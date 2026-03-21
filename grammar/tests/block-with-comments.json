@@ -1,0 +1,3 @@
+{
+  "input": "f(x) =>\n  // compute step 1\n  y = x + 1\n\n  // compute step 2\n  z = y * 2\n  z\n"
+}

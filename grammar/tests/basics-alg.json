@@ -1,0 +1,3 @@
+{
+  "input": "// Basic arithmetic\nx = 42\ny = 3 + 4 * 2\n\n// Functions\ndouble(n) => n * 2\nadd(a, b) => a + b\n\n// Lambda\nf = x => x + 1\ng = (a, b) => a + b\n\n// Conditional\nabs(n) => if n < 0 then 0 - n else n\n"
+}

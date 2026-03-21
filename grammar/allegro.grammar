@@ -1,0 +1,301 @@
+@whitespace /[ \t]+/
+@comment /\/\/[^\n]*/
+@block-indent
+
+@definitions
+  function makeInt(n) {
+    return { kind: 'Bits', length: 64, data: BigInt(n) };
+  }
+  function makeBits(length, data) {
+    return { kind: 'Bits', length, data: typeof data === 'number' ? BigInt(data) : data };
+  }
+  function stringToBits(s) {
+    const enc = new TextEncoder();
+    const bytes = enc.encode(s);
+    let data = 0n;
+    for (let i = bytes.length - 1; i >= 0; i--) {
+      data = (data << 8n) | BigInt(bytes[i]);
+    }
+    return makeBits(bytes.length * 8, data);
+  }
+  function makeParam(position, name) {
+    return { kind: 'Param', position, owner: null, _name: name };
+  }
+  function makeExpr(fn, args) {
+    return { kind: 'Expression', fn, args, memo: new Map() };
+  }
+  function makeComposedFn(params, body) {
+    const fn = { kind: 'ComposedFunction', params, body };
+    for (const p of params) p.owner = fn;
+    return fn;
+  }
+  function makeContext() {
+    return { kind: 'Context', bindings: new Map(), bindingList: [] };
+  }
+  function prim(name) {
+    return { kind: 'PrimitiveFunction', name, fn: null, lazy: name === 'eval_if' };
+  }
+  function cloneVal(v, seen) {
+    if (!v || typeof v !== 'object') return v;
+    if (seen.has(v)) return seen.get(v);
+    if (v.kind === 'Param') {
+      const c = makeParam(v.position, v._name);
+      seen.set(v, c);
+      return c;
+    }
+    if (v.kind === 'Expression') {
+      const c = makeExpr(cloneVal(v.fn, seen), v.args.map(a => cloneVal(a, seen)));
+      seen.set(v, c);
+      return c;
+    }
+    return v;
+  }
+  function collectParams(v, out, seen) {
+    if (!v || seen.has(v)) return;
+    seen.add(v);
+    if (v.kind === 'Param' && v.owner === null) out.push(v);
+    if (v.kind === 'Expression') {
+      collectParams(v.fn, out, seen);
+      for (const a of v.args) collectParams(a, out, seen);
+    }
+  }
+  function buildFn(paramNames, body) {
+    const cloned = cloneVal(body, new Map());
+    const paramValues = [];
+    collectParams(cloned, paramValues, new Set());
+    const matched = [];
+    const seenPos = new Set();
+    for (const p of paramValues) {
+      const idx = paramNames.indexOf(p._name);
+      if (idx >= 0) {
+        p.position = idx;
+        if (!seenPos.has(idx)) {
+          matched.push(p);
+          seenPos.add(idx);
+        }
+      }
+    }
+    matched.sort((a, b) => a.position - b.position);
+    return makeComposedFn(matched, cloned);
+  }
+  function substName(v, name, replacement) {
+    if (v.kind === 'Param' && v._name === name) return replacement;
+    if (v.kind === 'Expression') {
+      const nf = substName(v.fn, name, replacement);
+      const na = v.args.map(a => substName(a, name, replacement));
+      if (nf === v.fn && na.every((a, i) => a === v.args[i])) return v;
+      return makeExpr(nf, na);
+    }
+    if (v.kind === 'ComposedFunction') {
+      if (v.params.some(p => p._name === name)) return v;
+      const nb = substName(v.body, name, replacement);
+      if (nb === v.body) return v;
+      const nfn = { kind: 'ComposedFunction', params: v.params, body: nb };
+      for (const p of nfn.params) p.owner = nfn;
+      return nfn;
+    }
+    return v;
+  }
+  function bind(ctx, name, value) {
+    const b = { key: name, value, isUse: false };
+    ctx.bindings.set(name, b);
+    ctx.bindingList.push(b);
+  }
+  function extractString(text) {
+    const inner = text.slice(1, -1);
+    let result = '';
+    for (let i = 0; i < inner.length; i++) {
+      if (inner[i] === '\\' && i + 1 < inner.length) {
+        i++;
+        const c = inner[i];
+        result += c === 'n' ? '\n' : c === 't' ? '\t' : c === '\\' ? '\\' : c === '"' ? '"' : c;
+      } else {
+        result += inner[i];
+      }
+    }
+    return result;
+  }
+  function repChildren(repNode) {
+    return repNode.children.filter(
+      c => c.element !== repNode.element || c.children.length > 0
+    );
+  }
+  function buildFileCtx(repNode) {
+    const ctx = makeContext();
+    for (const child of repChildren(repNode)) {
+      const s = child.children[0];
+      if (s.binding) {
+        bind(ctx, s.binding.name, s.binding.value);
+      } else if (s.val !== undefined) {
+        ctx.bindingList.push({ key: null, value: s.val, isUse: false });
+      }
+    }
+    return ctx;
+  }
+  function buildBlock(repNode, lastExpr) {
+    let result = lastExpr;
+    for (const child of repChildren(repNode)) {
+      const b = child.children[0];
+      if (b.binding) {
+        result = substName(result, b.binding.name, b.binding.value);
+      }
+    }
+    return result;
+  }
+
+Int /[0-9]+/
+HexInt /0[xX][0-9a-fA-F]+/
+BinInt /0[bB][01]+/
+Str /"([^"\\]|\\.)*"/
+Ident /[a-zA-Z_][a-zA-Z0-9_]*/
+Eq /=(?![>=])/
+Arrow /=>/
+EqEq /==/
+BangEq /!=/
+LtEq /<=/
+GtEq />=/
+Lt /<(?!=)/
+Gt />(?!=)/
+
+File @target
+  StmtLine*
+    ctx = buildFileCtx($(0))
+
+StmtLine
+  Statement EndOfLine
+    binding = $(0).binding
+    val = $(0).val
+  Statement
+    binding = $(0).binding
+    val = $(0).val
+
+Statement
+  NamedFnDecl
+    binding = $(0).binding
+    val = undefined
+  Assignment
+    binding = $(0).binding
+    val = undefined
+  Expr
+    binding = null
+    val = $(0).val
+
+Assignment
+  Ident Eq Expr
+    binding = { name: $(0).text, value: $(2).val }
+
+NamedFnDecl
+  Ident '(' ParamList ')' Arrow FnBody
+    binding = { name: $(0).text, value: buildFn($(2).names, $(5).val) }
+
+ParamList
+  { Ident / ',' }
+    names = repChildren($(0)).map(c => c.text)
+
+Expr
+  LambdaExpr
+    val = $(0).val
+  CompareExpr
+    val = $(0).val
+
+LambdaExpr
+  Ident Arrow FnBody
+    val = buildFn([$(0).text], $(2).val)
+  '(' ParamList ')' Arrow FnBody
+    val = buildFn($(1).names, $(4).val)
+  '(' ')' Arrow FnBody
+    val = buildFn([], $(3).val)
+
+FnBody
+  EndOfLine Indent Block EndOfLine Unindent
+    val = $(2).val
+  Expr
+    val = $(0).val
+
+Block
+  BlockLine* Expr
+    val = buildBlock($(0), $(1).val)
+  Expr
+    val = $(0).val
+
+BlockLine
+  BlockBinding EndOfLine
+    binding = $(0).binding
+  BlockBinding
+    binding = $(0).binding
+
+BlockBinding
+  Assignment
+    binding = $(0).binding
+  NamedFnDecl
+    binding = $(0).binding
+
+CompareExpr
+  CompareExpr EqEq AddExpr
+    val = makeExpr(prim('bits_eq'), [$(0).val, $(2).val])
+  CompareExpr BangEq AddExpr
+    val = makeExpr(prim('bits_eq'), [makeExpr(prim('bits_eq'), [$(0).val, $(2).val]), makeInt(0)])
+  CompareExpr Lt AddExpr
+    val = makeExpr(prim('bits_lt'), [$(0).val, $(2).val])
+  CompareExpr Gt AddExpr
+    val = makeExpr(prim('bits_gt'), [$(0).val, $(2).val])
+  CompareExpr LtEq AddExpr
+    val = makeExpr(prim('bits_lte'), [$(0).val, $(2).val])
+  CompareExpr GtEq AddExpr
+    val = makeExpr(prim('bits_gte'), [$(0).val, $(2).val])
+  AddExpr
+    val = $(0).val
+
+AddExpr
+  AddExpr '+' MulExpr
+    val = makeExpr(prim('bits_add'), [$(0).val, $(2).val])
+  AddExpr '-' MulExpr
+    val = makeExpr(prim('bits_sub'), [$(0).val, $(2).val])
+  MulExpr
+    val = $(0).val
+
+MulExpr
+  MulExpr '*' UnaryExpr
+    val = makeExpr(prim('bits_mul'), [$(0).val, $(2).val])
+  MulExpr '/' UnaryExpr
+    val = makeExpr(prim('bits_div'), [$(0).val, $(2).val])
+  MulExpr '%' UnaryExpr
+    val = makeExpr(prim('bits_mod'), [$(0).val, $(2).val])
+  UnaryExpr
+    val = $(0).val
+
+UnaryExpr
+  '-' UnaryExpr
+    val = makeExpr(prim('bits_sub'), [makeInt(0), $(1).val])
+  CallExpr
+    val = $(0).val
+
+CallExpr
+  CallExpr '(' ArgList ')'
+    val = makeExpr($(0).val, $(2).vals)
+  Primary
+    val = $(0).val
+
+ArgList
+  { Expr / ',' }
+    vals = repChildren($(0)).map(c => c.val)
+
+Primary
+  IfExpr
+    val = $(0).val
+  HexInt
+    val = makeInt(parseInt($(0).text, 16))
+  BinInt
+    val = makeInt(parseInt($(0).text, 2))
+  Int
+    val = makeInt(parseInt($(0).text, 10))
+  Str
+    val = stringToBits(extractString($(0).text))
+  '(' Expr ')'
+    val = $(1).val
+  Ident
+    val = makeParam(-1, $(0).text)
+
+IfExpr
+  'if' Expr 'then' Expr 'else' Expr
+    val = makeExpr(prim('eval_if'), [$(1).val, makeComposedFn([], $(3).val), makeComposedFn([], $(5).val)])

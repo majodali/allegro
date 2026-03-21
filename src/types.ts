@@ -1,0 +1,191 @@
+// Allegro Base Language - Core Types
+// Five value kinds + Param placeholder
+
+export enum ValueKind {
+  Bits = "Bits",
+  PrimitiveFunction = "PrimitiveFunction",
+  ComposedFunction = "ComposedFunction",
+  Expression = "Expression",
+  Context = "Context",
+  MultiValue = "MultiValue",
+  Param = "Param",
+}
+
+// --- Bits: vector of bits with a known length ---
+
+export interface BitsValue {
+  kind: ValueKind.Bits;
+  length: number;
+  data: bigint;
+}
+
+// --- Primitive Function ---
+
+export type EvalFn = (value: Value, ctx: ContextValue) => Value;
+
+export type PrimitiveFnImpl = (
+  args: Value[],
+  ctx: ContextValue,
+  evalFn: EvalFn,
+) => Value;
+
+export interface PrimitiveFunctionValue {
+  kind: ValueKind.PrimitiveFunction;
+  name: string;
+  fn: PrimitiveFnImpl;
+  lazy?: boolean;
+}
+
+// --- Param: placeholder within expressions ---
+
+export interface ParamValue {
+  kind: ValueKind.Param;
+  position: number;
+  owner: ComposedFunctionValue | null;
+  _name?: string; // debugging / name resolution hint from parser
+}
+
+// --- Composed Function: expression body with declared params ---
+
+export interface ComposedFunctionValue {
+  kind: ValueKind.ComposedFunction;
+  params: ParamValue[];
+  body: Value;
+}
+
+// --- Expression: DAG node ---
+
+export interface ExpressionValue {
+  kind: ValueKind.Expression;
+  fn: Value;
+  args: Value[];
+  memo: Map<string, Value>;
+}
+
+// --- Context: evaluation context with bindings ---
+
+export interface Binding {
+  key: string | null;
+  value: Value | undefined;
+  isUse: boolean;
+}
+
+export interface ContextValue {
+  kind: ValueKind.Context;
+  bindings: Map<string, Binding>;
+  bindingList: Binding[];
+}
+
+// --- Multi-Value: primary + named components ---
+
+export interface MultiValueType {
+  kind: ValueKind.MultiValue;
+  primary: Value;
+  components: Map<string, Value>;
+}
+
+// --- Union type ---
+
+export type Value =
+  | BitsValue
+  | PrimitiveFunctionValue
+  | ComposedFunctionValue
+  | ExpressionValue
+  | ContextValue
+  | MultiValueType
+  | ParamValue;
+
+// --- Constructors ---
+
+export function makeBits(length: number, data: bigint | number): BitsValue {
+  return { kind: ValueKind.Bits, length, data: typeof data === "number" ? BigInt(data) : data };
+}
+
+export function makeInt(value: number): BitsValue {
+  return makeBits(64, BigInt(value));
+}
+
+export function makePrimitive(
+  name: string,
+  fn: PrimitiveFnImpl,
+  lazy?: boolean,
+): PrimitiveFunctionValue {
+  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy };
+}
+
+export function makeParam(position: number, name?: string): ParamValue {
+  return { kind: ValueKind.Param, position, owner: null, _name: name };
+}
+
+export function makeExpr(fn: Value, args: Value[]): ExpressionValue {
+  return { kind: ValueKind.Expression, fn, args, memo: new Map() };
+}
+
+export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunctionValue {
+  const fn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params, body };
+  for (const p of params) {
+    p.owner = fn;
+  }
+  return fn;
+}
+
+export function makeContext(): ContextValue {
+  return { kind: ValueKind.Context, bindings: new Map(), bindingList: [] };
+}
+
+export function makeMultiValue(primary: Value, components?: Map<string, Value>): MultiValueType {
+  return { kind: ValueKind.MultiValue, primary, components: components ?? new Map() };
+}
+
+// --- Utilities ---
+
+export function primaryOf(v: Value): Value {
+  return v.kind === ValueKind.MultiValue ? v.primary : v;
+}
+
+export function isResolved(v: Value): boolean {
+  switch (v.kind) {
+    case ValueKind.Bits:
+    case ValueKind.PrimitiveFunction:
+    case ValueKind.ComposedFunction:
+    case ValueKind.Context:
+      return true;
+    case ValueKind.Param:
+      return false;
+    case ValueKind.MultiValue:
+      return isResolved(v.primary);
+    case ValueKind.Expression:
+      return false;
+  }
+}
+
+// --- String/Bits conversion (UTF-8) ---
+
+export function stringToBits(s: string): BitsValue {
+  const bytes = new TextEncoder().encode(s);
+  let data = 0n;
+  for (let i = bytes.length - 1; i >= 0; i--) {
+    data = (data << 8n) | BigInt(bytes[i]);
+  }
+  return makeBits(bytes.length * 8, data);
+}
+
+export function bitsToString(b: BitsValue): string {
+  const byteLen = Math.ceil(b.length / 8);
+  const bytes = new Uint8Array(byteLen);
+  let data = b.data;
+  for (let i = 0; i < byteLen; i++) {
+    bytes[i] = Number(data & 0xFFn);
+    data >>= 8n;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+// --- Error class ---
+
+export class AllegroError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AllegroError";
+  }
+}
