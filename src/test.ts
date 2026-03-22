@@ -4,8 +4,9 @@
 // =============================================================================
 
 import { formatValue } from "./primitives.js";
-import { evalSource as runtimeEval } from "./runtime.js";
-import { Value, ValueKind } from "./types.js";
+import { evalSource as runtimeEval, Extension } from "./runtime.js";
+import { ModuleLoader } from "./modules.js";
+import { Value, ValueKind, BitsValue, AllegroError, makePrimitive, makeInt, primaryOf } from "./types.js";
 
 // --- Test infrastructure ---
 
@@ -319,12 +320,242 @@ test("persistent context: redefine binding", () => {
   eq(Number(v.data), 20);
 });
 
-// --- Results ---
+// == Anonymous Extensions ==
 
-console.log(`\n${"=".repeat(50)}`);
-console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
-if (failures.length > 0) {
-  console.log("\nFailures:");
-  for (const f of failures) console.log(`  ${f}`);
-  process.exit(1);
+// Build a math extension with abs, max, min
+const mathExtension: Extension = {
+  name: "math",
+  bindings: {
+    abs: makePrimitive("abs", (args) => {
+      const p = primaryOf(args[0]);
+      if (p.kind !== ValueKind.Bits) throw new AllegroError("abs: expected Bits");
+      const v = p.length === 64 && p.data >= 2n ** 63n ? p.data - 2n ** 64n : p.data;
+      return makeInt(Number(v < 0n ? -v : v));
+    }),
+    max: makePrimitive("max", (args) => {
+      const a = primaryOf(args[0]) as BitsValue;
+      const b = primaryOf(args[1]) as BitsValue;
+      const av = a.length === 64 && a.data >= 2n ** 63n ? a.data - 2n ** 64n : a.data;
+      const bv = b.length === 64 && b.data >= 2n ** 63n ? b.data - 2n ** 64n : b.data;
+      return av >= bv ? a : b;
+    }),
+    min: makePrimitive("min", (args) => {
+      const a = primaryOf(args[0]) as BitsValue;
+      const b = primaryOf(args[1]) as BitsValue;
+      const av = a.length === 64 && a.data >= 2n ** 63n ? a.data - 2n ** 64n : a.data;
+      const bv = b.length === 64 && b.data >= 2n ** 63n ? b.data - 2n ** 64n : b.data;
+      return av <= bv ? a : b;
+    }),
+  },
+};
+
+/** Evaluate with extensions and return numeric result. */
+function evalNumExt(source: string, extensions: Extension[]): number {
+  const result = runtimeEval(source + "\n", undefined, extensions);
+  const val = result.value;
+  if (val === null) throw new Error("No value produced");
+  const p = val.kind === ValueKind.MultiValue ? val.primary : val;
+  if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
+  if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
+  return Number(p.data);
 }
+
+test("extension: abs positive", () => {
+  eq(evalNumExt("abs(42)", [mathExtension]), 42);
+});
+
+test("extension: abs negative", () => {
+  eq(evalNumExt("abs(0 - 7)", [mathExtension]), 7);
+});
+
+test("extension: max", () => {
+  eq(evalNumExt("max(3, 9)", [mathExtension]), 9);
+});
+
+test("extension: min", () => {
+  eq(evalNumExt("min(3, 9)", [mathExtension]), 3);
+});
+
+test("extension: used in expressions", () => {
+  eq(evalNumExt("abs(0 - 5) + max(10, 20)", [mathExtension]), 25);
+});
+
+test("extension: used with user functions", () => {
+  eq(evalNumExt("clamp(x, lo, hi) => min(max(x, lo), hi)\nclamp(100, 0, 50)", [mathExtension]), 50);
+});
+
+test("extension: source can shadow extension binding", () => {
+  // User redefines abs — their version should win
+  eq(evalNumExt("abs(x) => x * 2\nabs(5)", [mathExtension]), 10);
+});
+
+test("extension: multiple extensions layer correctly", () => {
+  const ext1: Extension = {
+    name: "constants",
+    bindings: { pi: makeInt(3), tau: makeInt(6) },
+  };
+  const ext2: Extension = {
+    name: "overrides",
+    bindings: { pi: makeInt(4) }, // shadows ext1's pi
+  };
+  eq(evalNumExt("pi + tau", [ext1, ext2]), 10); // pi=4 from ext2, tau=6 from ext1
+});
+
+test("extension: not available without being provided", () => {
+  // abs is not a base primitive — should fail without the extension
+  throws(() => evalNum("abs(5)"));
+});
+
+// == Module Loader ==
+
+async function asyncTest(name: string, fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+    passed++;
+  } catch (e: any) {
+    failed++;
+    const msg = `FAIL: ${name} — ${e.message}`;
+    failures.push(msg);
+    console.log(msg);
+  }
+}
+
+async function asyncThrows(fn: () => Promise<any>, pattern?: string): Promise<void> {
+  try {
+    await fn();
+    throw new Error("Expected an error but none was thrown");
+  } catch (e: any) {
+    if (e.message === "Expected an error but none was thrown") throw e;
+    if (pattern && !e.message.includes(pattern)) {
+      throw new Error(`Expected error containing "${pattern}", got: ${e.message}`);
+    }
+  }
+}
+
+async function runModuleTests(): Promise<void> {
+  await asyncTest("module: load simple module", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "helpers" }],
+      resolve: (id) => id === "helpers" ? "/mock/helpers.alg" : null,
+      readFile: async () => "double(n) => n * 2\ntriple(n) => n * 3\n",
+    });
+    const exts = await loader.loadAll();
+    eq(exts.length, 1);
+    eq(exts[0].name, "helpers");
+    eq("double" in exts[0].bindings, true);
+    eq("triple" in exts[0].bindings, true);
+  });
+
+  await asyncTest("module: loaded functions work in evaluation", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "helpers" }],
+      resolve: (id) => id === "helpers" ? "/mock/helpers.alg" : null,
+      readFile: async () => "double(n) => n * 2\n",
+    });
+    const exts = await loader.loadAll();
+    eq(evalNumExt("double(21)", exts), 42);
+  });
+
+  await asyncTest("module: module with bindings and functions", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "constants" }],
+      resolve: (id) => id === "constants" ? "/mock/constants.alg" : null,
+      readFile: async () => "pi = 3\ntau = pi * 2\n",
+    });
+    const exts = await loader.loadAll();
+    eq(evalNumExt("pi + tau", exts), 9); // pi=3, tau=6
+  });
+
+  await asyncTest("module: transitive dependencies", async () => {
+    const loader = new ModuleLoader({
+      modules: [
+        { id: "base" },
+        { id: "derived", deps: ["base"] },
+      ],
+      resolve: (id) => `/mock/${id}.alg`,
+      readFile: async (path) => {
+        if (path === "/mock/base.alg") return "double(n) => n * 2\n";
+        if (path === "/mock/derived.alg") return "quadruple(n) => double(double(n))\n";
+        throw new Error("not found: " + path);
+      },
+    });
+    const exts = await loader.loadAll();
+    eq(evalNumExt("quadruple(5)", exts), 20);
+  });
+
+  await asyncTest("module: circular dependency detected", async () => {
+    const loader = new ModuleLoader({
+      modules: [
+        { id: "a", deps: ["b"] },
+        { id: "b", deps: ["a"] },
+      ],
+      resolve: (id) => `/mock/${id}.alg`,
+      readFile: async () => "x = 1\n",
+    });
+    await asyncThrows(() => loader.loadAll(), "Circular dependency");
+  });
+
+  await asyncTest("module: caching prevents re-reads", async () => {
+    let readCount = 0;
+    const loader = new ModuleLoader({
+      modules: [
+        { id: "shared" },
+        { id: "a", deps: ["shared"] },
+        { id: "b", deps: ["shared"] },
+      ],
+      resolve: (id) => `/mock/${id}.alg`,
+      readFile: async (path) => {
+        if (path === "/mock/shared.alg") {
+          readCount++;
+          return "x = 42\n";
+        }
+        return "y = x + 1\n";
+      },
+    });
+    await loader.loadAll();
+    eq(readCount, 1, "shared module should only be read once");
+  });
+
+  await asyncTest("module: unknown module ID", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "nonexistent" }],
+      resolve: () => null,
+      readFile: async () => "",
+    });
+    await asyncThrows(() => loader.loadAll(), "could not resolve");
+  });
+
+  await asyncTest("module: empty module produces empty extension", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "empty" }],
+      resolve: (id) => `/mock/${id}.alg`,
+      readFile: async () => "// just a comment\n",
+    });
+    const exts = await loader.loadAll();
+    eq(exts.length, 1);
+    eq(Object.keys(exts[0].bindings).length, 0);
+  });
+
+  await asyncTest("module: recursive function in module", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "math" }],
+      resolve: (id) => `/mock/${id}.alg`,
+      readFile: async () =>
+        "factorial(n) => if n == 0 then 1 else n * factorial(n - 1)\n",
+    });
+    const exts = await loader.loadAll();
+    eq(evalNumExt("factorial(5)", exts), 120);
+  });
+}
+
+// --- Run all tests (sync + async) and report ---
+
+runModuleTests().then(() => {
+  console.log(`\n${"=".repeat(50)}`);
+  console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
+  if (failures.length > 0) {
+    console.log("\nFailures:");
+    for (const f of failures) console.log(`  ${f}`);
+    process.exit(1);
+  }
+});

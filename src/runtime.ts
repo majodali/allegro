@@ -6,7 +6,23 @@
 import { parse } from "./parser.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, makeContext } from "./types.js";
+import { Value, ValueKind, ContextValue, PrimitiveFunctionValue, makeContext } from "./types.js";
+
+/**
+ * An anonymous extension: a set of named bindings injected into the
+ * evaluation context by the execution environment. Extensions are layered
+ * between primitives (bottom) and source bindings (top).
+ *
+ * Values can be any Allegro value — primitives, composed functions, bits, etc.
+ * An extension whose values are not fully resolved (e.g. contain Params or
+ * Expressions) supports partial evaluation: earlier build phases can
+ * type-check and optimize against the extension's interface without
+ * requiring the final runtime implementation.
+ */
+export interface Extension {
+  name: string;
+  bindings: Record<string, Value>;
+}
 
 /**
  * The parser creates stub PrimitiveFunctionValues with fn: null.
@@ -45,43 +61,59 @@ export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
 
 /**
  * Build an evaluation context from a parser file context.
- * Resolves stub primitives and binds all primitives into scope.
- * Optionally merges bindings from a pre-existing context (for REPL persistence).
+ *
+ * Context layers (bottom to top, later layers shadow earlier ones):
+ *   1. Primitives — base language built-ins
+ *   2. Extensions — anonymous extensions from the execution context
+ *   3. Base context — REPL persistence / pre-existing bindings
+ *   4. Source bindings — parsed from the current source file
  */
-export function buildEvalCtx(fileCtx: any, base?: ContextValue): ContextValue {
+export function buildEvalCtx(
+  fileCtx: any,
+  base?: ContextValue,
+  extensions?: Extension[],
+): ContextValue {
   const evalCtx = makeContext();
 
-  // Copy bindings from base context (REPL persistence)
-  if (base) {
-    for (const [key, binding] of base.bindings) {
-      const copy = { ...binding };
-      evalCtx.bindings.set(key, copy);
-      evalCtx.bindingList.push(copy);
+  function addBinding(key: string, value: Value, isUse: boolean = false): void {
+    const binding = { key, value, isUse };
+    const existingIdx = evalCtx.bindingList.findIndex(x => x.key === key);
+    if (existingIdx >= 0) {
+      evalCtx.bindingList[existingIdx] = binding;
+    } else {
+      evalCtx.bindingList.push(binding);
     }
+    evalCtx.bindings.set(key, binding);
   }
 
-  // Add named bindings from parsed file (overwrite if redefined)
-  for (const b of fileCtx.bindingList) {
-    if (b.key !== null && b.value !== undefined) {
-      const resolved = resolvePrimitives(b.value);
-      const binding = { key: b.key, value: resolved, isUse: false };
-      evalCtx.bindings.set(b.key, binding);
-      // Replace in bindingList if already present from base, otherwise push
-      const existingIdx = evalCtx.bindingList.findIndex(x => x.key === b.key);
-      if (existingIdx >= 0) {
-        evalCtx.bindingList[existingIdx] = binding;
-      } else {
-        evalCtx.bindingList.push(binding);
+  // Layer 1: Primitives
+  for (const [name, prim] of Object.entries(primitives)) {
+    addBinding(name, prim as Value);
+  }
+
+  // Layer 2: Extensions (applied in order, later extensions shadow earlier ones)
+  if (extensions) {
+    for (const ext of extensions) {
+      for (const [name, value] of Object.entries(ext.bindings)) {
+        addBinding(name, value);
       }
     }
   }
 
-  // Bind all primitives into context (if not already bound)
-  for (const [name, prim] of Object.entries(primitives)) {
-    if (!evalCtx.bindings.has(name)) {
-      const binding = { key: name, value: prim as Value, isUse: false };
-      evalCtx.bindings.set(name, binding);
-      evalCtx.bindingList.push(binding);
+  // Layer 3: Base context (REPL persistence)
+  if (base) {
+    for (const [key, binding] of base.bindings) {
+      // Skip primitives and extension bindings that were already added
+      // Only bring forward user-defined bindings from previous REPL inputs
+      addBinding(key, binding.value!, binding.isUse);
+    }
+  }
+
+  // Layer 4: Source bindings (overwrite anything below)
+  for (const b of fileCtx.bindingList) {
+    if (b.key !== null && b.value !== undefined) {
+      const resolved = resolvePrimitives(b.value);
+      addBinding(b.key, resolved);
     }
   }
 
@@ -92,12 +124,18 @@ export function buildEvalCtx(fileCtx: any, base?: ContextValue): ContextValue {
  * Parse and evaluate Allegro source code.
  * Returns { value, evalCtx } where value is the last bare expression's result
  * and evalCtx is the final context (useful for REPL persistence).
+ *
+ * @param source    — Allegro source code
+ * @param base      — pre-existing context (REPL persistence)
+ * @param extensions — anonymous extensions from the execution context
  */
 export function evalSource(
   source: string,
   base?: ContextValue,
+  extensions?: Extension[],
 ): { value: Value | null; evalCtx: ContextValue } {
-  const result = parse(source);
+  // Normalize line endings — the parser expects \n only
+  const result = parse(source.replace(/\r\n/g, "\n"));
 
   if (result.errors.length > 0) {
     throw new Error(`Parse error: ${result.errors[0].message}`);
@@ -108,7 +146,7 @@ export function evalSource(
     return { value: null, evalCtx: base ?? makeContext() };
   }
 
-  const evalCtx = buildEvalCtx(fileCtx, base);
+  const evalCtx = buildEvalCtx(fileCtx, base, extensions);
 
   let lastValue: Value | null = null;
   for (const b of fileCtx.bindingList) {
