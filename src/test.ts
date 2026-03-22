@@ -4,9 +4,10 @@
 // =============================================================================
 
 import { formatValue } from "./primitives.js";
-import { evalSource as runtimeEval, Extension } from "./runtime.js";
+import { evalSource as runtimeEval, Extension, extensionToContext } from "./runtime.js";
 import { ModuleLoader } from "./modules.js";
-import { Value, ValueKind, BitsValue, AllegroError, makePrimitive, makeInt, primaryOf } from "./types.js";
+import { buildStandardExtensions, GrammarExtension } from "./grammar-ext.js";
+import { Value, ValueKind, BitsValue, AllegroError, makePrimitive, makeInt, makeContext, primaryOf } from "./types.js";
 
 // --- Test infrastructure ---
 
@@ -547,6 +548,99 @@ async function runModuleTests(): Promise<void> {
     eq(evalNumExt("factorial(5)", exts), 120);
   });
 }
+
+// == Grammar Extensions ==
+
+const stdGrammarExt = buildStandardExtensions();
+
+/** Helper: build a Context value with named bindings */
+function makeCtxWith(bindings: Record<string, Value>): Value {
+  const ctx = makeContext();
+  for (const [name, value] of Object.entries(bindings)) {
+    ctx.bindings.set(name, { key: name, value, isUse: false });
+    ctx.bindingList.push({ key: name, value, isUse: false });
+  }
+  return ctx;
+}
+
+/** Evaluate with grammar extensions and return numeric result */
+function evalNumGrammar(
+  source: string,
+  extensions: Extension[],
+  grammarExt: GrammarExtension,
+): number {
+  const result = runtimeEval(source + "\n", undefined, extensions, grammarExt);
+  const val = result.value;
+  if (val === null) throw new Error("No value produced");
+  const p = val.kind === ValueKind.MultiValue ? val.primary : val;
+  if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
+  if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
+  return Number(p.data);
+}
+
+test("grammar ext: base syntax still works with extensions active", () => {
+  eq(evalNumGrammar("3 + 4 * 2", [], stdGrammarExt), 11);
+});
+
+test("grammar ext: dot access resolves from context", () => {
+  const mathCtx = makeCtxWith({ pi: makeInt(3) });
+  const ext: Extension = { name: "test", bindings: { math: mathCtx } };
+  eq(evalNumGrammar("math.pi", [ext], stdGrammarExt), 3);
+});
+
+test("grammar ext: dot access chained", () => {
+  const inner = makeCtxWith({ x: makeInt(42) });
+  const outer = makeCtxWith({ inner: inner });
+  const ext: Extension = { name: "test", bindings: { outer: outer } };
+  eq(evalNumGrammar("outer.inner.x", [ext], stdGrammarExt), 42);
+});
+
+test("grammar ext: dot access with function call", () => {
+  // Build a module context with a 'double' function
+  const mathCtx = makeCtxWith({ double: makePrimitive("double", (args) => {
+    const p = primaryOf(args[0]);
+    if (p.kind !== ValueKind.Bits) throw new AllegroError("double: expected Bits");
+    return makeInt(Number(p.data) * 2);
+  }) });
+  const ext: Extension = { name: "test", bindings: { math: mathCtx } };
+  eq(evalNumGrammar("math.double(21)", [ext], stdGrammarExt), 42);
+});
+
+test("grammar ext: dot access in arithmetic", () => {
+  const mathCtx = makeCtxWith({ pi: makeInt(3), e: makeInt(2) });
+  const ext: Extension = { name: "test", bindings: { math: mathCtx } };
+  eq(evalNumGrammar("math.pi + math.e", [ext], stdGrammarExt), 5);
+});
+
+test("grammar ext: import statement with extension binding", () => {
+  const ext: Extension = { name: "test", bindings: { foo: makeInt(42) } };
+  eq(evalNumGrammar("import foo\nfoo", [ext], stdGrammarExt), 42);
+});
+
+test("grammar ext: import + dot access", () => {
+  const mathCtx = makeCtxWith({ pi: makeInt(3) });
+  const ext: Extension = { name: "test", bindings: { math: mathCtx } };
+  eq(evalNumGrammar("import math\nmath.pi", [ext], stdGrammarExt), 3);
+});
+
+test("grammar ext: import doesn't shadow extension binding", () => {
+  // import creates binding with value: undefined, which buildEvalCtx skips
+  // so the extension-provided value should still be available
+  const ext: Extension = { name: "test", bindings: { x: makeInt(99) } };
+  eq(evalNumGrammar("import x\nx", [ext], stdGrammarExt), 99);
+});
+
+test("grammar ext: extensionToContext wraps bindings", () => {
+  const ext: Extension = { name: "math", bindings: { pi: makeInt(3), tau: makeInt(6) } };
+  const ctx = extensionToContext(ext);
+  eq(ctx.kind, ValueKind.Context);
+  eq(ctx.bindings.size, 2);
+  const pi = ctx.bindings.get("pi");
+  eq(pi !== undefined, true);
+  if (pi?.value?.kind === ValueKind.Bits) {
+    eq(Number(pi.value.data), 3);
+  }
+});
 
 // --- Run all tests (sync + async) and report ---
 

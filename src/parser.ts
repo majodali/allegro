@@ -344,11 +344,13 @@ class EarleyParser {
   private reconstructionCache: Map<string, SyntaxTreeNode | null> = new Map();
   private vtConsumed: Map<string, number> = new Map();
   private vtConsumedAtChartPos: Set<string> = new Set();
+  private additionalAlternatives: Map<GrammarElement, GrammarElement[]>;
 
-  constructor(grammar: Grammar, input: string, target: GrammarElement) {
+  constructor(grammar: Grammar, input: string, target: GrammarElement, additionalAlternatives?: Map<GrammarElement, GrammarElement[]>) {
     this.grammar = grammar;
     this.input = input;
     this.target = target;
+    this.additionalAlternatives = additionalAlternatives ?? new Map();
     this.blockIndent = grammar.options.blockIndent ?? false;
     this.compileWhitespace();
     if (this.blockIndent) {
@@ -460,6 +462,14 @@ class EarleyParser {
         const alt = element.alternatives[i];
         this.addRule({ element, symbols: [alt], altIndex: i });
         this.compileElement(alt, visited);
+      }
+      // Check for grammar extensions (additional alternatives without mutating base)
+      const extras = this.additionalAlternatives.get(element);
+      if (extras) {
+        for (let j = 0; j < extras.length; j++) {
+          this.addRule({ element, symbols: [extras[j]], altIndex: element.alternatives.length + j });
+          this.compileElement(extras[j], visited);
+        }
       }
     } else if (element instanceof Repetition) {
       this.compileRepetition(element, visited);
@@ -1027,6 +1037,14 @@ function __parse(grammar: Grammar, input: string): ParseResult {
   return new EarleyParser(grammar, input, target).parse();
 }
 
+function __parseExtended(grammar: Grammar, input: string, extensions: Map<GrammarElement, GrammarElement[]>): ParseResult {
+  const target = grammar.target;
+  if (!target) {
+    throw new Error('No target element specified.');
+  }
+  return new EarleyParser(grammar, input, target, extensions).parse();
+}
+
 
 // ─── Grammar Definitions ────────────────────────────────────────────────────
 
@@ -1407,3 +1425,28 @@ __grammar.target = __el_0;
 export function parse(input: string): ParseResult {
   return __parse(__grammar, input);
 }
+
+export function parseWithExtensions(input: string, extensions: Map<any, any[]>): ParseResult {
+  return __parseExtended(__grammar, input, extensions);
+}
+
+// Grammar element classes and types (for building extensions)
+export { Grammar, GrammarElement, Terminal, Phrase, Disjunction, SyntaxTreeNode };
+export type { ParseResult };
+
+// Base grammar instance (immutable — extensions create new alternatives, not modify this)
+export { __grammar as baseGrammar };
+
+// Parser helpers for building attribute functions in grammar extensions
+export {
+  makeExpr as parserMakeExpr,
+  makeParam as parserMakeParam,
+  makeInt as parserMakeInt,
+  makeComposedFn as parserMakeComposedFn,
+  prim as parserPrim,
+  buildFn as parserBuildFn,
+  substName as parserSubstName,
+  stringToBits as parserStringToBits,
+  makeContext as parserMakeContext,
+  bind as parserBind,
+};

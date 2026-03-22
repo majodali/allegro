@@ -4,9 +4,10 @@
 // =============================================================================
 
 import { parse } from "./parser.js";
+import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, PrimitiveFunctionValue, makeContext } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, PrimitiveFunctionValue, makeContext } from "./types.js";
 
 /**
  * An anonymous extension: a set of named bindings injected into the
@@ -121,21 +122,40 @@ export function buildEvalCtx(
 }
 
 /**
+ * Wrap an Extension's bindings as a Context value.
+ * Useful for making module exports accessible via dot access (ctx_resolve).
+ */
+export function extensionToContext(ext: Extension): ContextValue {
+  const ctx = makeContext();
+  for (const [name, value] of Object.entries(ext.bindings)) {
+    const binding: Binding = { key: name, value, isUse: false };
+    ctx.bindings.set(name, binding);
+    ctx.bindingList.push(binding);
+  }
+  return ctx;
+}
+
+/**
  * Parse and evaluate Allegro source code.
  * Returns { value, evalCtx } where value is the last bare expression's result
  * and evalCtx is the final context (useful for REPL persistence).
  *
- * @param source    — Allegro source code
- * @param base      — pre-existing context (REPL persistence)
- * @param extensions — anonymous extensions from the execution context
+ * @param source           — Allegro source code
+ * @param base             — pre-existing context (REPL persistence)
+ * @param extensions       — anonymous extensions from the execution context
+ * @param grammarExtension — grammar extensions (additional syntax)
  */
 export function evalSource(
   source: string,
   base?: ContextValue,
   extensions?: Extension[],
+  grammarExtension?: GrammarExtension,
 ): { value: Value | null; evalCtx: ContextValue } {
   // Normalize line endings — the parser expects \n only
-  const result = parse(source.replace(/\r\n/g, "\n"));
+  const normalized = source.replace(/\r\n/g, "\n");
+  const result = grammarExtension
+    ? parseExtended(normalized, grammarExtension)
+    : parse(normalized);
 
   if (result.errors.length > 0) {
     throw new Error(`Parse error: ${result.errors[0].message}`);
