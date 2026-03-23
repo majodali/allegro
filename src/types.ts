@@ -105,6 +105,21 @@ export function makeInt(value: number): BitsValue {
   return makeBits(64, BigInt(value));
 }
 
+export function makeFloat(value: number): BitsValue {
+  const buf = new ArrayBuffer(8);
+  new DataView(buf).setFloat64(0, value, true); // little-endian
+  const lo = BigInt(new Uint32Array(buf)[0]);
+  const hi = BigInt(new Uint32Array(buf)[1]);
+  return makeBits(64, (hi << 32n) | lo);
+}
+
+export function bitsToFloat(v: BitsValue): number {
+  const buf = new ArrayBuffer(8);
+  new Uint32Array(buf)[0] = Number(v.data & 0xFFFFFFFFn);
+  new Uint32Array(buf)[1] = Number((v.data >> 32n) & 0xFFFFFFFFn);
+  return new DataView(buf).getFloat64(0, true);
+}
+
 export function makePrimitive(
   name: string,
   fn: PrimitiveFnImpl,
@@ -179,6 +194,13 @@ export function bitsToString(b: BitsValue): string {
     data >>= 8n;
   }
   return new TextDecoder().decode(bytes);
+}
+
+// --- Extension interface (here to avoid circular deps) ---
+
+export interface Extension {
+  name: string;
+  bindings: Record<string, Value>;
 }
 
 // --- Error class ---

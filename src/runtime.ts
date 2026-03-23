@@ -7,22 +7,52 @@ import { parse } from "./parser.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, PrimitiveFunctionValue, makeContext } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, Extension } from "./types.js";
+import { withType, IntType, StringType } from "./types-std.js";
+
+// Re-export Extension for backward compatibility
+export type { Extension };
 
 /**
- * An anonymous extension: a set of named bindings injected into the
- * evaluation context by the execution environment. Extensions are layered
- * between primitives (bottom) and source bindings (top).
- *
- * Values can be any Allegro value — primitives, composed functions, bits, etc.
- * An extension whose values are not fully resolved (e.g. contain Params or
- * Expressions) supports partial evaluation: earlier build phases can
- * type-check and optimize against the extension's interface without
- * requiring the final runtime implementation.
+ * Walk an expression tree and wrap literal Bits values with type information.
+ * Int literals (64-bit) become MultiValue with Int type.
+ * String literals (non-64-bit, from stringToBits) become MultiValue with String type.
+ * Used when standard type system is active.
  */
-export interface Extension {
-  name: string;
-  bindings: Record<string, Value>;
+function typeLiterals(v: Value, seen?: Set<Value>): Value {
+  if (!seen) seen = new Set();
+  if (seen.has(v)) return v;
+  seen.add(v);
+
+  switch (v.kind) {
+    case ValueKind.Bits:
+      // 64-bit = Int literal, other lengths = String literal (from stringToBits)
+      if (v.length === 64) return withType(v, IntType);
+      if (v.length > 0) return withType(v, StringType);
+      return v;
+    case ValueKind.Expression: {
+      const newFn = typeLiterals(v.fn, seen);
+      const newArgs = v.args.map(a => typeLiterals(a, seen));
+      if (newFn === v.fn && newArgs.every((a, i) => a === v.args[i])) return v;
+      return makeExpr(newFn, newArgs);
+    }
+    case ValueKind.ComposedFunction: {
+      const newBody = typeLiterals(v.body, seen);
+      if (newBody === v.body) return v;
+      // Create new ComposedFunction with typed body but same params
+      const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: v.params, body: newBody };
+      // Re-bind params to new function
+      for (const p of newFn.params) p.owner = newFn;
+      return newFn;
+    }
+    case ValueKind.MultiValue: {
+      const newPrimary = typeLiterals(v.primary, seen);
+      if (newPrimary === v.primary) return v;
+      return makeMultiValue(newPrimary, new Map(v.components));
+    }
+    default:
+      return v;
+  }
 }
 
 /**
@@ -144,12 +174,14 @@ export function extensionToContext(ext: Extension): ContextValue {
  * @param base             — pre-existing context (REPL persistence)
  * @param extensions       — anonymous extensions from the execution context
  * @param grammarExtension — grammar extensions (additional syntax)
+ * @param typed            — if true, wrap literals with type info (Allegro Standard)
  */
 export function evalSource(
   source: string,
   base?: ContextValue,
   extensions?: Extension[],
   grammarExtension?: GrammarExtension,
+  typed?: boolean,
 ): { value: Value | null; evalCtx: ContextValue } {
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
@@ -164,6 +196,15 @@ export function evalSource(
   const fileCtx = (result.tree as any).ctx;
   if (!fileCtx) {
     return { value: null, evalCtx: base ?? makeContext() };
+  }
+
+  // Type literals if standard type system is active
+  if (typed) {
+    for (const b of fileCtx.bindingList) {
+      if (b.value !== undefined) {
+        b.value = typeLiterals(b.value);
+      }
+    }
   }
 
   const evalCtx = buildEvalCtx(fileCtx, base, extensions);

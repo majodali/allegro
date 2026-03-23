@@ -11,6 +11,20 @@ import {
 // --- Value formatting ---
 
 export function formatValue(v: Value): string {
+  // Check for typed values (MultiValue with "type" component)
+  if (v.kind === ValueKind.MultiValue) {
+    const typeComp = v.components.get("type");
+    if (typeComp && typeComp.kind === ValueKind.Context) {
+      const nameBinding = typeComp.bindings.get("__name");
+      if (nameBinding?.value && nameBinding.value.kind === ValueKind.Bits) {
+        const typeName = bitsToString(nameBinding.value);
+        if (typeName === "String") {
+          return bitsToString(v.primary as BitsValue);
+        }
+        // Int, Float, Bool — display the primary
+      }
+    }
+  }
   const p = primaryOf(v);
   switch (p.kind) {
     case ValueKind.Bits: {
@@ -357,6 +371,165 @@ const id_impl: PrimitiveFnImpl = (args) => {
   return makeExpr(id_prim, args);
 };
 
+// ============ GRAMMAR EXTENSION ============
+
+import {
+  GrammarBuilder, addDotAccess, addImport,
+  registryStore, registryGet,
+} from "./grammar-ext.js";
+
+const grammar_builder_impl: PrimitiveFnImpl = () => {
+  const builder = new GrammarBuilder();
+  return makeInt(registryStore(builder));
+};
+
+const grammar_add_dot_access_impl: PrimitiveFnImpl = (args) => {
+  const handle = Number(asBits(args[0], "grammar_add_dot_access").data);
+  const builder = registryGet(handle) as GrammarBuilder;
+  addDotAccess(builder);
+  return args[0]; // return same handle
+};
+
+const grammar_add_import_impl: PrimitiveFnImpl = (args) => {
+  const handle = Number(asBits(args[0], "grammar_add_import").data);
+  const builder = registryGet(handle) as GrammarBuilder;
+  addImport(builder);
+  return args[0]; // return same handle
+};
+
+const grammar_build_impl: PrimitiveFnImpl = (args) => {
+  const handle = Number(asBits(args[0], "grammar_build").data);
+  const builder = registryGet(handle) as GrammarBuilder;
+  const ext = builder.build();
+  return makeInt(registryStore(ext));
+};
+
+// ============ TYPE SYSTEM ============
+
+import {
+  getType, getTypeName, withType, typeMethod,
+  IntType, StringType,
+} from "./types-std.js";
+import { isResolved } from "./types.js";
+
+// --- typed_int / typed_string: wrap raw values with type ---
+
+const typed_int_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) return makeExpr(makePrimitive("typed_int", typed_int_impl, true), [v]);
+  return withType(v, IntType);
+};
+
+const typed_string_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) return makeExpr(makePrimitive("typed_string", typed_string_impl, true), [v]);
+  return withType(v, StringType);
+};
+
+// --- type_dispatch: type-directed dot access ---
+
+const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const obj = evalFn!(args[0], ctx!);
+  const fieldArg = evalFn!(args[1], ctx!);
+  if (!isResolved(obj) || !isResolved(fieldArg)) {
+    return makeExpr(makePrimitive("type_dispatch", type_dispatch_impl, true), [obj, fieldArg]);
+  }
+  const fieldName = bitsToString(asBits(fieldArg, "type_dispatch"));
+  const type = getType(obj);
+
+  if (type) {
+    const method = typeMethod(type, fieldName);
+    if (method) {
+      if (method.kind === ValueKind.PrimitiveFunction) {
+        const selfVal = primaryOf(obj);
+        // Check if this is a property getter (marked with __getter flag)
+        if ((method as any).__getter) {
+          // Call immediately with self
+          return method.fn([selfVal], undefined as any, undefined as any);
+        }
+        // Return a bound method: partially apply self as first arg
+        const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+          return method.fn([selfVal, ...callArgs], callCtx, callEvalFn);
+        };
+        return makePrimitive(`bound:${fieldName}`, boundFn);
+      }
+      return method;
+    }
+  }
+
+  // Fall back to ctx_resolve for untyped Contexts
+  const p = primaryOf(obj);
+  if (p.kind === ValueKind.Context) {
+    const b = p.bindings.get(fieldName);
+    if (!b) throw new AllegroError(`type_dispatch: '${fieldName}' not found`);
+    if (b.value === undefined) throw new AllegroError(`type_dispatch: '${fieldName}' is unbound`);
+    return b.value;
+  }
+
+  const typeName = getTypeName(obj) ?? p.kind;
+  throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
+};
+
+// --- type_of / type_check ---
+
+const type_of_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) return makeExpr(makePrimitive("type_of", type_of_impl, true), [v]);
+  const t = getType(v);
+  if (!t) throw new AllegroError("type_of: value has no type");
+  return t;
+};
+
+const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  const expectedType = evalFn!(args[1], ctx!);
+  if (!isResolved(v) || !isResolved(expectedType)) {
+    return makeExpr(makePrimitive("type_check", type_check_impl, true), [v, expectedType]);
+  }
+  const actualType = getType(v);
+  if (!actualType) throw new AllegroError("type_check: value has no type");
+  const actualName = getTypeName(v);
+  const expectedCtx = asCtx(expectedType, "type_check");
+  const expectedNameBinding = expectedCtx.bindings.get("__name");
+  if (!expectedNameBinding?.value) throw new AllegroError("type_check: expected type has no __name");
+  const expectedName = bitsToString(asBits(expectedNameBinding.value, "type_check"));
+  if (actualName !== expectedName) {
+    throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
+  }
+  return v;
+};
+
+// --- Typed binary operator helper ---
+
+function makeTypedBinOp(opName: string): PrimitiveFnImpl {
+  return (args, ctx, evalFn) => {
+    const left = evalFn!(args[0], ctx!);
+    const right = evalFn!(args[1], ctx!);
+    if (!isResolved(left) || !isResolved(right)) {
+      return makeExpr(makePrimitive(`typed_${opName}`, makeTypedBinOp(opName), true), [left, right]);
+    }
+    const leftType = getType(left);
+    if (!leftType) {
+      throw new AllegroError(`typed_${opName}: left operand has no type`);
+    }
+    const method = typeMethod(leftType, opName);
+    if (!method) {
+      const typeName = getTypeName(left) ?? "unknown";
+      throw new AllegroError(`typed_${opName}: type ${typeName} has no '${opName}' method`);
+    }
+    if (method.kind !== ValueKind.PrimitiveFunction) {
+      throw new AllegroError(`typed_${opName}: method is not a primitive function`);
+    }
+    // Call method with primaries (methods operate on raw values)
+    const result = method.fn([primaryOf(left), primaryOf(right)], ctx, evalFn);
+    // Re-wrap result with left operand's type (for arithmetic) or no type (for comparisons)
+    if (opName === "eq" || opName === "neq" || opName === "lt" || opName === "gt" || opName === "lte" || opName === "gte") {
+      return withType(result, IntType); // comparisons return Int (0 or 1)
+    }
+    return withType(result, leftType);
+  };
+}
+
 // ============ Build primitive values ============
 
 const id_prim = makePrimitive("id", id_impl);
@@ -406,4 +579,25 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   eval_if: eval_if_value,
   id: id_prim,
   print: makePrimitive("print", print_impl),
+  grammar_builder: makePrimitive("grammar_builder", grammar_builder_impl),
+  grammar_add_dot_access: makePrimitive("grammar_add_dot_access", grammar_add_dot_access_impl),
+  grammar_add_import: makePrimitive("grammar_add_import", grammar_add_import_impl),
+  grammar_build: makePrimitive("grammar_build", grammar_build_impl),
+  // Type system
+  typed_int: makePrimitive("typed_int", typed_int_impl, true),
+  typed_string: makePrimitive("typed_string", typed_string_impl, true),
+  type_dispatch: makePrimitive("type_dispatch", type_dispatch_impl, true),
+  type_of: makePrimitive("type_of", type_of_impl, true),
+  type_check: makePrimitive("type_check", type_check_impl, true),
+  typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
+  typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
+  typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),
+  typed_div: makePrimitive("typed_div", makeTypedBinOp("div"), true),
+  typed_mod: makePrimitive("typed_mod", makeTypedBinOp("mod"), true),
+  typed_eq: makePrimitive("typed_eq", makeTypedBinOp("eq"), true),
+  typed_neq: makePrimitive("typed_neq", makeTypedBinOp("neq"), true),
+  typed_lt: makePrimitive("typed_lt", makeTypedBinOp("lt"), true),
+  typed_gt: makePrimitive("typed_gt", makeTypedBinOp("gt"), true),
+  typed_lte: makePrimitive("typed_lte", makeTypedBinOp("lte"), true),
+  typed_gte: makePrimitive("typed_gte", makeTypedBinOp("gte"), true),
 };

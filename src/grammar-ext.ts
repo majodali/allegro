@@ -100,17 +100,19 @@ export function parseExtended(input: string, extension: GrammarExtension): Parse
 
 /**
  * Add dot access syntax: CallExpr → CallExpr "." Ident
- * Produces: ctx_resolve(left, "fieldName")
+ * Produces: ctx_resolve(left, "fieldName") in base mode,
+ * or type_dispatch(left, "fieldName") in typed mode.
  */
-export function addDotAccess(builder: GrammarBuilder): void {
+export function addDotAccess(builder: GrammarBuilder, typed: boolean = false): void {
   const dot = builder.terminal(".");
   const callExpr = builder.getBase("CallExpr");
   const ident = builder.getBase("Ident");
 
   const dotPhrase = builder.phrase([callExpr, dot, ident]);
+  const primName = typed ? "type_dispatch" : "ctx_resolve";
   (dotPhrase as any).attribute("val", Object, function (node: any) {
     return helpers.makeExpr(
-      helpers.prim("ctx_resolve"),
+      helpers.prim(primName),
       [node.children[0].val, helpers.stringToBits(node.children[2].text)],
     );
   });
@@ -151,10 +153,41 @@ export function addImport(builder: GrammarBuilder): void {
 
 /**
  * Build the standard grammar extensions (dot access + import).
+ * Uses ctx_resolve for dot access (base mode).
  */
 export function buildStandardExtensions(): GrammarExtension {
   const builder = new GrammarBuilder();
   addDotAccess(builder);
   addImport(builder);
   return builder.build();
+}
+
+/**
+ * Build Allegro Standard grammar extensions.
+ * Uses type_dispatch for dot access (type-directed dispatch).
+ */
+export function buildAllegroStandardExtensions(): GrammarExtension {
+  const builder = new GrammarBuilder();
+  addDotAccess(builder, true); // type-directed dispatch
+  addImport(builder);
+  return builder.build();
+}
+
+// --- Handle Registry ---
+// Grammar objects (GrammarBuilder, GrammarExtension) are opaque to Allegro.
+// They are stored here and referenced by integer handles (Bits values).
+
+let nextHandle = 1;
+const handleRegistry = new Map<number, any>();
+
+export function registryStore(obj: any): number {
+  const id = nextHandle++;
+  handleRegistry.set(id, obj);
+  return id;
+}
+
+export function registryGet(id: number): any {
+  const obj = handleRegistry.get(id);
+  if (obj === undefined) throw new Error(`Invalid grammar handle: ${id}`);
+  return obj;
 }

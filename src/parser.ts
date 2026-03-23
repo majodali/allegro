@@ -1430,8 +1430,13 @@ export function parseWithExtensions(input: string, extensions: Map<any, any[]>):
   return __parseExtended(__grammar, input, extensions);
 }
 
+/** Parse input using an arbitrary grammar (not limited to baseGrammar). */
+export function parseGrammar(grammar: Grammar, input: string): ParseResult {
+  return __parse(grammar, input);
+}
+
 // Grammar element classes and types (for building extensions)
-export { Grammar, GrammarElement, Terminal, Phrase, Disjunction, SyntaxTreeNode };
+export { Grammar, GrammarElement, Terminal, Phrase, Disjunction, Repetition, Optional, SyntaxTreeNode };
 export type { ParseResult };
 
 // Base grammar instance (immutable — extensions create new alternatives, not modify this)

@@ -8,6 +8,14 @@ import {
 
 const MAX_DEPTH = 10000;
 
+// Map base primitive names to type method names for type-directed dispatch
+const PRIM_TO_METHOD = new Map<string, string>([
+  ["bits_add", "add"], ["bits_sub", "sub"], ["bits_mul", "mul"],
+  ["bits_div", "div"], ["bits_mod", "mod"],
+  ["bits_eq", "eq"], ["bits_lt", "lt"], ["bits_gt", "gt"],
+  ["bits_lte", "lte"], ["bits_gte", "gte"],
+]);
+
 // --- Core evaluation ---
 
 export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Value {
@@ -91,9 +99,45 @@ function applyPrimitive(
     return makeExpr(fn, evalArgs);
   }
 
+  // Type-directed dispatch: if the first arg has a type with a matching method,
+  // dispatch through the type instead of calling the base primitive directly.
+  // This enables operator overloading (e.g., String + String = concatenation).
+  if (evalArgs[0]?.kind === ValueKind.MultiValue) {
+    const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
+    if (typeComp && typeComp.kind === ValueKind.Context) {
+      const methodName = PRIM_TO_METHOD.get(fn.name);
+      if (methodName) {
+        const methodBinding = (typeComp as ContextValue).bindings.get(methodName);
+        if (methodBinding?.value?.kind === ValueKind.PrimitiveFunction) {
+          const primaryArgs = evalArgs.map(primaryOf);
+          const result = (methodBinding.value as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
+          // Re-wrap with appropriate type
+          if (result.kind === ValueKind.Bits) {
+            if (methodName === "eq" || methodName === "neq" || methodName === "lt" || methodName === "gt" || methodName === "lte" || methodName === "gte") {
+              return makeMultiValue(result, new Map([["type", typeComp]])); // comparison returns same type context for now
+            }
+            return makeMultiValue(result, new Map([["type", typeComp]]));
+          }
+          return result;
+        }
+      }
+    }
+  }
+
   // Unwrap multi-values for primitives
   const primaryArgs = evalArgs.map(primaryOf);
-  return fn.fn(primaryArgs, ctx, evalFn);
+  const result = fn.fn(primaryArgs, ctx, evalFn);
+
+  // Type propagation: if the first arg had a type and the result is Bits,
+  // propagate the type to the result.
+  if (result.kind === ValueKind.Bits && evalArgs[0]?.kind === ValueKind.MultiValue) {
+    const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
+    if (typeComp) {
+      return makeMultiValue(result, new Map([["type", typeComp]]));
+    }
+  }
+
+  return result;
 }
 
 // --- Apply composed function ---

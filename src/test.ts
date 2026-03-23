@@ -6,8 +6,10 @@
 import { formatValue } from "./primitives.js";
 import { evalSource as runtimeEval, Extension, extensionToContext } from "./runtime.js";
 import { ModuleLoader } from "./modules.js";
-import { buildStandardExtensions, GrammarExtension } from "./grammar-ext.js";
-import { Value, ValueKind, BitsValue, AllegroError, makePrimitive, makeInt, makeContext, primaryOf } from "./types.js";
+import { buildStandardExtensions, buildAllegroStandardExtensions, GrammarExtension, registryGet } from "./grammar-ext.js";
+import { createTypeSystem, getTypeName, getType } from "./types-std.js";
+import { Grammar, parseGrammar } from "./parser.js";
+import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, primaryOf, stringToBits, bitsToString } from "./types.js";
 
 // --- Test infrastructure ---
 
@@ -640,6 +642,432 @@ test("grammar ext: extensionToContext wraps bindings", () => {
   if (pi?.value?.kind === ValueKind.Bits) {
     eq(Number(pi.value.data), 3);
   }
+});
+
+// == Allegro-Level Grammar Primitives ==
+
+test("allegro grammar: build extension from Allegro code", () => {
+  // Allegro code builds a grammar extension using primitives
+  const source = `
+b = grammar_builder()
+grammar_add_dot_access(b)
+grammar_add_import(b)
+ext = grammar_build(b)
+ext
+`;
+  const result = runtimeEval(source);
+  const val = result.value!;
+  const p = val.kind === ValueKind.MultiValue ? val.primary : val;
+  // ext should be a Bits value (handle to GrammarExtension)
+  eq(p.kind, ValueKind.Bits, "grammar_build should return a handle");
+  // Extract the GrammarExtension from the registry
+  const handle = Number((p as BitsValue).data);
+  const grammarExt = registryGet(handle) as GrammarExtension;
+  eq(grammarExt.additionalAlternatives instanceof Map, true);
+  eq(grammarExt.additionalAlternatives.size > 0, true);
+});
+
+test("allegro grammar: extension built from Allegro enables dot access", () => {
+  // Step 1: Allegro code builds the grammar extension
+  const buildResult = runtimeEval("ext = grammar_build(grammar_add_dot_access(grammar_builder()))\next\n");
+  const extVal = buildResult.value!;
+  const extP = extVal.kind === ValueKind.MultiValue ? extVal.primary : extVal;
+  const handle = Number((extP as BitsValue).data);
+  const grammarExt = registryGet(handle) as GrammarExtension;
+
+  // Step 2: Use the Allegro-built extension to parse code with dot access
+  const mathCtx = makeCtxWith({ pi: makeInt(3) });
+  const ext: Extension = { name: "test", bindings: { math: mathCtx } };
+  eq(evalNumGrammar("math.pi", [ext], grammarExt), 3);
+});
+
+test("allegro grammar: extension built from Allegro enables import", () => {
+  // Step 1: Build extension from Allegro
+  const buildResult = runtimeEval("ext = grammar_build(grammar_add_import(grammar_builder()))\next\n");
+  const extVal = buildResult.value!;
+  const extP = extVal.kind === ValueKind.MultiValue ? extVal.primary : extVal;
+  const handle = Number((extP as BitsValue).data);
+  const grammarExt = registryGet(handle) as GrammarExtension;
+
+  // Step 2: Use it to parse import syntax
+  const ext: Extension = { name: "test", bindings: { foo: makeInt(42) } };
+  eq(evalNumGrammar("import foo\nfoo", [ext], grammarExt), 42);
+});
+
+test("allegro grammar: full pipeline - build, then use dot + import", () => {
+  // Step 1: Build full extension from Allegro
+  const buildSource = `
+b = grammar_builder()
+grammar_add_dot_access(b)
+grammar_add_import(b)
+grammar_build(b)
+`;
+  const buildResult = runtimeEval(buildSource);
+  const extP = buildResult.value!.kind === ValueKind.MultiValue
+    ? buildResult.value!.primary : buildResult.value!;
+  const grammarExt = registryGet(Number((extP as BitsValue).data)) as GrammarExtension;
+
+  // Step 2: Use it to parse a program with import + dot access
+  const mathCtx = makeCtxWith({ pi: makeInt(3), e: makeInt(2) });
+  const ext: Extension = { name: "test", bindings: { math: mathCtx } };
+  eq(evalNumGrammar("import math\nmath.pi + math.e", [ext], grammarExt), 5);
+});
+
+// == Standalone Grammar: JSON Parser ==
+// Tests that entirely new grammars (not extending baseGrammar) can be built
+// and used to parse non-Allegro languages.
+
+function buildJsonGrammar(): Grammar {
+  const g = new Grammar({ whitespace: /[ \t\n\r]+/ });
+
+  // Terminals
+  const numberLit = g.terminal(/\-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/, "NumberLit");
+  const stringLit = g.terminal(/"([^"\\]|\\.)*"/, "StringLit");
+  const trueLit = g.terminal("true", "True");
+  const falseLit = g.terminal("false", "False");
+  const nullLit = g.terminal("null", "Null");
+
+  // Value → NumberLit | StringLit | True | False | Null | Array | Object
+  const jsonValue = g.disjunction([], "JsonValue");
+  // Propagate val through the Disjunction
+  (jsonValue as any).attribute("val", Object, function (node: any) {
+    return node.children[0].val;
+  });
+
+  // Number: attribute extracts numeric value as Bits
+  const numberVal = g.phrase([numberLit], "NumberVal");
+  (numberVal as any).attribute("val", Object, function (node: any) {
+    const n = parseFloat(node.children[0].text);
+    return Number.isInteger(n) ? makeInt(n) : makeFloat(n);
+  });
+
+  // String: attribute extracts string content (without quotes) as Bits
+  const stringVal = g.phrase([stringLit], "StringVal");
+  (stringVal as any).attribute("val", Object, function (node: any) {
+    const raw = node.children[0].text;
+    // Strip surrounding quotes and unescape
+    const content = raw.slice(1, -1).replace(/\\(.)/g, (_: string, c: string) => {
+      if (c === "n") return "\n";
+      if (c === "t") return "\t";
+      if (c === "r") return "\r";
+      return c;
+    });
+    return stringToBits(content);
+  });
+
+  // Boolean true
+  const trueVal = g.phrase([trueLit], "TrueVal");
+  (trueVal as any).attribute("val", Object, function () {
+    return makeInt(1);
+  });
+
+  // Boolean false
+  const falseVal = g.phrase([falseLit], "FalseVal");
+  (falseVal as any).attribute("val", Object, function () {
+    return makeInt(0);
+  });
+
+  // Null
+  const nullVal = g.phrase([nullLit], "NullVal");
+  (nullVal as any).attribute("val", Object, function () {
+    return makeInt(0); // null → 0 for simplicity
+  });
+
+  // Array: "[" JsonValue ("," JsonValue)* "]" | "[" "]"
+  const comma = g.terminal(",");
+  const lbracket = g.terminal("[");
+  const rbracket = g.terminal("]");
+
+  const arrayElements = g.repeat(jsonValue, { min: 0, delimiter: comma });
+  const arrayVal = g.phrase([lbracket, arrayElements, rbracket], "ArrayVal");
+  (arrayVal as any).attribute("val", Object, function (node: any) {
+    const elementsNode = node.children[1]; // the Repetition node
+    const result = makeContext();
+    let index = 0;
+    for (const child of elementsNode.children) {
+      if (child.val !== undefined) {
+        const key = String(index);
+        result.bindings.set(key, { key, value: child.val as Value, isUse: false });
+        result.bindingList.push({ key, value: child.val as Value, isUse: false });
+        index++;
+      }
+    }
+    const lenKey = "length";
+    result.bindings.set(lenKey, { key: lenKey, value: makeInt(index), isUse: false });
+    result.bindingList.push({ key: lenKey, value: makeInt(index), isUse: false });
+    return result;
+  });
+
+  // Object: "{" (pair ("," pair)*)? "}"
+  const lbrace = g.terminal("{");
+  const rbrace = g.terminal("}");
+  const colon = g.terminal(":");
+
+  const pair = g.phrase([stringLit, colon, jsonValue], "Pair");
+  (pair as any).attribute("key", Object, function (node: any) {
+    return node.children[0].text.slice(1, -1);
+  });
+  (pair as any).attribute("val", Object, function (node: any) {
+    return node.children[2].val;
+  });
+
+  const objectEntries = g.repeat(pair, { min: 0, delimiter: comma });
+  const objectVal = g.phrase([lbrace, objectEntries, rbrace], "ObjectVal");
+  (objectVal as any).attribute("val", Object, function (node: any) {
+    const entriesNode = node.children[1];
+    const result = makeContext();
+    for (const child of entriesNode.children) {
+      if (child.key !== undefined && child.val !== undefined) {
+        const key = child.key as string;
+        result.bindings.set(key, { key, value: child.val as Value, isUse: false });
+        result.bindingList.push({ key, value: child.val as Value, isUse: false });
+      }
+    }
+    return result;
+  });
+
+  // Wire up JsonValue alternatives
+  (jsonValue as any).alternatives.push(numberVal, stringVal, trueVal, falseVal, nullVal, arrayVal, objectVal);
+
+  // Root: a single JsonValue
+  const root = g.phrase([jsonValue], "Root");
+  (root as any).attribute("val", Object, function (node: any) {
+    return node.children[0].val;
+  });
+
+  g.target = root;
+  return g;
+}
+
+test("standalone grammar: parse JSON number", () => {
+  const g = buildJsonGrammar();
+  const result = parseGrammar(g, "42");
+  eq(result.errors.length, 0);
+  const val = result.tree.val as BitsValue;
+  eq(val.kind, ValueKind.Bits);
+  eq(Number(val.data), 42);
+});
+
+test("standalone grammar: parse JSON negative number", () => {
+  const g = buildJsonGrammar();
+  const result = parseGrammar(g, "-3.14");
+  eq(result.errors.length, 0);
+  const val = result.tree.val as BitsValue;
+  eq(bitsToFloat(val), -3.14);
+});
+
+test("standalone grammar: parse JSON string", () => {
+  const g = buildJsonGrammar();
+  const result = parseGrammar(g, '"hello world"');
+  eq(result.errors.length, 0);
+  const val = result.tree.val as BitsValue;
+  eq(val.kind, ValueKind.Bits);
+  eq(bitsToString(val), "hello world");
+});
+
+test("standalone grammar: parse JSON boolean", () => {
+  const g = buildJsonGrammar();
+  const trueResult = parseGrammar(g, "true");
+  eq(Number((trueResult.tree.val as BitsValue).data), 1);
+  const falseResult = parseGrammar(g, "false");
+  eq(Number((falseResult.tree.val as BitsValue).data), 0);
+});
+
+test("standalone grammar: parse JSON array", () => {
+  const g = buildJsonGrammar();
+  const result = parseGrammar(g, "[1, 2, 3]");
+  eq(result.errors.length, 0);
+  const val = result.tree.val as ContextValue;
+  eq(val.kind, ValueKind.Context);
+  // Check length
+  const len = (val.bindings.get("length")!).value as BitsValue;
+  eq(Number(len.data), 3);
+  // Check elements
+  eq(Number((val.bindings.get("0")!.value as BitsValue).data), 1);
+  eq(Number((val.bindings.get("1")!.value as BitsValue).data), 2);
+  eq(Number((val.bindings.get("2")!.value as BitsValue).data), 3);
+});
+
+test("standalone grammar: parse JSON empty array", () => {
+  const g = buildJsonGrammar();
+  const result = parseGrammar(g, "[]");
+  eq(result.errors.length, 0);
+  const val = result.tree.val as ContextValue;
+  const len = (val.bindings.get("length")!).value as BitsValue;
+  eq(Number(len.data), 0);
+});
+
+test("standalone grammar: parse JSON object", () => {
+  const g = buildJsonGrammar();
+  const result = parseGrammar(g, '{"x": 10, "y": 20}');
+  eq(result.errors.length, 0);
+  const val = result.tree.val as ContextValue;
+  eq(val.kind, ValueKind.Context);
+  eq(Number((val.bindings.get("x")!.value as BitsValue).data), 10);
+  eq(Number((val.bindings.get("y")!.value as BitsValue).data), 20);
+});
+
+test("standalone grammar: parse nested JSON", () => {
+  const g = buildJsonGrammar();
+  const result = parseGrammar(g, '{"items": [1, 2], "name": "test"}');
+  eq(result.errors.length, 0);
+  const val = result.tree.val as ContextValue;
+  // Check items array
+  const items = val.bindings.get("items")!.value as ContextValue;
+  eq(items.kind, ValueKind.Context);
+  eq(Number((items.bindings.get("length")!.value as BitsValue).data), 2);
+  eq(Number((items.bindings.get("0")!.value as BitsValue).data), 1);
+  // Check name string
+  const name = val.bindings.get("name")!.value as BitsValue;
+  eq(name.kind, ValueKind.Bits);
+});
+
+// == Allegro Standard — Type System ==
+
+const stdGrammar = buildAllegroStandardExtensions();
+const typeExt = createTypeSystem();
+
+/** Evaluate source in Allegro Standard mode (typed literals + type-directed dot access) */
+function evalStd(source: string, extraExtensions?: Extension[]): Value | null {
+  const exts = [typeExt, ...(extraExtensions ?? [])];
+  const { value } = runtimeEval(source, undefined, exts, stdGrammar, true);
+  return value;
+}
+
+test("type system: int literal has Int type", () => {
+  const result = evalStd("42");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Int");
+  eq(Number(primaryOf(result!) as any).valueOf !== undefined, true);
+  const p = primaryOf(result!) as BitsValue;
+  eq(Number(p.data), 42);
+});
+
+test("type system: string literal has String type", () => {
+  const result = evalStd('"hello"');
+  eq(result !== null, true);
+  eq(getTypeName(result!), "String");
+  eq(bitsToString(primaryOf(result!) as BitsValue), "hello");
+});
+
+test("type system: int arithmetic preserves type", () => {
+  const result = evalStd("3 + 4");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Int");
+  const p = primaryOf(result!) as BitsValue;
+  eq(Number(p.data), 7);
+});
+
+test("type system: int subtraction", () => {
+  const result = evalStd("10 - 3");
+  eq(getTypeName(result!), "Int");
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("type system: int multiplication", () => {
+  const result = evalStd("6 * 7");
+  eq(getTypeName(result!), "Int");
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("type system: int comparison returns typed Int", () => {
+  const result = evalStd("3 < 5");
+  eq(getTypeName(result!), "Int");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("type system: string dot length", () => {
+  const result = evalStd('"hello".length');
+  eq(result !== null, true);
+  const p = primaryOf(result!) as BitsValue;
+  eq(Number(p.data), 5);
+});
+
+test("type system: int dot toString", () => {
+  const result = evalStd("42.toString()");
+  eq(result !== null, true);
+  eq(bitsToString(primaryOf(result!) as BitsValue), "42");
+});
+
+test("type system: string dot slice", () => {
+  const result = evalStd('"hello".slice(1, 3)');
+  eq(result !== null, true);
+  eq(bitsToString(primaryOf(result!) as BitsValue), "el");
+});
+
+test("type system: string dot indexOf", () => {
+  const result = evalStd('"hello".indexOf("ll")');
+  eq(result !== null, true);
+  eq(Number((primaryOf(result!) as BitsValue).data), 2);
+});
+
+test("type system: string concat with +", () => {
+  const result = evalStd('"hello" + " world"');
+  eq(result !== null, true);
+  eq(getTypeName(result!), "String");
+  eq(bitsToString(primaryOf(result!) as BitsValue), "hello world");
+});
+
+test("type system: typed function calls", () => {
+  const result = evalStd("f(x) => x + 1\nf(5)");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Int");
+  eq(Number((primaryOf(result!) as BitsValue).data), 6);
+});
+
+test("type system: typed recursion", () => {
+  const result = evalStd("factorial(n) => if n == 0 then 1 else n * factorial(n - 1)\nfactorial(5)");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Int");
+  eq(Number((primaryOf(result!) as BitsValue).data), 120);
+});
+
+test("type system: formatValue shows string without quotes for typed string", () => {
+  const result = evalStd('"hello"');
+  eq(formatValue(result!), "hello");
+});
+
+test("type system: formatValue shows int for typed int", () => {
+  const result = evalStd("42");
+  eq(formatValue(result!), "42");
+});
+
+test("type system: dot access on untyped context falls back to ctx_resolve", () => {
+  const mathCtx = makeCtxWith({ pi: makeInt(3) });
+  const ext: Extension = { name: "test", bindings: { math: mathCtx } };
+  const result = evalStd("math.pi", [ext]);
+  eq(result !== null, true);
+  eq(Number((primaryOf(result!) as BitsValue).data), 3);
+});
+
+test("type system: basics.alg works in typed mode", () => {
+  // Run basics.alg content in typed mode
+  const basicsSource = `
+3 + 4 * 2
+42
+factorial(n) => if n == 0 then 1 else n * factorial(n - 1)
+factorial(5)
+f(x) => x
+f(42)
+fib(n) => if n < 2 then n else fib(n - 1) + fib(n - 2)
+fib(10)
+g(x) => x
+g(42)
+add(a, b) => a + b
+add(3, 4)
+`;
+  // Capture printed output
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStd(basicsSource);
+  } finally {
+    console.log = origLog;
+  }
+  // Verify the printed values (from print calls in basics.alg)
+  // In typed mode, bare expressions return values but don't print
+  // The actual basics.alg uses print(), but this test just verifies no errors
 });
 
 // --- Run all tests (sync + async) and report ---
