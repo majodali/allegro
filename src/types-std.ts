@@ -156,7 +156,7 @@ const intMethods: Record<string, PrimitiveFnImpl> = {
   // Conversion
   toString: ((args: Value[]) => {
     const a = toSigned(asBitsTyped(args[0], "Int.toString"));
-    return stringToBits(String(a));
+    return withType(stringToBits(String(a)), StringType);
   }) as PrimitiveFnImpl,
 };
 
@@ -169,7 +169,7 @@ const stringMethods: Record<string, PrimitiveFnImpl> = {
   add: (args) => {
     const a = bitsToString(asBitsTyped(args[0], "String.add"));
     const b = bitsToString(asBitsTyped(args[1], "String.add"));
-    return stringToBits(a + b);
+    return withType(stringToBits(a + b), StringType);
   },
 
   // Comparison
@@ -195,12 +195,12 @@ const stringMethods: Record<string, PrimitiveFnImpl> = {
     const end = args.length > 2
       ? Number(toSigned(asBitsTyped(args[2], "String.slice")))
       : s.length;
-    return stringToBits(s.slice(start, end));
+    return withType(stringToBits(s.slice(start, end)), StringType);
   },
   indexOf: (args) => {
     const s = bitsToString(asBitsTyped(args[0], "String.indexOf"));
     const search = bitsToString(asBitsTyped(args[1], "String.indexOf"));
-    return makeInt(s.indexOf(search));
+    return withType(makeInt(s.indexOf(search)), IntType);
   },
   toString: ((args: Value[]) => {
     return args[0]; // strings are already strings
@@ -231,7 +231,7 @@ const floatMethods: Record<string, PrimitiveFnImpl> = {
   gt: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.gt")) > bitsToFloat(asBitsTyped(args[1], "Float.gt")) ? 1 : 0),
   lte: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.lte")) <= bitsToFloat(asBitsTyped(args[1], "Float.lte")) ? 1 : 0),
   gte: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.gte")) >= bitsToFloat(asBitsTyped(args[1], "Float.gte")) ? 1 : 0),
-  toString: ((args: Value[]) => stringToBits(String(bitsToFloat(asBitsTyped(args[0], "Float.toString"))))) as PrimitiveFnImpl,
+  toString: ((args: Value[]) => withType(stringToBits(String(bitsToFloat(asBitsTyped(args[0], "Float.toString")))), StringType)) as PrimitiveFnImpl,
 };
 
 // =============================================================================
@@ -257,7 +257,7 @@ const boolMethods: Record<string, PrimitiveFnImpl> = {
   neq: (args) => makeInt(asBitsTyped(args[0], "Bool.neq").data !== asBitsTyped(args[1], "Bool.neq").data ? 1 : 0),
   toString: ((args: Value[]) => {
     const a = asBitsTyped(args[0], "Bool.toString").data !== 0n;
-    return stringToBits(a ? "true" : "false");
+    return withType(stringToBits(a ? "true" : "false"), StringType);
   }) as PrimitiveFnImpl,
 };
 

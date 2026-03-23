@@ -27,9 +27,9 @@ function typeLiterals(v: Value, seen?: Set<Value>): Value {
   switch (v.kind) {
     case ValueKind.Bits:
       // 64-bit = Int literal, other lengths = String literal (from stringToBits)
+      // Note: empty string "" has length 0 but is NOT 64-bit, so it falls through to String.
       if (v.length === 64) return withType(v, IntType);
-      if (v.length > 0) return withType(v, StringType);
-      return v;
+      return withType(v, StringType);
     case ValueKind.Expression: {
       const newFn = typeLiterals(v.fn, seen);
       const newArgs = v.args.map(a => typeLiterals(a, seen));

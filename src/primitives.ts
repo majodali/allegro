@@ -389,9 +389,11 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
 // ============ PRINT ============
 
-const print_impl: PrimitiveFnImpl = (args) => {
-  console.log(formatValue(args[0]));
-  return args[0];
+const print_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // Lazy so we get the full MultiValue (with type info) instead of primaryOf
+  const v = evalFn ? evalFn(args[0], ctx!) : args[0];
+  console.log(formatValue(v));
+  return v;
 };
 
 // ============ IDENTITY (data structures) ============
@@ -726,7 +728,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   mv_components: makePrimitive("mv_components", mv_components),
   eval_if: eval_if_value,
   id: id_prim,
-  print: makePrimitive("print", print_impl),
+  print: makePrimitive("print", print_impl, true),
   grammar_builder: makePrimitive("grammar_builder", grammar_builder_impl),
   grammar_add_dot_access: makePrimitive("grammar_add_dot_access", grammar_add_dot_access_impl),
   grammar_add_import: makePrimitive("grammar_add_import", grammar_add_import_impl),

@@ -1295,6 +1295,94 @@ test("array: chained map and filter", () => {
   eq(formatValue(result!), "[6, 8]");
 });
 
+// == File-based Tests (Allegro Standard .alg files) ==
+
+import * as fs from "fs";
+import * as path from "path";
+
+/**
+ * Run an .alg file in Allegro Standard mode.
+ * Captures print output and validates against "// expect: ..." comments.
+ */
+function runAlgFile(filePath: string, extensions?: Extension[]): void {
+  const source = fs.readFileSync(filePath, "utf-8");
+  const lines = source.split(/\r?\n/);
+
+  // Extract expected outputs from "// expect: ..." comments
+  const expectations: { lineNum: number; expected: string }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/\/\/\s*expect:\s*(.*)/);
+    if (match) {
+      expectations.push({ lineNum: i + 1, expected: match[1].trim() });
+    }
+  }
+
+  // Capture print output
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+
+  try {
+    const exts = [typeExt, ...(extensions ?? [])];
+    runtimeEval(source, undefined, exts, stdGrammar, true);
+  } catch (e: any) {
+    console.log = origLog;
+    throw e;
+  } finally {
+    console.log = origLog;
+  }
+
+  // Validate
+  const basename = path.basename(filePath);
+  if (expectations.length !== printed.length) {
+    throw new Error(
+      `${basename}: expected ${expectations.length} outputs but got ${printed.length}` +
+      `\n  Expected: ${expectations.map(e => e.expected).join(", ")}` +
+      `\n  Got: ${printed.join(", ")}`
+    );
+  }
+  for (let i = 0; i < expectations.length; i++) {
+    if (printed[i] !== expectations[i].expected) {
+      throw new Error(
+        `${basename} line ${expectations[i].lineNum}: expected "${expectations[i].expected}" but got "${printed[i]}"`
+      );
+    }
+  }
+}
+
+function fileTest(filePath: string, extensions?: Extension[]): void {
+  const basename = path.basename(filePath);
+  test(`file: ${basename}`, () => {
+    runAlgFile(filePath, extensions);
+    eq(true, true); // if we get here, all expectations matched
+  });
+}
+
+// Run all .alg test files
+const testsDir = path.resolve("tests");
+fileTest(path.join(testsDir, "types.alg"));
+fileTest(path.join(testsDir, "dot-access.alg"));
+fileTest(path.join(testsDir, "arrays.alg"));
+fileTest(path.join(testsDir, "objects.alg"));
+fileTest(path.join(testsDir, "logical.alg"));
+fileTest(path.join(testsDir, "functions.alg"));
+
+// Module test needs a math extension
+import { primitives as primRegistry } from "./primitives.js";
+const primNames = new Set(Object.keys(primRegistry));
+const typeNames = new Set(["Int", "Float", "String", "Bool", "Array", "Object", "true", "false"]);
+
+const mathSource = fs.readFileSync(path.join(testsDir, "lib", "math.alg"), "utf-8");
+const mathResult = runtimeEval(mathSource, undefined, [typeExt], stdGrammar, true);
+const mathBindings: Record<string, Value> = {};
+for (const [key, binding] of mathResult.evalCtx.bindings) {
+  if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+    mathBindings[key] = binding.value;
+  }
+}
+const mathModuleCtx = extensionToContext({ name: "math", bindings: mathBindings });
+fileTest(path.join(testsDir, "modules.alg"), [{ name: "modules", bindings: { math: mathModuleCtx } }]);
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {
