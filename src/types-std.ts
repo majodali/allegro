@@ -597,6 +597,31 @@ export function getGenericType(type: ContextValue): ContextValue | null {
 }
 
 /**
+ * Get the number of type parameters on a generic type.
+ */
+function getGenericParamCount(generic: ContextValue): number {
+  const paramsBinding = generic.bindings.get("__params");
+  if (!paramsBinding?.value) return 0;
+  const paramsCtx = primaryOf(paramsBinding.value);
+  if (paramsCtx.kind !== ValueKind.Context) return 0;
+  const lenBinding = (paramsCtx as ContextValue).bindings.get("__length");
+  return lenBinding?.value ? Number((lenBinding.value as BitsValue).data) : 0;
+}
+
+/**
+ * Normalize a type for use in type checking. If the type is a bare generic
+ * (e.g., Array without type arguments), resolve it to Generic[Any, ...] by
+ * applying AnyType for each parameter.
+ */
+export function normalizeType(type: ContextValue): ContextValue {
+  if (!isGenericType(type)) return type;
+  const paramCount = getGenericParamCount(type);
+  if (paramCount === 0) return type;
+  const anyArgs = Array.from({ length: paramCount }, () => AnyType as Value);
+  return applyGenericType(type, anyArgs);
+}
+
+/**
  * Apply type arguments to a generic type, returning the concrete type.
  */
 export function applyGenericType(generic: ContextValue, args: Value[]): ContextValue {

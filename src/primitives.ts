@@ -442,7 +442,7 @@ import {
   getType, getTypeName, withType, typeMethod,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   makeArray, makeObject,
-  isGenericType, getTypeArgs, getGenericType, applyGenericType,
+  isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 
@@ -653,15 +653,17 @@ const type_of_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 };
 
 const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // Step 1: Evaluate
   const v = evalFn!(args[0], ctx!);
   const expectedType = evalFn!(args[1], ctx!);
   if (!isResolved(v) || !isResolved(expectedType)) {
     return makeExpr(makePrimitive("type_check", type_check_impl, true), [v, expectedType]);
   }
-  const actualType = getType(v);
-  if (!actualType) throw new AllegroError("type_check: value has no type");
-  const actualName = getTypeName(v);
-  const expectedCtx = asCtx(primaryOf(expectedType), "type_check");
+
+  // Step 2: Normalize — resolve bare generics to Generic[Any, ...]
+  const rawExpectedCtx = asCtx(primaryOf(expectedType), "type_check");
+  const expectedCtx = normalizeType(rawExpectedCtx);
+
   const expectedNameBinding = expectedCtx.bindings.get("__name");
   if (!expectedNameBinding?.value) throw new AllegroError("type_check: expected type has no __name");
   const expectedName = bitsToString(asBits(expectedNameBinding.value, "type_check"));
@@ -669,26 +671,21 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Any matches everything
   if (expectedName === "Any") return v;
 
+  // Step 3: Check
+  const actualType = getType(v);
+  if (!actualType) throw new AllegroError("type_check: value has no type");
+  const actualName = getTypeName(v);
+
   // Check base type name
   if (actualName !== expectedName) {
     throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
   }
 
-  // If expected type is a bare generic (e.g., Array without [T]),
-  // it's equivalent to Array[Any] — accept any parameterization
-  if (isGenericType(expectedCtx)) return v;
-
-  // If expected type has __args, also check type arguments
+  // Check type arguments if the expected type has them
   const expectedArgs = getTypeArgs(expectedCtx);
   if (expectedArgs && expectedArgs.length > 0) {
     const actualArgs = getTypeArgs(actualType);
-    if (!actualArgs) {
-      // Value has bare type (e.g., Array), expected parameterized (Array[Int])
-      // Bare is compatible with parameterized (it's like Array[Any])
-    } else if (actualArgs.length !== expectedArgs.length) {
-      throw new AllegroError(`Type error: expected ${expectedName} with ${expectedArgs.length} type args, got ${actualArgs.length}`);
-    } else {
-      // Compare each type argument
+    if (actualArgs && actualArgs.length === expectedArgs.length) {
       for (let i = 0; i < expectedArgs.length; i++) {
         const expArgCtx = primaryOf(expectedArgs[i]);
         const actArgCtx = primaryOf(actualArgs[i]);
