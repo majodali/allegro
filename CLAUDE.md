@@ -4,9 +4,11 @@
 
 ```bash
 npx tsc --noEmit                    # type-check
-npx tsx src/index.ts                # REPL (base mode)
-npx tsx src/index.ts basics.alg     # run a file (base mode)
-npx tsx src/test.ts                 # run tests (154 tests)
+npx tsx src/index.ts                # REPL (Allegro Standard — default)
+npx tsx src/index.ts file.alg       # run a file (Allegro Standard)
+npx tsx src/index.ts --base         # REPL (Allegro Base)
+npx tsx src/index.ts --base file.alg  # run a file (Allegro Base)
+npx tsx src/test.ts                 # run tests (184 tests)
 ```
 
 **Expected output from `basics.alg`:**
@@ -234,9 +236,9 @@ math.pi
 
 ## What's Next
 
-1. **Module exports** — `export` primitive that builds typed module interface for encapsulation
-2. **Type annotations** — `f(x: Int) => ...` (requires design work)
-3. **Keyword support** — proper keyword vs identifier disambiguation (deferred to parser reimplementation)
-4. **Parser reimplementation** — bootstrapping Allegro's parser within Allegro itself
-5. **String interpolation** — `"hello {name}"`
-6. **`index.ts` update** — `--std` flag for Allegro Standard mode
+1. **Module exports** — `export` primitive + typed module interface for encapsulation
+2. **Formalize partial evaluation phases** — define compilation/execution boundary, phase-specific evaluation
+3. **Type inference** — built on partial evaluation, unification for generics
+4. **Keyword support** — proper keyword vs identifier disambiguation (deferred to parser reimplementation)
+5. **Parser reimplementation** — bootstrapping Allegro's parser within Allegro itself
+6. **String interpolation** — `"hello {name}"`
