@@ -286,9 +286,48 @@ export function addBracketAccess(builder: GrammarBuilder): void {
 }
 
 /**
+ * Add logical operators: && || at LambdaExpr level, ! at UnaryExpr level.
+ * && and || use short-circuit semantics (right operand wrapped in thunk).
+ */
+export function addLogicalOps(builder: GrammarBuilder): void {
+  const andOp = builder.terminal("&&");
+  const orOp = builder.terminal("||");
+  const notOp = builder.terminal("!");
+  const expr = builder.getBase("Expr");
+  const unaryExpr = builder.getBase("UnaryExpr");
+
+  // Expr → Expr "&&" Expr (short-circuit, lower precedence than comparison)
+  const andPhrase = builder.phrase([expr, andOp, expr]);
+  (andPhrase as any).attribute("val", Object, function (node: any) {
+    return helpers.makeExpr(helpers.prim("typed_and"), [
+      node.children[0].val,
+      helpers.makeComposedFn([], node.children[2].val), // thunk for short-circuit
+    ]);
+  });
+  builder.addAlternative("Expr", andPhrase);
+
+  // Expr → Expr "||" Expr (short-circuit, lower precedence than comparison)
+  const orPhrase = builder.phrase([expr, orOp, expr]);
+  (orPhrase as any).attribute("val", Object, function (node: any) {
+    return helpers.makeExpr(helpers.prim("typed_or"), [
+      node.children[0].val,
+      helpers.makeComposedFn([], node.children[2].val), // thunk for short-circuit
+    ]);
+  });
+  builder.addAlternative("Expr", orPhrase);
+
+  // UnaryExpr → "!" UnaryExpr
+  const notPhrase = builder.phrase([notOp, unaryExpr]);
+  (notPhrase as any).attribute("val", Object, function (node: any) {
+    return helpers.makeExpr(helpers.prim("typed_not"), [node.children[1].val]);
+  });
+  builder.addAlternative("UnaryExpr", notPhrase);
+}
+
+/**
  * Build Allegro Standard grammar extensions.
  * Uses type_dispatch for dot access (type-directed dispatch).
- * Includes bool/float literals, array/object literals, bracket access.
+ * Includes bool/float literals, array/object literals, bracket access, logical ops.
  */
 export function buildAllegroStandardExtensions(): GrammarExtension {
   const builder = new GrammarBuilder();
@@ -298,6 +337,7 @@ export function buildAllegroStandardExtensions(): GrammarExtension {
   addArrayLiteral(builder);
   addObjectLiteral(builder);
   addBracketAccess(builder);
+  addLogicalOps(builder);
   return builder.build();
 }
 

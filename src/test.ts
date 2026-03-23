@@ -1215,6 +1215,86 @@ test("type system: object with 4 fields", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 4);
 });
 
+// == Logical Operators ==
+
+test("logical: true && true", () => {
+  const result = evalStd("true && true");
+  eq(getTypeName(result!), "Bool");
+  eq(formatValue(result!), "true");
+});
+
+test("logical: true && false", () => {
+  eq(formatValue(evalStd("true && false")!), "false");
+});
+
+test("logical: false && true (short-circuit)", () => {
+  eq(formatValue(evalStd("false && true")!), "false");
+});
+
+test("logical: true || false", () => {
+  eq(formatValue(evalStd("true || false")!), "true");
+});
+
+test("logical: false || true", () => {
+  eq(formatValue(evalStd("false || true")!), "true");
+});
+
+test("logical: false || false", () => {
+  eq(formatValue(evalStd("false || false")!), "false");
+});
+
+test("logical: !true", () => {
+  eq(formatValue(evalStd("!true")!), "false");
+});
+
+test("logical: !false", () => {
+  eq(formatValue(evalStd("!false")!), "true");
+});
+
+test("logical: comparison with &&", () => {
+  const result = evalStd("3 > 1 && 5 < 10");
+  eq(formatValue(result!), "true");
+});
+
+test("logical: comparison with ||", () => {
+  const result = evalStd("3 > 100 || 5 < 10");
+  eq(formatValue(result!), "true");
+});
+
+test("logical: != operator works", () => {
+  eq(Number((primaryOf(evalStd("3 != 4")!) as BitsValue).data), 1);
+  eq(Number((primaryOf(evalStd("3 != 3")!) as BitsValue).data), 0);
+});
+
+// == Array Higher-Order Methods ==
+
+test("array: map", () => {
+  const result = evalStd("[1, 2, 3].map(x => x * 2)");
+  eq(getTypeName(result!), "Array");
+  eq(formatValue(result!), "[2, 4, 6]");
+});
+
+test("array: filter", () => {
+  const result = evalStd("[1, 2, 3, 4, 5].filter(x => x > 3)");
+  eq(getTypeName(result!), "Array");
+  eq(formatValue(result!), "[4, 5]");
+});
+
+test("array: reduce (sum)", () => {
+  const result = evalStd("[1, 2, 3, 4].reduce((acc, x) => acc + x, 0)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
+test("array: map with string", () => {
+  const result = evalStd('[1, 2, 3].map(x => x.toString())');
+  eq(getTypeName(result!), "Array");
+});
+
+test("array: chained map and filter", () => {
+  const result = evalStd("[1, 2, 3, 4].map(x => x * 2).filter(x => x > 4)");
+  eq(formatValue(result!), "[6, 8]");
+});
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {

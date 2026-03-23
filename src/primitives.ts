@@ -506,6 +506,74 @@ const typed_object_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return makeObject(entries);
 };
 
+// --- Logical operators (short-circuiting) ---
+
+const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // args[0] = left operand, args[1] = thunk (ComposedFunction) wrapping right operand
+  const left = evalFn!(args[0], ctx!);
+  if (!isResolved(left)) {
+    return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, args[1]]);
+  }
+  // Short-circuit: if left is falsy, return false without evaluating right
+  const leftP = primaryOf(left);
+  if (leftP.kind === ValueKind.Bits && leftP.data === 0n) {
+    return withType(makeInt(0), BoolType);
+  }
+  // Evaluate the thunk (right operand)
+  const right = evalFn!(args[1], ctx!);
+  if (!isResolved(right)) {
+    return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, right]);
+  }
+  // If right is a thunk (ComposedFunction with no params), evaluate its body
+  let rightVal = right;
+  if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
+    rightVal = evalFn!(right.body, ctx!);
+  }
+  const rightP = primaryOf(rightVal);
+  if (rightP.kind === ValueKind.Bits && rightP.data === 0n) {
+    return withType(makeInt(0), BoolType);
+  }
+  return withType(makeInt(1), BoolType);
+};
+
+const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const left = evalFn!(args[0], ctx!);
+  if (!isResolved(left)) {
+    return makeExpr(makePrimitive("typed_or", typed_or_impl, true), [left, args[1]]);
+  }
+  // Short-circuit: if left is truthy, return true without evaluating right
+  const leftP = primaryOf(left);
+  if (leftP.kind === ValueKind.Bits && leftP.data !== 0n) {
+    return withType(makeInt(1), BoolType);
+  }
+  // Evaluate the thunk
+  const right = evalFn!(args[1], ctx!);
+  if (!isResolved(right)) {
+    return makeExpr(makePrimitive("typed_or", typed_or_impl, true), [left, right]);
+  }
+  let rightVal = right;
+  if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
+    rightVal = evalFn!(right.body, ctx!);
+  }
+  const rightP = primaryOf(rightVal);
+  if (rightP.kind === ValueKind.Bits && rightP.data !== 0n) {
+    return withType(makeInt(1), BoolType);
+  }
+  return withType(makeInt(0), BoolType);
+};
+
+const typed_not_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const val = evalFn!(args[0], ctx!);
+  if (!isResolved(val)) {
+    return makeExpr(makePrimitive("typed_not", typed_not_impl, true), [val]);
+  }
+  const p = primaryOf(val);
+  if (p.kind === ValueKind.Bits && p.data === 0n) {
+    return withType(makeInt(1), BoolType);
+  }
+  return withType(makeInt(0), BoolType);
+};
+
 // --- type_dispatch: type-directed dot access ---
 
 const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
@@ -670,6 +738,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_bool: makePrimitive("typed_bool", typed_bool_impl, true),
   typed_array: makePrimitive("typed_array", typed_array_impl, true),
   typed_object: makePrimitive("typed_object", typed_object_impl, true),
+  typed_and: makePrimitive("typed_and", typed_and_impl, true),
+  typed_or: makePrimitive("typed_or", typed_or_impl, true),
+  typed_not: makePrimitive("typed_not", typed_not_impl, true),
   type_dispatch: makePrimitive("type_dispatch", type_dispatch_impl, true),
   type_of: makePrimitive("type_of", type_of_impl, true),
   type_check: makePrimitive("type_check", type_check_impl, true),

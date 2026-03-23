@@ -6,7 +6,7 @@
 
 import {
   Value, ValueKind, BitsValue, ContextValue, PrimitiveFnImpl,
-  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeContext, makeMultiValue,
+  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue,
   primaryOf, stringToBits, bitsToString, AllegroError,
   Extension,
 } from "./types.js";
@@ -321,6 +321,42 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
       : elems.length;
     return makeArray(elems.slice(start, end));
   },
+  map: (args, ctx, evalFn) => {
+    const arrCtx = args[0] as ContextValue;
+    const fn = args[1];
+    const elems = arrayElements(arrCtx);
+    const results: Value[] = [];
+    for (const elem of elems) {
+      const result = evalFn!(makeExpr(fn, [elem]), ctx!);
+      results.push(result);
+    }
+    return makeArray(results);
+  },
+  filter: (args, ctx, evalFn) => {
+    const arrCtx = args[0] as ContextValue;
+    const fn = args[1];
+    const elems = arrayElements(arrCtx);
+    const results: Value[] = [];
+    for (const elem of elems) {
+      const result = evalFn!(makeExpr(fn, [elem]), ctx!);
+      const p = primaryOf(result);
+      if (p.kind === ValueKind.Bits && p.data !== 0n) {
+        results.push(elem);
+      }
+    }
+    return makeArray(results);
+  },
+  reduce: (args, ctx, evalFn) => {
+    const arrCtx = args[0] as ContextValue;
+    const fn = args[1];
+    const initial = args[2];
+    const elems = arrayElements(arrCtx);
+    let acc = initial;
+    for (const elem of elems) {
+      acc = evalFn!(makeExpr(fn, [acc, elem]), ctx!);
+    }
+    return acc;
+  },
   eq: (args) => {
     // Reference equality for now (arrays are Contexts)
     return makeInt(args[0] === args[1] ? 1 : 0);
@@ -328,7 +364,6 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
   toString: ((args: Value[]) => {
     const ctx = args[0] as ContextValue;
     const elems = arrayElements(ctx);
-    // Simple representation
     return stringToBits(`[Array(${elems.length})]`);
   }) as PrimitiveFnImpl,
 };
