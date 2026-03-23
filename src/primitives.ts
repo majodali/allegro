@@ -666,10 +666,17 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!expectedNameBinding?.value) throw new AllegroError("type_check: expected type has no __name");
   const expectedName = bitsToString(asBits(expectedNameBinding.value, "type_check"));
 
+  // Any matches everything
+  if (expectedName === "Any") return v;
+
   // Check base type name
   if (actualName !== expectedName) {
     throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
   }
+
+  // If expected type is a bare generic (e.g., Array without [T]),
+  // it's equivalent to Array[Any] — accept any parameterization
+  if (isGenericType(expectedCtx)) return v;
 
   // If expected type has __args, also check type arguments
   const expectedArgs = getTypeArgs(expectedCtx);
@@ -677,7 +684,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const actualArgs = getTypeArgs(actualType);
     if (!actualArgs) {
       // Value has bare type (e.g., Array), expected parameterized (Array[Int])
-      // Allow for now — bare type is compatible with any parameterization
+      // Bare is compatible with parameterized (it's like Array[Any])
     } else if (actualArgs.length !== expectedArgs.length) {
       throw new AllegroError(`Type error: expected ${expectedName} with ${expectedArgs.length} type args, got ${actualArgs.length}`);
     } else {
@@ -691,7 +698,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
           if (expArgName?.value && actArgName?.value) {
             const en = bitsToString(asBits(expArgName.value, "type_check"));
             const an = bitsToString(asBits(actArgName.value, "type_check"));
-            if (en !== an) {
+            if (en !== "Any" && en !== an) {
               throw new AllegroError(`Type error: expected ${expectedName}[${en}], got ${expectedName}[${an}]`);
             }
           }

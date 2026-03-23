@@ -1479,6 +1479,32 @@ test("generics: Array is a generic type", () => {
   }
 });
 
+// == Any Type ==
+
+test("Any: type annotation accepts any value", () => {
+  eq(Number((primaryOf(evalStd("f(x: Any) => x\nf(42)")!) as BitsValue).data), 42);
+  eq(formatValue(evalStd('f(x: Any) => x\nf("hello")')!), "hello");
+  eq(formatValue(evalStd("f(x: Any) => x\nf(true)")!), "true");
+});
+
+test("Any: Array[Any] accepts any element type", () => {
+  const result = evalStd("f(arr: Array[Any]) => arr.length\nf([1, 2, 3])");
+  eq(Number((primaryOf(result!) as BitsValue).data), 3);
+});
+
+test("Any: bare Array annotation is Array[Any]", () => {
+  // Bare Array in annotation should accept Array[Int]
+  const result = evalStd("f(arr: Array) => arr[0]\nf([42])");
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("Any: Array[Int] rejects Array[String]", () => {
+  let threw = false;
+  try { evalStd('f(arr: Array[Int]) => arr[0]\nf(["hello"])'); }
+  catch (e: any) { threw = e.message.includes("Type error"); }
+  eq(threw, true);
+});
+
 // == UntypedFunction ==
 
 test("UntypedFunction: primitives in standard mode have UntypedFunction type", () => {

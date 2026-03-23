@@ -443,9 +443,22 @@ const untypedFnMethods: Record<string, PrimitiveFnImpl> = {
 };
 
 // =============================================================================
+// Any Type
+// Matches any value. Used for unparameterized generics (Array = Array[Any])
+// and explicit opt-out of type checking.
+// =============================================================================
+
+const anyMethods: Record<string, PrimitiveFnImpl> = {
+  toString: ((args: Value[]) => {
+    return withType(stringToBits("<any>"), StringType);
+  }) as PrimitiveFnImpl,
+};
+
+// =============================================================================
 // Build Type Contexts
 // =============================================================================
 
+export const AnyType: ContextValue = buildType("Any", anyMethods);
 export const IntType: ContextValue = buildType("Int", intMethods);
 export const FloatType: ContextValue = buildType("Float", floatMethods);
 export const StringType: ContextValue = buildType("String", stringMethods);
@@ -632,6 +645,7 @@ export function createTypeSystem(): Extension {
   return {
     name: "types",
     bindings: {
+      Any: AnyType,
       Int: IntType,
       Float: FloatType,
       String: StringType,
