@@ -970,9 +970,9 @@ test("type system: int multiplication", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 42);
 });
 
-test("type system: int comparison returns typed Int", () => {
+test("type system: int comparison returns typed Bool", () => {
   const result = evalStd("3 < 5");
-  eq(getTypeName(result!), "Int");
+  eq(getTypeName(result!), "Bool");
   eq(Number((primaryOf(result!) as BitsValue).data), 1);
 });
 

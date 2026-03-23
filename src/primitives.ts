@@ -616,10 +616,13 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
           return method.fn([selfVal], undefined as any, undefined as any);
         }
         // Return a bound method: partially apply self as first arg
+        // Lazy so it receives unevaluated args and preserves type info
         const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-          return method.fn([selfVal, ...callArgs], callCtx, callEvalFn);
+          // Evaluate args ourselves to preserve MultiValue type wrappers
+          const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+          return method.fn([selfVal, ...evalArgs], callCtx, callEvalFn);
         };
-        return makePrimitive(`bound:${fieldName}`, boundFn);
+        return makePrimitive(`bound:${fieldName}`, boundFn, true);
       }
       return method;
     }

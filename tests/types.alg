@@ -38,12 +38,12 @@ print(true)
 print(false)
 // expect: false
 
-// Comparisons
+// Comparisons (return Bool)
 print(3 < 5)
-// expect: 1
+// expect: true
 
 print(10 == 10)
-// expect: 1
+// expect: true
 
 print(3 != 4)
-// expect: 1
+// expect: true

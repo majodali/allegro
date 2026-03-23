@@ -91,66 +91,65 @@ function asBitsTyped(v: Value, ctx: string): BitsValue {
 
 const intMethods: Record<string, PrimitiveFnImpl> = {
   // Arithmetic — self is first arg, other is second
+  // All return typed values (IntType referenced via closure, initialized before any call)
   add: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.add"));
     const b = toSigned(asBitsTyped(args[1], "Int.add"));
-    return makeInt(Number(a + b));
+    return withType(makeInt(Number(a + b)), IntType);
   },
   sub: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.sub"));
     const b = toSigned(asBitsTyped(args[1], "Int.sub"));
-    return makeInt(Number(a - b));
+    return withType(makeInt(Number(a - b)), IntType);
   },
   mul: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.mul"));
     const b = toSigned(asBitsTyped(args[1], "Int.mul"));
-    return makeInt(Number(a * b));
+    return withType(makeInt(Number(a * b)), IntType);
   },
   div: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.div"));
     const b = toSigned(asBitsTyped(args[1], "Int.div"));
     if (b === 0n) throw new AllegroError("Int.div: division by zero");
-    // Integer division truncates toward zero
-    const result = a / b;
-    return makeInt(Number(result));
+    return withType(makeInt(Number(a / b)), IntType);
   },
   mod: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.mod"));
     const b = toSigned(asBitsTyped(args[1], "Int.mod"));
     if (b === 0n) throw new AllegroError("Int.mod: division by zero");
-    return makeInt(Number(a % b));
+    return withType(makeInt(Number(a % b)), IntType);
   },
 
-  // Comparison
+  // Comparison — return typed Bool
   eq: (args) => {
     const a = asBitsTyped(args[0], "Int.eq");
     const b = asBitsTyped(args[1], "Int.eq");
-    return makeInt(a.data === b.data ? 1 : 0);
+    return withType(makeInt(a.data === b.data ? 1 : 0), BoolType);
   },
   neq: (args) => {
     const a = asBitsTyped(args[0], "Int.neq");
     const b = asBitsTyped(args[1], "Int.neq");
-    return makeInt(a.data !== b.data ? 1 : 0);
+    return withType(makeInt(a.data !== b.data ? 1 : 0), BoolType);
   },
   lt: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.lt"));
     const b = toSigned(asBitsTyped(args[1], "Int.lt"));
-    return makeInt(a < b ? 1 : 0);
+    return withType(makeInt(a < b ? 1 : 0), BoolType);
   },
   gt: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.gt"));
     const b = toSigned(asBitsTyped(args[1], "Int.gt"));
-    return makeInt(a > b ? 1 : 0);
+    return withType(makeInt(a > b ? 1 : 0), BoolType);
   },
   lte: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.lte"));
     const b = toSigned(asBitsTyped(args[1], "Int.lte"));
-    return makeInt(a <= b ? 1 : 0);
+    return withType(makeInt(a <= b ? 1 : 0), BoolType);
   },
   gte: (args) => {
     const a = toSigned(asBitsTyped(args[0], "Int.gte"));
     const b = toSigned(asBitsTyped(args[1], "Int.gte"));
-    return makeInt(a >= b ? 1 : 0);
+    return withType(makeInt(a >= b ? 1 : 0), BoolType);
   },
 
   // Conversion
@@ -172,16 +171,16 @@ const stringMethods: Record<string, PrimitiveFnImpl> = {
     return withType(stringToBits(a + b), StringType);
   },
 
-  // Comparison
+  // Comparison — return typed Bool
   eq: (args) => {
     const a = bitsToString(asBitsTyped(args[0], "String.eq"));
     const b = bitsToString(asBitsTyped(args[1], "String.eq"));
-    return makeInt(a === b ? 1 : 0);
+    return withType(makeInt(a === b ? 1 : 0), BoolType);
   },
   neq: (args) => {
     const a = bitsToString(asBitsTyped(args[0], "String.neq"));
     const b = bitsToString(asBitsTyped(args[1], "String.neq"));
-    return makeInt(a !== b ? 1 : 0);
+    return withType(makeInt(a !== b ? 1 : 0), BoolType);
   },
 
   // Properties / methods
@@ -212,25 +211,25 @@ const stringMethods: Record<string, PrimitiveFnImpl> = {
 // =============================================================================
 
 const floatMethods: Record<string, PrimitiveFnImpl> = {
-  add: (args) => makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.add")) + bitsToFloat(asBitsTyped(args[1], "Float.add"))),
-  sub: (args) => makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.sub")) - bitsToFloat(asBitsTyped(args[1], "Float.sub"))),
-  mul: (args) => makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.mul")) * bitsToFloat(asBitsTyped(args[1], "Float.mul"))),
+  add: (args) => withType(makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.add")) + bitsToFloat(asBitsTyped(args[1], "Float.add"))), FloatType),
+  sub: (args) => withType(makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.sub")) - bitsToFloat(asBitsTyped(args[1], "Float.sub"))), FloatType),
+  mul: (args) => withType(makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.mul")) * bitsToFloat(asBitsTyped(args[1], "Float.mul"))), FloatType),
   div: (args) => {
     const b = bitsToFloat(asBitsTyped(args[1], "Float.div"));
     if (b === 0) throw new AllegroError("Float.div: division by zero");
-    return makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.div")) / b);
+    return withType(makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.div")) / b), FloatType);
   },
   mod: (args) => {
     const b = bitsToFloat(asBitsTyped(args[1], "Float.mod"));
     if (b === 0) throw new AllegroError("Float.mod: division by zero");
-    return makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.mod")) % b);
+    return withType(makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.mod")) % b), FloatType);
   },
-  eq: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.eq")) === bitsToFloat(asBitsTyped(args[1], "Float.eq")) ? 1 : 0),
-  neq: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.neq")) !== bitsToFloat(asBitsTyped(args[1], "Float.neq")) ? 1 : 0),
-  lt: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.lt")) < bitsToFloat(asBitsTyped(args[1], "Float.lt")) ? 1 : 0),
-  gt: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.gt")) > bitsToFloat(asBitsTyped(args[1], "Float.gt")) ? 1 : 0),
-  lte: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.lte")) <= bitsToFloat(asBitsTyped(args[1], "Float.lte")) ? 1 : 0),
-  gte: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.gte")) >= bitsToFloat(asBitsTyped(args[1], "Float.gte")) ? 1 : 0),
+  eq: (args) => withType(makeInt(bitsToFloat(asBitsTyped(args[0], "Float.eq")) === bitsToFloat(asBitsTyped(args[1], "Float.eq")) ? 1 : 0), BoolType),
+  neq: (args) => withType(makeInt(bitsToFloat(asBitsTyped(args[0], "Float.neq")) !== bitsToFloat(asBitsTyped(args[1], "Float.neq")) ? 1 : 0), BoolType),
+  lt: (args) => withType(makeInt(bitsToFloat(asBitsTyped(args[0], "Float.lt")) < bitsToFloat(asBitsTyped(args[1], "Float.lt")) ? 1 : 0), BoolType),
+  gt: (args) => withType(makeInt(bitsToFloat(asBitsTyped(args[0], "Float.gt")) > bitsToFloat(asBitsTyped(args[1], "Float.gt")) ? 1 : 0), BoolType),
+  lte: (args) => withType(makeInt(bitsToFloat(asBitsTyped(args[0], "Float.lte")) <= bitsToFloat(asBitsTyped(args[1], "Float.lte")) ? 1 : 0), BoolType),
+  gte: (args) => withType(makeInt(bitsToFloat(asBitsTyped(args[0], "Float.gte")) >= bitsToFloat(asBitsTyped(args[1], "Float.gte")) ? 1 : 0), BoolType),
   toString: ((args: Value[]) => withType(stringToBits(String(bitsToFloat(asBitsTyped(args[0], "Float.toString")))), StringType)) as PrimitiveFnImpl,
 };
 
@@ -242,19 +241,19 @@ const boolMethods: Record<string, PrimitiveFnImpl> = {
   and: (args) => {
     const a = asBitsTyped(args[0], "Bool.and").data !== 0n;
     const b = asBitsTyped(args[1], "Bool.and").data !== 0n;
-    return makeInt(a && b ? 1 : 0);
+    return withType(makeInt(a && b ? 1 : 0), BoolType);
   },
   or: (args) => {
     const a = asBitsTyped(args[0], "Bool.or").data !== 0n;
     const b = asBitsTyped(args[1], "Bool.or").data !== 0n;
-    return makeInt(a || b ? 1 : 0);
+    return withType(makeInt(a || b ? 1 : 0), BoolType);
   },
   not: (args) => {
     const a = asBitsTyped(args[0], "Bool.not").data !== 0n;
-    return makeInt(a ? 0 : 1);
+    return withType(makeInt(a ? 0 : 1), BoolType);
   },
-  eq: (args) => makeInt(asBitsTyped(args[0], "Bool.eq").data === asBitsTyped(args[1], "Bool.eq").data ? 1 : 0),
-  neq: (args) => makeInt(asBitsTyped(args[0], "Bool.neq").data !== asBitsTyped(args[1], "Bool.neq").data ? 1 : 0),
+  eq: (args) => withType(makeInt(asBitsTyped(args[0], "Bool.eq").data === asBitsTyped(args[1], "Bool.eq").data ? 1 : 0), BoolType),
+  neq: (args) => withType(makeInt(asBitsTyped(args[0], "Bool.neq").data !== asBitsTyped(args[1], "Bool.neq").data ? 1 : 0), BoolType),
   toString: ((args: Value[]) => {
     const a = asBitsTyped(args[0], "Bool.toString").data !== 0n;
     return withType(stringToBits(a ? "true" : "false"), StringType);
