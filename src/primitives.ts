@@ -629,16 +629,20 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
   }
 
-  // Fall back to ctx_resolve for untyped Contexts
+  // Fall back to ctx_resolve for Contexts:
+  // - Untyped Contexts: always fall through
+  // - Typed Contexts with __fieldAccess (e.g., Object): fall through for field access
+  // - Other typed values: type controls access (encapsulation)
   const p = primaryOf(obj);
-  if (p.kind === ValueKind.Context) {
+  const allowFieldAccess = !type || (type.bindings.get("__fieldAccess")?.value !== undefined);
+  if (allowFieldAccess && p.kind === ValueKind.Context) {
     const b = p.bindings.get(fieldName);
     if (!b) throw new AllegroError(`type_dispatch: '${fieldName}' not found`);
     if (b.value === undefined) throw new AllegroError(`type_dispatch: '${fieldName}' is unbound`);
     return b.value;
   }
 
-  const typeName = getTypeName(obj) ?? p.kind;
+  const typeName = getTypeName(obj) ?? (p.kind === ValueKind.Context ? "Context" : p.kind);
   throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
 };
 

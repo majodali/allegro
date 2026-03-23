@@ -201,6 +201,8 @@ export function bitsToString(b: BitsValue): string {
 export interface Extension {
   name: string;
   bindings: Record<string, Value>;
+  /** Typed module object for use with import + dot access. */
+  moduleObject?: Value;
 }
 
 // --- Error class ---

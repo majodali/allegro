@@ -159,9 +159,11 @@ export function buildEvalCtx(
 
 /**
  * Wrap an Extension's bindings as a Context value.
- * Useful for making module exports accessible via dot access (ctx_resolve).
+ * If the extension has a moduleObject (typed module), returns it as the primary.
+ * Otherwise wraps bindings as a plain Context (backward compat).
  */
-export function extensionToContext(ext: Extension): ContextValue {
+export function extensionToContext(ext: Extension): Value {
+  if (ext.moduleObject) return ext.moduleObject;
   const ctx = makeContext();
   for (const [name, value] of Object.entries(ext.bindings)) {
     const binding: Binding = { key: name, value, isUse: false };

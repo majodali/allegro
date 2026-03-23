@@ -6,7 +6,8 @@
 import { parse } from "./parser.js";
 import { buildEvalCtx, resolvePrimitives, Extension } from "./runtime.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind } from "./types.js";
+import { Value, ValueKind, ContextValue, PrimitiveFnImpl, makePrimitive, makeContext, makeMultiValue, stringToBits, primaryOf } from "./types.js";
+import { withType } from "./types-std.js";
 
 // --- Types ---
 
@@ -27,6 +28,53 @@ export interface ModuleLoaderOptions {
   modules: ModuleConfig[];
   resolve: ModuleResolver;
   readFile: FileReader;
+}
+
+// --- Module Type Builder ---
+
+/**
+ * Build a typed module object from exported bindings.
+ * Creates a module-specific type with getters for each exported field.
+ * The underlying Context holds all bindings (public and private),
+ * but only exported fields are accessible through the type.
+ */
+export function buildModuleObject(
+  name: string,
+  allBindings: Record<string, Value>,
+  exportedNames: Set<string>,
+): Value {
+  // Build the underlying Context with ALL bindings (public + private)
+  const ctx = makeContext();
+  for (const [key, value] of Object.entries(allBindings)) {
+    ctx.bindings.set(key, { key, value, isUse: false });
+    ctx.bindingList.push({ key, value, isUse: false });
+  }
+
+  // Build a module-specific type with getters for exported fields only
+  const moduleType = makeContext();
+
+  // __name
+  const nameKey = "__name";
+  const nameVal = stringToBits(name);
+  moduleType.bindings.set(nameKey, { key: nameKey, value: nameVal, isUse: false });
+  moduleType.bindingList.push({ key: nameKey, value: nameVal, isUse: false });
+
+  // Add a getter for each exported field
+  for (const fieldName of exportedNames) {
+    const getter: PrimitiveFnImpl = (args) => {
+      // self is the module Context (primary of the MultiValue)
+      const moduleCtx = args[0] as ContextValue;
+      const b = moduleCtx.bindings.get(fieldName);
+      if (!b?.value) return stringToBits(`<undefined:${fieldName}>`);
+      return b.value;
+    };
+    const prim = makePrimitive(`${name}.${fieldName}`, getter);
+    (prim as any).__getter = true; // auto-call with self
+    moduleType.bindings.set(fieldName, { key: fieldName, value: prim, isUse: false });
+    moduleType.bindingList.push({ key: fieldName, value: prim, isUse: false });
+  }
+
+  return withType(ctx, moduleType);
 }
 
 // --- Module Loader ---
@@ -147,9 +195,15 @@ export class ModuleLoader {
       }
     }
 
+    const exportNames = hasExports
+      ? new Set(Object.keys(exportedBindings))
+      : new Set(Object.keys(allBindings));
     const bindings = hasExports ? exportedBindings : allBindings;
 
-    const ext: Extension = { name: id, bindings };
+    // Build typed module object for use with `import name` + dot access
+    const moduleObj = buildModuleObject(id, allBindings, exportNames);
+
+    const ext: Extension = { name: id, bindings, moduleObject: moduleObj };
     this.cache.set(resolvedPath, ext);
     loading.delete(id);
     return ext;

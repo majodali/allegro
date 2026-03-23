@@ -5,7 +5,8 @@
 
 import { formatValue } from "./primitives.js";
 import { evalSource as runtimeEval, Extension, extensionToContext } from "./runtime.js";
-import { ModuleLoader } from "./modules.js";
+import { ModuleLoader, buildModuleObject } from "./modules.js";
+import { evaluate } from "./evaluator.js";
 import { buildStandardExtensions, buildAllegroStandardExtensions, GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
@@ -634,7 +635,7 @@ test("grammar ext: import doesn't shadow extension binding", () => {
 
 test("grammar ext: extensionToContext wraps bindings", () => {
   const ext: Extension = { name: "math", bindings: { pi: makeInt(3), tau: makeInt(6) } };
-  const ctx = extensionToContext(ext);
+  const ctx = extensionToContext(ext) as ContextValue;
   eq(ctx.kind, ValueKind.Context);
   eq(ctx.bindings.size, 2);
   const pi = ctx.bindings.get("pi");
@@ -1410,6 +1411,42 @@ test("module export: non-exported values don't have exported component", () => {
 test("module export: exported functions work normally", () => {
   const result = evalStd("f = export(x => x * 2)\nf(21)\n");
   eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("module export: typed module object exposes exports via dot", () => {
+  // Build a module with exports
+  const modSource = "private_val = 99\npub_val = export(42)\npub_fn = export(x => x * 2)\n";
+  const modResult = runtimeEval(modSource, undefined, [typeExt], stdGrammar, true);
+
+  // Extract and evaluate bindings, then build typed module
+  const allBindings: Record<string, Value> = {};
+  const exportedNames = new Set<string>();
+  for (const [key, binding] of modResult.evalCtx.bindings) {
+    if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+      const evaluated = evaluate(binding.value, modResult.evalCtx);
+      allBindings[key] = evaluated;
+      if (evaluated.kind === ValueKind.MultiValue && evaluated.components.has("exported")) {
+        exportedNames.add(key);
+      }
+    }
+  }
+
+  const moduleObj = buildModuleObject("testmod", allBindings, exportedNames);
+
+  // Access exported field via type_dispatch
+  const ext: Extension = { name: "test", bindings: { testmod: moduleObj } };
+  const pubResult = evalStd("testmod.pub_val", [ext]);
+  eq(Number((primaryOf(pubResult!) as BitsValue).data), 42);
+
+  // Access exported function
+  const fnResult = evalStd("testmod.pub_fn(21)", [ext]);
+  eq(Number((primaryOf(fnResult!) as BitsValue).data), 42);
+
+  // Private field should NOT be accessible via type_dispatch
+  let threw = false;
+  try { evalStd("testmod.private_val", [ext]); }
+  catch (e: any) { threw = e.message.includes("not found"); }
+  eq(threw, true);
 });
 
 // == Generics ==

@@ -464,6 +464,9 @@ export const FloatType: ContextValue = buildType("Float", floatMethods);
 export const StringType: ContextValue = buildType("String", stringMethods);
 export const BoolType: ContextValue = buildType("Bool", boolMethods);
 export const ObjectType: ContextValue = buildType("Object", objectMethods);
+// Object allows direct field access (not encapsulated like modules)
+ObjectType.bindings.set("__fieldAccess", { key: "__fieldAccess", value: makeInt(1), isUse: false });
+ObjectType.bindingList.push({ key: "__fieldAccess", value: makeInt(1), isUse: false });
 export const UntypedFunctionType: ContextValue = buildType("UntypedFunction", untypedFnMethods);
 
 // =============================================================================
