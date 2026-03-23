@@ -1383,6 +1383,33 @@ for (const [key, binding] of mathResult.evalCtx.bindings) {
 const mathModuleCtx = extensionToContext({ name: "math", bindings: mathBindings });
 fileTest(path.join(testsDir, "modules.alg"), [{ name: "modules", bindings: { math: mathModuleCtx } }]);
 
+// == Module Export Tests ==
+
+test("module export: export() marks value with exported component", () => {
+  const result = evalStd("x = export(42)\nx\n");
+  eq(result !== null, true);
+  // Should still be usable as a number
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+  // Should have "exported" component
+  eq(result!.kind, ValueKind.MultiValue);
+  if (result!.kind === ValueKind.MultiValue) {
+    eq(result!.components.has("exported"), true);
+  }
+});
+
+test("module export: non-exported values don't have exported component", () => {
+  const result = evalStd("x = 42\nx\n");
+  // Should NOT have "exported" component
+  if (result!.kind === ValueKind.MultiValue) {
+    eq(result!.components.has("exported"), false);
+  }
+});
+
+test("module export: exported functions work normally", () => {
+  const result = evalStd("f = export(x => x * 2)\nf(21)\n");
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {

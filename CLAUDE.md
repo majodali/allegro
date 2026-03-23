@@ -1,12 +1,12 @@
-# Allegro Base Language — Project Summary & Instructions
+# Allegro — Project Summary & Instructions
 
 ## Build & Run
 
 ```bash
 npx tsc --noEmit                    # type-check
-npx tsx src/index.ts                # REPL
-npx tsx src/index.ts basics.alg     # run a file
-npx tsx src/test.ts                 # run tests (once test.ts exists)
+npx tsx src/index.ts                # REPL (base mode)
+npx tsx src/index.ts basics.alg     # run a file (base mode)
+npx tsx src/test.ts                 # run tests (154 tests)
 ```
 
 **Expected output from `basics.alg`:**
@@ -20,6 +20,9 @@ npx tsx src/test.ts                 # run tests (once test.ts exists)
 7
 ```
 
+**Test .alg files** are in `tests/` and exercise Allegro Standard features.
+They are validated automatically by the test suite via `// expect:` comments.
+
 ## Project Setup
 
 - ESM modules (`"type": "module"` in package.json, `"module": "nodenext"` in tsconfig)
@@ -30,92 +33,115 @@ npx tsx src/test.ts                 # run tests (once test.ts exists)
 
 ## What is Allegro?
 
-Allegro is a **programmable language platform** — a minimal, flexible core (the "base language") that serves as a substrate for building higher-level languages and DSLs on top of. What most developers will experience as "Allegro" is a curated stack of extensions providing familiar syntax, rich type systems, and domain-specific features.
+Allegro is a **programmable language platform** — a minimal, flexible core ("Allegro Base") that serves as a substrate for building higher-level languages and DSLs. The standard language ("Allegro Standard") is a curated stack of extensions providing familiar syntax, a type system, and common data types.
 
-The base language sits below even its own parser — it is fundamentally an API for constructing and evaluating expression DAGs. The text parser is the first client of that API.
+- **Allegro Base** — the primitive language: 7 value kinds, expression DAGs, recursive evaluator
+- **Allegro Standard** — the standard language with types, modules, and extensions
+- In normal use, "Allegro" refers to the standard language
 
 ### Key Design Goals
 - **Human-AI collaboration**: Humans and AI agents negotiate domain abstractions, codify them as DSLs/type extensions, then both work within shared formalisms
-- **Extensible grammar**: New syntactic constructs defined within the language itself, importable as modules
+- **Extensible grammar**: New syntactic constructs via grammar extensions, importable as modules
 - **Configurable semantics**: Functional/non-functional, sync/async, type systems — all as extensions
-- **Partial evaluation as compilation**: Extensions (types, grammars, optimizers) run as Allegro code during partial evaluation, then get eliminated from runtime output
+- **Partial evaluation as compilation**: Each build phase is a partial evaluation step where phase-specific resources become available
 
 ## Architecture
-
-The dependency chain (no cycles allowed):
 
 ```
 Base language API (expression DAGs, evaluation contexts)
   → Base parser (first grammar, offside-rule blocks)
-    → Grammar extension mechanism
-      → Type system extension
-        → Async semantics / functional semantics
-          → Standard library & DSLs
+    → Grammar extension mechanism (GrammarBuilder, immutable layering)
+      → Type system (types as MultiValue "type" components)
+        → Module system (anonymous extensions, module loader)
+          → Allegro Standard (typed literals, dot dispatch, logical ops, collections)
 ```
 
 ## The Seven Value Kinds
 
-1. **Bits** — Vector of bits with a length. The only kind that reliably survives to runtime as data.
-2. **PrimitiveFunction** — Opaque host-language function.
-3. **ComposedFunction** — Expression body with declared parameter placeholders. Created via `expr.function()` which claims unowned params in its body expression.
-4. **Expression** — A DAG node: a function reference + ordered arguments. This is the intermediate representation. Expressions are the core computational construct.
-5. **Context** — Evaluation context with named bindings. Organizational scaffolding that typically gets compiled away.
-6. **MultiValue** — A primary value (any kind) plus named string-keyed components. Multi-values are what evaluation produces — they carry metadata (types, source info, errors, warnings) alongside the primary value. Components are flat (no nesting). Primitive functions operate on the primary transparently.
-7. **Param** — A placeholder within expressions, bound on function invocation. Has a position (integer) and an owner (the ComposedFunction it belongs to).
+1. **Bits** — Vector of bits with a length. Encodes integers (64-bit), floats (IEEE 754), and strings (UTF-8).
+2. **PrimitiveFunction** — Opaque host-language function. May be `lazy` (receives unevaluated args).
+3. **ComposedFunction** — Expression body with declared parameter placeholders.
+4. **Expression** — A DAG node: function reference + ordered arguments. The core computational construct.
+5. **Context** — Evaluation context with named bindings. Also serves as the representation for Objects and Arrays.
+6. **MultiValue** — A primary value plus named string-keyed components (type, error, warnings, source).
+7. **Param** — A placeholder within expressions, bound on function invocation.
 
-(Param is technically a sub-kind used within expressions, not a standalone value kind in the same sense as the other six.)
+## Type System (Allegro Standard)
 
-## Key Design Decisions
+Types are Context values with `__name`, `__check`, and method bindings. A typed value is a MultiValue where the primary is the data and the `"type"` component is the type Context.
 
-### Evaluation Model
-- **Recursive tree-walk with memoization**. When a node is evaluated, the result can be attached as a memo.
-- **Partial evaluation is fundamental**, not an optimization. When an expression has unresolved elements, the evaluator reduces as far as possible and returns the partially reduced form.
-- **Interleaved parsing and evaluation**: As a file is parsed, expressions are constructed and potentially partially evaluated immediately. Constant expressions are fully evaluated before the next token is read.
+### Six Core Types
+- **Int** — 64-bit signed integer. Arithmetic, comparison, toString.
+- **Float** — IEEE 754 double. Arithmetic, comparison, toString.
+- **String** — UTF-8 encoded Bits. Concat (+), length, slice, indexOf, toString.
+- **Bool** — Int(0/1) with Bool type. Provided as `true`/`false` context bindings.
+- **Array** — Context with numeric keys + `__length`. length, get, map, filter, reduce, concat, slice.
+- **Object** — Typed Context. Field access via dot, keys, values, get.
 
-### Functions
-- A **composed function** is created with `makeComposedFn(params, body)`. Each param has a `position` (integer) and an `owner` (set to the function).
-- `expr.function(body)` claims all unowned params in the body — ownership is assigned inside-out (inner functions before outer).
-- **Recursion** works through lazy context bindings: a function references itself by name through the context, and by the time it's invoked, the binding exists.
+### Type-Directed Dispatch
+- `type_dispatch` checks the value's type component, finds the method, returns a self-bound closure
+- Getters (e.g., `length`) are called immediately; methods return bound functions
+- The evaluator's `PRIM_TO_METHOD` mapping dispatches base operators (`bits_add` etc.) through type methods when operands are typed
+- No implicit fallback — missing type method is an error
 
-### Error Handling
-- Errors are **multi-value components**, not special binding states.
-- Every function application produces a value with a potential `"error"` component.
-- Primitive functions are **"dumb"** — they don't handle errors, they just fail if inputs are wrong types. Smarts are built in extensions.
-- **Eager propagation**: when a primitive receives an argument with an error component, it propagates without executing.
-- Explicit error catching via inspecting the error component of a value. No implicit distant handlers at the base level.
-- **Algebraic effects** map naturally onto the existing model: effect handlers are unbound elements in evaluation contexts, bound when effects are raised. This requires no new primitives — it's the same mechanism as function params, imports, and dependency injection.
+### Type Propagation
+- `typeLiterals` post-parse pass wraps raw Bits with type info (64-bit → Int, other → String)
+- Float and Bool literals come from grammar extensions and type system bindings
+- Type methods should return properly typed values (not raw Bits)
 
-### Binding States
-At the base level, a binding is either:
-- **Unbound** — declared but not yet resolved (via `ctx_use`)
-- **Bound** — resolved to a value
+## Grammar Extension
 
-That's it. Async "pending" is just unbound-with-a-process-attached. Stream completion is handled through value components, not binding states.
+- **GrammarBuilder** creates extensions without mutating the base grammar (immutable layering with structural sharing)
+- Extensions add new alternatives to existing Disjunctions
+- `repeat(element, { delimiter })` for variable-length constructs
+- Current extensions: dot access, import, float literals, array/object literals, bracket access, logical operators
 
-### Warnings
-Warnings propagate as multi-value components (key: `"warnings"`), not as thrown errors. Operations like grammar extension, parsing, partial evaluation, and type checking all return results with potential warning components. Only final evaluation throws errors that end processing.
+### Known Limitations
+- **Earley scanner can't handle overlapping token lengths** — float literals use `int.digits` pattern instead of a regex terminal
+- **Keywords vs identifiers** — `true`, `false` handled as context bindings; `export` will use same workaround. Proper keyword support deferred to parser reimplementation.
+- **Logical operators at Expr level** — `&&`/`||` are at the same precedence (both below comparison). The `LambdaExpr` Disjunction is NOT in the pass-through chain from CompareExpr to Expr.
 
-### Grammar Extension
-- The parser is not privileged infrastructure — it's the first client of the base language API.
-- Grammar extensions are functions that take existing grammars + new productions and return new grammars.
-- `grammar_set()` changes the active parser before the next token is read.
-- **Operator expressions** use a Pratt parser with operator definitions bound in context (not individual productions per operator). Static precedence per operator; semantic dispatch by type.
-- **Type-directed parsing**: type information serves as precedence indicators for ambiguous productions. Types must be defined before the text requiring disambiguation is parsed.
-- Grammar extensions should ideally be block-style agnostic (work with both braces and indentation).
+## Module System
 
-### Modules & Imports
-- `import allegro.math` binds `math` to a namespace of exports
-- `import allegro.math.round` binds `round` directly
-- Module resolution mechanism is environment-defined, not baked into the language
-- Exports are marked via multi-value components (extension-defined)
-- `ctx_use(ctx, key)` declares unbound bindings — the environment resolves these at the appropriate lifecycle phase
+- **Anonymous extensions**: named bindings injected by the execution context, layered between primitives and source
+- **ModuleLoader**: loads `.alg` files as extensions with dependency resolution, caching, circular dependency detection
+- **Import syntax**: `import name` — declarative, module values provided via extensions
+- **Context layering**: primitives → extensions → base (REPL persistence) → source bindings
+- **Export system**: not yet implemented — currently all bindings are visible. Planned: export as a primitive that builds a typed module interface.
 
-### Multi-Component Values
-- Exist at the **evaluation** level, not the construction level
-- When building expression DAGs, nodes contain raw values
-- Components get attached during evaluation/analysis
-- Conventional components: `"error"`, `"warnings"`, `"type"`, `"source"`
-- `value.kind()` was deliberately **excluded** — it works against partial evaluation. Type info should come from metadata components, not runtime inspection.
+## Build/Execution Context
+
+Each build phase is a successive partial evaluation where phase-specific resources become available:
+- **Compilation**: extensions, type system, module system, source files
+- **Packaging**: third-party dependency implementations
+- **Deployment**: environment resources, datastores, config
+- **Execution**: runtime I/O, process, filesystem
+
+Anonymous extensions are pre-loaded into the compilation context. Extension modules may consume bindings internally (e.g., module system uses a filesystem).
+
+## Current Implementation State
+
+### Files
+
+- **`src/types.ts`** — Value types, constructors, utilities, Extension interface, string↔bits, float↔bits
+- **`src/evaluator.ts`** — Recursive tree-walk evaluator, memoization, partial evaluation, type-directed dispatch via `PRIM_TO_METHOD`, closure support (substitution descends into inner functions)
+- **`src/primitives.ts`** — All primitives: bits ops, expression/context/multi-value ops, type system (type_dispatch, typed_int/string/float/bool/array/object, typed operators, logical ops), grammar primitives, print (lazy for type preservation)
+- **`src/types-std.ts`** — Six core types as Context values with method bindings, type helpers (getType, getTypeName, withType), makeArray, makeObject, createTypeSystem extension
+- **`src/parser.ts`** — Auto-generated Earley parser. Exports Grammar classes, parse functions, helpers. `collectParams` descends into all composed functions for closure support.
+- **`src/grammar-ext.ts`** — GrammarBuilder (terminal, phrase, repeat, addAlternative), built-in extensions (dot access, import, float literals, array/object literals, bracket access, logical ops), Allegro Standard grammar builder, handle registry for Allegro-level grammar primitives
+- **`src/runtime.ts`** — `evalSource` (parse → typeLiterals → buildEvalCtx → evaluate), `typeLiterals` post-parse type wrapping, `resolvePrimitives`, `extensionToContext`
+- **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution
+- **`src/index.ts`** — Entry point: file runner + REPL (base mode only currently)
+- **`src/test.ts`** — 154 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, file-based .alg tests
+
+### Test Files (tests/)
+- `types.alg` — typed literals, arithmetic, comparisons
+- `dot-access.alg` — string methods, toString, getters
+- `arrays.alg` — literals, bracket access, map/filter/reduce, chaining
+- `objects.alg` — literals, dot access, nesting, keys
+- `logical.alg` — &&, ||, !, with comparisons and if-then-else
+- `functions.alg` — closures, composition, higher-order, recursion
+- `modules.alg` — import + dot access on module
 
 ## Base Parser Syntax
 
@@ -128,13 +154,13 @@ name = "hello"
 f(x, y) => x + y
 factorial(n) => if n == 0 then 1 else n * factorial(n - 1)
 
-// Anonymous functions (lambdas)
+// Anonymous functions (lambdas) and closures
 x => x * 2
 (x, y) => x + y
-() => 42
+make_adder(n) => x => x + n
 
 // If-then-else (branches auto-wrapped in thunks)
-result = if x > 0 then x else -x
+result = if x > 0 then x else 0 - x
 
 // Operators: + - * / % == != < > <= >=
 // Standard precedence, left-associative
@@ -154,46 +180,63 @@ result =
 /* block comment */
 ```
 
-## Current Implementation State
+## Allegro Standard Syntax (extensions)
 
-### What exists (in TypeScript):
-- **`src/types.ts`** — All type definitions, constructors, utilities (`primaryOf`, `isResolved`), string↔bits conversion, `AllegroError`
-- **`src/evaluator.ts`** — Recursive tree-walk evaluator with memoization, partial evaluation, position-based param substitution (with thunk descent), named param resolution from context
-- **`src/primitives.ts`** — All primitive function implementations (bits, arithmetic, expression, context, multi-value, eval_if, id, print), `formatValue()` for display
-- **`src/parser.ts`** — Auto-generated Earley parser (from `grammar/generate-parser.ts`). Self-contained, no imports. Exports `parse(input) → { tree, errors }`. Builds expression DAGs via attribute evaluation during parse tree construction. Grammar helpers (`buildFn`, `substName`, `cloneVal`, `collectParams`) handle function building and name substitution.
-- **`src/runtime.ts`** — Bridge between parser and evaluator. Exports `resolvePrimitives()` (replaces parser stub primitives with real ones), `buildEvalCtx()` (builds evaluation context from parse output with optional base context for REPL persistence), and `evalSource()` (parse + evaluate in one call).
-- **`src/index.ts`** — Entry point: file runner + REPL with persistent context across inputs.
-- **`src/test.ts`** — Test suite (48 core tests + 3 REPL persistence tests). Run with `npx tsx src/test.ts`.
+```
+// Dot access (type-directed dispatch)
+"hello".length          // getter → 5
+"hello".slice(0, 3)     // bound method → "hel"
+42.toString()            // → "42"
 
-### Parser ↔ Evaluator bridge (in index.ts):
-The parser creates stub `PrimitiveFunction` values with `fn: null` (e.g., `prim('bits_add')`). `index.ts` walks the parse output and replaces these with real primitives from `primitives.ts`. Named references (identifiers) become `Param` values with `position: -1` and `_name` set — the evaluator resolves these from the evaluation context at runtime.
+// Float literals
+pi = 3.14
 
-### What's needed next:
+// Bool literals
+flag = true
 
-1. **Testing**: Write test cases to verify:
-   - Basic arithmetic: `3 + 4 * 2` → `11`
-   - Function definition and calls: `f(x) => x * 2` then `f(5)` → `10`
-   - Recursion: `factorial(5)` → `120`
-   - If-then-else: `if 1 == 1 then 42 else 0` → `42`
-   - Lambdas: `(x => x + 1)(5)` → `6`
-   - Closures: outer function referencing inner params correctly
-   - Error propagation: division by zero propagates
-   - Partial evaluation: expressions with unbound elements reduce correctly
-   - Indentation blocks
+// Array literals and methods
+nums = [1, 2, 3, 4, 5]
+nums[0]                  // bracket access → 1
+nums.map(x => x * 2)    // → [2, 4, 6, 8, 10]
+nums.filter(x => x > 3) // → [4, 5]
+nums.reduce((a, x) => a + x, 0) // → 15
 
-2. **Known issues to investigate**:
-   - Deferred references don't memoize (by design — they're context-dependent). Verify this doesn't cause performance issues with deep recursion.
+// Object literals
+point = {x: 10, y: 20}
+point.x                  // → 10
+nested = {a: {b: 42}}
+nested.a.b               // → 42
 
-3. **Grammar extension primitives**: `grammar_current()`, `grammar_extend()`, `grammar_set()`, `production()`, and pattern constructors. These are complex and should be tackled after the core interpreter is solid.
+// Logical operators (short-circuiting)
+true && false            // → false
+false || true            // → true
+!true                    // → false
+x > 0 && x < 10         // comparisons with logical
 
-4. **Module system**: File loading, import resolution, export marking. Environment-specific.
+// Import
+import math
+math.pi
 
-## Design Philosophy Reminders
+// String concatenation
+"hello" + " " + "world" // → "hello world"
+```
 
-- The base language is a **specification**, not a user-facing language. It's the contract any implementation must satisfy.
-- **Extensions are where the language lives.** Everything beyond the seven kinds and their primitives is an extension.
-- **Partial evaluation is the compilation model.** Extensions run as Allegro code during partial evaluation, produce validations/annotations, then get eliminated.
-- **Evaluation contexts are modeling constructs**, not runtime artifacts. They exist during analysis and compilation, then disappear.
-- **Don't add primitives for things extensions can handle.** The base should be minimal. If in doubt, leave it out.
-- **Parse structure should be obvious by sight.** Operator precedence is static. No dynamic precedence based on types.
-- **Browser-compatible**: Core types and evaluator should work in both Node.js and browser environments. Avoid Node-only APIs (e.g., use `TextEncoder`/`TextDecoder`, not `Buffer`).
+## Design Philosophy
+
+- The base language is a **specification**, not a user-facing language
+- **Extensions are where the language lives** — everything beyond the seven kinds and their primitives is an extension
+- **Partial evaluation is the compilation model** — each build phase binds more symbols
+- **Types as values** — type checking happens during evaluation via type components, not a separate pass
+- **Immutable grammar extension** — new grammars share structure with the base, never mutate it
+- **Browser-compatible** — core uses `TextEncoder`/`TextDecoder`, not `Buffer`
+- **No implicit fallback** in typed operators — missing type method is an error
+- **Immutable bindings and values** (for now) — mutation semantics to be explored later
+
+## What's Next
+
+1. **Module exports** — `export` primitive that builds typed module interface for encapsulation
+2. **Type annotations** — `f(x: Int) => ...` (requires design work)
+3. **Keyword support** — proper keyword vs identifier disambiguation (deferred to parser reimplementation)
+4. **Parser reimplementation** — bootstrapping Allegro's parser within Allegro itself
+5. **String interpolation** — `"hello {name}"`
+6. **`index.ts` update** — `--std` flag for Allegro Standard mode

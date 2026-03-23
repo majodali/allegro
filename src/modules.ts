@@ -6,7 +6,7 @@
 import { parse } from "./parser.js";
 import { buildEvalCtx, resolvePrimitives, Extension } from "./runtime.js";
 import { evaluate } from "./evaluator.js";
-import { Value } from "./types.js";
+import { Value, ValueKind } from "./types.js";
 
 // --- Types ---
 
@@ -123,18 +123,31 @@ export class ModuleLoader {
     }
 
     // 7. Extract source-defined bindings as exports
-    //    Only export names that were defined in this module's source,
-    //    not inherited primitives or dependency bindings.
-    const bindings: Record<string, Value> = {};
+    //    If any binding has an "exported" component, only export those.
+    //    Otherwise export all source-defined bindings (backward compat).
+    const allBindings: Record<string, Value> = {};
+    const exportedBindings: Record<string, Value> = {};
+    let hasExports = false;
+
     for (const b of fileCtx.bindingList) {
       if (b.key !== null && b.value !== undefined) {
         const ctxBinding = evalCtx.bindings.get(b.key);
         if (ctxBinding?.value !== undefined) {
-          // Evaluate the binding to resolve it as far as possible
-          bindings[b.key] = evaluate(ctxBinding.value, evalCtx);
+          const evaluated = evaluate(ctxBinding.value, evalCtx);
+          allBindings[b.key] = evaluated;
+          // Check for "exported" component
+          if (evaluated.kind === ValueKind.MultiValue) {
+            const exp = evaluated.components.get("exported");
+            if (exp) {
+              hasExports = true;
+              exportedBindings[b.key] = evaluated;
+            }
+          }
         }
       }
     }
+
+    const bindings = hasExports ? exportedBindings : allBindings;
 
     const ext: Extension = { name: id, bindings };
     this.cache.set(resolvedPath, ext);

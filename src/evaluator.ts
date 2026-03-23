@@ -52,7 +52,9 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
   const cached = expr.memo.get("eval");
   if (cached !== undefined) return cached;
 
-  const fn = evaluate(expr.fn, ctx, depth + 1);
+  const fnRaw = evaluate(expr.fn, ctx, depth + 1);
+  // Unwrap MultiValue to get the callable (e.g., exported functions)
+  const fn = primaryOf(fnRaw);
 
   // Primitive function
   if (fn.kind === ValueKind.PrimitiveFunction) {
@@ -182,9 +184,8 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
     }
 
     case ValueKind.ComposedFunction: {
-      // Don't substitute into non-thunk inner functions (they have their own params)
-      if (value.params.length > 0) return value;
-      // Descend into thunks (zero-param composed functions like if-then-else branches)
+      // Descend into all composed functions to substitute free variables.
+      // Inner functions' own params won't match (different owner).
       const newBody = subst(value.body, owner, posMap);
       if (newBody === value.body) return value;
       const newFn: ComposedFunctionValue = {
@@ -192,6 +193,8 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
         params: value.params,
         body: newBody,
       };
+      // Re-bind params to new function
+      for (const p of newFn.params) p.owner = newFn;
       return newFn;
     }
 

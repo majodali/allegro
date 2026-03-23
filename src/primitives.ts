@@ -576,6 +576,24 @@ const typed_not_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return withType(makeInt(0), BoolType);
 };
 
+// --- export: mark a value as exported from a module ---
+
+const export_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // export(value) — marks a value with an "exported" component
+  // Used as: x = export(42), the binding x gets an exported marker
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) {
+    return makeExpr(makePrimitive("export", export_impl, true), [v]);
+  }
+  // Wrap with exported marker
+  const primary = primaryOf(v);
+  const components = v.kind === ValueKind.MultiValue
+    ? new Map(v.components)
+    : new Map<string, Value>();
+  components.set("exported", makeInt(1));
+  return makeMultiValue(primary, components);
+};
+
 // --- type_dispatch: type-directed dot access ---
 
 const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
@@ -743,6 +761,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_and: makePrimitive("typed_and", typed_and_impl, true),
   typed_or: makePrimitive("typed_or", typed_or_impl, true),
   typed_not: makePrimitive("typed_not", typed_not_impl, true),
+  export: makePrimitive("export", export_impl, true),
   type_dispatch: makePrimitive("type_dispatch", type_dispatch_impl, true),
   type_of: makePrimitive("type_of", type_of_impl, true),
   type_check: makePrimitive("type_check", type_check_impl, true),

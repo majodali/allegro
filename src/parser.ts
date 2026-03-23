@@ -1109,8 +1109,9 @@ if (v.kind === 'Expression') {
 collectParams(v.fn, out, seen);
 for (const a of v.args) collectParams(a, out, seen);
 }
-// Descend into zero-param thunks (if-then-else branches) to claim their params
-if (v.kind === 'ComposedFunction' && v.params.length === 0) {
+// Descend into all composed functions to find unowned params (free variables)
+// Inner functions' owned params won't be collected (owner !== null)
+if (v.kind === 'ComposedFunction') {
 collectParams(v.body, out, seen);
 }
 }

@@ -11,6 +11,22 @@ apply(f, x) => f(x)
 print(apply(x => x * 2, 21))
 // expect: 42
 
+// Closure
+make_adder(n) => x => x + n
+add5 = make_adder(5)
+print(add5(10))
+// expect: 15
+print(add5(100))
+// expect: 105
+
+// Function composition
+compose(f, g) => x => f(g(x))
+double(x) => x * 2
+inc(x) => x + 1
+double_then_inc = compose(inc, double)
+print(double_then_inc(5))
+// expect: 11
+
 // Recursion with typed values
 factorial(n) => if n == 0 then 1 else n * factorial(n - 1)
 print(factorial(6))
