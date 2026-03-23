@@ -1454,4 +1454,5 @@ export {
   stringToBits as parserStringToBits,
   makeContext as parserMakeContext,
   bind as parserBind,
+  repChildren as parserRepChildren,
 };

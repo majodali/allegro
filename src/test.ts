@@ -1197,6 +1197,24 @@ test("type system: object keys", () => {
   eq(getTypeName(result!), "Array");
 });
 
+// == Repetition: arbitrary-length arrays and objects ==
+
+test("type system: array with 5 elements", () => {
+  const result = evalStd("[10, 20, 30, 40, 50]");
+  eq(getTypeName(result!), "Array");
+  eq(formatValue(result!), "[10, 20, 30, 40, 50]");
+});
+
+test("type system: array with 5 elements bracket access last", () => {
+  const result = evalStd("[10, 20, 30, 40, 50][4]");
+  eq(Number((primaryOf(result!) as BitsValue).data), 50);
+});
+
+test("type system: object with 4 fields", () => {
+  const result = evalStd("{a: 1, b: 2, c: 3, d: 4}.d");
+  eq(Number((primaryOf(result!) as BitsValue).data), 4);
+});
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {

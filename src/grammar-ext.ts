@@ -11,6 +11,7 @@ import {
   Terminal,
   Phrase,
   Disjunction,
+  Repetition,
   parseWithExtensions,
   parserMakeExpr,
   parserMakeParam,
@@ -22,6 +23,7 @@ import {
   parserStringToBits,
   parserMakeContext,
   parserBind,
+  parserRepChildren,
 } from "./parser.js";
 
 // --- Types ---
@@ -43,6 +45,7 @@ export const helpers = {
   stringToBits: parserStringToBits,
   makeContext: parserMakeContext,
   bind: parserBind,
+  repChildren: parserRepChildren,
 };
 
 // --- GrammarBuilder ---
@@ -68,6 +71,17 @@ export class GrammarBuilder {
   /** Create a new Phrase from grammar elements */
   phrase(elements: GrammarElement[]): Phrase {
     return new (Phrase as any)(elements);
+  }
+
+  /** Create a Repetition element (0+ by default, with optional delimiter) */
+  repeat(element: GrammarElement, options?: { delimiter?: GrammarElement; min?: number; max?: number }): Repetition {
+    return new (Repetition as any)(
+      element,
+      options?.min ?? 0,
+      options?.max ?? Infinity,
+      options?.delimiter ?? null,
+      false,
+    );
   }
 
   /** Add a new alternative to a named Disjunction in the base grammar */
@@ -192,8 +206,9 @@ export function addFloatLiterals(builder: GrammarBuilder): void {
 }
 
 /**
- * Add array literal: Primary → "[" (Expr ("," Expr)*)? "]"
+ * Add array literal: Primary → "[" Repeat(Expr, ",") "]"
  * Produces: typed_array(elem1, elem2, ...)
+ * Handles any number of elements including zero.
  */
 export function addArrayLiteral(builder: GrammarBuilder): void {
   const lbracket = builder.terminal("[");
@@ -201,38 +216,20 @@ export function addArrayLiteral(builder: GrammarBuilder): void {
   const comma = builder.terminal(",");
   const expr = builder.getBase("Expr");
 
-  // Empty array: []
-  const emptyArray = builder.phrase([lbracket, rbracket]);
-  (emptyArray as any).attribute("val", Object, function () {
-    return helpers.makeExpr(helpers.prim("typed_array"), []);
+  const elements = builder.repeat(expr, { delimiter: comma });
+  const arrayPhrase = builder.phrase([lbracket, elements, rbracket]);
+  (arrayPhrase as any).attribute("val", Object, function (node: any) {
+    const children = helpers.repChildren(node.children[1]);
+    const vals = children.map((c: any) => c.val);
+    return helpers.makeExpr(helpers.prim("typed_array"), vals);
   });
-  builder.addAlternative("Primary", emptyArray);
-
-  // Single element: [expr]
-  const singleArray = builder.phrase([lbracket, expr, rbracket]);
-  (singleArray as any).attribute("val", Object, function (node: any) {
-    return helpers.makeExpr(helpers.prim("typed_array"), [node.children[1].val]);
-  });
-  builder.addAlternative("Primary", singleArray);
-
-  // Two elements: [expr, expr]
-  const twoArray = builder.phrase([lbracket, expr, comma, expr, rbracket]);
-  (twoArray as any).attribute("val", Object, function (node: any) {
-    return helpers.makeExpr(helpers.prim("typed_array"), [node.children[1].val, node.children[3].val]);
-  });
-  builder.addAlternative("Primary", twoArray);
-
-  // Three elements: [expr, expr, expr]
-  const threeArray = builder.phrase([lbracket, expr, comma, expr, comma, expr, rbracket]);
-  (threeArray as any).attribute("val", Object, function (node: any) {
-    return helpers.makeExpr(helpers.prim("typed_array"), [node.children[1].val, node.children[3].val, node.children[5].val]);
-  });
-  builder.addAlternative("Primary", threeArray);
+  builder.addAlternative("Primary", arrayPhrase);
 }
 
 /**
- * Add object literal: Primary → "{" (Ident ":" Expr ("," Ident ":" Expr)*)? "}"
+ * Add object literal: Primary → "{" Repeat(Ident ":" Expr, ",") "}"
  * Produces: typed_object(key1_bits, val1, key2_bits, val2, ...)
+ * Handles any number of fields including zero.
  */
 export function addObjectLiteral(builder: GrammarBuilder): void {
   const lbrace = builder.terminal("{");
@@ -242,43 +239,27 @@ export function addObjectLiteral(builder: GrammarBuilder): void {
   const ident = builder.getBase("Ident");
   const expr = builder.getBase("Expr");
 
-  // Empty object: {}
-  const emptyObj = builder.phrase([lbrace, rbrace]);
-  (emptyObj as any).attribute("val", Object, function () {
-    return helpers.makeExpr(helpers.prim("typed_object"), []);
+  // Field definition: Ident ":" Expr
+  const fieldDef = builder.phrase([ident, colon, expr]);
+  (fieldDef as any).attribute("key", Object, function (node: any) {
+    return node.children[0].text;
   });
-  builder.addAlternative("Primary", emptyObj);
+  (fieldDef as any).attribute("val", Object, function (node: any) {
+    return node.children[2].val;
+  });
 
-  // One field: { ident: expr }
-  const oneFieldObj = builder.phrase([lbrace, ident, colon, expr, rbrace]);
-  (oneFieldObj as any).attribute("val", Object, function (node: any) {
-    return helpers.makeExpr(helpers.prim("typed_object"), [
-      helpers.stringToBits(node.children[1].text),
-      node.children[3].val,
-    ]);
+  const fields = builder.repeat(fieldDef, { delimiter: comma });
+  const objPhrase = builder.phrase([lbrace, fields, rbrace]);
+  (objPhrase as any).attribute("val", Object, function (node: any) {
+    const children = helpers.repChildren(node.children[1]);
+    const args: any[] = [];
+    for (const child of children) {
+      args.push(helpers.stringToBits(child.key));
+      args.push(child.val);
+    }
+    return helpers.makeExpr(helpers.prim("typed_object"), args);
   });
-  builder.addAlternative("Primary", oneFieldObj);
-
-  // Two fields: { ident: expr, ident: expr }
-  const twoFieldObj = builder.phrase([lbrace, ident, colon, expr, comma, ident, colon, expr, rbrace]);
-  (twoFieldObj as any).attribute("val", Object, function (node: any) {
-    return helpers.makeExpr(helpers.prim("typed_object"), [
-      helpers.stringToBits(node.children[1].text), node.children[3].val,
-      helpers.stringToBits(node.children[5].text), node.children[7].val,
-    ]);
-  });
-  builder.addAlternative("Primary", twoFieldObj);
-
-  // Three fields: { ident: expr, ident: expr, ident: expr }
-  const threeFieldObj = builder.phrase([lbrace, ident, colon, expr, comma, ident, colon, expr, comma, ident, colon, expr, rbrace]);
-  (threeFieldObj as any).attribute("val", Object, function (node: any) {
-    return helpers.makeExpr(helpers.prim("typed_object"), [
-      helpers.stringToBits(node.children[1].text), node.children[3].val,
-      helpers.stringToBits(node.children[5].text), node.children[7].val,
-      helpers.stringToBits(node.children[9].text), node.children[11].val,
-    ]);
-  });
-  builder.addAlternative("Primary", threeFieldObj);
+  builder.addAlternative("Primary", objPhrase);
 }
 
 /**
