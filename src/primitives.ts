@@ -442,6 +442,7 @@ import {
   getType, getTypeName, withType, typeMethod,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   makeArray, makeObject,
+  isGenericType, getTypeArgs, getGenericType, applyGenericType,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 
@@ -660,14 +661,70 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const actualType = getType(v);
   if (!actualType) throw new AllegroError("type_check: value has no type");
   const actualName = getTypeName(v);
-  const expectedCtx = asCtx(expectedType, "type_check");
+  const expectedCtx = asCtx(primaryOf(expectedType), "type_check");
   const expectedNameBinding = expectedCtx.bindings.get("__name");
   if (!expectedNameBinding?.value) throw new AllegroError("type_check: expected type has no __name");
   const expectedName = bitsToString(asBits(expectedNameBinding.value, "type_check"));
+
+  // Check base type name
   if (actualName !== expectedName) {
     throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
   }
+
+  // If expected type has __args, also check type arguments
+  const expectedArgs = getTypeArgs(expectedCtx);
+  if (expectedArgs && expectedArgs.length > 0) {
+    const actualArgs = getTypeArgs(actualType);
+    if (!actualArgs) {
+      // Value has bare type (e.g., Array), expected parameterized (Array[Int])
+      // Allow for now — bare type is compatible with any parameterization
+    } else if (actualArgs.length !== expectedArgs.length) {
+      throw new AllegroError(`Type error: expected ${expectedName} with ${expectedArgs.length} type args, got ${actualArgs.length}`);
+    } else {
+      // Compare each type argument
+      for (let i = 0; i < expectedArgs.length; i++) {
+        const expArgCtx = primaryOf(expectedArgs[i]);
+        const actArgCtx = primaryOf(actualArgs[i]);
+        if (expArgCtx.kind === ValueKind.Context && actArgCtx.kind === ValueKind.Context) {
+          const expArgName = (expArgCtx as ContextValue).bindings.get("__name");
+          const actArgName = (actArgCtx as ContextValue).bindings.get("__name");
+          if (expArgName?.value && actArgName?.value) {
+            const en = bitsToString(asBits(expArgName.value, "type_check"));
+            const an = bitsToString(asBits(actArgName.value, "type_check"));
+            if (en !== an) {
+              throw new AllegroError(`Type error: expected ${expectedName}[${en}], got ${expectedName}[${an}]`);
+            }
+          }
+        }
+      }
+    }
+  }
+
   return v;
+};
+
+// --- type_apply: apply type arguments to a generic type ---
+
+const type_apply_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const generic = evalFn!(args[0], ctx!);
+  if (!isResolved(generic)) {
+    return makeExpr(makePrimitive("type_apply", type_apply_impl, true), args);
+  }
+  const genericCtx = asCtx(primaryOf(generic), "type_apply");
+  if (!isGenericType(genericCtx)) {
+    const name = getTypeName(generic) ?? "unknown";
+    throw new AllegroError(`type_apply: ${name} is not a generic type`);
+  }
+  // Evaluate all type arguments
+  const typeArgs: Value[] = [];
+  for (let i = 1; i < args.length; i++) {
+    const arg = evalFn!(args[i], ctx!);
+    if (!isResolved(arg)) {
+      return makeExpr(makePrimitive("type_apply", type_apply_impl, true), [generic, ...args.slice(1)]);
+    }
+    typeArgs.push(primaryOf(arg));
+  }
+  return applyGenericType(genericCtx, typeArgs);
 };
 
 // --- Typed binary operator helper ---
@@ -768,6 +825,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   type_dispatch: makePrimitive("type_dispatch", type_dispatch_impl, true),
   type_of: makePrimitive("type_of", type_of_impl, true),
   type_check: makePrimitive("type_check", type_check_impl, true),
+  type_apply: makePrimitive("type_apply", type_apply_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

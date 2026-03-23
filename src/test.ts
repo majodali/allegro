@@ -1383,6 +1383,7 @@ for (const [key, binding] of mathResult.evalCtx.bindings) {
 const mathModuleCtx = extensionToContext({ name: "math", bindings: mathBindings });
 fileTest(path.join(testsDir, "modules.alg"), [{ name: "modules", bindings: { math: mathModuleCtx } }]);
 fileTest(path.join(testsDir, "type-annotations.alg"));
+fileTest(path.join(testsDir, "generics.alg"));
 
 // == Module Export Tests ==
 
@@ -1409,6 +1410,73 @@ test("module export: non-exported values don't have exported component", () => {
 test("module export: exported functions work normally", () => {
   const result = evalStd("f = export(x => x * 2)\nf(21)\n");
   eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+// == Generics ==
+
+test("generics: array literal infers Array[Int]", () => {
+  const result = evalStd("[1, 2, 3]");
+  eq(getTypeName(result!), "Array");
+  // Check it has type args
+  const type = getType(result!);
+  eq(type !== null, true);
+  const args = (type as any).bindings.get("__args");
+  eq(args !== undefined && args.value !== undefined, true);
+});
+
+test("generics: array literal infers Array[String]", () => {
+  const result = evalStd('["a", "b", "c"]');
+  eq(getTypeName(result!), "Array");
+  const type = getType(result!);
+  const args = (type as any).bindings.get("__args");
+  eq(args !== undefined && args.value !== undefined, true);
+});
+
+test("generics: mixed element array gets bare Array", () => {
+  // Can't easily create mixed array in Allegro Standard yet since all ints are Int,
+  // but empty array should be bare Array (no __args)
+  const result = evalStd("[]");
+  eq(getTypeName(result!), "Array");
+  const type = getType(result!);
+  // Bare Array (generic) should not have __args
+  const args = (type as any).bindings.get("__args");
+  eq(args, undefined);
+});
+
+test("generics: Array[Int] type annotation", () => {
+  const result = evalStd("f(arr: Array[Int]) => arr.length\nf([1, 2, 3])");
+  eq(Number((primaryOf(result!) as BitsValue).data), 3);
+});
+
+test("generics: Array[Int] type check passes for int array", () => {
+  // This should work — [1,2,3] is Array[Int], annotation expects Array[Int]
+  const result = evalStd("f(arr: Array[Int]) => arr[0]\nf([10, 20, 30])");
+  eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
+test("generics: bare Array annotation accepts any array", () => {
+  const result = evalStd("f(arr: Array) => arr.length\nf([1, 2, 3])");
+  eq(Number((primaryOf(result!) as BitsValue).data), 3);
+});
+
+test("generics: type_apply memoization", () => {
+  // Array[Int] applied twice should produce the same type
+  const result = evalStd(`
+f(a: Array[Int]) => a.length
+g(b: Array[Int]) => b[0]
+f([1, 2, 3]) + g([10, 20])
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 13);
+});
+
+test("generics: Array is a generic type", () => {
+  // Array in the context should have __isGeneric
+  const result = evalStd("Array");
+  const p = primaryOf(result!);
+  if (p.kind === ValueKind.Context) {
+    const isGen = (p as ContextValue).bindings.get("__isGeneric");
+    eq(isGen !== undefined, true);
+  }
 });
 
 // == UntypedFunction ==

@@ -333,7 +333,8 @@ export function addLogicalOps(builder: GrammarBuilder): void {
 
 interface ParamInfo {
   name: string;
-  typeName: string;
+  typeName: string;   // display name (e.g., "Array[Int]")
+  typeExpr: any;       // expression that resolves to the type value
 }
 
 /**
@@ -343,7 +344,7 @@ interface ParamInfo {
 function wrapParamsWithChecks(
   body: any,
   owner: any,
-  typedParams: Map<number, string>,
+  typedParams: Map<number, any>,  // position → type expression (Param or Expression)
   seen?: Set<any>,
 ): any {
   if (!body || typeof body !== "object") return body;
@@ -352,10 +353,10 @@ function wrapParamsWithChecks(
   seen.add(body);
 
   if (body.kind === "Param" && body.owner === owner && typedParams.has(body.position)) {
-    const typeName = typedParams.get(body.position)!;
+    const typeExpr = typedParams.get(body.position)!;
     return helpers.makeExpr(
       helpers.prim("type_check"),
-      [body, helpers.makeParam(-1, typeName)],
+      [body, typeExpr],
     );
   }
 
@@ -382,17 +383,17 @@ function wrapParamsWithChecks(
 function buildTypedFn(
   params: ParamInfo[],
   body: any,
-  returnTypeName: string | null,
+  returnTypeExpr: any | null,
 ): any {
   // 1. Build the base function with just param names
   const paramNames = params.map(p => p.name);
   const fn = helpers.buildFn(paramNames, body);
 
-  // 2. Collect typed params by position
-  const typedParams = new Map<number, string>();
+  // 2. Collect typed params by position (using type expressions)
+  const typedParams = new Map<number, any>();
   for (let i = 0; i < params.length; i++) {
-    if (params[i].typeName) {
-      typedParams.set(i, params[i].typeName);
+    if (params[i].typeExpr) {
+      typedParams.set(i, params[i].typeExpr);
     }
   }
 
@@ -402,10 +403,10 @@ function buildTypedFn(
   }
 
   // 4. Wrap return with type_check if return type specified
-  if (returnTypeName) {
+  if (returnTypeExpr) {
     fn.body = helpers.makeExpr(
       helpers.prim("type_check"),
-      [fn.body, helpers.makeParam(-1, returnTypeName)],
+      [fn.body, returnTypeExpr],
     );
   }
 
@@ -427,17 +428,52 @@ export function addTypeAnnotations(builder: GrammarBuilder): void {
   const ident = builder.getBase("Ident");
   const fnBody = builder.getBase("FnBody");
 
-  // TypeExpression: for now just Ident, extensible later for generics, algebraic types
-  const typeExprPhrase = builder.phrase([ident]);
-  (typeExprPhrase as any).attribute("typeName", Object, function (node: any) {
+  // TypeExpression: Ident or Ident "[" TypeExprList "]" for generics
+  const lbracket = builder.terminal("[");
+  const rbracket = builder.terminal("]");
+
+  // Simple type: Ident (e.g., "Int", "String")
+  const simpleTypeExpr = builder.phrase([ident]);
+  (simpleTypeExpr as any).attribute("typeName", Object, function (node: any) {
     return node.children[0].text;
   });
-  const typeExpression = builder.disjunction([typeExprPhrase]);
+  (simpleTypeExpr as any).attribute("typeExpr", Object, function (node: any) {
+    // For type_apply: return a named param that resolves to the type
+    return helpers.makeParam(-1, node.children[0].text);
+  });
+
+  // Placeholder disjunction — we need to reference it before adding the generic alternative
+  const typeExpression = builder.disjunction([simpleTypeExpr]);
+
+  // Generic type: Ident "[" Repeat(TypeExpression, ",") "]" (e.g., "Array[Int]")
+  const typeArgList = builder.repeat(typeExpression, { delimiter: comma });
+  const genericTypeExpr = builder.phrase([ident, lbracket, typeArgList, rbracket]);
+  (genericTypeExpr as any).attribute("typeName", Object, function (node: any) {
+    // Compound name for display: "Array[Int]"
+    const baseName = node.children[0].text;
+    const argInfos = helpers.repChildren(node.children[2]);
+    const argNames = argInfos.map((c: any) => c.typeName);
+    return baseName + "[" + argNames.join(", ") + "]";
+  });
+  (genericTypeExpr as any).attribute("typeExpr", Object, function (node: any) {
+    // Produce: type_apply(GenericType, arg1, arg2, ...)
+    const base = helpers.makeParam(-1, node.children[0].text);
+    const argInfos = helpers.repChildren(node.children[2]);
+    const args = argInfos.map((c: any) => c.typeExpr);
+    return helpers.makeExpr(helpers.prim("type_apply"), [base, ...args]);
+  });
+
+  // Add generic alternative to the TypeExpression disjunction
+  (typeExpression as any).add(genericTypeExpr);
 
   // TypedParam: Ident ":" TypeExpression
   const typedParam = builder.phrase([ident, colon, typeExpression]);
   (typedParam as any).attribute("paramInfo", Object, function (node: any) {
-    return { name: node.children[0].text, typeName: node.children[2].typeName };
+    return {
+      name: node.children[0].text,
+      typeName: node.children[2].typeName,
+      typeExpr: node.children[2].typeExpr,
+    };
   });
 
   // TypedParamList: repeat(TypedParam, ",")
@@ -459,9 +495,9 @@ export function addTypeAnnotations(builder: GrammarBuilder): void {
   (namedTypedFnRet as any).attribute("binding", Object, function (node: any) {
     const name = node.children[0].text;
     const paramInfos = helpers.repChildren(node.children[2]).map((c: any) => c.paramInfo);
-    const returnTypeName = node.children[5].typeName;
+    const returnTypeExpr = node.children[5].typeExpr;
     const body = node.children[7].val;
-    return { name, value: buildTypedFn(paramInfos, body, returnTypeName) };
+    return { name, value: buildTypedFn(paramInfos, body, returnTypeExpr) };
   });
   (namedTypedFnRet as any).attribute("val", Object, function () { return undefined; });
   builder.addAlternative("NamedFnDecl", namedTypedFnRet);
@@ -479,16 +515,16 @@ export function addTypeAnnotations(builder: GrammarBuilder): void {
   const lambdaTypedRet = builder.phrase([lparen, typedParamList, rparen, colon, typeExpression, arrow, fnBody]);
   (lambdaTypedRet as any).attribute("val", Object, function (node: any) {
     const paramInfos = helpers.repChildren(node.children[1]).map((c: any) => c.paramInfo);
-    const returnTypeName = node.children[4].typeName;
+    const returnTypeExpr = node.children[4].typeExpr;
     const body = node.children[6].val;
-    return buildTypedFn(paramInfos, body, returnTypeName);
+    return buildTypedFn(paramInfos, body, returnTypeExpr);
   });
   builder.addAlternative("LambdaExpr", lambdaTypedRet);
 
   // --- Single-param typed lambda: Ident ":" TypeExpression "=>" FnBody ---
   const singleTypedLambda = builder.phrase([ident, colon, typeExpression, arrow, fnBody]);
   (singleTypedLambda as any).attribute("val", Object, function (node: any) {
-    const paramInfos = [{ name: node.children[0].text, typeName: node.children[2].typeName }];
+    const paramInfos = [{ name: node.children[0].text, typeName: node.children[2].typeName, typeExpr: node.children[2].typeExpr }];
     const body = node.children[4].val;
     return buildTypedFn(paramInfos, body, null);
   });

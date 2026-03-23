@@ -265,8 +265,8 @@ const boolMethods: Record<string, PrimitiveFnImpl> = {
 // Arrays are Contexts with numeric string keys ("0", "1", ...) and "__length".
 // =============================================================================
 
-/** Create a typed Array value from a list of Allegro values */
-export function makeArray(elements: Value[]): Value {
+/** Build a raw array Context (without type wrapping). Used internally. */
+function makeRawArrayCtx(elements: Value[]): ContextValue {
   const ctx = makeContext();
   for (let i = 0; i < elements.length; i++) {
     const key = String(i);
@@ -277,8 +277,30 @@ export function makeArray(elements: Value[]): Value {
   const lenVal = makeInt(elements.length);
   ctx.bindings.set(lenKey, { key: lenKey, value: lenVal, isUse: false });
   ctx.bindingList.push({ key: lenKey, value: lenVal, isUse: false });
-  // Lazily reference ArrayType — it's defined below
-  return withType(ctx, ArrayType);
+  return ctx;
+}
+
+/** Create a typed Array value from a list of Allegro values.
+ *  Infers element type: if all elements have the same type, uses Array[T].
+ *  Otherwise uses bare Array (unparameterized). */
+export function makeArray(elements: Value[]): Value {
+  const ctx = makeRawArrayCtx(elements);
+
+  // Infer element type from elements
+  // Note: ArrayType may not be initialized during module loading (circular),
+  // so we check before using it for parameterized types.
+  let arrayType: ContextValue = ArrayType;
+  if (elements.length > 0 && isGenericType(ArrayType)) {
+    const firstType = getType(elements[0]);
+    if (firstType && elements.every(e => {
+      const t = getType(e);
+      return t !== null && getTypeName(e) === getTypeName(elements[0]);
+    })) {
+      arrayType = applyGenericType(ArrayType, [firstType]);
+    }
+  }
+
+  return withType(ctx, arrayType);
 }
 
 function arrayElements(ctx: ContextValue): Value[] {
@@ -428,9 +450,155 @@ export const IntType: ContextValue = buildType("Int", intMethods);
 export const FloatType: ContextValue = buildType("Float", floatMethods);
 export const StringType: ContextValue = buildType("String", stringMethods);
 export const BoolType: ContextValue = buildType("Bool", boolMethods);
-export const ArrayType: ContextValue = buildType("Array", arrayMethods);
 export const ObjectType: ContextValue = buildType("Object", objectMethods);
 export const UntypedFunctionType: ContextValue = buildType("UntypedFunction", untypedFnMethods);
+
+// =============================================================================
+// Generic Type Infrastructure
+// =============================================================================
+
+/**
+ * Build a GenericType: a type constructor that takes type parameters and
+ * produces concrete types. Each unique parameterization is memoized.
+ *
+ * @param name       Base name (e.g., "Array")
+ * @param paramNames Parameter names (e.g., ["T"])
+ * @param methods    Method implementations (shared by all concrete types)
+ * @param makeConcreteType  Function that builds a concrete type given args
+ */
+export function buildGenericType(
+  name: string,
+  paramNames: string[],
+  methods: Record<string, PrimitiveFnImpl>,
+  makeConcreteType?: (generic: ContextValue, args: Value[]) => ContextValue,
+): ContextValue {
+  // Memoization cache: keyed by arg identity (reference equality)
+  const cache = new Map<string, ContextValue>();
+
+  function cacheKey(args: Value[]): string {
+    // Use type names for type args, data for value args
+    return args.map(a => {
+      if (a.kind === ValueKind.Context) {
+        const nb = a.bindings.get("__name");
+        if (nb?.value?.kind === ValueKind.Bits) return bitsToString(nb.value);
+      }
+      if (a.kind === ValueKind.Bits) return `v:${a.data}`;
+      if (a.kind === ValueKind.MultiValue) {
+        const p = primaryOf(a);
+        if (p.kind === ValueKind.Bits) return `v:${p.data}`;
+      }
+      return `ref:${args.indexOf(a)}`;
+    }).join(",");
+  }
+
+  // Build the base type with methods + generic metadata
+  const ctx = buildType(name, methods);
+
+  // Add __params (use raw array to avoid circular dep with ArrayType)
+  const paramsKey = "__params";
+  const paramsVal = makeRawArrayCtx(paramNames.map(n => stringToBits(n)));
+  ctx.bindings.set(paramsKey, { key: paramsKey, value: paramsVal, isUse: false });
+  ctx.bindingList.push({ key: paramsKey, value: paramsVal, isUse: false });
+
+  // Add __constructor
+  const constructorFn = makePrimitive(`${name}.__constructor`, (args: Value[]) => {
+    const key = cacheKey(args);
+    const cached = cache.get(key);
+    if (cached) return cached;
+
+    let concrete: ContextValue;
+    if (makeConcreteType) {
+      concrete = makeConcreteType(ctx, args);
+    } else {
+      concrete = defaultConcreteType(ctx, name, args, methods);
+    }
+    cache.set(key, concrete);
+    return concrete;
+  });
+  const ctorKey = "__constructor";
+  ctx.bindings.set(ctorKey, { key: ctorKey, value: constructorFn, isUse: false });
+  ctx.bindingList.push({ key: ctorKey, value: constructorFn, isUse: false });
+
+  // Mark as generic
+  const genericKey = "__isGeneric";
+  const genericVal = makeInt(1);
+  ctx.bindings.set(genericKey, { key: genericKey, value: genericVal, isUse: false });
+  ctx.bindingList.push({ key: genericKey, value: genericVal, isUse: false });
+
+  return ctx;
+}
+
+/**
+ * Default concrete type builder: creates a type Context that inherits
+ * methods from the generic and records the applied type arguments.
+ */
+function defaultConcreteType(
+  generic: ContextValue,
+  name: string,
+  args: Value[],
+  methods: Record<string, PrimitiveFnImpl>,
+): ContextValue {
+  const concrete = buildType(name, methods);
+
+  // __generic: reference to the generic type
+  const genKey = "__generic";
+  concrete.bindings.set(genKey, { key: genKey, value: generic, isUse: false });
+  concrete.bindingList.push({ key: genKey, value: generic, isUse: false });
+
+  // __args: the applied type arguments (raw array to avoid circular deps)
+  const argsKey = "__args";
+  const argsVal = makeRawArrayCtx(args);
+  concrete.bindings.set(argsKey, { key: argsKey, value: argsVal, isUse: false });
+  concrete.bindingList.push({ key: argsKey, value: argsVal, isUse: false });
+
+  return concrete;
+}
+
+/**
+ * Check if a type is a generic type (has __isGeneric).
+ */
+export function isGenericType(type: ContextValue): boolean {
+  const b = type.bindings.get("__isGeneric");
+  return b?.value !== undefined;
+}
+
+/**
+ * Get the type arguments from a concrete parameterized type.
+ * Returns null if the type has no __args.
+ */
+export function getTypeArgs(type: ContextValue): Value[] | null {
+  const b = type.bindings.get("__args");
+  if (!b?.value) return null;
+  const ctx = primaryOf(b.value);
+  if (ctx.kind !== ValueKind.Context) return null;
+  return arrayElements(ctx as ContextValue);
+}
+
+/**
+ * Get the generic type from a concrete parameterized type.
+ */
+export function getGenericType(type: ContextValue): ContextValue | null {
+  const b = type.bindings.get("__generic");
+  if (!b?.value || b.value.kind !== ValueKind.Context) return null;
+  return b.value;
+}
+
+/**
+ * Apply type arguments to a generic type, returning the concrete type.
+ */
+export function applyGenericType(generic: ContextValue, args: Value[]): ContextValue {
+  const ctor = generic.bindings.get("__constructor");
+  if (!ctor?.value || ctor.value.kind !== ValueKind.PrimitiveFunction) {
+    throw new AllegroError(`Not a generic type: ${bitsToString(generic.bindings.get("__name")?.value as BitsValue ?? stringToBits("unknown"))}`);
+  }
+  return ctor.value.fn(args, undefined as any, undefined as any) as ContextValue;
+}
+
+// =============================================================================
+// Array as GenericType
+// =============================================================================
+
+export const ArrayType: ContextValue = buildGenericType("Array", ["T"], arrayMethods);
 
 // =============================================================================
 // Type System Extension
