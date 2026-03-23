@@ -1411,6 +1411,28 @@ test("module export: exported functions work normally", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 42);
 });
 
+// == UntypedFunction ==
+
+test("UntypedFunction: primitives in standard mode have UntypedFunction type", () => {
+  // In standard mode, print is a primitive wrapped with UntypedFunction
+  const result = evalStd("print");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "UntypedFunction");
+});
+
+test("UntypedFunction: wrapped primitives are still callable", () => {
+  const result = evalStd("print(42)");
+  eq(result !== null, true);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("UntypedFunction: user-defined functions in base mode have no type", () => {
+  // In base mode (no typed flag), functions don't get types
+  const { value } = runtimeEval("f(x) => x\nf\n");
+  eq(value !== null, true);
+  eq(getTypeName(value!), null);
+});
+
 // == Type Annotations ==
 
 test("type annotation: typed param correct type passes", () => {

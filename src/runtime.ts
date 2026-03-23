@@ -8,7 +8,7 @@ import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, Extension } from "./types.js";
-import { withType, IntType, StringType } from "./types-std.js";
+import { withType, IntType, StringType, wrapAsUntypedFunction } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
 export type { Extension };
@@ -103,6 +103,7 @@ export function buildEvalCtx(
   fileCtx: any,
   base?: ContextValue,
   extensions?: Extension[],
+  typed?: boolean,
 ): ContextValue {
   const evalCtx = makeContext();
 
@@ -118,8 +119,13 @@ export function buildEvalCtx(
   }
 
   // Layer 1: Primitives
+  // In typed/standard mode, wrap function primitives as UntypedFunction
   for (const [name, prim] of Object.entries(primitives)) {
-    addBinding(name, prim as Value);
+    if (typed && (prim as any).kind === ValueKind.PrimitiveFunction) {
+      addBinding(name, wrapAsUntypedFunction(prim as Value));
+    } else {
+      addBinding(name, prim as Value);
+    }
   }
 
   // Layer 2: Extensions (applied in order, later extensions shadow earlier ones)
@@ -207,7 +213,7 @@ export function evalSource(
     }
   }
 
-  const evalCtx = buildEvalCtx(fileCtx, base, extensions);
+  const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
 
   let lastValue: Value | null = null;
   for (const b of fileCtx.bindingList) {

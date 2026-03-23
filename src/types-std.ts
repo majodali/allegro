@@ -408,6 +408,19 @@ const objectMethods: Record<string, PrimitiveFnImpl> = {
 };
 
 // =============================================================================
+// UntypedFunction Type
+// Wraps base language / extension primitives that enter Standard mode.
+// These are callable but have no type information about params or return.
+// The arity is tracked when known.
+// =============================================================================
+
+const untypedFnMethods: Record<string, PrimitiveFnImpl> = {
+  toString: ((args: Value[]) => {
+    return withType(stringToBits("<untyped function>"), StringType);
+  }) as PrimitiveFnImpl,
+};
+
+// =============================================================================
 // Build Type Contexts
 // =============================================================================
 
@@ -417,10 +430,35 @@ export const StringType: ContextValue = buildType("String", stringMethods);
 export const BoolType: ContextValue = buildType("Bool", boolMethods);
 export const ArrayType: ContextValue = buildType("Array", arrayMethods);
 export const ObjectType: ContextValue = buildType("Object", objectMethods);
+export const UntypedFunctionType: ContextValue = buildType("UntypedFunction", untypedFnMethods);
 
 // =============================================================================
 // Type System Extension
 // =============================================================================
+
+/**
+ * Wrap a function value (PrimitiveFunction or ComposedFunction) as UntypedFunction.
+ * Attaches arity as a component when known.
+ */
+export function wrapAsUntypedFunction(fn: Value, arity?: number): Value {
+  const primary = primaryOf(fn);
+  const components = fn.kind === ValueKind.MultiValue
+    ? new Map(fn.components)
+    : new Map<string, Value>();
+  components.set("type", UntypedFunctionType);
+  if (arity !== undefined) {
+    components.set("arity", makeInt(arity));
+  }
+  return makeMultiValue(primary, components);
+}
+
+/**
+ * Check if a value is a function (PrimitiveFunction or ComposedFunction).
+ */
+function isFunctionValue(v: Value): boolean {
+  const p = primaryOf(v);
+  return p.kind === ValueKind.PrimitiveFunction || p.kind === ValueKind.ComposedFunction;
+}
 
 export function createTypeSystem(): Extension {
   return {
@@ -432,6 +470,7 @@ export function createTypeSystem(): Extension {
       Bool: BoolType,
       Array: ArrayType,
       Object: ObjectType,
+      UntypedFunction: UntypedFunctionType,
       // Bool literals as context bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,
