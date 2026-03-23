@@ -1382,6 +1382,7 @@ for (const [key, binding] of mathResult.evalCtx.bindings) {
 }
 const mathModuleCtx = extensionToContext({ name: "math", bindings: mathBindings });
 fileTest(path.join(testsDir, "modules.alg"), [{ name: "modules", bindings: { math: mathModuleCtx } }]);
+fileTest(path.join(testsDir, "type-annotations.alg"));
 
 // == Module Export Tests ==
 
@@ -1408,6 +1409,62 @@ test("module export: non-exported values don't have exported component", () => {
 test("module export: exported functions work normally", () => {
   const result = evalStd("f = export(x => x * 2)\nf(21)\n");
   eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+// == Type Annotations ==
+
+test("type annotation: typed param correct type passes", () => {
+  const result = evalStd("f(x: Int) => x + 1\nf(5)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 6);
+});
+
+test("type annotation: typed param wrong type throws", () => {
+  let threw = false;
+  try { evalStd('f(x: Int) => x\nf("hello")'); }
+  catch (e: any) { threw = e.message.includes("Type error"); }
+  eq(threw, true);
+});
+
+test("type annotation: multiple typed params", () => {
+  const result = evalStd("f(x: Int, y: Int) => x + y\nf(3, 4)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("type annotation: return type correct", () => {
+  const result = evalStd("f(x: Int): Int => x + 1\nf(5)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 6);
+});
+
+test("type annotation: return type wrong throws", () => {
+  let threw = false;
+  try { evalStd('f(x: Int): String => x + 1\nf(5)'); }
+  catch (e: any) { threw = e.message.includes("Type error"); }
+  eq(threw, true);
+});
+
+test("type annotation: lambda typed params", () => {
+  const result = evalStd("f = (x: Int, y: Int) => x + y\nf(3, 4)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("type annotation: lambda with return type", () => {
+  const result = evalStd("f = (x: Int): Int => x + 1\nf(5)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 6);
+});
+
+test("type annotation: single param typed lambda", () => {
+  const result = evalStd("[1, 2, 3].map(x: Int => x * 2)");
+  eq(formatValue(result!), "[2, 4, 6]");
+});
+
+test("type annotation: String type", () => {
+  const result = evalStd('f(s: String) => s\nf("hello")');
+  eq(formatValue(result!), "hello");
+});
+
+test("type annotation: untyped function still works", () => {
+  const result = evalStd("f(x) => x + 1\nf(5)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 6);
 });
 
 // --- Run all tests (sync + async) and report ---

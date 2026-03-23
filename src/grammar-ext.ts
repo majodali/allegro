@@ -84,6 +84,11 @@ export class GrammarBuilder {
     );
   }
 
+  /** Create a new Disjunction from alternatives */
+  disjunction(alternatives: GrammarElement[]): Disjunction {
+    return new (Disjunction as any)(alternatives);
+  }
+
   /** Add a new alternative to a named Disjunction in the base grammar */
   addAlternative(disjunctionName: string, alternative: GrammarElement): this {
     const disjunction = this.getBase(disjunctionName);
@@ -324,10 +329,176 @@ export function addLogicalOps(builder: GrammarBuilder): void {
   builder.addAlternative("UnaryExpr", notPhrase);
 }
 
+// --- Type Annotations ---
+
+interface ParamInfo {
+  name: string;
+  typeName: string;
+}
+
+/**
+ * Walk an expression body and wrap param references that have type annotations
+ * with type_check(param, TypeExpression) calls.
+ */
+function wrapParamsWithChecks(
+  body: any,
+  owner: any,
+  typedParams: Map<number, string>,
+  seen?: Set<any>,
+): any {
+  if (!body || typeof body !== "object") return body;
+  if (!seen) seen = new Set();
+  if (seen.has(body)) return body;
+  seen.add(body);
+
+  if (body.kind === "Param" && body.owner === owner && typedParams.has(body.position)) {
+    const typeName = typedParams.get(body.position)!;
+    return helpers.makeExpr(
+      helpers.prim("type_check"),
+      [body, helpers.makeParam(-1, typeName)],
+    );
+  }
+
+  if (body.kind === "Expression") {
+    const newFn = wrapParamsWithChecks(body.fn, owner, typedParams, seen);
+    const newArgs = body.args.map((a: any) => wrapParamsWithChecks(a, owner, typedParams, seen));
+    if (newFn === body.fn && newArgs.every((a: any, i: number) => a === body.args[i])) return body;
+    return helpers.makeExpr(newFn, newArgs);
+  }
+
+  if (body.kind === "ComposedFunction") {
+    const newBody = wrapParamsWithChecks(body.body, owner, typedParams, seen);
+    if (newBody === body.body) return body;
+    return helpers.makeComposedFn(body.params, newBody);
+  }
+
+  return body;
+}
+
+/**
+ * Build a typed function: wraps param references with type_check calls
+ * and optionally wraps the return value with a type check.
+ */
+function buildTypedFn(
+  params: ParamInfo[],
+  body: any,
+  returnTypeName: string | null,
+): any {
+  // 1. Build the base function with just param names
+  const paramNames = params.map(p => p.name);
+  const fn = helpers.buildFn(paramNames, body);
+
+  // 2. Collect typed params by position
+  const typedParams = new Map<number, string>();
+  for (let i = 0; i < params.length; i++) {
+    if (params[i].typeName) {
+      typedParams.set(i, params[i].typeName);
+    }
+  }
+
+  // 3. Wrap param references with type_check
+  if (typedParams.size > 0) {
+    fn.body = wrapParamsWithChecks(fn.body, fn, typedParams);
+  }
+
+  // 4. Wrap return with type_check if return type specified
+  if (returnTypeName) {
+    fn.body = helpers.makeExpr(
+      helpers.prim("type_check"),
+      [fn.body, helpers.makeParam(-1, returnTypeName)],
+    );
+  }
+
+  return fn;
+}
+
+/**
+ * Add type annotation syntax for function parameters and return types.
+ * f(x: Int, y: String): Bool => body
+ * (x: Int) => body
+ * x: Int => body
+ */
+export function addTypeAnnotations(builder: GrammarBuilder): void {
+  const colon = builder.terminal(":");
+  const comma = builder.terminal(",");
+  const lparen = builder.terminal("(");
+  const rparen = builder.terminal(")");
+  const arrow = builder.terminal(/=>/);
+  const ident = builder.getBase("Ident");
+  const fnBody = builder.getBase("FnBody");
+
+  // TypeExpression: for now just Ident, extensible later for generics, algebraic types
+  const typeExprPhrase = builder.phrase([ident]);
+  (typeExprPhrase as any).attribute("typeName", Object, function (node: any) {
+    return node.children[0].text;
+  });
+  const typeExpression = builder.disjunction([typeExprPhrase]);
+
+  // TypedParam: Ident ":" TypeExpression
+  const typedParam = builder.phrase([ident, colon, typeExpression]);
+  (typedParam as any).attribute("paramInfo", Object, function (node: any) {
+    return { name: node.children[0].text, typeName: node.children[2].typeName };
+  });
+
+  // TypedParamList: repeat(TypedParam, ",")
+  const typedParamList = builder.repeat(typedParam, { delimiter: comma });
+
+  // --- Named function: Ident "(" TypedParamList ")" "=>" FnBody ---
+  const namedTypedFn = builder.phrase([ident, lparen, typedParamList, rparen, arrow, fnBody]);
+  (namedTypedFn as any).attribute("binding", Object, function (node: any) {
+    const name = node.children[0].text;
+    const paramInfos = helpers.repChildren(node.children[2]).map((c: any) => c.paramInfo);
+    const body = node.children[5].val;
+    return { name, value: buildTypedFn(paramInfos, body, null) };
+  });
+  (namedTypedFn as any).attribute("val", Object, function () { return undefined; });
+  builder.addAlternative("NamedFnDecl", namedTypedFn);
+
+  // --- Named function with return type: Ident "(" TypedParamList ")" ":" TypeExpression "=>" FnBody ---
+  const namedTypedFnRet = builder.phrase([ident, lparen, typedParamList, rparen, colon, typeExpression, arrow, fnBody]);
+  (namedTypedFnRet as any).attribute("binding", Object, function (node: any) {
+    const name = node.children[0].text;
+    const paramInfos = helpers.repChildren(node.children[2]).map((c: any) => c.paramInfo);
+    const returnTypeName = node.children[5].typeName;
+    const body = node.children[7].val;
+    return { name, value: buildTypedFn(paramInfos, body, returnTypeName) };
+  });
+  (namedTypedFnRet as any).attribute("val", Object, function () { return undefined; });
+  builder.addAlternative("NamedFnDecl", namedTypedFnRet);
+
+  // --- Multi-param lambda: "(" TypedParamList ")" "=>" FnBody ---
+  const lambdaTyped = builder.phrase([lparen, typedParamList, rparen, arrow, fnBody]);
+  (lambdaTyped as any).attribute("val", Object, function (node: any) {
+    const paramInfos = helpers.repChildren(node.children[1]).map((c: any) => c.paramInfo);
+    const body = node.children[4].val;
+    return buildTypedFn(paramInfos, body, null);
+  });
+  builder.addAlternative("LambdaExpr", lambdaTyped);
+
+  // --- Multi-param lambda with return type: "(" TypedParamList ")" ":" TypeExpression "=>" FnBody ---
+  const lambdaTypedRet = builder.phrase([lparen, typedParamList, rparen, colon, typeExpression, arrow, fnBody]);
+  (lambdaTypedRet as any).attribute("val", Object, function (node: any) {
+    const paramInfos = helpers.repChildren(node.children[1]).map((c: any) => c.paramInfo);
+    const returnTypeName = node.children[4].typeName;
+    const body = node.children[6].val;
+    return buildTypedFn(paramInfos, body, returnTypeName);
+  });
+  builder.addAlternative("LambdaExpr", lambdaTypedRet);
+
+  // --- Single-param typed lambda: Ident ":" TypeExpression "=>" FnBody ---
+  const singleTypedLambda = builder.phrase([ident, colon, typeExpression, arrow, fnBody]);
+  (singleTypedLambda as any).attribute("val", Object, function (node: any) {
+    const paramInfos = [{ name: node.children[0].text, typeName: node.children[2].typeName }];
+    const body = node.children[4].val;
+    return buildTypedFn(paramInfos, body, null);
+  });
+  builder.addAlternative("LambdaExpr", singleTypedLambda);
+}
+
 /**
  * Build Allegro Standard grammar extensions.
  * Uses type_dispatch for dot access (type-directed dispatch).
- * Includes bool/float literals, array/object literals, bracket access, logical ops.
+ * Includes bool/float literals, array/object literals, bracket access, logical ops, type annotations.
  */
 export function buildAllegroStandardExtensions(): GrammarExtension {
   const builder = new GrammarBuilder();
@@ -338,6 +509,7 @@ export function buildAllegroStandardExtensions(): GrammarExtension {
   addObjectLiteral(builder);
   addBracketAccess(builder);
   addLogicalOps(builder);
+  addTypeAnnotations(builder);
   return builder.build();
 }
 
