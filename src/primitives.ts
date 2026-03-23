@@ -3,7 +3,7 @@
 import {
   Value, ValueKind, BitsValue, ContextValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn,
-  AllegroError, makeBits, makeInt, makePrimitive, makeExpr,
+  AllegroError, makeBits, makeInt, makeFloat, bitsToFloat, makePrimitive, makeExpr,
   makeParam, makeComposedFn, makeContext, makeMultiValue,
   primaryOf, stringToBits, bitsToString,
 } from "./types.js";
@@ -21,7 +21,37 @@ export function formatValue(v: Value): string {
         if (typeName === "String") {
           return bitsToString(v.primary as BitsValue);
         }
-        // Int, Float, Bool — display the primary
+        if (typeName === "Bool") {
+          return (v.primary as BitsValue).data !== 0n ? "true" : "false";
+        }
+        if (typeName === "Float") {
+          return String(bitsToFloat(v.primary as BitsValue));
+        }
+        if (typeName === "Array") {
+          // Display array elements
+          const ctx = v.primary as ContextValue;
+          const lenB = ctx.bindings.get("__length");
+          const len = lenB?.value ? Number((lenB.value as BitsValue).data) : 0;
+          const elems: string[] = [];
+          for (let i = 0; i < len && i < 10; i++) {
+            const b = ctx.bindings.get(String(i));
+            if (b?.value) elems.push(formatValue(b.value));
+          }
+          if (len > 10) elems.push("...");
+          return `[${elems.join(", ")}]`;
+        }
+        if (typeName === "Object") {
+          const ctx = v.primary as ContextValue;
+          const fields: string[] = [];
+          for (const [key, binding] of ctx.bindings) {
+            if (binding.value && fields.length < 5) {
+              fields.push(`${key}: ${formatValue(binding.value)}`);
+            }
+          }
+          if (ctx.bindings.size > 5) fields.push("...");
+          return `{${fields.join(", ")}}`;
+        }
+        // Int — display the primary normally
       }
     }
   }
@@ -408,7 +438,8 @@ const grammar_build_impl: PrimitiveFnImpl = (args) => {
 
 import {
   getType, getTypeName, withType, typeMethod,
-  IntType, StringType,
+  IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
+  makeArray, makeObject,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 
@@ -424,6 +455,55 @@ const typed_string_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
   if (!isResolved(v)) return makeExpr(makePrimitive("typed_string", typed_string_impl, true), [v]);
   return withType(v, StringType);
+};
+
+const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) return makeExpr(makePrimitive("typed_float", typed_float_impl, true), [v]);
+  // If arg is a string (Bits from stringToBits), parse it as a float
+  const p = primaryOf(v);
+  if (p.kind === ValueKind.Bits) {
+    // Check if it's a string representation (non-64-bit) that needs parsing
+    if (p.length !== 64 || (v.kind === ValueKind.MultiValue && getTypeName(v) === "String")) {
+      const str = bitsToString(p);
+      return withType(makeFloat(parseFloat(str)), FloatType);
+    }
+    return withType(p, FloatType);
+  }
+  return withType(v, FloatType);
+};
+
+const typed_bool_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) return makeExpr(makePrimitive("typed_bool", typed_bool_impl, true), [v]);
+  return withType(v, BoolType);
+};
+
+const typed_array_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // Evaluate all element args, build a typed array
+  const elements: Value[] = [];
+  for (const arg of args) {
+    const v = evalFn!(arg, ctx!);
+    if (!isResolved(v)) {
+      return makeExpr(makePrimitive("typed_array", typed_array_impl, true), args);
+    }
+    elements.push(v);
+  }
+  return makeArray(elements);
+};
+
+const typed_object_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // Args are [key1_bits, val1, key2_bits, val2, ...]
+  const entries: [string, Value][] = [];
+  for (let i = 0; i < args.length; i += 2) {
+    const keyV = evalFn!(args[i], ctx!);
+    const valV = evalFn!(args[i + 1], ctx!);
+    if (!isResolved(keyV) || !isResolved(valV)) {
+      return makeExpr(makePrimitive("typed_object", typed_object_impl, true), args);
+    }
+    entries.push([bitsToString(primaryOf(keyV) as BitsValue), valV]);
+  }
+  return makeObject(entries);
 };
 
 // --- type_dispatch: type-directed dot access ---
@@ -586,6 +666,10 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   // Type system
   typed_int: makePrimitive("typed_int", typed_int_impl, true),
   typed_string: makePrimitive("typed_string", typed_string_impl, true),
+  typed_float: makePrimitive("typed_float", typed_float_impl, true),
+  typed_bool: makePrimitive("typed_bool", typed_bool_impl, true),
+  typed_array: makePrimitive("typed_array", typed_array_impl, true),
+  typed_object: makePrimitive("typed_object", typed_object_impl, true),
   type_dispatch: makePrimitive("type_dispatch", type_dispatch_impl, true),
   type_of: makePrimitive("type_of", type_of_impl, true),
   type_check: makePrimitive("type_check", type_check_impl, true),

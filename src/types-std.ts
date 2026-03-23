@@ -6,7 +6,7 @@
 
 import {
   Value, ValueKind, BitsValue, ContextValue, PrimitiveFnImpl,
-  makeInt, makePrimitive, makeContext, makeMultiValue,
+  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeContext, makeMultiValue,
   primaryOf, stringToBits, bitsToString, AllegroError,
   Extension,
 } from "./types.js";
@@ -208,11 +208,181 @@ const stringMethods: Record<string, PrimitiveFnImpl> = {
 };
 
 // =============================================================================
+// Float Type
+// =============================================================================
+
+const floatMethods: Record<string, PrimitiveFnImpl> = {
+  add: (args) => makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.add")) + bitsToFloat(asBitsTyped(args[1], "Float.add"))),
+  sub: (args) => makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.sub")) - bitsToFloat(asBitsTyped(args[1], "Float.sub"))),
+  mul: (args) => makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.mul")) * bitsToFloat(asBitsTyped(args[1], "Float.mul"))),
+  div: (args) => {
+    const b = bitsToFloat(asBitsTyped(args[1], "Float.div"));
+    if (b === 0) throw new AllegroError("Float.div: division by zero");
+    return makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.div")) / b);
+  },
+  mod: (args) => {
+    const b = bitsToFloat(asBitsTyped(args[1], "Float.mod"));
+    if (b === 0) throw new AllegroError("Float.mod: division by zero");
+    return makeFloat(bitsToFloat(asBitsTyped(args[0], "Float.mod")) % b);
+  },
+  eq: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.eq")) === bitsToFloat(asBitsTyped(args[1], "Float.eq")) ? 1 : 0),
+  neq: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.neq")) !== bitsToFloat(asBitsTyped(args[1], "Float.neq")) ? 1 : 0),
+  lt: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.lt")) < bitsToFloat(asBitsTyped(args[1], "Float.lt")) ? 1 : 0),
+  gt: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.gt")) > bitsToFloat(asBitsTyped(args[1], "Float.gt")) ? 1 : 0),
+  lte: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.lte")) <= bitsToFloat(asBitsTyped(args[1], "Float.lte")) ? 1 : 0),
+  gte: (args) => makeInt(bitsToFloat(asBitsTyped(args[0], "Float.gte")) >= bitsToFloat(asBitsTyped(args[1], "Float.gte")) ? 1 : 0),
+  toString: ((args: Value[]) => stringToBits(String(bitsToFloat(asBitsTyped(args[0], "Float.toString"))))) as PrimitiveFnImpl,
+};
+
+// =============================================================================
+// Bool Type
+// =============================================================================
+
+const boolMethods: Record<string, PrimitiveFnImpl> = {
+  and: (args) => {
+    const a = asBitsTyped(args[0], "Bool.and").data !== 0n;
+    const b = asBitsTyped(args[1], "Bool.and").data !== 0n;
+    return makeInt(a && b ? 1 : 0);
+  },
+  or: (args) => {
+    const a = asBitsTyped(args[0], "Bool.or").data !== 0n;
+    const b = asBitsTyped(args[1], "Bool.or").data !== 0n;
+    return makeInt(a || b ? 1 : 0);
+  },
+  not: (args) => {
+    const a = asBitsTyped(args[0], "Bool.not").data !== 0n;
+    return makeInt(a ? 0 : 1);
+  },
+  eq: (args) => makeInt(asBitsTyped(args[0], "Bool.eq").data === asBitsTyped(args[1], "Bool.eq").data ? 1 : 0),
+  neq: (args) => makeInt(asBitsTyped(args[0], "Bool.neq").data !== asBitsTyped(args[1], "Bool.neq").data ? 1 : 0),
+  toString: ((args: Value[]) => {
+    const a = asBitsTyped(args[0], "Bool.toString").data !== 0n;
+    return stringToBits(a ? "true" : "false");
+  }) as PrimitiveFnImpl,
+};
+
+// =============================================================================
+// Array Type
+// Arrays are Contexts with numeric string keys ("0", "1", ...) and "__length".
+// =============================================================================
+
+/** Create a typed Array value from a list of Allegro values */
+export function makeArray(elements: Value[]): Value {
+  const ctx = makeContext();
+  for (let i = 0; i < elements.length; i++) {
+    const key = String(i);
+    ctx.bindings.set(key, { key, value: elements[i], isUse: false });
+    ctx.bindingList.push({ key, value: elements[i], isUse: false });
+  }
+  const lenKey = "__length";
+  const lenVal = makeInt(elements.length);
+  ctx.bindings.set(lenKey, { key: lenKey, value: lenVal, isUse: false });
+  ctx.bindingList.push({ key: lenKey, value: lenVal, isUse: false });
+  // Lazily reference ArrayType — it's defined below
+  return withType(ctx, ArrayType);
+}
+
+function arrayElements(ctx: ContextValue): Value[] {
+  const lenBinding = ctx.bindings.get("__length");
+  if (!lenBinding?.value) return [];
+  const len = Number((lenBinding.value as BitsValue).data);
+  const result: Value[] = [];
+  for (let i = 0; i < len; i++) {
+    const b = ctx.bindings.get(String(i));
+    if (b?.value) result.push(b.value);
+  }
+  return result;
+}
+
+const arrayMethods: Record<string, PrimitiveFnImpl> = {
+  length: (args) => {
+    const ctx = args[0] as ContextValue;
+    const lenBinding = ctx.bindings.get("__length");
+    return lenBinding?.value ?? makeInt(0);
+  },
+  get: (args) => {
+    const ctx = args[0] as ContextValue;
+    const idx = Number(toSigned(asBitsTyped(args[1], "Array.get")));
+    const b = ctx.bindings.get(String(idx));
+    if (!b?.value) throw new AllegroError(`Array.get: index ${idx} out of bounds`);
+    return b.value;
+  },
+  concat: (args) => {
+    const aCtx = args[0] as ContextValue;
+    const bCtx = args[1] as ContextValue;
+    return makeArray([...arrayElements(aCtx), ...arrayElements(bCtx)]);
+  },
+  slice: (args) => {
+    const ctx = args[0] as ContextValue;
+    const elems = arrayElements(ctx);
+    const start = Number(toSigned(asBitsTyped(args[1], "Array.slice")));
+    const end = args.length > 2
+      ? Number(toSigned(asBitsTyped(args[2], "Array.slice")))
+      : elems.length;
+    return makeArray(elems.slice(start, end));
+  },
+  eq: (args) => {
+    // Reference equality for now (arrays are Contexts)
+    return makeInt(args[0] === args[1] ? 1 : 0);
+  },
+  toString: ((args: Value[]) => {
+    const ctx = args[0] as ContextValue;
+    const elems = arrayElements(ctx);
+    // Simple representation
+    return stringToBits(`[Array(${elems.length})]`);
+  }) as PrimitiveFnImpl,
+};
+
+// =============================================================================
+// Object Type
+// Objects are typed Contexts. Fields are accessed via dot notation.
+// =============================================================================
+
+/** Create a typed Object value from key-value pairs */
+export function makeObject(entries: [string, Value][]): Value {
+  const ctx = makeContext();
+  for (const [key, value] of entries) {
+    ctx.bindings.set(key, { key, value, isUse: false });
+    ctx.bindingList.push({ key, value, isUse: false });
+  }
+  return withType(ctx, ObjectType);
+}
+
+const objectMethods: Record<string, PrimitiveFnImpl> = {
+  keys: (args) => {
+    const ctx = args[0] as ContextValue;
+    const keys = [...ctx.bindings.keys()];
+    return makeArray(keys.map(k => stringToBits(k)));
+  },
+  values: (args) => {
+    const ctx = args[0] as ContextValue;
+    const vals = [...ctx.bindings.values()].filter(b => b.value !== undefined).map(b => b.value!);
+    return makeArray(vals);
+  },
+  get: (args) => {
+    const ctx = args[0] as ContextValue;
+    const key = bitsToString(asBitsTyped(args[1], "Object.get"));
+    const b = ctx.bindings.get(key);
+    if (!b?.value) throw new AllegroError(`Object.get: '${key}' not found`);
+    return b.value;
+  },
+  eq: (args) => makeInt(args[0] === args[1] ? 1 : 0),
+  toString: ((args: Value[]) => {
+    const ctx = args[0] as ContextValue;
+    return stringToBits(`{Object(${ctx.bindings.size})}`);
+  }) as PrimitiveFnImpl,
+};
+
+// =============================================================================
 // Build Type Contexts
 // =============================================================================
 
 export const IntType: ContextValue = buildType("Int", intMethods);
+export const FloatType: ContextValue = buildType("Float", floatMethods);
 export const StringType: ContextValue = buildType("String", stringMethods);
+export const BoolType: ContextValue = buildType("Bool", boolMethods);
+export const ArrayType: ContextValue = buildType("Array", arrayMethods);
+export const ObjectType: ContextValue = buildType("Object", objectMethods);
 
 // =============================================================================
 // Type System Extension
@@ -223,7 +393,14 @@ export function createTypeSystem(): Extension {
     name: "types",
     bindings: {
       Int: IntType,
+      Float: FloatType,
       String: StringType,
+      Bool: BoolType,
+      Array: ArrayType,
+      Object: ObjectType,
+      // Bool literals as context bindings (parsed as identifiers, resolved here)
+      true: withType(makeInt(1), BoolType) as any,
+      false: withType(makeInt(0), BoolType) as any,
     },
   };
 }

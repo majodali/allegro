@@ -1041,7 +1041,6 @@ test("type system: dot access on untyped context falls back to ctx_resolve", () 
 });
 
 test("type system: basics.alg works in typed mode", () => {
-  // Run basics.alg content in typed mode
   const basicsSource = `
 3 + 4 * 2
 42
@@ -1056,7 +1055,6 @@ g(42)
 add(a, b) => a + b
 add(3, 4)
 `;
-  // Capture printed output
   const printed: string[] = [];
   const origLog = console.log;
   console.log = (msg: any) => printed.push(String(msg));
@@ -1065,9 +1063,138 @@ add(3, 4)
   } finally {
     console.log = origLog;
   }
-  // Verify the printed values (from print calls in basics.alg)
-  // In typed mode, bare expressions return values but don't print
-  // The actual basics.alg uses print(), but this test just verifies no errors
+});
+
+// == Float Type ==
+
+test("type system: float literal has Float type", () => {
+  const result = evalStd("3.14");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Float");
+  eq(formatValue(result!), "3.14");
+});
+
+test("type system: float arithmetic", () => {
+  const result = evalStd("1.5 + 2.5");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Float");
+  eq(formatValue(result!), "4");
+});
+
+test("type system: float multiplication", () => {
+  const result = evalStd("2.0 * 3.5");
+  eq(getTypeName(result!), "Float");
+  eq(formatValue(result!), "7");
+});
+
+test("type system: float division", () => {
+  const result = evalStd("7.0 / 2.0");
+  eq(getTypeName(result!), "Float");
+  eq(formatValue(result!), "3.5");
+});
+
+test("type system: float comparison", () => {
+  const result = evalStd("3.14 > 2.71");
+  eq(result !== null, true);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("type system: float toString", () => {
+  const result = evalStd("3.14.toString()");
+  eq(bitsToString(primaryOf(result!) as BitsValue), "3.14");
+});
+
+// == Bool Type ==
+
+test("type system: true literal has Bool type", () => {
+  const result = evalStd("true");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Bool");
+  eq(formatValue(result!), "true");
+});
+
+test("type system: false literal has Bool type", () => {
+  const result = evalStd("false");
+  eq(getTypeName(result!), "Bool");
+  eq(formatValue(result!), "false");
+});
+
+test("type system: bool toString", () => {
+  const result = evalStd("true.toString()");
+  eq(bitsToString(primaryOf(result!) as BitsValue), "true");
+});
+
+// == Array Type ==
+
+test("type system: empty array literal", () => {
+  const result = evalStd("[]");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Array");
+  eq(formatValue(result!), "[]");
+});
+
+test("type system: array with elements", () => {
+  const result = evalStd("[1, 2, 3]");
+  eq(getTypeName(result!), "Array");
+  eq(formatValue(result!), "[1, 2, 3]");
+});
+
+test("type system: array length", () => {
+  const result = evalStd("[10, 20, 30].length");
+  eq(result !== null, true);
+  eq(Number((primaryOf(result!) as BitsValue).data), 3);
+});
+
+test("type system: array bracket access", () => {
+  const result = evalStd("[10, 20, 30][1]");
+  eq(result !== null, true);
+  eq(Number((primaryOf(result!) as BitsValue).data), 20);
+});
+
+test("type system: array of strings", () => {
+  const result = evalStd('["a", "b", "c"]');
+  eq(getTypeName(result!), "Array");
+});
+
+test("type system: array slice", () => {
+  const result = evalStd("[1, 2, 3].slice(1, 3)");
+  eq(getTypeName(result!), "Array");
+  eq(formatValue(result!), "[2, 3]");
+});
+
+// == Object Type ==
+
+test("type system: empty object literal", () => {
+  const result = evalStd("{}");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "Object");
+});
+
+test("type system: object with fields", () => {
+  const result = evalStd("{x: 1, y: 2}");
+  eq(getTypeName(result!), "Object");
+});
+
+test("type system: object field access via dot", () => {
+  const result = evalStd("{x: 42, y: 7}.x");
+  eq(result !== null, true);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("type system: object bracket access", () => {
+  const result = evalStd('{name: "alice"}["name"]');
+  eq(result !== null, true);
+  eq(bitsToString(primaryOf(result!) as BitsValue), "alice");
+});
+
+test("type system: nested object", () => {
+  const result = evalStd("{a: {x: 1}}.a.x");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("type system: object keys", () => {
+  const result = evalStd("{x: 1, y: 2}.keys()");
+  eq(getTypeName(result!), "Array");
 });
 
 // --- Run all tests (sync + async) and report ---
