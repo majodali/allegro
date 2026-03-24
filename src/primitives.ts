@@ -51,6 +51,13 @@ export function formatValue(v: Value): string {
           if (ctx.bindings.size > 5) fields.push("...");
           return `{${fields.join(", ")}}`;
         }
+        if (typeName === "Function") {
+          const p = v.primary;
+          if (p.kind === ValueKind.ComposedFunction) {
+            return `<function(${p.params.length})>`;
+          }
+          return `<function>`;
+        }
         // Int — display the primary normally
       }
     }
@@ -441,7 +448,8 @@ const grammar_build_impl: PrimitiveFnImpl = (args) => {
 import {
   getType, getTypeName, withType, typeMethod,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
-  makeArray, makeObject,
+  FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
+  AnyType, makeArray, makeObject,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
@@ -507,6 +515,49 @@ const typed_object_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     entries.push([bitsToString(primaryOf(keyV) as BitsValue), valV]);
   }
   return makeObject(entries);
+};
+
+// --- typed_function: wrap composed function with FunctionType ---
+
+const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // Args: [composedFn, paramCount, paramType1, ..., paramTypeN, returnType]
+  const fn = evalFn!(args[0], ctx!);
+  if (!isResolved(fn)) {
+    return makeExpr(makePrimitive("typed_function", typed_function_impl, true), args);
+  }
+  const paramCount = Number(asBits(primaryOf(evalFn!(args[1], ctx!)), "typed_function").data);
+  const paramTypes: Value[] = [];
+  for (let i = 0; i < paramCount; i++) {
+    const pt = evalFn!(args[2 + i], ctx!);
+    // Type variables (unresolved Params) are kept as-is — they'll be
+    // resolved during unification when the function is called
+    if (isResolved(pt)) {
+      const ptPrimary = primaryOf(pt);
+      if (ptPrimary.kind === ValueKind.Context && isGenericType(ptPrimary as ContextValue)) {
+        paramTypes.push(normalizeType(ptPrimary as ContextValue));
+      } else {
+        paramTypes.push(ptPrimary);
+      }
+    } else {
+      // Unresolved — treat as type variable (store the Param/Expression as-is)
+      paramTypes.push(pt);
+    }
+  }
+  const returnTypeRaw = evalFn!(args[2 + paramCount], ctx!);
+  let returnType: Value;
+  if (!isResolved(returnTypeRaw)) {
+    // Return type contains unresolved type variables — store as-is
+    returnType = returnTypeRaw;
+  } else {
+    const rtp = primaryOf(returnTypeRaw);
+    if (rtp.kind === ValueKind.Context && isGenericType(rtp as ContextValue)) {
+      returnType = normalizeType(rtp as ContextValue);
+    } else {
+      returnType = rtp;
+    }
+  }
+  const fnType = makeFunctionType(paramTypes, returnType);
+  return withType(fn, fnType);
 };
 
 // --- Logical operators (short-circuiting) ---
@@ -826,6 +877,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_bool: makePrimitive("typed_bool", typed_bool_impl, true),
   typed_array: makePrimitive("typed_array", typed_array_impl, true),
   typed_object: makePrimitive("typed_object", typed_object_impl, true),
+  typed_function: makePrimitive("typed_function", typed_function_impl, true),
   typed_and: makePrimitive("typed_and", typed_and_impl, true),
   typed_or: makePrimitive("typed_or", typed_or_impl, true),
   typed_not: makePrimitive("typed_not", typed_not_impl, true),

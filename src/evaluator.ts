@@ -3,8 +3,12 @@
 import {
   Value, ValueKind, ExpressionValue, ContextValue,
   ComposedFunctionValue, ParamValue, MultiValueType,
-  AllegroError, primaryOf, isResolved, makeExpr, makeMultiValue,
+  AllegroError, primaryOf, isResolved, makeExpr, makeMultiValue, makeContext,
 } from "./types.js";
+import {
+  getType, getTypeName, withType, getFunctionParamTypes, getFunctionReturnType,
+  unifyTypes, resolveTypeWithBindings, TypeBindings,
+} from "./types-std.js";
 
 const MAX_DEPTH = 10000;
 
@@ -65,7 +69,7 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
 
   // Composed function
   if (fn.kind === ValueKind.ComposedFunction) {
-    const result = applyComposed(fn, expr.args, ctx, depth);
+    const result = applyComposed(fn, expr.args, ctx, depth, fnRaw);
     expr.memo.set("eval", result);
     return result;
   }
@@ -149,10 +153,62 @@ function applyComposed(
   args: Value[],
   ctx: ContextValue,
   depth: number,
+  fnRaw?: Value,
 ): Value {
   const evalArgs = args.map(a => evaluate(a, ctx, depth + 1));
+
+  // Type variable unification: if the function has a FunctionType,
+  // match arg types against param types to bind type variables
+  let enrichedCtx = ctx;
+  let inferredReturnType: Value | null = null;
+  if (fnRaw && fnRaw.kind === ValueKind.MultiValue) {
+    const fnType = getType(fnRaw);
+    const _fnTypeName = fnType ? getTypeName(fnRaw) : null;
+    if (fnType && _fnTypeName === "Function") {
+      const paramTypes = getFunctionParamTypes(fnType);
+      const returnTypeExpr = getFunctionReturnType(fnType);
+      if (paramTypes) {
+        const bindings: TypeBindings = new Map();
+        // Unify each arg type against the corresponding param type
+        for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
+          const argType = getType(evalArgs[i]);
+          unifyTypes(argType, paramTypes[i], bindings);
+        }
+        // If we have bindings, enrich the context
+        if (bindings.size > 0) {
+          enrichedCtx = makeContext();
+          // Copy all bindings from original context
+          for (const [key, binding] of ctx.bindings) {
+            enrichedCtx.bindings.set(key, binding);
+            enrichedCtx.bindingList.push(binding);
+          }
+          // Add type variable bindings
+          for (const [varName, typeVal] of bindings) {
+            const binding = { key: varName, value: typeVal, isUse: false };
+            enrichedCtx.bindings.set(varName, binding);
+            enrichedCtx.bindingList.push(binding);
+          }
+          // Resolve return type with bindings
+          if (returnTypeExpr && returnTypeExpr.kind === ValueKind.Param) {
+            inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
+          }
+        }
+      }
+    }
+  }
+
   const substituted = substituteParams(fn, evalArgs);
-  return evaluate(substituted, ctx, depth + 1);
+  let result = evaluate(substituted, enrichedCtx, depth + 1);
+
+  // If we inferred a return type from unification, apply it
+  if (inferredReturnType && inferredReturnType.kind === ValueKind.Context) {
+    const currentType = getType(result);
+    if (!currentType) {
+      result = withType(result, inferredReturnType as ContextValue);
+    }
+  }
+
+  return result;
 }
 
 // --- Parameter substitution ---

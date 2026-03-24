@@ -377,8 +377,9 @@ function wrapParamsWithChecks(
 }
 
 /**
- * Build a typed function: wraps param references with type_check calls
- * and optionally wraps the return value with a type check.
+ * Build a typed function: wraps param references with type_check calls,
+ * optionally wraps the return value with a type check, and wraps the
+ * entire function with typed_function to attach a FunctionType.
  */
 function buildTypedFn(
   params: ParamInfo[],
@@ -410,7 +411,14 @@ function buildTypedFn(
     );
   }
 
-  return fn;
+  // 5. Wrap with typed_function to attach FunctionType
+  // Args: [fn, paramCount, paramType1, ..., paramTypeN, returnType]
+  const typeExprs = params.map(p => p.typeExpr ?? helpers.makeParam(-1, "Any"));
+  const retExpr = returnTypeExpr ?? helpers.makeParam(-1, "Any");
+  return helpers.makeExpr(
+    helpers.prim("typed_function"),
+    [fn, helpers.makeInt(params.length), ...typeExprs, retExpr],
+  );
 }
 
 /**

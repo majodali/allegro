@@ -41,6 +41,15 @@ export function withType(v: Value, type: ContextValue): Value {
   return makeMultiValue(primary, components);
 }
 
+/** Get the __name from a type Context directly (not from a typed value) */
+function typeContextName(v: Value): string | null {
+  const ctx = v.kind === ValueKind.Context ? v : (v.kind === ValueKind.MultiValue ? primaryOf(v) : null);
+  if (!ctx || ctx.kind !== ValueKind.Context) return null;
+  const nb = (ctx as ContextValue).bindings.get("__name");
+  if (nb?.value?.kind === ValueKind.Bits) return bitsToString(nb.value);
+  return null;
+}
+
 /** Look up a method on a type Context */
 export function typeMethod(type: ContextValue, name: string): Value | null {
   const binding = type.bindings.get(name);
@@ -642,6 +651,153 @@ export function applyGenericType(generic: ContextValue, args: Value[]): ContextV
 export const ArrayType: ContextValue = buildGenericType("Array", ["T"], arrayMethods);
 
 // =============================================================================
+// Function Type (Generic)
+// Function[ParamTypes, ReturnType] where ParamTypes is an Array of types.
+// e.g., Function[[Int, String], Bool] for (Int, String) -> Bool
+// =============================================================================
+
+const functionTypeMethods: Record<string, PrimitiveFnImpl> = {
+  toString: ((args: Value[]) => {
+    return withType(stringToBits("<function type>"), StringType);
+  }) as PrimitiveFnImpl,
+};
+
+export const FunctionType: ContextValue = buildGenericType("Function", ["ParamTypes", "ReturnType"], functionTypeMethods);
+
+/** Create a concrete FunctionType from param types and return type. */
+export function makeFunctionType(paramTypes: Value[], returnType: Value): ContextValue {
+  const paramTypesArr = makeRawArrayCtx(paramTypes);
+  return applyGenericType(FunctionType, [paramTypesArr, returnType]);
+}
+
+/** Extract param types from a concrete FunctionType. Returns null if not a FunctionType. */
+export function getFunctionParamTypes(fnType: ContextValue): Value[] | null {
+  const args = getTypeArgs(fnType);
+  if (!args || args.length < 2) return null;
+  const paramTypesCtx = primaryOf(args[0]);
+  if (paramTypesCtx.kind !== ValueKind.Context) return null;
+  return arrayElements(paramTypesCtx as ContextValue);
+}
+
+/** Extract return type from a concrete FunctionType. Returns null if not a FunctionType. */
+export function getFunctionReturnType(fnType: ContextValue): Value | null {
+  const args = getTypeArgs(fnType);
+  if (!args || args.length < 2) return null;
+  return args[1];
+}
+
+// =============================================================================
+// Unification
+// Type variable bindings accumulate in a Map<string, Value> (varName → type).
+// =============================================================================
+
+export type TypeBindings = Map<string, Value>;
+
+/**
+ * Unify an actual type against an expected type expression.
+ * Type variables (Params) in expectedType get bound in the bindings map.
+ * Returns updated bindings. Throws on contradiction.
+ */
+export function unifyTypes(
+  actualType: Value | null,
+  expectedType: Value,
+  bindings: TypeBindings,
+): TypeBindings {
+  // If expected is a Param (unresolved type variable)
+  if (expectedType.kind === ValueKind.Param) {
+    const varName = (expectedType as any)._name;
+    if (!varName) return bindings; // positional param, can't unify
+    const existing = bindings.get(varName);
+    if (existing) {
+      // Check consistency — both existing and actual are type Contexts
+      const existingName = typeContextName(existing);
+      const actualName = actualType ? typeContextName(actualType) : null;
+      if (existingName && actualName && existingName !== actualName) {
+        throw new AllegroError(`Type variable ${varName}: conflicting bindings ${existingName} vs ${actualName}`);
+      }
+      return bindings;
+    }
+    if (actualType) {
+      bindings.set(varName, actualType);
+    }
+    return bindings;
+  }
+
+  // If expected is Any, always matches
+  if (expectedType.kind === ValueKind.Context) {
+    const expectedName = bitsToString(
+      ((expectedType as ContextValue).bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+    );
+    if (expectedName === "Any") return bindings;
+  }
+
+  // If expected is a concrete type
+  if (expectedType.kind === ValueKind.Context && actualType) {
+    const expectedCtx = expectedType as ContextValue;
+    const actualCtx = getType(actualType);
+    if (!actualCtx) return bindings; // no type on actual, can't unify
+
+    // Check base name
+    const expectedName = bitsToString(
+      (expectedCtx.bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+    );
+    const actualName = bitsToString(
+      (actualCtx.bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+    );
+    if (expectedName !== actualName) {
+      throw new AllegroError(`Type mismatch: expected ${expectedName}, got ${actualName}`);
+    }
+
+    // Recursively unify type arguments
+    const expectedArgs = getTypeArgs(expectedCtx);
+    const actualArgs = getTypeArgs(actualCtx);
+    if (expectedArgs && actualArgs) {
+      const len = Math.min(expectedArgs.length, actualArgs.length);
+      for (let i = 0; i < len; i++) {
+        unifyTypes(actualArgs[i], expectedArgs[i], bindings);
+      }
+    }
+  }
+
+  return bindings;
+}
+
+/**
+ * Resolve a type expression by substituting bound type variables.
+ * Returns the resolved type value, or the original if no variables to substitute.
+ */
+export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings): Value {
+  if (typeExpr.kind === ValueKind.Param) {
+    const varName = (typeExpr as any)._name;
+    if (varName && bindings.has(varName)) {
+      return bindings.get(varName)!;
+    }
+    return typeExpr;
+  }
+
+  if (typeExpr.kind === ValueKind.Context) {
+    const ctx = typeExpr as ContextValue;
+    const argsBinding = ctx.bindings.get("__args");
+    if (argsBinding?.value) {
+      const argsCtx = primaryOf(argsBinding.value);
+      if (argsCtx.kind === ValueKind.Context) {
+        const args = arrayElements(argsCtx as ContextValue);
+        const resolvedArgs = args.map(a => resolveTypeWithBindings(a, bindings));
+        if (resolvedArgs.some((a, i) => a !== args[i])) {
+          // Need to reconstruct the concrete type with resolved args
+          const generic = getGenericType(ctx);
+          if (generic) {
+            return applyGenericType(generic, resolvedArgs);
+          }
+        }
+      }
+    }
+  }
+
+  return typeExpr;
+}
+
+// =============================================================================
 // Type System Extension
 // =============================================================================
 
@@ -680,6 +836,7 @@ export function createTypeSystem(): Extension {
       Bool: BoolType,
       Array: ArrayType,
       Object: ObjectType,
+      Function: FunctionType,
       UntypedFunction: UntypedFunctionType,
       // Bool literals as context bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
