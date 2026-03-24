@@ -501,19 +501,48 @@ export function buildGenericType(
   const cache = new Map<string, ContextValue>();
 
   function cacheKey(args: Value[]): string {
-    // Use type names for type args, data for value args
-    return args.map(a => {
-      if (a.kind === ValueKind.Context) {
-        const nb = a.bindings.get("__name");
-        if (nb?.value?.kind === ValueKind.Bits) return bitsToString(nb.value);
+    return args.map((a, idx) => cacheKeyOne(a, idx)).join(",");
+  }
+
+  function cacheKeyOne(a: Value, idx: number): string {
+    if (a.kind === ValueKind.Context) {
+      const ctx = a as ContextValue;
+      // Named type (Int, String, Array, etc.)
+      const nb = ctx.bindings.get("__name");
+      if (nb?.value?.kind === ValueKind.Bits) {
+        const typeName = bitsToString(nb.value);
+        // Check for type args (concrete generic like Array[Int])
+        const argsB = ctx.bindings.get("__args");
+        if (argsB?.value?.kind === ValueKind.Context) {
+          const argsCtx = argsB.value as ContextValue;
+          const argElems = arrayElements(argsCtx);
+          return `${typeName}[${argElems.map((e, i) => cacheKeyOne(e, i)).join(";")}]`;
+        }
+        return typeName;
       }
-      if (a.kind === ValueKind.Bits) return `v:${a.data}`;
-      if (a.kind === ValueKind.MultiValue) {
-        const p = primaryOf(a);
-        if (p.kind === ValueKind.Bits) return `v:${p.data}`;
+      // Array-like Context (used as param types list)
+      const lenB = ctx.bindings.get("__length");
+      if (lenB?.value?.kind === ValueKind.Bits) {
+        const len = Number((lenB.value as BitsValue).data);
+        const elems: string[] = [];
+        for (let i = 0; i < len; i++) {
+          const eb = ctx.bindings.get(String(i));
+          if (eb?.value) elems.push(cacheKeyOne(eb.value, i));
+        }
+        return `arr(${elems.join(";")})`;
       }
-      return `ref:${args.indexOf(a)}`;
-    }).join(",");
+      // Generic Context — use binding count as rough key
+      return `ctx:${ctx.bindings.size}:${idx}`;
+    }
+    if (a.kind === ValueKind.Bits) return `v:${(a as BitsValue).data}`;
+    if (a.kind === ValueKind.MultiValue) {
+      const p = primaryOf(a);
+      if (p.kind === ValueKind.Bits) return `v:${(p as BitsValue).data}`;
+      return cacheKeyOne(p, idx);
+    }
+    // Params (type variables) — unique per instance
+    if (a.kind === ValueKind.Param) return `param:${(a as any)._name ?? idx}`;
+    return `unk:${idx}`;
   }
 
   // Build the base type with methods + generic metadata

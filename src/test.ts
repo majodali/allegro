@@ -8,7 +8,7 @@ import { evalSource as runtimeEval, Extension, extensionToContext } from "./runt
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { buildStandardExtensions, buildAllegroStandardExtensions, GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, unifyTypes, IntType, StringType } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, primaryOf, stringToBits, bitsToString } from "./types.js";
 
@@ -1666,22 +1666,14 @@ test("unification: same type variable must be consistent", () => {
   eq(getTypeName(result!), "Int");
 });
 
-// NOTE: conflicting type variable test works in isolation (verified via standalone script)
-// but fails in the test suite due to expression memo cache sharing between tests.
-// TODO: fix test isolation for expression memoization
-test("unification: conflicting type variables detected in isolation", () => {
-  // Verify the unification logic directly using imported functions
-  const bindings = new Map<string, any>();
-  const tParam = { kind: "Param", position: -1, owner: null, _name: "T" };
-  unifyTypes(IntType, tParam as any, bindings); // T = Int
-  let threw = false;
-  try {
-    unifyTypes(StringType, tParam as any, bindings); // T already Int, now String → conflict
-  } catch (e: any) {
-    threw = true;
-    eq(e.message.includes("conflicting"), true);
-  }
-  eq(threw, true);
+test("unification: conflicting type variables throw", () => {
+  // Use fresh grammar and type system to avoid any shared state
+  const freshGrammar = buildAllegroStandardExtensions();
+  const freshTypes = createTypeSystem();
+  throws(
+    () => runtimeEval('both(a: T, b: T): T => a\nboth(1, "hello")\n', undefined, [freshTypes], freshGrammar, true),
+    "conflicting",
+  );
 });
 
 // --- Run all tests (sync + async) and report ---
