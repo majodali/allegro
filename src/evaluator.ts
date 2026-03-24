@@ -30,6 +30,9 @@ export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Va
     case ValueKind.PrimitiveFunction:
     case ValueKind.Context:
     case ValueKind.ComposedFunction:
+      // ComposedFunctions are values — return as-is during evaluation.
+      // Closure capture happens at module export time (buildModuleObject),
+      // not during general evaluation.
       return value;
 
     case ValueKind.Param: {

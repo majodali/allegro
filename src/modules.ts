@@ -6,7 +6,7 @@
 import { parse } from "./parser.js";
 import { buildEvalCtx, resolvePrimitives, Extension } from "./runtime.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, PrimitiveFnImpl, makePrimitive, makeContext, makeMultiValue, stringToBits, primaryOf } from "./types.js";
+import { Value, ValueKind, ContextValue, ComposedFunctionValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, primaryOf } from "./types.js";
 import { withType } from "./types-std.js";
 
 // --- Types ---
@@ -33,19 +33,97 @@ export interface ModuleLoaderOptions {
 // --- Module Type Builder ---
 
 /**
+ * Capture closure variables in a function body by substituting
+ * named Params that reference module bindings.
+ */
+function captureModuleVars(
+  value: Value,
+  moduleBindings: Record<string, Value>,
+  ownParams: Set<string>,
+  seen?: Set<Value>,
+): Value {
+  if (!seen) seen = new Set();
+  if (seen.has(value)) return value;
+  seen.add(value);
+
+  switch (value.kind) {
+    case ValueKind.Bits:
+    case ValueKind.PrimitiveFunction:
+    case ValueKind.Context:
+      return value;
+
+    case ValueKind.Param: {
+      if (value._name && value.position === -1 && !ownParams.has(value._name)) {
+        const resolved = moduleBindings[value._name];
+        if (resolved !== undefined) return resolved;
+      }
+      return value;
+    }
+
+    case ValueKind.ComposedFunction: {
+      const fn = value as ComposedFunctionValue;
+      const innerOwn = new Set(ownParams);
+      for (const p of fn.params) {
+        if (p._name) innerOwn.add(p._name);
+      }
+      const newBody = captureModuleVars(fn.body, moduleBindings, innerOwn, seen);
+      if (newBody === fn.body) return value;
+      const newFn: ComposedFunctionValue = {
+        kind: ValueKind.ComposedFunction,
+        params: fn.params,
+        body: newBody,
+      };
+      for (const p of newFn.params) p.owner = newFn;
+      return newFn;
+    }
+
+    case ValueKind.Expression: {
+      const newFn = captureModuleVars(value.fn, moduleBindings, ownParams, seen);
+      const newArgs = value.args.map(a => captureModuleVars(a, moduleBindings, ownParams, seen));
+      if (newFn === value.fn && newArgs.every((a, i) => a === value.args[i])) return value;
+      return makeExpr(newFn, newArgs);
+    }
+
+    case ValueKind.MultiValue: {
+      const newP = captureModuleVars(value.primary, moduleBindings, ownParams, seen);
+      if (newP === value.primary) return value;
+      return makeMultiValue(newP, new Map(value.components));
+    }
+
+    default:
+      return value;
+  }
+}
+
+/**
  * Build a typed module object from exported bindings.
  * Creates a module-specific type with getters for each exported field.
  * The underlying Context holds all bindings (public and private),
  * but only exported fields are accessible through the type.
+ * Exported functions have closure variables captured from the module scope.
  */
 export function buildModuleObject(
   name: string,
   allBindings: Record<string, Value>,
   exportedNames: Set<string>,
 ): Value {
+  // Capture closure variables in exported functions.
+  // Skip self-referential bindings (recursive functions).
+  const capturedBindings: Record<string, Value> = {};
+  for (const [key, value] of Object.entries(allBindings)) {
+    const p = primaryOf(value);
+    if (p.kind === ValueKind.ComposedFunction) {
+      // Exclude this binding's own name to prevent infinite recursion
+      const selfExclude = new Set([key]);
+      capturedBindings[key] = captureModuleVars(value, allBindings, selfExclude);
+    } else {
+      capturedBindings[key] = value;
+    }
+  }
+
   // Build the underlying Context with ALL bindings (public + private)
   const ctx = makeContext();
-  for (const [key, value] of Object.entries(allBindings)) {
+  for (const [key, value] of Object.entries(capturedBindings)) {
     ctx.bindings.set(key, { key, value, isUse: false });
     ctx.bindingList.push({ key, value, isUse: false });
   }

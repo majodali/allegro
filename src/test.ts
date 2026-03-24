@@ -540,6 +540,58 @@ async function runModuleTests(): Promise<void> {
     eq(Object.keys(exts[0].bindings).length, 0);
   });
 
+  await asyncTest("module: export encapsulation — values", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "mymod" }],
+      resolve: (id) => `/mock/${id}.alg`,
+      readFile: async () =>
+        "secret = 99\n" +
+        "pub = export(42)\n",
+    });
+    const exts = await loader.loadAll();
+    const modObj = (exts[0] as any).moduleObject;
+    eq(modObj !== undefined, true, "module should have moduleObject");
+
+    const ext: Extension = { name: "test", bindings: { mymod: modObj } };
+
+    // Exported binding should work
+    const pubResult = evalStd("mymod.pub\n", [ext]);
+    eq(pubResult !== null, true, "exported value should be accessible");
+    eq(Number((primaryOf(pubResult!) as BitsValue).data), 42);
+
+    // Private binding should NOT be accessible
+    let threw = false;
+    try { evalStd("mymod.secret\n", [ext]); }
+    catch (e: any) { threw = e.message.includes("not found"); }
+    eq(threw, true, "private binding should not be accessible");
+  });
+
+  await asyncTest("module: export encapsulation — functions", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "mathmod" }],
+      resolve: (id) => `/mock/${id}.alg`,
+      readFile: async () =>
+        "helper(x) => x * x\n" +
+        "square = export(x => helper(x))\n",
+    });
+    const exts = await loader.loadAll();
+    const modObj = (exts[0] as any).moduleObject;
+    eq(modObj !== undefined, true);
+
+    const ext: Extension = { name: "test", bindings: { mathmod: modObj } };
+
+    // Exported function should work
+    const sqResult = evalStd("mathmod.square(5)\n", [ext]);
+    eq(sqResult !== null, true, "exported function should work");
+    eq(Number((primaryOf(sqResult!) as BitsValue).data), 25);
+
+    // Private helper should NOT be accessible
+    let threw = false;
+    try { evalStd("mathmod.helper(5)\n", [ext]); }
+    catch (e: any) { threw = e.message.includes("not found"); }
+    eq(threw, true, "private helper should not be accessible");
+  });
+
   await asyncTest("module: recursive function in module", async () => {
     const loader = new ModuleLoader({
       modules: [{ id: "math" }],
