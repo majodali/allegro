@@ -8,7 +8,7 @@ npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file (Allegro Standard)
 npx tsx src/index.ts --base         # REPL (Allegro Base)
 npx tsx src/index.ts --base file.alg  # run a file (Allegro Base)
-npx tsx src/test.ts                 # run tests (184 tests)
+npx tsx src/test.ts                 # run tests (199 tests)
 ```
 
 **Expected output from `basics.alg`:**
@@ -72,13 +72,31 @@ Base language API (expression DAGs, evaluation contexts)
 
 Types are Context values with `__name`, `__check`, and method bindings. A typed value is a MultiValue where the primary is the data and the `"type"` component is the type Context.
 
-### Six Core Types
+### Eight Core Types
 - **Int** — 64-bit signed integer. Arithmetic, comparison, toString.
 - **Float** — IEEE 754 double. Arithmetic, comparison, toString.
 - **String** — UTF-8 encoded Bits. Concat (+), length, slice, indexOf, toString.
 - **Bool** — Int(0/1) with Bool type. Provided as `true`/`false` context bindings.
-- **Array** — Context with numeric keys + `__length`. length, get, map, filter, reduce, concat, slice.
+- **Array** — Generic type `Array[T]`. Context with numeric keys + `__length`. length, get, map, filter, reduce, concat, slice. Element type inferred from contents.
 - **Object** — Typed Context. Field access via dot, keys, values, get.
+- **Function** — Generic type `Function[ParamTypes, ReturnType]`. Attached to typed function definitions. Supports type variable unification at call sites.
+- **UntypedFunction** — Wraps base language primitives entering standard context. Every value in standard mode has a type.
+- **Any** — Matches any type. Used when generic types are used without explicit parameters (e.g., bare `Array` → `Array[Any]`).
+
+### Generics
+- Generic types are type constructors: `Array` is a function from type params to concrete types
+- `Array[Int]` is a concrete type produced by applying `Array` to `Int`
+- Type parameters can be types or values (e.g., `Vector[3]`)
+- Concrete types are memoized — `Array[Int]` always returns the same Context
+- Generic types have `type = GenericType` (subtype of `Type`)
+- Bare generic in annotations auto-applies `Any`: `arr: Array` → `arr: Array[Any]`
+
+### Function Types and Unification
+- `Function[ParamTypes, ReturnType]` — parameterized type for typed functions
+- Type variables (unresolved Params in type expressions) bind progressively during function calls
+- Unification: match arg types against param types, accumulate type variable bindings
+- Bidirectional flow: `T` determined from one arg propagates to constrain others
+- Contradictory bindings (e.g., `T = Int` and `T = String`) produce type errors
 
 ### Type-Directed Dispatch
 - `type_dispatch` checks the value's type component, finds the method, returns a self-bound closure
@@ -89,14 +107,21 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 ### Type Propagation
 - `typeLiterals` post-parse pass wraps raw Bits with type info (64-bit → Int, other → String)
 - Float and Bool literals come from grammar extensions and type system bindings
-- Type methods should return properly typed values (not raw Bits)
+- Type methods return properly typed values (not raw Bits)
+
+### Type Annotations
+- Function parameters: `f(x: Int, y: String) => body`
+- Return types: `f(x: Int): String => body`
+- Type expressions support generics: `f(arr: Array[Int]) => ...`
+- Untyped functions via base grammar still work (`f(x) => x + 1`)
+- Type checks inserted at param use sites via `type_check` primitive
 
 ## Grammar Extension
 
 - **GrammarBuilder** creates extensions without mutating the base grammar (immutable layering with structural sharing)
 - Extensions add new alternatives to existing Disjunctions
 - `repeat(element, { delimiter })` for variable-length constructs
-- Current extensions: dot access, import, float literals, array/object literals, bracket access, logical operators
+- Current extensions: dot access, import, float literals, array/object literals, bracket access, logical operators, type annotations
 
 ### Known Limitations
 - **Earley scanner can't handle overlapping token lengths** — float literals use `int.digits` pattern instead of a regex terminal
@@ -109,15 +134,29 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - **ModuleLoader**: loads `.alg` files as extensions with dependency resolution, caching, circular dependency detection
 - **Import syntax**: `import name` — declarative, module values provided via extensions
 - **Context layering**: primitives → extensions → base (REPL persistence) → source bindings
-- **Export system**: not yet implemented — currently all bindings are visible. Planned: export as a primitive that builds a typed module interface.
+- **Export system**: `export("name", value)` primitive marks bindings for export. `buildModuleObject` wraps exported bindings as a typed Object. Planned: full typed module interfaces with encapsulation via type-directed dispatch.
+- **Module objects**: imported modules are typed Objects — dot access dispatches through the module's type, exposing only exported fields.
+
+## Partial Evaluation
+
+Partial evaluation follows two rules:
+1. **Rule 1**: If an expression results in an undefined value to be passed to a primitive, the partially evaluated expression is returned (with unbound symbols visible).
+2. **Rule 2**: If `eval_if` (or any lazy primitive) has an undefined condition, all branches are partially evaluated non-lazily, propagating type information through both paths.
+
+After partial evaluation, an expression's type is its `"type"` MultiValue component — which may be fully resolved or itself a partially evaluated expression. No separate `typeOf` function is needed.
 
 ## Build/Execution Context
 
 Each build phase is a successive partial evaluation where phase-specific resources become available:
-- **Compilation**: extensions, type system, module system, source files
-- **Packaging**: third-party dependency implementations
-- **Deployment**: environment resources, datastores, config
-- **Execution**: runtime I/O, process, filesystem
+- **Invocation**: build tool selection
+- **Configuration**: CLI args, env vars, config files, folder structure
+- **Compilation**: extensions, type system, module system, source files bound; type checking via partial evaluation
+- **Emitting**: target configuration, debug symbols, target-specific optimization
+- **Packaging**: third-party dependency implementations bound; tree shaking
+- **Deployment**: environment resources, datastores, config bound
+- **Execution**: runtime I/O, process, filesystem bound; final evaluation
+
+Phases are not strictly defined — a scripting environment may have only one phase where all bindings are available at once. Phase gate checks (postconditions) scan the expression graph for unresolved elements.
 
 Anonymous extensions are pre-loaded into the compilation context. Extension modules may consume bindings internally (e.g., module system uses a filesystem).
 
@@ -126,15 +165,15 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 ### Files
 
 - **`src/types.ts`** — Value types, constructors, utilities, Extension interface, string↔bits, float↔bits
-- **`src/evaluator.ts`** — Recursive tree-walk evaluator, memoization, partial evaluation, type-directed dispatch via `PRIM_TO_METHOD`, closure support (substitution descends into inner functions)
-- **`src/primitives.ts`** — All primitives: bits ops, expression/context/multi-value ops, type system (type_dispatch, typed_int/string/float/bool/array/object, typed operators, logical ops), grammar primitives, print (lazy for type preservation)
-- **`src/types-std.ts`** — Six core types as Context values with method bindings, type helpers (getType, getTypeName, withType), makeArray, makeObject, createTypeSystem extension
+- **`src/evaluator.ts`** — Recursive tree-walk evaluator, memoization, partial evaluation (Rule 1 + Rule 2), type-directed dispatch via `PRIM_TO_METHOD`, closure support, type variable unification at call sites
+- **`src/primitives.ts`** — All primitives: bits ops, expression/context/multi-value ops, type system (type_dispatch, type_check, type_apply, typed_int/string/float/bool/array/object, typed_function, typed operators, logical ops, unification), grammar primitives, print (lazy for type preservation)
+- **`src/types-std.ts`** — Eight core types as Context values with method bindings, generic type support (buildGenericType, memoized type constructors), type helpers (getType, getTypeName, withType), FunctionType, UntypedFunction, AnyType, makeArray, makeObject, createTypeSystem extension
 - **`src/parser.ts`** — Auto-generated Earley parser. Exports Grammar classes, parse functions, helpers. `collectParams` descends into all composed functions for closure support.
-- **`src/grammar-ext.ts`** — GrammarBuilder (terminal, phrase, repeat, addAlternative), built-in extensions (dot access, import, float literals, array/object literals, bracket access, logical ops), Allegro Standard grammar builder, handle registry for Allegro-level grammar primitives
-- **`src/runtime.ts`** — `evalSource` (parse → typeLiterals → buildEvalCtx → evaluate), `typeLiterals` post-parse type wrapping, `resolvePrimitives`, `extensionToContext`
-- **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution
-- **`src/index.ts`** — Entry point: file runner + REPL (base mode only currently)
-- **`src/test.ts`** — 154 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, file-based .alg tests
+- **`src/grammar-ext.ts`** — GrammarBuilder (terminal, phrase, repeat, disjunction, addAlternative), built-in extensions (dot access, import, float literals, array/object literals, bracket access, logical ops, type annotations with generics), typed function builder (buildTypedFn), Allegro Standard grammar builder, handle registry
+- **`src/runtime.ts`** — `evalSource` (parse → typeLiterals → buildEvalCtx → evaluate), `typeLiterals` post-parse type wrapping, `resolvePrimitives`, `extensionToContext`, UntypedFunction wrapping in standard mode
+- **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports.
+- **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode.
+- **`src/test.ts`** — 199 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
@@ -144,6 +183,9 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - `logical.alg` — &&, ||, !, with comparisons and if-then-else
 - `functions.alg` — closures, composition, higher-order, recursion
 - `modules.alg` — import + dot access on module
+- `type-annotations.alg` — typed params, return types, typed recursion
+- `generics.alg` — Array[Int], generic type annotations, type_apply
+- `function-types.alg` — function type signatures, type variable unification
 
 ## Base Parser Syntax
 
@@ -221,7 +263,31 @@ math.pi
 
 // String concatenation
 "hello" + " " + "world" // → "hello world"
+
+// Type annotations on functions
+add(x: Int, y: Int): Int => x + y
+greet(name: String): String => "Hello, " + name
+
+// Generic type annotations
+head(arr: Array[Int]): Int => arr[0]
+
+// Lambdas with type annotations
+nums.map(x: Int => x * 2)
+(x: Int, y: Int): Int => x + y
 ```
+
+## What's Next
+
+1. **Module exports with encapsulation** — typed module interfaces where exports define the public type, private bindings hidden via type-directed dispatch
+2. **Formalize partial evaluation phases** — explicit phase control in `evalSource`, phase gate checks (postconditions)
+3. **Tail call optimization** — evaluator detects tail-position self-calls and loops instead of recursing
+4. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions (not primitives)
+5. **Keyword support** — proper keyword vs identifier disambiguation (deferred to parser reimplementation)
+6. **Parser reimplementation** — bootstrapping Allegro's parser within Allegro itself
+7. **Subtyping** — `extends`, `__extends` prototype chain in type dispatch
+8. **Interfaces** — structural type matching
+9. **String interpolation** — `"hello {name}"`
+10. **Binding type annotations** — `x: Int = 42`
 
 ## Design Philosophy
 
@@ -232,13 +298,6 @@ math.pi
 - **Immutable grammar extension** — new grammars share structure with the base, never mutate it
 - **Browser-compatible** — core uses `TextEncoder`/`TextDecoder`, not `Buffer`
 - **No implicit fallback** in typed operators — missing type method is an error
-- **Immutable bindings and values** (for now) — mutation semantics to be explored later
-
-## What's Next
-
-1. **Module exports** — `export` primitive + typed module interface for encapsulation
-2. **Formalize partial evaluation phases** — define compilation/execution boundary, phase-specific evaluation
-3. **Type inference** — built on partial evaluation, unification for generics
-4. **Keyword support** — proper keyword vs identifier disambiguation (deferred to parser reimplementation)
-5. **Parser reimplementation** — bootstrapping Allegro's parser within Allegro itself
-6. **String interpolation** — `"hello {name}"`
+- **Immutable bindings and values** (for now) — mutation semantics to be explored later (linear types, transient mutation)
+- **Every value in Standard mode has a type** — base primitives wrapped as UntypedFunction
+- **Generic types are type constructors** — functions from type parameters to concrete types, memoized
