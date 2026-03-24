@@ -379,19 +379,49 @@ const mv_components: PrimitiveFnImpl = (args) => {
 
 const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 3) throw new AllegroError(`eval_if: need 3 args, got ${args.length}`);
-  const cond = evalFn(args[0], ctx);
+  const cond = evalFn!(args[0], ctx!);
   const condP = primaryOf(cond);
   if (condP.kind === ValueKind.Bits) {
     const branch = condP.data !== 0n ? args[1] : args[2];
     // If branch is a thunk (composed fn with no params), evaluate its body
-    const evalBranch = evalFn(branch, ctx);
+    const evalBranch = evalFn!(branch, ctx!);
     if (evalBranch.kind === ValueKind.ComposedFunction && evalBranch.params.length === 0) {
-      return evalFn(evalBranch.body, ctx);
+      return evalFn!(evalBranch.body, ctx!);
     }
     return evalBranch;
   }
-  // Condition unresolved
-  return makeExpr(eval_if_value, [cond, args[1], args[2]]);
+  // Condition unresolved — Rule 2: partially evaluate BOTH branches
+  // so that type information and other MultiValue components propagate.
+  const evalThen = evalFn!(args[1], ctx!);
+  const evalElse = evalFn!(args[2], ctx!);
+
+  // Unwrap thunks after partial evaluation
+  const thenVal = (evalThen.kind === ValueKind.ComposedFunction && evalThen.params.length === 0)
+    ? evalFn!(evalThen.body, ctx!) : evalThen;
+  const elseVal = (evalElse.kind === ValueKind.ComposedFunction && evalElse.params.length === 0)
+    ? evalFn!(evalElse.body, ctx!) : evalElse;
+
+  // Build the residual expression with partially evaluated branches
+  const residual = makeExpr(eval_if_value, [
+    cond,
+    makeComposedFn([], thenVal),
+    makeComposedFn([], elseVal),
+  ]);
+
+  // Propagate type info: if both branches have the same type, the result has that type
+  const thenType = getType(thenVal);
+  const elseType = getType(elseVal);
+  if (thenType && elseType) {
+    const thenName = getTypeName(thenVal);
+    const elseName = getTypeName(elseVal);
+    if (thenName === elseName) {
+      return withType(residual, thenType);
+    }
+    // Different types — result type is ambiguous, leave untyped
+    // (future: union types or common supertype)
+  }
+
+  return residual;
 };
 
 // ============ PRINT ============
