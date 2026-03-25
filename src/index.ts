@@ -9,12 +9,14 @@
 // =============================================================================
 
 import * as fs from "fs";
+import * as path from "path";
 import * as readline from "readline";
 import { formatValue } from "./primitives.js";
 import { evalSource, Extension } from "./runtime.js";
 import { ContextValue } from "./types.js";
 import { buildAllegroStandardExtensions, GrammarExtension } from "./grammar-ext.js";
 import { createTypeSystem } from "./types-std.js";
+import { ModuleLoader } from "./modules.js";
 
 // --- Standard mode setup ---
 
@@ -31,14 +33,51 @@ function getStdExtensions(): Extension[] {
   return stdExtensions;
 }
 
+// --- Module loading ---
+
+/**
+ * Discover modules in a lib/ directory relative to the source file.
+ * Convention: import math → lib/math.alg
+ */
+async function loadModules(sourceDir: string): Promise<Extension[]> {
+  const libDir = path.join(sourceDir, "lib");
+  if (!fs.existsSync(libDir)) return [];
+
+  const files = fs.readdirSync(libDir).filter(f => f.endsWith(".alg"));
+  if (files.length === 0) return [];
+
+  const modules = files.map(f => ({
+    id: path.basename(f, ".alg"),
+  }));
+
+  const loader = new ModuleLoader({
+    modules,
+    resolve: (id) => {
+      const p = path.join(libDir, `${id}.alg`);
+      return fs.existsSync(p) ? p : null;
+    },
+    readFile: async (p) => fs.readFileSync(p, "utf-8"),
+  });
+
+  return loader.loadAll();
+}
+
 // --- File runner ---
 
-function runFile(source: string, filename: string, standard: boolean): void {
+async function runFile(source: string, filename: string, standard: boolean): Promise<void> {
   try {
+    let extensions = standard ? [...getStdExtensions()] : undefined;
+
+    // In standard mode, load modules from lib/ directory
+    if (standard) {
+      const sourceDir = path.dirname(path.resolve(filename));
+      const moduleExts = await loadModules(sourceDir);
+      extensions = [...extensions!, ...moduleExts];
+    }
+
     const { value } = standard
-      ? evalSource(source, undefined, getStdExtensions(), getStdGrammar(), true)
+      ? evalSource(source, undefined, extensions, getStdGrammar(), true)
       : evalSource(source);
-    // File mode: bare expressions are evaluated for side effects (e.g. print).
     void value;
   } catch (e: any) {
     console.error(`Error in ${filename}: ${e.message}`);
@@ -101,7 +140,10 @@ const standard = !baseMode;
 if (files.length > 0) {
   const filename = files[0];
   const source = fs.readFileSync(filename, "utf-8");
-  runFile(source, filename, standard);
+  runFile(source, filename, standard).catch(e => {
+    console.error(e.message);
+    process.exit(1);
+  });
 } else {
   repl(standard);
 }
