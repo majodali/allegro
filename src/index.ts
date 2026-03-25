@@ -36,22 +36,36 @@ function getStdExtensions(): Extension[] {
 // --- Module loading ---
 
 /**
- * Discover modules in a lib/ directory relative to the source file.
- * Convention: import math → lib/math.alg
+ * Load modules on demand for a parsed file context.
+ * Only loads modules that are actually imported (bindings with value: undefined)
+ * and not already provided by existing extensions.
+ * Convention: import math → lib/math.alg relative to source file.
  */
-async function loadModules(sourceDir: string): Promise<Extension[]> {
+async function loadImportedModules(
+  fileCtx: any,
+  sourceDir: string,
+  existingExtensions: Extension[],
+): Promise<Extension[]> {
   const libDir = path.join(sourceDir, "lib");
-  if (!fs.existsSync(libDir)) return [];
 
-  const files = fs.readdirSync(libDir).filter(f => f.endsWith(".alg"));
-  if (files.length === 0) return [];
+  // Find import bindings that need loading
+  const existingNames = new Set<string>();
+  for (const ext of existingExtensions) {
+    for (const name of Object.keys(ext.bindings)) existingNames.add(name);
+    if (ext.moduleObject) existingNames.add(ext.name);
+  }
 
-  const modules = files.map(f => ({
-    id: path.basename(f, ".alg"),
-  }));
+  const needed: string[] = [];
+  for (const b of fileCtx.bindingList) {
+    if (b.key !== null && b.value === undefined && !existingNames.has(b.key)) {
+      needed.push(b.key);
+    }
+  }
+
+  if (needed.length === 0) return [];
 
   const loader = new ModuleLoader({
-    modules,
+    modules: needed.map(id => ({ id })),
     resolve: (id) => {
       const p = path.join(libDir, `${id}.alg`);
       return fs.existsSync(p) ? p : null;
@@ -66,19 +80,30 @@ async function loadModules(sourceDir: string): Promise<Extension[]> {
 
 async function runFile(source: string, filename: string, standard: boolean): Promise<void> {
   try {
-    let extensions = standard ? [...getStdExtensions()] : undefined;
-
-    // In standard mode, load modules from lib/ directory
-    if (standard) {
-      const sourceDir = path.dirname(path.resolve(filename));
-      const moduleExts = await loadModules(sourceDir);
-      extensions = [...extensions!, ...moduleExts];
+    if (!standard) {
+      evalSource(source);
+      return;
     }
 
-    const { value } = standard
-      ? evalSource(source, undefined, extensions, getStdGrammar(), true)
-      : evalSource(source);
-    void value;
+    // Standard mode: parse first to discover imports, then load on demand
+    const normalized = source.replace(/\r\n/g, "\n");
+    const grammar = getStdGrammar();
+    const { parseExtended } = await import("./grammar-ext.js");
+    const parseResult = parseExtended(normalized, grammar);
+    if (parseResult.errors.length > 0) {
+      throw new Error(`Parse error: ${parseResult.errors[0].message}`);
+    }
+
+    const fileCtx = (parseResult.tree as any).ctx;
+    let extensions = [...getStdExtensions()];
+
+    if (fileCtx) {
+      const sourceDir = path.dirname(path.resolve(filename));
+      const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);
+      extensions = [...extensions, ...moduleExts];
+    }
+
+    evalSource(source, undefined, extensions, grammar, true);
   } catch (e: any) {
     console.error(`Error in ${filename}: ${e.message}`);
     process.exit(1);
