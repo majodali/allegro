@@ -8,7 +8,7 @@ npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file (Allegro Standard)
 npx tsx src/index.ts --base         # REPL (Allegro Base)
 npx tsx src/index.ts --base file.alg  # run a file (Allegro Base)
-npx tsx src/test.ts                 # run tests (199 tests)
+npx tsx src/test.ts                 # run tests (201 tests)
 ```
 
 **Expected output from `basics.alg`:**
@@ -136,6 +136,7 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - **Context layering**: primitives → extensions → base (REPL persistence) → source bindings
 - **Export system**: `export("name", value)` primitive marks bindings for export. `buildModuleObject` wraps exported bindings as a typed Object. Planned: full typed module interfaces with encapsulation via type-directed dispatch.
 - **Module objects**: imported modules are typed Objects — dot access dispatches through the module's type, exposing only exported fields.
+- **Module encapsulation**: `type_dispatch` enforces encapsulation for typed values — only fields listed on the type are accessible. Object type has `__fieldAccess` for transparent field access; module types do not.
 
 ## Partial Evaluation
 
@@ -173,7 +174,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/runtime.ts`** — `evalSource` (parse → typeLiterals → buildEvalCtx → evaluate), `typeLiterals` post-parse type wrapping, `resolvePrimitives`, `extensionToContext`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports.
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode.
-- **`src/test.ts`** — 199 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, file-based .alg tests
+- **`src/test.ts`** — 201 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
@@ -278,16 +279,16 @@ nums.map(x: Int => x * 2)
 
 ## What's Next
 
-1. **Module exports with encapsulation** — typed module interfaces where exports define the public type, private bindings hidden via type-directed dispatch
-2. **Formalize partial evaluation phases** — explicit phase control in `evalSource`, phase gate checks (postconditions)
+Immediate:
+1. **Symbol resolution / lexical scoping** — replace `Param(-1, "name")` with properly scoped Symbols resolved at parse time
+2. **eval_if Rule 2** — partial evaluation of both branches when condition is undefined
 3. **Tail call optimization** — evaluator detects tail-position self-calls and loops instead of recursing
-4. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions (not primitives)
-5. **Keyword support** — proper keyword vs identifier disambiguation (deferred to parser reimplementation)
-6. **Parser reimplementation** — bootstrapping Allegro's parser within Allegro itself
-7. **Subtyping** — `extends`, `__extends` prototype chain in type dispatch
-8. **Interfaces** — structural type matching
-9. **String interpolation** — `"hello {name}"`
-10. **Binding type annotations** — `x: Int = 42`
+
+Next milestone — **Parser reimplementation**:
+4. **New parser architecture** — hybrid TypeScript/Allegro-informed design, proper keyword support, grammar as values
+5. **Keyword support** — `export`, `true`/`false` as proper keywords (currently workarounds)
+
+See `BACKLOG.md` for full roadmap.
 
 ## Design Philosophy
 
