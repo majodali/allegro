@@ -5,6 +5,7 @@
 
 import { parse } from "./parser.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
+import { parseBase as hybridParseBase, parseStandard as hybridParseStandard } from "./hybrid-parser.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, Extension } from "./types.js";
@@ -522,6 +523,54 @@ export function evalSource(
   }
 
   // Resolve all symbols (named Params) using lexical scoping
+  resolveSymbols(fileCtx, base, extensions, typed);
+
+  const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
+
+  let lastValue: Value | null = null;
+  for (const b of fileCtx.bindingList) {
+    if (b.key === null && b.value !== undefined) {
+      lastValue = evaluate(b.value, evalCtx);
+    }
+  }
+
+  return { value: lastValue, evalCtx };
+}
+
+/**
+ * Parse and evaluate using the hybrid parser (Pratt + recursive descent).
+ * Drop-in replacement for evalSource.
+ */
+export function evalSourceHybrid(
+  source: string,
+  base?: ContextValue,
+  extensions?: Extension[],
+  typed?: boolean,
+): { value: Value | null; evalCtx: ContextValue } {
+  const normalized = source.replace(/\r\n/g, "\n");
+  const result = typed
+    ? hybridParseStandard(normalized)
+    : hybridParseBase(normalized);
+
+  if (result.errors.length > 0) {
+    throw new Error(`Parse error: ${result.errors[0].message}`);
+  }
+
+  const fileCtx = (result.tree as any).ctx;
+  if (!fileCtx) {
+    return { value: null, evalCtx: base ?? makeContext() };
+  }
+
+  // Type literals if standard type system is active
+  if (typed) {
+    for (const b of fileCtx.bindingList) {
+      if (b.value !== undefined) {
+        b.value = typeLiterals(b.value);
+      }
+    }
+  }
+
+  // Resolve all symbols
   resolveSymbols(fileCtx, base, extensions, typed);
 
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
