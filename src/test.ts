@@ -7,7 +7,7 @@ import { formatValue } from "./primitives.js";
 import { evalSource as runtimeEval, Extension, extensionToContext } from "./runtime.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
-import { buildStandardExtensions, buildAllegroStandardExtensions, GrammarExtension, registryGet } from "./grammar-ext.js";
+import { GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
@@ -354,7 +354,7 @@ const mathExtension: Extension = {
 };
 
 /** Evaluate with extensions and return numeric result. */
-function evalNumExt(source: string, extensions: Extension[]): number {
+function evalNumExt(source: string, extensions?: Extension[]): number {
   const result = runtimeEval(source + "\n", undefined, extensions);
   const val = result.value;
   if (val === null) throw new Error("No value produced");
@@ -606,8 +606,6 @@ async function runModuleTests(): Promise<void> {
 
 // == Grammar Extensions ==
 
-const stdGrammarExt = buildStandardExtensions();
-
 /** Helper: build a Context value with named bindings */
 function makeCtxWith(bindings: Record<string, Value>): Value {
   const ctx = makeContext();
@@ -618,7 +616,8 @@ function makeCtxWith(bindings: Record<string, Value>): Value {
   return ctx;
 }
 
-/** Evaluate with grammar extensions and return numeric result */
+
+/** Evaluate with Earley grammar extensions and return numeric result (for grammar primitive tests) */
 function evalNumGrammar(
   source: string,
   extensions: Extension[],
@@ -633,56 +632,53 @@ function evalNumGrammar(
   return Number(p.data);
 }
 
-test("grammar ext: base syntax still works with extensions active", () => {
-  eq(evalNumGrammar("3 + 4 * 2", [], stdGrammarExt), 11);
+test("hybrid parser: base syntax", () => {
+  eq(evalNumExt("3 + 4 * 2"), 11);
 });
 
-test("grammar ext: dot access resolves from context", () => {
+test("hybrid parser: dot access resolves from context", () => {
   const mathCtx = makeCtxWith({ pi: makeInt(3) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
-  eq(evalNumGrammar("math.pi", [ext], stdGrammarExt), 3);
+  eq(evalNumExt("math.pi", [ext]), 3);
 });
 
-test("grammar ext: dot access chained", () => {
+test("hybrid parser: dot access chained", () => {
   const inner = makeCtxWith({ x: makeInt(42) });
   const outer = makeCtxWith({ inner: inner });
   const ext: Extension = { name: "test", bindings: { outer: outer } };
-  eq(evalNumGrammar("outer.inner.x", [ext], stdGrammarExt), 42);
+  eq(evalNumExt("outer.inner.x", [ext]), 42);
 });
 
-test("grammar ext: dot access with function call", () => {
-  // Build a module context with a 'double' function
+test("hybrid parser: dot access with function call", () => {
   const mathCtx = makeCtxWith({ double: makePrimitive("double", (args) => {
     const p = primaryOf(args[0]);
     if (p.kind !== ValueKind.Bits) throw new AllegroError("double: expected Bits");
     return makeInt(Number(p.data) * 2);
   }) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
-  eq(evalNumGrammar("math.double(21)", [ext], stdGrammarExt), 42);
+  eq(evalNumExt("math.double(21)", [ext]), 42);
 });
 
-test("grammar ext: dot access in arithmetic", () => {
+test("hybrid parser: dot access in arithmetic", () => {
   const mathCtx = makeCtxWith({ pi: makeInt(3), e: makeInt(2) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
-  eq(evalNumGrammar("math.pi + math.e", [ext], stdGrammarExt), 5);
+  eq(evalNumExt("math.pi + math.e", [ext]), 5);
 });
 
-test("grammar ext: import statement with extension binding", () => {
+test("hybrid parser: import statement with extension binding", () => {
   const ext: Extension = { name: "test", bindings: { foo: makeInt(42) } };
-  eq(evalNumGrammar("import foo\nfoo", [ext], stdGrammarExt), 42);
+  eq(evalNumExt("import foo\nfoo", [ext]), 42);
 });
 
-test("grammar ext: import + dot access", () => {
+test("hybrid parser: import + dot access", () => {
   const mathCtx = makeCtxWith({ pi: makeInt(3) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
-  eq(evalNumGrammar("import math\nmath.pi", [ext], stdGrammarExt), 3);
+  eq(evalNumExt("import math\nmath.pi", [ext]), 3);
 });
 
-test("grammar ext: import doesn't shadow extension binding", () => {
-  // import creates binding with value: undefined, which buildEvalCtx skips
-  // so the extension-provided value should still be available
+test("hybrid parser: import doesn't shadow extension binding", () => {
   const ext: Extension = { name: "test", bindings: { x: makeInt(99) } };
-  eq(evalNumGrammar("import x\nx", [ext], stdGrammarExt), 99);
+  eq(evalNumExt("import x\nx", [ext]), 99);
 });
 
 test("grammar ext: extensionToContext wraps bindings", () => {
@@ -977,13 +973,12 @@ test("standalone grammar: parse nested JSON", () => {
 
 // == Allegro Standard — Type System ==
 
-const stdGrammar = buildAllegroStandardExtensions();
 const typeExt = createTypeSystem();
 
-/** Evaluate source in Allegro Standard mode (typed literals + type-directed dot access) */
+/** Evaluate source in Allegro Standard mode (uses hybrid parser) */
 function evalStd(source: string, extraExtensions?: Extension[]): Value | null {
   const exts = [typeExt, ...(extraExtensions ?? [])];
-  const { value } = runtimeEval(source, undefined, exts, stdGrammar, true);
+  const { value } = runtimeEval(source, undefined, exts, undefined, true);
   return value;
 }
 
@@ -1377,7 +1372,7 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
 
   try {
     const exts = [typeExt, ...(extensions ?? [])];
-    runtimeEval(source, undefined, exts, stdGrammar, true);
+    runtimeEval(source, undefined, exts, undefined, true);
   } catch (e: any) {
     console.log = origLog;
     throw e;
@@ -1426,7 +1421,7 @@ const primNames = new Set(Object.keys(primRegistry));
 const typeNames = new Set(["Int", "Float", "String", "Bool", "Array", "Object", "true", "false"]);
 
 const mathSource = fs.readFileSync(path.join(testsDir, "lib", "math.alg"), "utf-8");
-const mathResult = runtimeEval(mathSource, undefined, [typeExt], stdGrammar, true);
+const mathResult = runtimeEval(mathSource, undefined, [typeExt], undefined, true);
 const mathBindings: Record<string, Value> = {};
 for (const [key, binding] of mathResult.evalCtx.bindings) {
   if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
@@ -1440,8 +1435,8 @@ fileTest(path.join(testsDir, "generics.alg"));
 
 // == Module Export Tests ==
 
-test("module export: export() marks value with exported component", () => {
-  const result = evalStd("x = export(42)\nx\n");
+test("module export: export keyword marks value with exported component", () => {
+  const result = evalStd("export x = 42\nx\n");
   eq(result !== null, true);
   // Should still be usable as a number
   eq(Number((primaryOf(result!) as BitsValue).data), 42);
@@ -1461,14 +1456,14 @@ test("module export: non-exported values don't have exported component", () => {
 });
 
 test("module export: exported functions work normally", () => {
-  const result = evalStd("f = export(x => x * 2)\nf(21)\n");
+  const result = evalStd("export f = x => x * 2\nf(21)\n");
   eq(Number((primaryOf(result!) as BitsValue).data), 42);
 });
 
 test("module export: typed module object exposes exports via dot", () => {
   // Build a module with exports
-  const modSource = "private_val = 99\npub_val = export(42)\npub_fn = export(x => x * 2)\n";
-  const modResult = runtimeEval(modSource, undefined, [typeExt], stdGrammar, true);
+  const modSource = "private_val = 99\nexport pub_val = 42\nexport pub_fn = x => x * 2\n";
+  const modResult = runtimeEval(modSource, undefined, [typeExt], undefined, true);
 
   // Extract and evaluate bindings, then build typed module
   const allBindings: Record<string, Value> = {};
@@ -1719,11 +1714,9 @@ test("unification: same type variable must be consistent", () => {
 });
 
 test("unification: conflicting type variables throw", () => {
-  // Use fresh grammar and type system to avoid any shared state
-  const freshGrammar = buildAllegroStandardExtensions();
   const freshTypes = createTypeSystem();
   throws(
-    () => runtimeEval('both(a: T, b: T): T => a\nboth(1, "hello")\n', undefined, [freshTypes], freshGrammar, true),
+    () => runtimeEval('both(a: T, b: T): T => a\nboth(1, "hello")\n', undefined, [freshTypes], undefined, true),
     "conflicting",
   );
 });

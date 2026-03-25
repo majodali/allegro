@@ -3,7 +3,6 @@
 // Bridges the parser's output to the evaluator.
 // =============================================================================
 
-import { parse } from "./parser.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { parseBase as hybridParseBase, parseStandard as hybridParseStandard } from "./hybrid-parser.js";
 import { primitives } from "./primitives.js";
