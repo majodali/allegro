@@ -710,21 +710,33 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
   }
 
-  // Fall back to ctx_resolve for Contexts:
-  // - Untyped Contexts: always fall through
-  // - Typed Contexts with __fieldAccess (e.g., Object): fall through for field access
-  // - Other typed values: type controls access (encapsulation)
+  // If the value has a type, the type controls access — no fallback
+  // UNLESS the type declares __fieldAccess (e.g., Object type allows
+  // arbitrary field access on the underlying Context).
+  if (type) {
+    const allowFieldAccess = type.bindings.get("__fieldAccess")?.value !== undefined;
+    if (allowFieldAccess) {
+      const p = primaryOf(obj);
+      if (p.kind === ValueKind.Context) {
+        const b = p.bindings.get(fieldName);
+        if (b?.value !== undefined) return b.value;
+      }
+    }
+    // Field not found — type enforces encapsulation
+    const typeName = getTypeName(obj) ?? "unknown";
+    throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
+  }
+
+  // Untyped Contexts: fall through to ctx_resolve (base language behavior)
   const p = primaryOf(obj);
-  const allowFieldAccess = !type || (type.bindings.get("__fieldAccess")?.value !== undefined);
-  if (allowFieldAccess && p.kind === ValueKind.Context) {
+  if (p.kind === ValueKind.Context) {
     const b = p.bindings.get(fieldName);
     if (!b) throw new AllegroError(`type_dispatch: '${fieldName}' not found`);
     if (b.value === undefined) throw new AllegroError(`type_dispatch: '${fieldName}' is unbound`);
     return b.value;
   }
 
-  const typeName = getTypeName(obj) ?? (p.kind === ValueKind.Context ? "Context" : p.kind);
-  throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
+  throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${p.kind}`);
 };
 
 // --- type_of / type_check ---

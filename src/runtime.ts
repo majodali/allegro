@@ -134,6 +134,11 @@ export function buildEvalCtx(
       for (const [name, value] of Object.entries(ext.bindings)) {
         addBinding(name, value);
       }
+      // If extension has a typed module object, bind the module name to it.
+      // This is what `import <name>` resolves to — the encapsulated module.
+      if (ext.moduleObject) {
+        addBinding(ext.name, ext.moduleObject);
+      }
     }
   }
 
