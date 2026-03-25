@@ -1,22 +1,23 @@
 # Allegro — Backlog
 
-## Next Milestone: Parser Reimplementation
+## 1. Milestones
 
-Prerequisites:
-- [ ] Symbol resolution / lexical scoping (replace Param(-1, "name") with properly scoped Symbols)
-- [ ] eval_if Rule 2 (partial evaluation of both branches when condition undefined)
-- [ ] Tail call optimization (parser uses recursion heavily)
-- [ ] String operations fully typed (parser manipulates strings)
+High-level goals, roughly ordered by dependency:
 
-Parser work:
-- [ ] Design new parser architecture (hybrid TypeScript/Allegro-informed)
-- [ ] Implement scannerless Earley (or alternative) with proper keyword support
-- [ ] Grammar as Allegro values — parser driven by grammar Contexts
-- [ ] Mid-statement grammar switching (low priority — rare use case)
-- [ ] Bootstrap: translate TypeScript parser to Allegro
+- **Allegro Standard complete** — all core types fully typed, type inference, pattern matching, error handling, string interpolation. The language is usable for real programs.
+- **DSL ready** — grammar extension DSL defined in Allegro, embeddable grammars, custom syntax as importable modules.
+- **Multi-phase build pipeline** — project configuration, phase-specific resources, phase gate checks. The partial evaluation compilation model works end-to-end.
+- **Tracing and debugging** — execution tracing, expression graph inspection, source location in errors, step-through debugging.
+- **Standard library** — filesystem, networking, process management, math, collections. Enough to write useful tools.
+- **Fully bootstrapped** — parser, type system, module system all implemented in Allegro. TypeScript runtime is just a thin host.
+- **In-browser sandbox** — core + standard library running in the browser, interactive REPL, shareable programs.
+- **Target code generation** — expression graph → JavaScript / WASM / native. Partial evaluation as optimization.
+- **Performance optimization** — memoization as Standard feature, continuation-based TCO (Stage 2), JIT-style hotspot optimization.
+- **Package ecosystem** — versioning, dependency resolution, registry. Third-party modules.
 
-## Type System
+## 2. Detailed Features
 
+### Type System
 - [ ] Subtyping / extends — `__extends` prototype chain, `isSubtypeOf` predicate
 - [ ] Interfaces — structural type matching (no explicit `implements`)
 - [ ] Mixins — types with default implementations
@@ -26,63 +27,91 @@ Parser work:
 - [ ] Type constraints — `where T: Comparable`
 - [ ] Binding type annotations — `x: Int = 42`
 - [ ] Pattern matching — destructuring, match expressions
+- [x] Generics — `Array[T]`, `Function[ParamTypes, ReturnType]`, memoized type constructors
+- [x] Function types and unification — type variables bind progressively at call sites
+- [x] UntypedFunction — wraps base primitives in standard mode
+- [x] Any type — matches any type, bare generics auto-apply Any
 
-## Partial Evaluation & Compilation
-
+### Partial Evaluation & Compilation
 - [ ] Formalize partial evaluation phases (invocation → config → compile → emit → package → deploy → execute)
 - [ ] Phase gate checks (postconditions that scan expression graphs)
 - [ ] Target code generation (expression graph → executable)
 - [ ] Tree shaking via partial evaluation
-- [ ] Tail call optimization in evaluator
 - [ ] Memoization as Standard feature (remove from base evaluator)
+- [ ] Continuation-based TCO (Stage 2 — attach continuations for non-tail recursive calls)
+- [x] eval_if Rule 2 — partial evaluation of both branches when condition undefined
+- [x] Tail call optimization (Stage 1) — O(1) stack for tail-recursive functions
+- [x] Symbol resolution — compile-time lexical scoping, direct references
 
-## Execution Context & Build Pipeline
+### Parser & Grammar
+- [ ] Grammar extension DSL — define new syntax from Allegro code
+- [ ] Embeddable grammars — switch to different parser mid-file or per-module
+- [ ] Mid-statement grammar switching (low priority)
+- [ ] Bootstrap parser in Allegro
+- [ ] Error recovery improvements (currently skips to next statement)
+- [x] Hybrid parser (Pratt + recursive descent) — O(n) expression parsing
+- [x] Dynamic lexer config — extensions register new operators/keywords
+- [x] Keyword disambiguation — true/false/import/export properly handled
+- [x] Float literals via maximal munch
+- [x] Source location tracking in tokens
+- [x] Earley parser retained for standalone grammars
 
+### Execution Context & Build Pipeline
 - [ ] Project root file (structure, phases, deps — replaces package.json + tsconfig)
 - [ ] Phase-specific resource declarations (`ctx_use` with type annotations)
 - [ ] CLI modes: `allegro run`, `allegro build`, `allegro test`
 - [ ] Multi-phase build pipeline implementation
 
-## Module System
-
-- [ ] Export syntax sugar (`export` keyword — requires parser keyword support)
+### Module System
 - [ ] Qualified import (`import math.round`)
 - [ ] Re-exports
 - [ ] Module versioning and compatibility
 - [ ] Circular dependency handling (currently prohibited)
+- [x] Export keyword — `export name = value`
+- [x] Module encapsulation — type-directed access, unexported bindings hidden
+- [x] On-demand module loading from `lib/` directory
 
-## Language Features
-
+### Language Features
 - [ ] String interpolation — `"hello {name}"`
 - [ ] Async evaluation — promises/futures, await syntax
 - [ ] Configurable mutability — linear types, transient mutation, semantic variants
 - [ ] Error handling — try/catch or effect-based surface syntax
-- [ ] Pipe/chaining operator
-- [ ] Unary minus as proper operator (currently `0 - x`)
+- [ ] Pipe/chaining operator (`|>`)
+- [ ] Regular expressions
+- [x] Logical operators — `&&`, `||`, `!` with short-circuit semantics
+- [x] String operations — fully typed (17 methods)
+- [x] Array higher-order methods — map, filter, reduce
+- [x] Type annotations — function params and return types with generics
 
-## Standard Libraries
-
+### Standard Libraries
 - [ ] Filesystem (read/write, provided by execution context)
 - [ ] Networking (HTTP, sockets)
 - [ ] Process management (spawn, signals)
 - [ ] Math (trig, pow, sqrt — as typed Allegro functions)
-- [ ] String utilities (regex, split, join, trim)
 - [ ] Collections (Map, Set — as typed generic structures)
+- [ ] Regex
 
-## Runtime & Tooling
-
+### Runtime & Tooling
 - [ ] Browser runtime (core is browser-compatible, needs packaging)
 - [ ] Debugging and execution/evaluation tracing
 - [ ] REPL improvements (multi-line input, better error display, tab completion)
 - [ ] Expression graph processing (query, transform, rewriting)
 - [ ] Language server protocol (LSP) for IDE integration
 
-## Long-term / Allegro High
-
+### Long-term / Allegro High
 - [ ] Logic programming extensions/DSL
 - [ ] Constraint programming
 - [ ] Data modeling DSL
 - [ ] Numerical methods
 - [ ] Sophisticated declarative composition
-- [ ] Grammar extension DSL (define new syntax from Allegro code)
 - [ ] Multiple semantic models (functional, imperative, mixed) as extensions
+
+## 3. Immediate To Do
+
+Priority-ordered list of next items to implement:
+
+1. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions (not primitives), validates TCO and language usability
+2. **String interpolation** — `"hello {name}"`, needs lexer + parser support
+3. **Binding type annotations** — `x: Int = 42`
+4. **Subtyping / extends** — `__extends` prototype chain, foundation for richer type system
+5. **Pattern matching** — destructuring in bindings and function params
