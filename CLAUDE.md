@@ -8,7 +8,7 @@ npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file (Allegro Standard)
 npx tsx src/index.ts --base         # REPL (Allegro Base)
 npx tsx src/index.ts --base file.alg  # run a file (Allegro Base)
-npx tsx src/test.ts                 # run tests (201 tests)
+npx tsx src/test.ts                 # run all tests
 ```
 
 **Expected output from `basics.alg`:**
@@ -116,17 +116,20 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - Untyped functions via base grammar still work (`f(x) => x + 1`)
 - Type checks inserted at param use sites via `type_check` primitive
 
-## Grammar Extension
+## Parser (Hybrid: Pratt + Recursive Descent)
 
-- **GrammarBuilder** creates extensions without mutating the base grammar (immutable layering with structural sharing)
-- Extensions add new alternatives to existing Disjunctions
-- `repeat(element, { delimiter })` for variable-length constructs
-- Current extensions: dot access, import, float literals, array/object literals, bracket access, logical operators, type annotations
+The parser is a hybrid design:
+- **Lexer** (`src/lexer.ts`): tokenizer with maximal munch, keyword disambiguation, float vs int, source location tracking, indentation (offside rule) support. Token tables are dynamic via `LexerConfig` — extensions add new operators/keywords without modifying lexer code.
+- **Pratt parser** (expression level): O(n) with data-driven precedence/associativity tables. Handles all operators, function calls, dot access, bracket access, array/object literals, if-then-else, lambdas.
+- **Recursive descent** (statement level): file structure, statements, blocks, function declarations, import/export.
+- **Earley parser** (`src/parser.ts`): retained as fallback for standalone grammars (JSON, custom DSLs). Grammar classes (`Grammar`, `Terminal`, `Phrase`, `Disjunction`, `Repetition`, `Optional`) and `parseGrammar` still exported.
 
-### Known Limitations
-- **Earley scanner can't handle overlapping token lengths** — float literals use `int.digits` pattern instead of a regex terminal
-- **Keywords vs identifiers** — `true`, `false` handled as context bindings; `export` will use same workaround. Proper keyword support deferred to parser reimplementation.
-- **Logical operators at Expr level** — `&&`/`||` are at the same precedence (both below comparison). The `LambdaExpr` Disjunction is NOT in the pass-through chain from CompareExpr to Expr.
+### Keywords
+Keywords (`if`, `then`, `else`, `import`, `export`, `true`, `false`) are properly disambiguated from identifiers by the lexer. New keywords can be registered via `LexerConfig`.
+
+### Grammar Extension
+- **Earley extensions** (`GrammarBuilder`): still available for standalone grammars and grammar primitive tests
+- **Hybrid extensions**: `HybridGrammarConfig` with prefix/infix parselet registrations and `LexerConfig` for new operators/keywords. Immutable layering via `extendLexerConfig`.
 
 ## Module System
 
@@ -166,14 +169,17 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 ### Files
 
 - **`src/types.ts`** — Value types, constructors, utilities, Extension interface, string↔bits, float↔bits
-- **`src/evaluator.ts`** — Recursive tree-walk evaluator, memoization, partial evaluation (Rule 1 + Rule 2), type-directed dispatch via `PRIM_TO_METHOD`, closure support, type variable unification at call sites
+- **`src/evaluator.ts`** — Recursive tree-walk evaluator, memoization, partial evaluation (Rule 1 + Rule 2), type-directed dispatch via `PRIM_TO_METHOD`, closure support, type variable unification at call sites, tail call optimization (TailCall marker + loop in applyComposed)
 - **`src/primitives.ts`** — All primitives: bits ops, expression/context/multi-value ops, type system (type_dispatch, type_check, type_apply, typed_int/string/float/bool/array/object, typed_function, typed operators, logical ops, unification), grammar primitives, print (lazy for type preservation)
 - **`src/types-std.ts`** — Eight core types as Context values with method bindings, generic type support (buildGenericType, memoized type constructors), type helpers (getType, getTypeName, withType), FunctionType, UntypedFunction, AnyType, makeArray, makeObject, createTypeSystem extension
-- **`src/parser.ts`** — Auto-generated Earley parser. Exports Grammar classes, parse functions, helpers. `collectParams` descends into all composed functions for closure support.
-- **`src/grammar-ext.ts`** — GrammarBuilder (terminal, phrase, repeat, disjunction, addAlternative), built-in extensions (dot access, import, float literals, array/object literals, bracket access, logical ops, type annotations with generics), typed function builder (buildTypedFn), Allegro Standard grammar builder, handle registry
-- **`src/runtime.ts`** — `evalSource` (parse → typeLiterals → buildEvalCtx → evaluate), `typeLiterals` post-parse type wrapping, `resolvePrimitives`, `extensionToContext`, UntypedFunction wrapping in standard mode
-- **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports.
-- **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode.
+- **`src/lexer.ts`** — Tokenizer with maximal munch, dynamic keyword/operator tables via `LexerConfig`, source location tracking, indentation (offside rule) support
+- **`src/hybrid-parser.ts`** — Pratt + recursive descent parser. Data-driven precedence/parselets. Handles all Allegro Standard syntax. Exports `parseBase`, `parseStandard`, `HybridGrammarConfig`
+- **`src/parser-helpers.ts`** — Shared value-construction helpers (makeInt, makeExpr, makeParam, buildFn, etc.) used by both hybrid parser and Earley fallback
+- **`src/parser.ts`** — Earley parser (retained for standalone grammars). Exports Grammar classes, `parseGrammar`
+- **`src/grammar-ext.ts`** — GrammarBuilder for Earley extensions, handle registry for grammar primitives. `parseExtended` for Earley fallback path
+- **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → buildEvalCtx → evaluate), symbol resolution with lexical scoping, UntypedFunction wrapping in standard mode
+- **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
+- **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
 - **`src/test.ts`** — 201 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, file-based .alg tests
 
 ### Test Files (tests/)
@@ -262,6 +268,10 @@ x > 0 && x < 10         // comparisons with logical
 import math
 math.pi
 
+// Export (module public interface)
+export square = x => x * x
+export pi = 3.14159
+
 // String concatenation
 "hello" + " " + "world" // → "hello world"
 
@@ -279,16 +289,13 @@ nums.map(x: Int => x * 2)
 
 ## What's Next
 
-Immediate:
-1. **Symbol resolution / lexical scoping** — replace `Param(-1, "name")` with properly scoped Symbols resolved at parse time
-2. **eval_if Rule 2** — partial evaluation of both branches when condition is undefined
-3. **Tail call optimization** — evaluator detects tail-position self-calls and loops instead of recursing
-
-Next milestone — **Parser reimplementation**:
-4. **New parser architecture** — hybrid TypeScript/Allegro-informed design, proper keyword support, grammar as values
-5. **Keyword support** — `export`, `true`/`false` as proper keywords (currently workarounds)
-
-See `BACKLOG.md` for full roadmap.
+See `BACKLOG.md` for full roadmap. Key completed items:
+- ✅ Symbol resolution / lexical scoping (compile-time, not runtime)
+- ✅ eval_if Rule 2 (partial eval both branches)
+- ✅ Tail call optimization (O(1) stack for tail-recursive functions)
+- ✅ Parser reimplementation (hybrid Pratt + recursive descent)
+- ✅ Keyword support (export, true/false properly disambiguated)
+- ✅ Dynamic lexer config (extensions add operators/keywords)
 
 ## Design Philosophy
 
