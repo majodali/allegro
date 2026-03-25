@@ -1049,6 +1049,40 @@ test("type system: string dot indexOf", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 2);
 });
 
+test("type system: string trim returns typed String", () => {
+  const result = evalStd('"  hello  ".trim()');
+  eq(getTypeName(result!), "String");
+  eq(bitsToString(primaryOf(result!) as BitsValue), "hello");
+});
+
+test("type system: string startsWith returns typed Bool", () => {
+  const result = evalStd('"hello".startsWith("hel")');
+  eq(getTypeName(result!), "Bool");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("type system: string split returns typed Array", () => {
+  const result = evalStd('"a,b,c".split(",")');
+  eq(getTypeName(result!), "Array");
+});
+
+test("type system: string replace returns typed String", () => {
+  const result = evalStd('"aabb".replace("b", "x")');
+  eq(getTypeName(result!), "String");
+  eq(bitsToString(primaryOf(result!) as BitsValue), "aaxx");
+});
+
+test("type system: string toUpperCase returns typed String", () => {
+  const result = evalStd('"hello".toUpperCase()');
+  eq(getTypeName(result!), "String");
+  eq(bitsToString(primaryOf(result!) as BitsValue), "HELLO");
+});
+
+test("type system: string toCharCodes returns typed Array", () => {
+  const result = evalStd('"AB".toCharCodes()');
+  eq(getTypeName(result!), "Array");
+});
+
 test("type system: string concat with +", () => {
   const result = evalStd('"hello" + " world"');
   eq(result !== null, true);

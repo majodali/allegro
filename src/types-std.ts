@@ -195,7 +195,7 @@ const stringMethods: Record<string, PrimitiveFnImpl> = {
   // Properties / methods
   length: (args) => {
     const s = bitsToString(asBitsTyped(args[0], "String.length"));
-    return makeInt(s.length);
+    return withType(makeInt(s.length), IntType);
   },
   slice: (args) => {
     const s = bitsToString(asBitsTyped(args[0], "String.slice"));
@@ -209,6 +209,79 @@ const stringMethods: Record<string, PrimitiveFnImpl> = {
     const s = bitsToString(asBitsTyped(args[0], "String.indexOf"));
     const search = bitsToString(asBitsTyped(args[1], "String.indexOf"));
     return withType(makeInt(s.indexOf(search)), IntType);
+  },
+  trim: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.trim"));
+    return withType(stringToBits(s.trim()), StringType);
+  },
+  startsWith: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.startsWith"));
+    const prefix = bitsToString(asBitsTyped(args[1], "String.startsWith"));
+    return withType(makeInt(s.startsWith(prefix) ? 1 : 0), BoolType);
+  },
+  endsWith: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.endsWith"));
+    const suffix = bitsToString(asBitsTyped(args[1], "String.endsWith"));
+    return withType(makeInt(s.endsWith(suffix) ? 1 : 0), BoolType);
+  },
+  includes: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.includes"));
+    const search = bitsToString(asBitsTyped(args[1], "String.includes"));
+    return withType(makeInt(s.includes(search) ? 1 : 0), BoolType);
+  },
+  split: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.split"));
+    const delimiter = bitsToString(asBitsTyped(args[1], "String.split"));
+    const parts = s.split(delimiter);
+    return makeArray(parts.map(p => withType(stringToBits(p), StringType)));
+  },
+  replace: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.replace"));
+    const search = bitsToString(asBitsTyped(args[1], "String.replace"));
+    const replacement = bitsToString(asBitsTyped(args[2], "String.replace"));
+    // Optional count parameter: default replaces all occurrences
+    const count = args.length > 3
+      ? Number(toSigned(asBitsTyped(args[3], "String.replace")))
+      : -1; // -1 = replace all
+    let result = s;
+    if (count === -1) {
+      result = result.split(search).join(replacement);
+    } else {
+      for (let i = 0; i < count; i++) {
+        const idx = result.indexOf(search);
+        if (idx === -1) break;
+        result = result.slice(0, idx) + replacement + result.slice(idx + search.length);
+      }
+    }
+    return withType(stringToBits(result), StringType);
+  },
+  toUpperCase: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.toUpperCase"));
+    return withType(stringToBits(s.toUpperCase()), StringType);
+  },
+  toLowerCase: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.toLowerCase"));
+    return withType(stringToBits(s.toLowerCase()), StringType);
+  },
+  charAt: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.charAt"));
+    const idx = Number(toSigned(asBitsTyped(args[1], "String.charAt")));
+    if (idx < 0 || idx >= s.length) return withType(stringToBits(""), StringType);
+    return withType(stringToBits(s.charAt(idx)), StringType);
+  },
+  repeat: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.repeat"));
+    const count = Number(toSigned(asBitsTyped(args[1], "String.repeat")));
+    if (count < 0) throw new AllegroError("String.repeat: count must be non-negative");
+    return withType(stringToBits(s.repeat(count)), StringType);
+  },
+  toCharCodes: (args) => {
+    const s = bitsToString(asBitsTyped(args[0], "String.toCharCodes"));
+    const codes: Value[] = [];
+    for (let i = 0; i < s.length; i++) {
+      codes.push(withType(makeInt(s.charCodeAt(i)), IntType));
+    }
+    return makeArray(codes);
   },
   toString: ((args: Value[]) => {
     return args[0]; // strings are already strings

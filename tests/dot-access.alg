@@ -35,3 +35,57 @@ a = "foo"
 b = "bar"
 print(a + b)
 // expect: foobar
+
+// String trim
+print("  hello  ".trim())
+// expect: hello
+
+// String startsWith / endsWith
+print("hello".startsWith("hel"))
+// expect: true
+
+print("hello".endsWith("llo"))
+// expect: true
+
+print("hello".startsWith("xyz"))
+// expect: false
+
+// String includes
+print("hello world".includes("world"))
+// expect: true
+
+print("hello".includes("xyz"))
+// expect: false
+
+// String replace (replaces all by default)
+print("aabbcc".replace("b", "x"))
+// expect: aaxxcc
+
+// String replace with count
+print("aabbcc".replace("b", "x", 1))
+// expect: aaxbcc
+
+// String case
+print("hello".toUpperCase())
+// expect: HELLO
+
+print("HELLO".toLowerCase())
+// expect: hello
+
+// String charAt
+print("hello".charAt(1))
+// expect: e
+
+// String repeat
+print("ab".repeat(3))
+// expect: ababab
+
+// String split
+s = "a,b,c".split(",")
+print(s.length)
+// expect: 3
+
+// String toCharCodes
+codes = "ABC".toCharCodes()
+print(codes.length)
+// expect: 3

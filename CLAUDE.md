@@ -75,7 +75,7 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 ### Eight Core Types
 - **Int** — 64-bit signed integer. Arithmetic, comparison, toString.
 - **Float** — IEEE 754 double. Arithmetic, comparison, toString.
-- **String** — UTF-8 encoded Bits. Concat (+), length, slice, indexOf, toString.
+- **String** — UTF-8 encoded Bits. Concat (+), length, slice, indexOf, trim, startsWith, endsWith, includes, split, replace (all by default, optional count), toUpperCase, toLowerCase, charAt, repeat, toCharCodes, toString.
 - **Bool** — Int(0/1) with Bool type. Provided as `true`/`false` context bindings.
 - **Array** — Generic type `Array[T]`. Context with numeric keys + `__length`. length, get, map, filter, reduce, concat, slice. Element type inferred from contents.
 - **Object** — Typed Context. Field access via dot, keys, values, get.
