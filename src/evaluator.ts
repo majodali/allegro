@@ -224,10 +224,13 @@ function substituteParams(fn: ComposedFunctionValue, args: Value[]): Value {
       posMap.set(p.position, args[p.position]);
     }
   }
-  return subst(fn.body, fn, posMap);
+  return subst(fn.body, fn, posMap, new Set());
 }
 
-function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, Value>): Value {
+function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, Value>, seen: Set<Value>): Value {
+  if (seen.has(value)) return value; // circular reference guard
+  seen.add(value);
+
   switch (value.kind) {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
@@ -245,7 +248,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
     case ValueKind.ComposedFunction: {
       // Descend into all composed functions to substitute free variables.
       // Inner functions' own params won't match (different owner).
-      const newBody = subst(value.body, owner, posMap);
+      const newBody = subst(value.body, owner, posMap, seen);
       if (newBody === value.body) return value;
       const newFn: ComposedFunctionValue = {
         kind: ValueKind.ComposedFunction,
@@ -258,14 +261,14 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
     }
 
     case ValueKind.Expression: {
-      const newFn = subst(value.fn, owner, posMap);
-      const newArgs = value.args.map(a => subst(a, owner, posMap));
+      const newFn = subst(value.fn, owner, posMap, seen);
+      const newArgs = value.args.map(a => subst(a, owner, posMap, seen));
       if (newFn === value.fn && newArgs.every((a, i) => a === value.args[i])) return value;
       return makeExpr(newFn, newArgs);
     }
 
     case ValueKind.MultiValue: {
-      const newP = subst(value.primary, owner, posMap);
+      const newP = subst(value.primary, owner, posMap, seen);
       return newP === value.primary ? value : makeMultiValue(newP, new Map(value.components));
     }
   }

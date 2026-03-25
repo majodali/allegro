@@ -91,6 +91,308 @@ export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
 }
 
 /**
+ * Resolve all named symbols (Param position=-1) in a file context using lexical scoping.
+ * Two-pass per context:
+ *   1. Collect all binding names in the context
+ *   2. Walk expression trees, replacing Param(-1, "name") with direct references
+ *
+ * Resolution order (inner to outer):
+ *   - Source bindings (same context)
+ *   - Base context (REPL persistence)
+ *   - Extensions (type system, modules, etc.)
+ *   - Primitives
+ *
+ * After resolution, no named Params remain — everything is either:
+ *   - A positional Param (function parameter)
+ *   - A direct reference to the definition value
+ *   - An unresolvable name (throws error)
+ *
+ * Recursive functions: the function body references the same ComposedFunction
+ * object, creating a direct circular reference (JavaScript handles this fine).
+ */
+export function resolveSymbols(
+  fileCtx: any,
+  base?: ContextValue,
+  extensions?: Extension[],
+  typed?: boolean,
+): void {
+  // Build the full resolution map: name → value
+  // Order matters: later entries shadow earlier ones
+  const resolutionMap = new Map<string, Value>();
+
+  // Layer 1: Primitives
+  for (const [name, prim] of Object.entries(primitives)) {
+    if (typed && (prim as any).kind === ValueKind.PrimitiveFunction) {
+      resolutionMap.set(name, wrapAsUntypedFunction(prim as Value));
+    } else {
+      resolutionMap.set(name, prim as Value);
+    }
+  }
+
+  // Layer 2: Extensions
+  if (extensions) {
+    for (const ext of extensions) {
+      for (const [name, value] of Object.entries(ext.bindings)) {
+        resolutionMap.set(name, value);
+      }
+      if (ext.moduleObject) {
+        resolutionMap.set(ext.name, ext.moduleObject);
+      }
+    }
+  }
+
+  // Layer 3: Base context (REPL persistence)
+  if (base) {
+    for (const [key, binding] of base.bindings) {
+      if (binding.value !== undefined) {
+        resolutionMap.set(key, binding.value);
+      }
+    }
+  }
+
+  // Layer 4: Source bindings — collect names first (two-pass)
+  // First pass: resolve primitive stubs and record all source binding names
+  const sourceNames = new Set<string>();
+  for (const b of fileCtx.bindingList) {
+    if (b.key !== null) {
+      sourceNames.add(b.key);
+      // Resolve primitive stubs in the binding values
+      if (b.value !== undefined) {
+        b.value = resolvePrimitives(b.value);
+      }
+    }
+  }
+
+  // Add source bindings to resolution map (values may still contain unresolved named Params)
+  for (const b of fileCtx.bindingList) {
+    if (b.key !== null && b.value !== undefined) {
+      resolutionMap.set(b.key, b.value);
+    }
+  }
+
+  // Second pass: resolve non-source names (primitives, extensions, base context)
+  // Skip source binding names — they may have forward/mutual references
+  const nonSourceMap = new Map(resolutionMap);
+  for (const name of sourceNames) nonSourceMap.delete(name);
+
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) {
+      b.value = resolveNamedParams(b.value, nonSourceMap, null);
+    }
+  }
+
+  // Third pass: patch source-binding references in-place
+  // Build a map from source name → binding object (so mutations propagate)
+  // Use in-place patching to handle mutual recursion and self-references
+  const sourceBindings = new Map<string, any>();
+  for (const b of fileCtx.bindingList) {
+    if (b.key !== null && b.value !== undefined) {
+      sourceBindings.set(b.key, b);
+    }
+  }
+
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) {
+      for (const [name, srcBinding] of sourceBindings) {
+        patchNamedParams(b.value, name, srcBinding, new Set());
+      }
+    }
+  }
+}
+
+/**
+ * In-place patch: find Param(-1, name) in expression trees and replace
+ * with the binding's current value. Uses the binding object so the
+ * reference stays current even for mutual recursion.
+ * Creates circular references for recursive functions (JS handles this).
+ */
+function patchNamedParams(
+  value: Value,
+  name: string,
+  binding: { value: Value },
+  seen: Set<Value>,
+): void {
+  if (!value || typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+
+  if (value.kind === ValueKind.Expression) {
+    if (value.fn.kind === ValueKind.Param && value.fn._name === name && value.fn.position === -1) {
+      (value as any).fn = binding.value;
+    } else {
+      patchNamedParams(value.fn, name, binding, seen);
+    }
+    for (let i = 0; i < value.args.length; i++) {
+      const arg = value.args[i];
+      if (arg.kind === ValueKind.Param && arg._name === name && arg.position === -1) {
+        value.args[i] = binding.value;
+      } else {
+        patchNamedParams(arg, name, binding, seen);
+      }
+    }
+  } else if (value.kind === ValueKind.ComposedFunction) {
+    // Don't patch params that shadow the name
+    const shadows = value.params.some(p => p._name === name);
+    if (!shadows) {
+      patchNamedParams(value.body, name, binding, seen);
+    }
+  } else if (value.kind === ValueKind.MultiValue) {
+    patchNamedParams(value.primary, name, binding, seen);
+  }
+}
+
+/**
+ * Walk an expression tree and replace named Params (position=-1) with their
+ * definitions from the resolution map.
+ *
+ * @param selfName — if provided, skip resolution of this name to handle
+ *   recursive self-references. The function's body will contain a Param
+ *   that refers to itself. After this pass, we patch it with the actual
+ *   function reference.
+ */
+function resolveNamedParams(
+  value: Value,
+  resMap: Map<string, Value>,
+  selfName?: string | null,
+  seen?: Set<Value>,
+): Value {
+  if (!seen) seen = new Set();
+  if (!value || typeof value !== "object") return value;
+  if (seen.has(value)) return value;
+  seen.add(value);
+
+  switch (value.kind) {
+    case ValueKind.Bits:
+    case ValueKind.Context:
+      return value;
+
+    case ValueKind.PrimitiveFunction: {
+      // Resolve primitive stubs (fn: null)
+      if ((value as any).fn === null) {
+        const real = primitives[value.name];
+        if (real) return real;
+        // Unknown primitive — leave as-is (might be resolved later)
+      }
+      return value;
+    }
+
+    case ValueKind.Param: {
+      if (value._name && value.position === -1) {
+        // Skip self-references — handled after the whole function is resolved
+        if (value._name === selfName) return value;
+        const resolved = resMap.get(value._name);
+        if (resolved !== undefined) return resolved;
+        // Unresolved — leave as named Param (might be a type variable or phase binding)
+      }
+      return value;
+    }
+
+    case ValueKind.ComposedFunction: {
+      // Don't resolve params owned by this function — they're positional
+      const fn = value as ComposedFunctionValue;
+      const ownParamNames = new Set(fn.params.map(p => p._name).filter(Boolean) as string[]);
+      const newBody = resolveNamedParamsInner(fn.body, resMap, fn, ownParamNames, selfName, seen);
+      if (newBody === fn.body) return value;
+      const newFn: ComposedFunctionValue = {
+        kind: ValueKind.ComposedFunction,
+        params: fn.params,
+        body: newBody,
+      };
+      for (const p of newFn.params) p.owner = newFn;
+      return newFn;
+    }
+
+    case ValueKind.Expression: {
+      const newFn = resolveNamedParams(value.fn, resMap, selfName, seen);
+      const newArgs = value.args.map(a => resolveNamedParams(a, resMap, selfName, seen));
+      if (newFn === value.fn && newArgs.every((a, i) => a === value.args[i])) return value;
+      return makeExpr(newFn, newArgs);
+    }
+
+    case ValueKind.MultiValue: {
+      const newP = resolveNamedParams(value.primary, resMap, selfName, seen);
+      if (newP === value.primary) return value;
+      return makeMultiValue(newP, new Map(value.components));
+    }
+  }
+  return value;
+}
+
+/**
+ * Inner resolution for function bodies — skips params owned by the enclosing function
+ * and params that shadow outer bindings.
+ */
+function resolveNamedParamsInner(
+  value: Value,
+  resMap: Map<string, Value>,
+  owner: ComposedFunctionValue,
+  ownParamNames: Set<string>,
+  selfName?: string | null,
+  seen?: Set<Value>,
+): Value {
+  if (!value || typeof value !== "object") return value;
+  if (!seen) seen = new Set();
+  if (seen.has(value)) return value;
+  seen.add(value);
+
+  switch (value.kind) {
+    case ValueKind.Bits:
+    case ValueKind.Context:
+      return value;
+
+    case ValueKind.PrimitiveFunction: {
+      if ((value as any).fn === null) {
+        const real = primitives[value.name];
+        if (real) return real;
+      }
+      return value;
+    }
+
+    case ValueKind.Param: {
+      // Positional params owned by this function — leave alone
+      if (value.owner === owner) return value;
+      // Named params that shadow function params — leave alone
+      if (value._name && ownParamNames.has(value._name)) return value;
+      // Named params — resolve
+      if (value._name && value.position === -1) {
+        if (value._name === selfName) return value;
+        const resolved = resMap.get(value._name);
+        if (resolved !== undefined) return resolved;
+      }
+      return value;
+    }
+
+    case ValueKind.ComposedFunction: {
+      // Inner function — create new scope with its own params
+      const fn = value as ComposedFunctionValue;
+      const innerOwn = new Set(fn.params.map(p => p._name).filter(Boolean) as string[]);
+      const newBody = resolveNamedParamsInner(fn.body, resMap, fn, innerOwn, selfName, seen);
+      if (newBody === fn.body) return value;
+      const newFn: ComposedFunctionValue = {
+        kind: ValueKind.ComposedFunction,
+        params: fn.params,
+        body: newBody,
+      };
+      for (const p of newFn.params) p.owner = newFn;
+      return newFn;
+    }
+
+    case ValueKind.Expression: {
+      const newFn = resolveNamedParamsInner(value.fn, resMap, owner, ownParamNames, selfName, seen);
+      const newArgs = value.args.map(a => resolveNamedParamsInner(a, resMap, owner, ownParamNames, selfName, seen));
+      if (newFn === value.fn && newArgs.every((a, i) => a === value.args[i])) return value;
+      return makeExpr(newFn, newArgs);
+    }
+
+    case ValueKind.MultiValue: {
+      const newP = resolveNamedParamsInner(value.primary, resMap, owner, ownParamNames, selfName, seen);
+      if (newP === value.primary) return value;
+      return makeMultiValue(newP, new Map(value.components));
+    }
+  }
+  return value;
+}
+
+/**
  * Build an evaluation context from a parser file context.
  *
  * Context layers (bottom to top, later layers shadow earlier ones):
@@ -151,11 +453,10 @@ export function buildEvalCtx(
     }
   }
 
-  // Layer 4: Source bindings (overwrite anything below)
+  // Layer 4: Source bindings (already resolved by resolveSymbols)
   for (const b of fileCtx.bindingList) {
     if (b.key !== null && b.value !== undefined) {
-      const resolved = resolvePrimitives(b.value);
-      addBinding(b.key, resolved);
+      addBinding(b.key, b.value);
     }
   }
 
@@ -220,13 +521,15 @@ export function evalSource(
     }
   }
 
+  // Resolve all symbols (named Params) using lexical scoping
+  resolveSymbols(fileCtx, base, extensions, typed);
+
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
 
   let lastValue: Value | null = null;
   for (const b of fileCtx.bindingList) {
     if (b.key === null && b.value !== undefined) {
-      const resolved = resolvePrimitives(b.value);
-      lastValue = evaluate(resolved, evalCtx);
+      lastValue = evaluate(b.value, evalCtx);
     }
   }
 

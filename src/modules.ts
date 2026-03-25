@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { parse } from "./parser.js";
-import { buildEvalCtx, resolvePrimitives, Extension } from "./runtime.js";
+import { buildEvalCtx, resolvePrimitives, resolveSymbols, Extension } from "./runtime.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, ComposedFunctionValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, primaryOf } from "./types.js";
 import { withType } from "./types-std.js";
@@ -237,14 +237,14 @@ export class ModuleLoader {
       return ext;
     }
 
-    // 5. Build evaluation context with dependency extensions
+    // 5. Resolve symbols and build evaluation context
+    resolveSymbols(fileCtx, undefined, depExtensions);
     const evalCtx = buildEvalCtx(fileCtx, undefined, depExtensions);
 
     // 6. Evaluate bare expressions (side effects)
     for (const b of fileCtx.bindingList) {
       if (b.key === null && b.value !== undefined) {
-        const resolved = resolvePrimitives(b.value);
-        evaluate(resolved, evalCtx);
+        evaluate(b.value, evalCtx);
       }
     }
 
