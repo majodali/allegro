@@ -1802,6 +1802,55 @@ test("partial eval: nested if-then-else preserves types", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 2);
 });
 
+// == Compile-Time Type Inference ==
+
+test("compile: infer return type Int from arithmetic body", () => {
+  const { compilationReport } = runtimeEval(
+    "add(x: Int, y: Int) => x + y\n",
+    undefined, [typeExt], undefined, true,
+  );
+  const inferred = compilationReport?.inferred.find(i => i.name === "add");
+  eq(inferred !== undefined, true, "add should have inferred return type");
+  eq(inferred?.returnType, "Int");
+});
+
+test("compile: infer return type String from concat body", () => {
+  const { compilationReport } = runtimeEval(
+    'greet(name: String) => "Hello, " + name\n',
+    undefined, [typeExt], undefined, true,
+  );
+  const inferred = compilationReport?.inferred.find(i => i.name === "greet");
+  eq(inferred !== undefined, true);
+  eq(inferred?.returnType, "String");
+});
+
+test("compile: infer return type from if-then-else branches", () => {
+  const { compilationReport } = runtimeEval(
+    "abs(x: Int) => if x > 0 then x else 0 - x\n",
+    undefined, [typeExt], undefined, true,
+  );
+  const inferred = compilationReport?.inferred.find(i => i.name === "abs");
+  eq(inferred !== undefined, true);
+  eq(inferred?.returnType, "Int");
+});
+
+test("compile: report lists unresolved imports", () => {
+  const { compilationReport } = runtimeEval(
+    "import db\nx = 42\n",
+    undefined, [typeExt], undefined, true,
+  );
+  eq(compilationReport?.unresolved.includes("db"), true);
+});
+
+test("compile: non-typed functions not in inferred list", () => {
+  const { compilationReport } = runtimeEval(
+    "f(x) => x + 1\n",
+    undefined, [typeExt], undefined, true,
+  );
+  const inferred = compilationReport?.inferred.find(i => i.name === "f");
+  eq(inferred, undefined, "untyped function should not be pre-compiled");
+});
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {

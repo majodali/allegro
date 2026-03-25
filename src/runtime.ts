@@ -4,12 +4,12 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { markTailCalls } from "./evaluator.js";
+import { markTailCalls, precompileFunction } from "./evaluator.js";
 import { parseBase as hybridParseBase, parseStandard as hybridParseStandard } from "./hybrid-parser.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, Extension } from "./types.js";
-import { withType, IntType, StringType, wrapAsUntypedFunction } from "./types-std.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, Extension } from "./types.js";
+import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
 export type { Extension };
@@ -421,6 +421,134 @@ function markTailCallsInValue(v: any, seen: Set<any>): void {
   }
 }
 
+// --- Compilation Report ---
+
+export interface CompilationReport {
+  /** Functions with inferred return types */
+  inferred: { name: string; returnType: string }[];
+  /** Type errors detected at compile time */
+  errors: { name: string; message: string }[];
+  /** Bindings still unresolved after compilation */
+  unresolved: string[];
+}
+
+/**
+ * Pre-compile typed functions: partially evaluate their bodies with
+ * typed param placeholders to infer return types and detect type errors.
+ */
+function precompileFunctions(
+  fileCtx: any,
+  extensions?: Extension[],
+  typed?: boolean,
+): CompilationReport {
+  const report: CompilationReport = { inferred: [], errors: [], unresolved: [] };
+  if (!typed) return report;
+
+  // Build a minimal context for pre-compilation (primitives + extensions)
+  const compileCtx = makeContext();
+  for (const [name, prim] of Object.entries(primitives)) {
+    const binding = { key: name, value: prim as Value, isUse: false };
+    compileCtx.bindings.set(name, binding);
+    compileCtx.bindingList.push(binding);
+  }
+  if (extensions) {
+    for (const ext of extensions) {
+      for (const [name, value] of Object.entries(ext.bindings)) {
+        const binding = { key: name, value, isUse: false };
+        compileCtx.bindings.set(name, binding);
+        compileCtx.bindingList.push(binding);
+      }
+      if (ext.moduleObject) {
+        const binding = { key: ext.name, value: ext.moduleObject, isUse: false };
+        compileCtx.bindings.set(ext.name, binding);
+        compileCtx.bindingList.push(binding);
+      }
+    }
+  }
+  // Add source bindings to compile context
+  for (const b of fileCtx.bindingList) {
+    if (b.key !== null && b.value !== undefined) {
+      compileCtx.bindings.set(b.key, { key: b.key, value: b.value, isUse: false });
+      compileCtx.bindingList.push({ key: b.key, value: b.value, isUse: false });
+    }
+  }
+
+  for (const b of fileCtx.bindingList) {
+    if (b.key === null || b.value === undefined) continue;
+
+    // Evaluate the binding to resolve typed_function wrappers
+    let val: Value;
+    try {
+      val = evaluate(b.value, compileCtx, 0);
+    } catch (e: any) {
+      // Skip bindings that can't be evaluated at compile time
+      report.errors.push({ name: b.key ?? "?", message: `precompile eval: ${e.message}` });
+      continue;
+    }
+
+    // Check if this is a typed function (MultiValue with FunctionType)
+    if (val.kind !== ValueKind.MultiValue) continue;
+
+    const fnType = getType(val);
+    if (!fnType) continue;
+    const typeName = getTypeName(val);
+    if (typeName !== "Function") continue;
+
+    const fn = val.primary;
+    if (fn.kind !== ValueKind.ComposedFunction) continue;
+
+    const paramTypes = getFunctionParamTypes(fnType);
+    if (!paramTypes) continue;
+
+    // Pre-compile: partially evaluate body with typed placeholders
+    const { inferredReturnType, errors: fnErrors } = precompileFunction(
+      fn as ComposedFunctionValue,
+      paramTypes,
+      compileCtx,
+    );
+
+    if (fnErrors.length > 0) {
+      for (const err of fnErrors) {
+        report.errors.push({ name: b.key, message: err });
+      }
+    }
+
+    if (inferredReturnType) {
+      const inferredName = inferredReturnType.kind === ValueKind.Context
+        ? (inferredReturnType as ContextValue).bindings.get("__name")?.value
+        : null;
+      const inferredStr = inferredName && inferredName.kind === ValueKind.Bits
+        ? bitsToString(inferredName as BitsValue)
+        : "unknown";
+      report.inferred.push({ name: b.key, returnType: inferredStr });
+
+      // Check against explicit return type if declared
+      const declaredReturn = getFunctionReturnType(fnType);
+      if (declaredReturn && declaredReturn.kind === ValueKind.Context) {
+        const declaredName = (declaredReturn as ContextValue).bindings.get("__name")?.value;
+        const declaredStr = declaredName && declaredName.kind === ValueKind.Bits
+          ? bitsToString(declaredName as BitsValue)
+          : null;
+        if (declaredStr && inferredStr !== "unknown" && declaredStr !== inferredStr && declaredStr !== "Any") {
+          report.errors.push({
+            name: b.key,
+            message: `Return type mismatch: declared ${declaredStr}, inferred ${inferredStr}`,
+          });
+        }
+      }
+    }
+  }
+
+  // Scan for unresolved bindings
+  for (const b of fileCtx.bindingList) {
+    if (b.key !== null && b.value === undefined) {
+      report.unresolved.push(b.key);
+    }
+  }
+
+  return report;
+}
+
 /**
  * Build an evaluation context from a parser file context.
  *
@@ -526,7 +654,7 @@ export function evalSource(
   extensions?: Extension[],
   grammarExtension?: GrammarExtension,
   typed?: boolean,
-): { value: Value | null; evalCtx: ContextValue } {
+): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport } {
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
@@ -561,6 +689,9 @@ export function evalSource(
   // Mark tail-position calls in function bodies for TCO
   markTailCallsInContext(fileCtx);
 
+  // Pre-compile typed functions: infer return types and detect type errors
+  const compilationReport = precompileFunctions(fileCtx, extensions, typed);
+
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
 
   let lastValue: Value | null = null;
@@ -570,5 +701,5 @@ export function evalSource(
     }
   }
 
-  return { value: lastValue, evalCtx };
+  return { value: lastValue, evalCtx, compilationReport };
 }

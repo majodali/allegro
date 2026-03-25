@@ -753,8 +753,19 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Step 1: Evaluate
   const v = evalFn!(args[0], ctx!);
   const expectedType = evalFn!(args[1], ctx!);
-  if (!isResolved(v) || !isResolved(expectedType)) {
+  // If the expected type isn't resolved, defer completely
+  if (!isResolved(expectedType)) {
     return makeExpr(makePrimitive("type_check", type_check_impl, true), [v, expectedType]);
+  }
+  // If the value isn't fully resolved but HAS a type component,
+  // we can still check the type (partial evaluation: type check at compile time)
+  if (!isResolved(v)) {
+    const valueType = getType(v);
+    if (!valueType) {
+      // No type info at all — defer
+      return makeExpr(makePrimitive("type_check", type_check_impl, true), [v, expectedType]);
+    }
+    // Type is known — proceed with the check (value stays as-is if it passes)
   }
 
   // Step 2: Normalize — resolve bare generics to Generic[Any, ...]

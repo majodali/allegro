@@ -144,10 +144,18 @@ Keywords (`if`, `then`, `else`, `import`, `export`, `true`, `false`) are properl
 ## Partial Evaluation
 
 Partial evaluation follows two rules:
-1. **Rule 1**: If an expression results in an undefined value to be passed to a primitive, the partially evaluated expression is returned (with unbound symbols visible).
+1. **Rule 1**: If an expression results in an undefined value to be passed to a primitive, the partially evaluated expression is returned (with unbound symbols visible). If the args have type components, the result type is propagated to the residual expression.
 2. **Rule 2**: If `eval_if` (or any lazy primitive) has an undefined condition, all branches are partially evaluated non-lazily, propagating type information through both paths.
 
 After partial evaluation, an expression's type is its `"type"` MultiValue component — which may be fully resolved or itself a partially evaluated expression. No separate `typeOf` function is needed.
+
+### Compile-Time Type Inference
+- `precompileFunctions` pass in `evalSource` partially evaluates typed function bodies at definition time
+- Typed params get placeholder MultiValues (unresolved primary + resolved type component)
+- `type_check` proceeds when the type component is known, even if the primary is unresolved
+- `applyPrimitive` propagates type components through residual Expressions
+- Return type inferred from the partially evaluated body's type component
+- `CompilationReport` returned from `evalSource`: inferred return types, type errors, unresolved bindings
 
 ## Build/Execution Context
 
@@ -169,7 +177,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 ### Files
 
 - **`src/types.ts`** — Value types, constructors, utilities, Extension interface, string↔bits, float↔bits
-- **`src/evaluator.ts`** — Recursive tree-walk evaluator, memoization, partial evaluation (Rule 1 + Rule 2), type-directed dispatch via `PRIM_TO_METHOD`, closure support, type variable unification at call sites, tail call optimization (TailCall marker + loop in applyComposed)
+- **`src/evaluator.ts`** — Recursive tree-walk evaluator, memoization, partial evaluation (Rule 1 + Rule 2 with type propagation through residuals), type-directed dispatch via `PRIM_TO_METHOD`, closure support, type variable unification at call sites, tail call optimization, `precompileFunction` for compile-time type inference
 - **`src/primitives.ts`** — All primitives: bits ops, expression/context/multi-value ops, type system (type_dispatch, type_check, type_apply, typed_int/string/float/bool/array/object, typed_function, typed operators, logical ops, unification), grammar primitives, print (lazy for type preservation)
 - **`src/types-std.ts`** — Eight core types as Context values with method bindings, generic type support (buildGenericType, memoized type constructors), type helpers (getType, getTypeName, withType), FunctionType, UntypedFunction, AnyType, makeArray, makeObject, createTypeSystem extension
 - **`src/lexer.ts`** — Tokenizer with maximal munch, dynamic keyword/operator tables via `LexerConfig`, source location tracking, indentation (offside rule) support
@@ -177,7 +185,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/parser-helpers.ts`** — Shared value-construction helpers (makeInt, makeExpr, makeParam, buildFn, etc.) used by both hybrid parser and Earley fallback
 - **`src/parser.ts`** — Earley parser (retained for standalone grammars). Exports Grammar classes, `parseGrammar`
 - **`src/grammar-ext.ts`** — GrammarBuilder for Earley extensions, handle registry for grammar primitives. `parseExtended` for Earley fallback path
-- **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → buildEvalCtx → evaluate), symbol resolution with lexical scoping, UntypedFunction wrapping in standard mode
+- **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
 - **`src/test.ts`** — 201 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, file-based .alg tests

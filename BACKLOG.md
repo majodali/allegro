@@ -22,7 +22,8 @@ High-level goals, roughly ordered by dependency:
 - [ ] Interfaces — structural type matching (no explicit `implements`)
 - [ ] Mixins — types with default implementations
 - [ ] Algebraic types — sum types (tagged unions), product types
-- [ ] Type inference — Hindley-Milner style, built on partial evaluation + unification
+- [ ] Full type inference — Hindley-Milner style for unannotated functions
+- [x] Return type inference — via compile-time partial evaluation of typed function bodies
 - [ ] Variance — covariant/contravariant/invariant type parameters
 - [ ] Type constraints — `where T: Comparable`
 - [ ] Binding type annotations — `x: Int = 42`
@@ -33,8 +34,9 @@ High-level goals, roughly ordered by dependency:
 - [x] Any type — matches any type, bare generics auto-apply Any
 
 ### Partial Evaluation & Compilation
-- [ ] Formalize partial evaluation phases (invocation → config → compile → emit → package → deploy → execute)
-- [ ] Phase gate checks (postconditions that scan expression graphs)
+- [ ] Formalize multi-phase partial evaluation (invocation → config → compile → emit → package → deploy → execute)
+- [x] Compile-time type inference — precompileFunctions pass, type propagation through residuals
+- [x] Phase gate checks — CompilationReport with inferred types, errors, unresolved bindings
 - [ ] Target code generation (expression graph → executable)
 - [ ] Tree shaking via partial evaluation
 - [ ] Memoization as Standard feature (remove from base evaluator)

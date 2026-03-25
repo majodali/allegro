@@ -164,7 +164,21 @@ function applyPrimitive(
   // Eager: evaluate all args
   const evalArgs = args.map(a => evaluate(a, ctx, depth + 1));
   if (!evalArgs.every(isResolved)) {
-    return makeExpr(fn, evalArgs);
+    const residual = makeExpr(fn, evalArgs);
+    // Even though args aren't fully resolved, their type components
+    // may be known. Use type-level dispatch to infer the result type.
+    if (evalArgs[0]?.kind === ValueKind.MultiValue) {
+      const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
+      if (typeComp && typeComp.kind === ValueKind.Context) {
+        const methodName = PRIM_TO_METHOD.get(fn.name);
+        if (methodName) {
+          // Result type = left operand's type for arithmetic,
+          // or Bool-like for comparisons (Int for now)
+          return makeMultiValue(residual, new Map([["type", typeComp]]));
+        }
+      }
+    }
+    return residual;
   }
 
   // Type-directed dispatch: if the first arg has a type with a matching method,
@@ -351,4 +365,61 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
 export function resolveInContext(ctx: ContextValue, name: string): Value | undefined {
   const b = ctx.bindings.get(name);
   return b?.value;
+}
+
+// --- Function pre-compilation (compile-time partial evaluation) ---
+
+import { makeParam as makeParamHelper } from "./types.js";
+
+/**
+ * Pre-compile a typed function by partially evaluating its body with
+ * typed param placeholders. Each param gets a MultiValue with the
+ * declared type but an unresolved primary (Param). The evaluator's
+ * existing partial evaluation behavior handles the rest:
+ * - Type checks pass (type component matches)
+ * - Arithmetic on typed-but-valueless params produces typed Expressions
+ * - eval_if with unknown condition propagates types through branches
+ *
+ * Returns the inferred return type (from the result's type component),
+ * or null if the return type couldn't be determined.
+ */
+export function precompileFunction(
+  fn: ComposedFunctionValue,
+  paramTypes: Value[],
+  ctx: ContextValue,
+): { inferredReturnType: Value | null; errors: string[] } {
+  const errors: string[] = [];
+
+  // Create typed placeholders for each param
+  const placeholders: Value[] = [];
+  for (let i = 0; i < fn.params.length; i++) {
+    const param = fn.params[i];
+    const paramType = i < paramTypes.length ? paramTypes[i] : null;
+
+    if (paramType && paramType.kind === ValueKind.Context) {
+      // Typed param: create MultiValue(Param, type: paramType)
+      const placeholder = makeMultiValue(
+        makeParamHelper(param.position, param._name),
+        new Map([["type", paramType]]),
+      );
+      placeholders.push(placeholder);
+    } else {
+      // Untyped or type variable — leave as bare Param
+      placeholders.push(makeParamHelper(param.position, param._name));
+    }
+  }
+
+  // Substitute typed placeholders into the body
+  const substituted = substituteParams(fn, placeholders);
+
+  // Partially evaluate the body
+  try {
+    const result = evaluate(substituted, ctx, 0);
+    const inferredType = getType(result);
+    return { inferredReturnType: inferredType, errors };
+  } catch (e: any) {
+    // Compile-time type error detected
+    errors.push(e.message);
+    return { inferredReturnType: null, errors };
+  }
 }
