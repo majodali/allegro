@@ -49,9 +49,21 @@ export interface Token {
   offset: number;
 }
 
-// --- Keyword map ---
+// --- Lexer Configuration ---
 
-const KEYWORDS = new Map<string, TokenType>([
+/**
+ * Configures the lexer's keyword and operator tables.
+ * Grammar extensions add new entries here to make the lexer
+ * recognize new tokens without modifying lexer code.
+ */
+export interface LexerConfig {
+  keywords: Map<string, TokenType>;
+  /** Operators sorted longest-first for maximal munch */
+  operators: [string, TokenType][];
+}
+
+/** Base keywords (always available) */
+export const BASE_KEYWORDS = new Map<string, TokenType>([
   ["if", TokenType.If],
   ["then", TokenType.Then],
   ["else", TokenType.Else],
@@ -61,9 +73,8 @@ const KEYWORDS = new Map<string, TokenType>([
   ["false", TokenType.False],
 ]);
 
-// --- Multi-character operator matching (longest first) ---
-
-const OPERATORS: [string, TokenType][] = [
+/** Base operators (always available), sorted longest-first */
+export const BASE_OPERATORS: [string, TokenType][] = [
   ["=>", TokenType.Arrow],
   ["==", TokenType.EqEq],
   ["!=", TokenType.BangEq],
@@ -91,6 +102,42 @@ const OPERATORS: [string, TokenType][] = [
   [":", TokenType.Colon],
 ];
 
+/** Create a default LexerConfig with base keywords and operators */
+export function createBaseLexerConfig(): LexerConfig {
+  return {
+    keywords: new Map(BASE_KEYWORDS),
+    operators: [...BASE_OPERATORS],
+  };
+}
+
+/**
+ * Extend a LexerConfig with additional keywords and operators.
+ * Returns a new config (immutable layering).
+ */
+export function extendLexerConfig(
+  base: LexerConfig,
+  extra?: { keywords?: Map<string, TokenType>; operators?: [string, TokenType][] },
+): LexerConfig {
+  const keywords = new Map(base.keywords);
+  const operators = [...base.operators];
+
+  if (extra?.keywords) {
+    for (const [k, v] of extra.keywords) keywords.set(k, v);
+  }
+  if (extra?.operators) {
+    for (const op of extra.operators) {
+      // Only add if not already present
+      if (!operators.some(([text]) => text === op[0])) {
+        operators.push(op);
+      }
+    }
+    // Re-sort longest first for maximal munch
+    operators.sort((a, b) => b[0].length - a[0].length);
+  }
+
+  return { keywords, operators };
+}
+
 // --- Lexer ---
 
 export class Lexer {
@@ -100,25 +147,17 @@ export class Lexer {
   private column: number = 1;
   private tokens: Token[] = [];
   private tokenIdx: number = 0;
-  private keywords: Map<string, TokenType>;
+  private config: LexerConfig;
 
   // Indentation tracking
   private indentStack: number[] = [0];
   private atLineStart: boolean = true;
   private pendingTokens: Token[] = [];
 
-  constructor(input: string, extraKeywords?: Map<string, TokenType>) {
+  constructor(input: string, config?: LexerConfig) {
     this.input = input;
-    this.keywords = new Map(KEYWORDS);
-    if (extraKeywords) {
-      for (const [k, v] of extraKeywords) this.keywords.set(k, v);
-    }
+    this.config = config ?? createBaseLexerConfig();
     this.tokenizeAll();
-  }
-
-  /** Add a keyword to the set (for extensions) */
-  addKeyword(word: string, type: TokenType): void {
-    this.keywords.set(word, type);
   }
 
   peek(): Token {
@@ -412,7 +451,7 @@ export class Lexer {
     }
 
     const text = this.input.slice(startOff, this.pos);
-    const kwType = this.keywords.get(text);
+    const kwType = this.config.keywords.get(text);
 
     this.tokens.push({
       type: kwType ?? TokenType.Ident,
@@ -422,8 +461,8 @@ export class Lexer {
   }
 
   private readOperator(): boolean {
-    // Try longest match first (operators are sorted by length descending for multi-char)
-    for (const [op, type] of OPERATORS) {
+    // Try longest match first (operators sorted by length descending)
+    for (const [op, type] of this.config.operators) {
       if (this.input.startsWith(op, this.pos)) {
         // Disambiguate: '/' followed by '/' or '*' is a comment, not division
         if (op === '/' && this.pos + 1 < this.input.length) {

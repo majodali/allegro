@@ -3,7 +3,7 @@
 // Fast path for Allegro Standard. Earley fallback for standalone grammars.
 // =============================================================================
 
-import { Lexer, TokenType, Token } from "./lexer.js";
+import { Lexer, TokenType, Token, LexerConfig, createBaseLexerConfig } from "./lexer.js";
 import {
   makeInt, makeExpr, makeParam, makeComposedFn, makeContext,
   prim, buildFn, substName, bind, extractString, stringToBits,
@@ -37,7 +37,7 @@ interface InfixParselet {
 export interface HybridGrammarConfig {
   prefixParselets: Map<TokenType, PrefixParseFn>;
   infixParselets: Map<TokenType, InfixParselet>;
-  keywords: Map<string, TokenType>;
+  lexerConfig: LexerConfig;
   /** If true, dot access uses type_dispatch; otherwise ctx_resolve */
   typed: boolean;
 }
@@ -51,7 +51,7 @@ export class HybridParser {
 
   constructor(input: string, config: HybridGrammarConfig) {
     this.config = config;
-    this.lexer = new Lexer(input, config.keywords);
+    this.lexer = new Lexer(input, config.lexerConfig);
   }
 
   // --- Public API ---
@@ -681,20 +681,10 @@ function buildBaseGrammar(): HybridGrammarConfig {
   return {
     prefixParselets: prefix,
     infixParselets: infix,
-    keywords: new Map(KEYWORDS_BASE),
+    lexerConfig: createBaseLexerConfig(),
     typed: false,
   };
 }
-
-const KEYWORDS_BASE = new Map<string, TokenType>([
-  ["if", TokenType.If],
-  ["then", TokenType.Then],
-  ["else", TokenType.Else],
-  ["import", TokenType.Import],
-  ["export", TokenType.Export],
-  ["true", TokenType.True],
-  ["false", TokenType.False],
-]);
 
 // =============================================================================
 // Standard Grammar (extends base with typed dispatch)
