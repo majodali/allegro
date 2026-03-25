@@ -546,7 +546,7 @@ async function runModuleTests(): Promise<void> {
       resolve: (id) => `/mock/${id}.alg`,
       readFile: async () =>
         "secret = 99\n" +
-        "pub = export(42)\n",
+        "export pub = 42\n",
     });
     const exts = await loader.loadAll();
     const modObj = (exts[0] as any).moduleObject;
@@ -572,7 +572,7 @@ async function runModuleTests(): Promise<void> {
       resolve: (id) => `/mock/${id}.alg`,
       readFile: async () =>
         "helper(x) => x * x\n" +
-        "square = export(x => helper(x))\n",
+        "export square = x => helper(x)\n",
     });
     const exts = await loader.loadAll();
     const modObj = (exts[0] as any).moduleObject;

@@ -14,19 +14,12 @@ import * as readline from "readline";
 import { formatValue } from "./primitives.js";
 import { evalSource, Extension } from "./runtime.js";
 import { ContextValue } from "./types.js";
-import { buildAllegroStandardExtensions, GrammarExtension } from "./grammar-ext.js";
 import { createTypeSystem } from "./types-std.js";
 import { ModuleLoader } from "./modules.js";
 
 // --- Standard mode setup ---
 
-let stdGrammar: GrammarExtension | undefined;
 let stdExtensions: Extension[] | undefined;
-
-function getStdGrammar(): GrammarExtension {
-  if (!stdGrammar) stdGrammar = buildAllegroStandardExtensions();
-  return stdGrammar;
-}
 
 function getStdExtensions(): Extension[] {
   if (!stdExtensions) stdExtensions = [createTypeSystem()];
@@ -87,9 +80,8 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
 
     // Standard mode: parse first to discover imports, then load on demand
     const normalized = source.replace(/\r\n/g, "\n");
-    const grammar = getStdGrammar();
-    const { parseExtended } = await import("./grammar-ext.js");
-    const parseResult = parseExtended(normalized, grammar);
+    const { parseStandard } = await import("./hybrid-parser.js");
+    const parseResult = parseStandard(normalized);
     if (parseResult.errors.length > 0) {
       throw new Error(`Parse error: ${parseResult.errors[0].message}`);
     }
@@ -103,7 +95,7 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
       extensions = [...extensions, ...moduleExts];
     }
 
-    evalSource(source, undefined, extensions, grammar, true);
+    evalSource(source, undefined, extensions, undefined, true);
   } catch (e: any) {
     console.error(`Error in ${filename}: ${e.message}`);
     process.exit(1);
@@ -134,7 +126,7 @@ function repl(standard: boolean): void {
       if (buffer.trim()) {
         try {
           const result = standard
-            ? evalSource(buffer, ctx, getStdExtensions(), getStdGrammar(), true)
+            ? evalSource(buffer, ctx, getStdExtensions(), undefined, true)
             : evalSource(buffer, ctx);
           ctx = result.evalCtx;
           if (result.value !== null) {

@@ -3,7 +3,7 @@
 // Loads .alg files as anonymous extensions.
 // =============================================================================
 
-import { parse } from "./parser.js";
+import { parseBase } from "./hybrid-parser.js";
 import { buildEvalCtx, resolvePrimitives, resolveSymbols, Extension } from "./runtime.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, ComposedFunctionValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, primaryOf } from "./types.js";
@@ -222,7 +222,7 @@ export class ModuleLoader {
     // 4. Read and parse module source
     const source = await this.readFile(resolvedPath);
     const normalized = source.replace(/\r\n/g, "\n");
-    const parseResult = parse(normalized);
+    const parseResult = parseBase(normalized);
 
     if (parseResult.errors.length > 0) {
       throw new Error(`Module '${id}': parse error: ${parseResult.errors[0].message}`);

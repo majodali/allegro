@@ -4,6 +4,6 @@
 helper_scale(x, factor) => x * factor
 
 // Public exports
-area_rect = export((w, h) => w * h)
-area_circle = export(r => helper_scale(r * r, 3))
-perimeter_rect = export((w, h) => 2 * (w + h))
+export area_rect = (w, h) => w * h
+export area_circle = r => helper_scale(r * r, 3)
+export perimeter_rect = (w, h) => 2 * (w + h)

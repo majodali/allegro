@@ -482,13 +482,14 @@ export function extensionToContext(ext: Extension): Value {
 
 /**
  * Parse and evaluate Allegro source code.
- * Returns { value, evalCtx } where value is the last bare expression's result
- * and evalCtx is the final context (useful for REPL persistence).
+ * Uses the hybrid parser (Pratt + recursive descent) by default.
+ * Falls back to Earley parser when a grammarExtension is provided
+ * (for standalone grammars or tests using the old extension mechanism).
  *
  * @param source           — Allegro source code
  * @param base             — pre-existing context (REPL persistence)
  * @param extensions       — anonymous extensions from the execution context
- * @param grammarExtension — grammar extensions (additional syntax)
+ * @param grammarExtension — Earley grammar extension (legacy, for standalone grammars)
  * @param typed            — if true, wrap literals with type info (Allegro Standard)
  */
 export function evalSource(
@@ -500,9 +501,13 @@ export function evalSource(
 ): { value: Value | null; evalCtx: ContextValue } {
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
+
+  // Use hybrid parser by default; fall back to Earley for legacy grammar extensions
   const result = grammarExtension
     ? parseExtended(normalized, grammarExtension)
-    : parse(normalized);
+    : typed
+      ? hybridParseStandard(normalized)
+      : hybridParseBase(normalized);
 
   if (result.errors.length > 0) {
     throw new Error(`Parse error: ${result.errors[0].message}`);
@@ -523,54 +528,6 @@ export function evalSource(
   }
 
   // Resolve all symbols (named Params) using lexical scoping
-  resolveSymbols(fileCtx, base, extensions, typed);
-
-  const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
-
-  let lastValue: Value | null = null;
-  for (const b of fileCtx.bindingList) {
-    if (b.key === null && b.value !== undefined) {
-      lastValue = evaluate(b.value, evalCtx);
-    }
-  }
-
-  return { value: lastValue, evalCtx };
-}
-
-/**
- * Parse and evaluate using the hybrid parser (Pratt + recursive descent).
- * Drop-in replacement for evalSource.
- */
-export function evalSourceHybrid(
-  source: string,
-  base?: ContextValue,
-  extensions?: Extension[],
-  typed?: boolean,
-): { value: Value | null; evalCtx: ContextValue } {
-  const normalized = source.replace(/\r\n/g, "\n");
-  const result = typed
-    ? hybridParseStandard(normalized)
-    : hybridParseBase(normalized);
-
-  if (result.errors.length > 0) {
-    throw new Error(`Parse error: ${result.errors[0].message}`);
-  }
-
-  const fileCtx = (result.tree as any).ctx;
-  if (!fileCtx) {
-    return { value: null, evalCtx: base ?? makeContext() };
-  }
-
-  // Type literals if standard type system is active
-  if (typed) {
-    for (const b of fileCtx.bindingList) {
-      if (b.value !== undefined) {
-        b.value = typeLiterals(b.value);
-      }
-    }
-  }
-
-  // Resolve all symbols
   resolveSymbols(fileCtx, base, extensions, typed);
 
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
