@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
+import { markTailCalls } from "./evaluator.js";
 import { parseBase as hybridParseBase, parseStandard as hybridParseStandard } from "./hybrid-parser.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
@@ -393,6 +394,34 @@ function resolveNamedParamsInner(
 }
 
 /**
+ * Walk all bindings and mark tail-position calls in ComposedFunction bodies.
+ */
+function markTailCallsInContext(fileCtx: any): void {
+  const seen = new Set<any>();
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) {
+      markTailCallsInValue(b.value, seen);
+    }
+  }
+}
+
+function markTailCallsInValue(v: any, seen: Set<any>): void {
+  if (!v || typeof v !== "object" || seen.has(v)) return;
+  seen.add(v);
+  if (v.kind === "ComposedFunction") {
+    // Mark the body's outermost expression as tail position
+    markTailCalls(v.body, new Set());
+    // Also recurse into the body to find nested functions
+    markTailCallsInValue(v.body, seen);
+  } else if (v.kind === "Expression") {
+    markTailCallsInValue(v.fn, seen);
+    for (const a of v.args) markTailCallsInValue(a, seen);
+  } else if (v.kind === "MultiValue") {
+    markTailCallsInValue(v.primary, seen);
+  }
+}
+
+/**
  * Build an evaluation context from a parser file context.
  *
  * Context layers (bottom to top, later layers shadow earlier ones):
@@ -528,6 +557,9 @@ export function evalSource(
 
   // Resolve all symbols (named Params) using lexical scoping
   resolveSymbols(fileCtx, base, extensions, typed);
+
+  // Mark tail-position calls in function bodies for TCO
+  markTailCallsInContext(fileCtx);
 
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
 

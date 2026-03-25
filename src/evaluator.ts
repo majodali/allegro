@@ -12,6 +12,56 @@ import {
 
 const MAX_DEPTH = 10000;
 
+// --- Tail Call Optimization ---
+
+/**
+ * TailCall marker: returned by the evaluator when a tail-position call
+ * to a ComposedFunction is detected. The enclosing applyComposed catches
+ * it and loops instead of recursing.
+ */
+interface TailCall {
+  __tailCall: true;
+  fn: ComposedFunctionValue;
+  args: Value[];
+  fnRaw?: Value;
+}
+
+function isTailCall(v: any): v is TailCall {
+  return v && v.__tailCall === true;
+}
+
+function makeTailCall(fn: ComposedFunctionValue, args: Value[], fnRaw?: Value): TailCall {
+  return { __tailCall: true, fn, args, fnRaw };
+}
+
+/**
+ * Mark tail-position Expressions in a function body.
+ * A tail-position Expression is one whose result IS the function's result.
+ */
+export function markTailCalls(body: Value, seen?: Set<Value>): void {
+  if (!body || typeof body !== "object") return;
+  if (!seen) seen = new Set();
+  if (seen.has(body)) return;
+  seen.add(body);
+
+  if (body.kind === ValueKind.Expression) {
+    // This expression is in tail position — mark it
+    (body as any)._tailPosition = true;
+
+    // If this is eval_if, mark both branch thunks' bodies as tail position
+    const fn = body.fn;
+    if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "eval_if" && body.args.length === 3) {
+      // args[1] and args[2] are thunks (ComposedFn with no params)
+      for (const branchIdx of [1, 2]) {
+        const branch = body.args[branchIdx];
+        if (branch.kind === ValueKind.ComposedFunction && branch.params.length === 0) {
+          markTailCalls(branch.body, seen);
+        }
+      }
+    }
+  }
+}
+
 // Map base primitive names to type method names for type-directed dispatch
 const PRIM_TO_METHOD = new Map<string, string>([
   ["bits_add", "add"], ["bits_sub", "sub"], ["bits_mul", "mul"],
@@ -30,18 +80,14 @@ export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Va
     case ValueKind.PrimitiveFunction:
     case ValueKind.Context:
     case ValueKind.ComposedFunction:
-      // ComposedFunctions are values — return as-is during evaluation.
-      // Closure capture happens at module export time (buildModuleObject),
-      // not during general evaluation.
       return value;
 
     case ValueKind.Param: {
-      // Try to resolve named params against the context
       if (value._name && value.position === -1) {
         const resolved = ctx.bindings.get(value._name);
         if (resolved?.value !== undefined) return evaluate(resolved.value, ctx, depth + 1);
       }
-      return value; // unbound param
+      return value;
     }
 
     case ValueKind.MultiValue: {
@@ -49,12 +95,18 @@ export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Va
       return ep === value.primary ? value : makeMultiValue(ep, new Map(value.components));
     }
 
-    case ValueKind.Expression:
-      return evaluateExpr(value, ctx, depth);
+    case ValueKind.Expression: {
+      const result = evaluateExpr(value, ctx, depth);
+      // TailCall propagation: if evaluateExpr returns a TailCall,
+      // return it as-is (cast to Value). The enclosing applyComposed
+      // will detect it via isTailCall(). This is safe because TailCall
+      // only appears in tail position and is always caught.
+      return result as Value;
+    }
   }
 }
 
-function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): Value {
+function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): Value | TailCall {
   // Check memo
   const cached = expr.memo.get("eval");
   if (cached !== undefined) return cached;
@@ -66,12 +118,19 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
   // Primitive function
   if (fn.kind === ValueKind.PrimitiveFunction) {
     const result = applyPrimitive(fn, expr.args, ctx, depth);
+    // eval_if may return a TailCall from a branch — propagate it
+    if (isTailCall(result)) return result;
     expr.memo.set("eval", result);
     return result;
   }
 
-  // Composed function
+  // Composed function — check for tail call optimization
   if (fn.kind === ValueKind.ComposedFunction) {
+    if ((expr as any)._tailPosition) {
+      // Tail position: return TailCall marker instead of recursing
+      const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1));
+      return makeTailCall(fn, evalArgs, fnRaw);
+    }
     const result = applyComposed(fn, expr.args, ctx, depth, fnRaw);
     expr.memo.set("eval", result);
     return result;
@@ -158,60 +217,70 @@ function applyComposed(
   depth: number,
   fnRaw?: Value,
 ): Value {
-  const evalArgs = args.map(a => evaluate(a, ctx, depth + 1));
+  let currentFn = fn;
+  let currentArgs = args;
+  let currentFnRaw = fnRaw;
 
-  // Type variable unification: if the function has a FunctionType,
-  // match arg types against param types to bind type variables
-  let enrichedCtx = ctx;
-  let inferredReturnType: Value | null = null;
-  if (fnRaw && fnRaw.kind === ValueKind.MultiValue) {
-    const fnType = getType(fnRaw);
-    const _fnTypeName = fnType ? getTypeName(fnRaw) : null;
-    if (fnType && _fnTypeName === "Function") {
-      const paramTypes = getFunctionParamTypes(fnType);
-      const returnTypeExpr = getFunctionReturnType(fnType);
-      if (paramTypes) {
-        const bindings: TypeBindings = new Map();
-        // Unify each arg type against the corresponding param type
-        for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
-          const argType = getType(evalArgs[i]);
-          unifyTypes(argType, paramTypes[i], bindings);
-        }
-        // If we have bindings, enrich the context
-        if (bindings.size > 0) {
-          enrichedCtx = makeContext();
-          // Copy all bindings from original context
-          for (const [key, binding] of ctx.bindings) {
-            enrichedCtx.bindings.set(key, binding);
-            enrichedCtx.bindingList.push(binding);
+  // TCO loop: re-enters when a tail call to the same (or different) function is detected
+  tco_loop: while (true) {
+    const evalArgs = currentArgs.map(a => evaluate(a, ctx, depth + 1));
+
+    // Type variable unification
+    let enrichedCtx = ctx;
+    let inferredReturnType: Value | null = null;
+    if (currentFnRaw && currentFnRaw.kind === ValueKind.MultiValue) {
+      const fnType = getType(currentFnRaw);
+      const _fnTypeName = fnType ? getTypeName(currentFnRaw) : null;
+      if (fnType && _fnTypeName === "Function") {
+        const paramTypes = getFunctionParamTypes(fnType);
+        const returnTypeExpr = getFunctionReturnType(fnType);
+        if (paramTypes) {
+          const bindings: TypeBindings = new Map();
+          for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
+            const argType = getType(evalArgs[i]);
+            unifyTypes(argType, paramTypes[i], bindings);
           }
-          // Add type variable bindings
-          for (const [varName, typeVal] of bindings) {
-            const binding = { key: varName, value: typeVal, isUse: false };
-            enrichedCtx.bindings.set(varName, binding);
-            enrichedCtx.bindingList.push(binding);
-          }
-          // Resolve return type with bindings
-          if (returnTypeExpr && returnTypeExpr.kind === ValueKind.Param) {
-            inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
+          if (bindings.size > 0) {
+            enrichedCtx = makeContext();
+            for (const [key, binding] of ctx.bindings) {
+              enrichedCtx.bindings.set(key, binding);
+              enrichedCtx.bindingList.push(binding);
+            }
+            for (const [varName, typeVal] of bindings) {
+              const binding = { key: varName, value: typeVal, isUse: false };
+              enrichedCtx.bindings.set(varName, binding);
+              enrichedCtx.bindingList.push(binding);
+            }
+            if (returnTypeExpr && returnTypeExpr.kind === ValueKind.Param) {
+              inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
+            }
           }
         }
       }
     }
-  }
 
-  const substituted = substituteParams(fn, evalArgs);
-  let result = evaluate(substituted, enrichedCtx, depth + 1);
+    const substituted = substituteParams(currentFn, evalArgs);
+    let result: Value | TailCall = evaluate(substituted, enrichedCtx, depth + 1);
 
-  // If we inferred a return type from unification, apply it
-  if (inferredReturnType && inferredReturnType.kind === ValueKind.Context) {
-    const currentType = getType(result);
-    if (!currentType) {
-      result = withType(result, inferredReturnType as ContextValue);
+    // Check for TailCall from tail-position evaluation
+    if (isTailCall(result)) {
+      // Tail call detected — loop instead of recursing
+      currentFn = result.fn;
+      currentArgs = result.args;
+      currentFnRaw = result.fnRaw;
+      continue tco_loop;
     }
-  }
 
-  return result;
+    // Apply inferred return type
+    if (inferredReturnType && inferredReturnType.kind === ValueKind.Context) {
+      const currentType = getType(result);
+      if (!currentType) {
+        result = withType(result, inferredReturnType as ContextValue);
+      }
+    }
+
+    return result;
+  }
 }
 
 // --- Parameter substitution ---
@@ -264,7 +333,10 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       const newFn = subst(value.fn, owner, posMap, seen);
       const newArgs = value.args.map(a => subst(a, owner, posMap, seen));
       if (newFn === value.fn && newArgs.every((a, i) => a === value.args[i])) return value;
-      return makeExpr(newFn, newArgs);
+      const newExpr = makeExpr(newFn, newArgs);
+      // Propagate tail position flag through substitution
+      if ((value as any)._tailPosition) (newExpr as any)._tailPosition = true;
+      return newExpr;
     }
 
     case ValueKind.MultiValue: {
