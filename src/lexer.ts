@@ -35,6 +35,10 @@ export enum TokenType {
   Indent,
   Unindent,
 
+  // String interpolation
+  InterpStart,    // start of interpolation expression within a string
+  InterpEnd,      // end of interpolation expression (closing })
+
   // End
   EOF,
 }
@@ -345,27 +349,106 @@ export class Lexer {
   private readString(): void {
     const startLine = this.line;
     const startCol = this.column;
-    const startOff = this.pos;
     this.pos++; // skip opening "
     this.column++;
+
+    let segStart = this.pos;
+    let hasInterpolation = false;
+
     while (this.pos < this.input.length && this.input[this.pos] !== '"') {
+      // Escape sequence
       if (this.input[this.pos] === '\\' && this.pos + 1 < this.input.length) {
         this.pos += 2;
         this.column += 2;
-      } else {
-        this.pos++;
-        this.column++;
+        continue;
       }
+
+      // Interpolation: unescaped {
+      if (this.input[this.pos] === '{') {
+        hasInterpolation = true;
+        // Emit the string segment before {
+        const segText = this.input.slice(segStart, this.pos);
+        this.tokens.push({
+          type: TokenType.String,
+          text: `"${segText}"`,
+          line: startLine, column: startCol, offset: segStart,
+        });
+        this.tokens.push({
+          type: TokenType.InterpStart,
+          text: "{",
+          line: this.line, column: this.column, offset: this.pos,
+        });
+        this.pos++; // skip {
+        this.column++;
+
+        // Tokenize the expression inside {} using normal tokenization
+        let braceDepth = 1;
+        while (this.pos < this.input.length && braceDepth > 0) {
+          this.skipWhitespaceAndComments();
+          if (this.pos >= this.input.length) break;
+
+          const ch = this.input[this.pos];
+          if (ch === '}') {
+            braceDepth--;
+            if (braceDepth === 0) {
+              this.tokens.push({
+                type: TokenType.InterpEnd,
+                text: "}",
+                line: this.line, column: this.column, offset: this.pos,
+              });
+              this.pos++;
+              this.column++;
+              break;
+            }
+          }
+          if (ch === '{') braceDepth++;
+
+          // Tokenize one token normally
+          if (ch === '"') {
+            this.readString(); // nested strings
+          } else if (ch >= '0' && ch <= '9') {
+            this.readNumber();
+          } else if (this.isIdentStart(ch)) {
+            this.readIdentOrKeyword();
+          } else if (this.readOperator()) {
+            // operator consumed
+          } else {
+            throw new Error(`Unexpected character '${ch}' in string interpolation at line ${this.line}, column ${this.column}`);
+          }
+        }
+
+        segStart = this.pos;
+        continue;
+      }
+
+      this.pos++;
+      this.column++;
     }
+
+    // Emit the final string segment
+    const segText = this.input.slice(segStart, this.pos);
+    if (hasInterpolation) {
+      // Only emit if there's content after the last interpolation
+      if (segText.length > 0) {
+        this.tokens.push({
+          type: TokenType.String,
+          text: `"${segText}"`,
+          line: this.line, column: this.column, offset: segStart,
+        });
+      }
+    } else {
+      // No interpolation — emit as a regular string (with quotes)
+      this.tokens.push({
+        type: TokenType.String,
+        text: `"${segText}"`,
+        line: startLine, column: startCol, offset: segStart - 1,
+      });
+    }
+
     if (this.pos < this.input.length) {
       this.pos++; // skip closing "
       this.column++;
     }
-    this.tokens.push({
-      type: TokenType.String,
-      text: this.input.slice(startOff, this.pos),
-      line: startLine, column: startCol, offset: startOff,
-    });
   }
 
   private readNumber(): void {

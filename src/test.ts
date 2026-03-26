@@ -1802,6 +1802,38 @@ test("partial eval: nested if-then-else preserves types", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 2);
 });
 
+// == String Interpolation ==
+
+test("interpolation: simple variable", () => {
+  const result = evalStd('name = "world"\n"hello {name}"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "hello world");
+});
+
+test("interpolation: expression", () => {
+  const result = evalStd('"2 + 2 = {2 + 2}"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "2 + 2 = 4");
+});
+
+test("interpolation: multiple", () => {
+  const result = evalStd('a = 1\nb = 2\n"{a} + {b} = {a + b}"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "1 + 2 = 3");
+});
+
+test("interpolation: no interpolation is unchanged", () => {
+  const result = evalStd('"plain string"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "plain string");
+});
+
+test("interpolation: escaped brace", () => {
+  const result = evalStd('"use \\{braces\\}"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "use {braces}");
+});
+
+test("interpolation: at start of string", () => {
+  const result = evalStd('"{42} is the answer"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "42 is the answer");
+});
+
 // == Compile-Time Type Inference ==
 
 test("compile: infer return type Int from arithmetic body", () => {

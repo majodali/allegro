@@ -436,8 +436,32 @@ function buildBaseGrammar(): HybridGrammarConfig {
   });
 
   // String literal
-  prefix.set(TokenType.String, (_parser, token) => {
-    return stringToBits(extractString(token.text));
+  prefix.set(TokenType.String, (parser, token) => {
+    let result: any = stringToBits(extractString(token.text));
+
+    // Check for string interpolation: String InterpStart expr InterpEnd [String ...]
+    if (parser.lexer.peek().type === TokenType.InterpStart) {
+      // Wrap initial segment with typed_string for proper type dispatch
+      result = makeExpr(prim("typed_string"), [result]);
+
+      while (parser.lexer.peek().type === TokenType.InterpStart) {
+        parser.lexer.next(); // consume InterpStart
+        const expr = parser.parseExpression(0);
+        parser.lexer.expect(TokenType.InterpEnd, "after interpolation expression");
+        // Convert expression to string via toString, then concatenate
+        const exprStr = makeExpr(prim("type_dispatch"), [expr, stringToBits("toString")]);
+        const exprStrCalled = makeExpr(exprStr, []);
+        result = makeExpr(prim("bits_add"), [result, exprStrCalled]);
+        // Check for more string content after the interpolation
+        if (parser.lexer.peek().type === TokenType.String) {
+          const nextStr = parser.lexer.next();
+          const nextBits = makeExpr(prim("typed_string"), [stringToBits(extractString(nextStr.text))]);
+          result = makeExpr(prim("bits_add"), [result, nextBits]);
+        }
+      }
+    }
+
+    return result;
   });
 
   // Identifier

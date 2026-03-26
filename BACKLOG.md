@@ -74,7 +74,7 @@ High-level goals, roughly ordered by dependency:
 - [x] On-demand module loading from `lib/` directory
 
 ### Language Features
-- [ ] String interpolation — `"hello {name}"`
+- [x] String interpolation — `"hello {name}"`, `"{expr}"`, escaped `\{`
 - [ ] Async evaluation — promises/futures, await syntax
 - [ ] Configurable mutability — linear types, transient mutation, semantic variants
 - [ ] Error handling — try/catch or effect-based surface syntax
@@ -112,8 +112,8 @@ High-level goals, roughly ordered by dependency:
 
 Priority-ordered list of next items to implement:
 
-1. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions (not primitives), validates TCO and language usability
-2. **String interpolation** — `"hello {name}"`, needs lexer + parser support
-3. **Binding type annotations** — `x: Int = 42`
-4. **Subtyping / extends** — `__extends` prototype chain, foundation for richer type system
-5. **Pattern matching** — destructuring in bindings and function params
+1. **Type system deep dive** — subtyping, interfaces, algebraic types design
+2. **Binding type annotations** — `x: Int = 42`
+3. **Pattern matching** — destructuring in bindings and function params
+4. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions (bootstrapping)
+5. **Error handling** — try/catch or effect-based surface syntax

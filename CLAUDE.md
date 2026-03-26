@@ -283,6 +283,12 @@ export pi = 3.14159
 // String concatenation
 "hello" + " " + "world" // → "hello world"
 
+// String interpolation
+name = "world"
+"hello {name}"           // → "hello world"
+"2 + 2 = {2 + 2}"       // → "2 + 2 = 4"
+"\{escaped\}"            // → "{escaped}"
+
 // Type annotations on functions
 add(x: Int, y: Int): Int => x + y
 greet(name: String): String => "Hello, " + name
