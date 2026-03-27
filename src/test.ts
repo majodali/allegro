@@ -562,7 +562,7 @@ async function runModuleTests(): Promise<void> {
     // Private binding should NOT be accessible
     let threw = false;
     try { evalStd("mymod.secret\n", [ext]); }
-    catch (e: any) { threw = e.message.includes("not found"); }
+    catch (e: any) { threw = e.message.includes("not found") || e.message.includes("not exported"); }
     eq(threw, true, "private binding should not be accessible");
   });
 
@@ -588,7 +588,7 @@ async function runModuleTests(): Promise<void> {
     // Private helper should NOT be accessible
     let threw = false;
     try { evalStd("mathmod.helper(5)\n", [ext]); }
-    catch (e: any) { threw = e.message.includes("not found"); }
+    catch (e: any) { threw = e.message.includes("not found") || e.message.includes("not exported"); }
     eq(threw, true, "private helper should not be accessible");
   });
 
@@ -1526,7 +1526,7 @@ test("module export: typed module object exposes exports via dot", () => {
   // Private field should NOT be accessible via type_dispatch
   let threw = false;
   try { evalStd("testmod.private_val", [ext]); }
-  catch (e: any) { threw = e.message.includes("not found"); }
+  catch (e: any) { threw = e.message.includes("not found") || e.message.includes("not exported"); }
   eq(threw, true);
 });
 

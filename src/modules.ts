@@ -6,7 +6,7 @@
 import { parseBase } from "./hybrid-parser.js";
 import { buildEvalCtx, resolvePrimitives, resolveSymbols, Extension } from "./runtime.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, ComposedFunctionValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, primaryOf } from "./types.js";
+import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, primaryOf, AllegroError } from "./types.js";
 import { withType } from "./types-std.js";
 
 // --- Types ---
@@ -128,7 +128,9 @@ export function buildModuleObject(
     ctx.bindingList.push({ key, value, isUse: false });
   }
 
-  // Build a module-specific type with getters for exported fields only
+  // Build a module-specific type with __getMember for exported fields only.
+  // The __getMember checks if the requested field is in the exported set,
+  // enforcing encapsulation — private module bindings are inaccessible.
   const moduleType = makeContext();
 
   // __name
@@ -137,20 +139,20 @@ export function buildModuleObject(
   moduleType.bindings.set(nameKey, { key: nameKey, value: nameVal, isUse: false });
   moduleType.bindingList.push({ key: nameKey, value: nameVal, isUse: false });
 
-  // Add a getter for each exported field
-  for (const fieldName of exportedNames) {
-    const getter: PrimitiveFnImpl = (args) => {
-      // self is the module Context (primary of the MultiValue)
-      const moduleCtx = args[0] as ContextValue;
-      const b = moduleCtx.bindings.get(fieldName);
-      if (!b?.value) return stringToBits(`<undefined:${fieldName}>`);
-      return b.value;
-    };
-    const prim = makePrimitive(`${name}.${fieldName}`, getter);
-    (prim as any).__getter = true; // auto-call with self
-    moduleType.bindings.set(fieldName, { key: fieldName, value: prim, isUse: false });
-    moduleType.bindingList.push({ key: fieldName, value: prim, isUse: false });
-  }
+  // __getMember: only allows access to exported fields
+  const getMember: PrimitiveFnImpl = (args) => {
+    const moduleCtx = args[0] as ContextValue;
+    const fieldName = bitsToString(args[1] as BitsValue);
+    if (!exportedNames.has(fieldName)) {
+      throw new AllegroError(`Module '${name}': '${fieldName}' is not exported`);
+    }
+    const b = moduleCtx.bindings.get(fieldName);
+    if (!b?.value) throw new AllegroError(`Module '${name}': '${fieldName}' is undefined`);
+    return b.value;
+  };
+  const getMemberPrim = makePrimitive(`${name}.__getMember`, getMember);
+  moduleType.bindings.set("__getMember", { key: "__getMember", value: getMemberPrim, isUse: false });
+  moduleType.bindingList.push({ key: "__getMember", value: getMemberPrim, isUse: false });
 
   return withType(ctx, moduleType);
 }
