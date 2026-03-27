@@ -8,7 +8,7 @@ import { evalSource as runtimeEval, Extension, extensionToContext } from "./runt
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, Type, NamedType, IntType, StringType, structuralWrap } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
 
@@ -1881,6 +1881,83 @@ test("compile: non-typed functions not in inferred list", () => {
   );
   const inferred = compilationReport?.inferred.find(i => i.name === "f");
   eq(inferred, undefined, "untyped function should not be pre-compiled");
+});
+
+// == Type Hierarchy: Type, NamedType, Subtyping ==
+
+test("type hierarchy: all types have __type = NamedType", () => {
+  // Int, String, Bool, Float, Object should all have __type = NamedType
+  const intType = IntType.bindings.get("__type")?.value;
+  eq(intType === NamedType, true);
+  const strType = StringType.bindings.get("__type")?.value;
+  eq(strType === NamedType, true);
+});
+
+test("type hierarchy: Type has __type = Type (self-referential)", () => {
+  const ttType = Type.bindings.get("__type")?.value;
+  eq(ttType === Type, true);
+});
+
+test("type hierarchy: NamedType extends Type", () => {
+  const ext = NamedType.bindings.get("__extends")?.value;
+  eq(ext === Type, true);
+});
+
+test("type hierarchy: nominal instanceof passes for matching type", () => {
+  const result = evalStd("42");
+  const instanceofMethod = NamedType.bindings.get("instanceof")?.value;
+  eq(instanceofMethod !== undefined, true);
+  if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
+    const check = instanceofMethod.fn([IntType, result!], undefined as any, undefined as any);
+    eq(Number((primaryOf(check) as BitsValue).data), 1);
+  }
+});
+
+test("type hierarchy: nominal instanceof fails for wrong type", () => {
+  const result = evalStd("42");
+  const instanceofMethod = NamedType.bindings.get("instanceof")?.value;
+  if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
+    const check = instanceofMethod.fn([StringType, result!], undefined as any, undefined as any);
+    eq(Number((primaryOf(check) as BitsValue).data), 0);
+  }
+});
+
+test("type hierarchy: structural instanceof passes for compatible shape", () => {
+  // Int has add, sub, mul, toString, etc.
+  // A value typed as Int should structurally match any type with a subset of those methods
+  const result = evalStd("42");
+  const instanceofMethod = Type.bindings.get("instanceof")?.value;
+  if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
+    // IntType has all the methods StringType has (toString), so structurally compatible at a basic level
+    const check = instanceofMethod.fn([IntType, result!], undefined as any, undefined as any);
+    eq(Number((primaryOf(check) as BitsValue).data), 1);
+  }
+});
+
+test("type hierarchy: nominal subtypeof - same type", () => {
+  const subtypeofMethod = NamedType.bindings.get("subtypeof")?.value;
+  if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
+    const check = subtypeofMethod.fn([IntType, IntType], undefined as any, undefined as any);
+    eq(Number((primaryOf(check) as BitsValue).data), 1);
+  }
+});
+
+test("type hierarchy: nominal subtypeof - different types", () => {
+  const subtypeofMethod = NamedType.bindings.get("subtypeof")?.value;
+  if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
+    const check = subtypeofMethod.fn([IntType, StringType], undefined as any, undefined as any);
+    eq(Number((primaryOf(check) as BitsValue).data), 0);
+  }
+});
+
+test("type hierarchy: structural_wrap makes nominal type use structural checking", () => {
+  const wrappedInt = structuralWrap(IntType);
+  // The wrapped type should have __type = Type (structural) not NamedType
+  const wrapType = wrappedInt.bindings.get("__type")?.value;
+  eq(wrapType === Type, true);
+  // It should still have the original name
+  const name = wrappedInt.bindings.get("__name")?.value;
+  eq(name !== undefined, true);
 });
 
 // --- Run all tests (sync + async) and report ---

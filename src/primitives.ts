@@ -479,8 +479,9 @@ import {
   getType, getTypeName, withType, typeMethod,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
-  AnyType, makeArray, makeObject,
+  AnyType, Type, NamedType, makeArray, makeObject,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
+  structuralWrap,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 
@@ -779,12 +780,29 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Any matches everything
   if (expectedName === "Any") return v;
 
-  // Step 3: Check
+  // Step 3: Check using the type's instanceof method
+  // The type hierarchy determines checking semantics:
+  // - NamedType: nominal check (by __name and __extends chain)
+  // - Type (or ~wrapped): structural check (by field compatibility)
   const actualType = getType(v);
   if (!actualType) throw new AllegroError("type_check: value has no type");
   const actualName = getTypeName(v);
 
-  // Check base type name
+  // Use the expected type's instanceof method if available
+  const typeType = expectedCtx.bindings.get("__type")?.value as ContextValue | undefined;
+  if (typeType) {
+    const instanceofMethod = typeType.bindings.get("instanceof")?.value;
+    if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
+      const checkResult = instanceofMethod.fn([expectedCtx, v], undefined as any, undefined as any);
+      const checkP = primaryOf(checkResult);
+      if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
+        throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
+      }
+      return v;
+    }
+  }
+
+  // Fallback: name-based check (for types without the hierarchy yet)
   if (actualName !== expectedName) {
     throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
   }
@@ -950,4 +968,12 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_gt: makePrimitive("typed_gt", makeTypedBinOp("gt"), true),
   typed_lte: makePrimitive("typed_lte", makeTypedBinOp("lte"), true),
   typed_gte: makePrimitive("typed_gte", makeTypedBinOp("gte"), true),
+  // Type hierarchy operations
+  structural_wrap: makePrimitive("structural_wrap", ((args: Value[], ctx: any, evalFn: any) => {
+    const v = evalFn!(args[0], ctx!);
+    if (!isResolved(v)) return makeExpr(makePrimitive("structural_wrap", (() => {}) as any, true), [v]);
+    const type = primaryOf(v);
+    if (type.kind !== ValueKind.Context) throw new AllegroError("structural_wrap: expected a type");
+    return structuralWrap(type as ContextValue);
+  }) as PrimitiveFnImpl, true),
 };

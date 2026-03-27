@@ -18,7 +18,7 @@ High-level goals, roughly ordered by dependency:
 ## 2. Detailed Features
 
 ### Type System
-- [ ] Subtyping / extends — `__extends` prototype chain, `isSubtypeOf` predicate
+- [x] Subtyping / extends — Type/NamedType hierarchy, nominal + structural instanceof/subtypeof, `~` structural operator
 - [ ] Interfaces — structural type matching (no explicit `implements`)
 - [ ] Mixins — types with default implementations
 - [ ] Algebraic types — sum types (tagged unions), product types
@@ -112,8 +112,8 @@ High-level goals, roughly ordered by dependency:
 
 Priority-ordered list of next items to implement:
 
-1. **Type system deep dive** — subtyping, interfaces, algebraic types design
-2. **Binding type annotations** — `x: Int = 42`
-3. **Pattern matching** — destructuring in bindings and function params
-4. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions (bootstrapping)
+1. **Algebraic types** — union constraints (`Shape = Circle | Rectangle`), refinement types (`Int & _ > 0`)
+2. **`~` syntax in grammar** — structural type modifier in annotations (needs parser reimplementation)
+3. **Binding type annotations** — `x: Int = 42`
+4. **Pattern matching** — destructuring in bindings and function params
 5. **Error handling** — try/catch or effect-based surface syntax

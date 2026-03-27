@@ -57,26 +57,218 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
   return binding.value;
 }
 
+// =============================================================================
+// Type Hierarchy: Type, NamedType
+//
+// Type — base meta-type. All type values have type = Type.
+//   Provides structural instanceof/subtypeof.
+// NamedType — extends Type. Named types have type = NamedType.
+//   Overrides instanceof/subtypeof for nominal checking via __name and __extends.
+// ConcreteType — interface (not a position in hierarchy). Concrete types have __construct.
+//
+// Bootstrap: Type and NamedType are created as raw Contexts first,
+// then retroactively given their own type components.
+// =============================================================================
+
+/** Helper to add a binding to a Context */
+function addBinding(ctx: ContextValue, key: string, value: Value): void {
+  ctx.bindings.set(key, { key, value, isUse: false });
+  ctx.bindingList.push({ key, value, isUse: false });
+}
+
+/**
+ * Structural instanceof: does the value's type have all the methods/fields
+ * that the expected type has? Checks by comparing binding names.
+ */
+function structuralInstanceof(value: Value, expectedType: ContextValue): boolean {
+  const actualType = getType(value);
+  if (!actualType) return false;
+  // Check that actualType has all bindings that expectedType has (except __ internals)
+  for (const [key] of expectedType.bindings) {
+    if (key.startsWith("__")) continue;
+    if (!actualType.bindings.has(key)) return false;
+  }
+  return true;
+}
+
+/**
+ * Structural subtypeof: does typeA have all the methods/fields of typeB?
+ */
+function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
+  for (const [key] of typeB.bindings) {
+    if (key.startsWith("__")) continue;
+    if (!typeA.bindings.has(key)) return false;
+  }
+  return true;
+}
+
+/**
+ * Nominal instanceof: does the value's type match the expected type
+ * by name, or nominally extend it?
+ */
+function nominalInstanceof(value: Value, expectedType: ContextValue): boolean {
+  const actualType = getType(value);
+  if (!actualType) return false;
+  return nominalSubtypeof(actualType, expectedType);
+}
+
+/**
+ * Nominal subtypeof: is typeA the same as typeB (by name and type args),
+ * or does typeA's __extends chain include typeB?
+ */
+function nominalSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
+  const nameB = getTypeNameFromCtx(typeB);
+  if (!nameB) return false;
+  // Walk typeA's extends chain
+  let current: ContextValue | null = typeA;
+  while (current) {
+    const nameA = getTypeNameFromCtx(current);
+    if (nameA === nameB) {
+      // Names match — also check type arguments if present
+      return typeArgsMatch(current, typeB);
+    }
+    // Check __extends
+    const extendsBinding = current.bindings.get("__extends");
+    if (extendsBinding?.value?.kind === ValueKind.Context) {
+      current = extendsBinding.value as ContextValue;
+    } else {
+      current = null;
+    }
+  }
+  return false;
+}
+
+/** Check that type arguments match (if the expected type has them) */
+function typeArgsMatch(actual: ContextValue, expected: ContextValue): boolean {
+  const expectedArgsB = expected.bindings.get("__args");
+  if (!expectedArgsB?.value || expectedArgsB.value.kind !== ValueKind.Context) return true; // no args to check
+  const actualArgsB = actual.bindings.get("__args");
+  if (!actualArgsB?.value || actualArgsB.value.kind !== ValueKind.Context) return true; // actual has no args — accept (bare generic)
+
+  const expectedArgsCtx = expectedArgsB.value as ContextValue;
+  const actualArgsCtx = actualArgsB.value as ContextValue;
+  const expElems = arrayElements(expectedArgsCtx);
+  const actElems = arrayElements(actualArgsCtx);
+
+  if (expElems.length !== actElems.length) return false;
+
+  for (let i = 0; i < expElems.length; i++) {
+    const expArg = primaryOf(expElems[i]);
+    const actArg = primaryOf(actElems[i]);
+    if (expArg.kind !== ValueKind.Context || actArg.kind !== ValueKind.Context) continue;
+    const expName = getTypeNameFromCtx(expArg as ContextValue);
+    const actName = getTypeNameFromCtx(actArg as ContextValue);
+    if (expName && actName && expName !== "Any" && expName !== actName) return false;
+  }
+  return true;
+}
+
+/** Get __name from a type Context */
+function getTypeNameFromCtx(type: ContextValue): string | null {
+  const nb = type.bindings.get("__name");
+  if (nb?.value?.kind === ValueKind.Bits) return bitsToString(nb.value);
+  return null;
+}
+
+// --- Build Type (structural instanceof/subtypeof) ---
+
+export const Type: ContextValue = makeContext();
+addBinding(Type, "__name", stringToBits("Type"));
+addBinding(Type, "instanceof", makePrimitive("Type.instanceof", (args) => {
+  // args[0] = the type itself (self), args[1] = the value to check
+  const type = args[0] as ContextValue;
+  const value = args[1];
+  return withType(makeInt(structuralInstanceof(value, type) ? 1 : 0), BoolType);
+}));
+addBinding(Type, "subtypeof", makePrimitive("Type.subtypeof", (args) => {
+  // args[0] = the type itself (self), args[1] = the other type
+  const typeA = args[0] as ContextValue;
+  const typeB = args[1] as ContextValue;
+  return withType(makeInt(structuralSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
+}));
+
+// --- Build NamedType (nominal instanceof/subtypeof) ---
+
+export const NamedType: ContextValue = makeContext();
+addBinding(NamedType, "__name", stringToBits("NamedType"));
+addBinding(NamedType, "__extends", Type);
+addBinding(NamedType, "instanceof", makePrimitive("NamedType.instanceof", (args) => {
+  const type = args[0] as ContextValue;
+  const value = args[1];
+  return withType(makeInt(nominalInstanceof(value, type) ? 1 : 0), BoolType);
+}));
+addBinding(NamedType, "subtypeof", makePrimitive("NamedType.subtypeof", (args) => {
+  const typeA = args[0] as ContextValue;
+  const typeB = args[1] as ContextValue;
+  return withType(makeInt(nominalSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
+}));
+
+// --- Structural wrap (~): wraps a NamedType to use structural checking ---
+
+/**
+ * Create a structural wrapper around a named type.
+ * The wrapper uses Type's structural instanceof/subtypeof instead of
+ * NamedType's nominal checking. This is the ~ operator.
+ */
+export function structuralWrap(type: ContextValue): ContextValue {
+  const wrapper = makeContext();
+  // Copy all bindings from the original type
+  for (const [key, binding] of type.bindings) {
+    if (key === "__type") continue; // override the type's type
+    wrapper.bindings.set(key, { ...binding });
+    wrapper.bindingList.push({ ...binding });
+  }
+  // Set __type to Type (structural) instead of NamedType (nominal)
+  addBinding(wrapper, "__type", Type);
+  // Mark as structural wrapper
+  addBinding(wrapper, "__structural", makeInt(1));
+  // Reference the original type
+  addBinding(wrapper, "__wraps", type);
+  return wrapper;
+}
+
+// Bootstrap: Type and NamedType get their own type components
+// Type's type is Type (self-referential)
+// NamedType's type is NamedType (it's a named type itself)
+// We can't use withType (returns MultiValue) since these are Contexts used directly.
+// Instead, we store a __type binding that type_dispatch can check.
+addBinding(Type, "__type", Type);
+addBinding(NamedType, "__type", NamedType);
+
 // --- Type builder helper ---
 
 /** Names of properties that should be treated as getters (auto-called with self) */
 const getterNames = new Set(["length"]);
 
-function buildType(name: string, methods: Record<string, PrimitiveFnImpl>): ContextValue {
+/**
+ * Build a named type. All types built this way are NamedTypes with nominal
+ * instanceof/subtypeof semantics. The type's own type is NamedType.
+ *
+ * @param name     Type name (e.g., "Int", "String")
+ * @param methods  Instance methods (dispatched via type_dispatch on values of this type)
+ * @param options  Optional: extends (parent type)
+ */
+function buildType(
+  name: string,
+  methods: Record<string, PrimitiveFnImpl>,
+  options?: { extends?: ContextValue },
+): ContextValue {
   const ctx = makeContext();
   // __name
-  const nameKey = "__name";
-  const nameVal = stringToBits(name);
-  ctx.bindings.set(nameKey, { key: nameKey, value: nameVal, isUse: false });
-  ctx.bindingList.push({ key: nameKey, value: nameVal, isUse: false });
+  addBinding(ctx, "__name", stringToBits(name));
+  // __type = NamedType (this type is a named type)
+  addBinding(ctx, "__type", NamedType);
+  // __extends (optional parent type for nominal subtyping chain)
+  if (options?.extends) {
+    addBinding(ctx, "__extends", options.extends);
+  }
   // methods
   for (const [key, fn] of Object.entries(methods)) {
     const prim = makePrimitive(`${name}.${key}`, fn);
     if (getterNames.has(key)) {
       (prim as any).__getter = true;
     }
-    ctx.bindings.set(key, { key, value: prim, isUse: false });
-    ctx.bindingList.push({ key, value: prim, isUse: false });
+    addBinding(ctx, key, prim);
   }
   return ctx;
 }
@@ -940,6 +1132,9 @@ export function createTypeSystem(): Extension {
       Object: ObjectType,
       Function: FunctionType,
       UntypedFunction: UntypedFunctionType,
+      // Meta-types
+      Type: Type,
+      NamedType: NamedType,
       // Bool literals as context bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,

@@ -116,6 +116,19 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - Untyped functions via base grammar still work (`f(x) => x + 1`)
 - Type checks inserted at param use sites via `type_check` primitive
 
+### Type Hierarchy
+- **Type** — base meta-type. Provides structural `instanceof`/`subtypeof`.
+- **NamedType** — extends Type. Provides nominal `instanceof`/`subtypeof` via `__name` and `__extends` chain.
+- All built-in types (Int, String, etc.) are NamedTypes with `__type = NamedType`.
+- Type and NamedType are self-describing (bootstrap: Type has `__type = Type`).
+
+### Nominal vs Structural Typing
+- Named types use **nominal** checking by default: `f(x: Animal)` requires x to be Animal or extend it.
+- **`~` operator** (structural wrap): `~Animal` uses structural checking — any type with Animal's fields matches.
+- Four operations: nominal/structural × instanceof/subtypeof.
+- `structuralWrap(type)` creates a wrapper that delegates to Type's structural methods instead of NamedType's nominal ones.
+- Unnamed type expressions (inline `{ ... }`) are always structural.
+
 ## Parser (Hybrid: Pratt + Recursive Descent)
 
 The parser is a hybrid design:
