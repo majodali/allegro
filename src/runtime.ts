@@ -195,6 +195,8 @@ export function resolveSymbols(
   for (const b of fileCtx.bindingList) {
     if (b.value !== undefined) {
       for (const [name, srcBinding] of sourceBindings) {
+        // Skip self-references — recursive functions resolve from context at runtime
+        if (b.key === name) continue;
         patchNamedParams(b.value, name, srcBinding, new Set());
       }
     }
@@ -217,14 +219,14 @@ function patchNamedParams(
   seen.add(value);
 
   if (value.kind === ValueKind.Expression) {
-    if (value.fn.kind === ValueKind.Param && value.fn._name === name && value.fn.position === -1) {
+    if (value.fn.kind === ValueKind.Symbol && value.fn.name === name) {
       (value as any).fn = binding.value;
     } else {
       patchNamedParams(value.fn, name, binding, seen);
     }
     for (let i = 0; i < value.args.length; i++) {
       const arg = value.args[i];
-      if (arg.kind === ValueKind.Param && arg._name === name && arg.position === -1) {
+      if (arg.kind === ValueKind.Symbol && arg.name === name) {
         value.args[i] = binding.value;
       } else {
         patchNamedParams(arg, name, binding, seen);
@@ -276,14 +278,15 @@ function resolveNamedParams(
       return value;
     }
 
-    case ValueKind.Param: {
-      if (value._name && value.position === -1) {
-        // Skip self-references — handled after the whole function is resolved
-        if (value._name === selfName) return value;
-        const resolved = resMap.get(value._name);
-        if (resolved !== undefined) return resolved;
-        // Unresolved — leave as named Param (might be a type variable or phase binding)
-      }
+    case ValueKind.Param:
+      return value;
+
+    case ValueKind.Symbol: {
+      // Skip self-references — handled after the whole function is resolved
+      if (value.name === selfName) return value;
+      const resolved = resMap.get(value.name);
+      if (resolved !== undefined) return resolved;
+      // Unresolved — leave as Symbol (might be a type variable or phase binding)
       return value;
     }
 
@@ -351,14 +354,15 @@ function resolveNamedParamsInner(
     case ValueKind.Param: {
       // Positional params owned by this function — leave alone
       if (value.owner === owner) return value;
-      // Named params that shadow function params — leave alone
-      if (value._name && ownParamNames.has(value._name)) return value;
-      // Named params — resolve
-      if (value._name && value.position === -1) {
-        if (value._name === selfName) return value;
-        const resolved = resMap.get(value._name);
-        if (resolved !== undefined) return resolved;
-      }
+      return value;
+    }
+
+    case ValueKind.Symbol: {
+      // Symbol that shadows a function param — leave alone
+      if (ownParamNames.has(value.name)) return value;
+      if (value.name === selfName) return value;
+      const resolved = resMap.get(value.name);
+      if (resolved !== undefined) return resolved;
       return value;
     }
 

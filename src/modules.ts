@@ -52,9 +52,12 @@ function captureModuleVars(
     case ValueKind.Context:
       return value;
 
-    case ValueKind.Param: {
-      if (value._name && value.position === -1 && !ownParams.has(value._name)) {
-        const resolved = moduleBindings[value._name];
+    case ValueKind.Param:
+      return value;
+
+    case ValueKind.Symbol: {
+      if (!ownParams.has(value.name)) {
+        const resolved = moduleBindings[value.name];
         if (resolved !== undefined) return resolved;
       }
       return value;

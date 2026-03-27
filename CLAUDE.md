@@ -66,7 +66,8 @@ Base language API (expression DAGs, evaluation contexts)
 4. **Expression** — A DAG node: function reference + ordered arguments. The core computational construct.
 5. **Context** — Evaluation context with named bindings. Also serves as the representation for Objects and Arrays.
 6. **MultiValue** — A primary value plus named string-keyed components (type, error, warnings, source).
-7. **Param** — A placeholder within expressions, bound on function invocation.
+7. **Param** — A positional placeholder within function expressions, bound on invocation.
+8. **Symbol** — A named reference, resolved during compilation via lexical scoping. Created by the parser for identifiers, resolved by `resolveSymbols` to bindings or Params.
 
 ## Type System (Allegro Standard)
 
@@ -203,7 +204,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 234 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, file-based .alg tests
+- **`src/test.ts`** — 234+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons

@@ -1066,6 +1066,9 @@ return makeBits(bytes.length * 8, data);
 function makeParam(position, name) {
 return { kind: 'Param', position, owner: null, _name: name };
 }
+function makeSymbol(name) {
+return { kind: 'Symbol', name };
+}
 function makeExpr(fn, args) {
 return { kind: 'Expression', fn, args, memo: new Map() };
 }
@@ -1396,7 +1399,7 @@ __el_66.attribute("val", Object, function eval_43_val(node) { return (makeInt(Nu
 __el_68.attribute("val", Object, function eval_44_val(node) { return (makeInt(parseInt(node.children[0].text, 10))); });
 __el_70.attribute("val", Object, function eval_45_val(node) { return (stringToBits(extractString(node.children[0].text))); });
 __el_72.attribute("val", Object, function eval_46_val(node) { return (node.children[1].val); });
-__el_73.attribute("val", Object, function eval_47_val(node) { return (makeParam(-1, node.children[0].text)); });
+__el_73.attribute("val", Object, function eval_47_val(node) { return (makeSymbol(node.children[0].text)); });
 __el_74.attribute("val", Object, function eval_33_val(node) { return (makeExpr(prim('bits_div'), [node.children[0].val, node.children[2].val])); });
 __el_76.attribute("val", Object, function eval_34_val(node) { return (makeExpr(prim('bits_mod'), [node.children[0].val, node.children[2].val])); });
 __el_78.attribute("val", Object, function eval_35_val(node) { return (node.children[0].val); });
@@ -1447,6 +1450,7 @@ export { __grammar as baseGrammar };
 export {
   makeExpr as parserMakeExpr,
   makeParam as parserMakeParam,
+  makeSymbol as parserMakeSymbol,
   makeInt as parserMakeInt,
   makeComposedFn as parserMakeComposedFn,
   prim as parserPrim,

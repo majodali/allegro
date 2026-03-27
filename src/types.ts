@@ -9,6 +9,7 @@ export enum ValueKind {
   Context = "Context",
   MultiValue = "MultiValue",
   Param = "Param",
+  Symbol = "Symbol",
 }
 
 // --- Bits: vector of bits with a known length ---
@@ -36,13 +37,22 @@ export interface PrimitiveFunctionValue {
   lazy?: boolean;
 }
 
-// --- Param: placeholder within expressions ---
+// --- Param: positional placeholder within function expressions ---
 
 export interface ParamValue {
   kind: ValueKind.Param;
   position: number;
   owner: ComposedFunctionValue | null;
-  _name?: string; // debugging / name resolution hint from parser
+  _name?: string; // debugging hint
+}
+
+// --- Symbol: named reference resolved during compilation ---
+// Created by the parser for identifiers. Resolved by resolveSymbols to
+// the binding's value or a Param (for function parameters).
+
+export interface SymbolValue {
+  kind: ValueKind.Symbol;
+  name: string;
 }
 
 // --- Composed Function: expression body with declared params ---
@@ -93,7 +103,8 @@ export type Value =
   | ExpressionValue
   | ContextValue
   | MultiValueType
-  | ParamValue;
+  | ParamValue
+  | SymbolValue;
 
 // --- Constructors ---
 
@@ -132,6 +143,10 @@ export function makeParam(position: number, name?: string): ParamValue {
   return { kind: ValueKind.Param, position, owner: null, _name: name };
 }
 
+export function makeSymbol(name: string): SymbolValue {
+  return { kind: ValueKind.Symbol, name };
+}
+
 export function makeExpr(fn: Value, args: Value[]): ExpressionValue {
   return { kind: ValueKind.Expression, fn, args, memo: new Map() };
 }
@@ -166,6 +181,7 @@ export function isResolved(v: Value): boolean {
     case ValueKind.Context:
       return true;
     case ValueKind.Param:
+    case ValueKind.Symbol:
       return false;
     case ValueKind.MultiValue:
       return isResolved(v.primary);

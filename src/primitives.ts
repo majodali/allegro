@@ -81,6 +81,8 @@ export function formatValue(v: Value): string {
       return formatValue(p.primary);
     case ValueKind.Param:
       return `<param:${p._name ?? p.position}>`;
+    case ValueKind.Symbol:
+      return `<symbol:${p.name}>`;
   }
 }
 

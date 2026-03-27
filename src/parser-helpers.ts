@@ -28,6 +28,10 @@ export function makeParam(position: number, name?: string) {
   return { kind: 'Param' as const, position, owner: null as any, _name: name };
 }
 
+export function makeSymbol(name: string) {
+  return { kind: 'Symbol' as const, name };
+}
+
 export function makeExpr(fn: any, args: any[]) {
   return { kind: 'Expression' as const, fn, args, memo: new Map() };
 }
@@ -51,6 +55,11 @@ export function prim(name: string) {
 export function cloneVal(v: any, seen: Map<any, any>): any {
   if (!v || typeof v !== 'object') return v;
   if (seen.has(v)) return seen.get(v);
+  if (v.kind === 'Symbol') {
+    const c = makeSymbol(v.name);
+    seen.set(v, c);
+    return c;
+  }
   if (v.kind === 'Param') {
     const c = makeParam(v.position, v._name);
     seen.set(v, c);
@@ -84,27 +93,106 @@ export function collectParams(v: any, out: any[], seen: Set<any>): void {
   }
 }
 
+/**
+ * Replace Symbols matching param names with Params in an expression tree.
+ * Returns the new tree with Symbols → Params, and collects the created Params.
+ */
+function replaceSymbolsWithParams(v: any, paramNames: string[], created: Map<string, any>, seen: Map<any, any>): any {
+  if (!v || typeof v !== 'object') return v;
+  if (seen.has(v)) return seen.get(v);
+
+  if (v.kind === 'Symbol') {
+    const idx = paramNames.indexOf(v.name);
+    if (idx >= 0) {
+      // Replace with a Param
+      if (!created.has(v.name)) {
+        created.set(v.name, makeParam(idx, v.name));
+      }
+      const p = created.get(v.name)!;
+      seen.set(v, p);
+      return p;
+    }
+    return v; // not a param name — leave as Symbol
+  }
+  if (v.kind === 'Param') {
+    // Legacy: unowned Params from cloneVal
+    if (v.owner === null) {
+      const idx = paramNames.indexOf(v._name);
+      if (idx >= 0) {
+        v.position = idx;
+        if (!created.has(v._name)) created.set(v._name, v);
+        seen.set(v, v);
+        return v;
+      }
+    }
+    return v;
+  }
+  if (v.kind === 'Expression') {
+    const newFn = replaceSymbolsWithParams(v.fn, paramNames, created, seen);
+    const newArgs = v.args.map((a: any) => replaceSymbolsWithParams(a, paramNames, created, seen));
+    if (newFn === v.fn && newArgs.every((a: any, i: number) => a === v.args[i])) {
+      seen.set(v, v);
+      return v;
+    }
+    const c = makeExpr(newFn, newArgs);
+    seen.set(v, c);
+    return c;
+  }
+  if (v.kind === 'ComposedFunction' && v.params.length === 0) {
+    // Thunks (if-then-else branches)
+    const newBody = replaceSymbolsWithParams(v.body, paramNames, created, seen);
+    if (newBody === v.body) { seen.set(v, v); return v; }
+    const c = makeComposedFn([], newBody);
+    seen.set(v, c);
+    return c;
+  }
+  // Descend into inner ComposedFunctions to replace free variables
+  // (but NOT symbols matching the inner function's own params)
+  if (v.kind === 'ComposedFunction') {
+    const innerParamNames = new Set(v.params.map((p: any) => p._name).filter(Boolean));
+    // Filter out param names shadowed by the inner function
+    const outerOnly = paramNames.filter(n => !innerParamNames.has(n));
+    if (outerOnly.length === 0) return v; // all params shadowed
+    const newBody = replaceSymbolsWithParams(v.body, outerOnly, created, seen);
+    if (newBody === v.body) { seen.set(v, v); return v; }
+    const c = makeComposedFn(v.params, newBody);
+    seen.set(v, c);
+    return c;
+  }
+  return v;
+}
+
 export function buildFn(paramNames: string[], body: any) {
   const cloned = cloneVal(body, new Map());
+  const created = new Map<string, any>();
+  const newBody = replaceSymbolsWithParams(cloned, paramNames, created, new Map());
+
+  // Also handle any legacy Params (from parser internals)
   const paramValues: any[] = [];
-  collectParams(cloned, paramValues, new Set());
-  const matched: any[] = [];
-  const seenPos = new Set<number>();
+  collectParams(newBody, paramValues, new Set());
   for (const p of paramValues) {
     const idx = paramNames.indexOf(p._name);
     if (idx >= 0) {
       p.position = idx;
-      if (!seenPos.has(idx)) {
-        matched.push(p);
-        seenPos.add(idx);
-      }
+      if (!created.has(p._name)) created.set(p._name, p);
+    }
+  }
+
+  // Build sorted param list
+  const matched: any[] = [];
+  const seenPos = new Set<number>();
+  for (const [, p] of created) {
+    if (!seenPos.has(p.position)) {
+      matched.push(p);
+      seenPos.add(p.position);
     }
   }
   matched.sort((a: any, b: any) => a.position - b.position);
-  return makeComposedFn(matched, cloned);
+  return makeComposedFn(matched, newBody);
 }
 
 export function substName(v: any, name: string, replacement: any): any {
+  if (v.kind === 'Symbol' && v.name === name) return replacement;
   if (v.kind === 'Param' && v._name === name) return replacement;
   if (v.kind === 'Expression') {
     const nf = substName(v.fn, name, replacement);

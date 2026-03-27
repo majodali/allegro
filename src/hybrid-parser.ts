@@ -5,7 +5,7 @@
 
 import { Lexer, TokenType, Token, LexerConfig, createBaseLexerConfig } from "./lexer.js";
 import {
-  makeInt, makeExpr, makeParam, makeComposedFn, makeContext,
+  makeInt, makeExpr, makeParam, makeSymbol, makeComposedFn, makeContext,
   prim, buildFn, substName, bind, extractString, stringToBits,
 } from "./parser-helpers.js";
 
@@ -279,7 +279,7 @@ export class HybridParser {
     }
 
     const name = this.lexer.expect(TokenType.Ident, "in type expression");
-    let base: any = makeParam(-1, name.text);
+    let base: any = makeSymbol(name.text);
 
     // Generic: Type[Arg1, Arg2, ...]
     if (this.lexer.peek().type === TokenType.LBracket) {
@@ -324,8 +324,8 @@ export class HybridParser {
     }
 
     // Wrap with typed_function
-    const typeExprs = typedParams.map(p => p.typeExpr ?? makeParam(-1, "Any"));
-    const retExpr = returnTypeExpr ?? makeParam(-1, "Any");
+    const typeExprs = typedParams.map(p => p.typeExpr ?? makeSymbol("Any"));
+    const retExpr = returnTypeExpr ?? makeSymbol("Any");
     return makeExpr(prim("typed_function"), [fn, makeInt(typedParams.length), ...typeExprs, retExpr]);
   }
 
@@ -535,12 +535,12 @@ function buildBaseGrammar(): HybridGrammarConfig {
       // Not a lambda — restore and return as identifier
       (parser.lexer as any).tokenIdx = savedIdx;
     }
-    return makeParam(-1, token.text);
+    return makeSymbol(token.text);
   });
 
   // true / false → named params (resolved from context)
-  prefix.set(TokenType.True, () => makeParam(-1, "true"));
-  prefix.set(TokenType.False, () => makeParam(-1, "false"));
+  prefix.set(TokenType.True, () => makeSymbol("true"));
+  prefix.set(TokenType.False, () => makeSymbol("false"));
 
   // Unary minus
   prefix.set(TokenType.Minus, (parser) => {

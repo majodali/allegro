@@ -1065,7 +1065,25 @@ export function unifyTypes(
   expectedType: Value,
   bindings: TypeBindings,
 ): TypeBindings {
-  // If expected is a Param (unresolved type variable)
+  // If expected is a type variable (Symbol or unresolved Param)
+  if (expectedType.kind === ValueKind.Symbol) {
+    const varName = (expectedType as any).name;
+    if (!varName) return bindings;
+    const existing = bindings.get(varName);
+    if (existing) {
+      const existingName = typeContextName(existing);
+      const actualName = actualType ? typeContextName(actualType) : null;
+      if (existingName && actualName && existingName !== actualName) {
+        throw new AllegroError(`Type variable ${varName}: conflicting bindings ${existingName} vs ${actualName}`);
+      }
+      return bindings;
+    }
+    if (actualType) {
+      bindings.set(varName, actualType);
+    }
+    return bindings;
+  }
+  // Legacy: Param as type variable
   if (expectedType.kind === ValueKind.Param) {
     const varName = (expectedType as any)._name;
     if (!varName) return bindings; // positional param, can't unify
@@ -1129,6 +1147,11 @@ export function unifyTypes(
  * Returns the resolved type value, or the original if no variables to substitute.
  */
 export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings): Value {
+  if (typeExpr.kind === ValueKind.Symbol) {
+    const varName = (typeExpr as any).name;
+    if (varName && bindings.has(varName)) return bindings.get(varName)!;
+    return typeExpr;
+  }
   if (typeExpr.kind === ValueKind.Param) {
     const varName = (typeExpr as any)._name;
     if (varName && bindings.has(varName)) {

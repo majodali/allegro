@@ -82,11 +82,12 @@ export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Va
     case ValueKind.ComposedFunction:
       return value;
 
-    case ValueKind.Param: {
-      if (value._name && value.position === -1) {
-        const resolved = ctx.bindings.get(value._name);
-        if (resolved?.value !== undefined) return evaluate(resolved.value, ctx, depth + 1);
-      }
+    case ValueKind.Param:
+      return value;
+
+    case ValueKind.Symbol: {
+      const resolved = ctx.bindings.get(value.name);
+      if (resolved?.value !== undefined) return evaluate(resolved.value, ctx, depth + 1);
       return value;
     }
 
@@ -119,6 +120,7 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
   if (fn.kind === ValueKind.PrimitiveFunction) {
     const result = applyPrimitive(fn, expr.args, ctx, depth);
     // eval_if may return a TailCall from a branch — propagate it
+    // Do NOT memoize TailCall results — they're context-dependent
     if (isTailCall(result)) return result;
     expr.memo.set("eval", result);
     return result;
@@ -266,7 +268,7 @@ function applyComposed(
               enrichedCtx.bindings.set(varName, binding);
               enrichedCtx.bindingList.push(binding);
             }
-            if (returnTypeExpr && returnTypeExpr.kind === ValueKind.Param) {
+            if (returnTypeExpr && (returnTypeExpr.kind === ValueKind.Param || returnTypeExpr.kind === ValueKind.Symbol)) {
               inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
             }
           }
@@ -312,8 +314,8 @@ function substituteParams(fn: ComposedFunctionValue, args: Value[]): Value {
 }
 
 function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, Value>, seen: Set<Value>): Value {
-  if (seen.has(value)) return value; // circular reference guard
-  seen.add(value);
+  // Note: no circular reference guard needed now that self-references stay as Symbols
+  // (no circular function references in expression tree)
 
   switch (value.kind) {
     case ValueKind.Bits:
@@ -328,6 +330,9 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       }
       return value;
     }
+
+    case ValueKind.Symbol:
+      return value; // Symbols are resolved by name, not substituted by position
 
     case ValueKind.ComposedFunction: {
       // Descend into all composed functions to substitute free variables.

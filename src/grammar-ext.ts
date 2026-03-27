@@ -24,6 +24,7 @@ import {
   parserMakeContext,
   parserBind,
   parserRepChildren,
+  parserMakeSymbol,
 } from "./parser.js";
 
 // --- Types ---
@@ -46,6 +47,7 @@ export const helpers = {
   makeContext: parserMakeContext,
   bind: parserBind,
   repChildren: parserRepChildren,
+  makeSymbol: parserMakeSymbol,
 };
 
 // --- GrammarBuilder ---
@@ -413,8 +415,8 @@ function buildTypedFn(
 
   // 5. Wrap with typed_function to attach FunctionType
   // Args: [fn, paramCount, paramType1, ..., paramTypeN, returnType]
-  const typeExprs = params.map(p => p.typeExpr ?? helpers.makeParam(-1, "Any"));
-  const retExpr = returnTypeExpr ?? helpers.makeParam(-1, "Any");
+  const typeExprs = params.map(p => p.typeExpr ?? helpers.makeSymbol("Any"));
+  const retExpr = returnTypeExpr ?? helpers.makeSymbol("Any");
   return helpers.makeExpr(
     helpers.prim("typed_function"),
     [fn, helpers.makeInt(params.length), ...typeExprs, retExpr],
@@ -447,7 +449,7 @@ export function addTypeAnnotations(builder: GrammarBuilder): void {
   });
   (simpleTypeExpr as any).attribute("typeExpr", Object, function (node: any) {
     // For type_apply: return a named param that resolves to the type
-    return helpers.makeParam(-1, node.children[0].text);
+    return helpers.makeSymbol(node.children[0].text);
   });
 
   // Placeholder disjunction — we need to reference it before adding the generic alternative
@@ -465,7 +467,7 @@ export function addTypeAnnotations(builder: GrammarBuilder): void {
   });
   (genericTypeExpr as any).attribute("typeExpr", Object, function (node: any) {
     // Produce: type_apply(GenericType, arg1, arg2, ...)
-    const base = helpers.makeParam(-1, node.children[0].text);
+    const base = helpers.makeSymbol(node.children[0].text);
     const argInfos = helpers.repChildren(node.children[2]);
     const args = argInfos.map((c: any) => c.typeExpr);
     return helpers.makeExpr(helpers.prim("type_apply"), [base, ...args]);
