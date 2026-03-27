@@ -307,18 +307,10 @@ export class HybridParser {
     const paramNames = typedParams.map(p => p.name);
     const fn = buildFn(paramNames, body);
 
-    // Wrap param references with type_check
-    const typedMap = new Map<number, any>();
-    for (let i = 0; i < typedParams.length; i++) {
-      if (typedParams[i].typeExpr) {
-        typedMap.set(i, typedParams[i].typeExpr);
-      }
-    }
-    if (typedMap.size > 0) {
-      fn.body = this.wrapParamsWithChecks(fn.body, fn, typedMap, new Set());
-    }
+    // Type checking moved to call site (applyComposed checks arg types
+    // against FunctionType param types). No body-level wrapping needed.
 
-    // Return type check
+    // Return type check stays in body — validates output
     if (returnTypeExpr) {
       fn.body = makeExpr(prim("type_check"), [fn.body, returnTypeExpr]);
     }

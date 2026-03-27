@@ -117,7 +117,7 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - Return types: `f(x: Int): String => body`
 - Type expressions support generics: `f(arr: Array[Int]) => ...`
 - Untyped functions via base grammar still work (`f(x) => x + 1`)
-- Type checks inserted at param use sites via `type_check` primitive
+- Type checks at call site: `applyComposed` checks arg types against FunctionType param types before substitution. Handles unions, structural, generics with arg comparison. No type_check wrappers in function bodies.
 
 ### Type Hierarchy
 - **Type** — base meta-type. Provides structural `instanceof`/`subtypeof`.

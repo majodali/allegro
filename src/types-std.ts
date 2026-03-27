@@ -42,7 +42,7 @@ export function withType(v: Value, type: ContextValue): Value {
 }
 
 /** Get the __name from a type Context directly (not from a typed value) */
-function typeContextName(v: Value): string | null {
+export function typeContextName(v: Value): string | null {
   const ctx = v.kind === ValueKind.Context ? v : (v.kind === ValueKind.MultiValue ? primaryOf(v) : null);
   if (!ctx || ctx.kind !== ValueKind.Context) return null;
   const nb = (ctx as ContextValue).bindings.get("__name");

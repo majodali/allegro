@@ -7,7 +7,7 @@ import {
 } from "./types.js";
 import {
   getType, getTypeName, withType, getFunctionParamTypes, getFunctionReturnType,
-  unifyTypes, resolveTypeWithBindings, TypeBindings,
+  unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
 
 const MAX_DEPTH = 10000;
@@ -287,6 +287,13 @@ function applyComposed(
               inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
             }
           }
+          // Call-site type checking: verify args match param types
+          // (after unification, so type variables are resolved)
+          for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
+            const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
+            if (resolvedParamType.kind !== ValueKind.Context) continue; // unresolved type var
+            checkArgType(evalArgs[i], resolvedParamType as ContextValue, i);
+          }
         }
       }
     }
@@ -386,6 +393,78 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
 export function resolveInContext(ctx: ContextValue, name: string): Value | undefined {
   const b = ctx.bindings.get(name);
   return b?.value;
+}
+
+// --- Call-site type checking ---
+
+import { normalizeType } from "./types-std.js";
+
+/**
+ * Check that an argument value matches the expected parameter type.
+ * Called at function call sites. Handles named types, unions, structural,
+ * generic type args — mirrors type_check_impl but without lazy evaluation.
+ */
+function checkArgType(arg: Value, expectedType: ContextValue, argIndex: number): void {
+  // Normalize bare generics to Generic[Any]
+  const expected = normalizeType(expectedType);
+  const expectedName = typeContextName(expected);
+  if (!expectedName || expectedName === "Any") return;
+
+  const argType = getType(arg);
+  if (!argType) return; // untyped arg — skip
+
+  const actualName = typeContextName(argType);
+  if (actualName === expectedName) {
+    // Names match — also check type args for generics (Array[Int] vs Array[String])
+    const expectedArgs = expected.bindings.get("__args")?.value;
+    const actualArgs = argType.bindings.get("__args")?.value;
+    if (expectedArgs?.kind === ValueKind.Context && actualArgs?.kind === ValueKind.Context) {
+      const expCtx = expectedArgs as ContextValue;
+      const actCtx = actualArgs as ContextValue;
+      const expLen = Number(expCtx.bindings.get("__length")?.value?.kind === ValueKind.Bits ? (expCtx.bindings.get("__length")!.value! as any).data : 0n);
+      const actLen = Number(actCtx.bindings.get("__length")?.value?.kind === ValueKind.Bits ? (actCtx.bindings.get("__length")!.value! as any).data : 0n);
+      for (let j = 0; j < Math.min(expLen, actLen); j++) {
+        const expArg = expCtx.bindings.get(String(j))?.value;
+        const actArg = actCtx.bindings.get(String(j))?.value;
+        if (expArg?.kind === ValueKind.Context && actArg?.kind === ValueKind.Context) {
+          const expArgName = typeContextName(expArg);
+          const actArgName = typeContextName(actArg);
+          if (expArgName && actArgName && expArgName !== "Any" && actArgName !== "Any" && expArgName !== actArgName) {
+            throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}[${expArgName}], got ${expectedName}[${actArgName}]`);
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  // Check using the expected type's own instanceof (handles unions)
+  const directInstanceof = expected.bindings.get("instanceof")?.value;
+  if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
+    const checkResult = directInstanceof.fn([arg], undefined as any, undefined as any);
+    const checkP = primaryOf(checkResult);
+    if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
+      throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
+    }
+    return;
+  }
+
+  // Use meta-type instanceof (NamedType nominal check)
+  const typeType = expected.bindings.get("__type")?.value as ContextValue | undefined;
+  if (typeType) {
+    const instanceofMethod = typeType.bindings.get("instanceof")?.value;
+    if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
+      const checkResult = instanceofMethod.fn([expected, arg], undefined as any, undefined as any);
+      const checkP = primaryOf(checkResult);
+      if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
+        throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
+      }
+      return;
+    }
+  }
+
+  // Name mismatch with no instanceof to check
+  throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
 }
 
 // --- Function pre-compilation (compile-time partial evaluation) ---

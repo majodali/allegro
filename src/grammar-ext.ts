@@ -392,20 +392,10 @@ function buildTypedFn(
   const paramNames = params.map(p => p.name);
   const fn = helpers.buildFn(paramNames, body);
 
-  // 2. Collect typed params by position (using type expressions)
-  const typedParams = new Map<number, any>();
-  for (let i = 0; i < params.length; i++) {
-    if (params[i].typeExpr) {
-      typedParams.set(i, params[i].typeExpr);
-    }
-  }
+  // Type checking of params moved to call site (applyComposed).
+  // No body-level wrapping needed.
 
-  // 3. Wrap param references with type_check
-  if (typedParams.size > 0) {
-    fn.body = wrapParamsWithChecks(fn.body, fn, typedParams);
-  }
-
-  // 4. Wrap return with type_check if return type specified
+  // 2. Wrap return with type_check if return type specified
   if (returnTypeExpr) {
     fn.body = helpers.makeExpr(
       helpers.prim("type_check"),
