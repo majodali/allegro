@@ -474,6 +474,31 @@ export function addTypeAnnotations(builder: GrammarBuilder): void {
   // Add generic alternative to the TypeExpression disjunction
   (typeExpression as any).add(genericTypeExpr);
 
+  // Structural type: "~" TypeExpression (e.g., ~Animal)
+  const tilde = builder.terminal("~");
+  const structuralTypeExpr = builder.phrase([tilde, typeExpression]);
+  (structuralTypeExpr as any).attribute("typeName", Object, function (node: any) {
+    return "~" + node.children[1].typeName;
+  });
+  (structuralTypeExpr as any).attribute("typeExpr", Object, function (node: any) {
+    return helpers.makeExpr(helpers.prim("structural_wrap"), [node.children[1].typeExpr]);
+  });
+  (typeExpression as any).add(structuralTypeExpr);
+
+  // Union type: TypeExpression "|" TypeExpression (e.g., Int | String)
+  const pipe = builder.terminal("|");
+  const unionTypeExpr = builder.phrase([typeExpression, pipe, typeExpression]);
+  (unionTypeExpr as any).attribute("typeName", Object, function (node: any) {
+    return node.children[0].typeName + " | " + node.children[2].typeName;
+  });
+  (unionTypeExpr as any).attribute("typeExpr", Object, function (node: any) {
+    return helpers.makeExpr(helpers.prim("type_union"), [
+      node.children[0].typeExpr,
+      node.children[2].typeExpr,
+    ]);
+  });
+  (typeExpression as any).add(unionTypeExpr);
+
   // TypedParam: Ident ":" TypeExpression
   const typedParam = builder.phrase([ident, colon, typeExpression]);
   (typedParam as any).attribute("paramInfo", Object, function (node: any) {

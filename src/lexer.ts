@@ -20,7 +20,7 @@ export enum TokenType {
 
   // Operators
   Plus, Minus, Star, Slash, Percent,
-  Eq, EqEq, BangEq,
+  Eq, EqEq, BangEq, Tilde, Pipe,
   Lt, Gt, LtEq, GtEq,
   Arrow,          // =>
   And, Or, Not,   // &&, ||, !
@@ -104,6 +104,8 @@ export const BASE_OPERATORS: [string, TokenType][] = [
   ["}", TokenType.RBrace],
   [",", TokenType.Comma],
   [":", TokenType.Colon],
+  ["~", TokenType.Tilde],
+  ["|", TokenType.Pipe],
 ];
 
 /** Create a default LexerConfig with base keywords and operators */
@@ -183,6 +185,14 @@ export class Lexer {
     const tok = this.peek();
     if (this.tokenIdx < this.tokens.length) this.tokenIdx++;
     return tok;
+  }
+
+  save(): number {
+    return this.tokenIdx;
+  }
+
+  restore(saved: number): void {
+    this.tokenIdx = saved;
   }
 
   expect(type: TokenType, context?: string): Token {

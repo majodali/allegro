@@ -1960,6 +1960,57 @@ test("type hierarchy: structural_wrap makes nominal type use structural checking
   eq(name !== undefined, true);
 });
 
+// == Union Types ==
+
+test("union type: Int | String accepted", () => {
+  // A function accepting Int | String should accept both
+  const result1 = evalStd('f(x: Int | String) => x\nf(42)');
+  eq(Number((primaryOf(result1!) as BitsValue).data), 42);
+
+  const result2 = evalStd('f(x: Int | String) => x\nf("hello")');
+  eq(bitsToString(primaryOf(result2!) as BitsValue), "hello");
+});
+
+test("union type: rejects non-matching type", () => {
+  let threw = false;
+  try { evalStd('f(x: Int | String) => x\nf(true)'); }
+  catch (e: any) { threw = e.message.includes("Type error") || e.message.includes("type"); }
+  eq(threw, true, "Bool should not match Int | String");
+});
+
+// == Structural Type (~) ==
+
+test("structural type: ~Type in annotation", () => {
+  // ~Int should accept any type with Int's structure
+  // For now just verify the syntax parses and ~Int can be used
+  const result = evalStd('f(x: ~Int) => x\nf(42)');
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+// == Binding Type Annotations ==
+
+test("binding type: x: Int = 42", () => {
+  const result = evalStd('x: Int = 42\nx');
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("binding type: x: String = hello", () => {
+  const result = evalStd('x: String = "hello"\nx');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "hello");
+});
+
+test("binding type: mismatch throws", () => {
+  let threw = false;
+  try { evalStd('x: Int = "hello"\nx'); }
+  catch (e: any) { threw = e.message.includes("Type error") || e.message.includes("type"); }
+  eq(threw, true, "String should not match Int annotation");
+});
+
+test("binding type: used in expression", () => {
+  const result = evalStd('x: Int = 5\ny: Int = 10\nx + y');
+  eq(Number((primaryOf(result!) as BitsValue).data), 15);
+});
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {

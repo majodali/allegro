@@ -486,7 +486,7 @@ import {
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
   AnyType, Type, NamedType, makeArray, makeObject,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
-  structuralWrap,
+  structuralWrap, makeUnionType,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 
@@ -789,7 +789,18 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!actualType) throw new AllegroError("type_check: value has no type");
   const actualName = getTypeName(v);
 
-  // Use the expected type's instanceof method if available
+  // Check if the expected type has its own instanceof method (e.g., UnionType)
+  const directInstanceof = expectedCtx.bindings.get("instanceof")?.value;
+  if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
+    const checkResult = directInstanceof.fn([v], undefined as any, undefined as any);
+    const checkP = primaryOf(checkResult);
+    if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
+      throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
+    }
+    return v;
+  }
+
+  // Use the meta-type's instanceof method
   const typeType = expectedCtx.bindings.get("__type")?.value as ContextValue | undefined;
   if (typeType) {
     const instanceofMethod = typeType.bindings.get("instanceof")?.value;
@@ -856,6 +867,44 @@ const type_apply_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     typeArgs.push(primaryOf(arg));
   }
   return applyGenericType(genericCtx, typeArgs);
+};
+
+// --- type_union: create a union type from alternatives ---
+
+const type_union_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // Evaluate all alternative type args
+  const alternatives: Value[] = [];
+  for (const arg of args) {
+    const v = evalFn!(arg, ctx!);
+    if (!isResolved(v)) {
+      return makeExpr(makePrimitive("type_union", type_union_impl, true), args);
+    }
+    alternatives.push(primaryOf(v));
+  }
+  return makeUnionType(alternatives as ContextValue[]);
+};
+
+// --- structural_wrap: ~ operator on types ---
+
+const structural_wrap_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) {
+    return makeExpr(makePrimitive("structural_wrap", structural_wrap_impl, true), [v]);
+  }
+  const typeCtx = asCtx(primaryOf(v), "structural_wrap");
+  return structuralWrap(typeCtx);
+};
+
+// --- type_check_binding: check value type for binding annotations ---
+
+const type_check_binding_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  const expectedType = evalFn!(args[1], ctx!);
+  if (!isResolved(v) || !isResolved(expectedType)) {
+    return makeExpr(makePrimitive("type_check_binding", type_check_binding_impl, true), [v, expectedType]);
+  }
+  // Delegate to type_check_impl
+  return type_check_impl([v, expectedType], ctx, evalFn);
 };
 
 // --- Typed binary operator helper ---
@@ -959,6 +1008,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   type_of: makePrimitive("type_of", type_of_impl, true),
   type_check: makePrimitive("type_check", type_check_impl, true),
   type_apply: makePrimitive("type_apply", type_apply_impl, true),
+  type_union: makePrimitive("type_union", type_union_impl, true),
+  structural_wrap: makePrimitive("structural_wrap", structural_wrap_impl, true),
+  type_check_binding: makePrimitive("type_check_binding", type_check_binding_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),
@@ -970,12 +1022,4 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_gt: makePrimitive("typed_gt", makeTypedBinOp("gt"), true),
   typed_lte: makePrimitive("typed_lte", makeTypedBinOp("lte"), true),
   typed_gte: makePrimitive("typed_gte", makeTypedBinOp("gte"), true),
-  // Type hierarchy operations
-  structural_wrap: makePrimitive("structural_wrap", ((args: Value[], ctx: any, evalFn: any) => {
-    const v = evalFn!(args[0], ctx!);
-    if (!isResolved(v)) return makeExpr(makePrimitive("structural_wrap", (() => {}) as any, true), [v]);
-    const type = primaryOf(v);
-    if (type.kind !== ValueKind.Context) throw new AllegroError("structural_wrap: expected a type");
-    return structuralWrap(type as ContextValue);
-  }) as PrimitiveFnImpl, true),
 };

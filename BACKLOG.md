@@ -21,12 +21,12 @@ High-level goals, roughly ordered by dependency:
 - [x] Subtyping / extends — Type/NamedType hierarchy, nominal + structural instanceof/subtypeof, `~` structural operator
 - [ ] Interfaces — structural type matching (no explicit `implements`)
 - [ ] Mixins — types with default implementations
-- [ ] Algebraic types — sum types (tagged unions), product types
+- [x] Union types — `Int | String`, `type_union` primitive, union instanceof checks alternatives
 - [ ] Full type inference — Hindley-Milner style for unannotated functions
 - [x] Return type inference — via compile-time partial evaluation of typed function bodies
 - [ ] Variance — covariant/contravariant/invariant type parameters
 - [ ] Type constraints — `where T: Comparable`
-- [ ] Binding type annotations — `x: Int = 42`
+- [x] Binding type annotations — `x: Int = 42`, `type_check_binding` primitive
 - [ ] Pattern matching — destructuring, match expressions
 - [x] Generics — `Array[T]`, `Function[ParamTypes, ReturnType]`, memoized type constructors
 - [x] Function types and unification — type variables bind progressively at call sites
@@ -112,8 +112,8 @@ High-level goals, roughly ordered by dependency:
 
 Priority-ordered list of next items to implement:
 
-1. **Algebraic types** — union constraints (`Shape = Circle | Rectangle`), refinement types (`Int & _ > 0`)
-2. **`~` syntax in grammar** — structural type modifier in annotations (needs parser reimplementation)
-3. **Binding type annotations** — `x: Int = 42`
-4. **Pattern matching** — destructuring in bindings and function params
-5. **Error handling** — try/catch or effect-based surface syntax
+1. **Pattern matching** — destructuring in bindings and function params
+2. **Error handling** — try/catch or effect-based surface syntax
+3. **Refinement types** — `Int & _ > 0`, constraint expressions
+4. **Interfaces** — structural type matching (no explicit `implements`)
+5. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions

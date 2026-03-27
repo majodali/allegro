@@ -129,6 +129,28 @@ export class HybridParser {
         }
       }
 
+      // Typed binding: ident : Type = ... (but not ident : Type => which is typed lambda)
+      if (next.type === TokenType.Colon) {
+        // Peek further: if there's an = after the type expression, it's a typed binding
+        // Save state and try to parse as typed binding
+        const saved = this.lexer.save();
+        this.lexer.next(); // consume ident
+        this.lexer.next(); // consume :
+        try {
+          const typeExpr = this.parseTypeExpr();
+          if (this.lexer.peek().type === TokenType.Eq) {
+            this.lexer.next(); // consume =
+            const value = this.parseFnBody();
+            // Wrap value with type_check_binding
+            const checked = makeExpr(prim("type_check_binding"), [value, typeExpr]);
+            bind(ctx, tok.text, checked);
+            return;
+          }
+        } catch {}
+        // Not a typed binding — restore and fall through
+        this.lexer.restore(saved);
+      }
+
       // Assignment: ident = ... (but not ==)
       if (next.type === TokenType.Eq) {
         this.lexer.next(); // consume ident
@@ -236,8 +258,28 @@ export class HybridParser {
   // --- Type expression parsing ---
 
   parseTypeExpr(): any {
+    let typeExpr = this.parseTypeExprAtom();
+
+    // Union: Type | Type | ...
+    while (this.lexer.peek().type === TokenType.Pipe) {
+      this.lexer.next(); // consume |
+      const right = this.parseTypeExprAtom();
+      typeExpr = makeExpr(prim("type_union"), [typeExpr, right]);
+    }
+
+    return typeExpr;
+  }
+
+  private parseTypeExprAtom(): any {
+    // Structural prefix: ~Type
+    if (this.lexer.peek().type === TokenType.Tilde) {
+      this.lexer.next(); // consume ~
+      const inner = this.parseTypeExprAtom();
+      return makeExpr(prim("structural_wrap"), [inner]);
+    }
+
     const name = this.lexer.expect(TokenType.Ident, "in type expression");
-    const base = makeParam(-1, name.text);
+    let base: any = makeParam(-1, name.text);
 
     // Generic: Type[Arg1, Arg2, ...]
     if (this.lexer.peek().type === TokenType.LBracket) {
@@ -249,7 +291,7 @@ export class HybridParser {
         } while (this.lexer.match(TokenType.Comma));
       }
       this.lexer.expect(TokenType.RBracket, "after generic type arguments");
-      return makeExpr(prim("type_apply"), [base, ...args]);
+      base = makeExpr(prim("type_apply"), [base, ...args]);
     }
 
     return base;

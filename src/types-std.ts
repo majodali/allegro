@@ -227,6 +227,67 @@ export function structuralWrap(type: ContextValue): ContextValue {
   return wrapper;
 }
 
+// --- Union Type ---
+
+/**
+ * Create a union type from alternatives: `A | B | C`
+ * A union type's instanceof checks if the value satisfies ANY alternative.
+ * A union type's subtypeof checks if ALL alternatives are subtypes of the target.
+ */
+export function makeUnionType(alternatives: ContextValue[]): ContextValue {
+  const union = makeContext();
+  addBinding(union, "__name", stringToBits(
+    alternatives.map(a => {
+      const n = a.bindings.get("__name")?.value;
+      return n && n.kind === ValueKind.Bits ? bitsToString(n) : "?";
+    }).join(" | ")
+  ));
+  // Store alternatives as an array-like Context
+  for (let i = 0; i < alternatives.length; i++) {
+    addBinding(union, String(i), alternatives[i]);
+  }
+  addBinding(union, "__length", makeInt(alternatives.length));
+  addBinding(union, "__union", makeInt(1)); // marker
+
+  // instanceof: value matches if it matches ANY alternative
+  addBinding(union, "instanceof", makePrimitive("UnionType.instanceof", (args) => {
+    const value = args[0];
+    const valueType = getType(value);
+    if (!valueType) return makeInt(0);
+    const valueName = getTypeName(value);
+    for (let i = 0; i < alternatives.length; i++) {
+      const alt = alternatives[i];
+      const altName = alt.bindings.get("__name")?.value;
+      const altNameStr = altName && altName.kind === ValueKind.Bits ? bitsToString(altName) : null;
+      if (altNameStr && altNameStr === valueName) return makeInt(1);
+      // Also check structural compatibility via the alternative's own instanceof
+      const altInstanceof = alt.bindings.get("instanceof")?.value;
+      if (altInstanceof?.kind === ValueKind.PrimitiveFunction) {
+        const result = altInstanceof.fn([value], undefined as any, undefined as any);
+        if (result.kind === ValueKind.Bits && (result as BitsValue).data !== 0n) return makeInt(1);
+      }
+    }
+    return makeInt(0);
+  }));
+
+  // subtypeof: this union is a subtype of target if ALL alternatives are subtypes
+  addBinding(union, "subtypeof", makePrimitive("UnionType.subtypeof", (args) => {
+    const target = args[0] as ContextValue;
+    for (const alt of alternatives) {
+      const altSubtype = alt.bindings.get("subtypeof")?.value;
+      if (!altSubtype || altSubtype.kind !== ValueKind.PrimitiveFunction) return makeInt(0);
+      const result = altSubtype.fn([target], undefined as any, undefined as any);
+      if (result.kind === ValueKind.Bits && (result as BitsValue).data === 0n) return makeInt(0);
+    }
+    return makeInt(1);
+  }));
+
+  // Set __type to Type (unions are structural)
+  addBinding(union, "__type", Type);
+
+  return union;
+}
+
 // Bootstrap: Type and NamedType get their own type components
 // Type's type is Type (self-referential)
 // NamedType's type is NamedType (it's a named type itself)
