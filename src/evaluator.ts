@@ -107,10 +107,26 @@ export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Va
   }
 }
 
+/**
+ * Check if an expression is safe to memoize — no Symbols or unresolved Params
+ * that would make the result context-dependent.
+ */
+function isMemoSafe(expr: ExpressionValue): boolean {
+  if (expr.fn.kind === ValueKind.Symbol) return false;
+  for (const arg of expr.args) {
+    if (arg.kind === ValueKind.Symbol) return false;
+    if (arg.kind === ValueKind.Param) return false;
+  }
+  return true;
+}
+
 function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): Value | TailCall {
-  // Check memo
-  const cached = expr.memo.get("eval");
-  if (cached !== undefined) return cached;
+  // Check memo — only use for context-independent expressions
+  const memoSafe = isMemoSafe(expr);
+  if (memoSafe) {
+    const cached = expr.memo.get("eval");
+    if (cached !== undefined) return cached;
+  }
 
   const fnRaw = evaluate(expr.fn, ctx, depth + 1);
   // Unwrap MultiValue to get the callable (e.g., exported functions)
@@ -119,10 +135,9 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
   // Primitive function
   if (fn.kind === ValueKind.PrimitiveFunction) {
     const result = applyPrimitive(fn, expr.args, ctx, depth);
-    // eval_if may return a TailCall from a branch — propagate it
     // Do NOT memoize TailCall results — they're context-dependent
     if (isTailCall(result)) return result;
-    expr.memo.set("eval", result);
+    if (memoSafe) expr.memo.set("eval", result);
     return result;
   }
 
@@ -134,18 +149,18 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
       return makeTailCall(fn, evalArgs, fnRaw);
     }
     const result = applyComposed(fn, expr.args, ctx, depth, fnRaw);
-    expr.memo.set("eval", result);
+    if (memoSafe) expr.memo.set("eval", result);
     return result;
   }
 
   // Function not resolved - partially evaluate args
   const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1));
   if (fn === expr.fn && evalArgs.every((a, i) => a === expr.args[i])) {
-    expr.memo.set("eval", expr);
+    if (memoSafe) expr.memo.set("eval", expr);
     return expr;
   }
   const reduced = makeExpr(fn, evalArgs);
-  expr.memo.set("eval", reduced);
+  if (memoSafe) expr.memo.set("eval", reduced);
   return reduced;
 }
 

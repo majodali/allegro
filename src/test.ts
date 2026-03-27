@@ -1747,18 +1747,12 @@ test("unification: same type variable must be consistent", () => {
   eq(getTypeName(result!), "Int");
 });
 
-// Known issue: this test passes in isolation but fails when run after other tests
-// due to Expression memoization sharing stale results across evaluations.
-// This will be fixed when memoization moves to Standard (not Base evaluator).
-test("unification: conflicting type variables detected", () => {
+test("unification: conflicting type variables throw", () => {
   const freshTypes = createTypeSystem();
-  const { compilationReport } = runtimeEval(
-    'both(a: T, b: T): T => a\n', undefined, [freshTypes], undefined, true,
+  throws(
+    () => runtimeEval('both(a: T, b: T): T => a\nboth(1, "hello")\n', undefined, [freshTypes], undefined, true),
+    "conflicting",
   );
-  // At minimum, the function should be compiled with type variables
-  const inferred = compilationReport?.inferred.find((i: any) => i.name === "both");
-  // Type variables prevent return type inference — so inferred return type is unknown
-  eq(inferred === undefined || inferred.returnType === "unknown", true);
 });
 
 // == Partial Evaluation ==

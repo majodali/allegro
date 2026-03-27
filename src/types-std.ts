@@ -873,8 +873,9 @@ export function buildGenericType(
       if (p.kind === ValueKind.Bits) return `v:${(p as BitsValue).data}`;
       return cacheKeyOne(p, idx);
     }
-    // Params (type variables) — unique per instance
+    // Params and Symbols (type variables) — unique per name
     if (a.kind === ValueKind.Param) return `param:${(a as any)._name ?? idx}`;
+    if (a.kind === ValueKind.Symbol) return `sym:${(a as any).name}`;
     return `unk:${idx}`;
   }
 
