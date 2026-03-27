@@ -716,19 +716,15 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
   }
 
-  // If the value has a type, the type controls access — no fallback
-  // UNLESS the type declares __fieldAccess (e.g., Object type allows
-  // arbitrary field access on the underlying Context).
+  // If the value has a type, check for __getMember fallback.
+  // __getMember is called when the field isn't a type method — it lets
+  // the type control access to instance fields (like Python's __getattr__).
   if (type) {
-    const allowFieldAccess = type.bindings.get("__fieldAccess")?.value !== undefined;
-    if (allowFieldAccess) {
-      const p = primaryOf(obj);
-      if (p.kind === ValueKind.Context) {
-        const b = p.bindings.get(fieldName);
-        if (b?.value !== undefined) return b.value;
-      }
+    const getMember = typeMethod(type, "__getMember");
+    if (getMember?.kind === ValueKind.PrimitiveFunction) {
+      return getMember.fn([primaryOf(obj), stringToBits(fieldName)], undefined as any, undefined as any);
     }
-    // Field not found — type enforces encapsulation
+    // No __getMember — type enforces strict encapsulation
     const typeName = getTypeName(obj) ?? "unknown";
     throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
   }

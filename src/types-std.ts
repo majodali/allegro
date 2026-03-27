@@ -738,9 +738,16 @@ export const FloatType: ContextValue = buildType("Float", floatMethods);
 export const StringType: ContextValue = buildType("String", stringMethods);
 export const BoolType: ContextValue = buildType("Bool", boolMethods);
 export const ObjectType: ContextValue = buildType("Object", objectMethods);
-// Object allows direct field access (not encapsulated like modules)
-ObjectType.bindings.set("__fieldAccess", { key: "__fieldAccess", value: makeInt(1), isUse: false });
-ObjectType.bindingList.push({ key: "__fieldAccess", value: makeInt(1), isUse: false });
+// Object __getMember: allows access to any field on the underlying Context.
+// Called by type_dispatch when the field isn't a type method.
+const objectGetMember = makePrimitive("Object.__getMember", (args) => {
+  const ctx = args[0] as ContextValue;
+  const fieldName = bitsToString(args[1] as BitsValue);
+  const b = ctx.bindings.get(fieldName);
+  if (!b?.value) throw new AllegroError(`Object: field '${fieldName}' not found`);
+  return b.value;
+});
+addBinding(ObjectType, "__getMember", objectGetMember);
 export const UntypedFunctionType: ContextValue = buildType("UntypedFunction", untypedFnMethods);
 
 // =============================================================================
