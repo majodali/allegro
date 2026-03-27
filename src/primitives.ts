@@ -175,6 +175,11 @@ const bits_eq: PrimitiveFnImpl = (args) => {
   return fromBool(a.data === b.data && a.length === b.length);
 };
 
+const bits_neq: PrimitiveFnImpl = (args) => {
+  const a = asBits(args[0], "bits_neq"), b = asBits(args[1], "bits_neq");
+  return fromBool(a.data !== b.data || a.length !== b.length);
+};
+
 // Arithmetic (signed 64-bit)
 const bits_add: PrimitiveFnImpl = (args) => {
   const a = toSigned(asBits(args[0], "bits_add")), b = toSigned(asBits(args[1], "bits_add"));
@@ -907,6 +912,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   bits_xor: makePrimitive("bits_xor", bits_xor),
   bits_not: makePrimitive("bits_not", bits_not),
   bits_eq: makePrimitive("bits_eq", bits_eq),
+  bits_neq: makePrimitive("bits_neq", bits_neq),
   bits_add: makePrimitive("bits_add", bits_add),
   bits_sub: makePrimitive("bits_sub", bits_sub),
   bits_mul: makePrimitive("bits_mul", bits_mul),

@@ -102,7 +102,9 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - `type_dispatch` checks the value's type component, finds the method, returns a self-bound closure
 - Getters (e.g., `length`) are called immediately; methods return bound functions
 - The evaluator's `PRIM_TO_METHOD` mapping dispatches base operators (`bits_add` etc.) through type methods when operands are typed
+- Type methods return properly typed values — comparisons return Bool, arithmetic returns the operand type
 - No implicit fallback — missing type method is an error
+- Object type has `__fieldAccess` allowing direct Context field access via dot notation
 
 ### Type Propagation
 - `typeLiterals` post-parse pass wraps raw Bits with type info (64-bit → Int, other → String)

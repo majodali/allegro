@@ -66,7 +66,7 @@ export function markTailCalls(body: Value, seen?: Set<Value>): void {
 const PRIM_TO_METHOD = new Map<string, string>([
   ["bits_add", "add"], ["bits_sub", "sub"], ["bits_mul", "mul"],
   ["bits_div", "div"], ["bits_mod", "mod"],
-  ["bits_eq", "eq"], ["bits_lt", "lt"], ["bits_gt", "gt"],
+  ["bits_eq", "eq"], ["bits_neq", "neq"], ["bits_lt", "lt"], ["bits_gt", "gt"],
   ["bits_lte", "lte"], ["bits_gte", "gte"],
 ]);
 
@@ -172,8 +172,9 @@ function applyPrimitive(
       if (typeComp && typeComp.kind === ValueKind.Context) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
         if (methodName) {
-          // Result type = left operand's type for arithmetic,
-          // or Bool-like for comparisons (Int for now)
+          // Propagate left operand's type as the residual's type.
+          // For comparisons this is imprecise (should be Bool), but the
+          // correct type will be determined when the expression fully evaluates.
           return makeMultiValue(residual, new Map([["type", typeComp]]));
         }
       }
@@ -193,11 +194,11 @@ function applyPrimitive(
         if (methodBinding?.value?.kind === ValueKind.PrimitiveFunction) {
           const primaryArgs = evalArgs.map(primaryOf);
           const result = (methodBinding.value as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
-          // Re-wrap with appropriate type
+          // If the method already returned a typed value (MultiValue), use it as-is.
+          // Methods know their return types (e.g., comparisons return Bool).
+          if (result.kind === ValueKind.MultiValue) return result;
+          // Otherwise wrap with the left operand's type (arithmetic results)
           if (result.kind === ValueKind.Bits) {
-            if (methodName === "eq" || methodName === "neq" || methodName === "lt" || methodName === "gt" || methodName === "lte" || methodName === "gte") {
-              return makeMultiValue(result, new Map([["type", typeComp]])); // comparison returns same type context for now
-            }
             return makeMultiValue(result, new Map([["type", typeComp]]));
           }
           return result;

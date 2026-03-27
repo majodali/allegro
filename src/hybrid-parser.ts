@@ -640,8 +640,7 @@ function buildBaseGrammar(): HybridGrammarConfig {
     bp: 10,
     parse: (parser, left) => {
       const right = parser.parseExpression(11);
-      // != is !(==): bits_eq(bits_eq(left, right), 0)
-      return makeExpr(prim("bits_eq"), [makeExpr(prim("bits_eq"), [left, right]), makeInt(0)]);
+      return makeExpr(prim("bits_neq"), [left, right]);
     },
   });
   infix.set(TokenType.Lt, compareOp("bits_lt"));
