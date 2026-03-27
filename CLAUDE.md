@@ -154,7 +154,7 @@ Keywords (`if`, `then`, `else`, `import`, `export`, `true`, `false`) are properl
 - **Context layering**: primitives → extensions → base (REPL persistence) → source bindings
 - **Export system**: `export("name", value)` primitive marks bindings for export. `buildModuleObject` wraps exported bindings as a typed Object. Planned: full typed module interfaces with encapsulation via type-directed dispatch.
 - **Module objects**: imported modules are typed Objects — dot access dispatches through the module's type, exposing only exported fields.
-- **Module encapsulation**: `type_dispatch` enforces encapsulation for typed values — only fields listed on the type are accessible. Object type has `__fieldAccess` for transparent field access; module types do not.
+- **Module encapsulation**: `type_dispatch` enforces encapsulation for typed values — only fields listed on the type are accessible. Types use `__getMember` for controlled field access; module types restrict to exported fields only.
 
 ## Partial Evaluation
 
@@ -203,7 +203,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 201 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, file-based .alg tests
+- **`src/test.ts`** — 227 tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
