@@ -73,7 +73,7 @@ Base language API (expression DAGs, evaluation contexts)
 
 Types are Context values with `__name`, `__check`, and method bindings. A typed value is a MultiValue where the primary is the data and the `"type"` component is the type Context.
 
-### Eight Core Types
+### Ten Core Types
 - **Int** — 64-bit signed integer. Arithmetic, comparison, toString.
 - **Float** — IEEE 754 double. Arithmetic, comparison, toString.
 - **String** — UTF-8 encoded Bits. Concat (+), length, slice, indexOf, trim, startsWith, endsWith, includes, split, replace (all by default, optional count), toUpperCase, toLowerCase, charAt, repeat, toCharCodes, toString.
@@ -82,6 +82,8 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - **Object** — Typed Context. Field access via dot, keys, values, get.
 - **Function** — Generic type `Function[ParamTypes, ReturnType]`. Attached to typed function definitions. Supports type variable unification at call sites.
 - **UntypedFunction** — Wraps base language primitives entering standard context. Every value in standard mode has a type.
+- **None** — Represents absence of a value. Singleton `none` keyword. Returned by `component_get` when a component is absent.
+- **Error** — Represents a failed computation. Created via `error expr`. Error values propagate automatically through operations.
 - **Any** — Matches any type. Used when generic types are used without explicit parameters (e.g., bare `Array` → `Array[Any]`).
 
 ### Generics
@@ -141,7 +143,7 @@ The parser is a hybrid design:
 - **Earley parser** (`src/parser.ts`): retained as fallback for standalone grammars (JSON, custom DSLs). Grammar classes (`Grammar`, `Terminal`, `Phrase`, `Disjunction`, `Repetition`, `Optional`) and `parseGrammar` still exported.
 
 ### Keywords
-Keywords (`if`, `then`, `else`, `import`, `export`, `true`, `false`) are properly disambiguated from identifiers by the lexer. New keywords can be registered via `LexerConfig`.
+Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, `false`, `none`, `error`) are properly disambiguated from identifiers by the lexer. New keywords can be registered via `LexerConfig`.
 
 ### Grammar Extension
 - **Earley extensions** (`GrammarBuilder`): still available for standalone grammars and grammar primitive tests
@@ -204,7 +206,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 234+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, file-based .alg tests
+- **`src/test.ts`** — 274+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
@@ -217,6 +219,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - `type-annotations.alg` — typed params, return types, typed recursion
 - `generics.alg` — Array[Int], generic type annotations, type_apply
 - `function-types.alg` — function type signatures, type variable unification
+- `pattern-match.alg` — when/is/then pattern matching, multivalue access
 
 ## Base Parser Syntax
 
@@ -249,6 +252,31 @@ result =
     x = 3
     y = x + 1
     y
+
+// Pattern matching (when/is/then)
+result = when x is 42 then "found" else "other"
+result = when x
+    is 1 then "one"
+    is 2 then "two"
+    is y then "other: " + y.toString()
+
+// Type destructuring
+when shape
+    is Object(x, y) then x + y          // nominal: check type, extract fields
+    is Object(x: a, y: b) then a + b    // with rename
+
+// Structural destructuring
+when point
+    is {x, y} then x + y                // match any value with fields x, y
+    is {x: a, y: b} then a + b          // with rename
+
+// MultiValue component access (Y of x)
+t = type of someValue        // access "type" component
+e = error of someValue       // access "error" component (returns none if absent)
+
+// Error values (propagate automatically through operations)
+result = error "something went wrong"
+result = error "bad" + 5     // error propagates — result is still an error
 
 // C-style comments
 // line comment
@@ -326,6 +354,10 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ Parser reimplementation (hybrid Pratt + recursive descent)
 - ✅ Keyword support (export, true/false properly disambiguated)
 - ✅ Dynamic lexer config (extensions add operators/keywords)
+- ✅ Pattern matching (when/is/then with resolve-first semantics, type/structural destructuring)
+- ✅ MultiValue component access (Y of x syntax)
+- ✅ Error propagation (error values as MultiValue components, automatic propagation)
+- ✅ None type (singleton `none` keyword, returned for absent components)
 
 ## Design Philosophy
 

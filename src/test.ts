@@ -8,7 +8,7 @@ import { evalSource as runtimeEval, Extension, extensionToContext } from "./runt
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, Type, NamedType, IntType, StringType, structuralWrap } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, Type, NamedType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
 
@@ -2009,6 +2009,277 @@ test("binding type: mismatch throws", () => {
 test("binding type: used in expression", () => {
   const result = evalStd('x: Int = 5\ny: Int = 10\nx + y');
   eq(Number((primaryOf(result!) as BitsValue).data), 15);
+});
+
+// == Pattern Matching (when/is/then) ==
+
+test("when: literal match — hit", () => {
+  eq(evalNum("when 42 is 42 then 1 else 0"), 1);
+});
+
+test("when: literal match — miss", () => {
+  eq(evalNum("when 42 is 99 then 1 else 0"), 0);
+});
+
+test("when: literal string match", () => {
+  const result = evalStd('when "hello" is "hello" then 1 else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("when: wildcard always matches", () => {
+  eq(evalNum("when 42 is _ then 99 else 0"), 99);
+});
+
+test("when: binding captures value", () => {
+  eq(evalNum("when 42 is y then y + 1 else 0"), 43);
+});
+
+test("when: resolve-first — known var matches its value", () => {
+  eq(evalNum("x = 42\nwhen 42 is x then 1 else 0"), 1);
+});
+
+test("when: resolve-first — known var mismatch", () => {
+  eq(evalNum("x = 99\nwhen 42 is x then 1 else 0"), 0);
+});
+
+test("when: multi-case literal", () => {
+  const src = `
+v = 2
+when v
+  is 1 then 10
+  is 2 then 20
+  is 3 then 30
+`;
+  eq(evalNum(src), 20);
+});
+
+test("when: multi-case with binding fallthrough", () => {
+  const src = `
+v = 99
+when v
+  is 1 then 10
+  is 2 then 20
+  is other then other + 1
+`;
+  eq(evalNum(src), 100);
+});
+
+test("when: multi-case with wildcard", () => {
+  const src = `
+v = 99
+when v
+  is 1 then 10
+  is _ then 0
+`;
+  eq(evalNum(src), 0);
+});
+
+test("when: no match throws", () => {
+  throws(() => evalNum(`
+when 5
+  is 1 then 10
+  is 2 then 20
+`), "no matching case");
+});
+
+test("when: negative literal", () => {
+  eq(evalNum("when 0 - 5 is -5 then 1 else 0"), 1);
+});
+
+test("when: typed mode preserves types", () => {
+  const result = evalStd("when 42 is _ then 99 else 0");
+  eq(getTypeName(result!), "Int");
+  eq(Number((primaryOf(result!) as BitsValue).data), 99);
+});
+
+test("when: true/false literal match", () => {
+  const result = evalStd("when true is true then 1 else 0");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+// == MultiValue Access (Y of x) ==
+
+test("of: type of typed int", () => {
+  const result = evalStd("type of 42");
+  eq(result !== null, true);
+  // The type of 42 is the Int type context — which has __name = "Int"
+  eq(result!.kind, ValueKind.Context);
+  const nameBinding = (result as ContextValue).bindings.get("__name");
+  eq(nameBinding !== undefined, true);
+  eq(bitsToString(primaryOf(nameBinding!.value!) as BitsValue), "Int");
+});
+
+test("of: type of typed string", () => {
+  const result = evalStd('type of "hello"');
+  eq(result !== null, true);
+});
+
+test("of: used in expression", () => {
+  // type of 42 should return the Int type, which has __name = "Int"
+  const result = evalStd('x = 42\ntype of x');
+  eq(result !== null, true);
+});
+
+// == Structural Destructuring ==
+
+test("when: struct destruct — extract fields", () => {
+  const result = evalStd('p = {x: 10, y: 20}\nwhen p is {x, y} then x + y else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 30);
+});
+
+test("when: struct destruct — field missing → no match", () => {
+  const result = evalStd('p = {x: 10}\nwhen p is {x, y} then x + y else 99');
+  eq(Number((primaryOf(result!) as BitsValue).data), 99);
+});
+
+test("when: struct destruct — rename", () => {
+  const result = evalStd('p = {x: 10, y: 20}\nwhen p is {x: a, y: b} then a * b else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 200);
+});
+
+test("when: struct destruct — multi-case", () => {
+  const src = `
+p = {x: 5, y: 10}
+when p
+  is {z} then z
+  is {x, y} then x + y
+  is _ then 0
+`;
+  // {z} won't match because p doesn't have field z... wait, p has x and y not z
+  // Actually {z} checks if field "z" exists — it doesn't, so falls through
+  eq(Number((primaryOf(evalStd(src)!) as BitsValue).data), 15);
+});
+
+test("when: struct destruct — single field", () => {
+  const result = evalStd('p = {name: "hello"}\nwhen p is {name} then name else "none"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "hello");
+});
+
+// == Type Destructuring ==
+
+test("when: type destruct — Object type", () => {
+  const result = evalStd('p = {x: 10, y: 20}\nwhen p is Object(x, y) then x + y else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 30);
+});
+
+test("when: type destruct — Object type mismatch", () => {
+  // 42 is Int, not Object → should fall to else
+  const result = evalStd('when 42 is Object(x) then x else 99');
+  eq(Number((primaryOf(result!) as BitsValue).data), 99);
+});
+
+test("when: type destruct — with rename", () => {
+  const result = evalStd('p = {x: 3, y: 4}\nwhen p is Object(x: a, y: b) then a + b else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("when: type destruct — multi-case objects", () => {
+  const src = `
+v = {x: 10, y: 20}
+when v
+  is {z} then z
+  is Object(x, y) then x * y
+  is _ then 0
+`;
+  eq(Number((primaryOf(evalStd(src)!) as BitsValue).data), 200);
+});
+
+// == None Type ==
+
+test("none: literal has None type", () => {
+  const result = evalStd("none");
+  eq(result !== null, true);
+  eq(getTypeName(result!), "None");
+});
+
+test("none: formatValue", () => {
+  const result = evalStd("none");
+  eq(formatValue(result!), "none");
+});
+
+test("none: print", () => {
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStd("print(none)");
+  } finally {
+    console.log = origLog;
+  }
+  eq(printed[0], "none");
+});
+
+// == Error Values ==
+
+test("error: creates error MultiValue", () => {
+  const result = evalStd('error "something went wrong"');
+  eq(result !== null, true);
+  eq(result!.kind, ValueKind.MultiValue);
+  eq((result as any).components.has("error"), true);
+});
+
+test("error: has Error type", () => {
+  const result = evalStd('error "bad"');
+  eq(getTypeName(result!), "Error");
+});
+
+test("error: formatValue shows error", () => {
+  const result = evalStd('error "bad"');
+  eq(formatValue(result!), "error(bad)");
+});
+
+test("error: propagates through arithmetic", () => {
+  const result = evalStd('error "bad" + 5');
+  eq(result !== null, true);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("error: propagates through multiplication", () => {
+  const result = evalStd('3 * error "oops"');
+  eq((result as any).components?.has("error"), true);
+});
+
+test("error: propagates through function calls", () => {
+  const result = evalStd('f(x) => x + 1\nf(error "bad")');
+  eq((result as any).components?.has("error"), true);
+});
+
+test("error: does not propagate through if condition", () => {
+  // if-then-else is lazy — the error in unused branch shouldn't propagate
+  const result = evalStd('if true then 42 else error "bad"');
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("error: error of non-error returns none", () => {
+  const result = evalStd('error of 42');
+  eq(getTypeName(result!), "None");
+});
+
+test("error: error of error returns the error value", () => {
+  const result = evalStd('error of (error "bad")');
+  eq(result !== null, true);
+  // The error component is the string "bad"
+  eq(bitsToString(primaryOf(result!) as BitsValue), "bad");
+});
+
+test("error: type of returns Error type context", () => {
+  const result = evalStd('type of (error "bad")');
+  eq(result !== null, true);
+  eq(result!.kind, ValueKind.Context);
+});
+
+test("error: when/is can inspect error", () => {
+  const src = `
+result = error "bad"
+e = error of result
+when e
+  is none then "ok"
+  is msg then "error: " + msg
+`;
+  // 'none' resolves to the none value, so this is a literal match
+  // 'msg' is a binding since it's not in scope
+  const result = evalStd(src);
+  eq(bitsToString(primaryOf(result!) as BitsValue), "error: bad");
 });
 
 // --- Run all tests (sync + async) and report ---

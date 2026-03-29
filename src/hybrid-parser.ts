@@ -444,6 +444,133 @@ export class HybridParser {
 }
 
 // =============================================================================
+// Pattern parsing for when/is/then
+// =============================================================================
+
+interface PatternResult {
+  pattern: any;
+  bindingNames: string[];
+}
+
+/**
+ * Parse a field spec in a destructuring pattern: `name` or `name: binding`.
+ * Returns [fieldName, bindingName].
+ */
+function parseFieldSpec(parser: HybridParser): [string, string] {
+  const name = parser.lexer.expect(TokenType.Ident, "in destructuring pattern");
+  if (parser.lexer.peek().type === TokenType.Colon) {
+    parser.lexer.next(); // consume :
+    const binding = parser.lexer.expect(TokenType.Ident, "after ':' in pattern field");
+    return [name.text, binding.text];
+  }
+  return [name.text, name.text]; // same-name binding
+}
+
+/**
+ * Parse a pattern in a when/is/then expression.
+ * Returns the pattern value and binding names for the then-branch.
+ *
+ * Patterns:
+ * - `_` → wildcard (always matches)
+ * - Integer/String/true/false → literal match
+ * - Identifier → Symbol (resolve-first: in scope → literal match; unknown → binding)
+ * - `Ident(field, ...)` → type destructuring (nominal)
+ * - `{field, ...}` → structural destructuring
+ */
+function parsePattern(parser: HybridParser): PatternResult {
+  const tok = parser.lexer.peek();
+
+  if (tok.type === TokenType.Ident && tok.text === "_") {
+    parser.lexer.next();
+    return { pattern: makeExpr(prim("when_wildcard"), []), bindingNames: [] };
+  }
+
+  if (tok.type === TokenType.Int) {
+    parser.lexer.next();
+    if (tok.text.startsWith("0x") || tok.text.startsWith("0X")) {
+      return { pattern: makeInt(parseInt(tok.text, 16)), bindingNames: [] };
+    }
+    if (tok.text.startsWith("0b") || tok.text.startsWith("0B")) {
+      return { pattern: makeInt(parseInt(tok.text.slice(2), 2)), bindingNames: [] };
+    }
+    return { pattern: makeInt(parseInt(tok.text, 10)), bindingNames: [] };
+  }
+
+  if (tok.type === TokenType.String) {
+    parser.lexer.next();
+    return { pattern: stringToBits(extractString(tok.text)), bindingNames: [] };
+  }
+
+  if (tok.type === TokenType.True) {
+    parser.lexer.next();
+    return { pattern: makeSymbol("true"), bindingNames: [] };
+  }
+
+  if (tok.type === TokenType.False) {
+    parser.lexer.next();
+    return { pattern: makeSymbol("false"), bindingNames: [] };
+  }
+
+  if (tok.type === TokenType.None) {
+    parser.lexer.next();
+    return { pattern: makeSymbol("none"), bindingNames: [] };
+  }
+
+  if (tok.type === TokenType.Minus) {
+    parser.lexer.next();
+    const numTok = parser.lexer.expect(TokenType.Int, "after '-' in pattern");
+    return { pattern: makeExpr(prim("bits_sub"), [makeInt(0), makeInt(parseInt(numTok.text, 10))]), bindingNames: [] };
+  }
+
+  // Structural destructuring: {field, field: binding, ...}
+  if (tok.type === TokenType.LBrace) {
+    parser.lexer.next(); // consume {
+    const fieldArgs: any[] = [];
+    const bindingNames: string[] = [];
+    if (parser.lexer.peek().type !== TokenType.RBrace) {
+      do {
+        const [fieldName, bindingName] = parseFieldSpec(parser);
+        fieldArgs.push(stringToBits(fieldName), stringToBits(bindingName));
+        bindingNames.push(bindingName);
+      } while (parser.lexer.match(TokenType.Comma));
+    }
+    parser.lexer.expect(TokenType.RBrace, "after destructuring fields");
+    return {
+      pattern: makeExpr(prim("when_struct_destruct"), fieldArgs),
+      bindingNames,
+    };
+  }
+
+  if (tok.type === TokenType.Ident) {
+    parser.lexer.next();
+
+    // Type destructuring: Ident(field, field: binding, ...)
+    if (parser.lexer.peek().type === TokenType.LParen) {
+      parser.lexer.next(); // consume (
+      const fieldArgs: any[] = [];
+      const bindingNames: string[] = [];
+      if (parser.lexer.peek().type !== TokenType.RParen) {
+        do {
+          const [fieldName, bindingName] = parseFieldSpec(parser);
+          fieldArgs.push(stringToBits(fieldName), stringToBits(bindingName));
+          bindingNames.push(bindingName);
+        } while (parser.lexer.match(TokenType.Comma));
+      }
+      parser.lexer.expect(TokenType.RParen, "after type destructuring fields");
+      return {
+        pattern: makeExpr(prim("when_type_destruct"), [makeSymbol(tok.text), ...fieldArgs]),
+        bindingNames,
+      };
+    }
+
+    // Plain identifier — resolve-first binding
+    return { pattern: makeSymbol(tok.text), bindingNames: [tok.text] };
+  }
+
+  throw new Error(`Parse error at line ${tok.line}: unexpected '${tok.text}' in pattern`);
+}
+
+// =============================================================================
 // Base Allegro Grammar Configuration
 // =============================================================================
 
@@ -530,9 +657,20 @@ function buildBaseGrammar(): HybridGrammarConfig {
     return makeSymbol(token.text);
   });
 
-  // true / false → named params (resolved from context)
+  // true / false / none → named params (resolved from context)
   prefix.set(TokenType.True, () => makeSymbol("true"));
   prefix.set(TokenType.False, () => makeSymbol("false"));
+  prefix.set(TokenType.None, () => makeSymbol("none"));
+
+  // error prefix — creates error MultiValue, or acts as identifier for "error of x"
+  prefix.set(TokenType.ErrorKw, (parser) => {
+    // "error of x" → component access, not error creation
+    if (parser.lexer.peek().type === TokenType.Of) {
+      return makeSymbol("error");
+    }
+    const value = parser.parseExpression(40); // binds tightly
+    return makeExpr(prim("make_error"), [value]);
+  });
 
   // Unary minus
   prefix.set(TokenType.Minus, (parser) => {
@@ -611,6 +749,70 @@ function buildBaseGrammar(): HybridGrammarConfig {
     return makeExpr(prim("eval_if"), [
       cond,
       makeComposedFn([], thenBranch),
+      makeComposedFn([], elseBranch),
+    ]);
+  });
+
+  // When-is-then (pattern matching)
+  prefix.set(TokenType.When, (parser) => {
+    const subject = parser.parseExpression(0);
+
+    // Helper: build then-branch function from binding names
+    const makeThenFn = (names: string[], body: any) =>
+      names.length > 0 ? buildFn(names, body) : makeComposedFn([], body);
+
+    // Multi-case: when expr NEWLINE INDENT (is pattern then branch)+ UNINDENT
+    if (parser.lexer.peek().type === TokenType.Newline && parser.lexer.peekAt(1).type === TokenType.Indent) {
+      parser.lexer.next(); // newline
+      parser.lexer.next(); // indent
+
+      const cases: { pattern: any; body: any; bindingNames: string[] }[] = [];
+
+      while (parser.lexer.peek().type !== TokenType.Unindent && !parser.lexer.isAtEnd()) {
+        while (parser.lexer.match(TokenType.Newline)) {}
+        if (parser.lexer.peek().type === TokenType.Unindent || parser.lexer.isAtEnd()) break;
+
+        parser.lexer.expect(TokenType.Is, "in when case");
+        const { pattern, bindingNames } = parsePattern(parser);
+        parser.lexer.expect(TokenType.Then, "after pattern");
+        const body = parser.parseFnBody();
+        cases.push({ pattern, body, bindingNames });
+      }
+      parser.lexer.match(TokenType.Unindent);
+
+      if (cases.length === 0) throw new Error("Parse error: empty when expression");
+
+      // Desugar from last to first into nested eval_when
+      let result: any = makeExpr(prim("when_no_match"), [subject]);
+      for (let i = cases.length - 1; i >= 0; i--) {
+        const c = cases[i];
+        result = makeExpr(prim("eval_when"), [
+          subject,
+          c.pattern,
+          makeThenFn(c.bindingNames, c.body),
+          makeComposedFn([], result),
+        ]);
+      }
+      return result;
+    }
+
+    // Inline: when expr is pattern then branch [else branch]
+    parser.lexer.expect(TokenType.Is, "after when expression");
+    const { pattern, bindingNames } = parsePattern(parser);
+    parser.lexer.expect(TokenType.Then, "after pattern");
+    const thenBranch = parser.parseExpression(0);
+    let elseBranch: any;
+    if (parser.lexer.peek().type === TokenType.Else) {
+      parser.lexer.next();
+      elseBranch = parser.parseExpression(0);
+    } else {
+      elseBranch = makeExpr(prim("when_no_match"), [subject]);
+    }
+
+    return makeExpr(prim("eval_when"), [
+      subject,
+      pattern,
+      makeThenFn(bindingNames, thenBranch),
       makeComposedFn([], elseBranch),
     ]);
   });
@@ -721,6 +923,19 @@ function buildBaseGrammar(): HybridGrammarConfig {
       const field = parser.lexer.expect(TokenType.Ident, "after '.'");
       const dispatchPrim = parser['config'].typed ? "type_dispatch" : "ctx_resolve";
       return makeExpr(prim(dispatchPrim), [left, stringToBits(field.text)]);
+    },
+  });
+
+  // MultiValue component access: "type of x" → mv_get(x, "type")
+  infix.set(TokenType.Of, {
+    bp: 45,
+    parse: (parser, left) => {
+      // Left must be an identifier (Symbol) — the component name
+      if (left.kind !== "Symbol") {
+        throw new Error(`Parse error: expected identifier before 'of', got ${left.kind}`);
+      }
+      const right = parser.parseExpression(46); // right-associative
+      return makeExpr(prim("component_get"), [right, stringToBits(left.name)]);
     },
   });
 

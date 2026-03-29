@@ -27,7 +27,9 @@ High-level goals, roughly ordered by dependency:
 - [ ] Variance — covariant/contravariant/invariant type parameters
 - [ ] Type constraints — `where T: Comparable`
 - [x] Binding type annotations — `x: Int = 42`, `type_check_binding` primitive
-- [ ] Pattern matching — destructuring, match expressions
+- [x] Pattern matching — `when/is/then` with resolve-first semantics, multi-case, wildcard, binding
+- [x] Destructuring patterns — type `is Type(field)` and structural `is {field}`, with rename support
+- [ ] Pattern matching — nested patterns, guard clauses
 - [x] Generics — `Array[T]`, `Function[ParamTypes, ReturnType]`, memoized type constructors
 - [x] Function types and unification — type variables bind progressively at call sites
 - [x] UntypedFunction — wraps base primitives in standard mode
@@ -53,7 +55,7 @@ High-level goals, roughly ordered by dependency:
 - [ ] Error recovery improvements (currently skips to next statement)
 - [x] Hybrid parser (Pratt + recursive descent) — O(n) expression parsing
 - [x] Dynamic lexer config — extensions register new operators/keywords
-- [x] Keyword disambiguation — true/false/import/export properly handled
+- [x] Keyword disambiguation — true/false/import/export/when/is/of properly handled
 - [x] Float literals via maximal munch
 - [x] Source location tracking in tokens
 - [x] Earley parser retained for standalone grammars
@@ -77,13 +79,19 @@ High-level goals, roughly ordered by dependency:
 - [x] String interpolation — `"hello {name}"`, `"{expr}"`, escaped `\{`
 - [ ] Async evaluation — promises/futures, await syntax
 - [ ] Configurable mutability — linear types, transient mutation, semantic variants
-- [ ] Error handling — try/catch or effect-based surface syntax
+- [x] Error values — `error` keyword, automatic propagation through operations, Error type
+- [x] None type — `none` keyword, singleton value, returned for absent MultiValue components
+- [ ] Error handling — try/catch syntax (deferred; can use `if error of x is E` for now)
+- [ ] Algebraic effects — `perform`/`handle`/`resume` (requires continuations)
 - [ ] Pipe/chaining operator (`|>`)
 - [ ] Regular expressions
 - [x] Logical operators — `&&`, `||`, `!` with short-circuit semantics
 - [x] String operations — fully typed (17 methods)
 - [x] Array higher-order methods — map, filter, reduce
 - [x] Type annotations — function params and return types with generics
+- [x] MultiValue component access — `Y of x` syntax (e.g., `type of value`, `error of value`)
+- [x] Error propagation — errors as MultiValue components, auto-propagation in evaluator
+- [x] None type — `none` keyword, returned for absent components
 
 ### Standard Libraries
 - [ ] Filesystem (read/write, provided by execution context)
@@ -112,8 +120,8 @@ High-level goals, roughly ordered by dependency:
 
 Priority-ordered list of next items to implement:
 
-1. **Pattern matching** — destructuring in bindings and function params
-2. **Error handling** — try/catch or effect-based surface syntax
+1. **Constructor syntax** — named constructors for error types and data types
+2. **Pattern matching — nested patterns and guards** — nested destructuring, `when x is Int(n) if n > 0`
 3. **Refinement types** — `Int & _ > 0`, constraint expressions
 4. **Interfaces** — structural type matching (no explicit `implements`)
 5. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions

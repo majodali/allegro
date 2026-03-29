@@ -199,6 +199,20 @@ function applyPrimitive(
     return residual;
   }
 
+  // Error propagation: if any evaluated arg has an error component, propagate
+  // the error without executing this primitive.
+  for (const arg of evalArgs) {
+    if (arg.kind === ValueKind.MultiValue) {
+      const errComp = (arg as MultiValueType).components.get("error");
+      if (errComp) {
+        const components = new Map<string, Value>([["error", errComp]]);
+        const typeComp = (arg as MultiValueType).components.get("type");
+        if (typeComp) components.set("type", typeComp);
+        return makeMultiValue(makeExpr(fn, evalArgs), components);
+      }
+    }
+  }
+
   // Type-directed dispatch: if the first arg has a type with a matching method,
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
@@ -256,6 +270,19 @@ function applyComposed(
   // TCO loop: re-enters when a tail call to the same (or different) function is detected
   tco_loop: while (true) {
     const evalArgs = currentArgs.map(a => evaluate(a, ctx, depth + 1));
+
+    // Error propagation: if any arg has an error component, propagate without executing
+    for (const arg of evalArgs) {
+      if (arg.kind === ValueKind.MultiValue) {
+        const errComp = (arg as MultiValueType).components.get("error");
+        if (errComp) {
+          const components = new Map<string, Value>([["error", errComp]]);
+          const typeComp = (arg as MultiValueType).components.get("type");
+          if (typeComp) components.set("type", typeComp);
+          return makeMultiValue(makeExpr(currentFn, evalArgs), components);
+        }
+      }
+    }
 
     // Type variable unification
     let enrichedCtx = ctx;

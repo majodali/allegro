@@ -13,11 +13,18 @@ import {
 export function formatValue(v: Value): string {
   // Check for typed values (MultiValue with "type" component)
   if (v.kind === ValueKind.MultiValue) {
+    // Error values — show error component
+    if (v.components.has("error")) {
+      return `error(${formatValue(v.components.get("error")!)})`;
+    }
     const typeComp = v.components.get("type");
     if (typeComp && typeComp.kind === ValueKind.Context) {
       const nameBinding = typeComp.bindings.get("__name");
       if (nameBinding?.value && nameBinding.value.kind === ValueKind.Bits) {
         const typeName = bitsToString(nameBinding.value);
+        if (typeName === "None") {
+          return "none";
+        }
         if (typeName === "String") {
           return bitsToString(v.primary as BitsValue);
         }
@@ -431,6 +438,181 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return residual;
 };
 
+// ============ EVAL_WHEN (lazy — pattern matching) ============
+
+/**
+ * Helper: check if an Expression is a specific primitive pattern marker.
+ */
+function isPatternPrim(v: Value, name: string): boolean {
+  return v.kind === ValueKind.Expression &&
+    v.fn.kind === ValueKind.PrimitiveFunction &&
+    (v.fn as PrimitiveFunctionValue).name === name;
+}
+
+/**
+ * Helper: extract field values from a Context by field spec pairs.
+ * fieldSpecs are [fieldName, bindingName] pairs encoded as evaluated Bits strings.
+ * Returns extracted values in binding order, or null if a field is missing.
+ */
+function extractFields(ctx: ContextValue, specArgs: Value[]): Value[] | null {
+  const values: Value[] = [];
+  for (let i = 0; i < specArgs.length; i += 2) {
+    const fieldName = bitsToString(primaryOf(specArgs[i]) as BitsValue);
+    const b = ctx.bindings.get(fieldName);
+    if (!b?.value) return null; // field not found → no match
+    values.push(b.value);
+  }
+  return values;
+}
+
+/**
+ * Helper: evaluate the then-branch, applying extracted values for bindings.
+ */
+function evalThenBranch(
+  thenBranch: Value, extractedValues: Value[],
+  ctx: ContextValue, evalFn: EvalFn,
+): Value {
+  const evalThen = evalFn(thenBranch, ctx);
+  if (evalThen.kind === ValueKind.ComposedFunction) {
+    if (evalThen.params.length === 0) {
+      // Thunk — unwrap
+      return evalFn(evalThen.body, ctx);
+    }
+    if (evalThen.params.length === extractedValues.length && extractedValues.length > 0) {
+      // Apply function with extracted values
+      return evalFn(makeExpr(evalThen, extractedValues), ctx);
+    }
+  }
+  return evalThen;
+}
+
+const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 4) throw new AllegroError(`eval_when: need 4 args, got ${args.length}`);
+  const subject = evalFn!(args[0], ctx!);
+  const pattern = evalFn!(args[1], ctx!);
+  const thenBranch = args[2];
+  const elseBranch = args[3];
+
+  const subjectP = primaryOf(subject);
+  let matched = false;
+  let extractedValues: Value[] = [];
+
+  if (isPatternPrim(pattern, "when_wildcard")) {
+    // Wildcard: always matches, no bindings
+    matched = true;
+
+  } else if (isPatternPrim(pattern, "when_type_destruct")) {
+    // Type destructuring: when_type_destruct(TypeValue, fieldName1, bindingName1, ...)
+    const patternExpr = pattern as import("./types.js").ExpressionValue;
+    const typeValue = patternExpr.args[0]; // already resolved via evalFn
+    const fieldSpecs = patternExpr.args.slice(1);
+
+    // Check type name match (nominal)
+    const subjectTypeName = getTypeName(subject);
+    const patternTypeName = typeValue.kind === ValueKind.Context
+      ? bitsToString(primaryOf(
+          (typeValue as ContextValue).bindings.get("__name")?.value ?? stringToBits("")
+        ) as BitsValue)
+      : null;
+
+    if (subjectTypeName && patternTypeName && subjectTypeName === patternTypeName) {
+      // Type matches — extract fields from the primary Context
+      if (subjectP.kind === ValueKind.Context) {
+        const values = extractFields(subjectP as ContextValue, fieldSpecs);
+        if (values) {
+          matched = true;
+          extractedValues = values;
+        }
+      }
+    }
+
+  } else if (isPatternPrim(pattern, "when_struct_destruct")) {
+    // Structural destructuring: when_struct_destruct(fieldName1, bindingName1, ...)
+    const patternExpr = pattern as import("./types.js").ExpressionValue;
+    const fieldSpecs = patternExpr.args;
+
+    // Extract fields from primary (must be a Context)
+    if (subjectP.kind === ValueKind.Context) {
+      const values = extractFields(subjectP as ContextValue, fieldSpecs);
+      if (values) {
+        matched = true;
+        extractedValues = values;
+      }
+    }
+
+  } else if (pattern.kind === ValueKind.Symbol) {
+    // Unresolved symbol → binding pattern: always matches
+    matched = true;
+    extractedValues = [subject];
+
+  } else {
+    // Literal match: compare primary values
+    const patternP = primaryOf(pattern);
+    if (subjectP.kind === ValueKind.Bits && patternP.kind === ValueKind.Bits) {
+      matched = (subjectP as BitsValue).length === (patternP as BitsValue).length &&
+                (subjectP as BitsValue).data === (patternP as BitsValue).data;
+    } else {
+      matched = subjectP === patternP;
+    }
+  }
+
+  if (matched) {
+    return evalThenBranch(thenBranch, extractedValues, ctx!, evalFn!);
+  }
+
+  // No match — evaluate else branch
+  const evalElse = evalFn!(elseBranch, ctx!);
+  if (evalElse.kind === ValueKind.ComposedFunction && evalElse.params.length === 0) {
+    return evalFn!(evalElse.body, ctx!);
+  }
+  return evalElse;
+};
+
+// ============ COMPONENT_GET (lazy — for "Y of x" syntax) ============
+
+const component_get_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) throw new AllegroError(`component_get: need 2 args, got ${args.length}`);
+  const value = evalFn!(args[0], ctx!);
+  const key = bitsToString(primaryOf(args[1]) as BitsValue);
+  if (value.kind === ValueKind.MultiValue) {
+    const c = value.components.get(key);
+    if (c !== undefined) return c;
+  }
+  // Component not found — return none instead of throwing
+  return noneSingleton;
+};
+
+// ============ MAKE_ERROR (lazy — for "error expr" syntax) ============
+
+const make_error_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) throw new AllegroError(`make_error: need 1 arg, got ${args.length}`);
+  const errorValue = evalFn!(args[0], ctx!);
+  // Create MultiValue with error component and Error type, sentinel primary
+  const components = new Map<string, Value>();
+  components.set("error", errorValue);
+  components.set("type", ErrorType);
+  return makeMultiValue(makeInt(0), components);
+};
+
+const when_wildcard_impl: PrimitiveFnImpl = () => {
+  // Marker — returned as an Expression by the parser, recognized by eval_when
+  return makeExpr(makePrimitive("when_wildcard", when_wildcard_impl), []);
+};
+
+const when_type_destruct_impl: PrimitiveFnImpl = (args) => {
+  // Marker — recognized by eval_when. Args: [TypeSymbol, fieldName1, bindingName1, ...]
+  return makeExpr(makePrimitive("when_type_destruct", when_type_destruct_impl), args);
+};
+
+const when_struct_destruct_impl: PrimitiveFnImpl = (args) => {
+  // Marker — recognized by eval_when. Args: [fieldName1, bindingName1, ...]
+  return makeExpr(makePrimitive("when_struct_destruct", when_struct_destruct_impl), args);
+};
+
+const when_no_match_impl: PrimitiveFnImpl = (args, _ctx, _evalFn) => {
+  throw new AllegroError(`when: no matching case for value`);
+};
+
 // ============ PRINT ============
 
 const print_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
@@ -486,7 +668,7 @@ import {
   getType, getTypeName, withType, typeMethod,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
-  AnyType, Type, NamedType, makeArray, makeObject,
+  AnyType, Type, NamedType, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
   structuralWrap, makeUnionType,
 } from "./types-std.js";
@@ -944,6 +1126,7 @@ function makeTypedBinOp(opName: string): PrimitiveFnImpl {
 
 const id_prim = makePrimitive("id", id_impl);
 const eval_if_value = makePrimitive("eval_if", eval_if_impl, true);
+const eval_when_value = makePrimitive("eval_when", eval_when_impl, true);
 
 // ============ Registry ============
 
@@ -988,6 +1171,13 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   mv_set: makePrimitive("mv_set", mv_set),
   mv_components: makePrimitive("mv_components", mv_components),
   eval_if: eval_if_value,
+  component_get: makePrimitive("component_get", component_get_impl, true),
+  make_error: makePrimitive("make_error", make_error_impl, true),
+  eval_when: eval_when_value,
+  when_wildcard: makePrimitive("when_wildcard", when_wildcard_impl),
+  when_type_destruct: makePrimitive("when_type_destruct", when_type_destruct_impl),
+  when_struct_destruct: makePrimitive("when_struct_destruct", when_struct_destruct_impl),
+  when_no_match: makePrimitive("when_no_match", when_no_match_impl, true),
   id: id_prim,
   print: makePrimitive("print", print_impl, true),
   grammar_builder: makePrimitive("grammar_builder", grammar_builder_impl),

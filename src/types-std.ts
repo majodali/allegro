@@ -811,6 +811,25 @@ const objectGetMember = makePrimitive("Object.__getMember", (args) => {
 addBinding(ObjectType, "__getMember", objectGetMember);
 export const UntypedFunctionType: ContextValue = buildType("UntypedFunction", untypedFnMethods);
 
+// None type — represents the absence of a value
+const noneMethods: Record<string, PrimitiveFnImpl> = {
+  toString: () => withType(stringToBits("none"), StringType),
+  eq: (args) => withType(makeInt(args[0] === args[1] ? 1 : 0), BoolType),
+  neq: (args) => withType(makeInt(args[0] !== args[1] ? 1 : 0), BoolType),
+};
+export const NoneType: ContextValue = buildType("None", noneMethods);
+export const noneSingleton: Value = withType(makeInt(0), NoneType);
+
+// Error type — represents a value that failed to compute
+const errorMethods: Record<string, PrimitiveFnImpl> = {
+  toString: ((_args: Value[]) => {
+    return withType(stringToBits("error"), StringType);
+  }) as PrimitiveFnImpl,
+  eq: ((args: Value[]) => withType(makeInt(args[0] === args[1] ? 1 : 0), BoolType)) as PrimitiveFnImpl,
+  neq: ((args: Value[]) => withType(makeInt(args[0] !== args[1] ? 1 : 0), BoolType)) as PrimitiveFnImpl,
+};
+export const ErrorType: ContextValue = buildType("Error", errorMethods);
+
 // =============================================================================
 // Generic Type Infrastructure
 // =============================================================================
@@ -1227,9 +1246,12 @@ export function createTypeSystem(): Extension {
       // Meta-types
       Type: Type,
       NamedType: NamedType,
-      // Bool literals as context bindings (parsed as identifiers, resolved here)
+      None: NoneType,
+      Error: ErrorType,
+      // Literal bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,
+      none: noneSingleton as any,
     },
   };
 }

@@ -15,8 +15,9 @@ export enum TokenType {
   // Identifiers and keywords
   Ident,          // [a-zA-Z_][a-zA-Z0-9_]* (not a keyword)
   If, Then, Else,
+  When, Is, Of,
   Import, Export,
-  True, False,
+  True, False, None, ErrorKw,
 
   // Operators
   Plus, Minus, Star, Slash, Percent,
@@ -71,10 +72,15 @@ export const BASE_KEYWORDS = new Map<string, TokenType>([
   ["if", TokenType.If],
   ["then", TokenType.Then],
   ["else", TokenType.Else],
+  ["when", TokenType.When],
+  ["is", TokenType.Is],
+  ["of", TokenType.Of],
   ["import", TokenType.Import],
   ["export", TokenType.Export],
   ["true", TokenType.True],
   ["false", TokenType.False],
+  ["none", TokenType.None],
+  ["error", TokenType.ErrorKw],
 ]);
 
 /** Base operators (always available), sorted longest-first */
