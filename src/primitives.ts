@@ -65,6 +65,23 @@ export function formatValue(v: Value): string {
           }
           return `<function>`;
         }
+        // Record types (from .extend) — check if type has __fields
+        const fieldsBinding = typeComp.bindings.get("__fields");
+        if (fieldsBinding?.value?.kind === ValueKind.Context && v.primary.kind === ValueKind.Context) {
+          const fieldsCtx = fieldsBinding.value as ContextValue;
+          const instanceCtx = v.primary as ContextValue;
+          const len = Number((fieldsCtx.bindings.get("__length")?.value as BitsValue)?.data ?? 0n);
+          const parts: string[] = [];
+          for (let i = 0; i < len; i++) {
+            const fieldNameBits = fieldsCtx.bindings.get(String(i))?.value;
+            if (fieldNameBits?.kind === ValueKind.Bits) {
+              const fn = bitsToString(fieldNameBits as BitsValue);
+              const fieldVal = instanceCtx.bindings.get(fn)?.value;
+              if (fieldVal) parts.push(`${fn}: ${formatValue(fieldVal)}`);
+            }
+          }
+          return `${typeName}(${parts.join(", ")})`;
+        }
         // Int — display the primary normally
       }
     }
@@ -913,13 +930,34 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
   }
 
-  // Untyped Contexts: fall through to ctx_resolve (base language behavior)
+  // Untyped Contexts: check meta-type dispatch first (for method binding),
+  // then direct binding lookup (for data fields)
   const p = primaryOf(obj);
   if (p.kind === ValueKind.Context) {
+    // Meta-type dispatch: check __type for type-level methods (e.g., Int.extend)
+    // This must come first so methods get proper self-binding
+    const metaTypeBinding = (p as ContextValue).bindings.get("__type");
+    if (metaTypeBinding?.value?.kind === ValueKind.Context) {
+      const metaType = metaTypeBinding.value as ContextValue;
+      const metaMethod = typeMethod(metaType, fieldName);
+      if (metaMethod?.kind === ValueKind.PrimitiveFunction) {
+        const selfVal = p;
+        if ((metaMethod as any).__getter) {
+          return (metaMethod as PrimitiveFunctionValue).fn([selfVal], undefined as any, undefined as any);
+        }
+        const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+          const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+          return (metaMethod as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
+        };
+        return makePrimitive(`bound:${fieldName}`, boundFn, true);
+      }
+    }
+
+    // Direct binding lookup (for data fields like __name, non-method bindings)
     const b = p.bindings.get(fieldName);
-    if (!b) throw new AllegroError(`type_dispatch: '${fieldName}' not found`);
-    if (b.value === undefined) throw new AllegroError(`type_dispatch: '${fieldName}' is unbound`);
-    return b.value;
+    if (b && b.value !== undefined) return b.value;
+
+    throw new AllegroError(`type_dispatch: '${fieldName}' not found`);
   }
 
   throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${p.kind}`);

@@ -5,7 +5,7 @@
 // =============================================================================
 
 import {
-  Value, ValueKind, BitsValue, ContextValue, PrimitiveFnImpl,
+  Value, ValueKind, BitsValue, ContextValue, PrimitiveFnImpl, PrimitiveFunctionValue,
   makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue,
   primaryOf, stringToBits, bitsToString, AllegroError,
   Extension,
@@ -295,6 +295,249 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
 // Instead, we store a __type binding that type_dispatch can check.
 addBinding(Type, "__type", Type);
 addBinding(NamedType, "__type", NamedType);
+
+// =============================================================================
+// Fluent Type API: extend, where, distinct, constructor
+// =============================================================================
+
+/**
+ * Build a record type from a parent type and field specification.
+ * Auto-generates __construct (positional args), __getMember (field access), toString.
+ */
+function buildRecordType(
+  parentType: ContextValue,
+  fieldSpecObj: Value,
+  metaType: ContextValue,
+): ContextValue {
+  // Extract field specs from the Object's Context
+  const fieldCtx = primaryOf(fieldSpecObj);
+  if (fieldCtx.kind !== ValueKind.Context) {
+    throw new AllegroError("extend: argument must be an object literal {field: Type, ...}");
+  }
+  const fields: { name: string; type: Value }[] = [];
+  for (const [key, binding] of (fieldCtx as ContextValue).bindings) {
+    if (key.startsWith("__")) continue;
+    if (binding.value) {
+      fields.push({ name: key, type: binding.value });
+    }
+  }
+
+  // Build the new type Context
+  const newType = makeContext();
+  addBinding(newType, "__name", stringToBits("<anonymous>"));
+  addBinding(newType, "__type", metaType);
+  addBinding(newType, "__extends", parentType);
+
+  // Store field spec for introspection (ordered)
+  const fieldsCtx = makeContext();
+  for (let i = 0; i < fields.length; i++) {
+    addBinding(fieldsCtx, fields[i].name, fields[i].type);
+    addBinding(fieldsCtx, String(i), stringToBits(fields[i].name));
+  }
+  addBinding(fieldsCtx, "__length", makeInt(fields.length));
+  addBinding(newType, "__fields", fieldsCtx);
+
+  // Copy non-internal, non-meta methods from parent
+  // Skip meta-type methods (instanceof, subtypeof, extend, where, distinct, constructor)
+  const metaMethodNames = new Set(["instanceof", "subtypeof", "extend", "where", "distinct", "constructor"]);
+  for (const [key, binding] of parentType.bindings) {
+    if (key.startsWith("__")) continue;
+    if (metaMethodNames.has(key)) continue;
+    if (!newType.bindings.has(key) && binding.value) {
+      addBinding(newType, key, binding.value);
+    }
+  }
+
+  // Auto-generate __construct: positional args in field order
+  const constructImpl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+    const evalArgs = args.map(a => evalFn!(a, ctx!));
+    if (evalArgs.length !== fields.length) {
+      throw new AllegroError(`Constructor expects ${fields.length} args, got ${evalArgs.length}`);
+    }
+    const instance = makeContext();
+    for (let i = 0; i < fields.length; i++) {
+      addBinding(instance, fields[i].name, evalArgs[i]);
+    }
+    return withType(instance, newType);
+  };
+  addBinding(newType, "__construct", makePrimitive("record.__construct", constructImpl, true));
+
+  // Auto-generate __getMember: field access on instances
+  addBinding(newType, "__getMember", makePrimitive("record.__getMember", (args) => {
+    const instanceCtx = args[0] as ContextValue;
+    const fieldName = bitsToString(args[1] as BitsValue);
+    const b = instanceCtx.bindings.get(fieldName);
+    if (!b?.value) throw new AllegroError(`Field '${fieldName}' not found`);
+    return b.value;
+  }));
+
+  // Auto-generate toString
+  addBinding(newType, "toString", makePrimitive("record.toString", ((args: Value[]) => {
+    const instanceCtx = args[0] as ContextValue;
+    const typeName = getTypeNameFromCtx(newType) ?? "<anonymous>";
+    const parts: string[] = [];
+    for (const f of fields) {
+      const val = instanceCtx.bindings.get(f.name)?.value;
+      if (val) {
+        // Try to get a string representation via type's toString
+        const valType = getType(val);
+        if (valType) {
+          const tsMethod = typeMethod(valType, "toString");
+          if (tsMethod?.kind === ValueKind.PrimitiveFunction) {
+            const str = (tsMethod as PrimitiveFunctionValue).fn([primaryOf(val)], undefined as any, undefined as any);
+            const sp = primaryOf(str);
+            if (sp.kind === ValueKind.Bits) {
+              parts.push(`${f.name}: ${bitsToString(sp as BitsValue)}`);
+              continue;
+            }
+          }
+        }
+        parts.push(`${f.name}: ...`);
+      }
+    }
+    return withType(stringToBits(`${typeName}(${parts.join(", ")})`), StringType);
+  }) as PrimitiveFnImpl));
+
+  return newType;
+}
+
+/**
+ * Build a refined type: inherits parent, wraps constructor with predicate check.
+ */
+function buildRefinedType(parentType: ContextValue, predicate: Value): ContextValue {
+  const refinedType = makeContext();
+  // Copy all bindings from parent
+  for (const [key, binding] of parentType.bindings) {
+    if (binding.value) {
+      addBinding(refinedType, key, binding.value);
+    }
+  }
+  // Override __name
+  refinedType.bindings.delete("__name");
+  addBinding(refinedType, "__name", stringToBits("<refined>"));
+  // Set __extends to parent
+  refinedType.bindings.delete("__extends");
+  addBinding(refinedType, "__extends", parentType);
+  // Store predicate
+  addBinding(refinedType, "__predicate", predicate);
+
+  // Wrap __construct with predicate check
+  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
+    refinedType.bindings.delete("__construct");
+    const idx = refinedType.bindingList.findIndex(b => b.key === "__construct");
+    if (idx >= 0) refinedType.bindingList.splice(idx, 1);
+
+    addBinding(refinedType, "__construct", makePrimitive("refined.__construct", (args, ctx, evalFn) => {
+      // Call parent constructor
+      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
+
+      // Apply predicate
+      const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
+      const checkP = primaryOf(checkResult);
+      if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
+        // Predicate failed — return error
+        const components = new Map<string, Value>();
+        components.set("error", withType(stringToBits("refinement check failed"), StringType));
+        components.set("type", ErrorType);
+        return makeMultiValue(makeInt(0), components);
+      }
+
+      // Re-tag with refined type
+      return withType(primaryOf(value), refinedType);
+    }, true));
+  }
+
+  return refinedType;
+}
+
+/**
+ * Build a distinct type: copies parent, breaks subtypeof chain.
+ */
+function buildDistinctType(parentType: ContextValue): ContextValue {
+  const distinctType = makeContext();
+  // Copy all bindings except __extends
+  for (const [key, binding] of parentType.bindings) {
+    if (key === "__extends") continue;
+    if (binding.value) {
+      addBinding(distinctType, key, binding.value);
+    }
+  }
+  // Override __name and __type
+  distinctType.bindings.delete("__name");
+  addBinding(distinctType, "__name", stringToBits("<distinct>"));
+  distinctType.bindings.delete("__type");
+  addBinding(distinctType, "__type", NamedType); // always nominal
+
+  // Wrap __construct to re-tag with distinct type
+  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
+    distinctType.bindings.delete("__construct");
+    const idx = distinctType.bindingList.findIndex(b => b.key === "__construct");
+    if (idx >= 0) distinctType.bindingList.splice(idx, 1);
+
+    addBinding(distinctType, "__construct", makePrimitive("distinct.__construct", (args, ctx, evalFn) => {
+      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
+      return withType(primaryOf(value), distinctType);
+    }, true));
+  }
+
+  return distinctType;
+}
+
+// --- Add fluent methods to Type and NamedType ---
+
+// extend: Type.extend({fields}) → structural record, NominalType.extend({fields}) → nominal record
+addBinding(Type, "extend", makePrimitive("Type.extend", (args, _ctx, _evalFn) => {
+  return buildRecordType(args[0] as ContextValue, args[1], Type);
+}));
+addBinding(NamedType, "extend", makePrimitive("NamedType.extend", (args, _ctx, _evalFn) => {
+  return buildRecordType(args[0] as ContextValue, args[1], NamedType);
+}));
+
+// where: T.where(predicate) → refined type
+addBinding(Type, "where", makePrimitive("Type.where", (args) => {
+  return buildRefinedType(args[0] as ContextValue, args[1]);
+}));
+addBinding(NamedType, "where", makePrimitive("NamedType.where", (args) => {
+  return buildRefinedType(args[0] as ContextValue, args[1]);
+}));
+
+// distinct: T.distinct() → newtype
+addBinding(Type, "distinct", makePrimitive("Type.distinct", (args) => {
+  return buildDistinctType(args[0] as ContextValue);
+}));
+addBinding(NamedType, "distinct", makePrimitive("NamedType.distinct", (args) => {
+  return buildDistinctType(args[0] as ContextValue);
+}));
+
+// constructor: T.constructor(fn) → override __construct
+addBinding(Type, "constructor", makePrimitive("Type.constructor", (args) => {
+  const type = args[0] as ContextValue;
+  const fn = args[1];
+  // Remove old __construct
+  type.bindings.delete("__construct");
+  const idx = type.bindingList.findIndex(b => b.key === "__construct");
+  if (idx >= 0) type.bindingList.splice(idx, 1);
+  // Add new __construct that wraps user fn to re-tag with type
+  addBinding(type, "__construct", makePrimitive("custom.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
+    const result = ctorEvalFn!(makeExpr(fn, ctorArgs), ctorCtx!);
+    return withType(primaryOf(result), type);
+  }, true));
+  return type;
+}));
+addBinding(NamedType, "constructor", makePrimitive("NamedType.constructor", (args) => {
+  const type = args[0] as ContextValue;
+  const fn = args[1];
+  type.bindings.delete("__construct");
+  const idx = type.bindingList.findIndex(b => b.key === "__construct");
+  if (idx >= 0) type.bindingList.splice(idx, 1);
+  addBinding(type, "__construct", makePrimitive("custom.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
+    const result = ctorEvalFn!(makeExpr(fn, ctorArgs), ctorCtx!);
+    return withType(primaryOf(result), type);
+  }, true));
+  return type;
+}));
 
 // --- Type builder helper ---
 

@@ -2363,6 +2363,157 @@ test("constructor: result passes instanceof", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 1);
 });
 
+// == Fluent Type API ==
+
+test("extend: create nominal record type", () => {
+  const result = evalStd(`
+Point = NamedType.extend({x: Int, y: Int})
+p = Point(10, 20)
+p.x
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
+test("extend: field access y", () => {
+  const result = evalStd(`
+Point = NamedType.extend({x: Int, y: Int})
+p = Point(10, 20)
+p.y
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 20);
+});
+
+test("extend: instanceof works", () => {
+  const result = evalStd(`
+Point = NamedType.extend({x: Int, y: Int})
+p = Point(10, 20)
+p instanceof Point
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("extend: auto-naming from binding", () => {
+  const result = evalStd(`
+Point = NamedType.extend({x: Int, y: Int})
+p = Point(1, 2)
+type of p
+`);
+  // The type's __name should be "Point"
+  eq(result!.kind, ValueKind.Context);
+  const nameB = (result as ContextValue).bindings.get("__name");
+  eq(bitsToString(primaryOf(nameB!.value!) as BitsValue), "Point");
+});
+
+test("extend: wrong arg count throws", () => {
+  throws(() => evalStd(`
+Point = NamedType.extend({x: Int, y: Int})
+Point(10)
+`), "expects 2 args");
+});
+
+test("extend: formatValue shows record", () => {
+  const result = evalStd(`
+Point = NamedType.extend({x: Int, y: Int})
+Point(10, 20)
+`);
+  eq(formatValue(result!), "Point(x: 10, y: 20)");
+});
+
+test("extend: print shows record (name finalized after eval)", () => {
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStd(`
+Point = NamedType.extend({x: Int, y: Int})
+print(Point(3, 4))
+`);
+  } finally {
+    console.log = origLog;
+  }
+  // During evaluation, name is still <anonymous>; auto-naming runs after eval
+  eq(printed[0].includes("x: 3, y: 4"), true);
+});
+
+test("extend: structural type", () => {
+  const result = evalStd(`
+Pair = Type.extend({a: Int, b: Int})
+p = Pair(1, 2)
+p.a
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("extend: subtypeof chain", () => {
+  const result = evalStd(`
+Shape = NamedType.extend({})
+Point = Shape.extend({x: Int, y: Int})
+Point subtypeof Shape
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("where: refinement passes", () => {
+  const result = evalStd(`
+PositiveInt = Int.where(n => n > 0)
+x = PositiveInt(5)
+x
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 5);
+});
+
+test("where: refinement fails → error", () => {
+  const result = evalStd(`
+PositiveInt = Int.where(n => n > 0)
+PositiveInt(0 - 1)
+`);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("where: refined type instanceof parent", () => {
+  const result = evalStd(`
+PositiveInt = Int.where(n => n > 0)
+PositiveInt(5) instanceof Int
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("distinct: breaks instanceof", () => {
+  const result = evalStd(`
+UserId = Int.distinct()
+UserId(42) instanceof Int
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 0);
+});
+
+test("distinct: instanceof self works", () => {
+  const result = evalStd(`
+UserId = Int.distinct()
+UserId(42) instanceof UserId
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("distinct: value preserved", () => {
+  const result = evalStd(`
+UserId = Int.distinct()
+x = UserId(42)
+x + 0
+`);
+  // Addition may or may not work depending on whether methods are copied
+  // At minimum the primary value should be 42
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("constructor: override", () => {
+  const result = evalStd(`
+Point = NamedType.extend({x: Int, y: Int}).constructor((a, b) => {x: a * 2, y: b * 2})
+p = Point(5, 10)
+p.x
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {

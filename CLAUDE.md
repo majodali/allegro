@@ -207,7 +207,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 288+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, file-based .alg tests
+- **`src/test.ts`** — 304+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
@@ -370,6 +370,9 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ None type (singleton `none` keyword, returned for absent components)
 - ✅ `instanceof` and `subtypeof` infix operators
 - ✅ Type constructors via `__construct` (Int, Float, String, Bool)
+- ✅ Fluent type API: `extend`, `where`, `distinct`, `constructor` methods on Type/NamedType
+- ✅ Meta-type dispatch for type-level methods (e.g., `Int.where(...)`)
+- ✅ Auto-naming: types bound to symbols get named automatically
 
 ## Design Philosophy
 

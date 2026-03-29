@@ -25,6 +25,9 @@ High-level goals, roughly ordered by dependency:
 - [ ] Full type inference — Hindley-Milner style for unannotated functions
 - [x] Return type inference — via compile-time partial evaluation of typed function bodies
 - [ ] Variance — covariant/contravariant/invariant type parameters
+- [ ] Scalar type builder — `Scalar(bitLength)` for new Bits-backed types with custom encoding
+- [ ] Packed Bits structures — buffers, tuples, vectors of same-type scalars as Bits representations
+- [ ] Rename NamedType → NominalType (clearer purpose: nominal vs structural checking)
 - [ ] Type constraints — `where T: Comparable`
 - [x] Binding type annotations — `x: Int = 42`, `type_check_binding` primitive
 - [x] Pattern matching — `when/is/then` with resolve-first semantics, multi-case, wildcard, binding
@@ -37,6 +40,9 @@ High-level goals, roughly ordered by dependency:
 - [x] `instanceof` infix — `x instanceof T` returns Bool
 - [x] `subtypeof` infix — `S subtypeof T` returns Bool
 - [x] Type constructors — `__construct` mechanism, built-in constructors for Int/Float/String/Bool
+- [x] Fluent type API — `extend`, `where`, `distinct`, `constructor` methods on Type/NamedType
+- [x] Meta-type dispatch — type-level methods via `__type` binding on raw Contexts
+- [x] Auto-naming — types bound to symbols get named after evaluation
 
 ### Partial Evaluation & Compilation
 - [ ] Formalize multi-phase partial evaluation (invocation → config → compile → emit → package → deploy → execute)
@@ -123,7 +129,7 @@ High-level goals, roughly ordered by dependency:
 
 Priority-ordered list of next items to implement:
 
-1. **User-defined type declarations** — syntax for defining new types with constructors and methods
+1. **User-defined type declaration syntax** — syntax sugar for `extend`/`where`/`distinct` (deferred until API patterns are clear)
 2. **Pattern matching — nested patterns and guards** — nested destructuring, `when x is Int(n) if n > 0`
 3. **Refinement types** — `Int & _ > 0`, constraint expressions
 4. **Interfaces** — structural type matching (no explicit `implements`)

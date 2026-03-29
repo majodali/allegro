@@ -8,7 +8,7 @@ import { markTailCalls, precompileFunction } from "./evaluator.js";
 import { parseBase as hybridParseBase, parseStandard as hybridParseStandard } from "./hybrid-parser.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, Extension } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension } from "./types.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -201,6 +201,7 @@ export function resolveSymbols(
       }
     }
   }
+
 }
 
 /**
@@ -702,6 +703,27 @@ export function evalSource(
   for (const b of fileCtx.bindingList) {
     if (b.key === null && b.value !== undefined) {
       lastValue = evaluate(b.value, evalCtx);
+    }
+  }
+
+  // Auto-name types: types created via .extend()/.where()/.distinct() have placeholder names.
+  // After evaluation, evaluate each named binding and check if it resolves to an anonymous type.
+  for (const b of fileCtx.bindingList) {
+    if (b.key && b.value !== undefined) {
+      try {
+        const val = evaluate(b.value, evalCtx);
+        if (val.kind === ValueKind.Context) {
+          const nameBinding = (val as ContextValue).bindings.get("__name");
+          if (nameBinding?.value?.kind === ValueKind.Bits) {
+            const currentName = bitsToString(nameBinding.value as BitsValue);
+            if (currentName.startsWith("<")) {
+              nameBinding.value = stringToBits(b.key);
+            }
+          }
+        }
+      } catch {
+        // Skip bindings that can't be evaluated (e.g., forward references)
+      }
     }
   }
 
