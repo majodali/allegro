@@ -1029,6 +1029,80 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return v;
 };
 
+// --- type_instanceof: boolean-returning type check (for `instanceof` infix) ---
+
+const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  const expectedType = evalFn!(args[1], ctx!);
+  if (!isResolved(expectedType) || !isResolved(v)) {
+    return makeExpr(makePrimitive("type_instanceof", type_instanceof_impl, true), [v, expectedType]);
+  }
+
+  const expectedCtx = primaryOf(expectedType);
+  if (expectedCtx.kind !== ValueKind.Context) return withType(makeInt(0), BoolType);
+
+  const expectedNameBinding = (expectedCtx as ContextValue).bindings.get("__name");
+  if (!expectedNameBinding?.value) return withType(makeInt(0), BoolType);
+  const expectedName = bitsToString(asBits(expectedNameBinding.value, "type_instanceof"));
+
+  if (expectedName === "Any") return withType(makeInt(1), BoolType);
+
+  const actualType = getType(v);
+  if (!actualType) return withType(makeInt(0), BoolType);
+
+  // Check via expected type's own instanceof (e.g., UnionType)
+  const directInstanceof = (expectedCtx as ContextValue).bindings.get("instanceof")?.value;
+  if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
+    const result = directInstanceof.fn([v], undefined as any, undefined as any);
+    const rp = primaryOf(result);
+    return withType(makeInt(rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n ? 1 : 0), BoolType);
+  }
+
+  // Use meta-type's instanceof
+  const typeType = (expectedCtx as ContextValue).bindings.get("__type")?.value as ContextValue | undefined;
+  if (typeType) {
+    const instanceofMethod = typeType.bindings.get("instanceof")?.value;
+    if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
+      const result = instanceofMethod.fn([expectedCtx as ContextValue, v], undefined as any, undefined as any);
+      const rp = primaryOf(result);
+      return withType(makeInt(rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n ? 1 : 0), BoolType);
+    }
+  }
+
+  // Fallback: name-based
+  const actualName = getTypeName(v);
+  return withType(makeInt(actualName === expectedName ? 1 : 0), BoolType);
+};
+
+// --- type_subtypeof: check if type S is a subtype of type T ---
+
+const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const typeA = evalFn!(args[0], ctx!);
+  const typeB = evalFn!(args[1], ctx!);
+  if (!isResolved(typeA) || !isResolved(typeB)) {
+    return makeExpr(makePrimitive("type_subtypeof", type_subtypeof_impl, true), [typeA, typeB]);
+  }
+
+  const ctxA = primaryOf(typeA);
+  const ctxB = primaryOf(typeB);
+  if (ctxA.kind !== ValueKind.Context || ctxB.kind !== ValueKind.Context) {
+    return withType(makeInt(0), BoolType);
+  }
+
+  // Use typeA's meta-type subtypeof method
+  const metaType = (ctxA as ContextValue).bindings.get("__type")?.value as ContextValue | undefined;
+  if (metaType) {
+    const subtypeofMethod = metaType.bindings.get("subtypeof")?.value;
+    if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
+      const result = subtypeofMethod.fn([ctxA as ContextValue, ctxB as ContextValue], undefined as any, undefined as any);
+      const rp = primaryOf(result);
+      return withType(makeInt(rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n ? 1 : 0), BoolType);
+    }
+  }
+
+  return withType(makeInt(0), BoolType);
+};
+
 // --- type_apply: apply type arguments to a generic type ---
 
 const type_apply_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
@@ -1199,6 +1273,8 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   type_dispatch: makePrimitive("type_dispatch", type_dispatch_impl, true),
   type_of: makePrimitive("type_of", type_of_impl, true),
   type_check: makePrimitive("type_check", type_check_impl, true),
+  type_instanceof: makePrimitive("type_instanceof", type_instanceof_impl, true),
+  type_subtypeof: makePrimitive("type_subtypeof", type_subtypeof_impl, true),
   type_apply: makePrimitive("type_apply", type_apply_impl, true),
   type_union: makePrimitive("type_union", type_union_impl, true),
   structural_wrap: makePrimitive("structural_wrap", structural_wrap_impl, true),

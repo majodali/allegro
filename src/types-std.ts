@@ -831,6 +831,34 @@ const errorMethods: Record<string, PrimitiveFnImpl> = {
 export const ErrorType: ContextValue = buildType("Error", errorMethods);
 
 // =============================================================================
+// Built-in Type Constructors (__construct)
+// =============================================================================
+
+// Int(x) — wrap a value with Int type
+addBinding(IntType, "__construct", makePrimitive("Int.__construct", (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  return withType(primaryOf(v), IntType);
+}, true));
+
+// Float(x) — wrap a value with Float type
+addBinding(FloatType, "__construct", makePrimitive("Float.__construct", (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  return withType(primaryOf(v), FloatType);
+}, true));
+
+// String(x) — wrap a value with String type
+addBinding(StringType, "__construct", makePrimitive("String.__construct", (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  return withType(primaryOf(v), StringType);
+}, true));
+
+// Bool(x) — wrap a value with Bool type
+addBinding(BoolType, "__construct", makePrimitive("Bool.__construct", (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  return withType(primaryOf(v), BoolType);
+}, true));
+
+// =============================================================================
 // Generic Type Infrastructure
 // =============================================================================
 

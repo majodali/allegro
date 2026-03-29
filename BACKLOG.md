@@ -34,6 +34,9 @@ High-level goals, roughly ordered by dependency:
 - [x] Function types and unification — type variables bind progressively at call sites
 - [x] UntypedFunction — wraps base primitives in standard mode
 - [x] Any type — matches any type, bare generics auto-apply Any
+- [x] `instanceof` infix — `x instanceof T` returns Bool
+- [x] `subtypeof` infix — `S subtypeof T` returns Bool
+- [x] Type constructors — `__construct` mechanism, built-in constructors for Int/Float/String/Bool
 
 ### Partial Evaluation & Compilation
 - [ ] Formalize multi-phase partial evaluation (invocation → config → compile → emit → package → deploy → execute)
@@ -55,7 +58,7 @@ High-level goals, roughly ordered by dependency:
 - [ ] Error recovery improvements (currently skips to next statement)
 - [x] Hybrid parser (Pratt + recursive descent) — O(n) expression parsing
 - [x] Dynamic lexer config — extensions register new operators/keywords
-- [x] Keyword disambiguation — true/false/import/export/when/is/of properly handled
+- [x] Keyword disambiguation — true/false/import/export/when/is/of/none/error/instanceof/subtypeof properly handled
 - [x] Float literals via maximal munch
 - [x] Source location tracking in tokens
 - [x] Earley parser retained for standalone grammars
@@ -120,7 +123,7 @@ High-level goals, roughly ordered by dependency:
 
 Priority-ordered list of next items to implement:
 
-1. **Constructor syntax** — named constructors for error types and data types
+1. **User-defined type declarations** — syntax for defining new types with constructors and methods
 2. **Pattern matching — nested patterns and guards** — nested destructuring, `when x is Int(n) if n > 0`
 3. **Refinement types** — `Int & _ > 0`, constraint expressions
 4. **Interfaces** — structural type matching (no explicit `implements`)

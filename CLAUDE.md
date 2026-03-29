@@ -108,6 +108,7 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - Type methods return properly typed values — comparisons return Bool, arithmetic returns the operand type
 - No implicit fallback — missing type method is an error
 - Types can define `__getMember(self, fieldName)` as a fallback for fields not in the type's methods (like Python's `__getattr__`). Object uses this for field access. Types without `__getMember` enforce strict encapsulation.
+- Types can define `__construct(args...)` — when a type Context is called as a function, the evaluator invokes `__construct`. Built-in types (Int, Float, String, Bool) have constructors that wrap values with the type.
 
 ### Type Propagation
 - `typeLiterals` post-parse pass wraps raw Bits with type info (64-bit → Int, other → String)
@@ -143,7 +144,7 @@ The parser is a hybrid design:
 - **Earley parser** (`src/parser.ts`): retained as fallback for standalone grammars (JSON, custom DSLs). Grammar classes (`Grammar`, `Terminal`, `Phrase`, `Disjunction`, `Repetition`, `Optional`) and `parseGrammar` still exported.
 
 ### Keywords
-Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, `false`, `none`, `error`) are properly disambiguated from identifiers by the lexer. New keywords can be registered via `LexerConfig`.
+Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, `false`, `none`, `error`, `instanceof`, `subtypeof`) are properly disambiguated from identifiers by the lexer. New keywords can be registered via `LexerConfig`.
 
 ### Grammar Extension
 - **Earley extensions** (`GrammarBuilder`): still available for standalone grammars and grammar primitive tests
@@ -206,7 +207,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 274+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, file-based .alg tests
+- **`src/test.ts`** — 288+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
@@ -277,6 +278,15 @@ e = error of someValue       // access "error" component (returns none if absent
 // Error values (propagate automatically through operations)
 result = error "something went wrong"
 result = error "bad" + 5     // error propagates — result is still an error
+
+// Type operators
+42 instanceof Int              // → true
+"hello" instanceof String      // → true
+NamedType subtypeof Type       // → true
+
+// Type constructors (calls __construct)
+Int(42)                        // wraps value with Int type
+String("hello")                // wraps value with String type
 
 // C-style comments
 // line comment
@@ -358,6 +368,8 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ MultiValue component access (Y of x syntax)
 - ✅ Error propagation (error values as MultiValue components, automatic propagation)
 - ✅ None type (singleton `none` keyword, returned for absent components)
+- ✅ `instanceof` and `subtypeof` infix operators
+- ✅ Type constructors via `__construct` (Int, Float, String, Bool)
 
 ## Design Philosophy
 

@@ -18,6 +18,7 @@ export enum TokenType {
   When, Is, Of,
   Import, Export,
   True, False, None, ErrorKw,
+  Instanceof, Subtypeof,
 
   // Operators
   Plus, Minus, Star, Slash, Percent,
@@ -81,6 +82,8 @@ export const BASE_KEYWORDS = new Map<string, TokenType>([
   ["false", TokenType.False],
   ["none", TokenType.None],
   ["error", TokenType.ErrorKw],
+  ["instanceof", TokenType.Instanceof],
+  ["subtypeof", TokenType.Subtypeof],
 ]);
 
 /** Base operators (always available), sorted longest-first */

@@ -884,6 +884,22 @@ function buildBaseGrammar(): HybridGrammarConfig {
   infix.set(TokenType.LtEq, compareOp("bits_lte"));
   infix.set(TokenType.GtEq, compareOp("bits_gte"));
 
+  // Type operators
+  infix.set(TokenType.Instanceof, {
+    bp: 10,
+    parse: (parser, left) => {
+      const right = parser.parseExpression(11);
+      return makeExpr(prim("type_instanceof"), [left, right]);
+    },
+  });
+  infix.set(TokenType.Subtypeof, {
+    bp: 10,
+    parse: (parser, left) => {
+      const right = parser.parseExpression(11);
+      return makeExpr(prim("type_subtypeof"), [left, right]);
+    },
+  });
+
   // Logical operators (short-circuit — right operand thunked)
   infix.set(TokenType.And, {
     bp: 5,

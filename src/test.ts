@@ -2282,6 +2282,87 @@ when e
   eq(bitsToString(primaryOf(result!) as BitsValue), "error: bad");
 });
 
+// == instanceof ==
+
+test("instanceof: int is Int", () => {
+  const result = evalStd("42 instanceof Int");
+  eq(getTypeName(result!), "Bool");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("instanceof: string is String", () => {
+  const result = evalStd('"hello" instanceof String');
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("instanceof: int is not String", () => {
+  const result = evalStd("42 instanceof String");
+  eq(Number((primaryOf(result!) as BitsValue).data), 0);
+});
+
+test("instanceof: bool is Bool", () => {
+  const result = evalStd("true instanceof Bool");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("instanceof: object is Object", () => {
+  const result = evalStd("{x: 1} instanceof Object");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("instanceof: Any matches everything", () => {
+  const result = evalStd("42 instanceof Any");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("instanceof: none is None", () => {
+  const result = evalStd("none instanceof None");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("instanceof: in if condition", () => {
+  const result = evalStd('if 42 instanceof Int then "yes" else "no"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "yes");
+});
+
+// == subtypeof ==
+
+test("subtypeof: NamedType subtypeof Type", () => {
+  const result = evalStd("NamedType subtypeof Type");
+  eq(getTypeName(result!), "Bool");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("subtypeof: Int not subtypeof String", () => {
+  const result = evalStd("Int subtypeof String");
+  eq(Number((primaryOf(result!) as BitsValue).data), 0);
+});
+
+// == Constructors ==
+
+test("constructor: Int(42)", () => {
+  const result = evalStd("Int(42)");
+  eq(getTypeName(result!), "Int");
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("constructor: String(42) wraps as String", () => {
+  const result = evalStd('String("hello")');
+  eq(getTypeName(result!), "String");
+  eq(bitsToString(primaryOf(result!) as BitsValue), "hello");
+});
+
+test("constructor: Bool(1)", () => {
+  const result = evalStd("Bool(1)");
+  eq(getTypeName(result!), "Bool");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("constructor: result passes instanceof", () => {
+  const result = evalStd("Int(42) instanceof Int");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {

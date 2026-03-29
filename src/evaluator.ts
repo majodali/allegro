@@ -153,6 +153,24 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
     return result;
   }
 
+  // Context as function — constructor call via __construct
+  if (fn.kind === ValueKind.Context) {
+    const constructBinding = (fn as ContextValue).bindings.get("__construct");
+    if (constructBinding?.value) {
+      const ctor = constructBinding.value;
+      if (ctor.kind === ValueKind.PrimitiveFunction) {
+        const result = applyPrimitive(ctor, expr.args, ctx, depth);
+        if (memoSafe && !isTailCall(result)) expr.memo.set("eval", result);
+        return result;
+      }
+      if (ctor.kind === ValueKind.ComposedFunction) {
+        const result = applyComposed(ctor, expr.args, ctx, depth);
+        if (memoSafe) expr.memo.set("eval", result);
+        return result;
+      }
+    }
+  }
+
   // Function not resolved - partially evaluate args
   const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1));
   if (fn === expr.fn && evalArgs.every((a, i) => a === expr.args[i])) {
