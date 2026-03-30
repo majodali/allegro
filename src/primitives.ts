@@ -467,19 +467,112 @@ function isPatternPrim(v: Value, name: string): boolean {
 }
 
 /**
+ * Helper: match a value against a sub-pattern.
+ * Returns extracted values (possibly empty for non-binding matches), or null for no match.
+ */
+function matchSubPattern(
+  value: Value, subPattern: Value, evalFn: EvalFn, ctx: ContextValue,
+): Value[] | null {
+  const subP = primaryOf(subPattern);
+
+  // Wildcard
+  if (isPatternPrim(subPattern, "when_wildcard")) {
+    return [];
+  }
+
+  // Symbol (unresolved) → binding
+  if (subPattern.kind === ValueKind.Symbol) {
+    return [value];
+  }
+
+  // Nested struct destruct
+  if (isPatternPrim(subPattern, "when_struct_destruct")) {
+    const innerCtx = primaryOf(value);
+    if (innerCtx.kind !== ValueKind.Context) return null;
+    return extractFields(innerCtx as ContextValue, (subPattern as any).args, evalFn, ctx);
+  }
+
+  // Nested type destruct
+  if (isPatternPrim(subPattern, "when_type_destruct")) {
+    const typeValue = (subPattern as any).args[0];
+    const fieldSpecs = (subPattern as any).args.slice(1);
+    const valTypeName = getTypeName(value);
+    const patTypeName = typeValue.kind === ValueKind.Context
+      ? bitsToString(primaryOf(
+          (typeValue as ContextValue).bindings.get("__name")?.value ?? stringToBits("")
+        ) as BitsValue)
+      : null;
+    if (!valTypeName || !patTypeName || valTypeName !== patTypeName) return null;
+    const innerCtx = primaryOf(value);
+    if (innerCtx.kind !== ValueKind.Context) return null;
+    return extractFields(innerCtx as ContextValue, fieldSpecs, evalFn, ctx);
+  }
+
+  // Type context → instanceof check
+  if (subP.kind === ValueKind.Context &&
+      (subP as ContextValue).bindings.has("__name") &&
+      (subP as ContextValue).bindings.has("__type")) {
+    const valTypeName = getTypeName(value);
+    const patName = bitsToString(primaryOf(
+      (subP as ContextValue).bindings.get("__name")!.value!
+    ) as BitsValue);
+    if (valTypeName === patName) return [value]; // match + bind
+    return null;
+  }
+
+  // Bits literal → equality check
+  if (subP.kind === ValueKind.Bits) {
+    const valP = primaryOf(value);
+    if (valP.kind === ValueKind.Bits &&
+        (valP as BitsValue).length === (subP as BitsValue).length &&
+        (valP as BitsValue).data === (subP as BitsValue).data) {
+      return []; // match, no binding
+    }
+    return null;
+  }
+
+  // Reference equality fallback
+  if (primaryOf(value) === subP) return [];
+  return null;
+}
+
+/**
  * Helper: extract field values from a Context by field spec pairs.
- * fieldSpecs are [fieldName, bindingName] pairs encoded as evaluated Bits strings.
+ * fieldSpecs are [fieldName, subPattern] pairs where subPattern is always
+ * a pattern value (Symbol for binding, Expression for destruct, etc.).
  * Returns extracted values in binding order, or null if a field is missing.
  */
-function extractFields(ctx: ContextValue, specArgs: Value[]): Value[] | null {
+function extractFields(
+  ctx: ContextValue, specArgs: Value[], evalFn: EvalFn, evalCtx: ContextValue,
+): Value[] | null {
   const values: Value[] = [];
   for (let i = 0; i < specArgs.length; i += 2) {
     const fieldName = bitsToString(primaryOf(specArgs[i]) as BitsValue);
     const b = ctx.bindings.get(fieldName);
     if (!b?.value) return null; // field not found → no match
-    values.push(b.value);
+
+    const subValues = matchSubPattern(b.value, specArgs[i + 1], evalFn, evalCtx);
+    if (!subValues) return null; // sub-pattern match failed
+    if (subValues.length === 0) {
+      // Sub-pattern matched but produced no bindings (wildcard, literal match, type check).
+      // Use the field value as the binding (field name is the binding name).
+      values.push(b.value);
+    } else {
+      values.push(...subValues);
+    }
   }
   return values;
+}
+
+/**
+ * Helper: evaluate the else-branch (unwrap thunk).
+ */
+function evalElseBranch(elseBranch: Value, ctx: ContextValue, evalFn: EvalFn): Value {
+  const evalElse = evalFn(elseBranch, ctx);
+  if (evalElse.kind === ValueKind.ComposedFunction && evalElse.params.length === 0) {
+    return evalFn(evalElse.body, ctx);
+  }
+  return evalElse;
 }
 
 /**
@@ -495,8 +588,9 @@ function evalThenBranch(
       // Thunk — unwrap
       return evalFn(evalThen.body, ctx);
     }
-    if (evalThen.params.length === extractedValues.length && extractedValues.length > 0) {
-      // Apply function with extracted values
+    if (evalThen.params.length > 0 && extractedValues.length >= evalThen.params.length) {
+      // Apply function with extracted values (may have more values than params
+      // if some bindings aren't referenced in the body)
       return evalFn(makeExpr(evalThen, extractedValues), ctx);
     }
   }
@@ -504,27 +598,25 @@ function evalThenBranch(
 }
 
 const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
-  if (args.length !== 4) throw new AllegroError(`eval_when: need 4 args, got ${args.length}`);
+  if (args.length !== 5) throw new AllegroError(`eval_when: need 5 args, got ${args.length}`);
   const subject = evalFn!(args[0], ctx!);
   const pattern = evalFn!(args[1], ctx!);
-  const thenBranch = args[2];
-  const elseBranch = args[3];
+  const guardFn = args[2];     // guard function or literal Int(1) for no guard
+  const thenBranch = args[3];
+  const elseBranch = args[4];
 
   const subjectP = primaryOf(subject);
   let matched = false;
   let extractedValues: Value[] = [];
 
   if (isPatternPrim(pattern, "when_wildcard")) {
-    // Wildcard: always matches, no bindings
     matched = true;
 
   } else if (isPatternPrim(pattern, "when_type_destruct")) {
-    // Type destructuring: when_type_destruct(TypeValue, fieldName1, bindingName1, ...)
     const patternExpr = pattern as import("./types.js").ExpressionValue;
-    const typeValue = patternExpr.args[0]; // already resolved via evalFn
+    const typeValue = patternExpr.args[0];
     const fieldSpecs = patternExpr.args.slice(1);
 
-    // Check type name match (nominal)
     const subjectTypeName = getTypeName(subject);
     const patternTypeName = typeValue.kind === ValueKind.Context
       ? bitsToString(primaryOf(
@@ -533,9 +625,8 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       : null;
 
     if (subjectTypeName && patternTypeName && subjectTypeName === patternTypeName) {
-      // Type matches — extract fields from the primary Context
       if (subjectP.kind === ValueKind.Context) {
-        const values = extractFields(subjectP as ContextValue, fieldSpecs);
+        const values = extractFields(subjectP as ContextValue, fieldSpecs, evalFn!, ctx!);
         if (values) {
           matched = true;
           extractedValues = values;
@@ -544,13 +635,11 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
 
   } else if (isPatternPrim(pattern, "when_struct_destruct")) {
-    // Structural destructuring: when_struct_destruct(fieldName1, bindingName1, ...)
     const patternExpr = pattern as import("./types.js").ExpressionValue;
     const fieldSpecs = patternExpr.args;
 
-    // Extract fields from primary (must be a Context)
     if (subjectP.kind === ValueKind.Context) {
-      const values = extractFields(subjectP as ContextValue, fieldSpecs);
+      const values = extractFields(subjectP as ContextValue, fieldSpecs, evalFn!, ctx!);
       if (values) {
         matched = true;
         extractedValues = values;
@@ -558,14 +647,26 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
 
   } else if (pattern.kind === ValueKind.Symbol) {
-    // Unresolved symbol → binding pattern: always matches
     matched = true;
     extractedValues = [subject];
 
   } else {
-    // Literal match: compare primary values
+    // Literal or type match
     const patternP = primaryOf(pattern);
-    if (subjectP.kind === ValueKind.Bits && patternP.kind === ValueKind.Bits) {
+
+    // Type context → instanceof check (for patterns like `is Int`)
+    if (patternP.kind === ValueKind.Context &&
+        (patternP as ContextValue).bindings.has("__name") &&
+        (patternP as ContextValue).bindings.has("__type")) {
+      const subjectTypeName = getTypeName(subject);
+      const patternName = bitsToString(primaryOf(
+        (patternP as ContextValue).bindings.get("__name")!.value!
+      ) as BitsValue);
+      if (subjectTypeName === patternName) {
+        matched = true;
+        extractedValues = [subject]; // bind the value
+      }
+    } else if (subjectP.kind === ValueKind.Bits && patternP.kind === ValueKind.Bits) {
       matched = (subjectP as BitsValue).length === (patternP as BitsValue).length &&
                 (subjectP as BitsValue).data === (patternP as BitsValue).data;
     } else {
@@ -574,15 +675,26 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   if (matched) {
+    // Evaluate guard if present
+    const evalGuard = evalFn!(guardFn, ctx!);
+    const guardP = primaryOf(evalGuard);
+    if (guardP.kind === ValueKind.ComposedFunction && (guardP as any).params?.length > 0) {
+      // Guard is a function — apply with extracted values
+      const guardResult = evalFn!(makeExpr(evalGuard, extractedValues), ctx!);
+      const guardRP = primaryOf(guardResult);
+      if (guardRP.kind === ValueKind.Bits && (guardRP as BitsValue).data === 0n) {
+        // Guard failed — fall through
+        return evalElseBranch(elseBranch, ctx!, evalFn!);
+      }
+    } else if (guardP.kind === ValueKind.Bits && (guardP as BitsValue).data === 0n) {
+      // Guard is a literal false
+      return evalElseBranch(elseBranch, ctx!, evalFn!);
+    }
+    // Guard passed (or is literal 1 / non-function truthy)
     return evalThenBranch(thenBranch, extractedValues, ctx!, evalFn!);
   }
 
-  // No match — evaluate else branch
-  const evalElse = evalFn!(elseBranch, ctx!);
-  if (evalElse.kind === ValueKind.ComposedFunction && evalElse.params.length === 0) {
-    return evalFn!(evalElse.body, ctx!);
-  }
-  return evalElse;
+  return evalElseBranch(elseBranch, ctx!, evalFn!);
 };
 
 // ============ COMPONENT_GET (lazy — for "Y of x" syntax) ============

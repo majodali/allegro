@@ -2132,8 +2132,10 @@ test("when: struct destruct — field missing → no match", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 99);
 });
 
-test("when: struct destruct — rename", () => {
-  const result = evalStd('p = {x: 10, y: 20}\nwhen p is {x: a, y: b} then a * b else 0');
+test("when: struct destruct — sub-pattern binding uses field name", () => {
+  // {x: a} means extract field x, match against pattern a (unresolved → binding)
+  // The binding name is x (field name), not a
+  const result = evalStd('p = {x: 10, y: 20}\nwhen p is {x: a, y: b} then x * y else 0');
   eq(Number((primaryOf(result!) as BitsValue).data), 200);
 });
 
@@ -2168,8 +2170,8 @@ test("when: type destruct — Object type mismatch", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 99);
 });
 
-test("when: type destruct — with rename", () => {
-  const result = evalStd('p = {x: 3, y: 4}\nwhen p is Object(x: a, y: b) then a + b else 0');
+test("when: type destruct — sub-pattern uses field name", () => {
+  const result = evalStd('p = {x: 3, y: 4}\nwhen p is Object(x: a, y: b) then x + y else 0');
   eq(Number((primaryOf(result!) as BitsValue).data), 7);
 });
 
@@ -2512,6 +2514,126 @@ p = Point(5, 10)
 p.x
 `);
   eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
+// == Guard Clauses (and) ==
+
+test("guard: basic guard passes", () => {
+  const result = evalStd('when 5 is n and n > 0 then "pos" else "neg"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "pos");
+});
+
+test("guard: basic guard fails → else", () => {
+  const result = evalStd('when 0 - 5 is n and n > 0 then "pos" else "neg"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "neg");
+});
+
+test("guard: with destructuring", () => {
+  const result = evalStd('when {x: 5} is {x} and x > 3 then "big" else "small"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "big");
+});
+
+test("guard: fails with destructuring → else", () => {
+  const result = evalStd('when {x: 1} is {x} and x > 3 then "big" else "small"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "small");
+});
+
+test("guard: multi-case fallthrough", () => {
+  const src = `
+classify(n) => when n
+  is x and x > 0 then "positive"
+  is x and x < 0 then "negative"
+  is _ then "zero"
+classify(5)
+`;
+  eq(bitsToString(primaryOf(evalStd(src)!) as BitsValue), "positive");
+});
+
+test("guard: multi-case fallthrough to second", () => {
+  const src = `
+classify(n) => when n
+  is x and x > 0 then "positive"
+  is x and x < 0 then "negative"
+  is _ then "zero"
+classify(0 - 3)
+`;
+  eq(bitsToString(primaryOf(evalStd(src)!) as BitsValue), "negative");
+});
+
+test("guard: multi-case fallthrough to wildcard", () => {
+  const src = `
+classify(n) => when n
+  is x and x > 0 then "positive"
+  is x and x < 0 then "negative"
+  is _ then "zero"
+classify(0)
+`;
+  eq(bitsToString(primaryOf(evalStd(src)!) as BitsValue), "zero");
+});
+
+test("guard: no guard (backward compat)", () => {
+  eq(evalNum("when 42 is _ then 99 else 0"), 99);
+});
+
+// == Nested Destructuring ==
+
+test("nested: struct in struct", () => {
+  const result = evalStd('when {a: {b: 42}} is {a: {b}} then b else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("nested: struct fail falls through", () => {
+  const result = evalStd('when {a: 1} is {a: {b}} then b else 99');
+  eq(Number((primaryOf(result!) as BitsValue).data), 99);
+});
+
+test("nested: mixed fields", () => {
+  const result = evalStd(`
+p = {center: {x: 10, y: 20}, radius: 5}
+when p is {center: {x, y}, radius} then x + y + radius else 0
+`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 35);
+});
+
+test("nested: type sub-pattern", () => {
+  const result = evalStd('when {x: 42} is {x: Int} then x else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("nested: type sub-pattern mismatch", () => {
+  const result = evalStd('when {x: "hello"} is {x: Int} then x else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 0);
+});
+
+test("nested: literal sub-pattern match", () => {
+  const result = evalStd('when {x: 42} is {x: 42} then "yes" else "no"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "yes");
+});
+
+test("nested: literal sub-pattern mismatch", () => {
+  const result = evalStd('when {x: 42} is {x: 99} then "yes" else "no"');
+  eq(bitsToString(primaryOf(result!) as BitsValue), "no");
+});
+
+test("nested: wildcard sub-pattern", () => {
+  const result = evalStd('when {x: 42, y: 10} is {x: _, y} then y else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
+test("nested: binding sub-pattern uses field name", () => {
+  // {x: val} — val is the pattern (unresolved → binding), x is the binding name
+  const result = evalStd('when {x: 42} is {x: val} then x + 1 else 0');
+  eq(Number((primaryOf(result!) as BitsValue).data), 43);
+});
+
+// == Combined Guards + Nested ==
+
+test("guard + nested: combined", () => {
+  const result = evalStd(`
+p = {x: 5, y: 10}
+when p is {x, y} and x + y > 10 then "big" else "small"
+`);
+  eq(bitsToString(primaryOf(result!) as BitsValue), "big");
 });
 
 // --- Run all tests (sync + async) and report ---

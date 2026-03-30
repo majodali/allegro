@@ -31,8 +31,10 @@ High-level goals, roughly ordered by dependency:
 - [ ] Type constraints — `where T: Comparable`
 - [x] Binding type annotations — `x: Int = 42`, `type_check_binding` primitive
 - [x] Pattern matching — `when/is/then` with resolve-first semantics, multi-case, wildcard, binding
-- [x] Destructuring patterns — type `is Type(field)` and structural `is {field}`, with rename support
-- [ ] Pattern matching — nested patterns, guard clauses
+- [x] Destructuring patterns — type `is Type(field)` and structural `is {field}`, nested sub-patterns
+- [x] Guard clauses — `and` keyword in patterns, `and`/`or` as keyword synonyms for `&&`/`||`
+- [x] Nested destructuring — colon introduces sub-pattern in field specs, recursive matching
+- [ ] Patterns as boolean expressions with unification — full expression parsing in pattern mode (future)
 - [x] Generics — `Array[T]`, `Function[ParamTypes, ReturnType]`, memoized type constructors
 - [x] Function types and unification — type variables bind progressively at call sites
 - [x] UntypedFunction — wraps base primitives in standard mode

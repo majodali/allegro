@@ -84,6 +84,8 @@ export const BASE_KEYWORDS = new Map<string, TokenType>([
   ["error", TokenType.ErrorKw],
   ["instanceof", TokenType.Instanceof],
   ["subtypeof", TokenType.Subtypeof],
+  ["and", TokenType.And],
+  ["or", TokenType.Or],
 ]);
 
 /** Base operators (always available), sorted longest-first */

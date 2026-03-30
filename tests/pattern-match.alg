@@ -49,8 +49,8 @@ point = {x: 3, y: 4}
 d = when point is {x, y} then x + y else 0
 print(d) // expect: 7
 
-// Structural destructuring with rename
-d2 = when point is {x: a, y: b} then a * b else 0
+// Structural destructuring with sub-pattern binding
+d2 = when point is {x: px, y: py} then x * y else 0
 print(d2) // expect: 12
 
 // Type destructuring

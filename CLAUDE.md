@@ -207,7 +207,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 304+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, file-based .alg tests
+- **`src/test.ts`** — 322+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
@@ -270,6 +270,16 @@ when shape
 when point
     is {x, y} then x + y                // match any value with fields x, y
     is {x: a, y: b} then a + b          // with rename
+
+// Nested destructuring (colon introduces sub-pattern)
+when shape
+    is {center: {x, y}, radius} then x + y + radius
+
+// Guard clauses (and)
+when x
+    is n and n > 0 then "positive"
+    is n and n < 0 then "negative"
+    is _ then "zero"
 
 // MultiValue component access (Y of x)
 t = type of someValue        // access "type" component
@@ -373,6 +383,8 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ Fluent type API: `extend`, `where`, `distinct`, `constructor` methods on Type/NamedType
 - ✅ Meta-type dispatch for type-level methods (e.g., `Int.where(...)`)
 - ✅ Auto-naming: types bound to symbols get named automatically
+- ✅ Guard clauses (`and` keyword in patterns)
+- ✅ Nested destructuring (colon introduces sub-pattern, recursive matching)
 
 ## Design Philosophy
 

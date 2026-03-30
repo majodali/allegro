@@ -453,17 +453,40 @@ interface PatternResult {
 }
 
 /**
- * Parse a field spec in a destructuring pattern: `name` or `name: binding`.
- * Returns [fieldName, bindingName].
+ * Parse a field spec in a destructuring pattern.
+ * `name` → shorthand: extract field, bind as name
+ * `name: subPattern` → extract field, match against sub-pattern
+ * Returns { fieldName, subPattern (PatternResult), fieldBindingName (for type sub-patterns) }
  */
-function parseFieldSpec(parser: HybridParser): [string, string] {
+function parseDestructField(parser: HybridParser): { fieldName: string; patternArgs: any[]; bindingNames: string[] } {
   const name = parser.lexer.expect(TokenType.Ident, "in destructuring pattern");
   if (parser.lexer.peek().type === TokenType.Colon) {
     parser.lexer.next(); // consume :
-    const binding = parser.lexer.expect(TokenType.Ident, "after ':' in pattern field");
-    return [name.text, binding.text];
+    const sub = parsePattern(parser);
+    // Binding names from sub-patterns:
+    // - Nested destructuring ({x: {a, b}}): use the nested bindings [a, b]
+    // - Everything else: use the field name as the binding
+    //   This covers types ({x: Int}), literals ({x: 42}), wildcards ({x: _}),
+    //   and plain identifiers ({x: n} — n is the pattern, x is the binding)
+    const bindingNames = sub.bindingNames.length > 1 || isDestructPattern(sub.pattern)
+      ? sub.bindingNames
+      : [name.text];
+    return { fieldName: name.text, patternArgs: [stringToBits(name.text), sub.pattern], bindingNames };
   }
-  return [name.text, name.text]; // same-name binding
+  // Shorthand: {x} → extract x, always bind as x
+  // Use wildcard as sub-pattern (always matches) — the field name provides the binding
+  return { fieldName: name.text, patternArgs: [stringToBits(name.text), makeExpr(prim("when_wildcard"), [])], bindingNames: [name.text] };
+}
+
+/**
+ * Check if a pattern is a destructuring pattern (struct or type destruct).
+ * Destructuring patterns have their own binding names from nested fields.
+ */
+function isDestructPattern(pattern: any): boolean {
+  if (pattern.kind !== "Expression") return false;
+  const fn = pattern.fn;
+  if (fn?.kind !== "PrimitiveFunction") return false;
+  return fn.name === "when_struct_destruct" || fn.name === "when_type_destruct";
 }
 
 /**
@@ -522,16 +545,16 @@ function parsePattern(parser: HybridParser): PatternResult {
     return { pattern: makeExpr(prim("bits_sub"), [makeInt(0), makeInt(parseInt(numTok.text, 10))]), bindingNames: [] };
   }
 
-  // Structural destructuring: {field, field: binding, ...}
+  // Structural destructuring: {field, field: subPattern, ...}
   if (tok.type === TokenType.LBrace) {
     parser.lexer.next(); // consume {
     const fieldArgs: any[] = [];
     const bindingNames: string[] = [];
     if (parser.lexer.peek().type !== TokenType.RBrace) {
       do {
-        const [fieldName, bindingName] = parseFieldSpec(parser);
-        fieldArgs.push(stringToBits(fieldName), stringToBits(bindingName));
-        bindingNames.push(bindingName);
+        const field = parseDestructField(parser);
+        fieldArgs.push(...field.patternArgs);
+        bindingNames.push(...field.bindingNames);
       } while (parser.lexer.match(TokenType.Comma));
     }
     parser.lexer.expect(TokenType.RBrace, "after destructuring fields");
@@ -544,16 +567,16 @@ function parsePattern(parser: HybridParser): PatternResult {
   if (tok.type === TokenType.Ident) {
     parser.lexer.next();
 
-    // Type destructuring: Ident(field, field: binding, ...)
+    // Type destructuring: Ident(field, field: subPattern, ...)
     if (parser.lexer.peek().type === TokenType.LParen) {
       parser.lexer.next(); // consume (
       const fieldArgs: any[] = [];
       const bindingNames: string[] = [];
       if (parser.lexer.peek().type !== TokenType.RParen) {
         do {
-          const [fieldName, bindingName] = parseFieldSpec(parser);
-          fieldArgs.push(stringToBits(fieldName), stringToBits(bindingName));
-          bindingNames.push(bindingName);
+          const field = parseDestructField(parser);
+          fieldArgs.push(...field.patternArgs);
+          bindingNames.push(...field.bindingNames);
         } while (parser.lexer.match(TokenType.Comma));
       }
       parser.lexer.expect(TokenType.RParen, "after type destructuring fields");
@@ -757,16 +780,26 @@ function buildBaseGrammar(): HybridGrammarConfig {
   prefix.set(TokenType.When, (parser) => {
     const subject = parser.parseExpression(0);
 
-    // Helper: build then-branch function from binding names
-    const makeThenFn = (names: string[], body: any) =>
+    // Helper: build function from binding names (thunk if no bindings)
+    const makeBoundFn = (names: string[], body: any) =>
       names.length > 0 ? buildFn(names, body) : makeComposedFn([], body);
 
-    // Multi-case: when expr NEWLINE INDENT (is pattern then branch)+ UNINDENT
+    // Helper: parse optional guard after pattern (and expr)
+    const parseGuard = (bindingNames: string[]): any => {
+      if (parser.lexer.peek().type === TokenType.And) {
+        parser.lexer.next(); // consume and
+        const guardExpr = parser.parseExpression(0);
+        return makeBoundFn(bindingNames, guardExpr);
+      }
+      return makeInt(1); // no guard → always true
+    };
+
+    // Multi-case: when expr NEWLINE INDENT (is pattern [and guard] then branch)+ UNINDENT
     if (parser.lexer.peek().type === TokenType.Newline && parser.lexer.peekAt(1).type === TokenType.Indent) {
       parser.lexer.next(); // newline
       parser.lexer.next(); // indent
 
-      const cases: { pattern: any; body: any; bindingNames: string[] }[] = [];
+      const cases: { pattern: any; guard: any; body: any; bindingNames: string[] }[] = [];
 
       while (parser.lexer.peek().type !== TokenType.Unindent && !parser.lexer.isAtEnd()) {
         while (parser.lexer.match(TokenType.Newline)) {}
@@ -774,31 +807,34 @@ function buildBaseGrammar(): HybridGrammarConfig {
 
         parser.lexer.expect(TokenType.Is, "in when case");
         const { pattern, bindingNames } = parsePattern(parser);
+        const guard = parseGuard(bindingNames);
         parser.lexer.expect(TokenType.Then, "after pattern");
         const body = parser.parseFnBody();
-        cases.push({ pattern, body, bindingNames });
+        cases.push({ pattern, guard, body, bindingNames });
       }
       parser.lexer.match(TokenType.Unindent);
 
       if (cases.length === 0) throw new Error("Parse error: empty when expression");
 
-      // Desugar from last to first into nested eval_when
+      // Desugar from last to first into nested eval_when (5-arg with guard)
       let result: any = makeExpr(prim("when_no_match"), [subject]);
       for (let i = cases.length - 1; i >= 0; i--) {
         const c = cases[i];
         result = makeExpr(prim("eval_when"), [
           subject,
           c.pattern,
-          makeThenFn(c.bindingNames, c.body),
+          c.guard,
+          makeBoundFn(c.bindingNames, c.body),
           makeComposedFn([], result),
         ]);
       }
       return result;
     }
 
-    // Inline: when expr is pattern then branch [else branch]
+    // Inline: when expr is pattern [and guard] then branch [else branch]
     parser.lexer.expect(TokenType.Is, "after when expression");
     const { pattern, bindingNames } = parsePattern(parser);
+    const guard = parseGuard(bindingNames);
     parser.lexer.expect(TokenType.Then, "after pattern");
     const thenBranch = parser.parseExpression(0);
     let elseBranch: any;
@@ -812,7 +848,8 @@ function buildBaseGrammar(): HybridGrammarConfig {
     return makeExpr(prim("eval_when"), [
       subject,
       pattern,
-      makeThenFn(bindingNames, thenBranch),
+      guard,
+      makeBoundFn(bindingNames, thenBranch),
       makeComposedFn([], elseBranch),
     ]);
   });
