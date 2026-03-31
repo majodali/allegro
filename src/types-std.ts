@@ -908,7 +908,7 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
   },
   concat: (args) => {
     const aCtx = args[0] as ContextValue;
-    const bCtx = args[1] as ContextValue;
+    const bCtx = primaryOf(args[1]) as ContextValue;
     return makeArray([...arrayElements(aCtx), ...arrayElements(bCtx)]);
   },
   slice: (args) => {
