@@ -8,7 +8,7 @@ import { evalSource as runtimeEval, Extension, extensionToContext } from "./runt
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, Type, NamedType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
 
@@ -1883,14 +1883,14 @@ test("compile: non-typed functions not in inferred list", () => {
   eq(inferred, undefined, "untyped function should not be pre-compiled");
 });
 
-// == Type Hierarchy: Type, NamedType, Subtyping ==
+// == Type Hierarchy: Type, NominalType, Subtyping ==
 
-test("type hierarchy: all types have __type = NamedType", () => {
-  // Int, String, Bool, Float, Object should all have __type = NamedType
+test("type hierarchy: all types have __type = NominalType", () => {
+  // Int, String, Bool, Float, Object should all have __type = NominalType
   const intType = IntType.bindings.get("__type")?.value;
-  eq(intType === NamedType, true);
+  eq(intType === NominalType, true);
   const strType = StringType.bindings.get("__type")?.value;
-  eq(strType === NamedType, true);
+  eq(strType === NominalType, true);
 });
 
 test("type hierarchy: Type has __type = Type (self-referential)", () => {
@@ -1898,14 +1898,14 @@ test("type hierarchy: Type has __type = Type (self-referential)", () => {
   eq(ttType === Type, true);
 });
 
-test("type hierarchy: NamedType extends Type", () => {
-  const ext = NamedType.bindings.get("__extends")?.value;
+test("type hierarchy: NominalType extends Type", () => {
+  const ext = NominalType.bindings.get("__extends")?.value;
   eq(ext === Type, true);
 });
 
 test("type hierarchy: nominal instanceof passes for matching type", () => {
   const result = evalStd("42");
-  const instanceofMethod = NamedType.bindings.get("instanceof")?.value;
+  const instanceofMethod = NominalType.bindings.get("instanceof")?.value;
   eq(instanceofMethod !== undefined, true);
   if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = instanceofMethod.fn([IntType, result!], undefined as any, undefined as any);
@@ -1915,7 +1915,7 @@ test("type hierarchy: nominal instanceof passes for matching type", () => {
 
 test("type hierarchy: nominal instanceof fails for wrong type", () => {
   const result = evalStd("42");
-  const instanceofMethod = NamedType.bindings.get("instanceof")?.value;
+  const instanceofMethod = NominalType.bindings.get("instanceof")?.value;
   if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = instanceofMethod.fn([StringType, result!], undefined as any, undefined as any);
     eq(Number((primaryOf(check) as BitsValue).data), 0);
@@ -1935,7 +1935,7 @@ test("type hierarchy: structural instanceof passes for compatible shape", () => 
 });
 
 test("type hierarchy: nominal subtypeof - same type", () => {
-  const subtypeofMethod = NamedType.bindings.get("subtypeof")?.value;
+  const subtypeofMethod = NominalType.bindings.get("subtypeof")?.value;
   if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = subtypeofMethod.fn([IntType, IntType], undefined as any, undefined as any);
     eq(Number((primaryOf(check) as BitsValue).data), 1);
@@ -1943,7 +1943,7 @@ test("type hierarchy: nominal subtypeof - same type", () => {
 });
 
 test("type hierarchy: nominal subtypeof - different types", () => {
-  const subtypeofMethod = NamedType.bindings.get("subtypeof")?.value;
+  const subtypeofMethod = NominalType.bindings.get("subtypeof")?.value;
   if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = subtypeofMethod.fn([IntType, StringType], undefined as any, undefined as any);
     eq(Number((primaryOf(check) as BitsValue).data), 0);
@@ -1952,7 +1952,7 @@ test("type hierarchy: nominal subtypeof - different types", () => {
 
 test("type hierarchy: structural_wrap makes nominal type use structural checking", () => {
   const wrappedInt = structuralWrap(IntType);
-  // The wrapped type should have __type = Type (structural) not NamedType
+  // The wrapped type should have __type = Type (structural) not NominalType
   const wrapType = wrappedInt.bindings.get("__type")?.value;
   eq(wrapType === Type, true);
   // It should still have the original name
@@ -2329,8 +2329,8 @@ test("instanceof: in if condition", () => {
 
 // == subtypeof ==
 
-test("subtypeof: NamedType subtypeof Type", () => {
-  const result = evalStd("NamedType subtypeof Type");
+test("subtypeof: NominalType subtypeof Type", () => {
+  const result = evalStd("NominalType subtypeof Type");
   eq(getTypeName(result!), "Bool");
   eq(Number((primaryOf(result!) as BitsValue).data), 1);
 });
@@ -2369,7 +2369,7 @@ test("constructor: result passes instanceof", () => {
 
 test("extend: create nominal record type", () => {
   const result = evalStd(`
-Point = NamedType.extend({x: Int, y: Int})
+Point = NominalType.extend({x: Int, y: Int})
 p = Point(10, 20)
 p.x
 `);
@@ -2378,7 +2378,7 @@ p.x
 
 test("extend: field access y", () => {
   const result = evalStd(`
-Point = NamedType.extend({x: Int, y: Int})
+Point = NominalType.extend({x: Int, y: Int})
 p = Point(10, 20)
 p.y
 `);
@@ -2387,7 +2387,7 @@ p.y
 
 test("extend: instanceof works", () => {
   const result = evalStd(`
-Point = NamedType.extend({x: Int, y: Int})
+Point = NominalType.extend({x: Int, y: Int})
 p = Point(10, 20)
 p instanceof Point
 `);
@@ -2396,7 +2396,7 @@ p instanceof Point
 
 test("extend: auto-naming from binding", () => {
   const result = evalStd(`
-Point = NamedType.extend({x: Int, y: Int})
+Point = NominalType.extend({x: Int, y: Int})
 p = Point(1, 2)
 type of p
 `);
@@ -2408,14 +2408,14 @@ type of p
 
 test("extend: wrong arg count throws", () => {
   throws(() => evalStd(`
-Point = NamedType.extend({x: Int, y: Int})
+Point = NominalType.extend({x: Int, y: Int})
 Point(10)
 `), "expects 2 args");
 });
 
 test("extend: formatValue shows record", () => {
   const result = evalStd(`
-Point = NamedType.extend({x: Int, y: Int})
+Point = NominalType.extend({x: Int, y: Int})
 Point(10, 20)
 `);
   eq(formatValue(result!), "Point(x: 10, y: 20)");
@@ -2427,7 +2427,7 @@ test("extend: print shows record (name finalized after eval)", () => {
   console.log = (msg: any) => printed.push(String(msg));
   try {
     evalStd(`
-Point = NamedType.extend({x: Int, y: Int})
+Point = NominalType.extend({x: Int, y: Int})
 print(Point(3, 4))
 `);
   } finally {
@@ -2448,7 +2448,7 @@ p.a
 
 test("extend: subtypeof chain", () => {
   const result = evalStd(`
-Shape = NamedType.extend({})
+Shape = NominalType.extend({})
 Point = Shape.extend({x: Int, y: Int})
 Point subtypeof Shape
 `);
@@ -2509,7 +2509,7 @@ x + 0
 
 test("constructor: override", () => {
   const result = evalStd(`
-Point = NamedType.extend({x: Int, y: Int}).constructor((a, b) => {x: a * 2, y: b * 2})
+Point = NominalType.extend({x: Int, y: Int}).constructor((a, b) => {x: a * 2, y: b * 2})
 p = Point(5, 10)
 p.x
 `);

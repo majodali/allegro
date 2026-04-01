@@ -18,7 +18,7 @@ High-level goals, roughly ordered by dependency:
 ## 2. Detailed Features
 
 ### Type System
-- [x] Subtyping / extends — Type/NamedType hierarchy, nominal + structural instanceof/subtypeof, `~` structural operator
+- [x] Subtyping / extends — Type/NominalType hierarchy, nominal + structural instanceof/subtypeof, `~` structural operator
 - [ ] Interfaces — structural type matching (no explicit `implements`)
 - [ ] Mixins — types with default implementations
 - [x] Union types — `Int | String`, `type_union` primitive, union instanceof checks alternatives
@@ -27,7 +27,7 @@ High-level goals, roughly ordered by dependency:
 - [ ] Variance — covariant/contravariant/invariant type parameters
 - [ ] Scalar type builder — `Scalar(bitLength)` for new Bits-backed types with custom encoding
 - [ ] Packed Bits structures — buffers, tuples, vectors of same-type scalars as Bits representations
-- [ ] Rename NamedType → NominalType (clearer purpose: nominal vs structural checking)
+- [x] Rename NamedType → NominalType (clearer purpose: nominal vs structural checking)
 - [ ] Type constraints — `where T: Comparable`
 - [x] Binding type annotations — `x: Int = 42`, `type_check_binding` primitive
 - [x] Pattern matching — `when/is/then` with resolve-first semantics, multi-case, wildcard, binding
@@ -42,7 +42,7 @@ High-level goals, roughly ordered by dependency:
 - [x] `instanceof` infix — `x instanceof T` returns Bool
 - [x] `subtypeof` infix — `S subtypeof T` returns Bool
 - [x] Type constructors — `__construct` mechanism, built-in constructors for Int/Float/String/Bool
-- [x] Fluent type API — `extend`, `where`, `distinct`, `constructor` methods on Type/NamedType
+- [x] Fluent type API — `extend`, `where`, `distinct`, `constructor` methods on Type/NominalType
 - [x] Meta-type dispatch — type-level methods via `__type` binding on raw Contexts
 - [x] Auto-naming — types bound to symbols get named after evaluation
 

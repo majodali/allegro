@@ -58,15 +58,15 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
 }
 
 // =============================================================================
-// Type Hierarchy: Type, NamedType
+// Type Hierarchy: Type, NominalType
 //
 // Type — base meta-type. All type values have type = Type.
 //   Provides structural instanceof/subtypeof.
-// NamedType — extends Type. Named types have type = NamedType.
+// NominalType — extends Type. Named types have type = NominalType.
 //   Overrides instanceof/subtypeof for nominal checking via __name and __extends.
 // ConcreteType — interface (not a position in hierarchy). Concrete types have __construct.
 //
-// Bootstrap: Type and NamedType are created as raw Contexts first,
+// Bootstrap: Type and NominalType are created as raw Contexts first,
 // then retroactively given their own type components.
 // =============================================================================
 
@@ -187,28 +187,28 @@ addBinding(Type, "subtypeof", makePrimitive("Type.subtypeof", (args) => {
   return withType(makeInt(structuralSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
 }));
 
-// --- Build NamedType (nominal instanceof/subtypeof) ---
+// --- Build NominalType (nominal instanceof/subtypeof) ---
 
-export const NamedType: ContextValue = makeContext();
-addBinding(NamedType, "__name", stringToBits("NamedType"));
-addBinding(NamedType, "__extends", Type);
-addBinding(NamedType, "instanceof", makePrimitive("NamedType.instanceof", (args) => {
+export const NominalType: ContextValue = makeContext();
+addBinding(NominalType, "__name", stringToBits("NominalType"));
+addBinding(NominalType, "__extends", Type);
+addBinding(NominalType, "instanceof", makePrimitive("NominalType.instanceof", (args) => {
   const type = args[0] as ContextValue;
   const value = args[1];
   return withType(makeInt(nominalInstanceof(value, type) ? 1 : 0), BoolType);
 }));
-addBinding(NamedType, "subtypeof", makePrimitive("NamedType.subtypeof", (args) => {
+addBinding(NominalType, "subtypeof", makePrimitive("NominalType.subtypeof", (args) => {
   const typeA = args[0] as ContextValue;
   const typeB = args[1] as ContextValue;
   return withType(makeInt(nominalSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
 }));
 
-// --- Structural wrap (~): wraps a NamedType to use structural checking ---
+// --- Structural wrap (~): wraps a NominalType to use structural checking ---
 
 /**
  * Create a structural wrapper around a named type.
  * The wrapper uses Type's structural instanceof/subtypeof instead of
- * NamedType's nominal checking. This is the ~ operator.
+ * NominalType's nominal checking. This is the ~ operator.
  */
 export function structuralWrap(type: ContextValue): ContextValue {
   const wrapper = makeContext();
@@ -218,7 +218,7 @@ export function structuralWrap(type: ContextValue): ContextValue {
     wrapper.bindings.set(key, { ...binding });
     wrapper.bindingList.push({ ...binding });
   }
-  // Set __type to Type (structural) instead of NamedType (nominal)
+  // Set __type to Type (structural) instead of NominalType (nominal)
   addBinding(wrapper, "__type", Type);
   // Mark as structural wrapper
   addBinding(wrapper, "__structural", makeInt(1));
@@ -288,13 +288,13 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
   return union;
 }
 
-// Bootstrap: Type and NamedType get their own type components
+// Bootstrap: Type and NominalType get their own type components
 // Type's type is Type (self-referential)
-// NamedType's type is NamedType (it's a named type itself)
+// NominalType's type is NominalType (it's a named type itself)
 // We can't use withType (returns MultiValue) since these are Contexts used directly.
 // Instead, we store a __type binding that type_dispatch can check.
 addBinding(Type, "__type", Type);
-addBinding(NamedType, "__type", NamedType);
+addBinding(NominalType, "__type", NominalType);
 
 // =============================================================================
 // Fluent Type API: extend, where, distinct, constructor
@@ -467,7 +467,7 @@ function buildDistinctType(parentType: ContextValue): ContextValue {
   distinctType.bindings.delete("__name");
   addBinding(distinctType, "__name", stringToBits("<distinct>"));
   distinctType.bindings.delete("__type");
-  addBinding(distinctType, "__type", NamedType); // always nominal
+  addBinding(distinctType, "__type", NominalType); // always nominal
 
   // Wrap __construct to re-tag with distinct type
   const parentConstruct = parentType.bindings.get("__construct")?.value;
@@ -485,21 +485,21 @@ function buildDistinctType(parentType: ContextValue): ContextValue {
   return distinctType;
 }
 
-// --- Add fluent methods to Type and NamedType ---
+// --- Add fluent methods to Type and NominalType ---
 
 // extend: Type.extend({fields}) → structural record, NominalType.extend({fields}) → nominal record
 addBinding(Type, "extend", makePrimitive("Type.extend", (args, _ctx, _evalFn) => {
   return buildRecordType(args[0] as ContextValue, args[1], Type);
 }));
-addBinding(NamedType, "extend", makePrimitive("NamedType.extend", (args, _ctx, _evalFn) => {
-  return buildRecordType(args[0] as ContextValue, args[1], NamedType);
+addBinding(NominalType, "extend", makePrimitive("NominalType.extend", (args, _ctx, _evalFn) => {
+  return buildRecordType(args[0] as ContextValue, args[1], NominalType);
 }));
 
 // where: T.where(predicate) → refined type
 addBinding(Type, "where", makePrimitive("Type.where", (args) => {
   return buildRefinedType(args[0] as ContextValue, args[1]);
 }));
-addBinding(NamedType, "where", makePrimitive("NamedType.where", (args) => {
+addBinding(NominalType, "where", makePrimitive("NominalType.where", (args) => {
   return buildRefinedType(args[0] as ContextValue, args[1]);
 }));
 
@@ -507,7 +507,7 @@ addBinding(NamedType, "where", makePrimitive("NamedType.where", (args) => {
 addBinding(Type, "distinct", makePrimitive("Type.distinct", (args) => {
   return buildDistinctType(args[0] as ContextValue);
 }));
-addBinding(NamedType, "distinct", makePrimitive("NamedType.distinct", (args) => {
+addBinding(NominalType, "distinct", makePrimitive("NominalType.distinct", (args) => {
   return buildDistinctType(args[0] as ContextValue);
 }));
 
@@ -526,7 +526,7 @@ addBinding(Type, "constructor", makePrimitive("Type.constructor", (args) => {
   }, true));
   return type;
 }));
-addBinding(NamedType, "constructor", makePrimitive("NamedType.constructor", (args) => {
+addBinding(NominalType, "constructor", makePrimitive("NominalType.constructor", (args) => {
   const type = args[0] as ContextValue;
   const fn = args[1];
   type.bindings.delete("__construct");
@@ -545,8 +545,8 @@ addBinding(NamedType, "constructor", makePrimitive("NamedType.constructor", (arg
 const getterNames = new Set(["length"]);
 
 /**
- * Build a named type. All types built this way are NamedTypes with nominal
- * instanceof/subtypeof semantics. The type's own type is NamedType.
+ * Build a named type. All types built this way are NominalTypes with nominal
+ * instanceof/subtypeof semantics. The type's own type is NominalType.
  *
  * @param name     Type name (e.g., "Int", "String")
  * @param methods  Instance methods (dispatched via type_dispatch on values of this type)
@@ -560,8 +560,8 @@ function buildType(
   const ctx = makeContext();
   // __name
   addBinding(ctx, "__name", stringToBits(name));
-  // __type = NamedType (this type is a named type)
-  addBinding(ctx, "__type", NamedType);
+  // __type = NominalType (this type is a named type)
+  addBinding(ctx, "__type", NominalType);
   // __extends (optional parent type for nominal subtyping chain)
   if (options?.extends) {
     addBinding(ctx, "__extends", options.extends);
@@ -1516,7 +1516,7 @@ export function createTypeSystem(): Extension {
       UntypedFunction: UntypedFunctionType,
       // Meta-types
       Type: Type,
-      NamedType: NamedType,
+      NominalType: NominalType,
       None: NoneType,
       Error: ErrorType,
       // Literal bindings (parsed as identifiers, resolved here)

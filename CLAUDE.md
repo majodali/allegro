@@ -124,15 +124,15 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 
 ### Type Hierarchy
 - **Type** — base meta-type. Provides structural `instanceof`/`subtypeof`.
-- **NamedType** — extends Type. Provides nominal `instanceof`/`subtypeof` via `__name` and `__extends` chain.
-- All built-in types (Int, String, etc.) are NamedTypes with `__type = NamedType`.
-- Type and NamedType are self-describing (bootstrap: Type has `__type = Type`).
+- **NominalType** — extends Type. Provides nominal `instanceof`/`subtypeof` via `__name` and `__extends` chain.
+- All built-in types (Int, String, etc.) are NominalTypes with `__type = NominalType`.
+- Type and NominalType are self-describing (bootstrap: Type has `__type = Type`).
 
 ### Nominal vs Structural Typing
 - Named types use **nominal** checking by default: `f(x: Animal)` requires x to be Animal or extend it.
 - **`~` operator** (structural wrap): `~Animal` uses structural checking — any type with Animal's fields matches.
 - Four operations: nominal/structural × instanceof/subtypeof.
-- `structuralWrap(type)` creates a wrapper that delegates to Type's structural methods instead of NamedType's nominal ones.
+- `structuralWrap(type)` creates a wrapper that delegates to Type's structural methods instead of NominalType's nominal ones.
 - Unnamed type expressions (inline `{ ... }`) are always structural.
 
 ## Parser (Hybrid: Pratt + Recursive Descent)
@@ -292,7 +292,7 @@ result = error "bad" + 5     // error propagates — result is still an error
 // Type operators
 42 instanceof Int              // → true
 "hello" instanceof String      // → true
-NamedType subtypeof Type       // → true
+NominalType subtypeof Type       // → true
 
 // Type constructors (calls __construct)
 Int(42)                        // wraps value with Int type
@@ -380,7 +380,7 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ None type (singleton `none` keyword, returned for absent components)
 - ✅ `instanceof` and `subtypeof` infix operators
 - ✅ Type constructors via `__construct` (Int, Float, String, Bool)
-- ✅ Fluent type API: `extend`, `where`, `distinct`, `constructor` methods on Type/NamedType
+- ✅ Fluent type API: `extend`, `where`, `distinct`, `constructor` methods on Type/NominalType
 - ✅ Meta-type dispatch for type-level methods (e.g., `Int.where(...)`)
 - ✅ Auto-naming: types bound to symbols get named automatically
 - ✅ Guard clauses (`and` keyword in patterns)

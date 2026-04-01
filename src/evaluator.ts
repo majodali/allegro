@@ -497,7 +497,7 @@ function checkArgType(arg: Value, expectedType: ContextValue, argIndex: number):
     return;
   }
 
-  // Use meta-type instanceof (NamedType nominal check)
+  // Use meta-type instanceof (NominalType nominal check)
   const typeType = expected.bindings.get("__type")?.value as ContextValue | undefined;
   if (typeType) {
     const instanceofMethod = typeType.bindings.get("instanceof")?.value;

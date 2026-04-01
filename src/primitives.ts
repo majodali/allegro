@@ -797,7 +797,7 @@ import {
   getType, getTypeName, withType, typeMethod,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
-  AnyType, Type, NamedType, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
+  AnyType, Type, NominalType, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
   structuralWrap, makeUnionType,
 } from "./types-std.js";
@@ -1117,7 +1117,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Step 3: Check using the type's instanceof method
   // The type hierarchy determines checking semantics:
-  // - NamedType: nominal check (by __name and __extends chain)
+  // - NominalType: nominal check (by __name and __extends chain)
   // - Type (or ~wrapped): structural check (by field compatibility)
   const actualType = getType(v);
   if (!actualType) throw new AllegroError("type_check: value has no type");
