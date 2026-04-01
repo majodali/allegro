@@ -52,7 +52,8 @@ High-level goals, roughly ordered by dependency:
 - [x] Phase gate checks — CompilationReport with inferred types, errors, unresolved bindings
 - [ ] Target code generation (expression graph → executable)
 - [ ] Tree shaking via partial evaluation
-- [ ] Memoization as Standard feature (remove from base evaluator)
+- [ ] Forward-chaining partial evaluation — residual expressions re-evaluate when dependencies complete. Replaces memoization for incomplete expressions. Symbol binding and phase-provided bindings use the same mechanism. Residuals are replaced (not mutated) on each re-evaluation, so no stale state or circular dependency issues.
+- [ ] Memoization as Standard feature (only for fully resolved expressions, remove from base evaluator)
 - [ ] Continuation-based TCO (Stage 2 — attach continuations for non-tail recursive calls)
 - [x] eval_if Rule 2 — partial evaluation of both branches when condition undefined
 - [x] Tail call optimization (Stage 1) — O(1) stack for tail-recursive functions
