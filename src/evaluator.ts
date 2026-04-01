@@ -258,6 +258,9 @@ function applyPrimitive(
 
   // Unwrap multi-values for primitives
   const primaryArgs = evalArgs.map(primaryOf);
+  if (typeof fn.fn !== "function") {
+    throw new AllegroError(`applyPrimitive: ${fn.name} has unresolved stub (fn=null). Check resolvePrimitives.`);
+  }
   const result = fn.fn(primaryArgs, ctx, evalFn);
 
   // Type propagation: if the first arg had a type and the result is Bits,

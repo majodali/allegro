@@ -120,17 +120,20 @@ print(seniors.length)
 // Pattern matching with arrays
 // =============================================================================
 
-describeLen(len) => when len
+describeList(arr) => when arr.length
   is 0 then "empty"
   is 1 then "singleton"
-  is _ then "other"
+  is n and n < 5 then "small"
+  is _ then "large"
 
-print(describeLen(0))
+print(describeList([]))
 // expect: empty
-print(describeLen(1))
+print(describeList([42]))
 // expect: singleton
-print(describeLen(5))
-// expect: other
+print(describeList([1, 2, 3]))
+// expect: small
+print(describeList([1, 2, 3, 4, 5]))
+// expect: large
 
 // =============================================================================
 // Error handling with arrays

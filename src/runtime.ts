@@ -22,13 +22,13 @@ export type { Extension };
  */
 function typeLiterals(v: Value, seen?: Set<Value>): Value {
   if (!seen) seen = new Set();
-  if (seen.has(v)) return v;
-  seen.add(v);
+  // Only track ComposedFunctions for cycle detection (self-referential function bodies).
+  // Do NOT skip Expressions — shared expression objects (like subject in multi-case when)
+  // must be processed each time they appear to ensure all references get updated.
+  if (v.kind === ValueKind.ComposedFunction && seen.has(v)) return v;
 
   switch (v.kind) {
     case ValueKind.Bits:
-      // 64-bit = Int literal, other lengths = String literal (from stringToBits)
-      // Note: empty string "" has length 0 but is NOT 64-bit, so it falls through to String.
       if (v.length === 64) return withType(v, IntType);
       return withType(v, StringType);
     case ValueKind.Expression: {
@@ -38,11 +38,10 @@ function typeLiterals(v: Value, seen?: Set<Value>): Value {
       return makeExpr(newFn, newArgs);
     }
     case ValueKind.ComposedFunction: {
+      seen.add(v);
       const newBody = typeLiterals(v.body, seen);
       if (newBody === v.body) return v;
-      // Create new ComposedFunction with typed body but same params
       const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: v.params, body: newBody };
-      // Re-bind params to new function
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
     }
@@ -261,8 +260,10 @@ function resolveNamedParams(
 ): Value {
   if (!seen) seen = new Set();
   if (!value || typeof value !== "object") return value;
-  if (seen.has(value)) return value;
-  seen.add(value);
+  // Only track ComposedFunctions for cycle detection — NOT Expressions.
+  // Shared expression objects (e.g., subject in multi-case when) must be
+  // processed each time they appear to ensure all references get updated.
+  if (value.kind === ValueKind.ComposedFunction && seen.has(value)) return value;
 
   switch (value.kind) {
     case ValueKind.Bits:
@@ -270,11 +271,9 @@ function resolveNamedParams(
       return value;
 
     case ValueKind.PrimitiveFunction: {
-      // Resolve primitive stubs (fn: null)
       if ((value as any).fn === null) {
         const real = primitives[value.name];
         if (real) return real;
-        // Unknown primitive — leave as-is (might be resolved later)
       }
       return value;
     }
@@ -283,16 +282,14 @@ function resolveNamedParams(
       return value;
 
     case ValueKind.Symbol: {
-      // Skip self-references — handled after the whole function is resolved
       if (value.name === selfName) return value;
       const resolved = resMap.get(value.name);
       if (resolved !== undefined) return resolved;
-      // Unresolved — leave as Symbol (might be a type variable or phase binding)
       return value;
     }
 
     case ValueKind.ComposedFunction: {
-      // Don't resolve params owned by this function — they're positional
+      seen.add(value);
       const fn = value as ComposedFunctionValue;
       const ownParamNames = new Set(fn.params.map(p => p._name).filter(Boolean) as string[]);
       const newBody = resolveNamedParamsInner(fn.body, resMap, fn, ownParamNames, selfName, seen);
@@ -336,8 +333,8 @@ function resolveNamedParamsInner(
 ): Value {
   if (!value || typeof value !== "object") return value;
   if (!seen) seen = new Set();
-  if (seen.has(value)) return value;
-  seen.add(value);
+  // Only track ComposedFunctions for cycle detection
+  if (value.kind === ValueKind.ComposedFunction && seen.has(value)) return value;
 
   switch (value.kind) {
     case ValueKind.Bits:
@@ -353,13 +350,11 @@ function resolveNamedParamsInner(
     }
 
     case ValueKind.Param: {
-      // Positional params owned by this function — leave alone
       if (value.owner === owner) return value;
       return value;
     }
 
     case ValueKind.Symbol: {
-      // Symbol that shadows a function param — leave alone
       if (ownParamNames.has(value.name)) return value;
       if (value.name === selfName) return value;
       const resolved = resMap.get(value.name);
@@ -368,7 +363,7 @@ function resolveNamedParamsInner(
     }
 
     case ValueKind.ComposedFunction: {
-      // Inner function — create new scope with its own params
+      seen.add(value);
       const fn = value as ComposedFunctionValue;
       const innerOwn = new Set(fn.params.map(p => p._name).filter(Boolean) as string[]);
       const newBody = resolveNamedParamsInner(fn.body, resMap, fn, innerOwn, selfName, seen);
