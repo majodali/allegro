@@ -107,50 +107,23 @@ export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Va
   }
 }
 
-/**
- * Check if an expression is safe to memoize — no Symbols or unresolved Params
- * that would make the result context-dependent.
- */
-function isMemoSafe(expr: ExpressionValue): boolean {
-  if (expr.fn.kind === ValueKind.Symbol) return false;
-  for (const arg of expr.args) {
-    if (arg.kind === ValueKind.Symbol) return false;
-    if (arg.kind === ValueKind.Param) return false;
-  }
-  return true;
-}
-
 function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): Value | TailCall {
-  // Check memo — only use for context-independent expressions
-  const memoSafe = isMemoSafe(expr);
-  if (memoSafe) {
-    const cached = expr.memo.get("eval");
-    if (cached !== undefined) return cached;
-  }
+  // Memoization disabled — will be replaced by forward-chaining partial evaluation.
+  // See BACKLOG.md for the design direction.
 
   const fnRaw = evaluate(expr.fn, ctx, depth + 1);
-  // Unwrap MultiValue to get the callable (e.g., exported functions)
   const fn = primaryOf(fnRaw);
 
-  // Primitive function
   if (fn.kind === ValueKind.PrimitiveFunction) {
-    const result = applyPrimitive(fn, expr.args, ctx, depth);
-    // Do NOT memoize TailCall results — they're context-dependent
-    if (isTailCall(result)) return result;
-    if (memoSafe) expr.memo.set("eval", result);
-    return result;
+    return applyPrimitive(fn, expr.args, ctx, depth);
   }
 
-  // Composed function — check for tail call optimization
   if (fn.kind === ValueKind.ComposedFunction) {
     if ((expr as any)._tailPosition) {
-      // Tail position: return TailCall marker instead of recursing
       const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1));
       return makeTailCall(fn, evalArgs, fnRaw);
     }
-    const result = applyComposed(fn, expr.args, ctx, depth, fnRaw);
-    if (memoSafe) expr.memo.set("eval", result);
-    return result;
+    return applyComposed(fn, expr.args, ctx, depth, fnRaw);
   }
 
   // Context as function — constructor call via __construct
@@ -159,27 +132,20 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
     if (constructBinding?.value) {
       const ctor = constructBinding.value;
       if (ctor.kind === ValueKind.PrimitiveFunction) {
-        const result = applyPrimitive(ctor, expr.args, ctx, depth);
-        if (memoSafe && !isTailCall(result)) expr.memo.set("eval", result);
-        return result;
+        return applyPrimitive(ctor, expr.args, ctx, depth);
       }
       if (ctor.kind === ValueKind.ComposedFunction) {
-        const result = applyComposed(ctor, expr.args, ctx, depth);
-        if (memoSafe) expr.memo.set("eval", result);
-        return result;
+        return applyComposed(ctor, expr.args, ctx, depth);
       }
     }
   }
 
-  // Function not resolved - partially evaluate args
+  // Function not resolved — partially evaluate args
   const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1));
   if (fn === expr.fn && evalArgs.every((a, i) => a === expr.args[i])) {
-    if (memoSafe) expr.memo.set("eval", expr);
     return expr;
   }
-  const reduced = makeExpr(fn, evalArgs);
-  if (memoSafe) expr.memo.set("eval", reduced);
-  return reduced;
+  return makeExpr(fn, evalArgs);
 }
 
 // --- Apply primitive ---

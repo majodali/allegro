@@ -694,19 +694,18 @@ export function evalSource(
 
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
 
+  // Evaluate all bindings (named and bare) in order.
   let lastValue: Value | null = null;
   for (const b of fileCtx.bindingList) {
-    if (b.key === null && b.value !== undefined) {
-      lastValue = evaluate(b.value, evalCtx);
-    }
-  }
-
-  // Auto-name types: types created via .extend()/.where()/.distinct() have placeholder names.
-  // After evaluation, evaluate each named binding and check if it resolves to an anonymous type.
-  for (const b of fileCtx.bindingList) {
-    if (b.key && b.value !== undefined) {
-      try {
-        const val = evaluate(b.value, evalCtx);
+    if (b.value !== undefined) {
+      const val = evaluate(b.value, evalCtx);
+      if (b.key === null) {
+        lastValue = val;
+      } else {
+        // Auto-name types immediately: if the evaluated value is a type Context
+        // with a placeholder name, set it to the binding name. This happens at
+        // the point of creation, so the type object itself (including references
+        // captured in constructors) gets the correct name.
         if (val.kind === ValueKind.Context) {
           const nameBinding = (val as ContextValue).bindings.get("__name");
           if (nameBinding?.value?.kind === ValueKind.Bits) {
@@ -716,8 +715,11 @@ export function evalSource(
             }
           }
         }
-      } catch {
-        // Skip bindings that can't be evaluated (e.g., forward references)
+        // Store evaluated value in eval context
+        const ctxBinding = evalCtx.bindings.get(b.key);
+        if (ctxBinding) {
+          ctxBinding.value = val;
+        }
       }
     }
   }
