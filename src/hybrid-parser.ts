@@ -48,6 +48,9 @@ export class HybridParser {
   lexer: Lexer;
   errors: ParseError[] = [];
   private config: HybridGrammarConfig;
+  /** Tracks nested indentation continuations within expressions.
+   *  When > 0, Newline tokens are treated as whitespace (continuation). */
+  continuationDepth: number = 0;
 
   constructor(input: string, config: HybridGrammarConfig) {
     this.config = config;
@@ -342,12 +345,36 @@ export class HybridParser {
     return body;
   }
 
+  // --- Expression continuation ---
+
+  /**
+   * Skip indentation tokens that represent continuation within expressions.
+   * Indent → increment depth, consume (continuation starts)
+   * Newline when depth > 0 → consume (whitespace within continuation)
+   * Unindent when depth > 0 → decrement depth, consume (continuation ends)
+   */
+  private skipContinuationWhitespace(): void {
+    while (true) {
+      const next = this.lexer.peek();
+      if (next.type === TokenType.Indent) {
+        this.continuationDepth++;
+        this.lexer.next();
+      } else if (next.type === TokenType.Newline && this.continuationDepth > 0) {
+        this.lexer.next();
+      } else if (next.type === TokenType.Unindent && this.continuationDepth > 0) {
+        this.continuationDepth--;
+        this.lexer.next();
+      } else {
+        break;
+      }
+    }
+  }
+
   // --- Function body (expression or indented block) ---
 
   parseFnBody(): any {
-    // Check for indented block
-    if (this.lexer.peek().type === TokenType.Newline && this.lexer.peekAt(1).type === TokenType.Indent) {
-      this.lexer.next(); // newline
+    // Check for indented block (Indent without preceding Newline since lexer change)
+    if (this.lexer.peek().type === TokenType.Indent) {
       this.lexer.next(); // indent
       return this.parseBlock();
     }
@@ -411,6 +438,9 @@ export class HybridParser {
   // --- Pratt expression parser ---
 
   parseExpression(minBP: number): any {
+    // Skip continuation whitespace before the prefix token
+    this.skipContinuationWhitespace();
+
     // Prefix
     const token = this.lexer.next();
     const prefix = this.config.prefixParselets.get(token.type);
@@ -423,6 +453,7 @@ export class HybridParser {
 
     // Infix loop
     while (true) {
+      this.skipContinuationWhitespace();
       const next = this.lexer.peek();
       const infix = this.config.infixParselets.get(next.type);
       if (!infix || infix.bp < minBP) break;
@@ -436,6 +467,7 @@ export class HybridParser {
   // --- Error recovery ---
 
   private skipToNewline(): void {
+    this.continuationDepth = 0; // Reset on error recovery
     while (!this.lexer.isAtEnd()) {
       const tok = this.lexer.next();
       if (tok.type === TokenType.Newline || tok.type === TokenType.EOF) break;
@@ -794,10 +826,13 @@ function buildBaseGrammar(): HybridGrammarConfig {
       return makeInt(1); // no guard → always true
     };
 
-    // Multi-case: when expr NEWLINE INDENT (is pattern [and guard] then branch)+ UNINDENT
-    if (parser.lexer.peek().type === TokenType.Newline && parser.lexer.peekAt(1).type === TokenType.Indent) {
-      parser.lexer.next(); // newline
-      parser.lexer.next(); // indent
+    // Multi-case: when expr INDENT (is pattern [and guard] then branch)+ UNINDENT
+    // After parseExpression for the subject, the Indent was consumed by
+    // skipContinuationWhitespace, incrementing continuationDepth.
+    if (parser.continuationDepth > 0) {
+      // Take ownership of the continuation block — decrement depth so the
+      // Unindent at the end of the block is not consumed by skipContinuationWhitespace
+      parser.continuationDepth--;
 
       const cases: { pattern: any; guard: any; body: any; bindingNames: string[] }[] = [];
 

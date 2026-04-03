@@ -65,8 +65,11 @@ print(squares[3])
 // Recursive array algorithms (proving the language works)
 // =============================================================================
 
-// Recursive map
-myMap(arr, f) => if arr.length == 0 then [] else [f(arr[0])].concat(myMap(arr.slice(1), f))
+// Recursive map (multi-line)
+myMap(arr, f) =>
+  if arr.length == 0
+    then []
+    else [f(arr[0])].concat(myMap(arr.slice(1), f))
 
 tripled = myMap([1, 2, 3], x => x * 3)
 print(tripled[0])
@@ -74,8 +77,13 @@ print(tripled[0])
 print(tripled[2])
 // expect: 9
 
-// Recursive filter
-myFilter(arr, pred) => if arr.length == 0 then [] else if pred(arr[0]) then [arr[0]].concat(myFilter(arr.slice(1), pred)) else myFilter(arr.slice(1), pred)
+// Recursive filter (multi-line)
+myFilter(arr, pred) =>
+  if arr.length == 0
+    then []
+    else if pred(arr[0])
+      then [arr[0]].concat(myFilter(arr.slice(1), pred))
+      else myFilter(arr.slice(1), pred)
 
 odds = myFilter([1, 2, 3, 4, 5], x => x % 2 != 0)
 print(odds.length)
@@ -85,8 +93,11 @@ print(odds[0])
 print(odds[2])
 // expect: 5
 
-// Recursive reduce (tail-recursive)
-myReduce(arr, f, acc) => if arr.length == 0 then acc else myReduce(arr.slice(1), f, f(acc, arr[0]))
+// Recursive reduce (tail-recursive, multi-line)
+myReduce(arr, f, acc) =>
+  if arr.length == 0
+    then acc
+    else myReduce(arr.slice(1), f, f(acc, arr[0]))
 
 mySum = myReduce([1, 2, 3, 4, 5], (a, b) => a + b, 0)
 print(mySum)
@@ -139,7 +150,10 @@ print(describeList([1, 2, 3, 4, 5]))
 // Error handling with arrays
 // =============================================================================
 
-safeGet(arr, idx) => if idx >= 0 and idx < arr.length then arr[idx] else error "index out of bounds"
+safeGet(arr, idx) =>
+  if idx >= 0 and idx < arr.length
+    then arr[idx]
+    else error "index out of bounds"
 
 print(safeGet([10, 20, 30], 1))
 // expect: 20

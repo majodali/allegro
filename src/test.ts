@@ -2631,6 +2631,42 @@ when p is {x, y} and x + y > 10 then "big" else "small"
   eq(bitsToString(primaryOf(result!) as BitsValue), "big");
 });
 
+// == Multi-Line Expressions (Offside Rule) ==
+
+test("multiline: if/then/else across lines", () => {
+  const result = evalStd("if true\n    then 42\n    else 0");
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("multiline: if with expression condition", () => {
+  const result = evalStd("x = 5\nif x > 0\n    then x\n    else 0 - x");
+  eq(Number((primaryOf(result!) as BitsValue).data), 5);
+});
+
+test("multiline: binary operator continuation", () => {
+  const result = evalStd("a = 1 +\n    2 +\n    3\na");
+  eq(Number((primaryOf(result!) as BitsValue).data), 6);
+});
+
+test("multiline: function with multi-line if body", () => {
+  const result = evalStd("abs(x) =>\n    if x > 0\n        then x\n        else 0 - x\nabs(0 - 5)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 5);
+});
+
+test("multiline: nested if in function with block", () => {
+  const result = evalStd("f(x) =>\n    y = if x > 0\n        then x * 2\n        else 0\n    y + 1\nf(5)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 11);
+});
+
+test("multiline: when multi-case still works", () => {
+  const result = evalStd("v = 2\nwhen v\n    is 1 then 10\n    is 2 then 20\n    is _ then 0");
+  eq(Number((primaryOf(result!) as BitsValue).data), 20);
+});
+
+test("multiline: single-line if unchanged", () => {
+  eq(evalNum("if 1 == 1 then 42 else 0"), 42);
+});
+
 // --- Run all tests (sync + async) and report ---
 
 runModuleTests().then(() => {

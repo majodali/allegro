@@ -309,8 +309,9 @@ export class Lexer {
     const currentIndent = this.indentStack[this.indentStack.length - 1];
 
     if (indent > currentIndent) {
+      // Indent increase: emit only Indent (no Newline).
+      // The parser treats Indent as continuation whitespace within expressions.
       this.indentStack.push(indent);
-      this.tokens.push({ type: TokenType.Newline, text: "\n", line: nlLine, column: nlCol, offset: nlOff });
       this.tokens.push({ type: TokenType.Indent, text: "", line: this.line, column: 1, offset: this.pos });
     } else if (indent < currentIndent) {
       this.tokens.push({ type: TokenType.Newline, text: "\n", line: nlLine, column: nlCol, offset: nlOff });

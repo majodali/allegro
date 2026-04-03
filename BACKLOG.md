@@ -70,6 +70,7 @@ High-level goals, roughly ordered by dependency:
 - [x] Keyword disambiguation — true/false/import/export/when/is/of/none/error/instanceof/subtypeof properly handled
 - [x] Float literals via maximal munch
 - [x] Source location tracking in tokens
+- [x] Expression continuation via offside rule — multi-line if/then/else, operator continuation, nested expressions. Lexer suppresses Newline before Indent, parser tracks continuationDepth.
 - [x] Earley parser retained for standalone grammars
 
 ### Execution Context & Build Pipeline
