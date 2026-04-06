@@ -4,6 +4,7 @@ import {
   Value, ValueKind, ExpressionValue, ContextValue,
   ComposedFunctionValue, ParamValue, MultiValueType,
   AllegroError, primaryOf, isResolved, makeExpr, makeMultiValue, makeContext,
+  DepCollector,
 } from "./types.js";
 import {
   getType, getTypeName, withType, getFunctionParamTypes, getFunctionReturnType,
@@ -72,7 +73,9 @@ const PRIM_TO_METHOD = new Map<string, string>([
 
 // --- Core evaluation ---
 
-export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Value {
+export function evaluate(
+  value: Value, ctx: ContextValue, depth: number = 0, depCollector?: DepCollector,
+): Value {
   if (depth > MAX_DEPTH) throw new AllegroError("Maximum evaluation depth exceeded");
 
   switch (value.kind) {
@@ -87,43 +90,40 @@ export function evaluate(value: Value, ctx: ContextValue, depth: number = 0): Va
 
     case ValueKind.Symbol: {
       const resolved = ctx.bindings.get(value.name);
-      if (resolved?.value !== undefined) return evaluate(resolved.value, ctx, depth + 1);
+      if (resolved?.value !== undefined) return evaluate(resolved.value, ctx, depth + 1, depCollector);
+      // Symbol unresolved — record as incomplete dependency
+      if (depCollector) depCollector.incompleteRefs.add(value.name);
       return value;
     }
 
     case ValueKind.MultiValue: {
-      const ep = evaluate(value.primary, ctx, depth + 1);
+      const ep = evaluate(value.primary, ctx, depth + 1, depCollector);
       return ep === value.primary ? value : makeMultiValue(ep, new Map(value.components));
     }
 
     case ValueKind.Expression: {
-      const result = evaluateExpr(value, ctx, depth);
-      // TailCall propagation: if evaluateExpr returns a TailCall,
-      // return it as-is (cast to Value). The enclosing applyComposed
-      // will detect it via isTailCall(). This is safe because TailCall
-      // only appears in tail position and is always caught.
+      const result = evaluateExpr(value, ctx, depth, depCollector);
       return result as Value;
     }
   }
 }
 
-function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): Value | TailCall {
-  // Memoization disabled — will be replaced by forward-chaining partial evaluation.
-  // See BACKLOG.md for the design direction.
-
-  const fnRaw = evaluate(expr.fn, ctx, depth + 1);
+function evaluateExpr(
+  expr: ExpressionValue, ctx: ContextValue, depth: number, depCollector?: DepCollector,
+): Value | TailCall {
+  const fnRaw = evaluate(expr.fn, ctx, depth + 1, depCollector);
   const fn = primaryOf(fnRaw);
 
   if (fn.kind === ValueKind.PrimitiveFunction) {
-    return applyPrimitive(fn, expr.args, ctx, depth);
+    return applyPrimitive(fn, expr.args, ctx, depth, depCollector);
   }
 
   if (fn.kind === ValueKind.ComposedFunction) {
     if ((expr as any)._tailPosition) {
-      const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1));
+      const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1, depCollector));
       return makeTailCall(fn, evalArgs, fnRaw);
     }
-    return applyComposed(fn, expr.args, ctx, depth, fnRaw);
+    return applyComposed(fn, expr.args, ctx, depth, fnRaw, depCollector);
   }
 
   // Context as function — constructor call via __construct
@@ -132,16 +132,16 @@ function evaluateExpr(expr: ExpressionValue, ctx: ContextValue, depth: number): 
     if (constructBinding?.value) {
       const ctor = constructBinding.value;
       if (ctor.kind === ValueKind.PrimitiveFunction) {
-        return applyPrimitive(ctor, expr.args, ctx, depth);
+        return applyPrimitive(ctor, expr.args, ctx, depth, depCollector);
       }
       if (ctor.kind === ValueKind.ComposedFunction) {
-        return applyComposed(ctor, expr.args, ctx, depth);
+        return applyComposed(ctor, expr.args, ctx, depth, undefined, depCollector);
       }
     }
   }
 
   // Function not resolved — partially evaluate args
-  const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1));
+  const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1, depCollector));
   if (fn === expr.fn && evalArgs.every((a, i) => a === expr.args[i])) {
     return expr;
   }
@@ -155,15 +155,16 @@ function applyPrimitive(
   args: Value[],
   ctx: ContextValue,
   depth: number,
+  depCollector?: DepCollector,
 ): Value {
-  const evalFn = (v: Value, c: ContextValue) => evaluate(v, c, depth + 1);
+  const evalFn = (v: Value, c: ContextValue) => evaluate(v, c, depth + 1, depCollector);
 
   if (fn.lazy) {
     return fn.fn(args, ctx, evalFn);
   }
 
   // Eager: evaluate all args
-  const evalArgs = args.map(a => evaluate(a, ctx, depth + 1));
+  const evalArgs = args.map(a => evaluate(a, ctx, depth + 1, depCollector));
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
     // Even though args aren't fully resolved, their type components
@@ -249,6 +250,7 @@ function applyComposed(
   ctx: ContextValue,
   depth: number,
   fnRaw?: Value,
+  depCollector?: DepCollector,
 ): Value {
   let currentFn = fn;
   let currentArgs = args;
@@ -256,7 +258,7 @@ function applyComposed(
 
   // TCO loop: re-enters when a tail call to the same (or different) function is detected
   tco_loop: while (true) {
-    const evalArgs = currentArgs.map(a => evaluate(a, ctx, depth + 1));
+    const evalArgs = currentArgs.map(a => evaluate(a, ctx, depth + 1, depCollector));
 
     // Error propagation: if any arg has an error component, propagate without executing
     for (const arg of evalArgs) {
@@ -313,7 +315,7 @@ function applyComposed(
     }
 
     const substituted = substituteParams(currentFn, evalArgs);
-    let result: Value | TailCall = evaluate(substituted, enrichedCtx, depth + 1);
+    let result: Value | TailCall = evaluate(substituted, enrichedCtx, depth + 1, depCollector);
 
     // Check for TailCall from tail-position evaluation
     if (isTailCall(result)) {

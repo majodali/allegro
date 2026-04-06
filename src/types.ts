@@ -221,6 +221,13 @@ export interface Extension {
   moduleObject?: Value;
 }
 
+// --- Dependency tracking for forward-chaining partial evaluation ---
+
+/** Accumulates names of bindings accessed during evaluation that are incomplete. */
+export interface DepCollector {
+  incompleteRefs: Set<string>;
+}
+
 // --- Error class ---
 
 export class AllegroError extends Error {

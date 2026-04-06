@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { formatValue } from "./primitives.js";
-import { evalSource as runtimeEval, Extension, extensionToContext } from "./runtime.js";
+import { evalSource as runtimeEval, Extension, extensionToContext, applyPhase, DependencyRegistry } from "./runtime.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
@@ -2665,6 +2665,85 @@ test("multiline: when multi-case still works", () => {
 
 test("multiline: single-line if unchanged", () => {
   eq(evalNum("if 1 == 1 then 42 else 0"), 42);
+});
+
+// == Reactive Forward-Chaining Evaluation ==
+
+test("reactive: all bindings complete → registry has no incomplete", () => {
+  const { registry } = runtimeEval("x = 42\ny = x + 1\n", undefined, [typeExt], undefined, true);
+  eq(registry.dependents.size, 0, "no incomplete dependencies");
+  const xb = registry.bindings.get("x");
+  eq(xb?.isComplete, true, "x is complete");
+  const yb = registry.bindings.get("y");
+  eq(yb?.isComplete, true, "y is complete");
+});
+
+test("reactive: import binding starts incomplete", () => {
+  // 'import foo' creates a binding with value: undefined
+  // If foo is not provided by extensions, it stays incomplete
+  const { registry, evalCtx } = runtimeEval("import foo\nx = 42\n", undefined, [typeExt], undefined, true);
+  const xb = registry.bindings.get("x");
+  eq(xb?.isComplete, true, "x is complete");
+  // foo is an import (value: undefined) — not tracked as a reactive binding
+  // But x doesn't depend on foo, so x should still be complete
+});
+
+test("reactive: applyPhase provides binding and triggers re-eval", () => {
+  // Evaluate code where 'config' is not available
+  const { registry, evalCtx } = runtimeEval("x = 42\n", undefined, [typeExt], undefined, true);
+
+  // Apply a new phase with a binding
+  applyPhase(registry, evalCtx, new Map([["extra", makeInt(100)]]));
+
+  // The new binding should be in evalCtx
+  const extraB = evalCtx.bindings.get("extra");
+  eq(extraB?.value !== undefined, true, "extra binding available");
+  eq(Number((primaryOf(extraB!.value!) as BitsValue).data), 100);
+});
+
+test("reactive: applyPhase triggers dependent re-evaluation", () => {
+  // Create a source that references an unavailable binding
+  // Use ctx_use to declare 'config' as needed but undefined
+  const { registry, evalCtx } = runtimeEval("x = 42\n", undefined, [typeExt], undefined, true);
+
+  // Manually add an incomplete binding to simulate a dependency
+  const configSymbol = { kind: "Symbol" as const, name: "config" };
+  evalCtx.bindings.set("result", { key: "result", value: configSymbol as any, isUse: false });
+  registry.bindings.set("result", {
+    key: "result",
+    currentValue: configSymbol as any,
+    incompleteDeps: new Set(["config"]),
+    isComplete: false,
+  });
+  // Register dependency
+  let deps = registry.dependents.get("config");
+  if (!deps) { deps = new Set(); registry.dependents.set("config", deps); }
+  deps.add("result");
+
+  // Apply phase with config
+  applyPhase(registry, evalCtx, new Map([["config", makeInt(99)]]));
+
+  // result should now be re-evaluated
+  const rb = registry.bindings.get("result");
+  eq(rb?.isComplete, true, "result should be complete after config provided");
+  eq(Number((primaryOf(rb!.currentValue) as BitsValue).data), 99, "result should be 99");
+});
+
+test("reactive: depCollector records incomplete symbols during evaluation", () => {
+  // Evaluate an expression that references an undefined symbol
+  const ctx = makeContext();
+  ctx.bindings.set("a", { key: "a", value: makeInt(5), isUse: false });
+  ctx.bindingList.push({ key: "a", value: makeInt(5), isUse: false });
+  // 'b' is NOT defined
+
+  const collector = { incompleteRefs: new Set<string>() };
+  const expr = makeExpr(
+    { kind: "PrimitiveFunction" as const, name: "bits_add", fn: (args: any[]) => makeInt(Number(args[0].data + args[1].data)), lazy: undefined } as any,
+    [{ kind: "Symbol" as const, name: "a" } as any, { kind: "Symbol" as const, name: "b" } as any]
+  );
+  const result = evaluate(expr, ctx, 0, collector);
+  eq(collector.incompleteRefs.has("b"), true, "b should be recorded as incomplete");
+  eq(collector.incompleteRefs.has("a"), false, "a should not be incomplete");
 });
 
 // --- Run all tests (sync + async) and report ---

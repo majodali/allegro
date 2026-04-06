@@ -8,7 +8,7 @@ import { markTailCalls, precompileFunction } from "./evaluator.js";
 import { parseBase as hybridParseBase, parseStandard as hybridParseStandard } from "./hybrid-parser.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved } from "./types.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -636,6 +636,125 @@ export function extensionToContext(ext: Extension): Value {
   return ctx;
 }
 
+// =============================================================================
+// Forward-Chaining Reactive Partial Evaluation
+// =============================================================================
+
+/** A binding tracked by the reactive evaluation system. */
+export interface ReactiveBinding {
+  key: string;
+  /** Current value — may be a residual Expression or final value */
+  currentValue: Value;
+  /** Names of incomplete dependencies (only meaningful when !isComplete) */
+  incompleteDeps: Set<string>;
+  /** True when currentValue is fully resolved */
+  isComplete: boolean;
+}
+
+/** Registry of reactive bindings and their dependency relationships. */
+export interface DependencyRegistry {
+  /** Maps incomplete binding name → set of binding keys that depend on it */
+  dependents: Map<string, Set<string>>;
+  /** All reactive bindings by key */
+  bindings: Map<string, ReactiveBinding>;
+}
+
+/** Create an empty dependency registry. */
+export function createRegistry(): DependencyRegistry {
+  return { dependents: new Map(), bindings: new Map() };
+}
+
+/** Register a binding's incomplete dependencies in the registry. */
+function registerDeps(registry: DependencyRegistry, key: string, deps: Set<string>): void {
+  for (const depName of deps) {
+    let set = registry.dependents.get(depName);
+    if (!set) { set = new Set(); registry.dependents.set(depName, set); }
+    set.add(key);
+  }
+}
+
+/**
+ * Forward-chain: when bindings complete, re-evaluate their dependents.
+ * Cascades until no more completions occur.
+ */
+function propagateCompletions(
+  registry: DependencyRegistry,
+  evalCtx: ContextValue,
+  completedNames: Set<string>,
+): void {
+  const worklist = new Set<string>();
+
+  // Collect all bindings that depend on the newly completed names
+  for (const name of completedNames) {
+    const deps = registry.dependents.get(name);
+    if (deps) {
+      for (const depKey of deps) worklist.add(depKey);
+      registry.dependents.delete(name);
+    }
+  }
+
+  const newlyCompleted = new Set<string>();
+
+  for (const key of worklist) {
+    const rb = registry.bindings.get(key);
+    if (!rb || rb.isComplete) continue;
+
+    // Re-evaluate the residual in the updated context
+    const collector: DepCollector = { incompleteRefs: new Set() };
+    const newVal = evaluate(rb.currentValue, evalCtx, 0, collector);
+
+    // Replace the binding's value (not mutate)
+    rb.currentValue = newVal;
+    rb.incompleteDeps = collector.incompleteRefs;
+
+    const ctxBinding = evalCtx.bindings.get(key);
+    if (ctxBinding) ctxBinding.value = newVal;
+
+    const nowComplete = isResolved(newVal);
+    rb.isComplete = nowComplete;
+
+    if (nowComplete) {
+      newlyCompleted.add(key);
+    } else {
+      // Re-register remaining dependencies
+      registerDeps(registry, key, collector.incompleteRefs);
+    }
+  }
+
+  // Cascade: if re-evaluation completed more bindings, propagate again
+  if (newlyCompleted.size > 0) {
+    propagateCompletions(registry, evalCtx, newlyCompleted);
+  }
+}
+
+/**
+ * Apply a new phase: add bindings and trigger re-evaluation of dependents.
+ * Used for import resolution, REPL persistence, and multi-phase builds.
+ */
+export function applyPhase(
+  registry: DependencyRegistry,
+  evalCtx: ContextValue,
+  newBindings: Map<string, Value>,
+): void {
+  const completed = new Set<string>();
+
+  for (const [name, value] of newBindings) {
+    const binding: Binding = { key: name, value, isUse: false };
+    evalCtx.bindings.set(name, binding);
+    // Also add to bindingList if not already present
+    if (!evalCtx.bindingList.some(b => b.key === name)) {
+      evalCtx.bindingList.push(binding);
+    }
+    completed.add(name);
+  }
+
+  propagateCompletions(registry, evalCtx, completed);
+}
+
+// =============================================================================
+// Source Evaluation
+// =============================================================================
+
 /**
  * Parse and evaluate Allegro source code.
  * Uses the hybrid parser (Pratt + recursive descent) by default.
@@ -654,7 +773,7 @@ export function evalSource(
   extensions?: Extension[],
   grammarExtension?: GrammarExtension,
   typed?: boolean,
-): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport } {
+): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
@@ -671,7 +790,7 @@ export function evalSource(
 
   const fileCtx = (result.tree as any).ctx;
   if (!fileCtx) {
-    return { value: null, evalCtx: base ?? makeContext() };
+    return { value: null, evalCtx: base ?? makeContext(), registry: createRegistry() };
   }
 
   // Type literals if standard type system is active
@@ -693,36 +812,58 @@ export function evalSource(
   const compilationReport = precompileFunctions(fileCtx, extensions, typed);
 
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
+  const registry = createRegistry();
 
-  // Evaluate all bindings (named and bare) in order.
+  // Evaluate all bindings (named and bare) in order with dependency tracking.
   let lastValue: Value | null = null;
+  const completedInThisPass = new Set<string>();
+
   for (const b of fileCtx.bindingList) {
-    if (b.value !== undefined) {
-      const val = evaluate(b.value, evalCtx);
-      if (b.key === null) {
-        lastValue = val;
-      } else {
-        // Auto-name types immediately: if the evaluated value is a type Context
-        // with a placeholder name, set it to the binding name. This happens at
-        // the point of creation, so the type object itself (including references
-        // captured in constructors) gets the correct name.
-        if (val.kind === ValueKind.Context) {
-          const nameBinding = (val as ContextValue).bindings.get("__name");
-          if (nameBinding?.value?.kind === ValueKind.Bits) {
-            const currentName = bitsToString(nameBinding.value as BitsValue);
-            if (currentName.startsWith("<")) {
-              nameBinding.value = stringToBits(b.key);
-            }
+    if (b.value === undefined) continue;
+
+    const collector: DepCollector = { incompleteRefs: new Set() };
+    const val = evaluate(b.value, evalCtx, 0, collector);
+
+    if (b.key === null) {
+      // Bare expression
+      lastValue = val;
+    } else {
+      // Auto-name types immediately
+      if (val.kind === ValueKind.Context) {
+        const nameBinding = (val as ContextValue).bindings.get("__name");
+        if (nameBinding?.value?.kind === ValueKind.Bits) {
+          const currentName = bitsToString(nameBinding.value as BitsValue);
+          if (currentName.startsWith("<")) {
+            nameBinding.value = stringToBits(b.key);
           }
         }
-        // Store evaluated value in eval context
-        const ctxBinding = evalCtx.bindings.get(b.key);
-        if (ctxBinding) {
-          ctxBinding.value = val;
-        }
+      }
+
+      // Store evaluated value in eval context
+      const ctxBinding = evalCtx.bindings.get(b.key);
+      if (ctxBinding) ctxBinding.value = val;
+
+      // Register in reactive registry
+      const complete = isResolved(val);
+      registry.bindings.set(b.key, {
+        key: b.key,
+        currentValue: val,
+        incompleteDeps: complete ? new Set() : collector.incompleteRefs,
+        isComplete: complete,
+      });
+
+      if (complete) {
+        completedInThisPass.add(b.key);
+      } else if (collector.incompleteRefs.size > 0) {
+        registerDeps(registry, b.key, collector.incompleteRefs);
       }
     }
   }
 
-  return { value: lastValue, evalCtx, compilationReport };
+  // Forward-chain: propagate completions to re-evaluate dependent residuals
+  if (completedInThisPass.size > 0) {
+    propagateCompletions(registry, evalCtx, completedInThisPass);
+  }
+
+  return { value: lastValue, evalCtx, compilationReport, registry };
 }
