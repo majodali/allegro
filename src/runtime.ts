@@ -191,16 +191,13 @@ export function resolveSymbols(
     }
   }
 
-  for (const b of fileCtx.bindingList) {
-    if (b.value !== undefined) {
-      for (const [name, srcBinding] of sourceBindings) {
-        // Skip self-references — recursive functions resolve from context at runtime
-        if (b.key === name) continue;
-        patchNamedParams(b.value, name, srcBinding, new Set());
-      }
-    }
-  }
-
+  // Third pass removed: source-to-source references stay as Symbols and resolve
+  // from the eval context at runtime. This ensures that when a binding is evaluated,
+  // subsequent references see the evaluated value (not the pre-evaluation expression).
+  // This is correct with forward-chaining: bindings evaluate once, results stored
+  // in evalCtx, and Symbols resolve to those results.
+  // Previously patchNamedParams created direct value references which prevented
+  // re-evaluation from seeing updated values (the auto-naming/duplicate-object issue).
 }
 
 /**

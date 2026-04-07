@@ -2384,17 +2384,16 @@ p instanceof Point
   eq(Number((primaryOf(result!) as BitsValue).data), 1);
 });
 
-test("extend: auto-naming in eval context", () => {
-  // Auto-naming updates the eval context's copy of the type.
-  // Without memoization, instances may hold a different type object.
-  // This test verifies the eval context has the named type.
-  const { evalCtx } = runtimeEval(`
+test("extend: auto-naming propagates to instances", () => {
+  // Auto-naming now works correctly: Symbols resolve from evalCtx which
+  // has the named type. Instances share the same type object.
+  const result = evalStd(`
 Point = NominalType.extend({x: Int, y: Int})
-Point(1, 2)
-`, undefined, [typeExt], undefined, true);
-  const pointVal = evalCtx.bindings.get("Point")?.value;
-  eq(pointVal?.kind, ValueKind.Context);
-  const nameB = (pointVal as ContextValue).bindings.get("__name");
+p = Point(1, 2)
+type of p
+`);
+  eq(result!.kind, ValueKind.Context);
+  const nameB = (result as ContextValue).bindings.get("__name");
   eq(bitsToString(primaryOf(nameB!.value!) as BitsValue), "Point");
 });
 
@@ -2405,15 +2404,12 @@ Point(10)
 `), "expects 2 args");
 });
 
-test("extend: formatValue shows record fields", () => {
-  // Without memoization, the type name may be <anonymous> on instances
-  // (auto-naming updates evalCtx copy, not the constructor's captured copy).
-  // Verify the fields are displayed correctly regardless of name.
+test("extend: formatValue shows named record", () => {
   const result = evalStd(`
 Point = NominalType.extend({x: Int, y: Int})
 Point(10, 20)
 `);
-  eq(formatValue(result!).includes("x: 10, y: 20"), true);
+  eq(formatValue(result!), "Point(x: 10, y: 20)");
 });
 
 test("extend: print shows record (name finalized after eval)", () => {
