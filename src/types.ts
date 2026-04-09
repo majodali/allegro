@@ -1,4 +1,4 @@
-// Allegro Base Language - Core Types
+// Allegretto - Core Types
 // Five value kinds + Param placeholder
 
 export enum ValueKind {

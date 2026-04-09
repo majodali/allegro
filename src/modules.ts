@@ -1,5 +1,5 @@
 // =============================================================================
-// Allegro Base Language - Module Loader
+// Allegretto - Module Loader
 // Loads .alg files as anonymous extensions.
 // =============================================================================
 

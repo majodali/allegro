@@ -6,8 +6,8 @@
 npx tsc --noEmit                    # type-check
 npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file (Allegro Standard)
-npx tsx src/index.ts --base         # REPL (Allegro Base)
-npx tsx src/index.ts --base file.alg  # run a file (Allegro Base)
+npx tsx src/index.ts --base         # REPL (Allegretto)
+npx tsx src/index.ts --base file.alg  # run a file (Allegretto)
 npx tsx src/test.ts                 # run all tests
 ```
 
@@ -35,9 +35,9 @@ They are validated automatically by the test suite via `// expect:` comments.
 
 ## What is Allegro?
 
-Allegro is a **programmable language platform** — a minimal, flexible core ("Allegro Base") that serves as a substrate for building higher-level languages and DSLs. The standard language ("Allegro Standard") is a curated stack of extensions providing familiar syntax, a type system, and common data types.
+Allegro is a **programmable language platform** — a minimal, flexible core ("Allegretto") that serves as a substrate for building higher-level languages and DSLs. The standard language ("Allegro Standard") is a curated stack of extensions providing familiar syntax, a type system, and common data types.
 
-- **Allegro Base** — the primitive language: 7 value kinds, expression DAGs, recursive evaluator
+- **Allegretto** — the primitive language: 7 value kinds, expression DAGs, recursive evaluator
 - **Allegro Standard** — the standard language with types, modules, and extensions
 - In normal use, "Allegro" refers to the standard language
 

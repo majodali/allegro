@@ -1074,7 +1074,7 @@ export function getStandardGrammarConfig(): HybridGrammarConfig {
 // Public parse functions (match Earley parser interface)
 // =============================================================================
 
-/** Parse source in base mode */
+/** Parse source in Allegretto (base) mode */
 export function parseBase(input: string): ParseResult {
   const parser = new HybridParser(input, getBaseGrammarConfig());
   return parser.parseFile();

@@ -1,4 +1,4 @@
-// Allegro Base Language - Evaluator
+// Allegretto - Evaluator
 
 import {
   Value, ValueKind, ExpressionValue, ContextValue,

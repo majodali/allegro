@@ -1,5 +1,5 @@
 // =============================================================================
-// Allegro Base Language - Grammar Extension
+// Allegretto - Grammar Extension
 // Provides a builder API for extending the grammar without mutating the base.
 // =============================================================================
 
@@ -121,7 +121,7 @@ export function parseExtended(input: string, extension: GrammarExtension): Parse
 
 /**
  * Add dot access syntax: CallExpr → CallExpr "." Ident
- * Produces: ctx_resolve(left, "fieldName") in base mode,
+ * Produces: ctx_resolve(left, "fieldName") in Allegretto mode,
  * or type_dispatch(left, "fieldName") in typed mode.
  */
 export function addDotAccess(builder: GrammarBuilder, typed: boolean = false): void {
@@ -174,7 +174,7 @@ export function addImport(builder: GrammarBuilder): void {
 
 /**
  * Build the standard grammar extensions (dot access + import).
- * Uses ctx_resolve for dot access (base mode).
+ * Uses ctx_resolve for dot access (Allegretto mode).
  */
 export function buildStandardExtensions(): GrammarExtension {
   const builder = new GrammarBuilder();

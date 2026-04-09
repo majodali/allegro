@@ -1,11 +1,11 @@
 // =============================================================================
 // Allegro — Entry Point
-// Supports both Base mode and Standard mode (default).
+// Supports both Allegretto (base) and Allegro Standard (default) modes.
 // Usage:
-//   npx tsx src/index.ts                  # Standard REPL
-//   npx tsx src/index.ts file.alg         # Standard file runner
-//   npx tsx src/index.ts --base           # Base REPL
-//   npx tsx src/index.ts --base file.alg  # Base file runner
+//   npx tsx src/index.ts                  # Allegro Standard REPL
+//   npx tsx src/index.ts file.alg         # Allegro Standard file runner
+//   npx tsx src/index.ts --base           # Allegretto REPL
+//   npx tsx src/index.ts --base file.alg  # Allegretto file runner
 // =============================================================================
 
 import * as fs from "fs";
@@ -108,10 +108,10 @@ function repl(standard: boolean): void {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: standard ? "allegro> " : "allegro-base> ",
+    prompt: standard ? "allegro> " : "allegretto> ",
   });
 
-  const modeName = standard ? "Allegro Standard" : "Allegro Base";
+  const modeName = standard ? "Allegro Standard" : "Allegretto";
   console.log(`${modeName} REPL (Ctrl+D to exit)`);
   rl.prompt();
 

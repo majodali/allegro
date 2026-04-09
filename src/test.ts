@@ -1,5 +1,5 @@
 // =============================================================================
-// Allegro Base Language - Test Suite
+// Allegretto - Test Suite
 // Run: npx tsx src/test.ts
 // =============================================================================
 
@@ -1628,8 +1628,8 @@ test("UntypedFunction: wrapped primitives are still callable", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 42);
 });
 
-test("UntypedFunction: user-defined functions in base mode have no type", () => {
-  // In base mode (no typed flag), functions don't get types
+test("UntypedFunction: user-defined functions in Allegretto mode have no type", () => {
+  // In Allegretto mode (no typed flag), functions don't get types
   const { value } = runtimeEval("f(x) => x\nf\n");
   eq(value !== null, true);
   eq(getTypeName(value!), null);

@@ -1,4 +1,4 @@
-// Allegro Base Language - Primitive Functions
+// Allegretto - Primitive Functions
 
 import {
   Value, ValueKind, BitsValue, ContextValue,

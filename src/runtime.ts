@@ -1,5 +1,5 @@
 // =============================================================================
-// Allegro Base Language - Runtime
+// Allegretto - Runtime
 // Bridges the parser's output to the evaluator.
 // =============================================================================
 
