@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Allegro Sandbox</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  header {
+    background: #181825;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #313244;
+  }
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #cba6f7;
+  }
+  header .mode {
+    font-size: 12px;
+    color: #6c7086;
+    background: #313244;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    background: #181825;
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #313244;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover { background: #45475a; }
+  button.primary { background: #89b4fa; color: #1e1e2e; border-color: #89b4fa; }
+  button.primary:hover { background: #74c7ec; }
+  button.danger { background: #f38ba8; color: #1e1e2e; border-color: #f38ba8; }
+  button.danger:hover { background: #eba0ac; }
+  select {
+    background: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .separator { width: 1px; height: 20px; background: #45475a; }
+  .label { font-size: 12px; color: #6c7086; }
+
+  /* Main panels */
+  .panels {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+  .panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .panel-header {
+    background: #181825;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #6c7086;
+    border-bottom: 1px solid #313244;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .panel:first-child { border-right: 1px solid #313244; }
+
+  /* Editor */
+  #editor {
+    flex: 1;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 12px;
+    border: none;
+    outline: none;
+    resize: none;
+    tab-size: 4;
+    white-space: pre;
+    overflow: auto;
+  }
+
+  /* Output */
+  #output {
+    flex: 1;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 12px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .out-line { color: #a6e3a1; }
+  .out-result { color: #89b4fa; }
+  .out-error { color: #f38ba8; }
+  .out-info { color: #6c7086; font-style: italic; }
+
+  /* Status bar */
+  footer {
+    background: #181825;
+    padding: 4px 16px;
+    font-size: 11px;
+    color: #6c7086;
+    border-top: 1px solid #313244;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .panels { flex-direction: column; }
+    .panel:first-child { border-right: none; border-bottom: 1px solid #313244; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Allegro Sandbox</h1>
+  <span class="mode">Allegro Standard</span>
+  <a href="/" style="color: #6c7086; text-decoration: none; font-size: 13px; margin-left: auto;">Documentation</a>
+</header>
+
+<div class="toolbar">
+  <button class="primary" onclick="runCode()" title="Ctrl+Enter">Run</button>
+  <button onclick="resetSession()">Reset</button>
+  <div class="separator"></div>
+  <span class="label">Examples:</span>
+  <select id="examples" onchange="loadExample()">
+    <option value="">— select —</option>
+  </select>
+  <div class="separator"></div>
+  <span class="label">Snippets:</span>
+  <select id="snippets" onchange="loadSnippet()">
+    <option value="">— select —</option>
+  </select>
+  <button onclick="saveSnippet()">Save</button>
+  <button class="danger" onclick="deleteSnippet()">Delete</button>
+</div>
+
+<div class="panels">
+  <div class="panel">
+    <div class="panel-header">Editor</div>
+    <textarea id="editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">// Welcome to the Allegro Sandbox!
+// Press Ctrl+Enter or click Run to evaluate.
+
+print("Hello, Allegro!")
+</textarea>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Output</div>
+    <div id="output"><span class="out-info">Press Run to evaluate...</span></div>
+  </div>
+</div>
+
+<footer>
+  <span id="status">Ready</span>
+  <span>Allegro Standard | Web Sandbox</span>
+</footer>
+
+<script src="/allegro.js"></script>
+<script>
+// =============================================================================
+// Sandbox Logic
+// =============================================================================
+
+const editor = document.getElementById('editor');
+const output = document.getElementById('output');
+const status = document.getElementById('status');
+const examplesSelect = document.getElementById('examples');
+const snippetsSelect = document.getElementById('snippets');
+
+// --- Examples (built-in) ---
+
+const EXAMPLES = {
+  "Hello World": `print("Hello, Allegro!")`,
+
+  "Fibonacci": `// Tail-recursive fibonacci
+fib(n) => if n < 2 then n else fib(n - 1) + fib(n - 2)
+print(fib(10))
+print(fib(20))`,
+
+  "Pattern Matching": `// Pattern matching with guards and destructuring
+classify(val) => when val
+  is n and n > 0 then "positive"
+  is n and n < 0 then "negative"
+  is _ then "zero"
+
+print(classify(42))
+print(classify(0 - 5))
+print(classify(0))
+
+// Destructuring
+point = {x: 10, y: 20}
+when point
+  is {x, y} and x > 0 then print("x={x}, y={y}")
+  is _ then print("origin")`,
+
+  "Custom Types": `// Define a custom type using the fluent API
+Point = NominalType.extend({x: Int, y: Int})
+p = Point(10, 20)
+print(p)
+print(p.x)
+print(p instanceof Point)
+
+// Refinement type
+PositiveInt = Int.where(n => n > 0)
+print(PositiveInt(5))
+x = PositiveInt(0 - 1)
+print(error of x)
+
+// Distinct type (breaks subtypeof)
+UserId = Int.distinct()
+print(UserId(42) instanceof Int)
+print(UserId(42) instanceof UserId)`,
+
+  "Arrays": `// Array operations
+nums = [1, 2, 3, 4, 5]
+print(nums.length)
+
+doubled = nums.map(x => x * 2)
+print(doubled)
+
+evens = nums.filter(x => x % 2 == 0)
+print(evens)
+
+sum = nums.reduce((acc, x) => acc + x, 0)
+print(sum)
+
+// Chaining
+result = [1, 2, 3, 4, 5]
+  .filter(x => x > 2)
+  .map(x => x * 10)
+print(result)`,
+
+  "String Interpolation": `name = "World"
+print("Hello, {name}!")
+
+x = 6
+y = 7
+print("{x} * {y} = {x * y}")
+
+// String methods
+greeting = "  Hello, Allegro!  "
+print(greeting.trim())
+print(greeting.trim().toUpperCase())
+print("hello".startsWith("hel"))
+print("a,b,c".split(","))`,
+
+  "Error Handling": `// Error values propagate automatically
+safeDiv(a, b) =>
+  if b == 0
+    then error "division by zero"
+    else a / b
+
+print(safeDiv(10, 2))
+print(safeDiv(10, 0))
+
+// Inspect errors
+result = safeDiv(10, 0)
+when error of result
+  is none then print("ok")
+  is msg then print("Error: {msg}")`,
+
+  "Type System": `// Type hierarchy
+print(42 instanceof Int)
+print("hello" instanceof String)
+print(NominalType subtypeof Type)
+
+// Generics
+arr = [1, 2, 3]
+print(arr instanceof Array)
+print(arr instanceof Array[Int])
+
+// Type annotations
+add(x: Int, y: Int): Int => x + y
+print(add(3, 4))
+
+// Multi-line expressions
+abs(x) =>
+  if x > 0
+    then x
+    else 0 - x
+print(abs(0 - 42))`,
+
+  "Recursive Algorithms": `// Recursive map
+myMap(arr, f) =>
+  if arr.length == 0
+    then []
+    else [f(arr[0])].concat(myMap(arr.slice(1), f))
+
+print(myMap([1, 2, 3], x => x * 3))
+
+// Recursive filter
+myFilter(arr, pred) =>
+  if arr.length == 0
+    then []
+    else if pred(arr[0])
+      then [arr[0]].concat(myFilter(arr.slice(1), pred))
+      else myFilter(arr.slice(1), pred)
+
+print(myFilter([1, 2, 3, 4, 5], x => x % 2 == 0))
+
+// Recursive reduce (tail-recursive)
+myReduce(arr, f, acc) =>
+  if arr.length == 0
+    then acc
+    else myReduce(arr.slice(1), f, f(acc, arr[0]))
+
+print(myReduce([1, 2, 3, 4, 5], (a, b) => a + b, 0))`,
+};
+
+// Populate examples dropdown
+for (const name of Object.keys(EXAMPLES)) {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  examplesSelect.appendChild(opt);
+}
+
+function loadExample() {
+  const name = examplesSelect.value;
+  if (name && EXAMPLES[name]) {
+    editor.value = EXAMPLES[name];
+    examplesSelect.value = '';
+  }
+}
+
+// --- Snippets (localStorage) ---
+
+const STORAGE_KEY = 'allegro-snippets';
+
+function getSnippets() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  } catch { return {}; }
+}
+
+function saveSnippets(snippets) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(snippets));
+}
+
+function refreshSnippetsList() {
+  const snippets = getSnippets();
+  snippetsSelect.innerHTML = '<option value="">— select —</option>';
+  for (const name of Object.keys(snippets).sort()) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    snippetsSelect.appendChild(opt);
+  }
+}
+
+function saveSnippet() {
+  const name = prompt('Snippet name:');
+  if (!name) return;
+  const snippets = getSnippets();
+  snippets[name] = editor.value;
+  saveSnippets(snippets);
+  refreshSnippetsList();
+  status.textContent = `Saved: ${name}`;
+}
+
+function loadSnippet() {
+  const name = snippetsSelect.value;
+  if (!name) return;
+  const snippets = getSnippets();
+  if (snippets[name]) {
+    editor.value = snippets[name];
+    snippetsSelect.value = '';
+  }
+}
+
+function deleteSnippet() {
+  const name = snippetsSelect.value;
+  if (!name) return;
+  if (!confirm(`Delete snippet "${name}"?`)) return;
+  const snippets = getSnippets();
+  delete snippets[name];
+  saveSnippets(snippets);
+  refreshSnippetsList();
+  snippetsSelect.value = '';
+  status.textContent = `Deleted: ${name}`;
+}
+
+refreshSnippetsList();
+
+// --- Run ---
+
+function runCode() {
+  const source = editor.value;
+  if (!source.trim()) {
+    output.innerHTML = '<span class="out-info">Nothing to evaluate.</span>';
+    return;
+  }
+
+  const start = performance.now();
+  const result = Allegro.eval(source);
+  const elapsed = (performance.now() - start).toFixed(1);
+
+  let html = '';
+
+  // Print output lines
+  for (const line of result.output) {
+    html += `<span class="out-line">${escapeHtml(line)}</span>\n`;
+  }
+
+  // Final result value
+  if (result.result !== null && result.result !== undefined) {
+    html += `<span class="out-result">${escapeHtml(result.result)}</span>\n`;
+  }
+
+  // Error
+  if (result.error) {
+    html += `<span class="out-error">Error: ${escapeHtml(result.error)}</span>\n`;
+  }
+
+  if (!html) {
+    html = '<span class="out-info">No output.</span>';
+  }
+
+  output.innerHTML = html;
+  status.textContent = `Evaluated in ${elapsed}ms`;
+}
+
+function resetSession() {
+  Allegro.reset();
+  output.innerHTML = '<span class="out-info">Session reset.</span>';
+  status.textContent = 'Session reset';
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// --- Keyboard shortcuts ---
+
+editor.addEventListener('keydown', (e) => {
+  // Ctrl+Enter / Cmd+Enter — run
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    runCode();
+  }
+
+  // Tab — insert spaces
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
+    editor.selectionStart = editor.selectionEnd = start + 4;
+  }
+});
+</script>
+
+</body>
+</html>
