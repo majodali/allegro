@@ -90,7 +90,9 @@ High-level goals, roughly ordered by dependency:
 
 ### Language Features
 - [x] String interpolation — `"hello {name}"`, `"{expr}"`, escaped `\{`
-- [ ] Async evaluation — promises/futures, await syntax
+- [x] Implicit async via futures — FutureManager bridges JS Promises to forward-chaining. `delay(ms)` primitive. Deferred print. No `await` keyword needed.
+- [ ] Async I/O primitives — fetch, file read/write (execution-context provided)
+- [ ] Sync/async type modifiers — explore async-by-default with `sync` optimization hint
 - [ ] Configurable mutability — linear types, transient mutation, semantic variants
 - [x] Error values — `error` keyword, automatic propagation through operations, Error type
 - [x] None type — `none` keyword, singleton value, returned for absent MultiValue components

@@ -5,6 +5,7 @@
 
 import { formatValue } from "./primitives.js";
 import { evalSource as runtimeEval, Extension, extensionToContext, applyPhase, DependencyRegistry } from "./runtime.js";
+import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
@@ -2742,9 +2743,64 @@ test("reactive: depCollector records incomplete symbols during evaluation", () =
   eq(collector.incompleteRefs.has("a"), false, "a should not be incomplete");
 });
 
+// == Async Futures ==
+
+async function runAsyncTests(): Promise<void> {
+  await asyncTest("async: delay creates pending future", async () => {
+    const fm = createFutureManager();
+    const { registry } = runtimeEval("x = delay(10)\n", undefined, [typeExt], undefined, true, fm);
+    eq(fm.hasPending(), true, "should have pending future");
+    const xb = registry.bindings.get("x");
+    eq(xb?.isComplete, false, "x should be incomplete");
+    await fm.waitForAll();
+    eq(fm.hasPending(), false, "should have no pending futures");
+  });
+
+  await asyncTest("async: delay resolves and propagates to dependents", async () => {
+    const fm = createFutureManager();
+    const { registry } = runtimeEval("x = delay(10)\ny = x\n", undefined, [typeExt], undefined, true, fm);
+    eq(registry.bindings.get("y")?.isComplete, false, "y should start incomplete");
+    await fm.waitForAll();
+    eq(registry.bindings.get("x")?.isComplete, true, "x should be complete");
+    eq(registry.bindings.get("y")?.isComplete, true, "y should be complete after propagation");
+  });
+
+  await asyncTest("async: print defers until value resolves", async () => {
+    const output: string[] = [];
+    const fm = createFutureManager();
+    fm.onOutput = (text: string) => output.push(text);
+    runtimeEval("print(delay(10))\n", undefined, [typeExt], undefined, true, fm);
+    eq(output.length, 0, "no output while pending");
+    await fm.waitForAll();
+    eq(output.length, 1, "print fired after resolve");
+    eq(output[0], "0", "delay resolves to 0");
+  });
+
+  await asyncTest("async: multiple independent futures", async () => {
+    const fm = createFutureManager();
+    const { registry } = runtimeEval("a = delay(10)\nb = delay(20)\n", undefined, [typeExt], undefined, true, fm);
+    eq(fm.pendingCount, 2, "two pending futures");
+    await fm.waitForAll();
+    eq(registry.bindings.get("a")?.isComplete, true);
+    eq(registry.bindings.get("b")?.isComplete, true);
+  });
+
+  await asyncTest("async: chain of dependent futures", async () => {
+    const fm = createFutureManager();
+    const output: string[] = [];
+    fm.onOutput = (text: string) => output.push(text);
+    runtimeEval("x = delay(10)\ny = x + 1\nprint(y)\n", undefined, [typeExt], undefined, true, fm);
+    eq(output.length, 0, "no output while pending");
+    await fm.waitForAll();
+    // delay resolves to 0 (typed Int), so y = 0 + 1 = 1
+    eq(output.length, 1, "print fired");
+    eq(output[0], "1", "y should be 1");
+  });
+}
+
 // --- Run all tests (sync + async) and report ---
 
-runModuleTests().then(() => {
+runModuleTests().then(() => runAsyncTests()).then(() => {
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
   if (failures.length > 0) {

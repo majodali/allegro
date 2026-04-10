@@ -176,6 +176,15 @@ After partial evaluation, an expression's type is its `"type"` MultiValue compon
 - Residuals are replaced (not mutated) on re-evaluation — no stale state
 - Memoization disabled — forward-chaining replaces it for incomplete expressions
 
+### Implicit Async via Futures
+- `FutureManager` (`src/futures.ts`) bridges JavaScript Promises to forward-chaining
+- Async primitives (e.g., `delay(ms)`) create synthetic bindings (`__future_N`) with `value: undefined`
+- The evaluator treats them as unresolved Symbols — produces residuals naturally
+- When the Promise resolves, `applyPhase` provides the value and cascades re-evaluation
+- `print` defers on unresolved args — returns a residual that fires when the value resolves
+- No `await` keyword — async is implicit through forward-chaining
+- Bare expressions with futures are tracked via synthetic `__bare_N` bindings
+
 ### Compile-Time Type Inference
 - `precompileFunctions` pass in `evalSource` partially evaluates typed function bodies at definition time
 - Typed params get placeholder MultiValues (unresolved primary + resolved type component)
@@ -214,8 +223,9 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/grammar-ext.ts`** — GrammarBuilder for Earley extensions, handle registry for grammar primitives. `parseExtended` for Earley fallback path
 - **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
+- **`src/futures.ts`** — FutureManager: bridges JavaScript Promises to forward-chaining evaluation. Creates synthetic `__future_N` bindings, attaches `.then()` handlers that call `applyPhase`
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 334+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, file-based .alg tests
+- **`src/test.ts`** — 339+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons

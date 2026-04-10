@@ -770,6 +770,7 @@ export function evalSource(
   extensions?: Extension[],
   grammarExtension?: GrammarExtension,
   typed?: boolean,
+  futureManager?: import("./futures.js").FutureManager,
 ): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
@@ -811,9 +812,32 @@ export function evalSource(
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
   const registry = createRegistry();
 
+  // Link FutureManager to registry and evalCtx (for async primitives)
+  if (futureManager) {
+    futureManager.registry = registry;
+    futureManager.evalCtx = evalCtx;
+    (evalCtx as any).__futureManager = futureManager;
+  }
+
+  // Helper: collect Symbol names from a value tree (for dependency tracking
+  // of futures returned from primitives that bypass DepCollector)
+  function collectSymbolRefs(v: Value, refs: Set<string>, seen?: Set<Value>): void {
+    if (!seen) seen = new Set();
+    if (!v || typeof v !== "object" || seen.has(v)) return;
+    seen.add(v);
+    if (v.kind === ValueKind.Symbol) refs.add(v.name);
+    if (v.kind === ValueKind.Expression) {
+      collectSymbolRefs(v.fn, refs, seen);
+      for (const a of v.args) collectSymbolRefs(a, refs, seen);
+    }
+    if (v.kind === ValueKind.MultiValue) collectSymbolRefs(v.primary, refs, seen);
+    if (v.kind === ValueKind.ComposedFunction) collectSymbolRefs(v.body, refs, seen);
+  }
+
   // Evaluate all bindings (named and bare) in order with dependency tracking.
   let lastValue: Value | null = null;
   const completedInThisPass = new Set<string>();
+  let bareCounter = 0;
 
   for (const b of fileCtx.bindingList) {
     if (b.value === undefined) continue;
@@ -824,6 +848,23 @@ export function evalSource(
     if (b.key === null) {
       // Bare expression
       lastValue = val;
+      // Track Symbol dependencies from async futures (Symbols in the result
+      // that weren't seen by DepCollector because they were returned by primitives)
+      if (!isResolved(val)) collectSymbolRefs(val, collector.incompleteRefs);
+      // Track bare expressions with pending futures so forward-chaining
+      // can re-evaluate them (e.g., deferred print calls)
+      if (!isResolved(val) && collector.incompleteRefs.size > 0) {
+        const bareKey = `__bare_${bareCounter++}`;
+        registry.bindings.set(bareKey, {
+          key: bareKey,
+          currentValue: val,
+          incompleteDeps: collector.incompleteRefs,
+          isComplete: false,
+        });
+        registerDeps(registry, bareKey, collector.incompleteRefs);
+        evalCtx.bindings.set(bareKey, { key: bareKey, value: val, isUse: false });
+        evalCtx.bindingList.push({ key: bareKey, value: val, isUse: false });
+      }
     } else {
       // Auto-name types immediately
       if (val.kind === ValueKind.Context) {
@@ -839,6 +880,9 @@ export function evalSource(
       // Store evaluated value in eval context
       const ctxBinding = evalCtx.bindings.get(b.key);
       if (ctxBinding) ctxBinding.value = val;
+
+      // Track Symbol dependencies from async futures in the result tree
+      if (!isResolved(val)) collectSymbolRefs(val, collector.incompleteRefs);
 
       // Register in reactive registry
       const complete = isResolved(val);

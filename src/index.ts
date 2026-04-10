@@ -16,6 +16,7 @@ import { evalSource, Extension } from "./runtime.js";
 import { ContextValue } from "./types.js";
 import { createTypeSystem } from "./types-std.js";
 import { ModuleLoader } from "./modules.js";
+import { createFutureManager, FutureManager } from "./futures.js";
 
 // --- Standard mode setup ---
 
@@ -95,7 +96,11 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
       extensions = [...extensions, ...moduleExts];
     }
 
-    evalSource(source, undefined, extensions, undefined, true);
+    const fm = createFutureManager();
+    evalSource(source, undefined, extensions, undefined, true, fm);
+    if (fm.hasPending()) {
+      await fm.waitForAll();
+    }
   } catch (e: any) {
     console.error(`Error in ${filename}: ${e.message}`);
     process.exit(1);
@@ -117,6 +122,7 @@ function repl(standard: boolean): void {
 
   let buffer = "";
   let ctx: ContextValue | undefined;
+  const fm = standard ? createFutureManager() : undefined;
 
   rl.on("line", (line) => {
     buffer += line + "\n";
@@ -126,7 +132,7 @@ function repl(standard: boolean): void {
       if (buffer.trim()) {
         try {
           const result = standard
-            ? evalSource(buffer, ctx, getStdExtensions(), undefined, true)
+            ? evalSource(buffer, ctx, getStdExtensions(), undefined, true, fm)
             : evalSource(buffer, ctx);
           ctx = result.evalCtx;
           if (result.value !== null) {
@@ -139,7 +145,15 @@ function repl(standard: boolean): void {
       buffer = "";
     }
 
-    rl.prompt();
+    // Defer prompt if futures are pending
+    if (fm?.hasPending()) {
+      fm.onDrain = () => {
+        fm.onDrain = null;
+        rl.prompt();
+      };
+    } else {
+      rl.prompt();
+    }
   });
 
   rl.on("close", () => {

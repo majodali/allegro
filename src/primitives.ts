@@ -747,8 +747,44 @@ const when_no_match_impl: PrimitiveFnImpl = (args, _ctx, _evalFn) => {
 const print_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Lazy so we get the full MultiValue (with type info) instead of primaryOf
   const v = evalFn ? evalFn(args[0], ctx!) : args[0];
-  console.log(formatValue(v));
+  if (!isResolved(v)) {
+    // Value is pending (async future or other residual) — defer print
+    return makeExpr(makePrimitive("print", print_impl, true), [v]);
+  }
+  // Use FutureManager's onOutput if available (for async/web streaming)
+  const fm = (ctx as any)?.__futureManager;
+  if (fm?.onOutput) {
+    fm.onOutput(formatValue(v));
+  } else {
+    console.log(formatValue(v));
+  }
   return v;
+};
+
+// ============ ASYNC PRIMITIVES ============
+
+const delay_impl: PrimitiveFnImpl = (args) => {
+  // delay(ms) — returns a future that resolves after ms milliseconds
+  // The future resolves to none (Int 0)
+  const ctx = args.length > 1 ? args[1] : undefined; // ctx passed by evaluator
+  throw new AllegroError("delay: internal — should be called through delay_wrapper");
+};
+
+// Wrapper that accesses FutureManager from the evaluation context
+const delay_wrapper: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) {
+    return makeExpr(makePrimitive("delay", delay_wrapper, true), [v]);
+  }
+  const ms = Number(asBits(primaryOf(v), "delay").data);
+  const fm = (ctx as any)?.__futureManager as import("./futures.js").FutureManager | undefined;
+  if (!fm) {
+    throw new AllegroError("delay: requires async runtime (no FutureManager available)");
+  }
+  const promise = new Promise<Value>((resolve) => {
+    setTimeout(() => resolve(makeInt(0)), ms);
+  });
+  return fm.createFuture(promise);
 };
 
 // ============ IDENTITY (data structures) ============
@@ -1440,4 +1476,6 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_gt: makePrimitive("typed_gt", makeTypedBinOp("gt"), true),
   typed_lte: makePrimitive("typed_lte", makeTypedBinOp("lte"), true),
   typed_gte: makePrimitive("typed_gte", makeTypedBinOp("gte"), true),
+  // Async
+  delay: makePrimitive("delay", delay_wrapper, true),
 };
