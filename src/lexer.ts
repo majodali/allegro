@@ -22,7 +22,7 @@ export enum TokenType {
 
   // Operators
   Plus, Minus, Star, Slash, Percent,
-  Eq, EqEq, BangEq, Tilde, Pipe,
+  Eq, EqEq, BangEq, Tilde, Pipe, PipeArrow,
   Lt, Gt, LtEq, GtEq,
   Arrow,          // =>
   And, Or, Not,   // &&, ||, !
@@ -116,6 +116,7 @@ export const BASE_OPERATORS: [string, TokenType][] = [
   [",", TokenType.Comma],
   [":", TokenType.Colon],
   ["~", TokenType.Tilde],
+  ["|>", TokenType.PipeArrow],
   ["|", TokenType.Pipe],
 ];
 

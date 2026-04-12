@@ -2743,6 +2743,33 @@ test("reactive: depCollector records incomplete symbols during evaluation", () =
   eq(collector.incompleteRefs.has("a"), false, "a should not be incomplete");
 });
 
+// == Pipe Operator ==
+
+test("pipe: simple function application", () => {
+  const result = evalStd("double(x) => x * 2\n5 |> double");
+  eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
+test("pipe: chained", () => {
+  const result = evalStd("double(x) => x * 2\nadd1(x) => x + 1\n5 |> double |> add1");
+  eq(Number((primaryOf(result!) as BitsValue).data), 11);
+});
+
+test("pipe: with lambda", () => {
+  const result = evalStd("5 |> (x => x * 3)");
+  eq(Number((primaryOf(result!) as BitsValue).data), 15);
+});
+
+test("pipe: preserves types", () => {
+  const result = evalStd("5 |> (x => x + 1)");
+  eq(getTypeName(result!), "Int");
+});
+
+test("pipe: with string", () => {
+  const result = evalStd('"hello" |> (s => s.length)');
+  eq(Number((primaryOf(result!) as BitsValue).data), 5);
+});
+
 // == Full Type Inference ==
 
 test("inference: literal binding has inferred type", () => {

@@ -988,6 +988,15 @@ function buildBaseGrammar(): HybridGrammarConfig {
     },
   });
 
+  // Pipe operator: x |> f → f(x)
+  infix.set(TokenType.PipeArrow, {
+    bp: 3,
+    parse: (parser, left) => {
+      const right = parser.parseExpression(4); // left-associative
+      return makeExpr(right, [left]);
+    },
+  });
+
   // Function call
   infix.set(TokenType.LParen, {
     bp: 50,

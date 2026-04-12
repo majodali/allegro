@@ -98,7 +98,7 @@ High-level goals, roughly ordered by dependency:
 - [x] None type — `none` keyword, singleton value, returned for absent MultiValue components
 - [ ] Error handling — try/catch syntax (deferred; can use `if error of x is E` for now)
 - [ ] Algebraic effects — `perform`/`handle`/`resume` (requires continuations)
-- [ ] Pipe/chaining operator (`|>`)
+- [x] Pipe operator (`|>`) — `x |> f` desugars to `f(x)`, left-associative, bp=3
 - [ ] Regular expressions
 - [x] Logical operators — `&&`, `||`, `!` with short-circuit semantics
 - [x] String operations — fully typed (17 methods)
