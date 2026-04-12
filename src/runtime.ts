@@ -427,6 +427,8 @@ export interface CompilationReport {
   errors: { name: string; message: string }[];
   /** Bindings still unresolved after compilation */
   unresolved: string[];
+  /** Inferred types for all bindings (populated during evaluation) */
+  bindingTypes: Map<string, string>;
 }
 
 /**
@@ -438,7 +440,7 @@ function precompileFunctions(
   extensions?: Extension[],
   typed?: boolean,
 ): CompilationReport {
-  const report: CompilationReport = { inferred: [], errors: [], unresolved: [] };
+  const report: CompilationReport = { inferred: [], errors: [], unresolved: [], bindingTypes: new Map() };
   if (!typed) return report;
 
   // Build a minimal context for pre-compilation (primitives + extensions)
@@ -880,6 +882,14 @@ export function evalSource(
       // Store evaluated value in eval context
       const ctxBinding = evalCtx.bindings.get(b.key);
       if (ctxBinding) ctxBinding.value = val;
+
+      // Record inferred type in compilation report
+      if (compilationReport) {
+        const typeName = getTypeName(val);
+        if (typeName) {
+          compilationReport.bindingTypes.set(b.key, typeName);
+        }
+      }
 
       // Track Symbol dependencies from async futures in the result tree
       if (!isResolved(val)) collectSymbolRefs(val, collector.incompleteRefs);

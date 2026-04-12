@@ -22,7 +22,7 @@ High-level goals, roughly ordered by dependency:
 - [ ] Interfaces — structural type matching (no explicit `implements`)
 - [ ] Mixins — types with default implementations
 - [x] Union types — `Int | String`, `type_union` primitive, union instanceof checks alternatives
-- [ ] Full type inference — Hindley-Milner style for unannotated functions
+- [x] Full type inference — evaluation IS type inference. Typed args flow into untyped functions, types propagate through call chains, polymorphic specialization at each call site. CompilationReport.bindingTypes records all inferred types.
 - [x] Return type inference — via compile-time partial evaluation of typed function bodies
 - [ ] Variance — covariant/contravariant/invariant type parameters
 - [ ] Scalar type builder — `Scalar(bitLength)` for new Bits-backed types with custom encoding

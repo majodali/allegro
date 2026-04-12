@@ -193,6 +193,14 @@ After partial evaluation, an expression's type is its `"type"` MultiValue compon
 - Return type inferred from the partially evaluated body's type component
 - `CompilationReport` returned from `evalSource`: inferred return types, type errors, unresolved bindings
 
+### Full-Program Type Inference
+- The evaluation loop IS the compilation pass — types propagate through all bindings naturally
+- `CompilationReport.bindingTypes` records the inferred type for every binding
+- Untyped functions infer types at each call site — typed args flow in via substituteParams, type-directed dispatch produces typed results
+- Polymorphic: same function at different call sites produces different types (each specializes independently)
+- Recursive functions: return type inferred through execution (eval_if Rule 2 propagates common branch types)
+- No separate type inference algorithm — partial evaluation IS type inference
+
 ## Build/Execution Context
 
 Each build phase is a successive partial evaluation where phase-specific resources become available:
@@ -225,7 +233,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/futures.ts`** — FutureManager: bridges JavaScript Promises to forward-chaining evaluation. Creates synthetic `__future_N` bindings, attaches `.then()` handlers that call `applyPhase`
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 339+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, file-based .alg tests
+- **`src/test.ts`** — 353+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons

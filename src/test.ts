@@ -2743,6 +2743,79 @@ test("reactive: depCollector records incomplete symbols during evaluation", () =
   eq(collector.incompleteRefs.has("a"), false, "a should not be incomplete");
 });
 
+// == Full Type Inference ==
+
+test("inference: literal binding has inferred type", () => {
+  const { compilationReport: r } = runtimeEval("x = 42\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("x"), "Int");
+});
+
+test("inference: string binding has inferred type", () => {
+  const { compilationReport: r } = runtimeEval('s = "hello"\n', undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("s"), "String");
+});
+
+test("inference: expression binding type propagates", () => {
+  const { compilationReport: r } = runtimeEval("x = 3 + 4\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("x"), "Int");
+});
+
+test("inference: untyped function called with typed arg — result typed", () => {
+  const { compilationReport: r } = runtimeEval("f(x) => x + 1\nresult = f(5)\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("result"), "Int");
+});
+
+test("inference: cross-function type propagation", () => {
+  const { compilationReport: r } = runtimeEval("double(x) => x * 2\nwrap(n) => double(n) + 1\nresult = wrap(5)\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("result"), "Int");
+});
+
+test("inference: recursive function return type", () => {
+  const { compilationReport: r } = runtimeEval("factorial(n) => if n == 0 then 1 else n * factorial(n - 1)\nresult = factorial(5)\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("result"), "Int");
+});
+
+test("inference: polymorphic — Int call site", () => {
+  const { compilationReport: r } = runtimeEval("f(x) => x + x\nresult = f(5)\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("result"), "Int");
+});
+
+test("inference: polymorphic — String call site", () => {
+  const { compilationReport: r } = runtimeEval('f(x) => x + x\nresult = f("hi")\n', undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("result"), "String");
+});
+
+test("inference: array operations", () => {
+  const { compilationReport: r } = runtimeEval("nums = [1, 2, 3]\nresult = nums.map(x => x * 2)\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("nums"), "Array");
+  eq(r?.bindingTypes.get("result"), "Array");
+});
+
+test("inference: object type", () => {
+  const { compilationReport: r } = runtimeEval("p = {x: 1, y: 2}\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("p"), "Object");
+});
+
+test("inference: bool from comparison", () => {
+  const { compilationReport: r } = runtimeEval("result = 3 > 2\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("result"), "Bool");
+});
+
+test("inference: custom type", () => {
+  const { compilationReport: r } = runtimeEval("Point = NominalType.extend({x: Int, y: Int})\np = Point(1, 2)\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("p"), "Point");
+});
+
+test("inference: error value", () => {
+  const { compilationReport: r } = runtimeEval('e = error "bad"\n', undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("e"), "Error");
+});
+
+test("inference: none", () => {
+  const { compilationReport: r } = runtimeEval("n = none\n", undefined, [typeExt], undefined, true);
+  eq(r?.bindingTypes.get("n"), "None");
+});
+
 // == Async Futures ==
 
 async function runAsyncTests(): Promise<void> {
