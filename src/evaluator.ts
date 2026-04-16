@@ -7,7 +7,7 @@ import {
   DepCollector,
 } from "./types.js";
 import {
-  getType, getTypeName, withType, getFunctionParamTypes, getFunctionReturnType,
+  getType, getTypeName, withType, typeMethod, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
 
@@ -127,8 +127,12 @@ function evaluateExpr(
   }
 
   // Context as function — constructor call via __construct
-  if (fn.kind === ValueKind.Context) {
-    const constructBinding = (fn as ContextValue).bindings.get("__construct");
+  // Types may be wrapped as MultiValues (e.g., Int is MultiValue(IntType, {type: NominalType}))
+  const fnCtx = fn.kind === ValueKind.Context ? fn as ContextValue
+    : (fn.kind === ValueKind.MultiValue && (fn as MultiValueType).primary.kind === ValueKind.Context)
+      ? (fn as MultiValueType).primary as ContextValue : null;
+  if (fnCtx) {
+    const constructBinding = fnCtx.bindings.get("__construct");
     if (constructBinding?.value) {
       const ctor = constructBinding.value;
       if (ctor.kind === ValueKind.PrimitiveFunction) {
@@ -206,10 +210,10 @@ function applyPrimitive(
     if (typeComp && typeComp.kind === ValueKind.Context) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
       if (methodName) {
-        const methodBinding = (typeComp as ContextValue).bindings.get(methodName);
-        if (methodBinding?.value?.kind === ValueKind.PrimitiveFunction) {
+        const method = typeMethod(typeComp as ContextValue, methodName);
+        if (method?.kind === ValueKind.PrimitiveFunction) {
           const primaryArgs = evalArgs.map(primaryOf);
-          const result = (methodBinding.value as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
+          const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
           // If the method already returned a typed value (MultiValue), use it as-is.
           // Methods know their return types (e.g., comparisons return Bool).
           if (result.kind === ValueKind.MultiValue) return result;
@@ -308,7 +312,7 @@ function applyComposed(
           for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
             const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
             if (resolvedParamType.kind !== ValueKind.Context) continue; // unresolved type var
-            checkArgType(evalArgs[i], resolvedParamType as ContextValue, i);
+            checkArgType(evalArgs[i], resolvedParamType as ContextValue, i, enrichedCtx, depth, depCollector);
           }
         }
       }
@@ -420,14 +424,64 @@ import { normalizeType } from "./types-std.js";
  * Called at function call sites. Handles named types, unions, structural,
  * generic type args — mirrors type_check_impl but without lazy evaluation.
  */
-function checkArgType(arg: Value, expectedType: ContextValue, argIndex: number): void {
+function checkArgType(
+  arg: Value,
+  expectedType: ContextValue,
+  argIndex: number,
+  ctx?: ContextValue,
+  depth?: number,
+  depCollector?: DepCollector,
+): void {
   // Normalize bare generics to Generic[Any]
-  const expected = normalizeType(expectedType);
+  let expected = normalizeType(expectedType);
+
+  // Refinement type handling: if expected is a refined type, check the value
+  // against the refinement's BASE (via __extends chain), then evaluate the predicate.
+  // This allows a plain Int to satisfy PositiveInt if the predicate passes.
+  const refinementPredicate = expected.bindings.get("__predicate")?.value;
+  if (refinementPredicate) {
+    const base = expected.bindings.get("__extends")?.value;
+    if (base?.kind === ValueKind.Context) {
+      // Recurse on the base type (unwraps nested refinements)
+      try {
+        checkArgType(arg, base as ContextValue, argIndex, ctx, depth, depCollector);
+      } catch (e) {
+        throw e;
+      }
+      // Base check passed — evaluate the predicate (unless same refined type)
+      const argType0 = getType(arg);
+      if (argType0 !== expected && ctx && depth !== undefined) {
+        const result = evaluate(makeExpr(refinementPredicate, [arg]), ctx, depth + 1, depCollector);
+        const p = primaryOf(result);
+        if (p.kind === ValueKind.Bits && p.data === 0n) {
+          const name = typeContextName(expected) ?? "<refined>";
+          throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}`);
+        }
+      }
+      return;
+    }
+  }
+
   const expectedName = typeContextName(expected);
   if (!expectedName || expectedName === "Any") return;
 
   const argType = getType(arg);
   if (!argType) return; // untyped arg — skip
+
+  // Helper: evaluate refinement predicate on arg if expected type has one.
+  // Short-circuits when argType is reference-equal to expected (same refined type).
+  const checkRefinement = (): void => {
+    const predicate = expected.bindings.get("__predicate")?.value;
+    if (!predicate) return;
+    if (argType === expected) return; // same refined type — predicate already holds
+    if (!ctx || depth === undefined) return; // no eval context — best-effort skip
+    const result = evaluate(makeExpr(predicate, [arg]), ctx, depth + 1, depCollector);
+    const p = primaryOf(result);
+    if (p.kind === ValueKind.Bits && p.data === 0n) {
+      throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`);
+    }
+    // If unresolved, best-effort accept (partial evaluation will retry)
+  };
 
   const actualName = typeContextName(argType);
   if (actualName === expectedName) {
@@ -451,10 +505,11 @@ function checkArgType(arg: Value, expectedType: ContextValue, argIndex: number):
         }
       }
     }
+    checkRefinement();
     return;
   }
 
-  // Check using the expected type's own instanceof (handles unions)
+  // Check using the expected type's own instanceof (direct binding, e.g., UnionType)
   const directInstanceof = expected.bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const checkResult = directInstanceof.fn([arg], undefined as any, undefined as any);
@@ -462,19 +517,21 @@ function checkArgType(arg: Value, expectedType: ContextValue, argIndex: number):
     if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
     }
+    checkRefinement();
     return;
   }
 
   // Use meta-type instanceof (NominalType nominal check)
   const typeType = expected.bindings.get("__type")?.value as ContextValue | undefined;
   if (typeType) {
-    const instanceofMethod = typeType.bindings.get("instanceof")?.value;
+    const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const checkResult = instanceofMethod.fn([expected, arg], undefined as any, undefined as any);
       const checkP = primaryOf(checkResult);
       if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
         throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
       }
+      checkRefinement();
       return;
     }
   }

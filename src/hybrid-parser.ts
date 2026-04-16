@@ -270,6 +270,16 @@ export class HybridParser {
       typeExpr = makeExpr(prim("type_union"), [typeExpr, right]);
     }
 
+    // Refinement: Type && <predicate expression>
+    // The predicate is parsed as a full expression where _ is the value parameter.
+    // Multiple && compose via expression-level logical AND in the predicate body.
+    if (this.lexer.peek().type === TokenType.And) {
+      this.lexer.next(); // consume &&
+      const predBody = this.parseExpression(0);
+      const predicate = buildFn(["_"], predBody);
+      typeExpr = makeExpr(prim("type_refine"), [typeExpr, predicate]);
+    }
+
     return typeExpr;
   }
 
@@ -739,6 +749,13 @@ function buildBaseGrammar(): HybridGrammarConfig {
     return makeExpr(prim("typed_not"), [operand]);
   });
 
+  // Structural wrap (~): wraps a type for structural checking
+  // Works in both type expressions and regular expressions (e.g., x instanceof ~T)
+  prefix.set(TokenType.Tilde, (parser) => {
+    const operand = parser.parseExpression(40);
+    return makeExpr(prim("structural_wrap"), [operand]);
+  });
+
   // Parenthesized expression or lambda
   prefix.set(TokenType.LParen, (parser) => {
     // Try to parse as lambda: () => body, (params) => body, (typed params) [: retType] => body
@@ -973,6 +990,8 @@ function buildBaseGrammar(): HybridGrammarConfig {
   });
 
   // Logical operators (short-circuit — right operand thunked)
+  // typed_and_impl detects refinement use (left is a type) and builds a
+  // one-param predicate lambda from the thunk body at runtime.
   infix.set(TokenType.And, {
     bp: 5,
     parse: (parser, left) => {

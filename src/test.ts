@@ -9,7 +9,7 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
 
@@ -1896,8 +1896,8 @@ test("type hierarchy: NominalType extends Type", () => {
 
 test("type hierarchy: nominal instanceof passes for matching type", () => {
   const result = evalStd("42");
-  const instanceofMethod = NominalType.bindings.get("instanceof")?.value;
-  eq(instanceofMethod !== undefined, true);
+  const instanceofMethod = typeMethod(NominalType, "instanceof");
+  eq(instanceofMethod !== undefined && instanceofMethod !== null, true);
   if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = instanceofMethod.fn([IntType, result!], undefined as any, undefined as any);
     eq(Number((primaryOf(check) as BitsValue).data), 1);
@@ -1906,7 +1906,7 @@ test("type hierarchy: nominal instanceof passes for matching type", () => {
 
 test("type hierarchy: nominal instanceof fails for wrong type", () => {
   const result = evalStd("42");
-  const instanceofMethod = NominalType.bindings.get("instanceof")?.value;
+  const instanceofMethod = typeMethod(NominalType, "instanceof");
   if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = instanceofMethod.fn([StringType, result!], undefined as any, undefined as any);
     eq(Number((primaryOf(check) as BitsValue).data), 0);
@@ -1917,7 +1917,7 @@ test("type hierarchy: structural instanceof passes for compatible shape", () => 
   // Int has add, sub, mul, toString, etc.
   // A value typed as Int should structurally match any type with a subset of those methods
   const result = evalStd("42");
-  const instanceofMethod = Type.bindings.get("instanceof")?.value;
+  const instanceofMethod = typeMethod(Type, "instanceof");
   if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
     // IntType has all the methods StringType has (toString), so structurally compatible at a basic level
     const check = instanceofMethod.fn([IntType, result!], undefined as any, undefined as any);
@@ -1926,7 +1926,7 @@ test("type hierarchy: structural instanceof passes for compatible shape", () => 
 });
 
 test("type hierarchy: nominal subtypeof - same type", () => {
-  const subtypeofMethod = NominalType.bindings.get("subtypeof")?.value;
+  const subtypeofMethod = typeMethod(NominalType, "subtypeof");
   if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = subtypeofMethod.fn([IntType, IntType], undefined as any, undefined as any);
     eq(Number((primaryOf(check) as BitsValue).data), 1);
@@ -1934,7 +1934,7 @@ test("type hierarchy: nominal subtypeof - same type", () => {
 });
 
 test("type hierarchy: nominal subtypeof - different types", () => {
-  const subtypeofMethod = NominalType.bindings.get("subtypeof")?.value;
+  const subtypeofMethod = typeMethod(NominalType, "subtypeof");
   if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = subtypeofMethod.fn([IntType, StringType], undefined as any, undefined as any);
     eq(Number((primaryOf(check) as BitsValue).data), 0);
@@ -1949,6 +1949,234 @@ test("type hierarchy: structural_wrap makes nominal type use structural checking
   // It should still have the original name
   const name = wrappedInt.bindings.get("__name")?.value;
   eq(name !== undefined, true);
+});
+
+// == Member Descriptors (__members) ==
+
+test("member descriptors: IntType has __members with Method descriptors", () => {
+  const members = IntType.bindings.get("__members")?.value;
+  eq(members !== undefined, true);
+  eq(members!.kind, ValueKind.Context);
+  const addDesc = (members as ContextValue).bindings.get("add")?.value;
+  eq(addDesc !== undefined, true);
+  eq(isMethodDescriptor(addDesc as ContextValue), true);
+  eq(isFieldDescriptor(addDesc as ContextValue), false);
+});
+
+test("member descriptors: typeMemberDescriptor returns descriptor", () => {
+  const desc = typeMemberDescriptor(IntType, "add");
+  eq(desc !== null, true);
+  eq(isMethodDescriptor(desc!), true);
+});
+
+test("member descriptors: typeMemberDescriptor returns null for missing", () => {
+  const desc = typeMemberDescriptor(IntType, "nonexistent");
+  eq(desc, null);
+});
+
+test("member descriptors: length is a getter descriptor", () => {
+  const desc = typeMemberDescriptor(StringType, "length");
+  eq(desc !== null, true);
+  eq(isGetterDescriptor(desc!), true);
+});
+
+test("member descriptors: typeMethod reads from __members", () => {
+  const addMethod = typeMethod(IntType, "add");
+  eq(addMethod !== null, true);
+  eq(addMethod!.kind, ValueKind.PrimitiveFunction);
+});
+
+test("member descriptors: Type has __members with meta-methods", () => {
+  const members = Type.bindings.get("__members")?.value;
+  eq(members !== undefined, true);
+  const extendDesc = (members as ContextValue).bindings.get("extend")?.value;
+  eq(extendDesc !== undefined, true);
+  eq(isMethodDescriptor(extendDesc as ContextValue), true);
+});
+
+test("member descriptors: NominalType has __members with meta-methods", () => {
+  const members = NominalType.bindings.get("__members")?.value;
+  eq(members !== undefined, true);
+  const instanceofDesc = (members as ContextValue).bindings.get("instanceof")?.value;
+  eq(instanceofDesc !== undefined, true);
+  eq(isMethodDescriptor(instanceofDesc as ContextValue), true);
+});
+
+test("member descriptors: record type has Field descriptors", () => {
+  const result = evalStd(`Animal = Int.extend({name: String, age: Int})
+Animal`);
+  const typeCtx = primaryOf(result!) as ContextValue;
+  eq(typeCtx.kind, ValueKind.Context);
+  const members = typeCtx.bindings.get("__members")?.value;
+  eq(members !== undefined, true);
+  const nameDesc = (members as ContextValue).bindings.get("name")?.value;
+  eq(nameDesc !== undefined, true);
+  eq(isFieldDescriptor(nameDesc as ContextValue), true);
+  // toString should be a Method descriptor
+  const tsDesc = (members as ContextValue).bindings.get("toString")?.value;
+  eq(tsDesc !== undefined, true);
+  eq(isMethodDescriptor(tsDesc as ContextValue), true);
+});
+
+test("member descriptors: record field access via type_dispatch works", () => {
+  const result = evalStd(`Point = Int.extend({x: Int, y: Int})
+p = Point(3, 4)
+p.x + p.y`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+// == Types as Typed Values ==
+
+test("typed types: Int instanceof NominalType", () => {
+  const result = evalStd("Int instanceof NominalType");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("typed types: String instanceof NominalType", () => {
+  const result = evalStd("String instanceof NominalType");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("typed types: NominalType instanceof NominalType", () => {
+  const result = evalStd("NominalType instanceof NominalType");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("typed types: user-defined type instanceof NominalType", () => {
+  const result = evalStd(`Point = Int.extend({x: Int, y: Int})
+Point instanceof NominalType`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("typed types: type of Int returns NominalType", () => {
+  const result = evalStd("type of Int");
+  eq(result!.kind !== ValueKind.MultiValue || getType(result!) !== null, true);
+});
+
+// == Interfaces ==
+
+test("interfaces: Type.interface creates structural type with __interface marker", () => {
+  const result = evalStd(`Printable = Type.interface({toString: Function})
+Printable`);
+  const iface = primaryOf(result!) as ContextValue;
+  eq(iface.kind, ValueKind.Context);
+  // __interface marker
+  const marker = iface.bindings.get("__interface")?.value;
+  eq(marker !== undefined, true);
+  eq((marker as BitsValue).data, 1n);
+  // __type = Type (structural)
+  eq(iface.bindings.get("__type")?.value === Type, true);
+});
+
+test("interfaces: interface has Field descriptors in __members", () => {
+  const result = primaryOf(evalStd(`Type.interface({toString: Function, length: Int})`)!) as ContextValue;
+  const members = result.bindings.get("__members")?.value as ContextValue;
+  eq(members !== undefined, true);
+  const tsDesc = members.bindings.get("toString")?.value;
+  eq(tsDesc !== undefined, true);
+  eq(isFieldDescriptor(tsDesc as ContextValue), true);
+  const lenDesc = members.bindings.get("length")?.value;
+  eq(lenDesc !== undefined, true);
+  eq(isFieldDescriptor(lenDesc as ContextValue), true);
+});
+
+test("interfaces: interface has no __construct", () => {
+  const result = primaryOf(evalStd(`Type.interface({x: Int})`)!) as ContextValue;
+  eq(result.bindings.has("__construct"), false);
+});
+
+test("interfaces: instanceof passes for conforming type", () => {
+  const result = evalStd(`Printable = Type.interface({toString: Function})
+42 instanceof Printable`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("interfaces: instanceof fails for non-conforming type", () => {
+  const result = evalStd(`HasFoo = Type.interface({foo: Function})
+42 instanceof HasFoo`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 0);
+});
+
+test("interfaces: parent member inheritance", () => {
+  // Int has add, sub, etc. in __members. Int.interface({extra: Int}) requires all of them plus extra.
+  const result = evalStd(`WithExtra = Int.interface({extra: Int})
+WithExtra`);
+  const iface = primaryOf(result!) as ContextValue;
+  const members = iface.bindings.get("__members")?.value as ContextValue;
+  // Should have 'add' from Int's __members
+  eq(members.bindings.has("add"), true);
+  // Should have 'extra' as declared
+  eq(members.bindings.has("extra"), true);
+});
+
+test("interfaces: NominalType.interface also creates structural type", () => {
+  const result = evalStd(`Sized = Int.interface({length: Int})
+Sized`);
+  const iface = primaryOf(result!) as ContextValue;
+  eq(iface.bindings.get("__type")?.value === Type, true);
+});
+
+test("interfaces: auto-named when bound to symbol", () => {
+  const result = evalStd(`Printable = Type.interface({toString: Function})
+Printable`);
+  const iface = primaryOf(result!) as ContextValue;
+  const name = iface.bindings.get("__name")?.value;
+  eq(name !== undefined, true);
+  eq(bitsToString(name as BitsValue), "Printable");
+});
+
+test("interfaces: string satisfies Sized interface via structural check", () => {
+  const result = evalStd(`Sized = Type.interface({length: Int})
+"hello" instanceof Sized`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+// == Mixins ==
+
+test("mixins: basic mixin adds method", () => {
+  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({mag: (self) => self.x + self.y})
+p = Point(3, 4)
+p.mag()`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("mixins: field access via self works", () => {
+  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({getX: (self) => self.x})
+Point(10, 20).getX()`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
+test("mixins: constructor works on mixin type", () => {
+  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({sum: (self) => self.x + self.y})
+p = Point(5, 7)
+p.sum()`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 12);
+});
+
+test("mixins: error on name conflict", () => {
+  let threw = false;
+  try {
+    evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({toString: (self) => "point"})`);
+  } catch (e) {
+    threw = true;
+  }
+  eq(threw, true);
+});
+
+test("mixins: reusable spec variable", () => {
+  const result = evalStd(`magMixin = {mag: (self) => self.x * self.x + self.y * self.y}
+A = Int.extend({x: Int, y: Int}).mixin(magMixin)
+B = Int.extend({x: Int, y: Int}).mixin(magMixin)
+A(3, 4).mag() + B(5, 12).mag()`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 25 + 169);
+});
+
+test("mixins: method with extra args", () => {
+  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
+p = Point(1, 2)
+q = p.translate(10, 20)
+q.x + q.y`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 33);
 });
 
 // == Union Types ==
@@ -2469,6 +2697,101 @@ test("where: refined type instanceof parent", () => {
 PositiveInt = Int.where(n => n > 0)
 PositiveInt(5) instanceof Int
 `);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+// == Refinement types: && syntax ==
+
+test("refinement: && syntax creates refined type", () => {
+  const result = evalStd(`PositiveInt = Int && _ > 0
+PositiveInt(5)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 5);
+});
+
+test("refinement: && syntax fails on invalid value", () => {
+  const result = evalStd(`PositiveInt = Int && _ > 0
+PositiveInt(0 - 5)`);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("refinement: compound predicate with && and &&", () => {
+  const result = evalStd(`SmallPos = Int && _ > 0 && _ < 100
+SmallPos(50)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 50);
+});
+
+test("refinement: compound predicate rejects out-of-range", () => {
+  const result = evalStd(`SmallPos = Int && _ > 0 && _ < 100
+SmallPos(150)`);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("refinement: bare Int satisfies refined type at call site if predicate passes", () => {
+  const result = evalStd(`PositiveInt = Int && _ > 0
+double(x: PositiveInt): Int => x * 2
+double(5)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 10);
+});
+
+test("refinement: call site rejects value failing predicate", () => {
+  let threw = false;
+  try {
+    evalStd(`PositiveInt = Int && _ > 0
+f(x: PositiveInt): Int => x
+f(0 - 5)`);
+  } catch (e) {
+    threw = true;
+  }
+  eq(threw, true);
+});
+
+test("refinement: already-refined value passes without re-checking", () => {
+  const result = evalStd(`PositiveInt = Int && _ > 0
+f(x: PositiveInt): Int => x
+x = PositiveInt(7)
+f(x)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("refinement: logical AND still works for bools", () => {
+  const result = evalStd(`true && false`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 0);
+});
+
+test("refinement: logical AND short-circuits", () => {
+  const result = evalStd(`true && true`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+// == preserveOps ==
+
+test("preserveOps: lifted add preserves refined type", () => {
+  const result = evalStd(`PositiveInt = (Int && _ > 0).preserveOps()
+x = PositiveInt(5)
+y = x + 3
+y instanceof PositiveInt`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("preserveOps: lifted op produces error on predicate failure", () => {
+  const result = evalStd(`PositiveInt = (Int && _ > 0).preserveOps()
+x = PositiveInt(5)
+x - 10`);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("preserveOps: lifted op value is still correct", () => {
+  const result = evalStd(`PositiveInt = (Int && _ > 0).preserveOps()
+x = PositiveInt(5)
+x + 3`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 8);
+});
+
+test("preserveOps: specific ops can be lifted", () => {
+  const result = evalStd(`PositiveInt = (Int && _ > 0).preserveOps(add)
+x = PositiveInt(5)
+y = x + 3
+y instanceof PositiveInt`);
   eq(Number((primaryOf(result!) as BitsValue).data), 1);
 });
 

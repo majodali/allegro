@@ -71,14 +71,14 @@ Base language API (expression DAGs, evaluation contexts)
 
 ## Type System (Allegro Standard)
 
-Types are Context values with `__name`, `__check`, and method bindings. A typed value is a MultiValue where the primary is the data and the `"type"` component is the type Context.
+Types are Context values with `__name`, `__type`, `__members`, and other meta-bindings. A typed value is a MultiValue where the primary is the data and the `"type"` component is the type Context. **Types themselves are typed** — user-visible type bindings are MultiValues with their meta-type as the type component (e.g., `Int` is `MultiValue(IntType, {type: NominalType})`). This means `Int instanceof NominalType` returns true, and `type of Int` returns NominalType. Internally, type infrastructure uses the primary Context via `primaryOf()`.
 
 ### Ten Core Types
 - **Int** — 64-bit signed integer. Arithmetic, comparison, toString.
 - **Float** — IEEE 754 double. Arithmetic, comparison, toString.
 - **String** — UTF-8 encoded Bits. Concat (+), length, slice, indexOf, trim, startsWith, endsWith, includes, split, replace (all by default, optional count), toUpperCase, toLowerCase, charAt, repeat, toCharCodes, toString.
 - **Bool** — Int(0/1) with Bool type. Provided as `true`/`false` context bindings.
-- **Array** — Generic type `Array[T]`. Context with numeric keys + `__length`. length, get, map, filter, reduce, concat, slice. Element type inferred from contents.
+- **Array** — Generic type `Array[T]`. Context with numeric keys + `__length`. length, get, map, filter, reduce, concat, slice. Element type inferred from contents. map/filter/reduce are Allegro ComposedFunctions (recursive, built via AST construction); length/get/concat/slice are primitives.
 - **Object** — Typed Context. Field access via dot, keys, values, get.
 - **Function** — Generic type `Function[ParamTypes, ReturnType]`. Attached to typed function definitions. Supports type variable unification at call sites.
 - **UntypedFunction** — Wraps base language primitives entering standard context. Every value in standard mode has a type.
@@ -101,13 +101,23 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - Bidirectional flow: `T` determined from one arg propagates to constrain others
 - Contradictory bindings (e.g., `T = Int` and `T = String`) produce type errors
 
+### Member Descriptors (__members)
+- Every type has a `__members` Context containing named member descriptors
+- **Method descriptors**: `{__type: MethodType, name: String, value: PrimitiveFunction, getter?: 1}` — executable methods with optional getter flag
+- **Field descriptors**: `{__type: FieldType, name: String, fieldType: Type}` — typed field declarations (on record types)
+- `typeMethod(type, name)` reads from `__members` first, falls back to direct bindings — the single bridge function for all member access
+- `typeMemberDescriptor(type, name)` returns the full descriptor for dispatch-level access
+- Meta-types (Type, NominalType) store their methods (instanceof, subtypeof, extend, where, distinct, constructor) in `__members`
+- Structural checking compares `__members` collections: every member in the expected type must exist in the actual type
+
 ### Type-Directed Dispatch
-- `type_dispatch` checks the value's type component, finds the method, returns a self-bound closure
-- Getters (e.g., `length`) are called immediately; methods return bound functions
-- The evaluator's `PRIM_TO_METHOD` mapping dispatches base operators (`bits_add` etc.) through type methods when operands are typed
+- `type_dispatch` checks the value's type component, looks up member descriptor from `__members`, returns a self-bound closure
+- Getter descriptors are called immediately with self; method descriptors return bound functions
+- Field descriptors look up the field value on the instance's primary Context
+- The evaluator's `PRIM_TO_METHOD` mapping dispatches base operators (`bits_add` etc.) through `typeMethod()` when operands are typed
 - Type methods return properly typed values — comparisons return Bool, arithmetic returns the operand type
 - No implicit fallback — missing type method is an error
-- Types can define `__getMember(self, fieldName)` as a fallback for fields not in the type's methods (like Python's `__getattr__`). Object uses this for field access. Types without `__getMember` enforce strict encapsulation.
+- Types can define `__getMember(self, fieldName)` as a fallback for fields not in `__members` (like Python's `__getattr__`). Object uses this for field access. Types without `__getMember` enforce strict encapsulation.
 - Types can define `__construct(args...)` — when a type Context is called as a function, the evaluator invokes `__construct`. Built-in types (Int, Float, String, Bool) have constructors that wrap values with the type.
 
 ### Type Propagation
@@ -128,12 +138,40 @@ Types are Context values with `__name`, `__check`, and method bindings. A typed 
 - All built-in types (Int, String, etc.) are NominalTypes with `__type = NominalType`.
 - Type and NominalType are self-describing (bootstrap: Type has `__type = Type`).
 
+### Interfaces
+- Declared via `Type.interface({member: Type, ...})` — produces a structural type with `__type = Type`
+- `__members` contains Field descriptors for declared members, plus inherited non-meta members from parent
+- No `__construct`, `__getMember`, or auto-generated methods — interfaces declare structure only
+- `__interface` marker binding distinguishes interfaces from record types
+- Conformance via structural `instanceof`: `42 instanceof Printable` checks that Int has all members Printable declares
+- Parent inheritance: `Int.interface({extra: Int})` requires all of Int's members plus `extra`
+- Auto-named when bound to a symbol: `Printable = Type.interface(...)` → name is "Printable"
+
+### Mixins
+- Declared via `Type.mixin({method: fn, ...})` — adds Method descriptors to a type's `__members`
+- Returns a new type with the mixin methods added; does not mutate the base type
+- **Error on name conflict**: if a mixin method name already exists in the type's `__members`, throws an error
+- Mixin methods receive `self` (the full typed MultiValue) as first argument — enables field access (`self.x`) and method calls (`self.otherMethod()`) via type dispatch
+- Mixin methods are ComposedFunctions stored in Method descriptors; `type_dispatch_impl` handles self-binding for both PrimitiveFunction and ComposedFunction method descriptors
+- Reusable: put the spec in a variable and pass it to multiple `.mixin()` calls
+
 ### Nominal vs Structural Typing
 - Named types use **nominal** checking by default: `f(x: Animal)` requires x to be Animal or extend it.
 - **`~` operator** (structural wrap): `~Animal` uses structural checking — any type with Animal's fields matches.
+- **Interfaces** are inherently structural (`__type = Type`) — no `~` needed.
 - Four operations: nominal/structural × instanceof/subtypeof.
 - `structuralWrap(type)` creates a wrapper that delegates to Type's structural methods instead of NominalType's nominal ones.
 - Unnamed type expressions (inline `{ ... }`) are always structural.
+
+### Refinement Types
+- Declared via `Type && <predicate>` where `_` in the predicate refers to the value being checked: `PositiveInt = Int && _ > 0`. Equivalent to `Int.where(_ => _ > 0)`.
+- `&&` in expression position is overloaded: if the left operand is a type (has meta-type Type or NominalType), it creates a refined type via `buildRefinedType`. Otherwise it's logical AND. `typed_and_impl` dispatches at runtime.
+- Compound predicates via repeated `&&`: `Int && _ > 0 && _ < 100` — the second `&&` is expression-level logical AND inside the predicate body. Parsed as `Int && (_ > 0 && _ < 100)`.
+- Predicate is an Allegro lambda with parameter `_`. `buildRefinedType` stores it as `__predicate` on the refined type.
+- **Construction check**: `__construct` wrapper evaluates the predicate on the constructed value. If false, returns an error value instead of the refined value.
+- **Annotation/call-site check**: `type_check_impl` and `checkArgType` evaluate `__predicate` after the nominal/structural base check passes. Short-circuits when `actualType === expectedType` (value was already refined through the same type).
+- **Partial evaluation integration**: predicates are Allegro expressions, so they partially evaluate naturally with known values. Unresolved predicates produce residual type checks.
+- **`preserveOps`**: `(Int && _ > 0).preserveOps(add, sub)` or `.preserveOps()` (all numeric ops). Creates a new refined type where named operators are lifted: after the parent op runs, the result is fed through `__construct`, re-running the predicate check and tagging with the refined type. This makes `x + 3` where `x: PositiveInt` produce a `PositiveInt` instead of bare `Int`.
 
 ## Parser (Hybrid: Pratt + Recursive Descent)
 
@@ -233,7 +271,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/futures.ts`** — FutureManager: bridges JavaScript Promises to forward-chaining evaluation. Creates synthetic `__future_N` bindings, attaches `.then()` handlers that call `applyPhase`
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 358+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, file-based .alg tests
+- **`src/test.ts`** — 400+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, member descriptors, interfaces, typed types, refinement types, preserveOps, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
@@ -247,6 +285,10 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - `generics.alg` — Array[Int], generic type annotations, type_apply
 - `function-types.alg` — function type signatures, type variable unification
 - `pattern-match.alg` — when/is/then pattern matching, multivalue access
+- `interfaces.alg` — Type.interface, structural conformance, parent inheritance
+- `typed-types.alg` — types as typed values, Int instanceof NominalType, meta-type checks
+- `refinements.alg` — refinement types via `&&`, compound predicates, preserveOps operator lifting
+- `mixins.alg` — mixin methods, field access via self, reusable specs, multi-arg methods
 
 ## Base Parser Syntax
 
@@ -389,6 +431,33 @@ head(arr: Array[Int]): Int => arr[0]
 // Lambdas with type annotations
 nums.map(x: Int => x * 2)
 (x: Int, y: Int): Int => x + y
+
+// Interfaces (structural type matching)
+Printable = Type.interface({toString: Function})
+42 instanceof Printable           // true — Int has toString
+Sized = Type.interface({length: Int})
+"hello" instanceof Sized          // true — String has length
+
+// Refinement types (Int && predicate, _ is the value)
+PositiveInt = Int && _ > 0
+PositiveInt(5)                    // → 5
+PositiveInt(0 - 1)                // → error(refinement check failed)
+
+// Compound predicates
+SmallPos = Int && _ > 0 && _ < 100
+SmallPos(50)                      // → 50
+SmallPos(150)                     // → error
+
+// Refinement in function annotation
+double(x: PositiveInt): Int => x * 2
+double(5)                         // → 10 (bare Int passes predicate check)
+
+// preserveOps — lift operators to preserve the refinement
+PI = (Int && _ > 0).preserveOps()
+x = PI(5)
+y = x + 3                         // y: PositiveInt, re-checked after +
+y instanceof PI                   // → true
+x - 10                            // → error (predicate fails after subtraction)
 ```
 
 ## What's Next
@@ -411,6 +480,12 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ Auto-naming: types bound to symbols get named automatically
 - ✅ Guard clauses (`and` keyword in patterns)
 - ✅ Nested destructuring (colon introduces sub-pattern, recursive matching)
+- ✅ Member descriptors (`__members`): unified Method/Field types, structural checking via member comparison, meta-type methods in `__members`
+- ✅ Interfaces: `Type.interface({...})` — structural type matching, no `implements` keyword needed
+- ✅ Types as typed values: `Int instanceof NominalType`, `type of Int` → NominalType, all type bindings wrapped as MultiValues
+- ✅ Array map/filter/reduce as Allegro ComposedFunctions (recursive AST construction, not imperative TypeScript loops)
+- ✅ Refinement types: `Type && _ > 0` syntax, predicate checking at construction/annotation/call sites, `preserveOps` operator lifting for refinement preservation through operators
+- ✅ Mixins: `.mixin({method: fn, ...})` adds method implementations to types, ComposedFunction method dispatch with self binding
 
 ## Design Philosophy
 

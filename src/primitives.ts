@@ -7,6 +7,7 @@ import {
   makeParam, makeComposedFn, makeContext, makeMultiValue,
   primaryOf, stringToBits, bitsToString,
 } from "./types.js";
+import { buildFn } from "./parser-helpers.js";
 
 // --- Value formatting ---
 
@@ -65,7 +66,21 @@ export function formatValue(v: Value): string {
           }
           return `<function>`;
         }
-        // Record types (from .extend) — check if type has __fields
+        // Record types — check __members for Field descriptors
+        const membersBinding = typeComp.bindings.get("__members");
+        if (membersBinding?.value?.kind === ValueKind.Context && v.primary.kind === ValueKind.Context) {
+          const membersCtx = membersBinding.value as ContextValue;
+          const instanceCtx = v.primary as ContextValue;
+          const parts: string[] = [];
+          for (const [key, binding] of membersCtx.bindings) {
+            if (binding.value?.kind === ValueKind.Context && isFieldDescriptor(binding.value as ContextValue)) {
+              const fieldVal = instanceCtx.bindings.get(key)?.value;
+              if (fieldVal) parts.push(`${key}: ${formatValue(fieldVal)}`);
+            }
+          }
+          if (parts.length > 0) return `${typeName}(${parts.join(", ")})`;
+        }
+        // Legacy fallback: __fields
         const fieldsBinding = typeComp.bindings.get("__fields");
         if (fieldsBinding?.value?.kind === ValueKind.Context && v.primary.kind === ValueKind.Context) {
           const fieldsCtx = fieldsBinding.value as ContextValue;
@@ -618,9 +633,10 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const fieldSpecs = patternExpr.args.slice(1);
 
     const subjectTypeName = getTypeName(subject);
-    const patternTypeName = typeValue.kind === ValueKind.Context
+    const typeCtx = primaryOf(typeValue);
+    const patternTypeName = typeCtx.kind === ValueKind.Context
       ? bitsToString(primaryOf(
-          (typeValue as ContextValue).bindings.get("__name")?.value ?? stringToBits("")
+          (typeCtx as ContextValue).bindings.get("__name")?.value ?? stringToBits("")
         ) as BitsValue)
       : null;
 
@@ -830,12 +846,13 @@ const grammar_build_impl: PrimitiveFnImpl = (args) => {
 // ============ TYPE SYSTEM ============
 
 import {
-  getType, getTypeName, withType, typeMethod,
+  getType, getTypeName, withType, typeMethod, typeMemberDescriptor,
+  isMethodDescriptor, isFieldDescriptor, isGetterDescriptor,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
   AnyType, Type, NominalType, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
-  structuralWrap, makeUnionType,
+  structuralWrap, makeUnionType, wrapType, buildRefinedType,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 
@@ -948,22 +965,44 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 // --- Logical operators (short-circuiting) ---
 
 const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
-  // args[0] = left operand, args[1] = thunk (ComposedFunction) wrapping right operand
+  // args[0] = left operand, args[1] = zero-param thunk wrapping right operand
+  // If left is a type, this is a refinement: Type && <predicate-expression>
+  // Otherwise, logical AND: left && right (short-circuit via thunk)
   const left = evalFn!(args[0], ctx!);
   if (!isResolved(left)) {
     return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, args[1]]);
   }
-  // Short-circuit: if left is falsy, return false without evaluating right
+
+  // Type refinement: if left is a type, extract the raw body from the thunk
+  // and build a one-param predicate lambda (_ => body).
+  const leftType = getType(left);
+  if (leftType && (leftType === Type || leftType === NominalType)) {
+    const thunk = args[1];
+    if (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0) {
+      // Extract raw body and wrap as a one-param lambda with `_`
+      const predicate = buildFn(["_"], thunk.body) as Value;
+      const parentType = primaryOf(left) as ContextValue;
+      return wrapType(buildRefinedType(parentType, predicate));
+    }
+    // Already a one-param lambda (rare path) — use directly
+    const predicate = evalFn!(args[1], ctx!);
+    if (!isResolved(predicate)) {
+      return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, predicate]);
+    }
+    const parentType = primaryOf(left) as ContextValue;
+    return wrapType(buildRefinedType(parentType, predicate));
+  }
+
+  // Logical AND path (short-circuit)
   const leftP = primaryOf(left);
   if (leftP.kind === ValueKind.Bits && leftP.data === 0n) {
     return withType(makeInt(0), BoolType);
   }
-  // Evaluate the thunk (right operand)
   const right = evalFn!(args[1], ctx!);
   if (!isResolved(right)) {
     return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, right]);
   }
-  // If right is a thunk (ComposedFunction with no params), evaluate its body
+  // Unwrap thunk
   let rightVal = right;
   if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
     rightVal = evalFn!(right.body, ctx!);
@@ -1043,19 +1082,50 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const type = getType(obj);
 
   if (type) {
+    // Look up member descriptor from __members
+    const desc = typeMemberDescriptor(type, fieldName);
+    if (desc) {
+      if (isMethodDescriptor(desc)) {
+        const impl = desc.bindings.get("value")?.value;
+        if (impl?.kind === ValueKind.PrimitiveFunction) {
+          const selfVal = primaryOf(obj);
+          if (isGetterDescriptor(desc)) {
+            return (impl as PrimitiveFunctionValue).fn([selfVal], undefined as any, undefined as any);
+          }
+          const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+            const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+            return (impl as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
+          };
+          return makePrimitive(`bound:${fieldName}`, boundFn, true);
+        }
+        if (impl?.kind === ValueKind.ComposedFunction) {
+          // Mixin/user-defined method — pass full typed obj as self for field/method access
+          if (isGetterDescriptor(desc)) {
+            return evalFn!(makeExpr(impl, [obj]), ctx!);
+          }
+          const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+            const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+            return callEvalFn!(makeExpr(impl, [obj, ...evalArgs]), callCtx!);
+          };
+          return makePrimitive(`bound:${fieldName}`, boundFn, true);
+        }
+        if (impl) return impl;
+      } else if (isFieldDescriptor(desc)) {
+        // Field descriptor — look up field value on the instance's primary Context
+        const instanceCtx = primaryOf(obj);
+        if (instanceCtx.kind === ValueKind.Context) {
+          const b = (instanceCtx as ContextValue).bindings.get(fieldName);
+          if (b?.value !== undefined) return b.value;
+        }
+      }
+    }
+
+    // Fallback: typeMethod for backward compat (direct bindings like __getMember)
     const method = typeMethod(type, fieldName);
     if (method) {
       if (method.kind === ValueKind.PrimitiveFunction) {
         const selfVal = primaryOf(obj);
-        // Check if this is a property getter (marked with __getter flag)
-        if ((method as any).__getter) {
-          // Call immediately with self
-          return method.fn([selfVal], undefined as any, undefined as any);
-        }
-        // Return a bound method: partially apply self as first arg
-        // Lazy so it receives unevaluated args and preserves type info
         const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-          // Evaluate args ourselves to preserve MultiValue type wrappers
           const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
           return method.fn([selfVal, ...evalArgs], callCtx, callEvalFn);
         };
@@ -1063,17 +1133,12 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       }
       return method;
     }
-  }
 
-  // If the value has a type, check for __getMember fallback.
-  // __getMember is called when the field isn't a type method — it lets
-  // the type control access to instance fields (like Python's __getattr__).
-  if (type) {
-    const getMember = typeMethod(type, "__getMember");
+    // __getMember fallback for Object/module types
+    const getMember = type.bindings.get("__getMember")?.value;
     if (getMember?.kind === ValueKind.PrimitiveFunction) {
-      return getMember.fn([primaryOf(obj), stringToBits(fieldName)], undefined as any, undefined as any);
+      return (getMember as PrimitiveFunctionValue).fn([primaryOf(obj), stringToBits(fieldName)], undefined as any, undefined as any);
     }
-    // No __getMember — type enforces strict encapsulation
     const typeName = getTypeName(obj) ?? "unknown";
     throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
   }
@@ -1087,12 +1152,27 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const metaTypeBinding = (p as ContextValue).bindings.get("__type");
     if (metaTypeBinding?.value?.kind === ValueKind.Context) {
       const metaType = metaTypeBinding.value as ContextValue;
+      const metaDesc = typeMemberDescriptor(metaType, fieldName);
+      if (metaDesc) {
+        if (isMethodDescriptor(metaDesc)) {
+          const metaImpl = metaDesc.bindings.get("value")?.value;
+          if (metaImpl?.kind === ValueKind.PrimitiveFunction) {
+            const selfVal = p;
+            if (isGetterDescriptor(metaDesc)) {
+              return (metaImpl as PrimitiveFunctionValue).fn([selfVal], undefined as any, undefined as any);
+            }
+            const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+              const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+              return (metaImpl as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
+            };
+            return makePrimitive(`bound:${fieldName}`, boundFn, true);
+          }
+        }
+      }
+      // Fallback: direct binding on meta-type (for non-__members methods)
       const metaMethod = typeMethod(metaType, fieldName);
       if (metaMethod?.kind === ValueKind.PrimitiveFunction) {
         const selfVal = p;
-        if ((metaMethod as any).__getter) {
-          return (metaMethod as PrimitiveFunctionValue).fn([selfVal], undefined as any, undefined as any);
-        }
         const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
           const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
           return (metaMethod as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
@@ -1110,6 +1190,39 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${p.kind}`);
 };
+
+// --- refinement predicate helper ---
+
+/**
+ * Evaluate a refinement type's __predicate against a value.
+ * Returns:
+ *   { ok: true }          — predicate holds (or type has no predicate)
+ *   { ok: false }         — predicate fails (type error)
+ *   { ok: null, residual } — predicate unresolved (partial eval)
+ *
+ * Short-circuits when actualType is reference-equal to expectedType,
+ * since the value was constructed/checked via this exact refined type.
+ */
+function checkRefinementPredicate(
+  v: Value,
+  expectedCtx: ContextValue,
+  actualType: ContextValue | null,
+  ctx: ContextValue,
+  evalFn: (v: Value, ctx: ContextValue) => Value,
+): { ok: boolean | null; residual?: Value } {
+  const predicate = expectedCtx.bindings.get("__predicate")?.value;
+  if (!predicate) return { ok: true };
+  // Short-circuit: same refined type by reference → predicate already holds
+  if (actualType === expectedCtx) return { ok: true };
+  // Evaluate predicate against the value
+  const result = evalFn(makeExpr(predicate, [v]), ctx);
+  const p = primaryOf(result);
+  if (p.kind === ValueKind.Bits) {
+    return { ok: (p as BitsValue).data !== 0n };
+  }
+  // Unresolved — residual
+  return { ok: null, residual: result };
+}
 
 // --- type_of / type_check ---
 
@@ -1159,7 +1272,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!actualType) throw new AllegroError("type_check: value has no type");
   const actualName = getTypeName(v);
 
-  // Check if the expected type has its own instanceof method (e.g., UnionType)
+  // Check if the expected type has its own instanceof (direct binding, e.g., UnionType)
   const directInstanceof = expectedCtx.bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const checkResult = directInstanceof.fn([v], undefined as any, undefined as any);
@@ -1173,12 +1286,21 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Use the meta-type's instanceof method
   const typeType = expectedCtx.bindings.get("__type")?.value as ContextValue | undefined;
   if (typeType) {
-    const instanceofMethod = typeType.bindings.get("instanceof")?.value;
+    const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const checkResult = instanceofMethod.fn([expectedCtx, v], undefined as any, undefined as any);
       const checkP = primaryOf(checkResult);
       if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
         throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
+      }
+      // Check refinement predicate if present
+      const predCheck = checkRefinementPredicate(v, expectedCtx, actualType, ctx!, evalFn!);
+      if (predCheck.ok === false) {
+        throw new AllegroError(`Type error: refinement predicate failed for ${expectedName}`);
+      }
+      if (predCheck.ok === null) {
+        // Unresolved predicate — return a residual type_check
+        return makeExpr(makePrimitive("type_check", type_check_impl, true), [v, expectedType]);
       }
       return v;
     }
@@ -1236,7 +1358,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const actualType = getType(v);
   if (!actualType) return withType(makeInt(0), BoolType);
 
-  // Check via expected type's own instanceof (e.g., UnionType)
+  // Check via expected type's own instanceof (e.g., UnionType has direct binding, not in __members)
   const directInstanceof = (expectedCtx as ContextValue).bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const result = directInstanceof.fn([v], undefined as any, undefined as any);
@@ -1247,11 +1369,20 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Use meta-type's instanceof
   const typeType = (expectedCtx as ContextValue).bindings.get("__type")?.value as ContextValue | undefined;
   if (typeType) {
-    const instanceofMethod = typeType.bindings.get("instanceof")?.value;
+    const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const result = instanceofMethod.fn([expectedCtx as ContextValue, v], undefined as any, undefined as any);
       const rp = primaryOf(result);
-      return withType(makeInt(rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n ? 1 : 0), BoolType);
+      const baseOk = rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n;
+      if (!baseOk) return withType(makeInt(0), BoolType);
+      // Base check passed — also check refinement predicate if present
+      const predCheck = checkRefinementPredicate(v, expectedCtx as ContextValue, actualType, ctx!, evalFn!);
+      if (predCheck.ok === false) return withType(makeInt(0), BoolType);
+      if (predCheck.ok === null) {
+        // Unresolved predicate — return a residual instanceof
+        return makeExpr(makePrimitive("type_instanceof", type_instanceof_impl, true), [v, expectedType]);
+      }
+      return withType(makeInt(1), BoolType);
     }
   }
 
@@ -1275,10 +1406,23 @@ const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return withType(makeInt(0), BoolType);
   }
 
-  // Use typeA's meta-type subtypeof method
+  // If typeB uses structural checking (~wrapped or Type-based), use its subtypeof method
+  const metaTypeB = (ctxB as ContextValue).bindings.get("__type")?.value as ContextValue | undefined;
+  if (metaTypeB) {
+    const bSubtypeof = typeMethod(metaTypeB, "subtypeof");
+    if (bSubtypeof?.kind === ValueKind.PrimitiveFunction) {
+      const result = bSubtypeof.fn([ctxA as ContextValue, ctxB as ContextValue], undefined as any, undefined as any);
+      const rp = primaryOf(result);
+      if (rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n) {
+        return withType(makeInt(1), BoolType);
+      }
+    }
+  }
+
+  // Otherwise use typeA's meta-type subtypeof method
   const metaType = (ctxA as ContextValue).bindings.get("__type")?.value as ContextValue | undefined;
   if (metaType) {
-    const subtypeofMethod = metaType.bindings.get("subtypeof")?.value;
+    const subtypeofMethod = typeMethod(metaType, "subtypeof");
     if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
       const result = subtypeofMethod.fn([ctxA as ContextValue, ctxB as ContextValue], undefined as any, undefined as any);
       const rp = primaryOf(result);
@@ -1310,7 +1454,7 @@ const type_apply_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
     typeArgs.push(primaryOf(arg));
   }
-  return applyGenericType(genericCtx, typeArgs);
+  return wrapType(applyGenericType(genericCtx, typeArgs));
 };
 
 // --- type_union: create a union type from alternatives ---
@@ -1325,7 +1469,7 @@ const type_union_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
     alternatives.push(primaryOf(v));
   }
-  return makeUnionType(alternatives as ContextValue[]);
+  return wrapType(makeUnionType(alternatives as ContextValue[]));
 };
 
 // --- structural_wrap: ~ operator on types ---
@@ -1336,7 +1480,19 @@ const structural_wrap_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("structural_wrap", structural_wrap_impl, true), [v]);
   }
   const typeCtx = asCtx(primaryOf(v), "structural_wrap");
-  return structuralWrap(typeCtx);
+  return wrapType(structuralWrap(typeCtx));
+};
+
+// --- type_refine: && operator on types (refinement types) ---
+
+const type_refine_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const typeVal = evalFn!(args[0], ctx!);
+  const predicate = evalFn!(args[1], ctx!);
+  if (!isResolved(typeVal) || !isResolved(predicate)) {
+    return makeExpr(makePrimitive("type_refine", type_refine_impl, true), [typeVal, predicate]);
+  }
+  const parentType = asCtx(primaryOf(typeVal), "type_refine");
+  return wrapType(buildRefinedType(parentType, predicate));
 };
 
 // --- type_check_binding: check value type for binding annotations ---
@@ -1464,6 +1620,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   type_apply: makePrimitive("type_apply", type_apply_impl, true),
   type_union: makePrimitive("type_union", type_union_impl, true),
   structural_wrap: makePrimitive("structural_wrap", structural_wrap_impl, true),
+  type_refine: makePrimitive("type_refine", type_refine_impl, true),
   type_check_binding: makePrimitive("type_check_binding", type_check_binding_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),

@@ -8,7 +8,7 @@ import { markTailCalls, precompileFunction } from "./evaluator.js";
 import { parseBase as hybridParseBase, parseStandard as hybridParseStandard } from "./hybrid-parser.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf } from "./types.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -868,9 +868,12 @@ export function evalSource(
         evalCtx.bindingList.push({ key: bareKey, value: val, isUse: false });
       }
     } else {
-      // Auto-name types immediately
-      if (val.kind === ValueKind.Context) {
-        const nameBinding = (val as ContextValue).bindings.get("__name");
+      // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
+      const typeCtx = val.kind === ValueKind.Context ? val as ContextValue
+        : (val.kind === ValueKind.MultiValue && primaryOf(val).kind === ValueKind.Context)
+          ? primaryOf(val) as ContextValue : null;
+      if (typeCtx && typeCtx.bindings.has("__type")) {
+        const nameBinding = typeCtx.bindings.get("__name");
         if (nameBinding?.value?.kind === ValueKind.Bits) {
           const currentName = bitsToString(nameBinding.value as BitsValue);
           if (currentName.startsWith("<")) {

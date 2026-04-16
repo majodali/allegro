@@ -19,8 +19,8 @@ High-level goals, roughly ordered by dependency:
 
 ### Type System
 - [x] Subtyping / extends — Type/NominalType hierarchy, nominal + structural instanceof/subtypeof, `~` structural operator
-- [ ] Interfaces — structural type matching (no explicit `implements`)
-- [ ] Mixins — types with default implementations
+- [x] Interfaces — `Type.interface({...})`, structural type matching (no explicit `implements`), parent member inheritance, auto-naming
+- [x] Mixins — `.mixin({method: fn, ...})` adds methods to types, ComposedFunction dispatch, error on conflict
 - [x] Union types — `Int | String`, `type_union` primitive, union instanceof checks alternatives
 - [x] Full type inference — evaluation IS type inference. Typed args flow into untyped functions, types propagate through call chains, polymorphic specialization at each call site. CompilationReport.bindingTypes records all inferred types.
 - [x] Return type inference — via compile-time partial evaluation of typed function bodies
@@ -45,6 +45,7 @@ High-level goals, roughly ordered by dependency:
 - [x] Fluent type API — `extend`, `where`, `distinct`, `constructor` methods on Type/NominalType
 - [x] Meta-type dispatch — type-level methods via `__type` binding on raw Contexts
 - [x] Auto-naming — types bound to symbols get named after evaluation
+- [x] Member descriptors (`__members`) — unified Method/Field descriptor types, type methods and fields in `__members` collection, structural checking via `__members` comparison, meta-type methods (instanceof, subtypeof, extend, where, distinct, constructor) in `__members`
 
 ### Partial Evaluation & Compilation
 - [ ] Formalize multi-phase partial evaluation (invocation → config → compile → emit → package → deploy → execute)
@@ -135,8 +136,7 @@ High-level goals, roughly ordered by dependency:
 
 Priority-ordered list of next items to implement:
 
-1. **User-defined type declaration syntax** — syntax sugar for `extend`/`where`/`distinct` (deferred until API patterns are clear)
-2. **Pattern matching — nested patterns and guards** — nested destructuring, `when x is Int(n) if n > 0`
-3. **Refinement types** — `Int & _ > 0`, constraint expressions
-4. **Interfaces** — structural type matching (no explicit `implements`)
-5. **Migrate array methods to Allegro** — map/filter/reduce as typed Allegro functions
+1. **User-defined type declaration syntax** — syntax sugar for `extend`/`where`/`distinct`/`interface` (deferred until API patterns are clear)
+2. ~~**Refinement types**~~ — ✅ Phase 1: `Int && _ > 0` syntax, predicate checks at construction/annotation/call sites, `.preserveOps()` operator lifting. Phase 2 deferred: algebraic constraint propagation (`y = x + 1` inheriting `_ > 1`), type parameter constraints (`Array[T] && T subtypeof Int`), flow-sensitive narrowing.
+3. ~~**Migrate array methods to Allegro**~~ — ✅ map/filter/reduce as Allegro ComposedFunctions (recursive AST construction)
+4. ~~**Mixins**~~ — ✅ `.mixin({method: fn})` adds Method descriptors to types, ComposedFunction method dispatch with self binding, error on name conflict

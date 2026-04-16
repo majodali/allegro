@@ -1,0 +1,22 @@
+// Types are typed values — they carry type information
+
+// Built-in types are instances of NominalType
+print(Int instanceof NominalType) // expect: true
+print(String instanceof NominalType) // expect: true
+print(Bool instanceof NominalType) // expect: true
+
+// Meta-types have their own types
+print(NominalType instanceof NominalType) // expect: true
+
+// User-defined types are typed
+Point = Int.extend({x: Int, y: Int})
+print(Point instanceof NominalType) // expect: true
+
+// Interfaces are structural (Type)
+Printable = Type.interface({toString: Function})
+print(Printable instanceof Type) // expect: true
+
+// Regular values still work
+print(42 instanceof Int) // expect: true
+print("hello" instanceof String) // expect: true
+print(42 instanceof Printable) // expect: true
