@@ -2131,6 +2131,27 @@ test("interfaces: string satisfies Sized interface via structural check", () => 
   eq(Number((primaryOf(result!) as BitsValue).data), 1);
 });
 
+// == Edge cases ==
+
+test("edge case: empty interface satisfies any type", () => {
+  const result = evalStd(`EmptyIface = Type.interface({})
+42 instanceof EmptyIface`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("edge case: empty mixin produces identical type", () => {
+  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({})
+p = Point(3, 4)
+p.x + p.y`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("edge case: preserveOps on non-refined type is no-op", () => {
+  const result = evalStd(`T = Int.preserveOps()
+T(42) + 0`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
 // == Mixins ==
 
 test("mixins: basic mixin adds method", () => {

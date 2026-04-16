@@ -80,23 +80,6 @@ export function formatValue(v: Value): string {
           }
           if (parts.length > 0) return `${typeName}(${parts.join(", ")})`;
         }
-        // Legacy fallback: __fields
-        const fieldsBinding = typeComp.bindings.get("__fields");
-        if (fieldsBinding?.value?.kind === ValueKind.Context && v.primary.kind === ValueKind.Context) {
-          const fieldsCtx = fieldsBinding.value as ContextValue;
-          const instanceCtx = v.primary as ContextValue;
-          const len = Number((fieldsCtx.bindings.get("__length")?.value as BitsValue)?.data ?? 0n);
-          const parts: string[] = [];
-          for (let i = 0; i < len; i++) {
-            const fieldNameBits = fieldsCtx.bindings.get(String(i))?.value;
-            if (fieldNameBits?.kind === ValueKind.Bits) {
-              const fn = bitsToString(fieldNameBits as BitsValue);
-              const fieldVal = instanceCtx.bindings.get(fn)?.value;
-              if (fieldVal) parts.push(`${fn}: ${formatValue(fieldVal)}`);
-            }
-          }
-          return `${typeName}(${parts.join(", ")})`;
-        }
         // Int — display the primary normally
       }
     }
@@ -1530,10 +1513,10 @@ function makeTypedBinOp(opName: string): PrimitiveFnImpl {
     }
     // Call method with primaries (methods operate on raw values)
     const result = method.fn([primaryOf(left), primaryOf(right)], ctx, evalFn);
-    // Re-wrap result with left operand's type (for arithmetic) or no type (for comparisons)
-    if (opName === "eq" || opName === "neq" || opName === "lt" || opName === "gt" || opName === "lte" || opName === "gte") {
-      return withType(result, IntType); // comparisons return Int (0 or 1)
-    }
+    // Type methods already return properly typed values (e.g., comparisons return Bool,
+    // arithmetic returns the operand type). If the result is already a MultiValue, use it.
+    if (result.kind === ValueKind.MultiValue) return result;
+    // Otherwise wrap with the left operand's type (for raw Bits results)
     return withType(result, leftType);
   };
 }

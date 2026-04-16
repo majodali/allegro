@@ -13,6 +13,14 @@ import {
   Extension,
 } from "./types.js";
 
+// --- Constants ---
+
+/** Meta-method names that should NOT be inherited by child types during extend/interface */
+const META_METHOD_NAMES = new Set([
+  "instanceof", "subtypeof", "extend", "where", "distinct",
+  "constructor", "interface", "preserveOps", "mixin",
+]);
+
 // --- Helpers ---
 
 /** Get the type component from a value (if it's a MultiValue with "type") */
@@ -107,7 +115,7 @@ function structuralInstanceof(value: Value, expectedType: ContextValue): boolean
 
 /**
  * Structural subtypeof: does typeA have all the members (methods + fields) of typeB?
- * Compares __members collections. Falls back to legacy __fields + direct binding check.
+ * Compares __members collections: every member in typeB must exist in typeA.
  */
 function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
   const aMembersVal = typeA.bindings.get("__members")?.value;
@@ -116,30 +124,13 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
   if (bMembersVal?.kind === ValueKind.Context) {
     const bMembers = bMembersVal as ContextValue;
     const aMembers = aMembersVal?.kind === ValueKind.Context ? aMembersVal as ContextValue : null;
-    // Every member declared in B must exist in A's __members
     for (const [key] of bMembers.bindings) {
       if (!aMembers || !aMembers.bindings.has(key)) return false;
     }
     return true;
   }
 
-  // Legacy fallback: check direct bindings + __fields
-  for (const [key] of typeB.bindings) {
-    if (key.startsWith("__")) continue;
-    if (!typeA.bindings.has(key)) return false;
-  }
-  const bFields = typeB.bindings.get("__fields")?.value;
-  if (bFields?.kind === ValueKind.Context) {
-    for (const [key] of (bFields as ContextValue).bindings) {
-      if (key.startsWith("__")) continue;
-      if (!typeA.bindings.has(key)) {
-        const aFields = typeA.bindings.get("__fields")?.value;
-        if (!aFields || aFields.kind !== ValueKind.Context || !(aFields as ContextValue).bindings.has(key)) {
-          return false;
-        }
-      }
-    }
-  }
+  // No __members on expected type — trivially satisfied
   return true;
 }
 
@@ -425,15 +416,6 @@ function buildRecordType(
   addBinding(newType, "__type", metaType);
   addBinding(newType, "__extends", parentType);
 
-  // Store field spec for introspection (ordered)
-  const fieldsCtx = makeContext();
-  for (let i = 0; i < fields.length; i++) {
-    addBinding(fieldsCtx, fields[i].name, fields[i].type);
-    addBinding(fieldsCtx, String(i), stringToBits(fields[i].name));
-  }
-  addBinding(fieldsCtx, "__length", makeInt(fields.length));
-  addBinding(newType, "__fields", fieldsCtx);
-
   // Build __members: Field descriptors for declared fields + Method descriptors for methods
   const members = makeContext();
 
@@ -443,7 +425,7 @@ function buildRecordType(
   }
 
   // Copy non-meta Method descriptors from parent's __members
-  const metaMethodNames = new Set(["instanceof", "subtypeof", "extend", "where", "distinct", "constructor", "interface", "preserveOps", "mixin"]);
+  const metaMethodNames = META_METHOD_NAMES;
   const parentMembers = parentType.bindings.get("__members")?.value;
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
@@ -546,7 +528,7 @@ function buildInterfaceType(
   const members = makeContext();
 
   // Copy non-meta Method descriptors from parent's __members
-  const metaMethodNames = new Set(["instanceof", "subtypeof", "extend", "where", "distinct", "constructor", "interface", "preserveOps", "mixin"]);
+  const metaMethodNames = META_METHOD_NAMES;
   const parentMembers = parentType.bindings.get("__members")?.value;
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
@@ -2089,11 +2071,6 @@ export function wrapAsUntypedFunction(fn: Value, arity?: number): Value {
 /**
  * Check if a value is a function (PrimitiveFunction or ComposedFunction).
  */
-function isFunctionValue(v: Value): boolean {
-  const p = primaryOf(v);
-  return p.kind === ValueKind.PrimitiveFunction || p.kind === ValueKind.ComposedFunction;
-}
-
 /** Wrap a type Context as a typed MultiValue using its __type as meta-type */
 export function wrapType(type: ContextValue): Value {
   const metaType = type.bindings.get("__type")?.value as ContextValue | undefined;

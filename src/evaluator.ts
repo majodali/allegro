@@ -443,11 +443,7 @@ function checkArgType(
     const base = expected.bindings.get("__extends")?.value;
     if (base?.kind === ValueKind.Context) {
       // Recurse on the base type (unwraps nested refinements)
-      try {
-        checkArgType(arg, base as ContextValue, argIndex, ctx, depth, depCollector);
-      } catch (e) {
-        throw e;
-      }
+      checkArgType(arg, base as ContextValue, argIndex, ctx, depth, depCollector);
       // Base check passed — evaluate the predicate (unless same refined type)
       const argType0 = getType(arg);
       if (argType0 !== expected && ctx && depth !== undefined) {
