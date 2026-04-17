@@ -58,13 +58,22 @@ async function loadImportedModules(
 
   if (needed.length === 0) return [];
 
+  // System library directory: lib/ alongside src/ (the Allegro installation)
+  const systemLibDir = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")), "..", "lib");
+
   const loader = new ModuleLoader({
     modules: needed.map(id => ({ id })),
     resolve: (id) => {
-      const p = path.join(libDir, `${id}.alg`);
-      return fs.existsSync(p) ? p : null;
+      // 1. Local lib (user's project)
+      const local = path.join(libDir, `${id}.alg`);
+      if (fs.existsSync(local)) return local;
+      // 2. System lib (alongside Allegro source)
+      const system = path.join(systemLibDir, `${id}.alg`);
+      if (fs.existsSync(system)) return system;
+      return null;
     },
     readFile: async (p) => fs.readFileSync(p, "utf-8"),
+    extensions: existingExtensions,
   });
 
   return loader.loadAll();

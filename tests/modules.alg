@@ -1,18 +1,18 @@
 // Allegro Standard - Module / Import Tests
 // Tests import syntax and dot access on imported modules.
 
-import math
+import mymath
 
 // Access module fields via dot notation
-print(math.pi)
+print(mymath.pi)
 // expect: 3
 
-print(math.e)
+print(mymath.e)
 // expect: 2
 
 // Use module functions
-print(math.square(5))
+print(mymath.square(5))
 // expect: 25
 
-print(math.double(7))
+print(mymath.double(7))
 // expect: 14

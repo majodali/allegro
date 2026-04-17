@@ -81,6 +81,9 @@ High-level goals, roughly ordered by dependency:
 - [ ] Multi-phase build pipeline implementation
 
 ### Module System
+- [x] Standard library — `lib/math.alg` (sqrt, pow, sin, cos, abs, floor, ceil, round, min, max, clamp, sign, PI, E, TAU), `lib/functional.alg` (identity, constant, flip, compose, pipe, apply, twice, thrice, on), `lib/collections.alg` (range, zip, flatten, take, drop, head, tail, last, reverse, sum, product, contains, indexOf)
+- [x] System library resolution — local lib/ first, system lib/ fallback
+- [x] Standard parser in modules — modules can use typed syntax (Float, Int, etc.)
 - [ ] Qualified import (`import math.round`)
 - [ ] Re-exports
 - [ ] Module versioning and compatibility

@@ -3,7 +3,7 @@
 // Loads .alg files as anonymous extensions.
 // =============================================================================
 
-import { parseBase } from "./hybrid-parser.js";
+import { parseBase, parseStandard } from "./hybrid-parser.js";
 import { buildEvalCtx, resolvePrimitives, resolveSymbols, Extension } from "./runtime.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, primaryOf, AllegroError } from "./types.js";
@@ -28,6 +28,8 @@ export interface ModuleLoaderOptions {
   modules: ModuleConfig[];
   resolve: ModuleResolver;
   readFile: FileReader;
+  /** Standard extensions (type system, etc.) to make available in modules */
+  extensions?: Extension[];
 }
 
 // --- Module Type Builder ---
@@ -167,11 +169,13 @@ export class ModuleLoader {
   private configs: Map<string, ModuleConfig>;
   private resolve: ModuleResolver;
   private readFile: FileReader;
+  private extensions: Extension[];
 
   constructor(options: ModuleLoaderOptions) {
     this.configs = new Map(options.modules.map(m => [m.id, m]));
     this.resolve = options.resolve;
     this.readFile = options.readFile;
+    this.extensions = options.extensions ?? [];
   }
 
   /**
@@ -227,7 +231,10 @@ export class ModuleLoader {
     // 4. Read and parse module source
     const source = await this.readFile(resolvedPath);
     const normalized = source.replace(/\r\n/g, "\n");
-    const parseResult = parseBase(normalized);
+    // Use standard parser if extensions are available (enables typed syntax)
+    const parseResult = this.extensions.length > 0
+      ? parseStandard(normalized)
+      : parseBase(normalized);
 
     if (parseResult.errors.length > 0) {
       throw new Error(`Module '${id}': parse error: ${parseResult.errors[0].message}`);
@@ -243,8 +250,10 @@ export class ModuleLoader {
     }
 
     // 5. Resolve symbols and build evaluation context
-    resolveSymbols(fileCtx, undefined, depExtensions);
-    const evalCtx = buildEvalCtx(fileCtx, undefined, depExtensions);
+    //    Include standard extensions so modules can use types (Float, Int, etc.)
+    const allExtensions = [...this.extensions, ...depExtensions];
+    resolveSymbols(fileCtx, undefined, allExtensions);
+    const evalCtx = buildEvalCtx(fileCtx, undefined, allExtensions);
 
     // 6. Evaluate bare expressions (side effects)
     for (const b of fileCtx.bindingList) {

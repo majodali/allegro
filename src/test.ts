@@ -1445,7 +1445,7 @@ import { primitives as primRegistry } from "./primitives.js";
 const primNames = new Set(Object.keys(primRegistry));
 const typeNames = new Set(["Int", "Float", "String", "Bool", "Array", "Object", "true", "false"]);
 
-const mathSource = fs.readFileSync(path.join(testsDir, "lib", "math.alg"), "utf-8");
+const mathSource = fs.readFileSync(path.join(testsDir, "lib", "mymath.alg"), "utf-8");
 const mathResult = runtimeEval(mathSource, undefined, [typeExt], undefined, true);
 const mathBindings: Record<string, Value> = {};
 for (const [key, binding] of mathResult.evalCtx.bindings) {
@@ -1453,8 +1453,8 @@ for (const [key, binding] of mathResult.evalCtx.bindings) {
     mathBindings[key] = binding.value;
   }
 }
-const mathModuleCtx = extensionToContext({ name: "math", bindings: mathBindings });
-fileTest(path.join(testsDir, "modules.alg"), [{ name: "modules", bindings: { math: mathModuleCtx } }]);
+const mathModuleCtx = extensionToContext({ name: "mymath", bindings: mathBindings });
+fileTest(path.join(testsDir, "modules.alg"), [{ name: "modules", bindings: { mymath: mathModuleCtx } }]);
 fileTest(path.join(testsDir, "type-annotations.alg"));
 fileTest(path.join(testsDir, "generics.alg"));
 

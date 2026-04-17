@@ -74,8 +74,8 @@ Base language API (expression DAGs, evaluation contexts)
 Types are Context values with `__name`, `__type`, `__members`, and other meta-bindings. A typed value is a MultiValue where the primary is the data and the `"type"` component is the type Context. **Types themselves are typed** — user-visible type bindings are MultiValues with their meta-type as the type component (e.g., `Int` is `MultiValue(IntType, {type: NominalType})`). This means `Int instanceof NominalType` returns true, and `type of Int` returns NominalType. Internally, type infrastructure uses the primary Context via `primaryOf()`.
 
 ### Ten Core Types
-- **Int** — 64-bit signed integer. Arithmetic, comparison, toString.
-- **Float** — IEEE 754 double. Arithmetic, comparison, toString.
+- **Int** — 64-bit signed integer. Arithmetic, comparison, toString, abs, toFloat.
+- **Float** — IEEE 754 double. Arithmetic, comparison, toString, sqrt, pow, abs, floor, ceil, round, sin, cos, tan, log, log2, log10, exp.
 - **String** — UTF-8 encoded Bits. Concat (+), length, slice, indexOf, trim, startsWith, endsWith, includes, split, replace (all by default, optional count), toUpperCase, toLowerCase, charAt, repeat, toCharCodes, toString.
 - **Bool** — Int(0/1) with Bool type. Provided as `true`/`false` context bindings.
 - **Array** — Generic type `Array[T]`. Context with numeric keys + `__length`. length, get, map, filter, reduce, concat, slice. Element type inferred from contents. map/filter/reduce are Allegro ComposedFunctions (recursive, built via AST construction); length/get/concat/slice are primitives.
@@ -197,6 +197,8 @@ Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, 
 - **Export system**: `export("name", value)` primitive marks bindings for export. `buildModuleObject` wraps exported bindings as a typed Object. Planned: full typed module interfaces with encapsulation via type-directed dispatch.
 - **Module objects**: imported modules are typed Objects — dot access dispatches through the module's type, exposing only exported fields.
 - **Module encapsulation**: `type_dispatch` enforces encapsulation for typed values — only fields listed on the type are accessible. Types use `__getMember` for controlled field access; module types restrict to exported fields only.
+- **System library**: `lib/` directory alongside `src/` provides standard library modules. Module resolution: local `lib/` first, then system `lib/` fallback. Modules are parsed with the standard parser and have full access to the type system (Float, Int, etc.).
+- **Standard library modules**: `math` (sqrt, pow, sin, cos, etc. + constants PI, E), `functional` (compose, pipe, identity, etc.), `collections` (range, zip, flatten, reverse, sum, etc.)
 
 ## Partial Evaluation
 
