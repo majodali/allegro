@@ -187,6 +187,7 @@ Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, 
 ### Grammar Extension
 - **Earley extensions** (`GrammarBuilder`): still available for standalone grammars and grammar primitive tests
 - **Hybrid extensions**: `HybridGrammarConfig` with prefix/infix parselet registrations and `LexerConfig` for new operators/keywords. Immutable layering via `extendLexerConfig`.
+- **Parser combinators from Allegro** (Phase 1 DSL primitives): `grammar_new`, `grammar_terminal`, `grammar_phrase`, `grammar_choice`, `grammar_choice_add` (mutable append for recursion), `grammar_repeat`, `grammar_optional`, `grammar_set_target`, `grammar_parse`. Build grammars at runtime, parse strings, receive a tree of Allegro values — Terminal→String, Phrase→Array (positional), Disjunction→transparent (unwrapped), Repetition→Array (delimiters stripped), Optional→value or none. Parse errors become typed Error values. Example demo: `tests/grammar-regex.alg` implements a regex DSL end-to-end.
 
 ## Module System
 

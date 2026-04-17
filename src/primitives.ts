@@ -826,6 +826,9 @@ const id_impl: PrimitiveFnImpl = (args) => {
 import {
   GrammarBuilder, addDotAccess, addImport,
   registryStore, registryGet,
+  makeGrammarHandle, makeTerminalHandle, makePhraseHandle, makeChoiceHandle,
+  addChoiceAlternative, makeRepeatHandle, makeOptionalHandle,
+  setGrammarTarget, parseGrammarToAllegro,
 } from "./grammar-ext.js";
 
 const grammar_builder_impl: PrimitiveFnImpl = () => {
@@ -852,6 +855,119 @@ const grammar_build_impl: PrimitiveFnImpl = (args) => {
   const builder = registryGet(handle) as GrammarBuilder;
   const ext = builder.build();
   return makeInt(registryStore(ext));
+};
+
+// ============ PARSER COMBINATORS (Phase 1 grammar extensions) ============
+// Handle-based primitives for building grammars from Allegro code.
+// All handles are Int values referencing grammar-ext.ts's registry.
+
+// Helpers to extract options from Allegro Object contexts
+function optionalStringFromCtx(ctx: ContextValue, key: string): string | undefined {
+  const b = ctx.bindings.get(key);
+  if (!b?.value) return undefined;
+  const p = primaryOf(b.value);
+  if (p.kind !== ValueKind.Bits) return undefined;
+  return bitsToString(p as BitsValue);
+}
+function optionalIntFromCtx(ctx: ContextValue, key: string): number | undefined {
+  const b = ctx.bindings.get(key);
+  if (!b?.value) return undefined;
+  const p = primaryOf(b.value);
+  if (p.kind !== ValueKind.Bits) return undefined;
+  return Number((p as BitsValue).data);
+}
+function arrayHandlesFromValue(v: Value, fnName: string): number[] {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.Context) {
+    throw new AllegroError(`${fnName}: expected Array of handles`);
+  }
+  const ctx = p as ContextValue;
+  const lenB = ctx.bindings.get("__length")?.value;
+  const len = lenB?.kind === ValueKind.Bits ? Number((lenB as BitsValue).data) : 0;
+  const handles: number[] = [];
+  for (let i = 0; i < len; i++) {
+    const itemB = ctx.bindings.get(String(i));
+    if (!itemB?.value) continue;
+    const ip = primaryOf(itemB.value);
+    if (ip.kind !== ValueKind.Bits) {
+      throw new AllegroError(`${fnName}: element ${i} is not a handle`);
+    }
+    handles.push(Number((ip as BitsValue).data));
+  }
+  return handles;
+}
+
+const grammar_new_impl: PrimitiveFnImpl = (args) => {
+  // Optional options object as first arg
+  let opts: { whitespace?: string } = {};
+  if (args.length > 0) {
+    const p = primaryOf(args[0]);
+    if (p.kind === ValueKind.Context) {
+      const ws = optionalStringFromCtx(p as ContextValue, "whitespace");
+      if (ws !== undefined) opts.whitespace = ws;
+    }
+  }
+  return makeInt(makeGrammarHandle(opts));
+};
+
+const grammar_terminal_impl: PrimitiveFnImpl = (args) => {
+  const gHandle = Number(asBits(args[0], "grammar_terminal").data);
+  const pattern = bitsToString(asBits(args[1], "grammar_terminal"));
+  return makeInt(makeTerminalHandle(gHandle, pattern));
+};
+
+const grammar_phrase_impl: PrimitiveFnImpl = (args) => {
+  const gHandle = Number(asBits(args[0], "grammar_phrase").data);
+  const elementHandles = arrayHandlesFromValue(args[1], "grammar_phrase");
+  return makeInt(makePhraseHandle(gHandle, elementHandles));
+};
+
+const grammar_choice_impl: PrimitiveFnImpl = (args) => {
+  const gHandle = Number(asBits(args[0], "grammar_choice").data);
+  const altHandles = arrayHandlesFromValue(args[1], "grammar_choice");
+  return makeInt(makeChoiceHandle(gHandle, altHandles));
+};
+
+const grammar_choice_add_impl: PrimitiveFnImpl = (args) => {
+  const disjHandle = Number(asBits(args[0], "grammar_choice_add").data);
+  const altHandle = Number(asBits(args[1], "grammar_choice_add").data);
+  addChoiceAlternative(disjHandle, altHandle);
+  return args[0];
+};
+
+const grammar_repeat_impl: PrimitiveFnImpl = (args) => {
+  const gHandle = Number(asBits(args[0], "grammar_repeat").data);
+  const elementHandle = Number(asBits(args[1], "grammar_repeat").data);
+  let opts: { min?: number; max?: number; delimiter?: number } = {};
+  if (args.length > 2) {
+    const p = primaryOf(args[2]);
+    if (p.kind === ValueKind.Context) {
+      const ctx = p as ContextValue;
+      opts.min = optionalIntFromCtx(ctx, "min");
+      opts.max = optionalIntFromCtx(ctx, "max");
+      opts.delimiter = optionalIntFromCtx(ctx, "delimiter");
+    }
+  }
+  return makeInt(makeRepeatHandle(gHandle, elementHandle, opts));
+};
+
+const grammar_optional_impl: PrimitiveFnImpl = (args) => {
+  const gHandle = Number(asBits(args[0], "grammar_optional").data);
+  const elementHandle = Number(asBits(args[1], "grammar_optional").data);
+  return makeInt(makeOptionalHandle(gHandle, elementHandle));
+};
+
+const grammar_set_target_impl: PrimitiveFnImpl = (args) => {
+  const gHandle = Number(asBits(args[0], "grammar_set_target").data);
+  const elementHandle = Number(asBits(args[1], "grammar_set_target").data);
+  setGrammarTarget(gHandle, elementHandle);
+  return args[0];
+};
+
+const grammar_parse_impl: PrimitiveFnImpl = (args) => {
+  const gHandle = Number(asBits(args[0], "grammar_parse").data);
+  const input = bitsToString(asBits(args[1], "grammar_parse"));
+  return parseGrammarToAllegro(gHandle, input);
 };
 
 // ============ TYPE SYSTEM ============
@@ -1611,6 +1727,16 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   grammar_add_dot_access: makePrimitive("grammar_add_dot_access", grammar_add_dot_access_impl),
   grammar_add_import: makePrimitive("grammar_add_import", grammar_add_import_impl),
   grammar_build: makePrimitive("grammar_build", grammar_build_impl),
+  // Parser combinators (Phase 1)
+  grammar_new: makePrimitive("grammar_new", grammar_new_impl),
+  grammar_terminal: makePrimitive("grammar_terminal", grammar_terminal_impl),
+  grammar_phrase: makePrimitive("grammar_phrase", grammar_phrase_impl),
+  grammar_choice: makePrimitive("grammar_choice", grammar_choice_impl),
+  grammar_choice_add: makePrimitive("grammar_choice_add", grammar_choice_add_impl),
+  grammar_repeat: makePrimitive("grammar_repeat", grammar_repeat_impl),
+  grammar_optional: makePrimitive("grammar_optional", grammar_optional_impl),
+  grammar_set_target: makePrimitive("grammar_set_target", grammar_set_target_impl),
+  grammar_parse: makePrimitive("grammar_parse", grammar_parse_impl),
   // Type system
   typed_int: makePrimitive("typed_int", typed_int_impl, true),
   typed_string: makePrimitive("typed_string", typed_string_impl, true),

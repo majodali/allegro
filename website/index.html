@@ -134,6 +134,7 @@
     <a href="#refinements">Refinements</a>
     <a href="#mixins">Mixins</a>
     <a href="#async">Async</a>
+    <a href="#grammar">Grammar</a>
     <a href="/sandbox.html">Sandbox</a>
   </div>
 </nav>
@@ -414,6 +415,37 @@ b = fetch("https://jsonplaceholder.typicode.com/users/2")
 print("User 1: {a.slice(0, 50)}...")
 print("User 2: {b.slice(0, 50)}...")</textarea>
 <div class="sandbox-bar"><button onclick="runSandbox('s-async2')">Run</button><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<!-- ================================================ -->
+<h2 id="grammar">Grammar Extensions</h2>
+
+<p>Allegro exposes its Earley parser as first-class primitives. Build a grammar at runtime, parse strings into trees of Allegro values, and interpret those trees in pure Allegro — build a DSL in a page of code.</p>
+
+<p>The example below builds a minimal regex DSL: literal chars, <code>|</code> alternation, <code>*</code>/<code>+</code>/<code>?</code> postfix. The grammar is defined with <code>grammar_terminal</code>, <code>grammar_phrase</code>, <code>grammar_choice</code>, <code>grammar_repeat</code>, <code>grammar_optional</code>. The parse tree is then interpreted by pure Allegro functions to produce a matcher.</p>
+
+<div class="sandbox" id="s-grammar">
+<textarea class="sandbox-editor" rows="22">// Build a tiny regex DSL grammar
+g = grammar_new({whitespace: ""})
+chr = grammar_terminal(g, "/[a-z]/")
+postfix = grammar_choice(g, [
+  grammar_terminal(g, "*"),
+  grammar_terminal(g, "+"),
+  grammar_terminal(g, "?")])
+atom = grammar_phrase(g, [chr, grammar_optional(g, postfix)])
+concat_rule = grammar_repeat(g, atom, {min: 1})
+pipe = grammar_terminal(g, "|")
+alt_rule = grammar_repeat(g, concat_rule, {min: 1, delimiter: pipe})
+grammar_set_target(g, alt_rule)
+
+// Parse "a*b" — result is a tree of Strings and Arrays
+tree = grammar_parse(g, "a*b")
+print(tree)
+
+// Parse alternation
+print(grammar_parse(g, "a|b|c"))</textarea>
+<div class="sandbox-bar"><button onclick="runSandbox('s-grammar')">Run</button><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 

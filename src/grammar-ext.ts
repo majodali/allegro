@@ -12,6 +12,9 @@ import {
   Phrase,
   Disjunction,
   Repetition,
+  Optional,
+  SyntaxTreeNode,
+  parseGrammar,
   parseWithExtensions,
   parserMakeExpr,
   parserMakeParam,
@@ -26,6 +29,11 @@ import {
   parserRepChildren,
   parserMakeSymbol,
 } from "./parser.js";
+import {
+  Value, ValueKind, ContextValue, BitsValue,
+  makeContext, makeInt, makeMultiValue, stringToBits, primaryOf,
+} from "./types.js";
+import { withType, StringType, ErrorType, IntType, makeArray, noneSingleton } from "./types-std.js";
 
 // --- Types ---
 
@@ -591,4 +599,153 @@ export function registryGet(id: number): any {
   const obj = handleRegistry.get(id);
   if (obj === undefined) throw new Error(`Invalid grammar handle: ${id}`);
   return obj;
+}
+
+// =============================================================================
+// Parser Combinator Factories (Phase 1 grammar extensions)
+// Thin wrappers around Grammar class methods that return integer handles.
+// Used by primitives.ts to expose parser combinators to Allegro code.
+// =============================================================================
+
+export interface GrammarFactoryOptions {
+  whitespace?: string;
+}
+
+/** Build a fresh Grammar and return its handle. */
+export function makeGrammarHandle(options?: GrammarFactoryOptions): number {
+  const ws = options?.whitespace !== undefined ? new RegExp(options.whitespace) : undefined;
+  const g = new Grammar(ws !== undefined ? { whitespace: ws } : {});
+  return registryStore(g);
+}
+
+/** Create a Terminal. Pattern starting with "/" treated as regex source (strip slashes). */
+export function makeTerminalHandle(gHandle: number, pattern: string): number {
+  const g = registryGet(gHandle) as Grammar;
+  // If pattern starts with "/" and ends with "/" treat middle as regex source
+  let p: string | RegExp = pattern;
+  if (pattern.length >= 2 && pattern.startsWith("/") && pattern.endsWith("/")) {
+    p = new RegExp(pattern.slice(1, -1));
+  }
+  const t = g.terminal(p);
+  return registryStore(t);
+}
+
+/** Create a Phrase from element handles. */
+export function makePhraseHandle(gHandle: number, elementHandles: number[]): number {
+  const g = registryGet(gHandle) as Grammar;
+  const elements = elementHandles.map(h => registryGet(h) as GrammarElement);
+  const p = g.phrase(elements);
+  return registryStore(p);
+}
+
+/** Create a Disjunction (possibly empty for forward reference). */
+export function makeChoiceHandle(gHandle: number, altHandles: number[]): number {
+  const g = registryGet(gHandle) as Grammar;
+  const alts = altHandles.map(h => registryGet(h) as GrammarElement);
+  const d = g.disjunction(alts);
+  return registryStore(d);
+}
+
+/** Append an alternative to an existing Disjunction (the recursion hook). */
+export function addChoiceAlternative(disjunctionHandle: number, altHandle: number): number {
+  const d = registryGet(disjunctionHandle) as Disjunction;
+  const alt = registryGet(altHandle) as GrammarElement;
+  d.add(alt);
+  return disjunctionHandle;
+}
+
+/** Create a Repetition. */
+export interface RepeatFactoryOptions {
+  min?: number;
+  max?: number;
+  delimiter?: number;
+}
+export function makeRepeatHandle(gHandle: number, elementHandle: number, opts?: RepeatFactoryOptions): number {
+  const g = registryGet(gHandle) as Grammar;
+  const element = registryGet(elementHandle) as GrammarElement;
+  const repeatOpts: any = {};
+  if (opts?.min !== undefined) repeatOpts.min = opts.min;
+  if (opts?.max !== undefined) repeatOpts.max = opts.max;
+  if (opts?.delimiter !== undefined) repeatOpts.delimiter = registryGet(opts.delimiter) as GrammarElement;
+  const r = g.repeat(element, repeatOpts);
+  return registryStore(r);
+}
+
+/** Create an Optional. */
+export function makeOptionalHandle(gHandle: number, elementHandle: number): number {
+  const g = registryGet(gHandle) as Grammar;
+  const element = registryGet(elementHandle) as GrammarElement;
+  const o = g.optional(element);
+  return registryStore(o);
+}
+
+/** Set the target (start element) of a grammar. */
+export function setGrammarTarget(gHandle: number, elementHandle: number): number {
+  const g = registryGet(gHandle) as Grammar;
+  const element = registryGet(elementHandle) as GrammarElement;
+  g.target = element;
+  return gHandle;
+}
+
+/**
+ * Parse an input string with a grammar, returning a tree of Allegro values.
+ * On parse failure, returns an Allegro error value.
+ */
+export function parseGrammarToAllegro(gHandle: number, input: string): Value {
+  const g = registryGet(gHandle) as Grammar;
+  const result = parseGrammar(g, input);
+  if (result.errors.length > 0) {
+    const err = result.errors[0];
+    const msg = `parse error at ${err.start.line}:${err.start.column}: ${err.message}`;
+    const components = new Map<string, Value>();
+    components.set("error", withType(stringToBits(msg), StringType));
+    components.set("type", ErrorType);
+    return makeMultiValue(makeInt(0), components);
+  }
+  return syntaxTreeToAllegroValue(result.tree);
+}
+
+/**
+ * Convert a SyntaxTreeNode to an Allegro value, guided by the node's element type.
+ *
+ * Terminal    → String (matched text)
+ * Phrase      → Array of children's values (positional)
+ * Disjunction → Transparent: unwrap to the single matched alternative's value
+ * Repetition  → Array of body values, delimiters stripped
+ * Optional    → child value or `none`
+ */
+export function syntaxTreeToAllegroValue(node: SyntaxTreeNode): Value {
+  const element = node.element;
+
+  if (element instanceof Terminal) {
+    return withType(stringToBits(node.text), StringType);
+  }
+
+  if (element instanceof Phrase) {
+    const childVals: Value[] = node.children.map(c => syntaxTreeToAllegroValue(c));
+    return makeArray(childVals);
+  }
+
+  if (element instanceof Disjunction) {
+    // Transparent — unwrap to the single matched alternative's value.
+    // A matched disjunction has exactly one child (the chosen alternative's node).
+    if (node.children.length === 0) return noneSingleton as Value;
+    return syntaxTreeToAllegroValue(node.children[0]);
+  }
+
+  if (element instanceof Repetition) {
+    // Use parser's repetition flattening: includes body elements, excludes delimiters.
+    const bodies = parserRepChildren(node) as SyntaxTreeNode[];
+    const childVals = bodies.map(c => syntaxTreeToAllegroValue(c));
+    return makeArray(childVals);
+  }
+
+  if (element instanceof Optional) {
+    if (node.children.length === 0) return noneSingleton as Value;
+    return syntaxTreeToAllegroValue(node.children[0]);
+  }
+
+  // Fallback: treat as phrase-like
+  const childVals: Value[] = node.children.map(c => syntaxTreeToAllegroValue(c));
+  return makeArray(childVals);
 }

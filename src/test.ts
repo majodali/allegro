@@ -3187,6 +3187,88 @@ test("inference: none", () => {
   eq(r?.bindingTypes.get("n"), "None");
 });
 
+// == Parser Combinators (Phase 1 grammar extensions from Allegro) ==
+
+test("grammar combinators: terminal matches regex pattern", () => {
+  const result = evalStd(`g = grammar_new({whitespace: ""})
+t = grammar_terminal(g, "/[0-9]+/")
+grammar_set_target(g, t)
+grammar_parse(g, "42")`);
+  const pv = primaryOf(result!);
+  eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "42", true);
+});
+
+test("grammar combinators: terminal matches literal text", () => {
+  const result = evalStd(`g = grammar_new({whitespace: ""})
+t = grammar_terminal(g, "hello")
+grammar_set_target(g, t)
+grammar_parse(g, "hello")`);
+  const pv = primaryOf(result!);
+  eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "hello", true);
+});
+
+test("grammar combinators: phrase returns Array of children", () => {
+  const result = evalStd(`g = grammar_new({whitespace: ""})
+a = grammar_terminal(g, "a")
+b = grammar_terminal(g, "b")
+p = grammar_phrase(g, [a, b])
+grammar_set_target(g, p)
+grammar_parse(g, "ab")`);
+  const pv = primaryOf(result!) as any;
+  eq(pv.kind === ValueKind.Context, true);
+});
+
+test("grammar combinators: choice is transparent (unwraps matched alternative)", () => {
+  const result = evalStd(`g = grammar_new({whitespace: ""})
+a = grammar_terminal(g, "a")
+b = grammar_terminal(g, "b")
+c = grammar_choice(g, [a, b])
+grammar_set_target(g, c)
+grammar_parse(g, "b")`);
+  const pv = primaryOf(result!);
+  eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "b", true);
+});
+
+test("grammar combinators: repeat strips delimiters", () => {
+  const result = evalStd(`g = grammar_new({whitespace: ""})
+a = grammar_terminal(g, "a")
+comma = grammar_terminal(g, ",")
+rep = grammar_repeat(g, a, {min: 1, delimiter: comma})
+grammar_set_target(g, rep)
+tree = grammar_parse(g, "a,a,a")
+tree.length`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 3);
+});
+
+test("grammar combinators: optional returns matched value", () => {
+  const result = evalStd(`g = grammar_new({whitespace: ""})
+a = grammar_terminal(g, "a")
+opt = grammar_optional(g, a)
+grammar_set_target(g, opt)
+grammar_parse(g, "a")`);
+  const pv = primaryOf(result!);
+  eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "a", true);
+});
+
+test("grammar combinators: choice_add mutable forward-ref works", () => {
+  const result = evalStd(`g = grammar_new({whitespace: ""})
+digit = grammar_terminal(g, "/[0-9]/")
+choice = grammar_choice(g, [])
+grammar_choice_add(choice, digit)
+grammar_set_target(g, choice)
+grammar_parse(g, "5")`);
+  const pv = primaryOf(result!);
+  eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "5", true);
+});
+
+test("grammar combinators: parse failure returns error value", () => {
+  const result = evalStd(`g = grammar_new({whitespace: ""})
+a = grammar_terminal(g, "a")
+grammar_set_target(g, a)
+grammar_parse(g, "b")`);
+  eq((result as any).components?.has("error"), true);
+});
+
 // == Async Futures ==
 
 async function runAsyncTests(): Promise<void> {
