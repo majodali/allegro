@@ -98,7 +98,16 @@ export function evaluate(
 
     case ValueKind.MultiValue: {
       const ep = evaluate(value.primary, ctx, depth + 1, depCollector);
-      return ep === value.primary ? value : makeMultiValue(ep, new Map(value.components));
+      if (ep === value.primary) return value;
+      // If re-evaluation produced another MultiValue, FLATTEN rather than NEST.
+      // Inner (freshly-evaluated) components shadow outer (stale) components —
+      // fresh resolved type info should replace pre-computed partial-eval types.
+      if (ep.kind === ValueKind.MultiValue) {
+        const merged = new Map(value.components);
+        for (const [k, v] of (ep as MultiValueType).components) merged.set(k, v);
+        return makeMultiValue((ep as MultiValueType).primary, merged);
+      }
+      return makeMultiValue(ep, new Map(value.components));
     }
 
     case ValueKind.Expression: {

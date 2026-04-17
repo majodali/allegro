@@ -781,7 +781,7 @@ const delay_wrapper: PrimitiveFnImpl = (args, ctx, evalFn) => {
     throw new AllegroError("delay: requires async runtime (no FutureManager available)");
   }
   const promise = new Promise<Value>((resolve) => {
-    setTimeout(() => resolve(makeInt(0)), ms);
+    setTimeout(() => resolve(withType(makeInt(0), IntType)), ms);
   });
   return fm.createFuture(promise);
 };

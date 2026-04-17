@@ -68,16 +68,19 @@ function evalAllegroAsync(
     ctx = evalCtx;
     console.log = origLog;
 
-    const result = value !== null ? formatValue(value) : null;
-
     if (!fm.hasPending()) {
+      const result = value !== null ? formatValue(value) : null;
       fm.onOutput = null;
       return Promise.resolve({ output, result, error: null });
     }
 
+    // When there are pending futures, the streamed output (via onOutput) is
+    // authoritative — the sync `value` is a stale residual Expression that
+    // would format as "<expression>". Don't display it; everything the user
+    // needs has already been streamed as prints resolve.
     return fm.waitForAll().then(() => {
       fm!.onOutput = null;
-      return { output, result, error: null };
+      return { output, result: null, error: null };
     });
   } catch (e: any) {
     return Promise.resolve({ output, result: null, error: e.message || String(e) });

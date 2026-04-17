@@ -389,13 +389,18 @@ when error of result
 <p>Allegro handles async operations <strong>without <code>await</code></strong>. Expressions that depend on unresolved futures automatically defer and re-evaluate when results arrive. <code>print</code> streams output as values become available.</p>
 
 <div class="sandbox" id="s-async">
-<textarea class="sandbox-editor" rows="10">// Fetch data from an API — no await needed
+<textarea class="sandbox-editor" rows="12">// Fetch data from an API — no await needed.
+// The print below depends on data.slice(...), so it defers
+// until the fetch resolves, then fires automatically.
 data = fetch("https://jsonplaceholder.typicode.com/todos/1")
 print("Fetched: {data.slice(0, 60)}...")
 
-// Delayed output
-delay(500)
-print("Half a second later!")</textarea>
+// Delay + dependency: the print depends on 'waited',
+// which only resolves once the delay completes.
+// delay(ms) returns 0 on completion; we just use it as a barrier.
+waited = delay(500)
+msg = if waited == 0 then "Half a second later!" else "never"
+print(msg)</textarea>
 <div class="sandbox-bar"><button onclick="runSandbox('s-async')">Run</button><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
