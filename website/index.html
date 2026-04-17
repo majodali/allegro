@@ -130,7 +130,9 @@
     <a href="#patterns">Patterns</a>
     <a href="#collections">Collections</a>
     <a href="#custom-types">Custom Types</a>
-    <a href="#errors">Errors</a>
+    <a href="#interfaces">Interfaces</a>
+    <a href="#refinements">Refinements</a>
+    <a href="#mixins">Mixins</a>
     <a href="/sandbox.html">Sandbox</a>
   </div>
 </nav>
@@ -253,26 +255,103 @@ print(result)</textarea>
 <!-- ================================================ -->
 <h2 id="custom-types">Custom Types</h2>
 
-<p>Create types using the fluent API. <code>extend</code> creates record types, <code>where</code> adds refinement constraints, <code>distinct</code> creates newtypes.</p>
+<p>Create types using the fluent API. <code>extend</code> creates record types, <code>distinct</code> creates newtypes. Types themselves are typed values — <code>Int instanceof NominalType</code> is true.</p>
 
 <div class="sandbox" id="s-custom-types">
-<textarea class="sandbox-editor" rows="12">// Record type with constructor
-Point = NominalType.extend({x: Int, y: Int})
+<textarea class="sandbox-editor" rows="14">// Record type with fields and constructor
+Point = Int.extend({x: Int, y: Int})
 p = Point(10, 20)
 print(p)
-print(p.x)
+print(p.x + p.y)
 print(p instanceof Point)
 
-// Refinement type
-PositiveInt = Int.where(n => n > 0)
-print(PositiveInt(5))
-print(error of PositiveInt(0 - 1))
+// Types are typed values
+print(Int instanceof NominalType)
+print(type of Point instanceof NominalType)
 
 // Distinct type (breaks subtypeof)
 UserId = Int.distinct()
 print(UserId(42) instanceof Int)
 print(UserId(42) instanceof UserId)</textarea>
 <div class="sandbox-bar"><button onclick="runSandbox('s-custom-types')">Run</button><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<!-- ================================================ -->
+<h2 id="interfaces">Interfaces</h2>
+
+<p>Interfaces declare required members using structural type matching. Any type with the right members satisfies the interface — no <code>implements</code> keyword needed.</p>
+
+<div class="sandbox" id="s-interfaces">
+<textarea class="sandbox-editor" rows="12">// Declare an interface
+Printable = Type.interface({toString: Function})
+
+// Any type with toString satisfies it
+print(42 instanceof Printable)
+print("hello" instanceof Printable)
+
+// Interface with specific member
+Sized = Type.interface({length: Int})
+print("hello" instanceof Sized)
+print(42 instanceof Sized)
+
+// Interfaces are structural types
+print(Printable instanceof Type)</textarea>
+<div class="sandbox-bar"><button onclick="runSandbox('s-interfaces')">Run</button><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<!-- ================================================ -->
+<h2 id="refinements">Refinement Types</h2>
+
+<p>Constrain existing types with predicates using <code>&&</code>. The <code>_</code> placeholder refers to the value. Predicates are checked at construction and at function call sites.</p>
+
+<div class="sandbox" id="s-refinements">
+<textarea class="sandbox-editor" rows="14">// Refinement type: Int that must be positive
+PositiveInt = Int && _ > 0
+print(PositiveInt(5))
+
+// Construction check — fails when predicate is false
+print(PositiveInt(0 - 3))
+
+// Compound predicate
+SmallPos = Int && _ > 0 && _ < 100
+print(SmallPos(50))
+
+// Function with refined parameter
+double(x: PositiveInt): Int => x * 2
+print(double(7))
+
+// preserveOps: operators re-check the predicate
+PI = (Int && _ > 0).preserveOps()
+x = PI(5)
+print(x + 3)
+print(x instanceof PI)</textarea>
+<div class="sandbox-bar"><button onclick="runSandbox('s-refinements')">Run</button><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<!-- ================================================ -->
+<h2 id="mixins">Mixins</h2>
+
+<p>Add method implementations to types with <code>.mixin()</code>. Mixin methods receive <code>self</code> as their first argument and can access fields and call other methods.</p>
+
+<div class="sandbox" id="s-mixins">
+<textarea class="sandbox-editor" rows="12">// Add methods to a record type
+Point = Int.extend({x: Int, y: Int}).mixin({magnitude: (self) => self.x * self.x + self.y * self.y, translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
+
+p = Point(3, 4)
+print(p.magnitude())
+
+q = p.translate(10, 20)
+print(q.x)
+print(q.y)
+
+// Reusable mixin spec
+magSpec = {mag: (self) => self.x * self.x + self.y * self.y}
+Vec = Int.extend({x: Int, y: Int}).mixin(magSpec)
+print(Vec(5, 12).mag())</textarea>
+<div class="sandbox-bar"><button onclick="runSandbox('s-mixins')">Run</button><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
