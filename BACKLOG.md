@@ -95,7 +95,9 @@ High-level goals, roughly ordered by dependency:
 ### Language Features
 - [x] String interpolation — `"hello {name}"`, `"{expr}"`, escaped `\{`
 - [x] Implicit async via futures — FutureManager bridges JS Promises to forward-chaining. `delay(ms)` primitive. Deferred print. No `await` keyword needed.
-- [ ] Async I/O primitives — fetch, file read/write (execution-context provided)
+- [x] `fetch(url)` primitive — async HTTP GET, returns future resolving to String. Works in Node 18+ and browsers. Error responses become error values.
+- [x] Browser async demos — web sandboxes use `evalAllegroAsync` with streaming output. Fetch and delay demos on allegrolang.org.
+- [ ] Async I/O primitives — file read/write, WebSocket, timers (execution-context provided)
 - [ ] Sync/async type modifiers — explore async-by-default with `sync` optimization hint
 - [ ] Configurable mutability — linear types, transient mutation, semantic variants
 - [x] Error values — `error` keyword, automatic propagation through operations, Error type

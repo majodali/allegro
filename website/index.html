@@ -133,6 +133,7 @@
     <a href="#interfaces">Interfaces</a>
     <a href="#refinements">Refinements</a>
     <a href="#mixins">Mixins</a>
+    <a href="#async">Async</a>
     <a href="/sandbox.html">Sandbox</a>
   </div>
 </nav>
@@ -383,6 +384,35 @@ when error of result
 </div>
 
 <!-- ================================================ -->
+<h2 id="async">Implicit Async</h2>
+
+<p>Allegro handles async operations <strong>without <code>await</code></strong>. Expressions that depend on unresolved futures automatically defer and re-evaluate when results arrive. <code>print</code> streams output as values become available.</p>
+
+<div class="sandbox" id="s-async">
+<textarea class="sandbox-editor" rows="10">// Fetch data from an API — no await needed
+data = fetch("https://jsonplaceholder.typicode.com/todos/1")
+print("Fetched: {data.slice(0, 60)}...")
+
+// Delayed output
+delay(500)
+print("Half a second later!")</textarea>
+<div class="sandbox-bar"><button onclick="runSandbox('s-async')">Run</button><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<div class="sandbox" id="s-async2">
+<textarea class="sandbox-editor" rows="8">// Multiple concurrent fetches — both start immediately
+a = fetch("https://jsonplaceholder.typicode.com/users/1")
+b = fetch("https://jsonplaceholder.typicode.com/users/2")
+
+// Prints fire when each resolves (order depends on network)
+print("User 1: {a.slice(0, 50)}...")
+print("User 2: {b.slice(0, 50)}...")</textarea>
+<div class="sandbox-bar"><button onclick="runSandbox('s-async2')">Run</button><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<!-- ================================================ -->
 <h2 id="recursive">Recursive Algorithms</h2>
 
 <p>Allegro supports tail call optimization. Write recursive algorithms naturally — they use O(1) stack space when in tail position.</p>
@@ -422,11 +452,12 @@ print(myReduce([1, 2, 3, 4, 5], (a, b) => a + b, 0))</textarea>
 
 <script src="/allegro.js"></script>
 <script>
-function runSandbox(id) {
+async function runSandbox(id) {
   const container = document.getElementById(id);
   const editor = container.querySelector('.sandbox-editor');
   const output = container.querySelector('.sandbox-output');
   const timing = container.querySelector('.timing');
+  const button = container.querySelector('button');
 
   const source = editor.value;
   if (!source.trim()) {
@@ -434,24 +465,33 @@ function runSandbox(id) {
     return;
   }
 
+  // Show running state
+  output.innerHTML = '';
+  button.disabled = true;
+  button.textContent = 'Running...';
   const start = performance.now();
-  const result = Allegro.eval(source);
-  const elapsed = (performance.now() - start).toFixed(1);
 
-  let html = '';
-  for (const line of result.output) {
-    html += `<span class="out-line">${esc(line)}</span>\n`;
-  }
-  if (result.result !== null && result.result !== undefined) {
-    html += `<span class="out-result">${esc(result.result)}</span>\n`;
-  }
-  if (result.error) {
-    html += `<span class="out-error">Error: ${esc(result.error)}</span>\n`;
-  }
-  if (!html) html = '<span class="out-info">No output.</span>';
+  try {
+    const result = await Allegro.evalAsync(source, (text) => {
+      // Stream output as futures resolve
+      output.innerHTML += `<span class="out-line">${esc(text)}</span>\n`;
+    });
 
-  output.innerHTML = html;
-  timing.textContent = `${elapsed}ms`;
+    // Show any final result or error
+    if (result.result !== null && result.result !== undefined) {
+      output.innerHTML += `<span class="out-result">${esc(result.result)}</span>\n`;
+    }
+    if (result.error) {
+      output.innerHTML += `<span class="out-error">Error: ${esc(result.error)}</span>\n`;
+    }
+    if (!output.innerHTML) output.innerHTML = '<span class="out-info">No output.</span>';
+  } catch (e) {
+    output.innerHTML += `<span class="out-error">Error: ${esc(String(e))}</span>\n`;
+  }
+
+  timing.textContent = `${(performance.now() - start).toFixed(0)}ms`;
+  button.disabled = false;
+  button.textContent = 'Run';
 
   // Reset context after each sandbox run so they're independent
   Allegro.reset();

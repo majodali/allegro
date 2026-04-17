@@ -786,6 +786,34 @@ const delay_wrapper: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return fm.createFuture(promise);
 };
 
+// ============ FETCH (async HTTP) ============
+
+const fetch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  if (!isResolved(v)) {
+    return makeExpr(makePrimitive("fetch", fetch_impl, true), [v]);
+  }
+  const url = bitsToString(asBits(primaryOf(v), "fetch"));
+  const fm = (ctx as any)?.__futureManager as import("./futures.js").FutureManager | undefined;
+  if (!fm) {
+    throw new AllegroError("fetch: requires async runtime (no FutureManager available)");
+  }
+  const promise = globalThis.fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error(`fetch: HTTP ${r.status} ${r.statusText}`);
+      return r.text();
+    })
+    .then(text => withType(stringToBits(text), StringType))
+    .catch(err => {
+      // Return error value instead of throwing
+      const components = new Map<string, Value>();
+      components.set("error", withType(stringToBits(String(err)), StringType));
+      components.set("type", ErrorType);
+      return makeMultiValue(makeInt(0), components);
+    });
+  return fm.createFuture(promise);
+};
+
 // ============ IDENTITY (data structures) ============
 
 const id_impl: PrimitiveFnImpl = (args) => {
@@ -1618,4 +1646,5 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_gte: makePrimitive("typed_gte", makeTypedBinOp("gte"), true),
   // Async
   delay: makePrimitive("delay", delay_wrapper, true),
+  fetch: makePrimitive("fetch", fetch_impl, true),
 };

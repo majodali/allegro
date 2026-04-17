@@ -218,12 +218,14 @@ After partial evaluation, an expression's type is its `"type"` MultiValue compon
 
 ### Implicit Async via Futures
 - `FutureManager` (`src/futures.ts`) bridges JavaScript Promises to forward-chaining
-- Async primitives (e.g., `delay(ms)`) create synthetic bindings (`__future_N`) with `value: undefined`
+- Async primitives (e.g., `delay(ms)`, `fetch(url)`) create synthetic bindings (`__future_N`) with `value: undefined`
 - The evaluator treats them as unresolved Symbols — produces residuals naturally
 - When the Promise resolves, `applyPhase` provides the value and cascades re-evaluation
 - `print` defers on unresolved args — returns a residual that fires when the value resolves
 - No `await` keyword — async is implicit through forward-chaining
 - Bare expressions with futures are tracked via synthetic `__bare_N` bindings
+- **`fetch(url)`** — HTTP GET, returns a future that resolves to the response body (String). Errors become error values. Works in both Node (18+) and browsers via `globalThis.fetch`.
+- **Web sandboxes** use `evalAllegroAsync` with streaming output — print output appears incrementally as futures resolve
 
 ### Compile-Time Type Inference
 - `precompileFunctions` pass in `evalSource` partially evaluates typed function bodies at definition time
