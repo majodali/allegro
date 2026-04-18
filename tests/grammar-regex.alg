@@ -1,10 +1,9 @@
-// Simple regex-like pattern DSL built from grammar combinator primitives.
-// Supports: literal chars [a-zA-Z0-9], | alternation, *, +, ? postfix.
-// (Grouping via parentheses deferred — exposes an evaluator issue with
-// mutual recursion between match_base and match_pattern.)
+// Regex-like pattern DSL built from grammar combinator primitives.
+// Supports: literal chars [a-zA-Z0-9], | alternation, *, +, ? postfix, (...) grouping.
 //
 // Demonstrates:
 //   - Building a full grammar from Allegro using parser combinators
+//   - Recursive grammars via the forward-declare + grammar_choice_add pattern
 //   - Post-processing parse trees in pure Allegro to implement semantics
 
 // --- 1. Build the regex DSL grammar ---
@@ -15,12 +14,21 @@ pipe = grammar_terminal(g, "|")
 star = grammar_terminal(g, "*")
 plus = grammar_terminal(g, "+")
 qmark = grammar_terminal(g, "?")
+lparen = grammar_terminal(g, "(")
+rparen = grammar_terminal(g, ")")
+
+// Forward-declare `pattern` as an empty choice (recursion hook)
+pattern = grammar_choice(g, [])
+
+// base := chr | "(" pattern ")"
+grouped = grammar_phrase(g, [lparen, pattern, rparen])
+base = grammar_choice(g, [chr, grouped])
 
 // postfix := "*" | "+" | "?"
 postfix = grammar_choice(g, [star, plus, qmark])
 
-// atom := chr postfix?
-atom = grammar_phrase(g, [chr, grammar_optional(g, postfix)])
+// atom := base postfix?
+atom = grammar_phrase(g, [base, grammar_optional(g, postfix)])
 
 // concat := atom+
 concat_rule = grammar_repeat(g, atom, {min: 1})
@@ -28,7 +36,9 @@ concat_rule = grammar_repeat(g, atom, {min: 1})
 // alt := concat ("|" concat)*
 alt_rule = grammar_repeat(g, concat_rule, {min: 1, delimiter: pipe})
 
-grammar_set_target(g, alt_rule)
+// Close recursion: pattern is alt
+grammar_choice_add(pattern, alt_rule)
+grammar_set_target(g, pattern)
 
 // --- 2. Interpreter over parse trees ---
 
@@ -37,28 +47,33 @@ match_literal_char(ch, input) =>
     then input.slice(1, input.length)
     else none
 
+match_base(base_node, input) =>
+  if base_node instanceof String
+    then match_literal_char(base_node, input)
+    else match_pattern(base_node[1], input)
+
 match_atom(atom_node, input) =>
-  ch = atom_node[0]
+  base_node = atom_node[0]
   post = atom_node[1]
   when post
-    is none then match_literal_char(ch, input)
-    is "*" then match_zero_or_more(ch, input)
-    is "+" then match_one_or_more(ch, input)
-    is "?" then match_zero_or_one(ch, input)
-    is _ then match_literal_char(ch, input)
+    is none then match_base(base_node, input)
+    is "*" then match_zero_or_more(base_node, input)
+    is "+" then match_one_or_more(base_node, input)
+    is "?" then match_zero_or_one(base_node, input)
+    is _ then match_base(base_node, input)
 
-match_zero_or_more(ch, input) =>
-  when match_literal_char(ch, input)
+match_zero_or_more(base_node, input) =>
+  when match_base(base_node, input)
     is none then input
-    is r then match_zero_or_more(ch, r)
+    is r then match_zero_or_more(base_node, r)
 
-match_one_or_more(ch, input) =>
-  when match_literal_char(ch, input)
+match_one_or_more(base_node, input) =>
+  when match_base(base_node, input)
     is none then none
-    is r then match_zero_or_more(ch, r)
+    is r then match_zero_or_more(base_node, r)
 
-match_zero_or_one(ch, input) =>
-  when match_literal_char(ch, input)
+match_zero_or_one(base_node, input) =>
+  when match_base(base_node, input)
     is none then input
     is r then r
 
@@ -94,6 +109,10 @@ print(matches("a", "b"))           // expect: false
 print(matches("a*b", "aaab"))      // expect: true
 print(matches("a*b", "b"))         // expect: true
 print(matches("a*b", "ac"))        // expect: false
-print(matches("ab+", "abbb"))      // expect: true
-print(matches("ab+", "a"))         // expect: false
+print(matches("(ab)+", "abab"))    // expect: true
+print(matches("(ab)+", "abc"))     // expect: false
+print(matches("a|b|c", "b"))       // expect: true
+print(matches("a|b|c", "d"))       // expect: false
 print(matches("a?b", "b"))         // expect: true
+print(matches("a?b", "ab"))        // expect: true
+print(matches("a?b", "aab"))       // expect: false

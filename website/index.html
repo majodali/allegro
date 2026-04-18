@@ -426,25 +426,71 @@ print("User 2: {b.slice(0, 50)}...")</textarea>
 <p>The example below builds a minimal regex DSL: literal chars, <code>|</code> alternation, <code>*</code>/<code>+</code>/<code>?</code> postfix. The grammar is defined with <code>grammar_terminal</code>, <code>grammar_phrase</code>, <code>grammar_choice</code>, <code>grammar_repeat</code>, <code>grammar_optional</code>. The parse tree is then interpreted by pure Allegro functions to produce a matcher.</p>
 
 <div class="sandbox" id="s-grammar">
-<textarea class="sandbox-editor" rows="22">// Build a tiny regex DSL grammar
+<textarea class="sandbox-editor" rows="30">// Build a regex DSL grammar — literals, |, *, +, ?, ( )
 g = grammar_new({whitespace: ""})
-chr = grammar_terminal(g, "/[a-z]/")
+chr  = grammar_terminal(g, "/[a-z]/")
+pipe = grammar_terminal(g, "|")
+lp   = grammar_terminal(g, "(")
+rp   = grammar_terminal(g, ")")
+
+// Recursion hook: forward-declare pattern, bind later
+pattern = grammar_choice(g, [])
+grouped = grammar_phrase(g, [lp, pattern, rp])
+base    = grammar_choice(g, [chr, grouped])
 postfix = grammar_choice(g, [
   grammar_terminal(g, "*"),
   grammar_terminal(g, "+"),
   grammar_terminal(g, "?")])
-atom = grammar_phrase(g, [chr, grammar_optional(g, postfix)])
+atom    = grammar_phrase(g, [base, grammar_optional(g, postfix)])
 concat_rule = grammar_repeat(g, atom, {min: 1})
-pipe = grammar_terminal(g, "|")
-alt_rule = grammar_repeat(g, concat_rule, {min: 1, delimiter: pipe})
-grammar_set_target(g, alt_rule)
+alt_rule    = grammar_repeat(g, concat_rule, {min: 1, delimiter: pipe})
+grammar_choice_add(pattern, alt_rule)
+grammar_set_target(g, pattern)
 
-// Parse "a*b" — result is a tree of Strings and Arrays
-tree = grammar_parse(g, "a*b")
-print(tree)
+// Interpret the parse tree as a matcher (pure Allegro)
+match_base(n, s) =>
+  if n instanceof String then
+    if s.length > 0 && s.charAt(0) == n then s.slice(1, s.length) else none
+  else match_pattern(n[1], s)
 
-// Parse alternation
-print(grammar_parse(g, "a|b|c"))</textarea>
+match_atom(a, s) =>
+  when a[1]
+    is none then match_base(a[0], s)
+    is "*" then match_star(a[0], s)
+    is "+" then match_plus(a[0], s)
+    is "?" then match_opt(a[0], s)
+
+match_star(n, s) => when match_base(n, s) is none then s is r then match_star(n, r)
+match_plus(n, s) => when match_base(n, s) is none then none is r then match_star(n, r)
+match_opt(n, s)  => when match_base(n, s) is none then s is r then r
+
+concat_from(a, i, s) =>
+  if i >= a.length
+    then s
+    else when match_atom(a[i], s)
+      is none then none
+      is r then concat_from(a, i + 1, r)
+
+match_concat(a, s) => concat_from(a, 0, s)
+
+pattern_from(c, i, s) =>
+  if i >= c.length
+    then none
+    else when match_concat(c[i], s)
+      is none then pattern_from(c, i + 1, s)
+      is r then r
+
+match_pattern(c, s) => pattern_from(c, 0, s)
+
+matches(pat, str) =>
+  when match_pattern(grammar_parse(g, pat), str)
+    is none then false
+    is r then r.length == 0
+
+print(matches("(ab)+", "abab"))   // true
+print(matches("a|b|c", "b"))      // true
+print(matches("a*b", "aaab"))     // true
+print(matches("a?b", "aab"))      // false</textarea>
 <div class="sandbox-bar"><button onclick="runSandbox('s-grammar')">Run</button><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>

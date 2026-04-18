@@ -49,13 +49,23 @@ export function markTailCalls(body: Value, seen?: Set<Value>): void {
     // This expression is in tail position — mark it
     (body as any)._tailPosition = true;
 
-    // If this is eval_if, mark both branch thunks' bodies as tail position
     const fn = body.fn;
+    // eval_if: args[1] and args[2] are thunks; their bodies are in tail position
     if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "eval_if" && body.args.length === 3) {
-      // args[1] and args[2] are thunks (ComposedFn with no params)
       for (const branchIdx of [1, 2]) {
         const branch = body.args[branchIdx];
         if (branch.kind === ValueKind.ComposedFunction && branch.params.length === 0) {
+          markTailCalls(branch.body, seen);
+        }
+      }
+    }
+    // eval_when: args are [subject, pattern, guardFn, thenBranch, elseBranch].
+    // thenBranch and elseBranch are ComposedFunctions (with possible pattern-
+    // extracted params); their bodies are in tail position relative to the when.
+    if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "eval_when" && body.args.length === 5) {
+      for (const branchIdx of [3, 4]) {
+        const branch = body.args[branchIdx];
+        if (branch.kind === ValueKind.ComposedFunction) {
           markTailCalls(branch.body, seen);
         }
       }
@@ -353,6 +363,43 @@ function applyComposed(
 
 // --- Parameter substitution ---
 
+/**
+ * Walk an expression tree and replace Param references per paramMap.
+ * Used by subst when cloning inner ComposedFunctions to avoid sharing
+ * param arrays (which would cause owner-mutation to corrupt the original).
+ */
+function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>): Value {
+  if (paramMap.size === 0) return value;
+  switch (value.kind) {
+    case ValueKind.Bits:
+    case ValueKind.PrimitiveFunction:
+    case ValueKind.Context:
+    case ValueKind.Symbol:
+      return value;
+    case ValueKind.Param: {
+      const replacement = paramMap.get(value);
+      return replacement ?? value;
+    }
+    case ValueKind.Expression: {
+      const newFn = remapParams(value.fn, paramMap);
+      const newArgs = value.args.map(a => remapParams(a, paramMap));
+      if (newFn === value.fn && newArgs.every((a, i) => a === value.args[i])) return value;
+      const newExpr = makeExpr(newFn, newArgs);
+      if ((value as any)._tailPosition) (newExpr as any)._tailPosition = true;
+      return newExpr;
+    }
+    case ValueKind.ComposedFunction: {
+      const newBody = remapParams(value.body, paramMap);
+      if (newBody === value.body) return value;
+      return { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
+    }
+    case ValueKind.MultiValue: {
+      const newP = remapParams(value.primary, paramMap);
+      return newP === value.primary ? value : makeMultiValue(newP, new Map(value.components));
+    }
+  }
+}
+
 function substituteParams(fn: ComposedFunctionValue, args: Value[]): Value {
   // Build a position-based map for substitution
   const posMap = new Map<number, Value>();
@@ -390,12 +437,27 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       // Inner functions' own params won't match (different owner).
       const newBody = subst(value.body, owner, posMap, seen);
       if (newBody === value.body) return value;
+      // CRITICAL: clone the params array AND each param, so re-binding owner
+      // below doesn't corrupt the original function's params. Without this,
+      // mutating p.owner affects every previous substitution result that
+      // shared the same params (e.g., two closures from the same factory
+      // would end up pointing to each other's inner lambdas).
+      const newParams = value.params.map(p => ({
+        kind: ValueKind.Param,
+        position: p.position,
+        owner: null as any,
+        _name: p._name,
+      } as ParamValue));
+      // Rewrite Param references in the new body that point to old params,
+      // remapping them to the cloned params (matched by position).
+      const paramMap = new Map<ParamValue, ParamValue>();
+      for (let i = 0; i < value.params.length; i++) paramMap.set(value.params[i], newParams[i]);
+      const remappedBody = remapParams(newBody, paramMap);
       const newFn: ComposedFunctionValue = {
         kind: ValueKind.ComposedFunction,
-        params: value.params,
-        body: newBody,
+        params: newParams,
+        body: remappedBody,
       };
-      // Re-bind params to new function
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
     }

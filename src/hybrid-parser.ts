@@ -563,7 +563,8 @@ function parsePattern(parser: HybridParser): PatternResult {
 
   if (tok.type === TokenType.String) {
     parser.lexer.next();
-    return { pattern: stringToBits(extractString(tok.text)), bindingNames: [] };
+    // Wrap with typed_string so 8-byte pattern literals don't get mistyped as Int.
+    return { pattern: makeExpr(prim("typed_string"), [stringToBits(extractString(tok.text))]), bindingNames: [] };
   }
 
   if (tok.type === TokenType.True) {
@@ -661,14 +662,14 @@ function buildBaseGrammar(): HybridGrammarConfig {
     return makeExpr(prim("typed_float"), [stringToBits(token.text)]);
   });
 
-  // String literal
+  // String literal — always wrap with typed_string so 8-byte literals
+  // aren't mistyped as Int by typeLiterals' length heuristic (fixes
+  // the bug where "a*b/aaab" was indistinguishable from a 64-bit int).
   prefix.set(TokenType.String, (parser, token) => {
-    let result: any = stringToBits(extractString(token.text));
+    let result: any = makeExpr(prim("typed_string"), [stringToBits(extractString(token.text))]);
 
     // Check for string interpolation: String InterpStart expr InterpEnd [String ...]
     if (parser.lexer.peek().type === TokenType.InterpStart) {
-      // Wrap initial segment with typed_string for proper type dispatch
-      result = makeExpr(prim("typed_string"), [result]);
 
       while (parser.lexer.peek().type === TokenType.InterpStart) {
         parser.lexer.next(); // consume InterpStart
