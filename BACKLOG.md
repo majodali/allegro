@@ -62,6 +62,7 @@ High-level goals, roughly ordered by dependency:
 
 ### Parser & Grammar
 - [ ] Grammar extension DSL — define new syntax from Allegro code
+- [ ] Runtime grammar extension Phase 2 — multi-token prefix parselets (`match x with ...`), new statement forms, conflict detection, registration from the hosting file, operator/keyword name mangling, per-scope activation
 - [ ] Embeddable grammars — switch to different parser mid-file or per-module
 - [ ] Mid-statement grammar switching (low priority)
 - [ ] Bootstrap parser in Allegro
@@ -73,6 +74,7 @@ High-level goals, roughly ordered by dependency:
 - [x] Source location tracking in tokens
 - [x] Expression continuation via offside rule — multi-line if/then/else, operator continuation, nested expressions. Lexer suppresses Newline before Indent, parser tracks continuationDepth.
 - [x] Earley parser retained for standalone grammars
+- [x] Runtime grammar extension Phase 1 — module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix`, `use_grammar NAME` header activates module's `GrammarFragment` before parsing, lambda body substituted as AST template (no eval at parse time). Demo: `lib/pow.alg` with `**` and `neg`.
 
 ### Execution Context & Build Pipeline
 - [ ] Project root file (structure, phases, deps — replaces package.json + tsconfig)

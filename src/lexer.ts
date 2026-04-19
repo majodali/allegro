@@ -41,6 +41,12 @@ export enum TokenType {
   InterpStart,    // start of interpolation expression within a string
   InterpEnd,      // end of interpolation expression (closing })
 
+  // Runtime grammar extensions — see src/primitives.ts register_* primitives.
+  // Tokens carry the registered symbol/keyword in token.text; the parser
+  // dispatches via userInfixParselets / userPrefixParselets by text.
+  UserOp,         // user-registered operator symbol (e.g., **, ^^)
+  UserKeyword,    // user-registered keyword identifier (e.g., lazy, await)
+
   // End
   EOF,
 }

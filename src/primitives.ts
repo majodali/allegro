@@ -970,6 +970,72 @@ const grammar_parse_impl: PrimitiveFnImpl = (args) => {
   return parseGrammarToAllegro(gHandle, input);
 };
 
+// ============ RUNTIME GRAMMAR EXTENSIONS ============
+// Module-scoped primitives that register new parselets/operators/keywords.
+// The module's ctx carries a hidden `__grammar_fragment` binding that
+// accumulates registrations; the module loader extracts it and attaches
+// the fragment to the Extension returned for this module.
+
+import type { GrammarFragment } from "./types.js";
+import { emptyGrammarFragment } from "./types.js";
+
+/** Get the current module's grammar fragment, creating it on ctx if absent. */
+function getOrCreateFragment(ctx: ContextValue): GrammarFragment {
+  const existing = (ctx as any).__grammar_fragment as GrammarFragment | undefined;
+  if (existing) return existing;
+  const fresh = emptyGrammarFragment();
+  (ctx as any).__grammar_fragment = fresh;
+  return fresh;
+}
+
+/** Extract the grammar fragment from a ctx if any registrations happened. */
+export function extractGrammarFragment(ctx: ContextValue): GrammarFragment | undefined {
+  return (ctx as any).__grammar_fragment as GrammarFragment | undefined;
+}
+
+const register_infix_impl: PrimitiveFnImpl = (args, ctx) => {
+  if (args.length !== 3) throw new AllegroError(`register_infix: expected 3 args, got ${args.length}`);
+  const op = bitsToString(asBits(args[0], "register_infix"));
+  const bp = Number(asBits(args[1], "register_infix").data);
+  const fn = args[2];
+  const fragment = getOrCreateFragment(ctx!);
+  fragment.infix.push({ token: op, bp, fn });
+  if (!fragment.operators.includes(op)) fragment.operators.push(op);
+  return noneSingleton;
+};
+
+const register_prefix_impl: PrimitiveFnImpl = (args, ctx) => {
+  if (args.length !== 3) throw new AllegroError(`register_prefix: expected 3 args, got ${args.length}`);
+  const op = bitsToString(asBits(args[0], "register_prefix"));
+  const bp = Number(asBits(args[1], "register_prefix").data);
+  const fn = args[2];
+  const fragment = getOrCreateFragment(ctx!);
+  fragment.prefixOp.push({ token: op, bp, fn });
+  if (!fragment.operators.includes(op)) fragment.operators.push(op);
+  return noneSingleton;
+};
+
+const register_postfix_impl: PrimitiveFnImpl = (args, ctx) => {
+  if (args.length !== 3) throw new AllegroError(`register_postfix: expected 3 args, got ${args.length}`);
+  const op = bitsToString(asBits(args[0], "register_postfix"));
+  const bp = Number(asBits(args[1], "register_postfix").data);
+  const fn = args[2];
+  const fragment = getOrCreateFragment(ctx!);
+  fragment.postfixOp.push({ token: op, bp, fn });
+  if (!fragment.operators.includes(op)) fragment.operators.push(op);
+  return noneSingleton;
+};
+
+const register_expr_prefix_impl: PrimitiveFnImpl = (args, ctx) => {
+  if (args.length !== 2) throw new AllegroError(`register_expr_prefix: expected 2 args, got ${args.length}`);
+  const kw = bitsToString(asBits(args[0], "register_expr_prefix"));
+  const fn = args[1];
+  const fragment = getOrCreateFragment(ctx!);
+  fragment.exprPrefix.push({ keyword: kw, fn });
+  if (!fragment.keywords.includes(kw)) fragment.keywords.push(kw);
+  return noneSingleton;
+};
+
 // ============ TYPE SYSTEM ============
 
 import {
@@ -1737,6 +1803,11 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   grammar_optional: makePrimitive("grammar_optional", grammar_optional_impl),
   grammar_set_target: makePrimitive("grammar_set_target", grammar_set_target_impl),
   grammar_parse: makePrimitive("grammar_parse", grammar_parse_impl),
+  // Runtime grammar extensions (Phase 1: simple combinators)
+  register_infix: makePrimitive("register_infix", register_infix_impl),
+  register_prefix: makePrimitive("register_prefix", register_prefix_impl),
+  register_postfix: makePrimitive("register_postfix", register_postfix_impl),
+  register_expr_prefix: makePrimitive("register_expr_prefix", register_expr_prefix_impl),
   // Type system
   typed_int: makePrimitive("typed_int", typed_int_impl, true),
   typed_string: makePrimitive("typed_string", typed_string_impl, true),

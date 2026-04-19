@@ -11,6 +11,9 @@ import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
+import { mergeGrammarFragments, getStandardGrammarConfig, parseStandard, parseWithConfig } from "./hybrid-parser.js";
+import { extractGrammarFragment } from "./primitives.js";
+import { emptyGrammarFragment, GrammarFragment } from "./types.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
 
 // --- Test infrastructure ---
@@ -1376,6 +1379,8 @@ import * as path from "path";
 /**
  * Run an .alg file in Allegro Standard mode.
  * Captures print output and validates against "// expect: ..." comments.
+ * Also handles `use_grammar NAME` headers by loading lib/NAME.alg and merging
+ * its grammar fragment, mirroring the file runner behavior.
  */
 function runAlgFile(filePath: string, extensions?: Extension[]): void {
   const source = fs.readFileSync(filePath, "utf-8");
@@ -1390,14 +1395,42 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
     }
   }
 
+  // Handle `use_grammar NAME` directives: load lib/NAME.alg as a grammar
+  // module and attach its fragment as an extension.
+  const grammarNames: string[] = [];
+  for (const line of lines) {
+    const m = /^\s*use_grammar\s+(\w+)\s*$/.exec(line);
+    if (m) grammarNames.push(m[1]);
+    else if (line.trim() !== "" && !line.trim().startsWith("//")) break;
+  }
+  let grammarExts: Extension[] = [];
+  if (grammarNames.length > 0) {
+    const libDir = path.resolve("lib");
+    for (const id of grammarNames) {
+      const modPath = path.join(libDir, `${id}.alg`);
+      const modSource = fs.readFileSync(modPath, "utf-8");
+      const modResult = runtimeEval(modSource, undefined, [typeExt], undefined, true);
+      const frag = extractGrammarFragment(modResult.evalCtx);
+      const bindings: Record<string, Value> = {};
+      for (const [key, b] of modResult.evalCtx.bindings) {
+        if (b.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+          bindings[key] = b.value;
+        }
+      }
+      grammarExts.push({ name: id, bindings, grammarFragment: frag });
+    }
+  }
+  // Strip use_grammar lines from source before evaluation
+  const cleanSource = source.replace(/^\s*use_grammar\s+\w+\s*$/gm, "");
+
   // Capture print output
   const printed: string[] = [];
   const origLog = console.log;
   console.log = (msg: any) => printed.push(String(msg));
 
   try {
-    const exts = [typeExt, ...(extensions ?? [])];
-    runtimeEval(source, undefined, exts, undefined, true);
+    const exts = [typeExt, ...grammarExts, ...(extensions ?? [])];
+    runtimeEval(cleanSource, undefined, exts, undefined, true);
   } catch (e: any) {
     console.log = origLog;
     throw e;
@@ -3268,6 +3301,138 @@ grammar_set_target(g, a)
 grammar_parse(g, "b")`);
   eq((result as any).components?.has("error"), true);
 });
+
+// == Runtime Grammar Extension (Phase 1) ==
+
+test("register_infix: stores a fragment on the eval ctx", () => {
+  const r = runtimeEval(`register_infix("**", 40, (l, r) => l * r)`, undefined, [typeExt], undefined, true);
+  const frag = extractGrammarFragment(r.evalCtx);
+  eq(frag !== undefined, true);
+  eq(frag!.infix.length, 1);
+  eq(frag!.infix[0].token, "**");
+  eq(frag!.infix[0].bp, 40);
+  eq(frag!.operators.length, 1);
+  eq(frag!.operators[0], "**");
+});
+
+test("register_prefix: stores a prefix-op fragment", () => {
+  const r = runtimeEval(`register_prefix("#", 60, x => x + 1)`, undefined, [typeExt], undefined, true);
+  const frag = extractGrammarFragment(r.evalCtx);
+  eq(frag !== undefined, true);
+  eq(frag!.prefixOp.length, 1);
+  eq(frag!.prefixOp[0].token, "#");
+  eq(frag!.prefixOp[0].bp, 60);
+  eq(frag!.operators.length, 1);
+});
+
+test("register_postfix: stores a postfix-op fragment", () => {
+  const r = runtimeEval(`register_postfix("!", 70, x => x)`, undefined, [typeExt], undefined, true);
+  const frag = extractGrammarFragment(r.evalCtx);
+  eq(frag !== undefined, true);
+  eq(frag!.postfixOp.length, 1);
+  eq(frag!.postfixOp[0].token, "!");
+  eq(frag!.postfixOp[0].bp, 70);
+});
+
+test("register_expr_prefix: stores a keyword-prefix fragment", () => {
+  const r = runtimeEval(`register_expr_prefix("neg", x => 0 - x)`, undefined, [typeExt], undefined, true);
+  const frag = extractGrammarFragment(r.evalCtx);
+  eq(frag !== undefined, true);
+  eq(frag!.exprPrefix.length, 1);
+  eq(frag!.exprPrefix[0].keyword, "neg");
+  eq(frag!.keywords.length, 1);
+  eq(frag!.keywords[0], "neg");
+});
+
+test("register_*: multiple registrations accumulate in one fragment", () => {
+  const r = runtimeEval(`
+register_infix("**", 40, (l, r) => l * r)
+register_infix("^^", 40, (l, r) => l - r)
+register_expr_prefix("neg", x => 0 - x)
+`, undefined, [typeExt], undefined, true);
+  const frag = extractGrammarFragment(r.evalCtx);
+  eq(frag !== undefined, true);
+  eq(frag!.infix.length, 2);
+  eq(frag!.exprPrefix.length, 1);
+  eq(frag!.operators.length, 2);
+  eq(frag!.keywords.length, 1);
+});
+
+test("mergeGrammarFragments: empty fragments returns base unchanged", () => {
+  const base = getStandardGrammarConfig();
+  const merged = mergeGrammarFragments(base, []);
+  eq(merged === base, true);
+});
+
+test("mergeGrammarFragments: adds user-keyed parselets from fragments", () => {
+  const base = getStandardGrammarConfig();
+  const frag: GrammarFragment = emptyGrammarFragment();
+  frag.operators.push("@@");
+  frag.infix.push({
+    token: "@@",
+    bp: 40,
+    fn: { kind: ValueKind.ComposedFunction, params: [], body: makeInt(0) } as any,
+  });
+  const merged = mergeGrammarFragments(base, [frag]);
+  eq(merged.userInfixParselets !== undefined, true);
+  eq(merged.userInfixParselets!.has("@@"), true);
+  eq(merged.userInfixParselets!.get("@@")!.bp, 40);
+});
+
+test("mergeGrammarFragments: extends lexer with new operators and keywords", () => {
+  const base = getStandardGrammarConfig();
+  const frag: GrammarFragment = emptyGrammarFragment();
+  frag.operators.push("@@");
+  frag.keywords.push("lazy_kw");
+  frag.infix.push({ token: "@@", bp: 40, fn: { kind: ValueKind.ComposedFunction, params: [], body: makeInt(0) } as any });
+  frag.exprPrefix.push({ keyword: "lazy_kw", fn: { kind: ValueKind.ComposedFunction, params: [], body: makeInt(0) } as any });
+  const merged = mergeGrammarFragments(base, [frag]);
+  // Lexer config should know about new operator / keyword
+  eq(merged.lexerConfig.keywords.has("lazy_kw"), true);
+  const hasOp = merged.lexerConfig.operators.some(([s]) => s === "@@");
+  eq(hasOp, true);
+});
+
+test("runtime grammar: module-scoped infix operator applied at parse time", () => {
+  // Simulate a module that registers ** and exposes pow_int; then use it
+  // in a consumer source through a merged config.
+  const modSource = `
+pow_helper(base, n, acc) =>
+  if n == 0
+    then acc
+    else pow_helper(base, n - 1, acc * base)
+
+pow_int(base, n) => pow_helper(base, n, 1)
+
+register_infix("**", 40, (l, r) => pow_int(l, r))
+`;
+  const modResult = runtimeEval(modSource, undefined, [typeExt], undefined, true);
+  const frag = extractGrammarFragment(modResult.evalCtx);
+  eq(frag !== undefined, true);
+  // Build extension with the module's bindings as sibling extension
+  const bindings: Record<string, Value> = {};
+  for (const [key, b] of modResult.evalCtx.bindings) {
+    if (b.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+      bindings[key] = b.value;
+    }
+  }
+  const ext: Extension = { name: "pow_test", bindings, grammarFragment: frag };
+  const consumerResult = runtimeEval("2 ** 10", undefined, [typeExt, ext], undefined, true);
+  eq(Number((primaryOf(consumerResult.value!) as BitsValue).data), 1024);
+});
+
+test("runtime grammar: module-scoped expr-prefix keyword applied at parse time", () => {
+  const modSource = `register_expr_prefix("negate", x => 0 - x)`;
+  const modResult = runtimeEval(modSource, undefined, [typeExt], undefined, true);
+  const frag = extractGrammarFragment(modResult.evalCtx);
+  eq(frag !== undefined, true);
+  const ext: Extension = { name: "neg_test", bindings: {}, grammarFragment: frag };
+  const consumerResult = runtimeEval("negate 7", undefined, [typeExt, ext], undefined, true);
+  eq(Number((primaryOf(consumerResult.value!) as BitsValue).data), -7);
+});
+
+// Run the end-to-end grammar-runtime.alg test (uses `use_grammar pow` header)
+fileTest(path.join(testsDir, "grammar-runtime.alg"));
 
 // == Async Futures ==
 

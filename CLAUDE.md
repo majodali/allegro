@@ -188,6 +188,7 @@ Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, 
 - **Earley extensions** (`GrammarBuilder`): still available for standalone grammars and grammar primitive tests
 - **Hybrid extensions**: `HybridGrammarConfig` with prefix/infix parselet registrations and `LexerConfig` for new operators/keywords. Immutable layering via `extendLexerConfig`.
 - **Parser combinators from Allegro** (Phase 1 DSL primitives): `grammar_new`, `grammar_terminal`, `grammar_phrase`, `grammar_choice`, `grammar_choice_add` (mutable append for recursion), `grammar_repeat`, `grammar_optional`, `grammar_set_target`, `grammar_parse`. Build grammars at runtime, parse strings, receive a tree of Allegro values — Terminal→String, Phrase→Array (positional), Disjunction→transparent (unwrapped), Repetition→Array (delimiters stripped), Optional→value or none. Parse errors become typed Error values. Example demo: `tests/grammar-regex.alg` implements a regex DSL end-to-end.
+- **Runtime grammar extension** (Phase 1): modules can register new host-language syntax via four primitives — `register_infix(op, bp, (l, r) => ast)`, `register_prefix(op, bp, x => ast)`, `register_postfix(op, bp, x => ast)`, `register_expr_prefix(kw, x => ast)`. Files opt in with a top-of-file `use_grammar NAME` header, which loads the named module and applies its `GrammarFragment` to parsing. The lambda supplied to each register is a ComposedFunction whose body is an AST template; at parse time `substituteParams` injects the operand ASTs without evaluating, producing a new AST node the evaluator processes normally. Lexer gets two new token kinds: `TokenType.UserOp` (matched by operator-char string) and `TokenType.UserKeyword` (matched by identifier string). Parser dispatches via `userPrefixParselets`/`userInfixParselets` keyed by token text. Extension type grows `grammarFragment?: GrammarFragment`. Demo: `lib/pow.alg` adds `**` and `neg`, used in `tests/grammar-runtime.alg`.
 
 ## Module System
 
@@ -294,6 +295,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - `typed-types.alg` — types as typed values, Int instanceof NominalType, meta-type checks
 - `refinements.alg` — refinement types via `&&`, compound predicates, preserveOps operator lifting
 - `mixins.alg` — mixin methods, field access via self, reusable specs, multi-arg methods
+- `grammar-runtime.alg` — `use_grammar pow` header plus `**`/`neg` from `lib/pow.alg`
 
 ## Base Parser Syntax
 
@@ -491,6 +493,7 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ Array map/filter/reduce as Allegro ComposedFunctions (recursive AST construction, not imperative TypeScript loops)
 - ✅ Refinement types: `Type && _ > 0` syntax, predicate checking at construction/annotation/call sites, `preserveOps` operator lifting for refinement preservation through operators
 - ✅ Mixins: `.mixin({method: fn, ...})` adds method implementations to types, ComposedFunction method dispatch with self binding
+- ✅ Runtime grammar extension Phase 1: module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix` primitives; `use_grammar NAME` top-of-file header activates a module's `GrammarFragment` before parsing
 
 ## Design Philosophy
 

@@ -4,11 +4,19 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { markTailCalls, precompileFunction } from "./evaluator.js";
-import { parseBase as hybridParseBase, parseStandard as hybridParseStandard } from "./hybrid-parser.js";
+import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
+import {
+  parseBase as hybridParseBase,
+  parseStandard as hybridParseStandard,
+  parseWithConfig as hybridParseWithConfig,
+  mergeGrammarFragments,
+  getBaseGrammarConfig,
+  getStandardGrammarConfig,
+  type HybridGrammarConfig,
+} from "./hybrid-parser.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf } from "./types.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -291,10 +299,23 @@ function resolveNamedParams(
       const ownParamNames = new Set(fn.params.map(p => p._name).filter(Boolean) as string[]);
       const newBody = resolveNamedParamsInner(fn.body, resMap, fn, ownParamNames, selfName, seen);
       if (newBody === fn.body) return value;
+      // CRITICAL: clone params so that mutating owner below doesn't corrupt
+      // the original function. Without this, earlier-resolved closures that
+      // share this params array would have their params re-pointed to newFn.
+      // See evaluator.ts subst() for the same fix pattern.
+      const newParams = fn.params.map(p => ({
+        kind: ValueKind.Param,
+        position: p.position,
+        owner: null as any,
+        _name: p._name,
+      } as ParamValue));
+      const paramMap = new Map<ParamValue, ParamValue>();
+      for (let i = 0; i < fn.params.length; i++) paramMap.set(fn.params[i], newParams[i]);
+      const remappedBody = remapParams(newBody, paramMap);
       const newFn: ComposedFunctionValue = {
         kind: ValueKind.ComposedFunction,
-        params: fn.params,
-        body: newBody,
+        params: newParams,
+        body: remappedBody,
       };
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
@@ -365,10 +386,20 @@ function resolveNamedParamsInner(
       const innerOwn = new Set(fn.params.map(p => p._name).filter(Boolean) as string[]);
       const newBody = resolveNamedParamsInner(fn.body, resMap, fn, innerOwn, selfName, seen);
       if (newBody === fn.body) return value;
+      // Clone params — see resolveNamedParams above and evaluator.ts subst().
+      const newParams = fn.params.map(p => ({
+        kind: ValueKind.Param,
+        position: p.position,
+        owner: null as any,
+        _name: p._name,
+      } as ParamValue));
+      const paramMap = new Map<ParamValue, ParamValue>();
+      for (let i = 0; i < fn.params.length; i++) paramMap.set(fn.params[i], newParams[i]);
+      const remappedBody = remapParams(newBody, paramMap);
       const newFn: ComposedFunctionValue = {
         kind: ValueKind.ComposedFunction,
-        params: fn.params,
-        body: newBody,
+        params: newParams,
+        body: remappedBody,
       };
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
@@ -773,16 +804,30 @@ export function evalSource(
   grammarExtension?: GrammarExtension,
   typed?: boolean,
   futureManager?: import("./futures.js").FutureManager,
+  grammarConfig?: HybridGrammarConfig,
 ): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
+  // If extensions carry grammar fragments, merge them into the active config.
+  // This lets modules' register_* primitives take effect on this file's parsing.
+  const hybridExtFragments = (extensions ?? [])
+    .map(e => e.grammarFragment)
+    .filter((f): f is NonNullable<typeof f> => f !== undefined);
+  let effectiveConfig = grammarConfig;
+  if (!effectiveConfig && hybridExtFragments.length > 0) {
+    const base = typed ? getStandardGrammarConfig() : getBaseGrammarConfig();
+    effectiveConfig = mergeGrammarFragments(base, hybridExtFragments);
+  }
+
   // Use hybrid parser by default; fall back to Earley for legacy grammar extensions
   const result = grammarExtension
     ? parseExtended(normalized, grammarExtension)
-    : typed
-      ? hybridParseStandard(normalized)
-      : hybridParseBase(normalized);
+    : effectiveConfig
+      ? hybridParseWithConfig(normalized, effectiveConfig)
+      : typed
+        ? hybridParseStandard(normalized)
+        : hybridParseBase(normalized);
 
   if (result.errors.length > 0) {
     throw new Error(`Parse error: ${result.errors[0].message}`);

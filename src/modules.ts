@@ -5,8 +5,8 @@
 
 import { parseBase, parseStandard } from "./hybrid-parser.js";
 import { buildEvalCtx, resolvePrimitives, resolveSymbols, Extension } from "./runtime.js";
-import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, primaryOf, AllegroError } from "./types.js";
+import { evaluate, remapParams } from "./evaluator.js";
+import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, primaryOf, AllegroError } from "./types.js";
 import { withType } from "./types-std.js";
 
 // --- Types ---
@@ -73,10 +73,25 @@ function captureModuleVars(
       }
       const newBody = captureModuleVars(fn.body, moduleBindings, innerOwn, seen);
       if (newBody === fn.body) return value;
+      // CRITICAL: clone params so mutating p.owner doesn't corrupt the original
+      // function (which is referenced elsewhere — e.g., via ext.bindings for
+      // direct-access paths). Without this, any function captured into the
+      // module's typed moduleObject would have its original lose valid param
+      // ownership, breaking direct-access calls. Mirrors the pattern in
+      // evaluator.subst() and runtime.resolveNamedParams.
+      const newParams = fn.params.map(p => ({
+        kind: ValueKind.Param,
+        position: p.position,
+        owner: null as any,
+        _name: p._name,
+      } as ParamValue));
+      const paramMap = new Map<ParamValue, ParamValue>();
+      for (let i = 0; i < fn.params.length; i++) paramMap.set(fn.params[i], newParams[i]);
+      const remappedBody = remapParams(newBody, paramMap);
       const newFn: ComposedFunctionValue = {
         kind: ValueKind.ComposedFunction,
-        params: fn.params,
-        body: newBody,
+        params: newParams,
+        body: remappedBody,
       };
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
@@ -295,7 +310,15 @@ export class ModuleLoader {
     // Build typed module object for use with `import name` + dot access
     const moduleObj = buildModuleObject(id, allBindings, exportNames);
 
-    const ext: Extension = { name: id, bindings, moduleObject: moduleObj };
+    // Extract grammar fragment if module registered any parselets
+    const grammarFragment = (evalCtx as any).__grammar_fragment;
+
+    const ext: Extension = {
+      name: id,
+      bindings,
+      moduleObject: moduleObj,
+      grammarFragment,
+    };
     this.cache.set(resolvedPath, ext);
     loading.delete(id);
     return ext;

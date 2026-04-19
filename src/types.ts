@@ -219,6 +219,37 @@ export interface Extension {
   bindings: Record<string, Value>;
   /** Typed module object for use with import + dot access. */
   moduleObject?: Value;
+  /** Grammar-extension fragment populated by register_* primitives inside
+   *  the module. When the importing file uses `use_grammar NAME`, the module's
+   *  fragment is merged into the parser config before parsing. */
+  grammarFragment?: GrammarFragment;
+}
+
+/** A module's contribution to the hybrid-parser grammar. */
+export interface GrammarFragment {
+  /** Identifiers that should tokenize as UserKeyword instead of Ident */
+  keywords: string[];
+  /** Operator-char sequences that should tokenize as UserOp */
+  operators: string[];
+  /** Binary operator parselets — fn is a ComposedFunction(left, right) → ast */
+  infix: Array<{ token: string; bp: number; fn: Value }>;
+  /** Unary prefix operator parselets — fn is a ComposedFunction(arg) → ast */
+  prefixOp: Array<{ token: string; bp: number; fn: Value }>;
+  /** Unary postfix operator parselets — fn is a ComposedFunction(arg) → ast */
+  postfixOp: Array<{ token: string; bp: number; fn: Value }>;
+  /** Keyword-led unary prefix parselets — `kw EXPR` → fn(EXPR) */
+  exprPrefix: Array<{ keyword: string; fn: Value }>;
+}
+
+export function emptyGrammarFragment(): GrammarFragment {
+  return {
+    keywords: [],
+    operators: [],
+    infix: [],
+    prefixOp: [],
+    postfixOp: [],
+    exprPrefix: [],
+  };
 }
 
 // --- Dependency tracking for forward-chaining partial evaluation ---

@@ -368,7 +368,7 @@ function applyComposed(
  * Used by subst when cloning inner ComposedFunctions to avoid sharing
  * param arrays (which would cause owner-mutation to corrupt the original).
  */
-function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>): Value {
+export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>): Value {
   if (paramMap.size === 0) return value;
   switch (value.kind) {
     case ValueKind.Bits:
@@ -400,7 +400,7 @@ function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>): Value
   }
 }
 
-function substituteParams(fn: ComposedFunctionValue, args: Value[]): Value {
+export function substituteParams(fn: ComposedFunctionValue, args: Value[]): Value {
   // Build a position-based map for substitution
   const posMap = new Map<number, Value>();
   for (const p of fn.params) {

@@ -40,6 +40,11 @@ export interface HybridGrammarConfig {
   lexerConfig: LexerConfig;
   /** If true, dot access uses type_dispatch; otherwise ctx_resolve */
   typed: boolean;
+  /** User-registered parselets keyed by token.text — dispatched when
+   *  token.type is UserOp or UserKeyword. Populated via register_* primitives
+   *  in grammar-extension modules. */
+  userPrefixParselets?: Map<string, PrefixParseFn>;
+  userInfixParselets?: Map<string, InfixParselet>;
 }
 
 // --- The Parser ---
@@ -453,7 +458,11 @@ export class HybridParser {
 
     // Prefix
     const token = this.lexer.next();
-    const prefix = this.config.prefixParselets.get(token.type);
+    // User-registered prefix parselets dispatch by token.text for UserOp/UserKeyword
+    let prefix = this.config.prefixParselets.get(token.type);
+    if (!prefix && (token.type === TokenType.UserOp || token.type === TokenType.UserKeyword)) {
+      prefix = this.config.userPrefixParselets?.get(token.text);
+    }
     if (!prefix) {
       throw new Error(
         `Parse error at line ${token.line}, column ${token.column}: unexpected ${token.type === TokenType.EOF ? "end of input" : `'${token.text}'`}`
@@ -465,7 +474,10 @@ export class HybridParser {
     while (true) {
       this.skipContinuationWhitespace();
       const next = this.lexer.peek();
-      const infix = this.config.infixParselets.get(next.type);
+      let infix = this.config.infixParselets.get(next.type);
+      if (!infix && (next.type === TokenType.UserOp || next.type === TokenType.UserKeyword)) {
+        infix = this.config.userInfixParselets?.get(next.text);
+      }
       if (!infix || infix.bp < minBP) break;
       this.lexer.next();
       left = infix.parse(this, left, next);
@@ -1119,4 +1131,88 @@ export function parseStandard(input: string): ParseResult {
 export function parseWithConfig(input: string, config: HybridGrammarConfig): ParseResult {
   const parser = new HybridParser(input, config);
   return parser.parseFile();
+}
+
+/** Merge grammar fragments from extensions into a base config. Produces a
+ *  new config with additional lexer entries and user-keyed parselet maps.
+ *  The user lambda in each fragment entry is a ComposedFunction that is
+ *  substituted (not evaluated) into the AST via substituteParams at parse
+ *  time — no evaluation happens during parsing.
+ */
+import { extendLexerConfig } from "./lexer.js";
+import { substituteParams } from "./evaluator.js";
+import type { GrammarFragment } from "./types.js";
+
+export function mergeGrammarFragments(
+  base: HybridGrammarConfig,
+  fragments: GrammarFragment[],
+): HybridGrammarConfig {
+  if (fragments.length === 0) return base;
+
+  // Collect new lexer additions
+  const newKeywords = new Map<string, TokenType>();
+  const newOperators: [string, TokenType][] = [];
+  for (const f of fragments) {
+    for (const kw of f.keywords) newKeywords.set(kw, TokenType.UserKeyword);
+    for (const op of f.operators) {
+      // Only add unique symbols — later dup-registrations silently merge.
+      if (!newOperators.some(([s]) => s === op)) {
+        newOperators.push([op, TokenType.UserOp]);
+      }
+    }
+  }
+
+  const lexerConfig = extendLexerConfig(base.lexerConfig, {
+    keywords: newKeywords,
+    operators: newOperators,
+  });
+
+  // Build user-keyed parselet maps
+  const userPrefixParselets = new Map<string, PrefixParseFn>(base.userPrefixParselets ?? []);
+  const userInfixParselets = new Map<string, InfixParselet>(base.userInfixParselets ?? []);
+
+  for (const f of fragments) {
+    for (const entry of f.infix) {
+      const fn = entry.fn;
+      userInfixParselets.set(entry.token, {
+        bp: entry.bp,
+        parse: (parser, left, _token) => {
+          const right = parser.parseExpression(entry.bp);
+          return substituteParams(fn as any, [left, right]);
+        },
+      });
+    }
+    for (const entry of f.prefixOp) {
+      const fn = entry.fn;
+      userPrefixParselets.set(entry.token, (parser, _token) => {
+        const arg = parser.parseExpression(entry.bp);
+        return substituteParams(fn as any, [arg]);
+      });
+    }
+    for (const entry of f.postfixOp) {
+      const fn = entry.fn;
+      userInfixParselets.set(entry.token, {
+        bp: entry.bp,
+        parse: (_parser, left, _token) => {
+          // Postfix: no right operand consumed
+          return substituteParams(fn as any, [left]);
+        },
+      });
+    }
+    for (const entry of f.exprPrefix) {
+      const fn = entry.fn;
+      userPrefixParselets.set(entry.keyword, (parser, _token) => {
+        // Parse one expression at minBP=0 (full expression)
+        const arg = parser.parseExpression(0);
+        return substituteParams(fn as any, [arg]);
+      });
+    }
+  }
+
+  return {
+    ...base,
+    lexerConfig,
+    userPrefixParselets,
+    userInfixParselets,
+  };
 }

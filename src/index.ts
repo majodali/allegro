@@ -79,6 +79,78 @@ async function loadImportedModules(
   return loader.loadAll();
 }
 
+/**
+ * Pre-scan source for `use_grammar NAME` directives at the top of the file.
+ * Each directive must appear before any non-`use_grammar`, non-comment, non-blank
+ * line. Returns the list of grammar-extension module names to load first.
+ */
+function scanUseGrammar(source: string): string[] {
+  const names: string[] = [];
+  const lines = source.split(/\r?\n/);
+  let inBlockComment = false;
+  for (const rawLine of lines) {
+    let line = rawLine;
+    // Strip block comment contents (naive — good enough for header scan)
+    if (inBlockComment) {
+      const end = line.indexOf("*/");
+      if (end >= 0) {
+        line = line.slice(end + 2);
+        inBlockComment = false;
+      } else continue;
+    }
+    const bcStart = line.indexOf("/*");
+    if (bcStart >= 0) {
+      const bcEnd = line.indexOf("*/", bcStart + 2);
+      if (bcEnd >= 0) line = line.slice(0, bcStart) + line.slice(bcEnd + 2);
+      else { line = line.slice(0, bcStart); inBlockComment = true; }
+    }
+    // Strip line comment
+    const lcStart = line.indexOf("//");
+    if (lcStart >= 0) line = line.slice(0, lcStart);
+    const trimmed = line.trim();
+    if (trimmed === "") continue;
+    const m = /^use_grammar\s+(\w+)\s*$/.exec(trimmed);
+    if (m) {
+      names.push(m[1]);
+      continue;
+    }
+    // First non-blank, non-comment, non-use_grammar line ends the header
+    break;
+  }
+  return names;
+}
+
+/**
+ * Load grammar-extension modules listed in `use_grammar` directives.
+ * Returns their Extensions (with grammarFragment populated by register_* calls).
+ */
+async function loadGrammarModules(
+  names: string[],
+  sourceDir: string,
+  existingExtensions: Extension[],
+): Promise<Extension[]> {
+  if (names.length === 0) return [];
+  const libDir = path.join(sourceDir, "lib");
+  const systemLibDir = path.join(
+    path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")),
+    "..",
+    "lib",
+  );
+  const loader = new ModuleLoader({
+    modules: names.map(id => ({ id })),
+    resolve: (id) => {
+      const local = path.join(libDir, `${id}.alg`);
+      if (fs.existsSync(local)) return local;
+      const system = path.join(systemLibDir, `${id}.alg`);
+      if (fs.existsSync(system)) return system;
+      return null;
+    },
+    readFile: async (p) => fs.readFileSync(p, "utf-8"),
+    extensions: existingExtensions,
+  });
+  return loader.loadAll();
+}
+
 // --- File runner ---
 
 async function runFile(source: string, filename: string, standard: boolean): Promise<void> {
@@ -88,25 +160,48 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
       return;
     }
 
-    // Standard mode: parse first to discover imports, then load on demand
-    const normalized = source.replace(/\r\n/g, "\n");
-    const { parseStandard } = await import("./hybrid-parser.js");
-    const parseResult = parseStandard(normalized);
+    const sourceDir = path.dirname(path.resolve(filename));
+    let extensions = [...getStdExtensions()];
+
+    // 1. Pre-scan for `use_grammar` directives and load those modules FIRST
+    //    so their grammar extensions are available when we parse the main file.
+    const grammarNames = scanUseGrammar(source);
+    if (grammarNames.length > 0) {
+      const grammarExts = await loadGrammarModules(grammarNames, sourceDir, extensions);
+      extensions = [...extensions, ...grammarExts];
+    }
+
+    // 2. Strip `use_grammar` lines from source before parsing (they're directives,
+    //    not real statements that the parser should try to understand).
+    const cleanSource = source.replace(/^\s*use_grammar\s+\w+\s*$/gm, "");
+
+    // Standard mode: parse first to discover imports, then load on demand.
+    // Parse with the grammar-augmented config (extensions now include grammar fragments).
+    const normalized = cleanSource.replace(/\r\n/g, "\n");
+    const { parseStandard, parseWithConfig, mergeGrammarFragments, getStandardGrammarConfig } =
+      await import("./hybrid-parser.js");
+
+    // Build config for import-discovery parse too, in case the file uses
+    // grammar-extension syntax before/between imports.
+    const hybridFragments = extensions
+      .map(e => e.grammarFragment)
+      .filter((f): f is NonNullable<typeof f> => f !== undefined);
+    const parseResult = hybridFragments.length > 0
+      ? parseWithConfig(normalized, mergeGrammarFragments(getStandardGrammarConfig(), hybridFragments))
+      : parseStandard(normalized);
     if (parseResult.errors.length > 0) {
       throw new Error(`Parse error: ${parseResult.errors[0].message}`);
     }
 
     const fileCtx = (parseResult.tree as any).ctx;
-    let extensions = [...getStdExtensions()];
 
     if (fileCtx) {
-      const sourceDir = path.dirname(path.resolve(filename));
       const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);
       extensions = [...extensions, ...moduleExts];
     }
 
     const fm = createFutureManager();
-    evalSource(source, undefined, extensions, undefined, true, fm);
+    evalSource(cleanSource, undefined, extensions, undefined, true, fm);
     if (fm.hasPending()) {
       await fm.waitForAll();
     }
