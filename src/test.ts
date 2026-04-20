@@ -3566,6 +3566,318 @@ test("runtime grammar: module-scoped expr-prefix keyword applied at parse time",
 // Run the end-to-end grammar-runtime.alg test (uses `use_grammar pow` header)
 fileTest(path.join(testsDir, "grammar-runtime.alg"));
 
+// == Grammar 2 (Phase 1) — new formalism + engine ==
+//
+// Tests for the TypeScript-level types and engine in src/grammar2/. These
+// do NOT yet integrate with Allegro source; they verify the engine on
+// directly-constructed grammar values. Allegro-level integration comes
+// via builder.ts and registered primitives (tested separately below).
+
+import * as g2 from "./grammar2/types.js";
+import { parse as g2parse, ParseResult as G2ParseResult } from "./grammar2/engine.js";
+
+function g2ok(r: G2ParseResult): asserts r is Extract<G2ParseResult, { ok: true }> {
+  if (!r.ok) throw new Error(`expected parse success, got: ${r.error.message}`);
+}
+
+function g2fail(r: G2ParseResult): asserts r is Extract<G2ParseResult, { ok: false }> {
+  if (r.ok) throw new Error(`expected parse failure, got tree`);
+}
+
+function mkGrammar(start: string, productions: Record<string, g2.Rule>): g2.Grammar {
+  const g = g2.makeGrammar({ start });
+  for (const [name, rule] of Object.entries(productions)) {
+    g2.addProduction(g, { name, rule });
+  }
+  return g;
+}
+
+test("grammar2/types: constructor helpers produce well-shaped values", () => {
+  const r = g2.seq([g2.lit("a"), g2.lit("b")]);
+  eq(r.kind, "seq");
+  eq((r.items[0] as g2.Terminal).match.kind, "literal");
+});
+
+test("grammar2/engine: literal match", () => {
+  const g = mkGrammar("s", { s: g2.lit("hello") });
+  const r = g2parse(g, "hello");
+  g2ok(r);
+  eq(r.tree.kind === "branch" || r.tree.kind === "leaf", true);
+});
+
+test("grammar2/engine: literal mismatch reports farthest advance", () => {
+  const g = mkGrammar("s", { s: g2.lit("hello") });
+  const r = g2parse(g, "hxllo");
+  g2fail(r);
+  eq(r.error.position, 0);
+  eq(r.error.actual, "h");
+});
+
+test("grammar2/engine: seq consumes all items in order", () => {
+  const g = mkGrammar("s", { s: g2.seq([g2.lit("ab"), g2.lit("cd")]) });
+  const r = g2parse(g, "abcd");
+  g2ok(r);
+  if (r.tree.kind === "branch") {
+    eq(r.tree.children.length, 2);
+  }
+});
+
+test("grammar2/engine: alt picks the first matching alternative", () => {
+  const g = mkGrammar("s", { s: g2.alt([g2.lit("x"), g2.lit("y")]) });
+  const r = g2parse(g, "y");
+  g2ok(r);
+});
+
+test("grammar2/engine: alt reports farthest failure across options", () => {
+  const g = mkGrammar("s", { s: g2.alt([g2.lit("xxxx"), g2.lit("yy")]) });
+  const r = g2parse(g, "zz");
+  g2fail(r);
+  // Neither alt advances; farthest is 0.
+  eq(r.error.position, 0);
+});
+
+test("grammar2/engine: rep with min=1 requires at least one match", () => {
+  const g = mkGrammar("s", { s: g2.rep(g2.lit("a"), { min: 1 }) });
+  const r = g2parse(g, "aaa");
+  g2ok(r);
+  if (r.tree.kind === "branch") {
+    eq(r.tree.children.length, 3);
+  }
+});
+
+test("grammar2/engine: rep with min=1 fails on empty", () => {
+  const g = mkGrammar("s", { s: g2.rep(g2.lit("a"), { min: 1 }) });
+  const r = g2parse(g, "");
+  g2fail(r);
+});
+
+test("grammar2/engine: rep with separator strips delimiters from result", () => {
+  const g = mkGrammar("s", {
+    s: g2.rep(g2.lit("x"), { min: 1, sep: g2.lit(",") }),
+  });
+  const r = g2parse(g, "x,x,x");
+  g2ok(r);
+  if (r.tree.kind === "branch") {
+    eq(r.tree.children.length, 3);
+  }
+});
+
+test("grammar2/engine: opt produces 'none' on miss", () => {
+  const g = mkGrammar("s", { s: g2.seq([g2.lit("a"), g2.opt(g2.lit("b"))]) });
+  const r = g2parse(g, "a");
+  g2ok(r);
+  if (r.tree.kind === "branch") {
+    eq(r.tree.children.length, 2);
+    eq(r.tree.children[1].kind, "none");
+  }
+});
+
+test("grammar2/engine: opt consumes when present", () => {
+  const g = mkGrammar("s", { s: g2.seq([g2.lit("a"), g2.opt(g2.lit("b"))]) });
+  const r = g2parse(g, "ab");
+  g2ok(r);
+});
+
+test("grammar2/engine: charClass matches a single character", () => {
+  const g = mkGrammar("s", { s: g2.cls("[a-z]") });
+  const r = g2parse(g, "m");
+  g2ok(r);
+});
+
+test("grammar2/engine: regex matches at current position", () => {
+  const g = mkGrammar("s", { s: g2.regex(/[0-9]+/) });
+  const r = g2parse(g, "12345");
+  g2ok(r);
+});
+
+test("grammar2/engine: nonterm dispatches to named production", () => {
+  const g = mkGrammar("s", {
+    s:   g2.seq([g2.nonterm("a"), g2.nonterm("a")]),
+    a:   g2.lit("hi"),
+  });
+  const r = g2parse(g, "hihi");
+  g2ok(r);
+});
+
+test("grammar2/engine: guarded notFollowedBy succeeds when negative lookahead holds", () => {
+  const g = mkGrammar("s", {
+    s: g2.guarded(g2.lit("if"), g2.notFollowedBy(g2.cls("[a-zA-Z]"))),
+  });
+  const r = g2parse(g, "if");
+  g2ok(r);
+});
+
+test("grammar2/engine: guarded notFollowedBy fails when lookahead matches", () => {
+  const g = mkGrammar("s", {
+    s: g2.guarded(g2.lit("if"), g2.notFollowedBy(g2.cls("[a-zA-Z]"))),
+  });
+  const r = g2parse(g, "iffy");
+  g2fail(r);
+});
+
+test("grammar2/engine: reserved guard rejects keyword-matching idents", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g.reserved.set("keywords", new Set(["if", "then", "else"]));
+  g2.addProduction(g, {
+    name: "s",
+    rule: g2.guarded(
+      g2.regex(/[a-zA-Z]+/),
+      g2.reserved("keywords"),
+    ),
+  });
+  const ok = g2parse(g, "hello");
+  g2ok(ok);
+  const notOk = g2parse(g, "if");
+  g2fail(notOk);
+});
+
+test("grammar2/engine: left-to-right alt order determines match (pre-analyzer)", () => {
+  // "a+" matches one or more 'a'; order of alts in an alt means the shorter
+  // literal wins if placed first. Phase 1 uses first-match semantics.
+  const g = mkGrammar("s", {
+    s: g2.alt([g2.lit("ab"), g2.lit("abc")]),
+  });
+  const r = g2parse(g, "abc");
+  // "ab" matches but "abc" doesn't fully consume input — farthest-advance
+  // error. This tests that first-match behavior is working as documented.
+  g2fail(r);
+});
+
+test("grammar2/engine: @longest alt picks the longest match", () => {
+  const g = mkGrammar("s", {
+    s: g2.alt(
+      [g2.lit("ab"), g2.lit("abc")],
+      { longest: true },
+    ),
+  });
+  const r = g2parse(g, "abc");
+  g2ok(r);
+});
+
+// --- Regex DSL (§10.3 acceptance test) ---
+// Build a regex grammar that matches character-level patterns: a*, b+, c?,
+// alternation |, grouping (...). Then verify it parses a few regex strings.
+
+// --- Allegro-level integration: verify the primitives compose from Allegro code ---
+
+test("grammar2 primitives: literal match via Allegro", () => {
+  const r = evalStd(`
+g = grammar2_new()
+grammar2_add_production(g, "s", grammar2_lit("hello"))
+grammar2_set_start(g, "s")
+grammar2_parse(g, "hello")
+`);
+  // Parse tree for the "s" production wrapping a single literal leaf.
+  // Shape: Object { tag: "s", children: ["hello"] } OR just a String if the
+  // engine collapsed the single-child branch. Either way, primary is not an error.
+  eq((r as any).components?.has("error") ?? false, false);
+});
+
+test("grammar2 primitives: sequence via Allegro", () => {
+  const r = evalStd(`
+g = grammar2_new()
+grammar2_add_production(g, "s", grammar2_seq([grammar2_lit("ab"), grammar2_lit("cd")]))
+grammar2_set_start(g, "s")
+grammar2_parse(g, "abcd")
+`);
+  eq((r as any).components?.has("error") ?? false, false);
+});
+
+test("grammar2 primitives: parse failure produces error value", () => {
+  const r = evalStd(`
+g = grammar2_new()
+grammar2_add_production(g, "s", grammar2_lit("hello"))
+grammar2_set_start(g, "s")
+grammar2_parse(g, "world")
+`);
+  eq((r as any).components?.has("error") ?? false, true);
+});
+
+test("grammar2 primitives: regex DSL end-to-end from Allegro", () => {
+  // Build the §10.3 regex grammar and parse a few inputs, returning Bool.
+  const r = evalStd(`
+g = grammar2_new()
+
+// Productions:
+//   pattern = concat (| concat)*
+//   concat  = atom+
+//   atom    = base postfix?
+//   postfix = * | + | ?
+//   base    = [a-z] | group
+//   group   = ( pattern )
+
+grammar2_add_production(g, "pattern",
+  grammar2_rep(grammar2_nonterm("concat"), {min: 1, sep: grammar2_lit("|")}))
+grammar2_add_production(g, "concat",
+  grammar2_rep(grammar2_nonterm("atom"), {min: 1}))
+grammar2_add_production(g, "atom",
+  grammar2_seq([grammar2_nonterm("base"), grammar2_opt(grammar2_nonterm("postfix"))]))
+grammar2_add_production(g, "postfix",
+  grammar2_alt([grammar2_lit("*"), grammar2_lit("+"), grammar2_lit("?")]))
+grammar2_add_production(g, "base",
+  grammar2_alt([grammar2_cls("[a-z]"), grammar2_nonterm("group")]))
+grammar2_add_production(g, "group",
+  grammar2_seq([grammar2_lit("("), grammar2_nonterm("pattern"), grammar2_lit(")")]))
+
+grammar2_set_start(g, "pattern")
+
+// Parse each input; check error component inline (error values auto-propagate
+// through function calls, so we can't use a helper).
+[
+  if error of grammar2_parse(g, "abc")     == none then "ok" else "err",
+  if error of grammar2_parse(g, "a*b")     == none then "ok" else "err",
+  if error of grammar2_parse(g, "(ab)+")   == none then "ok" else "err",
+  if error of grammar2_parse(g, "a|b|c")   == none then "ok" else "err",
+  if error of grammar2_parse(g, "(a|b)*c") == none then "ok" else "err",
+  if error of grammar2_parse(g, "")        == none then "ok" else "err",
+  if error of grammar2_parse(g, "AB")      == none then "ok" else "err",
+  if error of grammar2_parse(g, "(abc")    == none then "ok" else "err"
+]
+`);
+  // Expected: 5 "ok", then 3 "err".
+  const p = primaryOf(r!) as any;
+  // p is the Array Context with __length and numeric bindings.
+  const len = Number(p.bindings.get("__length").value.data);
+  eq(len, 8);
+  const results: string[] = [];
+  for (let i = 0; i < len; i++) {
+    const el = p.bindings.get(String(i)).value;
+    results.push(bitsToString(primaryOf(el) as any));
+  }
+  eq(results.join(","), "ok,ok,ok,ok,ok,err,err,err");
+});
+
+test("grammar2 §10.3: regex DSL parses simple literal", () => {
+  const g = g2.makeGrammar({ start: "pattern" });
+  g2.addProduction(g, { name: "pattern",
+    rule: g2.rep(g2.nonterm("concat"), { min: 1, sep: g2.lit("|") }),
+  });
+  g2.addProduction(g, { name: "concat",
+    rule: g2.rep(g2.nonterm("atom"), { min: 1 }),
+  });
+  g2.addProduction(g, { name: "atom",
+    rule: g2.seq([g2.nonterm("base"), g2.opt(g2.nonterm("postfix"))]),
+  });
+  g2.addProduction(g, { name: "postfix",
+    rule: g2.alt([g2.lit("*"), g2.lit("+"), g2.lit("?")]),
+  });
+  g2.addProduction(g, { name: "base",
+    rule: g2.alt([g2.cls("[a-z]"), g2.nonterm("group")]),
+  });
+  g2.addProduction(g, { name: "group",
+    rule: g2.seq([g2.lit("("), g2.nonterm("pattern"), g2.lit(")")]),
+  });
+
+  g2ok(g2parse(g, "abc"));
+  g2ok(g2parse(g, "a*b"));
+  g2ok(g2parse(g, "(ab)+"));
+  g2ok(g2parse(g, "a|b|c"));
+  g2ok(g2parse(g, "(a|b)*c"));
+  g2fail(g2parse(g, ""));           // min=1, empty fails
+  g2fail(g2parse(g, "AB"));         // uppercase not in [a-z]
+  g2fail(g2parse(g, "(abc"));       // unbalanced paren
+});
+
 // == Async Futures ==
 
 async function runAsyncTests(): Promise<void> {

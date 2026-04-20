@@ -8,6 +8,7 @@ import {
   primaryOf, stringToBits, bitsToString,
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
+import { grammar2Primitives } from "./grammar2/builder.js";
 
 // --- Value formatting ---
 
@@ -1825,6 +1826,8 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   grammar_optional: makePrimitive("grammar_optional", grammar_optional_impl),
   grammar_set_target: makePrimitive("grammar_set_target", grammar_set_target_impl),
   grammar_parse: makePrimitive("grammar_parse", grammar_parse_impl),
+  // Grammar 2 (new formalism, Phase 1) — scannerless parser, see docs/grammar-formalism.md
+  ...grammar2Primitives,
   // Runtime grammar extensions (Phase 1: simple combinators)
   register_infix: makePrimitive("register_infix", register_infix_impl),
   register_prefix: makePrimitive("register_prefix", register_prefix_impl),
