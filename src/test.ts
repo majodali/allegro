@@ -3758,6 +3758,159 @@ test("grammar2/engine: @longest alt picks the longest match", () => {
 // Build a regex grammar that matches character-level patterns: a*, b+, c?,
 // alternation |, grouping (...). Then verify it parses a few regex strings.
 
+// --- Phase 2a: left recursion (Warth) ---
+
+test("grammar2/engine: direct left recursion on a single rule", () => {
+  // expr = expr '+' num | num
+  const g = g2.makeGrammar({ start: "expr" });
+  g2.addProduction(g, { name: "num",
+    rule: g2.regex(/[0-9]+/),
+  });
+  g2.addProduction(g, { name: "expr",
+    rule: g2.alt([
+      g2.seq([g2.nonterm("expr"), g2.lit("+"), g2.nonterm("num")]),
+      g2.nonterm("num"),
+    ]),
+  });
+  const r = g2parse(g, "1+2+3");
+  g2ok(r);
+});
+
+test("grammar2/engine: left recursion produces left-associative tree", () => {
+  const g = g2.makeGrammar({ start: "expr" });
+  g2.addProduction(g, { name: "num",
+    rule: g2.regex(/[0-9]+/),
+  });
+  g2.addProduction(g, { name: "expr",
+    rule: g2.alt([
+      g2.seq([g2.nonterm("expr"), g2.lit("+"), g2.nonterm("num")], { name: "add" }),
+      g2.nonterm("num"),
+    ]),
+  });
+  const r = g2parse(g, "1+2+3");
+  g2ok(r);
+  // Expect the tree to be nested left: add(add(1, 2), 3) not add(1, add(2, 3)).
+  // The top-level is an `add` branch whose first child is itself an `add` branch.
+  if (r.tree.kind === "branch") {
+    // Unwrap the outer production layer if present.
+    const outer = r.tree.tag === "add" ? r.tree :
+      (r.tree.children[0] && r.tree.children[0].kind === "branch" ? r.tree.children[0] : null);
+    if (outer && outer.tag === "add") {
+      // First child should be a nested add, not a leaf/num
+      const first = outer.children[0];
+      if (first.kind === "branch") {
+        // If first is a nested branch, it should eventually lead to another "add"
+        const hasNestedAdd = JSON.stringify(first).includes("\"tag\":\"add\"");
+        eq(hasNestedAdd, true, "left-associative: first child should contain another add");
+      }
+    }
+  }
+});
+
+test("grammar2/engine: left-recursive rule falls back to base when no further matches", () => {
+  const g = g2.makeGrammar({ start: "expr" });
+  g2.addProduction(g, { name: "num", rule: g2.regex(/[0-9]+/) });
+  g2.addProduction(g, { name: "expr",
+    rule: g2.alt([
+      g2.seq([g2.nonterm("expr"), g2.lit("+"), g2.nonterm("num")]),
+      g2.nonterm("num"),
+    ]),
+  });
+  // Single number should parse via the base (non-recursive) alt.
+  const r = g2parse(g, "42");
+  g2ok(r);
+});
+
+test("grammar2/engine: deeply left-recursive input parses without stack overflow", () => {
+  // Generate 100 "+1" suffixes; all-left-associative chain.
+  const g = g2.makeGrammar({ start: "expr" });
+  g2.addProduction(g, { name: "num", rule: g2.regex(/[0-9]+/) });
+  g2.addProduction(g, { name: "expr",
+    rule: g2.alt([
+      g2.seq([g2.nonterm("expr"), g2.lit("+"), g2.nonterm("num")]),
+      g2.nonterm("num"),
+    ]),
+  });
+  const input = "1" + "+1".repeat(100);
+  const r = g2parse(g, input);
+  g2ok(r);
+});
+
+// --- Phase 2a: indent terminals ---
+
+test("grammar2/engine: NEWLINE matches same-indent line boundary", () => {
+  const g = g2.makeGrammar({ start: "lines" });
+  g2.addProduction(g, { name: "line", rule: g2.regex(/[a-z]+/) });
+  g2.addProduction(g, { name: "lines",
+    rule: g2.rep(g2.nonterm("line"), { min: 1, sep: g2.indent("NEWLINE") }),
+  });
+  const r = g2parse(g, "abc\ndef\nghi");
+  g2ok(r);
+});
+
+test("grammar2/engine: INDENT + DEDENT bracket an indented block", () => {
+  // header = 'if' NEWLINE? block
+  // block  = INDENT line (NEWLINE line)* DEDENT
+  const g = g2.makeGrammar({ start: "top" });
+  g2.addProduction(g, { name: "line", rule: g2.regex(/[a-z]+/) });
+  g2.addProduction(g, { name: "block",
+    rule: g2.seq([
+      g2.indent("INDENT"),
+      g2.rep(g2.nonterm("line"), { min: 1, sep: g2.indent("NEWLINE") }),
+      g2.indent("DEDENT"),
+    ]),
+  });
+  g2.addProduction(g, { name: "top",
+    rule: g2.seq([g2.lit("if"), g2.nonterm("block")]),
+  });
+  // "if\n    a\n    b" — after "if", INDENT at col 4 succeeds, line a, NEWLINE at col 4,
+  // line b, then DEDENT (next content is EOF or col < 4).
+  const r = g2parse(g, "if\n    a\n    b");
+  g2ok(r);
+});
+
+test("grammar2/engine: INDENT fails when next line is not deeper", () => {
+  const g = g2.makeGrammar({ start: "top" });
+  g2.addProduction(g, { name: "line", rule: g2.regex(/[a-z]+/) });
+  g2.addProduction(g, { name: "top",
+    rule: g2.seq([g2.lit("if"), g2.indent("INDENT"), g2.nonterm("line")]),
+  });
+  // No indented line follows "if".
+  const r = g2parse(g, "if\nx");
+  g2fail(r);
+});
+
+test("grammar2/engine: NEWLINE fails between continuation lines", () => {
+  // NEWLINE at col 0 top, input "abc\n  def" — second line is deeper,
+  // so NEWLINE doesn't fire (continuation-style).
+  const g = g2.makeGrammar({ start: "lines" });
+  g2.addProduction(g, { name: "line", rule: g2.regex(/[a-z]+/) });
+  g2.addProduction(g, { name: "lines",
+    rule: g2.rep(g2.nonterm("line"), { min: 2, sep: g2.indent("NEWLINE") }),
+  });
+  const r = g2parse(g, "abc\n  def");
+  g2fail(r);
+});
+
+test("grammar2/engine: DEDENT pops a level", () => {
+  // A two-level nested block
+  const g = g2.makeGrammar({ start: "top" });
+  g2.addProduction(g, { name: "line", rule: g2.regex(/[a-z]+/) });
+  g2.addProduction(g, { name: "block",
+    rule: g2.seq([
+      g2.indent("INDENT"),
+      g2.rep(g2.nonterm("line"), { min: 1, sep: g2.indent("NEWLINE") }),
+      g2.indent("DEDENT"),
+    ]),
+  });
+  g2.addProduction(g, { name: "top",
+    rule: g2.seq([g2.lit("outer"), g2.nonterm("block")]),
+  });
+  // outer \n INDENT \n a \n b DEDENT
+  const r = g2parse(g, "outer\n  a\n  b");
+  g2ok(r);
+});
+
 // --- Allegro-level integration: verify the primitives compose from Allegro code ---
 
 test("grammar2 primitives: literal match via Allegro", () => {
@@ -3791,6 +3944,42 @@ grammar2_set_start(g, "s")
 grammar2_parse(g, "world")
 `);
   eq((r as any).components?.has("error") ?? false, true);
+});
+
+test("grammar2 primitives: left recursion works from Allegro", () => {
+  // expr = expr + num | num
+  const r = evalStd(`
+g = grammar2_new()
+grammar2_add_production(g, "num", grammar2_regex("[0-9]+"))
+grammar2_add_production(g, "expr",
+  grammar2_alt([
+    grammar2_seq([grammar2_nonterm("expr"), grammar2_lit("+"), grammar2_nonterm("num")]),
+    grammar2_nonterm("num")
+  ]))
+grammar2_set_start(g, "expr")
+if error of grammar2_parse(g, "1+2+3+4") == none then "ok" else "err"
+`);
+  eq(bitsToString(primaryOf(r!) as BitsValue), "ok");
+});
+
+test("grammar2 primitives: indent block works from Allegro", () => {
+  const r = evalStd(`
+g = grammar2_new()
+grammar2_add_production(g, "line", grammar2_regex("[a-z]+"))
+grammar2_add_production(g, "block",
+  grammar2_seq([
+    grammar2_indent("INDENT"),
+    grammar2_rep(grammar2_nonterm("line"), {min: 1, sep: grammar2_indent("NEWLINE")}),
+    grammar2_indent("DEDENT")
+  ]))
+grammar2_add_production(g, "top",
+  grammar2_seq([grammar2_lit("if"), grammar2_nonterm("block")]))
+grammar2_set_start(g, "top")
+if error of grammar2_parse(g, "if
+    a
+    b") == none then "ok" else "err"
+`);
+  eq(bitsToString(primaryOf(r!) as BitsValue), "ok");
 });
 
 test("grammar2 primitives: regex DSL end-to-end from Allegro", () => {

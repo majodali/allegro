@@ -84,16 +84,19 @@ class ParseState {
   /** Rules active at the farthest position (for error messages). */
   farthestRules: Rule[] = [];
   /**
-   * Memo cache: key = `${ruleId}@${pos}`. Value = match result or null (for
-   * "known failure" at this position).
-   *
-   * Rules are identified by their JS object identity via a WeakMap. Non-
-   * terminal references use `nt:${name}@${pos}` keys since those are shared
-   * by every reference to the same name.
+   * Memo cache: key = `${ruleId}@${pos}:${indentKey}`.
+   * Values are either a regular memoized result (MemoEntry) or null (known
+   * failure at this position+indent).
    */
-  memo: Map<string, MatchResult | null> = new Map();
+  memo: Map<string, MemoEntry | null> = new Map();
   ruleIds: WeakMap<Rule, number> = new WeakMap();
   nextRuleId: number = 1;
+
+  /**
+   * Indent stack. Top of stack is the indent level of the currently-open
+   * block. Starts as [0] (the document block is rooted at column 0).
+   */
+  indentStack: number[] = [0];
 
   constructor(grammar: Grammar, input: string) {
     this.grammar = grammar;
@@ -101,13 +104,23 @@ class ParseState {
   }
 
   ruleKey(rule: Rule, pos: number): string {
-    if (rule.kind === "nonterm") return `nt:${rule.name}@${pos}`;
+    const baseKey = rule.kind === "nonterm"
+      ? `nt:${rule.name}@${pos}`
+      : `r${this.ruleId(rule)}@${pos}`;
+    // Include the indent stack in the key. Even though most rules don't
+    // depend on it, including it keeps the memo correct for indent-aware
+    // rules without a static grammar analysis. Cost is modest: stacks are
+    // typically 1-5 elements.
+    return `${baseKey}:${this.indentStack.join(",")}`;
+  }
+
+  private ruleId(rule: Rule): number {
     let id = this.ruleIds.get(rule);
     if (id === undefined) {
       id = this.nextRuleId++;
       this.ruleIds.set(rule, id);
     }
-    return `r${id}@${pos}`;
+    return id;
   }
 
   advance(pos: number, activeRules: Rule[]): void {
@@ -124,9 +137,30 @@ class ParseState {
   }
 }
 
-interface MatchResult {
+export interface MatchResult {
   tree:    ParseTree;
   nextPos: number;
+  /**
+   * If set, replaces the parser's indent stack after this match. Used by
+   * INDENT (pushes a level), DEDENT (pops). NEWLINE does not modify the
+   * stack directly — it's passive about block structure.
+   */
+  newIndentStack?: number[];
+}
+
+/**
+ * Memo entry. Warth-style left recursion support:
+ *   - `result` holds the final cached answer once settled.
+ *   - `isLR` is true while a left-recursive computation is in progress at
+ *     this (rule, pos); recursive re-entry returns the current `seed`.
+ *   - `lrDetected` flips to true when the recursive re-entry actually
+ *     happens, triggering iteration after the first parse attempt.
+ */
+interface MemoEntry {
+  result:     MatchResult | null;
+  isLR:       boolean;
+  seed:       MatchResult | null;
+  lrDetected: boolean;
 }
 
 // --- Rule dispatch ---
@@ -134,8 +168,110 @@ interface MatchResult {
 function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | null {
   const key = state.ruleKey(rule, pos);
   const cached = state.memo.get(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    if (cached === null) return null;
+    if (cached.isLR) {
+      cached.lrDetected = true;
+      // Return the seed; seed may carry a newIndentStack (rare for LR seeds).
+      if (cached.seed?.newIndentStack) state.indentStack = cached.seed.newIndentStack;
+      return cached.seed;
+    }
+    if (cached.result?.newIndentStack) state.indentStack = cached.result.newIndentStack;
+    return cached.result;
+  }
 
+  const snapshot = state.indentStack;
+  const entry: MemoEntry = { result: null, isLR: true, seed: null, lrDetected: false };
+  state.memo.set(key, entry);
+
+  let result = runDoMatch(state, rule, pos, snapshot);
+
+  if (!entry.lrDetected) {
+    entry.isLR  = false;
+    entry.result = result;
+    if (result === null) {
+      state.indentStack = snapshot;
+      state.advance(pos, [rule]);
+    } else if (result.newIndentStack) {
+      // Commit post-state.
+      state.indentStack = result.newIndentStack;
+    }
+    return result;
+  }
+
+  // Left recursion detected. Iterate with seed growth. Between iterations,
+  // clear memo entries at the same pos (other than our own LR entry) — they
+  // were computed against a stale seed and would incorrectly short-circuit
+  // the re-evaluation. This is Warth's "growing heads" concern, handled here
+  // conservatively by position-scoped invalidation.
+  while (result !== null) {
+    if (entry.seed !== null && result.nextPos <= entry.seed.nextPos) break;
+    entry.seed = result;
+    state.indentStack = snapshot;
+    invalidateAtPos(state, pos, key);
+    result = runDoMatch(state, rule, pos, snapshot);
+  }
+
+  entry.isLR  = false;
+  entry.result = entry.seed;
+  if (entry.seed === null) {
+    state.indentStack = snapshot;
+    state.advance(pos, [rule]);
+  } else if (entry.seed.newIndentStack) {
+    state.indentStack = entry.seed.newIndentStack;
+  } else {
+    state.indentStack = snapshot;
+  }
+  return entry.seed;
+}
+
+/**
+ * Clear memo entries whose key identifies a match attempt at `pos`, except
+ * the LR entry `keepKey`. Called between LR iterations to invalidate results
+ * that were computed with a stale seed.
+ *
+ * Key formats are `nt:<name>@<pos>:<stack>` or `r<id>@<pos>:<stack>`.
+ */
+function invalidateAtPos(state: ParseState, pos: number, keepKey: string): void {
+  const posMarker = `@${pos}:`;
+  for (const k of Array.from(state.memo.keys())) {
+    if (k === keepKey) continue;
+    if (k.includes(posMarker)) state.memo.delete(k);
+  }
+}
+
+/**
+ * Run doMatch. On failure, restore snapshot. On success, if the match mutated
+ * the stack (via INDENT/DEDENT returning newIndentStack in its result),
+ * propagate that up on the MatchResult so the caller memoizes the post-state.
+ *
+ * Nested matches (Seq/Alt/Rep/Opt) inherently commit via the inner matchRule
+ * logic above, which sets state.indentStack from result.newIndentStack. So by
+ * the time doMatch returns for a composite rule, state.indentStack already
+ * reflects the cumulative post-state of all inner matches.
+ */
+function runDoMatch(state: ParseState, rule: Rule, pos: number, snapshot: number[]): MatchResult | null {
+  const result = doMatch(state, rule, pos);
+  if (result === null) {
+    state.indentStack = snapshot;
+    return null;
+  }
+  // Surface the net change on the result so the outer memo captures it.
+  if (state.indentStack !== snapshot && !result.newIndentStack) {
+    result.newIndentStack = state.indentStack;
+  } else if (result.newIndentStack) {
+    // A terminal (INDENT/DEDENT) returned newIndentStack directly; mirror it
+    // into state so the NEXT rule in the enclosing Seq sees the updated stack.
+    state.indentStack = result.newIndentStack;
+  }
+  return result;
+}
+
+/**
+ * The actual rule-specific matching logic, separated from matchRule so the
+ * Warth iteration can call it multiple times without memo interference.
+ */
+function doMatch(state: ParseState, rule: Rule, pos: number): MatchResult | null {
   let result: MatchResult | null = null;
   switch (rule.kind) {
     case "terminal": result = matchTerminal(state, rule, pos); break;
@@ -150,15 +286,6 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
   // Apply @name tagging to the resulting tree.
   if (result && rule.attrs?.name && result.tree.kind === "branch") {
     result = { ...result, tree: { ...result.tree, tag: rule.attrs.name } };
-  } else if (result && rule.attrs?.name && result.tree.kind === "leaf") {
-    // Promote leaf to a tagged single-child branch? Simpler: leave as leaf
-    // and let consumers inspect the text. The tag is informational anyway.
-  }
-
-  state.memo.set(key, result);
-  if (result === null) {
-    // Track this rule as "active at the farthest position" if we failed here.
-    state.advance(pos, [rule]);
   }
   return result;
 }
@@ -222,10 +349,123 @@ function matchTerminal(state: ParseState, rule: Terminal, pos: number): MatchRes
       return null;
     }
     case "indent": {
-      // Indent terminals are Phase 1-deferred. For now, fail cleanly with a
-      // message so callers know not to use them yet.
-      throw new Error(`indent terminal '${m.directive}' not yet supported in Phase 1 engine`);
+      return matchIndentDirective(state, m.directive, pos);
     }
+  }
+}
+
+// --- Indent directives ---
+//
+// Semantics (per docs/grammar-formalism.md §5, with concrete pos-consumption
+// rules):
+//
+//   NEWLINE : at \n; consumes \n + horizontal ws + any blank lines. Succeeds
+//             iff the next non-blank line's content is at column == top of
+//             stack. (Same-level statement boundary.)
+//   INDENT  : at \n; same consumption as NEWLINE. Succeeds iff next content
+//             col > top. Pushes new col onto stack.
+//   DEDENT  : zero-width. Succeeds iff the current pos's column is < top of
+//             stack. Pops stack by one. Users can iterate DEDENT via Rep to
+//             pop multiple levels.
+//   SAMELINE: not implemented in Phase 2a; the grammar author should avoid it.
+
+/**
+ * Skip from `pos` over any \n and horizontal whitespace and blank lines,
+ * landing at the first non-blank line's first non-ws character (or EOF).
+ * Returns the resulting position and the column of that character.
+ *
+ * Tabs count as 4 columns, aligned to the next multiple of 4. Mixed tabs
+ * and spaces in leading whitespace of the SAME line produce an error.
+ */
+function skipToNextContent(input: string, start: number): { pos: number; col: number; error?: string } {
+  let p = start;
+  // Walk potentially past \n + blank lines.
+  while (p < input.length) {
+    // At \n: advance past it.
+    if (input[p] === "\n") { p++; continue; }
+    // Count leading ws of this line, checking for tab/space mixing.
+    let col = 0;
+    let lineStart = p;
+    let sawTab = false, sawSpace = false;
+    while (p < input.length && (input[p] === " " || input[p] === "\t")) {
+      if (input[p] === " ") { col++; sawSpace = true; }
+      else { col = (col + 4) & ~3; sawTab = true; }
+      p++;
+    }
+    if (sawTab && sawSpace) {
+      return { pos: p, col, error: `mixed tabs and spaces in leading whitespace at position ${lineStart}` };
+    }
+    if (p >= input.length) return { pos: p, col: Infinity };      // EOF after leading ws
+    if (input[p] === "\n") { p++; continue; }                     // blank line
+    return { pos: p, col };
+  }
+  return { pos: p, col: Infinity };
+}
+
+/**
+ * Return the column of `pos` (chars since the most recent \n or start).
+ * Used by DEDENT (zero-width, must inspect current column).
+ */
+function columnOf(input: string, pos: number): number {
+  let lineStart = pos;
+  while (lineStart > 0 && input[lineStart - 1] !== "\n") lineStart--;
+  let col = 0;
+  for (let i = lineStart; i < pos; i++) {
+    if (input[i] === " ") col++;
+    else if (input[i] === "\t") col = (col + 4) & ~3;
+    else col++;
+  }
+  return col;
+}
+
+function matchIndentDirective(state: ParseState, directive: "NEWLINE" | "INDENT" | "DEDENT" | "SAMELINE", pos: number): MatchResult | null {
+  const top = state.indentStack[state.indentStack.length - 1];
+  switch (directive) {
+    case "NEWLINE": {
+      if (state.input[pos] !== "\n") return null;
+      const { pos: contentPos, col, error } = skipToNextContent(state.input, pos);
+      if (error) return null;  // mixed tabs/spaces — just fail the NEWLINE; error reporting is a future concern
+      if (col === Infinity) {
+        // EOF: still counts as a statement boundary.
+        return {
+          tree: { kind: "leaf", text: state.input.slice(pos, contentPos), range: { start: pos, end: contentPos } },
+          nextPos: contentPos,
+        };
+      }
+      if (col !== top) return null;
+      return {
+        tree: { kind: "leaf", text: state.input.slice(pos, contentPos), range: { start: pos, end: contentPos } },
+        nextPos: contentPos,
+      };
+    }
+    case "INDENT": {
+      if (state.input[pos] !== "\n") return null;
+      const { pos: contentPos, col, error } = skipToNextContent(state.input, pos);
+      if (error || col === Infinity || col <= top) return null;
+      const newStack = [...state.indentStack, col];
+      return {
+        tree: { kind: "leaf", text: state.input.slice(pos, contentPos), range: { start: pos, end: contentPos } },
+        nextPos: contentPos,
+        newIndentStack: newStack,
+      };
+    }
+    case "DEDENT": {
+      // Zero-width. Look ahead to the next content's column. If that column
+      // is strictly less than top, this block is ending — pop one level.
+      // (To pop multiple levels, grammar authors chain DEDENTs via Rep.)
+      if (state.indentStack.length <= 1) return null;
+      const { col } = skipToNextContent(state.input, pos);
+      // col === Infinity means EOF — treat as dedent for all levels.
+      if (col !== Infinity && col >= top) return null;
+      const newStack = state.indentStack.slice(0, -1);
+      return {
+        tree: { kind: "leaf", text: "", range: { start: pos, end: pos } },
+        nextPos: pos,
+        newIndentStack: newStack,
+      };
+    }
+    case "SAMELINE":
+      throw new Error("SAMELINE is not implemented in the Phase 2a engine");
   }
 }
 

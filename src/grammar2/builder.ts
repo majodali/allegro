@@ -15,11 +15,12 @@
 
 import {
   Rule, Grammar, Guard, Production,
-  lit, cls, regex, eof, empty, fail,
+  lit, cls, regex, eof, empty, fail, indent as indentTerm,
   nonterm, seq, alt, rep, opt, guarded,
   notFollowedBy, followedBy, reserved,
   makeGrammar, addProduction,
   ParseTree,
+  IndentDirective,
 } from "./types.js";
 import { parse as engineParse } from "./engine.js";
 
@@ -148,6 +149,14 @@ const grammar2_regex_impl: PrimitiveFnImpl = (args) => {
 const grammar2_eof_impl: PrimitiveFnImpl = () => handleToValue(store(eof));
 const grammar2_empty_impl: PrimitiveFnImpl = () => handleToValue(store(empty));
 const grammar2_fail_impl: PrimitiveFnImpl = () => handleToValue(store(fail));
+
+const grammar2_indent_impl: PrimitiveFnImpl = (args) => {
+  const d = stringArg(args[0], "grammar2_indent");
+  if (d !== "NEWLINE" && d !== "INDENT" && d !== "DEDENT" && d !== "SAMELINE") {
+    throw new AllegroError(`grammar2_indent: directive must be NEWLINE/INDENT/DEDENT/SAMELINE, got '${d}'`);
+  }
+  return handleToValue(store(indentTerm(d as IndentDirective)));
+};
 
 const grammar2_nonterm_impl: PrimitiveFnImpl = (args) => {
   return handleToValue(store(nonterm(stringArg(args[0], "grammar2_nonterm"))));
@@ -291,6 +300,7 @@ export const grammar2Primitives: Record<string, Value> = {
   grammar2_eof:             makePrimitive("grammar2_eof", grammar2_eof_impl),
   grammar2_empty:           makePrimitive("grammar2_empty", grammar2_empty_impl),
   grammar2_fail:            makePrimitive("grammar2_fail", grammar2_fail_impl),
+  grammar2_indent:          makePrimitive("grammar2_indent", grammar2_indent_impl),
   grammar2_nonterm:         makePrimitive("grammar2_nonterm", grammar2_nonterm_impl),
   grammar2_seq:             makePrimitive("grammar2_seq", grammar2_seq_impl),
   grammar2_alt:             makePrimitive("grammar2_alt", grammar2_alt_impl),
