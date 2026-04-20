@@ -2233,6 +2233,138 @@ q.x + q.y`);
   eq(Number((primaryOf(result!) as BitsValue).data), 33);
 });
 
+// == Regression: mixin + refinement nesting ==
+// Previously buildMixinType only unwound one level of refinement when rebuilding
+// __construct. Now it delegates to parentConstruct which chains through all
+// nested refinements naturally.
+
+test("mixin on refined type: constructor still checks predicate", () => {
+  const result = evalStd(`PI = (Int && _ > 0).mixin({double: self => self + self})
+PI(5)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 5);
+});
+
+test("mixin on refined type: predicate failure produces error", () => {
+  const result = evalStd(`PI = (Int && _ > 0).mixin({double: self => self + self})
+PI(0 - 5)`);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("mixin on refined type: method call works", () => {
+  const result = evalStd(`PI = (Int && _ > 0).mixin({double: self => self + self})
+PI(7).double()`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 14);
+});
+
+test("mixin on doubly-refined type: both predicates checked (inner passes)", () => {
+  // Compound `&&` refinement + mixin. Must check both _ > 0 AND _ < 100,
+  // then run mixin method.
+  const result = evalStd(`T = (Int && _ > 0 && _ < 100).mixin({triple: self => self * 3})
+T(50).triple()`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 150);
+});
+
+test("mixin on doubly-refined type: outer predicate failure produces error", () => {
+  // _ > 0 holds but _ < 100 fails — inner check should catch it
+  const result = evalStd(`T = (Int && _ > 0 && _ < 100).mixin({triple: self => self * 3})
+T(500)`);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("mixin on doubly-refined type: inner predicate failure produces error", () => {
+  const result = evalStd(`T = (Int && _ > 0 && _ < 100).mixin({triple: self => self * 3})
+T(0 - 10)`);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("mixin on chained-where type: .where().mixin() preserves predicate", () => {
+  // .where(lambda) + mixin — another nesting shape.
+  const result = evalStd(`T = Int.where(n => n > 0).where(n => n < 100).mixin({id: self => self})
+T(42).id()`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("mixin on chained-where type: outer .where predicate failure caught", () => {
+  const result = evalStd(`T = Int.where(n => n > 0).where(n => n < 100).mixin({id: self => self})
+T(500)`);
+  eq((result as any).components?.has("error"), true);
+});
+
+test("mixin on chained-where type: inner .where predicate failure caught", () => {
+  const result = evalStd(`T = Int.where(n => n > 0).where(n => n < 100).mixin({id: self => self})
+T(0 - 10)`);
+  eq((result as any).components?.has("error"), true);
+});
+
+// Regression: meta-type dispatch for ComposedFunction descriptors.
+// type_dispatch's untyped-Context meta-type path previously only handled
+// PrimitiveFunction method descriptors. A ComposedFunction descriptor on a
+// meta-type would silently fall through. This unit test exercises that path
+// directly by constructing a raw Context with __type pointing to a type whose
+// __members contains a ComposedFunction method descriptor.
+test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => {
+  // Build a meta-type with a ComposedFunction method `describe` that returns
+  // self's __name field (self is the raw type Context).
+  const metaType = makeContext();
+  const metaMembers = makeContext();
+  // describe(self) => self.__name — as an Allegro lambda
+  const param = makeParam(0);
+  const selfExpr = param as unknown as Value;
+  // Body: access __name on self via __get_member... simpler: just return self.
+  const describeFn = makeComposedFn([param], selfExpr);
+  const desc = makeContext();
+  const descBindings = [
+    ["__type", Type],
+    ["name", stringToBits("describe")],
+    ["value", describeFn],
+  ] as const;
+  for (const [k, v] of descBindings) {
+    desc.bindings.set(k, { key: k, value: v as Value, isUse: false });
+    desc.bindingList.push({ key: k, value: v as Value, isUse: false });
+  }
+  metaMembers.bindings.set("describe", { key: "describe", value: desc, isUse: false });
+  metaMembers.bindingList.push({ key: "describe", value: desc, isUse: false });
+  metaType.bindings.set("__members", { key: "__members", value: metaMembers, isUse: false });
+  metaType.bindingList.push({ key: "__members", value: metaMembers, isUse: false });
+  metaType.bindings.set("__name", { key: "__name", value: stringToBits("MetaType"), isUse: false });
+  metaType.bindingList.push({ key: "__name", value: stringToBits("MetaType"), isUse: false });
+
+  // Raw Context with __type = metaType.
+  const target = makeContext();
+  target.bindings.set("__type", { key: "__type", value: metaType, isUse: false });
+  target.bindingList.push({ key: "__type", value: metaType, isUse: false });
+  target.bindings.set("__name", { key: "__name", value: stringToBits("Instance"), isUse: false });
+  target.bindingList.push({ key: "__name", value: stringToBits("Instance"), isUse: false });
+
+  // Call type_dispatch(target, "describe") via the primitive.
+  const typeDispatch = primRegistry["type_dispatch"] as any;
+  // Lazy primitive — pass raw args (unevaluated) and an evalFn + ctx.
+  const ctx = makeContext();
+  // Seed ctx with the target under a name, and invoke the bound method.
+  ctx.bindings.set("x", { key: "x", value: target, isUse: false });
+  ctx.bindingList.push({ key: "x", value: target, isUse: false });
+  const boundMethod = typeDispatch.fn(
+    [target, stringToBits("describe")],
+    ctx,
+    (v: Value, c: ContextValue) => evaluate(v, c),
+  );
+  eq(boundMethod !== null && boundMethod !== undefined, true);
+  // The returned value should be a bound primitive (since describe has one
+  // positional arg — self — which gets auto-bound). Calling it with no args
+  // invokes the ComposedFunction with self = target.
+  eq(boundMethod.kind, ValueKind.PrimitiveFunction, "meta-method should return a bound primitive");
+  const result = boundMethod.fn([], ctx, (v: Value, c: ContextValue) => evaluate(v, c));
+  // describeFn returns its self param; primary should be the raw target Context.
+  eq(primaryOf(result).kind, ValueKind.Context);
+  eq(primaryOf(result) === target, true, "bound method should pass target as self");
+});
+
+test("mixin on refined type: instanceof still works", () => {
+  const result = evalStd(`T = (Int && _ > 0).mixin({double: self => self + self})
+T(5) instanceof T`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
 // == Union Types ==
 
 test("union type: Int | String accepted", () => {

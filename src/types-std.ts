@@ -5,7 +5,7 @@
 // =============================================================================
 
 import {
-  Value, ValueKind, BitsValue, ContextValue, PrimitiveFnImpl, PrimitiveFunctionValue,
+  Value, ValueKind, BitsValue, ContextValue, MultiValueType, PrimitiveFnImpl, PrimitiveFunctionValue,
   ComposedFunctionValue,
   makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue,
   makeComposedFn, makeParam,
@@ -586,6 +586,15 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       // Call parent constructor
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
 
+      // Error propagation: if parent constructor produced an error (e.g., its
+      // own refinement check failed further up the chain), propagate it
+      // without re-tagging or running this predicate. Without this, a deeper
+      // refinement's error would get silently retagged with the outer type.
+      if (value.kind === ValueKind.MultiValue) {
+        const comps = (value as MultiValueType).components;
+        if (comps.has("error")) return value;
+      }
+
       // Apply predicate
       const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
       const checkP = primaryOf(checkResult);
@@ -783,36 +792,23 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
 
   addBinding(newType, "__members", newMembers);
 
-  // Rebuild __construct to tag with the new type
+  // Rebuild __construct: delegate to parentConstruct (which already chains all
+  // predicate checks through nested refinements), then retag with newType. This
+  // handles arbitrary refinement depth naturally — a previous implementation
+  // tried to skip one level and re-apply the immediate predicate, which was
+  // correct for a single level but fragile if the shape ever changed. If the
+  // parent's construct produces an error MultiValue (refinement failure), we
+  // propagate it without retagging.
   const parentConstruct = baseType.bindings.get("__construct")?.value;
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    // Check if the base type is a refined type (has __predicate)
-    const predicate = baseType.bindings.get("__predicate")?.value;
-    if (predicate) {
-      // Refined type — rebuild construct with predicate check + new type tag
-      const parentParent = baseType.bindings.get("__extends")?.value as ContextValue;
-      const parentParentConstruct = parentParent?.bindings.get("__construct")?.value;
-      if (parentParentConstruct?.kind === ValueKind.PrimitiveFunction) {
-        addBinding(newType, "__construct", makePrimitive("mixin.__construct", (args, ctx, evalFn) => {
-          const value = (parentParentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-          const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
-          const checkP = primaryOf(checkResult);
-          if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
-            const components = new Map<string, Value>();
-            components.set("error", withType(stringToBits("refinement check failed"), StringType));
-            components.set("type", ErrorType);
-            return makeMultiValue(makeInt(0), components);
-          }
-          return withType(primaryOf(value), newType);
-        }, true));
+    addBinding(newType, "__construct", makePrimitive("mixin.__construct", (args, ctx, evalFn) => {
+      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
+      if (value.kind === ValueKind.MultiValue) {
+        const components = (value as MultiValueType).components;
+        if (components.has("error")) return value;
       }
-    } else {
-      // Non-refined type — simple construct wrapping with new type tag
-      addBinding(newType, "__construct", makePrimitive("mixin.__construct", (args, ctx, evalFn) => {
-        const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-        return withType(primaryOf(value), newType);
-      }, true));
-    }
+      return withType(primaryOf(value), newType);
+    }, true));
   }
 
   return newType;

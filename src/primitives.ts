@@ -1349,8 +1349,8 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       if (metaDesc) {
         if (isMethodDescriptor(metaDesc)) {
           const metaImpl = metaDesc.bindings.get("value")?.value;
+          const selfVal = p;
           if (metaImpl?.kind === ValueKind.PrimitiveFunction) {
-            const selfVal = p;
             if (isGetterDescriptor(metaDesc)) {
               return (metaImpl as PrimitiveFunctionValue).fn([selfVal], undefined as any, undefined as any);
             }
@@ -1360,17 +1360,39 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
             };
             return makePrimitive(`bound:${fieldName}`, boundFn, true);
           }
+          if (metaImpl?.kind === ValueKind.ComposedFunction) {
+            // User-defined meta-method (e.g., a type-level method added via
+            // Type-mixin). Pass the type Context as self; mirrors the typed-
+            // value path above which handles ComposedFunction descriptors.
+            if (isGetterDescriptor(metaDesc)) {
+              return evalFn!(makeExpr(metaImpl, [selfVal]), ctx!);
+            }
+            const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+              const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+              return callEvalFn!(makeExpr(metaImpl, [selfVal, ...evalArgs]), callCtx!);
+            };
+            return makePrimitive(`bound:${fieldName}`, boundFn, true);
+          }
         }
       }
       // Fallback: direct binding on meta-type (for non-__members methods)
       const metaMethod = typeMethod(metaType, fieldName);
-      if (metaMethod?.kind === ValueKind.PrimitiveFunction) {
+      if (metaMethod) {
         const selfVal = p;
-        const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-          const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-          return (metaMethod as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
-        };
-        return makePrimitive(`bound:${fieldName}`, boundFn, true);
+        if (metaMethod.kind === ValueKind.PrimitiveFunction) {
+          const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+            const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+            return (metaMethod as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
+          };
+          return makePrimitive(`bound:${fieldName}`, boundFn, true);
+        }
+        if (metaMethod.kind === ValueKind.ComposedFunction) {
+          const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+            const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+            return callEvalFn!(makeExpr(metaMethod, [selfVal, ...evalArgs]), callCtx!);
+          };
+          return makePrimitive(`bound:${fieldName}`, boundFn, true);
+        }
       }
     }
 
