@@ -58,14 +58,27 @@ export function buildBaseGrammar(): Grammar {
 
   // --- Terminals ---
 
-  // Whitespace: spaces, tabs, and line/block comments. Horizontal only — does
-  // NOT consume newlines. Newlines are statement boundaries (NEWLINE).
+  // Whitespace: spaces, tabs, line/block comments, AND continuation newlines.
+  // A continuation newline is `\n + ws` where the next non-blank line's indent
+  // is strictly deeper than the current block (stack top). This lets
+  // expressions naturally span lines when indented:
+  //
+  //   if cond
+  //     then a
+  //     else b
+  //
+  // is a single expression because each continuation line is at col > 0.
+  //
+  // Horizontal whitespace AT the current block's column still ends the
+  // expression (NEWLINE fires instead), so statement separation remains
+  // intact.
   addProduction(g, { name: "ws",
     rule: rep(alt([
       lit(" "),
       lit("\t"),
       regex(/\/\/[^\n]*/),           // // line comment
       regex(/\/\*[\s\S]*?\*\//),     // /* block comment */
+      indentTerm("CONT_NL"),         // continuation newline
     ]), { min: 0 }),
   });
 
@@ -76,7 +89,22 @@ export function buildBaseGrammar(): Grammar {
       lit("\t"),
       regex(/\/\/[^\n]*/),
       regex(/\/\*[\s\S]*?\*\//),
+      indentTerm("CONT_NL"),
     ]), { min: 1 }),
+  });
+
+  // Bracket-context whitespace: consumes ANY whitespace including unconditional
+  // newlines and comments. Used inside (...), [...], {...} where the opening
+  // bracket establishes a "this is one expression" context — newlines don't
+  // mean statement boundaries until the matching closing bracket.
+  addProduction(g, { name: "ws_any",
+    rule: rep(alt([
+      lit(" "),
+      lit("\t"),
+      lit("\n"),
+      regex(/\/\/[^\n]*/),
+      regex(/\/\*[\s\S]*?\*\//),
+    ]), { min: 0 }),
   });
 
   // Number literal: integers only in the base. Floats are a Standard addition.
@@ -211,13 +239,14 @@ export function buildBaseGrammar(): Grammar {
 
   // Level 8 — postfix: function calls, dot access, bracket indexing.
   // Left-recursive so `f(x).y[0]` parses left-to-right as (((f)(x)).y)[0].
+  // Bracketed contexts use `ws_any` so args and indices may span lines freely.
   addProduction(g, { name: "expr_post",
     rule: alt([
-      seq([nonterm("expr_post"), lit("("), nonterm("ws"),
-           nonterm("args"), nonterm("ws"), lit(")")], { name: "call" }),
+      seq([nonterm("expr_post"), lit("("), nonterm("ws_any"),
+           nonterm("args"), nonterm("ws_any"), lit(")")], { name: "call" }),
       seq([nonterm("expr_post"), lit("."), nonterm("ident")], { name: "dot" }),
-      seq([nonterm("expr_post"), lit("["), nonterm("ws"),
-           nonterm("expr"), nonterm("ws"), lit("]")], { name: "bracket" }),
+      seq([nonterm("expr_post"), lit("["), nonterm("ws_any"),
+           nonterm("expr"), nonterm("ws_any"), lit("]")], { name: "bracket" }),
       nonterm("expr_atom"),
     ]),
   });
@@ -247,26 +276,31 @@ export function buildBaseGrammar(): Grammar {
   });
 
   // Array literal: `[expr, expr, ...]` — zero or more elements.
+  // Uses ws_any inside so multi-line arrays work.
   addProduction(g, { name: "array_lit",
     rule: seq([
       lit("["),
-      nonterm("ws"),
-      opt(spaced_list("expr", ",")),
-      nonterm("ws"),
+      nonterm("ws_any"),
+      opt(rep(nonterm("expr"), {
+        min: 1,
+        sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
+      })),
+      nonterm("ws_any"),
       lit("]"),
     ], { name: "array_lit" }),
   });
 
   // Object literal: `{key: expr, key: expr, ...}`. Keys are identifiers.
+  // Uses ws_any inside so multi-line objects work.
   addProduction(g, { name: "object_lit",
     rule: seq([
       lit("{"),
-      nonterm("ws"),
+      nonterm("ws_any"),
       opt(rep(nonterm("object_field"), {
         min: 1,
-        sep: seq([nonterm("ws"), lit(","), nonterm("ws")]),
+        sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
       })),
-      nonterm("ws"),
+      nonterm("ws_any"),
       lit("}"),
     ], { name: "object_lit" }),
   });
@@ -282,7 +316,7 @@ export function buildBaseGrammar(): Grammar {
   });
 
   addProduction(g, { name: "paren_expr",
-    rule: spaced([lit("("), nonterm("expr"), lit(")")]),
+    rule: seq([lit("("), nonterm("ws_any"), nonterm("expr"), nonterm("ws_any"), lit(")")]),
     attrs: { name: "paren" },
   });
 
@@ -305,7 +339,7 @@ export function buildBaseGrammar(): Grammar {
       seq([nonterm("ident"), nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr")],
         { name: "lambda1" }),
       // Multi-param: (ident, ...) => expr
-      seq([lit("("), nonterm("ws"), nonterm("param_list"), nonterm("ws"), lit(")"),
+      seq([lit("("), nonterm("ws_any"), nonterm("param_list"), nonterm("ws_any"), lit(")"),
            nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr")],
         { name: "lambdaN" }),
     ]),
@@ -321,8 +355,8 @@ export function buildBaseGrammar(): Grammar {
   addProduction(g, { name: "stmt",
     rule: alt([
       // Function def: `name(params) => body`
-      seq([nonterm("ident"), lit("("), nonterm("ws"), nonterm("param_list"),
-           nonterm("ws"), lit(")"), nonterm("ws"), lit("=>"), nonterm("ws"),
+      seq([nonterm("ident"), lit("("), nonterm("ws_any"), nonterm("param_list"),
+           nonterm("ws_any"), lit(")"), nonterm("ws"), lit("=>"), nonterm("ws"),
            nonterm("expr")],
         { name: "fn_decl" }),
       // Binding: `name = expr`

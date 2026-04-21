@@ -4022,6 +4022,85 @@ test("grammar2/std: array of objects with .map on field", () => {
   eq(Number((primaryOf(r) as BitsValue).data), 2);
 });
 
+// --- Phase 2c-3: multi-line expression continuation ---
+
+test("grammar2/std: if-then-else can span lines", () => {
+  const r = evalStandard2("x = 5\nif x > 0\n  then x\n  else 0 - x");
+  eq(Number((primaryOf(r) as BitsValue).data), 5);
+});
+
+test("grammar2/std: function body spans lines", () => {
+  const r = evalStandard2("f(n) =>\n  if n == 0\n    then 1\n    else n + 1\nf(0)");
+  eq(Number((primaryOf(r) as BitsValue).data), 1);
+});
+
+test("grammar2/std: binary operator continues onto next line", () => {
+  const r = evalStandard2("x = 1 +\n    2 +\n    3\nx");
+  eq(Number((primaryOf(r) as BitsValue).data), 6);
+});
+
+test("grammar2/std: function call args spread across lines", () => {
+  const r = evalStandard2("f(a, b, c) => a + b + c\nf(\n  1,\n  2,\n  3)");
+  eq(Number((primaryOf(r) as BitsValue).data), 6);
+});
+
+test("grammar2/std: array literal spread across lines", () => {
+  const r = evalStandard2("arr = [\n  1,\n  2,\n  3\n]\narr.length");
+  eq(Number((primaryOf(r) as BitsValue).data), 3);
+});
+
+test("grammar2/std: continuation doesn't cross back to base column", () => {
+  // After `x = 1`, `y` is at col 0 (same as top of stack) → NEWLINE fires,
+  // two separate stmts. Without continuation logic this would fail.
+  const r = evalStandard2("x = 1\ny = 2\nx + y");
+  eq(Number((primaryOf(r) as BitsValue).data), 3);
+});
+
+test("grammar2/std: recursive multi-line function (arrays.alg idiom)", () => {
+  const r = evalStandard2(`
+myMap(arr, f) =>
+  if arr.length == 0
+    then []
+    else [f(arr[0])].concat(myMap(arr.slice(1), f))
+
+myMap([1, 2, 3], x => x * 10).length
+`);
+  eq(Number((primaryOf(r) as BitsValue).data), 3);
+});
+
+test("grammar2/std: arrays.alg (prefix before when) runs end-to-end", () => {
+  // Parse the file up to but not including the `when` pattern-matching
+  // section at ~line 130. Covers multi-line function bodies, array methods,
+  // recursive functions with multi-line bodies, arrays-of-objects.
+  const fullSource = fs.readFileSync(path.join(testsDir, "arrays.alg"), "utf-8");
+  const cutIndex = fullSource.indexOf("Pattern matching");
+  if (cutIndex < 0) throw new Error("expected 'Pattern matching' marker");
+  // Cut at the preceding `// =====` divider line
+  const prefixEnd = fullSource.lastIndexOf("\n// =======", cutIndex);
+  const source = fullSource.slice(0, prefixEnd);
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStandard2(source);
+  } finally {
+    console.log = origLog;
+  }
+  const lines = source.split(/\r?\n/);
+  const expected: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/\/\/\s*expect:\s*(.*)/);
+    if (m) expected.push(m[1].trim());
+  }
+  eq(printed.length, expected.length, "line count");
+  for (let i = 0; i < expected.length; i++) {
+    eq(printed[i], expected[i], `line ${i}`);
+  }
+});
+
+// Full tests/arrays.alg end-to-end is deferred until Phase 2c-4 adds
+// `when/is/then` pattern matching — the file's tail exercises that feature.
+
 test("grammar2/std: objects.alg runs end-to-end", () => {
   const source = fs.readFileSync(path.join(testsDir, "objects.alg"), "utf-8");
   const printed: string[] = [];

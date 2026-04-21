@@ -425,7 +425,7 @@ function columnOf(input: string, pos: number): number {
   return col;
 }
 
-function matchIndentDirective(state: ParseState, directive: "NEWLINE" | "INDENT" | "DEDENT" | "SAMELINE", pos: number): MatchResult | null {
+function matchIndentDirective(state: ParseState, directive: "NEWLINE" | "INDENT" | "DEDENT" | "SAMELINE" | "CONT_NL", pos: number): MatchResult | null {
   const top = state.indentStack[state.indentStack.length - 1];
   switch (directive) {
     case "NEWLINE": {
@@ -469,6 +469,20 @@ function matchIndentDirective(state: ParseState, directive: "NEWLINE" | "INDENT"
         tree: { kind: "leaf", text: "", range: { start: pos, end: pos } },
         nextPos: pos,
         newIndentStack: newStack,
+      };
+    }
+    case "CONT_NL": {
+      // Expression continuation: consume \n + horizontal whitespace iff the
+      // next non-blank line's indent is STRICTLY DEEPER than the current
+      // block's indent. Does NOT modify the stack — we're just absorbing
+      // continuation whitespace mid-expression.
+      if (state.input[pos] !== "\n") return null;
+      const { pos: contentPos, col, error } = skipToNextContent(state.input, pos);
+      if (error || col === Infinity) return null;
+      if (col <= top) return null;
+      return {
+        tree: { kind: "leaf", text: state.input.slice(pos, contentPos), range: { start: pos, end: contentPos } },
+        nextPos: contentPos,
       };
     }
     case "SAMELINE":

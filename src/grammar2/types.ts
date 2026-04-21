@@ -20,7 +20,16 @@ export type TerminalMatch =
   | { kind: "fail" }                                                     // always fails
   | { kind: "indent";      directive: IndentDirective };                 // stateful indent terminals
 
-export type IndentDirective = "NEWLINE" | "INDENT" | "DEDENT" | "SAMELINE";
+/**
+ * Indent-aware stateful terminals.
+ *   NEWLINE  — statement boundary at same indent level
+ *   INDENT   — opening of a deeper block (pushes on stack)
+ *   DEDENT   — closing of a deeper block (pops from stack)
+ *   SAMELINE — assertion that no NEWLINE has been consumed (deferred)
+ *   CONT_NL  — expression continuation: consume \n + ws iff next content is
+ *              strictly deeper than the current block (doesn't modify stack)
+ */
+export type IndentDirective = "NEWLINE" | "INDENT" | "DEDENT" | "SAMELINE" | "CONT_NL";
 
 export function lit(text: string): Terminal {
   return { kind: "terminal", match: { kind: "literal", text } };
