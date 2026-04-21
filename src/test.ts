@@ -3763,7 +3763,7 @@ test("grammar2/engine: @longest alt picks the longest match", () => {
 import { buildBaseGrammar } from "./grammar2/base-grammar.js";
 import { buildProgram } from "./grammar2/tree-builder.js";
 import { evaluate as evalVal } from "./evaluator.js";
-import { resolveSymbols, buildEvalCtx, resolvePrimitives } from "./runtime.js";
+import { resolveSymbols, buildEvalCtx, resolvePrimitives, typeLiterals } from "./runtime.js";
 
 function parseBase2(source: string): any {
   const g = buildBaseGrammar();
@@ -3775,13 +3775,35 @@ function parseBase2(source: string): any {
 
 function evalBase2(source: string): any {
   const fileCtx = parseBase2(source);
-  // Resolve primitive stubs
   for (const b of fileCtx.bindingList) {
     if (b.value !== undefined) b.value = resolvePrimitives(b.value);
   }
-  // Symbol resolution in base mode (no type system, no extensions)
   resolveSymbols(fileCtx, undefined, undefined, false);
   const ctx = buildEvalCtx(fileCtx, undefined, undefined, false);
+  let last: any = null;
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) {
+      const r = evalVal(b.value, ctx);
+      if (b.key === null) last = r;
+    }
+  }
+  return last;
+}
+
+/** Evaluate a source through grammar2 in Standard mode (type system active). */
+function evalStandard2(source: string): any {
+  const fileCtx = parseBase2(source);
+  const extensions = [typeExt];
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) b.value = resolvePrimitives(b.value);
+  }
+  // typeLiterals: wraps raw Bits with type info (Int for 64-bit, String otherwise).
+  // Runs before symbol resolution.
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) b.value = typeLiterals(b.value);
+  }
+  resolveSymbols(fileCtx, undefined, extensions, true);
+  const ctx = buildEvalCtx(fileCtx, undefined, extensions, true);
   let last: any = null;
   for (const b of fileCtx.bindingList) {
     if (b.value !== undefined) {
@@ -3853,6 +3875,95 @@ test("grammar2/base: lambda", () => {
 test("grammar2/base: fib", () => {
   const r = evalBase2("fib(n) => if n <= 1 then n else fib(n - 1) + fib(n - 2)\nfib(10)");
   eq(Number((r as BitsValue).data), 55);
+});
+
+// --- Phase 2c-1: typed literals, dot access, bracket indexing ---
+
+test("grammar2/std: float literal produces Float-typed value", () => {
+  const r = evalStandard2("3.14");
+  eq(getTypeName(r), "Float");
+});
+
+test("grammar2/std: true/false resolve to Bool values", () => {
+  const r1 = evalStandard2("true");
+  const r2 = evalStandard2("false");
+  eq(getTypeName(r1), "Bool");
+  eq(getTypeName(r2), "Bool");
+});
+
+test("grammar2/std: none resolves to None singleton", () => {
+  const r = evalStandard2("none");
+  eq(getTypeName(r), "None");
+});
+
+test("grammar2/std: string literal produces String-typed value", () => {
+  const r = evalStandard2('"hello"');
+  eq(getTypeName(r), "String");
+});
+
+test("grammar2/std: dot access — string length getter", () => {
+  const r = evalStandard2('"hello".length');
+  eq(Number((primaryOf(r) as BitsValue).data), 5);
+});
+
+test("grammar2/std: dot access — string method call", () => {
+  const r = evalStandard2('"hello".slice(0, 3)');
+  eq(bitsToString(primaryOf(r) as BitsValue), "hel");
+});
+
+test("grammar2/std: dot access — Int.toString()", () => {
+  const r = evalStandard2("42.toString()");
+  eq(bitsToString(primaryOf(r) as BitsValue), "42");
+});
+
+test("grammar2/std: dot access — Float.toString()", () => {
+  const r = evalStandard2("3.14.toString()");
+  eq(bitsToString(primaryOf(r) as BitsValue), "3.14");
+});
+
+test("grammar2/std: dot access — Bool.toString()", () => {
+  const r = evalStandard2("true.toString()");
+  eq(bitsToString(primaryOf(r) as BitsValue), "true");
+});
+
+test("grammar2/std: chained dot access and method calls", () => {
+  const r = evalStandard2('"hello".indexOf("ll")');
+  eq(Number((primaryOf(r) as BitsValue).data), 2);
+});
+
+test("grammar2/std: bound variable dot access", () => {
+  const r = evalStandard2('s = "a,b,c".split(",")\ns.length');
+  eq(Number((primaryOf(r) as BitsValue).data), 3);
+});
+
+test("grammar2/std: bracket indexing on array", () => {
+  // `.split(",")` returns an Array[String]. arr[0] dispatches through
+  // the array's `get` method.
+  const r = evalStandard2('arr = "a,b,c".split(",")\narr[1]');
+  eq(bitsToString(primaryOf(r) as BitsValue), "b");
+});
+
+test("grammar2/std: dot-access.alg runs end-to-end through grammar2", () => {
+  const source = fs.readFileSync(path.join(testsDir, "dot-access.alg"), "utf-8");
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStandard2(source);
+  } finally {
+    console.log = origLog;
+  }
+  // Extract expected outputs from "// expect: ..." comments and compare
+  const lines = source.split(/\r?\n/);
+  const expected: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/\/\/\s*expect:\s*(.*)/);
+    if (m) expected.push(m[1].trim());
+  }
+  eq(printed.length, expected.length);
+  for (let i = 0; i < expected.length; i++) {
+    eq(printed[i], expected[i], `line ${i}`);
+  }
 });
 
 test("grammar2/base: basics.alg runs end-to-end, matches expected output", () => {

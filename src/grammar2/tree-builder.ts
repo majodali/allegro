@@ -16,6 +16,7 @@ import {
   makeInt, makeBits, stringToBits, makeParam, makeSymbol, makeExpr,
   makeComposedFn, makeContext, prim, bind,
 } from "../parser-helpers.js";
+import { makeFloat } from "../types.js";
 
 // --- Helpers ---
 
@@ -93,7 +94,9 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     case "neg":  return makeExpr(prim("bits_sub"),   [makeInt(0), buildExpr(lastChild(c), paramMap)]);
     case "not":  return makeExpr(prim("typed_not"),  [buildExpr(lastChild(c), paramMap)]);
 
-    case "call": return buildCall(tree, paramMap);
+    case "call":    return buildCall(tree, paramMap);
+    case "dot":     return buildDot(tree, paramMap);
+    case "bracket": return buildBracket(tree, paramMap);
     case "paren": {
       // The paren_expr production wraps `( ws expr ws )`. Find the expr child.
       const inner = findTaggedChild(c, ["or","and","eq","neq","lt","gt","lte","gte","add","sub","mul","div","mod","neg","not","call","paren","if","lambda1","lambdaN","number","string","ident"]);
@@ -125,6 +128,22 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       const txt = textOf(tree);
       return makeInt(Number(txt));
     }
+    case "float": {
+      // Emit typed_float(bits) so the evaluator produces a Float-typed value.
+      // (A raw 64-bit Bits would be wrapped as Int by typeLiterals otherwise.)
+      const txt = textOf(tree);
+      const f = makeFloat(Number(txt));
+      return makeExpr(prim("typed_float"), [f]);
+    }
+    case "bool": {
+      // `true` and `false` are extension-provided bindings in Standard mode.
+      // Emit Symbol; resolveSymbols will link it to the extension value.
+      const txt = textOf(tree);
+      return makeSymbol(txt);
+    }
+    case "none_lit": {
+      return makeSymbol("none");
+    }
     case "string": {
       const raw = textOf(tree);
       const unquoted = raw.slice(1, -1); // strip surrounding quotes
@@ -138,7 +157,10 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
           default:   return ch;
         }
       });
-      return stringToBits(unescaped);
+      // Emit typed_string(bits) so the evaluator wraps it with String type
+      // (without this, typeLiterals would only wrap non-64-bit bits as String,
+      // leaving 8-char strings miscategorized as Int).
+      return makeExpr(prim("typed_string"), [stringToBits(unescaped)]);
     }
     case "ident": {
       const name = textOf(tree);
@@ -176,6 +198,44 @@ function findTaggedChild(children: ParseTree[], tags: string[]): ParseTree | nul
     }
   }
   return null;
+}
+
+// --- Dot access: `obj.field` → Expression(type_dispatch, [obj, "field"]) ---
+
+function buildDot(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch") throw new Error("buildDot: not a branch");
+  const c = tree.children;
+  // Children: [expr_post, ".", ident]. The field is the LAST ident, not the
+  // first — the obj is also often an ident, so `find` would grab the wrong
+  // one. Scan from the end.
+  const objTree = c[0];
+  let identTree: ParseTree | null = null;
+  for (let i = c.length - 1; i >= 1; i--) {
+    if (c[i].kind === "branch" && (c[i] as any).tag === "ident") {
+      identTree = c[i]; break;
+    }
+  }
+  if (!identTree) throw new Error("dot: missing field ident");
+  const obj = buildExpr(objTree, paramMap);
+  const field = textOf(identTree);
+  return makeExpr(prim("type_dispatch"), [obj, stringToBits(field)]);
+}
+
+// --- Bracket indexing: `arr[i]` → Expression(type_dispatch(arr, "get"), [i]) ---
+
+function buildBracket(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch") throw new Error("buildBracket: not a branch");
+  const c = tree.children;
+  // Children: [expr_post, "[", ws, expr, ws, "]"]
+  const objTree = c[0];
+  const indexTree = c.slice(1).find(ch =>
+    ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag),
+  );
+  if (!indexTree) throw new Error("bracket: missing index expression");
+  const obj = buildExpr(objTree, paramMap);
+  const index = buildExpr(indexTree, paramMap);
+  const getter = makeExpr(prim("type_dispatch"), [obj, stringToBits("get")]);
+  return makeExpr(getter, [index]);
 }
 
 // --- Function calls ---
@@ -222,7 +282,8 @@ function collectArgs(tree: ParseTree, paramMap: Map<string, any>): any[] {
 
 const EXPRESSION_TAGS = new Set([
   "or","and","eq","neq","lt","gt","lte","gte","add","sub","mul","div","mod",
-  "neg","not","call","paren","if","lambda1","lambdaN","number","string","ident",
+  "neg","not","call","dot","bracket","paren","if","lambda1","lambdaN",
+  "number","float","bool","none_lit","string","ident",
 ]);
 
 // --- Lambdas ---

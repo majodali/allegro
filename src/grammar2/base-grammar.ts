@@ -85,6 +85,27 @@ export function buildBaseGrammar(): Grammar {
     attrs: { name: "number" },
   });
 
+  // Float literal (Standard): digits, decimal point, digits. Must be tried
+  // BEFORE `number` in Alt order so "3.14" matches the float rule rather
+  // than `number` consuming "3" and leaving `.14` to dot access.
+  addProduction(g, { name: "float",
+    rule: regex(/[0-9]+\.[0-9]+/),
+    attrs: { name: "float" },
+  });
+
+  // Bool literals (Standard): `true`/`false`. Note these ARE in the reserved
+  // set, so they're kept out of `ident`; here they match as typed atoms.
+  addProduction(g, { name: "bool",
+    rule: alt([lit("true"), lit("false")]),
+    attrs: { name: "bool" },
+  });
+
+  // None literal (Standard): the `none` singleton.
+  addProduction(g, { name: "none_lit",
+    rule: lit("none"),
+    attrs: { name: "none_lit" },
+  });
+
   // Identifier: starts with letter or underscore; followed by word chars.
   // @reserved(keywords) excludes exact-match keywords from `ident`.
   addProduction(g, { name: "ident",
@@ -162,14 +183,15 @@ export function buildBaseGrammar(): Grammar {
     ]),
   });
 
-  // Level 8 — postfix: function calls and (future) dot access
-  //   expr_post = expr_post "(" args ")"   — call
-  //             | expr_atom
-  // Left-recursive: `f(x)(y)` parses as `(f(x))(y)`.
+  // Level 8 — postfix: function calls, dot access, bracket indexing.
+  // Left-recursive so `f(x).y[0]` parses left-to-right as (((f)(x)).y)[0].
   addProduction(g, { name: "expr_post",
     rule: alt([
       seq([nonterm("expr_post"), lit("("), nonterm("ws"),
            nonterm("args"), nonterm("ws"), lit(")")], { name: "call" }),
+      seq([nonterm("expr_post"), lit("."), nonterm("ident")], { name: "dot" }),
+      seq([nonterm("expr_post"), lit("["), nonterm("ws"),
+           nonterm("expr"), nonterm("ws"), lit("]")], { name: "bracket" }),
       nonterm("expr_atom"),
     ]),
   });
@@ -179,13 +201,18 @@ export function buildBaseGrammar(): Grammar {
     rule: opt(spaced_list("expr", ",")),
   });
 
-  // Level 9 — atoms
+  // Level 9 — atoms. Order matters: float before number (3.14 vs 3), bool
+  // and none before ident (they're keywords and would fail ident's reserved
+  // guard anyway, but being explicit matches clearly).
   addProduction(g, { name: "expr_atom",
     rule: alt([
       nonterm("if_expr"),
       nonterm("lambda"),
+      nonterm("float"),
       nonterm("number"),
       nonterm("string"),
+      nonterm("bool"),
+      nonterm("none_lit"),
       nonterm("paren_expr"),
       nonterm("ident"),
     ]),

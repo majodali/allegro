@@ -28,7 +28,7 @@ export type { Extension };
  * String literals (non-64-bit, from stringToBits) become MultiValue with String type.
  * Used when standard type system is active.
  */
-function typeLiterals(v: Value, seen?: Set<Value>): Value {
+export function typeLiterals(v: Value, seen?: Set<Value>): Value {
   if (!seen) seen = new Set();
   // Only track ComposedFunctions for cycle detection (self-referential function bodies).
   // Do NOT skip Expressions — shared expression objects (like subject in multi-case when)
