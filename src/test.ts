@@ -3758,6 +3758,119 @@ test("grammar2/engine: @longest alt picks the longest match", () => {
 // Build a regex grammar that matches character-level patterns: a*, b+, c?,
 // alternation |, grouping (...). Then verify it parses a few regex strings.
 
+// --- Phase 2b: base (Allegretto) grammar in grammar2 formalism ---
+
+import { buildBaseGrammar } from "./grammar2/base-grammar.js";
+import { buildProgram } from "./grammar2/tree-builder.js";
+import { evaluate as evalVal } from "./evaluator.js";
+import { resolveSymbols, buildEvalCtx, resolvePrimitives } from "./runtime.js";
+
+function parseBase2(source: string): any {
+  const g = buildBaseGrammar();
+  const normalized = source.replace(/\r\n/g, "\n");
+  const result = g2parse(g, normalized);
+  if (!result.ok) throw new Error(`Parse failed: ${result.error.message}`);
+  return buildProgram(result.tree);
+}
+
+function evalBase2(source: string): any {
+  const fileCtx = parseBase2(source);
+  // Resolve primitive stubs
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) b.value = resolvePrimitives(b.value);
+  }
+  // Symbol resolution in base mode (no type system, no extensions)
+  resolveSymbols(fileCtx, undefined, undefined, false);
+  const ctx = buildEvalCtx(fileCtx, undefined, undefined, false);
+  let last: any = null;
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) {
+      const r = evalVal(b.value, ctx);
+      if (b.key === null) last = r;
+    }
+  }
+  return last;
+}
+
+test("grammar2/base: integer literal", () => {
+  const g = buildBaseGrammar();
+  const r = g2parse(g, "42");
+  g2ok(r);
+});
+
+test("grammar2/base: simple binding", () => {
+  const g = buildBaseGrammar();
+  const r = g2parse(g, "x = 42");
+  g2ok(r);
+});
+
+test("grammar2/base: binding evaluates", () => {
+  const r = evalBase2("x = 42\nx");
+  eq(Number((r as BitsValue).data), 42);
+});
+
+test("grammar2/base: arithmetic evaluates", () => {
+  const r = evalBase2("3 + 4");
+  eq(Number((r as BitsValue).data), 7);
+});
+
+test("grammar2/base: precedence — mul tighter than add", () => {
+  const r = evalBase2("3 + 4 * 2");
+  eq(Number((r as BitsValue).data), 11);
+});
+
+test("grammar2/base: parentheses override precedence", () => {
+  const r = evalBase2("(3 + 4) * 2");
+  eq(Number((r as BitsValue).data), 14);
+});
+
+test("grammar2/base: comparison returns bits", () => {
+  const r = evalBase2("3 == 3");
+  // bits_eq returns 1 on equal
+  eq(Number((r as BitsValue).data), 1);
+});
+
+test("grammar2/base: if-then-else selects branch", () => {
+  const r = evalBase2("if 1 then 42 else 0");
+  eq(Number((r as BitsValue).data), 42);
+});
+
+test("grammar2/base: function definition and call", () => {
+  const r = evalBase2("double(n) => n * 2\ndouble(21)");
+  eq(Number((r as BitsValue).data), 42);
+});
+
+test("grammar2/base: factorial (recursive)", () => {
+  const r = evalBase2("fact(n) => if n == 0 then 1 else n * fact(n - 1)\nfact(5)");
+  eq(Number((r as BitsValue).data), 120);
+});
+
+test("grammar2/base: lambda", () => {
+  const r = evalBase2("apply(f, x) => f(x)\napply(n => n + 10, 32)");
+  eq(Number((r as BitsValue).data), 42);
+});
+
+test("grammar2/base: fib", () => {
+  const r = evalBase2("fib(n) => if n <= 1 then n else fib(n - 1) + fib(n - 2)\nfib(10)");
+  eq(Number((r as BitsValue).data), 55);
+});
+
+test("grammar2/base: basics.alg runs end-to-end, matches expected output", () => {
+  // Phase 2b acceptance: parse, build, and evaluate the full basics.alg through
+  // the new grammar2 path. The expected output from CLAUDE.md is the seven
+  // lines below — all produced by print() calls in the source.
+  const source = fs.readFileSync("basics.alg", "utf-8");
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalBase2(source);
+  } finally {
+    console.log = origLog;
+  }
+  eq(printed.join(","), "11,42,120,42,55,42,7");
+});
+
 // --- Phase 2a: left recursion (Warth) ---
 
 test("grammar2/engine: direct left recursion on a single rule", () => {

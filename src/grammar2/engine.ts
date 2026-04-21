@@ -204,12 +204,16 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
   // were computed against a stale seed and would incorrectly short-circuit
   // the re-evaluation. This is Warth's "growing heads" concern, handled here
   // conservatively by position-scoped invalidation.
+  let iters = 0;
   while (result !== null) {
     if (entry.seed !== null && result.nextPos <= entry.seed.nextPos) break;
     entry.seed = result;
     state.indentStack = snapshot;
     invalidateAtPos(state, pos, key);
     result = runDoMatch(state, rule, pos, snapshot);
+    if (++iters > state.input.length + 10) {
+      throw new Error(`LR iteration exceeded input length at rule ${rule.kind === "nonterm" ? rule.name : rule.kind} pos ${pos}`);
+    }
   }
 
   entry.isLR  = false;
@@ -227,16 +231,19 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
 
 /**
  * Clear memo entries whose key identifies a match attempt at `pos`, except
- * the LR entry `keepKey`. Called between LR iterations to invalidate results
- * that were computed with a stale seed.
- *
- * Key formats are `nt:<name>@<pos>:<stack>` or `r<id>@<pos>:<stack>`.
+ * the LR entry `keepKey` AND any other in-progress LR entries (isLR=true)
+ * at the same position. Outer LR entries must be preserved so their own
+ * seeds remain the active "current answer" for their rules during inner
+ * iteration.
  */
 function invalidateAtPos(state: ParseState, pos: number, keepKey: string): void {
   const posMarker = `@${pos}:`;
   for (const k of Array.from(state.memo.keys())) {
     if (k === keepKey) continue;
-    if (k.includes(posMarker)) state.memo.delete(k);
+    if (!k.includes(posMarker)) continue;
+    const entry = state.memo.get(k);
+    if (entry && entry.isLR) continue;  // in-progress LR — preserve
+    state.memo.delete(k);
   }
 }
 
