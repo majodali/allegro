@@ -107,9 +107,27 @@ export function buildBaseGrammar(): Grammar {
     ]), { min: 0 }),
   });
 
-  // Number literal: integers only in the base. Floats are a Standard addition.
+  // Horizontal-only whitespace (no CONT_NL, no \n): used before a position
+  // where INDENT might start a block, so the \n stays available for INDENT
+  // to match. Without this, `ws`'s CONT_NL would consume the \n eagerly
+  // and prevent block_expr from matching.
+  addProduction(g, { name: "hws",
+    rule: rep(alt([
+      lit(" "),
+      lit("\t"),
+      regex(/\/\/[^\n]*/),
+      regex(/\/\*[\s\S]*?\*\//),
+    ]), { min: 0 }),
+  });
+
+  // Number literal: integers. Supports decimal, hex (`0x...`) and binary
+  // (`0b...`) forms. Floats are a separate production.
   addProduction(g, { name: "number",
-    rule: regex(/[0-9]+/),
+    rule: alt([
+      regex(/0[xX][0-9a-fA-F]+/),   // hex
+      regex(/0[bB][01]+/),          // binary
+      regex(/[0-9]+/),              // decimal
+    ]),
     attrs: { name: "number" },
   });
 
@@ -284,9 +302,13 @@ export function buildBaseGrammar(): Grammar {
 
   // Level 9 — atoms. Order matters: float before number (3.14 vs 3), bool
   // and none before ident (they're keywords and would fail ident's reserved
-  // guard anyway, but being explicit matches clearly).
+  // guard anyway, but being explicit matches clearly). block_expr is tried
+  // first because it needs the INDENT terminal to fire; INDENT can only
+  // match if the next content is deeper than the current stack top, so
+  // block_expr fails cheaply on non-block inputs.
   addProduction(g, { name: "expr_atom",
     rule: alt([
+      nonterm("block_expr"),
       nonterm("when_expr"),
       nonterm("if_expr"),
       nonterm("lambda"),
@@ -299,6 +321,32 @@ export function buildBaseGrammar(): Grammar {
       nonterm("object_lit"),
       nonterm("paren_expr"),
       nonterm("ident"),
+    ]),
+  });
+
+  // Offside-rule block as an expression value. Grammar:
+  //
+  //   block_expr = INDENT block_body DEDENT
+  //   block_body = stmt (NEWLINE stmt)*     (last stmt must be a bare expr)
+  //
+  // The value of the block is the value of the final bare-expr stmt, with
+  // preceding binding stmts available in its scope (handled by the tree
+  // builder via nested lambda substitution).
+  addProduction(g, { name: "block_expr",
+    rule: seq([
+      indentTerm("INDENT"),
+      rep(nonterm("stmt"), { min: 1, sep: nonterm("line_break") }),
+      indentTerm("DEDENT"),
+    ], { name: "block_expr" }),
+  });
+
+  // Body of a function or binding value. Tries an indented block FIRST —
+  // `hws` (horizontal-only) keeps the \n available for INDENT to match. If
+  // that fails, fall back to the inline form with continuation-aware `ws`.
+  addProduction(g, { name: "fn_body",
+    rule: alt([
+      seq([nonterm("hws"), nonterm("block_expr")]),
+      seq([nonterm("ws"),  nonterm("expr")]),
     ]),
   });
 
@@ -466,7 +514,7 @@ export function buildBaseGrammar(): Grammar {
     ], { name: "if" }),
   });
 
-  // Lambda: `x => expr`, `x: T => expr`, `(x, y) => expr`, `(x: T, y: U) => expr`.
+  // Lambda: `x => expr`, `x: T => expr`, `(x, y) => expr`, `(x: T, y: U): R => expr`.
   addProduction(g, { name: "lambda",
     rule: alt([
       // Single-param with type: ident : type => expr
@@ -476,8 +524,9 @@ export function buildBaseGrammar(): Grammar {
       // Single-param: ident => expr
       seq([nonterm("ident"), nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr")],
         { name: "lambda1" }),
-      // Multi-param: (typed_params) => expr
+      // Multi-param with optional return type: (typed_params)[: R] => expr
       seq([lit("("), nonterm("ws_any"), nonterm("typed_param_list"), nonterm("ws_any"), lit(")"),
+           opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
            nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr")],
         { name: "lambdaN" }),
     ]),
@@ -506,6 +555,8 @@ export function buildBaseGrammar(): Grammar {
 
   addProduction(g, { name: "type_expr_atom",
     rule: alt([
+      // Structural wrap: ~Type
+      seq([lit("~"), nonterm("type_expr_atom")], { name: "type_structural" }),
       // Generic: Name[T, U, ...]
       seq([nonterm("ident"), lit("["), nonterm("ws_any"),
            rep(nonterm("type_expr"), { min: 1, sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]) }),
@@ -534,17 +585,34 @@ export function buildBaseGrammar(): Grammar {
 
   addProduction(g, { name: "stmt",
     rule: alt([
+      // import NAME
+      seq([lit("import"), nonterm("ws_req"), nonterm("ident")],
+        { name: "import_stmt" }),
+      // export NAME(params)[: ret] => body — exported function
+      seq([lit("export"), nonterm("ws_req"),
+           nonterm("ident"), lit("("), nonterm("ws_any"), nonterm("typed_param_list"),
+           nonterm("ws_any"), lit(")"),
+           opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
+           nonterm("hws"), lit("=>"),
+           nonterm("fn_body")],
+        { name: "export_fn_decl" }),
+      // export NAME[: type] = expr — exported binding
+      seq([lit("export"), nonterm("ws_req"),
+           nonterm("ident"),
+           opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
+           nonterm("hws"), lit("="), nonterm("fn_body")],
+        { name: "export_binding" }),
       // Function def with optional return type: `name(params)[: ret] => body`
       seq([nonterm("ident"), lit("("), nonterm("ws_any"), nonterm("typed_param_list"),
            nonterm("ws_any"), lit(")"),
            opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
-           nonterm("ws"), lit("=>"), nonterm("ws"),
-           nonterm("expr")],
+           nonterm("hws"), lit("=>"),
+           nonterm("fn_body")],
         { name: "fn_decl" }),
       // Binding with optional type annotation: `name[: type] = expr`
       seq([nonterm("ident"),
            opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
-           nonterm("ws"), lit("="), nonterm("ws"), nonterm("expr")],
+           nonterm("hws"), lit("="), nonterm("fn_body")],
         { name: "binding" }),
       // Bare expression
       nonterm("expr"),

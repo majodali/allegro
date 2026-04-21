@@ -4176,6 +4176,130 @@ test("grammar2/std: pattern-match.alg runs end-to-end", () => {
   }
 });
 
+// --- Phase 2c-5: remaining Standard features ---
+
+test("grammar2/std: hex literal", () => {
+  const r = evalStandard2("0xFF");
+  eq(Number((primaryOf(r) as BitsValue).data), 255);
+});
+
+test("grammar2/std: binary literal", () => {
+  const r = evalStandard2("0b1010");
+  eq(Number((primaryOf(r) as BitsValue).data), 10);
+});
+
+test("grammar2/std: refinement type creation", () => {
+  // Int && _ > 0 creates a refined type
+  const r = evalStandard2("PI = Int && _ > 0\nPI(5)");
+  eq(Number((primaryOf(r) as BitsValue).data), 5);
+});
+
+test("grammar2/std: refinement check failure produces error", () => {
+  const r = evalStandard2("PI = Int && _ > 0\nPI(0 - 5)");
+  eq((r as any).components?.has("error"), true);
+});
+
+test("grammar2/std: compound refinement predicates", () => {
+  const r = evalStandard2("SmallPos = Int && _ > 0 && _ < 100\nSmallPos(50)");
+  eq(Number((primaryOf(r) as BitsValue).data), 50);
+});
+
+test("grammar2/std: structural wrap type annotation", () => {
+  // ~Int creates a structural wrap
+  const r = evalStandard2("f(x: ~Int) => x\nf(42)");
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+test("grammar2/std: union type annotation", () => {
+  const r = evalStandard2('f(x: Int | String) => x\nf(42)');
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+test("grammar2/std: export binding wraps value", () => {
+  // Build a module-like source, check that exported bindings carry the
+  // "exported" component.
+  const r = evalStandard2("export x = 42\nx");
+  eq((r as any).components?.has("exported"), true);
+});
+
+test("grammar2/std: export function declaration", () => {
+  const r = evalStandard2("export double(n: Int): Int => n * 2\ndouble(21)");
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+// Helper for file-based grammar2 tests
+function runFileThroughGrammar2(filename: string): void {
+  const source = fs.readFileSync(path.join(testsDir, filename), "utf-8");
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStandard2(source);
+  } finally {
+    console.log = origLog;
+  }
+  const lines = source.split(/\r?\n/);
+  const expected: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/\/\/\s*expect:\s*(.*)/);
+    if (m) expected.push(m[1].trim());
+  }
+  eq(printed.length, expected.length, `${filename}: line count`);
+  for (let i = 0; i < expected.length; i++) {
+    eq(printed[i], expected[i], `${filename} line ${i}`);
+  }
+}
+
+test("grammar2/std: refinements.alg runs end-to-end", () => {
+  runFileThroughGrammar2("refinements.alg");
+});
+
+test("grammar2/std: types.alg runs end-to-end", () => {
+  runFileThroughGrammar2("types.alg");
+});
+
+test("grammar2/std: logical.alg runs end-to-end", () => {
+  runFileThroughGrammar2("logical.alg");
+});
+
+test("grammar2/std: functions.alg runs end-to-end", () => {
+  runFileThroughGrammar2("functions.alg");
+});
+
+test("grammar2/std: interfaces.alg runs end-to-end", () => {
+  runFileThroughGrammar2("interfaces.alg");
+});
+
+test("grammar2/std: mixins.alg runs end-to-end", () => {
+  runFileThroughGrammar2("mixins.alg");
+});
+
+test("grammar2/std: generics.alg runs end-to-end", () => {
+  runFileThroughGrammar2("generics.alg");
+});
+
+test("grammar2/std: function-types.alg runs end-to-end", () => {
+  runFileThroughGrammar2("function-types.alg");
+});
+
+test("grammar2/std: typed-types.alg runs end-to-end", () => {
+  runFileThroughGrammar2("typed-types.alg");
+});
+
+test("grammar2/std: block expression as function body", () => {
+  const r = evalStandard2(`
+f() =>
+  x = 3
+  y = x + 1
+  y * 2
+f()`);
+  eq(Number((primaryOf(r) as BitsValue).data), 8);
+});
+
+// grammar-regex.alg deferred — parses fully through grammar2 with block
+// expressions, but exercises grammar_* primitives whose "No target element
+// specified" behavior needs investigation separate from the parser work.
+
 test("grammar2/std: type-annotations.alg runs end-to-end", () => {
   const source = fs.readFileSync(path.join(testsDir, "type-annotations.alg"), "utf-8");
   const printed: string[] = [];

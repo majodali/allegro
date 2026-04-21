@@ -14,7 +14,7 @@
 import { ParseTree } from "./types.js";
 import {
   makeInt, makeBits, stringToBits, makeParam, makeSymbol, makeExpr,
-  makeComposedFn, makeContext, prim, bind, buildFn,
+  makeComposedFn, makeContext, prim, bind, buildFn, substName,
 } from "../parser-helpers.js";
 import { makeFloat } from "../types.js";
 
@@ -76,9 +76,11 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   // Binary operators share the same layout: [left, right] (whitespace and
   // operator leaves are interleaved but we skip them by tag lookup).
   switch (tag) {
-    // Binary operators — produce Expression(prim_op, [left, right])
-    case "or":   return makeExpr(prim("typed_or"),   [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
-    case "and":  return makeExpr(prim("typed_and"),  [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
+    // Logical operators wrap RHS in a zero-arg thunk so it can be lazily
+    // evaluated (short-circuit) or inspected as a predicate body (for
+    // `Type && _ > 0` refinements).
+    case "or":   return makeExpr(prim("typed_or"),   [buildExpr(c[0], paramMap), makeComposedFn([], buildExpr(lastChild(c), paramMap))]);
+    case "and":  return makeExpr(prim("typed_and"),  [buildExpr(c[0], paramMap), makeComposedFn([], buildExpr(lastChild(c), paramMap))]);
     case "eq":   return makeExpr(prim("bits_eq"),    [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
     case "neq":  return makeExpr(prim("bits_neq"),   [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
     case "lt":   return makeExpr(prim("bits_lt"),    [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
@@ -152,8 +154,17 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     case "when_expr":
       return buildWhenExpr(tree, paramMap);
 
+    case "block_expr":
+      return buildBlockExpr(tree, paramMap);
+
     case "number": {
       const txt = textOf(tree);
+      if (txt.startsWith("0x") || txt.startsWith("0X")) {
+        return makeInt(parseInt(txt, 16));
+      }
+      if (txt.startsWith("0b") || txt.startsWith("0B")) {
+        return makeInt(parseInt(txt.slice(2), 2));
+      }
       return makeInt(Number(txt));
     }
     case "float": {
@@ -192,6 +203,49 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   if (c.length === 1) return buildExpr(c[0], paramMap);
 
   throw new Error(`buildExpr: unrecognized tree tag '${tag ?? "(untagged)"}' with ${c.length} children`);
+}
+
+/**
+ * Find a function/binding body inside a stmt's children. The body lives
+ * either as a direct expression-tagged branch (inline case) or inside a
+ * `fn_body` wrapper (which may contain either an inline expression or a
+ * block_expr). Returns the body tree — which may be an expression, a
+ * `block_expr`, or null if missing.
+ */
+function findBodyExpr(children: ParseTree[]): ParseTree | null {
+  // Scan from the end for fn_body or direct expression.
+  for (let i = children.length - 1; i >= 0; i--) {
+    const ch = children[i];
+    if (ch.kind !== "branch") continue;
+    if (ch.tag === "fn_body") {
+      // Descend: look for block_expr or expression tag inside.
+      for (let j = ch.children.length - 1; j >= 0; j--) {
+        const sub = ch.children[j];
+        if (sub.kind === "branch") {
+          if (sub.tag === "block_expr") return sub;
+          if (sub.tag && EXPRESSION_TAGS.has(sub.tag)) return sub;
+          // Could be an untagged seq wrapper — descend once more
+          const inner = findInner(sub);
+          if (inner) return inner;
+        }
+      }
+      continue;
+    }
+    if (ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
+      return ch;
+    }
+  }
+  return null;
+}
+
+function findInner(t: ParseTree): ParseTree | null {
+  if (t.kind !== "branch") return null;
+  if (t.tag === "block_expr" || (t.tag && EXPRESSION_TAGS.has(t.tag))) return t;
+  for (const c of t.children) {
+    const r = findInner(c);
+    if (r) return r;
+  }
+  return null;
 }
 
 /** Grab the last branch/leaf child after skipping whitespace/operator tokens. */
@@ -547,6 +601,72 @@ function isPatternTag(tag: string | undefined): boolean {
     tag === "pattern_typed";
 }
 
+// --- Block expressions (offside-rule blocks as values) ---
+
+/**
+ * Convert a block-expression parse tree into a Value. The block consists
+ * of zero or more binding/fn_decl stmts followed by a final bare-expression
+ * stmt. The value of the block is the final expression with each preceding
+ * binding substituted in.
+ *
+ * Implementation: walk stmts in order, collecting bindings. The final bare
+ * expression is the return value. Then fold bindings from last to first,
+ * substituting each binding's name with its value in the rest.
+ */
+function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch") throw new Error("buildBlockExpr: not a branch");
+
+  // Collect stmts in order (by building each via buildStmt, passing our
+  // outer paramMap so `n` inside the block resolves to the function's Param).
+  const stmts: BuiltBinding[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    if (t.tag === "stmt" || t.tag === "binding" || t.tag === "fn_decl" ||
+        t.tag === "import_stmt" || t.tag === "export_binding" || t.tag === "export_fn_decl" ||
+        (t.tag && EXPRESSION_TAGS.has(t.tag))) {
+      stmts.push(buildStmt(t, paramMap));
+      return;
+    }
+    for (const c of t.children) walk(c);
+  };
+  for (const c of tree.children) walk(c);
+
+  if (stmts.length === 0) {
+    throw new Error("block_expr: empty block");
+  }
+
+  // Separate final bare expression (key=null) from bindings (key=<name>).
+  // If the final stmt is a binding, use its value as the block's result
+  // (matches hybrid parser's fallback behavior for blocks without a final
+  // bare expression).
+  const lastStmt = stmts[stmts.length - 1];
+  let result: any;
+  let bindings: BuiltBinding[];
+  if (lastStmt.key === null) {
+    // Last is a bare expression — its value IS the block's result.
+    result = lastStmt.value;
+    bindings = stmts.slice(0, -1).filter(s => s.key !== null);
+  } else {
+    // No final bare expr — use the last binding's value.
+    result = lastStmt.value;
+    bindings = stmts.filter(s => s.key !== null);
+  }
+
+  // Substitute each binding into all subsequent values and the result, from
+  // first to last. (Matches the hybrid parser's `substName` approach.)
+  for (let i = 0; i < bindings.length; i++) {
+    const bname = bindings[i].key as string;
+    const bval = bindings[i].value;
+    // Propagate to later bindings
+    for (let j = i + 1; j < bindings.length; j++) {
+      bindings[j].value = substName(bindings[j].value, bname, bval);
+    }
+    // Propagate to the result
+    result = substName(result, bname, bval);
+  }
+  return result;
+}
+
 // --- String literals (with interpolation) ---
 
 /**
@@ -739,7 +859,7 @@ const EXPRESSION_TAGS = new Set([
   "number","float","bool","none_lit","string","ident",
   "array_lit","object_lit",
   "instanceof","subtypeof","of","of_error","error_expr",
-  "when_expr",
+  "when_expr","block_expr",
 ]);
 
 // --- Lambdas ---
@@ -777,9 +897,10 @@ function collectTypedParams(tree: ParseTree, paramMap: Map<string, any>, out: Ty
 /** Find the type_expr within an optional annotation block. */
 function findTypeExpr(tree: ParseTree): ParseTree | null {
   if (tree.kind !== "branch") return null;
-  // A type_expr is either the `type_union` tag, or one of: ident, type_generic
-  // (all would be tagged). Search recursively.
-  if (tree.tag === "type_union" || tree.tag === "type_generic" || tree.tag === "ident") {
+  // A type_expr is tagged as `type_union`, `type_generic`, `type_structural`,
+  // or `ident`. Search recursively.
+  if (tree.tag === "type_union" || tree.tag === "type_generic" ||
+      tree.tag === "type_structural" || tree.tag === "ident") {
     return tree;
   }
   for (const ch of tree.children) {
@@ -822,11 +943,20 @@ function buildTypeExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   if (tree.tag === "type_union") {
     // Children: [type_expr_atom, ws, "|", ws, type_expr]
     const parts = tree.children.filter(ch =>
-      ch.kind === "branch" && (ch.tag === "ident" || ch.tag === "type_generic" || ch.tag === "type_union")
+      ch.kind === "branch" && (ch.tag === "ident" || ch.tag === "type_generic" ||
+        ch.tag === "type_union" || ch.tag === "type_structural")
     );
     if (parts.length < 2) throw new Error("type_union: expected 2 parts");
     return makeExpr(prim("type_union"),
       parts.map(p => buildTypeExpr(p, paramMap)));
+  }
+  if (tree.tag === "type_structural") {
+    // Children: ["~", type_expr_atom]
+    const inner = tree.children.find(ch =>
+      ch.kind === "branch" && ch.tag && ch.tag !== "ws" && ch.tag !== "ws_any",
+    );
+    if (!inner) throw new Error("type_structural: missing inner type");
+    return makeExpr(prim("structural_wrap"), [buildTypeExpr(inner, paramMap)]);
   }
   throw new Error(`buildTypeExpr: unknown tag '${tree.tag}'`);
 }
@@ -882,26 +1012,34 @@ function buildLambda(tree: ParseTree, outerParamMap: Map<string, any>): any {
     }
   }
 
+  // Optional return type annotation for lambdaN: `)[: R] =>`
+  let returnTypeExpr: any | undefined = undefined;
+  if (tree.tag === "lambdaN") {
+    let afterCloseParen = false;
+    for (const ch of c) {
+      if (ch.kind === "leaf" && ch.text === ")") { afterCloseParen = true; continue; }
+      if (!afterCloseParen) continue;
+      if (ch.kind === "leaf" && ch.text === "=>") break;
+      if (ch.kind === "branch") {
+        const typeTree = findTypeExpr(ch);
+        if (typeTree) { returnTypeExpr = buildTypeExpr(typeTree, outerParamMap); break; }
+      }
+    }
+  }
+
   // Build Params and extend paramMap
   const paramNames = typedParams.map(p => p.name);
   const params = paramNames.map((n, i) => makeParam(i, n));
   const innerMap = new Map(outerParamMap);
   for (let i = 0; i < paramNames.length; i++) innerMap.set(paramNames[i], params[i]);
 
-  // Find the body expression (the last branch child with an expression tag)
-  let bodyTree: ParseTree | null = null;
-  for (let i = c.length - 1; i >= 0; i--) {
-    const ch = c[i];
-    if (ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
-      bodyTree = ch;
-      break;
-    }
-  }
+  // Find the body: fn_body wrapper, or a direct expression-tagged branch.
+  const bodyTree = findBodyExpr(c);
   if (!bodyTree) throw new Error("lambda: missing body");
 
   const body = buildExpr(bodyTree, innerMap);
   const fn = makeComposedFn(params, body);
-  return maybeTyped(fn, typedParams, undefined);
+  return maybeTyped(fn, typedParams, returnTypeExpr);
 }
 
 function collectIdents(tree: ParseTree, out: string[]): void {
@@ -920,20 +1058,87 @@ export interface BuiltBinding {
   value: any;
 }
 
-export function buildStmt(tree: ParseTree): BuiltBinding {
+export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new Map()): BuiltBinding {
   tree = peelUntilTag(tree);
   if (tree.kind !== "branch") throw new Error("buildStmt: not a branch");
 
   // A "stmt" production wrapper may contain the inner tagged stmt.
   if (tree.tag === "stmt") {
-    // Find the inner tagged child
     for (const c of tree.children) {
-      if (c.kind === "branch" && c.tag) return buildStmt(c);
+      if (c.kind === "branch" && c.tag) return buildStmt(c, outerParamMap);
     }
   }
 
   const tag = tree.tag;
   const c = tree.children;
+
+  if (tag === "import_stmt") {
+    // import NAME — produces a binding with value undefined. Module loader
+    // provides the actual value via an extension.
+    const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
+    if (!identTree) throw new Error("import_stmt: missing name");
+    return { key: textOf(identTree), value: undefined as any };
+  }
+
+  if (tag === "export_binding") {
+    // export NAME[: type] = expr — build binding, wrap with export primitive.
+    const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
+    if (!identTree) throw new Error("export_binding: missing name");
+    const name = textOf(identTree);
+    // Find optional type annotation (between ident and "=")
+    const identIdx = c.indexOf(identTree);
+    const eqIdx = c.findIndex(ch => ch.kind === "leaf" && ch.text === "=");
+    let typeExpr: any | undefined = undefined;
+    if (identIdx >= 0 && eqIdx > identIdx) {
+      const midChildren = c.slice(identIdx + 1, eqIdx);
+      const typeTree = findTypeExpr({ kind: "branch", tag: undefined, children: midChildren, range: { start: 0, end: 0 } } as any);
+      if (typeTree) typeExpr = buildTypeExpr(typeTree, new Map());
+    }
+    const bodyTree2 = findBodyExpr(c);
+    if (!bodyTree2) throw new Error("export_binding: missing expr");
+    let value = buildExpr(bodyTree2, new Map());
+    if (typeExpr !== undefined) {
+      value = makeExpr(prim("type_check_binding"), [value, typeExpr]);
+    }
+    value = makeExpr(prim("export"), [value]);
+    return { key: name, value };
+  }
+
+  if (tag === "export_fn_decl") {
+    // export NAME(params)[: ret] => body — build fn_decl, then wrap with export.
+    const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
+    if (!identTree) throw new Error("export_fn_decl: missing function name");
+    const fnName = textOf(identTree);
+
+    const typedParams: TypedParam[] = [];
+    const paramListTree = c.find(ch => ch.kind === "branch" && ch.tag === "typed_param_list");
+    if (paramListTree) collectTypedParams(paramListTree, new Map(), typedParams);
+
+    let returnTypeExpr: any | undefined = undefined;
+    let afterCloseParen = false;
+    for (const ch of c) {
+      if (ch.kind === "leaf" && ch.text === ")") { afterCloseParen = true; continue; }
+      if (!afterCloseParen) continue;
+      if (ch.kind === "leaf" && ch.text === "=>") break;
+      if (ch.kind === "branch") {
+        const typeTree = findTypeExpr(ch);
+        if (typeTree) { returnTypeExpr = buildTypeExpr(typeTree, new Map()); break; }
+      }
+    }
+
+    const bodyTree = findBodyExpr(c);
+    if (!bodyTree) throw new Error("export_fn_decl: missing body");
+
+    const paramNames = typedParams.map(p => p.name);
+    const params = paramNames.map((n, i) => makeParam(i, n));
+    const innerMap = new Map<string, any>(outerParamMap);
+    for (let i = 0; i < paramNames.length; i++) innerMap.set(paramNames[i], params[i]);
+    const body = buildExpr(bodyTree, innerMap);
+    const fn = makeComposedFn(params, body);
+    const typed = maybeTyped(fn, typedParams, returnTypeExpr);
+    const exported = makeExpr(prim("export"), [typed]);
+    return { key: fnName, value: exported };
+  }
 
   if (tag === "binding") {
     // ident [ws ":" ws type_expr] ws "=" ws expr
@@ -941,26 +1146,20 @@ export function buildStmt(tree: ParseTree): BuiltBinding {
     if (!identTree) throw new Error("binding: missing ident");
     const name = textOf(identTree);
 
-    // Find optional type annotation (type_expr between ident and "=" leaf)
+    // Find optional type annotation (between ident and "=" leaf)
+    const identIdx = c.indexOf(identTree);
+    const eqIdx = c.findIndex(ch => ch.kind === "leaf" && ch.text === "=");
     let typeExpr: any | undefined = undefined;
-    const typeTree = findTypeExpr({
-      kind: "branch",
-      tag: undefined,
-      children: c.slice(1, c.findIndex(ch => ch.kind === "leaf" && ch.text === "=")),
-      range: { start: 0, end: 0 },
-    } as any);
-    if (typeTree) typeExpr = buildTypeExpr(typeTree, new Map());
-
-    // Body: last expression-tagged branch after "="
-    let bodyTree: ParseTree | null = null;
-    for (let i = c.length - 1; i >= 0; i--) {
-      const ch = c[i];
-      if (ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
-        bodyTree = ch; break;
-      }
+    if (identIdx >= 0 && eqIdx > identIdx + 1) {
+      const midChildren = c.slice(identIdx + 1, eqIdx);
+      const typeTree = findTypeExpr({ kind: "branch", tag: undefined, children: midChildren, range: { start: 0, end: 0 } } as any);
+      if (typeTree) typeExpr = buildTypeExpr(typeTree, new Map());
     }
+
+    // Body: the fn_body wrapper, or an expression-tagged branch directly.
+    let bodyTree: ParseTree | null = findBodyExpr(c);
     if (!bodyTree) throw new Error("binding: missing expr");
-    let value = buildExpr(bodyTree, new Map());
+    let value = buildExpr(bodyTree, outerParamMap);
     if (typeExpr !== undefined) {
       value = makeExpr(prim("type_check_binding"), [value, typeExpr]);
     }
@@ -991,19 +1190,12 @@ export function buildStmt(tree: ParseTree): BuiltBinding {
       }
     }
 
-    // Body: the last expression-tagged branch
-    let bodyTree: ParseTree | null = null;
-    for (let i = c.length - 1; i >= 0; i--) {
-      const ch = c[i];
-      if (ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
-        bodyTree = ch; break;
-      }
-    }
+    const bodyTree = findBodyExpr(c);
     if (!bodyTree) throw new Error("fn_decl: missing body");
 
     const paramNames = typedParams.map(p => p.name);
     const params = paramNames.map((n, i) => makeParam(i, n));
-    const innerMap = new Map<string, any>();
+    const innerMap = new Map<string, any>(outerParamMap);
     for (let i = 0; i < paramNames.length; i++) innerMap.set(paramNames[i], params[i]);
     const body = buildExpr(bodyTree, innerMap);
     const fn = makeComposedFn(params, body);
@@ -1012,7 +1204,7 @@ export function buildStmt(tree: ParseTree): BuiltBinding {
   }
 
   // Bare expression (the stmt's whole tree is an expression). Rebuild as expr.
-  const value = buildExpr(tree, new Map());
+  const value = buildExpr(tree, outerParamMap);
   return { key: null, value };
 }
 
@@ -1038,12 +1230,11 @@ export function buildProgram(tree: ParseTree): any {
   const walk = (t: ParseTree): void => {
     if (t.kind !== "branch") return;
     if (t.tag === "stmt" || t.tag === "binding" || t.tag === "fn_decl" ||
+        t.tag === "import_stmt" || t.tag === "export_binding" || t.tag === "export_fn_decl" ||
         (t.tag && EXPRESSION_TAGS.has(t.tag))) {
-      // Build this stmt
       try {
         addStmt(buildStmt(t));
       } catch (e: any) {
-        // If a stmt build fails, log but continue
         throw new Error(`Failed to build stmt: ${e.message}`);
       }
       return;
