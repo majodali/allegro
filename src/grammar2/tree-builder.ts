@@ -96,6 +96,13 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     case "neg":  return makeExpr(prim("bits_sub"),   [makeInt(0), buildExpr(lastChild(c), paramMap)]);
     case "not":  return makeExpr(prim("typed_not"),  [buildExpr(lastChild(c), paramMap)]);
 
+    // Pipe: `x |> f` → `f(x)`. left-associative.
+    case "pipe": {
+      const left = buildExpr(c[0], paramMap);
+      const right = buildExpr(lastChild(c), paramMap);
+      return makeExpr(right, [left]);
+    }
+
     // Type operators — use the typed variants (type-aware dispatch)
     case "instanceof": return makeExpr(prim("type_instanceof"), [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
     case "subtypeof":  return makeExpr(prim("type_subtypeof"),  [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
@@ -124,8 +131,9 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     case "dot":     return buildDot(tree, paramMap);
     case "bracket": return buildBracket(tree, paramMap);
     case "paren": {
-      // The paren_expr production wraps `( ws expr ws )`. Find the expr child.
-      const inner = findTaggedChild(c, ["or","and","eq","neq","lt","gt","lte","gte","add","sub","mul","div","mod","neg","not","call","paren","if","lambda1","lambdaN","number","string","ident"]);
+      // The paren_expr production wraps `( ws expr ws )`. Find the expr child
+      // by looking for any expression-tagged branch.
+      const inner = findTaggedChild(c, Array.from(EXPRESSION_TAGS));
       if (!inner) throw new Error("paren_expr: missing inner expression");
       return buildExpr(inner, paramMap);
     }
@@ -484,7 +492,8 @@ function buildWhenExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     throw new Error("when_expr: missing 'when' keyword");
   }
   const subjectItem = next();
-  if (!subjectItem || subjectItem.kind !== "tagged" || !subjectItem.branch.tag || !EXPRESSION_TAGS.has(subjectItem.branch.tag)) {
+  if (!subjectItem || subjectItem.kind !== "tagged" || subjectItem.branch.kind !== "branch" ||
+      !subjectItem.branch.tag || !EXPRESSION_TAGS.has(subjectItem.branch.tag)) {
     throw new Error("when_expr: missing subject expression");
   }
   const subject = buildExpr(subjectItem.branch, paramMap);
@@ -557,7 +566,8 @@ function buildWhenCase(tree: ParseTree, paramMap: Map<string, any>): { pattern: 
     throw new Error("when_case: missing 'is'");
   }
   const patItem = next();
-  if (!patItem || patItem.kind !== "tagged" || !isPatternTag(patItem.branch.tag)) {
+  if (!patItem || patItem.kind !== "tagged" || patItem.branch.kind !== "branch" ||
+      !isPatternTag(patItem.branch.tag)) {
     throw new Error("when_case: missing pattern");
   }
   const patResult = buildPattern(patItem.branch);
@@ -859,7 +869,7 @@ const EXPRESSION_TAGS = new Set([
   "number","float","bool","none_lit","string","ident",
   "array_lit","object_lit",
   "instanceof","subtypeof","of","of_error","error_expr",
-  "when_expr","block_expr",
+  "when_expr","block_expr","pipe",
 ]);
 
 // --- Lambdas ---

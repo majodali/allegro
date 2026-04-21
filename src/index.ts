@@ -176,24 +176,35 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
     const cleanSource = source.replace(/^\s*use_grammar\s+\w+\s*$/gm, "");
 
     // Standard mode: parse first to discover imports, then load on demand.
-    // Parse with the grammar-augmented config (extensions now include grammar fragments).
     const normalized = cleanSource.replace(/\r\n/g, "\n");
-    const { parseStandard, parseWithConfig, mergeGrammarFragments, getStandardGrammarConfig } =
-      await import("./hybrid-parser.js");
 
-    // Build config for import-discovery parse too, in case the file uses
-    // grammar-extension syntax before/between imports.
+    // If any grammar-extension fragments are active (via use_grammar), use
+    // the hybrid parser — fragments are still only understood by the hybrid
+    // pipeline. Otherwise parse via grammar2.
     const hybridFragments = extensions
       .map(e => e.grammarFragment)
       .filter((f): f is NonNullable<typeof f> => f !== undefined);
-    const parseResult = hybridFragments.length > 0
-      ? parseWithConfig(normalized, mergeGrammarFragments(getStandardGrammarConfig(), hybridFragments))
-      : parseStandard(normalized);
-    if (parseResult.errors.length > 0) {
-      throw new Error(`Parse error: ${parseResult.errors[0].message}`);
-    }
 
-    const fileCtx = (parseResult.tree as any).ctx;
+    let fileCtx: any;
+    if (hybridFragments.length > 0) {
+      const { parseWithConfig, mergeGrammarFragments, getStandardGrammarConfig } =
+        await import("./hybrid-parser.js");
+      const parseResult = parseWithConfig(normalized,
+        mergeGrammarFragments(getStandardGrammarConfig(), hybridFragments));
+      if (parseResult.errors.length > 0) {
+        throw new Error(`Parse error: ${parseResult.errors[0].message}`);
+      }
+      fileCtx = (parseResult.tree as any).ctx;
+    } else {
+      const { parse: g2parse } = await import("./grammar2/engine.js");
+      const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
+      const { buildProgram } = await import("./grammar2/tree-builder.js");
+      const result = g2parse(getBaseGrammar(), normalized);
+      if (!result.ok) {
+        throw new Error(`Parse error at position ${result.error.position}: ${result.error.message}`);
+      }
+      fileCtx = buildProgram(result.tree);
+    }
 
     if (fileCtx) {
       const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);

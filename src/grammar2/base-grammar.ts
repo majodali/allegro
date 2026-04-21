@@ -196,9 +196,18 @@ export function buildBaseGrammar(): Grammar {
 
   // --- Expression levels (left-recursive for binary operators) ---
 
-  // Top-level expression: start at the lowest precedence (or).
+  // Top-level expression: pipe is the lowest precedence.
   addProduction(g, { name: "expr",
-    rule: nonterm("expr_or"),
+    rule: nonterm("expr_pipe"),
+  });
+
+  // Level 0 — pipe operator: `x |> f` → `f(x)` (left-associative)
+  addProduction(g, { name: "expr_pipe",
+    rule: alt([
+      seq([nonterm("expr_pipe"), nonterm("ws"), lit("|>"), nonterm("ws"), nonterm("expr_or")],
+        { name: "pipe" }),
+      nonterm("expr_or"),
+    ]),
   });
 
   // Level 1 — logical or (|| and keyword `or`)

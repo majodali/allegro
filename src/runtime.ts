@@ -6,14 +6,15 @@
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
 import {
-  parseBase as hybridParseBase,
-  parseStandard as hybridParseStandard,
   parseWithConfig as hybridParseWithConfig,
   mergeGrammarFragments,
   getBaseGrammarConfig,
   getStandardGrammarConfig,
   type HybridGrammarConfig,
 } from "./hybrid-parser.js";
+import { parse as grammar2Parse } from "./grammar2/engine.js";
+import { getBaseGrammar } from "./grammar2/base-grammar.js";
+import { buildProgram } from "./grammar2/tree-builder.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf } from "./types.js";
@@ -809,8 +810,10 @@ export function evalSource(
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
-  // If extensions carry grammar fragments, merge them into the active config.
-  // This lets modules' register_* primitives take effect on this file's parsing.
+  // If extensions carry grammar fragments, merge them into the active hybrid
+  // config. `use_grammar` runtime extensions are handled by the hybrid parser
+  // until we port grammar fragments to grammar2. Without fragments, we use
+  // grammar2 for ALL parsing.
   const hybridExtFragments = (extensions ?? [])
     .map(e => e.grammarFragment)
     .filter((f): f is NonNullable<typeof f> => f !== undefined);
@@ -820,20 +823,27 @@ export function evalSource(
     effectiveConfig = mergeGrammarFragments(base, hybridExtFragments);
   }
 
-  // Use hybrid parser by default; fall back to Earley for legacy grammar extensions
-  const result = grammarExtension
-    ? parseExtended(normalized, grammarExtension)
-    : effectiveConfig
-      ? hybridParseWithConfig(normalized, effectiveConfig)
-      : typed
-        ? hybridParseStandard(normalized)
-        : hybridParseBase(normalized);
-
-  if (result.errors.length > 0) {
-    throw new Error(`Parse error: ${result.errors[0].message}`);
+  // Parser selection:
+  //   - Earley fallback (grammarExtension): for standalone DSL grammars
+  //   - Hybrid: when a grammarFragment is active (use_grammar extension)
+  //   - grammar2: default for everything else
+  let fileCtx: any;
+  if (grammarExtension) {
+    const result = parseExtended(normalized, grammarExtension);
+    if (result.errors.length > 0) throw new Error(`Parse error: ${result.errors[0].message}`);
+    fileCtx = (result.tree as any).ctx;
+  } else if (effectiveConfig) {
+    const result = hybridParseWithConfig(normalized, effectiveConfig);
+    if (result.errors.length > 0) throw new Error(`Parse error: ${result.errors[0].message}`);
+    fileCtx = (result.tree as any).ctx;
+  } else {
+    const result = grammar2Parse(getBaseGrammar(), normalized);
+    if (!result.ok) {
+      throw new Error(`Parse error at position ${result.error.position}: ${result.error.message}`);
+    }
+    fileCtx = buildProgram(result.tree);
   }
 
-  const fileCtx = (result.tree as any).ctx;
   if (!fileCtx) {
     return { value: null, evalCtx: base ?? makeContext(), registry: createRegistry() };
   }
