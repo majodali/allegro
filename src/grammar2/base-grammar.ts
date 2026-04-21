@@ -116,9 +116,35 @@ export function buildBaseGrammar(): Grammar {
     attrs: { name: "ident" },
   });
 
-  // String literal: double-quoted. Backslash escapes deferred to Standard.
+  // String literal: double-quoted, with backslash escapes and `{expr}`
+  // interpolation. Supports escapes `\n`, `\t`, `\\`, `\"`, `\{`, `\}`.
+  //
+  // Structure (scannerless):
+  //   string = " string_part* "
+  //   string_part = string_chars | string_escape | string_interp
+  //   string_chars = anything except " \ {
+  //   string_escape = \ .
+  //   string_interp = { expr }
+  addProduction(g, { name: "string_chars",
+    rule: regex(/[^"\\{]+/),
+  });
+  addProduction(g, { name: "string_escape",
+    rule: regex(/\\./),
+  });
+  addProduction(g, { name: "string_interp",
+    rule: seq([lit("{"), nonterm("ws"), nonterm("expr"), nonterm("ws"), lit("}")],
+      { name: "string_interp" }),
+  });
   addProduction(g, { name: "string",
-    rule: regex(/"(?:[^"\\]|\\.)*"/),
+    rule: seq([
+      lit("\""),
+      rep(alt([
+        nonterm("string_chars"),
+        nonterm("string_escape"),
+        nonterm("string_interp"),
+      ]), { min: 0 }),
+      lit("\""),
+    ]),
     attrs: { name: "string" },
   });
 
@@ -213,9 +239,46 @@ export function buildBaseGrammar(): Grammar {
       nonterm("string"),
       nonterm("bool"),
       nonterm("none_lit"),
+      nonterm("array_lit"),
+      nonterm("object_lit"),
       nonterm("paren_expr"),
       nonterm("ident"),
     ]),
+  });
+
+  // Array literal: `[expr, expr, ...]` — zero or more elements.
+  addProduction(g, { name: "array_lit",
+    rule: seq([
+      lit("["),
+      nonterm("ws"),
+      opt(spaced_list("expr", ",")),
+      nonterm("ws"),
+      lit("]"),
+    ], { name: "array_lit" }),
+  });
+
+  // Object literal: `{key: expr, key: expr, ...}`. Keys are identifiers.
+  addProduction(g, { name: "object_lit",
+    rule: seq([
+      lit("{"),
+      nonterm("ws"),
+      opt(rep(nonterm("object_field"), {
+        min: 1,
+        sep: seq([nonterm("ws"), lit(","), nonterm("ws")]),
+      })),
+      nonterm("ws"),
+      lit("}"),
+    ], { name: "object_lit" }),
+  });
+
+  addProduction(g, { name: "object_field",
+    rule: seq([
+      nonterm("ident"),
+      nonterm("ws"),
+      lit(":"),
+      nonterm("ws"),
+      nonterm("expr"),
+    ], { name: "object_field" }),
   });
 
   addProduction(g, { name: "paren_expr",

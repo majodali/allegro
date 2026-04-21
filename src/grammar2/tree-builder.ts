@@ -145,22 +145,13 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       return makeSymbol("none");
     }
     case "string": {
-      const raw = textOf(tree);
-      const unquoted = raw.slice(1, -1); // strip surrounding quotes
-      // Handle basic escape sequences
-      const unescaped = unquoted.replace(/\\(.)/g, (_, ch) => {
-        switch (ch) {
-          case "n":  return "\n";
-          case "t":  return "\t";
-          case "\\": return "\\";
-          case "\"": return "\"";
-          default:   return ch;
-        }
-      });
-      // Emit typed_string(bits) so the evaluator wraps it with String type
-      // (without this, typeLiterals would only wrap non-64-bit bits as String,
-      // leaving 8-char strings miscategorized as Int).
-      return makeExpr(prim("typed_string"), [stringToBits(unescaped)]);
+      return buildString(tree, paramMap);
+    }
+    case "array_lit": {
+      return buildArrayLit(tree, paramMap);
+    }
+    case "object_lit": {
+      return buildObjectLit(tree, paramMap);
     }
     case "ident": {
       const name = textOf(tree);
@@ -238,6 +229,150 @@ function buildBracket(tree: ParseTree, paramMap: Map<string, any>): any {
   return makeExpr(getter, [index]);
 }
 
+// --- String literals (with interpolation) ---
+
+/**
+ * Build a typed-string expression from a `string` branch tree. The tree has
+ * the structure:
+ *
+ *   [string]
+ *     "\""                          <- opening quote leaf
+ *     [<rep>]                        <- untagged rep body
+ *       [string_chars]  text         \ zero or more
+ *       [string_escape] \x text      | mixed in
+ *       [string_interp] { expr }    / any order
+ *     "\""                          <- closing quote leaf
+ *
+ * Output: typed_string(bits) when no interp; otherwise a chain of
+ * concatenations: typed_string(s0) + type_dispatch(e1, "toString")() + typed_string(s1) + ...
+ * matching the hybrid parser's shape.
+ */
+function buildString(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch") throw new Error("buildString: not a branch");
+  // Walk children depth-first, collecting runs of text and interp exprs.
+  // Emit a running "accumulator" as we go: string + toString(expr) + string + ...
+  const parts: Array<{ kind: "text"; text: string } | { kind: "expr"; value: any }> = [];
+
+  const walk = (t: ParseTree): void => {
+    if (t.kind === "leaf") {
+      // Skip the surrounding quote leaves (they're the opening/closing quotes).
+      if (t.text === "\"") return;
+      // Other leaves shouldn't appear inside string; ignore defensively.
+      return;
+    }
+    if (t.kind === "none") return;
+    if (t.kind === "error") return;
+    // Branch
+    if (t.tag === "string_chars") {
+      appendText(parts, t.children.map(c => c.kind === "leaf" ? c.text : "").join(""));
+      return;
+    }
+    if (t.tag === "string_escape") {
+      const raw = textOf(t);
+      // raw is "\x" — one escape char
+      const ch = raw[1] ?? "";
+      appendText(parts, unescape(ch));
+      return;
+    }
+    if (t.tag === "string_interp") {
+      // Children: "{", ws, expr, ws, "}"
+      const exprTree = t.children.find(ch =>
+        ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag),
+      );
+      if (!exprTree) throw new Error("string_interp: missing expression");
+      parts.push({ kind: "expr", value: buildExpr(exprTree, paramMap) });
+      return;
+    }
+    // Untagged wrapper — descend.
+    for (const c of t.children) walk(c);
+  };
+  walk(tree);
+
+  // Build output. Ensure we always start and end with a text (possibly "").
+  if (parts.length === 0 || parts[0].kind !== "text") {
+    parts.unshift({ kind: "text", text: "" });
+  }
+  let result: any = makeExpr(prim("typed_string"), [stringToBits((parts[0] as any).text)]);
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts[i];
+    let piece: any;
+    if (p.kind === "text") {
+      piece = makeExpr(prim("typed_string"), [stringToBits(p.text)]);
+    } else {
+      // type_dispatch(expr, "toString")()
+      const method = makeExpr(prim("type_dispatch"), [p.value, stringToBits("toString")]);
+      piece = makeExpr(method, []);
+    }
+    result = makeExpr(prim("bits_add"), [result, piece]);
+  }
+  return result;
+}
+
+function appendText(parts: Array<{ kind: "text"; text: string } | { kind: "expr"; value: any }>, text: string): void {
+  const last = parts[parts.length - 1];
+  if (last && last.kind === "text") last.text += text;
+  else parts.push({ kind: "text", text });
+}
+
+function unescape(ch: string): string {
+  switch (ch) {
+    case "n":  return "\n";
+    case "t":  return "\t";
+    case "\\": return "\\";
+    case "\"": return "\"";
+    case "{":  return "{";
+    case "}":  return "}";
+    default:   return ch;
+  }
+}
+
+// --- Array literal ---
+
+function buildArrayLit(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch") throw new Error("buildArrayLit: not a branch");
+  // Children: "[", ws, <opt rep of expr>, ws, "]"
+  const elems: any[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    if (t.tag && EXPRESSION_TAGS.has(t.tag)) {
+      elems.push(buildExpr(t, paramMap));
+      return;
+    }
+    // Skip whitespace
+    if (t.tag === "ws" || t.tag === "ws_req") return;
+    for (const c of t.children) walk(c);
+  };
+  // Skip the outer `[` and `]` leaves by walking all children of tree.
+  for (const c of tree.children) walk(c);
+  return makeExpr(prim("typed_array"), elems);
+}
+
+// --- Object literal ---
+
+function buildObjectLit(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch") throw new Error("buildObjectLit: not a branch");
+  // The object literal's children contain object_field branches. typed_object
+  // takes a flat list [key_bits, value, key_bits, value, ...].
+  const args: any[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    if (t.tag === "object_field") {
+      // Children: ident, ws, ":", ws, expr
+      const keyTree = t.children.find(ch => ch.kind === "branch" && ch.tag === "ident");
+      const valTree = t.children.slice().reverse().find(ch =>
+        ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag),
+      );
+      if (!keyTree || !valTree) throw new Error("object_field: missing key or value");
+      args.push(stringToBits(textOf(keyTree)));
+      args.push(buildExpr(valTree, paramMap));
+      return;
+    }
+    for (const c of t.children) walk(c);
+  };
+  for (const c of tree.children) walk(c);
+  return makeExpr(prim("typed_object"), args);
+}
+
 // --- Function calls ---
 
 function buildCall(tree: ParseTree, paramMap: Map<string, any>): any {
@@ -284,6 +419,7 @@ const EXPRESSION_TAGS = new Set([
   "or","and","eq","neq","lt","gt","lte","gte","add","sub","mul","div","mod",
   "neg","not","call","dot","bracket","paren","if","lambda1","lambdaN",
   "number","float","bool","none_lit","string","ident",
+  "array_lit","object_lit",
 ]);
 
 // --- Lambdas ---

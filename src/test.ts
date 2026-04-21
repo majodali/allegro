@@ -3943,6 +3943,111 @@ test("grammar2/std: bracket indexing on array", () => {
   eq(bitsToString(primaryOf(r) as BitsValue), "b");
 });
 
+// --- Phase 2c-2: collection literals + string interpolation ---
+
+test("grammar2/std: array literal", () => {
+  const r = evalStandard2("[1, 2, 3]");
+  eq(getTypeName(r), "Array");
+});
+
+test("grammar2/std: array element access via bracket", () => {
+  const r = evalStandard2("[10, 20, 30][1]");
+  eq(Number((primaryOf(r) as BitsValue).data), 20);
+});
+
+test("grammar2/std: empty array", () => {
+  const r = evalStandard2("[]");
+  eq(getTypeName(r), "Array");
+});
+
+test("grammar2/std: array map method", () => {
+  const r = evalStandard2("[1, 2, 3].map(x => x * 2).length");
+  eq(Number((primaryOf(r) as BitsValue).data), 3);
+});
+
+test("grammar2/std: object literal", () => {
+  const r = evalStandard2("{x: 10, y: 20}");
+  eq(getTypeName(r), "Object");
+});
+
+test("grammar2/std: object field access via dot", () => {
+  const r = evalStandard2("p = {x: 10, y: 20}\np.x");
+  eq(Number((primaryOf(r) as BitsValue).data), 10);
+});
+
+test("grammar2/std: nested object field access", () => {
+  const r = evalStandard2("nested = {a: {b: 42}}\nnested.a.b");
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+test("grammar2/std: string interpolation", () => {
+  const r = evalStandard2('name = "world"\n"hello {name}"');
+  eq(bitsToString(primaryOf(r) as BitsValue), "hello world");
+});
+
+test("grammar2/std: string interpolation with expression", () => {
+  const r = evalStandard2('"2 + 2 = {2 + 2}"');
+  eq(bitsToString(primaryOf(r) as BitsValue), "2 + 2 = 4");
+});
+
+test("grammar2/std: escaped braces in string", () => {
+  const r = evalStandard2('"\\{literal\\}"');
+  eq(bitsToString(primaryOf(r) as BitsValue), "{literal}");
+});
+
+test("grammar2/std: array concat method", () => {
+  const r = evalStandard2("[1, 2].concat([3, 4]).length");
+  eq(Number((primaryOf(r) as BitsValue).data), 4);
+});
+
+test("grammar2/std: array filter/reduce chain", () => {
+  const r = evalStandard2("[1, 2, 3, 4, 5].filter(x => x > 2).reduce((a, x) => a + x, 0)");
+  eq(Number((primaryOf(r) as BitsValue).data), 12);
+});
+
+test("grammar2/std: object with multiple fields", () => {
+  const r = evalStandard2("{a: 1, b: 2, c: 3}.b");
+  eq(Number((primaryOf(r) as BitsValue).data), 2);
+});
+
+test("grammar2/std: empty object literal", () => {
+  const r = evalStandard2("{}");
+  eq(getTypeName(r), "Object");
+});
+
+test("grammar2/std: array of objects with .map on field", () => {
+  const r = evalStandard2(
+    'people = [{name: "Alice", age: 30}, {name: "Bob", age: 25}]\npeople.map(p => p.name).length'
+  );
+  eq(Number((primaryOf(r) as BitsValue).data), 2);
+});
+
+test("grammar2/std: objects.alg runs end-to-end", () => {
+  const source = fs.readFileSync(path.join(testsDir, "objects.alg"), "utf-8");
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStandard2(source);
+  } finally {
+    console.log = origLog;
+  }
+  const lines = source.split(/\r?\n/);
+  const expected: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/\/\/\s*expect:\s*(.*)/);
+    if (m) expected.push(m[1].trim());
+  }
+  eq(printed.length, expected.length);
+  for (let i = 0; i < expected.length; i++) {
+    eq(printed[i], expected[i], `line ${i}`);
+  }
+});
+
+// Note: full end-to-end on tests/arrays.alg requires multi-line expression
+// continuation (e.g., `f(x) =>\n  if cond\n    then a\n    else b`) which
+// is scheduled for a later sub-phase.
+
 test("grammar2/std: dot-access.alg runs end-to-end through grammar2", () => {
   const source = fs.readFileSync(path.join(testsDir, "dot-access.alg"), "utf-8");
   const printed: string[] = [];
