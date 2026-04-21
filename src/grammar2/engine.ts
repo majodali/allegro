@@ -500,12 +500,28 @@ function matchNonTerm(state: ParseState, rule: NonTerm, pos: number): MatchResul
   const inner = matchRule(state, prod.rule, pos);
   if (!inner) return null;
 
-  // If the inner tree is already a branch and the production has no explicit
-  // name attr, pass the child through. Otherwise wrap in a named branch.
-  const prodName = prod.attrs?.name ?? rule.name;
+  // Tag the resulting branch. If the production has an EXPLICIT @name attr,
+  // use that — it overrides whatever tag the inner rule produced. Otherwise
+  // fall back to the inner tree's existing tag, or the production's name.
+  const explicitName = prod.attrs?.name;
+  const defaultName = rule.name;
   if (inner.tree.kind === "branch") {
+    const tag = explicitName ?? inner.tree.tag ?? defaultName;
+    // If explicit name, wrap in a new branch so the downstream tree-builder
+    // sees `pattern_ident > ident > "n"` rather than a re-tagged ident.
+    if (explicitName && inner.tree.tag && inner.tree.tag !== explicitName) {
+      return {
+        tree: {
+          kind: "branch",
+          tag: explicitName,
+          children: [inner.tree],
+          range: inner.tree.range,
+        },
+        nextPos: inner.nextPos,
+      };
+    }
     return {
-      tree: { ...inner.tree, tag: inner.tree.tag ?? prodName },
+      tree: { ...inner.tree, tag },
       nextPos: inner.nextPos,
     };
   }
@@ -513,7 +529,7 @@ function matchNonTerm(state: ParseState, rule: NonTerm, pos: number): MatchResul
     return {
       tree: {
         kind: "branch",
-        tag: prodName,
+        tag: explicitName ?? defaultName,
         children: [inner.tree],
         range: inner.tree.range,
       },

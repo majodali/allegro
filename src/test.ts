@@ -4022,6 +4022,182 @@ test("grammar2/std: array of objects with .map on field", () => {
   eq(Number((primaryOf(r) as BitsValue).data), 2);
 });
 
+// --- Phase 2c-4: keyword operators ---
+
+test("grammar2/std: instanceof operator", () => {
+  const r = evalStandard2("42 instanceof Int");
+  eq(Number((primaryOf(r) as BitsValue).data), 1);
+});
+
+test("grammar2/std: subtypeof operator", () => {
+  const r = evalStandard2("NominalType subtypeof Type");
+  eq(Number((primaryOf(r) as BitsValue).data), 1);
+});
+
+test("grammar2/std: `and` keyword as logical and", () => {
+  const r = evalStandard2("true and false");
+  eq(Number((primaryOf(r) as BitsValue).data), 0);
+});
+
+test("grammar2/std: `or` keyword as logical or", () => {
+  const r = evalStandard2("false or true");
+  eq(Number((primaryOf(r) as BitsValue).data), 1);
+});
+
+test("grammar2/std: `of` infix accesses MultiValue component", () => {
+  // `type of 42` returns the Int type (a raw Context). Verify it's a Context
+  // with name "Int".
+  const r = evalStandard2("type of 42");
+  const p = primaryOf(r!);
+  eq(p.kind, ValueKind.Context);
+  const nameBind = (p as any).bindings.get("__name");
+  eq(bitsToString(nameBind.value), "Int");
+});
+
+test("grammar2/std: `error expr` creates an error value", () => {
+  const r = evalStandard2('error "something broke"');
+  eq((r as any).components?.has("error"), true);
+});
+
+test("grammar2/std: `error of x` extracts error component", () => {
+  const r = evalStandard2('x = error "boom"\nerror of x');
+  eq(bitsToString(primaryOf(r) as BitsValue), "boom");
+});
+
+// --- Phase 2c-4: type annotations ---
+
+test("grammar2/std: typed function params", () => {
+  const r = evalStandard2("add(x: Int, y: Int) => x + y\nadd(3, 4)");
+  eq(Number((primaryOf(r) as BitsValue).data), 7);
+});
+
+test("grammar2/std: typed function return type", () => {
+  const r = evalStandard2("double(x: Int): Int => x * 2\ndouble(21)");
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+test("grammar2/std: typed lambda (paren form)", () => {
+  const r = evalStandard2("mul = (x: Int, y: Int) => x * y\nmul(6, 7)");
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+test("grammar2/std: typed lambda (single-param form)", () => {
+  const r = evalStandard2("f = x: Int => x * 2\nf(21)");
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+test("grammar2/std: binding type annotation", () => {
+  const r = evalStandard2("x: Int = 42\nx");
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+test("grammar2/std: generic type annotation Array[Int]", () => {
+  const r = evalStandard2("head(arr: Array[Int]): Int => arr[0]\nhead([10, 20, 30])");
+  eq(Number((primaryOf(r) as BitsValue).data), 10);
+});
+
+test("grammar2/std: mixed typed and untyped functions coexist", () => {
+  const r = evalStandard2("identity(x) => x\ntyped(x: Int): Int => x + 1\ntyped(identity(41))");
+  eq(Number((primaryOf(r) as BitsValue).data), 42);
+});
+
+// --- Phase 2c-4: when/is/then pattern matching ---
+
+test("grammar2/std: when with int literal match", () => {
+  const r = evalStandard2("when 42 is 42 then 1 else 0");
+  eq(Number((primaryOf(r) as BitsValue).data), 1);
+});
+
+test("grammar2/std: when with int literal miss", () => {
+  const r = evalStandard2("when 42 is 99 then 1 else 0");
+  eq(Number((primaryOf(r) as BitsValue).data), 0);
+});
+
+test("grammar2/std: when with wildcard", () => {
+  const r = evalStandard2("when 42 is _ then 99 else 0");
+  eq(Number((primaryOf(r) as BitsValue).data), 99);
+});
+
+test("grammar2/std: when with ident binding", () => {
+  const r = evalStandard2("when 10 is n then n + 5 else 0");
+  eq(Number((primaryOf(r) as BitsValue).data), 15);
+});
+
+test("grammar2/std: when resolve-first (known var matches)", () => {
+  const r = evalStandard2("known = 42\nwhen 42 is known then 1 else 0");
+  eq(Number((primaryOf(r) as BitsValue).data), 1);
+});
+
+test("grammar2/std: when multi-case (inline lines)", () => {
+  const r = evalStandard2(`
+v = 2
+m = when v
+  is 1 then 10
+  is 2 then 20
+  is 3 then 30
+m`);
+  eq(Number((primaryOf(r) as BitsValue).data), 20);
+});
+
+test("grammar2/std: when with structural destructuring", () => {
+  const r = evalStandard2('point = {x: 3, y: 4}\nwhen point is {x, y} then x + y else 0');
+  eq(Number((primaryOf(r) as BitsValue).data), 7);
+});
+
+test("grammar2/std: when with type destructuring", () => {
+  const r = evalStandard2('obj = {width: 5, height: 10}\nwhen obj is Object(width, height) then width * height else 0');
+  eq(Number((primaryOf(r) as BitsValue).data), 50);
+});
+
+test("grammar2/std: when with guard", () => {
+  const r = evalStandard2("when 5 is n and n > 0 then n * 2 else 0");
+  eq(Number((primaryOf(r) as BitsValue).data), 10);
+});
+
+test("grammar2/std: pattern-match.alg runs end-to-end", () => {
+  const source = fs.readFileSync(path.join(testsDir, "pattern-match.alg"), "utf-8");
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStandard2(source);
+  } finally {
+    console.log = origLog;
+  }
+  const lines = source.split(/\r?\n/);
+  const expected: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/\/\/\s*expect:\s*(.*)/);
+    if (m) expected.push(m[1].trim());
+  }
+  eq(printed.length, expected.length, "line count");
+  for (let i = 0; i < expected.length; i++) {
+    eq(printed[i], expected[i], `line ${i}`);
+  }
+});
+
+test("grammar2/std: type-annotations.alg runs end-to-end", () => {
+  const source = fs.readFileSync(path.join(testsDir, "type-annotations.alg"), "utf-8");
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStandard2(source);
+  } finally {
+    console.log = origLog;
+  }
+  const lines = source.split(/\r?\n/);
+  const expected: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/\/\/\s*expect:\s*(.*)/);
+    if (m) expected.push(m[1].trim());
+  }
+  eq(printed.length, expected.length, "line count");
+  for (let i = 0; i < expected.length; i++) {
+    eq(printed[i], expected[i], `line ${i}`);
+  }
+});
+
 // --- Phase 2c-3: multi-line expression continuation ---
 
 test("grammar2/std: if-then-else can span lines", () => {
@@ -4068,16 +4244,8 @@ myMap([1, 2, 3], x => x * 10).length
   eq(Number((primaryOf(r) as BitsValue).data), 3);
 });
 
-test("grammar2/std: arrays.alg (prefix before when) runs end-to-end", () => {
-  // Parse the file up to but not including the `when` pattern-matching
-  // section at ~line 130. Covers multi-line function bodies, array methods,
-  // recursive functions with multi-line bodies, arrays-of-objects.
-  const fullSource = fs.readFileSync(path.join(testsDir, "arrays.alg"), "utf-8");
-  const cutIndex = fullSource.indexOf("Pattern matching");
-  if (cutIndex < 0) throw new Error("expected 'Pattern matching' marker");
-  // Cut at the preceding `// =====` divider line
-  const prefixEnd = fullSource.lastIndexOf("\n// =======", cutIndex);
-  const source = fullSource.slice(0, prefixEnd);
+test("grammar2/std: arrays.alg runs end-to-end", () => {
+  const source = fs.readFileSync(path.join(testsDir, "arrays.alg"), "utf-8");
   const printed: string[] = [];
   const origLog = console.log;
   console.log = (msg: any) => printed.push(String(msg));
@@ -4098,8 +4266,6 @@ test("grammar2/std: arrays.alg (prefix before when) runs end-to-end", () => {
   }
 });
 
-// Full tests/arrays.alg end-to-end is deferred until Phase 2c-4 adds
-// `when/is/then` pattern matching — the file's tail exercises that feature.
 
 test("grammar2/std: objects.alg runs end-to-end", () => {
   const source = fs.readFileSync(path.join(testsDir, "objects.alg"), "utf-8");

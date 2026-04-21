@@ -14,7 +14,7 @@
 import { ParseTree } from "./types.js";
 import {
   makeInt, makeBits, stringToBits, makeParam, makeSymbol, makeExpr,
-  makeComposedFn, makeContext, prim, bind,
+  makeComposedFn, makeContext, prim, bind, buildFn,
 } from "../parser-helpers.js";
 import { makeFloat } from "../types.js";
 
@@ -94,6 +94,30 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     case "neg":  return makeExpr(prim("bits_sub"),   [makeInt(0), buildExpr(lastChild(c), paramMap)]);
     case "not":  return makeExpr(prim("typed_not"),  [buildExpr(lastChild(c), paramMap)]);
 
+    // Type operators — use the typed variants (type-aware dispatch)
+    case "instanceof": return makeExpr(prim("type_instanceof"), [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
+    case "subtypeof":  return makeExpr(prim("type_subtypeof"),  [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
+
+    // MultiValue component access: `name of expr` → component_get(expr, "name")
+    // Note: `component_get` is lazy — it sees the MultiValue wrapper directly,
+    // unlike `mv_get` which operates on primaryArgs.
+    case "of": {
+      // c[0] is the ident (component name); last expression-tagged child is the target.
+      const name = textOf(c[0]);
+      const target = buildExpr(lastChild(c), paramMap);
+      return makeExpr(prim("component_get"), [target, stringToBits(name)]);
+    }
+    case "of_error": {
+      // `error of expr` — same shape but LHS is the literal `error` keyword.
+      const target = buildExpr(lastChild(c), paramMap);
+      return makeExpr(prim("component_get"), [target, stringToBits("error")]);
+    }
+
+    // Error creation: `error expr` → make_error(expr)
+    case "error_expr": {
+      return makeExpr(prim("make_error"), [buildExpr(lastChild(c), paramMap)]);
+    }
+
     case "call":    return buildCall(tree, paramMap);
     case "dot":     return buildDot(tree, paramMap);
     case "bracket": return buildBracket(tree, paramMap);
@@ -121,8 +145,12 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     }
 
     case "lambda1":
+    case "lambda1_typed":
     case "lambdaN":
       return buildLambda(tree, paramMap);
+
+    case "when_expr":
+      return buildWhenExpr(tree, paramMap);
 
     case "number": {
       const txt = textOf(tree);
@@ -227,6 +255,296 @@ function buildBracket(tree: ParseTree, paramMap: Map<string, any>): any {
   const index = buildExpr(indexTree, paramMap);
   const getter = makeExpr(prim("type_dispatch"), [obj, stringToBits("get")]);
   return makeExpr(getter, [index]);
+}
+
+// --- when/is/then pattern matching ---
+
+interface PatternResult {
+  pattern:      any;           // Value — the pattern AST
+  bindingNames: string[];      // names extracted by this pattern
+}
+
+function buildPattern(tree: ParseTree): PatternResult {
+  if (tree.kind !== "branch") throw new Error("buildPattern: not a branch");
+  const tag = tree.tag;
+  const c = tree.children;
+
+  switch (tag) {
+    case "pattern_wildcard":
+      return { pattern: makeExpr(prim("when_wildcard"), []), bindingNames: [] };
+
+    case "pattern_number": {
+      const numTree = c.find(ch => ch.kind === "leaf" || ch.kind === "branch");
+      const txt = textOf(tree);
+      return { pattern: makeInt(Number(txt)), bindingNames: [] };
+    }
+    case "pattern_neg_number": {
+      // Children include "-" and a number leaf/branch
+      const digits = textOf(tree).replace(/^-/, "");
+      return {
+        pattern: makeExpr(prim("bits_sub"), [makeInt(0), makeInt(Number(digits))]),
+        bindingNames: [],
+      };
+    }
+    case "pattern_string": {
+      // Build the string normally (handles escapes + interpolation if any,
+      // though interpolation in patterns is unusual and probably should error)
+      const pat = buildString(tree, new Map());
+      return { pattern: pat, bindingNames: [] };
+    }
+    case "pattern_bool": {
+      const txt = textOf(tree);
+      return { pattern: makeSymbol(txt), bindingNames: [] };
+    }
+    case "pattern_none":
+      return { pattern: makeSymbol("none"), bindingNames: [] };
+
+    case "pattern_ident": {
+      // Plain identifier — resolve-first binding. The interpretation at runtime
+      // is: if `name` is resolvable in scope, match against that value;
+      // otherwise bind `name` to the subject.
+      const name = textOf(tree);
+      return { pattern: makeSymbol(name), bindingNames: [name] };
+    }
+
+    case "pattern_struct": {
+      // Children: "{", ws, opt(rep(field_pattern, sep)), ws, "}"
+      const fieldArgs: any[] = [];
+      const bindingNames: string[] = [];
+      collectFieldPatterns(tree, fieldArgs, bindingNames);
+      return {
+        pattern: makeExpr(prim("when_struct_destruct"), fieldArgs),
+        bindingNames,
+      };
+    }
+
+    case "pattern_typed": {
+      // Children: ident "(" ws opt(rep(field_pattern, sep)) ws ")"
+      const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
+      if (!identTree) throw new Error("pattern_typed: missing type name");
+      const fieldArgs: any[] = [];
+      const bindingNames: string[] = [];
+      collectFieldPatterns(tree, fieldArgs, bindingNames);
+      return {
+        pattern: makeExpr(prim("when_type_destruct"), [makeSymbol(textOf(identTree)), ...fieldArgs]),
+        bindingNames,
+      };
+    }
+  }
+
+  // Untagged wrapper? Descend.
+  if (c.length === 1) return buildPattern(c[0]);
+  throw new Error(`buildPattern: unrecognized tag '${tag}'`);
+}
+
+/**
+ * Walk a pattern_struct / pattern_typed tree, collecting flat field-pattern
+ * args and binding names.
+ *
+ * For each field_pattern:
+ *   - shorthand `x` → args=[Bits("x"), when_wildcard], bindings=["x"]
+ *   - renamed `x: sub` → args=[Bits("x"), sub_pattern], bindings follow sub
+ */
+function collectFieldPatterns(tree: ParseTree, args: any[], bindings: string[]): void {
+  if (tree.kind !== "branch") return;
+  if (tree.tag === "field_pattern") {
+    // A shorthand field_pattern wraps a single ident or a renamed form.
+    // Look at children.
+    const c = tree.children;
+    // If children contain a field_pattern_renamed child (untagged, since the
+    // Alt doesn't re-tag), find the renamed form.
+    const renamedChild = c.find(ch => ch.kind === "branch" && ch.tag === "field_pattern_renamed");
+    if (renamedChild && renamedChild.kind === "branch") {
+      // field_pattern_renamed children: [ident, ws, ":", ws, pattern]
+      const rc = renamedChild.children;
+      const identTree = rc.find((ch: ParseTree) => ch.kind === "branch" && ch.tag === "ident");
+      const patTree   = rc.slice().reverse().find((ch: ParseTree) => ch.kind === "branch" && ch.tag !== "ident" && ch.tag !== "ws");
+      if (!identTree) throw new Error("field_pattern_renamed: missing ident");
+      if (!patTree) throw new Error("field_pattern_renamed: missing sub-pattern");
+      const name = textOf(identTree);
+      const sub = buildPattern(patTree);
+      args.push(stringToBits(name), sub.pattern);
+      // Binding rules (match hybrid parser):
+      //   - Nested destructuring: use nested bindings
+      //   - Everything else: field name is the binding
+      const isDestruct = sub.pattern.kind === "Expression" &&
+        sub.pattern.fn?.kind === "PrimitiveFunction" &&
+        (sub.pattern.fn.name === "when_struct_destruct" || sub.pattern.fn.name === "when_type_destruct");
+      if (sub.bindingNames.length > 1 || isDestruct) {
+        for (const b of sub.bindingNames) bindings.push(b);
+      } else {
+        bindings.push(name);
+      }
+      return;
+    }
+    // Shorthand: just an ident; binding = ident name, sub-pattern = wildcard
+    const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
+    if (!identTree) throw new Error("field_pattern: missing ident");
+    const name = textOf(identTree);
+    args.push(stringToBits(name), makeExpr(prim("when_wildcard"), []));
+    bindings.push(name);
+    return;
+  }
+  for (const ch of tree.children) collectFieldPatterns(ch, args, bindings);
+}
+
+/**
+ * Build a when-expression tree:
+ *   when subject case1 case2 ... [else fallback]
+ * Desugars to nested eval_when calls.
+ *
+ * The tree has considerable nesting from Seq + Rep + Opt wrappers. We
+ * flatten it into a linear sequence of leaves/tagged-branches, then walk
+ * that sequentially finding the subject, cases, and else branch.
+ */
+function buildWhenExpr(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch") throw new Error("buildWhenExpr: not a branch");
+
+  // Flatten: collect all tagged branches and all meaningful leaves, in order.
+  const items: Array<{ kind: "leaf"; text: string } | { kind: "tagged"; branch: ParseTree }> = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind === "leaf") {
+      if (t.text === "when" || t.text === "else" || t.text === "and" || t.text === "is" || t.text === "then") {
+        items.push({ kind: "leaf", text: t.text });
+      }
+      return;
+    }
+    if (t.kind !== "branch") return;
+    if (t.tag === "ws" || t.tag === "ws_req" || t.tag === "ws_any") return;
+    if (t.tag === "when_case" || (t.tag && EXPRESSION_TAGS.has(t.tag))) {
+      items.push({ kind: "tagged", branch: t });
+      return;
+    }
+    // Untagged wrapper — descend
+    for (const c of t.children) walk(c);
+  };
+  for (const c of tree.children) walk(c);
+
+  // Process: "when" <expr> <when_case>+ ["else" <expr>]
+  let idx = 0;
+  const next = () => items[idx++];
+  const peek = () => items[idx];
+
+  const first = next();
+  if (!first || first.kind !== "leaf" || first.text !== "when") {
+    throw new Error("when_expr: missing 'when' keyword");
+  }
+  const subjectItem = next();
+  if (!subjectItem || subjectItem.kind !== "tagged" || !subjectItem.branch.tag || !EXPRESSION_TAGS.has(subjectItem.branch.tag)) {
+    throw new Error("when_expr: missing subject expression");
+  }
+  const subject = buildExpr(subjectItem.branch, paramMap);
+
+  const cases: Array<{ pattern: any; guard: any; body: any; bindingNames: string[] }> = [];
+  while (peek() && peek().kind === "tagged" && (peek() as any).branch.tag === "when_case") {
+    const cItem = next() as any;
+    cases.push(buildWhenCase(cItem.branch, paramMap));
+  }
+
+  if (cases.length === 0) throw new Error("when_expr: at least one case required");
+
+  let elseBranch: any | null = null;
+  if (peek() && peek().kind === "leaf" && (peek() as any).text === "else") {
+    next(); // consume "else"
+    const elseItem = next();
+    if (!elseItem || elseItem.kind !== "tagged") {
+      throw new Error("when_expr: missing else expression");
+    }
+    elseBranch = buildExpr(elseItem.branch, paramMap);
+  }
+
+  // Default else branch: when_no_match(subject)
+  let result: any = elseBranch !== null
+    ? elseBranch
+    : makeExpr(prim("when_no_match"), [subject]);
+
+  // Fold cases from last to first into nested eval_when expressions.
+  for (let i = cases.length - 1; i >= 0; i--) {
+    const cs = cases[i];
+    const thenFn = cs.bindingNames.length > 0
+      ? buildFn(cs.bindingNames, cs.body)
+      : makeComposedFn([], cs.body);
+    const elseFn = makeComposedFn([], result);
+    result = makeExpr(prim("eval_when"), [subject, cs.pattern, cs.guard, thenFn, elseFn]);
+  }
+  return result;
+}
+
+function buildWhenCase(tree: ParseTree, paramMap: Map<string, any>): { pattern: any; guard: any; body: any; bindingNames: string[] } {
+  if (tree.kind !== "branch") throw new Error("buildWhenCase: not a branch");
+
+  // Flatten: collect leaves (is/and/then) and tagged branches (pattern_* + expr).
+  type Item = { kind: "leaf"; text: string } | { kind: "tagged"; branch: ParseTree };
+  const items: Item[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind === "leaf") {
+      if (t.text === "is" || t.text === "and" || t.text === "then") {
+        items.push({ kind: "leaf", text: t.text });
+      }
+      return;
+    }
+    if (t.kind !== "branch") return;
+    if (t.tag === "ws" || t.tag === "ws_req" || t.tag === "ws_any") return;
+    if (t.tag && (isPatternTag(t.tag) || EXPRESSION_TAGS.has(t.tag))) {
+      items.push({ kind: "tagged", branch: t });
+      return;
+    }
+    for (const c of t.children) walk(c);
+  };
+  for (const c of tree.children) walk(c);
+
+  // Process: "is" <pattern> ["and" <guard_expr>] "then" <body_expr>
+  let idx = 0;
+  const next = () => items[idx++];
+  const peek = () => items[idx];
+
+  const firstTok = next();
+  if (!firstTok || firstTok.kind !== "leaf" || firstTok.text !== "is") {
+    throw new Error("when_case: missing 'is'");
+  }
+  const patItem = next();
+  if (!patItem || patItem.kind !== "tagged" || !isPatternTag(patItem.branch.tag)) {
+    throw new Error("when_case: missing pattern");
+  }
+  const patResult = buildPattern(patItem.branch);
+  const bindingNames = patResult.bindingNames;
+
+  let guardTree: ParseTree | null = null;
+  if (peek() && peek().kind === "leaf" && (peek() as any).text === "and") {
+    next(); // consume "and"
+    const gItem = next();
+    if (!gItem || gItem.kind !== "tagged" || !EXPRESSION_TAGS.has((gItem as any).branch.tag)) {
+      throw new Error("when_case: missing guard expression");
+    }
+    guardTree = (gItem as any).branch;
+  }
+
+  const thenTok = next();
+  if (!thenTok || thenTok.kind !== "leaf" || thenTok.text !== "then") {
+    throw new Error("when_case: missing 'then'");
+  }
+  const bodyItem = next();
+  if (!bodyItem || bodyItem.kind !== "tagged" || !EXPRESSION_TAGS.has((bodyItem as any).branch.tag)) {
+    throw new Error("when_case: missing body");
+  }
+
+  const body = buildExpr((bodyItem as any).branch, paramMap);
+  let guard: any = makeInt(1);
+  if (guardTree) {
+    const guardExpr = buildExpr(guardTree, paramMap);
+    guard = bindingNames.length > 0
+      ? buildFn(bindingNames, guardExpr)
+      : makeComposedFn([], guardExpr);
+  }
+  return { pattern: patResult.pattern, guard, body, bindingNames };
+}
+
+function isPatternTag(tag: string | undefined): boolean {
+  return tag === "pattern_wildcard" || tag === "pattern_number" ||
+    tag === "pattern_neg_number" || tag === "pattern_string" ||
+    tag === "pattern_bool" || tag === "pattern_none" ||
+    tag === "pattern_ident" || tag === "pattern_struct" ||
+    tag === "pattern_typed";
 }
 
 // --- String literals (with interpolation) ---
@@ -417,33 +735,155 @@ function collectArgs(tree: ParseTree, paramMap: Map<string, any>): any[] {
 
 const EXPRESSION_TAGS = new Set([
   "or","and","eq","neq","lt","gt","lte","gte","add","sub","mul","div","mod",
-  "neg","not","call","dot","bracket","paren","if","lambda1","lambdaN",
+  "neg","not","call","dot","bracket","paren","if","lambda1","lambda1_typed","lambdaN",
   "number","float","bool","none_lit","string","ident",
   "array_lit","object_lit",
+  "instanceof","subtypeof","of","of_error","error_expr",
+  "when_expr",
 ]);
 
 // --- Lambdas ---
+
+/**
+ * Collect typed parameters from a typed_param_list tree.
+ * Returns an array of { name, typeExpr? } — typeExpr is the value built from
+ * the type annotation, or undefined if the param has no annotation.
+ */
+interface TypedParam { name: string; typeExpr?: any; }
+
+function collectTypedParams(tree: ParseTree, paramMap: Map<string, any>, out: TypedParam[]): void {
+  if (tree.kind !== "branch") return;
+  if (tree.tag === "typed_param") {
+    // Children: [ident, opt_type_annotation]
+    const identTree = tree.children.find(ch => ch.kind === "branch" && ch.tag === "ident");
+    if (!identTree) throw new Error("typed_param: missing ident");
+    const name = textOf(identTree);
+    // The optional annotation is an untagged branch containing [ws, ":", ws, type_expr]
+    // OR a 'none' if no annotation was given.
+    let typeExpr: any | undefined = undefined;
+    for (const ch of tree.children) {
+      if (ch.kind === "branch" && !ch.tag) {
+        // Unwrapped opt's content — look for a type_expr
+        const typeTree = findTypeExpr(ch);
+        if (typeTree) typeExpr = buildTypeExpr(typeTree, paramMap);
+      }
+    }
+    out.push({ name, typeExpr });
+    return;
+  }
+  for (const ch of tree.children) collectTypedParams(ch, paramMap, out);
+}
+
+/** Find the type_expr within an optional annotation block. */
+function findTypeExpr(tree: ParseTree): ParseTree | null {
+  if (tree.kind !== "branch") return null;
+  // A type_expr is either the `type_union` tag, or one of: ident, type_generic
+  // (all would be tagged). Search recursively.
+  if (tree.tag === "type_union" || tree.tag === "type_generic" || tree.tag === "ident") {
+    return tree;
+  }
+  for (const ch of tree.children) {
+    const f = findTypeExpr(ch);
+    if (f) return f;
+  }
+  return null;
+}
+
+/**
+ * Build a type expression from a parse tree. Supports:
+ *   - ident                    → Symbol(name)
+ *   - type_generic             → type_apply(Symbol(name), [args...])
+ *   - type_union               → type_union(left, right)
+ */
+function buildTypeExpr(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch") throw new Error("buildTypeExpr: not a branch");
+  if (tree.tag === "ident") {
+    return makeSymbol(textOf(tree));
+  }
+  if (tree.tag === "type_generic") {
+    // Children: [ident, "[", ws, rep-of-type_expr, ws, "]"]
+    const identTree = tree.children.find(ch => ch.kind === "branch" && ch.tag === "ident");
+    if (!identTree) throw new Error("type_generic: missing ident");
+    const args: any[] = [];
+    const walk = (t: ParseTree): void => {
+      if (t.kind !== "branch") return;
+      if (t === identTree) return;
+      const inner = findTypeExpr(t);
+      if (inner && inner !== identTree) {
+        args.push(buildTypeExpr(inner, paramMap));
+        return;
+      }
+      for (const c of t.children) walk(c);
+    };
+    // Skip the first child (the ident) and walk the rest for type args
+    for (let i = 1; i < tree.children.length; i++) walk(tree.children[i]);
+    return makeExpr(prim("type_apply"), [makeSymbol(textOf(identTree)), ...args]);
+  }
+  if (tree.tag === "type_union") {
+    // Children: [type_expr_atom, ws, "|", ws, type_expr]
+    const parts = tree.children.filter(ch =>
+      ch.kind === "branch" && (ch.tag === "ident" || ch.tag === "type_generic" || ch.tag === "type_union")
+    );
+    if (parts.length < 2) throw new Error("type_union: expected 2 parts");
+    return makeExpr(prim("type_union"),
+      parts.map(p => buildTypeExpr(p, paramMap)));
+  }
+  throw new Error(`buildTypeExpr: unknown tag '${tree.tag}'`);
+}
+
+/**
+ * Wrap a built function with `typed_function` if any param or return type
+ * annotation is present. Otherwise return as-is.
+ */
+function maybeTyped(fn: any, typedParams: TypedParam[], returnTypeExpr: any | undefined): any {
+  const hasAnyType = returnTypeExpr !== undefined || typedParams.some(p => p.typeExpr !== undefined);
+  if (!hasAnyType) return fn;
+  // Wrap body with type_check(body, returnTypeExpr) if return type given
+  if (returnTypeExpr !== undefined && fn.kind === "ComposedFunction") {
+    fn.body = makeExpr(prim("type_check"), [fn.body, returnTypeExpr]);
+  }
+  const typeExprs = typedParams.map(p => p.typeExpr ?? makeSymbol("Any"));
+  const retExpr = returnTypeExpr ?? makeSymbol("Any");
+  return makeExpr(prim("typed_function"), [fn, makeInt(typedParams.length), ...typeExprs, retExpr]);
+}
 
 function buildLambda(tree: ParseTree, outerParamMap: Map<string, any>): any {
   if (tree.kind !== "branch") throw new Error("buildLambda: not a branch");
   const c = tree.children;
 
-  // Extract parameter names:
-  const paramNames: string[] = [];
+  // Extract typed params
+  const typedParams: TypedParam[] = [];
   if (tree.tag === "lambda1") {
-    // First child is the ident branch
+    // First child is the ident branch (untyped)
     const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
     if (!identTree) throw new Error("lambda1: missing param ident");
-    paramNames.push(textOf(identTree));
+    typedParams.push({ name: textOf(identTree) });
+  } else if (tree.tag === "lambda1_typed") {
+    // ident ws ":" ws type_expr ws "=>" ws expr
+    const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
+    if (!identTree) throw new Error("lambda1_typed: missing ident");
+    // Find the type_expr (the first type-expr-like branch AFTER the ident)
+    let seen = false;
+    let typeExpr: any | undefined = undefined;
+    for (const ch of c) {
+      if (ch === identTree) { seen = true; continue; }
+      if (!seen) continue;
+      if (ch.kind === "branch" && (ch.tag === "type_generic" || ch.tag === "type_union" || ch.tag === "ident")) {
+        typeExpr = buildTypeExpr(ch, outerParamMap);
+        break;
+      }
+    }
+    typedParams.push({ name: textOf(identTree), typeExpr });
   } else {
-    // lambdaN: param_list branch holds them
-    const paramListTree = c.find(ch => ch.kind === "branch" && ch.tag === "param_list");
+    // lambdaN: typed_param_list branch holds them
+    const paramListTree = c.find(ch => ch.kind === "branch" && ch.tag === "typed_param_list");
     if (paramListTree) {
-      collectIdents(paramListTree, paramNames);
+      collectTypedParams(paramListTree, outerParamMap, typedParams);
     }
   }
 
   // Build Params and extend paramMap
+  const paramNames = typedParams.map(p => p.name);
   const params = paramNames.map((n, i) => makeParam(i, n));
   const innerMap = new Map(outerParamMap);
   for (let i = 0; i < paramNames.length; i++) innerMap.set(paramNames[i], params[i]);
@@ -456,16 +896,12 @@ function buildLambda(tree: ParseTree, outerParamMap: Map<string, any>): any {
       bodyTree = ch;
       break;
     }
-    if (ch.kind === "branch" && !ch.tag) {
-      // An unwrapped passthrough — descend
-      const inner = findTaggedChild([ch], [...EXPRESSION_TAGS]);
-      if (inner) { bodyTree = inner; break; }
-    }
   }
   if (!bodyTree) throw new Error("lambda: missing body");
 
   const body = buildExpr(bodyTree, innerMap);
-  return makeComposedFn(params, body);
+  const fn = makeComposedFn(params, body);
+  return maybeTyped(fn, typedParams, undefined);
 }
 
 function collectIdents(tree: ParseTree, out: string[]): void {
@@ -500,28 +936,62 @@ export function buildStmt(tree: ParseTree): BuiltBinding {
   const c = tree.children;
 
   if (tag === "binding") {
-    // ident ws '=' ws expr  →  find ident and expr
+    // ident [ws ":" ws type_expr] ws "=" ws expr
     const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
-    const exprTree = c.slice().reverse().find(ch => ch.kind === "branch" && ch.tag !== "ident");
-    if (!identTree || !exprTree) throw new Error("binding: missing ident or expr");
+    if (!identTree) throw new Error("binding: missing ident");
     const name = textOf(identTree);
-    const value = buildExpr(exprTree, new Map());
+
+    // Find optional type annotation (type_expr between ident and "=" leaf)
+    let typeExpr: any | undefined = undefined;
+    const typeTree = findTypeExpr({
+      kind: "branch",
+      tag: undefined,
+      children: c.slice(1, c.findIndex(ch => ch.kind === "leaf" && ch.text === "=")),
+      range: { start: 0, end: 0 },
+    } as any);
+    if (typeTree) typeExpr = buildTypeExpr(typeTree, new Map());
+
+    // Body: last expression-tagged branch after "="
+    let bodyTree: ParseTree | null = null;
+    for (let i = c.length - 1; i >= 0; i--) {
+      const ch = c[i];
+      if (ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
+        bodyTree = ch; break;
+      }
+    }
+    if (!bodyTree) throw new Error("binding: missing expr");
+    let value = buildExpr(bodyTree, new Map());
+    if (typeExpr !== undefined) {
+      value = makeExpr(prim("type_check_binding"), [value, typeExpr]);
+    }
     return { key: name, value };
   }
 
   if (tag === "fn_decl") {
-    // ident "(" ws param_list ws ")" ws "=>" ws expr
+    // ident "(" ws typed_param_list ws ")" [ws ":" ws type_expr] ws "=>" ws expr
     const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
     if (!identTree) throw new Error("fn_decl: missing function name");
     const fnName = textOf(identTree);
 
-    // param_list branch carries tag "param_list" (its production name).
-    const paramNames: string[] = [];
-    const paramListTree = c.find(ch => ch.kind === "branch" && ch.tag === "param_list");
-    if (paramListTree) collectIdents(paramListTree, paramNames);
+    // Collect typed params from typed_param_list
+    const typedParams: TypedParam[] = [];
+    const paramListTree = c.find(ch => ch.kind === "branch" && ch.tag === "typed_param_list");
+    if (paramListTree) collectTypedParams(paramListTree, new Map(), typedParams);
 
-    // Body: the last expression-tagged branch. Must skip non-expr branches
-    // (ws, param_list) and only consider true expressions.
+    // Return type (optional): the first type_expr branch AFTER the ")" leaf
+    let returnTypeExpr: any | undefined = undefined;
+    let afterCloseParen = false;
+    for (const ch of c) {
+      if (ch.kind === "leaf" && ch.text === ")") { afterCloseParen = true; continue; }
+      if (!afterCloseParen) continue;
+      if (ch.kind === "leaf" && ch.text === "=>") break;
+      if (ch.kind === "branch") {
+        const typeTree = findTypeExpr(ch);
+        if (typeTree) { returnTypeExpr = buildTypeExpr(typeTree, new Map()); break; }
+      }
+    }
+
+    // Body: the last expression-tagged branch
     let bodyTree: ParseTree | null = null;
     for (let i = c.length - 1; i >= 0; i--) {
       const ch = c[i];
@@ -531,12 +1001,14 @@ export function buildStmt(tree: ParseTree): BuiltBinding {
     }
     if (!bodyTree) throw new Error("fn_decl: missing body");
 
+    const paramNames = typedParams.map(p => p.name);
     const params = paramNames.map((n, i) => makeParam(i, n));
     const innerMap = new Map<string, any>();
     for (let i = 0; i < paramNames.length; i++) innerMap.set(paramNames[i], params[i]);
     const body = buildExpr(bodyTree, innerMap);
     const fn = makeComposedFn(params, body);
-    return { key: fnName, value: fn };
+    const value = maybeTyped(fn, typedParams, returnTypeExpr);
+    return { key: fnName, value };
   }
 
   // Bare expression (the stmt's whole tree is an expression). Rebuild as expr.

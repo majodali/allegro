@@ -183,14 +183,22 @@ export function buildBaseGrammar(): Grammar {
     rule: nonterm("expr_or"),
   });
 
-  // Level 1 — logical or
+  // Level 1 — logical or (|| and keyword `or`)
   addProduction(g, { name: "expr_or",
-    rule: leftBinary("expr_or", "expr_and", [{ op: "||", tag: "or" }]),
+    rule: alt([
+      seq([nonterm("expr_or"), nonterm("ws"), lit("||"), nonterm("ws"), nonterm("expr_and")], { name: "or" }),
+      seq([nonterm("expr_or"), nonterm("ws_req"), lit("or"), nonterm("ws_req"), nonterm("expr_and")], { name: "or" }),
+      nonterm("expr_and"),
+    ]),
   });
 
-  // Level 2 — logical and
+  // Level 2 — logical and (&& and keyword `and`)
   addProduction(g, { name: "expr_and",
-    rule: leftBinary("expr_and", "expr_eq", [{ op: "&&", tag: "and" }]),
+    rule: alt([
+      seq([nonterm("expr_and"), nonterm("ws"), lit("&&"), nonterm("ws"), nonterm("expr_eq")], { name: "and" }),
+      seq([nonterm("expr_and"), nonterm("ws_req"), lit("and"), nonterm("ws_req"), nonterm("expr_eq")], { name: "and" }),
+      nonterm("expr_eq"),
+    ]),
   });
 
   // Level 3 — equality
@@ -201,13 +209,16 @@ export function buildBaseGrammar(): Grammar {
     ]),
   });
 
-  // Level 4 — comparison
+  // Level 4 — comparison (ordering + type operators)
   addProduction(g, { name: "expr_cmp",
-    rule: leftBinary("expr_cmp", "expr_add", [
-      { op: "<=", tag: "lte" },
-      { op: ">=", tag: "gte" },
-      { op: "<",  tag: "lt" },
-      { op: ">",  tag: "gt" },
+    rule: alt([
+      seq([nonterm("expr_cmp"), nonterm("ws"), lit("<="), nonterm("ws"), nonterm("expr_add")], { name: "lte" }),
+      seq([nonterm("expr_cmp"), nonterm("ws"), lit(">="), nonterm("ws"), nonterm("expr_add")], { name: "gte" }),
+      seq([nonterm("expr_cmp"), nonterm("ws"), lit("<"),  nonterm("ws"), nonterm("expr_add")], { name: "lt" }),
+      seq([nonterm("expr_cmp"), nonterm("ws"), lit(">"),  nonterm("ws"), nonterm("expr_add")], { name: "gt" }),
+      seq([nonterm("expr_cmp"), nonterm("ws_req"), lit("instanceof"), nonterm("ws_req"), nonterm("expr_add")], { name: "instanceof" }),
+      seq([nonterm("expr_cmp"), nonterm("ws_req"), lit("subtypeof"),  nonterm("ws_req"), nonterm("expr_add")], { name: "subtypeof" }),
+      nonterm("expr_add"),
     ]),
   });
 
@@ -221,18 +232,33 @@ export function buildBaseGrammar(): Grammar {
 
   // Level 6 — multiplicative
   addProduction(g, { name: "expr_mul",
-    rule: leftBinary("expr_mul", "expr_unary", [
+    rule: leftBinary("expr_mul", "expr_of", [
       { op: "*", tag: "mul" },
       { op: "/", tag: "div" },
       { op: "%", tag: "mod" },
     ]),
   });
 
-  // Level 7 — unary prefix ops
+  // Level 7a — `<name> of <expr>`: MultiValue component access.
+  //   type of x   → mv_get(x, "type")
+  //   error of y  → mv_get(y, "error")
+  //
+  // LHS is syntactically an ident OR the `error` keyword (which is reserved
+  // and wouldn't match ident). Non-recursive: only one `of` per chain.
+  addProduction(g, { name: "expr_of",
+    rule: alt([
+      seq([nonterm("ident"),    nonterm("ws_req"), lit("of"), nonterm("ws_req"), nonterm("expr_unary")], { name: "of" }),
+      seq([lit("error"),        nonterm("ws_req"), lit("of"), nonterm("ws_req"), nonterm("expr_unary")], { name: "of_error" }),
+      nonterm("expr_unary"),
+    ]),
+  });
+
+  // Level 7b — unary prefix ops
   addProduction(g, { name: "expr_unary",
     rule: alt([
       seq([lit("-"), nonterm("expr_unary")], { name: "neg" }),
       seq([lit("!"), nonterm("expr_unary")], { name: "not" }),
+      seq([lit("error"), nonterm("ws_req"), nonterm("expr_unary")], { name: "error_expr" }),
       nonterm("expr_post"),
     ]),
   });
@@ -261,6 +287,7 @@ export function buildBaseGrammar(): Grammar {
   // guard anyway, but being explicit matches clearly).
   addProduction(g, { name: "expr_atom",
     rule: alt([
+      nonterm("when_expr"),
       nonterm("if_expr"),
       nonterm("lambda"),
       nonterm("float"),
@@ -320,6 +347,113 @@ export function buildBaseGrammar(): Grammar {
     attrs: { name: "paren" },
   });
 
+  // --- `when/is/then` pattern matching ---
+  //
+  // Inline : `when expr is pattern [and guard] then result else result`
+  // Multi  : `when expr (is pattern [and guard] then result)+` (cases separated
+  //          by continuation whitespace; no else required)
+  //
+  // The grammar expresses one-or-more cases with an optional else branch.
+  // Limitation: deeply nested `when` inside case bodies requires parens or
+  // explicit `else` branches (no column-based scope tracking yet).
+  addProduction(g, { name: "when_expr",
+    rule: seq([
+      lit("when"), nonterm("ws_req"), nonterm("expr"),
+      nonterm("ws"), nonterm("when_case"),
+      rep(seq([nonterm("ws"), nonterm("when_case")]), { min: 0 }),
+      opt(seq([nonterm("ws"), lit("else"), nonterm("ws_req"), nonterm("expr")])),
+    ], { name: "when_expr" }),
+  });
+
+  addProduction(g, { name: "when_case",
+    rule: seq([
+      lit("is"), nonterm("ws_req"), nonterm("pattern"),
+      opt(seq([nonterm("ws_req"), lit("and"), nonterm("ws_req"), nonterm("expr")])),
+      nonterm("ws_req"), lit("then"), nonterm("ws_req"), nonterm("expr"),
+    ], { name: "when_case" }),
+  });
+
+  // Pattern grammar. Order matters — more-specific patterns first.
+  addProduction(g, { name: "pattern",
+    rule: alt([
+      nonterm("pattern_struct"),   // {x, y} / {x: sub}
+      nonterm("pattern_typed"),    // Type(x, y)
+      nonterm("pattern_wildcard"), // _
+      nonterm("pattern_string"),   // "..."
+      nonterm("pattern_number"),   // 42, -3
+      nonterm("pattern_bool"),     // true/false
+      nonterm("pattern_none"),     // none
+      nonterm("pattern_ident"),    // var (binding or resolve-first)
+    ]),
+  });
+
+  addProduction(g, { name: "pattern_wildcard",
+    rule: seq([lit("_"), guarded(lit(""), {
+      kind: "notFollowedBy",
+      rule: cls("[a-zA-Z_0-9]"),
+    } as any)], { name: "pattern_wildcard" }),
+  });
+
+  addProduction(g, { name: "pattern_number",
+    rule: alt([
+      seq([lit("-"), regex(/[0-9]+/)], { name: "pattern_neg_number" }),
+      seq([regex(/[0-9]+/)],           { name: "pattern_number" }),
+    ]),
+  });
+
+  addProduction(g, { name: "pattern_string",
+    rule: nonterm("string"),
+    attrs: { name: "pattern_string" },
+  });
+
+  addProduction(g, { name: "pattern_bool",
+    rule: alt([lit("true"), lit("false")]),
+    attrs: { name: "pattern_bool" },
+  });
+
+  addProduction(g, { name: "pattern_none",
+    rule: lit("none"),
+    attrs: { name: "pattern_none" },
+  });
+
+  addProduction(g, { name: "pattern_ident",
+    rule: nonterm("ident"),
+    attrs: { name: "pattern_ident" },
+  });
+
+  addProduction(g, { name: "pattern_struct",
+    rule: seq([
+      lit("{"), nonterm("ws_any"),
+      opt(rep(nonterm("field_pattern"), {
+        min: 1,
+        sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
+      })),
+      nonterm("ws_any"), lit("}"),
+    ], { name: "pattern_struct" }),
+  });
+
+  addProduction(g, { name: "pattern_typed",
+    rule: seq([
+      nonterm("ident"),
+      lit("("), nonterm("ws_any"),
+      opt(rep(nonterm("field_pattern"), {
+        min: 1,
+        sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
+      })),
+      nonterm("ws_any"), lit(")"),
+    ], { name: "pattern_typed" }),
+  });
+
+  // Field patterns: `name` (shorthand for `name: name`) or `name: subpattern`
+  addProduction(g, { name: "field_pattern",
+    rule: alt([
+      seq([nonterm("ident"), nonterm("ws"), lit(":"), nonterm("ws"), nonterm("pattern")],
+        { name: "field_pattern_renamed" }),
+      nonterm("ident"),
+    ]),
+    attrs: { name: "field_pattern" },
+  });
+
   // if-then-else (right-associative by construction: else branch is expr)
   addProduction(g, { name: "if_expr",
     rule: seq([
@@ -332,14 +466,18 @@ export function buildBaseGrammar(): Grammar {
     ], { name: "if" }),
   });
 
-  // Lambda: `x => expr` (single param, no parens) or `(x, y) => expr`.
+  // Lambda: `x => expr`, `x: T => expr`, `(x, y) => expr`, `(x: T, y: U) => expr`.
   addProduction(g, { name: "lambda",
     rule: alt([
+      // Single-param with type: ident : type => expr
+      seq([nonterm("ident"), nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr"),
+           nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr")],
+        { name: "lambda1_typed" }),
       // Single-param: ident => expr
       seq([nonterm("ident"), nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr")],
         { name: "lambda1" }),
-      // Multi-param: (ident, ...) => expr
-      seq([lit("("), nonterm("ws_any"), nonterm("param_list"), nonterm("ws_any"), lit(")"),
+      // Multi-param: (typed_params) => expr
+      seq([lit("("), nonterm("ws_any"), nonterm("typed_param_list"), nonterm("ws_any"), lit(")"),
            nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr")],
         { name: "lambdaN" }),
     ]),
@@ -350,17 +488,63 @@ export function buildBaseGrammar(): Grammar {
     rule: opt(spaced_list("ident", ",")),
   });
 
+  // --- Type expressions (Phase 2c-4 — simple + generics) ---
+  //
+  // type_expr = type_expr_union
+  // type_expr_union = type_expr_atom ("|" type_expr_atom)*
+  // type_expr_atom = ident ("[" type_expr_args "]")? | "{" type_fields "}"
+  //
+  // For now, just ident-based types with generics. Union and structural are
+  // supported. Refinements (`&&`) deferred.
+
+  addProduction(g, { name: "type_expr",
+    rule: alt([
+      seq([nonterm("type_expr_atom"), nonterm("ws"), lit("|"), nonterm("ws"), nonterm("type_expr")], { name: "type_union" }),
+      nonterm("type_expr_atom"),
+    ]),
+  });
+
+  addProduction(g, { name: "type_expr_atom",
+    rule: alt([
+      // Generic: Name[T, U, ...]
+      seq([nonterm("ident"), lit("["), nonterm("ws_any"),
+           rep(nonterm("type_expr"), { min: 1, sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]) }),
+           nonterm("ws_any"), lit("]")], { name: "type_generic" }),
+      // Simple: Name
+      nonterm("ident"),
+    ]),
+  });
+
+  // Typed parameter: `ident` or `ident : type_expr`
+  addProduction(g, { name: "typed_param",
+    rule: seq([
+      nonterm("ident"),
+      opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
+    ], { name: "typed_param" }),
+  });
+
+  addProduction(g, { name: "typed_param_list",
+    rule: opt(rep(nonterm("typed_param"), {
+      min: 1,
+      sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
+    })),
+  });
+
   // --- Statements ---
 
   addProduction(g, { name: "stmt",
     rule: alt([
-      // Function def: `name(params) => body`
-      seq([nonterm("ident"), lit("("), nonterm("ws_any"), nonterm("param_list"),
-           nonterm("ws_any"), lit(")"), nonterm("ws"), lit("=>"), nonterm("ws"),
+      // Function def with optional return type: `name(params)[: ret] => body`
+      seq([nonterm("ident"), lit("("), nonterm("ws_any"), nonterm("typed_param_list"),
+           nonterm("ws_any"), lit(")"),
+           opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
+           nonterm("ws"), lit("=>"), nonterm("ws"),
            nonterm("expr")],
         { name: "fn_decl" }),
-      // Binding: `name = expr`
-      seq([nonterm("ident"), nonterm("ws"), lit("="), nonterm("ws"), nonterm("expr")],
+      // Binding with optional type annotation: `name[: type] = expr`
+      seq([nonterm("ident"),
+           opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
+           nonterm("ws"), lit("="), nonterm("ws"), nonterm("expr")],
         { name: "binding" }),
       // Bare expression
       nonterm("expr"),
