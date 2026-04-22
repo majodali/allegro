@@ -3822,6 +3822,7 @@ test("grammar2/analyzer: opt-in disjointness catches real ambiguity", () => {
 });
 
 import { assertClean as g2assertClean } from "./grammar2/analyzer.js";
+import { grammarToAllegro } from "./grammar2/to-allegro.js";
 
 test("grammar2/analyzer: assertClean throws on grammar errors", () => {
   const g = g2.makeGrammar({ start: "s" });
@@ -3830,6 +3831,95 @@ test("grammar2/analyzer: assertClean throws on grammar errors", () => {
   try { g2assertClean(g); }
   catch (e: any) { threw = e.message.includes("E_UNDEFINED_NAME"); }
   eq(threw, true);
+});
+
+// --- Phase 5: Allegro-native analyzer (proof-of-concept) ---
+//
+// Verifies that the Allegro-implemented grammar analyzer in
+// `lib/grammar-analyzer.alg` works end-to-end: parse a ~4KB .alg module,
+// invoke its `check_defined` and `check_reachable` functions on a small
+// grammar, compare results to the TS reference.
+//
+// Parse+eval of the analyzer module takes ~40s on current interpreter —
+// the bulk of the time is parsing due to the stratified grammar's
+// backtracking. Performance work is Phase 9.
+
+let _analyzerCtx: any = null;
+function loadAllegroAnalyzer(): any {
+  if (_analyzerCtx) return _analyzerCtx;
+  const src = fs.readFileSync("lib/grammar-analyzer.alg", "utf-8");
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  _analyzerCtx = evalCtx;
+  return evalCtx;
+}
+
+function callAllegroAnalyzer(fnName: string, grammar: g2.Grammar): any[] {
+  const evalCtx = loadAllegroAnalyzer();
+  const fn = evalCtx.bindings.get(fnName)?.value;
+  if (!fn) throw new Error(`${fnName} not found in analyzer context`);
+  const result = evaluate(makeExpr(fn, [grammarToAllegro(grammar)]), evalCtx);
+  // result is an Array (typed MultiValue). Extract entries.
+  const p = primaryOf(result);
+  if (p.kind !== ValueKind.Context) return [];
+  const len = Number(((p.bindings.get("__length")?.value) as any)?.data ?? 0n);
+  const out: any[] = [];
+  for (let i = 0; i < len; i++) {
+    const entry = p.bindings.get(String(i))?.value;
+    const entryP = primaryOf(entry!);
+    if (entryP.kind === ValueKind.Context) {
+      const code = entryP.bindings.get("code")?.value;
+      const msg = entryP.bindings.get("message")?.value;
+      const prod = entryP.bindings.get("production")?.value;
+      out.push({
+        code:       code ? bitsToString(primaryOf(code) as any) : undefined,
+        message:    msg ? bitsToString(primaryOf(msg) as any) : undefined,
+        production: prod && (prod as any).kind === ValueKind.Bits ? bitsToString(prod as any) :
+                    prod ? bitsToString(primaryOf(prod) as any) : undefined,
+      });
+    }
+  }
+  return out;
+}
+
+test("Phase 5: Allegro analyzer detects undefined name (matches TS analyzer)", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.seq([g2.lit("a"), g2.nonterm("missing")]) });
+
+  // Allegro analyzer
+  const algErrs = callAllegroAnalyzer("check_defined", g);
+  // TS analyzer
+  const tsReport = g2analyze(g);
+
+  // Both should report exactly one E_UNDEFINED_NAME error.
+  eq(algErrs.length, 1, "Allegro analyzer found 1 error");
+  eq(algErrs[0].code, "E_UNDEFINED_NAME");
+  eq(tsReport.errors.filter(e => e.code === "E_UNDEFINED_NAME").length, 1, "TS analyzer agrees");
+});
+
+test("Phase 5: Allegro analyzer detects unreachable production (matches TS analyzer)", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s",      rule: g2.lit("a") });
+  g2.addProduction(g, { name: "orphan", rule: g2.lit("b") });
+
+  const algWarns = callAllegroAnalyzer("check_reachable", g);
+  const tsReport = g2analyze(g);
+
+  eq(algWarns.length, 1);
+  eq(algWarns[0].code, "W_UNREACHABLE");
+  eq(algWarns[0].production, "orphan");
+  eq(tsReport.warnings.filter(w => w.code === "W_UNREACHABLE" && w.production === "orphan").length, 1);
+});
+
+test("Phase 5: Allegro analyzer finds no errors in a clean grammar", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.seq([g2.lit("a"), g2.nonterm("b")]) });
+  g2.addProduction(g, { name: "b", rule: g2.lit("b") });
+
+  const algErrs = callAllegroAnalyzer("check_defined", g);
+  const algWarns = callAllegroAnalyzer("check_reachable", g);
+
+  eq(algErrs.length, 0);
+  eq(algWarns.length, 0);
 });
 
 // --- Phase 2b: base (Allegretto) grammar in grammar2 formalism ---

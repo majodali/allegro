@@ -1594,6 +1594,20 @@ const objectMethods: Record<string, PrimitiveFnImpl> = {
     if (!b?.value) throw new AllegroError(`Object.get: '${key}' not found`);
     return b.value;
   },
+  has: (args) => {
+    const ctx = args[0] as ContextValue;
+    const key = bitsToString(asBitsTyped(args[1], "Object.has"));
+    const b = ctx.bindings.get(key);
+    return withType(makeInt(b?.value !== undefined ? 1 : 0), BoolType);
+  },
+  tryGet: (args) => {
+    // Like .get but returns none if the key is absent, instead of throwing.
+    const ctx = args[0] as ContextValue;
+    const key = bitsToString(asBitsTyped(args[1], "Object.tryGet"));
+    const b = ctx.bindings.get(key);
+    if (!b?.value) return noneSingleton;
+    return b.value;
+  },
   eq: (args) => makeInt(args[0] === args[1] ? 1 : 0),
   toString: ((args: Value[]) => {
     const ctx = args[0] as ContextValue;

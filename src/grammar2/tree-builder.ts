@@ -144,11 +144,20 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     }
 
     case "if": {
-      // Children: "if" ws_req <cond> ws_req "then" ws_req <then> ws_req "else" ws_req <else>
-      // Filter to just expression-tagged branches (skips ws, ws_req, keyword leaves).
-      const exprBranches = c.filter(ch =>
-        ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag),
-      );
+      // Children include the condition as a direct expr branch, then for
+      // then/else a `fn_body` wrapper (inline expr or indented block).
+      // Collect expression trees — either direct expr-tagged branches, or
+      // descend through fn_body wrappers.
+      const exprBranches: ParseTree[] = [];
+      for (const ch of c) {
+        if (ch.kind !== "branch") continue;
+        if (ch.tag === "fn_body") {
+          const inner = findBodyExpr([ch]);
+          if (inner) exprBranches.push(inner);
+        } else if (ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
+          exprBranches.push(ch);
+        }
+      }
       if (exprBranches.length < 3) throw new Error(`if: expected 3 expressions, got ${exprBranches.length}`);
       const condV = buildExpr(exprBranches[0], paramMap);
       const thenV = buildExpr(exprBranches[1], paramMap);
@@ -564,6 +573,7 @@ function buildWhenCase(tree: ParseTree, paramMap: Map<string, any>): { pattern: 
   if (tree.kind !== "branch") throw new Error("buildWhenCase: not a branch");
 
   // Flatten: collect leaves (is/and/then) and tagged branches (pattern_* + expr).
+  // fn_body wrappers get unwrapped to their inner block_expr / expression.
   type Item = { kind: "leaf"; text: string } | { kind: "tagged"; branch: ParseTree };
   const items: Item[] = [];
   const walk = (t: ParseTree): void => {
@@ -575,6 +585,11 @@ function buildWhenCase(tree: ParseTree, paramMap: Map<string, any>): { pattern: 
     }
     if (t.kind !== "branch") return;
     if (t.tag === "ws" || t.tag === "ws_req" || t.tag === "ws_any") return;
+    if (t.tag === "fn_body") {
+      const inner = findBodyExpr([t]);
+      if (inner) items.push({ kind: "tagged", branch: inner });
+      return;
+    }
     if (t.tag && (isPatternTag(t.tag) || EXPRESSION_TAGS.has(t.tag))) {
       items.push({ kind: "tagged", branch: t });
       return;

@@ -292,13 +292,14 @@ export function buildBaseGrammar(): Grammar {
 
   // Level 8 — postfix: function calls, dot access, bracket indexing.
   // Left-recursive so `f(x).y[0]` parses left-to-right as (((f)(x)).y)[0].
-  // Bracketed contexts use `ws_any` so args and indices may span lines freely.
+  // `ws` before the opener allows multi-line chains (e.g. `xs\n  .map(f)`).
+  // Bracketed contexts use `ws_any` so args/indices may span lines freely.
   addProduction(g, { name: "expr_post",
     rule: alt([
-      seq([nonterm("expr_post"), lit("("), nonterm("ws_any"),
+      seq([nonterm("expr_post"), nonterm("ws"), lit("("), nonterm("ws_any"),
            nonterm("args"), nonterm("ws_any"), lit(")")], { name: "call" }),
-      seq([nonterm("expr_post"), lit("."), nonterm("ident")], { name: "dot" }),
-      seq([nonterm("expr_post"), lit("["), nonterm("ws_any"),
+      seq([nonterm("expr_post"), nonterm("ws"), lit("."), nonterm("ws"), nonterm("ident")], { name: "dot" }),
+      seq([nonterm("expr_post"), nonterm("ws"), lit("["), nonterm("ws_any"),
            nonterm("expr"), nonterm("ws_any"), lit("]")], { name: "bracket" }),
       nonterm("expr_atom"),
     ]),
@@ -359,31 +360,37 @@ export function buildBaseGrammar(): Grammar {
     ]),
   });
 
-  // Array literal: `[expr, expr, ...]` — zero or more elements.
-  // Uses ws_any inside so multi-line arrays work.
+  // Array literal: `[expr, expr, ...]` — zero or more elements, optional
+  // trailing comma. Uses ws_any inside so multi-line arrays work.
   addProduction(g, { name: "array_lit",
     rule: seq([
       lit("["),
       nonterm("ws_any"),
-      opt(rep(nonterm("expr"), {
-        min: 1,
-        sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
-      })),
+      opt(seq([
+        rep(nonterm("expr"), {
+          min: 1,
+          sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
+        }),
+        opt(seq([nonterm("ws_any"), lit(",")])),
+      ])),
       nonterm("ws_any"),
       lit("]"),
     ], { name: "array_lit" }),
   });
 
-  // Object literal: `{key: expr, key: expr, ...}`. Keys are identifiers.
-  // Uses ws_any inside so multi-line objects work.
+  // Object literal: `{key: expr, key: expr, ...}`. Keys are identifiers,
+  // optional trailing comma. Uses ws_any inside so multi-line objects work.
   addProduction(g, { name: "object_lit",
     rule: seq([
       lit("{"),
       nonterm("ws_any"),
-      opt(rep(nonterm("object_field"), {
-        min: 1,
-        sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
-      })),
+      opt(seq([
+        rep(nonterm("object_field"), {
+          min: 1,
+          sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
+        }),
+        opt(seq([nonterm("ws_any"), lit(",")])),
+      ])),
       nonterm("ws_any"),
       lit("}"),
     ], { name: "object_lit" }),
@@ -422,11 +429,12 @@ export function buildBaseGrammar(): Grammar {
     ], { name: "when_expr" }),
   });
 
+  // Body-after-then uses fn_body so an indented block is allowed.
   addProduction(g, { name: "when_case",
     rule: seq([
       lit("is"), nonterm("ws_req"), nonterm("pattern"),
       opt(seq([nonterm("ws_req"), lit("and"), nonterm("ws_req"), nonterm("expr")])),
-      nonterm("ws_req"), lit("then"), nonterm("ws_req"), nonterm("expr"),
+      nonterm("ws_req"), lit("then"), nonterm("fn_body"),
     ], { name: "when_case" }),
   });
 
@@ -511,15 +519,13 @@ export function buildBaseGrammar(): Grammar {
     attrs: { name: "field_pattern" },
   });
 
-  // if-then-else (right-associative by construction: else branch is expr)
+  // if-then-else. Branches use fn_body so they can be indented blocks.
   addProduction(g, { name: "if_expr",
     rule: seq([
       lit("if"),    nonterm("ws_req"),
       nonterm("expr"), nonterm("ws_req"),
-      lit("then"),  nonterm("ws_req"),
-      nonterm("expr"), nonterm("ws_req"),
-      lit("else"),  nonterm("ws_req"),
-      nonterm("expr"),
+      lit("then"),  nonterm("fn_body"), nonterm("ws_req"),
+      lit("else"),  nonterm("fn_body"),
     ], { name: "if" }),
   });
 
