@@ -3853,16 +3853,28 @@ function loadAllegroAnalyzer(): any {
   return evalCtx;
 }
 
-function callAllegroAnalyzer(fnName: string, grammar: g2.Grammar): any[] {
+/** Call an Allegro analyzer function with `(grammar)` and return the raw result Value. */
+function callAllegroFn1(fnName: string, grammar: g2.Grammar): any {
   const evalCtx = loadAllegroAnalyzer();
   const fn = evalCtx.bindings.get(fnName)?.value;
   if (!fn) throw new Error(`${fnName} not found in analyzer context`);
-  const result = evaluate(makeExpr(fn, [grammarToAllegro(grammar)]), evalCtx);
-  // result is an Array (typed MultiValue). Extract entries.
+  return evaluate(makeExpr(fn, [grammarToAllegro(grammar)]), evalCtx);
+}
+
+/** Call an Allegro analyzer function with `(grammar, nullable)` and return the raw result. */
+function callAllegroFn2(fnName: string, grammar: g2.Grammar, nullable: any): any {
+  const evalCtx = loadAllegroAnalyzer();
+  const fn = evalCtx.bindings.get(fnName)?.value;
+  if (!fn) throw new Error(`${fnName} not found in analyzer context`);
+  return evaluate(makeExpr(fn, [grammarToAllegro(grammar), nullable]), evalCtx);
+}
+
+/** Extract an array of `{code, message, production}` error/warning records. */
+function extractErrorList(result: any): { code?: string; message?: string; production?: string }[] {
   const p = primaryOf(result);
   if (p.kind !== ValueKind.Context) return [];
   const len = Number(((p.bindings.get("__length")?.value) as any)?.data ?? 0n);
-  const out: any[] = [];
+  const out: { code?: string; message?: string; production?: string }[] = [];
   for (let i = 0; i < len; i++) {
     const entry = p.bindings.get(String(i))?.value;
     const entryP = primaryOf(entry!);
@@ -3879,6 +3891,26 @@ function callAllegroAnalyzer(fnName: string, grammar: g2.Grammar): any[] {
     }
   }
   return out;
+}
+
+/** Extract an array of strings from an Allegro Array result. */
+function extractStringList(result: any): string[] {
+  const p = primaryOf(result);
+  if (p.kind !== ValueKind.Context) return [];
+  const len = Number(((p.bindings.get("__length")?.value) as any)?.data ?? 0n);
+  const out: string[] = [];
+  for (let i = 0; i < len; i++) {
+    const entry = p.bindings.get(String(i))?.value;
+    if (!entry) continue;
+    const entryP = primaryOf(entry);
+    if (entryP.kind === ValueKind.Bits) out.push(bitsToString(entryP));
+  }
+  return out;
+}
+
+/** Legacy helper — returns error-list shape for `check_defined` / `check_reachable`. */
+function callAllegroAnalyzer(fnName: string, grammar: g2.Grammar): any[] {
+  return extractErrorList(callAllegroFn1(fnName, grammar));
 }
 
 test("Phase 5: Allegro analyzer detects undefined name (matches TS analyzer)", () => {
@@ -3920,6 +3952,137 @@ test("Phase 5: Allegro analyzer finds no errors in a clean grammar", () => {
 
   eq(algErrs.length, 0);
   eq(algWarns.length, 0);
+});
+
+test("Phase 5: Allegro analyzer detects undefined start production", () => {
+  const g = g2.makeGrammar({ start: "missing_start" });
+  g2.addProduction(g, { name: "s", rule: g2.lit("a") });
+
+  const algErrs = callAllegroAnalyzer("check_defined", g);
+  eq(algErrs.length, 1);
+  eq(algErrs[0].code, "E_UNDEFINED_START");
+});
+
+test("Phase 5: Allegro analyzer computes nullability (matches TS reference)", () => {
+  // s → opt("a") [nullable]; t → "b" [not nullable]; u → s [nullable, via s]
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.opt(g2.lit("a")) });
+  g2.addProduction(g, { name: "t", rule: g2.lit("b") });
+  g2.addProduction(g, { name: "u", rule: g2.nonterm("s") });
+
+  const algNullable = extractStringList(callAllegroFn1("compute_nullability", g)).sort();
+  const tsReport = g2analyze(g);
+  const tsNullable = [...tsReport.nullable].sort();
+
+  eq(algNullable.join(","), tsNullable.join(","));
+  eq(algNullable.includes("s"), true);
+  eq(algNullable.includes("u"), true);
+  eq(algNullable.includes("t"), false);
+});
+
+test("Phase 5: Allegro analyzer detects infinite-rep (rep of nullable with no sep)", () => {
+  // s → (opt("a"))*  — rep of a nullable item with no non-nullable separator
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.rep(g2.opt(g2.lit("a"))) });
+
+  const nullable = callAllegroFn1("compute_nullability", g);
+  const algErrs = extractErrorList(callAllegroFn2("check_infinite_rep", g, nullable));
+  const tsReport = g2analyze(g);
+
+  eq(algErrs.length, 1);
+  eq(algErrs[0].code, "E_INFINITE_REP");
+  eq(tsReport.errors.filter(e => e.code === "E_INFINITE_REP").length, 1);
+});
+
+test("Phase 5: Allegro analyzer passes rep with non-nullable item", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.rep(g2.lit("a")) });
+
+  const nullable = callAllegroFn1("compute_nullability", g);
+  const algErrs = extractErrorList(callAllegroFn2("check_infinite_rep", g, nullable));
+  eq(algErrs.length, 0);
+});
+
+test("Phase 5: Allegro analyzer detects undefined reserved set", () => {
+  // s → guarded("x", reserved("missing_set")) — references a set that was never declared
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, {
+    name: "s",
+    rule: g2.guarded(g2.lit("x"), g2.reserved("missing_set")),
+  });
+
+  const algErrs = extractErrorList(callAllegroFn1("check_reservations", g));
+  const tsReport = g2analyze(g);
+
+  eq(algErrs.length, 1);
+  eq(algErrs[0].code, "E_UNDEFINED_RESERVED_SET");
+  eq(tsReport.errors.filter(e => e.code === "E_UNDEFINED_RESERVED_SET").length, 1);
+});
+
+test("Phase 5: Allegro analyzer passes declared reserved set", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g.reserved.set("kw", new Set(["if", "then", "else"]));
+  g2.addProduction(g, {
+    name: "s",
+    rule: g2.guarded(g2.regex(/[a-z]+/), g2.reserved("kw")),
+  });
+
+  const algErrs = extractErrorList(callAllegroFn1("check_reservations", g));
+  eq(algErrs.length, 0);
+});
+
+test("Phase 5: Allegro analyzer detects left recursion (direct and via nullable prefix)", () => {
+  // s → s "a" | "b"      — direct left recursion
+  // t → opt(x) t "c" | "d"  — left recursion via nullable prefix
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, {
+    name: "s",
+    rule: g2.alt([
+      g2.seq([g2.nonterm("s"), g2.lit("a")]),
+      g2.lit("b"),
+    ]),
+  });
+  g2.addProduction(g, {
+    name: "t",
+    rule: g2.alt([
+      g2.seq([g2.opt(g2.lit("x")), g2.nonterm("t"), g2.lit("c")]),
+      g2.lit("d"),
+    ]),
+  });
+  g2.addProduction(g, { name: "u", rule: g2.lit("u") }); // not LR
+
+  const nullable = callAllegroFn1("compute_nullability", g);
+  const algLR = extractStringList(callAllegroFn2("check_left_recursion", g, nullable)).sort();
+  const tsReport = g2analyze(g);
+  const tsLR = [...tsReport.leftRec].sort();
+
+  eq(algLR.join(","), tsLR.join(","));
+  eq(algLR.includes("s"), true);
+  eq(algLR.includes("t"), true);
+  eq(algLR.includes("u"), false);
+});
+
+test("Phase 5: Allegro analyze() top-level returns unified report", () => {
+  // One grammar exercising every check at once.
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s",      rule: g2.seq([g2.lit("a"), g2.nonterm("missing")]) }); // E_UNDEFINED_NAME
+  g2.addProduction(g, { name: "orphan", rule: g2.lit("b") });                                   // W_UNREACHABLE
+  g2.addProduction(g, { name: "lr",     rule: g2.nonterm("lr") });                              // left rec (unreachable too)
+
+  const result = callAllegroFn1("analyze", g);
+  const p = primaryOf(result);
+  eq(p.kind, ValueKind.Context, "analyze returned an object");
+  if (p.kind !== ValueKind.Context) return;
+
+  const errors   = extractErrorList(p.bindings.get("errors")!.value);
+  const warnings = extractErrorList(p.bindings.get("warnings")!.value);
+  const nullable = extractStringList(p.bindings.get("nullable")!.value);
+  const leftRec  = extractStringList(p.bindings.get("leftRec")!.value);
+
+  eq(errors.some(e => e.code === "E_UNDEFINED_NAME"), true);
+  eq(warnings.some(w => w.code === "W_UNREACHABLE"), true);
+  eq(Array.isArray(nullable), true);
+  eq(leftRec.includes("lr"), true);
 });
 
 // --- Phase 2b: base (Allegretto) grammar in grammar2 formalism ---

@@ -75,6 +75,8 @@ High-level goals, roughly ordered by dependency:
 - [x] Expression continuation via offside rule — multi-line if/then/else, operator continuation, nested expressions. Lexer suppresses Newline before Indent, parser tracks continuationDepth.
 - [x] Earley parser retained for standalone grammars
 - [x] Runtime grammar extension Phase 1 — module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix`, `use_grammar NAME` header activates module's `GrammarFragment` before parsing, lambda body substituted as AST template (no eval at parse time). Demo: `lib/pow.alg` with `**` and `neg`.
+- [x] Grammar 2 formalism Phase 1-5 — scannerless engine, builder primitives, TS analyzer (`src/grammar2/analyzer.ts`), Allegretto base grammar, hybrid parser + lexer retirement, `lib/grammar-analyzer.alg` Allegro-native port of the analyzer (all checks except FIRST), memo-bucketing perf fix (42-50× speedup, linear scaling restored).
+- [ ] Grammar 2 Phase 6+ — indent engine, full GLL for left recursion, precedence analyzer, stratified-grammar migration of remaining Allegro syntax, Phase 9 target code emitter.
 
 ### Execution Context & Build Pipeline
 - [ ] Project root file (structure, phases, deps — replaces package.json + tsconfig)
