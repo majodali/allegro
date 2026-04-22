@@ -52,9 +52,14 @@ export interface ParseError {
   actual:   string;
 }
 
-export type ParseResult = ParseOk | ParseFail;
+export type ParseResult = (ParseOk | ParseFail) & { stats?: ParseStats };
 
-export function parse(grammar: Grammar, input: string): ParseResult {
+export interface ParseOptions {
+  /** Collect instrumentation stats. Slight overhead (~5%). */
+  stats?: boolean;
+}
+
+export function parse(grammar: Grammar, input: string, options?: ParseOptions): ParseResult {
   if (!grammar.start) {
     throw new Error("Grammar has no start production");
   }
@@ -62,16 +67,69 @@ export function parse(grammar: Grammar, input: string): ParseResult {
     throw new Error(`Start production '${grammar.start}' not found in grammar`);
   }
   const state = new ParseState(grammar, input);
+  if (options?.stats) state.stats = newStats();
   const startRule: NonTerm = { kind: "nonterm", name: grammar.start };
+  const t0 = options?.stats ? Date.now() : 0;
   const result = matchRule(state, startRule, 0);
+  let out: ParseResult;
   if (!result) {
-    return { ok: false, error: buildFarthestError(state) };
+    out = { ok: false, error: buildFarthestError(state) };
+  } else if (result.nextPos !== input.length) {
+    out = { ok: false, error: buildFarthestError(state) };
+  } else {
+    out = { ok: true, tree: result.tree };
   }
-  if (result.nextPos !== input.length) {
-    // Didn't consume all input; surface the farthest error.
-    return { ok: false, error: buildFarthestError(state) };
+  if (state.stats) {
+    state.stats.durationMs    = Date.now() - t0;
+    state.stats.finalMemoSize = state.memo.size;
+    out.stats = state.stats;
   }
-  return { ok: true, tree: result.tree };
+  return out;
+}
+
+// --- Instrumentation ---
+
+/**
+ * Per-parse statistics. Populated when `parse(... , { stats: true })`.
+ * Useful for profiling the engine — not free; only collected when enabled.
+ */
+export interface ParseStats {
+  /** Total matchRule calls (counts every re-entry, including cache hits). */
+  matchRuleCalls:      number;
+  /** Cache hits (result returned without recomputation). */
+  memoHits:            number;
+  /** Cache misses (new entry created and doMatch ran). */
+  memoMisses:          number;
+  /** Times a match returned the current LR seed (re-entry during iteration). */
+  lrSeedReturns:       number;
+  /** Total LR iterations performed across all productions. */
+  lrIterations:        number;
+  /** Total entries cleared by invalidateAtPos across all LR growth steps. */
+  invalidationCount:   number;
+  /** invalidateAtPos calls — one per LR growth iteration. */
+  invalidationRounds:  number;
+  /** Peak memo size seen during the parse. */
+  peakMemoSize:        number;
+  /** Memo size at end of parse. */
+  finalMemoSize:       number;
+  /** Per-production matchRule call counts (for nonterm rules). */
+  callsByNonTerm:      Map<string, number>;
+  /** Per-production LR iteration counts. */
+  lrIterationsByName:  Map<string, number>;
+  /** Wall-clock time in ms. */
+  durationMs:          number;
+}
+
+function newStats(): ParseStats {
+  return {
+    matchRuleCalls: 0, memoHits: 0, memoMisses: 0,
+    lrSeedReturns: 0, lrIterations: 0,
+    invalidationCount: 0, invalidationRounds: 0,
+    peakMemoSize: 0, finalMemoSize: 0,
+    callsByNonTerm: new Map(),
+    lrIterationsByName: new Map(),
+    durationMs: 0,
+  };
 }
 
 // --- Internal state ---
@@ -84,11 +142,16 @@ class ParseState {
   /** Rules active at the farthest position (for error messages). */
   farthestRules: Rule[] = [];
   /**
-   * Memo cache: key = `${ruleId}@${pos}:${indentKey}`.
-   * Values are either a regular memoized result (MemoEntry) or null (known
-   * failure at this position+indent).
+   * Memo cache indexed by position first, then by rule-within-indent-stack
+   * key. This shape lets `invalidateAtPos` clear only the entries at one
+   * position in O(entries_at_pos) instead of scanning the whole memo. For
+   * a grammar with N productions and M input positions, the previous flat
+   * Map<string, Entry> implementation made invalidation O(NM) per round
+   * and O(N²M) total, which dominated parse time on anything non-trivial.
    */
-  memo: Map<string, MemoEntry | null> = new Map();
+  memo: Map<number, Map<string, MemoEntry | null>> = new Map();
+  /** Total entries across all pos-buckets — tracked for stats. */
+  private _memoSize: number = 0;
   ruleIds: WeakMap<Rule, number> = new WeakMap();
   nextRuleId: number = 1;
 
@@ -98,20 +161,55 @@ class ParseState {
    */
   indentStack: number[] = [0];
 
+  /** Optional stats collector — null means no instrumentation. */
+  stats: ParseStats | null = null;
+
   constructor(grammar: Grammar, input: string) {
     this.grammar = grammar;
     this.input   = input;
   }
 
-  ruleKey(rule: Rule, pos: number): string {
+  /**
+   * Build the within-position key for a (rule, indentStack) lookup. Does
+   * NOT include position (which is the outer map key).
+   */
+  ruleKey(rule: Rule): string {
     const baseKey = rule.kind === "nonterm"
-      ? `nt:${rule.name}@${pos}`
-      : `r${this.ruleId(rule)}@${pos}`;
-    // Include the indent stack in the key. Even though most rules don't
-    // depend on it, including it keeps the memo correct for indent-aware
-    // rules without a static grammar analysis. Cost is modest: stacks are
-    // typically 1-5 elements.
+      ? `nt:${rule.name}`
+      : `r${this.ruleId(rule)}`;
+    // Stacks are typically 1–5 small integers — cheap to serialize.
     return `${baseKey}:${this.indentStack.join(",")}`;
+  }
+
+  memoGet(pos: number, key: string): MemoEntry | null | undefined {
+    const bucket = this.memo.get(pos);
+    if (!bucket) return undefined;
+    return bucket.get(key);
+  }
+
+  memoSet(pos: number, key: string, entry: MemoEntry | null): void {
+    let bucket = this.memo.get(pos);
+    if (!bucket) { bucket = new Map(); this.memo.set(pos, bucket); }
+    const had = bucket.has(key);
+    bucket.set(key, entry);
+    if (!had) this._memoSize++;
+  }
+
+  memoSize(): number { return this._memoSize; }
+
+  /** Delete entries at one position. Returns the number of entries removed. */
+  clearPos(pos: number, keepKey: string): number {
+    const bucket = this.memo.get(pos);
+    if (!bucket) return 0;
+    let removed = 0;
+    for (const [k, entry] of Array.from(bucket.entries())) {
+      if (k === keepKey) continue;
+      if (entry && entry.isLR) continue; // in-progress outer LR — preserve
+      bucket.delete(k);
+      removed++;
+    }
+    this._memoSize -= removed;
+    return removed;
   }
 
   private ruleId(rule: Rule): number {
@@ -166,11 +264,19 @@ interface MemoEntry {
 // --- Rule dispatch ---
 
 function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | null {
-  const key = state.ruleKey(rule, pos);
-  const cached = state.memo.get(key);
+  if (state.stats) {
+    state.stats.matchRuleCalls++;
+    if (rule.kind === "nonterm") {
+      state.stats.callsByNonTerm.set(rule.name, (state.stats.callsByNonTerm.get(rule.name) ?? 0) + 1);
+    }
+  }
+  const key = state.ruleKey(rule);
+  const cached = state.memoGet(pos, key);
   if (cached !== undefined) {
+    if (state.stats) state.stats.memoHits++;
     if (cached === null) return null;
     if (cached.isLR) {
+      if (state.stats) state.stats.lrSeedReturns++;
       cached.lrDetected = true;
       // Return the seed; seed may carry a newIndentStack (rare for LR seeds).
       if (cached.seed?.newIndentStack) state.indentStack = cached.seed.newIndentStack;
@@ -179,17 +285,27 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
     if (cached.result?.newIndentStack) state.indentStack = cached.result.newIndentStack;
     return cached.result;
   }
+  if (state.stats) {
+    state.stats.memoMisses++;
+    const sz = state.memoSize();
+    if (sz > state.stats.peakMemoSize) state.stats.peakMemoSize = sz;
+  }
 
   const snapshot = state.indentStack;
   const entry: MemoEntry = { result: null, isLR: true, seed: null, lrDetected: false };
-  state.memo.set(key, entry);
+  state.memoSet(pos, key, entry);
 
   let result = runDoMatch(state, rule, pos, snapshot);
 
   if (!entry.lrDetected) {
     entry.isLR  = false;
     entry.result = result;
+    // When the result is null, collapse the bucket entry to `null` so
+    // re-entries get cached-null semantics immediately. Otherwise the
+    // caller sees an LR entry with seed=null and interprets it as "LR in
+    // progress". That looks like two failures in a row instead of one.
     if (result === null) {
+      state.memoSet(pos, key, null);
       state.indentStack = snapshot;
       state.advance(pos, [rule]);
     } else if (result.newIndentStack) {
@@ -211,6 +327,13 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
     state.indentStack = snapshot;
     invalidateAtPos(state, pos, key);
     result = runDoMatch(state, rule, pos, snapshot);
+    if (state.stats) {
+      state.stats.lrIterations++;
+      if (rule.kind === "nonterm") {
+        state.stats.lrIterationsByName.set(rule.name,
+          (state.stats.lrIterationsByName.get(rule.name) ?? 0) + 1);
+      }
+    }
     if (++iters > state.input.length + 10) {
       throw new Error(`LR iteration exceeded input length at rule ${rule.kind === "nonterm" ? rule.name : rule.kind} pos ${pos}`);
     }
@@ -219,6 +342,7 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
   entry.isLR  = false;
   entry.result = entry.seed;
   if (entry.seed === null) {
+    state.memoSet(pos, key, null);
     state.indentStack = snapshot;
     state.advance(pos, [rule]);
   } else if (entry.seed.newIndentStack) {
@@ -237,14 +361,9 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
  * iteration.
  */
 function invalidateAtPos(state: ParseState, pos: number, keepKey: string): void {
-  const posMarker = `@${pos}:`;
-  for (const k of Array.from(state.memo.keys())) {
-    if (k === keepKey) continue;
-    if (!k.includes(posMarker)) continue;
-    const entry = state.memo.get(k);
-    if (entry && entry.isLR) continue;  // in-progress LR — preserve
-    state.memo.delete(k);
-  }
+  if (state.stats) state.stats.invalidationRounds++;
+  const removed = state.clearPos(pos, keepKey);
+  if (state.stats) state.stats.invalidationCount += removed;
 }
 
 /**
