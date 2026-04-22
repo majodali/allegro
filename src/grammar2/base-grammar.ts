@@ -541,11 +541,6 @@ export function buildBaseGrammar(): Grammar {
     ]),
   });
 
-  // Parameter list: 0 or more idents separated by commas.
-  addProduction(g, { name: "param_list",
-    rule: opt(spaced_list("ident", ",")),
-  });
-
   // --- Type expressions (Phase 2c-4 — simple + generics) ---
   //
   // type_expr = type_expr_union

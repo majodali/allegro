@@ -9,6 +9,7 @@ import { parse as grammar2Parse } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
 import { buildProgram } from "./grammar2/tree-builder.js";
 import { getGrammarWithFragments } from "./grammar2/fragments.js";
+import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
 import { primitives } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf } from "./types.js";
@@ -822,6 +823,11 @@ export function evalSource(
     const grammar = g2Fragments.length > 0
       ? getGrammarWithFragments(g2Fragments)
       : getBaseGrammar();
+    // Run the static analyzer. Base grammar is known-clean; fragments can
+    // introduce errors (e.g., a user registers an operator that references
+    // an undeclared reserved set). `assertGrammarClean` throws on errors
+    // with the full report in the message.
+    assertGrammarClean(grammar);
     const result = grammar2Parse(grammar, normalized);
     if (!result.ok) {
       throw new Error(`Parse error at position ${result.error.position}: ${result.error.message}`);

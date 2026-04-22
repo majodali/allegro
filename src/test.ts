@@ -3727,6 +3727,111 @@ test("grammar2/engine: @longest alt picks the longest match", () => {
 // Build a regex grammar that matches character-level patterns: a*, b+, c?,
 // alternation |, grouping (...). Then verify it parses a few regex strings.
 
+// --- Phase 3: grammar analyzer ---
+
+import { analyze as g2analyze, formatReport as g2format, analyzeWithDisjointnessCheck } from "./grammar2/analyzer.js";
+import { buildBaseGrammar as buildBaseG2 } from "./grammar2/base-grammar.js";
+
+test("grammar2/analyzer: base grammar is clean", () => {
+  const g = buildBaseG2();
+  const report = g2analyze(g);
+  eq(report.errors.length, 0, `errors: ${g2format(report)}`);
+  eq(report.warnings.length, 0, `warnings: ${g2format(report)}`);
+});
+
+test("grammar2/analyzer: detects undefined nonterminal reference", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.nonterm("missing") });
+  const report = g2analyze(g);
+  eq(report.errors.length >= 1, true);
+  eq(report.errors.some(e => e.code === "E_UNDEFINED_NAME"), true);
+});
+
+test("grammar2/analyzer: detects undefined start production", () => {
+  const g = g2.makeGrammar({ start: "missing" });
+  g2.addProduction(g, { name: "other", rule: g2.lit("x") });
+  const report = g2analyze(g);
+  eq(report.errors.some(e => e.code === "E_UNDEFINED_START"), true);
+});
+
+test("grammar2/analyzer: detects unreachable production", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s",      rule: g2.lit("a") });
+  g2.addProduction(g, { name: "orphan", rule: g2.lit("b") });
+  const report = g2analyze(g);
+  eq(report.warnings.some(w => w.code === "W_UNREACHABLE" && w.production === "orphan"), true);
+});
+
+test("grammar2/analyzer: detects infinite Rep (nullable item, no sep)", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s",
+    rule: g2.rep(g2.opt(g2.lit("a")), { min: 0 }),
+  });
+  const report = g2analyze(g);
+  eq(report.errors.some(e => e.code === "E_INFINITE_REP"), true);
+});
+
+test("grammar2/analyzer: computes nullability correctly", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.opt(g2.lit("a")) });
+  g2.addProduction(g, { name: "t", rule: g2.lit("b") });
+  const report = g2analyze(g);
+  eq(report.nullable.has("s"), true);
+  eq(report.nullable.has("t"), false);
+});
+
+test("grammar2/analyzer: identifies direct left recursion", () => {
+  const g = g2.makeGrammar({ start: "e" });
+  g2.addProduction(g, { name: "e", rule: g2.alt([
+    g2.seq([g2.nonterm("e"), g2.lit("+"), g2.nonterm("num")]),
+    g2.nonterm("num"),
+  ]) });
+  g2.addProduction(g, { name: "num", rule: g2.regex(/[0-9]+/) });
+  const report = g2analyze(g);
+  eq(report.leftRec.has("e"), true);
+  eq(report.leftRec.has("num"), false);
+});
+
+test("grammar2/analyzer: detects undefined reserved set", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s",
+    rule: g2.guarded(g2.regex(/[a-z]+/), g2.reserved("undeclared_set")),
+  });
+  const report = g2analyze(g);
+  eq(report.errors.some(e => e.code === "E_UNDEFINED_RESERVED_SET"), true);
+});
+
+test("grammar2/analyzer: computes FIRST sets for simple productions", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.lit("hello") });
+  const report = g2analyze(g);
+  const firsts = report.first.get("s");
+  eq(firsts!.length >= 1, true);
+  eq(firsts!.some(e => e.kind === "literal" && (e as any).text === "hello"), true);
+});
+
+test("grammar2/analyzer: opt-in disjointness catches real ambiguity", () => {
+  // Two alts that genuinely overlap: both start with 'a'.
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.alt([
+    g2.lit("apple"),
+    g2.lit("apricot"),
+  ]) });
+  const report = analyzeWithDisjointnessCheck(g);
+  eq(report.warnings.some(w => w.code === "W_ALT_OVERLAP"), true);
+});
+
+import { assertClean as g2assertClean } from "./grammar2/analyzer.js";
+
+test("grammar2/analyzer: assertClean throws on grammar errors", () => {
+  const g = g2.makeGrammar({ start: "s" });
+  g2.addProduction(g, { name: "s", rule: g2.nonterm("missing") });
+  let threw = false;
+  try { g2assertClean(g); }
+  catch (e: any) { threw = e.message.includes("E_UNDEFINED_NAME"); }
+  eq(threw, true);
+});
+
 // --- Phase 2b: base (Allegretto) grammar in grammar2 formalism ---
 
 import { buildBaseGrammar } from "./grammar2/base-grammar.js";
