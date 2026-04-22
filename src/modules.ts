@@ -3,7 +3,9 @@
 // Loads .alg files as anonymous extensions.
 // =============================================================================
 
-import { parseBase, parseStandard } from "./hybrid-parser.js";
+import { parse as grammar2Parse } from "./grammar2/engine.js";
+import { getBaseGrammar } from "./grammar2/base-grammar.js";
+import { buildProgram } from "./grammar2/tree-builder.js";
 import { buildEvalCtx, resolvePrimitives, resolveSymbols, Extension } from "./runtime.js";
 import { evaluate, remapParams } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, primaryOf, AllegroError } from "./types.js";
@@ -243,19 +245,14 @@ export class ModuleLoader {
       depExtensions.push(depExt);
     }
 
-    // 4. Read and parse module source
+    // 4. Read and parse module source via grammar2
     const source = await this.readFile(resolvedPath);
     const normalized = source.replace(/\r\n/g, "\n");
-    // Use standard parser if extensions are available (enables typed syntax)
-    const parseResult = this.extensions.length > 0
-      ? parseStandard(normalized)
-      : parseBase(normalized);
-
-    if (parseResult.errors.length > 0) {
-      throw new Error(`Module '${id}': parse error: ${parseResult.errors[0].message}`);
+    const parseResult = grammar2Parse(getBaseGrammar(), normalized);
+    if (!parseResult.ok) {
+      throw new Error(`Module '${id}': parse error at position ${parseResult.error.position}: ${parseResult.error.message}`);
     }
-
-    const fileCtx = (parseResult.tree as any).ctx;
+    const fileCtx = buildProgram(parseResult.tree);
     if (!fileCtx) {
       // Empty module
       const ext: Extension = { name: id, bindings: {} };

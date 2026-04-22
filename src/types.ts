@@ -225,7 +225,10 @@ export interface Extension {
   grammarFragment?: GrammarFragment;
 }
 
-/** A module's contribution to the hybrid-parser grammar. */
+/** A module's contribution to the grammar (infix/prefix/postfix operators
+ *  and expression-prefix keywords registered via `register_*` primitives).
+ *  Consumed by `src/grammar2/fragments.ts` to build extended grammar2
+ *  grammars when files declare `use_grammar NAME`. */
 export interface GrammarFragment {
   /** Identifiers that should tokenize as UserKeyword instead of Ident */
   keywords: string[];

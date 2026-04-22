@@ -178,33 +178,23 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
     // Standard mode: parse first to discover imports, then load on demand.
     const normalized = cleanSource.replace(/\r\n/g, "\n");
 
-    // If any grammar-extension fragments are active (via use_grammar), use
-    // the hybrid parser — fragments are still only understood by the hybrid
-    // pipeline. Otherwise parse via grammar2.
-    const hybridFragments = extensions
+    // Gather any grammar fragments from use_grammar-loaded modules.
+    const g2Fragments = extensions
       .map(e => e.grammarFragment)
       .filter((f): f is NonNullable<typeof f> => f !== undefined);
 
-    let fileCtx: any;
-    if (hybridFragments.length > 0) {
-      const { parseWithConfig, mergeGrammarFragments, getStandardGrammarConfig } =
-        await import("./hybrid-parser.js");
-      const parseResult = parseWithConfig(normalized,
-        mergeGrammarFragments(getStandardGrammarConfig(), hybridFragments));
-      if (parseResult.errors.length > 0) {
-        throw new Error(`Parse error: ${parseResult.errors[0].message}`);
-      }
-      fileCtx = (parseResult.tree as any).ctx;
-    } else {
-      const { parse: g2parse } = await import("./grammar2/engine.js");
-      const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
-      const { buildProgram } = await import("./grammar2/tree-builder.js");
-      const result = g2parse(getBaseGrammar(), normalized);
-      if (!result.ok) {
-        throw new Error(`Parse error at position ${result.error.position}: ${result.error.message}`);
-      }
-      fileCtx = buildProgram(result.tree);
+    const { parse: g2parse } = await import("./grammar2/engine.js");
+    const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
+    const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
+    const { buildProgram } = await import("./grammar2/tree-builder.js");
+    const grammar = g2Fragments.length > 0
+      ? getGrammarWithFragments(g2Fragments)
+      : getBaseGrammar();
+    const result = g2parse(grammar, normalized);
+    if (!result.ok) {
+      throw new Error(`Parse error at position ${result.error.position}: ${result.error.message}`);
     }
+    const fileCtx: any = buildProgram(result.tree);
 
     if (fileCtx) {
       const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);

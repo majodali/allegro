@@ -11,7 +11,6 @@ import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
-import { mergeGrammarFragments, getStandardGrammarConfig, parseStandard, parseWithConfig } from "./hybrid-parser.js";
 import { extractGrammarFragment } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
@@ -3490,40 +3489,10 @@ register_expr_prefix("neg", x => 0 - x)
   eq(frag!.keywords.length, 1);
 });
 
-test("mergeGrammarFragments: empty fragments returns base unchanged", () => {
-  const base = getStandardGrammarConfig();
-  const merged = mergeGrammarFragments(base, []);
-  eq(merged === base, true);
-});
-
-test("mergeGrammarFragments: adds user-keyed parselets from fragments", () => {
-  const base = getStandardGrammarConfig();
-  const frag: GrammarFragment = emptyGrammarFragment();
-  frag.operators.push("@@");
-  frag.infix.push({
-    token: "@@",
-    bp: 40,
-    fn: { kind: ValueKind.ComposedFunction, params: [], body: makeInt(0) } as any,
-  });
-  const merged = mergeGrammarFragments(base, [frag]);
-  eq(merged.userInfixParselets !== undefined, true);
-  eq(merged.userInfixParselets!.has("@@"), true);
-  eq(merged.userInfixParselets!.get("@@")!.bp, 40);
-});
-
-test("mergeGrammarFragments: extends lexer with new operators and keywords", () => {
-  const base = getStandardGrammarConfig();
-  const frag: GrammarFragment = emptyGrammarFragment();
-  frag.operators.push("@@");
-  frag.keywords.push("lazy_kw");
-  frag.infix.push({ token: "@@", bp: 40, fn: { kind: ValueKind.ComposedFunction, params: [], body: makeInt(0) } as any });
-  frag.exprPrefix.push({ keyword: "lazy_kw", fn: { kind: ValueKind.ComposedFunction, params: [], body: makeInt(0) } as any });
-  const merged = mergeGrammarFragments(base, [frag]);
-  // Lexer config should know about new operator / keyword
-  eq(merged.lexerConfig.keywords.has("lazy_kw"), true);
-  const hasOp = merged.lexerConfig.operators.some(([s]) => s === "@@");
-  eq(hasOp, true);
-});
+// Note: the Phase 1 hybrid-parser `mergeGrammarFragments` tests were deleted
+// along with the hybrid parser in Phase 2c-7. Grammar fragments now extend
+// grammar2 values via `getGrammarWithFragments` (see src/grammar2/fragments.ts)
+// and are exercised via the end-to-end `grammar-runtime.alg` test below.
 
 test("runtime grammar: module-scoped infix operator applied at parse time", () => {
   // Simulate a module that registers ** and exposes pow_int; then use it

@@ -17,6 +17,8 @@ import {
   makeComposedFn, makeContext, prim, bind, buildFn, substName,
 } from "../parser-helpers.js";
 import { makeFloat } from "../types.js";
+import { getUserOp } from "./fragments.js";
+import { substituteParams } from "../evaluator.js";
 
 // --- Helpers ---
 
@@ -131,9 +133,12 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     case "dot":     return buildDot(tree, paramMap);
     case "bracket": return buildBracket(tree, paramMap);
     case "paren": {
-      // The paren_expr production wraps `( ws expr ws )`. Find the expr child
-      // by looking for any expression-tagged branch.
-      const inner = findTaggedChild(c, Array.from(EXPRESSION_TAGS));
+      // The paren_expr production wraps `( ws expr ws )`. Find the first
+      // expression-tagged branch child.
+      let inner: ParseTree | null = null;
+      for (const ch of c) {
+        if (ch.kind === "branch" && EXPRESSION_TAGS.has(ch.tag)) { inner = ch; break; }
+      }
       if (!inner) throw new Error("paren_expr: missing inner expression");
       return buildExpr(inner, paramMap);
     }
@@ -205,6 +210,28 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       if (paramMap.has(name)) return paramMap.get(name);
       return makeSymbol(name);
     }
+  }
+
+  // User-registered operator (from `register_infix` / `register_prefix` /
+  // `register_postfix` / `register_expr_prefix` with `use_grammar NAME`).
+  // The tag is a unique identifier issued by fragments.ts; look up the
+  // user's substitution template and apply it to the operand AST(s).
+  if (tag && tag.startsWith("user_op_")) {
+    const userOp = getUserOp(tag);
+    if (!userOp) throw new Error(`buildExpr: unknown user-op tag '${tag}'`);
+    // Collect expression-typed children (the operands). For infix there
+    // are two; for prefix/postfix there's one; the expr-prefix keyword
+    // form has one.
+    const operands: any[] = [];
+    for (const ch of c) {
+      if (ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
+        operands.push(buildExpr(ch, paramMap));
+      }
+    }
+    // Apply substituteParams: body of user's lambda has Params referring
+    // to the operand positions (0, 1, ...). Substitution produces the
+    // expanded AST.
+    return substituteParams(userOp.fn as any, operands);
   }
 
   // Untagged: a pass-through wrapper. Descend to the only child.
@@ -863,7 +890,7 @@ function collectArgs(tree: ParseTree, paramMap: Map<string, any>): any[] {
   return out;
 }
 
-const EXPRESSION_TAGS = new Set([
+const BUILTIN_EXPRESSION_TAGS = new Set([
   "or","and","eq","neq","lt","gt","lte","gte","add","sub","mul","div","mod",
   "neg","not","call","dot","bracket","paren","if","lambda1","lambda1_typed","lambdaN",
   "number","float","bool","none_lit","string","ident",
@@ -871,6 +898,17 @@ const EXPRESSION_TAGS = new Set([
   "instanceof","subtypeof","of","of_error","error_expr",
   "when_expr","block_expr","pipe",
 ]);
+
+// Used like a Set but also matches user-op tags issued at runtime by
+// grammar extension. All user-registered operators share the `user_op_`
+// prefix.
+const EXPRESSION_TAGS = {
+  has(tag: string | undefined): boolean {
+    if (!tag) return false;
+    if (BUILTIN_EXPRESSION_TAGS.has(tag)) return true;
+    return tag.startsWith("user_op_");
+  },
+} as const;
 
 // --- Lambdas ---
 
