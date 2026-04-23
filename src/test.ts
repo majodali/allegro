@@ -4333,6 +4333,64 @@ test("Phase 6b: EBNF regex literal parses", () => {
   eq(r.ok, true);
 });
 
+// --- Phase 6b step 2: tree-builder + primitives populate fragment ---
+
+test("Phase 6b: rule_decl populates fragment.rules", () => {
+  const src =
+    'x = grammar {\n' +
+    '  rule match_case = p:expr "=>" e:expr => (p, e) => {p: p, e: e}\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  const rules = data.fragment.rules ?? [];
+  eq(rules.length, 1, "one user rule");
+  eq(rules[0].name, "match_case");
+  eq(rules[0].op,   "add");
+});
+
+test("Phase 6b: expr_form_decl populates fragment.exprForms", () => {
+  const src =
+    'x = grammar {\n' +
+    '  expr_form "match" s:expr "with" cs:expr => (s, cs) => cs\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  const forms = data.fragment.exprForms ?? [];
+  eq(forms.length, 1, "one expr_form");
+  eq(forms[0].rule !== undefined, true);
+});
+
+test("Phase 6b: stmt_form_decl populates fragment.stmtForms", () => {
+  const src =
+    'x = grammar {\n' +
+    '  stmt_form "for" v:ident "in" xs:expr ":" body:block_expr => (v, xs, body) => body\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  const forms = data.fragment.stmtForms ?? [];
+  eq(forms.length, 1, "one stmt_form");
+});
+
+test("Phase 6b: rule_decl with += populates op=append", () => {
+  const src =
+    'x = grammar {\n' +
+    '  rule expr_add += expr_add "xor" expr_mul => (l, op, r) => l + r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  const rules = data.fragment.rules ?? [];
+  eq(rules.length, 1);
+  eq(rules[0].op, "append");
+});
+
 // --- Phase 6 step 7: conflict detection ---
 
 test("Phase 6 step 7: duplicate infix op across fragments → E_OPERATOR_CONFLICT", () => {

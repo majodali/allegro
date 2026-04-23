@@ -1304,8 +1304,10 @@ function buildGrammarExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   const decls: ParseTree[] = [];
   const walk = (t: ParseTree): void => {
     if (t.kind !== "branch") return;
-    if (t.tag === "infix_decl" || t.tag === "prefix_decl" ||
-        t.tag === "postfix_decl" || t.tag === "expr_prefix_decl") {
+    if (t.tag === "infix_decl"       || t.tag === "prefix_decl" ||
+        t.tag === "postfix_decl"     || t.tag === "expr_prefix_decl" ||
+        t.tag === "rule_decl"        || t.tag === "expr_form_decl" ||
+        t.tag === "stmt_form_decl") {
       decls.push(t);
       return;
     }
@@ -1325,10 +1327,18 @@ function buildGrammarExpr(tree: ParseTree, paramMap: Map<string, any>): any {
 function buildDeclAsCall(decl: ParseTree, fragExpr: any, paramMap: Map<string, any>): any {
   if (decl.kind !== "branch") throw new Error("buildDeclAsCall: not a branch");
   const c = decl.children;
+
+  // Phase 6b decls have a different shape (ident name, ebnf body). Dispatch first.
+  switch (decl.tag) {
+    case "rule_decl":       return buildRuleDecl(decl, fragExpr, paramMap);
+    case "expr_form_decl":  return buildFormDecl(decl, fragExpr, paramMap, "grammar_expr_form_add");
+    case "stmt_form_decl":  return buildFormDecl(decl, fragExpr, paramMap, "grammar_stmt_form_add");
+  }
+
+  // Phase 6 (and back-compat Phase 1) decls: op string + optional prec_spec.
   const stringTree = findTaggedBranch(c, "string");
   const precTree   = findTaggedBranch(c, "prec_spec");
   const assocTree  = findTaggedBranch(c, "assoc");
-  // Body expression: the LAST expression-tagged descendant (skip the op string).
   let bodyTree: ParseTree | null = null;
   for (let i = c.length - 1; i >= 0; i--) {
     const ch = c[i];
@@ -1367,6 +1377,235 @@ function buildDeclAsCall(decl: ParseTree, fragExpr: any, paramMap: Map<string, a
       return makeExpr(prim("grammar_expr_prefix_add"), [fragExpr, opBits, body]);
   }
   throw new Error(`buildDeclAsCall: unknown decl tag ${decl.tag}`);
+}
+
+/**
+ * Build a `rule_decl` call. Shape:
+ *   rule NAME = body => template        // add / replace production
+ *   rule NAME += body => template       // append alternative
+ *
+ * Lowers to:
+ *   grammar_rule_add(handle, "NAME", "add"|"append", ebnfObject, templateFn)
+ */
+function buildRuleDecl(decl: ParseTree, fragExpr: any, paramMap: Map<string, any>): any {
+  if (decl.kind !== "branch") throw new Error("buildRuleDecl: not a branch");
+  const c = decl.children;
+  const nameTree = findTaggedBranch(c, "ident");
+  if (!nameTree) throw new Error("rule_decl: missing rule name");
+  const name = textOf(nameTree);
+
+  // Tag indicates add vs append — the inner alt wrapper.
+  const opTagTree = findTaggedBranch(c, "rule_append") ?? findTaggedBranch(c, "rule_replace_or_add");
+  const opName    = opTagTree?.kind === "branch" && opTagTree.tag === "rule_append" ? "append" : "add";
+
+  const ebnfTree = findTaggedBranch(c, "ebnf_body");
+  if (!ebnfTree) throw new Error("rule_decl: missing ebnf_body");
+  const ebnfObj = buildEbnf(ebnfTree);
+
+  // Template lambda follows `=> …`. Last expression-tagged descendant.
+  const templateTree = findLastExprBranch(c);
+  if (!templateTree) throw new Error("rule_decl: missing template");
+  const template = buildExpr(templateTree, paramMap);
+
+  return makeExpr(prim("grammar_rule_add"),
+    [fragExpr, stringToBits(name), stringToBits(opName), ebnfObj, template]);
+}
+
+/**
+ * Build an `expr_form_decl` or `stmt_form_decl` call. Both have the same
+ * shape: a multi-token EBNF body (typically a seq of labeled parts) and a
+ * template lambda.
+ */
+function buildFormDecl(
+  decl:     ParseTree,
+  fragExpr: any,
+  paramMap: Map<string, any>,
+  primName: "grammar_expr_form_add" | "grammar_stmt_form_add",
+): any {
+  if (decl.kind !== "branch") throw new Error(`buildFormDecl: not a branch`);
+  const c = decl.children;
+  const ebnfTree = findTaggedBranch(c, "ebnf_body");
+  if (!ebnfTree) throw new Error(`${decl.tag}: missing ebnf_body`);
+  const ebnfObj = buildEbnf(ebnfTree);
+
+  const templateTree = findLastExprBranch(c);
+  if (!templateTree) throw new Error(`${decl.tag}: missing template`);
+  const template = buildExpr(templateTree, paramMap);
+
+  return makeExpr(prim(primName), [fragExpr, ebnfObj, template]);
+}
+
+// --- EBNF → Rule Object conversion ---
+//
+// Each EBNF construct lowers to a typed Object whose `kind` field steers
+// the fragment primitive when parsing it into a grammar2 Rule value.
+//
+//   {kind:"lit",     text:"match"}
+//   {kind:"regex",   pattern:"[a-z]+"}
+//   {kind:"nonterm", name:"expr"}
+//   {kind:"seq",     items:[r, r, …]}
+//   {kind:"alt",     options:[r, r, …]}
+//   {kind:"rep",     item:r, min:0|1, sep:r|none}
+//   {kind:"opt",     item:r}
+//   {kind:"labeled", label:"s", rule:r}
+
+function buildEbnf(tree: ParseTree): any {
+  // Strip leading untagged wrappers until we hit a handled tag.
+  if (tree.kind !== "branch") throw new Error("buildEbnf: not a branch");
+
+  // Dispatch on the tagged branch — ebnf_body wraps an ebnf_alt, which may
+  // itself be tagged "ebnf_alt" (true alt) or pass through the first alt.
+  return buildEbnfNode(tree);
+}
+
+function buildEbnfNode(t: ParseTree): any {
+  if (t.kind !== "branch") {
+    // A leaf in isolation shouldn't happen for EBNF constructs we care about.
+    throw new Error(`buildEbnfNode: unexpected leaf '${t.kind === "leaf" ? t.text : t.kind}'`);
+  }
+
+  switch (t.tag) {
+    case "ebnf_alt":      return buildEbnfAlt(t);
+    case "ebnf_labeled":  return buildEbnfLabeled(t);
+    case "ebnf_star":     return ebnfRep(buildEbnfNode(firstNonWs(t)!), 0);
+    case "ebnf_plus":     return ebnfRep(buildEbnfNode(firstNonWs(t)!), 1);
+    case "ebnf_opt":      return ebnfObj("opt",
+                             [stringToBits("item"), buildEbnfNode(firstNonWs(t)!)]);
+    case "ebnf_sep_rep":  return buildEbnfSepRep(t);
+    case "ebnf_group":    return buildEbnfNode(findFirstEbnfChild(t)!);
+    case "ebnf_regex":    return buildEbnfRegex(t);
+    case "string":        return ebnfObj("lit", [stringToBits("text"), stringToBits(simpleStringText(t))]);
+    case "ident":         return ebnfObj("nonterm", [stringToBits("name"), stringToBits(textOf(t))]);
+  }
+
+  // No explicit tag — walk into children to find the EBNF node (e.g.
+  // ebnf_body wraps ebnf_alt which wraps ebnf_seq, and ebnf_seq may not be
+  // tagged as "ebnf_alt" if there's only one seq).
+  const sub = findFirstEbnfChild(t);
+  if (sub) return buildEbnfNode(sub);
+
+  // Otherwise: treat as a single-element seq built from children.
+  return buildEbnfSeqChildren(t);
+}
+
+function buildEbnfAlt(t: ParseTree): any {
+  if (t.kind !== "branch") throw new Error("buildEbnfAlt: not a branch");
+  const opts: any[] = [];
+  const walkAlt = (n: ParseTree): void => {
+    if (n.kind !== "branch") return;
+    if (n.tag === "ebnf_alt" || n.tag === "ebnf_alt_tail") {
+      for (const c of n.children) walkAlt(c);
+      return;
+    }
+    if (isEbnfValueSubtree(n)) { opts.push(buildEbnfNode(n)); return; }
+    for (const c of n.children) walkAlt(c);
+  };
+  for (const c of t.children) walkAlt(c);
+  if (opts.length === 1) return opts[0];
+  return ebnfObj("alt", [stringToBits("options"), makeEbnfArray(opts)]);
+}
+
+function buildEbnfLabeled(t: ParseTree): any {
+  if (t.kind !== "branch") throw new Error("buildEbnfLabeled: not a branch");
+  const identTree = t.children.find(c => c.kind === "branch" && c.tag === "ident") as ParseTree | undefined;
+  if (!identTree) throw new Error("ebnf_labeled: missing ident");
+  const label = textOf(identTree);
+  const innerTree = findFirstEbnfChild(t, new Set([t, identTree]));
+  if (!innerTree) throw new Error("ebnf_labeled: missing inner");
+  const inner = buildEbnfNode(innerTree);
+  return ebnfObj("labeled", [stringToBits("label"), stringToBits(label), stringToBits("rule"), inner]);
+}
+
+function buildEbnfSepRep(t: ParseTree): any {
+  if (t.kind !== "branch") throw new Error("buildEbnfSepRep: not a branch");
+  const atoms: any[] = [];
+  for (const c of t.children) {
+    if (c.kind === "branch" && isEbnfValueSubtree(c)) {
+      atoms.push(buildEbnfNode(c));
+    }
+  }
+  if (atoms.length !== 2) throw new Error(`ebnf_sep_rep: expected 2 atoms, got ${atoms.length}`);
+  const [item, sep] = atoms;
+  return ebnfObj("rep",
+    [stringToBits("item"), item, stringToBits("min"), makeInt(0), stringToBits("sep"), sep]);
+}
+
+function buildEbnfRegex(t: ParseTree): any {
+  if (t.kind !== "branch") throw new Error("buildEbnfRegex: not a branch");
+  let body = "";
+  let seenFirst = false;
+  for (const c of t.children) {
+    if (c.kind === "leaf") {
+      if (c.text === "/") { seenFirst = true; continue; }
+      if (seenFirst) body += c.text;
+    } else if (c.kind === "branch") {
+      if (seenFirst) body += textOf(c);
+    }
+  }
+  return ebnfObj("regex", [stringToBits("pattern"), stringToBits(body)]);
+}
+
+function buildEbnfSeqChildren(t: ParseTree): any {
+  if (t.kind !== "branch") throw new Error("buildEbnfSeqChildren: not a branch");
+  const items: any[] = [];
+  const walk = (n: ParseTree): void => {
+    if (n.kind !== "branch") return;
+    if (isEbnfValueSubtree(n)) { items.push(buildEbnfNode(n)); return; }
+    for (const c of n.children) walk(c);
+  };
+  for (const c of t.children) walk(c);
+  if (items.length === 0) throw new Error("ebnf seq: no items");
+  if (items.length === 1) return items[0];
+  return ebnfObj("seq", [stringToBits("items"), makeEbnfArray(items)]);
+}
+
+/** Tags that build into an EBNF value node. */
+const EBNF_VALUE_TAGS = new Set([
+  "ebnf_alt", "ebnf_labeled", "ebnf_star", "ebnf_plus", "ebnf_opt",
+  "ebnf_sep_rep", "ebnf_group", "ebnf_regex",
+  "string", "ident",
+]);
+
+function isEbnfValueSubtree(t: ParseTree): boolean {
+  return t.kind === "branch" && !!t.tag && EBNF_VALUE_TAGS.has(t.tag);
+}
+
+function firstNonWs(t: ParseTree): ParseTree | null {
+  if (t.kind !== "branch") return null;
+  for (const c of t.children) {
+    if (c.kind === "branch" && c.tag !== "ws" && c.tag !== "ws_any") return c;
+  }
+  return null;
+}
+
+function findFirstEbnfChild(t: ParseTree, exclude?: Set<ParseTree>): ParseTree | null {
+  if (t.kind !== "branch") return null;
+  for (const c of t.children) {
+    if (exclude?.has(c)) continue;
+    if (c.kind === "branch" && c.tag && EBNF_VALUE_TAGS.has(c.tag)) return c;
+  }
+  for (const c of t.children) {
+    if (exclude?.has(c)) continue;
+    if (c.kind === "branch") {
+      const sub = findFirstEbnfChild(c, exclude);
+      if (sub) return sub;
+    }
+  }
+  return null;
+}
+
+function ebnfObj(kind: string, kvs: any[]): any {
+  // typed_object(key, val, key, val, …) takes a flat list and kind goes first.
+  return makeExpr(prim("typed_object"), [stringToBits("kind"), stringToBits(kind), ...kvs]);
+}
+
+function makeEbnfArray(items: any[]): any {
+  return makeExpr(prim("typed_array"), items);
+}
+
+function ebnfRep(item: any, min: 0 | 1): any {
+  return ebnfObj("rep",
+    [stringToBits("item"), item, stringToBits("min"), makeInt(min)]);
 }
 
 /**

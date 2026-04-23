@@ -1277,21 +1277,55 @@ const grammar_fragment_finalize_impl: PrimitiveFnImpl = (args) => {
   return makeGrammarValue(h.fragment, h.base);
 };
 
-// Remaining Phase 6 primitives are still stubbed — steps 5 / 6 / 7 / 8
-// implement them as they become needed.
+// --- Phase 6b primitives: user rules and multi-token forms ---
+
+const grammar_rule_add_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 5) throw new AllegroError(`grammar_rule_add: expected 5 args, got ${args.length}`);
+  const h       = asGrammarHandle(args[0], "grammar_rule_add");
+  const name    = bitsToString(asBits(args[1], "grammar_rule_add"));
+  const opStr   = bitsToString(asBits(args[2], "grammar_rule_add"));
+  const ruleObj = args[3];
+  const builder = args[4];
+  const op: "add" | "append" = opStr === "append" ? "append" : "add";
+
+  if (!h.fragment.rules) h.fragment.rules = [];
+  h.fragment.rules.push({ name, op, rule: ruleObj, builder });
+  return args[0];
+};
+
+const grammar_expr_form_add_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 3) throw new AllegroError(`grammar_expr_form_add: expected 3 args, got ${args.length}`);
+  const h       = asGrammarHandle(args[0], "grammar_expr_form_add");
+  const ruleObj = args[1];
+  const builder = args[2];
+
+  if (!h.fragment.exprForms) h.fragment.exprForms = [];
+  h.fragment.exprForms.push({ rule: ruleObj, fn: builder });
+  return args[0];
+};
+
+const grammar_stmt_form_add_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 3) throw new AllegroError(`grammar_stmt_form_add: expected 3 args, got ${args.length}`);
+  const h       = asGrammarHandle(args[0], "grammar_stmt_form_add");
+  const ruleObj = args[1];
+  const builder = args[2];
+
+  if (!h.fragment.stmtForms) h.fragment.stmtForms = [];
+  h.fragment.stmtForms.push({ rule: ruleObj, fn: builder });
+  return args[0];
+};
+
+// Remaining Phase 6 primitives still stubbed.
 
 function notYet(name: string, step: string): AllegroError {
   return new AllegroError(`${name}: Phase 6 primitive not yet implemented (${step})`);
 }
 const grammar_precedence_add_impl:     PrimitiveFnImpl = () => { throw notYet("grammar_precedence_add", "step 5"); };
-const grammar_expr_form_add_impl:      PrimitiveFnImpl = () => { throw notYet("grammar_expr_form_add",  "step 6"); };
-const grammar_stmt_form_add_impl:      PrimitiveFnImpl = () => { throw notYet("grammar_stmt_form_add",  "step 6"); };
-const grammar_rule_add_impl:           PrimitiveFnImpl = () => { throw notYet("grammar_rule_add",       "step 6"); };
-const grammar_rule_replace_impl:       PrimitiveFnImpl = () => { throw notYet("grammar_rule_replace",   "step 6"); };
-const grammar_rule_append_impl:        PrimitiveFnImpl = () => { throw notYet("grammar_rule_append",    "step 6"); };
-const grammar_combine_impl:            PrimitiveFnImpl = () => { throw notYet("combine",                "step 8"); };
-const grammar_override_impl:           PrimitiveFnImpl = () => { throw notYet("override",               "step 8"); };
-const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("without",                "step 8"); };
+const grammar_rule_replace_impl:       PrimitiveFnImpl = () => { throw notYet("grammar_rule_replace",   "step 6c"); };
+const grammar_rule_append_impl:        PrimitiveFnImpl = () => { throw notYet("grammar_rule_append",    "step 6c"); };
+const grammar_combine_impl:            PrimitiveFnImpl = () => { throw notYet("combine",                "Phase 7");  };
+const grammar_override_impl:           PrimitiveFnImpl = () => { throw notYet("override",               "Phase 7");  };
+const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("without",                "Phase 7");  };
 
 // ============ TYPE SYSTEM ============
 

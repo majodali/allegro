@@ -918,6 +918,7 @@ export function buildBaseGrammar(): Grammar {
 
   addProduction(g, { name: "ebnf_body",
     rule: nonterm("ebnf_alt"),
+    attrs: { name: "ebnf_body" },       // force tag so tree-builder can find it
   });
 
   addProduction(g, { name: "ebnf_alt",

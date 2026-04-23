@@ -288,27 +288,21 @@ export interface GrammarFragment {
   }>;
 
   /** Multi-token expression-level forms: `expr_form "match" s:expr "with" …`.
-   *  `parts` is the sequence of rule components (literals, nonterm refs,
-   *  labeled parts); `fn` is the builder template. */
-  exprForms?: Array<{ parts: LabeledPart[]; fn: Value }>;
+   *  The stored `rule` is the full EBNF body — typically a seq with some
+   *  labeled items. The merger walks it to find labels in order and binds
+   *  matched sub-ASTs positionally to the template `fn`. */
+  exprForms?: Array<{ rule: GrammarFragmentRule; fn: Value }>;
 
   /** Multi-token statement-level forms: `stmt_form "for" x:ident … `. */
-  stmtForms?: Array<{ parts: LabeledPart[]; fn: Value }>;
+  stmtForms?: Array<{ rule: GrammarFragmentRule; fn: Value }>;
 
   /** User-defined sub-rules (local nonterms that forms can reference). */
   rules?: Array<{
     name:     string;
-    op:       "add" | "replace" | "append";
+    op:       "add" | "append";
     rule:     GrammarFragmentRule;
     builder?: Value;
   }>;
-}
-
-/** One component of a multi-token form or user rule. `label` names the
- *  binding that becomes a Param in the builder template. */
-export interface LabeledPart {
-  label?: string;
-  rule:   GrammarFragmentRule;
 }
 
 /** Structural rule shape used in fragments. Opaque to types.ts — the actual
