@@ -15,11 +15,11 @@
 
 import {
   Grammar, Rule, makeGrammar, addProduction,
-  lit, nonterm, seq, alt, rep,
+  lit, nonterm, seq, alt, rep, opt, regex as ruleRegex,
 } from "./types.js";
 import { buildBaseGrammar, BASE_LEVEL_NAMES, BASE_OPERATORS_TO_LEVEL } from "./base-grammar.js";
-import type { GrammarFragment } from "../types.js";
-import type { Value } from "../types.js";
+import type { GrammarFragment, Value, ContextValue, BitsValue } from "../types.js";
+import { ValueKind, primaryOf, bitsToString } from "../types.js";
 
 // --- User operation registry ---
 //
@@ -28,9 +28,13 @@ import type { Value } from "../types.js";
 // looks up by tag at match time and calls substituteParams on the template.
 
 export interface UserOp {
-  kind:  "infix" | "prefix" | "postfix" | "exprPrefix";
-  token: string;   // "**" or "neg"
-  fn:    Value;    // ComposedFunction whose body is the AST template
+  kind:  "infix" | "prefix" | "postfix" | "exprPrefix" | "exprForm" | "stmtForm" | "rule";
+  token: string;             // operator symbol; "" for form/rule
+  fn:    Value;              // ComposedFunction whose body is the AST template
+  /** For form/rule kinds: labels in the order they appear in the EBNF body.
+   *  At dispatch time the tree-builder extracts sub-ASTs by these label tags
+   *  and passes them to substituteParams positionally. */
+  labels?: string[];
 }
 
 const userOpRegistry: Map<string, UserOp> = new Map();
@@ -294,6 +298,12 @@ function buildExtendedGrammar(fragments: GrammarFragment[]): Grammar {
   // --- Phase 6 path (named precedence, level insertion) ---
   applyPhase6Extensions(g, p6Infix, p6Prefix, p6Postfix, p6LevelDecls);
 
+  // --- Phase 6b: user rules and multi-token forms ---
+  //
+  // Runs after operator handling so forms can reference any already-extended
+  // productions (including user-level operators).
+  applyUserRulesAndForms(g, fragments);
+
   return g;
 }
 
@@ -548,5 +558,191 @@ function rewriteNonterm(rule: Rule, fromName: string, toName: string): Rule {
       return { ...rule, item: rewriteNonterm(rule.item, fromName, toName) };
     default:
       return rule;
+  }
+}
+
+// =============================================================================
+// Phase 6b — user rules and multi-token forms
+// =============================================================================
+
+/**
+ * Convert an EBNF typed Object (produced by the tree-builder's `buildEbnf`)
+ * into a grammar2 Rule. Labels on nodes are rendered as `attrs.name` so the
+ * parse tree carries the label as a tag, enabling dispatch-time extraction.
+ */
+function ebnfObjectToRule(v: Value, labels: string[]): Rule {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.Context) {
+    throw new Error(`EBNF object: expected Context, got ${p.kind}`);
+  }
+  const ctx  = p as ContextValue;
+  const kind = getStringField(ctx, "kind");
+
+  switch (kind) {
+    case "lit":
+      return lit(getStringField(ctx, "text"));
+    case "regex":
+      return ruleRegex(new RegExp(getStringField(ctx, "pattern")));
+    case "nonterm":
+      return nonterm(getStringField(ctx, "name"));
+    case "seq": {
+      // User EBNF sequences get `ws_any` interleaved between items so the
+      // written form `"match" s:expr "with" …` accepts real whitespace
+      // (and newlines, inside a grammar-extension context) between tokens.
+      const items = getArrayField(ctx, "items").map(x => ebnfObjectToRule(x, labels));
+      return seq(interleaveWs(items));
+    }
+    case "alt": {
+      const options = getArrayField(ctx, "options").map(x => ebnfObjectToRule(x, labels));
+      return alt(options);
+    }
+    case "rep": {
+      const item   = ebnfObjectToRule(getField(ctx, "item"), labels);
+      const min    = getIntField(ctx, "min");
+      const sepV   = ctx.bindings.get("sep")?.value;
+      const sepR   = sepV ? ebnfObjectToRule(sepV, labels) : undefined;
+      // Wrap the separator with `ws_any` on both sides so users can write
+      // `item ** ","` without worrying about whitespace around commas.
+      const wrapped = sepR ? seq([nonterm("ws_any"), sepR, nonterm("ws_any")]) : undefined;
+      return rep(item, { min, sep: wrapped });
+    }
+    case "opt":
+      return opt(ebnfObjectToRule(getField(ctx, "item"), labels));
+    case "labeled": {
+      const label = getStringField(ctx, "label");
+      const inner = ebnfObjectToRule(getField(ctx, "rule"), labels);
+      labels.push(label);
+      // Wrap inner in a one-element seq tagged with the label. The engine
+      // applies the label as the seq branch's tag and preserves `inner`'s
+      // original tag (e.g. "string", "ident", "number") as its child, so
+      // the dispatcher's tree walk can still find the inner expression by
+      // tag. `$rep` suffix signals "always wrap as array at dispatch time".
+      const tagName = inner.kind === "rep" ? `${label}$rep` : label;
+      return seq([inner], { name: tagName });
+    }
+  }
+  throw new Error(`EBNF object: unknown kind '${kind}'`);
+}
+
+/** Interleave `ws_any` between items of a user EBNF sequence so whitespace
+ *  between rule parts works transparently. */
+function interleaveWs(items: Rule[]): Rule[] {
+  if (items.length < 2) return items;
+  const out: Rule[] = [items[0]];
+  for (let i = 1; i < items.length; i++) {
+    out.push(nonterm("ws_any"));
+    out.push(items[i]);
+  }
+  return out;
+}
+
+function getField(ctx: ContextValue, key: string): Value {
+  const b = ctx.bindings.get(key);
+  if (!b?.value) throw new Error(`EBNF object: missing field '${key}'`);
+  return b.value;
+}
+
+function getStringField(ctx: ContextValue, key: string): string {
+  const p = primaryOf(getField(ctx, key));
+  if (p.kind !== ValueKind.Bits) throw new Error(`EBNF object: field '${key}' not a string`);
+  return bitsToString(p as BitsValue);
+}
+
+function getIntField(ctx: ContextValue, key: string): number {
+  const b = ctx.bindings.get(key);
+  if (!b?.value) return 0;
+  const p = primaryOf(b.value);
+  if (p.kind !== ValueKind.Bits) return 0;
+  return Number((p as BitsValue).data);
+}
+
+function getArrayField(ctx: ContextValue, key: string): Value[] {
+  const arr = primaryOf(getField(ctx, key));
+  if (arr.kind !== ValueKind.Context) {
+    throw new Error(`EBNF object: field '${key}' not an array`);
+  }
+  const len  = Number(((arr.bindings.get("__length")?.value as any)?.data) ?? 0n);
+  const out: Value[] = [];
+  for (let i = 0; i < len; i++) {
+    const v = arr.bindings.get(String(i))?.value;
+    if (v) out.push(v);
+  }
+  return out;
+}
+
+/**
+ * Apply user-declared rules, expr_forms, and stmt_forms to the grammar.
+ * Runs AFTER phase1/phase6 operator handling so forms reference the
+ * already-extended productions (user-level infix etc. are visible to
+ * forms that reference `expr`).
+ */
+function applyUserRulesAndForms(g: Grammar, fragments: GrammarFragment[]): void {
+  for (let fi = 0; fi < fragments.length; fi++) {
+    const frag = fragments[fi];
+
+    // User rules — become new productions (or append alts to existing).
+    for (const r of (frag.rules ?? [])) {
+      const labels: string[] = [];
+      const rule     = ebnfObjectToRule(r.rule as Value, labels);
+      const builder  = r.builder;
+      const tag      = builder
+        ? registerUserOp({ kind: "rule", token: "", fn: builder, labels })
+        : undefined;
+      // Wrap in a one-element seq so the user-op tag lives on the OUTER
+      // branch and the inner rule's tags (including any label wrappers)
+      // remain accessible as children in the parse tree.
+      const taggedRule = tag ? seq([rule], { name: tag }) : rule;
+
+      if (r.op === "append") {
+        const existing = g.productions.get(r.name);
+        if (!existing) {
+          throw new Error(`rule ${r.name} += …: production '${r.name}' not found`);
+        }
+        const oldRule = existing.rule;
+        const newOpts = oldRule.kind === "alt"
+          ? [...oldRule.options, taggedRule]
+          : [oldRule, taggedRule];
+        g.productions.set(r.name, { name: r.name, rule: alt(newOpts) });
+      } else {
+        // "add": replace if exists, otherwise create.
+        g.productions.set(r.name, { name: r.name, rule: taggedRule });
+      }
+    }
+
+    // expr_forms — append to expr_atom (before the ident fallthrough).
+    for (const f of (frag.exprForms ?? [])) {
+      const labels: string[] = [];
+      const rule    = ebnfObjectToRule(f.rule as Value, labels);
+      const tag     = registerUserOp({ kind: "exprForm", token: "", fn: f.fn, labels });
+      const tagged  = seq([rule], { name: tag });
+
+      // The tree-builder's expression walker must recognise this tag. We
+      // splice the form alt into expr_atom BEFORE `ident` (the last alt)
+      // so it's tried ahead of bare identifiers.
+      const atomProd = g.productions.get("expr_atom");
+      if (!atomProd || atomProd.rule.kind !== "alt") {
+        throw new Error("expr_atom is not an alt production");
+      }
+      const opts = [...atomProd.rule.options];
+      // Insert right before the last alt (expr_atom's `ident` fallthrough).
+      opts.splice(opts.length - 1, 0, tagged);
+      g.productions.set("expr_atom", { name: "expr_atom", rule: alt(opts) });
+    }
+
+    // stmt_forms — append to stmt as new alternatives.
+    for (const f of (frag.stmtForms ?? [])) {
+      const labels: string[] = [];
+      const rule    = ebnfObjectToRule(f.rule as Value, labels);
+      const tag     = registerUserOp({ kind: "stmtForm", token: "", fn: f.fn, labels });
+      const tagged  = seq([rule], { name: tag });
+
+      const stmtProd = g.productions.get("stmt");
+      if (!stmtProd) throw new Error("stmt production not found");
+      const oldRule = stmtProd.rule;
+      const newOpts = oldRule.kind === "alt"
+        ? [tagged, ...oldRule.options]
+        : [tagged, oldRule];
+      g.productions.set("stmt", { name: "stmt", rule: alt(newOpts) });
+    }
   }
 }

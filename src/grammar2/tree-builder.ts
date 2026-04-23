@@ -231,18 +231,30 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   if (tag && tag.startsWith("user_op_")) {
     const userOp = getUserOp(tag);
     if (!userOp) throw new Error(`buildExpr: unknown user-op tag '${tag}'`);
-    // Collect expression-typed children (the operands). For infix there
-    // are two; for prefix/postfix there's one; the expr-prefix keyword
-    // form has one.
+
+    // Phase 6b multi-token forms and user rules: operand extraction is by
+    // LABEL (from the EBNF `name:rule` bindings). The parse tree may tag
+    // rep-kind labels as `label$rep` — when present, the operand is
+    // collected as a typed_array regardless of how many items matched.
+    if (userOp.kind === "exprForm" || userOp.kind === "stmtForm" || userOp.kind === "rule") {
+      const labels = userOp.labels ?? [];
+      const operands: any[] = [];
+      for (const label of labels) {
+        const { tree: labelTree, isRep } = findLabeledBranch(c, label);
+        if (!labelTree) throw new Error(`user ${userOp.kind}: label '${label}' not found in parse tree`);
+        operands.push(buildExprFromLabeled(labelTree, paramMap, isRep));
+      }
+      return substituteParams(userOp.fn as any, operands);
+    }
+
+    // Phase 1/6 operators: collect expression-tagged children positionally
+    // (two for infix, one for prefix/postfix/expr_prefix).
     const operands: any[] = [];
     for (const ch of c) {
       if (ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
         operands.push(buildExpr(ch, paramMap));
       }
     }
-    // Apply substituteParams: body of user's lambda has Params referring
-    // to the operand positions (0, 1, ...). Substitution produces the
-    // expanded AST.
     return substituteParams(userOp.fn as any, operands);
   }
 
@@ -1460,11 +1472,12 @@ function buildEbnf(tree: ParseTree): any {
 
 function buildEbnfNode(t: ParseTree): any {
   if (t.kind !== "branch") {
-    // A leaf in isolation shouldn't happen for EBNF constructs we care about.
     throw new Error(`buildEbnfNode: unexpected leaf '${t.kind === "leaf" ? t.text : t.kind}'`);
   }
 
   switch (t.tag) {
+    case "ebnf_body":     return buildEbnfNode(findFirstEbnfChildOrSelf(t) ?? t);
+    case "ebnf_seq":      return buildEbnfSeqChildren(t);
     case "ebnf_alt":      return buildEbnfAlt(t);
     case "ebnf_labeled":  return buildEbnfLabeled(t);
     case "ebnf_star":     return ebnfRep(buildEbnfNode(firstNonWs(t)!), 0);
@@ -1478,14 +1491,24 @@ function buildEbnfNode(t: ParseTree): any {
     case "ident":         return ebnfObj("nonterm", [stringToBits("name"), stringToBits(textOf(t))]);
   }
 
-  // No explicit tag — walk into children to find the EBNF node (e.g.
-  // ebnf_body wraps ebnf_alt which wraps ebnf_seq, and ebnf_seq may not be
-  // tagged as "ebnf_alt" if there's only one seq).
+  // No explicit tag — walk into children to find the EBNF node. Covers
+  // thin wrappers the engine sometimes produces.
   const sub = findFirstEbnfChild(t);
   if (sub) return buildEbnfNode(sub);
 
-  // Otherwise: treat as a single-element seq built from children.
   return buildEbnfSeqChildren(t);
+}
+
+/** Unlike findFirstEbnfChild, returns the child even if its tag is a wrapper
+ *  (e.g. ebnf_seq, ebnf_alt) — covers the case where ebnf_body wraps a
+ *  single-seq body that we want to descend INTO rather than past. */
+function findFirstEbnfChildOrSelf(t: ParseTree): ParseTree | null {
+  if (t.kind !== "branch") return null;
+  const extended = new Set([...EBNF_VALUE_TAGS, "ebnf_seq", "ebnf_body"]);
+  for (const c of t.children) {
+    if (c.kind === "branch" && c.tag && extended.has(c.tag)) return c;
+  }
+  return null;
 }
 
 function buildEbnfAlt(t: ParseTree): any {
@@ -1698,6 +1721,61 @@ function findTaggedBranch(children: ParseTree[], tag: string): ParseTree | undef
     if (sub) return sub;
   }
   return undefined;
+}
+
+/** Like findTaggedBranch but traverses more deeply — for user rule / form
+ *  dispatch where labeled branches may be nested under repetition wrappers. */
+function findTaggedBranchDeep(children: ParseTree[], tag: string): ParseTree | undefined {
+  const queue: ParseTree[] = [...children];
+  while (queue.length > 0) {
+    const t = queue.shift()!;
+    if (t.kind !== "branch") continue;
+    if (t.tag === tag) return t;
+    for (const c of t.children) queue.push(c);
+  }
+  return undefined;
+}
+
+/** Find a label-tagged branch, also checking for the `$rep` suffix that the
+ *  merger attaches to labels wrapping a rep-kind inner rule. Returns both
+ *  the tree and whether it came from the $rep variant. */
+function findLabeledBranch(children: ParseTree[], label: string): { tree: ParseTree | undefined; isRep: boolean } {
+  const direct = findTaggedBranchDeep(children, label);
+  if (direct) return { tree: direct, isRep: false };
+  const rep = findTaggedBranchDeep(children, `${label}$rep`);
+  if (rep) return { tree: rep, isRep: true };
+  return { tree: undefined, isRep: false };
+}
+
+/**
+ * Build an Allegro Value from a labeled parse-tree branch. If the label
+ * wraps a single expression, recurse into it. If it wraps a repetition of
+ * labeled sub-items, build an Array of their values. Otherwise, treat as
+ * raw text.
+ */
+function buildExprFromLabeled(tree: ParseTree, paramMap: Map<string, any>, isRep: boolean = false): any {
+  if (tree.kind !== "branch") return stringToBits(tree.kind === "leaf" ? tree.text : "");
+
+  // Collect all expression-tagged descendants in order. Walk recursively but
+  // don't descend into an expression-tagged branch's children (those belong
+  // to that expression's own tree-building).
+  const items: any[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    if (t.tag && EXPRESSION_TAGS.has(t.tag)) { items.push(buildExpr(t, paramMap)); return; }
+    for (const c of t.children) walk(c);
+  };
+  for (const c of tree.children) walk(c);
+
+  if (isRep) {
+    // Rep-kind label: always wrap as an array, even if exactly one item.
+    return makeExpr(prim("typed_array"), items);
+  }
+  if (items.length === 1) return items[0];
+  if (items.length  >  1) {
+    return makeExpr(prim("typed_array"), items);
+  }
+  return stringToBits(textOf(tree));
 }
 
 function findLastExprBranch(children: ParseTree[]): ParseTree | null {

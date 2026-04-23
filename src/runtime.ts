@@ -50,6 +50,12 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       return newFn;
     }
     case ValueKind.MultiValue: {
+      // If the MultiValue already carries a type component, don't recurse
+      // into its primary — the value was deliberately typed (e.g. by an
+      // earlier typeLiterals pass in a module) and wrapping again would
+      // produce a nested MultiValue(MultiValue(Bits, T), T) that later
+      // breaks `primaryOf(v) as BitsValue` extractions.
+      if (v.components.has("type")) return v;
       const newPrimary = typeLiterals(v.primary, seen);
       if (newPrimary === v.primary) return v;
       return makeMultiValue(newPrimary, new Map(v.components));

@@ -3538,6 +3538,9 @@ test("runtime grammar: module-scoped expr-prefix keyword applied at parse time",
 // Run the end-to-end grammar-runtime.alg test (uses `use pow` header, Phase 6)
 fileTest(path.join(testsDir, "grammar-runtime.alg"));
 
+// Phase 6b multi-token demo — `match x with …` expression
+fileTest(path.join(testsDir, "match-demo.alg"));
+
 // == Grammar 2 (Phase 1) — new formalism + engine ==
 //
 // Tests for the TypeScript-level types and engine in src/grammar2/. These
