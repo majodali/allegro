@@ -4266,6 +4266,73 @@ test("Phase 6: multiple infix regs sharing prec(X) share one level decl", () => 
   eq(data.fragment.infix[1].level, "pow");
 });
 
+// --- Phase 6b step 1: EBNF + rule/expr_form/stmt_form syntax parses ---
+
+test("Phase 6b: rule_decl with EBNF body parses", () => {
+  const g = buildBaseGrammar();
+  const src =
+    'x = grammar {\n' +
+    '  rule match_case = p:expr "=>" e:expr => {p: p, e: e}\n' +
+    '}\n';
+  const r = g2parse(g, src);
+  eq(r.ok, true, `parse ok (${r.ok ? "" : (r as any).error.message})`);
+});
+
+test("Phase 6b: rule_decl with `+=` parses", () => {
+  const g = buildBaseGrammar();
+  const src =
+    'x = grammar {\n' +
+    '  rule expr_add += expr_add "xor" expr_mul => (l, r) => l + r\n' +
+    '}\n';
+  const r = g2parse(g, src);
+  eq(r.ok, true);
+});
+
+test("Phase 6b: expr_form with multi-token body parses", () => {
+  const g = buildBaseGrammar();
+  const src =
+    'x = grammar {\n' +
+    '  expr_form "match" s:expr "with" cs:match_list => (s, cs) => cs\n' +
+    '}\n';
+  const r = g2parse(g, src);
+  eq(r.ok, true, `parse ok (${r.ok ? "" : (r as any).error.message})`);
+});
+
+test("Phase 6b: stmt_form with block parses", () => {
+  const g = buildBaseGrammar();
+  const src =
+    'x = grammar {\n' +
+    '  stmt_form "for" v:ident "in" xs:expr ":" body:block_expr => (v, xs, body) => body\n' +
+    '}\n';
+  const r = g2parse(g, src);
+  eq(r.ok, true);
+});
+
+test("Phase 6b: EBNF postfix / alt / sep-rep all parse", () => {
+  const g = buildBaseGrammar();
+  const src =
+    'x = grammar {\n' +
+    '  rule a = "foo"* => l => l\n' +
+    '  rule b = "foo"+ => l => l\n' +
+    '  rule c = "foo"? => l => l\n' +
+    '  rule d = item ** "," => l => l\n' +
+    '  rule e = "a" | "b" | "c" => x => x\n' +
+    '  rule f = (item | other) => x => x\n' +
+    '}\n';
+  const r = g2parse(g, src);
+  eq(r.ok, true, `parse ok (${r.ok ? "" : (r as any).error.message})`);
+});
+
+test("Phase 6b: EBNF regex literal parses", () => {
+  const g = buildBaseGrammar();
+  const src =
+    'x = grammar {\n' +
+    '  rule hex = /[0-9a-fA-F]+/ => x => x\n' +
+    '}\n';
+  const r = g2parse(g, src);
+  eq(r.ok, true);
+});
+
 // --- Phase 6 step 7: conflict detection ---
 
 test("Phase 6 step 7: duplicate infix op across fragments → E_OPERATOR_CONFLICT", () => {

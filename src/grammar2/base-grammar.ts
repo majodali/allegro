@@ -746,6 +746,9 @@ export function buildBaseGrammar(): Grammar {
       nonterm("prefix_decl"),
       nonterm("postfix_decl"),
       nonterm("expr_prefix_decl"),
+      nonterm("rule_decl"),           // Phase 6b: user sub-rule
+      nonterm("expr_form_decl"),      // Phase 6b: multi-token expression form
+      nonterm("stmt_form_decl"),      // Phase 6b: multi-token statement form
     ]),
   });
 
@@ -843,6 +846,141 @@ export function buildBaseGrammar(): Grammar {
       lit("right"),
       lit("none"),
     ]),
+  });
+
+  // --- Phase 6b: user rules and multi-token forms ---
+  //
+  // rule_decl:      adds a user-named production to the grammar, or appends
+  //                 an alternative to an existing production (`+=`). The
+  //                 body is an EBNF expression; the `=> template` is a
+  //                 ComposedFunction whose positional Params match the
+  //                 order of labeled parts in the body.
+  //
+  // expr_form_decl: adds a new multi-token expression alternative (e.g.
+  //                 `match x with p => e | …`). The body is a seq of EBNF
+  //                 parts, at least some of which are labeled.
+  //
+  // stmt_form_decl: same but for statement-level forms (`for x in xs: body`).
+
+  addProduction(g, { name: "rule_decl",
+    rule: seq([
+      lit("rule"),
+      nonterm("ws_req"),
+      nonterm("ident"),
+      nonterm("ws"),
+      alt([
+        seq([lit("+="), nonterm("ws"), nonterm("ebnf_body")], { name: "rule_append" }),
+        seq([lit("="),  nonterm("ws"), nonterm("ebnf_body")], { name: "rule_replace_or_add" }),
+      ]),
+      nonterm("ws"),
+      lit("=>"),
+      nonterm("ws"),
+      nonterm("expr"),
+    ], { name: "rule_decl" }),
+  });
+
+  addProduction(g, { name: "expr_form_decl",
+    rule: seq([
+      lit("expr_form"),
+      nonterm("ws_req"),
+      nonterm("ebnf_body"),
+      nonterm("ws"),
+      lit("=>"),
+      nonterm("ws"),
+      nonterm("expr"),
+    ], { name: "expr_form_decl" }),
+  });
+
+  addProduction(g, { name: "stmt_form_decl",
+    rule: seq([
+      lit("stmt_form"),
+      nonterm("ws_req"),
+      nonterm("ebnf_body"),
+      nonterm("ws"),
+      lit("=>"),
+      nonterm("ws"),
+      nonterm("expr"),
+    ], { name: "stmt_form_decl" }),
+  });
+
+  // --- EBNF mini-grammar ---
+  //
+  // Precedence (low → high):
+  //   alt   — `a | b`
+  //   seq   — juxtaposition `a b c`
+  //   label — `name:atom` (bound tight around one element)
+  //   post  — `a*` `a+` `a?`
+  //   sep   — `a ** sep`
+  //   atom  — `"lit"`, `/regex/`, ident, `(…)`
+  //
+  // Whitespace inside EBNF bodies is `ws_any`-style (newlines allowed), so
+  // multi-line rules work out of the box inside a grammar { } block.
+
+  addProduction(g, { name: "ebnf_body",
+    rule: nonterm("ebnf_alt"),
+  });
+
+  addProduction(g, { name: "ebnf_alt",
+    rule: alt([
+      seq([nonterm("ebnf_seq"), nonterm("ws_any"),
+           rep(seq([lit("|"), nonterm("ws_any"), nonterm("ebnf_seq"), nonterm("ws_any")], { name: "ebnf_alt_tail" }), { min: 1 })],
+        { name: "ebnf_alt" }),
+      nonterm("ebnf_seq"),
+    ]),
+  });
+
+  addProduction(g, { name: "ebnf_seq",
+    rule: rep(nonterm("ebnf_elem"), { min: 1, sep: nonterm("ws_any") }),
+  });
+
+  addProduction(g, { name: "ebnf_elem",
+    rule: alt([
+      nonterm("ebnf_labeled"),
+      nonterm("ebnf_post"),
+    ]),
+  });
+
+  // label binds tighter than postfix; `s:a*` = `s:(a*)` per the rule shape.
+  addProduction(g, { name: "ebnf_labeled",
+    rule: seq([nonterm("ident"), lit(":"), nonterm("ebnf_post")],
+      { name: "ebnf_labeled" }),
+  });
+
+  addProduction(g, { name: "ebnf_post",
+    rule: alt([
+      seq([nonterm("ebnf_sep"), lit("*")], { name: "ebnf_star" }),
+      seq([nonterm("ebnf_sep"), lit("+")], { name: "ebnf_plus" }),
+      seq([nonterm("ebnf_sep"), lit("?")], { name: "ebnf_opt" }),
+      nonterm("ebnf_sep"),
+    ]),
+  });
+
+  addProduction(g, { name: "ebnf_sep",
+    rule: alt([
+      seq([nonterm("ebnf_atom"), nonterm("ws_any"), lit("**"), nonterm("ws_any"), nonterm("ebnf_atom")],
+        { name: "ebnf_sep_rep" }),
+      nonterm("ebnf_atom"),
+    ]),
+  });
+
+  addProduction(g, { name: "ebnf_atom",
+    rule: alt([
+      seq([lit("("), nonterm("ws_any"), nonterm("ebnf_alt"), nonterm("ws_any"), lit(")")],
+        { name: "ebnf_group" }),
+      nonterm("string"),                     // string literal → lit(…)
+      nonterm("ebnf_regex"),
+      nonterm("ident"),                      // bare ident → nonterm(name)
+    ]),
+  });
+
+  // Regex literal: `/pattern/` — simple match-anything-but-slash-or-newline
+  // in step 6b. Escapes and flags come later if needed.
+  addProduction(g, { name: "ebnf_regex",
+    rule: seq([
+      lit("/"),
+      regex(/[^\/\n]+/),
+      lit("/"),
+    ], { name: "ebnf_regex" }),
   });
 
   return g;
