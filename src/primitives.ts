@@ -1037,31 +1037,194 @@ const register_expr_prefix_impl: PrimitiveFnImpl = (args, ctx) => {
   return noneSingleton;
 };
 
-// --- Phase 6 grammar-building primitives (stubbed) ---
+// --- Phase 6 grammar-building primitives ---
 //
-// These are the targets `grammar { … }` blocks desugar to. Step 4 of the
-// Phase 6 rollout wires up real implementations. For now they throw so the
-// API surface is visible and any accidental premature use is loud.
+// `grammar { … }` blocks compile to a chain of calls on a fragment handle:
+//
+//   grammar_fragment_finalize(
+//     grammar_infix_add(
+//       grammar_fragment_new("allegro"),
+//       "**", {at: "mul"}, "right", <fn>
+//     )
+//   )
+//
+// Each `*_add` primitive mutates the handle in place and returns it, so the
+// chain threads through. `grammar_fragment_finalize` converts the handle to
+// a Grammar Value (opaque Context with a hidden `__grammarValue` field the
+// `use X` pre-scanner recognizes at compile time).
+//
+// Step 4 implements the Phase 1 subset: infix/prefix/postfix/expr_prefix
+// registration with `at(existing_level)` prec specs. Named precedence
+// (`prec(pow)`), new-level creation (`above(X) below(Y)`), multi-token
+// forms, and user sub-rules land in steps 5–6.
 
-function notYet(name: string): AllegroError {
-  return new AllegroError(`${name}: Phase 6 primitive not yet implemented (step 4)`);
+/** Data packed inside a fragment handle Context. */
+interface GrammarHandleData {
+  fragment: GrammarFragment;
+  base:     string;          // "allegro" | "empty" | <name>
 }
 
-const grammar_fragment_new_impl:       PrimitiveFnImpl = () => { throw notYet("grammar_fragment_new"); };
-const grammar_fragment_finalize_impl:  PrimitiveFnImpl = () => { throw notYet("grammar_fragment_finalize"); };
-const grammar_precedence_add_impl:     PrimitiveFnImpl = () => { throw notYet("grammar_precedence_add"); };
-const grammar_infix_add_impl:          PrimitiveFnImpl = () => { throw notYet("grammar_infix_add"); };
-const grammar_prefix_add_impl:         PrimitiveFnImpl = () => { throw notYet("grammar_prefix_add"); };
-const grammar_postfix_add_impl:        PrimitiveFnImpl = () => { throw notYet("grammar_postfix_add"); };
-const grammar_expr_prefix_add_impl:    PrimitiveFnImpl = () => { throw notYet("grammar_expr_prefix_add"); };
-const grammar_expr_form_add_impl:      PrimitiveFnImpl = () => { throw notYet("grammar_expr_form_add"); };
-const grammar_stmt_form_add_impl:      PrimitiveFnImpl = () => { throw notYet("grammar_stmt_form_add"); };
-const grammar_rule_add_impl:           PrimitiveFnImpl = () => { throw notYet("grammar_rule_add"); };
-const grammar_rule_replace_impl:       PrimitiveFnImpl = () => { throw notYet("grammar_rule_replace"); };
-const grammar_rule_append_impl:        PrimitiveFnImpl = () => { throw notYet("grammar_rule_append"); };
-const grammar_combine_impl:            PrimitiveFnImpl = () => { throw notYet("combine"); };
-const grammar_override_impl:           PrimitiveFnImpl = () => { throw notYet("override"); };
-const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("without"); };
+/** Data packed inside a finalized Grammar value Context. */
+export interface GrammarValueData {
+  fragment:  GrammarFragment;
+  baseChain: string[];
+}
+
+function makeFragmentBuilderHandle(base: string): ContextValue {
+  const ctx  = makeContext() as ContextValue;
+  const data: GrammarHandleData = { fragment: emptyGrammarFragment(), base };
+  (ctx as any).__grammarHandle = data;
+  return ctx;
+}
+
+function asGrammarHandle(v: Value, fnName: string): GrammarHandleData {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.Context) {
+    throw new AllegroError(`${fnName}: expected grammar fragment handle, got ${p.kind}`);
+  }
+  const h = (p as any).__grammarHandle as GrammarHandleData | undefined;
+  if (!h) throw new AllegroError(`${fnName}: value is not a grammar fragment handle`);
+  return h;
+}
+
+/** Public accessor: inspect a Value to see if it carries a finalized Grammar.
+ *  Returns the Grammar data if so, otherwise undefined. Used by the `use X`
+ *  pre-scanner (step 8) and fragment merger. */
+export function asGrammarValue(v: Value): GrammarValueData | undefined {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.Context) return undefined;
+  return (p as any).__grammarValue as GrammarValueData | undefined;
+}
+
+function makeGrammarValue(fragment: GrammarFragment, base: string): ContextValue {
+  const ctx  = makeContext() as ContextValue;
+  const data: GrammarValueData = { fragment, baseChain: [base] };
+  (ctx as any).__grammarValue = data;
+  return ctx;
+}
+
+/** Read a prec_spec object `{at: "mul"}` / `{above: "mul", below: "unary"}` /
+ *  `{prec: "pow", above: "mul"}` etc. Returns whichever fields are present. */
+interface PrecSpecRead {
+  at?:    string;
+  above?: string;
+  below?: string;
+  prec?:  string;
+}
+
+function readPrecSpec(v: Value, fnName: string): PrecSpecRead {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.Context) {
+    throw new AllegroError(`${fnName}: expected prec_spec object, got ${p.kind}`);
+  }
+  const out: PrecSpecRead = {};
+  for (const key of ["at", "above", "below", "prec"] as const) {
+    const b = p.bindings.get(key);
+    if (b?.value) {
+      const bp = primaryOf(b.value);
+      if (bp.kind === ValueKind.Bits) out[key] = bitsToString(bp);
+    }
+  }
+  if (out.at === undefined && out.above === undefined &&
+      out.below === undefined && out.prec === undefined) {
+    throw new AllegroError(`${fnName}: prec_spec has no at/above/below/prec fields`);
+  }
+  return out;
+}
+
+/** Resolve a prec_spec to the level name used in the fragment's operator
+ *  entry. Step 4 only supports `{at: LEVEL}`; other forms land in step 5. */
+function resolveLevelFromPrecSpec(spec: PrecSpecRead, fnName: string): string {
+  if (spec.at !== undefined &&
+      spec.above === undefined && spec.below === undefined && spec.prec === undefined) {
+    return spec.at;
+  }
+  if (spec.prec !== undefined &&
+      spec.above === undefined && spec.below === undefined && spec.at === undefined) {
+    // `prec(X)` without constraints: equivalent to `at(X)` when X is known.
+    // Step 5 may reject this if X is undeclared; for now treat as `at`.
+    return spec.prec;
+  }
+  throw new AllegroError(
+    `${fnName}: only at(X) / prec(X) prec specs are supported in step 4; ` +
+    `combined above/below precedence lands in step 5.`,
+  );
+}
+
+const grammar_fragment_new_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 1) throw new AllegroError(`grammar_fragment_new: expected 1 arg, got ${args.length}`);
+  const base = bitsToString(asBits(args[0], "grammar_fragment_new"));
+  return makeFragmentBuilderHandle(base);
+};
+
+const grammar_infix_add_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 5) throw new AllegroError(`grammar_infix_add: expected 5 args, got ${args.length}`);
+  const h      = asGrammarHandle(args[0], "grammar_infix_add");
+  const op     = bitsToString(asBits(args[1], "grammar_infix_add"));
+  const spec   = readPrecSpec(args[2], "grammar_infix_add");
+  const assoc  = bitsToString(asBits(args[3], "grammar_infix_add")) as "left" | "right" | "none";
+  const fn     = args[4];
+  const level  = resolveLevelFromPrecSpec(spec, "grammar_infix_add");
+  h.fragment.infix.push({ token: op, level, assoc, fn });
+  if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
+  return args[0];
+};
+
+const grammar_prefix_add_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 4) throw new AllegroError(`grammar_prefix_add: expected 4 args, got ${args.length}`);
+  const h      = asGrammarHandle(args[0], "grammar_prefix_add");
+  const op     = bitsToString(asBits(args[1], "grammar_prefix_add"));
+  const spec   = readPrecSpec(args[2], "grammar_prefix_add");
+  const fn     = args[3];
+  const level  = resolveLevelFromPrecSpec(spec, "grammar_prefix_add");
+  h.fragment.prefixOp.push({ token: op, level, fn });
+  if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
+  return args[0];
+};
+
+const grammar_postfix_add_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 4) throw new AllegroError(`grammar_postfix_add: expected 4 args, got ${args.length}`);
+  const h      = asGrammarHandle(args[0], "grammar_postfix_add");
+  const op     = bitsToString(asBits(args[1], "grammar_postfix_add"));
+  const spec   = readPrecSpec(args[2], "grammar_postfix_add");
+  const fn     = args[3];
+  const level  = resolveLevelFromPrecSpec(spec, "grammar_postfix_add");
+  h.fragment.postfixOp.push({ token: op, level, fn });
+  if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
+  return args[0];
+};
+
+const grammar_expr_prefix_add_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 3) throw new AllegroError(`grammar_expr_prefix_add: expected 3 args, got ${args.length}`);
+  const h  = asGrammarHandle(args[0], "grammar_expr_prefix_add");
+  const kw = bitsToString(asBits(args[1], "grammar_expr_prefix_add"));
+  const fn = args[2];
+  h.fragment.exprPrefix.push({ keyword: kw, fn });
+  if (!h.fragment.keywords.includes(kw)) h.fragment.keywords.push(kw);
+  return args[0];
+};
+
+const grammar_fragment_finalize_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 1) throw new AllegroError(`grammar_fragment_finalize: expected 1 arg, got ${args.length}`);
+  const h = asGrammarHandle(args[0], "grammar_fragment_finalize");
+  return makeGrammarValue(h.fragment, h.base);
+};
+
+// Remaining Phase 6 primitives are still stubbed — steps 5 / 6 / 7 / 8
+// implement them as they become needed.
+
+function notYet(name: string, step: string): AllegroError {
+  return new AllegroError(`${name}: Phase 6 primitive not yet implemented (${step})`);
+}
+const grammar_precedence_add_impl:     PrimitiveFnImpl = () => { throw notYet("grammar_precedence_add", "step 5"); };
+const grammar_expr_form_add_impl:      PrimitiveFnImpl = () => { throw notYet("grammar_expr_form_add",  "step 6"); };
+const grammar_stmt_form_add_impl:      PrimitiveFnImpl = () => { throw notYet("grammar_stmt_form_add",  "step 6"); };
+const grammar_rule_add_impl:           PrimitiveFnImpl = () => { throw notYet("grammar_rule_add",       "step 6"); };
+const grammar_rule_replace_impl:       PrimitiveFnImpl = () => { throw notYet("grammar_rule_replace",   "step 6"); };
+const grammar_rule_append_impl:        PrimitiveFnImpl = () => { throw notYet("grammar_rule_append",    "step 6"); };
+const grammar_combine_impl:            PrimitiveFnImpl = () => { throw notYet("combine",                "step 8"); };
+const grammar_override_impl:           PrimitiveFnImpl = () => { throw notYet("override",               "step 8"); };
+const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("without",                "step 8"); };
 
 // ============ TYPE SYSTEM ============
 

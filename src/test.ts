@@ -11,7 +11,7 @@ import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
-import { extractGrammarFragment } from "./primitives.js";
+import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
 
@@ -4120,6 +4120,54 @@ test("Phase 6: grammar as a parameter name still works (no reservation collision
   const g = buildBaseGrammar();
   const result = g2parse(g, "f(grammar) => grammar.productions\n");
   eq(result.ok, true, "grammar as param name works");
+});
+
+test("Phase 6: grammar block evaluates to a Grammar value (infix)", () => {
+  const src = 'x = grammar { infix "**" at(mul) right => (l, r) => l + r }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const xVal = evalCtx.bindings.get("x")?.value;
+  const data = xVal ? asGrammarValue(xVal) : undefined;
+  eq(data !== undefined, true, "x is a Grammar value");
+  if (!data) return;
+  eq(data.baseChain.join(","), "allegro");
+  eq(data.fragment.infix.length, 1);
+  eq(data.fragment.infix[0].token, "**");
+  eq(data.fragment.infix[0].level, "mul");
+  eq(data.fragment.infix[0].assoc, "right");
+});
+
+test("Phase 6: grammar block accumulates multiple decl kinds", () => {
+  const src =
+    'x = grammar {\n' +
+    '  infix "**" at(mul) right => (l, r) => l + r\n' +
+    '  prefix "neg" at(unary) => y => 0 - y\n' +
+    '  expr_prefix "lazy" => e => e\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const xVal = evalCtx.bindings.get("x")?.value;
+  const data = xVal ? asGrammarValue(xVal) : undefined;
+  eq(data !== undefined, true);
+  if (!data) return;
+  eq(data.fragment.infix.length, 1);
+  eq(data.fragment.prefixOp.length, 1);
+  eq(data.fragment.exprPrefix.length, 1);
+  eq(data.fragment.infix[0].token, "**");
+  eq(data.fragment.prefixOp[0].token, "neg");
+  eq(data.fragment.prefixOp[0].level, "unary");
+  eq(data.fragment.exprPrefix[0].keyword, "lazy");
+  // `neg` is tracked as a user keyword (distinguishes from the ident `neg`).
+  eq(data.fragment.operators.includes("neg"), true);
+  eq(data.fragment.keywords.includes("lazy"), true);
+});
+
+test("Phase 6: combined above/below prec spec is rejected in step 4", () => {
+  const src = 'x = grammar { infix "**" above(mul) below(unary) right => (l, r) => l + r }\n';
+  let threw = false;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true, "combined above/below throws");
+  eq(msg.includes("step 5"), true, `error mentions step 5: ${msg}`);
 });
 
 test("Phase 6: tree-builder lowers grammar block to finalize(add(new))", () => {

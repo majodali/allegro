@@ -1325,9 +1325,9 @@ function buildGrammarExpr(tree: ParseTree, paramMap: Map<string, any>): any {
 function buildDeclAsCall(decl: ParseTree, fragExpr: any, paramMap: Map<string, any>): any {
   if (decl.kind !== "branch") throw new Error("buildDeclAsCall: not a branch");
   const c = decl.children;
-  const stringTree = c.find(ch => ch.kind === "branch" && ch.tag === "string") as ParseTree | undefined;
-  const precTree   = c.find(ch => ch.kind === "branch" && ch.tag === "prec_spec") as ParseTree | undefined;
-  const assocTree  = c.find(ch => ch.kind === "branch" && ch.tag === "assoc") as ParseTree | undefined;
+  const stringTree = findTaggedBranch(c, "string");
+  const precTree   = findTaggedBranch(c, "prec_spec");
+  const assocTree  = findTaggedBranch(c, "assoc");
   // Body expression: the LAST expression-tagged descendant (skip the op string).
   let bodyTree: ParseTree | null = null;
   for (let i = c.length - 1; i >= 0; i--) {
@@ -1446,6 +1446,19 @@ function simpleStringText(tree: ParseTree): string {
       default:   return ch;
     }
   });
+}
+
+/** Search children (and their descendants) for the first branch with the
+ *  given tag. Used by the grammar-block builder where named subtrees may
+ *  be wrapped by `opt(seq([…]))` and similar. */
+function findTaggedBranch(children: ParseTree[], tag: string): ParseTree | undefined {
+  for (const c of children) {
+    if (c.kind !== "branch") continue;
+    if (c.tag === tag) return c;
+    const sub = findTaggedBranch(c.children, tag);
+    if (sub) return sub;
+  }
+  return undefined;
 }
 
 function findLastExprBranch(children: ParseTree[]): ParseTree | null {
