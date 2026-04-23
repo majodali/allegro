@@ -165,6 +165,7 @@ const LEVELS: LevelSpec[] = [
       nonterm("none_lit"),
       nonterm("array_lit"),
       nonterm("object_lit"),
+      nonterm("grammar_expr"),          // Phase 6 — `grammar { … }` block.
       nonterm("paren_expr"),
       nonterm("ident"),
     ]) },
@@ -190,6 +191,10 @@ export function buildBaseGrammar(): Grammar {
     "none", "error",
     "instanceof", "subtypeof",
   ]));
+  // Note: `grammar` is NOT reserved — existing code uses it as a variable /
+  // parameter name (see `lib/grammar-analyzer.alg`). The `grammar_expr`
+  // atom alternative disambiguates by requiring `{` to follow; if absent,
+  // parsing backtracks to `ident` which accepts `grammar` normally.
 
   // --- Terminals ---
 
@@ -671,6 +676,146 @@ export function buildBaseGrammar(): Grammar {
       opt(nonterm("line_break")),
       opt(nonterm("ws")),
     ], { name: "program" }),
+  });
+
+  // --- Phase 6: grammar { … } blocks ---
+  //
+  // The `grammar` keyword introduces a grammar-building expression. Inside
+  // braces, a sequence of declarations (infix / prefix / postfix /
+  // expr_prefix in step 3's subset) compile to calls on a fresh fragment
+  // accumulator. The tree-builder chains them into primitive-call
+  // expressions; at evaluation the fragment is finalized into a Grammar
+  // value.
+  //
+  // Step 3 parses only the Phase 1-equivalent forms. Step 5 adds `prec(X)`
+  // named levels and combined `above(X) below(Y)` precedence clauses; step
+  // 6 adds `rule NAME = …` and the `expr_form` / `stmt_form` multi-token
+  // shapes with the EBNF mini-grammar.
+
+  // grammar_expr = "grammar" ws "{" ws_any grammar_body ws_any "}"
+  addProduction(g, { name: "grammar_expr",
+    rule: seq([
+      lit("grammar"),
+      nonterm("ws"),
+      lit("{"),
+      nonterm("ws_any"),
+      nonterm("grammar_body"),
+      nonterm("ws_any"),
+      lit("}"),
+    ], { name: "grammar_expr" }),
+  });
+
+  // grammar_body = (ws_any grammar_decl)*
+  // `ws_any` before each decl consumes newlines between declarations inside
+  // braces. Each decl's keyword starts with `infix`/`prefix`/`postfix`/
+  // `expr_prefix`, which unambiguously signal the decl alternative.
+  addProduction(g, { name: "grammar_body",
+    rule: rep(seq([nonterm("ws_any"), nonterm("grammar_decl")]), { min: 0 }),
+  });
+
+  addProduction(g, { name: "grammar_decl",
+    rule: alt([
+      nonterm("infix_decl"),
+      nonterm("prefix_decl"),
+      nonterm("postfix_decl"),
+      nonterm("expr_prefix_decl"),
+    ]),
+  });
+
+  // infix_decl = "infix" ws_req string ws prec_spec ws (assoc ws)? "=>" ws expr
+  addProduction(g, { name: "infix_decl",
+    rule: seq([
+      lit("infix"),
+      nonterm("ws_req"),
+      nonterm("string"),
+      nonterm("ws_req"),
+      nonterm("prec_spec"),
+      nonterm("ws"),
+      opt(seq([nonterm("assoc"), nonterm("ws")])),
+      lit("=>"),
+      nonterm("ws"),
+      nonterm("expr"),
+    ], { name: "infix_decl" }),
+  });
+
+  // prefix_decl = "prefix" ws_req string ws_req prec_spec ws "=>" ws expr
+  addProduction(g, { name: "prefix_decl",
+    rule: seq([
+      lit("prefix"),
+      nonterm("ws_req"),
+      nonterm("string"),
+      nonterm("ws_req"),
+      nonterm("prec_spec"),
+      nonterm("ws"),
+      lit("=>"),
+      nonterm("ws"),
+      nonterm("expr"),
+    ], { name: "prefix_decl" }),
+  });
+
+  // postfix_decl = "postfix" ws_req string ws_req prec_spec ws "=>" ws expr
+  addProduction(g, { name: "postfix_decl",
+    rule: seq([
+      lit("postfix"),
+      nonterm("ws_req"),
+      nonterm("string"),
+      nonterm("ws_req"),
+      nonterm("prec_spec"),
+      nonterm("ws"),
+      lit("=>"),
+      nonterm("ws"),
+      nonterm("expr"),
+    ], { name: "postfix_decl" }),
+  });
+
+  // expr_prefix_decl = "expr_prefix" ws_req string ws "=>" ws expr
+  addProduction(g, { name: "expr_prefix_decl",
+    rule: seq([
+      lit("expr_prefix"),
+      nonterm("ws_req"),
+      nonterm("string"),
+      nonterm("ws"),
+      lit("=>"),
+      nonterm("ws"),
+      nonterm("expr"),
+    ], { name: "expr_prefix_decl" }),
+  });
+
+  // prec_spec = prec_form (ws prec_form)*
+  // A prec_spec is one or more forms. Examples:
+  //   at(mul)
+  //   prec(pow) above(mul) below(unary)
+  //   above("*")                                  // lookup by operator symbol
+  addProduction(g, { name: "prec_spec",
+    rule: rep(nonterm("prec_form"), { min: 1, sep: nonterm("ws") }),
+  });
+
+  addProduction(g, { name: "prec_form",
+    rule: alt([
+      seq([lit("at"),    nonterm("ws"), lit("("), nonterm("ws"), nonterm("prec_target"), nonterm("ws"), lit(")")], { name: "prec_at" }),
+      seq([lit("above"), nonterm("ws"), lit("("), nonterm("ws"), nonterm("prec_target"), nonterm("ws"), lit(")")], { name: "prec_above" }),
+      seq([lit("below"), nonterm("ws"), lit("("), nonterm("ws"), nonterm("prec_target"), nonterm("ws"), lit(")")], { name: "prec_below" }),
+      seq([lit("prec"),  nonterm("ws"), lit("("), nonterm("ws"), nonterm("prec_target"), nonterm("ws"), lit(")")], { name: "prec_named" }),
+    ]),
+  });
+
+  // prec_target: an identifier (level name) OR a literal string (operator
+  // symbol lookup). Interpolated strings are not supported here.
+  addProduction(g, { name: "prec_target",
+    rule: alt([
+      nonterm("ident"),
+      nonterm("string"),
+    ]),
+  });
+
+  // Associativity keyword: literal matches are context-sensitive so `left`
+  // and `right` remain usable as identifiers elsewhere.
+  addProduction(g, { name: "assoc",
+    rule: alt([
+      lit("left"),
+      lit("right"),
+      lit("none"),
+    ]),
   });
 
   return g;

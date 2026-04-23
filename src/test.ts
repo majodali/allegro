@@ -4085,6 +4085,58 @@ test("Phase 5: Allegro analyze() top-level returns unified report", () => {
   eq(leftRec.includes("lr"), true);
 });
 
+// --- Phase 6 step 3: grammar { … } block parsing ---
+//
+// Confirm the new `grammar { … }` atom parses into the expected tree
+// (a chain of grammar_*_add primitive calls wrapped in
+// grammar_fragment_finalize). Execution requires the primitives to be
+// implemented (step 4), so these tests only assert on parse shape.
+
+test("Phase 6: empty grammar block parses", () => {
+  const g = buildBaseGrammar();
+  const result = g2parse(g, "x = grammar { }\n");
+  eq(result.ok, true, "empty grammar block parses");
+});
+
+test("Phase 6: infix decl in grammar block parses", () => {
+  const g = buildBaseGrammar();
+  const result = g2parse(g, 'x = grammar { infix "**" at(mul) right => (l, r) => l + r }\n');
+  eq(result.ok, true, "infix decl parses");
+});
+
+test("Phase 6: multiple decls in grammar block parses", () => {
+  const g = buildBaseGrammar();
+  const src =
+    'x = grammar {\n' +
+    '  infix "**" at(mul) right => (l, r) => l + r\n' +
+    '  prefix "neg" at(unary) => x => 0 - x\n' +
+    '  expr_prefix "lazy" => e => e\n' +
+    '}\n';
+  const result = g2parse(g, src);
+  eq(result.ok, true, `multi-decl grammar block parses (${result.ok ? "ok" : (result as any).error.message})`);
+});
+
+test("Phase 6: grammar as a parameter name still works (no reservation collision)", () => {
+  const g = buildBaseGrammar();
+  const result = g2parse(g, "f(grammar) => grammar.productions\n");
+  eq(result.ok, true, "grammar as param name works");
+});
+
+test("Phase 6: tree-builder lowers grammar block to finalize(add(new))", () => {
+  const g = buildBaseGrammar();
+  const result = g2parse(g, 'x = grammar { infix "**" at(mul) right => (l, r) => l + r }\n');
+  eq(result.ok, true);
+  if (!result.ok) return;
+  const program = buildProgram(result.tree);
+  // The binding `x` should be an Expression calling grammar_fragment_finalize.
+  const xBinding = program.bindings.get("x");
+  eq(xBinding !== undefined, true, "x binding exists");
+  const xVal = xBinding.value;
+  eq(xVal.kind, ValueKind.Expression, "x is an Expression");
+  const fnName = (xVal.fn && xVal.fn.name) ? xVal.fn.name : "?";
+  eq(fnName, "grammar_fragment_finalize", `outer call is finalize, got ${fnName}`);
+});
+
 // --- Phase 2b: base (Allegretto) grammar in grammar2 formalism ---
 
 import { buildBaseGrammar } from "./grammar2/base-grammar.js";

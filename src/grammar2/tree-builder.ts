@@ -179,6 +179,9 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     case "block_expr":
       return buildBlockExpr(tree, paramMap);
 
+    case "grammar_expr":
+      return buildGrammarExpr(tree, paramMap);
+
     case "number": {
       const txt = textOf(tree);
       if (txt.startsWith("0x") || txt.startsWith("0X")) {
@@ -912,6 +915,7 @@ const BUILTIN_EXPRESSION_TAGS = new Set([
   "array_lit","object_lit",
   "instanceof","subtypeof","of","of_error","error_expr",
   "when_expr","block_expr","pipe",
+  "grammar_expr",          // Phase 6 — `grammar { … }` block evaluates to a Grammar.
 ]);
 
 // Used like a Set but also matches user-op tags issued at runtime by
@@ -1272,6 +1276,189 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
 }
 
 // --- Top-level: program → fileCtx ---
+
+// --- Phase 6: grammar { … } block ---
+//
+// A grammar block compiles to a chain of fragment-builder primitive calls:
+//
+//   grammar_fragment_finalize(
+//     grammar_infix_add(
+//       grammar_prefix_add(
+//         grammar_fragment_new("allegro"),
+//         "neg", prec_spec, body
+//       ),
+//       "**", prec_spec, assoc, body
+//     )
+//   )
+//
+// Each `grammar_*_add` primitive takes the handle, mutates it, and returns
+// it so calls can be chained. `grammar_fragment_finalize` returns the
+// resulting Grammar value. Step 3 only produces the expression shape; the
+// primitive implementations (step 4) and merger (step 5+) fill in behaviour.
+
+function buildGrammarExpr(tree: ParseTree, paramMap: Map<string, any>): any {
+  if (tree.kind !== "branch" || tree.tag !== "grammar_expr") {
+    throw new Error(`buildGrammarExpr: not a grammar_expr tree`);
+  }
+  // Collect all decl branches (rep + ws may wrap them).
+  const decls: ParseTree[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    if (t.tag === "infix_decl" || t.tag === "prefix_decl" ||
+        t.tag === "postfix_decl" || t.tag === "expr_prefix_decl") {
+      decls.push(t);
+      return;
+    }
+    for (const c of t.children) walk(c);
+  };
+  for (const c of tree.children) walk(c);
+
+  // Default base is "allegro". `new grammar { … }` and `extends X` arrive in
+  // a later step; for now every grammar block extends Allegro.
+  let expr: any = makeExpr(prim("grammar_fragment_new"), [stringToBits("allegro")]);
+  for (const decl of decls) {
+    expr = buildDeclAsCall(decl, expr, paramMap);
+  }
+  return makeExpr(prim("grammar_fragment_finalize"), [expr]);
+}
+
+function buildDeclAsCall(decl: ParseTree, fragExpr: any, paramMap: Map<string, any>): any {
+  if (decl.kind !== "branch") throw new Error("buildDeclAsCall: not a branch");
+  const c = decl.children;
+  const stringTree = c.find(ch => ch.kind === "branch" && ch.tag === "string") as ParseTree | undefined;
+  const precTree   = c.find(ch => ch.kind === "branch" && ch.tag === "prec_spec") as ParseTree | undefined;
+  const assocTree  = c.find(ch => ch.kind === "branch" && ch.tag === "assoc") as ParseTree | undefined;
+  // Body expression: the LAST expression-tagged descendant (skip the op string).
+  let bodyTree: ParseTree | null = null;
+  for (let i = c.length - 1; i >= 0; i--) {
+    const ch = c[i];
+    if (ch.kind === "branch") {
+      if (ch.tag && EXPRESSION_TAGS.has(ch.tag)) { bodyTree = ch; break; }
+      const sub = findLastExprBranch(ch.children);
+      if (sub) { bodyTree = sub; break; }
+    }
+  }
+  if (!stringTree || !bodyTree) {
+    throw new Error(`${decl.tag}: missing required parts (string=${!!stringTree}, body=${!!bodyTree})`);
+  }
+
+  const opBits = stringToBits(simpleStringText(stringTree));
+  const body   = buildExpr(bodyTree, paramMap);
+
+  switch (decl.tag) {
+    case "infix_decl": {
+      if (!precTree) throw new Error("infix_decl: missing prec_spec");
+      const precSpec = buildPrecSpec(precTree);
+      const assoc    = assocTree ? textOf(assocTree) : "left";
+      return makeExpr(prim("grammar_infix_add"),
+        [fragExpr, opBits, precSpec, stringToBits(assoc), body]);
+    }
+    case "prefix_decl": {
+      if (!precTree) throw new Error("prefix_decl: missing prec_spec");
+      const precSpec = buildPrecSpec(precTree);
+      return makeExpr(prim("grammar_prefix_add"), [fragExpr, opBits, precSpec, body]);
+    }
+    case "postfix_decl": {
+      if (!precTree) throw new Error("postfix_decl: missing prec_spec");
+      const precSpec = buildPrecSpec(precTree);
+      return makeExpr(prim("grammar_postfix_add"), [fragExpr, opBits, precSpec, body]);
+    }
+    case "expr_prefix_decl":
+      return makeExpr(prim("grammar_expr_prefix_add"), [fragExpr, opBits, body]);
+  }
+  throw new Error(`buildDeclAsCall: unknown decl tag ${decl.tag}`);
+}
+
+/**
+ * Build a precedence-spec value from a prec_spec tree. Emits a typed Object
+ * with kind-keyed fields: `{at: "mul"}`, `{above: "mul", below: "unary"}`,
+ * `{prec: "pow"}`, etc. The merger inspects which keys are present.
+ */
+function buildPrecSpec(tree: ParseTree): any {
+  if (tree.kind !== "branch") throw new Error("buildPrecSpec: not a branch");
+  const kvs: any[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    const kind =
+      t.tag === "prec_at"    ? "at"    :
+      t.tag === "prec_above" ? "above" :
+      t.tag === "prec_below" ? "below" :
+      t.tag === "prec_named" ? "prec"  : undefined;
+    if (kind) {
+      kvs.push(stringToBits(kind));
+      kvs.push(stringToBits(extractPrecTarget(t)));
+      return;
+    }
+    for (const c of t.children) walk(c);
+  };
+  for (const c of tree.children) walk(c);
+  return makeExpr(prim("typed_object"), kvs);
+}
+
+/**
+ * Extract the prec_target's underlying text. The `prec_target` production is
+ * an alt that may hoist past its wrapper, so we scan the whole subtree for
+ * the first `ident` or `string` branch.
+ */
+function extractPrecTarget(tree: ParseTree): string {
+  const walk = (t: ParseTree): string | null => {
+    if (t.kind !== "branch") return null;
+    if (t.tag === "ident")  return textOf(t);
+    if (t.tag === "string") return simpleStringText(t);
+    for (const c of t.children) {
+      const r = walk(c);
+      if (r !== null) return r;
+    }
+    return null;
+  };
+  const r = walk(tree);
+  if (r === null) throw new Error("prec_target: missing ident or string");
+  return r;
+}
+
+/** Extract plain text from a `string` ParseTree. Interpolation not allowed. */
+function simpleStringText(tree: ParseTree): string {
+  if (tree.kind !== "branch" || tree.tag !== "string") {
+    throw new Error(`simpleStringText: expected string tree, got ${tree.kind}/${(tree as any).tag}`);
+  }
+  let out = "";
+  const walk = (t: ParseTree): void => {
+    if (t.kind === "branch") {
+      if (t.tag === "string_interp") {
+        throw new Error("string interpolation not allowed in grammar declaration");
+      }
+      for (const c of t.children) walk(c);
+      return;
+    }
+    if (t.kind === "leaf") {
+      if (t.text === `"`) return;   // skip quote leaves
+      out += t.text;
+    }
+  };
+  walk(tree);
+  return out.replace(/\\(.)/g, (_, ch: string) => {
+    switch (ch) {
+      case "n":  return "\n";
+      case "t":  return "\t";
+      case "r":  return "\r";
+      case '"':  return '"';
+      case "\\": return "\\";
+      default:   return ch;
+    }
+  });
+}
+
+function findLastExprBranch(children: ParseTree[]): ParseTree | null {
+  for (let i = children.length - 1; i >= 0; i--) {
+    const c = children[i];
+    if (c.kind === "branch") {
+      if (c.tag && EXPRESSION_TAGS.has(c.tag)) return c;
+      const sub = findLastExprBranch(c.children);
+      if (sub) return sub;
+    }
+  }
+  return null;
+}
 
 export function buildProgram(tree: ParseTree): any {
   tree = peelUntilTag(tree);
