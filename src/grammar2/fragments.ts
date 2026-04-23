@@ -17,7 +17,7 @@ import {
   Grammar, Rule, makeGrammar, addProduction,
   lit, nonterm, seq, alt, rep,
 } from "./types.js";
-import { buildBaseGrammar, BASE_LEVEL_NAMES } from "./base-grammar.js";
+import { buildBaseGrammar, BASE_LEVEL_NAMES, BASE_OPERATORS_TO_LEVEL } from "./base-grammar.js";
 import type { GrammarFragment } from "../types.js";
 import type { Value } from "../types.js";
 
@@ -76,7 +76,159 @@ export function getGrammarWithFragments(fragments: GrammarFragment[]): Grammar {
  *
  * Future work: map the user-supplied `bp` to a specific precedence level.
  */
+// --- Fragment compatibility / conflict validation (Phase 6 step 7) ---
+//
+// Run BEFORE the merger applies changes so errors surface as a single
+// aggregated message rather than a mid-merge failure. Checks:
+//   E_OPERATOR_CONFLICT      — two fragments (or fragment + base) both
+//                              register the same operator symbol.
+//   E_KEYWORD_CONFLICT       — ditto for expr_prefix keywords / user
+//                              keywords vs. base reserved words.
+//   E_PRECEDENCE_CYCLE       — user level constraints + base stack form a
+//                              cyclic partial order (topo-sort fails).
+//
+// Deferred: E_INCOMPATIBLE_GRAMMARS (meaningful only after `new grammar`),
+// W_PRODUCTION_REPLACED (needs `rule NAME = …` — step 6).
+
+const BASE_RESERVED_KEYWORDS = new Set([
+  "if", "then", "else",
+  "when", "is", "of", "and",
+  "import", "export",
+  "true", "false",
+  "none", "error",
+  "instanceof", "subtypeof",
+]);
+
+export function validateFragments(fragments: GrammarFragment[]): string[] {
+  const errors: string[] = [];
+
+  // --- Operator conflicts ---
+  //
+  // Track each operator symbol's first source. A collision is any attempt to
+  // re-register the same symbol — whether it's a base operator the user is
+  // trying to shadow, or two fragments registering the same new operator.
+  const opSources = new Map<string, string>();
+  for (const [sym, level] of Object.entries(BASE_OPERATORS_TO_LEVEL)) {
+    opSources.set(sym, `base grammar (level '${level}')`);
+  }
+  for (let i = 0; i < fragments.length; i++) {
+    const fragTag = `fragment[${i}]`;
+    for (const e of fragments[i].infix) {
+      if (opSources.has(e.token)) {
+        errors.push(`E_OPERATOR_CONFLICT: infix '${e.token}' from ${fragTag} conflicts with ${opSources.get(e.token)}`);
+      } else opSources.set(e.token, `${fragTag} infix`);
+    }
+    for (const e of fragments[i].prefixOp) {
+      if (opSources.has(e.token)) {
+        errors.push(`E_OPERATOR_CONFLICT: prefix '${e.token}' from ${fragTag} conflicts with ${opSources.get(e.token)}`);
+      } else opSources.set(e.token, `${fragTag} prefix`);
+    }
+    for (const e of fragments[i].postfixOp) {
+      if (opSources.has(e.token)) {
+        errors.push(`E_OPERATOR_CONFLICT: postfix '${e.token}' from ${fragTag} conflicts with ${opSources.get(e.token)}`);
+      } else opSources.set(e.token, `${fragTag} postfix`);
+    }
+  }
+
+  // --- Keyword conflicts (expr_prefix) ---
+  const kwSources = new Map<string, string>();
+  for (const kw of BASE_RESERVED_KEYWORDS) kwSources.set(kw, "base reserved keyword");
+  for (let i = 0; i < fragments.length; i++) {
+    for (const e of fragments[i].exprPrefix) {
+      if (kwSources.has(e.keyword)) {
+        errors.push(`E_KEYWORD_CONFLICT: keyword '${e.keyword}' from fragment[${i}] conflicts with ${kwSources.get(e.keyword)}`);
+      } else kwSources.set(e.keyword, `fragment[${i}]`);
+    }
+  }
+
+  // --- Precedence cycle detection ---
+  //
+  // Build a DAG over [base levels ∪ user levels]. Edges encode "binds tighter
+  // than": A → B means B is tighter than A. The base grammar contributes its
+  // total order (pipe → or → … → atom). Each user constraint adds:
+  //   above(X) on level L  ⇒ X → L       (L is tighter than X)
+  //   below(Y) on level L  ⇒ L → Y       (L is looser than Y, i.e., Y tighter than L)
+  //
+  // DFS with three-colour marking catches any back-edge = cycle.
+  const userLevelDecls = new Map<string, Array<{ kind: "at"|"above"|"below"; target: string }>>();
+  for (const f of fragments) {
+    for (const p of (f.precedence ?? [])) {
+      const existing = userLevelDecls.get(p.name) ?? [];
+      for (const c of p.constraints) {
+        if (!existing.some(ec => ec.kind === c.kind && ec.target === c.target)) {
+          existing.push(c);
+        }
+      }
+      userLevelDecls.set(p.name, existing);
+    }
+  }
+  if (userLevelDecls.size > 0) {
+    const cycleErr = detectPrecedenceCycle(userLevelDecls);
+    if (cycleErr) errors.push(cycleErr);
+  }
+
+  return errors;
+}
+
+function detectPrecedenceCycle(
+  userDecls: Map<string, Array<{ kind: "at"|"above"|"below"; target: string }>>,
+): string | null {
+  const nodes = new Set<string>([...BASE_LEVEL_NAMES, ...userDecls.keys()]);
+  const edges = new Map<string, Set<string>>();
+  for (const n of nodes) edges.set(n, new Set());
+
+  // Base total order.
+  for (let i = 0; i < BASE_LEVEL_NAMES.length - 1; i++) {
+    edges.get(BASE_LEVEL_NAMES[i])!.add(BASE_LEVEL_NAMES[i + 1]);
+  }
+  // User constraints.
+  for (const [level, constraints] of userDecls) {
+    for (const c of constraints) {
+      if (c.kind === "above") edges.get(c.target)?.add(level);
+      if (c.kind === "below") edges.get(level)?.add(c.target);
+      // `at` is an alias — no edge needed.
+    }
+  }
+
+  // DFS cycle detection.
+  const colour = new Map<string, 0 | 1 | 2>();
+  for (const n of nodes) colour.set(n, 0);
+
+  function dfs(n: string, stack: string[]): string[] | null {
+    if (colour.get(n) === 1) {
+      const start = stack.indexOf(n);
+      return [...stack.slice(start), n];
+    }
+    if (colour.get(n) === 2) return null;
+    colour.set(n, 1);
+    stack.push(n);
+    for (const m of edges.get(n) ?? []) {
+      const cyc = dfs(m, stack);
+      if (cyc) return cyc;
+    }
+    stack.pop();
+    colour.set(n, 2);
+    return null;
+  }
+
+  for (const n of nodes) {
+    if (colour.get(n) === 0) {
+      const cyc = dfs(n, []);
+      if (cyc) return `E_PRECEDENCE_CYCLE: constraint cycle: ${cyc.join(" → ")}`;
+    }
+  }
+  return null;
+}
+
 function buildExtendedGrammar(fragments: GrammarFragment[]): Grammar {
+  // Validate cross-fragment consistency before mutating the grammar. An
+  // aggregated error (joined with \n) surfaces at the `use X` call site so
+  // users see all problems at once.
+  const errs = validateFragments(fragments);
+  if (errs.length > 0) {
+    throw new Error("Grammar extension errors:\n  " + errs.join("\n  "));
+  }
+
   // Start with a fresh base grammar.
   const g = buildBaseGrammar();
 

@@ -1415,31 +1415,11 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
           bindings[key] = b.value;
         }
       }
-      // Also harvest Phase 6 Grammar values from bindings and merge their
-      // fragments into (or alongside) the Phase 1 fragment.
-      const phase6Frags: any[] = [];
-      for (const key of Object.keys(bindings)) {
-        const data = asGrammarValue(bindings[key]);
-        if (data) phase6Frags.push(data.fragment);
-      }
-      let mergedFrag = frag;
-      for (const f of phase6Frags) {
-        if (!mergedFrag) mergedFrag = f;
-        else mergedFrag = {
-          keywords:   [...mergedFrag.keywords,   ...f.keywords],
-          operators:  [...mergedFrag.operators,  ...f.operators],
-          infix:      [...mergedFrag.infix,      ...f.infix],
-          prefixOp:   [...mergedFrag.prefixOp,   ...f.prefixOp],
-          postfixOp:  [...mergedFrag.postfixOp,  ...f.postfixOp],
-          exprPrefix: [...mergedFrag.exprPrefix, ...f.exprPrefix],
-          base:       mergedFrag.base ?? f.base,
-          precedence: [...(mergedFrag.precedence ?? []), ...(f.precedence ?? [])],
-          exprForms:  [...(mergedFrag.exprForms  ?? []), ...(f.exprForms  ?? [])],
-          stmtForms:  [...(mergedFrag.stmtForms  ?? []), ...(f.stmtForms  ?? [])],
-          rules:      [...(mergedFrag.rules      ?? []), ...(f.rules      ?? [])],
-        };
-      }
-      grammarExts.push({ name: id, bindings, grammarFragment: mergedFrag });
+      // Attach the Phase 1 fragment (if any). Phase 6 fragments live in
+      // Grammar-valued bindings and are picked up by evalSource directly —
+      // don't merge them here or we'll double-count and trigger
+      // E_OPERATOR_CONFLICT against ourselves.
+      grammarExts.push({ name: id, bindings, grammarFragment: frag });
     }
   }
   // Strip `use …` lines from source before evaluation.
@@ -4284,6 +4264,91 @@ test("Phase 6: multiple infix regs sharing prec(X) share one level decl", () => 
   eq(data.fragment.infix.length, 2);
   eq(data.fragment.infix[0].level, "pow");
   eq(data.fragment.infix[1].level, "pow");
+});
+
+// --- Phase 6 step 7: conflict detection ---
+
+test("Phase 6 step 7: duplicate infix op across fragments → E_OPERATOR_CONFLICT", () => {
+  const src1 = 'a = grammar { infix "**" at(mul) right => (l, r) => l + r }\n';
+  const src2 = 'b = grammar { infix "**" at(mul) right => (l, r) => l * r }\n';
+  const { evalCtx: c1 } = runtimeEval(src1, undefined, [typeExt], undefined, true);
+  const { evalCtx: c2 } = runtimeEval(src2, undefined, [typeExt], undefined, true);
+  const f1 = asGrammarValue(c1.bindings.get("a")!.value!)!.fragment;
+  const f2 = asGrammarValue(c2.bindings.get("b")!.value!)!.fragment;
+  let threw = false, msg = "";
+  try { g2getGrammarWithFragments([f1, f2]); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true, "conflict throws");
+  eq(msg.includes("E_OPERATOR_CONFLICT"), true, `error mentions E_OPERATOR_CONFLICT: ${msg}`);
+  eq(msg.includes("**"), true);
+});
+
+test("Phase 6 step 7: user infix shadowing a base operator → E_OPERATOR_CONFLICT", () => {
+  const src = 'x = grammar { infix "+" at(add) left => (l, r) => l * r }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("x")!.value!)!.fragment;
+  let threw = false, msg = "";
+  try { g2getGrammarWithFragments([frag]); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true, "base-shadow throws");
+  eq(msg.includes("E_OPERATOR_CONFLICT"), true);
+  eq(msg.includes("base grammar"), true, "error mentions base grammar");
+});
+
+test("Phase 6 step 7: duplicate expr_prefix keyword → E_KEYWORD_CONFLICT", () => {
+  const src1 = 'a = grammar { expr_prefix "lazy" => e => e }\n';
+  const src2 = 'b = grammar { expr_prefix "lazy" => e => e }\n';
+  const { evalCtx: c1 } = runtimeEval(src1, undefined, [typeExt], undefined, true);
+  const { evalCtx: c2 } = runtimeEval(src2, undefined, [typeExt], undefined, true);
+  const f1 = asGrammarValue(c1.bindings.get("a")!.value!)!.fragment;
+  const f2 = asGrammarValue(c2.bindings.get("b")!.value!)!.fragment;
+  let threw = false, msg = "";
+  try { g2getGrammarWithFragments([f1, f2]); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true);
+  eq(msg.includes("E_KEYWORD_CONFLICT"), true, `error mentions E_KEYWORD_CONFLICT: ${msg}`);
+});
+
+test("Phase 6 step 7: expr_prefix shadowing a base keyword → E_KEYWORD_CONFLICT", () => {
+  const src = 'x = grammar { expr_prefix "if" => e => e }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("x")!.value!)!.fragment;
+  let threw = false, msg = "";
+  try { g2getGrammarWithFragments([frag]); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true);
+  eq(msg.includes("E_KEYWORD_CONFLICT"), true);
+  eq(msg.includes("base reserved"), true);
+});
+
+test("Phase 6 step 7: cyclic precedence → E_PRECEDENCE_CYCLE", () => {
+  // Two levels each claiming to be above the other.
+  const src =
+    'x = grammar {\n' +
+    '  infix "@@" prec(a) above(b) right => (l, r) => l + r\n' +
+    '  infix "##" prec(b) above(a) right => (l, r) => l + r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("x")!.value!)!.fragment;
+  let threw = false, msg = "";
+  try { g2getGrammarWithFragments([frag]); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true, "cycle throws");
+  eq(msg.includes("E_PRECEDENCE_CYCLE"), true, `error mentions E_PRECEDENCE_CYCLE: ${msg}`);
+});
+
+test("Phase 6 step 7: non-cyclic constraints between two user levels are fine", () => {
+  // a tighter than mul, b tighter than a — linear chain, no cycle.
+  const src =
+    'x = grammar {\n' +
+    '  infix "@@" prec(a) above(mul) right => (l, r) => l + r\n' +
+    '  infix "##" prec(b) above(a)   right => (l, r) => l + r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("x")!.value!)!.fragment;
+  const merged = g2getGrammarWithFragments([frag]);    // must not throw
+  eq(merged.productions.has("expr_a"), true);
+  eq(merged.productions.has("expr_b"), true);
 });
 
 test("Phase 6: tree-builder lowers grammar block to finalize(add(new))", () => {
