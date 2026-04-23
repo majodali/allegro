@@ -11,9 +11,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
-import { formatValue } from "./primitives.js";
+import { formatValue, asGrammarValue } from "./primitives.js";
 import { evalSource, Extension } from "./runtime.js";
-import { ContextValue } from "./types.js";
+import { ContextValue, GrammarFragment } from "./types.js";
 import { createTypeSystem } from "./types-std.js";
 import { ModuleLoader } from "./modules.js";
 import { createFutureManager, FutureManager } from "./futures.js";
@@ -80,23 +80,24 @@ async function loadImportedModules(
 }
 
 /**
- * Pre-scan source for `use_grammar NAME` directives at the top of the file.
- * Each directive must appear before any non-`use_grammar`, non-comment, non-blank
+ * Pre-scan source for `use X` directives at the top of the file (Phase 6).
+ * Accepted forms in step 8's whitelist:
+ *   use NAME            — loads module NAME, applies its grammar
+ *   use import NAME     — same; `import` is accepted but currently does the
+ *                         same thing (module bindings always land in scope
+ *                         as an extension; step 11+ may distinguish).
+ * Each directive must appear before any non-`use`, non-comment, non-blank
  * line. Returns the list of grammar-extension module names to load first.
  */
-function scanUseGrammar(source: string): string[] {
+function scanUses(source: string): string[] {
   const names: string[] = [];
   const lines = source.split(/\r?\n/);
   let inBlockComment = false;
   for (const rawLine of lines) {
     let line = rawLine;
-    // Strip block comment contents (naive — good enough for header scan)
     if (inBlockComment) {
       const end = line.indexOf("*/");
-      if (end >= 0) {
-        line = line.slice(end + 2);
-        inBlockComment = false;
-      } else continue;
+      if (end >= 0) { line = line.slice(end + 2); inBlockComment = false; } else continue;
     }
     const bcStart = line.indexOf("/*");
     if (bcStart >= 0) {
@@ -104,24 +105,45 @@ function scanUseGrammar(source: string): string[] {
       if (bcEnd >= 0) line = line.slice(0, bcStart) + line.slice(bcEnd + 2);
       else { line = line.slice(0, bcStart); inBlockComment = true; }
     }
-    // Strip line comment
     const lcStart = line.indexOf("//");
     if (lcStart >= 0) line = line.slice(0, lcStart);
     const trimmed = line.trim();
     if (trimmed === "") continue;
-    const m = /^use_grammar\s+(\w+)\s*$/.exec(trimmed);
-    if (m) {
-      names.push(m[1]);
-      continue;
-    }
-    // First non-blank, non-comment, non-use_grammar line ends the header
+    // Match `use NAME` or `use import NAME`.
+    const m = /^use\s+(?:import\s+)?(\w+)\s*$/.exec(trimmed);
+    if (m) { names.push(m[1]); continue; }
     break;
   }
   return names;
 }
 
+/** Strip `use …` directive lines from source before the main parse. */
+function stripUses(source: string): string {
+  return source.replace(/^\s*use\s+(?:import\s+)?\w+\s*$/gm, "");
+}
+
 /**
- * Load grammar-extension modules listed in `use_grammar` directives.
+ * Collect grammar fragments contributed by extensions. Two sources:
+ *   1. `ext.grammarFragment` — set by Phase 1 register_* primitives.
+ *   2. `ext.bindings[name] = grammar { … }` — Phase 6 Grammar values
+ *      produced by the new syntax. We scan bindings for any value that
+ *      `asGrammarValue` recognises.
+ */
+function collectFragments(extensions: Extension[]): GrammarFragment[] {
+  const out: GrammarFragment[] = [];
+  for (const ext of extensions) {
+    if (ext.grammarFragment) out.push(ext.grammarFragment);
+    const bindings = ext.bindings ?? {};
+    for (const key of Object.keys(bindings)) {
+      const data = asGrammarValue(bindings[key]);
+      if (data) out.push(data.fragment);
+    }
+  }
+  return out;
+}
+
+/**
+ * Load grammar-extension modules listed in `use …` directives.
  * Returns their Extensions (with grammarFragment populated by register_* calls).
  */
 async function loadGrammarModules(
@@ -163,25 +185,26 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
     const sourceDir = path.dirname(path.resolve(filename));
     let extensions = [...getStdExtensions()];
 
-    // 1. Pre-scan for `use_grammar` directives and load those modules FIRST
-    //    so their grammar extensions are available when we parse the main file.
-    const grammarNames = scanUseGrammar(source);
+    // 1. Pre-scan for `use …` directives and load those modules FIRST so
+    //    their grammar extensions are available when we parse the main file.
+    const grammarNames = scanUses(source);
     if (grammarNames.length > 0) {
       const grammarExts = await loadGrammarModules(grammarNames, sourceDir, extensions);
       extensions = [...extensions, ...grammarExts];
     }
 
-    // 2. Strip `use_grammar` lines from source before parsing (they're directives,
-    //    not real statements that the parser should try to understand).
-    const cleanSource = source.replace(/^\s*use_grammar\s+\w+\s*$/gm, "");
+    // 2. Strip `use …` lines from source before parsing (they're directives,
+    //    not statements the parser should try to understand).
+    const cleanSource = stripUses(source);
 
     // Standard mode: parse first to discover imports, then load on demand.
     const normalized = cleanSource.replace(/\r\n/g, "\n");
 
-    // Gather any grammar fragments from use_grammar-loaded modules.
-    const g2Fragments = extensions
-      .map(e => e.grammarFragment)
-      .filter((f): f is NonNullable<typeof f> => f !== undefined);
+    // Gather any grammar fragments from loaded modules. An extension can
+    // contribute fragments from both the Phase 1 register_* path (attached
+    // as `grammarFragment`) AND Phase 6 `grammar { … }` values bound in the
+    // module — we pick the latter up from the extension's bindings.
+    const g2Fragments = collectFragments(extensions);
 
     const { parse: g2parse } = await import("./grammar2/engine.js");
     const { getBaseGrammar } = await import("./grammar2/base-grammar.js");

@@ -225,7 +225,7 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   }
 
   // User-registered operator (from `register_infix` / `register_prefix` /
-  // `register_postfix` / `register_expr_prefix` with `use_grammar NAME`).
+  // `register_postfix` / `register_expr_prefix` / Phase 6 `grammar { … }`).
   // The tag is a unique identifier issued by fragments.ts; look up the
   // user's substitution template and apply it to the operand AST(s).
   if (tag && tag.startsWith("user_op_")) {

@@ -1,9 +1,9 @@
 // Runtime grammar extension demo.
-// The `use_grammar pow` header loads lib/pow.alg's grammar extensions
-// before this file is parsed, so the `**` operator and `neg` keyword
-// are recognized in the code below.
+// The `use pow` header loads lib/pow.alg's grammar extensions before this
+// file is parsed, so the `**` operator and `neg` keyword are recognized
+// in the code below.
 
-use_grammar pow
+use pow
 
 print(2 ** 10)       // expect: 1024
 print(3 ** 4)        // expect: 81

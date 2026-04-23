@@ -1,6 +1,6 @@
 // Grammar-extension module: adds the `**` exponentiation operator and the
-// `neg` prefix keyword. Files that `use_grammar pow` get these syntactic
-// additions before parsing their own source.
+// `neg` prefix keyword. Files that `use pow` (or `use import pow`) get
+// these syntactic additions before parsing.
 
 // Helper: integer exponentiation by repeated multiplication.
 pow_helper(base, n, acc) =>
@@ -10,10 +10,13 @@ pow_helper(base, n, acc) =>
 
 pow_int(base, n) => pow_helper(base, n, 1)
 
-// `a ** b` — exponentiation at BP 40 (between * at 20 and call at 50).
-// The lambda is substituted (NOT evaluated) at parse time; `pow_int` resolves
-// during normal evaluation.
-register_infix("**", 40, (l, r) => pow_int(l, r))
-
-// `neg EXPR` — keyword-led unary negation.
-register_expr_prefix("neg", x => 0 - x)
+// Grammar additions. `pow_grammar` is the exported Grammar value; the
+// `use pow` pre-scanner picks up any Grammar-valued binding in the module.
+//
+// Precedence: `**` sits between multiplication and unary — binds tighter
+// than `*` / `/`, looser than `-x`. Right-associative so `a ** b ** c`
+// parses as `a ** (b ** c)`.
+pow_grammar = grammar {
+  infix "**" prec(pow) above(mul) below(unary) right => (l, r) => pow_int(l, r)
+  expr_prefix "neg" => x => 0 - x
+}

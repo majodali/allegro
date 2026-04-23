@@ -1378,8 +1378,8 @@ import * as path from "path";
 /**
  * Run an .alg file in Allegro Standard mode.
  * Captures print output and validates against "// expect: ..." comments.
- * Also handles `use_grammar NAME` headers by loading lib/NAME.alg and merging
- * its grammar fragment, mirroring the file runner behavior.
+ * Handles `use NAME` (and the back-compat-free pre-scanner) by loading
+ * lib/NAME.alg and merging its grammar fragment, mirroring the file runner.
  */
 function runAlgFile(filePath: string, extensions?: Extension[]): void {
   const source = fs.readFileSync(filePath, "utf-8");
@@ -1394,11 +1394,10 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
     }
   }
 
-  // Handle `use_grammar NAME` directives: load lib/NAME.alg as a grammar
-  // module and attach its fragment as an extension.
+  // Handle `use NAME` / `use import NAME` directives at the top of the file.
   const grammarNames: string[] = [];
   for (const line of lines) {
-    const m = /^\s*use_grammar\s+(\w+)\s*$/.exec(line);
+    const m = /^\s*use\s+(?:import\s+)?(\w+)\s*$/.exec(line);
     if (m) grammarNames.push(m[1]);
     else if (line.trim() !== "" && !line.trim().startsWith("//")) break;
   }
@@ -1416,11 +1415,35 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
           bindings[key] = b.value;
         }
       }
-      grammarExts.push({ name: id, bindings, grammarFragment: frag });
+      // Also harvest Phase 6 Grammar values from bindings and merge their
+      // fragments into (or alongside) the Phase 1 fragment.
+      const phase6Frags: any[] = [];
+      for (const key of Object.keys(bindings)) {
+        const data = asGrammarValue(bindings[key]);
+        if (data) phase6Frags.push(data.fragment);
+      }
+      let mergedFrag = frag;
+      for (const f of phase6Frags) {
+        if (!mergedFrag) mergedFrag = f;
+        else mergedFrag = {
+          keywords:   [...mergedFrag.keywords,   ...f.keywords],
+          operators:  [...mergedFrag.operators,  ...f.operators],
+          infix:      [...mergedFrag.infix,      ...f.infix],
+          prefixOp:   [...mergedFrag.prefixOp,   ...f.prefixOp],
+          postfixOp:  [...mergedFrag.postfixOp,  ...f.postfixOp],
+          exprPrefix: [...mergedFrag.exprPrefix, ...f.exprPrefix],
+          base:       mergedFrag.base ?? f.base,
+          precedence: [...(mergedFrag.precedence ?? []), ...(f.precedence ?? [])],
+          exprForms:  [...(mergedFrag.exprForms  ?? []), ...(f.exprForms  ?? [])],
+          stmtForms:  [...(mergedFrag.stmtForms  ?? []), ...(f.stmtForms  ?? [])],
+          rules:      [...(mergedFrag.rules      ?? []), ...(f.rules      ?? [])],
+        };
+      }
+      grammarExts.push({ name: id, bindings, grammarFragment: mergedFrag });
     }
   }
-  // Strip use_grammar lines from source before evaluation
-  const cleanSource = source.replace(/^\s*use_grammar\s+\w+\s*$/gm, "");
+  // Strip `use …` lines from source before evaluation.
+  const cleanSource = source.replace(/^\s*use\s+(?:import\s+)?\w+\s*$/gm, "");
 
   // Capture print output
   const printed: string[] = [];
@@ -3532,7 +3555,7 @@ test("runtime grammar: module-scoped expr-prefix keyword applied at parse time",
   eq(Number((primaryOf(consumerResult.value!) as BitsValue).data), -7);
 });
 
-// Run the end-to-end grammar-runtime.alg test (uses `use_grammar pow` header)
+// Run the end-to-end grammar-runtime.alg test (uses `use pow` header, Phase 6)
 fileTest(path.join(testsDir, "grammar-runtime.alg"));
 
 // == Grammar 2 (Phase 1) — new formalism + engine ==

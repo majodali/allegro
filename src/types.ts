@@ -220,8 +220,9 @@ export interface Extension {
   /** Typed module object for use with import + dot access. */
   moduleObject?: Value;
   /** Grammar-extension fragment populated by register_* primitives inside
-   *  the module. When the importing file uses `use_grammar NAME`, the module's
-   *  fragment is merged into the parser config before parsing. */
+   *  the module. When the importing file uses `use NAME`, the module's
+   *  fragment (plus any Grammar values in bindings) is merged into the
+   *  parser config before parsing. */
   grammarFragment?: GrammarFragment;
 }
 
@@ -232,7 +233,7 @@ export interface Extension {
  *     user sub-rules, `extends` base.
  *
  *  Consumed by `src/grammar2/fragments.ts` to build extended grammar2 grammars
- *  when files declare `use X` (or legacy `use_grammar NAME`).
+ *  when files declare `use NAME` (or `use import NAME`).
  *
  *  Phase 6 fields are all optional so Phase 1 fragments continue to work
  *  unchanged. `emptyGrammarFragment()` initialises the Phase 1 arrays only;

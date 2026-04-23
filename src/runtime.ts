@@ -10,9 +10,9 @@ import { getBaseGrammar } from "./grammar2/base-grammar.js";
 import { buildProgram } from "./grammar2/tree-builder.js";
 import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
-import { primitives } from "./primitives.js";
+import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf, GrammarFragment } from "./types.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -804,12 +804,22 @@ export function evalSource(
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
-  // Gather any grammar fragments from the extensions (from `use_grammar` /
-  // register_* primitives). grammar2 handles both the unextended base and
-  // fragment-augmented cases uniformly.
-  const g2Fragments = (extensions ?? [])
-    .map(e => e.grammarFragment)
-    .filter((f): f is NonNullable<typeof f> => f !== undefined);
+  // Gather any grammar fragments from the extensions. Two sources:
+  //   - `ext.grammarFragment` — set by Phase 1 register_* primitives.
+  //   - Grammar values bound in ext.bindings — set by Phase 6 `grammar { … }`
+  //     blocks inside a `use`d module.
+  // grammar2 handles both the unextended base and fragment-augmented cases
+  // uniformly through `getGrammarWithFragments`.
+  const g2Fragments: GrammarFragment[] = [];
+  for (const ext of extensions ?? []) {
+    if (ext.grammarFragment) g2Fragments.push(ext.grammarFragment);
+    if (ext.bindings) {
+      for (const key of Object.keys(ext.bindings)) {
+        const data = asGrammarValue(ext.bindings[key]);
+        if (data) g2Fragments.push(data.fragment);
+      }
+    }
+  }
 
   // Parser selection:
   //   - Earley fallback (grammarExtension): for standalone DSL grammars

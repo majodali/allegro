@@ -1,9 +1,10 @@
 // =============================================================================
 // Allegro Grammar 2 — Runtime Fragment Merging
 //
-// `use_grammar NAME` loads a module that calls `register_infix` / `register_prefix` /
-// `register_postfix` / `register_expr_prefix`. Each call records an entry on a
-// `GrammarFragment` attached to the module's Extension.
+// `use NAME` (and the Phase 1 legacy `register_infix` / `register_prefix` /
+// `register_postfix` / `register_expr_prefix` primitives) load a module whose
+// grammar extensions — stored as a `GrammarFragment` — are merged into the
+// parser grammar before parsing the consuming file.
 //
 // This file takes those fragments and produces an extended grammar2 Grammar
 // value — adding user-registered infix/prefix/postfix alternatives at the
