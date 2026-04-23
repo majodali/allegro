@@ -14,22 +14,22 @@ let ctx: ContextValue | undefined = undefined;
 let fm: FutureManager | undefined = undefined;
 
 // Library registry: name → source. Populated via Allegro.registerLibrary().
-// Referenced via `use_grammar NAME` directives in sandbox sources.
+// Referenced via `use NAME` directives in sandbox sources.
 const libraries: Map<string, string> = new Map();
 
 function registerLibrary(name: string, source: string): void {
   libraries.set(name, source);
 }
 
-// Scan `use_grammar NAME` directives at the top of a source file.
-// Returns the list of names in order. Stops at first non-header line.
-function scanUseGrammar(source: string): string[] {
+// Scan `use NAME` (or `use import NAME`) directives at the top of a source
+// file. Returns the list of names in order. Stops at first non-header line.
+function scanUses(source: string): string[] {
   const names: string[] = [];
   const lines = source.split(/\r?\n/);
   for (const line of lines) {
     const t = line.trim();
     if (t === "" || t.startsWith("//")) continue;
-    const m = /^use_grammar\s+(\w+)\s*$/.exec(t);
+    const m = /^use\s+(?:import\s+)?(\w+)\s*$/.exec(t);
     if (m) { names.push(m[1]); continue; }
     break;
   }
@@ -68,16 +68,16 @@ function evalAllegro(source: string, standard: boolean = true): EvalResult {
 
   try {
     if (!fm) fm = createFutureManager();
-    // Two-pass: handle `use_grammar` directives by loading the named libraries
+    // Two-pass: handle `use …` directives by loading the named libraries
     // and merging their grammar fragments before parsing the main source.
     let extensions: Extension[] | undefined = standard ? [typeExt] : undefined;
     let effectiveSource = source;
     if (standard) {
-      const grammarNames = scanUseGrammar(source);
+      const grammarNames = scanUses(source);
       if (grammarNames.length > 0) {
         const grammarExts = grammarNames.map(loadGrammarLibrary);
         extensions = [...(extensions ?? []), ...grammarExts];
-        effectiveSource = source.replace(/^\s*use_grammar\s+\w+\s*$/gm, "");
+        effectiveSource = source.replace(/^\s*use\s+(?:import\s+)?\w+\s*$/gm, "");
       }
     }
     const { value, evalCtx } = evalSource(effectiveSource, ctx, extensions, undefined, standard, fm);
@@ -111,11 +111,11 @@ function evalAllegroAsync(
     let extensions: Extension[] | undefined = standard ? [typeExt] : undefined;
     let effectiveSource = source;
     if (standard) {
-      const grammarNames = scanUseGrammar(source);
+      const grammarNames = scanUses(source);
       if (grammarNames.length > 0) {
         const grammarExts = grammarNames.map(loadGrammarLibrary);
         extensions = [...(extensions ?? []), ...grammarExts];
-        effectiveSource = source.replace(/^\s*use_grammar\s+\w+\s*$/gm, "");
+        effectiveSource = source.replace(/^\s*use\s+(?:import\s+)?\w+\s*$/gm, "");
       }
     }
     const origLog = console.log;

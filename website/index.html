@@ -499,31 +499,38 @@ print(matches("a?b", "aab"))      // false</textarea>
 <!-- ================================================ -->
 <h2 id="runtime-grammar">Runtime Grammar</h2>
 
-<p>Beyond building standalone DSL grammars, Allegro lets modules extend the <em>host</em> language itself. A module can register new infix operators, prefix/postfix operators, and unary prefix keywords. Files that opt in with a <code>use_grammar NAME</code> header get those syntactic additions before parsing starts.</p>
+<p>Beyond building standalone DSL grammars, Allegro lets modules extend the <em>host</em> language itself. Inside a <code>grammar { … }</code> block, a module declares new operators, keywords, or entire multi-token expressions. Files that opt in with a <code>use NAME</code> header get those syntactic additions before parsing starts.</p>
 
-<p>Four registration primitives — each takes a lambda that maps operand ASTs to a new AST (substituted at parse time, evaluated later):</p>
+<p>Four operator-level declarations plus user rules and multi-token forms, all sharing one grammar block:</p>
 
 <ul>
-  <li><code>register_infix(op, bp, (l, r) =&gt; ast)</code> — binary operator at binding power <code>bp</code></li>
-  <li><code>register_prefix(op, bp, x =&gt; ast)</code> — unary prefix symbol (e.g. <code>#x</code>)</li>
-  <li><code>register_postfix(op, bp, x =&gt; ast)</code> — unary postfix symbol (e.g. <code>n!</code>)</li>
-  <li><code>register_expr_prefix(kw, x =&gt; ast)</code> — keyword followed by one expression (e.g. <code>neg x</code>)</li>
+  <li><code>infix S prec(X) left/right/none =&gt; (l, r) =&gt; ast</code> — binary operator at a named precedence level</li>
+  <li><code>prefix S at(X) =&gt; x =&gt; ast</code> — unary prefix symbol (e.g. <code>#x</code>)</li>
+  <li><code>postfix S at(X) =&gt; x =&gt; ast</code> — unary postfix symbol (e.g. <code>n!</code>)</li>
+  <li><code>expr_prefix KW =&gt; x =&gt; ast</code> — keyword followed by one expression (e.g. <code>neg x</code>)</li>
+  <li><code>rule NAME = ebnf =&gt; template</code> — user sub-rule used by forms</li>
+  <li><code>expr_form parts =&gt; template</code> — multi-token inline expression (<code>match x with …</code>)</li>
+  <li><code>stmt_form parts =&gt; template</code> — multi-token statement form</li>
 </ul>
 
-<p>Here's <code>lib/pow.alg</code>, which adds the <code>**</code> exponentiation operator and the <code>neg</code> keyword:</p>
+<p>Precedence is named, not numeric. Use <code>at(mul)</code> to place at an existing level, <code>prec(pow) above(mul) below(unary)</code> to declare a new level between existing ones, or <code>at("*")</code> to look up by operator symbol.</p>
+
+<p>Here's <code>lib/pow.alg</code> — adds <code>**</code> and <code>neg</code>:</p>
 
 <pre><code>pow_helper(base, n, acc) =&gt;
   if n == 0 then acc else pow_helper(base, n - 1, acc * base)
 
 pow_int(base, n) =&gt; pow_helper(base, n, 1)
 
-register_infix("**", 40, (l, r) =&gt; pow_int(l, r))
-register_expr_prefix("neg", x =&gt; 0 - x)</code></pre>
+pow_grammar = grammar {
+  infix "**" prec(pow) above(mul) below(unary) right =&gt; (l, r) =&gt; pow_int(l, r)
+  expr_prefix "neg" =&gt; x =&gt; 0 - x
+}</code></pre>
 
-<p>A consumer file declares <code>use_grammar pow</code> at the top and uses the new syntax as if it were built in:</p>
+<p>A consumer file declares <code>use pow</code> at the top and uses the new syntax as if it were built in:</p>
 
 <div class="sandbox" id="s-runtime-grammar">
-<textarea class="sandbox-editor" rows="14">use_grammar pow
+<textarea class="sandbox-editor" rows="14">use pow
 
 // ** is now a parseable infix operator
 print(2 ** 10)         // 1024
@@ -533,8 +540,7 @@ print(3 ** 4)          // 81
 print(neg 7)           // -7
 print(neg (2 ** 3))    // -8
 
-// Plays well with built-in operators
-// ** has higher precedence than *, so 3 ** 2 = 9, then 2 * 9 = 18
+// Precedence: ** binds tighter than *, so 3 ** 2 = 9, then 2 * 9 = 18
 print(2 * 3 ** 2)      // 18
 print(2 ** 3 + 1)      // 9
 </textarea>
@@ -542,7 +548,47 @@ print(2 ** 3 + 1)      // 9
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
-<p>The mechanism is module-scoped — only files that <code>use_grammar</code>-declare <code>pow</code> see <code>**</code>. Other files still parse as plain Allegro Standard.</p>
+<p>Multi-token forms let a single module ship a whole new expression shape. Here's <code>lib/match_expr.alg</code> — a <code>match x with p =&gt; e | …</code> form that desugars to a linear search:</p>
+
+<pre><code>match_helper(scrutinee, cases, idx) =&gt;
+  if idx == cases.length
+    then error "match: no branch matched"
+    else if scrutinee == cases[idx].p
+      then cases[idx].e
+      else match_helper(scrutinee, cases, idx + 1)
+
+match_dispatch(scrutinee, cases) =&gt;
+  match_helper(scrutinee, cases, 0)
+
+match_grammar = grammar {
+  rule match_case = p:expr "=&gt;" e:expr      =&gt; (p, e) =&gt; {p: p, e: e}
+  rule match_list = c:match_case ** "|"      =&gt; c =&gt; c
+
+  expr_form "match" s:expr "with" cs:match_list
+    =&gt; (s, cs) =&gt; match_dispatch(s, cs)
+}</code></pre>
+
+<p>EBNF inside a rule body: <code>"literal"</code>, <code>ident</code> references, <code>s:rule</code> labels, <code>a*</code> / <code>a+</code> / <code>a?</code> repetition, <code>a ** sep</code> separator-rep, <code>(a | b)</code> alternation. Templates receive labels as positional params.</p>
+
+<div class="sandbox" id="s-runtime-match">
+<textarea class="sandbox-editor" rows="10">use match_expr
+
+describe(n) =&gt;
+  match n with
+    1 =&gt; "one"
+  | 2 =&gt; "two"
+  | 3 =&gt; "three"
+  | 99 =&gt; "ninety-nine"
+
+print(describe(1))     // one
+print(describe(2))     // two
+print(describe(99))    // ninety-nine
+</textarea>
+<div class="sandbox-bar"><button onclick="runSandbox('s-runtime-match')">Run</button><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<p>The mechanism is module-scoped — only files that <code>use</code>-declare <code>pow</code> or <code>match_expr</code> see those additions. Cross-module conflicts (two modules registering the same operator, cyclic precedence declarations) surface at <code>use</code> time with aggregated error messages. Other files still parse as plain Allegro Standard.</p>
 
 <!-- ================================================ -->
 <h2 id="recursive">Recursive Algorithms</h2>
@@ -584,15 +630,37 @@ print(myReduce([1, 2, 3, 4, 5], (a, b) => a + b, 0))</textarea>
 
 <script src="/allegro.js"></script>
 <script>
-// Register grammar-extension libraries (keeps `use_grammar NAME` in sandboxes working).
+// Register grammar-extension libraries (keeps `use NAME` in sandboxes working).
 Allegro.registerLibrary('pow', `// Grammar-extension module for ** and neg.
 pow_helper(base, n, acc) =>
   if n == 0 then acc else pow_helper(base, n - 1, acc * base)
 
 pow_int(base, n) => pow_helper(base, n, 1)
 
-register_infix("**", 40, (l, r) => pow_int(l, r))
-register_expr_prefix("neg", x => 0 - x)
+pow_grammar = grammar {
+  infix "**" prec(pow) above(mul) below(unary) right => (l, r) => pow_int(l, r)
+  expr_prefix "neg" => x => 0 - x
+}
+`);
+
+Allegro.registerLibrary('match_expr', `// Grammar-extension module for a match … with … | … form.
+match_helper(scrutinee, cases, idx) =>
+  if idx == cases.length
+    then error "match: no branch matched"
+    else if scrutinee == cases[idx].p
+      then cases[idx].e
+      else match_helper(scrutinee, cases, idx + 1)
+
+match_dispatch(scrutinee, cases) =>
+  match_helper(scrutinee, cases, 0)
+
+match_grammar = grammar {
+  rule match_case = p:expr "=>" e:expr => (p, e) => {p: p, e: e}
+  rule match_list = c:match_case ** "|" => c => c
+
+  expr_form "match" s:expr "with" cs:match_list
+    => (s, cs) => match_dispatch(s, cs)
+}
 `);
 
 async function runSandbox(id) {

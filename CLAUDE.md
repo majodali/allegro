@@ -189,7 +189,13 @@ Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, 
 - **Hybrid extensions**: `HybridGrammarConfig` with prefix/infix parselet registrations and `LexerConfig` for new operators/keywords. Immutable layering via `extendLexerConfig`.
 - **Parser combinators from Allegro** (Phase 1 DSL primitives): `grammar_new`, `grammar_terminal`, `grammar_phrase`, `grammar_choice`, `grammar_choice_add` (mutable append for recursion), `grammar_repeat`, `grammar_optional`, `grammar_set_target`, `grammar_parse`. Build grammars at runtime, parse strings, receive a tree of Allegro values — Terminal→String, Phrase→Array (positional), Disjunction→transparent (unwrapped), Repetition→Array (delimiters stripped), Optional→value or none. Parse errors become typed Error values. Example demo: `tests/grammar-regex.alg` implements a regex DSL end-to-end.
 - **Grammar 2 formalism (new, Phase 1 in progress)** — scannerless formalism described in `docs/grammar-formalism.md`. Will replace Pratt + Earley in Phase 2. Rule union (Terminal/NonTerm/Seq/Alt/Rep/Opt/Guarded), named productions, symbolic precedence, stateful indent terminals, grammar-value extension via `Operation` deltas, user-defined `@error` productions with `@sync` panic recovery. Phase 1 status: types + engine + Allegro primitives (`grammar2_*`) + tests covering the §10.3 regex DSL. Not yet: analyzer, indent engine, left recursion via full GLL, migration of existing Allegro grammar.
-- **Runtime grammar extension** (Phase 6): modules declare syntax additions in a `grammar { … }` block — `infix S prec(X) left/right/none => (l,r) => ast`, `prefix S at(X) => …`, `postfix S at(X) => …`, `expr_prefix KW => …`. Precedence clauses accept named levels (`prec(pow)`), positional constraints (`above(mul) below(unary)`, single or combined), and operator-symbol lookup (`at("*")`). Anonymous levels get gensym'd names. Files activate a grammar with a top-of-file `use NAME` / `use import NAME` header; the pre-scanner loads the named module and harvests any `grammar { … }` Grammar values from its bindings. A cross-fragment validator runs before merging and reports `E_OPERATOR_CONFLICT` / `E_KEYWORD_CONFLICT` / `E_PRECEDENCE_CYCLE` with aggregated messages. Level insertion in `src/grammar2/fragments.ts` splices new productions into the stratified stack via surgery on the base grammar (LEVELS array in `base-grammar.ts`). Phase 1 `register_infix` / `register_prefix` / `register_postfix` / `register_expr_prefix` primitives retain as a lower-level back-compat path. Demo: `lib/pow.alg` uses `grammar { infix "**" prec(pow) above(mul) below(unary) right => (l, r) => pow_int(l, r); expr_prefix "neg" => x => 0 - x }`, consumed by `tests/grammar-runtime.alg` via `use pow`. Deferred to Phase 6b: EBNF mini-grammar, multi-token `expr_form`/`stmt_form`, `rule NAME = …`/`+=`, `new grammar { … }`, arbitrary-builder lambdas, selector-based `rule -= …` / `rule[name] = …`.
+- **Runtime grammar extension** (Phase 6 + 6b): modules declare syntax additions in a `grammar { … }` block:
+  - **Operators** (Phase 6): `infix S prec(X) left/right/none => (l,r) => ast`, `prefix S at(X) => …`, `postfix S at(X) => …`, `expr_prefix KW => …`. Precedence clauses accept named levels (`prec(pow)`), positional constraints (`above(mul) below(unary)`, single or combined), and operator-symbol lookup (`at("*")`). Anonymous levels get gensym'd names. Level insertion in `src/grammar2/fragments.ts` splices new productions into the stratified stack via surgery on the base grammar (LEVELS array in `base-grammar.ts`).
+  - **User rules + multi-token forms** (Phase 6b): `rule NAME = ebnf_body => template` adds/replaces a production; `rule NAME += …` appends an alternative. `expr_form parts => template` adds a new multi-token expression alternative (e.g. `match x with p => e | …`); `stmt_form parts => template` adds a new statement alternative. EBNF inside rule bodies supports `"lit"`, `/regex/`, ident refs, `s:rule` labels, `a*`/`a+`/`a?` postfix, `a ** sep` sep-rep, `(a | b)` grouping. Labels bind positionally to the template's params; `substituteParams` injects matched sub-ASTs at parse time. Whitespace between seq items and around rep separators is auto-interleaved.
+  - **Activation**: top-of-file `use NAME` / `use import NAME` header. The pre-scanner loads the named module and harvests any `grammar { … }` Grammar values from its bindings.
+  - **Validation**: cross-fragment validator runs before merging and reports `E_OPERATOR_CONFLICT` / `E_KEYWORD_CONFLICT` / `E_PRECEDENCE_CYCLE` at `use` time with aggregated messages.
+  - Phase 1 `register_infix` / `register_prefix` / `register_postfix` / `register_expr_prefix` primitives retain as a lower-level back-compat path.
+  - Demos: `lib/pow.alg` (adds `**` and `neg`, consumed by `tests/grammar-runtime.alg`), `lib/match_expr.alg` (adds `match x with p1 => e1 | … | pn => en`, consumed by `tests/match-demo.alg`).
 
 ## Module System
 
@@ -487,6 +493,24 @@ use pow
 print(2 ** 10)        // → 1024
 print(2 * 3 ** 2)     // → 18 (** binds tighter than *)
 print(neg (2 ** 3))   // → -8
+
+// Multi-token forms (Phase 6b)
+// lib/match_expr.alg:
+match_grammar = grammar {
+  rule match_case = p:expr "=>" e:expr       => (p, e) => {p: p, e: e}
+  rule match_list = c:match_case ** "|"      => c => c
+
+  expr_form "match" s:expr "with" cs:match_list
+    => (s, cs) => match_dispatch(s, cs)
+}
+
+// Consumer:
+use match_expr
+describe(n) =>
+  match n with
+    1 => "one"
+  | 2 => "two"
+  | 3 => "three"
 ```
 
 ## What's Next
@@ -516,7 +540,8 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ Refinement types: `Type && _ > 0` syntax, predicate checking at construction/annotation/call sites, `preserveOps` operator lifting for refinement preservation through operators
 - ✅ Mixins: `.mixin({method: fn, ...})` adds method implementations to types, ComposedFunction method dispatch with self binding
 - ✅ Runtime grammar extension Phase 1: module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix` primitives; `use_grammar NAME` top-of-file header activated a module's `GrammarFragment` before parsing (superseded by Phase 6)
-- ✅ Runtime grammar extension Phase 6: `grammar { infix/prefix/postfix/expr_prefix … }` block syntax with named precedence (`prec(pow)`, `at(X)`, `above(X)`, `below(Y)`, combined forms), operator-symbol lookup (`at("*")`), anonymous levels, and data-driven stratified-stack level insertion. `use X` pre-scanner (replaces `use_grammar`; accepts `use NAME` and `use import NAME`, extensible to full expressions later). Conflict detection: `E_OPERATOR_CONFLICT`, `E_KEYWORD_CONFLICT`, `E_PRECEDENCE_CYCLE` surface at `use` time with aggregated messages. Deferred to Phase 6b: EBNF mini-grammar, multi-token `expr_form`/`stmt_form`, `rule NAME = …`/`+=`, `new grammar { … }` for standalone grammars, arbitrary-builder lambdas, hygienic substitution, selector-based `rule -= …` / `rule[name] = …`.
+- ✅ Runtime grammar extension Phase 6: `grammar { infix/prefix/postfix/expr_prefix … }` block syntax with named precedence (`prec(pow)`, `at(X)`, `above(X)`, `below(Y)`, combined forms), operator-symbol lookup (`at("*")`), anonymous levels, and data-driven stratified-stack level insertion. `use X` pre-scanner (replaces `use_grammar`; accepts `use NAME` and `use import NAME`, extensible to full expressions later). Conflict detection: `E_OPERATOR_CONFLICT`, `E_KEYWORD_CONFLICT`, `E_PRECEDENCE_CYCLE` surface at `use` time with aggregated messages.
+- ✅ Runtime grammar extension Phase 6b: EBNF mini-grammar for rule bodies (`"lit"`, `/regex/`, ident refs, `s:rule` labels, `a*`/`a+`/`a?` postfix, `a ** sep` sep-rep, `(a | b)` groups). Multi-token `expr_form parts => template` (e.g. `match x with p => e | …`) and `stmt_form parts => template` for statement-level forms. User sub-rules via `rule NAME = body => template` (new production) and `rule NAME += body => template` (append alternative). Template params are positional matching the order of EBNF labels; `substituteParams` injects the matched sub-ASTs at parse time. Demo: `lib/match_expr.alg` implements a `match … with …` expression in 3 lines. Deferred to later phases: `new grammar { … }` for standalone grammars, `extends X` for non-Allegro bases, arbitrary-builder parse-time lambdas, hygienic substitution, selector-based `rule -= …` / `rule[name] = …`.
 
 ## Design Philosophy
 
