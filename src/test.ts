@@ -3544,6 +3544,7 @@ fileTest(path.join(testsDir, "grammar-runtime.alg"));
 
 import * as g2 from "./grammar2/types.js";
 import { parse as g2parse, ParseResult as G2ParseResult } from "./grammar2/engine.js";
+import { getGrammarWithFragments as g2getGrammarWithFragments } from "./grammar2/fragments.js";
 
 function g2ok(r: G2ParseResult): asserts r is Extract<G2ParseResult, { ok: true }> {
   if (!r.ok) throw new Error(`expected parse success, got: ${r.error.message}`);
@@ -4185,11 +4186,11 @@ test("Phase 6: anonymous above(mul) below(unary) gensyms a level name", () => {
   const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
   eq(data !== undefined, true);
   if (!data) return;
-  eq(data.fragment.infix[0].level.startsWith("__anon_"), true,
-     `level is anonymous (got ${data.fragment.infix[0].level})`);
+  const anonLevel = data.fragment.infix[0].level!;
+  eq(anonLevel.startsWith("__anon_"), true, `level is anonymous (got ${anonLevel})`);
   const prec = data.fragment.precedence ?? [];
   eq(prec.length, 1, "one precedence decl");
-  eq(prec[0].name, data.fragment.infix[0].level);
+  eq(prec[0].name, anonLevel);
 });
 
 test("Phase 6: at(\"*\") resolves to mul via operator-symbol lookup", () => {
@@ -4199,6 +4200,49 @@ test("Phase 6: at(\"*\") resolves to mul via operator-symbol lookup", () => {
   eq(data !== undefined, true);
   if (!data) return;
   eq(data.fragment.infix[0].level, "mul", "at(\"*\") resolves to mul");
+});
+
+test("Phase 6 step 5b: level insertion creates expr_pow production in merged grammar", () => {
+  const src =
+    'x = grammar {\n' +
+    '  infix "**" prec(pow) above(mul) below(unary) right => (l, r) => l + r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  // Now merge into base grammar and check the result.
+  const merged = g2getGrammarWithFragments([data.fragment]);
+  eq(merged.productions.has("expr_pow"), true, "expr_pow production exists");
+  // expr_mul should now reference expr_pow (not expr_of) as its tighter neighbour.
+  const mulProd = merged.productions.get("expr_mul")!;
+  const mulStr  = JSON.stringify(mulProd);
+  eq(mulStr.includes("expr_pow"), true, "expr_mul threads through expr_pow");
+  // expr_pow should include a user-op alternative (tag starts with user_op_).
+  const powProd = merged.productions.get("expr_pow")!;
+  const powStr  = JSON.stringify(powProd);
+  eq(powStr.includes("user_op_"), true, "expr_pow contains a user_op_ tagged alt");
+  // The insertion preserves the intermediate `of` level — pow sits between
+  // mul and of, so pow falls through to of (NOT directly to unary).
+  eq(powStr.includes("expr_of"), true, "expr_pow falls through to expr_of (chain preserved)");
+});
+
+test("Phase 6 step 5b: at(mul) appends to existing mul level, no new production", () => {
+  // Using a bare symbol as the body (not a lambda) keeps the tree-builder
+  // path identical across assoc variants.
+  const src =
+    'f = (l, r) => l + r\n' +
+    'x = grammar { infix "++" at(mul) left => (l, r) => l + r }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  const merged = g2getGrammarWithFragments([data.fragment]);
+  // No new production created.
+  eq(merged.productions.has("expr_pow"), false);
+  // expr_mul should contain the user-op alt.
+  const mulStr = JSON.stringify(merged.productions.get("expr_mul"));
+  eq(mulStr.includes("user_op_"), true, "expr_mul contains the user_op_ alt");
 });
 
 test("Phase 6: multiple infix regs sharing prec(X) share one level decl", () => {
