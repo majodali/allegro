@@ -42,6 +42,141 @@ function leftBinary(selfName: string, tailName: string, ops: Array<{ op: string;
   return alt(options);
 }
 
+// --- Precedence levels (data-driven) ---
+//
+// The stratified expression grammar used to be 11 hand-written `addProduction`
+// blocks threading their tighter neighbours by name. This array holds one
+// `LevelSpec` per level instead; `build(selfName, tighterName)` returns the
+// Rule for that level given its production name and the name of its tighter
+// (higher-precedence) neighbour. The construction loop in `buildBaseGrammar`
+// wires the chain in order.
+//
+// The order here IS the precedence ordering — first entry is loosest, last is
+// tightest. Phase 6 grammar extensions can insert new levels by splicing into
+// this list (after resolving `above`/`below`/`at` constraints), then rebuilding.
+//
+// Each level's production name is `expr_${level.name}`. `expr_atom` is the
+// innermost level and has no tighter neighbour.
+
+interface LevelSpec {
+  name:  string;
+  build: (selfName: string, tighterName: string | undefined) => Rule;
+}
+
+const LEVELS: LevelSpec[] = [
+  // Level 0 — pipe operator `x |> f` (left-associative).
+  { name: "pipe", build: (self, tighter) => alt([
+      seq([nonterm(self), nonterm("ws"), lit("|>"), nonterm("ws"), nonterm(tighter!)],
+        { name: "pipe" }),
+      nonterm(tighter!),
+    ]) },
+
+  // Level 1 — logical or (`||` and keyword `or`).
+  { name: "or", build: (self, tighter) => alt([
+      seq([nonterm(self), nonterm("ws"), lit("||"), nonterm("ws"), nonterm(tighter!)], { name: "or" }),
+      seq([nonterm(self), nonterm("ws_req"), lit("or"), nonterm("ws_req"), nonterm(tighter!)], { name: "or" }),
+      nonterm(tighter!),
+    ]) },
+
+  // Level 2 — logical and (`&&` and keyword `and`).
+  { name: "and", build: (self, tighter) => alt([
+      seq([nonterm(self), nonterm("ws"), lit("&&"), nonterm("ws"), nonterm(tighter!)], { name: "and" }),
+      seq([nonterm(self), nonterm("ws_req"), lit("and"), nonterm("ws_req"), nonterm(tighter!)], { name: "and" }),
+      nonterm(tighter!),
+    ]) },
+
+  // Level 3 — equality.
+  { name: "eq", build: (self, tighter) => leftBinary(self, tighter!, [
+      { op: "==", tag: "eq" },
+      { op: "!=", tag: "neq" },
+    ]) },
+
+  // Level 4 — comparison (ordering + type operators).
+  { name: "cmp", build: (self, tighter) => alt([
+      seq([nonterm(self), nonterm("ws"), lit("<="), nonterm("ws"), nonterm(tighter!)], { name: "lte" }),
+      seq([nonterm(self), nonterm("ws"), lit(">="), nonterm("ws"), nonterm(tighter!)], { name: "gte" }),
+      seq([nonterm(self), nonterm("ws"), lit("<"),  nonterm("ws"), nonterm(tighter!)], { name: "lt" }),
+      seq([nonterm(self), nonterm("ws"), lit(">"),  nonterm("ws"), nonterm(tighter!)], { name: "gt" }),
+      seq([nonterm(self), nonterm("ws_req"), lit("instanceof"), nonterm("ws_req"), nonterm(tighter!)], { name: "instanceof" }),
+      seq([nonterm(self), nonterm("ws_req"), lit("subtypeof"),  nonterm("ws_req"), nonterm(tighter!)], { name: "subtypeof" }),
+      nonterm(tighter!),
+    ]) },
+
+  // Level 5 — additive.
+  { name: "add", build: (self, tighter) => leftBinary(self, tighter!, [
+      { op: "+", tag: "add" },
+      { op: "-", tag: "sub" },
+    ]) },
+
+  // Level 6 — multiplicative.
+  { name: "mul", build: (self, tighter) => leftBinary(self, tighter!, [
+      { op: "*", tag: "mul" },
+      { op: "/", tag: "div" },
+      { op: "%", tag: "mod" },
+    ]) },
+
+  // Level 7a — `<name> of <expr>`: MultiValue component access.
+  //   type of x   → mv_get(x, "type")
+  //   error of y  → mv_get(y, "error")
+  // LHS is syntactically an ident OR the `error` keyword. Non-recursive: only
+  // one `of` per chain.
+  { name: "of", build: (_self, tighter) => alt([
+      seq([nonterm("ident"), nonterm("ws_req"), lit("of"), nonterm("ws_req"), nonterm(tighter!)], { name: "of" }),
+      seq([lit("error"),     nonterm("ws_req"), lit("of"), nonterm("ws_req"), nonterm(tighter!)], { name: "of_error" }),
+      nonterm(tighter!),
+    ]) },
+
+  // Level 7b — unary prefix operators.
+  { name: "unary", build: (self, tighter) => alt([
+      seq([lit("-"), nonterm(self)], { name: "neg" }),
+      seq([lit("!"), nonterm(self)], { name: "not" }),
+      seq([lit("error"), nonterm("ws_req"), nonterm(self)], { name: "error_expr" }),
+      nonterm(tighter!),
+    ]) },
+
+  // Level 8 — postfix: function calls, dot access, bracket indexing.
+  // Left-recursive so `f(x).y[0]` parses left-to-right as (((f)(x)).y)[0].
+  // `ws` before the opener allows multi-line chains (e.g. `xs\n  .map(f)`).
+  // Bracketed contexts use `ws_any` so args/indices may span lines freely.
+  { name: "post", build: (self, tighter) => alt([
+      seq([nonterm(self), nonterm("ws"), lit("("), nonterm("ws_any"),
+           nonterm("args"), nonterm("ws_any"), lit(")")], { name: "call" }),
+      seq([nonterm(self), nonterm("ws"), lit("."), nonterm("ws"), nonterm("ident")], { name: "dot" }),
+      seq([nonterm(self), nonterm("ws"), lit("["), nonterm("ws_any"),
+           nonterm("expr"), nonterm("ws_any"), lit("]")], { name: "bracket" }),
+      nonterm(tighter!),
+    ]) },
+
+  // Level 9 — atoms. Order matters: float before number (3.14 vs 3), bool and
+  // none before ident (they're keywords and would fail ident's reserved guard
+  // anyway, but being explicit matches clearly). block_expr is tried first
+  // because it needs the INDENT terminal to fire; INDENT can only match if
+  // the next content is deeper than the current stack top, so block_expr
+  // fails cheaply on non-block inputs.
+  { name: "atom", build: (_self, _tighter) => alt([
+      nonterm("block_expr"),
+      nonterm("when_expr"),
+      nonterm("if_expr"),
+      nonterm("lambda"),
+      nonterm("float"),
+      nonterm("number"),
+      nonterm("string"),
+      nonterm("bool"),
+      nonterm("none_lit"),
+      nonterm("array_lit"),
+      nonterm("object_lit"),
+      nonterm("paren_expr"),
+      nonterm("ident"),
+    ]) },
+];
+
+/**
+ * Ordered precedence level names (loosest → tightest). Exported so Phase 6
+ * fragment merging can splice in new user-declared levels and rebuild the
+ * stratified stack.
+ */
+export const BASE_LEVEL_NAMES: readonly string[] = LEVELS.map(l => l.name);
+
 // --- Build the grammar ---
 
 export function buildBaseGrammar(): Grammar {
@@ -195,143 +330,26 @@ export function buildBaseGrammar(): Grammar {
   });
 
   // --- Expression levels (left-recursive for binary operators) ---
-
-  // Top-level expression: pipe is the lowest precedence.
-  addProduction(g, { name: "expr",
-    rule: nonterm("expr_pipe"),
-  });
-
-  // Level 0 — pipe operator: `x |> f` → `f(x)` (left-associative)
-  addProduction(g, { name: "expr_pipe",
-    rule: alt([
-      seq([nonterm("expr_pipe"), nonterm("ws"), lit("|>"), nonterm("ws"), nonterm("expr_or")],
-        { name: "pipe" }),
-      nonterm("expr_or"),
-    ]),
-  });
-
-  // Level 1 — logical or (|| and keyword `or`)
-  addProduction(g, { name: "expr_or",
-    rule: alt([
-      seq([nonterm("expr_or"), nonterm("ws"), lit("||"), nonterm("ws"), nonterm("expr_and")], { name: "or" }),
-      seq([nonterm("expr_or"), nonterm("ws_req"), lit("or"), nonterm("ws_req"), nonterm("expr_and")], { name: "or" }),
-      nonterm("expr_and"),
-    ]),
-  });
-
-  // Level 2 — logical and (&& and keyword `and`)
-  addProduction(g, { name: "expr_and",
-    rule: alt([
-      seq([nonterm("expr_and"), nonterm("ws"), lit("&&"), nonterm("ws"), nonterm("expr_eq")], { name: "and" }),
-      seq([nonterm("expr_and"), nonterm("ws_req"), lit("and"), nonterm("ws_req"), nonterm("expr_eq")], { name: "and" }),
-      nonterm("expr_eq"),
-    ]),
-  });
-
-  // Level 3 — equality
-  addProduction(g, { name: "expr_eq",
-    rule: leftBinary("expr_eq", "expr_cmp", [
-      { op: "==", tag: "eq" },
-      { op: "!=", tag: "neq" },
-    ]),
-  });
-
-  // Level 4 — comparison (ordering + type operators)
-  addProduction(g, { name: "expr_cmp",
-    rule: alt([
-      seq([nonterm("expr_cmp"), nonterm("ws"), lit("<="), nonterm("ws"), nonterm("expr_add")], { name: "lte" }),
-      seq([nonterm("expr_cmp"), nonterm("ws"), lit(">="), nonterm("ws"), nonterm("expr_add")], { name: "gte" }),
-      seq([nonterm("expr_cmp"), nonterm("ws"), lit("<"),  nonterm("ws"), nonterm("expr_add")], { name: "lt" }),
-      seq([nonterm("expr_cmp"), nonterm("ws"), lit(">"),  nonterm("ws"), nonterm("expr_add")], { name: "gt" }),
-      seq([nonterm("expr_cmp"), nonterm("ws_req"), lit("instanceof"), nonterm("ws_req"), nonterm("expr_add")], { name: "instanceof" }),
-      seq([nonterm("expr_cmp"), nonterm("ws_req"), lit("subtypeof"),  nonterm("ws_req"), nonterm("expr_add")], { name: "subtypeof" }),
-      nonterm("expr_add"),
-    ]),
-  });
-
-  // Level 5 — additive
-  addProduction(g, { name: "expr_add",
-    rule: leftBinary("expr_add", "expr_mul", [
-      { op: "+", tag: "add" },
-      { op: "-", tag: "sub" },
-    ]),
-  });
-
-  // Level 6 — multiplicative
-  addProduction(g, { name: "expr_mul",
-    rule: leftBinary("expr_mul", "expr_of", [
-      { op: "*", tag: "mul" },
-      { op: "/", tag: "div" },
-      { op: "%", tag: "mod" },
-    ]),
-  });
-
-  // Level 7a — `<name> of <expr>`: MultiValue component access.
-  //   type of x   → mv_get(x, "type")
-  //   error of y  → mv_get(y, "error")
   //
-  // LHS is syntactically an ident OR the `error` keyword (which is reserved
-  // and wouldn't match ident). Non-recursive: only one `of` per chain.
-  addProduction(g, { name: "expr_of",
-    rule: alt([
-      seq([nonterm("ident"),    nonterm("ws_req"), lit("of"), nonterm("ws_req"), nonterm("expr_unary")], { name: "of" }),
-      seq([lit("error"),        nonterm("ws_req"), lit("of"), nonterm("ws_req"), nonterm("expr_unary")], { name: "of_error" }),
-      nonterm("expr_unary"),
-    ]),
+  // Construction is data-driven: LEVELS (module-level) supplies each level's
+  // name and rule-builder. Top-level `expr` forwards to the loosest level;
+  // each level's production is `expr_${level.name}` and references its tighter
+  // neighbour's name via its build function. Level definitions, semantics,
+  // and associativity commentary live on each LevelSpec above.
+  addProduction(g, { name: "expr",
+    rule: nonterm(`expr_${LEVELS[0].name}`),
   });
+  for (let i = 0; i < LEVELS.length; i++) {
+    const level   = LEVELS[i];
+    const self    = `expr_${level.name}`;
+    const tighter = i + 1 < LEVELS.length ? `expr_${LEVELS[i + 1].name}` : undefined;
+    addProduction(g, { name: self, rule: level.build(self, tighter) });
+  }
 
-  // Level 7b — unary prefix ops
-  addProduction(g, { name: "expr_unary",
-    rule: alt([
-      seq([lit("-"), nonterm("expr_unary")], { name: "neg" }),
-      seq([lit("!"), nonterm("expr_unary")], { name: "not" }),
-      seq([lit("error"), nonterm("ws_req"), nonterm("expr_unary")], { name: "error_expr" }),
-      nonterm("expr_post"),
-    ]),
-  });
-
-  // Level 8 — postfix: function calls, dot access, bracket indexing.
-  // Left-recursive so `f(x).y[0]` parses left-to-right as (((f)(x)).y)[0].
-  // `ws` before the opener allows multi-line chains (e.g. `xs\n  .map(f)`).
-  // Bracketed contexts use `ws_any` so args/indices may span lines freely.
-  addProduction(g, { name: "expr_post",
-    rule: alt([
-      seq([nonterm("expr_post"), nonterm("ws"), lit("("), nonterm("ws_any"),
-           nonterm("args"), nonterm("ws_any"), lit(")")], { name: "call" }),
-      seq([nonterm("expr_post"), nonterm("ws"), lit("."), nonterm("ws"), nonterm("ident")], { name: "dot" }),
-      seq([nonterm("expr_post"), nonterm("ws"), lit("["), nonterm("ws_any"),
-           nonterm("expr"), nonterm("ws_any"), lit("]")], { name: "bracket" }),
-      nonterm("expr_atom"),
-    ]),
-  });
-
-  // Comma-separated arguments (0 or more)
+  // Comma-separated arguments (0 or more) — used by the `call` alternative in
+  // the `post` level. Not itself a precedence level.
   addProduction(g, { name: "args",
     rule: opt(spaced_list("expr", ",")),
-  });
-
-  // Level 9 — atoms. Order matters: float before number (3.14 vs 3), bool
-  // and none before ident (they're keywords and would fail ident's reserved
-  // guard anyway, but being explicit matches clearly). block_expr is tried
-  // first because it needs the INDENT terminal to fire; INDENT can only
-  // match if the next content is deeper than the current stack top, so
-  // block_expr fails cheaply on non-block inputs.
-  addProduction(g, { name: "expr_atom",
-    rule: alt([
-      nonterm("block_expr"),
-      nonterm("when_expr"),
-      nonterm("if_expr"),
-      nonterm("lambda"),
-      nonterm("float"),
-      nonterm("number"),
-      nonterm("string"),
-      nonterm("bool"),
-      nonterm("none_lit"),
-      nonterm("array_lit"),
-      nonterm("object_lit"),
-      nonterm("paren_expr"),
-      nonterm("ident"),
-    ]),
   });
 
   // Offside-rule block as an expression value. Grammar:
