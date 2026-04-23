@@ -178,6 +178,33 @@ const LEVELS: LevelSpec[] = [
  */
 export const BASE_LEVEL_NAMES: readonly string[] = LEVELS.map(l => l.name);
 
+/**
+ * Map from operator symbol / keyword to the level it lives at in the base
+ * grammar. Enables `at("*")` / `above("+")` operator-symbol lookup in
+ * precedence specs. Keys cover every user-visible base-grammar operator.
+ */
+export const BASE_OPERATORS_TO_LEVEL: Readonly<Record<string, string>> = {
+  "|>":         "pipe",
+  "||":         "or",
+  "or":         "or",
+  "&&":         "and",
+  "and":        "and",
+  "==":         "eq",
+  "!=":         "eq",
+  "<":          "cmp",
+  ">":          "cmp",
+  "<=":         "cmp",
+  ">=":         "cmp",
+  "instanceof": "cmp",
+  "subtypeof":  "cmp",
+  "+":          "add",
+  "-":          "add",
+  "*":          "mul",
+  "/":          "mul",
+  "%":          "mul",
+  "of":         "of",
+};
+
 // --- Build the grammar ---
 
 export function buildBaseGrammar(): Grammar {

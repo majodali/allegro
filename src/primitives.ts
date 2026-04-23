@@ -9,6 +9,7 @@ import {
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
 import { grammar2Primitives } from "./grammar2/builder.js";
+import { BASE_OPERATORS_TO_LEVEL } from "./grammar2/base-grammar.js";
 
 // --- Value formatting ---
 
@@ -1060,8 +1061,10 @@ const register_expr_prefix_impl: PrimitiveFnImpl = (args, ctx) => {
 
 /** Data packed inside a fragment handle Context. */
 interface GrammarHandleData {
-  fragment: GrammarFragment;
-  base:     string;          // "allegro" | "empty" | <name>
+  fragment:         GrammarFragment;
+  base:             string;     // "allegro" | "empty" | <name>
+  /** Counter for gensym'd anonymous level names (e.g. __anon_1, __anon_2). */
+  anonLevelCounter: number;
 }
 
 /** Data packed inside a finalized Grammar value Context. */
@@ -1072,7 +1075,7 @@ export interface GrammarValueData {
 
 function makeFragmentBuilderHandle(base: string): ContextValue {
   const ctx  = makeContext() as ContextValue;
-  const data: GrammarHandleData = { fragment: emptyGrammarFragment(), base };
+  const data: GrammarHandleData = { fragment: emptyGrammarFragment(), base, anonLevelCounter: 0 };
   (ctx as any).__grammarHandle = data;
   return ctx;
 }
@@ -1132,23 +1135,87 @@ function readPrecSpec(v: Value, fnName: string): PrecSpecRead {
   return out;
 }
 
-/** Resolve a prec_spec to the level name used in the fragment's operator
- *  entry. Step 4 only supports `{at: LEVEL}`; other forms land in step 5. */
-function resolveLevelFromPrecSpec(spec: PrecSpecRead, fnName: string): string {
+/**
+ * Resolve a prec_spec into a level name AND (if needed) record a precedence
+ * declaration on the fragment. Accepts all Phase 6 spec forms:
+ *
+ *   {at: X}                        — reference existing level X (or base
+ *                                    operator's level if X looks like an op)
+ *   {prec: X}                      — reference/declare named level X; no
+ *                                    ordering constraints
+ *   {prec: X, above: Y}            — declare X tighter than Y
+ *   {prec: X, below: Z}            — declare X looser than Z
+ *   {prec: X, above: Y, below: Z}  — declare X with both constraints
+ *   {above: Y}                     — anonymous level above Y (gensym'd name)
+ *   {below: Z}                     — anonymous level below Z
+ *   {above: Y, below: Z}           — anonymous level between Y and Z
+ *
+ * `at(X)` and `prec(X)` without constraints are distinct semantically: the
+ * former appends to X's existing level; the latter declares X as a level
+ * (idempotent if already declared). In practice they behave the same when
+ * X is a known base-grammar level.
+ */
+function resolveLevelFromPrecSpec(
+  spec:   PrecSpecRead,
+  handle: GrammarHandleData,
+  fnName: string,
+): string {
+  // `at(X)`: reference existing level by name, or the level an operator lives at.
   if (spec.at !== undefined &&
       spec.above === undefined && spec.below === undefined && spec.prec === undefined) {
-    return spec.at;
+    return resolveLevelRef(spec.at);
   }
-  if (spec.prec !== undefined &&
-      spec.above === undefined && spec.below === undefined && spec.at === undefined) {
-    // `prec(X)` without constraints: equivalent to `at(X)` when X is known.
-    // Step 5 may reject this if X is undeclared; for now treat as `at`.
-    return spec.prec;
+
+  // Named level — declare (idempotent) and optionally add constraints.
+  if (spec.prec !== undefined) {
+    const name = spec.prec;
+    addPrecedenceDecl(handle.fragment, name, spec, fnName);
+    return name;
   }
-  throw new AllegroError(
-    `${fnName}: only at(X) / prec(X) prec specs are supported in step 4; ` +
-    `combined above/below precedence lands in step 5.`,
-  );
+
+  // Anonymous level — gensym and declare with whichever constraints present.
+  if (spec.above !== undefined || spec.below !== undefined) {
+    handle.anonLevelCounter++;
+    const name = `__anon_${handle.anonLevelCounter}`;
+    addPrecedenceDecl(handle.fragment, name, spec, fnName);
+    return name;
+  }
+
+  throw new AllegroError(`${fnName}: empty prec_spec`);
+}
+
+/** Resolve a target referenced by `at(X)`. If X is a known operator symbol
+ *  in the base grammar, return the level it lives at; otherwise return X
+ *  itself (treated as a level name). */
+function resolveLevelRef(target: string): string {
+  return BASE_OPERATORS_TO_LEVEL[target] ?? target;
+}
+
+function addPrecedenceDecl(
+  fragment: GrammarFragment,
+  name:     string,
+  spec:     PrecSpecRead,
+  _fnName:  string,
+): void {
+  const constraints: Array<
+    | { kind: "at";    target: string }
+    | { kind: "above"; target: string }
+    | { kind: "below"; target: string }
+  > = [];
+  if (spec.above !== undefined) constraints.push({ kind: "above", target: resolveLevelRef(spec.above) });
+  if (spec.below !== undefined) constraints.push({ kind: "below", target: resolveLevelRef(spec.below) });
+  if (!fragment.precedence) fragment.precedence = [];
+  // Merge with an existing decl if one with the same name already exists.
+  const existing = fragment.precedence.find(p => p.name === name);
+  if (existing) {
+    for (const c of constraints) {
+      if (!existing.constraints.some(ec => ec.kind === c.kind && ec.target === c.target)) {
+        existing.constraints.push(c);
+      }
+    }
+  } else {
+    fragment.precedence.push({ name, constraints });
+  }
 }
 
 const grammar_fragment_new_impl: PrimitiveFnImpl = (args) => {
@@ -1164,7 +1231,7 @@ const grammar_infix_add_impl: PrimitiveFnImpl = (args) => {
   const spec   = readPrecSpec(args[2], "grammar_infix_add");
   const assoc  = bitsToString(asBits(args[3], "grammar_infix_add")) as "left" | "right" | "none";
   const fn     = args[4];
-  const level  = resolveLevelFromPrecSpec(spec, "grammar_infix_add");
+  const level  = resolveLevelFromPrecSpec(spec, h, "grammar_infix_add");
   h.fragment.infix.push({ token: op, level, assoc, fn });
   if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
   return args[0];
@@ -1176,7 +1243,7 @@ const grammar_prefix_add_impl: PrimitiveFnImpl = (args) => {
   const op     = bitsToString(asBits(args[1], "grammar_prefix_add"));
   const spec   = readPrecSpec(args[2], "grammar_prefix_add");
   const fn     = args[3];
-  const level  = resolveLevelFromPrecSpec(spec, "grammar_prefix_add");
+  const level  = resolveLevelFromPrecSpec(spec, h, "grammar_prefix_add");
   h.fragment.prefixOp.push({ token: op, level, fn });
   if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
   return args[0];
@@ -1188,7 +1255,7 @@ const grammar_postfix_add_impl: PrimitiveFnImpl = (args) => {
   const op     = bitsToString(asBits(args[1], "grammar_postfix_add"));
   const spec   = readPrecSpec(args[2], "grammar_postfix_add");
   const fn     = args[3];
-  const level  = resolveLevelFromPrecSpec(spec, "grammar_postfix_add");
+  const level  = resolveLevelFromPrecSpec(spec, h, "grammar_postfix_add");
   h.fragment.postfixOp.push({ token: op, level, fn });
   if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
   return args[0];

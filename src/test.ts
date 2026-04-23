@@ -4160,14 +4160,63 @@ test("Phase 6: grammar block accumulates multiple decl kinds", () => {
   eq(data.fragment.keywords.includes("lazy"), true);
 });
 
-test("Phase 6: combined above/below prec spec is rejected in step 4", () => {
-  const src = 'x = grammar { infix "**" above(mul) below(unary) right => (l, r) => l + r }\n';
-  let threw = false;
-  let msg = "";
-  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
-  catch (e: any) { threw = true; msg = e.message; }
-  eq(threw, true, "combined above/below throws");
-  eq(msg.includes("step 5"), true, `error mentions step 5: ${msg}`);
+test("Phase 6: prec(pow) above(mul) below(unary) declares named level with constraints", () => {
+  const src =
+    'x = grammar {\n' +
+    '  infix "**" prec(pow) above(mul) below(unary) right => (l, r) => l + r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  eq(data.fragment.infix[0].level, "pow");
+  const prec = data.fragment.precedence ?? [];
+  const pow  = prec.find(p => p.name === "pow");
+  eq(pow !== undefined, true, "pow precedence declared");
+  if (!pow) return;
+  eq(pow.constraints.some(c => c.kind === "above" && c.target === "mul"), true);
+  eq(pow.constraints.some(c => c.kind === "below" && c.target === "unary"), true);
+});
+
+test("Phase 6: anonymous above(mul) below(unary) gensyms a level name", () => {
+  const src =
+    'x = grammar { infix "**" above(mul) below(unary) right => (l, r) => l + r }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  eq(data.fragment.infix[0].level.startsWith("__anon_"), true,
+     `level is anonymous (got ${data.fragment.infix[0].level})`);
+  const prec = data.fragment.precedence ?? [];
+  eq(prec.length, 1, "one precedence decl");
+  eq(prec[0].name, data.fragment.infix[0].level);
+});
+
+test("Phase 6: at(\"*\") resolves to mul via operator-symbol lookup", () => {
+  const src = 'x = grammar { infix "**" at("*") right => (l, r) => l + r }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  eq(data.fragment.infix[0].level, "mul", "at(\"*\") resolves to mul");
+});
+
+test("Phase 6: multiple infix regs sharing prec(X) share one level decl", () => {
+  const src =
+    'x = grammar {\n' +
+    '  infix "^^" prec(pow) above(mul) right => (l, r) => l + r\n' +
+    '  infix "**" prec(pow) right => (l, r) => l * r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  const prec = data.fragment.precedence ?? [];
+  const pow  = prec.filter(p => p.name === "pow");
+  eq(pow.length, 1, "pow declared only once");
+  eq(data.fragment.infix.length, 2);
+  eq(data.fragment.infix[0].level, "pow");
+  eq(data.fragment.infix[1].level, "pow");
 });
 
 test("Phase 6: tree-builder lowers grammar block to finalize(add(new))", () => {
