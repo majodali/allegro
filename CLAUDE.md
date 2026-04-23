@@ -189,7 +189,7 @@ Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, 
 - **Hybrid extensions**: `HybridGrammarConfig` with prefix/infix parselet registrations and `LexerConfig` for new operators/keywords. Immutable layering via `extendLexerConfig`.
 - **Parser combinators from Allegro** (Phase 1 DSL primitives): `grammar_new`, `grammar_terminal`, `grammar_phrase`, `grammar_choice`, `grammar_choice_add` (mutable append for recursion), `grammar_repeat`, `grammar_optional`, `grammar_set_target`, `grammar_parse`. Build grammars at runtime, parse strings, receive a tree of Allegro values — Terminal→String, Phrase→Array (positional), Disjunction→transparent (unwrapped), Repetition→Array (delimiters stripped), Optional→value or none. Parse errors become typed Error values. Example demo: `tests/grammar-regex.alg` implements a regex DSL end-to-end.
 - **Grammar 2 formalism (new, Phase 1 in progress)** — scannerless formalism described in `docs/grammar-formalism.md`. Will replace Pratt + Earley in Phase 2. Rule union (Terminal/NonTerm/Seq/Alt/Rep/Opt/Guarded), named productions, symbolic precedence, stateful indent terminals, grammar-value extension via `Operation` deltas, user-defined `@error` productions with `@sync` panic recovery. Phase 1 status: types + engine + Allegro primitives (`grammar2_*`) + tests covering the §10.3 regex DSL. Not yet: analyzer, indent engine, left recursion via full GLL, migration of existing Allegro grammar.
-- **Runtime grammar extension** (Phase 1): modules can register new host-language syntax via four primitives — `register_infix(op, bp, (l, r) => ast)`, `register_prefix(op, bp, x => ast)`, `register_postfix(op, bp, x => ast)`, `register_expr_prefix(kw, x => ast)`. Files opt in with a top-of-file `use_grammar NAME` header, which loads the named module and applies its `GrammarFragment` to parsing. The lambda supplied to each register is a ComposedFunction whose body is an AST template; at parse time `substituteParams` injects the operand ASTs without evaluating, producing a new AST node the evaluator processes normally. Lexer gets two new token kinds: `TokenType.UserOp` (matched by operator-char string) and `TokenType.UserKeyword` (matched by identifier string). Parser dispatches via `userPrefixParselets`/`userInfixParselets` keyed by token text. Extension type grows `grammarFragment?: GrammarFragment`. Demo: `lib/pow.alg` adds `**` and `neg`, used in `tests/grammar-runtime.alg`.
+- **Runtime grammar extension** (Phase 6): modules declare syntax additions in a `grammar { … }` block — `infix S prec(X) left/right/none => (l,r) => ast`, `prefix S at(X) => …`, `postfix S at(X) => …`, `expr_prefix KW => …`. Precedence clauses accept named levels (`prec(pow)`), positional constraints (`above(mul) below(unary)`, single or combined), and operator-symbol lookup (`at("*")`). Anonymous levels get gensym'd names. Files activate a grammar with a top-of-file `use NAME` / `use import NAME` header; the pre-scanner loads the named module and harvests any `grammar { … }` Grammar values from its bindings. A cross-fragment validator runs before merging and reports `E_OPERATOR_CONFLICT` / `E_KEYWORD_CONFLICT` / `E_PRECEDENCE_CYCLE` with aggregated messages. Level insertion in `src/grammar2/fragments.ts` splices new productions into the stratified stack via surgery on the base grammar (LEVELS array in `base-grammar.ts`). Phase 1 `register_infix` / `register_prefix` / `register_postfix` / `register_expr_prefix` primitives retain as a lower-level back-compat path. Demo: `lib/pow.alg` uses `grammar { infix "**" prec(pow) above(mul) below(unary) right => (l, r) => pow_int(l, r); expr_prefix "neg" => x => 0 - x }`, consumed by `tests/grammar-runtime.alg` via `use pow`. Deferred to Phase 6b: EBNF mini-grammar, multi-token `expr_form`/`stmt_form`, `rule NAME = …`/`+=`, `new grammar { … }`, arbitrary-builder lambdas, selector-based `rule -= …` / `rule[name] = …`.
 
 ## Module System
 
@@ -286,7 +286,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
 - **`src/futures.ts`** — FutureManager: bridges JavaScript Promises to forward-chaining evaluation. Creates synthetic `__future_N` bindings, attaches `.then()` handlers that call `applyPhase`
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
-- **`src/test.ts`** — 580+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, member descriptors, interfaces, typed types, refinement types, preserveOps, file-based .alg tests
+- **`src/test.ts`** — 600+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, member descriptors, interfaces, typed types, refinement types, preserveOps, file-based .alg tests
 
 ### Test Files (tests/)
 - `types.alg` — typed literals, arithmetic, comparisons
@@ -474,6 +474,19 @@ x = PI(5)
 y = x + 3                         // y: PositiveInt, re-checked after +
 y instanceof PI                   // → true
 x - 10                            // → error (predicate fails after subtraction)
+
+// Grammar extension — add new operators from a module (Phase 6)
+// lib/pow.alg:
+pow_grammar = grammar {
+  infix "**" prec(pow) above(mul) below(unary) right => (l, r) => pow_int(l, r)
+  expr_prefix "neg" => x => 0 - x
+}
+
+// Consumer file activates the grammar via `use`:
+use pow
+print(2 ** 10)        // → 1024
+print(2 * 3 ** 2)     // → 18 (** binds tighter than *)
+print(neg (2 ** 3))   // → -8
 ```
 
 ## What's Next
@@ -502,7 +515,8 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ Array map/filter/reduce as Allegro ComposedFunctions (recursive AST construction, not imperative TypeScript loops)
 - ✅ Refinement types: `Type && _ > 0` syntax, predicate checking at construction/annotation/call sites, `preserveOps` operator lifting for refinement preservation through operators
 - ✅ Mixins: `.mixin({method: fn, ...})` adds method implementations to types, ComposedFunction method dispatch with self binding
-- ✅ Runtime grammar extension Phase 1: module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix` primitives; `use_grammar NAME` top-of-file header activates a module's `GrammarFragment` before parsing
+- ✅ Runtime grammar extension Phase 1: module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix` primitives; `use_grammar NAME` top-of-file header activated a module's `GrammarFragment` before parsing (superseded by Phase 6)
+- ✅ Runtime grammar extension Phase 6: `grammar { infix/prefix/postfix/expr_prefix … }` block syntax with named precedence (`prec(pow)`, `at(X)`, `above(X)`, `below(Y)`, combined forms), operator-symbol lookup (`at("*")`), anonymous levels, and data-driven stratified-stack level insertion. `use X` pre-scanner (replaces `use_grammar`; accepts `use NAME` and `use import NAME`, extensible to full expressions later). Conflict detection: `E_OPERATOR_CONFLICT`, `E_KEYWORD_CONFLICT`, `E_PRECEDENCE_CYCLE` surface at `use` time with aggregated messages. Deferred to Phase 6b: EBNF mini-grammar, multi-token `expr_form`/`stmt_form`, `rule NAME = …`/`+=`, `new grammar { … }` for standalone grammars, arbitrary-builder lambdas, hygienic substitution, selector-based `rule -= …` / `rule[name] = …`.
 
 ## Design Philosophy
 

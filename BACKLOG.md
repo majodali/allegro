@@ -62,7 +62,8 @@ High-level goals, roughly ordered by dependency:
 
 ### Parser & Grammar
 - [ ] Grammar extension DSL — define new syntax from Allegro code
-- [ ] Runtime grammar extension Phase 2 — multi-token prefix parselets (`match x with ...`), new statement forms, conflict detection, registration from the hosting file, operator/keyword name mangling, per-scope activation
+- [ ] Runtime grammar extension Phase 6b — EBNF mini-grammar for rule bodies, multi-token `expr_form` (`match x with …`) and `stmt_form` (`for x in xs: body`) with named parts, `rule NAME = …` / `+=` for user sub-rules, `new grammar { … }` for standalone grammars, `extends X` clause for non-Allegro bases, arbitrary-builder parse-time lambdas, selector-based `rule NAME -= …` / `rule NAME[alt] = …`, `W_PRODUCTION_REPLACED` / `E_INCOMPATIBLE_GRAMMARS` analyzer checks
+- [ ] Runtime grammar extension Phase 7 — per-scope (block-local) grammar activation, hygienic template substitution, registration from the hosting file (not just modules), single-pass `use X` with mid-parse grammar updates
 - [ ] Embeddable grammars — switch to different parser mid-file or per-module
 - [ ] Mid-statement grammar switching (low priority)
 - [ ] Bootstrap parser in Allegro
@@ -74,9 +75,10 @@ High-level goals, roughly ordered by dependency:
 - [x] Source location tracking in tokens
 - [x] Expression continuation via offside rule — multi-line if/then/else, operator continuation, nested expressions. Lexer suppresses Newline before Indent, parser tracks continuationDepth.
 - [x] Earley parser retained for standalone grammars
-- [x] Runtime grammar extension Phase 1 — module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix`, `use_grammar NAME` header activates module's `GrammarFragment` before parsing, lambda body substituted as AST template (no eval at parse time). Demo: `lib/pow.alg` with `**` and `neg`.
+- [x] Runtime grammar extension Phase 1 — module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix` primitives, `use_grammar NAME` header (superseded by Phase 6's `use X`), lambda body substituted as AST template (no eval at parse time)
+- [x] Runtime grammar extension Phase 6 — `grammar { infix/prefix/postfix/expr_prefix … }` block, named precedence (`prec(X)`, `at(X)`, `above(X)`, `below(Y)`, combined forms, operator-symbol lookup `at("*")`), anonymous level gensyms, data-driven stratified-stack level insertion in `fragments.ts` (LEVELS array + surgery on base productions), `use NAME` / `use import NAME` pre-scanner replacing `use_grammar`, cross-fragment conflict detection (`E_OPERATOR_CONFLICT`, `E_KEYWORD_CONFLICT`, `E_PRECEDENCE_CYCLE`). Demo: `lib/pow.alg` rewritten to `grammar { infix "**" prec(pow) above(mul) below(unary) right => (l, r) => pow_int(l, r); expr_prefix "neg" => x => 0 - x }`.
 - [x] Grammar 2 formalism Phase 1-5 — scannerless engine, builder primitives, TS analyzer (`src/grammar2/analyzer.ts`), Allegretto base grammar, hybrid parser + lexer retirement, `lib/grammar-analyzer.alg` Allegro-native port of the analyzer (all checks except FIRST), memo-bucketing perf fix (42-50× speedup, linear scaling restored).
-- [ ] Grammar 2 Phase 6+ — indent engine, full GLL for left recursion, precedence analyzer, stratified-grammar migration of remaining Allegro syntax, Phase 9 target code emitter.
+- [ ] Grammar 2 Phase 7+ — indent engine extensions, full GLL for left recursion, precedence analyzer, stratified-grammar migration of remaining Allegro syntax, Phase 9 target code emitter.
 
 ### Execution Context & Build Pipeline
 - [ ] Project root file (structure, phases, deps — replaces package.json + tsconfig)
