@@ -225,24 +225,95 @@ export interface Extension {
   grammarFragment?: GrammarFragment;
 }
 
-/** A module's contribution to the grammar (infix/prefix/postfix operators
- *  and expression-prefix keywords registered via `register_*` primitives).
- *  Consumed by `src/grammar2/fragments.ts` to build extended grammar2
- *  grammars when files declare `use_grammar NAME`. */
+/** A module's contribution to the grammar. Produced by:
+ *   - Phase 1 `register_infix` / `register_prefix` / `register_postfix` /
+ *     `register_expr_prefix` — single-operator registrations with numeric bp.
+ *   - Phase 6 `grammar { … }` blocks — named precedence, multi-token forms,
+ *     user sub-rules, `extends` base.
+ *
+ *  Consumed by `src/grammar2/fragments.ts` to build extended grammar2 grammars
+ *  when files declare `use X` (or legacy `use_grammar NAME`).
+ *
+ *  Phase 6 fields are all optional so Phase 1 fragments continue to work
+ *  unchanged. `emptyGrammarFragment()` initialises the Phase 1 arrays only;
+ *  Phase 6 fields are populated by their respective primitives when used. */
 export interface GrammarFragment {
-  /** Identifiers that should tokenize as UserKeyword instead of Ident */
+  // --- Phase 1 (compatible) ---
+
+  /** Identifiers that should tokenize as user keywords (added to reserved set). */
   keywords: string[];
-  /** Operator-char sequences that should tokenize as UserOp */
+  /** Operator-char sequences (tracked for conflict detection). */
   operators: string[];
   /** Binary operator parselets — fn is a ComposedFunction(left, right) → ast */
-  infix: Array<{ token: string; bp: number; fn: Value }>;
+  infix:      Array<{
+    token: string;
+    bp?:   number;                          // Phase 1 numeric BP
+    level?: string;                         // Phase 6 named level
+    assoc?: "left" | "right" | "none";      // Phase 6 associativity
+    fn:    Value;
+  }>;
   /** Unary prefix operator parselets — fn is a ComposedFunction(arg) → ast */
-  prefixOp: Array<{ token: string; bp: number; fn: Value }>;
+  prefixOp:   Array<{
+    token: string;
+    bp?:   number;
+    level?: string;
+    fn:    Value;
+  }>;
   /** Unary postfix operator parselets — fn is a ComposedFunction(arg) → ast */
-  postfixOp: Array<{ token: string; bp: number; fn: Value }>;
+  postfixOp:  Array<{
+    token: string;
+    bp?:   number;
+    level?: string;
+    fn:    Value;
+  }>;
   /** Keyword-led unary prefix parselets — `kw EXPR` → fn(EXPR) */
   exprPrefix: Array<{ keyword: string; fn: Value }>;
+
+  // --- Phase 6 (additive) ---
+
+  /** Name of the grammar this fragment extends. "allegro" | "empty" | <name>.
+   *  Phase 1 fragments leave this undefined → treated as "allegro". */
+  base?: string;
+
+  /** User-declared precedence levels with constraints. Anonymous levels get
+   *  gensym names. Constraints are resolved during fragment merge. */
+  precedence?: Array<{
+    name: string;
+    constraints: Array<
+      | { kind: "at";    target: string }
+      | { kind: "above"; target: string }
+      | { kind: "below"; target: string }
+    >;
+  }>;
+
+  /** Multi-token expression-level forms: `expr_form "match" s:expr "with" …`.
+   *  `parts` is the sequence of rule components (literals, nonterm refs,
+   *  labeled parts); `fn` is the builder template. */
+  exprForms?: Array<{ parts: LabeledPart[]; fn: Value }>;
+
+  /** Multi-token statement-level forms: `stmt_form "for" x:ident … `. */
+  stmtForms?: Array<{ parts: LabeledPart[]; fn: Value }>;
+
+  /** User-defined sub-rules (local nonterms that forms can reference). */
+  rules?: Array<{
+    name:     string;
+    op:       "add" | "replace" | "append";
+    rule:     GrammarFragmentRule;
+    builder?: Value;
+  }>;
 }
+
+/** One component of a multi-token form or user rule. `label` names the
+ *  binding that becomes a Param in the builder template. */
+export interface LabeledPart {
+  label?: string;
+  rule:   GrammarFragmentRule;
+}
+
+/** Structural rule shape used in fragments. Opaque to types.ts — the actual
+ *  Rule shape lives in src/grammar2/types.ts. We hold it as unknown here to
+ *  keep types.ts free of grammar2 imports (layering). */
+export type GrammarFragmentRule = unknown;
 
 export function emptyGrammarFragment(): GrammarFragment {
   return {

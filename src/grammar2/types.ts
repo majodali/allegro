@@ -186,6 +186,13 @@ export interface Grammar {
     levels?: Map<string, number>;
   };
   meta: Record<string, unknown>;
+  /**
+   * Phase 6: provenance chain of base grammars. Present on grammars built via
+   * `grammar { … }` / `grammar extends X { … }`. Compatibility check at `use`
+   * time requires one chain to be a prefix of the other. `undefined` on the
+   * raw base grammar from `buildBaseGrammar()`.
+   */
+  baseChain?: string[];
 }
 
 export function makeGrammar(init?: Partial<Grammar>): Grammar {
@@ -195,6 +202,7 @@ export function makeGrammar(init?: Partial<Grammar>): Grammar {
     reserved:    init?.reserved ?? new Map(),
     precedence:  init?.precedence ?? { constraints: [] },
     meta:        init?.meta ?? {},
+    baseChain:   init?.baseChain,
   };
 }
 

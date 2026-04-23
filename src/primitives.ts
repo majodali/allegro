@@ -1037,6 +1037,32 @@ const register_expr_prefix_impl: PrimitiveFnImpl = (args, ctx) => {
   return noneSingleton;
 };
 
+// --- Phase 6 grammar-building primitives (stubbed) ---
+//
+// These are the targets `grammar { … }` blocks desugar to. Step 4 of the
+// Phase 6 rollout wires up real implementations. For now they throw so the
+// API surface is visible and any accidental premature use is loud.
+
+function notYet(name: string): AllegroError {
+  return new AllegroError(`${name}: Phase 6 primitive not yet implemented (step 4)`);
+}
+
+const grammar_fragment_new_impl:       PrimitiveFnImpl = () => { throw notYet("grammar_fragment_new"); };
+const grammar_fragment_finalize_impl:  PrimitiveFnImpl = () => { throw notYet("grammar_fragment_finalize"); };
+const grammar_precedence_add_impl:     PrimitiveFnImpl = () => { throw notYet("grammar_precedence_add"); };
+const grammar_infix_add_impl:          PrimitiveFnImpl = () => { throw notYet("grammar_infix_add"); };
+const grammar_prefix_add_impl:         PrimitiveFnImpl = () => { throw notYet("grammar_prefix_add"); };
+const grammar_postfix_add_impl:        PrimitiveFnImpl = () => { throw notYet("grammar_postfix_add"); };
+const grammar_expr_prefix_add_impl:    PrimitiveFnImpl = () => { throw notYet("grammar_expr_prefix_add"); };
+const grammar_expr_form_add_impl:      PrimitiveFnImpl = () => { throw notYet("grammar_expr_form_add"); };
+const grammar_stmt_form_add_impl:      PrimitiveFnImpl = () => { throw notYet("grammar_stmt_form_add"); };
+const grammar_rule_add_impl:           PrimitiveFnImpl = () => { throw notYet("grammar_rule_add"); };
+const grammar_rule_replace_impl:       PrimitiveFnImpl = () => { throw notYet("grammar_rule_replace"); };
+const grammar_rule_append_impl:        PrimitiveFnImpl = () => { throw notYet("grammar_rule_append"); };
+const grammar_combine_impl:            PrimitiveFnImpl = () => { throw notYet("combine"); };
+const grammar_override_impl:           PrimitiveFnImpl = () => { throw notYet("override"); };
+const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("without"); };
+
 // ============ TYPE SYSTEM ============
 
 import {
@@ -1828,11 +1854,30 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   grammar_parse: makePrimitive("grammar_parse", grammar_parse_impl),
   // Grammar 2 (new formalism, Phase 1) — scannerless parser, see docs/grammar-formalism.md
   ...grammar2Primitives,
-  // Runtime grammar extensions (Phase 1: simple combinators)
+  // Runtime grammar extensions (Phase 1: simple combinators — retained as the
+  // low-level API; `grammar { … }` blocks (Phase 6) compile down to the
+  // Phase 6 primitives below.)
   register_infix: makePrimitive("register_infix", register_infix_impl),
   register_prefix: makePrimitive("register_prefix", register_prefix_impl),
   register_postfix: makePrimitive("register_postfix", register_postfix_impl),
   register_expr_prefix: makePrimitive("register_expr_prefix", register_expr_prefix_impl),
+  // Phase 6 grammar-building primitives (stubs; implemented step-by-step).
+  grammar_fragment_new:      makePrimitive("grammar_fragment_new",      grammar_fragment_new_impl),
+  grammar_fragment_finalize: makePrimitive("grammar_fragment_finalize", grammar_fragment_finalize_impl),
+  grammar_precedence_add:    makePrimitive("grammar_precedence_add",    grammar_precedence_add_impl),
+  grammar_infix_add:         makePrimitive("grammar_infix_add",         grammar_infix_add_impl),
+  grammar_prefix_add:        makePrimitive("grammar_prefix_add",        grammar_prefix_add_impl),
+  grammar_postfix_add:       makePrimitive("grammar_postfix_add",       grammar_postfix_add_impl),
+  grammar_expr_prefix_add:   makePrimitive("grammar_expr_prefix_add",   grammar_expr_prefix_add_impl),
+  grammar_expr_form_add:     makePrimitive("grammar_expr_form_add",     grammar_expr_form_add_impl),
+  grammar_stmt_form_add:     makePrimitive("grammar_stmt_form_add",     grammar_stmt_form_add_impl),
+  grammar_rule_add:          makePrimitive("grammar_rule_add",          grammar_rule_add_impl),
+  grammar_rule_replace:      makePrimitive("grammar_rule_replace",      grammar_rule_replace_impl),
+  grammar_rule_append:       makePrimitive("grammar_rule_append",       grammar_rule_append_impl),
+  // Grammar combinators (accepted on the `use X` RHS whitelist).
+  grammar_combine:           makePrimitive("grammar_combine",           grammar_combine_impl),
+  grammar_override:          makePrimitive("grammar_override",          grammar_override_impl),
+  grammar_without:           makePrimitive("grammar_without",           grammar_without_impl),
   // Type system
   typed_int: makePrimitive("typed_int", typed_int_impl, true),
   typed_string: makePrimitive("typed_string", typed_string_impl, true),
