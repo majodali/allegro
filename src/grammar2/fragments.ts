@@ -103,8 +103,57 @@ const BASE_RESERVED_KEYWORDS = new Set([
   "instanceof", "subtypeof",
 ]);
 
-export function validateFragments(fragments: GrammarFragment[]): string[] {
-  const errors: string[] = [];
+export interface FragmentValidationResult {
+  errors:   string[];
+  warnings: string[];
+}
+
+export function validateFragments(fragments: GrammarFragment[]): FragmentValidationResult {
+  const errors:   string[] = [];
+  const warnings: string[] = [];
+
+  // --- Base-chain compatibility (E_INCOMPATIBLE_GRAMMARS) ---
+  //
+  // Each fragment carries a `base` identifier seeded at fragment_new time:
+  // "allegro" (default), "empty" (from `new grammar`), or a "/"-joined chain
+  // (from `grammar extends X`). Two fragments are compatible iff their base
+  // identifiers are equal, OR one is a prefix chain of the other when split
+  // on "/". Undefined base is treated as "allegro".
+  const baseOf = (f: GrammarFragment) => f.base ?? "allegro";
+  const chainOf = (base: string) => base.split("/");
+  for (let i = 0; i < fragments.length; i++) {
+    for (let j = i + 1; j < fragments.length; j++) {
+      const a = baseOf(fragments[i]);
+      const b = baseOf(fragments[j]);
+      if (a === b) continue;
+      const ca = chainOf(a);
+      const cb = chainOf(b);
+      const isPrefix = (short: string[], long: string[]) =>
+        short.every((x, k) => long[k] === x);
+      if (!isPrefix(ca, cb) && !isPrefix(cb, ca)) {
+        errors.push(
+          `E_INCOMPATIBLE_GRAMMARS: fragment[${i}] base '${a}' is not compatible with fragment[${j}] base '${b}'`,
+        );
+      }
+    }
+  }
+
+  // --- Production-replacement warnings (W_PRODUCTION_REPLACED) ---
+  //
+  // If a user rule in any fragment shares a name with a production that
+  // already exists in the base grammar, the merger will silently overwrite
+  // it. Users typically want this but occasionally cause confusing
+  // regressions — warn so it's visible.
+  const basePRodNames = new Set(buildBaseGrammar().productions.keys());
+  for (let i = 0; i < fragments.length; i++) {
+    for (const r of (fragments[i].rules ?? [])) {
+      if (r.op === "add" && basePRodNames.has(r.name)) {
+        warnings.push(
+          `W_PRODUCTION_REPLACED: fragment[${i}] rule '${r.name}' shadows an existing base production — use '+=' to append instead of replace`,
+        );
+      }
+    }
+  }
 
   // --- Operator conflicts ---
   //
@@ -171,7 +220,7 @@ export function validateFragments(fragments: GrammarFragment[]): string[] {
     if (cycleErr) errors.push(cycleErr);
   }
 
-  return errors;
+  return { errors, warnings };
 }
 
 function detectPrecedenceCycle(
@@ -225,12 +274,16 @@ function detectPrecedenceCycle(
 }
 
 function buildExtendedGrammar(fragments: GrammarFragment[]): Grammar {
-  // Validate cross-fragment consistency before mutating the grammar. An
-  // aggregated error (joined with \n) surfaces at the `use X` call site so
-  // users see all problems at once.
-  const errs = validateFragments(fragments);
-  if (errs.length > 0) {
-    throw new Error("Grammar extension errors:\n  " + errs.join("\n  "));
+  // Validate cross-fragment consistency before mutating the grammar. Errors
+  // throw with an aggregated message; warnings emit via console.warn so they
+  // reach developers without halting the build.
+  const { errors, warnings } = validateFragments(fragments);
+  if (errors.length > 0) {
+    throw new Error("Grammar extension errors:\n  " + errors.join("\n  "));
+  }
+  for (const w of warnings) {
+    // eslint-disable-next-line no-console
+    console.warn(w);
   }
 
   // Start with a fresh base grammar.

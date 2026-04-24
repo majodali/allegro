@@ -1074,8 +1074,10 @@ export interface GrammarValueData {
 }
 
 function makeFragmentBuilderHandle(base: string): ContextValue {
-  const ctx  = makeContext() as ContextValue;
-  const data: GrammarHandleData = { fragment: emptyGrammarFragment(), base, anonLevelCounter: 0 };
+  const ctx = makeContext() as ContextValue;
+  const fragment = emptyGrammarFragment();
+  fragment.base = base;             // propagate to fragment for validator checks
+  const data: GrammarHandleData = { fragment, base, anonLevelCounter: 0 };
   (ctx as any).__grammarHandle = data;
   return ctx;
 }

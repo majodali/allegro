@@ -4564,6 +4564,37 @@ test("Phase 7a: `new grammar { … }` has baseChain = [empty]", () => {
   eq(data.baseChain.join(","), "empty");
 });
 
+test("Phase 7a thread 8: two fragments with incompatible bases trigger E_INCOMPATIBLE_GRAMMARS", () => {
+  const src1 = 'a = grammar { infix "**" at(mul) right => (l, r) => l + r }\n';
+  const src2 = 'b = new grammar { infix "^^" at(add) left => (l, r) => l + r }\n';
+  const { evalCtx: c1 } = runtimeEval(src1, undefined, [typeExt], undefined, true);
+  const { evalCtx: c2 } = runtimeEval(src2, undefined, [typeExt], undefined, true);
+  const f1 = asGrammarValue(c1.bindings.get("a")!.value!)!.fragment;
+  const f2 = asGrammarValue(c2.bindings.get("b")!.value!)!.fragment;
+  let threw = false, msg = "";
+  try { g2getGrammarWithFragments([f1, f2]); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true, "incompatible bases throws");
+  eq(msg.includes("E_INCOMPATIBLE_GRAMMARS"), true, `error mentions E_INCOMPATIBLE_GRAMMARS: ${msg}`);
+});
+
+test("Phase 7a thread 8: rule shadowing a base production emits W_PRODUCTION_REPLACED", () => {
+  // Rewriting `expr_atom` with a user rule shadows the base. Capture console.warn.
+  const src =
+    'x = grammar {\n' +
+    '  rule expr_atom = "foo" => x => x\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("x")!.value!)!.fragment;
+  const warnings: string[] = [];
+  const origWarn = console.warn;
+  console.warn = (msg: string) => warnings.push(msg);
+  try { g2getGrammarWithFragments([frag]); }
+  finally { console.warn = origWarn; }
+  eq(warnings.some(w => w.includes("W_PRODUCTION_REPLACED")), true, "warning emitted");
+  eq(warnings.some(w => w.includes("expr_atom")), true, "warning mentions expr_atom");
+});
+
 test("Phase 7a: `grammar extends X { … }` chains onto X's baseChain", () => {
   const src =
     'base_g = grammar { infix "**" at(mul) right => (l, r) => l + r }\n' +
