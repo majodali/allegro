@@ -473,11 +473,24 @@ function repl(standard: boolean): void {
 // -- Main --
 const argv = process.argv.slice(2);
 const baseMode = argv.includes("--base");
-const files = argv.filter(a => !a.startsWith("--"));
+const flagless = argv.filter(a => !a.startsWith("--"));
 const standard = !baseMode;
 
-if (files.length > 0) {
-  const filename = files[0];
+// Subcommand detection: first positional arg can be a subcommand.
+//   allegro inspect <file>   — Phase A: emit a module summary for review
+//   allegro <file>            — run the file (existing behaviour)
+if (flagless[0] === "inspect") {
+  const filename = flagless[1];
+  if (!filename) {
+    console.error("usage: allegro inspect <file>");
+    process.exit(1);
+  }
+  runInspect(filename, standard).catch(e => {
+    console.error(e.message);
+    process.exit(1);
+  });
+} else if (flagless.length > 0) {
+  const filename = flagless[0];
   const source = fs.readFileSync(filename, "utf-8");
   runFile(source, filename, standard).catch(e => {
     console.error(e.message);
@@ -485,4 +498,55 @@ if (files.length > 0) {
   });
 } else {
   repl(standard);
+}
+
+/**
+ * Evaluate the file and emit a semantic summary of its top-level bindings:
+ * inferred types, safety grade, primitives called, unresolved references.
+ * No program side effects are executed because `print` / deferred futures
+ * are never awaited — the point is to see what the compiler understood.
+ */
+async function runInspect(filename: string, isStandard: boolean): Promise<void> {
+  const source = fs.readFileSync(filename, "utf-8");
+  const sourceDir = path.dirname(path.resolve(filename));
+  let extensions: Extension[] = isStandard ? [...getStdExtensions()] : [];
+
+  // Handle `use …` directives the same way runFile does — so inspect works
+  // on files that use grammar extensions.
+  const { directives, headerEnd } = scanUses(source);
+  const moduleNames = directives.filter(d => d.kind === "module").map(d => d.name!);
+  if (moduleNames.length > 0) {
+    const grammarExts = await loadGrammarModules(moduleNames, sourceDir, extensions);
+    extensions = [...extensions, ...grammarExts];
+  }
+  const cleanSource = source.slice(headerEnd);
+
+  // Swallow print output during inspect — we want the summary, not program I/O.
+  const origLog = console.log;
+  const suppress: string[] = [];
+  console.log = (...args: any[]) => suppress.push(args.map(String).join(" "));
+  let result;
+  try {
+    result = evalSource(cleanSource, undefined, extensions, undefined, isStandard);
+  } finally {
+    console.log = origLog;
+  }
+
+  // Filter out primitives/type bindings injected by extensions so the user
+  // sees only their source-defined bindings.
+  const { primitives: primRegistry } = await import("./primitives.js");
+  const primNames = new Set(Object.keys(primRegistry));
+  const typeExtNames = new Set<string>();
+  for (const ext of extensions) {
+    for (const k of Object.keys(ext.bindings)) typeExtNames.add(k);
+  }
+  const excluded = new Set<string>([...primNames, ...typeExtNames]);
+
+  const { summarizeModule, renderModuleSummary } = await import("./introspect.js");
+  const summary = summarizeModule(result.evalCtx, result.compilationReport, {
+    excludeBindings: excluded,
+  });
+  console.log(`allegro inspect — ${filename}`);
+  console.log("=".repeat(60));
+  console.log(renderModuleSummary(summary));
 }

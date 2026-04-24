@@ -5,9 +5,10 @@
 
 import { evalSource } from "../src/runtime.js";
 import { createTypeSystem } from "../src/types-std.js";
-import { formatValue, extractGrammarFragment, asGrammarValue } from "../src/primitives.js";
+import { formatValue, extractGrammarFragment, asGrammarValue, primitives as primRegistry } from "../src/primitives.js";
 import { ContextValue, Value, Extension } from "../src/types.js";
 import { createFutureManager, FutureManager } from "../src/futures.js";
+import { summarizeModule, renderModuleSummary } from "../src/introspect.js";
 
 const typeExt = createTypeSystem();
 let ctx: ContextValue | undefined = undefined;
@@ -274,6 +275,68 @@ function resetContext(): void {
   fm = undefined;
 }
 
+/**
+ * Inspect a source file: evaluate it (suppressing any print output) and
+ * return the rendered semantic summary — safety grade, per-binding types,
+ * primitives used, unresolved references. Phase A of the provability arc.
+ */
+function inspectAllegro(source: string): { summary: string; grade: string; error: string | null } {
+  const primNames = new Set(Object.keys(primRegistry));
+  const suppress: string[] = [];
+  const origLog = console.log;
+  console.log = (...args: any[]) => suppress.push(args.map(String).join(" "));
+
+  try {
+    // Mirror evalAllegro's grammar-directive handling.
+    let extensions: Extension[] = [typeExt];
+    let effectiveSource = source;
+    const { directives, headerEnd } = scanUses(source);
+    const memberByModule = new Map<string, Set<string>>();
+    for (const d of directives) {
+      if (d.kind === "member") {
+        if (!memberByModule.has(d.moduleName!)) memberByModule.set(d.moduleName!, new Set());
+        memberByModule.get(d.moduleName!)!.add(d.memberName!);
+      }
+    }
+    for (const d of directives) {
+      if (d.kind === "module") extensions.push(loadGrammarLibrary(d.name!));
+      if (d.kind === "member" && memberByModule.has(d.moduleName!)) {
+        extensions.push(loadGrammarLibrary(d.moduleName!, memberByModule.get(d.moduleName!)!));
+        memberByModule.delete(d.moduleName!);
+      }
+      if (d.kind === "literal") {
+        const boot = evalSource(d.source!, undefined, [typeExt], undefined, true);
+        if (boot.value) {
+          extensions.push({
+            name: `__inline_${extensions.length}`,
+            bindings: { __inline_grammar: boot.value },
+          });
+        }
+      }
+    }
+    effectiveSource = source.slice(headerEnd);
+
+    const result = evalSource(effectiveSource, undefined, extensions, undefined, true);
+    const excluded = new Set<string>(primNames);
+    for (const ext of extensions) {
+      for (const k of Object.keys(ext.bindings)) excluded.add(k);
+    }
+    const summary = summarizeModule(result.evalCtx, result.compilationReport, {
+      excludeBindings: excluded,
+    });
+    return {
+      summary: renderModuleSummary(summary),
+      grade:   summary.grade,
+      error:   null,
+    };
+  } catch (e: any) {
+    return { summary: "", grade: "has-errors", error: e.message || String(e) };
+  } finally {
+    console.log = origLog;
+    void suppress; // deliberately discarded
+  }
+}
+
 // Expose to global scope for the HTML page
 (window as any).Allegro = {
   eval: evalAllegro,
@@ -281,4 +344,5 @@ function resetContext(): void {
   reset: resetContext,
   formatValue,
   registerLibrary,
+  inspect: inspectAllegro,
 };

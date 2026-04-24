@@ -75,6 +75,7 @@
     justify-content: space-between;
     border-top: 1px solid #313244;
   }
+  .sandbox-bar .btn-group { display: flex; gap: 6px; }
   .sandbox-bar button {
     background: #89b4fa;
     color: #1e1e2e;
@@ -86,7 +87,17 @@
     font-weight: 600;
   }
   .sandbox-bar button:hover { background: #74c7ec; }
+  .sandbox-bar button.btn-inspect {
+    background: #313244;
+    color: #cba6f7;
+  }
+  .sandbox-bar button.btn-inspect:hover { background: #45475a; }
   .sandbox-bar .timing { font-size: 11px; color: #6c7086; }
+  .out-grade { display: inline-block; padding: 1px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-bottom: 6px; }
+  .grade-proven-safe  { background: #1f3a1f; color: #a6e3a1; }
+  .grade-partial      { background: #3a331f; color: #f9e2af; }
+  .grade-has-warnings { background: #3a2a1f; color: #fab387; }
+  .grade-has-errors   { background: #3a1f1f; color: #f38ba8; }
   .sandbox-output {
     background: #11111b;
     min-height: 24px;
@@ -172,7 +183,7 @@ print(factorial(5))
 make_adder(n) => x => x + n
 add5 = make_adder(5)
 print(add5(10))</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-basics')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-basics')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-basics')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -198,7 +209,7 @@ print("hello" instanceof String)
 // Type annotations
 add(x: Int, y: Int): Int => x + y
 print(add(3, 4))</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-types')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-types')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-types')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -223,7 +234,7 @@ point = {x: 10, y: 20}
 when point
   is {x, y} and x > 0 then print("x={x}, y={y}")
   is _ then print("origin")</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-patterns')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-patterns')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-patterns')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -251,7 +262,7 @@ result = [1, 2, 3, 4, 5]
   .filter(x => x > 2)
   .map(x => x * 10)
 print(result)</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-collections')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-collections')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-collections')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -276,7 +287,7 @@ print(type of Point instanceof NominalType)
 UserId = Int.distinct()
 print(UserId(42) instanceof Int)
 print(UserId(42) instanceof UserId)</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-custom-types')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-custom-types')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-custom-types')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -300,7 +311,7 @@ print(42 instanceof Sized)
 
 // Interfaces are structural types
 print(Printable instanceof Type)</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-interfaces')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-interfaces')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-interfaces')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -330,7 +341,7 @@ PI = (Int && _ > 0).preserveOps()
 x = PI(5)
 print(x + 3)
 print(x instanceof PI)</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-refinements')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-refinements')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-refinements')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -354,7 +365,7 @@ print(q.y)
 magSpec = {mag: (self) => self.x * self.x + self.y * self.y}
 Vec = Int.extend({x: Int, y: Int}).mixin(magSpec)
 print(Vec(5, 12).mag())</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-mixins')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-mixins')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-mixins')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -381,7 +392,7 @@ print(result)
 when error of result
   is none then print("ok")
   is msg then print("Error: {msg}")</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-errors')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-errors')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-errors')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -403,7 +414,7 @@ print("Fetched: {data.slice(0, 60)}...")
 waited = delay(500)
 msg = if waited == 0 then "Half a second later!" else "never"
 print(msg)</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-async')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-async')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-async')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -415,7 +426,7 @@ b = fetch("https://jsonplaceholder.typicode.com/users/2")
 // Prints fire when each resolves (order depends on network)
 print("User 1: {a.slice(0, 50)}...")
 print("User 2: {b.slice(0, 50)}...")</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-async2')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-async2')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-async2')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -492,7 +503,7 @@ print(matches("(ab)+", "abab"))   // true
 print(matches("a|b|c", "b"))      // true
 print(matches("a*b", "aaab"))     // true
 print(matches("a?b", "aab"))      // false</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-grammar')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-grammar')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-grammar')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -544,7 +555,7 @@ print(neg (2 ** 3))    // -8
 print(2 * 3 ** 2)      // 18
 print(2 ** 3 + 1)      // 9
 </textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-runtime-grammar')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-runtime-grammar')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-runtime-grammar')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -584,7 +595,7 @@ print(describe(1))     // one
 print(describe(2))     // two
 print(describe(99))    // ninety-nine
 </textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-runtime-match')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-runtime-match')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-runtime-match')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -617,7 +628,7 @@ print(1 @@ 2 @@ 3)      // 123
 print(4 @@ 5)            // 45
 print(1 + 2 @@ 3)        // 33   (1+2=3, then 3 @@ 3 = 33)
 </textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-runtime-inline')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-runtime-inline')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-runtime-inline')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -642,7 +653,7 @@ myReduce(arr, f, acc) =>
     else myReduce(arr.slice(1), f, f(acc, arr[0]))
 
 print(myReduce([1, 2, 3, 4, 5], (a, b) => a + b, 0))</textarea>
-<div class="sandbox-bar"><button onclick="runSandbox('s-recursive')">Run</button><span class="timing"></span></div>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-recursive')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-recursive')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
@@ -693,6 +704,29 @@ match_grammar = grammar {
     => (s, cs) => match_dispatch(s, cs)
 }
 `);
+
+function inspectSandbox(id) {
+  const container = document.getElementById(id);
+  const editor = container.querySelector('.sandbox-editor');
+  const output = container.querySelector('.sandbox-output');
+  const source = editor.value;
+  if (!source.trim()) {
+    output.innerHTML = '<span class="out-info">Nothing to inspect.</span>';
+    return;
+  }
+  try {
+    const { summary, grade, error } = Allegro.inspect(source);
+    if (error) {
+      output.innerHTML = `<span class="out-error">${esc(error)}</span>`;
+      return;
+    }
+    output.innerHTML =
+      `<span class="out-grade grade-${grade}">${grade}</span>\n` +
+      `<span class="out-info">${esc(summary)}</span>`;
+  } catch (e) {
+    output.innerHTML = `<span class="out-error">${esc(e.message || String(e))}</span>`;
+  }
+}
 
 async function runSandbox(id) {
   const container = document.getElementById(id);

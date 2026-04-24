@@ -3633,6 +3633,72 @@ fileTest(path.join(testsDir, "hygiene-demo.alg"));
 // Phase 7d: `use NAME.MEMBER` — select specific Grammar binding from a module.
 fileTest(path.join(testsDir, "dotted-use-demo.alg"));
 
+// --- Phase A: introspection / semantic summary ---
+
+import {
+  summarizeValue, summarizeModule, safetyGradeFor, renderModuleSummary,
+} from "./introspect.js";
+
+test("Phase A: summarizeValue describes an Int literal", () => {
+  const src = "x = 42\n";
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const xVal = evalCtx.bindings.get("x")!.value!;
+  const s = summarizeValue(xVal);
+  eq(s.typeName, "Int");
+  eq(s.resolved, true);
+  eq(s.shortDescription.includes("42"), true);
+});
+
+test("Phase A: summarizeValue reports function param names", () => {
+  const src = "f(x, y) => x + y\n";
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fVal = evalCtx.bindings.get("f")!.value!;
+  const s = summarizeValue(fVal);
+  eq(s.shortDescription.includes("x, y"), true, `got: ${s.shortDescription}`);
+  eq(s.primitives.includes("bits_add"), true, "sums via bits_add");
+});
+
+test("Phase A: summarizeValue collects unresolved symbols", () => {
+  const src = "f(x) => x + unknown_thing\n";
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fVal = evalCtx.bindings.get("f")!.value!;
+  const s = summarizeValue(fVal);
+  eq(s.externalSymbols.includes("unknown_thing"), true);
+});
+
+test("Phase A: summarizeModule grades a clean module 'proven-safe'", () => {
+  const src = "x = 1\ny = 2\nz = x + y\n";
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const summary = summarizeModule(result.evalCtx, result.compilationReport, {
+    excludeBindings: new Set(Object.keys(primRegistry)),
+  });
+  eq(summary.grade, "proven-safe");
+  eq(summary.bindingCount >= 3, true);
+  eq(summary.resolvedCount, summary.bindingCount);
+});
+
+test("Phase A: safetyGradeFor classifies edge cases", () => {
+  eq(safetyGradeFor(undefined), "partial");
+  eq(safetyGradeFor({ inferred: [], errors: [], unresolved: [], bindingTypes: new Map() }),
+     "proven-safe");
+  eq(safetyGradeFor({ inferred: [], errors: [], unresolved: ["foo"], bindingTypes: new Map() }),
+     "partial");
+  eq(safetyGradeFor({ inferred: [], errors: [{ name: "f", message: "boom" }], unresolved: [], bindingTypes: new Map() }),
+     "has-errors");
+});
+
+test("Phase A: renderModuleSummary produces readable text", () => {
+  const src = "x = 42\nf(n) => n + 1\n";
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const summary = summarizeModule(result.evalCtx, result.compilationReport, {
+    excludeBindings: new Set(Object.keys(primRegistry)),
+  });
+  const text = renderModuleSummary(summary);
+  eq(text.includes("safety grade:"), true);
+  eq(text.includes("x"), true);
+  eq(text.includes("f"), true);
+});
+
 // == Grammar 2 (Phase 1) — new formalism + engine ==
 //
 // Tests for the TypeScript-level types and engine in src/grammar2/. These
