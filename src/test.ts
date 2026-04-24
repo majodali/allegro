@@ -3606,6 +3606,10 @@ fileTest(path.join(testsDir, "match-demo.alg"));
 // Phase 7a thread 2: hosting-file grammar via `use grammar { … }`
 fileTest(path.join(testsDir, "inline-grammar-demo.alg"));
 
+// Phase 7b thread 5: hygienic template substitution — consumer can't hijack
+// a module's grammar template by rebinding a referenced name.
+fileTest(path.join(testsDir, "hygiene-demo.alg"));
+
 // == Grammar 2 (Phase 1) — new formalism + engine ==
 //
 // Tests for the TypeScript-level types and engine in src/grammar2/. These

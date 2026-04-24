@@ -1274,48 +1274,102 @@ const grammar_fragment_new_from_impl: PrimitiveFnImpl = (args) => {
   return handle;
 };
 
-const grammar_infix_add_impl: PrimitiveFnImpl = (args) => {
+/**
+ * Hygienic resolution: walk a template ComposedFunction's body and replace
+ * free Symbols with their resolved values from the enclosing eval context.
+ *
+ * Why: grammar templates like `(s, cs) => match_dispatch(s, cs)` contain
+ * Symbols (`match_dispatch`) that, if left unresolved, get looked up in the
+ * CONSUMER'S scope at parse time. If the consumer accidentally binds the
+ * same name, the grammar extension silently misbehaves.
+ *
+ * With hygienic resolution, at registration time we bind Symbols in the
+ * template body to their module-scope Values — so a consumer binding of the
+ * same name can't hijack the template.
+ *
+ * Symbols that don't resolve at registration time (either not yet defined,
+ * or genuinely intended to resolve in the consumer scope) are left as
+ * Symbols; they'll look up in the consumer's scope as before.
+ */
+function resolveFreeSymbols(v: Value, ctx: ContextValue, seen: Set<Value> = new Set()): Value {
+  if (!v || typeof v !== "object") return v;
+  if (v.kind === ValueKind.ComposedFunction && seen.has(v)) return v;
+
+  switch (v.kind) {
+    case ValueKind.Symbol: {
+      const b = ctx.bindings.get(v.name);
+      if (b?.value !== undefined && isResolved(b.value)) {
+        return b.value;
+      }
+      return v;
+    }
+    case ValueKind.Expression: {
+      const newFn = resolveFreeSymbols(v.fn, ctx, seen);
+      const newArgs = v.args.map(a => resolveFreeSymbols(a, ctx, seen));
+      if (newFn === v.fn && newArgs.every((a, i) => a === v.args[i])) return v;
+      return makeExpr(newFn, newArgs);
+    }
+    case ValueKind.ComposedFunction: {
+      seen.add(v);
+      const newBody = resolveFreeSymbols(v.body, ctx, seen);
+      if (newBody === v.body) return v;
+      const newFn: any = { kind: ValueKind.ComposedFunction, params: v.params, body: newBody };
+      // Retarget Params' owner to the new fn so substituteParams can find them.
+      for (const p of newFn.params) p.owner = newFn;
+      return newFn;
+    }
+    case ValueKind.MultiValue: {
+      const newPrimary = resolveFreeSymbols(v.primary, ctx, seen);
+      if (newPrimary === v.primary) return v;
+      return makeMultiValue(newPrimary, new Map(v.components));
+    }
+    default:
+      return v;
+  }
+}
+
+const grammar_infix_add_impl: PrimitiveFnImpl = (args, ctx) => {
   if (args.length !== 5) throw new AllegroError(`grammar_infix_add: expected 5 args, got ${args.length}`);
   const h      = asGrammarHandle(args[0], "grammar_infix_add");
   const op     = bitsToString(asBits(args[1], "grammar_infix_add"));
   const spec   = readPrecSpec(args[2], "grammar_infix_add");
   const assoc  = bitsToString(asBits(args[3], "grammar_infix_add")) as "left" | "right" | "none";
-  const fn     = args[4];
+  const fn     = ctx ? resolveFreeSymbols(args[4], ctx) : args[4];
   const level  = resolveLevelFromPrecSpec(spec, h, "grammar_infix_add");
   h.fragment.infix.push({ token: op, level, assoc, fn });
   if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
   return args[0];
 };
 
-const grammar_prefix_add_impl: PrimitiveFnImpl = (args) => {
+const grammar_prefix_add_impl: PrimitiveFnImpl = (args, ctx) => {
   if (args.length !== 4) throw new AllegroError(`grammar_prefix_add: expected 4 args, got ${args.length}`);
   const h      = asGrammarHandle(args[0], "grammar_prefix_add");
   const op     = bitsToString(asBits(args[1], "grammar_prefix_add"));
   const spec   = readPrecSpec(args[2], "grammar_prefix_add");
-  const fn     = args[3];
+  const fn     = ctx ? resolveFreeSymbols(args[3], ctx) : args[3];
   const level  = resolveLevelFromPrecSpec(spec, h, "grammar_prefix_add");
   h.fragment.prefixOp.push({ token: op, level, fn });
   if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
   return args[0];
 };
 
-const grammar_postfix_add_impl: PrimitiveFnImpl = (args) => {
+const grammar_postfix_add_impl: PrimitiveFnImpl = (args, ctx) => {
   if (args.length !== 4) throw new AllegroError(`grammar_postfix_add: expected 4 args, got ${args.length}`);
   const h      = asGrammarHandle(args[0], "grammar_postfix_add");
   const op     = bitsToString(asBits(args[1], "grammar_postfix_add"));
   const spec   = readPrecSpec(args[2], "grammar_postfix_add");
-  const fn     = args[3];
+  const fn     = ctx ? resolveFreeSymbols(args[3], ctx) : args[3];
   const level  = resolveLevelFromPrecSpec(spec, h, "grammar_postfix_add");
   h.fragment.postfixOp.push({ token: op, level, fn });
   if (!h.fragment.operators.includes(op)) h.fragment.operators.push(op);
   return args[0];
 };
 
-const grammar_expr_prefix_add_impl: PrimitiveFnImpl = (args) => {
+const grammar_expr_prefix_add_impl: PrimitiveFnImpl = (args, ctx) => {
   if (args.length !== 3) throw new AllegroError(`grammar_expr_prefix_add: expected 3 args, got ${args.length}`);
   const h  = asGrammarHandle(args[0], "grammar_expr_prefix_add");
   const kw = bitsToString(asBits(args[1], "grammar_expr_prefix_add"));
-  const fn = args[2];
+  const fn = ctx ? resolveFreeSymbols(args[2], ctx) : args[2];
   h.fragment.exprPrefix.push({ keyword: kw, fn });
   if (!h.fragment.keywords.includes(kw)) h.fragment.keywords.push(kw);
   return args[0];
@@ -1342,13 +1396,13 @@ function makeGrammarValueWithChain(fragment: GrammarFragment, baseChain: string[
 
 // --- Phase 6b primitives: user rules and multi-token forms ---
 
-const grammar_rule_add_impl: PrimitiveFnImpl = (args) => {
+const grammar_rule_add_impl: PrimitiveFnImpl = (args, ctx) => {
   if (args.length !== 5) throw new AllegroError(`grammar_rule_add: expected 5 args, got ${args.length}`);
   const h       = asGrammarHandle(args[0], "grammar_rule_add");
   const name    = bitsToString(asBits(args[1], "grammar_rule_add"));
   const opStr   = bitsToString(asBits(args[2], "grammar_rule_add"));
   const ruleObj = args[3];
-  const builder = args[4];
+  const builder = ctx ? resolveFreeSymbols(args[4], ctx) : args[4];
   const op: "add" | "append" = opStr === "append" ? "append" : "add";
 
   if (!h.fragment.rules) h.fragment.rules = [];
@@ -1356,22 +1410,22 @@ const grammar_rule_add_impl: PrimitiveFnImpl = (args) => {
   return args[0];
 };
 
-const grammar_expr_form_add_impl: PrimitiveFnImpl = (args) => {
+const grammar_expr_form_add_impl: PrimitiveFnImpl = (args, ctx) => {
   if (args.length !== 3) throw new AllegroError(`grammar_expr_form_add: expected 3 args, got ${args.length}`);
   const h       = asGrammarHandle(args[0], "grammar_expr_form_add");
   const ruleObj = args[1];
-  const builder = args[2];
+  const builder = ctx ? resolveFreeSymbols(args[2], ctx) : args[2];
 
   if (!h.fragment.exprForms) h.fragment.exprForms = [];
   h.fragment.exprForms.push({ rule: ruleObj, fn: builder });
   return args[0];
 };
 
-const grammar_stmt_form_add_impl: PrimitiveFnImpl = (args) => {
+const grammar_stmt_form_add_impl: PrimitiveFnImpl = (args, ctx) => {
   if (args.length !== 3) throw new AllegroError(`grammar_stmt_form_add: expected 3 args, got ${args.length}`);
   const h       = asGrammarHandle(args[0], "grammar_stmt_form_add");
   const ruleObj = args[1];
-  const builder = args[2];
+  const builder = ctx ? resolveFreeSymbols(args[2], ctx) : args[2];
 
   if (!h.fragment.stmtForms) h.fragment.stmtForms = [];
   h.fragment.stmtForms.push({ rule: ruleObj, fn: builder });
