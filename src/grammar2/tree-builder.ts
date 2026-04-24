@@ -1323,10 +1323,11 @@ function buildGrammarExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   const decls: ParseTree[] = [];
   const walk = (t: ParseTree): void => {
     if (t.kind !== "branch") return;
-    if (t.tag === "infix_decl"       || t.tag === "prefix_decl" ||
-        t.tag === "postfix_decl"     || t.tag === "expr_prefix_decl" ||
-        t.tag === "rule_decl"        || t.tag === "expr_form_decl" ||
-        t.tag === "stmt_form_decl") {
+    if (t.tag === "infix_decl"        || t.tag === "prefix_decl" ||
+        t.tag === "postfix_decl"      || t.tag === "expr_prefix_decl" ||
+        t.tag === "rule_decl"         || t.tag === "expr_form_decl" ||
+        t.tag === "stmt_form_decl"    ||
+        t.tag === "rule_replace_alt"  || t.tag === "rule_remove") {
       decls.push(t);
       return;
     }
@@ -1365,9 +1366,11 @@ function buildDeclAsCall(decl: ParseTree, fragExpr: any, paramMap: Map<string, a
 
   // Phase 6b decls have a different shape (ident name, ebnf body). Dispatch first.
   switch (decl.tag) {
-    case "rule_decl":       return buildRuleDecl(decl, fragExpr, paramMap);
-    case "expr_form_decl":  return buildFormDecl(decl, fragExpr, paramMap, "grammar_expr_form_add");
-    case "stmt_form_decl":  return buildFormDecl(decl, fragExpr, paramMap, "grammar_stmt_form_add");
+    case "rule_decl":         return buildRuleDecl(decl, fragExpr, paramMap);
+    case "rule_replace_alt":  return buildRuleReplaceAlt(decl, fragExpr, paramMap);
+    case "rule_remove":       return buildRuleRemove(decl, fragExpr);
+    case "expr_form_decl":    return buildFormDecl(decl, fragExpr, paramMap, "grammar_expr_form_add");
+    case "stmt_form_decl":    return buildFormDecl(decl, fragExpr, paramMap, "grammar_stmt_form_add");
   }
 
   // Phase 6 (and back-compat Phase 1) decls: op string + optional prec_spec.
@@ -1444,6 +1447,57 @@ function buildRuleDecl(decl: ParseTree, fragExpr: any, paramMap: Map<string, any
 
   return makeExpr(prim("grammar_rule_add"),
     [fragExpr, stringToBits(name), stringToBits(opName), ebnfObj, template]);
+}
+
+/**
+ * Build a `rule NAME[ALT] = body => template` declaration — replaces a
+ * specific alternative in the named production.
+ */
+function buildRuleReplaceAlt(decl: ParseTree, fragExpr: any, paramMap: Map<string, any>): any {
+  if (decl.kind !== "branch") throw new Error("buildRuleReplaceAlt: not a branch");
+  // Children include two ident branches: the rule name and the selector.
+  // They appear in order — name first, selector second.
+  const idents: ParseTree[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    if (t.tag === "ident") { idents.push(t); return; }
+    for (const c of t.children) walk(c);
+  };
+  for (const c of decl.children) walk(c);
+  if (idents.length < 2) throw new Error("rule_replace_alt: expected name and selector idents");
+  const ruleName = textOf(idents[0]);
+  const selector = textOf(idents[1]);
+
+  const ebnfTree = findTaggedBranch(decl.children, "ebnf_body");
+  if (!ebnfTree) throw new Error("rule_replace_alt: missing ebnf_body");
+  const ebnfObj = buildEbnf(ebnfTree);
+
+  const templateTree = findLastExprBranch(decl.children);
+  if (!templateTree) throw new Error("rule_replace_alt: missing template");
+  const template = buildExpr(templateTree, paramMap);
+
+  return makeExpr(prim("grammar_rule_replace_alt"),
+    [fragExpr, stringToBits(ruleName), stringToBits(selector), ebnfObj, template]);
+}
+
+/**
+ * Build a `rule NAME -= ALT` declaration — removes a specific alternative
+ * from the named production. No template.
+ */
+function buildRuleRemove(decl: ParseTree, fragExpr: any): any {
+  if (decl.kind !== "branch") throw new Error("buildRuleRemove: not a branch");
+  const idents: ParseTree[] = [];
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    if (t.tag === "ident") { idents.push(t); return; }
+    for (const c of t.children) walk(c);
+  };
+  for (const c of decl.children) walk(c);
+  if (idents.length < 2) throw new Error("rule_remove: expected name and selector idents");
+  const ruleName = textOf(idents[0]);
+  const selector = textOf(idents[1]);
+  return makeExpr(prim("grammar_rule_remove"),
+    [fragExpr, stringToBits(ruleName), stringToBits(selector)]);
 }
 
 /**

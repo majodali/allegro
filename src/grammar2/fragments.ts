@@ -677,6 +677,50 @@ function ebnfObjectToRule(v: Value, labels: string[]): Rule {
   throw new Error(`EBNF object: unknown kind '${kind}'`);
 }
 
+/**
+ * Remove the alternative with `attrs.name === selector` from the alt-list of
+ * production `name`. Errors if the production isn't an alt rule or no alt
+ * with the selector exists.
+ */
+function applyRemoveAlt(g: Grammar, name: string, selector: string): void {
+  const prod = g.productions.get(name);
+  if (!prod) throw new Error(`rule ${name} -= ${selector}: production '${name}' not found`);
+  if (prod.rule.kind !== "alt") {
+    throw new Error(`rule ${name} -= ${selector}: production '${name}' is not an alt`);
+  }
+  const opts = prod.rule.options;
+  const filtered = opts.filter(o => o.attrs?.name !== selector);
+  if (filtered.length === opts.length) {
+    throw new Error(`rule ${name} -= ${selector}: no alternative with name '${selector}' found`);
+  }
+  g.productions.set(name, { name, rule: alt(filtered) });
+}
+
+/**
+ * Replace the alternative tagged `selector` in production `name` with
+ * `replacement`. Errors if the production isn't an alt rule or no match.
+ */
+function applyReplaceAlt(g: Grammar, name: string, selector: string, replacement: Rule): void {
+  const prod = g.productions.get(name);
+  if (!prod) throw new Error(`rule ${name}[${selector}] = …: production '${name}' not found`);
+  if (prod.rule.kind !== "alt") {
+    throw new Error(`rule ${name}[${selector}] = …: production '${name}' is not an alt`);
+  }
+  const opts = prod.rule.options;
+  let replaced = false;
+  const newOpts = opts.map(o => {
+    if (o.attrs?.name === selector) {
+      replaced = true;
+      return replacement;
+    }
+    return o;
+  });
+  if (!replaced) {
+    throw new Error(`rule ${name}[${selector}] = …: no alternative with name '${selector}' found`);
+  }
+  g.productions.set(name, { name, rule: alt(newOpts) });
+}
+
 /** Interleave `ws_any` between items of a user EBNF sequence so whitespace
  *  between rule parts works transparently. */
 function interleaveWs(items: Rule[]): Rule[] {
@@ -733,17 +777,21 @@ function applyUserRulesAndForms(g: Grammar, fragments: GrammarFragment[]): void 
   for (let fi = 0; fi < fragments.length; fi++) {
     const frag = fragments[fi];
 
-    // User rules — become new productions (or append alts to existing).
+    // User rules — become new productions, append alts, replace specific
+    // alts (by name selector), or remove specific alts.
     for (const r of (frag.rules ?? [])) {
+      // The `remove` op has no body or builder.
+      if (r.op === "remove") {
+        applyRemoveAlt(g, r.name, r.selector!);
+        continue;
+      }
+
       const labels: string[] = [];
       const rule     = ebnfObjectToRule(r.rule as Value, labels);
       const builder  = r.builder;
       const tag      = builder
         ? registerUserOp({ kind: "rule", token: "", fn: builder, labels })
         : undefined;
-      // Wrap in a one-element seq so the user-op tag lives on the OUTER
-      // branch and the inner rule's tags (including any label wrappers)
-      // remain accessible as children in the parse tree.
       const taggedRule = tag ? seq([rule], { name: tag }) : rule;
 
       if (r.op === "append") {
@@ -756,6 +804,8 @@ function applyUserRulesAndForms(g: Grammar, fragments: GrammarFragment[]): void 
           ? [...oldRule.options, taggedRule]
           : [oldRule, taggedRule];
         g.productions.set(r.name, { name: r.name, rule: alt(newOpts) });
+      } else if (r.op === "replaceAlt") {
+        applyReplaceAlt(g, r.name, r.selector!, taggedRule);
       } else {
         // "add": replace if exists, otherwise create.
         g.productions.set(r.name, { name: r.name, rule: taggedRule });

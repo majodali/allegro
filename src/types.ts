@@ -296,12 +296,19 @@ export interface GrammarFragment {
   /** Multi-token statement-level forms: `stmt_form "for" x:ident … `. */
   stmtForms?: Array<{ rule: GrammarFragmentRule; fn: Value }>;
 
-  /** User-defined sub-rules (local nonterms that forms can reference). */
+  /** User-defined sub-rules (local nonterms that forms can reference).
+   *  `op` kinds:
+   *    - "add":        add a new production, or replace an existing one by name
+   *    - "append":     append an alternative to an existing alt-rule production
+   *    - "replaceAlt": replace a specific named alternative in the production
+   *    - "remove":     remove a specific named alternative
+   *  `selector` names the target alt for replaceAlt / remove. */
   rules?: Array<{
-    name:     string;
-    op:       "add" | "append";
-    rule:     GrammarFragmentRule;
-    builder?: Value;
+    name:      string;
+    op:        "add" | "append" | "replaceAlt" | "remove";
+    rule:      GrammarFragmentRule;
+    builder?:  Value;
+    selector?: string;
   }>;
 }
 

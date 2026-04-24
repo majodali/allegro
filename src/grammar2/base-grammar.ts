@@ -874,21 +874,36 @@ export function buildBaseGrammar(): Grammar {
   //
   // stmt_form_decl: same but for statement-level forms (`for x in xs: body`).
 
+  // rule_decl shapes:
+  //   rule NAME = body => template       (add / replace whole production)
+  //   rule NAME += body => template      (append alternative)
+  //   rule NAME[ALT] = body => template  (replace specific alternative — 7c)
+  //   rule NAME -= ALT                   (remove alternative — 7c, no template)
   addProduction(g, { name: "rule_decl",
-    rule: seq([
-      lit("rule"),
-      nonterm("ws_req"),
-      nonterm("ident"),
-      nonterm("ws"),
-      alt([
-        seq([lit("+="), nonterm("ws"), nonterm("ebnf_body")], { name: "rule_append" }),
-        seq([lit("="),  nonterm("ws"), nonterm("ebnf_body")], { name: "rule_replace_or_add" }),
-      ]),
-      nonterm("ws"),
-      lit("=>"),
-      nonterm("ws"),
-      nonterm("expr"),
-    ], { name: "rule_decl" }),
+    rule: alt([
+      // rule NAME -= ALT  (remove alternative, no template)
+      seq([
+        lit("rule"), nonterm("ws_req"), nonterm("ident"),
+        nonterm("ws"), lit("-="), nonterm("ws_req"), nonterm("ident"),
+      ], { name: "rule_remove" }),
+      // rule NAME[ALT] = body => template
+      seq([
+        lit("rule"), nonterm("ws_req"), nonterm("ident"),
+        nonterm("ws"), lit("["), nonterm("ws"), nonterm("ident"), nonterm("ws"), lit("]"),
+        nonterm("ws"), lit("="), nonterm("ws"), nonterm("ebnf_body"),
+        nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr"),
+      ], { name: "rule_replace_alt" }),
+      // rule NAME = body => template / rule NAME += body => template
+      seq([
+        lit("rule"), nonterm("ws_req"), nonterm("ident"),
+        nonterm("ws"),
+        alt([
+          seq([lit("+="), nonterm("ws"), nonterm("ebnf_body")], { name: "rule_append" }),
+          seq([lit("="),  nonterm("ws"), nonterm("ebnf_body")], { name: "rule_replace_or_add" }),
+        ]),
+        nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("expr"),
+      ], { name: "rule_decl" }),
+    ]),
   });
 
   addProduction(g, { name: "expr_form_decl",

@@ -4568,6 +4568,53 @@ test("Phase 7a: `new grammar { … }` has baseChain = [empty]", () => {
   eq(data.baseChain.join(","), "empty");
 });
 
+// --- Phase 7c: selector-based rule surgery ---
+
+test("Phase 7c: `rule foo -= alt` removes the named alternative", () => {
+  const src =
+    'x = grammar {\n' +
+    '  rule expr_add -= sub\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("x")!.value!)!.fragment;
+  const merged = g2getGrammarWithFragments([frag]);
+  const addProd = merged.productions.get("expr_add")!;
+  const addStr  = JSON.stringify(addProd);
+  // The `sub` alternative is gone; `add` still there.
+  eq(addStr.includes(`"name":"sub"`), false, "sub alt removed");
+  eq(addStr.includes(`"name":"add"`), true,  "add alt preserved");
+});
+
+test("Phase 7c: removing a non-existent alt errors", () => {
+  const src =
+    'x = grammar {\n' +
+    '  rule expr_add -= bogus\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("x")!.value!)!.fragment;
+  let threw = false;
+  let msg = "";
+  try { g2getGrammarWithFragments([frag]); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true);
+  eq(msg.includes("bogus"), true);
+});
+
+test("Phase 7c: `rule foo[alt] = body => template` replaces a specific alternative", () => {
+  const src =
+    'x = grammar {\n' +
+    '  rule expr_add[sub] = expr_add "-" expr_mul => (l, _, r) => l + r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("x")!.value!)!.fragment;
+  const merged = g2getGrammarWithFragments([frag]);
+  const addStr = JSON.stringify(merged.productions.get("expr_add")!);
+  // The old `sub`-named alt is replaced by a seq whose wrapper is tagged
+  // user_op_<N>_rule_ (from the template wrapper).
+  eq(addStr.includes(`"name":"sub"`), false, "old sub alt removed");
+  eq(addStr.includes("user_op_"), true, "new user_op alt present");
+});
+
 test("Phase 7a thread 8: two fragments with incompatible bases trigger E_INCOMPATIBLE_GRAMMARS", () => {
   const src1 = 'a = grammar { infix "**" at(mul) right => (l, r) => l + r }\n';
   const src2 = 'b = new grammar { infix "^^" at(add) left => (l, r) => l + r }\n';

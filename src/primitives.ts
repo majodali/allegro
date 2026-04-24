@@ -1440,6 +1440,41 @@ function notYet(name: string, step: string): AllegroError {
 const grammar_precedence_add_impl:     PrimitiveFnImpl = () => { throw notYet("grammar_precedence_add", "step 5"); };
 const grammar_rule_replace_impl:       PrimitiveFnImpl = () => { throw notYet("grammar_rule_replace",   "step 6c"); };
 const grammar_rule_append_impl:        PrimitiveFnImpl = () => { throw notYet("grammar_rule_append",    "step 6c"); };
+
+const grammar_rule_replace_alt_impl: PrimitiveFnImpl = (args, ctx) => {
+  if (args.length !== 5) throw new AllegroError(`grammar_rule_replace_alt: expected 5 args, got ${args.length}`);
+  const h        = asGrammarHandle(args[0], "grammar_rule_replace_alt");
+  const name     = bitsToString(asBits(args[1], "grammar_rule_replace_alt"));
+  const selector = bitsToString(asBits(args[2], "grammar_rule_replace_alt"));
+  const ruleObj  = args[3];
+  const builder  = ctx ? resolveFreeSymbols(args[4], ctx) : args[4];
+
+  if (!h.fragment.rules) h.fragment.rules = [];
+  h.fragment.rules.push({
+    name,
+    op: "replaceAlt" as any,
+    rule: ruleObj,
+    builder,
+    selector,
+  } as any);
+  return args[0];
+};
+
+const grammar_rule_remove_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 3) throw new AllegroError(`grammar_rule_remove: expected 3 args, got ${args.length}`);
+  const h        = asGrammarHandle(args[0], "grammar_rule_remove");
+  const name     = bitsToString(asBits(args[1], "grammar_rule_remove"));
+  const selector = bitsToString(asBits(args[2], "grammar_rule_remove"));
+
+  if (!h.fragment.rules) h.fragment.rules = [];
+  h.fragment.rules.push({
+    name,
+    op: "remove" as any,
+    rule: undefined as any,
+    selector,
+  } as any);
+  return args[0];
+};
 const grammar_combine_impl:            PrimitiveFnImpl = () => { throw notYet("combine",                "Phase 7");  };
 const grammar_override_impl:           PrimitiveFnImpl = () => { throw notYet("override",               "Phase 7");  };
 const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("without",                "Phase 7");  };
@@ -2256,6 +2291,8 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   grammar_rule_add:          makePrimitive("grammar_rule_add",          grammar_rule_add_impl),
   grammar_rule_replace:      makePrimitive("grammar_rule_replace",      grammar_rule_replace_impl),
   grammar_rule_append:       makePrimitive("grammar_rule_append",       grammar_rule_append_impl),
+  grammar_rule_replace_alt:  makePrimitive("grammar_rule_replace_alt",  grammar_rule_replace_alt_impl),
+  grammar_rule_remove:       makePrimitive("grammar_rule_remove",       grammar_rule_remove_impl),
   // Grammar combinators (accepted on the `use X` RHS whitelist).
   grammar_combine:           makePrimitive("grammar_combine",           grammar_combine_impl),
   grammar_override:          makePrimitive("grammar_override",          grammar_override_impl),
