@@ -1394,13 +1394,69 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
     }
   }
 
-  // Handle `use NAME` / `use import NAME` directives at the top of the file.
+  // Pre-scan the header for `use NAME`, `use import NAME`, and `use grammar
+  // { … }` directives. Module names are collected for lib/ loading; literal
+  // grammar blocks are evaluated in a bootstrap context now.
   const grammarNames: string[] = [];
-  for (const line of lines) {
-    const m = /^\s*use\s+(?:import\s+)?(\w+)\s*$/.exec(line);
-    if (m) grammarNames.push(m[1]);
-    else if (line.trim() !== "" && !line.trim().startsWith("//")) break;
+  const literalGrammarSources: string[] = [];
+  let headerEnd = 0;
+  {
+    let i = 0;
+    const n = source.length;
+    const skipWs = (p: number): number => {
+      while (p < n) {
+        const c = source[p];
+        if (c === " " || c === "\t" || c === "\n" || c === "\r") { p++; continue; }
+        if (source.slice(p, p + 2) === "//") {
+          while (p < n && source[p] !== "\n") p++; continue;
+        }
+        break;
+      }
+      return p;
+    };
+    const findCloseBrace = (p: number): number => {
+      let depth = 0;
+      while (p < n) {
+        const ch = source[p];
+        if (ch === '"' || ch === "'") {
+          const q = ch; p++;
+          while (p < n && source[p] !== q) { if (source[p] === "\\") p++; p++; }
+          p++; continue;
+        }
+        if (source.slice(p, p + 2) === "//") { while (p < n && source[p] !== "\n") p++; continue; }
+        if (ch === "{") depth++;
+        else if (ch === "}") { depth--; if (depth === 0) return p; }
+        p++;
+      }
+      return -1;
+    };
+
+    while (i < n) {
+      i = skipWs(i);
+      if (i >= n) break;
+      if (source.slice(i, i + 4) === "use " || source.slice(i, i + 4) === "use\t") {
+        let j = i + 4;
+        while (j < n && (source[j] === " " || source[j] === "\t")) j++;
+        // `use grammar {`
+        if (source.slice(j, j + 7) === "grammar" && (source[j + 7] === " " || source[j + 7] === "\t" || source[j + 7] === "{")) {
+          const brace = source.indexOf("{", j);
+          const end = findCloseBrace(brace);
+          if (end < 0) break;
+          literalGrammarSources.push(source.slice(j, end + 1));
+          i = end + 1;
+          while (i < n && (source[i] === " " || source[i] === "\t")) i++;
+          if (i < n && source[i] === "\n") i++;
+          continue;
+        }
+        // `use NAME` or `use import NAME`
+        const m = /^(?:import\s+)?(\w+)\s*(\r?\n|$)/.exec(source.slice(j));
+        if (m) { grammarNames.push(m[1]); i = j + m[0].length; continue; }
+      }
+      break;
+    }
+    headerEnd = i;
   }
+
   let grammarExts: Extension[] = [];
   if (grammarNames.length > 0) {
     const libDir = path.resolve("lib");
@@ -1415,15 +1471,21 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
           bindings[key] = b.value;
         }
       }
-      // Attach the Phase 1 fragment (if any). Phase 6 fragments live in
-      // Grammar-valued bindings and are picked up by evalSource directly —
-      // don't merge them here or we'll double-count and trigger
-      // E_OPERATOR_CONFLICT against ourselves.
       grammarExts.push({ name: id, bindings, grammarFragment: frag });
     }
   }
-  // Strip `use …` lines from source before evaluation.
-  const cleanSource = source.replace(/^\s*use\s+(?:import\s+)?\w+\s*$/gm, "");
+  // Evaluate inline literal `grammar { … }` blocks in a bootstrap context.
+  for (let idx = 0; idx < literalGrammarSources.length; idx++) {
+    const bootstrapResult = runtimeEval(literalGrammarSources[idx], undefined, [typeExt], undefined, true);
+    const gv = bootstrapResult.value;
+    if (!gv) throw new Error("use grammar { … }: no grammar value produced");
+    grammarExts.push({
+      name: `__inline_grammar_${idx}`,
+      bindings: { __inline_grammar: gv },
+    });
+  }
+  // Strip the header from the source before evaluation.
+  const cleanSource = source.slice(headerEnd);
 
   // Capture print output
   const printed: string[] = [];
@@ -3540,6 +3602,9 @@ fileTest(path.join(testsDir, "grammar-runtime.alg"));
 
 // Phase 6b multi-token demo — `match x with …` expression
 fileTest(path.join(testsDir, "match-demo.alg"));
+
+// Phase 7a thread 2: hosting-file grammar via `use grammar { … }`
+fileTest(path.join(testsDir, "inline-grammar-demo.alg"));
 
 // == Grammar 2 (Phase 1) — new formalism + engine ==
 //

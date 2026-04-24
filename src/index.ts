@@ -80,46 +80,140 @@ async function loadImportedModules(
 }
 
 /**
- * Pre-scan source for `use X` directives at the top of the file (Phase 6).
- * Accepted forms in step 8's whitelist:
- *   use NAME            — loads module NAME, applies its grammar
- *   use import NAME     — same; `import` is accepted but currently does the
- *                         same thing (module bindings always land in scope
- *                         as an extension; step 11+ may distinguish).
+ * Pre-scan source for `use X` directives at the top of the file. Returns
+ * the parsed directives plus the offset in `source` where the header ends
+ * (so callers can strip or slice cleanly).
+ *
+ * Accepted forms:
+ *   use NAME              — module reference; loads NAME.alg
+ *   use import NAME       — same; `import` accepted for symmetry with imports
+ *   use grammar { … }     — Phase 7a hosting-file literal: a grammar block
+ *                           evaluated at bootstrap time (primitives + type
+ *                           system only — file-local bindings resolve later
+ *                           at the template's normal eval time).
  * Each directive must appear before any non-`use`, non-comment, non-blank
- * line. Returns the list of grammar-extension module names to load first.
+ * line.
  */
-function scanUses(source: string): string[] {
-  const names: string[] = [];
-  const lines = source.split(/\r?\n/);
-  let inBlockComment = false;
-  for (const rawLine of lines) {
-    let line = rawLine;
-    if (inBlockComment) {
-      const end = line.indexOf("*/");
-      if (end >= 0) { line = line.slice(end + 2); inBlockComment = false; } else continue;
-    }
-    const bcStart = line.indexOf("/*");
-    if (bcStart >= 0) {
-      const bcEnd = line.indexOf("*/", bcStart + 2);
-      if (bcEnd >= 0) line = line.slice(0, bcStart) + line.slice(bcEnd + 2);
-      else { line = line.slice(0, bcStart); inBlockComment = true; }
-    }
-    const lcStart = line.indexOf("//");
-    if (lcStart >= 0) line = line.slice(0, lcStart);
-    const trimmed = line.trim();
-    if (trimmed === "") continue;
-    // Match `use NAME` or `use import NAME`.
-    const m = /^use\s+(?:import\s+)?(\w+)\s*$/.exec(trimmed);
-    if (m) { names.push(m[1]); continue; }
-    break;
-  }
-  return names;
+interface UseDirective {
+  kind: "module" | "literal";
+  /** For kind "module": the module name. */
+  name?:    string;
+  /** For kind "literal": the source of the `grammar { … }` expression. */
+  source?:  string;
+}
+interface UseScanResult {
+  directives: UseDirective[];
+  headerEnd:  number;   // byte offset in `source` where the header stops
 }
 
-/** Strip `use …` directive lines from source before the main parse. */
-function stripUses(source: string): string {
-  return source.replace(/^\s*use\s+(?:import\s+)?\w+\s*$/gm, "");
+function scanUses(source: string): UseScanResult {
+  const directives: UseDirective[] = [];
+  let i = 0;
+  const n = source.length;
+
+  while (i < n) {
+    // Skip blanks / whitespace / comments.
+    const wsEnd = skipWsComments(source, i);
+    if (wsEnd >= n) { i = wsEnd; break; }
+
+    // `use` keyword?
+    if (source.slice(wsEnd, wsEnd + 4) === "use " || source.slice(wsEnd, wsEnd + 4) === "use\t") {
+      const afterUse = skipHSpaces(source, wsEnd + 4);
+
+      // `use import NAME` or `use NAME`
+      const identMatch = /^(?:import\s+)?(\w+)\s*(\r?\n|$)/.exec(source.slice(afterUse));
+      // `use grammar { … }` — inline literal; brace-count to find end.
+      if (source.slice(afterUse, afterUse + 8) === "grammar " ||
+          source.slice(afterUse, afterUse + 8) === "grammar\t" ||
+          source.slice(afterUse, afterUse + 8) === "grammar{") {
+        const braceStart = source.indexOf("{", afterUse);
+        if (braceStart < 0) break;
+        const braceEnd = findMatchingBrace(source, braceStart);
+        if (braceEnd < 0) break;
+        const body = source.slice(afterUse, braceEnd + 1);
+        directives.push({ kind: "literal", source: body });
+        // Advance past the end of the block + following newline.
+        i = braceEnd + 1;
+        while (i < n && (source[i] === " " || source[i] === "\t")) i++;
+        if (i < n && source[i] === "\n") i++;
+        continue;
+      }
+      if (identMatch) {
+        directives.push({ kind: "module", name: identMatch[1] });
+        i = afterUse + identMatch[0].length;
+        continue;
+      }
+      // `use …` with unrecognised form — stop header scan.
+      break;
+    }
+    break;
+  }
+  return { directives, headerEnd: i };
+}
+
+/** Advance past whitespace, line comments, and block comments. */
+function skipWsComments(src: string, from: number): number {
+  let i = from;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === " " || c === "\t" || c === "\n" || c === "\r") { i++; continue; }
+    if (src.slice(i, i + 2) === "//") {
+      while (i < src.length && src[i] !== "\n") i++;
+      continue;
+    }
+    if (src.slice(i, i + 2) === "/*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end < 0 ? src.length : end + 2;
+      continue;
+    }
+    break;
+  }
+  return i;
+}
+
+function skipHSpaces(src: string, from: number): number {
+  let i = from;
+  while (i < src.length && (src[i] === " " || src[i] === "\t")) i++;
+  return i;
+}
+
+/**
+ * Find the matching close-brace for the open-brace at the given start
+ * position, accounting for nested braces but NOT for braces inside
+ * strings or comments (best-effort, good enough for typical grammar-block
+ * contents).
+ */
+function findMatchingBrace(src: string, start: number): number {
+  let depth = 0;
+  let i = start;
+  let inString = false;
+  let stringQuote = "";
+  while (i < src.length) {
+    const c = src[i];
+    if (inString) {
+      if (c === "\\") { i += 2; continue; }
+      if (c === stringQuote) { inString = false; i++; continue; }
+      i++;
+      continue;
+    }
+    if (c === '"' || c === "'") { inString = true; stringQuote = c; i++; continue; }
+    if (src.slice(i, i + 2) === "//") {
+      while (i < src.length && src[i] !== "\n") i++;
+      continue;
+    }
+    if (src.slice(i, i + 2) === "/*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end < 0 ? src.length : end + 2;
+      continue;
+    }
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return i;
+    }
+    i++;
+  }
+  return -1;
 }
 
 /**
@@ -187,15 +281,45 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
 
     // 1. Pre-scan for `use …` directives and load those modules FIRST so
     //    their grammar extensions are available when we parse the main file.
-    const grammarNames = scanUses(source);
-    if (grammarNames.length > 0) {
-      const grammarExts = await loadGrammarModules(grammarNames, sourceDir, extensions);
+    const { directives, headerEnd } = scanUses(source);
+
+    // Load module references.
+    const moduleNames = directives.filter(d => d.kind === "module").map(d => d.name!);
+    if (moduleNames.length > 0) {
+      const grammarExts = await loadGrammarModules(moduleNames, sourceDir, extensions);
       extensions = [...extensions, ...grammarExts];
     }
 
-    // 2. Strip `use …` lines from source before parsing (they're directives,
-    //    not statements the parser should try to understand).
-    const cleanSource = stripUses(source);
+    // Evaluate inline `use grammar { … }` literals in a bootstrap context
+    // (just primitives + the type system). The resulting Grammar values are
+    // added as fragments without a module wrapper; templates inside can
+    // reference file-local bindings — those resolve at normal eval time.
+    const literalExts: Extension[] = [];
+    for (let idx = 0; idx < directives.length; idx++) {
+      const d = directives[idx];
+      if (d.kind !== "literal") continue;
+      const result = evalSource(d.source!, undefined, [...getStdExtensions()], undefined, true);
+      // The bootstrap source is a single bare-expression `grammar { … }` — so
+      // `result.value` is the produced Grammar value. (Bare-expression
+      // evaluation stashes the last value into `value`.)
+      const gv = result.value;
+      if (!gv) {
+        throw new Error(`use grammar { … }: evaluation produced no Grammar value`);
+      }
+      const data = asGrammarValue(gv);
+      if (!data) {
+        throw new Error(`use grammar { … }: evaluation produced a non-Grammar value`);
+      }
+      literalExts.push({
+        name: `__inline_grammar_${idx}`,
+        bindings: { __inline_grammar: gv },
+      });
+    }
+    extensions = [...extensions, ...literalExts];
+
+    // 2. Strip the header (all `use …` directives — both module and literal
+    //    forms) from the source before the main parse.
+    const cleanSource = source.slice(headerEnd);
 
     // Standard mode: parse first to discover imports, then load on demand.
     const normalized = cleanSource.replace(/\r\n/g, "\n");
