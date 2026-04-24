@@ -1398,6 +1398,7 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
   // { … }` directives. Module names are collected for lib/ loading; literal
   // grammar blocks are evaluated in a bootstrap context now.
   const grammarNames: string[] = [];
+  const memberRefs: Array<{ module: string; member: string }> = [];
   const literalGrammarSources: string[] = [];
   let headerEnd = 0;
   {
@@ -1448,6 +1449,13 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
           if (i < n && source[i] === "\n") i++;
           continue;
         }
+        // `use NAME.MEMBER` — Phase 7d dotted form; narrow to that Grammar.
+        const dotMatch = /^(?:import\s+)?(\w+)\.(\w+)\s*(\r?\n|$)/.exec(source.slice(j));
+        if (dotMatch) {
+          grammarNames.push(dotMatch[1]);
+          memberRefs.push({ module: dotMatch[1], member: dotMatch[2] });
+          i = j + dotMatch[0].length; continue;
+        }
         // `use NAME` or `use import NAME`
         const m = /^(?:import\s+)?(\w+)\s*(\r?\n|$)/.exec(source.slice(j));
         if (m) { grammarNames.push(m[1]); i = j + m[0].length; continue; }
@@ -1458,9 +1466,10 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
   }
 
   let grammarExts: Extension[] = [];
-  if (grammarNames.length > 0) {
+  const uniqModuleNames = [...new Set(grammarNames)];
+  if (uniqModuleNames.length > 0) {
     const libDir = path.resolve("lib");
-    for (const id of grammarNames) {
+    for (const id of uniqModuleNames) {
       const modPath = path.join(libDir, `${id}.alg`);
       const modSource = fs.readFileSync(modPath, "utf-8");
       const modResult = runtimeEval(modSource, undefined, [typeExt], undefined, true);
@@ -1469,6 +1478,17 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
       for (const [key, b] of modResult.evalCtx.bindings) {
         if (b.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
           bindings[key] = b.value;
+        }
+      }
+      // `use NAME.MEMBER` — narrow to the named Grammar binding(s).
+      const mems = memberRefs.filter(m => m.module === id);
+      if (mems.length > 0) {
+        const allowed = new Set(mems.map(m => m.member));
+        for (const key of Object.keys(bindings)) {
+          const v = bindings[key];
+          if (asGrammarValue(v) && !allowed.has(key)) {
+            delete bindings[key];
+          }
         }
       }
       grammarExts.push({ name: id, bindings, grammarFragment: frag });
@@ -3609,6 +3629,9 @@ fileTest(path.join(testsDir, "inline-grammar-demo.alg"));
 // Phase 7b thread 5: hygienic template substitution — consumer can't hijack
 // a module's grammar template by rebinding a referenced name.
 fileTest(path.join(testsDir, "hygiene-demo.alg"));
+
+// Phase 7d: `use NAME.MEMBER` — select specific Grammar binding from a module.
+fileTest(path.join(testsDir, "dotted-use-demo.alg"));
 
 // == Grammar 2 (Phase 1) — new formalism + engine ==
 //

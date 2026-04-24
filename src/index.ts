@@ -13,7 +13,7 @@ import * as path from "path";
 import * as readline from "readline";
 import { formatValue, asGrammarValue } from "./primitives.js";
 import { evalSource, Extension } from "./runtime.js";
-import { ContextValue, GrammarFragment } from "./types.js";
+import { ContextValue, GrammarFragment, Value } from "./types.js";
 import { createTypeSystem } from "./types-std.js";
 import { ModuleLoader } from "./modules.js";
 import { createFutureManager, FutureManager } from "./futures.js";
@@ -95,9 +95,13 @@ async function loadImportedModules(
  * line.
  */
 interface UseDirective {
-  kind: "module" | "literal";
+  kind: "module" | "literal" | "member";
   /** For kind "module": the module name. */
   name?:    string;
+  /** For kind "member": the module name. */
+  moduleName?: string;
+  /** For kind "member": the binding name inside the module (Phase 7d). */
+  memberName?: string;
   /** For kind "literal": the source of the `grammar { … }` expression. */
   source?:  string;
 }
@@ -120,8 +124,6 @@ function scanUses(source: string): UseScanResult {
     if (source.slice(wsEnd, wsEnd + 4) === "use " || source.slice(wsEnd, wsEnd + 4) === "use\t") {
       const afterUse = skipHSpaces(source, wsEnd + 4);
 
-      // `use import NAME` or `use NAME`
-      const identMatch = /^(?:import\s+)?(\w+)\s*(\r?\n|$)/.exec(source.slice(afterUse));
       // `use grammar { … }` — inline literal; brace-count to find end.
       if (source.slice(afterUse, afterUse + 8) === "grammar " ||
           source.slice(afterUse, afterUse + 8) === "grammar\t" ||
@@ -132,12 +134,27 @@ function scanUses(source: string): UseScanResult {
         if (braceEnd < 0) break;
         const body = source.slice(afterUse, braceEnd + 1);
         directives.push({ kind: "literal", source: body });
-        // Advance past the end of the block + following newline.
         i = braceEnd + 1;
         while (i < n && (source[i] === " " || source[i] === "\t")) i++;
         if (i < n && source[i] === "\n") i++;
         continue;
       }
+      // Module reference with optional dot-access (Phase 7d):
+      //   use NAME              — whole module
+      //   use import NAME       — same, with explicit import keyword
+      //   use NAME.MEMBER       — specific Grammar binding in module NAME
+      //   use import NAME.MEMBER — same, explicit
+      const memberMatch = /^(?:import\s+)?(\w+)\.(\w+)\s*(\r?\n|$)/.exec(source.slice(afterUse));
+      if (memberMatch) {
+        directives.push({
+          kind: "member",
+          moduleName: memberMatch[1],
+          memberName: memberMatch[2],
+        });
+        i = afterUse + memberMatch[0].length;
+        continue;
+      }
+      const identMatch = /^(?:import\s+)?(\w+)\s*(\r?\n|$)/.exec(source.slice(afterUse));
       if (identMatch) {
         directives.push({ kind: "module", name: identMatch[1] });
         i = afterUse + identMatch[0].length;
@@ -283,11 +300,50 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
     //    their grammar extensions are available when we parse the main file.
     const { directives, headerEnd } = scanUses(source);
 
-    // Load module references.
+    // Load module references. `use NAME` grabs the whole module's fragments;
+    // `use NAME.MEMBER` selects only the named Grammar binding so unrelated
+    // grammar values in the module don't bleed in.
     const moduleNames = directives.filter(d => d.kind === "module").map(d => d.name!);
-    if (moduleNames.length > 0) {
-      const grammarExts = await loadGrammarModules(moduleNames, sourceDir, extensions);
-      extensions = [...extensions, ...grammarExts];
+    const memberRefs  = directives
+      .filter(d => d.kind === "member")
+      .map(d => ({ module: d.moduleName!, member: d.memberName! }));
+    const allModuleNames = [...new Set([...moduleNames, ...memberRefs.map(m => m.module)])];
+    if (allModuleNames.length > 0) {
+      const grammarExts = await loadGrammarModules(allModuleNames, sourceDir, extensions);
+      // For whole-module `use`s, include the extension as-is.
+      // For member `use`s, include only a filtered extension exposing just
+      // the named binding — prevents sibling Grammar values from joining.
+      const filtered: Extension[] = [];
+      for (const ext of grammarExts) {
+        const mems = memberRefs.filter(m => m.module === ext.name);
+        if (moduleNames.includes(ext.name) && mems.length === 0) {
+          filtered.push(ext);
+          continue;
+        }
+        if (mems.length > 0) {
+          const narrowedBindings: Record<string, Value> = { ...ext.bindings };
+          for (const m of mems) {
+            const v = ext.bindings[m.member];
+            if (!v) throw new Error(`use ${m.module}.${m.member}: binding not found`);
+            if (!asGrammarValue(v)) {
+              throw new Error(`use ${m.module}.${m.member}: binding is not a Grammar value`);
+            }
+          }
+          // Keep all bindings (so templates can still resolve sibling symbols
+          // hygienically) but mark which Grammar binding(s) are active via a
+          // synthetic whitelist — collectFragments only picks up Grammar
+          // values whose key matches.
+          const allowed = new Set(mems.map(m => m.member));
+          for (const key of Object.keys(narrowedBindings)) {
+            const b = narrowedBindings[key];
+            if (asGrammarValue(b) && !allowed.has(key)) {
+              delete narrowedBindings[key];
+            }
+          }
+          filtered.push({ ...ext, bindings: narrowedBindings });
+        }
+      }
+      extensions = [...extensions, ...filtered];
     }
 
     // Evaluate inline `use grammar { … }` literals in a bootstrap context
