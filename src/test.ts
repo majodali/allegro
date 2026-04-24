@@ -4479,6 +4479,44 @@ test("Phase 6 step 7: non-cyclic constraints between two user levels are fine", 
   eq(merged.productions.has("expr_b"), true);
 });
 
+// --- Phase 7a thread 1: `new grammar` + `extends X` ---
+
+test("Phase 7a: `grammar { … }` defaults to baseChain = [allegro]", () => {
+  const src = 'x = grammar { infix "**" at(mul) right => (l, r) => l + r }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  eq(data.baseChain.join(","), "allegro");
+});
+
+test("Phase 7a: `new grammar { … }` has baseChain = [empty]", () => {
+  const src = 'x = new grammar { infix "**" at(mul) right => (l, r) => l + r }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const data = asGrammarValue(evalCtx.bindings.get("x")!.value!);
+  eq(data !== undefined, true);
+  if (!data) return;
+  eq(data.baseChain.join(","), "empty");
+});
+
+test("Phase 7a: `grammar extends X { … }` chains onto X's baseChain", () => {
+  const src =
+    'base_g = grammar { infix "**" at(mul) right => (l, r) => l + r }\n' +
+    'derived = grammar extends base_g { infix "^^" at(add) left => (l, r) => l * r }\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const baseG    = asGrammarValue(evalCtx.bindings.get("base_g")!.value!);
+  const derived  = asGrammarValue(evalCtx.bindings.get("derived")!.value!);
+  eq(baseG !== undefined, true);
+  eq(derived !== undefined, true);
+  if (!baseG || !derived) return;
+  eq(baseG.baseChain.join(","), "allegro", "base chain is allegro");
+  eq(derived.baseChain.join(","), "allegro", "derived inherits base_g's chain");
+  // Derived cumulatively contains both operators.
+  eq(derived.fragment.infix.length, 2, "derived has both infix ops");
+  const tokens = derived.fragment.infix.map(i => i.token).sort();
+  eq(tokens.join(","), "**,^^");
+});
+
 test("Phase 6: tree-builder lowers grammar block to finalize(add(new))", () => {
   const g = buildBaseGrammar();
   const result = g2parse(g, 'x = grammar { infix "**" at(mul) right => (l, r) => l + r }\n');

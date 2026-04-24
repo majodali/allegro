@@ -719,17 +719,29 @@ export function buildBaseGrammar(): Grammar {
   // 6 adds `rule NAME = …` and the `expr_form` / `stmt_form` multi-token
   // shapes with the EBNF mini-grammar.
 
-  // grammar_expr = "grammar" ws "{" ws_any grammar_body ws_any "}"
+  // grammar_expr accepts three shapes:
+  //   grammar { … }                 — default extends allegro
+  //   new grammar { … }             — fresh, no base (extends empty)
+  //   grammar extends X { … }       — explicit base (X is an ident)
   addProduction(g, { name: "grammar_expr",
-    rule: seq([
-      lit("grammar"),
-      nonterm("ws"),
-      lit("{"),
-      nonterm("ws_any"),
-      nonterm("grammar_body"),
-      nonterm("ws_any"),
-      lit("}"),
-    ], { name: "grammar_expr" }),
+    rule: alt([
+      seq([
+        lit("new"), nonterm("ws_req"), lit("grammar"),
+        nonterm("ws"), lit("{"), nonterm("ws_any"),
+        nonterm("grammar_body"), nonterm("ws_any"), lit("}"),
+      ], { name: "grammar_expr_new" }),
+      seq([
+        lit("grammar"), nonterm("ws_req"), lit("extends"), nonterm("ws_req"),
+        nonterm("ident"),
+        nonterm("ws"), lit("{"), nonterm("ws_any"),
+        nonterm("grammar_body"), nonterm("ws_any"), lit("}"),
+      ], { name: "grammar_expr_extends" }),
+      seq([
+        lit("grammar"),
+        nonterm("ws"), lit("{"), nonterm("ws_any"),
+        nonterm("grammar_body"), nonterm("ws_any"), lit("}"),
+      ], { name: "grammar_expr" }),
+    ]),
   });
 
   // grammar_body = (ws_any grammar_decl)*

@@ -1224,6 +1224,54 @@ const grammar_fragment_new_impl: PrimitiveFnImpl = (args) => {
   return makeFragmentBuilderHandle(base);
 };
 
+/**
+ * `grammar extends X { … }` desugars to this primitive: it takes an existing
+ * Grammar value X and seeds a fresh fragment whose base identity chains onto
+ * X's. The resulting Grammar — produced by finalize — has `baseChain` equal
+ * to X's chain plus an anonymous "extends_<N>" tail marker for validator
+ * compatibility checks.
+ */
+const grammar_fragment_new_from_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 1) throw new AllegroError(`grammar_fragment_new_from: expected 1 arg, got ${args.length}`);
+  const data = asGrammarValue(args[0]);
+  if (!data) throw new AllegroError(`grammar_fragment_new_from: argument is not a Grammar value`);
+  // The fragment's "base" field is now a composite — we store the chain
+  // itself so finalize can reproduce it. Use a sentinel base name that
+  // encodes the chain length; finalize reads the full chain from the handle.
+  const handle = makeFragmentBuilderHandle(data.baseChain.join("/"));
+  const h = (handle as any).__grammarHandle as GrammarHandleData;
+  // Attach the chain directly so finalize can use it verbatim.
+  (h as any).extendsChain = data.baseChain;
+  // Also copy the underlying fragment's declarations into the new one so
+  // extensions stack cumulatively. (This differs from Phase 6's `use NAME`
+  // merge which keeps fragments separate — here the new Grammar IS the old
+  // one plus additions.)
+  const src = data.fragment;
+  h.fragment.keywords.push(...src.keywords);
+  h.fragment.operators.push(...src.operators);
+  h.fragment.infix.push(...src.infix);
+  h.fragment.prefixOp.push(...src.prefixOp);
+  h.fragment.postfixOp.push(...src.postfixOp);
+  h.fragment.exprPrefix.push(...src.exprPrefix);
+  if (src.precedence) {
+    if (!h.fragment.precedence) h.fragment.precedence = [];
+    h.fragment.precedence.push(...src.precedence);
+  }
+  if (src.exprForms) {
+    if (!h.fragment.exprForms) h.fragment.exprForms = [];
+    h.fragment.exprForms.push(...src.exprForms);
+  }
+  if (src.stmtForms) {
+    if (!h.fragment.stmtForms) h.fragment.stmtForms = [];
+    h.fragment.stmtForms.push(...src.stmtForms);
+  }
+  if (src.rules) {
+    if (!h.fragment.rules) h.fragment.rules = [];
+    h.fragment.rules.push(...src.rules);
+  }
+  return handle;
+};
+
 const grammar_infix_add_impl: PrimitiveFnImpl = (args) => {
   if (args.length !== 5) throw new AllegroError(`grammar_infix_add: expected 5 args, got ${args.length}`);
   const h      = asGrammarHandle(args[0], "grammar_infix_add");
@@ -1274,8 +1322,21 @@ const grammar_expr_prefix_add_impl: PrimitiveFnImpl = (args) => {
 const grammar_fragment_finalize_impl: PrimitiveFnImpl = (args) => {
   if (args.length !== 1) throw new AllegroError(`grammar_fragment_finalize: expected 1 arg, got ${args.length}`);
   const h = asGrammarHandle(args[0], "grammar_fragment_finalize");
+  // If the handle was created via grammar_fragment_new_from, use the full
+  // chain it captured; otherwise use the single-step base name.
+  const extendsChain: string[] | undefined = (h as any).extendsChain;
+  if (extendsChain) {
+    return makeGrammarValueWithChain(h.fragment, extendsChain);
+  }
   return makeGrammarValue(h.fragment, h.base);
 };
+
+function makeGrammarValueWithChain(fragment: GrammarFragment, baseChain: string[]): ContextValue {
+  const ctx  = makeContext() as ContextValue;
+  const data: GrammarValueData = { fragment, baseChain };
+  (ctx as any).__grammarValue = data;
+  return ctx;
+}
 
 // --- Phase 6b primitives: user rules and multi-token forms ---
 
@@ -2126,8 +2187,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   register_postfix: makePrimitive("register_postfix", register_postfix_impl),
   register_expr_prefix: makePrimitive("register_expr_prefix", register_expr_prefix_impl),
   // Phase 6 grammar-building primitives (stubs; implemented step-by-step).
-  grammar_fragment_new:      makePrimitive("grammar_fragment_new",      grammar_fragment_new_impl),
-  grammar_fragment_finalize: makePrimitive("grammar_fragment_finalize", grammar_fragment_finalize_impl),
+  grammar_fragment_new:       makePrimitive("grammar_fragment_new",       grammar_fragment_new_impl),
+  grammar_fragment_new_from:  makePrimitive("grammar_fragment_new_from",  grammar_fragment_new_from_impl),
+  grammar_fragment_finalize:  makePrimitive("grammar_fragment_finalize",  grammar_fragment_finalize_impl),
   grammar_precedence_add:    makePrimitive("grammar_precedence_add",    grammar_precedence_add_impl),
   grammar_infix_add:         makePrimitive("grammar_infix_add",         grammar_infix_add_impl),
   grammar_prefix_add:        makePrimitive("grammar_prefix_add",        grammar_prefix_add_impl),

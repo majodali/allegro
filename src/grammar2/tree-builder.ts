@@ -180,6 +180,8 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       return buildBlockExpr(tree, paramMap);
 
     case "grammar_expr":
+    case "grammar_expr_new":
+    case "grammar_expr_extends":
       return buildGrammarExpr(tree, paramMap);
 
     case "number": {
@@ -927,7 +929,9 @@ const BUILTIN_EXPRESSION_TAGS = new Set([
   "array_lit","object_lit",
   "instanceof","subtypeof","of","of_error","error_expr",
   "when_expr","block_expr","pipe",
-  "grammar_expr",          // Phase 6 — `grammar { … }` block evaluates to a Grammar.
+  "grammar_expr",           // Phase 6 — `grammar { … }` block (default base)
+  "grammar_expr_new",       // Phase 7 — `new grammar { … }` (base = empty)
+  "grammar_expr_extends",   // Phase 7 — `grammar extends X { … }` (explicit base)
 ]);
 
 // Used like a Set but also matches user-op tags issued at runtime by
@@ -1309,9 +1313,12 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
 // primitive implementations (step 4) and merger (step 5+) fill in behaviour.
 
 function buildGrammarExpr(tree: ParseTree, paramMap: Map<string, any>): any {
-  if (tree.kind !== "branch" || tree.tag !== "grammar_expr") {
-    throw new Error(`buildGrammarExpr: not a grammar_expr tree`);
+  if (tree.kind !== "branch") throw new Error(`buildGrammarExpr: not a branch`);
+  const tag = tree.tag;
+  if (tag !== "grammar_expr" && tag !== "grammar_expr_new" && tag !== "grammar_expr_extends") {
+    throw new Error(`buildGrammarExpr: unexpected tag '${tag}'`);
   }
+
   // Collect all decl branches (rep + ws may wrap them).
   const decls: ParseTree[] = [];
   const walk = (t: ParseTree): void => {
@@ -1327,9 +1334,25 @@ function buildGrammarExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   };
   for (const c of tree.children) walk(c);
 
-  // Default base is "allegro". `new grammar { … }` and `extends X` arrive in
-  // a later step; for now every grammar block extends Allegro.
-  let expr: any = makeExpr(prim("grammar_fragment_new"), [stringToBits("allegro")]);
+  // Base selection:
+  //   grammar { … }                 → grammar_fragment_new("allegro")
+  //   new grammar { … }             → grammar_fragment_new("empty")
+  //   grammar extends X { … }       → grammar_fragment_new_from(X)
+  //                                   (X evaluates at parse-eval time to a
+  //                                    Grammar value whose baseChain seeds the
+  //                                    new fragment's chain)
+  let expr: any;
+  if (tag === "grammar_expr_new") {
+    expr = makeExpr(prim("grammar_fragment_new"), [stringToBits("empty")]);
+  } else if (tag === "grammar_expr_extends") {
+    // Find the ident child that names the base grammar.
+    const identTree = findTaggedBranch(tree.children, "ident");
+    if (!identTree) throw new Error("grammar extends: missing ident");
+    const baseSym = makeSymbol(textOf(identTree));
+    expr = makeExpr(prim("grammar_fragment_new_from"), [baseSym]);
+  } else {
+    expr = makeExpr(prim("grammar_fragment_new"), [stringToBits("allegro")]);
+  }
   for (const decl of decls) {
     expr = buildDeclAsCall(decl, expr, paramMap);
   }
