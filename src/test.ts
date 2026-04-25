@@ -3633,6 +3633,95 @@ fileTest(path.join(testsDir, "hygiene-demo.alg"));
 // Phase 7d: `use NAME.MEMBER` — select specific Grammar binding from a module.
 fileTest(path.join(testsDir, "dotted-use-demo.alg"));
 
+// Phase B: refinement propagation through arithmetic.
+fileTest(path.join(testsDir, "refinement-propagation-demo.alg"));
+
+// Phase B: subtyping via abstract domains (no runtime predicate evaluation).
+fileTest(path.join(testsDir, "refinement-subtype-demo.alg"));
+
+// Phase B: lib/math.alg pilot — `double_pos` discharges its PositiveInt
+// return type via abstract-domain implication.
+fileTest(path.join(testsDir, "math-pilot-demo.alg"));
+
+// --- Phase B: abstract-domain unit tests ---
+
+import {
+  domainFromPredicate, propagateAdd, propagateSub, propagateMul,
+  intersectDomains, joinDomains, impliesDomain, counterexampleFor,
+  formatDomain,
+} from "./refinements.js";
+
+test("Phase B: propagateAdd of two intervals", () => {
+  const d = propagateAdd(
+    { kind: "interval", lo: 1, hi: 5 },
+    { kind: "interval", lo: 2, hi: 3 },
+  );
+  eq(d.kind, "interval");
+  if (d.kind === "interval") {
+    eq(d.lo, 3);
+    eq(d.hi, 8);
+  }
+});
+
+test("Phase B: propagateMul handles negative ranges", () => {
+  const d = propagateMul(
+    { kind: "interval", lo: -2, hi: 3 },
+    { kind: "interval", lo: -1, hi: 4 },
+  );
+  // Possible products: (-2)(-1)=2, (-2)(4)=-8, (3)(-1)=-3, (3)(4)=12 → [-8, 12]
+  eq(d.kind, "interval");
+  if (d.kind === "interval") {
+    eq(d.lo, -8);
+    eq(d.hi, 12);
+  }
+});
+
+test("Phase B: intersectDomains tightens", () => {
+  const d = intersectDomains(
+    { kind: "interval", lo: 0, hi: 10 },
+    { kind: "interval", lo: 3, hi: 100 },
+  );
+  eq(d.kind, "interval");
+  if (d.kind === "interval") { eq(d.lo, 3); eq(d.hi, 10); }
+});
+
+test("Phase B: joinDomains widens", () => {
+  const d = joinDomains(
+    { kind: "interval", lo: 0, hi: 10 },
+    { kind: "interval", lo: 3, hi: 100 },
+  );
+  eq(d.kind, "interval");
+  if (d.kind === "interval") { eq(d.lo, 0); eq(d.hi, 100); }
+});
+
+test("Phase B: impliesDomain — tighter implies looser", () => {
+  eq(impliesDomain(
+    { kind: "interval", lo: 5, hi: 10 },
+    { kind: "interval", lo: 1, hi: +Infinity },
+  ), true);
+  eq(impliesDomain(
+    { kind: "interval", lo: -1, hi: 5 },
+    { kind: "interval", lo: 1, hi: +Infinity },
+  ), false);
+});
+
+test("Phase B: counterexampleFor surfaces a violating value", () => {
+  const cex = counterexampleFor(
+    { kind: "interval", lo: -5, hi: 10 },        // actual
+    { kind: "interval", lo: 1, hi: +Infinity },   // expected (positive)
+  );
+  // -5 is in actual but violates expected.
+  eq(cex !== null && cex < 1, true, `expected a counterexample, got ${cex}`);
+});
+
+test("Phase B: formatDomain renders human-readable strings", () => {
+  eq(formatDomain({ kind: "interval", lo: 1, hi: +Infinity }), "≥ 1");
+  eq(formatDomain({ kind: "interval", lo: -Infinity, hi: 99 }), "≤ 99");
+  eq(formatDomain({ kind: "interval", lo: 1, hi: 10 }), "∈ [1, 10]");
+  eq(formatDomain({ kind: "eq", value: 7 }), "== 7");
+  eq(formatDomain({ kind: "ne", value: 0 }), "≠ 0");
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

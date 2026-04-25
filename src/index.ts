@@ -521,6 +521,26 @@ async function runInspect(filename: string, isStandard: boolean): Promise<void> 
   }
   const cleanSource = source.slice(headerEnd);
 
+  // Discover and load `import …` modules first so the inspected file's
+  // references resolve cleanly. Mirror the runFile flow but skip evaluation
+  // of program prints.
+  if (isStandard) {
+    const { parse: g2parse } = await import("./grammar2/engine.js");
+    const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
+    const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
+    const { buildProgram } = await import("./grammar2/tree-builder.js");
+    const g2Fragments = collectFragments(extensions);
+    const grammar = g2Fragments.length > 0 ? getGrammarWithFragments(g2Fragments) : getBaseGrammar();
+    const result0 = g2parse(grammar, cleanSource.replace(/\r\n/g, "\n"));
+    if (result0.ok) {
+      const fileCtx: any = buildProgram(result0.tree);
+      if (fileCtx) {
+        const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);
+        extensions = [...extensions, ...moduleExts];
+      }
+    }
+  }
+
   // Swallow print output during inspect — we want the summary, not program I/O.
   const origLog = console.log;
   const suppress: string[] = [];

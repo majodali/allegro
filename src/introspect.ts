@@ -18,6 +18,7 @@ import {
 } from "./types.js";
 import type { CompilationReport } from "./runtime.js";
 import { getTypeName } from "./types-std.js";
+import { domainOf, formatDomain, AbstractDomain } from "./refinements.js";
 
 // =============================================================================
 // Summary shapes
@@ -41,6 +42,8 @@ export interface ValueSummary {
   primitives:    string[];
   /** Human-readable short description for log / UI display. */
   shortDescription: string;
+  /** Abstract domain (Phase B refinement propagation) if any. */
+  domain:        AbstractDomain | null;
 }
 
 /** Safety classification for a compiled module or binding.
@@ -125,6 +128,17 @@ export function summarizeValue(v: Value): ValueSummary {
 
   const kindAtPrimary = primaryOf(v).kind;
   const typeName = getTypeName(v);
+  // Pull abstract domain from the value itself, or — for refined values that
+  // didn't go through __construct (e.g. the refined type's own definition)
+  // — from the refined type Context's stored __abstractDomain.
+  let dom = domainOf(v);
+  if (!dom && v.kind === ValueKind.MultiValue) {
+    const typeComp = v.components.get("type");
+    if (typeComp?.kind === ValueKind.Context) {
+      const fromType = (typeComp as any).__abstractDomain;
+      if (fromType && fromType.kind) dom = fromType;
+    }
+  }
 
   return {
     kind:             kindAtPrimary,
@@ -135,6 +149,7 @@ export function summarizeValue(v: Value): ValueSummary {
     externalSymbols:  [...externalSymbols].sort(),
     primitives:       [...primitives].sort(),
     shortDescription: describeValue(v, kindAtPrimary, typeName),
+    domain:           dom,
   };
 }
 
@@ -149,8 +164,15 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       if (typeName === "Float") {
         return `Float ${bitsToFloat(bits)}`;
       }
-      if (typeName === "Int" || typeName === "Bool") {
-        return `${typeName} ${bits.data}`;
+      if (bits.length === 64) {
+        // Int-sized Bits: whatever the nominal type name is, render the
+        // integer value. Covers refined-Int (PositiveInt, etc.) where
+        // typeName is the refinement's name, not "Int".
+        const signed = bits.data >= 0x8000000000000000n ? bits.data - 0x10000000000000000n : bits.data;
+        return `${typeName ?? "Int"} ${signed}`;
+      }
+      if (typeName === "Bool") {
+        return `Bool ${bits.data}`;
       }
       return `Bits(len=${bits.length})`;
     }
@@ -293,6 +315,9 @@ export function renderModuleSummary(summary: ModuleSummary): string {
     const resolvedBit = b.resolved ? "" : " [unresolved]";
     lines.push(`  ${b.key}${typeBit}${resolvedBit}`);
     lines.push(`      ${b.summary.shortDescription}`);
+    if (b.summary.domain && b.summary.domain.kind !== "opaque") {
+      lines.push(`      refinement: ${formatDomain(b.summary.domain)}`);
+    }
     if (b.summary.nodeCount > 1) {
       lines.push(`      nodes: ${b.summary.nodeCount}, depth: ${b.summary.depth}`);
     }

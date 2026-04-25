@@ -9,9 +9,9 @@ print(x + 0) // expect: 5
 SmallPos = Int && _ > 0 && _ < 100
 print(SmallPos(50) + 0) // expect: 50
 
-// Out of range fails
+// Out of range fails — Phase B counterexample includes constraint + value
 bad = SmallPos(200)
-print(bad) // expect: error(refinement check failed)
+print(bad) // expect: error(refinement check failed: expected ≤ 99 (got 200))
 
 // Function with refined param — bare Int works if predicate passes
 double(y: PositiveInt): Int => y * 2
@@ -28,9 +28,9 @@ b = a + 3
 print(b + 0) // expect: 8
 print(b instanceof PI) // expect: true
 
-// preserveOps: failing operation produces error
+// preserveOps: failing operation produces error — counterexample shows it
 c = a - 10
-print(c) // expect: error(refinement check failed)
+print(c) // expect: error(refinement check failed: expected ≥ 1 (got -5))
 
 // .where() fluent API still works
 PosInt2 = Int.where(n => n > 0)

@@ -12,6 +12,7 @@ import {
   primaryOf, stringToBits, bitsToString, AllegroError,
   Extension,
 } from "./types.js";
+import { domainFromPredicate } from "./refinements.js";
 
 // --- Constants ---
 
@@ -574,6 +575,12 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   addBinding(refinedType, "__extends", parentType);
   // Store predicate
   addBinding(refinedType, "__predicate", predicate);
+  // Phase B: recognise the predicate's algebraic shape (if any) and stash
+  // an abstract domain. The domain lets downstream arithmetic propagate
+  // refinement facts without re-evaluating the predicate. Opaque
+  // predicates just get an opaque-tagged domain; runtime checks still
+  // fire via __construct / type_check.
+  (refinedType as any).__abstractDomain = domainFromPredicate(predicate);
 
   // Wrap __construct with predicate check
   const parentConstruct = parentType.bindings.get("__construct")?.value;
@@ -599,15 +606,61 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
       const checkP = primaryOf(checkResult);
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
-        // Predicate failed — return error
+        // Predicate failed — return a targeted error. If the refined type has
+        // a recognised abstract domain, render it in the message so the user
+        // sees what constraint the value violated.
+        const dom = (refinedType as any).__abstractDomain;
+        const primary = primaryOf(value);
+        let cexDesc = "";
+        if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
+          const signed = (primary as BitsValue).data >= 0x8000000000000000n
+            ? (primary as BitsValue).data - 0x10000000000000000n
+            : (primary as BitsValue).data;
+          cexDesc = ` (got ${signed})`;
+        }
+        let constraintDesc = "";
+        if (dom && dom.kind !== "opaque") {
+          // Lazy-import formatDomain to avoid a static circular dep with refinements.ts
+          // (types-std already imports refinements, but this keeps the failure path
+          // decoupled from that module's shape evolving.)
+          const formatDomain = (d: any): string => {
+            if (d.kind === "interval") {
+              if (d.lo === d.hi) return `== ${d.lo}`;
+              if (d.lo === -Infinity) return `≤ ${d.hi}`;
+              if (d.hi === +Infinity) return `≥ ${d.lo}`;
+              return `∈ [${d.lo}, ${d.hi}]`;
+            }
+            if (d.kind === "ne") return `≠ ${d.value}`;
+            if (d.kind === "eq") return `== ${d.value}`;
+            return "<predicate>";
+          };
+          constraintDesc = `: expected ${formatDomain(dom)}`;
+        }
+        const msg = `refinement check failed${constraintDesc}${cexDesc}`;
         const components = new Map<string, Value>();
-        components.set("error", withType(stringToBits("refinement check failed"), StringType));
+        components.set("error", withType(stringToBits(msg), StringType));
         components.set("type", ErrorType);
         return makeMultiValue(makeInt(0), components);
       }
 
-      // Re-tag with refined type
-      return withType(primaryOf(value), refinedType);
+      // Re-tag with refined type, and attach the abstract domain so downstream
+      // arithmetic can propagate the refinement without re-parsing the
+      // predicate.
+      const typed = withType(primaryOf(value), refinedType);
+      const dom = (refinedType as any).__abstractDomain;
+      if (dom) {
+        const comps = typed.kind === ValueKind.MultiValue
+          ? new Map(typed.components)
+          : new Map<string, Value>();
+        // Attach under the canonical "domain" component key; read back by
+        // `domainOf` in refinements.ts. Encode as an opaque Context so the
+        // evaluator treats it as data.
+        const ctx: ContextValue = { kind: ValueKind.Context, bindings: new Map(), bindingList: [] };
+        (ctx as any).__abstractDomain = dom;
+        comps.set("domain", ctx);
+        return makeMultiValue(primaryOf(typed), comps);
+      }
+      return typed;
     }, true));
   }
 
@@ -687,8 +740,33 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
       const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
       const checkP = primaryOf(checkResult);
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
+        // Same constraint-rendering logic as buildRefinedType's __construct.
+        const dom = (refinedType as any).__abstractDomain;
+        const primary = primaryOf(value);
+        let cexDesc = "";
+        if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
+          const signed = (primary as BitsValue).data >= 0x8000000000000000n
+            ? (primary as BitsValue).data - 0x10000000000000000n
+            : (primary as BitsValue).data;
+          cexDesc = ` (got ${signed})`;
+        }
+        let constraintDesc = "";
+        if (dom && dom.kind !== "opaque") {
+          const fmt = (d: any): string => {
+            if (d.kind === "interval") {
+              if (d.lo === d.hi) return `== ${d.lo}`;
+              if (d.lo === -Infinity) return `≤ ${d.hi}`;
+              if (d.hi === +Infinity) return `≥ ${d.lo}`;
+              return `∈ [${d.lo}, ${d.hi}]`;
+            }
+            if (d.kind === "ne") return `≠ ${d.value}`;
+            if (d.kind === "eq") return `== ${d.value}`;
+            return "<predicate>";
+          };
+          constraintDesc = `: expected ${fmt(dom)}`;
+        }
         const components = new Map<string, Value>();
-        components.set("error", withType(stringToBits("refinement check failed"), StringType));
+        components.set("error", withType(stringToBits(`refinement check failed${constraintDesc}${cexDesc}`), StringType));
         components.set("type", ErrorType);
         return makeMultiValue(makeInt(0), components);
       }

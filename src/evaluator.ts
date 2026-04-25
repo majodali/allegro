@@ -10,6 +10,7 @@ import {
   getType, getTypeName, withType, typeMethod, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
+import { propagateForPrimitive, withDomain } from "./refinements.js";
 
 const MAX_DEPTH = 10000;
 
@@ -221,6 +222,12 @@ function applyPrimitive(
     }
   }
 
+  // Phase B: refinement-domain propagation. If the primitive is one of
+  // bits_add / bits_sub / bits_mul and the operands carry abstract domains
+  // (from refined types or literal values), compute the output domain so
+  // downstream operations inherit the proof context.
+  const propagatedDomain = propagateForPrimitive(fn.name, evalArgs);
+
   // Type-directed dispatch: if the first arg has a type with a matching method,
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
@@ -235,12 +242,11 @@ function applyPrimitive(
           const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
           // If the method already returned a typed value (MultiValue), use it as-is.
           // Methods know their return types (e.g., comparisons return Bool).
-          if (result.kind === ValueKind.MultiValue) return result;
-          // Otherwise wrap with the left operand's type (arithmetic results)
-          if (result.kind === ValueKind.Bits) {
-            return makeMultiValue(result, new Map([["type", typeComp]]));
-          }
-          return result;
+          let out: Value;
+          if (result.kind === ValueKind.MultiValue) out = result;
+          else if (result.kind === ValueKind.Bits)  out = makeMultiValue(result, new Map([["type", typeComp]]));
+          else                                       out = result;
+          return propagatedDomain ? withDomain(out, propagatedDomain) : out;
         }
       }
     }
@@ -255,14 +261,15 @@ function applyPrimitive(
 
   // Type propagation: if the first arg had a type and the result is Bits,
   // propagate the type to the result.
+  let out: Value;
   if (result.kind === ValueKind.Bits && evalArgs[0]?.kind === ValueKind.MultiValue) {
     const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
-    if (typeComp) {
-      return makeMultiValue(result, new Map([["type", typeComp]]));
-    }
+    if (typeComp) out = makeMultiValue(result, new Map([["type", typeComp]]));
+    else          out = result;
+  } else {
+    out = result;
   }
-
-  return result;
+  return propagatedDomain ? withDomain(out, propagatedDomain) : out;
 }
 
 // --- Apply composed function ---
@@ -637,10 +644,19 @@ export function precompileFunction(
     const paramType = i < paramTypes.length ? paramTypes[i] : null;
 
     if (paramType && paramType.kind === ValueKind.Context) {
-      // Typed param: create MultiValue(Param, type: paramType)
+      // Typed param: create MultiValue(Param, type: paramType). If the type
+      // is refined and carries an abstract domain (Phase B), seed the domain
+      // on the placeholder so propagation rules fire during precompile.
+      const components = new Map<string, Value>([["type", paramType]]);
+      const dom = (paramType as any).__abstractDomain;
+      if (dom && dom.kind !== "opaque") {
+        const domCtx: ContextValue = { kind: ValueKind.Context, bindings: new Map(), bindingList: [] };
+        (domCtx as any).__abstractDomain = dom;
+        components.set("domain", domCtx);
+      }
       const placeholder = makeMultiValue(
         makeParamHelper(param.position, param._name),
-        new Map([["type", paramType]]),
+        components,
       );
       placeholders.push(placeholder);
     } else {

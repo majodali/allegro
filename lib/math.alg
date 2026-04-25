@@ -1,13 +1,28 @@
 // Allegro Standard Library — Math
 // Free-standing math functions and constants.
+//
+// Phase B pilot: refinement-annotated function signatures where domain
+// propagation alone suffices to discharge the return-type check (without
+// flow-sensitive narrowing — that's a future phase). Functions whose
+// implementation needs case-split reasoning (`abs`, `clamp`) currently
+// retain their plain Int signatures; their refinements unlock when
+// totality / pattern-narrowing land.
 
 export PI = 3.141592653589793
 export E = 2.718281828459045
 export TAU = 6.283185307179586
 
+export PositiveInt = Int && _ > 0
+export NonNeg      = Int && _ >= 0
+
 export sqrt(x) => Float(x).sqrt()
 export pow(x, n) => Float(x).pow(Float(n))
 export abs(x) => if x >= 0 then x else 0 - x
+
+// `double_pos` exemplifies the propagation pilot: x is PositiveInt (`_ > 0`,
+// domain `≥ 1`); x + x has domain `≥ 2`; `≥ 2` implies `≥ 1`, so the
+// PositiveInt return type-checks statically with no runtime predicate call.
+export double_pos(x: PositiveInt): PositiveInt => x + x
 export floor(x) => Float(x).floor()
 export ceil(x) => Float(x).ceil()
 export round(x) => Float(x).round()

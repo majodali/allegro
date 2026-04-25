@@ -1491,6 +1491,7 @@ import {
   structuralWrap, makeUnionType, wrapType, buildRefinedType,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
+import { domainOf as _domainOf, impliesDomain as _impliesDomain, AbstractDomain as _AbstractDomain } from "./refinements.js";
 
 // --- typed_int / typed_string: wrap raw values with type ---
 
@@ -1872,6 +1873,20 @@ function checkRefinementPredicate(
   if (!predicate) return { ok: true };
   // Short-circuit: same refined type by reference → predicate already holds
   if (actualType === expectedCtx) return { ok: true };
+
+  // Phase B: subtyping via abstract domains. If the value carries a domain
+  // and the expected type has one too, and the value's domain implies the
+  // expected one, the predicate is proved without a runtime call.
+  const expectedDom = (expectedCtx as any).__abstractDomain as _AbstractDomain | undefined;
+  if (expectedDom && expectedDom.kind !== "opaque") {
+    const valueDom = _domainOf(v);
+    const actualTypeDom = actualType ? (actualType as any).__abstractDomain as _AbstractDomain | undefined : undefined;
+    const effective = valueDom ?? actualTypeDom ?? null;
+    if (effective && _impliesDomain(effective, expectedDom)) {
+      return { ok: true };
+    }
+  }
+
   // Evaluate predicate against the value
   const result = evalFn(makeExpr(predicate, [v]), ctx);
   const p = primaryOf(result);
@@ -1921,6 +1936,43 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Any matches everything
   if (expectedName === "Any") return v;
+
+  // Refinement-type handling: if expected is a refined type, check the value
+  // against the BASE (via __extends), then either (a) discharge via abstract
+  // domain (Phase B subtyping), or (b) evaluate the predicate at runtime.
+  // This lets a plain Int value satisfy PositiveInt when the predicate holds
+  // — the standard refinement-as-subtype-of-base semantics.
+  const refinementPredicate = expectedCtx.bindings.get("__predicate")?.value;
+  if (refinementPredicate) {
+    const base = expectedCtx.bindings.get("__extends")?.value;
+    if (base?.kind === ValueKind.Context) {
+      // Recurse on the base (unwraps nested refinements)
+      const baseChecked = type_check_impl([v, base], ctx, evalFn);
+      const actualType0 = getType(v);
+      // Phase B fast path: if abstract domains can prove the implication,
+      // skip the runtime predicate evaluation.
+      const expectedDom = (expectedCtx as any).__abstractDomain as _AbstractDomain | undefined;
+      if (expectedDom && expectedDom.kind !== "opaque") {
+        const valueDom = _domainOf(v);
+        const actualTypeDom = actualType0 ? (actualType0 as any).__abstractDomain as _AbstractDomain | undefined : undefined;
+        const effective = valueDom ?? actualTypeDom ?? null;
+        if (effective && _impliesDomain(effective, expectedDom)) return baseChecked;
+      }
+      // Fall back to runtime predicate evaluation.
+      if (actualType0 !== expectedCtx) {
+        const result = evalFn!(makeExpr(refinementPredicate, [v]), ctx!);
+        const p = primaryOf(result);
+        if (p.kind === ValueKind.Bits && (p as BitsValue).data === 0n) {
+          throw new AllegroError(`Type error: refinement predicate failed for ${expectedName}`);
+        }
+        if (!(p.kind === ValueKind.Bits)) {
+          // Predicate unresolved — return residual type_check.
+          return makeExpr(makePrimitive("type_check", type_check_impl, true), [v, expectedType]);
+        }
+      }
+      return baseChecked;
+    }
+  }
 
   // Step 3: Check using the type's instanceof method
   // The type hierarchy determines checking semantics:
