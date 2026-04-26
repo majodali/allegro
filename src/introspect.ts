@@ -18,7 +18,10 @@ import {
 } from "./types.js";
 import type { CompilationReport } from "./runtime.js";
 import { getTypeName } from "./types-std.js";
-import { domainOf, formatDomain, AbstractDomain } from "./refinements.js";
+import {
+  domainOf, formatDomain, AbstractDomain,
+  predicatesOf, PredicateSet, Predicate,
+} from "./refinements.js";
 
 // =============================================================================
 // Summary shapes
@@ -42,8 +45,12 @@ export interface ValueSummary {
   primitives:    string[];
   /** Human-readable short description for log / UI display. */
   shortDescription: string;
-  /** Abstract domain (Phase B refinement propagation) if any. */
+  /** Abstract domain (Phase B refinement propagation) if any. Effective
+   *  domain across all predicates in the binding's set. */
   domain:        AbstractDomain | null;
+  /** Full predicate set (Phase C) if any. Each entry includes its
+   *  algebraic shape and source attribution. */
+  predicates:    Predicate[];
 }
 
 /** Safety classification for a compiled module or binding.
@@ -128,17 +135,20 @@ export function summarizeValue(v: Value): ValueSummary {
 
   const kindAtPrimary = primaryOf(v).kind;
   const typeName = getTypeName(v);
-  // Pull abstract domain from the value itself, or — for refined values that
-  // didn't go through __construct (e.g. the refined type's own definition)
-  // — from the refined type Context's stored __abstractDomain.
-  let dom = domainOf(v);
-  if (!dom && v.kind === ValueKind.MultiValue) {
+  // Pull predicate set from the value itself, or — for refined values that
+  // didn't go through __construct — synthesise a singleton set from the
+  // refined type Context's stored __abstractDomain.
+  let preds = predicatesOf(v);
+  if (!preds && v.kind === ValueKind.MultiValue) {
     const typeComp = v.components.get("type");
     if (typeComp?.kind === ValueKind.Context) {
       const fromType = (typeComp as any).__abstractDomain;
-      if (fromType && fromType.kind) dom = fromType;
+      if (fromType && fromType.kind) {
+        preds = new PredicateSet([{ shape: fromType, source: "refinement-type" }]);
+      }
     }
   }
+  const dom = preds?.effectiveDomain() ?? domainOf(v);
 
   return {
     kind:             kindAtPrimary,
@@ -150,6 +160,7 @@ export function summarizeValue(v: Value): ValueSummary {
     primitives:       [...primitives].sort(),
     shortDescription: describeValue(v, kindAtPrimary, typeName),
     domain:           dom,
+    predicates:       preds ? [...preds] : [],
   };
 }
 
@@ -315,7 +326,20 @@ export function renderModuleSummary(summary: ModuleSummary): string {
     const resolvedBit = b.resolved ? "" : " [unresolved]";
     lines.push(`  ${b.key}${typeBit}${resolvedBit}`);
     lines.push(`      ${b.summary.shortDescription}`);
-    if (b.summary.domain && b.summary.domain.kind !== "opaque") {
+    // Predicate-set rendering: when there's exactly one non-opaque predicate
+    // (the common case so far), keep the compact "refinement: ≥ k" line.
+    // When there are multiple predicates, list each with its source.
+    const nonOpaque = b.summary.predicates.filter(p => p.shape.kind !== "opaque");
+    if (nonOpaque.length === 1) {
+      lines.push(`      refinement: ${formatDomain(nonOpaque[0].shape)}`);
+    } else if (nonOpaque.length > 1) {
+      lines.push(`      predicates:`);
+      for (const p of nonOpaque) {
+        const src = p.source ? ` [${p.source}]` : "";
+        lines.push(`        ${formatDomain(p.shape)}${src}`);
+      }
+    } else if (b.summary.domain && b.summary.domain.kind !== "opaque") {
+      // Fallback: legacy single-domain path.
       lines.push(`      refinement: ${formatDomain(b.summary.domain)}`);
     }
     if (b.summary.nodeCount > 1) {

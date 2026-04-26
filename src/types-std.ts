@@ -12,7 +12,7 @@ import {
   primaryOf, stringToBits, bitsToString, AllegroError,
   Extension,
 } from "./types.js";
-import { domainFromPredicate } from "./refinements.js";
+import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates } from "./refinements.js";
 
 // --- Constants ---
 
@@ -649,16 +649,11 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       const typed = withType(primaryOf(value), refinedType);
       const dom = (refinedType as any).__abstractDomain;
       if (dom) {
-        const comps = typed.kind === ValueKind.MultiValue
-          ? new Map(typed.components)
-          : new Map<string, Value>();
-        // Attach under the canonical "domain" component key; read back by
-        // `domainOf` in refinements.ts. Encode as an opaque Context so the
-        // evaluator treats it as data.
-        const ctx: ContextValue = { kind: ValueKind.Context, bindings: new Map(), bindingList: [] };
-        (ctx as any).__abstractDomain = dom;
-        comps.set("domain", ctx);
-        return makeMultiValue(primaryOf(typed), comps);
+        // Phase C: attach a single-predicate set rather than a single
+        // domain. The set is the canonical predicate-storage form;
+        // downstream propagation and proof-search consume it.
+        const set = new PredicateSet([{ shape: dom, source: "refinement-type" }]);
+        return rfWithPredicates(typed, set);
       }
       return typed;
     }, true));

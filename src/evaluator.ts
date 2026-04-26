@@ -10,7 +10,7 @@ import {
   getType, getTypeName, withType, typeMethod, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
-import { propagateForPrimitive, withDomain } from "./refinements.js";
+import { propagateSetForPrimitive, withPredicates } from "./refinements.js";
 
 const MAX_DEPTH = 10000;
 
@@ -226,7 +226,7 @@ function applyPrimitive(
   // bits_add / bits_sub / bits_mul and the operands carry abstract domains
   // (from refined types or literal values), compute the output domain so
   // downstream operations inherit the proof context.
-  const propagatedDomain = propagateForPrimitive(fn.name, evalArgs);
+  const propagatedSet = propagateSetForPrimitive(fn.name, evalArgs);
 
   // Type-directed dispatch: if the first arg has a type with a matching method,
   // dispatch through the type instead of calling the base primitive directly.
@@ -246,7 +246,7 @@ function applyPrimitive(
           if (result.kind === ValueKind.MultiValue) out = result;
           else if (result.kind === ValueKind.Bits)  out = makeMultiValue(result, new Map([["type", typeComp]]));
           else                                       out = result;
-          return propagatedDomain ? withDomain(out, propagatedDomain) : out;
+          return propagatedSet ? withPredicates(out, propagatedSet) : out;
         }
       }
     }
@@ -269,7 +269,7 @@ function applyPrimitive(
   } else {
     out = result;
   }
-  return propagatedDomain ? withDomain(out, propagatedDomain) : out;
+  return propagatedSet ? withPredicates(out, propagatedSet) : out;
 }
 
 // --- Apply composed function ---

@@ -3643,6 +3643,9 @@ fileTest(path.join(testsDir, "refinement-subtype-demo.alg"));
 // return type via abstract-domain implication.
 fileTest(path.join(testsDir, "math-pilot-demo.alg"));
 
+// Phase C Chunk 1: predicate sets per binding.
+fileTest(path.join(testsDir, "predicate-set-demo.alg"));
+
 // --- Phase B: abstract-domain unit tests ---
 
 import {
@@ -3720,6 +3723,82 @@ test("Phase B: formatDomain renders human-readable strings", () => {
   eq(formatDomain({ kind: "interval", lo: 1, hi: 10 }), "∈ [1, 10]");
   eq(formatDomain({ kind: "eq", value: 7 }), "== 7");
   eq(formatDomain({ kind: "ne", value: 0 }), "≠ 0");
+});
+
+// --- Phase C Chunk 1: predicate sets ---
+
+import {
+  PredicateSet, addPredicate, mergePredicateSets, simplifyPredicateSet,
+  entailsPredicate, predicatesOf,
+} from "./refinements.js";
+
+test("Phase C: PredicateSet starts empty", () => {
+  const s = new PredicateSet();
+  eq(s.size, 0);
+  eq(s.isEmpty, true);
+});
+
+test("Phase C: addPredicate dedupes structurally-equal predicates", () => {
+  const s0 = new PredicateSet();
+  const s1 = addPredicate(s0, { shape: { kind: "interval", lo: 1, hi: +Infinity }, source: "refinement-type" });
+  const s2 = addPredicate(s1, { shape: { kind: "interval", lo: 1, hi: +Infinity }, source: "refinement-type" });
+  eq(s2.size, 1, "duplicate dropped");
+  const s3 = addPredicate(s2, { shape: { kind: "interval", lo: 1, hi: +Infinity }, source: "assert" });
+  eq(s3.size, 2, "different source kept");
+});
+
+test("Phase C: mergePredicateSets unions with dedup", () => {
+  const a = new PredicateSet([
+    { shape: { kind: "interval", lo: 1, hi: +Infinity }, source: "refinement-type" },
+  ]);
+  const b = new PredicateSet([
+    { shape: { kind: "interval", lo: 1, hi: +Infinity }, source: "refinement-type" },
+    { shape: { kind: "interval", lo: -Infinity, hi: 99 }, source: "assert" },
+  ]);
+  const merged = mergePredicateSets(a, b);
+  eq(merged.size, 2);
+});
+
+test("Phase C: simplifyPredicateSet folds compatible intervals", () => {
+  const s = new PredicateSet([
+    { shape: { kind: "interval", lo: 1, hi: +Infinity }, source: "refinement-type" },
+    { shape: { kind: "interval", lo: -Infinity, hi: 99 }, source: "assert" },
+  ]);
+  const simp = simplifyPredicateSet(s);
+  eq(simp.size, 1, "two intervals fold into one");
+  const eff = simp.effectiveDomain();
+  eq(eff?.kind, "interval");
+  if (eff?.kind === "interval") {
+    eq(eff.lo, 1);
+    eq(eff.hi, 99);
+  }
+});
+
+test("Phase C: entailsPredicate uses set's tightest fact", () => {
+  const s = new PredicateSet([
+    { shape: { kind: "interval", lo: 1, hi: +Infinity }, source: "refinement-type" },
+    { shape: { kind: "interval", lo: -Infinity, hi: 99 }, source: "assert" },
+  ]);
+  // [1, 99] should entail "> 0"
+  eq(entailsPredicate(s, { kind: "interval", lo: 1, hi: +Infinity }), true);
+  // [1, 99] should NOT entail "> 100"
+  eq(entailsPredicate(s, { kind: "interval", lo: 101, hi: +Infinity }), false);
+});
+
+test("Phase C: predicate sets propagate through arithmetic in evaluator", () => {
+  const src = `
+PositiveInt = Int && _ > 0
+x = PositiveInt(5)
+y = x + 10
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const yVal = evalCtx.bindings.get("y")!.value!;
+  const set = predicatesOf(yVal);
+  eq(set !== null, true, "y has a predicate set");
+  if (!set) return;
+  const eff = set.effectiveDomain();
+  eq(eff?.kind, "interval");
+  if (eff?.kind === "interval") eq(eff.lo, 11, `y's lower bound should be 11, got ${eff.lo}`);
 });
 
 // --- Phase A: introspection / semantic summary ---

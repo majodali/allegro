@@ -1491,7 +1491,13 @@ import {
   structuralWrap, makeUnionType, wrapType, buildRefinedType,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
-import { domainOf as _domainOf, impliesDomain as _impliesDomain, AbstractDomain as _AbstractDomain } from "./refinements.js";
+import {
+  domainOf as _domainOf, impliesDomain as _impliesDomain,
+  AbstractDomain as _AbstractDomain,
+  domainFromPredicate,
+  predicatesOf as _predicatesOf, withPredicates as _withPredicates,
+  PredicateSet as _PredicateSet, entailsPredicate as _entailsPredicate,
+} from "./refinements.js";
 
 // --- typed_int / typed_string: wrap raw values with type ---
 
@@ -2217,6 +2223,105 @@ const type_check_binding_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return type_check_impl([v, expectedType], ctx, evalFn);
 };
 
+// --- Phase C: invariant primitives ---
+//
+// `assert_invariant(value, predicate)` evaluates the predicate against the
+// value. If the value's abstract domain (from Phase B) implies the predicate's
+// recognised domain, the runtime call is elided — the invariant is discharged
+// at compile time. Otherwise the predicate runs; if it returns false, an
+// error value is produced with a counterexample.
+//
+// `assume_invariant(value, predicate)` claims the predicate holds without
+// checking. The predicate's recognised domain (if any) is attached to the
+// value so downstream uses inherit the assumption. Use only at trust
+// boundaries (external input, FFI, etc.).
+
+const assert_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) throw new AllegroError(`assert_invariant: expected 2 args, got ${args.length}`);
+  const value = evalFn!(args[0], ctx!);
+  const predicate = evalFn!(args[1], ctx!);
+  if (!isResolved(value) || !isResolved(predicate)) {
+    return makeExpr(makePrimitive("assert_invariant", assert_invariant_impl, true), [value, predicate]);
+  }
+
+  // Compile-time discharge: try the value's full predicate SET first
+  // (multiple facts may collectively entail the target), falling back to
+  // the legacy single-domain check.
+  const predDom = domainFromPredicate(predicate);
+  const valSet  = _predicatesOf(value);
+  if (predDom.kind !== "opaque" && valSet && _entailsPredicate(valSet, predDom)) {
+    // Discharged. Attach the proven predicate to the value's set so
+    // downstream code inherits the new fact (e.g., `assert x > 0` lets
+    // the next `assert x > 0` skip).
+    return _withPredicates(value, new _PredicateSet([{ shape: predDom, source: "assert" }]));
+  }
+  const valDom = _domainOf(value);
+  if (predDom.kind !== "opaque" && valDom && _impliesDomain(valDom, predDom)) {
+    return _withPredicates(value, new _PredicateSet([{ shape: predDom, source: "assert" }]));
+  }
+
+  // Runtime evaluation of the predicate against the value.
+  const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
+  const checkP = primaryOf(checkResult);
+  if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
+    // Build a counterexample-style error message.
+    let cexDesc = "";
+    const primary = primaryOf(value);
+    if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
+      const data = (primary as BitsValue).data;
+      const signed = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
+      cexDesc = ` (got ${signed})`;
+    }
+    let constraintDesc = "";
+    if (predDom.kind !== "opaque") {
+      const fmt = (d: any): string => {
+        if (d.kind === "interval") {
+          if (d.lo === d.hi) return `== ${d.lo}`;
+          if (d.lo === -Infinity) return `≤ ${d.hi}`;
+          if (d.hi === +Infinity) return `≥ ${d.lo}`;
+          return `∈ [${d.lo}, ${d.hi}]`;
+        }
+        if (d.kind === "ne") return `≠ ${d.value}`;
+        if (d.kind === "eq") return `== ${d.value}`;
+        return "<predicate>";
+      };
+      constraintDesc = `: expected ${fmt(predDom)}`;
+    }
+    const msg = `invariant failed${constraintDesc}${cexDesc}`;
+    const components = new Map<string, Value>();
+    components.set("error", withType(stringToBits(msg), StringType));
+    components.set("type", ErrorType);
+    return makeMultiValue(makeInt(0), components);
+  }
+  if (checkP.kind !== ValueKind.Bits) {
+    // Predicate unresolved (depends on incomplete bindings) — keep as residual.
+    return makeExpr(makePrimitive("assert_invariant", assert_invariant_impl, true), [value, predicate]);
+  }
+  // Runtime check passed: attach the proven predicate to the value's set
+  // so downstream code knows the fact (success branch of the implicit
+  // runtime-check "branch").
+  if (predDom.kind !== "opaque") {
+    return _withPredicates(value, new _PredicateSet([{ shape: predDom, source: "assert" }]));
+  }
+  return value;
+};
+
+const assume_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) throw new AllegroError(`assume_invariant: expected 2 args, got ${args.length}`);
+  const value = evalFn!(args[0], ctx!);
+  const predicate = evalFn!(args[1], ctx!);
+  if (!isResolved(value) || !isResolved(predicate)) {
+    return makeExpr(makePrimitive("assume_invariant", assume_invariant_impl, true), [value, predicate]);
+  }
+  // Attach the predicate's recognised domain (if any) to the value's
+  // predicate set without checking. The set's mergePredicateSets handles
+  // intersection naturally — adding a tighter fact to a looser set just
+  // means the effective domain narrows.
+  const predDom = domainFromPredicate(predicate);
+  if (predDom.kind === "opaque") return value;
+  return _withPredicates(value, new _PredicateSet([{ shape: predDom, source: "assert" }]));
+};
+
 // --- Typed binary operator helper ---
 
 function makeTypedBinOp(opName: string): PrimitiveFnImpl {
@@ -2371,6 +2476,8 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   structural_wrap: makePrimitive("structural_wrap", structural_wrap_impl, true),
   type_refine: makePrimitive("type_refine", type_refine_impl, true),
   type_check_binding: makePrimitive("type_check_binding", type_check_binding_impl, true),
+  assert_invariant: makePrimitive("assert_invariant", assert_invariant_impl, true),
+  assume_invariant: makePrimitive("assume_invariant", assume_invariant_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

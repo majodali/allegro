@@ -338,10 +338,172 @@ export function counterexampleFor(
 }
 
 // =============================================================================
+// Predicate sets (Phase C)
+// =============================================================================
+//
+// A `Predicate` is one fact about a value. Phase B attached at most one
+// AbstractDomain per value; Phase C attaches a *set* — every fact accumulated
+// from refinement types, asserts, branch conditions, contract clauses, and
+// arithmetic propagation. The set is the substrate the AI prover (Phase H)
+// will reason over.
+//
+// Each Predicate carries:
+//   - `shape`:        the recognised algebraic form (interval / eq / ne /
+//                     opaque). Same union as AbstractDomain.
+//   - `source`:       a tag describing where this predicate originated, used
+//                     for introspection rendering and debugging.
+//   - `originalExpr`: the raw predicate Value, retained for runtime check
+//                     when shape is opaque.
+//
+// PredicateSets stay small in practice (typical: 1–3 predicates per binding,
+// growing slightly through branches and asserts). Lookup is linear; the
+// wrapper type lets us swap the backing implementation without touching
+// callers.
+
+export type PredicateSource =
+  | "refinement-type"   // from a refined type's constructor
+  | "type-invariant"    // from Type.invariant(...) — Chunk 4
+  | "assert"            // from an `assert P` statement — Chunk 2
+  | "branch-then"       // from entering an if-then branch — Chunk 2
+  | "branch-else"       // from entering an if-else branch — Chunk 2
+  | "match-case"        // from matching a when/is/then case — Chunk 2
+  | "requires"          // from a function's requires clause — Chunk 3
+  | "ensures"           // from a function's ensures clause — Chunk 3
+  | "propagation"       // derived by arithmetic propagation
+  | "literal"           // from a literal value's known constant
+  ;
+
+export interface Predicate {
+  shape:         AbstractDomain;
+  source?:       PredicateSource;
+  /** Retained for opaque shapes so runtime checks still have the predicate
+   *  function available. Most callers should use `shape` for reasoning. */
+  originalExpr?: Value;
+}
+
+/** A set of predicates about a single value. Order is insertion order. */
+export class PredicateSet {
+  readonly preds: Predicate[];
+
+  constructor(preds: Predicate[] = []) {
+    this.preds = preds;
+  }
+
+  get size(): number { return this.preds.length; }
+  get isEmpty(): boolean { return this.preds.length === 0; }
+
+  /** Iterator support so callers can `for (const p of set)`. */
+  [Symbol.iterator](): Iterator<Predicate> { return this.preds[Symbol.iterator](); }
+
+  /** Effective single domain: intersect all non-opaque predicates so callers
+   *  that need a single domain (legacy `domainOf` callers) get the tightest
+   *  algebraic fact available. Returns the first opaque predicate's domain
+   *  if no algebraic facts exist. */
+  effectiveDomain(): AbstractDomain | null {
+    if (this.preds.length === 0) return null;
+    let result: AbstractDomain | null = null;
+    for (const p of this.preds) {
+      if (p.shape.kind === "opaque") continue;
+      if (result === null) result = p.shape;
+      else result = intersectDomains(result, p.shape);
+    }
+    if (result) return result;
+    return this.preds[0].shape;   // fall back to first opaque
+  }
+}
+
+/** Construct a Predicate from a domain + optional source. */
+export function makePredicate(shape: AbstractDomain, source?: PredicateSource, originalExpr?: Value): Predicate {
+  return { shape, source, originalExpr };
+}
+
+/** Add a predicate to a set, with structural-equality dedup. Returns a new
+ *  set; never mutates the input. */
+export function addPredicate(set: PredicateSet, p: Predicate): PredicateSet {
+  for (const existing of set.preds) {
+    if (predicatesEqual(existing, p)) return set;
+  }
+  return new PredicateSet([...set.preds, p]);
+}
+
+/** Merge two predicate sets via set union with dedup. Used at branch
+ *  rejoins; in Phase C we use simple concat-and-dedup, with a smarter
+ *  intersection-style merge as a later optimisation. */
+export function mergePredicateSets(a: PredicateSet, b: PredicateSet): PredicateSet {
+  let result = a;
+  for (const p of b.preds) result = addPredicate(result, p);
+  return result;
+}
+
+/** Trivial Horn-clause-like simplification: fold redundant facts implied by
+ *  tighter ones; combine `_ > k1` and `_ < k2` into a single interval. No
+ *  deeper reasoning — the AI prover handles harder cases at proof-search
+ *  time, not online during evaluation. */
+export function simplifyPredicateSet(set: PredicateSet): PredicateSet {
+  if (set.size <= 1) return set;
+  // Phase C MVP: combine any non-opaque predicates into a single tightest
+  // interval (when all involved domains are intervals or eq); leave opaque
+  // ones as-is. Future: smarter Horn-clause merging.
+  const opaques: Predicate[] = [];
+  let combined: AbstractDomain | null = null;
+  for (const p of set.preds) {
+    if (p.shape.kind === "opaque") {
+      opaques.push(p);
+    } else if (combined === null) {
+      combined = p.shape;
+    } else {
+      combined = intersectDomains(combined, p.shape);
+    }
+  }
+  const out: Predicate[] = [];
+  if (combined !== null) {
+    out.push({ shape: combined, source: "propagation" });
+  }
+  out.push(...opaques);
+  return new PredicateSet(out);
+}
+
+/** Does the set entail the target predicate? Linear scan against each
+ *  predicate's shape; opaque predicates can never entail a non-opaque
+ *  target. Used for compile-time discharge of asserts / requires / type
+ *  checks. */
+export function entailsPredicate(set: PredicateSet, target: AbstractDomain): boolean {
+  if (target.kind === "opaque") return false;
+  // Effective tightest domain may entail more than any single predicate.
+  const eff = set.effectiveDomain();
+  if (eff && eff.kind !== "opaque" && impliesDomain(eff, target)) return true;
+  // Fallback: scan individual predicates.
+  for (const p of set.preds) {
+    if (p.shape.kind !== "opaque" && impliesDomain(p.shape, target)) return true;
+  }
+  return false;
+}
+
+/** Structural equality on predicates (for dedup). Equal shape + equal source
+ *  + reference equality on originalExpr (since we don't deep-compare Values). */
+function predicatesEqual(a: Predicate, b: Predicate): boolean {
+  if (!domainsStructurallyEqual(a.shape, b.shape)) return false;
+  if (a.source !== b.source) return false;
+  if (a.originalExpr !== b.originalExpr) return false;
+  return true;
+}
+
+function domainsStructurallyEqual(a: AbstractDomain, b: AbstractDomain): boolean {
+  if (a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case "interval": return a.lo === (b as IntervalDomain).lo && a.hi === (b as IntervalDomain).hi;
+    case "eq":       return a.value === (b as EqualDomain).value;
+    case "ne":       return a.value === (b as NotEqualDomain).value;
+    case "opaque":   return a.predicate === (b as OpaqueDomain).predicate;
+  }
+}
+
+// =============================================================================
 // Value-level helpers — attach / read the "domain" component on a MultiValue
 // =============================================================================
 
 const DOMAIN_COMPONENT_KEY = "domain";
+const PREDICATES_COMPONENT_KEY = "predicates";
 
 /** Attach an abstract domain as a MultiValue component. Wraps if needed. */
 export function withDomain(v: Value, domain: AbstractDomain): Value {
@@ -351,12 +513,71 @@ export function withDomain(v: Value, domain: AbstractDomain): Value {
   return makeMultiValue(primaryOf(v), comps);
 }
 
-/** Read an abstract domain off a value, if one is present. */
+/** Read an abstract domain off a value, if one is present. With Phase C's
+ *  predicate sets active, this returns the set's effective tightest domain
+ *  for backward compatibility — preferring the new `predicates` component
+ *  over the legacy single-domain one. */
 export function domainOf(v: Value): AbstractDomain | null {
   if (v.kind !== ValueKind.MultiValue) return null;
+  // Phase C: prefer the predicate set if present.
+  const setComp = v.components.get(PREDICATES_COMPONENT_KEY);
+  if (setComp) {
+    const set = decodePredicates(setComp);
+    if (set) {
+      const eff = set.effectiveDomain();
+      if (eff) return eff;
+    }
+  }
   const c = v.components.get(DOMAIN_COMPONENT_KEY);
   if (!c) return null;
   return decodeDomain(c);
+}
+
+/** Attach a predicate set as a MultiValue component. Always merges with any
+ *  existing set; never overwrites silently. */
+export function withPredicates(v: Value, set: PredicateSet): Value {
+  const existing = v.kind === ValueKind.MultiValue ? v.components : new Map<string, Value>();
+  const comps = new Map(existing);
+  // Merge with any existing predicate set.
+  const prior = predicatesOf(v);
+  const merged = prior ? mergePredicateSets(prior, set) : set;
+  comps.set(PREDICATES_COMPONENT_KEY, encodePredicates(merged));
+  return makeMultiValue(primaryOf(v), comps);
+}
+
+/** Read a value's predicate set, if any. Returns a fresh PredicateSet —
+ *  callers can mutate the returned object freely (it's not shared with the
+ *  value's stored encoding). */
+export function predicatesOf(v: Value): PredicateSet | null {
+  if (v.kind !== ValueKind.MultiValue) return null;
+  const setComp = v.components.get(PREDICATES_COMPONENT_KEY);
+  if (setComp) {
+    const set = decodePredicates(setComp);
+    if (set) return set;
+  }
+  // Legacy fallback: lift a single-domain `domain` component into a
+  // singleton set so old code paths continue to work during the migration.
+  const dc = v.components.get(DOMAIN_COMPONENT_KEY);
+  if (dc) {
+    const dom = decodeDomain(dc);
+    if (dom) return new PredicateSet([{ shape: dom, source: "refinement-type" }]);
+  }
+  return null;
+}
+
+function encodePredicates(set: PredicateSet): Value {
+  const ctx: ContextValue = {
+    kind: ValueKind.Context,
+    bindings: new Map(),
+    bindingList: [],
+  };
+  (ctx as any).__predicateSet = set;
+  return ctx;
+}
+
+function decodePredicates(v: Value): PredicateSet | null {
+  if (v.kind !== ValueKind.Context) return null;
+  return (v as any).__predicateSet ?? null;
 }
 
 /** Encode a domain into a Value so it can live as a component. We stash it
@@ -418,4 +639,22 @@ function domainOrFromValue(v: Value): AbstractDomain | null {
   const lit = asIntLiteral(v);
   if (lit !== null) return { kind: "eq", value: lit };
   return null;
+}
+
+/**
+ * Phase C: predicate-set-aware propagation. Computes the result's predicate
+ * set from the operands' sets. Returns a singleton set with one propagated
+ * predicate when applicable; null when no propagation rule matches or
+ * neither operand carries refinement information.
+ *
+ * The returned set carries a `propagation`-sourced predicate so introspection
+ * can distinguish derived facts from explicit ones.
+ */
+export function propagateSetForPrimitive(
+  primName: string,
+  args: Value[],
+): PredicateSet | null {
+  const dom = propagateForPrimitive(primName, args);
+  if (!dom) return null;
+  return new PredicateSet([{ shape: dom, source: "propagation" }]);
 }
