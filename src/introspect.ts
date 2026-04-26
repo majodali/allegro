@@ -217,6 +217,12 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
         const chain = (ctx as any).__grammarValue.baseChain?.join(" > ") ?? "?";
         return `Grammar (extends ${chain})`;
       }
+      // Phase C Chunk 4: a type that carries lifecycle invariants.
+      const invs = (ctx as any).__invariantsList as Value[] | undefined;
+      if (invs && invs.length > 0 && typeName) {
+        const noun = invs.length === 1 ? "invariant" : "invariants";
+        return `${typeName} object [${invs.length} ${noun}]`;
+      }
       if (typeName) return `${typeName} object`;
       return "Context";
     }
@@ -248,6 +254,25 @@ export function safetyGradeFor(report: CompilationReport | undefined): SafetyGra
   // loose promise at this phase — we're only checking that the compiler
   // didn't complain. Phase B+ makes this claim stronger.
   return "proven-safe";
+}
+
+/**
+ * Classify a module summary considering both compilation report (above)
+ * AND the resolved bindings — values typed Error count as has-errors even
+ * when the compilation was syntactically clean. Phase C: failed
+ * refinement / invariant checks produce Error values; the safety grade
+ * should reflect them.
+ */
+export function safetyGradeForSummary(
+  bindings: Array<{ summary: { typeName: string | null } }>,
+  report: CompilationReport | undefined,
+): SafetyGrade {
+  const reportGrade = safetyGradeFor(report);
+  if (reportGrade === "has-errors") return "has-errors";
+  for (const b of bindings) {
+    if (b.summary.typeName === "Error") return "has-errors";
+  }
+  return reportGrade;
 }
 
 // =============================================================================
@@ -291,7 +316,7 @@ export function summarizeModule(
   }
 
   return {
-    grade:            safetyGradeFor(report),
+    grade:            safetyGradeForSummary(bindings, report),
     bindingCount:     bindings.length,
     resolvedCount,
     unresolvedNames:  bindings.filter(b => !b.resolved).map(b => b.key),

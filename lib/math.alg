@@ -1,19 +1,31 @@
 // Allegro Standard Library — Math
 // Free-standing math functions and constants.
 //
-// Phase B pilot: refinement-annotated function signatures where domain
-// propagation alone suffices to discharge the return-type check (without
-// flow-sensitive narrowing — that's a future phase). Functions whose
-// implementation needs case-split reasoning (`abs`, `clamp`) currently
-// retain their plain Int signatures; their refinements unlock when
-// totality / pattern-narrowing land.
+// Phase B/C pilot: refinement-annotated and invariant-annotated types where
+// domain propagation alone suffices to discharge the return-type check
+// (without flow-sensitive narrowing — that's a future phase).
+//
+// Phase C Chunk 4 demonstrates two equivalent ways to express a typed
+// constraint:
+//   - `Int && _ > 0`              (refinement type, value-level)
+//   - `Int.invariant(self > 0)`   (lifecycle invariant, multi-clause)
+// Mechanically equivalent for single-value types; `invariant` is the
+// natural form for record/struct types where the predicate references
+// fields.
 
 export PI = 3.141592653589793
 export E = 2.718281828459045
 export TAU = 6.283185307179586
 
+// Single-value refinements via `&&`. Equivalent to:
+//   Int.invariant(self => self > 0)
+//   Int.invariant(self => self >= 0)
 export PositiveInt = Int && _ > 0
 export NonNeg      = Int && _ >= 0
+
+// A multi-field range. The invariant ties two fields together — the
+// natural shape for `invariant` rather than refinement-via-`&&`.
+export Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
 
 export sqrt(x) => Float(x).sqrt()
 export pow(x, n) => Float(x).pow(Float(n))

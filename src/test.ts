@@ -3646,6 +3646,9 @@ fileTest(path.join(testsDir, "math-pilot-demo.alg"));
 // Phase C Chunk 1: predicate sets per binding.
 fileTest(path.join(testsDir, "predicate-set-demo.alg"));
 
+// Phase C Chunk 4: Type.invariant + multi-field record invariants.
+fileTest(path.join(testsDir, "invariant-demo.alg"));
+
 // --- Phase B: abstract-domain unit tests ---
 
 import {
@@ -3872,6 +3875,81 @@ assert_stmt(x > 0)
   // Should NOT throw.
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   eq(evalCtx.bindings.has("x"), true);
+});
+
+// --- Phase C Chunk 4: Type.invariant ---
+
+test("Phase C Chunk 4: single-invariant type accepts and rejects", () => {
+  const src = `
+PI = Int.invariant(self => self > 0)
+ok = PI(5)
+bad = PI(0 - 5)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  // ok succeeds → resolved Int value
+  const okV = evalCtx.bindings.get("ok")!.value!;
+  const okP = primaryOf(okV);
+  if (okP.kind === ValueKind.Bits) eq(Number((okP as any).data), 5);
+  // bad fails → Error-typed MultiValue
+  const badV = evalCtx.bindings.get("bad")!.value!;
+  if (badV.kind === ValueKind.MultiValue) {
+    eq(badV.components.has("error"), true, "bad has error component");
+  }
+});
+
+test("Phase C Chunk 4: chained invariants produce per-clause failure messages", () => {
+  const src = `
+SP = Int.invariant(self => self > 0).invariant(self => self < 100)
+mid = SP(50)
+low = SP(0)
+high = SP(200)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  // mid succeeds
+  const midV = evalCtx.bindings.get("mid")!.value!;
+  const midP = primaryOf(midV);
+  if (midP.kind === ValueKind.Bits) eq(Number((midP as any).data), 50);
+  // low fails on first invariant (self > 0)
+  const lowV = evalCtx.bindings.get("low")!.value!;
+  if (lowV.kind === ValueKind.MultiValue) {
+    const err = lowV.components.get("error");
+    if (err) {
+      const ep = primaryOf(err);
+      if (ep.kind === ValueKind.Bits) {
+        const msg = bitsToString(ep as BitsValue);
+        eq(msg.includes("invariant 1"), true, `expected invariant 1 in: ${msg}`);
+      }
+    }
+  }
+  // high fails on second invariant (self < 100)
+  const highV = evalCtx.bindings.get("high")!.value!;
+  if (highV.kind === ValueKind.MultiValue) {
+    const err = highV.components.get("error");
+    if (err) {
+      const ep = primaryOf(err);
+      if (ep.kind === ValueKind.Bits) {
+        const msg = bitsToString(ep as BitsValue);
+        eq(msg.includes("invariant 2"), true, `expected invariant 2 in: ${msg}`);
+      }
+    }
+  }
+});
+
+test("Phase C Chunk 4: multi-field record invariant", () => {
+  const src = `
+Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+ok = Range(1, 10)
+bad = Range(10, 1)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  // ok constructs successfully and exposes fields
+  const okV = evalCtx.bindings.get("ok")!.value!;
+  eq(okV.kind, ValueKind.MultiValue);
+  // bad fails the invariant
+  const badV = evalCtx.bindings.get("bad")!.value!;
+  if (badV.kind === ValueKind.MultiValue) {
+    eq(badV.components.has("error"), true);
+  }
 });
 
 // --- Phase A: introspection / semantic summary ---

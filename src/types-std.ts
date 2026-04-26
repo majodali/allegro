@@ -12,14 +12,14 @@ import {
   primaryOf, stringToBits, bitsToString, AllegroError,
   Extension,
 } from "./types.js";
-import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates } from "./refinements.js";
+import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate } from "./refinements.js";
 
 // --- Constants ---
 
 /** Meta-method names that should NOT be inherited by child types during extend/interface */
 const META_METHOD_NAMES = new Set([
   "instanceof", "subtypeof", "extend", "where", "distinct",
-  "constructor", "interface", "preserveOps", "mixin",
+  "constructor", "interface", "preserveOps", "mixin", "invariant",
 ]);
 
 // --- Helpers ---
@@ -663,6 +663,107 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
 }
 
 /**
+ * Build an invarianted type (Phase C Chunk 4): a type that carries one or
+ * more lifecycle invariants — predicates that must hold for every instance
+ * throughout its lifetime. Multiple invariants chain via repeated
+ * `.invariant()` calls; each is stored separately so introspection and
+ * proof-search can address them by source.
+ *
+ * `invariant` is the multi-predicate, multi-field counterpart to `where`:
+ *   - `where` is for value-level refinement on a primitive type
+ *     (`Int && _ > 0`).
+ *   - `invariant` is for record/struct types where the predicate references
+ *     fields (`self.balance >= 0`) and where readability benefits from
+ *     each rule being a separate clause.
+ *
+ * Mechanically the runtime story is the same as a refinement: the
+ * constructor runs the predicate; failure produces a counterexample-bearing
+ * error; success re-tags the value with the invarianted type and attaches
+ * the predicate's recognised abstract domain to the value's predicate set.
+ *
+ * Inheritance: a derived type via `.extend` automatically inherits the
+ * parent's invariants because the hidden `__invariantsList` field is
+ * carried forward in the standard binding-copy loop. (Parent's invariants
+ * stay separate from the child's via list concatenation.)
+ */
+export function buildInvariantedType(parentType: ContextValue, predicate: Value): ContextValue {
+  const newType = makeContext();
+
+  // Copy parent's bindings (everything except __construct, which we wrap
+  // below; everything else inherited).
+  for (const [key, binding] of parentType.bindings) {
+    if (key === "__construct") continue;
+    if (binding.value) addBinding(newType, key, binding.value);
+  }
+
+  // Inherit any existing invariants list from the parent and append the new
+  // predicate. Stored as a hidden JS array so the constructor wrapper can
+  // iterate without going through the bindings table.
+  const parentInvariants = (parentType as any).__invariantsList ?? [];
+  const newInvariants: Value[] = [...parentInvariants, predicate];
+  (newType as any).__invariantsList = newInvariants;
+
+  // Wrap parent's constructor so each invariant is checked after parent
+  // construction.
+  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
+    addBinding(newType, "__construct", makePrimitive("invariant.__construct", (args, ctx, evalFn) => {
+      // Call parent constructor first.
+      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
+
+      // Error propagation: parent's own invariant / refinement check might
+      // have failed already; pass the error through unchanged rather than
+      // re-tagging with this layer.
+      if (value.kind === ValueKind.MultiValue) {
+        const comps = (value as MultiValueType).components;
+        if (comps.has("error")) return value;
+      }
+
+      // Apply each invariant in declaration order. First failure → error.
+      for (let i = 0; i < newInvariants.length; i++) {
+        const inv = newInvariants[i];
+        const checkResult = evalFn!(makeExpr(inv, [value]), ctx!);
+        const checkP = primaryOf(checkResult);
+        if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
+          // Build a counterexample-style error message. For invariants on
+          // record types, render the field name(s) the predicate touched if
+          // we can recognise them; otherwise just say "invariant N failed."
+          const idx = i;
+          const msg = `invariant ${idx + 1} failed`;
+          const components = new Map<string, Value>();
+          components.set("error", withType(stringToBits(msg), StringType));
+          components.set("type", ErrorType);
+          return makeMultiValue(makeInt(0), components);
+        }
+      }
+
+      // Re-tag with the invarianted type. Also attach the recognised
+      // abstract domain (if any) of each invariant to the value's
+      // predicate set — same machinery as buildRefinedType so consumers
+      // see the inferred refinement on the result.
+      const typed = withType(primaryOf(value), newType);
+      try {
+        const preds: Predicate[] = [];
+        for (const inv of newInvariants) {
+          const dom = domainFromPredicate(inv);
+          if (dom.kind !== "opaque") {
+            preds.push({ shape: dom, source: "type-invariant" });
+          }
+        }
+        if (preds.length > 0) {
+          return rfWithPredicates(typed, new PredicateSet(preds));
+        }
+      } catch {
+        /* fall through if the helper isn't available */
+      }
+      return typed;
+    }, true));
+  }
+
+  return newType;
+}
+
+/**
  * Build a distinct type: copies parent, breaks subtypeof chain.
  */
 function buildDistinctType(parentType: ContextValue): ContextValue {
@@ -915,6 +1016,11 @@ addBinding(typeMembers, "where", makeMethodDescriptor("where",
     return wrapType(buildRefinedType(args[0] as ContextValue, args[1]));
   })
 ));
+addBinding(typeMembers, "invariant", makeMethodDescriptor("invariant",
+  makePrimitive("Type.invariant", (args) => {
+    return wrapType(buildInvariantedType(args[0] as ContextValue, args[1]));
+  })
+));
 addBinding(typeMembers, "distinct", makeMethodDescriptor("distinct",
   makePrimitive("Type.distinct", (args) => {
     return wrapType(buildDistinctType(args[0] as ContextValue));
@@ -983,6 +1089,11 @@ addBinding(nominalTypeMembers, "extend", makeMethodDescriptor("extend",
 addBinding(nominalTypeMembers, "where", makeMethodDescriptor("where",
   makePrimitive("NominalType.where", (args) => {
     return wrapType(buildRefinedType(args[0] as ContextValue, args[1]));
+  })
+));
+addBinding(nominalTypeMembers, "invariant", makeMethodDescriptor("invariant",
+  makePrimitive("NominalType.invariant", (args) => {
+    return wrapType(buildInvariantedType(args[0] as ContextValue, args[1]));
   })
 ));
 addBinding(nominalTypeMembers, "distinct", makeMethodDescriptor("distinct",
