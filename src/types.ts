@@ -84,6 +84,19 @@ export interface ContextValue {
   kind: ValueKind.Context;
   bindings: Map<string, Binding>;
   bindingList: Binding[];
+  /**
+   * Phase C scope-local predicate narrowing. When a binding is referenced
+   * within a scope that has additional predicates known about it (e.g. from
+   * a branch condition or an `assert` statement), the predicates are stored
+   * here keyed by binding name. Symbol resolution merges them into the
+   * resolved value's predicate set, so downstream references see the
+   * narrowed view.
+   *
+   * The map is opaque to most ContextValue consumers — module loaders, type
+   * machinery, etc. ignore it. Only the evaluator's Symbol resolution case
+   * and the branch / assert primitives read or write it.
+   */
+  scopePredicates?: Map<string, unknown>;
 }
 
 // --- Multi-Value: primary + named components ---

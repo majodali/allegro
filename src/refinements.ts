@@ -658,3 +658,115 @@ export function propagateSetForPrimitive(
   if (!dom) return null;
   return new PredicateSet([{ shape: dom, source: "propagation" }]);
 }
+
+// =============================================================================
+// Branch-condition narrowing (Phase C Chunk 2)
+// =============================================================================
+
+/**
+ * Given a condition expression and a polarity (true: condition was true;
+ * false: condition was false), derive a per-name map of predicates implied
+ * about each binding referenced in the expression.
+ *
+ * Recognises:
+ *   x op k       — x's domain narrows by op (negated under polarity=false)
+ *   k op x       — same with reversed op
+ *   left && rt   — splits, recurses on each side, unions the results
+ *
+ * Anything else: empty map. Conservative — we never claim a fact we can't
+ * pattern-match. The condition still runs at runtime as before; we only add
+ * predicates we can prove from its structure.
+ */
+export function deriveBranchPredicates(
+  condExpr: Value,
+  polarity: boolean,
+  source: PredicateSource,
+): Map<string, PredicateSet> {
+  const out = new Map<string, PredicateSet>();
+  collectNarrowing(condExpr, polarity, source, out);
+  return out;
+}
+
+function collectNarrowing(
+  expr: Value,
+  polarity: boolean,
+  source: PredicateSource,
+  out: Map<string, PredicateSet>,
+): void {
+  const e = primaryOf(expr);
+  if (e.kind !== ValueKind.Expression) return;
+  const fn = primaryOf(e.fn);
+  if (fn.kind !== ValueKind.PrimitiveFunction) return;
+
+  // Conjunction — `cond1 && cond2`.
+  // Allegro `&&` compiles to `typed_and(left, thunk(right))`. The right side
+  // is a zero-arg ComposedFunction; its body is the actual right expression.
+  if (fn.name === "typed_and" && polarity === true) {
+    if (e.args.length !== 2) return;
+    collectNarrowing(e.args[0], true, source, out);
+    const rightArg = primaryOf(e.args[1]);
+    if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
+      collectNarrowing(rightArg.body, true, source, out);
+    } else {
+      collectNarrowing(e.args[1], true, source, out);
+    }
+    return;
+  }
+
+  // Comparison — find which side is a Symbol and which is a literal.
+  if (e.args.length !== 2) return;
+  const left = primaryOf(e.args[0]);
+  const right = primaryOf(e.args[1]);
+  let symbolArg: Value | null = null;
+  let literalArg: Value | null = null;
+  let opOrder: "sym-lit" | "lit-sym" | null = null;
+  if (left.kind === ValueKind.Symbol) {
+    symbolArg = e.args[0];
+    literalArg = e.args[1];
+    opOrder = "sym-lit";
+  } else if (right.kind === ValueKind.Symbol) {
+    symbolArg = e.args[1];
+    literalArg = e.args[0];
+    opOrder = "lit-sym";
+  }
+  if (!symbolArg || !literalArg || !opOrder) return;
+  const k = asIntLiteral(literalArg);
+  if (k === null) return;
+
+  // Normalise to "symbol OP k" form, swapping op if literal was on the left.
+  let op = fn.name;
+  if (opOrder === "lit-sym") op = swapComparison(op);
+  // Negate under polarity=false.
+  if (!polarity) op = negateComparison(op);
+
+  let dom: AbstractDomain | null = null;
+  switch (op) {
+    case "bits_gt":  dom = { kind: "interval", lo: k + 1,     hi: +Infinity }; break;
+    case "bits_gte": dom = { kind: "interval", lo: k,         hi: +Infinity }; break;
+    case "bits_lt":  dom = { kind: "interval", lo: -Infinity, hi: k - 1     }; break;
+    case "bits_lte": dom = { kind: "interval", lo: -Infinity, hi: k         }; break;
+    case "bits_eq":  dom = { kind: "eq", value: k }; break;
+    case "bits_neq": dom = { kind: "ne", value: k }; break;
+  }
+  if (!dom) return;
+
+  const symPrim = primaryOf(symbolArg);
+  if (symPrim.kind !== ValueKind.Symbol) return;
+  const name = symPrim.name;
+
+  const existing = out.get(name);
+  const fresh = new PredicateSet([{ shape: dom, source }]);
+  out.set(name, existing ? mergePredicateSets(existing, fresh) : fresh);
+}
+
+function negateComparison(op: string): string {
+  switch (op) {
+    case "bits_gt":  return "bits_lte";
+    case "bits_gte": return "bits_lt";
+    case "bits_lt":  return "bits_gte";
+    case "bits_lte": return "bits_gt";
+    case "bits_eq":  return "bits_neq";
+    case "bits_neq": return "bits_eq";
+    default: return op;
+  }
+}

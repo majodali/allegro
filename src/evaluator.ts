@@ -10,7 +10,7 @@ import {
   getType, getTypeName, withType, typeMethod, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
-import { propagateSetForPrimitive, withPredicates } from "./refinements.js";
+import { propagateSetForPrimitive, withPredicates, PredicateSet } from "./refinements.js";
 
 const MAX_DEPTH = 10000;
 
@@ -101,7 +101,18 @@ export function evaluate(
 
     case ValueKind.Symbol: {
       const resolved = ctx.bindings.get(value.name);
-      if (resolved?.value !== undefined) return evaluate(resolved.value, ctx, depth + 1, depCollector);
+      if (resolved?.value !== undefined) {
+        let result = evaluate(resolved.value, ctx, depth + 1, depCollector);
+        // Phase C Chunk 2: augment with any scope-local predicates for this
+        // name (from branch conditions or in-scope `assert` statements).
+        if (ctx.scopePredicates) {
+          const scopePred = ctx.scopePredicates.get(value.name);
+          if (scopePred) {
+            result = withPredicates(result, scopePred as PredicateSet);
+          }
+        }
+        return result;
+      }
       // Symbol unresolved — record as incomplete dependency
       if (depCollector) depCollector.incompleteRefs.add(value.name);
       return value;

@@ -413,11 +413,18 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const cond = evalFn!(args[0], ctx!);
   const condP = primaryOf(cond);
   if (condP.kind === ValueKind.Bits) {
-    const branch = condP.data !== 0n ? args[1] : args[2];
+    const took_then = condP.data !== 0n;
+    const branch = took_then ? args[1] : args[2];
+    // Phase C Chunk 2: derive branch predicates from the condition. Symbols
+    // referenced in cond gain the implied predicate within the chosen
+    // branch; the branch's evaluation context carries the scope predicates.
+    const branchPreds = _deriveBranchPredicates(args[0], took_then,
+      took_then ? "branch-then" : "branch-else");
+    const branchCtx = branchPreds.size > 0 ? augmentScopePredicates(ctx!, branchPreds) : ctx!;
     // If branch is a thunk (composed fn with no params), evaluate its body
-    const evalBranch = evalFn!(branch, ctx!);
+    const evalBranch = evalFn!(branch, branchCtx);
     if (evalBranch.kind === ValueKind.ComposedFunction && evalBranch.params.length === 0) {
-      return evalFn!(evalBranch.body, ctx!);
+      return evalFn!(evalBranch.body, branchCtx);
     }
     return evalBranch;
   }
@@ -1497,7 +1504,36 @@ import {
   domainFromPredicate,
   predicatesOf as _predicatesOf, withPredicates as _withPredicates,
   PredicateSet as _PredicateSet, entailsPredicate as _entailsPredicate,
+  mergePredicateSets as _mergePredicateSets,
+  deriveBranchPredicates as _deriveBranchPredicates,
+  PredicateSource as _PredicateSource,
 } from "./refinements.js";
+
+/**
+ * Phase C Chunk 2: build a child ContextValue inheriting `parent`'s
+ * bindings (shared) but with `extra` scope predicates merged in. Used by
+ * branch refinement to push narrowing down into a branch's evaluation.
+ *
+ * Existing scope predicates in `parent` are inherited; new entries are
+ * merged via `mergePredicateSets`. Mutations to the returned ctx do not
+ * affect the parent.
+ */
+function augmentScopePredicates(parent: ContextValue, extra: Map<string, _PredicateSet>): ContextValue {
+  const sp = new Map<string, unknown>();
+  if (parent.scopePredicates) {
+    for (const [k, v] of parent.scopePredicates) sp.set(k, v);
+  }
+  for (const [k, v] of extra) {
+    const existing = sp.get(k) as _PredicateSet | undefined;
+    sp.set(k, existing ? _mergePredicateSets(existing, v) : v);
+  }
+  return {
+    kind: ValueKind.Context,
+    bindings: parent.bindings,
+    bindingList: parent.bindingList,
+    scopePredicates: sp,
+  };
+}
 
 // --- typed_int / typed_string: wrap raw values with type ---
 
@@ -2306,6 +2342,122 @@ const assert_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return value;
 };
 
+/**
+ * Phase C Chunk 2: `assert P` as a statement form.
+ *
+ * Takes the condition expression unevaluated. Two parallel jobs:
+ *
+ * 1. CHECK — try static discharge from referenced bindings' predicate sets.
+ *    If all narrowing predicates derived from P are entailed by the bindings'
+ *    existing facts, we know P holds; no runtime call needed. Otherwise
+ *    evaluate P; if false, error with counterexample.
+ *
+ * 2. NARROW — for predicates derived from P, mutate ctx.scopePredicates so
+ *    subsequent symbol references in this scope see the narrowed facts. The
+ *    mutation is intentional: ctx is shared across statements in a scope, so
+ *    later statements pick up the assertion's facts.
+ *
+ * In branch contexts (where ctx was already child-augmented by eval_if), the
+ * mutation is local to the branch — the parent ctx's scopePredicates is a
+ * separate Map.
+ *
+ * Multi-binding / relational predicates (e.g. `a < b`) don't narrow
+ * individual bindings under the current recogniser; they fall back to plain
+ * runtime check without scope-narrowing. Relational tracking arrives in
+ * Phase D.
+ */
+const assert_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) throw new AllegroError(`assert: expected 1 arg, got ${args.length}`);
+  const condExpr = args[0];
+
+  // Try static discharge from existing predicate sets.
+  const narrowing = _deriveBranchPredicates(condExpr, true, "assert");
+  let allEntailed = narrowing.size > 0;
+  if (allEntailed) {
+    for (const [name, pset] of narrowing) {
+      const binding = ctx!.bindings.get(name);
+      if (!binding?.value) { allEntailed = false; break; }
+      // For accurate entailment, also fold in any in-scope predicates from
+      // the parent (e.g. earlier asserts within this same scope).
+      let effectiveSet = _predicatesOf(binding.value);
+      if (ctx!.scopePredicates) {
+        const scoped = ctx!.scopePredicates.get(name) as _PredicateSet | undefined;
+        if (scoped) {
+          effectiveSet = effectiveSet ? _mergePredicateSets(effectiveSet, scoped) : scoped;
+        }
+      }
+      const target = pset.effectiveDomain();
+      if (!target || target.kind === "opaque") { allEntailed = false; break; }
+      if (!effectiveSet || !_entailsPredicate(effectiveSet, target)) { allEntailed = false; break; }
+    }
+  }
+
+  if (!allEntailed) {
+    // Runtime check.
+    const cond = evalFn!(condExpr, ctx!);
+    const condP = primaryOf(cond);
+    if (condP.kind !== ValueKind.Bits) {
+      // Unresolved — keep as residual.
+      return makeExpr(makePrimitive("assert_stmt", assert_stmt_impl, true), [cond]);
+    }
+    if ((condP as BitsValue).data === 0n) {
+      // Failed — build a counterexample-style error and HALT. assert is a
+      // verification statement, not a value-producing expression; silent
+      // failure would defeat the purpose. Mid-program halt is the right
+      // default ("build safety in").
+      let msg = `assertion failed`;
+      if (narrowing.size > 0) {
+        const parts: string[] = [];
+        for (const [name, pset] of narrowing) {
+          const dom = pset.effectiveDomain();
+          if (dom && dom.kind !== "opaque") {
+            const fmt = (d: any): string => {
+              if (d.kind === "interval") {
+                if (d.lo === d.hi) return `== ${d.lo}`;
+                if (d.lo === -Infinity) return `≤ ${d.hi}`;
+                if (d.hi === +Infinity) return `≥ ${d.lo}`;
+                return `∈ [${d.lo}, ${d.hi}]`;
+              }
+              if (d.kind === "ne") return `≠ ${d.value}`;
+              if (d.kind === "eq") return `== ${d.value}`;
+              return "?";
+            };
+            // Surface the actual value if available.
+            const binding = ctx!.bindings.get(name);
+            let actualDesc = "";
+            if (binding?.value) {
+              const p = primaryOf(binding.value);
+              if (p.kind === ValueKind.Bits && (p as BitsValue).length === 64) {
+                const data = (p as BitsValue).data;
+                const signed = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
+                actualDesc = ` (got ${name}=${signed})`;
+              }
+            }
+            parts.push(`expected ${name} ${fmt(dom)}${actualDesc}`);
+          }
+        }
+        if (parts.length > 0) msg = `assertion failed: ${parts.join(", ")}`;
+      }
+      throw new AllegroError(msg);
+    }
+  }
+
+  // Statically discharged or runtime check passed: narrow scope predicates
+  // for the rest of this scope.
+  if (narrowing.size > 0) {
+    if (!ctx!.scopePredicates) {
+      (ctx as any).scopePredicates = new Map();
+    }
+    const sp = ctx!.scopePredicates!;
+    for (const [name, pset] of narrowing) {
+      const existing = sp.get(name) as _PredicateSet | undefined;
+      sp.set(name, existing ? _mergePredicateSets(existing, pset) : pset);
+    }
+  }
+
+  return noneSingleton;
+};
+
 const assume_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) throw new AllegroError(`assume_invariant: expected 2 args, got ${args.length}`);
   const value = evalFn!(args[0], ctx!);
@@ -2478,6 +2630,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   type_check_binding: makePrimitive("type_check_binding", type_check_binding_impl, true),
   assert_invariant: makePrimitive("assert_invariant", assert_invariant_impl, true),
   assume_invariant: makePrimitive("assume_invariant", assume_invariant_impl, true),
+  assert_stmt: makePrimitive("assert_stmt", assert_stmt_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

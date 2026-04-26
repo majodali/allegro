@@ -1,33 +1,29 @@
-// Phase C, Chunk 1: predicate-set demo.
+// Phase C, Chunks 1+2: predicate-set demo.
 //
-// A binding accumulates multiple facts as data flows through it. Each
-// fact has a `source` attribution so the introspection surface can show
-// where it came from. Subsequent facts merge into the same set (with
-// dedup); the effective tightest fact is what gets used for proof
-// discharge.
+// Each binding accumulates a *set* of facts that the compiler tracks
+// through arithmetic, conditional branches, and `assert` statements.
+// Facts have source attribution visible in the introspection summary.
 
 use invariants
 
 PositiveInt = Int && _ > 0
 
-x = PositiveInt(5)
-   // predicates so far: ≥ 1 [refinement-type]
+// Refinement-type predicate flows through arithmetic propagation.
+x = PositiveInt(5)         // ≥ 1 [refinement-type]
+y = x + 10                 // ≥ 11 [propagation]
 
-y = x + 10
-   // predicates: ≥ 11 [propagation]
+// Branch refinement: within the then-branch, the compiler proves x > 100,
+// so x + 50 is provably > 150.
+big = if x > 100
+        then x + 50
+        else 0
+// This run takes the else branch (x = 5, not > 100).
+print(big)                 // expect: 0
 
-// `assume` attaches a fact without checking — adds to the set.
-y_tight = assume (v => v < 100) then y
-   // predicates: ≥ 11 [propagation], ≤ 99 [assert]
-   // the set's effective tightest interval becomes [11, 99]
+// `assert` statement narrows the bindings it references.
+z = x + 5                  // ≥ 6 [propagation]
+assert z > 5               // discharged statically: ≥ 6 entails > 5
+print(z)                   // expect: 10
 
-// Now the next propagation can use both bounds.
-z = y_tight + 5
-   // predicates: ≥ 16 (lo+5), but the upper bound IS knowable here:
-   // [11, 99] + literal-5 → [16, 104] — propagation derives an interval
-   // when both sides are bounded.
-
-print(x)            // expect: 5
-print(y)            // expect: 15
-print(y_tight)      // expect: 15
-print(z)            // expect: 20
+print(x)                   // expect: 5
+print(y)                   // expect: 15
