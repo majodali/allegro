@@ -838,6 +838,24 @@ match_grammar = grammar {
 }
 `);
 
+// Phase C provability libraries — keep `use invariants` (assert as stmt)
+// and `use contracts` (requires / ensures) working in browser sandboxes.
+Allegro.registerLibrary('invariants', `// Grammar-extension module for the universal \`assert\` statement.
+invariants_grammar = grammar {
+  stmt_form "assert" cond:expr
+    => cond => assert_stmt(cond)
+}
+`);
+
+Allegro.registerLibrary('contracts', `// Grammar-extension module for function-body \`requires\` and \`ensures\`.
+contracts_grammar = grammar {
+  stmt_form "requires" cond:expr
+    => cond => requires_stmt(cond)
+  stmt_form "ensures" cond:expr
+    => cond => ensures_decl(cond)
+}
+`);
+
 function inspectSandbox(id) {
   const container = document.getElementById(id);
   const editor = container.querySelector('.sandbox-editor');
