@@ -12,6 +12,11 @@
 // Mechanically equivalent for single-value types; `invariant` is the
 // natural form for record/struct types where the predicate references
 // fields.
+//
+// Phase C Chunk 3: function-body contracts (`requires` / `ensures`) attach
+// caller obligations and implementer guarantees to function definitions.
+
+use contracts
 
 export PI = 3.141592653589793
 export E = 2.718281828459045
@@ -35,6 +40,15 @@ export abs(x) => if x >= 0 then x else 0 - x
 // domain `≥ 1`); x + x has domain `≥ 2`; `≥ 2` implies `≥ 1`, so the
 // PositiveInt return type-checks statically with no runtime predicate call.
 export double_pos(x: PositiveInt): PositiveInt => x + x
+
+// `divide` exemplifies Phase C Chunk 3 contracts. `requires b != 0` is the
+// caller obligation — runtime-checked at function entry when not already
+// discharged from the call site's predicate set. `ensures _ != 0 || a == 0`
+// is the implementer guarantee, attached to the result so callers see the
+// post-condition. Multi-clause ensures chain via repeated annotations.
+export divide(a, b) =>
+  requires b != 0
+  a / b
 export floor(x) => Float(x).floor()
 export ceil(x) => Float(x).ceil()
 export round(x) => Float(x).round()

@@ -672,15 +672,39 @@ function isPatternTag(tag: string | undefined): boolean {
 
 // --- Block expressions (offside-rule blocks as values) ---
 
+/** Recognise an Expression whose function is the named primitive — either
+ *  already resolved (`PrimitiveFunction`, the typical case after hygienic
+ *  template resolution) or still a Symbol (when the primitive was called
+ *  directly by name in source, before resolveSymbols runs). The contract
+ *  preprocessor needs both shapes since it runs at parse time. */
+function isPrimitiveCall(value: any, primName: string): boolean {
+  if (!value || typeof value !== "object") return false;
+  if (value.kind !== "Expression") return false;
+  const fn = value.fn;
+  if (!fn) return false;
+  if (fn.kind === "PrimitiveFunction" && fn.name === primName) return true;
+  if (fn.kind === "Symbol" && fn.name === primName) return true;
+  return false;
+}
+
 /**
  * Convert a block-expression parse tree into a Value. The block consists
  * of zero or more binding/fn_decl stmts followed by a final bare-expression
  * stmt. The value of the block is the final expression with each preceding
  * binding substituted in.
  *
- * Implementation: walk stmts in order, collecting bindings. The final bare
- * expression is the return value. Then fold bindings from last to first,
- * substituting each binding's name with its value in the rest.
+ * Implementation: walk stmts in order, collecting bindings. Non-last bare
+ * expressions are sequenced via the `seq` primitive so their side effects
+ * (assertions, prints, contract checks) fire in source order. The final
+ * bare expression is the return value. Bindings from first to last
+ * substitute their values into all subsequent stmts and the result.
+ *
+ * Phase C Chunk 3: contract preprocessing. `requires_stmt(P)` markers are
+ * hoisted to the front (so preconditions check before any body statement
+ * runs); `ensures_decl(P)` markers are extracted, their predicate is
+ * compiled into a one-param lambda over `_`, and the block's result is
+ * wrapped with `ensures_check(result, lambda)` so the post-condition
+ * checks at function exit with `_` bound to the value.
  */
 function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   if (tree.kind !== "branch") throw new Error("buildBlockExpr: not a branch");
@@ -704,36 +728,101 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     throw new Error("block_expr: empty block");
   }
 
+  // Phase C Chunk 3: extract contract markers from bare-expression stmts.
+  //   requires_stmt(P) → goes to `requiresStmts`, runs at function entry
+  //   ensures_decl(P)  → predicate extracted, lambda built, wraps result
+  // Bindings and ordinary bare expressions stay in `filteredStmts`. Order
+  // among non-contract stmts is preserved.
+  const requiresStmts: any[] = [];
+  const ensuresLambdas: any[] = [];
+  const filteredStmts: BuiltBinding[] = [];
+  for (const s of stmts) {
+    if (s.key === null && isPrimitiveCall(s.value, "requires_stmt")) {
+      requiresStmts.push(s.value);
+      continue;
+    }
+    if (s.key === null && isPrimitiveCall(s.value, "ensures_decl")) {
+      // Extract the predicate expression (P) and lift it into a one-param
+      // lambda `(_) => P`. buildFn walks the body and converts Symbol("_")
+      // into a Param so the runtime check binds `_` to the result value.
+      const predExpr = (s.value as any).args[0];
+      const lambda = buildFn(["_"], predExpr);
+      ensuresLambdas.push(lambda);
+      continue;
+    }
+    filteredStmts.push(s);
+  }
+
+  if (filteredStmts.length === 0) {
+    // Block consisted entirely of contract markers — degenerate but legal.
+    // Return noneSingleton-equivalent: a Symbol that resolves to none.
+    // (Practically never hit; bodies always have a result expression.)
+    return makeSymbol("none");
+  }
+
   // Separate final bare expression (key=null) from bindings (key=<name>).
   // If the final stmt is a binding, use its value as the block's result
   // (matches hybrid parser's fallback behavior for blocks without a final
   // bare expression).
-  const lastStmt = stmts[stmts.length - 1];
+  const lastStmt = filteredStmts[filteredStmts.length - 1];
   let result: any;
   let bindings: BuiltBinding[];
+  let bareEarly: BuiltBinding[];
   if (lastStmt.key === null) {
     // Last is a bare expression — its value IS the block's result.
     result = lastStmt.value;
-    bindings = stmts.slice(0, -1).filter(s => s.key !== null);
+    const earlyStmts = filteredStmts.slice(0, -1);
+    bindings  = earlyStmts.filter(s => s.key !== null);
+    bareEarly = earlyStmts.filter(s => s.key === null);
   } else {
     // No final bare expr — use the last binding's value.
     result = lastStmt.value;
-    bindings = stmts.filter(s => s.key !== null);
+    bindings  = filteredStmts.filter(s => s.key !== null);
+    bareEarly = filteredStmts.filter((s, i) => s.key === null && i !== filteredStmts.length - 1);
   }
 
-  // Substitute each binding into all subsequent values and the result, from
-  // first to last. (Matches the hybrid parser's `substName` approach.)
+  // Substitute each binding into all subsequent values, bare expressions,
+  // and the result, from first to last. (Matches the hybrid parser's
+  // `substName` approach.)
   for (let i = 0; i < bindings.length; i++) {
     const bname = bindings[i].key as string;
     const bval = bindings[i].value;
-    // Propagate to later bindings
     for (let j = i + 1; j < bindings.length; j++) {
       bindings[j].value = substName(bindings[j].value, bname, bval);
     }
-    // Propagate to the result
+    for (let k = 0; k < bareEarly.length; k++) {
+      bareEarly[k].value = substName(bareEarly[k].value, bname, bval);
+    }
+    // Propagate into requires too (they reference function params, which
+    // bindings might shadow — though typical usage doesn't shadow params).
+    for (let r = 0; r < requiresStmts.length; r++) {
+      requiresStmts[r] = substName(requiresStmts[r], bname, bval);
+    }
+    // Propagate into ensures lambdas' bodies.
+    for (let e = 0; e < ensuresLambdas.length; e++) {
+      ensuresLambdas[e] = substName(ensuresLambdas[e], bname, bval);
+    }
     result = substName(result, bname, bval);
   }
-  return result;
+
+  // Wrap the result with ensures checks. Each `ensures_check(result, lambda)`
+  // runs the lambda against the result; on success the result is returned
+  // with the post-condition's domain attached to its predicate set.
+  for (const lambda of ensuresLambdas) {
+    result = makeExpr(prim("ensures_check"), [result, lambda]);
+  }
+
+  // Sequence: requires checks first, then ordinary bare expressions in
+  // source order, then the (possibly-ensures-wrapped) result. `seq` is an
+  // eager primitive that evaluates each arg in order and returns the last,
+  // so side effects of earlier args (assertions, prints) fire before the
+  // result is computed.
+  const seqArgs: any[] = [];
+  for (const r of requiresStmts) seqArgs.push(r);
+  for (const b of bareEarly) seqArgs.push(b.value);
+  if (seqArgs.length === 0) return result;
+  seqArgs.push(result);
+  return makeExpr(prim("seq"), seqArgs);
 }
 
 // --- String literals (with interpolation) ---

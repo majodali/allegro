@@ -177,12 +177,12 @@ function recogniseComparison(
   void paramArg;
 
   switch (op) {
-    case "bits_eq":  return { kind: "eq", value: k };
-    case "bits_neq": return { kind: "ne", value: k };
-    case "bits_gt":  return { kind: "interval", lo: k + 1,     hi: +Infinity };
-    case "bits_gte": return { kind: "interval", lo: k,         hi: +Infinity };
-    case "bits_lt":  return { kind: "interval", lo: -Infinity, hi: k - 1     };
-    case "bits_lte": return { kind: "interval", lo: -Infinity, hi: k         };
+    case "bits_eq":   case "typed_eq":  return { kind: "eq", value: k };
+    case "bits_neq":  case "typed_neq": return { kind: "ne", value: k };
+    case "bits_gt":   case "typed_gt":  return { kind: "interval", lo: k + 1,     hi: +Infinity };
+    case "bits_gte":  case "typed_gte": return { kind: "interval", lo: k,         hi: +Infinity };
+    case "bits_lt":   case "typed_lt":  return { kind: "interval", lo: -Infinity, hi: k - 1     };
+    case "bits_lte":  case "typed_lte": return { kind: "interval", lo: -Infinity, hi: k         };
   }
   return null;
 }
@@ -212,11 +212,15 @@ function asIntLiteral(v: Value): number | null {
 
 function swapComparison(op: string): string {
   switch (op) {
-    case "bits_gt":  return "bits_lt";
-    case "bits_gte": return "bits_lte";
-    case "bits_lt":  return "bits_gt";
-    case "bits_lte": return "bits_gte";
-    default:         return op;
+    case "bits_gt":   return "bits_lt";
+    case "bits_gte":  return "bits_lte";
+    case "bits_lt":   return "bits_gt";
+    case "bits_lte":  return "bits_gte";
+    case "typed_gt":  return "typed_lt";
+    case "typed_gte": return "typed_lte";
+    case "typed_lt":  return "typed_gt";
+    case "typed_lte": return "typed_gte";
+    default:          return op;
   }
 }
 
@@ -741,12 +745,12 @@ function collectNarrowing(
 
   let dom: AbstractDomain | null = null;
   switch (op) {
-    case "bits_gt":  dom = { kind: "interval", lo: k + 1,     hi: +Infinity }; break;
-    case "bits_gte": dom = { kind: "interval", lo: k,         hi: +Infinity }; break;
-    case "bits_lt":  dom = { kind: "interval", lo: -Infinity, hi: k - 1     }; break;
-    case "bits_lte": dom = { kind: "interval", lo: -Infinity, hi: k         }; break;
-    case "bits_eq":  dom = { kind: "eq", value: k }; break;
-    case "bits_neq": dom = { kind: "ne", value: k }; break;
+    case "bits_gt":   case "typed_gt":  dom = { kind: "interval", lo: k + 1,     hi: +Infinity }; break;
+    case "bits_gte":  case "typed_gte": dom = { kind: "interval", lo: k,         hi: +Infinity }; break;
+    case "bits_lt":   case "typed_lt":  dom = { kind: "interval", lo: -Infinity, hi: k - 1     }; break;
+    case "bits_lte":  case "typed_lte": dom = { kind: "interval", lo: -Infinity, hi: k         }; break;
+    case "bits_eq":   case "typed_eq":  dom = { kind: "eq", value: k }; break;
+    case "bits_neq":  case "typed_neq": dom = { kind: "ne", value: k }; break;
   }
   if (!dom) return;
 
@@ -761,12 +765,18 @@ function collectNarrowing(
 
 function negateComparison(op: string): string {
   switch (op) {
-    case "bits_gt":  return "bits_lte";
-    case "bits_gte": return "bits_lt";
-    case "bits_lt":  return "bits_gte";
-    case "bits_lte": return "bits_gt";
-    case "bits_eq":  return "bits_neq";
-    case "bits_neq": return "bits_eq";
+    case "bits_gt":   return "bits_lte";
+    case "bits_gte":  return "bits_lt";
+    case "bits_lt":   return "bits_gte";
+    case "bits_lte":  return "bits_gt";
+    case "bits_eq":   return "bits_neq";
+    case "bits_neq":  return "bits_eq";
+    case "typed_gt":  return "typed_lte";
+    case "typed_gte": return "typed_lt";
+    case "typed_lt":  return "typed_gte";
+    case "typed_lte": return "typed_gt";
+    case "typed_eq":  return "typed_neq";
+    case "typed_neq": return "typed_eq";
     default: return op;
   }
 }

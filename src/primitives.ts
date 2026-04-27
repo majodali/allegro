@@ -2474,6 +2474,227 @@ const assume_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return _withPredicates(value, new _PredicateSet([{ shape: predDom, source: "assert" }]));
 };
 
+// --- Phase C Chunk 3: requires / ensures contracts ---
+//
+// Contracts are body-leading clauses on function bodies. The grammar form
+// (in `lib/contracts.alg`) lowers to bare-expression markers in the function's
+// block_expr; the tree-builder's contract preprocessor (in `tree-builder.ts`)
+// rewrites the block to:
+//
+//   requires checks   (sequenced first, before the body proper)
+//   body              (last expression)
+//   ensures checks    (wrapped around the result)
+//
+// `requires P`: caller obligation. Runtime check at function entry. Same
+// shape as `assert P`, but tagged "requires" — the introspection summary
+// surfaces the contract distinctly. Phase D / sink-based generation will
+// move the runtime check to the call site when not statically discharged.
+//
+// `ensures P`: implementer guarantee. The predicate references `_`, which
+// the tree-builder rewrites at parse time into a one-param lambda over `_`.
+// `ensures_check(result, lambda)` invokes the lambda with the result; on
+// failure it errors; on success it attaches the predicate domain to the
+// result's predicate set so callers see the post-condition.
+
+/**
+ * Sequence-and-return-last. Lazy primitive — we evaluate each arg explicitly
+ * so we can return the last value with its full MultiValue wrapping (type,
+ * predicates) intact. The eager primitive path strips MultiValues before
+ * calling the impl and then re-wraps via type propagation from the first
+ * arg, which would mis-tag the result with the (often noneSingleton) first
+ * arg's type. By being lazy we sidestep that path entirely.
+ *
+ * Side effects (assert mutating ctx.scopePredicates, print emitting output)
+ * fire left-to-right because we evaluate args sequentially with the same
+ * ctx. Used by the block-expression builder to preserve non-last bare
+ * expressions, and by the contract preprocessor to splice requires checks
+ * ahead of the function body.
+ */
+const seq_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length === 0) return noneSingleton;
+  let last: Value = noneSingleton;
+  for (const a of args) {
+    last = evalFn!(a, ctx!);
+  }
+  return last;
+};
+
+/**
+ * `requires P` — caller obligation. Mechanically identical to `assert_stmt`
+ * but tags discharged predicates with `source: "requires"` and reports
+ * failures as "precondition failed" rather than "assertion failed".
+ *
+ * Static discharge tries the same predicate-set entailment path as
+ * assert_stmt; the difference is purely cosmetic (introspection tagging) and
+ * the message wording. When the predicate references only the function's
+ * parameters (the common case), the analyzer / safety summary can suggest
+ * the equivalent compile-time obligation upstream — that's why we keep the
+ * contract source distinct.
+ */
+const requires_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) throw new AllegroError(`requires: expected 1 arg, got ${args.length}`);
+  const condExpr = args[0];
+
+  const narrowing = _deriveBranchPredicates(condExpr, true, "requires");
+  let allEntailed = narrowing.size > 0;
+  if (allEntailed) {
+    for (const [name, pset] of narrowing) {
+      const binding = ctx!.bindings.get(name);
+      if (!binding?.value) { allEntailed = false; break; }
+      let effectiveSet = _predicatesOf(binding.value);
+      if (ctx!.scopePredicates) {
+        const scoped = ctx!.scopePredicates.get(name) as _PredicateSet | undefined;
+        if (scoped) {
+          effectiveSet = effectiveSet ? _mergePredicateSets(effectiveSet, scoped) : scoped;
+        }
+      }
+      const target = pset.effectiveDomain();
+      if (!target || target.kind === "opaque") { allEntailed = false; break; }
+      if (!effectiveSet || !_entailsPredicate(effectiveSet, target)) { allEntailed = false; break; }
+    }
+  }
+
+  if (!allEntailed) {
+    const cond = evalFn!(condExpr, ctx!);
+    const condP = primaryOf(cond);
+    if (condP.kind !== ValueKind.Bits) {
+      return makeExpr(makePrimitive("requires_stmt", requires_stmt_impl, true), [cond]);
+    }
+    if ((condP as BitsValue).data === 0n) {
+      let msg = `precondition failed`;
+      if (narrowing.size > 0) {
+        const parts: string[] = [];
+        for (const [name, pset] of narrowing) {
+          const dom = pset.effectiveDomain();
+          if (dom && dom.kind !== "opaque") {
+            const fmt = (d: any): string => {
+              if (d.kind === "interval") {
+                if (d.lo === d.hi) return `== ${d.lo}`;
+                if (d.lo === -Infinity) return `≤ ${d.hi}`;
+                if (d.hi === +Infinity) return `≥ ${d.lo}`;
+                return `∈ [${d.lo}, ${d.hi}]`;
+              }
+              if (d.kind === "ne") return `≠ ${d.value}`;
+              if (d.kind === "eq") return `== ${d.value}`;
+              return "?";
+            };
+            const binding = ctx!.bindings.get(name);
+            let actualDesc = "";
+            if (binding?.value) {
+              const p = primaryOf(binding.value);
+              if (p.kind === ValueKind.Bits && (p as BitsValue).length === 64) {
+                const data = (p as BitsValue).data;
+                const signed = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
+                actualDesc = ` (got ${name}=${signed})`;
+              }
+            }
+            parts.push(`expected ${name} ${fmt(dom)}${actualDesc}`);
+          }
+        }
+        if (parts.length > 0) msg = `precondition failed: ${parts.join(", ")}`;
+      }
+      throw new AllegroError(msg);
+    }
+  }
+
+  if (narrowing.size > 0) {
+    if (!ctx!.scopePredicates) {
+      (ctx as any).scopePredicates = new Map();
+    }
+    const sp = ctx!.scopePredicates!;
+    for (const [name, pset] of narrowing) {
+      // Re-tag with "requires" source — deriveBranchPredicates already used
+      // "requires" as the source argument, but ensure consistency.
+      const tagged = new _PredicateSet(pset.preds.map(p => ({ ...p, source: "requires" as const })));
+      const existing = sp.get(name) as _PredicateSet | undefined;
+      sp.set(name, existing ? _mergePredicateSets(existing, tagged) : tagged);
+    }
+  }
+
+  return noneSingleton;
+};
+
+/**
+ * `ensures P` marker. Lowered from the `ensures` stmt_form. The tree-builder's
+ * contract preprocessor recognises this primitive call by name, extracts the
+ * predicate AST, builds a one-param lambda over `_`, and rewrites the block
+ * so the predicate fires against the function's result via `ensures_check`.
+ *
+ * If this primitive is ever evaluated at runtime (e.g., used outside a
+ * function-body block where the preprocessor doesn't reach), it's a no-op
+ * — the user just doesn't get the post-condition enforcement. We don't
+ * error: declarative contracts shouldn't break code that uses them in
+ * unexpected positions.
+ */
+const ensures_decl_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  return noneSingleton;
+};
+
+/**
+ * `ensures_check(result, lambda)` — the runtime check. The tree-builder's
+ * contract preprocessor inserts these around the result expression of any
+ * function body that has `ensures` clauses.
+ *
+ * Static discharge: if the result already carries a predicate set that
+ * entails the post-condition's domain (e.g., the function body is itself
+ * a refined-type construction), no runtime call is needed. Otherwise the
+ * lambda runs against the result; on failure we throw an AllegroError
+ * (postcondition failed); on success we attach the predicate domain to
+ * the result's set with `source: "ensures"` so the caller sees the fact.
+ */
+const ensures_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) throw new AllegroError(`ensures_check: expected 2 args, got ${args.length}`);
+  const result = evalFn!(args[0], ctx!);
+  const lambda = evalFn!(args[1], ctx!);
+  if (!isResolved(result) || !isResolved(lambda)) {
+    return makeExpr(makePrimitive("ensures_check", ensures_check_impl, true), [result, lambda]);
+  }
+
+  // Try static discharge from the result's predicate set.
+  const predDom = domainFromPredicate(lambda);
+  const valSet  = _predicatesOf(result);
+  if (predDom.kind !== "opaque" && valSet && _entailsPredicate(valSet, predDom)) {
+    return _withPredicates(result, new _PredicateSet([{ shape: predDom, source: "ensures" }]));
+  }
+
+  // Runtime check.
+  const checkResult = evalFn!(makeExpr(lambda, [result]), ctx!);
+  const checkP = primaryOf(checkResult);
+  if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
+    let cexDesc = "";
+    const primary = primaryOf(result);
+    if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
+      const data = (primary as BitsValue).data;
+      const signed = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
+      cexDesc = ` (got ${signed})`;
+    }
+    let constraintDesc = "";
+    if (predDom.kind !== "opaque") {
+      const fmt = (d: any): string => {
+        if (d.kind === "interval") {
+          if (d.lo === d.hi) return `== ${d.lo}`;
+          if (d.lo === -Infinity) return `≤ ${d.hi}`;
+          if (d.hi === +Infinity) return `≥ ${d.lo}`;
+          return `∈ [${d.lo}, ${d.hi}]`;
+        }
+        if (d.kind === "ne") return `≠ ${d.value}`;
+        if (d.kind === "eq") return `== ${d.value}`;
+        return "<predicate>";
+      };
+      constraintDesc = `: expected ${fmt(predDom)}`;
+    }
+    throw new AllegroError(`postcondition failed${constraintDesc}${cexDesc}`);
+  }
+  if (checkP.kind !== ValueKind.Bits) {
+    return makeExpr(makePrimitive("ensures_check", ensures_check_impl, true), [result, lambda]);
+  }
+  // Passed; attach predicate so callers see the post-condition fact.
+  if (predDom.kind !== "opaque") {
+    return _withPredicates(result, new _PredicateSet([{ shape: predDom, source: "ensures" }]));
+  }
+  return result;
+};
+
 // --- Typed binary operator helper ---
 
 function makeTypedBinOp(opName: string): PrimitiveFnImpl {
@@ -2631,6 +2852,11 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   assert_invariant: makePrimitive("assert_invariant", assert_invariant_impl, true),
   assume_invariant: makePrimitive("assume_invariant", assume_invariant_impl, true),
   assert_stmt: makePrimitive("assert_stmt", assert_stmt_impl, true),
+  // Phase C Chunk 3: contracts.
+  seq: makePrimitive("seq", seq_impl, true),
+  requires_stmt: makePrimitive("requires_stmt", requires_stmt_impl, true),
+  ensures_decl: makePrimitive("ensures_decl", ensures_decl_impl, true),
+  ensures_check: makePrimitive("ensures_check", ensures_check_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

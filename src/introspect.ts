@@ -21,6 +21,7 @@ import { getTypeName } from "./types-std.js";
 import {
   domainOf, formatDomain, AbstractDomain,
   predicatesOf, PredicateSet, Predicate,
+  deriveBranchPredicates, domainFromPredicate,
 } from "./refinements.js";
 
 // =============================================================================
@@ -51,6 +52,25 @@ export interface ValueSummary {
   /** Full predicate set (Phase C) if any. Each entry includes its
    *  algebraic shape and source attribution. */
   predicates:    Predicate[];
+  /** Phase C Chunk 3: contracts surfaced from a function body. `requires`
+   *  entries are caller obligations (preconditions); `ensures` entries are
+   *  implementer guarantees (postconditions). Each entry pairs the
+   *  algebraic shape with the bindings referenced in the predicate. */
+  requires:      ContractSummary[];
+  ensures:       ContractSummary[];
+  /** Phase C Chunk 3: implicit-precondition suggestions. When an in-body
+   *  `assert P` references only function parameters / module-level
+   *  constants, P could be promoted to `requires P` for caller-side proof.
+   *  Each entry holds the recognised shape and the parameter names it
+   *  pins down. */
+  promotionSuggestions: ContractSummary[];
+}
+
+export interface ContractSummary {
+  /** Recognised algebraic shape (interval / eq / ne / opaque). */
+  shape:    AbstractDomain;
+  /** Names referenced in the predicate (function params or `_`). */
+  bindings: string[];
 }
 
 /** Safety classification for a compiled module or binding.
@@ -94,6 +114,9 @@ export interface BindingSummary {
 export function summarizeValue(v: Value): ValueSummary {
   const externalSymbols = new Set<string>();
   const primitives      = new Set<string>();
+  const requires:    ContractSummary[] = [];
+  const ensures:     ContractSummary[] = [];
+  const assertsInBody: ContractSummary[] = [];
   let nodeCount = 0;
   let maxDepth  = 0;
 
@@ -111,6 +134,31 @@ export function summarizeValue(v: Value): ValueSummary {
       case ValueKind.Expression: {
         if (seen.has(node)) return;
         seen.add(node);
+        // Phase C Chunk 3: surface contracts when we encounter their
+        // primitive-call markers. Match both PrimitiveFunction (after
+        // hygienic resolution / resolveSymbols) and Symbol (raw parse-time
+        // shape, when the primitive was invoked directly by name). In
+        // Standard mode, resolveSymbols wraps primitives as UntypedFunction
+        // MultiValues — peel that wrapper before matching.
+        const fnPrim = primaryOf(node.fn);
+        const fnName = (fnPrim.kind === ValueKind.PrimitiveFunction || fnPrim.kind === ValueKind.Symbol)
+          ? fnPrim.name : null;
+        if (fnName) {
+          if (fnName === "requires_stmt" && node.args.length === 1) {
+            const c = recogniseBoolExpr(node.args[0]);
+            if (c) requires.push(c);
+          } else if (fnName === "ensures_check" && node.args.length === 2) {
+            // args[1] is the lambda `(_) => P` — domainFromPredicate
+            // extracts its shape; we record `_` as the bound name.
+            const shape = domainFromPredicate(node.args[1]);
+            ensures.push({ shape, bindings: ["_"] });
+          } else if (fnName === "assert_stmt" && node.args.length === 1) {
+            // Body-internal asserts: candidate for promotion to `requires`
+            // when they reference only function parameters / constants.
+            const c = recogniseBoolExpr(node.args[0]);
+            if (c) assertsInBody.push(c);
+          }
+        }
         walk(node.fn, depth + 1, seen);
         for (const a of node.args) walk(a, depth + 1, seen);
         return;
@@ -132,6 +180,20 @@ export function summarizeValue(v: Value): ValueSummary {
   };
 
   walk(v, 0, new Set());
+
+  // Phase C Chunk 3: filter promotion suggestions. An in-body assert is a
+  // candidate for promotion to `requires` only if its predicate references
+  // function parameters (Symbols matching declared param names). The
+  // recogniser already tells us which bindings are referenced; here we
+  // intersect with the function's own param names.
+  const paramNames = collectParamNames(v);
+  const promotionSuggestions: ContractSummary[] = [];
+  for (const a of assertsInBody) {
+    if (a.bindings.length === 0) continue;
+    if (a.bindings.every(b => paramNames.has(b))) {
+      promotionSuggestions.push(a);
+    }
+  }
 
   const kindAtPrimary = primaryOf(v).kind;
   const typeName = getTypeName(v);
@@ -161,7 +223,128 @@ export function summarizeValue(v: Value): ValueSummary {
     shortDescription: describeValue(v, kindAtPrimary, typeName),
     domain:           dom,
     predicates:       preds ? [...preds] : [],
+    requires,
+    ensures,
+    promotionSuggestions,
   };
+}
+
+/** Extract a ContractSummary from a boolean expression (the condition of
+ *  an assert / requires). Inside a function body (which is what we walk)
+ *  references to function parameters are Params, not Symbols, so we can't
+ *  reuse `deriveBranchPredicates` directly — that recogniser is tuned for
+ *  the runtime path where bindings appear as Symbols. Instead we run the
+ *  same shape detection but match `Param._name` as the binding identifier. */
+function recogniseBoolExpr(expr: Value): ContractSummary | null {
+  // First try the Symbol path (covers top-level asserts in file scope).
+  const map = deriveBranchPredicates(expr, true, "assert");
+  if (map.size > 0) {
+    const [name, set] = [...map.entries()][0];
+    const eff = set.effectiveDomain();
+    if (eff) return { shape: eff, bindings: [name] };
+  }
+  // Fall back to Param-aware shape detection for in-body contracts.
+  return recogniseParamBoolExpr(expr);
+}
+
+/** Walk a boolean expression where function parameters appear as Params
+ *  (which is the case before substitution). Recognises:
+ *    - Param OP literal
+ *    - literal OP Param
+ *    - left && right (conjunction; combines via the left's shape)
+ *  Returns the first single-Param constraint found. Multi-param predicates
+ *  return null until Phase D introduces relational tracking. */
+function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
+  const e = primaryOf(expr);
+  if (e.kind !== ValueKind.Expression) return null;
+  const fn = primaryOf(e.fn);
+  // Accept Symbol too — when the boolean expr survives without resolveSymbols
+  // running (rare; the runtime fast-path normally resolves first).
+  if (fn.kind !== ValueKind.PrimitiveFunction && fn.kind !== ValueKind.Symbol) return null;
+
+  // Conjunction — recurse into the left side first; the right is the more
+  // complex case (it's wrapped in a thunk for short-circuiting).
+  if (fn.name === "typed_and" && e.args.length === 2) {
+    const left = recogniseParamBoolExpr(e.args[0]);
+    if (left) return left;
+    const rightArg = primaryOf(e.args[1]);
+    if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
+      return recogniseParamBoolExpr(rightArg.body);
+    }
+    return recogniseParamBoolExpr(e.args[1]);
+  }
+
+  if (e.args.length !== 2) return null;
+  const a = primaryOf(e.args[0]);
+  const b = primaryOf(e.args[1]);
+  let paramName: string | null = null;
+  let lit: number | null = null;
+  let leftIsParam = false;
+  if (a.kind === ValueKind.Param) {
+    paramName = a._name ?? null;
+    lit = asIntLiteral(e.args[1]);
+    leftIsParam = true;
+  } else if (b.kind === ValueKind.Param) {
+    paramName = b._name ?? null;
+    lit = asIntLiteral(e.args[0]);
+    leftIsParam = false;
+  }
+  if (paramName === null || lit === null) return null;
+
+  let op = fn.name;
+  if (!leftIsParam) {
+    // Swap operator: `k OP param` ↔ `param SWAP(OP) k`.
+    switch (op) {
+      case "bits_gt":   op = "bits_lt";   break;
+      case "bits_gte":  op = "bits_lte";  break;
+      case "bits_lt":   op = "bits_gt";   break;
+      case "bits_lte":  op = "bits_gte";  break;
+      case "typed_gt":  op = "typed_lt";  break;
+      case "typed_gte": op = "typed_lte"; break;
+      case "typed_lt":  op = "typed_gt";  break;
+      case "typed_lte": op = "typed_gte"; break;
+    }
+  }
+
+  let shape: AbstractDomain | null = null;
+  switch (op) {
+    case "bits_gt":   case "typed_gt":  shape = { kind: "interval", lo: lit + 1,     hi: +Infinity }; break;
+    case "bits_gte":  case "typed_gte": shape = { kind: "interval", lo: lit,         hi: +Infinity }; break;
+    case "bits_lt":   case "typed_lt":  shape = { kind: "interval", lo: -Infinity,   hi: lit - 1   }; break;
+    case "bits_lte":  case "typed_lte": shape = { kind: "interval", lo: -Infinity,   hi: lit       }; break;
+    case "bits_eq":   case "typed_eq":  shape = { kind: "eq", value: lit }; break;
+    case "bits_neq":  case "typed_neq": shape = { kind: "ne", value: lit }; break;
+  }
+  if (!shape) return null;
+  return { shape, bindings: [paramName] };
+}
+
+/** Extract a 64-bit integer literal value from a typed-or-raw Bits Value.
+ *  Mirrors refinements.ts asIntLiteral but lives here to avoid widening
+ *  that module's export surface for a single use. */
+function asIntLiteral(v: Value): number | null {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.Bits) return null;
+  if (p.length !== 64) return null;
+  const data = p.data;
+  if (typeof data !== "bigint") return null;
+  const asSigned = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
+  const n = Number(asSigned);
+  if (!Number.isSafeInteger(n)) return null;
+  return n;
+}
+
+/** Collect declared parameter names of a function value (for the promotion
+ *  filter). Returns empty set if the value is not a function. */
+function collectParamNames(v: Value): Set<string> {
+  const out = new Set<string>();
+  const p = primaryOf(v);
+  if (p.kind === ValueKind.ComposedFunction) {
+    for (const param of p.params) {
+      if (param._name) out.add(param._name);
+    }
+  }
+  return out;
 }
 
 function describeValue(v: Value, kind: ValueKind, typeName: string | null): string {
@@ -381,6 +564,27 @@ export function renderModuleSummary(summary: ModuleSummary): string {
       const more = b.summary.externalSymbols.length > 6
         ? ` (+${b.summary.externalSymbols.length - 6} more)` : "";
       lines.push(`      unresolved refs: ${shown}${more}`);
+    }
+    // Phase C Chunk 3: contracts and promotion suggestions.
+    if (b.summary.requires.length > 0) {
+      lines.push(`      requires:`);
+      for (const c of b.summary.requires) {
+        const name = c.bindings[0] ?? "<expr>";
+        lines.push(`        ${name} ${formatDomain(c.shape)}`);
+      }
+    }
+    if (b.summary.ensures.length > 0) {
+      lines.push(`      ensures:`);
+      for (const c of b.summary.ensures) {
+        lines.push(`        _ ${formatDomain(c.shape)}`);
+      }
+    }
+    if (b.summary.promotionSuggestions.length > 0) {
+      lines.push(`      suggested:`);
+      for (const c of b.summary.promotionSuggestions) {
+        const name = c.bindings[0] ?? "<expr>";
+        lines.push(`        promote 'assert ${name} ${formatDomain(c.shape)}' → 'requires …'`);
+      }
     }
   }
   return lines.join("\n");

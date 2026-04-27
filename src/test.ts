@@ -3649,6 +3649,9 @@ fileTest(path.join(testsDir, "predicate-set-demo.alg"));
 // Phase C Chunk 4: Type.invariant + multi-field record invariants.
 fileTest(path.join(testsDir, "invariant-demo.alg"));
 
+// Phase C Chunk 3: requires / ensures function-body contracts.
+fileTest(path.join(testsDir, "contracts-demo.alg"));
+
 // --- Phase B: abstract-domain unit tests ---
 
 import {
@@ -3949,6 +3952,130 @@ bad = Range(10, 1)
   const badV = evalCtx.bindings.get("bad")!.value!;
   if (badV.kind === ValueKind.MultiValue) {
     eq(badV.components.has("error"), true);
+  }
+});
+
+// --- Phase C Chunk 3: requires / ensures contracts ---
+//
+// Tests use direct primitive calls (`requires_stmt`, `ensures_decl`,
+// `assert_stmt`) so the grammar extension load path doesn't need to fire —
+// matching the Chunk 2 pattern. The tree-builder's contract preprocessor
+// keys off the primitive call NAMES (not the surface syntax), so behavior
+// is identical between the direct-primitive and `use contracts`-grammar
+// paths. The fileTest above (`tests/contracts-demo.alg`) covers the full
+// surface-syntax path end-to-end.
+
+// Pull in the introspection helper used by the contract-summary tests below.
+import { summarizeValue as _summarizeValueChunk3 } from "./introspect.js";
+
+test("Phase C Chunk 3: requires runtime check passes when condition holds", () => {
+  const src = `
+guard(x) =>
+  requires_stmt(x > 0)
+  x + 1
+y = guard(5)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const yV = evalCtx.bindings.get("y")!.value!;
+  const yPrim = primaryOf(yV);
+  if (yPrim.kind === ValueKind.Bits) {
+    eq(yPrim.data, 6n);
+  }
+});
+
+test("Phase C Chunk 3: requires runtime check halts on violation", () => {
+  const src = `
+guard(x) =>
+  requires_stmt(x > 0)
+  x
+y = guard(0 - 5)
+`;
+  let threw = false;
+  let msg = "";
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true;
+    msg = String(e.message ?? e);
+  }
+  eq(threw, true, "expected requires violation to halt");
+  eq(msg.toLowerCase().includes("precondition"), true, `expected precondition msg, got: ${msg}`);
+});
+
+test("Phase C Chunk 3: ensures attaches predicate to result on success", () => {
+  const src = `
+double_pos(x) =>
+  requires_stmt(x > 0)
+  ensures_decl(_ > 0)
+  x + x
+y = double_pos(5)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const yV = evalCtx.bindings.get("y")!.value!;
+  // y should carry an "ensures"-sourced predicate (≥ 1) on top of the
+  // propagation-derived one (≥ 2). The effective domain is the tightest
+  // intersection.
+  const set = predicatesOf(yV);
+  eq(set !== null, true, "ensures should attach predicate set");
+  if (set) {
+    const eff = set.effectiveDomain();
+    eq(eff?.kind === "interval" || eff?.kind === "eq", true);
+    if (eff?.kind === "interval") {
+      // ≥ 2 (from x+x with x ≥ 1) AND ≥ 1 (from ensures) → ≥ 2
+      eq(eff.lo >= 1, true);
+    }
+  }
+});
+
+test("Phase C Chunk 3: ensures runtime check halts on postcondition violation", () => {
+  // Construct a function whose body deliberately fails its ensures.
+  const src = `
+broken(x) =>
+  ensures_decl(_ > 0)
+  0 - x
+y = broken(5)
+`;
+  let threw = false;
+  let msg = "";
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true;
+    msg = String(e.message ?? e);
+  }
+  eq(threw, true, "expected ensures violation to halt");
+  eq(msg.toLowerCase().includes("postcondition"), true, `expected postcondition msg, got: ${msg}`);
+});
+
+test("Phase C Chunk 3: introspection surfaces requires and ensures", () => {
+  const src = `
+divide(a, b) =>
+  requires_stmt(b != 0)
+  ensures_decl(_ != 0 || a == 0)
+  a / b
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fnV = evalCtx.bindings.get("divide")!.value!;
+  const summary = _summarizeValueChunk3(fnV);
+  eq(summary.requires.length >= 1, true, `expected at least 1 requires, got ${summary.requires.length}`);
+  eq(summary.ensures.length >= 1, true, `expected at least 1 ensures, got ${summary.ensures.length}`);
+  // requires `b != 0` should recognise b as the bound name.
+  const reqB = summary.requires.find(c => c.bindings[0] === "b");
+  eq(reqB !== undefined, true, "requires should reference param b");
+});
+
+test("Phase C Chunk 3: introspection suggests promoting in-body assert to requires", () => {
+  const src = `
+guard(x) =>
+  assert_stmt(x > 0)
+  x + x
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fnV = evalCtx.bindings.get("guard")!.value!;
+  const summary = _summarizeValueChunk3(fnV);
+  eq(summary.promotionSuggestions.length, 1, "expected one promotion suggestion");
+  if (summary.promotionSuggestions.length > 0) {
+    eq(summary.promotionSuggestions[0].bindings[0], "x");
   }
 });
 
