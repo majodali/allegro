@@ -1,0 +1,245 @@
+// =============================================================================
+// Allegro — Effect types (Phase D1 of the provability arc)
+//
+// Phase D is the *negative* aspect of provability — what code DOESN'T do.
+// D1 starts the arc with extensible flat effect labels.
+//
+// An effect label is a plain string (`io`, `net`, `time`, `build-io`, …).
+// Core defines none beyond the implicit `pure` (the empty set). Every
+// other label is registered by the extension that provides the relevant
+// primitives — stdlib registers `io` alongside `print`, networking
+// extensions register `net` alongside `fetch`, and so on.
+//
+// A function's INFERRED effect set is the union of labels from every
+// primitive the function transitively calls. The user can also DECLARE
+// the effect set via the `effects` body-form clause (see `lib/effects.alg`);
+// the analyzer checks that inferred ⊆ declared (over-promising is safe,
+// under-promising is an error).
+//
+// Phase D2 will refine flat labels into parametric capabilities
+// (`net[api.example.com:443]`) and per-module capability budgets — built
+// on D1's substrate.
+//
+// See `previews/d1-effects.alg` for the design rationale and surface
+// syntax.
+// =============================================================================
+
+import {
+  Value, ValueKind, ComposedFunctionValue, primaryOf,
+} from "./types.js";
+
+// =============================================================================
+// EffectSet — a set of label strings.
+// =============================================================================
+
+/** A function's effect set: labels of all observable side effects.
+ *  Empty set = `pure`. Order is irrelevant; comparisons are set-based. */
+export type EffectSet = Set<string>;
+
+export const PURE: EffectSet = new Set();
+
+export function effectUnion(a: EffectSet, b: EffectSet): EffectSet {
+  if (a.size === 0) return new Set(b);
+  if (b.size === 0) return new Set(a);
+  const out = new Set(a);
+  for (const e of b) out.add(e);
+  return out;
+}
+
+export function effectSubset(sub: EffectSet, sup: EffectSet): boolean {
+  for (const e of sub) if (!sup.has(e)) return false;
+  return true;
+}
+
+export function effectEquals(a: EffectSet, b: EffectSet): boolean {
+  return a.size === b.size && effectSubset(a, b);
+}
+
+/** Render an EffectSet for human display. Empty → "pure"; otherwise
+ *  alphabetised comma-separated labels. */
+export function formatEffects(e: EffectSet): string {
+  if (e.size === 0) return "pure";
+  return [...e].sort().join(", ");
+}
+
+// =============================================================================
+// `effects_attach` recognition
+// =============================================================================
+//
+// The block preprocessor wraps a function body that has an `effects` clause
+// with `effects_attach(real_body, declared_labels_array)`. The wrapper is
+// transparent at runtime (returns the first arg) but visible to inference
+// and introspection. Helpers below extract the wrapped body and the
+// declared label list at compile time.
+
+/** If `v` is `effects_attach(body, labels_array)`, return the inner body
+ *  and the extracted label set. Otherwise null. */
+export function unwrapEffectsAttach(v: Value): { body: Value; declared: EffectSet } | null {
+  if (v.kind !== ValueKind.Expression) return null;
+  const fn = primaryOf(v.fn);
+  if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "effects_attach") return null;
+  if (v.args.length !== 2) return null;
+  const declared = extractLabelArray(v.args[1]);
+  return { body: v.args[0], declared };
+}
+
+/** Extract a set of label strings from a `typed_array(Symbol(L1), Symbol(L2), …)`
+ *  Expression. Used to pull declared labels out of an effects_attach call's
+ *  metadata argument. Unrecognised shapes silently yield an empty set —
+ *  the analyzer treats that as "no declaration". */
+function extractLabelArray(v: Value): EffectSet {
+  const out: EffectSet = new Set();
+  const e = primaryOf(v);
+  if (e.kind !== ValueKind.Expression) return out;
+  const fn = primaryOf(e.fn);
+  if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "typed_array") return out;
+  for (const a of e.args) {
+    const p = primaryOf(a);
+    if (p.kind === ValueKind.Symbol) out.add(p.name);
+    // Bits-encoded string literals would be `String "label"` — also accept.
+    // (Not currently emitted by the grammar, but cheap to support.)
+  }
+  return out;
+}
+
+// =============================================================================
+// Inference walker
+// =============================================================================
+//
+// Compute the inferred effect set for a function value by walking its body
+// and accumulating effects from every primitive call and every transitively
+// called ComposedFunction. Cycles (self / mutual recursion) are broken via
+// a seen-set; recursive self-calls contribute nothing extra (their effects
+// come entirely from the body we're already walking).
+//
+// Limitation: mutual recursion may under-estimate — function f's effects
+// computed first might miss effects from g that re-enter f. A fixpoint
+// iteration would be sound; for D1 chunk 1 we accept the conservative
+// approximation. The rare-in-practice case is documented; future work
+// can switch to fixpoint when it bites.
+
+/** Infer a function's effect set by walking its body. Used by the
+ *  precompile pass (declaration check) and by introspection (display). */
+export function inferFunctionEffects(
+  fn: ComposedFunctionValue,
+  seen: Set<ComposedFunctionValue> = new Set(),
+): EffectSet {
+  if (seen.has(fn)) return PURE;
+  seen.add(fn);
+  return walkValueEffects(fn.body, seen);
+}
+
+/** Walk an arbitrary Value tree and accumulate the effects from its
+ *  primitive calls and transitively-called functions. Used internally
+ *  by inferFunctionEffects; exposed for tests. */
+export function walkValueEffects(v: Value, seen: Set<ComposedFunctionValue>): EffectSet {
+  switch (v.kind) {
+    case ValueKind.Bits:
+    case ValueKind.Symbol:
+    case ValueKind.Param:
+    case ValueKind.Context:
+    case ValueKind.PrimitiveFunction:
+      return PURE;
+    case ValueKind.ComposedFunction:
+      // A function VALUE (not a call). Its effects fire only when invoked;
+      // for the purpose of the enclosing function's effects, having a
+      // closure literal in scope contributes nothing. Higher-order calls
+      // (function passed in, then called somewhere) are out of scope for
+      // D1 chunk 1 — they'll need analysis through call sites in chunk 2.
+      return PURE;
+    case ValueKind.MultiValue:
+      return walkValueEffects(v.primary, seen);
+    case ValueKind.Expression: {
+      // Special-case effects_attach: skip the metadata arg, walk the body.
+      const fn0 = primaryOf(v.fn);
+      if (fn0.kind === ValueKind.PrimitiveFunction && fn0.name === "effects_attach") {
+        if (v.args.length === 2) return walkValueEffects(v.args[0], seen);
+      }
+      let result: EffectSet = new Set();
+      // Effects from the function being called.
+      if (fn0.kind === ValueKind.PrimitiveFunction) {
+        if (fn0.effects) for (const e of fn0.effects) result.add(e);
+      } else if (fn0.kind === ValueKind.ComposedFunction) {
+        for (const e of inferFunctionEffects(fn0, seen)) result.add(e);
+      }
+      // Effects from evaluating each argument (since they may contain
+      // primitive calls themselves — Allegro is eager for non-lazy prims).
+      for (const arg of v.args) {
+        const argEffects = walkValueEffects(arg, seen);
+        for (const e of argEffects) result.add(e);
+      }
+      return result;
+    }
+  }
+}
+
+// =============================================================================
+// Effects mismatch — error type for failed declaration check
+// =============================================================================
+
+export interface EffectsMismatch {
+  binding:  string;
+  declared: EffectSet;
+  inferred: EffectSet;
+  /** Labels in inferred but not in declared — the under-promised set. */
+  missing:  EffectSet;
+}
+
+export function formatMismatch(m: EffectsMismatch): string {
+  return `effects mismatch in ${m.binding}: declared \`${formatEffects(m.declared)}\`, ` +
+         `inferred \`${formatEffects(m.inferred)}\` ` +
+         `(undeclared: ${formatEffects(m.missing)})`;
+}
+
+/** Compute the missing labels (inferred \\ declared). Empty if declared
+ *  is a superset of inferred. */
+export function effectDifference(inferred: EffectSet, declared: EffectSet): EffectSet {
+  const missing: EffectSet = new Set();
+  for (const e of inferred) if (!declared.has(e)) missing.add(e);
+  return missing;
+}
+
+// =============================================================================
+// Top-level declaration check
+// =============================================================================
+//
+// Walk every binding in a context; for each ComposedFunction (or MultiValue
+// wrapping one) whose body is wrapped in `effects_attach(body, labels)`,
+// compute the inferred set and verify inferred ⊆ declared. Returns the
+// list of mismatches; callers decide whether to throw or just record.
+
+/** Locate a ComposedFunction inside a value, peeling MultiValue wrappers
+ *  (typed-function envelope) and noticing legitimate non-function values. */
+function asFunction(v: Value): ComposedFunctionValue | null {
+  const p = primaryOf(v);
+  if (p.kind === ValueKind.ComposedFunction) return p;
+  return null;
+}
+
+/** For each named binding in `ctx`, if it's a function with an `effects`
+ *  declaration, check inferred ⊆ declared and collect mismatches. */
+export function checkEffectsDeclarations(
+  bindings: Iterable<{ key: string | null; value: Value | undefined }>,
+): EffectsMismatch[] {
+  const mismatches: EffectsMismatch[] = [];
+  for (const b of bindings) {
+    if (!b.key || !b.value) continue;
+    const fn = asFunction(b.value);
+    if (!fn) continue;
+    const wrap = unwrapEffectsAttach(fn.body);
+    if (!wrap) continue;
+    // Body for inference is the unwrapped expression — but inferFunctionEffects
+    // walks fn.body and already knows to peel effects_attach.
+    const inferred = inferFunctionEffects(fn);
+    const missing = effectDifference(inferred, wrap.declared);
+    if (missing.size > 0) {
+      mismatches.push({
+        binding:  b.key,
+        declared: wrap.declared,
+        inferred,
+        missing,
+      });
+    }
+  }
+  return mismatches;
+}

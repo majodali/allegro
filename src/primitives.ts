@@ -2695,6 +2695,35 @@ const ensures_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return result;
 };
 
+// --- Phase D1: effect-declaration markers ---
+//
+// `effects E1, E2` body-form clauses lower to `effects_decl_marker(labels)`
+// at parse time. The block-expression preprocessor recognises these markers,
+// extracts the label list, and wraps the function body's result expression
+// with `effects_attach(body, labels)`. At runtime `effects_attach` is a
+// transparent passthrough; the wrapper is metadata for the analyzer and
+// the introspection summary.
+//
+// See `src/effects.ts` for the inference walker and declaration check.
+
+const effects_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  // Marker. The block preprocessor extracts and consumes these at parse
+  // time; if one survives to runtime (e.g. used outside a function body
+  // block), it's a no-op. Mirrors `ensures_decl` for the same reason.
+  return noneSingleton;
+};
+
+const effects_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) {
+    throw new AllegroError(`effects_attach: expected 2 args, got ${args.length}`);
+  }
+  // Transparent passthrough: evaluate the wrapped body and return its
+  // value. The second arg (declared-labels metadata) is recovered at
+  // compile time by the inference walker via `unwrapEffectsAttach` —
+  // never evaluated here.
+  return evalFn!(args[0], ctx!);
+};
+
 // --- Typed binary operator helper ---
 
 function makeTypedBinOp(opName: string): PrimitiveFnImpl {
@@ -2783,7 +2812,10 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   when_struct_destruct: makePrimitive("when_struct_destruct", when_struct_destruct_impl),
   when_no_match: makePrimitive("when_no_match", when_no_match_impl, true),
   id: id_prim,
-  print: makePrimitive("print", print_impl, true),
+  // Phase D1: `print` produces an `io` effect; `fetch` produces `net`;
+  // `delay` produces `time`. Effect labels surface in function-effect
+  // inference via the `effects` field on the primitive value.
+  print: makePrimitive("print", print_impl, true, ["io"]),
   grammar_builder: makePrimitive("grammar_builder", grammar_builder_impl),
   grammar_add_dot_access: makePrimitive("grammar_add_dot_access", grammar_add_dot_access_impl),
   grammar_add_import: makePrimitive("grammar_add_import", grammar_add_import_impl),
@@ -2857,6 +2889,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   requires_stmt: makePrimitive("requires_stmt", requires_stmt_impl, true),
   ensures_decl: makePrimitive("ensures_decl", ensures_decl_impl, true),
   ensures_check: makePrimitive("ensures_check", ensures_check_impl, true),
+  // Phase D1: effect-declaration markers.
+  effects_decl_marker: makePrimitive("effects_decl_marker", effects_decl_marker_impl, true),
+  effects_attach: makePrimitive("effects_attach", effects_attach_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),
@@ -2869,6 +2904,6 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_lte: makePrimitive("typed_lte", makeTypedBinOp("lte"), true),
   typed_gte: makePrimitive("typed_gte", makeTypedBinOp("gte"), true),
   // Async
-  delay: makePrimitive("delay", delay_wrapper, true),
-  fetch: makePrimitive("fetch", fetch_impl, true),
+  delay: makePrimitive("delay", delay_wrapper, true, ["time"]),
+  fetch: makePrimitive("fetch", fetch_impl, true, ["net"]),
 };

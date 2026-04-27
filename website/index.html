@@ -196,12 +196,13 @@ print(acc2)   // 175
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
-<p>The four layers, each with its own playable example:</p>
+<p>The five layers, each with its own playable example. The first four are the <em>positive</em> aspect of provability — what the code does. The fifth is the <em>negative</em> aspect — what it doesn't do.</p>
 <ul>
   <li><a href="#refinements">Refinement types &amp; domain propagation</a> — facts attached to values flow through arithmetic.</li>
   <li><a href="#asserts">Asserts</a> — universal in-scope predicates, discharged statically when the compiler can prove them.</li>
   <li><a href="#invariants">Lifecycle invariants</a> — predicates that hold for every value of a type, checked on construction.</li>
   <li><a href="#contracts">Contracts</a> — <code>requires</code> / <code>ensures</code> on functions, surfacing in the safety summary.</li>
+  <li><a href="#effects">Effects</a> — what categories of side effects each function can produce; declared and verified against inference.</li>
 </ul>
 
 <!-- ================================================ -->
@@ -324,6 +325,43 @@ print(clamp_to_range(150, 0, 100))    // 100
 <div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-contracts')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-contracts')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
+
+<!-- ================================================ -->
+<h3 id="effects">Effects — the negative aspect</h3>
+
+<p>Each function can declare which categories of side effects it produces — <code>io</code>, <code>net</code>, <code>time</code>, … — via an <code>effects</code> body clause. The analyzer infers the actual set from the primitives transitively called and verifies the declaration is a superset (under-promising halts compilation). Click <strong>Inspect</strong> to see the inferred and declared sets surface in the safety summary.</p>
+
+<p>Effect labels are <em>extensible</em>, not a fixed enum. Core ships only the implicit <code>pure</code>; the standard library registers <code>io</code> alongside <code>print</code>, <code>net</code> alongside <code>fetch</code>, and so on. Domain-specific extensions can register their own labels (<code>build-io</code>, <code>funds-mutation</code>, …).</p>
+
+<div class="sandbox" id="s-effects">
+<textarea class="sandbox-editor" rows="18">use effects
+
+// Inferred-only — no declaration. Inspect shows `effects: pure (inferred)`.
+greet(name) => "Hello, " + name
+print(greet("world"))
+
+// Inferred from `print` → io.
+shout(msg) =>
+  print(msg)
+  msg
+shout("loud")
+
+// Declared, matches inferred. Summary: `effects: pure (declared, verified)`.
+square(x) =>
+  effects pure
+  x * x
+print(square(7))
+
+// Declared SUPERSET of inferred — fine (over-promising is safe).
+maybe_log(msg) =>
+  effects io
+  msg.length
+print(maybe_log("hi"))</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-effects')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-effects')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<p>Try editing the <code>square</code> function to add a <code>print(x)</code> call without removing <code>effects pure</code> — running halts with an effects-mismatch error pointing at the undeclared <code>io</code> effect.</p>
 
 <!-- ================================================ -->
 <h2 id="basics">Basics</h2>
@@ -853,6 +891,15 @@ contracts_grammar = grammar {
     => cond => requires_stmt(cond)
   stmt_form "ensures" cond:expr
     => cond => ensures_decl(cond)
+}
+`);
+
+// Phase D1: effect types — declares `effects label1, label2` body-form clause
+// for declaring (and verifying against inferred) a function's effect set.
+Allegro.registerLibrary('effects', `// Grammar-extension module for function-body \`effects\` declarations.
+effects_grammar = grammar {
+  stmt_form "effects" labels:ident ** ","
+    => labels => effects_decl_marker(labels)
 }
 `);
 

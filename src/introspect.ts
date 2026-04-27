@@ -23,6 +23,10 @@ import {
   predicatesOf, PredicateSet, Predicate,
   deriveBranchPredicates, domainFromPredicate,
 } from "./refinements.js";
+import {
+  EffectSet, formatEffects, inferFunctionEffects, unwrapEffectsAttach,
+  effectDifference,
+} from "./effects.js";
 
 // =============================================================================
 // Summary shapes
@@ -64,6 +68,14 @@ export interface ValueSummary {
    *  Each entry holds the recognised shape and the parameter names it
    *  pins down. */
   promotionSuggestions: ContractSummary[];
+  /** Phase D1: inferred effect set — labels accumulated from primitives
+   *  the function transitively calls. Empty set = pure. Only populated
+   *  when the value is a function (ComposedFunction or wrapped). */
+  inferredEffects: EffectSet | null;
+  /** Phase D1: declared effect set, if any (from an `effects` body
+   *  clause). When non-null AND inferred ⊄ declared, the function has a
+   *  declaration mismatch (separately surfaced as an error). */
+  declaredEffects: EffectSet | null;
 }
 
 export interface ContractSummary {
@@ -157,6 +169,15 @@ export function summarizeValue(v: Value): ValueSummary {
             // when they reference only function parameters / constants.
             const c = recogniseBoolExpr(node.args[0]);
             if (c) assertsInBody.push(c);
+          } else if (fnName === "effects_attach" && node.args.length === 2) {
+            // Phase D1: skip the metadata arg entirely. It contains a
+            // typed_array of Symbol(label) values which are intentionally
+            // unresolved — they're declarations, not references — so they
+            // shouldn't pollute the externalSymbols set or the primitive
+            // counts. Walk only the wrapped body.
+            walk(node.fn, depth + 1, seen);
+            walk(node.args[0], depth + 1, seen);
+            return;
           }
         }
         walk(node.fn, depth + 1, seen);
@@ -212,6 +233,18 @@ export function summarizeValue(v: Value): ValueSummary {
   }
   const dom = preds?.effectiveDomain() ?? domainOf(v);
 
+  // Phase D1: if the value is a function, compute inferred effects and
+  // (if present) extract declared effects from the `effects_attach`
+  // wrapper at the body root.
+  let inferredEffects: EffectSet | null = null;
+  let declaredEffects: EffectSet | null = null;
+  const fnPrim = primaryOf(v);
+  if (fnPrim.kind === ValueKind.ComposedFunction) {
+    inferredEffects = inferFunctionEffects(fnPrim);
+    const wrap = unwrapEffectsAttach(fnPrim.body);
+    if (wrap) declaredEffects = wrap.declared;
+  }
+
   return {
     kind:             kindAtPrimary,
     typeName,
@@ -226,6 +259,8 @@ export function summarizeValue(v: Value): ValueSummary {
     requires,
     ensures,
     promotionSuggestions,
+    inferredEffects,
+    declaredEffects,
   };
 }
 
@@ -584,6 +619,29 @@ export function renderModuleSummary(summary: ModuleSummary): string {
       for (const c of b.summary.promotionSuggestions) {
         const name = c.bindings[0] ?? "<expr>";
         lines.push(`        promote 'assert ${name} ${formatDomain(c.shape)}' → 'requires …'`);
+      }
+    }
+    // Phase D1: surface inferred and declared effects when the binding is
+    // a function. The format varies by whether a declaration is present
+    // and whether the declaration verified.
+    if (b.summary.inferredEffects) {
+      const inf = b.summary.inferredEffects;
+      const dec = b.summary.declaredEffects;
+      if (dec === null) {
+        lines.push(`      effects:    ${formatEffects(inf)} (inferred)`);
+      } else {
+        const missing = effectDifference(inf, dec);
+        if (missing.size === 0) {
+          // Inferred ⊆ Declared — declaration verifies.
+          if (formatEffects(inf) === formatEffects(dec)) {
+            lines.push(`      effects:    ${formatEffects(dec)} (declared, verified)`);
+          } else {
+            lines.push(`      effects:    ${formatEffects(dec)} (declared) ⊇ ${formatEffects(inf)} (inferred) ✓`);
+          }
+        } else {
+          // Mismatch — declared is missing labels.
+          lines.push(`      effects:    declared \`${formatEffects(dec)}\`, inferred \`${formatEffects(inf)}\` — undeclared: \`${formatEffects(missing)}\` ✗`);
+        }
       }
     }
   }

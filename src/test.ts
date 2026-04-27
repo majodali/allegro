@@ -3652,6 +3652,9 @@ fileTest(path.join(testsDir, "invariant-demo.alg"));
 // Phase C Chunk 3: requires / ensures function-body contracts.
 fileTest(path.join(testsDir, "contracts-demo.alg"));
 
+// Phase D1: function-body effect declarations.
+fileTest(path.join(testsDir, "effects-demo.alg"));
+
 // --- Phase B: abstract-domain unit tests ---
 
 import {
@@ -4076,6 +4079,125 @@ guard(x) =>
   eq(summary.promotionSuggestions.length, 1, "expected one promotion suggestion");
   if (summary.promotionSuggestions.length > 0) {
     eq(summary.promotionSuggestions[0].bindings[0], "x");
+  }
+});
+
+// --- Phase D1: effect types ---
+
+import {
+  PURE, effectUnion, effectSubset, effectDifference, formatEffects,
+  inferFunctionEffects, unwrapEffectsAttach,
+} from "./effects.js";
+import { ComposedFunctionValue } from "./types.js";
+
+test("Phase D1: empty EffectSet formats as 'pure'", () => {
+  eq(formatEffects(PURE), "pure");
+});
+
+test("Phase D1: effectSubset and effectUnion basic ops", () => {
+  const a = new Set(["io"]);
+  const b = new Set(["io", "net"]);
+  eq(effectSubset(a, b), true, "io ⊆ {io,net}");
+  eq(effectSubset(b, a), false, "{io,net} ⊄ {io}");
+  const u = effectUnion(a, b);
+  eq(u.size, 2);
+  eq(u.has("io") && u.has("net"), true);
+});
+
+test("Phase D1: pure function has empty inferred effect set", () => {
+  const src = `f(x) => x + 1\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("f")!.value as Value;
+  const fnP = primaryOf(fn) as ComposedFunctionValue;
+  const inferred = inferFunctionEffects(fnP);
+  eq(inferred.size, 0, "no effects from arithmetic");
+});
+
+test("Phase D1: function calling print infers io", () => {
+  const src = `f(x) =>
+  print(x)
+  x
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("f")!.value as Value;
+  const fnP = primaryOf(fn) as ComposedFunctionValue;
+  const inferred = inferFunctionEffects(fnP);
+  eq(inferred.has("io"), true, `expected io inferred, got: ${[...inferred].join(",")}`);
+});
+
+test("Phase D1: matching declaration verifies (does not halt)", () => {
+  // Directly hand-build the post-preprocessing shape so the test doesn't
+  // need the grammar extension loaded. effects_attach(body, typed_array(io))
+  // declares `io`; the body uses print which infers `io`. Matched.
+  const src = `f(msg) =>
+  effects_attach(
+    seq(print(msg), msg),
+    typed_array(io)
+  )
+`;
+  let threw = false;
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true;
+  }
+  eq(threw, false, "matching declaration should not throw");
+});
+
+test("Phase D1: declaring pure when print is used halts compilation", () => {
+  const src = `bad(msg) =>
+  effects_attach(
+    seq(print(msg), msg),
+    typed_array()
+  )
+
+bad("x")
+`;
+  // typed_array() with no args = empty declared set = pure.
+  // Inferred: io (from print). pure ⊋ io → mismatch.
+  let threw = false;
+  let msg = "";
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true;
+    msg = String(e.message ?? e);
+  }
+  eq(threw, true, "pure declaration with io body should halt");
+  eq(msg.toLowerCase().includes("effects") && msg.toLowerCase().includes("io"), true,
+     `expected effects mismatch mentioning io, got: ${msg}`);
+});
+
+test("Phase D1: introspection surfaces inferred and declared effects", () => {
+  const src = `f(x) =>
+  effects_attach(
+    seq(print(x), x),
+    typed_array(io)
+  )
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("f")!.value!;
+  const summary = _summarizeValueChunk3(fn);
+  eq(summary.inferredEffects?.has("io") ?? false, true);
+  eq(summary.declaredEffects?.has("io") ?? false, true);
+});
+
+test("Phase D1: unwrapEffectsAttach extracts declared label set", () => {
+  const src = `f(x) =>
+  effects_attach(
+    x + 1,
+    typed_array(io, net)
+  )
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("f")!.value!;
+  const fnP = primaryOf(fn) as ComposedFunctionValue;
+  const wrap = unwrapEffectsAttach(fnP.body);
+  eq(wrap !== null, true, "expected effects_attach wrapper");
+  if (wrap) {
+    eq(wrap.declared.has("io"), true);
+    eq(wrap.declared.has("net"), true);
+    eq(wrap.declared.size, 2);
   }
 });
 

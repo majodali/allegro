@@ -13,6 +13,7 @@ import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf, GrammarFragment } from "./types.js";
+import { checkEffectsDeclarations, formatMismatch } from "./effects.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -872,6 +873,22 @@ export function evalSource(
 
   // Pre-compile typed functions: infer return types and detect type errors
   const compilationReport = precompileFunctions(fileCtx, extensions, typed);
+
+  // Phase D1: check effect declarations against inferred sets. Mismatches
+  // (declared ⊉ inferred) are recorded in the compilation report and
+  // surface in the safety summary; we throw immediately so users see the
+  // failure visibly rather than getting a silent error in a binding's
+  // type. Same "build safety in" stance as Phase C contracts.
+  if (typed) {
+    const fxMismatches = checkEffectsDeclarations(fileCtx.bindingList);
+    if (fxMismatches.length > 0) {
+      for (const m of fxMismatches) {
+        compilationReport.errors.push({ name: m.binding, message: formatMismatch(m) });
+      }
+      const lines = fxMismatches.map(m => "  " + formatMismatch(m));
+      throw new Error("effects declaration check failed:\n" + lines.join("\n"));
+    }
+  }
 
   const evalCtx = buildEvalCtx(fileCtx, base, extensions, typed);
   const registry = createRegistry();

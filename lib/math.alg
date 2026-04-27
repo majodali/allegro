@@ -17,6 +17,7 @@
 // caller obligations and implementer guarantees to function definitions.
 
 use contracts
+use effects
 
 export PI = 3.141592653589793
 export E = 2.718281828459045
@@ -32,14 +33,26 @@ export NonNeg      = Int && _ >= 0
 // natural shape for `invariant` rather than refinement-via-`&&`.
 export Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
 
-export sqrt(x) => Float(x).sqrt()
-export pow(x, n) => Float(x).pow(Float(n))
-export abs(x) => if x >= 0 then x else 0 - x
+// Phase D1 pilot: pure math functions declare `effects pure` so the
+// declaration is reviewable in the safety summary alongside contracts.
+// Inferred sets are pure too — these calls only touch arithmetic and
+// type-system primitives, no io/net/time.
+export sqrt(x) =>
+  effects pure
+  Float(x).sqrt()
+export pow(x, n) =>
+  effects pure
+  Float(x).pow(Float(n))
+export abs(x) =>
+  effects pure
+  if x >= 0 then x else 0 - x
 
 // `double_pos` exemplifies the propagation pilot: x is PositiveInt (`_ > 0`,
 // domain `≥ 1`); x + x has domain `≥ 2`; `≥ 2` implies `≥ 1`, so the
 // PositiveInt return type-checks statically with no runtime predicate call.
-export double_pos(x: PositiveInt): PositiveInt => x + x
+export double_pos(x: PositiveInt): PositiveInt =>
+  effects pure
+  x + x
 
 // `divide` exemplifies Phase C Chunk 3 contracts. `requires b != 0` is the
 // caller obligation — runtime-checked at function entry when not already

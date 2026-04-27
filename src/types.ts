@@ -35,6 +35,14 @@ export interface PrimitiveFunctionValue {
   name: string;
   fn: PrimitiveFnImpl;
   lazy?: boolean;
+  /**
+   * Phase D1: optional set of effect labels this primitive produces. Empty
+   * / unset = pure. Labels are extension-provided strings (`io`, `net`,
+   * `time`, `build-io`, …); the core defines none beyond the implicit pure.
+   * The effect inference walker accumulates labels from primitives a
+   * function transitively calls.
+   */
+  effects?: string[];
 }
 
 // --- Param: positional placeholder within function expressions ---
@@ -148,8 +156,9 @@ export function makePrimitive(
   name: string,
   fn: PrimitiveFnImpl,
   lazy?: boolean,
+  effects?: string[],
 ): PrimitiveFunctionValue {
-  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy };
+  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects };
 }
 
 export function makeParam(position: number, name?: string): ParamValue {

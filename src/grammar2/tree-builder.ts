@@ -728,13 +728,16 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     throw new Error("block_expr: empty block");
   }
 
-  // Phase C Chunk 3: extract contract markers from bare-expression stmts.
-  //   requires_stmt(P) → goes to `requiresStmts`, runs at function entry
-  //   ensures_decl(P)  → predicate extracted, lambda built, wraps result
+  // Phase C Chunk 3 + Phase D1: extract contract / effect markers from
+  // bare-expression stmts.
+  //   requires_stmt(P)            → hoisted to function-entry checks
+  //   ensures_decl(P)             → predicate compiled to `(_) => P` lambda
+  //   effects_decl_marker(labels) → declared effect set wraps the result
   // Bindings and ordinary bare expressions stay in `filteredStmts`. Order
   // among non-contract stmts is preserved.
   const requiresStmts: any[] = [];
   const ensuresLambdas: any[] = [];
+  const declaredEffects: any[] = [];   // typed_array Expression of Symbol(label)
   const filteredStmts: BuiltBinding[] = [];
   for (const s of stmts) {
     if (s.key === null && isPrimitiveCall(s.value, "requires_stmt")) {
@@ -748,6 +751,14 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       const predExpr = (s.value as any).args[0];
       const lambda = buildFn(["_"], predExpr);
       ensuresLambdas.push(lambda);
+      continue;
+    }
+    if (s.key === null && isPrimitiveCall(s.value, "effects_decl_marker")) {
+      // Single arg: a typed_array of Symbol(label) values produced by the
+      // grammar's `labels:ident ** ","` repetition. Keep it as-is; the
+      // wrapper code below collects all declarations into one labels array.
+      const labelsArg = (s.value as any).args[0];
+      declaredEffects.push(labelsArg);
       continue;
     }
     filteredStmts.push(s);
@@ -820,9 +831,37 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   const seqArgs: any[] = [];
   for (const r of requiresStmts) seqArgs.push(r);
   for (const b of bareEarly) seqArgs.push(b.value);
-  if (seqArgs.length === 0) return result;
-  seqArgs.push(result);
-  return makeExpr(prim("seq"), seqArgs);
+  if (seqArgs.length > 0) {
+    seqArgs.push(result);
+    result = makeExpr(prim("seq"), seqArgs);
+  }
+
+  // Phase D1: if the block declared effect labels, wrap the (now-sequenced)
+  // result with `effects_attach(result, labels)`. The wrapper is a runtime
+  // passthrough; the inference walker / introspection peel it to recover
+  // the declared label set and check it against the inferred set.
+  if (declaredEffects.length > 0) {
+    // Merge the per-clause typed_array Expressions into one. Each is
+    // `typed_array(Symbol(L1), Symbol(L2), …)`; we union their args.
+    const mergedSymbols: any[] = [];
+    const seenLabels = new Set<string>();
+    for (const labelArr of declaredEffects) {
+      const arr = labelArr;
+      if (!arr || arr.kind !== "Expression") continue;
+      for (const sym of arr.args) {
+        // sym is a Symbol value (or, defensively, anything else — skip).
+        if (sym && sym.kind === "Symbol") {
+          if (seenLabels.has(sym.name)) continue;
+          seenLabels.add(sym.name);
+          mergedSymbols.push(sym);
+        }
+      }
+    }
+    const labelsAst = makeExpr(prim("typed_array"), mergedSymbols);
+    result = makeExpr(prim("effects_attach"), [result, labelsAst]);
+  }
+
+  return result;
 }
 
 // --- String literals (with interpolation) ---
