@@ -136,13 +136,13 @@
 <nav>
   <a href="/" class="logo">Allegro</a>
   <div class="links">
+    <a href="#provability">Provability</a>
     <a href="#basics">Basics</a>
     <a href="#types">Types</a>
     <a href="#patterns">Patterns</a>
     <a href="#collections">Collections</a>
     <a href="#custom-types">Custom Types</a>
     <a href="#interfaces">Interfaces</a>
-    <a href="#refinements">Refinements</a>
     <a href="#mixins">Mixins</a>
     <a href="#async">Async</a>
     <a href="#grammar">Grammar</a>
@@ -154,12 +154,175 @@
 <main>
 
 <h1>Allegro</h1>
-<p class="subtitle">A programmable language platform built on partial evaluation.</p>
+<p class="subtitle">A programmable language platform where correctness is provable by construction.</p>
 
-<p>Allegro is a minimal, flexible core language designed for human-AI collaboration. It provides familiar syntax, a rich type system, and extensible semantics — all built from a small set of primitives and the principle that <strong>partial evaluation is compilation</strong>.</p>
+<p>Allegro is built around a thesis: <strong>code is not the artifact you should review — the semantic summary of the code is</strong>. Refinement types, lifecycle invariants, and function contracts accumulate facts the compiler can prove; the same facts surface in a single safety summary that humans (and AIs) review instead of reading line-by-line. Familiar syntax, an extensible grammar, and partial evaluation as the compilation model are the means; provability is the point.</p>
 
 <div class="note">
-  Allegro is a work in progress. The examples below are live — edit them and click Run to experiment. <a href="/sandbox.html">Open the full sandbox</a> for a richer experience.
+  Allegro is a work in progress. The examples below are live — edit them and click Run to evaluate. Click <strong>Inspect</strong> on any sandbox to see the same code as a structured summary: types, predicates, contracts, safety grade. <a href="/sandbox.html">Open the full sandbox</a> for a richer experience.
+</div>
+
+<!-- ================================================ -->
+<h2 id="provability">Provability — the headline example</h2>
+
+<p>A small banking API demonstrates the four layers of Allegro's provability arc working together: a refinement type, arithmetic propagation, a function contract with <code>requires</code> and <code>ensures</code>, and runtime safety where static proof falls short.</p>
+
+<div class="sandbox" id="s-hero">
+<textarea class="sandbox-editor" rows="22">use contracts
+
+// PositiveInt: an Int constrained to be positive. The constructor checks
+// the predicate; downstream arithmetic propagates the fact (≥ 1) so the
+// compiler can reason about every derived value.
+PositiveInt = Int && _ > 0
+
+// `requires` is the caller's obligation; `ensures` is the implementer's
+// guarantee. `_` in `ensures` refers to the return value.
+deposit(balance: PositiveInt, amount: PositiveInt) =>
+  requires amount > 0
+  ensures _ > balance
+  balance + amount
+
+// Each call's contracts are discharged statically by the predicate set:
+//   - `amount > 0`  follows from amount: PositiveInt        (≥ 1)
+//   - `_ > balance` follows from balance + (≥ 1) ≥ balance + 1
+acc1 = deposit(PositiveInt(100), PositiveInt(50))
+acc2 = deposit(acc1, PositiveInt(25))
+
+print(acc1)   // 150
+print(acc2)   // 175
+// ↑ Click "Inspect" — acc1 carries `≥ 101 [ensures]`, acc2 carries
+//   `≥ 102 [propagation]`. The compiler proved both.</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-hero')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-hero')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<p>The four layers, each with its own playable example:</p>
+<ul>
+  <li><a href="#refinements">Refinement types &amp; domain propagation</a> — facts attached to values flow through arithmetic.</li>
+  <li><a href="#asserts">Asserts</a> — universal in-scope predicates, discharged statically when the compiler can prove them.</li>
+  <li><a href="#invariants">Lifecycle invariants</a> — predicates that hold for every value of a type, checked on construction.</li>
+  <li><a href="#contracts">Contracts</a> — <code>requires</code> / <code>ensures</code> on functions, surfacing in the safety summary.</li>
+</ul>
+
+<!-- ================================================ -->
+<h3 id="refinements">Refinement types &amp; domain propagation</h3>
+
+<p>Constrain existing types with predicates using <code>&&</code>. The <code>_</code> placeholder is the value. Construction and call-site checks fire automatically; the recognised algebraic shape (intervals, equality, inequality) propagates through arithmetic so downstream values inherit the proof.</p>
+
+<div class="sandbox" id="s-refinements">
+<textarea class="sandbox-editor" rows="14">// Refinement type: Int that must be positive.
+PositiveInt = Int && _ > 0
+print(PositiveInt(5))           // 5
+
+// Construction check fails when the predicate is false.
+print(PositiveInt(0 - 3))        // error(refinement check failed)
+
+// Compound predicates compose via `&&` inside the predicate body.
+SmallPos = Int && _ > 0 && _ < 100
+print(SmallPos(50))              // 50
+
+// Domain propagation: x: PositiveInt has domain ≥ 1, so x + x has ≥ 2,
+// which entails ≥ 1 — the return-type check is discharged statically.
+double_pos(x: PositiveInt): PositiveInt => x + x
+print(double_pos(PositiveInt(7)))   // 14
+// Click Inspect: every binding shows its proven predicate set.</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-refinements')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-refinements')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<!-- ================================================ -->
+<h3 id="asserts">Asserts</h3>
+
+<p>Activate <code>use invariants</code> for a universal <code>assert</code> statement. The predicate is checked against the binding's accumulated facts: if entailed, the runtime check disappears and the proven fact joins the binding's predicate set. If not, a runtime check fires and a failed assert halts visibly with a counterexample (no silent error values — build safety in).</p>
+
+<div class="sandbox" id="s-asserts">
+<textarea class="sandbox-editor" rows="14">use invariants
+
+PositiveInt = Int && _ > 0
+
+x = PositiveInt(5)         // ≥ 1 [refinement-type]
+y = x + 10                  // ≥ 11 [propagation]
+
+// Statically discharged — no runtime cost.
+assert y > 5
+
+// Branch refinement: the then-branch knows x > 100; the else-branch
+// knows x ≤ 100. Each branch's predicate set narrows accordingly.
+big = if x > 100 then x + 50 else 0
+print(big)                  // 0 (x = 5)
+
+// Subsequent code inherits proven facts.
+z = x + 5                   // ≥ 6 [propagation]
+assert z > 5                // also discharged
+print(z)                    // 10</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-asserts')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-asserts')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<!-- ================================================ -->
+<h3 id="invariants">Lifecycle invariants</h3>
+
+<p><code>Type.invariant(self => P)</code> declares a predicate that holds for every value of the type. The constructor checks every clause; multi-clause chaining reports per-clause failure messages. Multi-field invariants reference fields via <code>self.field</code>.</p>
+
+<div class="sandbox" id="s-invariants">
+<textarea class="sandbox-editor" rows="14">// Single-value invariant — equivalent to `Int && _ > 0` but composes
+// fluently when multiple constraints chain.
+PositiveInt = Int.invariant(self => self > 0)
+print(PositiveInt(10))           // 10
+
+// Multi-field record invariant: `lo <= hi` ties two fields together —
+// the natural shape for `invariant` rather than refinement-via-`&&`.
+Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+ok = Range(1, 100)
+print(ok.lo)                      // 1
+
+bad = Range(50, 5)
+print(error of bad)              // invariant 1 failed
+
+// Chained: per-clause failure messages.
+SmallPos = Int.invariant(self => self > 0).invariant(self => self < 100)
+print(SmallPos(50))              // 50
+print(error of SmallPos(0))      // invariant 1 failed
+print(error of SmallPos(200))    // invariant 2 failed</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-invariants')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-invariants')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<!-- ================================================ -->
+<h3 id="contracts">Contracts: <code>requires</code> &amp; <code>ensures</code></h3>
+
+<p>Function bodies declare contracts at the head. <code>requires P</code> is a caller obligation; <code>ensures P</code> is an implementer guarantee, with <code>_</code> referring to the return value. Predicate-set entailment short-circuits both runtime checks; the post-condition attaches to the result so callers see the proven fact.</p>
+
+<div class="sandbox" id="s-contracts">
+<textarea class="sandbox-editor" rows="18">use contracts
+
+PositiveInt = Int && _ > 0
+
+// Both contract clauses present. The ensures is statically discharged
+// because x + x with x ≥ 1 propagates to _ ≥ 2, which entails _ ≥ 1.
+double_pos(x) =>
+  requires x > 0
+  ensures _ > 0
+  x + x
+
+print(double_pos(5))             // 10
+print(double_pos(100))           // 200
+
+// Multi-clause ensures. Both post-conditions check at return; both
+// attach to the result on success.
+clamp_to_range(x, lo, hi) =>
+  requires lo < hi
+  ensures _ >= lo
+  ensures _ <= hi
+  if x < lo then lo
+    else if x > hi then hi
+    else x
+
+print(clamp_to_range(50, 0, 100))     // 50
+print(clamp_to_range(150, 0, 100))    // 100
+// Click Inspect: every function lists its requires and ensures.</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-contracts')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-contracts')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
 <!-- ================================================ -->
@@ -312,36 +475,6 @@ print(42 instanceof Sized)
 // Interfaces are structural types
 print(Printable instanceof Type)</textarea>
 <div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-interfaces')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-interfaces')">Inspect</button></div><span class="timing"></span></div>
-<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
-</div>
-
-<!-- ================================================ -->
-<h2 id="refinements">Refinement Types</h2>
-
-<p>Constrain existing types with predicates using <code>&&</code>. The <code>_</code> placeholder refers to the value. Predicates are checked at construction and at function call sites.</p>
-
-<div class="sandbox" id="s-refinements">
-<textarea class="sandbox-editor" rows="14">// Refinement type: Int that must be positive
-PositiveInt = Int && _ > 0
-print(PositiveInt(5))
-
-// Construction check — fails when predicate is false
-print(PositiveInt(0 - 3))
-
-// Compound predicate
-SmallPos = Int && _ > 0 && _ < 100
-print(SmallPos(50))
-
-// Function with refined parameter
-double(x: PositiveInt): Int => x * 2
-print(double(7))
-
-// preserveOps: operators re-check the predicate
-PI = (Int && _ > 0).preserveOps()
-x = PI(5)
-print(x + 3)
-print(x instanceof PI)</textarea>
-<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-refinements')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-refinements')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
