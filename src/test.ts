@@ -4314,6 +4314,174 @@ test("Phase D1: unwrapEffectsAttach extracts declared label set", () => {
   }
 });
 
+// --- Phase D1 sub-chunk 1.2: effects in PredicateSet ---
+
+import {
+  effectsDomain, formatDomain, intersectDomains, joinDomains, impliesDomain,
+  PredicateSet, makePredicate, entailsPredicate,
+} from "./refinements.js";
+import {
+  effectPredicatesForFunction, effectPredicatesForValue,
+} from "./effects.js";
+
+test("Phase D1.2: effectsDomain constructor builds EffectsDomain", () => {
+  const d = effectsDomain(["io", "time"]);
+  eq(d.kind, "effects");
+  eq(d.labels.has("io"), true);
+  eq(d.labels.has("time"), true);
+});
+
+test("Phase D1.2: effectsDomain empty renders as 'pure'", () => {
+  eq(formatDomain(effectsDomain()), "pure");
+});
+
+test("Phase D1.2: effectsDomain renders alphabetised", () => {
+  eq(formatDomain(effectsDomain(["time", "io", "net"])), "io, net, time");
+});
+
+test("Phase D1.2: intersectDomains effects ∩ effects = label intersection", () => {
+  const r = intersectDomains(effectsDomain(["io", "time"]), effectsDomain(["io", "net"]));
+  eq(r.kind, "effects");
+  if (r.kind === "effects") {
+    eq(r.labels.size, 1);
+    eq(r.labels.has("io"), true);
+  }
+});
+
+test("Phase D1.2: joinDomains effects ∪ effects = label union", () => {
+  const r = joinDomains(effectsDomain(["io"]), effectsDomain(["net", "time"]));
+  eq(r.kind, "effects");
+  if (r.kind === "effects") {
+    eq(r.labels.size, 3);
+  }
+});
+
+test("Phase D1.2: impliesDomain on effects (wider implies narrower)", () => {
+  // {io, net} implies {io} — having both covers a check for just io
+  eq(impliesDomain(effectsDomain(["io", "net"]), effectsDomain(["io"])), true);
+  // {io} does NOT imply {io, net} — narrower can't cover wider
+  eq(impliesDomain(effectsDomain(["io"]), effectsDomain(["io", "net"])), false);
+  // Equal sets imply each other
+  eq(impliesDomain(effectsDomain(["io"]), effectsDomain(["io"])), true);
+  // pure (empty) implies pure but nothing else
+  eq(impliesDomain(effectsDomain(), effectsDomain()), true);
+  eq(impliesDomain(effectsDomain(), effectsDomain(["io"])), false);
+  // Anything implies pure (the empty set is universally entailed)
+  eq(impliesDomain(effectsDomain(["io"]), effectsDomain()), true);
+});
+
+test("Phase D1.2: mixed-kind operations don't pollute results", () => {
+  const intv = { kind: "interval" as const, lo: 0, hi: 10 };
+  const fx = effectsDomain(["io"]);
+  // Mixed-kind intersect/join → opaque (no useful combination)
+  eq(intersectDomains(intv, fx).kind, "opaque");
+  eq(joinDomains(intv, fx).kind, "opaque");
+  // Mixed-kind implies → false
+  eq(impliesDomain(intv, fx), false);
+  eq(impliesDomain(fx, intv), false);
+});
+
+test("Phase D1.2: PredicateSet.effectiveEffects unions effects predicates", () => {
+  const set = new PredicateSet([
+    makePredicate(effectsDomain(["io"]), "effects-declared"),
+    makePredicate(effectsDomain(["time"]), "effects-inferred"),
+    // Numeric predicate should be ignored by effectiveEffects
+    makePredicate({ kind: "interval", lo: 0, hi: 10 }, "refinement-type"),
+  ]);
+  const fx = set.effectiveEffects();
+  eq(fx !== null, true);
+  if (fx) {
+    eq(fx.kind, "effects");
+    eq(fx.labels.size, 2);
+    eq(fx.labels.has("io"), true);
+    eq(fx.labels.has("time"), true);
+  }
+});
+
+test("Phase D1.2: PredicateSet.effectiveDomain skips effects predicates", () => {
+  const set = new PredicateSet([
+    makePredicate(effectsDomain(["io"]), "effects-declared"),
+    makePredicate({ kind: "interval", lo: 0, hi: 10 }, "refinement-type"),
+  ]);
+  const dom = set.effectiveDomain();
+  eq(dom !== null, true);
+  // Should be the interval, not the effects domain
+  eq(dom!.kind, "interval");
+});
+
+test("Phase D1.2: entailsPredicate works for effects targets", () => {
+  const set = new PredicateSet([
+    makePredicate(effectsDomain(["io", "net"]), "effects-declared"),
+  ]);
+  // Set says {io, net}, target {io} — entailed (wider covers narrower)
+  eq(entailsPredicate(set, effectsDomain(["io"])), true);
+  // Target {time} — not entailed
+  eq(entailsPredicate(set, effectsDomain(["time"])), false);
+});
+
+test("Phase D1.2: effectPredicatesForFunction yields inferred predicate for pure body", () => {
+  const src = `
+sq(x) =>
+  x * x
+sq
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("sq")!.value!;
+  const set = effectPredicatesForValue(fn);
+  eq(set !== null, true);
+  if (set) {
+    // Just an inferred predicate (no `effects` clause)
+    const inf = set.preds.find(p => p.source === "effects-inferred");
+    eq(inf !== undefined, true);
+    if (inf && inf.shape.kind === "effects") {
+      eq(inf.shape.labels.size, 0);
+    }
+  }
+});
+
+test("Phase D1.2: effectPredicatesForFunction yields inferred io for print body", () => {
+  const src = `
+greet(name) =>
+  print("hi " + name)
+  name
+greet
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("greet")!.value!;
+  const set = effectPredicatesForValue(fn);
+  eq(set !== null, true);
+  if (set) {
+    const inf = set.preds.find(p => p.source === "effects-inferred");
+    eq(inf !== undefined, true);
+    if (inf && inf.shape.kind === "effects") {
+      eq(inf.shape.labels.has("io"), true);
+    }
+  }
+});
+
+test("Phase D1.2: effectPredicatesForFunction surfaces both declared and inferred", () => {
+  // Use the same direct primitive shape the chunk-1 tests use, to avoid
+  // depending on the `use effects` grammar load path here.
+  const src = `f(x) =>
+  effects_attach(
+    seq(print(x), x),
+    typed_array(io)
+  )
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("f")!.value!;
+  const set = effectPredicatesForValue(fn);
+  eq(set !== null, true);
+  if (set) {
+    const dec = set.preds.find(p => p.source === "effects-declared");
+    const inf = set.preds.find(p => p.source === "effects-inferred");
+    eq(dec !== undefined, true);
+    eq(inf !== undefined, true);
+    if (dec && dec.shape.kind === "effects") eq(dec.shape.labels.has("io"), true);
+    if (inf && inf.shape.kind === "effects") eq(inf.shape.labels.has("io"), true);
+  }
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

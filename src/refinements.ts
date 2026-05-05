@@ -66,7 +66,34 @@ export interface OpaqueDomain {
   predicate: Value;
 }
 
-export type AbstractDomain = IntervalDomain | NotEqualDomain | EqualDomain | OpaqueDomain;
+/**
+ * Phase D1 sub-chunk 1.2: an effect-set domain. Carries a flat label set —
+ * the same `Set<string>` representation chunk-1 used in `src/effects.ts`,
+ * lifted into the predicate-set machinery so that effect facts compose with
+ * numeric refinements through the same lattice operations.
+ *
+ * `pure` is the empty set; `opaque` (Slice 2's universal effect) is currently
+ * encoded by callers outside this domain — we'll formalise it when anonymous
+ * conjunctions land. For 1.2, the labels are concrete strings tagged with
+ * `source: "effects-inferred"` (from `inferFunctionEffects`) or
+ * `source: "effects-declared"` (from an `effects` body-form clause).
+ */
+export interface EffectsDomain {
+  kind:   "effects";
+  labels: Set<string>;
+}
+
+export type AbstractDomain =
+  | IntervalDomain
+  | NotEqualDomain
+  | EqualDomain
+  | OpaqueDomain
+  | EffectsDomain;
+
+/** Convenience constructor — labels Set defaulting to empty (= `pure`). */
+export function effectsDomain(labels: Iterable<string> = []): EffectsDomain {
+  return { kind: "effects", labels: new Set(labels) };
+}
 
 /** Short human-readable rendering of a domain (used by introspect output). */
 export function formatDomain(d: AbstractDomain): string {
@@ -83,6 +110,8 @@ export function formatDomain(d: AbstractDomain): string {
     case "ne":   return `≠ ${d.value}`;
     case "eq":   return `== ${d.value}`;
     case "opaque": return "<predicate>";
+    case "effects":
+      return d.labels.size === 0 ? "pure" : [...d.labels].sort().join(", ");
   }
 }
 
@@ -230,6 +259,18 @@ function swapComparison(op: string): string {
 
 /** Tightest domain implied by both inputs (conjunction). */
 export function intersectDomains(a: AbstractDomain, b: AbstractDomain): AbstractDomain {
+  // Effects: intersection of label sets. Mixed-kind operands fall through
+  // to opaque — there's no useful intersection between a numeric refinement
+  // and an effect bound; they describe orthogonal concerns and should never
+  // be combined into a single domain.
+  if (a.kind === "effects" && b.kind === "effects") {
+    const labels = new Set<string>();
+    for (const l of a.labels) if (b.labels.has(l)) labels.add(l);
+    return { kind: "effects", labels };
+  }
+  if (a.kind === "effects" || b.kind === "effects") {
+    return { kind: "opaque", predicate: makeInt(0) };
+  }
   const ai = toInterval(a);
   const bi = toInterval(b);
   if (ai && bi) {
@@ -242,6 +283,14 @@ export function intersectDomains(a: AbstractDomain, b: AbstractDomain): Abstract
 /** Loosest domain containing both inputs (disjunction / least upper bound).
  *  Used when a value could come from either of two paths. */
 export function joinDomains(a: AbstractDomain, b: AbstractDomain): AbstractDomain {
+  if (a.kind === "effects" && b.kind === "effects") {
+    const labels = new Set<string>(a.labels);
+    for (const l of b.labels) labels.add(l);
+    return { kind: "effects", labels };
+  }
+  if (a.kind === "effects" || b.kind === "effects") {
+    return { kind: "opaque", predicate: makeInt(0) };
+  }
   const ai = toInterval(a);
   const bi = toInterval(b);
   if (ai && bi) {
@@ -308,6 +357,13 @@ export function propagateNeg(a: AbstractDomain): AbstractDomain {
  *  satisfies `b`.) Used for subtyping on refinements. */
 export function impliesDomain(a: AbstractDomain, b: AbstractDomain): boolean {
   if (b.kind === "opaque") return false;    // can't verify an opaque predicate
+  // Effects: a implies b iff b's labels ⊆ a's labels (having the wider effect
+  // set covers a check for a narrower one). Mixed-kind never implies.
+  if (a.kind === "effects" && b.kind === "effects") {
+    for (const l of b.labels) if (!a.labels.has(l)) return false;
+    return true;
+  }
+  if (a.kind === "effects" || b.kind === "effects") return false;
   const ai = toInterval(a);
   const bi = toInterval(b);
   if (ai && bi) {
@@ -375,6 +431,8 @@ export type PredicateSource =
   | "ensures"           // from a function's ensures clause — Chunk 3
   | "propagation"       // derived by arithmetic propagation
   | "literal"           // from a literal value's known constant
+  | "effects-declared"  // from an `effects` body-form clause — D1 sub-chunk 1.2
+  | "effects-inferred"  // from bottom-up effect inference — D1 sub-chunk 1.2
   ;
 
 export interface Predicate {
@@ -399,20 +457,39 @@ export class PredicateSet {
   /** Iterator support so callers can `for (const p of set)`. */
   [Symbol.iterator](): Iterator<Predicate> { return this.preds[Symbol.iterator](); }
 
-  /** Effective single domain: intersect all non-opaque predicates so callers
-   *  that need a single domain (legacy `domainOf` callers) get the tightest
-   *  algebraic fact available. Returns the first opaque predicate's domain
-   *  if no algebraic facts exist. */
+  /** Effective single domain: intersect all non-opaque numeric predicates so
+   *  callers that need a single domain (legacy `domainOf` callers) get the
+   *  tightest algebraic fact available. Effects predicates are excluded —
+   *  they describe an orthogonal axis and have their own accessor below.
+   *  Returns the first non-numeric predicate's domain if no algebraic facts
+   *  exist. */
   effectiveDomain(): AbstractDomain | null {
     if (this.preds.length === 0) return null;
     let result: AbstractDomain | null = null;
     for (const p of this.preds) {
-      if (p.shape.kind === "opaque") continue;
+      if (p.shape.kind === "opaque" || p.shape.kind === "effects") continue;
       if (result === null) result = p.shape;
       else result = intersectDomains(result, p.shape);
     }
     if (result) return result;
-    return this.preds[0].shape;   // fall back to first opaque
+    // Fall back to first non-effects predicate's shape, then to anything.
+    for (const p of this.preds) if (p.shape.kind !== "effects") return p.shape;
+    return this.preds[0].shape;
+  }
+
+  /** Effective effects domain: union of all effects-source predicates. The
+   *  declared bound is propagated as-is (it's a constraint), the inferred
+   *  set is propagated as-is. Callers asking "what effects does this binding
+   *  report" get one combined view. Returns null when no effects predicates
+   *  are present. */
+  effectiveEffects(): EffectsDomain | null {
+    let result: EffectsDomain | null = null;
+    for (const p of this.preds) {
+      if (p.shape.kind !== "effects") continue;
+      if (result === null) result = { kind: "effects", labels: new Set(p.shape.labels) };
+      else for (const l of p.shape.labels) result.labels.add(l);
+    }
+    return result;
   }
 }
 
@@ -499,6 +576,12 @@ function domainsStructurallyEqual(a: AbstractDomain, b: AbstractDomain): boolean
     case "eq":       return a.value === (b as EqualDomain).value;
     case "ne":       return a.value === (b as NotEqualDomain).value;
     case "opaque":   return a.predicate === (b as OpaqueDomain).predicate;
+    case "effects": {
+      const bl = (b as EffectsDomain).labels;
+      if (a.labels.size !== bl.size) return false;
+      for (const l of a.labels) if (!bl.has(l)) return false;
+      return true;
+    }
   }
 }
 

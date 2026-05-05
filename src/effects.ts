@@ -27,6 +27,9 @@
 import {
   Value, ValueKind, ComposedFunctionValue, primaryOf,
 } from "./types.js";
+import {
+  EffectsDomain, Predicate, PredicateSet, makePredicate,
+} from "./refinements.js";
 
 // =============================================================================
 // EffectSet — a set of label strings.
@@ -214,6 +217,51 @@ function asFunction(v: Value): ComposedFunctionValue | null {
   const p = primaryOf(v);
   if (p.kind === ValueKind.ComposedFunction) return p;
   return null;
+}
+
+// =============================================================================
+// Predicate-set bridge (Phase D1 sub-chunk 1.2)
+// =============================================================================
+//
+// The chunk-1 representation stores effect data via two channels: a body wrap
+// (`effects_attach(body, labels)`) for declared sets, and a transitive walk
+// (`inferFunctionEffects`) for inferred sets. Sub-chunk 1.2 lifts both into
+// PredicateSet entries so introspection, asserts, and (in Slice 2) HOF
+// annotations see a single uniform "facts about this binding" surface.
+//
+// The underlying chunk-1 storage is unchanged — this layer derives predicates
+// on demand. Storage migration (replacing `effects_attach` with a direct
+// predicate attachment on the function MultiValue) is deferred to Slice 2,
+// where it interacts with the param-effect-bound work.
+
+/** Build a `PredicateSet` view of a function's effect data: one predicate per
+ *  source (declared / inferred), shape = EffectsDomain over the underlying
+ *  flat label set. Returns an empty set if the function has neither a declared
+ *  bound nor any inferred effects. */
+export function effectPredicatesForFunction(fn: ComposedFunctionValue): PredicateSet {
+  const preds: Predicate[] = [];
+  const wrap = unwrapEffectsAttach(fn.body);
+  if (wrap) {
+    const dom: EffectsDomain = { kind: "effects", labels: new Set(wrap.declared) };
+    preds.push(makePredicate(dom, "effects-declared"));
+  }
+  const inferred = inferFunctionEffects(fn);
+  // Always emit an inferred predicate (even when empty = pure) so consumers
+  // can distinguish "no inference run" from "inference produced pure". This
+  // mirrors how introspection's three render formats treat the inferred set
+  // as always present for function values.
+  const infDom: EffectsDomain = { kind: "effects", labels: new Set(inferred) };
+  preds.push(makePredicate(infDom, "effects-inferred"));
+  return new PredicateSet(preds);
+}
+
+/** Locate the effects declaration on a function value (peeling typed-function
+ *  envelope) and return its `PredicateSet`. Convenience wrapper that handles
+ *  the common MultiValue-wrapped function case. */
+export function effectPredicatesForValue(v: Value): PredicateSet | null {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.ComposedFunction) return null;
+  return effectPredicatesForFunction(p);
 }
 
 /** For each named binding in `ctx`, if it's a function with an `effects`
