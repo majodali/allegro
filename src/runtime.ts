@@ -13,7 +13,7 @@ import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf, GrammarFragment } from "./types.js";
-import { checkEffectsDeclarations, formatMismatch } from "./effects.js";
+import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -454,6 +454,20 @@ function markTailCallsInValue(v: any, seen: Set<any>): void {
 
 // --- Compilation Report ---
 
+/** Notification — informational diagnostic that does NOT halt compilation by
+ *  default. Per-project severity (notification → error / warning / ignore) is
+ *  tracked separately on the backlog; for now notifications are surfaced as
+ *  their own collection alongside errors and warnings, never blocking. */
+export interface Notification {
+  /** Tag identifying the rule that fired. Stable string for project config
+   *  to filter on. Examples: `"effects-opaque-from-stdlib-hof"`. */
+  kind:     string;
+  /** Human-readable message. */
+  message:  string;
+  /** Binding the notification is anchored to, if applicable. */
+  binding?: string;
+}
+
 export interface CompilationReport {
   /** Functions with inferred return types */
   inferred: { name: string; returnType: string }[];
@@ -463,6 +477,9 @@ export interface CompilationReport {
   unresolved: string[];
   /** Inferred types for all bindings (populated during evaluation) */
   bindingTypes: Map<string, string>;
+  /** Phase D1 sub-chunk 1.3: informational diagnostics with project-
+   *  configurable severity. Does not halt compilation in this slice. */
+  notifications: Notification[];
 }
 
 /**
@@ -474,7 +491,7 @@ function precompileFunctions(
   extensions?: Extension[],
   typed?: boolean,
 ): CompilationReport {
-  const report: CompilationReport = { inferred: [], errors: [], unresolved: [], bindingTypes: new Map() };
+  const report: CompilationReport = { inferred: [], errors: [], unresolved: [], bindingTypes: new Map(), notifications: [] };
   if (!typed) return report;
 
   // Build a minimal context for pre-compilation (primitives + extensions)
@@ -875,10 +892,11 @@ export function evalSource(
   const compilationReport = precompileFunctions(fileCtx, extensions, typed);
 
   // Phase D1: check effect declarations against inferred sets. Mismatches
-  // (declared ⊉ inferred) are recorded in the compilation report and
-  // surface in the safety summary; we throw immediately so users see the
-  // failure visibly rather than getting a silent error in a binding's
-  // type. Same "build safety in" stance as Phase C contracts.
+  // (declared ⊉ inferred, ignoring "opaque" which is a Slice-1 placeholder
+  // from stdlib HOF calls) are recorded as errors and halt compilation.
+  // Opaque-only inferences become informational notifications (sub-chunk
+  // 1.3) so callers using `effects pure` over Array.map don't fail
+  // spuriously while soundness is being completed in Slice 2.
   if (typed) {
     const fxMismatches = checkEffectsDeclarations(fileCtx.bindingList);
     if (fxMismatches.length > 0) {
@@ -887,6 +905,13 @@ export function evalSource(
       }
       const lines = fxMismatches.map(m => "  " + formatMismatch(m));
       throw new Error("effects declaration check failed:\n" + lines.join("\n"));
+    }
+    for (const n of opaqueEffectNotices(fileCtx.bindingList)) {
+      compilationReport.notifications.push({
+        kind:    "effects-opaque-from-stdlib-hof",
+        binding: n.binding,
+        message: n.message,
+      });
     }
   }
 

@@ -1099,12 +1099,17 @@ const getterNames = new Set(["length"]);
  *
  * @param name     Type name (e.g., "Int", "String")
  * @param methods  Instance methods (dispatched via type_dispatch on values of this type)
- * @param options  Optional: extends (parent type)
+ * @param options  Optional:
+ *   - extends: parent type
+ *   - methodEffects: per-method effect label list. Used to tag stdlib HOFs
+ *     (`Array.map`, etc.) as `opaque` so callers' inferred effect sets reflect
+ *     "may do anything the callback does" until Slice 2's effect polymorphism
+ *     gives them precise types.
  */
 function buildType(
   name: string,
   methods: Record<string, PrimitiveFnImpl>,
-  options?: { extends?: ContextValue },
+  options?: { extends?: ContextValue; methodEffects?: Record<string, string[]> },
 ): ContextValue {
   const ctx = makeContext();
   addBinding(ctx, "__name", stringToBits(name));
@@ -1115,7 +1120,8 @@ function buildType(
   // Build __members with Method descriptors
   const members = makeContext();
   for (const [key, fn] of Object.entries(methods)) {
-    const prim = makePrimitive(`${name}.${key}`, fn);
+    const fxLabels = options?.methodEffects?.[key];
+    const prim = makePrimitive(`${name}.${key}`, fn, false, fxLabels);
     const isGetter = getterNames.has(key);
     addBinding(members, key, makeMethodDescriptor(key, prim, isGetter));
   }
@@ -1859,6 +1865,7 @@ export function buildGenericType(
   paramNames: string[],
   methods: Record<string, PrimitiveFnImpl>,
   makeConcreteType?: (generic: ContextValue, args: Value[]) => ContextValue,
+  options?: { methodEffects?: Record<string, string[]> },
 ): ContextValue {
   // Memoization cache: keyed by arg identity (reference equality)
   const cache = new Map<string, ContextValue>();
@@ -1910,7 +1917,7 @@ export function buildGenericType(
   }
 
   // Build the base type with methods + generic metadata
-  const ctx = buildType(name, methods);
+  const ctx = buildType(name, methods, { methodEffects: options?.methodEffects });
 
   // Add __params (use raw array to avoid circular dep with ArrayType)
   const paramsKey = "__params";
@@ -1928,7 +1935,7 @@ export function buildGenericType(
     if (makeConcreteType) {
       concrete = makeConcreteType(ctx, args);
     } else {
-      concrete = defaultConcreteType(ctx, name, args, methods);
+      concrete = defaultConcreteType(ctx, name, args, methods, options?.methodEffects);
     }
     cache.set(key, concrete);
     return concrete;
@@ -1955,8 +1962,9 @@ function defaultConcreteType(
   name: string,
   args: Value[],
   methods: Record<string, PrimitiveFnImpl>,
+  methodEffects?: Record<string, string[]>,
 ): ContextValue {
-  const concrete = buildType(name, methods);
+  const concrete = buildType(name, methods, { methodEffects });
 
   // __generic: reference to the generic type
   const genKey = "__generic";
@@ -2041,7 +2049,17 @@ export function applyGenericType(generic: ContextValue, args: Value[]): ContextV
 // Array as GenericType
 // =============================================================================
 
-export const ArrayType: ContextValue = buildGenericType("Array", ["T"], arrayMethods);
+export const ArrayType: ContextValue = buildGenericType(
+  "Array",
+  ["T"],
+  arrayMethods,
+  undefined,
+  // Phase D1 sub-chunk 1.3: until Slice 2's effect polymorphism lands,
+  // map/filter/reduce can do anything their callback does. Tag as `opaque`
+  // so callers' inferred sets reflect the soundness limit; the analyzer
+  // emits a notification rather than halting (callbacks are usually pure).
+  { methodEffects: { map: ["opaque"], filter: ["opaque"], reduce: ["opaque"] } },
+);
 
 // =============================================================================
 // Function Type (Generic)

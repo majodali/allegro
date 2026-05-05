@@ -4482,6 +4482,71 @@ test("Phase D1.2: effectPredicatesForFunction surfaces both declared and inferre
   }
 });
 
+// --- Phase D1 sub-chunk 1.3: opaque marking + Notification category ---
+
+test("Phase D1.3: CompilationReport carries notifications array", () => {
+  const src = `x = 42\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(Array.isArray(compilationReport!.notifications), true);
+});
+
+test("Phase D1.3: function calling Array.map gets opaque in inferred set", () => {
+  const src = `dbl(arr) =>
+  arr.map(x => x * 2)
+dbl
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("dbl")!.value!;
+  // inferFunctionEffects on a ComposedFunction calling Array.map should
+  // include "opaque" because Array.map's primitive carries effects=["opaque"].
+  const fnP = primaryOf(fn);
+  eq(fnP.kind, ValueKind.ComposedFunction);
+  if (fnP.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fnP);
+    eq(inferred.has("opaque"), true);
+  }
+});
+
+test("Phase D1.3: opaque-from-stdlib-hof emits a notification", () => {
+  const src = `dbl(arr) =>
+  arr.map(x => x * 2)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(n => n.kind === "effects-opaque-from-stdlib-hof");
+  eq(notes.length >= 1, true);
+  eq(notes.some(n => n.binding === "dbl"), true);
+});
+
+test("Phase D1.3: function with effects pure calling map does NOT halt (notification only)", () => {
+  // Without 1.3's filter, this would error: declared pure but inferred {opaque}.
+  // With the filter, opaque is excluded from mismatch check; instead a
+  // notification is emitted. The user's pure declaration is accepted.
+  const src = `dbl(arr) =>
+  effects_attach(
+    arr.map(x => x * 2),
+    typed_array()
+  )
+`;
+  let threw = false;
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true;
+  }
+  eq(threw, false, "opaque-only mismatch should not halt compilation");
+});
+
+test("Phase D1.3: pure function NOT calling stdlib HOF emits no opaque notification", () => {
+  const src = `sq(x) =>
+  x * x
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "effects-opaque-from-stdlib-hof" && n.binding === "sq"
+  );
+  eq(notes.length, 0);
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

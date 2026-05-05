@@ -1775,7 +1775,10 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
             const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
             return (impl as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
           };
-          return makePrimitive(`bound:${fieldName}`, boundFn, true);
+          // Propagate the underlying primitive's effects so dot-dispatch
+          // doesn't strip them. Critical for stdlib HOFs (Array.map, etc.)
+          // tagged opaque in sub-chunk 1.3.
+          return makePrimitive(`bound:${fieldName}`, boundFn, true, (impl as PrimitiveFunctionValue).effects);
         }
         if (impl?.kind === ValueKind.ComposedFunction) {
           // Mixin/user-defined method — pass full typed obj as self for field/method access
@@ -1808,7 +1811,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
           const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
           return method.fn([selfVal, ...evalArgs], callCtx, callEvalFn);
         };
-        return makePrimitive(`bound:${fieldName}`, boundFn, true);
+        return makePrimitive(`bound:${fieldName}`, boundFn, true, method.effects);
       }
       return method;
     }
@@ -1844,7 +1847,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
               const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
               return (metaImpl as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
             };
-            return makePrimitive(`bound:${fieldName}`, boundFn, true);
+            return makePrimitive(`bound:${fieldName}`, boundFn, true, (metaImpl as PrimitiveFunctionValue).effects);
           }
           if (metaImpl?.kind === ValueKind.ComposedFunction) {
             // User-defined meta-method (e.g., a type-level method added via
@@ -1870,7 +1873,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
             const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
             return (metaMethod as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
           };
-          return makePrimitive(`bound:${fieldName}`, boundFn, true);
+          return makePrimitive(`bound:${fieldName}`, boundFn, true, (metaMethod as PrimitiveFunctionValue).effects);
         }
         if (metaMethod.kind === ValueKind.ComposedFunction) {
           const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {

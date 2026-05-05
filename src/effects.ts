@@ -25,7 +25,8 @@
 // =============================================================================
 
 import {
-  Value, ValueKind, ComposedFunctionValue, primaryOf,
+  Value, ValueKind, ComposedFunctionValue, primaryOf, BitsValue,
+  bitsToString,
 } from "./types.js";
 import {
   EffectsDomain, Predicate, PredicateSet, makePredicate,
@@ -132,6 +133,12 @@ export function inferFunctionEffects(
   return walkValueEffects(fn.body, seen);
 }
 
+/** Method names recognised as higher-order functions on stdlib types. When
+ *  the static walker sees `type_dispatch(obj, "map" | "filter" | "reduce")`,
+ *  it conservatively adds `opaque` to the inferred effect set. Sub-chunk 1.3
+ *  placeholder until Slice 2's effect-polymorphism resolves precisely. */
+const HOF_METHOD_NAMES: Set<string> = new Set(["map", "filter", "reduce"]);
+
 /** Walk an arbitrary Value tree and accumulate the effects from its
  *  primitive calls and transitively-called functions. Used internally
  *  by inferFunctionEffects; exposed for tests. */
@@ -162,8 +169,30 @@ export function walkValueEffects(v: Value, seen: Set<ComposedFunctionValue>): Ef
       // Effects from the function being called.
       if (fn0.kind === ValueKind.PrimitiveFunction) {
         if (fn0.effects) for (const e of fn0.effects) result.add(e);
+        // Phase D1 sub-chunk 1.3: dot-dispatch on an unresolved object goes
+        // through `type_dispatch(obj, fieldName)`, returning a bound method.
+        // Static inference can't follow into the runtime dispatch, but for
+        // known stdlib HOF method names we conservatively mark `opaque` so
+        // callers' inferred sets reflect the soundness limit. Slice 2's
+        // effect polymorphism will replace this with precise inference.
+        if (fn0.name === "type_dispatch" && v.args.length === 2) {
+          const fieldArg = primaryOf(v.args[1]);
+          if (fieldArg.kind === ValueKind.Bits) {
+            const fieldName = bitsToString(fieldArg as BitsValue);
+            if (HOF_METHOD_NAMES.has(fieldName)) result.add("opaque");
+          }
+        }
       } else if (fn0.kind === ValueKind.ComposedFunction) {
         for (const e of inferFunctionEffects(fn0, seen)) result.add(e);
+      }
+      // If `v.fn` is itself a complex expression (e.g. a `type_dispatch` call
+      // producing a bound method, an `if-then-else` choosing between funcs,
+      // a higher-order pipeline), walk it too so its constituent effects are
+      // collected. Without this, `arr.map(cb)` would lose Array.map's tag
+      // entirely because the call's `fn` is an Expression rather than a
+      // direct PrimitiveFunction reference.
+      if (v.fn.kind === ValueKind.Expression) {
+        for (const e of walkValueEffects(v.fn, seen)) result.add(e);
       }
       // Effects from evaluating each argument (since they may contain
       // primitive calls themselves — Allegro is eager for non-lazy prims).
@@ -265,7 +294,13 @@ export function effectPredicatesForValue(v: Value): PredicateSet | null {
 }
 
 /** For each named binding in `ctx`, if it's a function with an `effects`
- *  declaration, check inferred ⊆ declared and collect mismatches. */
+ *  declaration, check inferred ⊆ declared and collect mismatches.
+ *
+ *  Phase D1 sub-chunk 1.3: `"opaque"` labels in the inferred set come from
+ *  stdlib HOFs (Array.map, etc.) until Slice 2's effect polymorphism lands.
+ *  They're filtered from the mismatch computation here so callers' explicit
+ *  `effects pure` declarations don't fail spuriously; an opaque-only inferred
+ *  set is surfaced via a notification instead (see `opaqueEffectNotices`). */
 export function checkEffectsDeclarations(
   bindings: Iterable<{ key: string | null; value: Value | undefined }>,
 ): EffectsMismatch[] {
@@ -276,10 +311,10 @@ export function checkEffectsDeclarations(
     if (!fn) continue;
     const wrap = unwrapEffectsAttach(fn.body);
     if (!wrap) continue;
-    // Body for inference is the unwrapped expression — but inferFunctionEffects
-    // walks fn.body and already knows to peel effects_attach.
     const inferred = inferFunctionEffects(fn);
-    const missing = effectDifference(inferred, wrap.declared);
+    const inferredHard = new Set(inferred);
+    inferredHard.delete("opaque");
+    const missing = effectDifference(inferredHard, wrap.declared);
     if (missing.size > 0) {
       mismatches.push({
         binding:  b.key,
@@ -290,4 +325,26 @@ export function checkEffectsDeclarations(
     }
   }
   return mismatches;
+}
+
+/** Phase D1 sub-chunk 1.3: scan bindings for functions whose inferred effect
+ *  set carries `"opaque"` (introduced by stdlib HOFs). Returns one notice per
+ *  binding so the runtime can surface them in `CompilationReport.notifications`.
+ *  Independent of whether the function has an `effects` declaration. */
+export function opaqueEffectNotices(
+  bindings: Iterable<{ key: string | null; value: Value | undefined }>,
+): { binding: string; message: string }[] {
+  const notices: { binding: string; message: string }[] = [];
+  for (const b of bindings) {
+    if (!b.key || !b.value) continue;
+    const fn = asFunction(b.value);
+    if (!fn) continue;
+    const inferred = inferFunctionEffects(fn);
+    if (!inferred.has("opaque")) continue;
+    notices.push({
+      binding: b.key,
+      message: `inferred effects include 'opaque' (likely from a stdlib HOF call); will refine in Slice 2 once effect polymorphism lands`,
+    });
+  }
+  return notices;
 }
