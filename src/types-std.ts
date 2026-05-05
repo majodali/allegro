@@ -2214,6 +2214,154 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
 }
 
 // =============================================================================
+// Effect meta-type (Phase D1 sub-chunk 1.1 substrate)
+//
+// Effect is a type whose subtypes represent categories of side effects. Specific
+// effects (`pure`, `opaque`, `io`, `time`, ...) are types that extend Effect and
+// participate in the lattice via the `subset_of` / `implies` / `intersect` /
+// `union` operations. Subtype relationships (`pure subtypeof Effect == true`)
+// fall out of the standard `__extends` machinery — Effect is a regular named
+// type for the purposes of nominal subtype checks.
+//
+// Lattice:
+//   `pure` (bottom)  ⊆  any specific effect  ⊆  `opaque` (top)
+//
+// Anonymous conjunction creation (`io & time`) is deferred to Slice 2; for now,
+// `union` of two non-equal non-trivial effects falls back to `opaque` as a
+// sound over-approximation. `intersect` similarly returns `pure` when there's
+// no detectable overlap.
+//
+// Marker bindings:
+//   `__effect_kind` — "pure" or "opaque" on the two core absolutes; absent on
+//                     ordinary named effects. Used for fast-path dispatch in
+//                     the lattice ops without depending on identity comparison
+//                     to module-local Contexts.
+// =============================================================================
+
+function isPureEffect(e: ContextValue): boolean {
+  const m = e.bindings.get("__effect_kind")?.value;
+  return m?.kind === ValueKind.Bits && bitsToString(m as BitsValue) === "pure";
+}
+
+function isOpaqueEffect(e: ContextValue): boolean {
+  const m = e.bindings.get("__effect_kind")?.value;
+  return m?.kind === ValueKind.Bits && bitsToString(m as BitsValue) === "opaque";
+}
+
+/** e1 ⊆ e2 in the effect lattice. */
+export function effectSubsetOf(e1: ContextValue, e2: ContextValue): boolean {
+  if (isOpaqueEffect(e2)) return true;       // anything ⊆ top
+  if (isPureEffect(e1)) return true;         // bottom ⊆ anything
+  if (isOpaqueEffect(e1)) return false;
+  if (isPureEffect(e2)) return false;
+  if (e1 === e2) return true;
+  // Walk e1's __extends chain looking for e2 by identity.
+  let current: ContextValue | null = e1;
+  while (current) {
+    const ext = current.bindings.get("__extends")?.value;
+    if (ext?.kind === ValueKind.Context) {
+      if (ext === e2) return true;
+      current = ext as ContextValue;
+    } else {
+      current = null;
+    }
+  }
+  return false;
+}
+
+/** e1 implies e2: knowing e1's effects discharges a check for e2. Equivalent
+ *  to `e2 ⊆ e1` — having the wider bound implies you have the narrower. */
+export function effectImplies(e1: ContextValue, e2: ContextValue): boolean {
+  return effectSubsetOf(e2, e1);
+}
+
+/** Lattice meet (greatest lower bound). */
+export function effectIntersect(e1: ContextValue, e2: ContextValue): ContextValue {
+  if (isPureEffect(e1) || isPureEffect(e2)) return pureEffect;
+  if (isOpaqueEffect(e1)) return e2;
+  if (isOpaqueEffect(e2)) return e1;
+  if (e1 === e2) return e1;
+  // Conservative: no statically detectable overlap → bottom. Slice 2 will
+  // handle conjunctions and refined overlap detection.
+  return pureEffect;
+}
+
+/** Lattice join (least upper bound). */
+export function effectUnion(e1: ContextValue, e2: ContextValue): ContextValue {
+  if (isOpaqueEffect(e1) || isOpaqueEffect(e2)) return opaqueEffect;
+  if (isPureEffect(e1)) return e2;
+  if (isPureEffect(e2)) return e1;
+  if (e1 === e2) return e1;
+  // Sound over-approximation pending Slice 2's anonymous conjunctions.
+  return opaqueEffect;
+}
+
+// --- Effect meta-type Context ---
+
+export const Effect: ContextValue = makeContext();
+addBinding(Effect, "__name", stringToBits("Effect"));
+addBinding(Effect, "__type", Type);
+
+const effectMembers = makeContext();
+addBinding(effectMembers, "subset_of", makeMethodDescriptor("subset_of",
+  makePrimitive("Effect.subset_of", (args) => {
+    const e1 = primaryOf(args[0]) as ContextValue;
+    const e2 = primaryOf(args[1]) as ContextValue;
+    return withType(makeInt(effectSubsetOf(e1, e2) ? 1 : 0), BoolType);
+  })
+));
+addBinding(effectMembers, "implies", makeMethodDescriptor("implies",
+  makePrimitive("Effect.implies", (args) => {
+    const e1 = primaryOf(args[0]) as ContextValue;
+    const e2 = primaryOf(args[1]) as ContextValue;
+    return withType(makeInt(effectImplies(e1, e2) ? 1 : 0), BoolType);
+  })
+));
+addBinding(effectMembers, "intersect", makeMethodDescriptor("intersect",
+  makePrimitive("Effect.intersect", (args) => {
+    const e1 = primaryOf(args[0]) as ContextValue;
+    const e2 = primaryOf(args[1]) as ContextValue;
+    return wrapType(effectIntersect(e1, e2));
+  })
+));
+addBinding(effectMembers, "union", makeMethodDescriptor("union",
+  makePrimitive("Effect.union", (args) => {
+    const e1 = primaryOf(args[0]) as ContextValue;
+    const e2 = primaryOf(args[1]) as ContextValue;
+    return wrapType(effectUnion(e1, e2));
+  })
+));
+addBinding(Effect, "__members", effectMembers);
+
+/**
+ * Build an effect type that extends Effect. Used for `pure` and `opaque` here;
+ * extension libraries will use the same builder for their own effects (`io`,
+ * `time`, ...) once the public surface lands in Slice 2.
+ *
+ * The lattice methods are copied into the new type's `__members` so that
+ * eventual dot-dispatch (`pure.subset_of(opaque)`) can find them on the value
+ * side. Today's dispatch flow finds them via `__type` (Type), which doesn't
+ * carry effect methods — so the copy is the bridge until Slice 2 either walks
+ * `__extends` for member lookup or formalises Effect-as-meta-type.
+ */
+export function buildEffect(name: string, kind?: "pure" | "opaque"): ContextValue {
+  const eff = makeContext();
+  addBinding(eff, "__name", stringToBits(name));
+  addBinding(eff, "__type", Type);
+  addBinding(eff, "__extends", Effect);
+  if (kind) addBinding(eff, "__effect_kind", stringToBits(kind));
+  const members = makeContext();
+  for (const [key, binding] of effectMembers.bindings) {
+    if (binding.value) addBinding(members, key, binding.value);
+  }
+  addBinding(eff, "__members", members);
+  return eff;
+}
+
+export const pureEffect: ContextValue = buildEffect("pure", "pure");
+export const opaqueEffect: ContextValue = buildEffect("opaque", "opaque");
+
+// =============================================================================
 // Type System Extension
 // =============================================================================
 
@@ -2261,6 +2409,10 @@ export function createTypeSystem(): Extension {
       NominalType: wrapType(NominalType) as any,
       None: wrapType(NoneType) as any,
       Error: wrapType(ErrorType) as any,
+      // Effect meta-type + core absolutes
+      Effect: wrapType(Effect) as any,
+      pure: wrapType(pureEffect) as any,
+      opaque: wrapType(opaqueEffect) as any,
       // Literal bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,

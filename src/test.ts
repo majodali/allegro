@@ -9,7 +9,7 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
@@ -2172,6 +2172,116 @@ test("typed types: type of Int returns NominalType", () => {
   eq(result!.kind !== ValueKind.MultiValue || getType(result!) !== null, true);
 });
 
+// == Effect meta-type (Phase D1 sub-chunk 1.1) ==
+
+test("effect: Effect meta-type has __type = Type", () => {
+  const tt = Effect.bindings.get("__type")?.value;
+  eq(tt === Type, true);
+});
+
+test("effect: Effect carries lattice methods in __members", () => {
+  const members = Effect.bindings.get("__members")?.value as ContextValue;
+  eq(members.kind, ValueKind.Context);
+  eq(members.bindings.has("subset_of"), true);
+  eq(members.bindings.has("implies"), true);
+  eq(members.bindings.has("intersect"), true);
+  eq(members.bindings.has("union"), true);
+});
+
+test("effect: pure extends Effect via __extends", () => {
+  const ext = pureEffect.bindings.get("__extends")?.value;
+  eq(ext === Effect, true);
+});
+
+test("effect: opaque extends Effect via __extends", () => {
+  const ext = opaqueEffect.bindings.get("__extends")?.value;
+  eq(ext === Effect, true);
+});
+
+test("effect: pure carries 'pure' kind marker", () => {
+  const k = pureEffect.bindings.get("__effect_kind")?.value as BitsValue;
+  eq(k.kind, ValueKind.Bits);
+});
+
+test("effect: opaque carries 'opaque' kind marker", () => {
+  const k = opaqueEffect.bindings.get("__effect_kind")?.value as BitsValue;
+  eq(k.kind, ValueKind.Bits);
+});
+
+test("effect lattice: pure ⊆ opaque", () => {
+  eq(effectSubsetOf(pureEffect, opaqueEffect), true);
+});
+
+test("effect lattice: pure ⊆ pure (reflexive)", () => {
+  eq(effectSubsetOf(pureEffect, pureEffect), true);
+});
+
+test("effect lattice: opaque ⊆ opaque (reflexive)", () => {
+  eq(effectSubsetOf(opaqueEffect, opaqueEffect), true);
+});
+
+test("effect lattice: opaque is not ⊆ pure", () => {
+  eq(effectSubsetOf(opaqueEffect, pureEffect), false);
+});
+
+test("effect lattice: implies is reverse subset_of (opaque implies pure)", () => {
+  // Having opaque (universal) implies you have pure's effects (the empty set).
+  eq(effectImplies(opaqueEffect, pureEffect), true);
+});
+
+test("effect lattice: pure does not imply opaque", () => {
+  eq(effectImplies(pureEffect, opaqueEffect), false);
+});
+
+test("effect lattice: intersect with pure is pure", () => {
+  eq(effectIntersect(pureEffect, opaqueEffect) === pureEffect, true);
+  eq(effectIntersect(opaqueEffect, pureEffect) === pureEffect, true);
+});
+
+test("effect lattice: intersect of equal effects is the effect", () => {
+  eq(effectIntersect(opaqueEffect, opaqueEffect) === opaqueEffect, true);
+  eq(effectIntersect(pureEffect, pureEffect) === pureEffect, true);
+});
+
+test("effect lattice: union with pure is the other", () => {
+  eq(effectUnion(pureEffect, opaqueEffect) === opaqueEffect, true);
+  eq(effectUnion(opaqueEffect, pureEffect) === opaqueEffect, true);
+});
+
+test("effect lattice: union with opaque is opaque", () => {
+  eq(effectUnion(pureEffect, opaqueEffect) === opaqueEffect, true);
+});
+
+test("effect lattice: union of equal effects is the effect", () => {
+  eq(effectUnion(pureEffect, pureEffect) === pureEffect, true);
+});
+
+test("effect Allegro source: pure subtypeof Effect", () => {
+  const result = evalStd("pure subtypeof Effect");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("effect Allegro source: opaque subtypeof Effect", () => {
+  const result = evalStd("opaque subtypeof Effect");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("effect Allegro source: Effect subtypeof Effect", () => {
+  const result = evalStd("Effect subtypeof Effect");
+  eq(Number((primaryOf(result!) as BitsValue).data), 1);
+});
+
+test("effect Allegro source: Int does not subtypeof Effect", () => {
+  const result = evalStd("Int subtypeof Effect");
+  eq(Number((primaryOf(result!) as BitsValue).data), 0);
+});
+
+test("effect Allegro source: pure does not subtypeof opaque (sibling subtypes)", () => {
+  // Both extend Effect but neither extends the other.
+  const result = evalStd("pure subtypeof opaque");
+  eq(Number((primaryOf(result!) as BitsValue).data), 0);
+});
+
 // == Interfaces ==
 
 test("interfaces: Type.interface creates structural type with __interface marker", () => {
@@ -4087,7 +4197,8 @@ guard(x) =>
 // --- Phase D1: effect types ---
 
 import {
-  PURE, effectUnion, effectSubset, effectDifference, formatEffects,
+  PURE, effectUnion as effectLabelSetUnion, effectSubset as effectLabelSetSubset,
+  effectDifference, formatEffects,
   inferFunctionEffects, unwrapEffectsAttach,
 } from "./effects.js";
 import { ComposedFunctionValue } from "./types.js";
@@ -4099,9 +4210,9 @@ test("Phase D1: empty EffectSet formats as 'pure'", () => {
 test("Phase D1: effectSubset and effectUnion basic ops", () => {
   const a = new Set(["io"]);
   const b = new Set(["io", "net"]);
-  eq(effectSubset(a, b), true, "io ⊆ {io,net}");
-  eq(effectSubset(b, a), false, "{io,net} ⊄ {io}");
-  const u = effectUnion(a, b);
+  eq(effectLabelSetSubset(a, b), true, "io ⊆ {io,net}");
+  eq(effectLabelSetSubset(b, a), false, "{io,net} ⊄ {io}");
+  const u = effectLabelSetUnion(a, b);
   eq(u.size, 2);
   eq(u.has("io") && u.has("net"), true);
 });
