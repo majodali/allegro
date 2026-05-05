@@ -71,7 +71,7 @@ Base language API (expression DAGs, evaluation contexts)
 
 ## Type System (Allegro Standard)
 
-Types are Context values with `__name`, `__type`, `__members`, and other meta-bindings. A typed value is a MultiValue where the primary is the data and the `"type"` component is the type Context. **Types themselves are typed** — user-visible type bindings are MultiValues with their meta-type as the type component (e.g., `Int` is `MultiValue(IntType, {type: NominalType})`). This means `Int instanceof NominalType` returns true, and `type of Int` returns NominalType. Internally, type infrastructure uses the primary Context via `primaryOf()`.
+Types are Context values with `__name`, `__type`, `__members`, and other meta-bindings. A typed value is a MultiValue where the primary is the data and the `"type"` component is the type Context. **Types themselves are typed** — user-visible type bindings are MultiValues with their meta-type as the type component (e.g., `Int` is `MultiValue(IntType, {type: Type})`). `Int instanceof Type` returns true, and `type of Int` returns Type. `NominalType` is preserved as a back-compat alias of `Type` (`NominalType === Type`), so `Int instanceof NominalType` and `NominalType.extend(...)` continue to work. Internally, type infrastructure uses the primary Context via `primaryOf()`.
 
 ### Ten Core Types
 - **Int** — 64-bit signed integer. Arithmetic, comparison, toString, abs, toFloat.
@@ -107,7 +107,7 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - **Field descriptors**: `{__type: FieldType, name: String, fieldType: Type}` — typed field declarations (on record types)
 - `typeMethod(type, name)` reads from `__members` first, falls back to direct bindings — the single bridge function for all member access
 - `typeMemberDescriptor(type, name)` returns the full descriptor for dispatch-level access
-- Meta-types (Type, NominalType) store their methods (instanceof, subtypeof, extend, where, distinct, constructor) in `__members`
+- The Type meta-type stores its methods (instanceof, subtypeof, extend, where, distinct, constructor, interface, preserveOps, mixin, invariant) in `__members`. `instanceof` and `subtypeof` are shape-aware; the rest are pure builders.
 - Structural checking compares `__members` collections: every member in the expected type must exist in the actual type
 
 ### Type-Directed Dispatch
@@ -133,10 +133,10 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - Type checks at call site: `applyComposed` checks arg types against FunctionType param types before substitution. Handles unions, structural, generics with arg comparison. No type_check wrappers in function bodies.
 
 ### Type Hierarchy
-- **Type** — base meta-type. Provides structural `instanceof`/`subtypeof`.
-- **NominalType** — extends Type. Provides nominal `instanceof`/`subtypeof` via `__name` and `__extends` chain.
-- All built-in types (Int, String, etc.) are NominalTypes with `__type = NominalType`.
-- Type and NominalType are self-describing (bootstrap: Type has `__type = Type`).
+- **Type** — the single meta-type. All types have `__type = Type`. Type self-types (`Type.__type = Type`).
+- `instanceof`/`subtypeof` on Type are **shape-aware**: nominal when both operands carry a `__name` (compares names + walks `__extends` chain), structural when the expected type is anonymous (`~T`, inline `{x: Int}`) or carries the `__interface` marker (compares `__members`).
+- **`NominalType`** is retained as a back-compat alias (`NominalType === Type`); existing code reading `Int instanceof NominalType` keeps working. The named-vs-anonymous distinction is now a property of the type value, not of its meta-type.
+- Multiple inheritance is deferred — see `memory/design_type_system_meta_types.md` for the explicit-conflict design and trigger conditions.
 
 ### Interfaces
 - Declared via `Type.interface({member: Type, ...})` — produces a structural type with `__type = Type`
@@ -158,14 +158,14 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 ### Nominal vs Structural Typing
 - Named types use **nominal** checking by default: `f(x: Animal)` requires x to be Animal or extend it.
 - **`~` operator** (structural wrap): `~Animal` uses structural checking — any type with Animal's fields matches.
-- **Interfaces** are inherently structural (`__type = Type`) — no `~` needed.
-- Four operations: nominal/structural × instanceof/subtypeof.
-- `structuralWrap(type)` creates a wrapper that delegates to Type's structural methods instead of NominalType's nominal ones.
+- **Interfaces** are inherently structural via the `__interface` marker on the type, even when named.
+- Dispatch happens inside Type's shape-aware `instanceof`/`subtypeof`: if the expected type carries `__interface` or has no `__name`, structural; if both operands are named concrete types, nominal.
+- `structuralWrap(type)` clones the type and erases its `__name`. Absence of `__name` is what triggers structural dispatch; `__wraps` keeps a back-link to the original named type.
 - Unnamed type expressions (inline `{ ... }`) are always structural.
 
 ### Refinement Types
 - Declared via `Type && <predicate>` where `_` in the predicate refers to the value being checked: `PositiveInt = Int && _ > 0`. Equivalent to `Int.where(_ => _ > 0)`.
-- `&&` in expression position is overloaded: if the left operand is a type (has meta-type Type or NominalType), it creates a refined type via `buildRefinedType`. Otherwise it's logical AND. `typed_and_impl` dispatches at runtime.
+- `&&` in expression position is overloaded: if the left operand is a type (has meta-type Type), it creates a refined type via `buildRefinedType`. Otherwise it's logical AND. `typed_and_impl` dispatches at runtime.
 - Compound predicates via repeated `&&`: `Int && _ > 0 && _ < 100` — the second `&&` is expression-level logical AND inside the predicate body. Parsed as `Int && (_ > 0 && _ < 100)`.
 - Predicate is an Allegro lambda with parameter `_`. `buildRefinedType` stores it as `__predicate` on the refined type.
 - **Construction check**: `__construct` wrapper evaluates the predicate on the constructed value. If false, returns an error value instead of the refined value.

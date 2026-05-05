@@ -1493,7 +1493,7 @@ import {
   isMethodDescriptor, isFieldDescriptor, isGetterDescriptor,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
-  AnyType, Type, NominalType, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
+  AnyType, Type, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
   structuralWrap, makeUnionType, wrapType, buildRefinedType,
 } from "./types-std.js";
@@ -1655,7 +1655,7 @@ const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Type refinement: if left is a type, extract the raw body from the thunk
   // and build a one-param predicate lambda (_ => body).
   const leftType = getType(left);
-  if (leftType && (leftType === Type || leftType === NominalType)) {
+  if (leftType && leftType === Type) {
     const thunk = args[1];
     if (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0) {
       // Extract raw body and wrap as a one-param lambda with `_`
@@ -2017,9 +2017,9 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   // Step 3: Check using the type's instanceof method
-  // The type hierarchy determines checking semantics:
-  // - NominalType: nominal check (by __name and __extends chain)
-  // - Type (or ~wrapped): structural check (by field compatibility)
+  // Type's instanceof is shape-aware:
+  // - Both operands named → nominal check (by __name and __extends chain)
+  // - Either operand anonymous (~wrapped, interface, union, …) → structural check
   const actualType = getType(v);
   if (!actualType) throw new AllegroError("type_check: value has no type");
   const actualName = getTypeName(v);

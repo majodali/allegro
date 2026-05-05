@@ -86,16 +86,25 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
 }
 
 // =============================================================================
-// Type Hierarchy: Type, NominalType
+// Meta-type: Type
 //
-// Type — base meta-type. All type values have type = Type.
-//   Provides structural instanceof/subtypeof.
-// NominalType — extends Type. Named types have type = NominalType.
-//   Overrides instanceof/subtypeof for nominal checking via __name and __extends.
+// All type values have __type = Type. Comparison methods (instanceof / subtypeof)
+// are SHAPE-AWARE: when both operands have a __name, the comparison is nominal
+// (by name + __extends chain); when either operand has no __name, it's structural
+// (by __members compatibility). This collapses the older Type / NominalType split
+// into a single meta-type — the named-vs-anonymous distinction is now a property
+// of the type value, not of its meta-type.
+//
+// `~T` (structural wrap) erases __name to project a named type into anonymous form.
+//
+// `NominalType` is retained as a back-compat alias (= Type) so existing user code
+// reading `Int instanceof NominalType` continues to work. Multiple inheritance and
+// NominalType-as-mixin are deferred — see memory/design_type_system_meta_types.md.
+//
 // ConcreteType — interface (not a position in hierarchy). Concrete types have __construct.
 //
-// Bootstrap: Type and NominalType are created as raw Contexts first,
-// then retroactively given their own type components.
+// Bootstrap: Type is created as a raw Context, then retroactively given itself as
+// its __type component.
 // =============================================================================
 
 /** Helper to add a binding to a Context */
@@ -105,18 +114,47 @@ function addBinding(ctx: ContextValue, key: string, value: Value): void {
 }
 
 /**
- * Structural instanceof: does the value's type have all the methods/fields
- * that the expected type has? Checks by comparing binding names.
+ * Shape-aware instanceof: dispatch based on __name presence.
+ *   - Both operand types named → nominal (by name + __extends chain)
+ *   - Either operand anonymous (no __name) → structural (by __members compat)
  */
-function structuralInstanceof(value: Value, expectedType: ContextValue): boolean {
+function shapeAwareInstanceof(value: Value, expectedType: ContextValue): boolean {
   const actualType = getType(value);
   if (!actualType) return false;
-  return structuralSubtypeof(actualType, expectedType);
+  return shapeAwareSubtypeof(actualType, expectedType);
 }
 
 /**
- * Structural subtypeof: does typeA have all the members (methods + fields) of typeB?
- * Compares __members collections: every member in typeB must exist in typeA.
+ * Shape-aware subtypeof: dispatch based on the expected type's nature.
+ *   - If typeB is an interface (`__interface` marker), comparison is structural
+ *     even when both sides have names. Interfaces declare a shape contract.
+ *   - If typeB has no `__name` (anonymous: `~T`, inline `{x: Int}`), structural.
+ *   - Otherwise (typeB is a named concrete type), nominal — but we still need
+ *     typeA to be named, since an anonymous typeA can't match a name.
+ */
+function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
+  if (isInterfaceType(typeB)) {
+    return structuralSubtypeof(typeA, typeB);
+  }
+  const nameB = getTypeNameFromCtx(typeB);
+  if (nameB === null) {
+    return structuralSubtypeof(typeA, typeB);
+  }
+  const nameA = getTypeNameFromCtx(typeA);
+  if (nameA === null) {
+    return structuralSubtypeof(typeA, typeB);
+  }
+  return nominalSubtypeof(typeA, typeB, nameB);
+}
+
+function isInterfaceType(t: ContextValue): boolean {
+  const m = t.bindings.get("__interface");
+  return m?.value?.kind === ValueKind.Bits && (m.value as BitsValue).data !== 0n;
+}
+
+/**
+ * Structural subtypeof: typeA has every member typeB declares.
+ * Compares __members collections by name.
  */
 function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
   const aMembersVal = typeA.bindings.get("__members")?.value;
@@ -136,31 +174,17 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
 }
 
 /**
- * Nominal instanceof: does the value's type match the expected type
- * by name, or nominally extend it?
+ * Nominal subtypeof: typeA is the same as typeB by name (and type args), or
+ * typeA's __extends chain reaches a type with that name. Caller has already
+ * confirmed both types carry a __name.
  */
-function nominalInstanceof(value: Value, expectedType: ContextValue): boolean {
-  const actualType = getType(value);
-  if (!actualType) return false;
-  return nominalSubtypeof(actualType, expectedType);
-}
-
-/**
- * Nominal subtypeof: is typeA the same as typeB (by name and type args),
- * or does typeA's __extends chain include typeB?
- */
-function nominalSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
-  const nameB = getTypeNameFromCtx(typeB);
-  if (!nameB) return false;
-  // Walk typeA's extends chain
+function nominalSubtypeof(typeA: ContextValue, typeB: ContextValue, nameB: string): boolean {
   let current: ContextValue | null = typeA;
   while (current) {
     const nameA = getTypeNameFromCtx(current);
     if (nameA === nameB) {
-      // Names match — also check type arguments if present
       return typeArgsMatch(current, typeB);
     }
-    // Check __extends
     const extendsBinding = current.bindings.get("__extends");
     if (extendsBinding?.value?.kind === ValueKind.Context) {
       current = extendsBinding.value as ContextValue;
@@ -203,38 +227,37 @@ function getTypeNameFromCtx(type: ContextValue): string | null {
   return null;
 }
 
-// --- Build Type (structural instanceof/subtypeof) ---
+// --- Build Type (the single meta-type) ---
 
 export const Type: ContextValue = makeContext();
 addBinding(Type, "__name", stringToBits("Type"));
 // __members added after all meta-types are bootstrapped (see below)
 
-// --- Build NominalType (nominal instanceof/subtypeof) ---
+/**
+ * Back-compat alias. NominalType used to be a distinct meta-type; its semantics
+ * (nominal comparison) now live inside Type's shape-aware methods, dispatching
+ * on __name presence. Keeping the export means existing user code (and tests)
+ * referring to `NominalType` continue to work.
+ */
+export const NominalType: ContextValue = Type;
 
-export const NominalType: ContextValue = makeContext();
-addBinding(NominalType, "__name", stringToBits("NominalType"));
-addBinding(NominalType, "__extends", Type);
-
-// --- Structural wrap (~): wraps a NominalType to use structural checking ---
+// --- Structural wrap (~): erase __name to make the type compare structurally ---
 
 /**
- * Create a structural wrapper around a named type.
- * The wrapper uses Type's structural instanceof/subtypeof instead of
- * NominalType's nominal checking. This is the ~ operator.
+ * Create an anonymous projection of a named type. With shape-aware dispatch,
+ * absence of __name flips comparisons from nominal to structural — so erasing
+ * the name is exactly the `~T` semantics. All other bindings (__extends,
+ * __members, __construct, __predicate, __invariantsList, ...) are preserved,
+ * so `~Int` still constructs Int values, has Int's methods, etc.; only its
+ * type comparisons go structural.
  */
 export function structuralWrap(type: ContextValue): ContextValue {
   const wrapper = makeContext();
-  // Copy all bindings from the original type
   for (const [key, binding] of type.bindings) {
-    if (key === "__type") continue; // override the type's type
+    if (key === "__name") continue; // erase name → anonymous → structural
     wrapper.bindings.set(key, { ...binding });
     wrapper.bindingList.push({ ...binding });
   }
-  // Set __type to Type (structural) instead of NominalType (nominal)
-  addBinding(wrapper, "__type", Type);
-  // Mark as structural wrapper
-  addBinding(wrapper, "__structural", makeInt(1));
-  // Reference the original type
   addBinding(wrapper, "__wraps", type);
   return wrapper;
 }
@@ -307,30 +330,29 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
   return union;
 }
 
-// Bootstrap: Type and NominalType get their own type components
+// Bootstrap: Type self-types
 addBinding(Type, "__type", Type);
-addBinding(NominalType, "__type", NominalType);
 
 // =============================================================================
 // Member Descriptor Types (bootstrap)
-// Member/Method/Field are proper NominalTypes created before buildType is available.
+// Member/Method/Field are named types created before buildType is available.
 // =============================================================================
 
 /** Abstract base type for member descriptors */
 export const MemberType: ContextValue = makeContext();
 addBinding(MemberType, "__name", stringToBits("Member"));
-addBinding(MemberType, "__type", NominalType);
+addBinding(MemberType, "__type", Type);
 
 /** Method descriptor — a member with an implementation function */
 export const MethodType: ContextValue = makeContext();
 addBinding(MethodType, "__name", stringToBits("Method"));
-addBinding(MethodType, "__type", NominalType);
+addBinding(MethodType, "__type", Type);
 addBinding(MethodType, "__extends", MemberType);
 
 /** Field descriptor — a member representing instance data */
 export const FieldType: ContextValue = makeContext();
 addBinding(FieldType, "__name", stringToBits("Field"));
-addBinding(FieldType, "__type", NominalType);
+addBinding(FieldType, "__type", Type);
 addBinding(FieldType, "__extends", MemberType);
 
 /** Create a Method descriptor */
@@ -785,7 +807,7 @@ function buildDistinctType(parentType: ContextValue): ContextValue {
   distinctType.bindings.delete("__name");
   addBinding(distinctType, "__name", stringToBits("<distinct>"));
   distinctType.bindings.delete("__type");
-  addBinding(distinctType, "__type", NominalType); // always nominal
+  addBinding(distinctType, "__type", Type); // named → nominal comparison via shape dispatch
 
   // Wrap __construct to re-tag with distinct type
   const parentConstruct = parentType.bindings.get("__construct")?.value;
@@ -988,22 +1010,23 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
   return newType;
 }
 
-// --- Build __members for Type and NominalType ---
+// --- Build __members for Type ---
+// Single block — instanceof/subtypeof are shape-aware (nominal when both
+// operands are named, structural otherwise).
 
-// Type's __members: structural instanceof/subtypeof + fluent API
 const typeMembers = makeContext();
 addBinding(typeMembers, "instanceof", makeMethodDescriptor("instanceof",
   makePrimitive("Type.instanceof", (args) => {
     const type = args[0] as ContextValue;
     const value = args[1];
-    return withType(makeInt(structuralInstanceof(value, type) ? 1 : 0), BoolType);
+    return withType(makeInt(shapeAwareInstanceof(value, type) ? 1 : 0), BoolType);
   })
 ));
 addBinding(typeMembers, "subtypeof", makeMethodDescriptor("subtypeof",
   makePrimitive("Type.subtypeof", (args) => {
     const typeA = args[0] as ContextValue;
     const typeB = args[1] as ContextValue;
-    return withType(makeInt(structuralSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
+    return withType(makeInt(shapeAwareSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
   })
 ));
 addBinding(typeMembers, "extend", makeMethodDescriptor("extend",
@@ -1065,89 +1088,14 @@ addBinding(typeMembers, "mixin", makeMethodDescriptor("mixin",
 ));
 addBinding(Type, "__members", typeMembers);
 
-// NominalType's __members: nominal instanceof/subtypeof + fluent API
-const nominalTypeMembers = makeContext();
-addBinding(nominalTypeMembers, "instanceof", makeMethodDescriptor("instanceof",
-  makePrimitive("NominalType.instanceof", (args) => {
-    const type = args[0] as ContextValue;
-    const value = args[1];
-    return withType(makeInt(nominalInstanceof(value, type) ? 1 : 0), BoolType);
-  })
-));
-addBinding(nominalTypeMembers, "subtypeof", makeMethodDescriptor("subtypeof",
-  makePrimitive("NominalType.subtypeof", (args) => {
-    const typeA = args[0] as ContextValue;
-    const typeB = args[1] as ContextValue;
-    return withType(makeInt(nominalSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
-  })
-));
-addBinding(nominalTypeMembers, "extend", makeMethodDescriptor("extend",
-  makePrimitive("NominalType.extend", (args, _ctx, _evalFn) => {
-    return wrapType(buildRecordType(args[0] as ContextValue, args[1], NominalType));
-  })
-));
-addBinding(nominalTypeMembers, "where", makeMethodDescriptor("where",
-  makePrimitive("NominalType.where", (args) => {
-    return wrapType(buildRefinedType(args[0] as ContextValue, args[1]));
-  })
-));
-addBinding(nominalTypeMembers, "invariant", makeMethodDescriptor("invariant",
-  makePrimitive("NominalType.invariant", (args) => {
-    return wrapType(buildInvariantedType(args[0] as ContextValue, args[1]));
-  })
-));
-addBinding(nominalTypeMembers, "distinct", makeMethodDescriptor("distinct",
-  makePrimitive("NominalType.distinct", (args) => {
-    return wrapType(buildDistinctType(args[0] as ContextValue));
-  })
-));
-addBinding(nominalTypeMembers, "constructor", makeMethodDescriptor("constructor",
-  makePrimitive("NominalType.constructor", (args) => {
-    const type = args[0] as ContextValue;
-    const fn = args[1];
-    type.bindings.delete("__construct");
-    const idx = type.bindingList.findIndex(b => b.key === "__construct");
-    if (idx >= 0) type.bindingList.splice(idx, 1);
-    addBinding(type, "__construct", makePrimitive("custom.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
-      const result = ctorEvalFn!(makeExpr(fn, ctorArgs), ctorCtx!);
-      return withType(primaryOf(result), type);
-    }, true));
-    return wrapType(type);
-  })
-));
-addBinding(nominalTypeMembers, "interface", makeMethodDescriptor("interface",
-  makePrimitive("NominalType.interface", (args) => {
-    return wrapType(buildInterfaceType(args[0] as ContextValue, args[1]));
-  })
-));
-addBinding(nominalTypeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
-  makePrimitive("NominalType.preserveOps", (args) => {
-    const type = args[0] as ContextValue;
-    const opNames: string[] = [];
-    for (let i = 1; i < args.length; i++) {
-      const p = primaryOf(args[i]);
-      if (p.kind === ValueKind.Bits) {
-        opNames.push(bitsToString(p as BitsValue));
-      }
-    }
-    return wrapType(buildPreserveOps(type, opNames));
-  })
-));
-addBinding(nominalTypeMembers, "mixin", makeMethodDescriptor("mixin",
-  makePrimitive("NominalType.mixin", (args) => {
-    return wrapType(buildMixinType(args[0] as ContextValue, args[1]));
-  })
-));
-addBinding(NominalType, "__members", nominalTypeMembers);
-
 // --- Type builder helper ---
 
 /** Names of properties that should be treated as getters (auto-called with self) */
 const getterNames = new Set(["length"]);
 
 /**
- * Build a named type. All types built this way are NominalTypes with nominal
- * instanceof/subtypeof semantics. The type's own type is NominalType.
+ * Build a named type. The type's __name carries its identity, so shape-aware
+ * comparison treats it nominally when paired against another named type.
  *
  * @param name     Type name (e.g., "Int", "String")
  * @param methods  Instance methods (dispatched via type_dispatch on values of this type)
@@ -1160,7 +1108,7 @@ function buildType(
 ): ContextValue {
   const ctx = makeContext();
   addBinding(ctx, "__name", stringToBits(name));
-  addBinding(ctx, "__type", NominalType);
+  addBinding(ctx, "__type", Type);
   if (options?.extends) {
     addBinding(ctx, "__extends", options.extends);
   }

@@ -158,7 +158,7 @@ function evaluateExpr(
   }
 
   // Context as function — constructor call via __construct
-  // Types may be wrapped as MultiValues (e.g., Int is MultiValue(IntType, {type: NominalType}))
+  // Types may be wrapped as MultiValues (e.g., Int is MultiValue(IntType, {type: Type}))
   const fnCtx = fn.kind === ValueKind.Context ? fn as ContextValue
     : (fn.kind === ValueKind.MultiValue && (fn as MultiValueType).primary.kind === ValueKind.Context)
       ? (fn as MultiValueType).primary as ContextValue : null;
@@ -606,7 +606,7 @@ function checkArgType(
     return;
   }
 
-  // Use meta-type instanceof (NominalType nominal check)
+  // Use meta-type instanceof (Type's shape-aware check: nominal if both named, structural otherwise)
   const typeType = expected.bindings.get("__type")?.value as ContextValue | undefined;
   if (typeType) {
     const instanceofMethod = typeMethod(typeType, "instanceof");

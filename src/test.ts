@@ -2006,9 +2006,8 @@ test("type hierarchy: Type has __type = Type (self-referential)", () => {
   eq(ttType === Type, true);
 });
 
-test("type hierarchy: NominalType extends Type", () => {
-  const ext = NominalType.bindings.get("__extends")?.value;
-  eq(ext === Type, true);
+test("type hierarchy: NominalType is an alias for Type", () => {
+  eq(NominalType === Type, true);
 });
 
 test("type hierarchy: nominal instanceof passes for matching type", () => {
@@ -2058,14 +2057,17 @@ test("type hierarchy: nominal subtypeof - different types", () => {
   }
 });
 
-test("type hierarchy: structural_wrap makes nominal type use structural checking", () => {
+test("type hierarchy: structural_wrap makes type compare structurally by erasing __name", () => {
   const wrappedInt = structuralWrap(IntType);
-  // The wrapped type should have __type = Type (structural) not NominalType
+  // __type stays Type (no longer flips meta-types — there's only one)
   const wrapType = wrappedInt.bindings.get("__type")?.value;
   eq(wrapType === Type, true);
-  // It should still have the original name
+  // __name erased — absence of name is what triggers structural dispatch
   const name = wrappedInt.bindings.get("__name")?.value;
-  eq(name !== undefined, true);
+  eq(name === undefined, true);
+  // __wraps preserves the link back to the original named type
+  const wraps = wrappedInt.bindings.get("__wraps")?.value;
+  eq(wraps === IntType, true);
 });
 
 // == Member Descriptors (__members) ==

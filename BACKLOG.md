@@ -18,7 +18,10 @@ High-level goals, roughly ordered by dependency:
 ## 2. Detailed Features
 
 ### Type System
-- [x] Subtyping / extends — Type/NominalType hierarchy, nominal + structural instanceof/subtypeof, `~` structural operator
+- [x] Subtyping / extends — single Type meta-type, shape-aware nominal + structural instanceof/subtypeof, `~` structural operator (now via `__name` erasure)
+- [x] Collapse `NominalType` into `Type` with optional `__name` — single meta-type, shape-aware comparison (nominal if both operands named and expected type isn't an interface; structural otherwise). `NominalType` retained as back-compat alias (`NominalType === Type`). `~T` projects to anonymous via `__name` erasure (preserves `__extends`/`__members`/`__construct`/etc.; adds `__wraps` back-link). Substrate for the upcoming `Effect` meta-type. See `memory/design_type_system_meta_types.md`.
+- [ ] Multiple inheritance (deferred) — `__extends: Type[]` with multiple parents, graph-reachability for `instanceof`/`subtypeof`, **explicit error on member conflict** (no MRO; mirrors Mixin's policy). User resolves conflicts by explicit override. Trigger: a second concrete use case beyond Effect surfaces, or Phase G/H domain library work pulls on it. See `memory/design_type_system_meta_types.md`.
+- [ ] `NominalType`-as-mixin (alternative path, deferred alongside MI) — model nominal-vs-structural as a behavior set added via mixin rather than a separate meta-type. Worth considering when re-evaluating MI.
 - [x] Interfaces — `Type.interface({...})`, structural type matching (no explicit `implements`), parent member inheritance, auto-naming
 - [x] Mixins — `.mixin({method: fn, ...})` adds methods to types, ComposedFunction dispatch, error on conflict
 - [x] Union types — `Int | String`, `type_union` primitive, union instanceof checks alternatives
@@ -51,6 +54,7 @@ High-level goals, roughly ordered by dependency:
 - [ ] Formalize multi-phase partial evaluation (invocation → config → compile → emit → package → deploy → execute)
 - [x] Compile-time type inference — precompileFunctions pass, type propagation through residuals
 - [x] Phase gate checks — CompilationReport with inferred types, errors, unresolved bindings
+- [ ] Notification category in CompilationReport (replace errors+warnings) — single `notifications` collection where each entry's severity (error / warning / ignore) is determined by per-project config. Replaces today's hard-coded errors-vs-warnings split. Initial driver: effect under-approximation cases need configurable severity. Long-term: every diagnostic categorised this way.
 - [ ] Target code generation (expression graph → executable)
 - [ ] Tree shaking via partial evaluation
 - [x] Forward-chaining partial evaluation — DepCollector tracks incomplete dependencies during evaluation. DependencyRegistry tracks reactive bindings. propagateCompletions re-evaluates dependents when bindings complete. applyPhase provides new bindings and triggers cascading re-evaluation. Memoization disabled (replaced by this mechanism).
@@ -152,13 +156,31 @@ High-level goals, roughly ordered by dependency:
 - [ ] Expression graph processing (query, transform, rewriting)
 - [ ] Language server protocol (LSP) for IDE integration
 
-### Long-term / Allegro High
+### Long-term / Allegro Vivace (top tier, fka "Allegro High")
 - [ ] Logic programming extensions/DSL
 - [ ] Constraint programming
 - [ ] Data modeling DSL
 - [ ] Numerical methods
 - [ ] Sophisticated declarative composition
 - [ ] Multiple semantic models (functional, imperative, mixed) as extensions
+- [ ] Software-systems modeling DSL
+- [ ] Workflow/process DSL
+- [ ] Automatic-reasoning DSL
+- [ ] UI modeling DSL
+- [ ] Data/analytics DSL
+- [ ] v1 bootstrap domain models (3–5 candidates) — pick the ones that demonstrate end-to-end loop on real use cases
+
+### Vivace Usability Research (open gaps)
+
+These track the gaps identified in the Vivace usability vision discussion. Each is a known-unsolved research/design question, not a coding task with a known shape. See `memory/design_vivace_vision.md` for the posture and partial answers.
+
+- [ ] **Counterexample legibility — domain-specific rendering layer.** PE produces residual-expression counterexamples; non-experts can't read them. Need a rendering layer where each domain model emits failures in its own vocabulary ("task A and B can deadlock on queue Q", not a residual with substituted Params). Places constraints on domain-model authors. **Foundational** — coupled to the AI iteration loop.
+- [ ] **Model composition patterns.** Real systems compose multiple domain models (workflow + data + UI + analytics). When predicates from different models interact, who arbitrates? Who owns cross-domain predicates? Risk of combinatorial explosion in multi-domain [impl, proof] generation. Allegro design goal — composition patterns not yet designed.
+- [ ] **AI iteration loop — usable failure modes.** When PE produces a residual the agent can't discharge, what does the agent see? When the agent can't solve, how is failure surfaced (cross-domain counterexamples, agent-suggested problem restructuring, time-boxing)? Should feel like positive learning, not a frustrating maze. Agents will use multiple models with different capabilities. Coupled to counterexample rendering — same artifact serves humans and agents.
+- [ ] **Proof exportability.** Proofs should be re-checkable by external tools (Lean / Coq / similar). Real challenge: which base implementation components ship with the proof to make it concrete enough to check externally. Pairs with transitive assurance through dependencies. See `memory/design_proof_exportability.md`.
+- [ ] **Constraint-set completeness — organizational process (longest critical path).** "Release when constraints are right" — who decides? Under-spec lets bugs through; over-spec blocks legitimate code. Probably AI-assisted recursive review ("here's a constraint your code assumes but didn't state"). Deeper question is org design: what process do orgs need? How different from current? Translation must be comprehensible AND valuable. Needs external research / customer interviews — not internal design.
+- [ ] **Bootstrap economics.** Vivace's value depends on rich domain models. Until those exist, it's Allegro Standard with extra ceremony. Depends on user engagement; v1 models won't be mature; need to start somewhere. Roadmap question.
+- [ ] **Escape-hatch awareness — partly resolved by inversion.** Principle: business rules define the domain, not vice versa. If the language doesn't exist to express a rule, extend the language; don't drop a tier. Lack of expertise to define domain terms soundly is comparable to a developer today who can't write a GraphQL query — collaboration, time-boxing, learning. See `memory/design_business_rules_define_domain.md`. Open piece: tooling to detect "you're cycling on this rule, here are options" so developers don't blame the system rightly.
 
 ## 3. Immediate To Do
 
