@@ -1,0 +1,5 @@
+# Normalize line endings on commit. Working trees on Windows or macOS that
+# inadvertently materialize CRLF will be re-stored as LF in the index, and
+# checked out as LF by default everywhere. Prevents the cross-machine
+# CRLF/LF drift that previously polluted every diff.
+* text=auto eol=lf
