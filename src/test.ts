@@ -4705,6 +4705,63 @@ test("Stage B: declared `effects pure` on `f: pure` param verifies cleanly (no n
   eq(notes.length, 0, "no opaque notification when bound matches declaration");
 });
 
+// --- Phase D1 Slice 2 Stage C1: generic param list grammar ---
+
+test("Stage C1: id[T](x: T): T parses and runs", () => {
+  // Explicit type-variable declaration. Should behave identically to the
+  // auto-promoted form for now (Stage C2 will introduce kind-based dispatch).
+  const result = evalStd(`id[T](x: T): T => x\nid(42)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("Stage C1: f[e: Effect] declared, function call works", () => {
+  // Effect-kinded generic param. Stage C1 just declares it; effect-variable
+  // unification is Stage C2. The function still runs end-to-end.
+  const result = evalStd(`apply[e: Effect](g: e, x: Int): Int => g(x)
+apply((x: Int): Int => x * 2, 21)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("Stage C1: multi-variable generic params parse", () => {
+  const result = evalStd(`pair[T, U](x: T, y: U): T => x
+pair(7, "hello")`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("Stage C1: auto-promoted type variable still works (no decl)", () => {
+  // Existing unannotated mechanism — `T` in `x: T` is auto-promoted as a
+  // type variable. Generic-param decl is opt-in for clarity.
+  const result = evalStd(`id(x: T): T => x\nid(99)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 99);
+});
+
+test("Stage C1: __genericParams metadata stamped on the underlying ComposedFunction", () => {
+  // The metadata lives on the ComposedFunction identity — it survives the
+  // typed_function envelope at runtime since the envelope just wraps the
+  // same ComposedFunction with type info. Stage C2 reads this to drive
+  // effect-variable unification dispatch.
+  const src = `id[T, e: Effect](x: T): T => x\nid`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("id")!.value!;
+  const cFn = primaryOf(fn);
+  const meta = (cFn as any).__genericParams;
+  eq(Array.isArray(meta), true);
+  if (Array.isArray(meta)) {
+    eq(meta.length, 2);
+    eq(meta[0].name, "T");
+    eq(meta[1].name, "e");
+    // First has no kind (defaults to Type); second has explicit Effect.
+    eq(meta[0].kind, undefined);
+    eq(meta[1].kind !== undefined, true);
+  }
+});
+
+test("Stage C1: export NAME[generic_decl](...) parses", () => {
+  // Make sure the generic-decl path also works through the export grammar.
+  const result = evalStd(`export id[T](x: T): T => x\nid(123)`);
+  eq(Number((primaryOf(result!) as BitsValue).data), 123);
+});
+
 // --- Phase D1 sub-chunk 1.3: opaque marking + Notification category ---
 
 test("Phase D1.3: CompilationReport carries notifications array", () => {

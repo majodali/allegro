@@ -650,6 +650,32 @@ export function buildBaseGrammar(): Grammar {
     })),
   });
 
+  // Generic parameter: `T` or `T : Kind`. Kind defaults to Type when absent.
+  // Used in function declarations: `name[T, e: Effect](params) => body`.
+  addProduction(g, { name: "generic_param",
+    rule: seq([
+      nonterm("ident"),
+      opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
+    ], { name: "generic_param" }),
+  });
+
+  addProduction(g, { name: "generic_param_list",
+    rule: rep(nonterm("generic_param"), {
+      min: 1,
+      sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
+    }),
+  });
+
+  // Optional bracket-wrapped generic-param section (after the function name,
+  // before the `(`). Disambiguated from expression-level indexing by the
+  // declaration position — only `name[…](` matches this production.
+  addProduction(g, { name: "generic_decl",
+    rule: seq([
+      lit("["), nonterm("ws_any"), nonterm("generic_param_list"),
+      nonterm("ws_any"), lit("]"),
+    ], { name: "generic_decl" }),
+  });
+
   // --- Statements ---
 
   addProduction(g, { name: "stmt",
@@ -657,9 +683,11 @@ export function buildBaseGrammar(): Grammar {
       // import NAME
       seq([lit("import"), nonterm("ws_req"), nonterm("ident")],
         { name: "import_stmt" }),
-      // export NAME(params)[: ret] => body — exported function
+      // export NAME[generic_decl](params)[: ret] => body — exported function
       seq([lit("export"), nonterm("ws_req"),
-           nonterm("ident"), lit("("), nonterm("ws_any"), nonterm("typed_param_list"),
+           nonterm("ident"),
+           opt(nonterm("generic_decl")),
+           lit("("), nonterm("ws_any"), nonterm("typed_param_list"),
            nonterm("ws_any"), lit(")"),
            opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
            nonterm("hws"), lit("=>"),
@@ -671,8 +699,11 @@ export function buildBaseGrammar(): Grammar {
            opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
            nonterm("hws"), lit("="), nonterm("fn_body")],
         { name: "export_binding" }),
-      // Function def with optional return type: `name(params)[: ret] => body`
-      seq([nonterm("ident"), lit("("), nonterm("ws_any"), nonterm("typed_param_list"),
+      // Function def with optional generic params + optional return type:
+      // `name[generic_decl](params)[: ret] => body`
+      seq([nonterm("ident"),
+           opt(nonterm("generic_decl")),
+           lit("("), nonterm("ws_any"), nonterm("typed_param_list"),
            nonterm("ws_any"), lit(")"),
            opt(seq([nonterm("ws"), lit(":"), nonterm("ws"), nonterm("type_expr")])),
            nonterm("hws"), lit("=>"),

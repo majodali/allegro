@@ -1108,6 +1108,38 @@ function collectTypedParams(tree: ParseTree, paramMap: Map<string, any>, out: Ty
   for (const ch of tree.children) collectTypedParams(ch, paramMap, out);
 }
 
+/** Generic parameter declared in `name[T, e: Effect](…)`. The `kind` is the
+ *  raw type-expression value of the annotation (`Type`, `Effect`, …) or
+ *  `undefined` when the user wrote bare `T`. Stage C2 will dispatch on kind
+ *  to drive effect-variable unification distinctly from type-variable
+ *  unification. */
+interface GenericParam { name: string; kind?: any; }
+
+function collectGenericParams(tree: ParseTree): GenericParam[] {
+  const out: GenericParam[] = [];
+  walk(tree);
+  return out;
+
+  function walk(t: ParseTree): void {
+    if (t.kind !== "branch") return;
+    if (t.tag === "generic_param") {
+      const identTree = t.children.find(ch => ch.kind === "branch" && ch.tag === "ident");
+      if (!identTree) throw new Error("generic_param: missing ident");
+      const name = textOf(identTree);
+      let kind: any | undefined = undefined;
+      for (const ch of t.children) {
+        if (ch.kind === "branch" && !ch.tag) {
+          const typeTree = findTypeExpr(ch);
+          if (typeTree) kind = buildTypeExpr(typeTree, new Map());
+        }
+      }
+      out.push({ name, kind });
+      return;
+    }
+    for (const ch of t.children) walk(ch);
+  }
+}
+
 /** Find the type_expr within an optional annotation block. */
 function findTypeExpr(tree: ParseTree): ParseTree | null {
   if (tree.kind !== "branch") return null;
@@ -1319,10 +1351,13 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
   }
 
   if (tag === "export_fn_decl") {
-    // export NAME(params)[: ret] => body — build fn_decl, then wrap with export.
+    // export NAME[generic_decl](params)[: ret] => body
     const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
     if (!identTree) throw new Error("export_fn_decl: missing function name");
     const fnName = textOf(identTree);
+
+    const genericTree = c.find(ch => ch.kind === "branch" && ch.tag === "generic_decl");
+    const genericParams = genericTree ? collectGenericParams(genericTree) : [];
 
     const typedParams: TypedParam[] = [];
     const paramListTree = c.find(ch => ch.kind === "branch" && ch.tag === "typed_param_list");
@@ -1349,6 +1384,9 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
     for (let i = 0; i < paramNames.length; i++) innerMap.set(paramNames[i], params[i]);
     const body = buildExpr(bodyTree, innerMap);
     const fn = makeComposedFn(params, body);
+    if (genericParams.length > 0) {
+      (fn as any).__genericParams = genericParams;
+    }
     const typed = maybeTyped(fn, typedParams, returnTypeExpr);
     const exported = makeExpr(prim("export"), [typed]);
     return { key: fnName, value: exported };
@@ -1381,12 +1419,22 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
   }
 
   if (tag === "fn_decl") {
-    // ident "(" ws typed_param_list ws ")" [ws ":" ws type_expr] ws "=>" ws expr
+    // ident [generic_decl] "(" ws typed_param_list ws ")" [ws ":" ws type_expr] ws "=>" ws expr
     const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
     if (!identTree) throw new Error("fn_decl: missing function name");
     const fnName = textOf(identTree);
 
-    // Collect typed params from typed_param_list
+    // Stage C1: optional generic param list `[T, e: Effect, …]` between the
+    // function name and `(`. For now we just collect the names so they
+    // resolve as type variables in subsequent type-expression parses; kind
+    // annotations are captured for later validation but not yet dispatched
+    // on (Stage C2 will do effect-variable unification).
+    const genericTree = c.find(ch => ch.kind === "branch" && ch.tag === "generic_decl");
+    const genericParams = genericTree ? collectGenericParams(genericTree) : [];
+
+    // Collect typed params from typed_param_list. The inner paramMap below
+    // will resolve generic-param names to fresh Symbols so they're treated
+    // as type variables (matches the existing auto-promotion path).
     const typedParams: TypedParam[] = [];
     const paramListTree = c.find(ch => ch.kind === "branch" && ch.tag === "typed_param_list");
     if (paramListTree) collectTypedParams(paramListTree, new Map(), typedParams);
@@ -1413,6 +1461,12 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
     for (let i = 0; i < paramNames.length; i++) innerMap.set(paramNames[i], params[i]);
     const body = buildExpr(bodyTree, innerMap);
     const fn = makeComposedFn(params, body);
+    // Stash generic-param metadata on the ComposedFunction (the identity
+    // survives `typed_function` wrapping at runtime). Stage C2 will consume
+    // this for effect-variable unification; inert in Stage C1.
+    if (genericParams.length > 0) {
+      (fn as any).__genericParams = genericParams;
+    }
     const value = maybeTyped(fn, typedParams, returnTypeExpr);
     return { key: fnName, value };
   }
