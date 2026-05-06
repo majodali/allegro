@@ -1644,35 +1644,13 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 // --- Logical operators (short-circuiting) ---
 
 const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
-  // args[0] = left operand, args[1] = zero-param thunk wrapping right operand
-  // If left is a type, this is a refinement: Type && <predicate-expression>
-  // Otherwise, logical AND: left && right (short-circuit via thunk)
+  // args[0] = left operand, args[1] = zero-param thunk wrapping right operand.
+  // Pure logical AND with short-circuit. Type-axis conjunction is `&` →
+  // `typed_amp` since Slice 2 Stage 0; `&&` no longer creates refinements.
   const left = evalFn!(args[0], ctx!);
   if (!isResolved(left)) {
     return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, args[1]]);
   }
-
-  // Type refinement: if left is a type, extract the raw body from the thunk
-  // and build a one-param predicate lambda (_ => body).
-  const leftType = getType(left);
-  if (leftType && leftType === Type) {
-    const thunk = args[1];
-    if (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0) {
-      // Extract raw body and wrap as a one-param lambda with `_`
-      const predicate = buildFn(["_"], thunk.body) as Value;
-      const parentType = primaryOf(left) as ContextValue;
-      return wrapType(buildRefinedType(parentType, predicate));
-    }
-    // Already a one-param lambda (rare path) — use directly
-    const predicate = evalFn!(args[1], ctx!);
-    if (!isResolved(predicate)) {
-      return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, predicate]);
-    }
-    const parentType = primaryOf(left) as ContextValue;
-    return wrapType(buildRefinedType(parentType, predicate));
-  }
-
-  // Logical AND path (short-circuit)
   const leftP = primaryOf(left);
   if (leftP.kind === ValueKind.Bits && leftP.data === 0n) {
     return withType(makeInt(0), BoolType);
@@ -1691,6 +1669,38 @@ const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return withType(makeInt(0), BoolType);
   }
   return withType(makeInt(1), BoolType);
+};
+
+// `&` — type/effect conjunction. For Stage 0, the supported shape is
+// refinement: `Type & <predicate-body>`. The right operand is a zero-arg
+// thunk; we extract its body and wrap it as a one-param predicate lambda
+// (`_ => body`) before passing to `buildRefinedType`. Type intersection
+// (two types) and effect conjunction (anonymous compound effects) are
+// scheduled for later Slice 2 stages and currently raise an error.
+const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const left = evalFn!(args[0], ctx!);
+  if (!isResolved(left)) {
+    return makeExpr(makePrimitive("typed_amp", typed_amp_impl, true), [left, args[1]]);
+  }
+  const leftType = getType(left);
+  if (!leftType || leftType !== Type) {
+    const ln = leftType ? getTypeName(left) : "untyped";
+    throw new AllegroError(`'&' requires a type on the left (got ${ln})`);
+  }
+  const thunk = args[1];
+  if (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0) {
+    // Refinement: extract the raw body and wrap as `_ => body`.
+    const predicate = buildFn(["_"], thunk.body) as Value;
+    const parentType = primaryOf(left) as ContextValue;
+    return wrapType(buildRefinedType(parentType, predicate));
+  }
+  // Right operand is a resolved type or other value — type-intersection /
+  // effect-conjunction. Deferred to later Slice 2 stages.
+  const right = evalFn!(args[1], ctx!);
+  if (!isResolved(right)) {
+    return makeExpr(makePrimitive("typed_amp", typed_amp_impl, true), [left, right]);
+  }
+  throw new AllegroError("'&' between two types not yet supported (Stage 0); use a predicate body like 'Int & _ > 0'");
 };
 
 const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
@@ -2871,6 +2881,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   typed_object: makePrimitive("typed_object", typed_object_impl, true),
   typed_function: makePrimitive("typed_function", typed_function_impl, true),
   typed_and: makePrimitive("typed_and", typed_and_impl, true),
+  typed_amp: makePrimitive("typed_amp", typed_amp_impl, true),
   typed_or: makePrimitive("typed_or", typed_or_impl, true),
   typed_not: makePrimitive("typed_not", typed_not_impl, true),
   export: makePrimitive("export", export_impl, true),

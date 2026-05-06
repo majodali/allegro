@@ -6,7 +6,7 @@
 
 use invariants
 
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 // Refinement-type predicate flows through arithmetic propagation.
 x = PositiveInt(5)         // ≥ 1 [refinement-type]

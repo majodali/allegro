@@ -78,7 +78,15 @@ const LEVELS: LevelSpec[] = [
       nonterm(tighter!),
     ]) },
 
-  // Level 2 — logical and (`&&` and keyword `and`).
+  // Level 2 — type/effect conjunction (`&`). Looser than `&&` so refinement
+  // predicates absorb logical-AND combinations: `Int & _ > 0 && _ < 100`
+  // parses as `Int & ((_ > 0) && (_ < 100))`.
+  { name: "amp", build: (self, tighter) => alt([
+      seq([nonterm(self), nonterm("ws"), lit("&"), nonterm("ws"), nonterm(tighter!)], { name: "amp" }),
+      nonterm(tighter!),
+    ]) },
+
+  // Level 3 — logical and (`&&` and keyword `and`).
   { name: "and", build: (self, tighter) => alt([
       seq([nonterm(self), nonterm("ws"), lit("&&"), nonterm("ws"), nonterm(tighter!)], { name: "and" }),
       seq([nonterm(self), nonterm("ws_req"), lit("and"), nonterm("ws_req"), nonterm(tighter!)], { name: "and" }),
@@ -187,6 +195,7 @@ export const BASE_OPERATORS_TO_LEVEL: Readonly<Record<string, string>> = {
   "|>":         "pipe",
   "||":         "or",
   "or":         "or",
+  "&":          "amp",
   "&&":         "and",
   "and":        "and",
   "==":         "eq",

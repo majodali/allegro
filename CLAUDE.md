@@ -164,14 +164,14 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - Unnamed type expressions (inline `{ ... }`) are always structural.
 
 ### Refinement Types
-- Declared via `Type && <predicate>` where `_` in the predicate refers to the value being checked: `PositiveInt = Int && _ > 0`. Equivalent to `Int.where(_ => _ > 0)`.
+- Declared via `Type & <predicate>` where `_` in the predicate refers to the value being checked: `PositiveInt = Int & _ > 0`. Equivalent to `Int.where(_ => _ > 0)`. (`&` is the type/effect conjunction operator, distinct from `&&` which is purely logical AND since Slice 2 Stage 0.)
 - `&&` in expression position is overloaded: if the left operand is a type (has meta-type Type), it creates a refined type via `buildRefinedType`. Otherwise it's logical AND. `typed_and_impl` dispatches at runtime.
-- Compound predicates via repeated `&&`: `Int && _ > 0 && _ < 100` — the second `&&` is expression-level logical AND inside the predicate body. Parsed as `Int && (_ > 0 && _ < 100)`.
+- Compound predicates: `Int & _ > 0 && _ < 100` parses as `Int & ((_ > 0) && (_ < 100))` because `&` is at a looser precedence than `&&`. The whole `_ > 0 && _ < 100` becomes a single predicate body; `domainFromPredicate` recognises the conjunction as a single interval (`[1, 99]`) for compile-time reasoning.
 - Predicate is an Allegro lambda with parameter `_`. `buildRefinedType` stores it as `__predicate` on the refined type.
 - **Construction check**: `__construct` wrapper evaluates the predicate on the constructed value. If false, returns an error value instead of the refined value.
 - **Annotation/call-site check**: `type_check_impl` and `checkArgType` evaluate `__predicate` after the nominal/structural base check passes. Short-circuits when `actualType === expectedType` (value was already refined through the same type).
 - **Partial evaluation integration**: predicates are Allegro expressions, so they partially evaluate naturally with known values. Unresolved predicates produce residual type checks.
-- **`preserveOps`**: `(Int && _ > 0).preserveOps(add, sub)` or `.preserveOps()` (all numeric ops). Creates a new refined type where named operators are lifted: after the parent op runs, the result is fed through `__construct`, re-running the predicate check and tagging with the refined type. This makes `x + 3` where `x: PositiveInt` produce a `PositiveInt` instead of bare `Int`.
+- **`preserveOps`**: `(Int & _ > 0).preserveOps(add, sub)` or `.preserveOps()` (all numeric ops). Creates a new refined type where named operators are lifted: after the parent op runs, the result is fed through `__construct`, re-running the predicate check and tagging with the refined type. This makes `x + 3` where `x: PositiveInt` produce a `PositiveInt` instead of bare `Int`.
 
 ## Parser (Hybrid: Pratt + Recursive Descent)
 
@@ -308,7 +308,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - `pattern-match.alg` — when/is/then pattern matching, multivalue access
 - `interfaces.alg` — Type.interface, structural conformance, parent inheritance
 - `typed-types.alg` — types as typed values, Int instanceof NominalType, meta-type checks
-- `refinements.alg` — refinement types via `&&`, compound predicates, preserveOps operator lifting
+- `refinements.alg` — refinement types via `&`, compound predicates, preserveOps operator lifting
 - `mixins.alg` — mixin methods, field access via self, reusable specs, multi-arg methods
 - `grammar-runtime.alg` — `use_grammar pow` header plus `**`/`neg` from `lib/pow.alg`
 
@@ -460,13 +460,13 @@ Printable = Type.interface({toString: Function})
 Sized = Type.interface({length: Int})
 "hello" instanceof Sized          // true — String has length
 
-// Refinement types (Int && predicate, _ is the value)
-PositiveInt = Int && _ > 0
+// Refinement types (Int & predicate, _ is the value)
+PositiveInt = Int & _ > 0
 PositiveInt(5)                    // → 5
 PositiveInt(0 - 1)                // → error(refinement check failed)
 
 // Compound predicates
-SmallPos = Int && _ > 0 && _ < 100
+SmallPos = Int & _ > 0 && _ < 100
 SmallPos(50)                      // → 50
 SmallPos(150)                     // → error
 
@@ -475,7 +475,7 @@ double(x: PositiveInt): Int => x * 2
 double(5)                         // → 10 (bare Int passes predicate check)
 
 // preserveOps — lift operators to preserve the refinement
-PI = (Int && _ > 0).preserveOps()
+PI = (Int & _ > 0).preserveOps()
 x = PI(5)
 y = x + 3                         // y: PositiveInt, re-checked after +
 y instanceof PI                   // → true
@@ -537,7 +537,7 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ Interfaces: `Type.interface({...})` — structural type matching, no `implements` keyword needed
 - ✅ Types as typed values: `Int instanceof NominalType`, `type of Int` → NominalType, all type bindings wrapped as MultiValues
 - ✅ Array map/filter/reduce as Allegro ComposedFunctions (recursive AST construction, not imperative TypeScript loops)
-- ✅ Refinement types: `Type && _ > 0` syntax, predicate checking at construction/annotation/call sites, `preserveOps` operator lifting for refinement preservation through operators
+- ✅ Refinement types: `Type & _ > 0` syntax, predicate checking at construction/annotation/call sites, `preserveOps` operator lifting for refinement preservation through operators (`&&` was the original operator; migrated to `&` in Slice 2 Stage 0 to free `&&` for purely logical AND)
 - ✅ Mixins: `.mixin({method: fn, ...})` adds method implementations to types, ComposedFunction method dispatch with self binding
 - ✅ Runtime grammar extension Phase 1: module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix` primitives; `use_grammar NAME` top-of-file header activated a module's `GrammarFragment` before parsing (superseded by Phase 6)
 - ✅ Runtime grammar extension Phase 6: `grammar { infix/prefix/postfix/expr_prefix … }` block syntax with named precedence (`prec(pow)`, `at(X)`, `above(X)`, `below(Y)`, combined forms), operator-symbol lookup (`at("*")`), anonymous levels, and data-driven stratified-stack level insertion. `use X` pre-scanner (replaces `use_grammar`; accepts `use NAME` and `use import NAME`, extensible to full expressions later). Conflict detection: `E_OPERATOR_CONFLICT`, `E_KEYWORD_CONFLICT`, `E_PRECEDENCE_CYCLE` surface at `use` time with aggregated messages.
@@ -560,6 +560,7 @@ See `BACKLOG.md` for full roadmap. Key completed items:
   Effect labels are EXTENSIBLE, not a fixed enum. `src/types.ts` `PrimitiveFunctionValue` gains an optional `effects: string[]`; `makePrimitive(name, fn, lazy?, effects?)` accepts the labels. Core declares no labels; the standard library tags `print` with `io`, `fetch` with `net`, `delay` with `time`. Domain-specific extensions register their own labels (`build-io`, `funds-mutation`) by attaching them to their primitives. `src/effects.ts` provides `EffectSet` (plain `Set<string>`), set ops (`effectUnion`, `effectSubset`, `effectDifference`), bottom-up inference (`inferFunctionEffects` walks ComposedFunction bodies, recurses into transitively called functions with cycle detection), and the `effects_attach` wrapper unwrap helpers. Surface syntax via `lib/effects.alg` grammar (stmt_form `effects` parsing comma-separated identifiers); the block-expression preprocessor recognises `effects_decl_marker(labels)` markers, extracts them, and wraps the body's result with `effects_attach(result, labels)` (a runtime passthrough that's metadata for the analyzer). `evalSource` runs `checkEffectsDeclarations` after `precompileFunctions`; mismatches throw an `Error` listing every binding's declared/inferred/missing sets. Introspection: `ValueSummary.inferredEffects` and `.declaredEffects` populate for any function value; the renderer surfaces three formats — `effects: pure (inferred)`, `effects: io (declared, verified)`, `effects: io (declared) ⊇ pure (inferred) ✓`. Pilot: `lib/math.alg` adds `effects pure` to `sqrt`, `pow`, `abs`, `double_pos`. Demo: `tests/effects-demo.alg`. Phase D2 will refine flat labels into parametric capabilities (`net[example.com:443]`) and per-module capability budgets — D1 is the substrate.
 - ✅ Provability arc — Phase D1 sub-chunk 1.1 (Effect meta-type substrate): `src/types-std.ts` adds the `Effect` meta-type (`__type = Type`, lattice members in `__members`) and the two core absolutes — `pureEffect` (lattice bottom, kind `"pure"`) and `opaqueEffect` (lattice top, kind `"opaque"`) — built via `buildEffect(name, kind?)` which sets `__extends = Effect` and copies the lattice methods into the new type's `__members`. TS lattice helpers `effectSubsetOf`, `effectImplies`, `effectIntersect`, `effectUnion` operate on Context values; subset/implies walk the `__extends` chain by identity; intersect/union return `pureEffect` (no overlap) or `opaqueEffect` (sound over-approximation pending Slice 2's anonymous conjunctions). Standard extension binds `Effect`, `pure`, `opaque` so Allegro source sees them as values. `pure subtypeof Effect` and `opaque subtypeof Effect` discharge through the existing nominal subtype check via `__extends`; sibling subtypes (`pure subtypeof opaque`) correctly return false. Anonymous conjunction creation (`io & time`) and `&` operator surface deferred to Slice 2.
 - ✅ Provability arc — Phase D1 sub-chunk 1.2 (effects in PredicateSet): `src/refinements.ts` `AbstractDomain` gains an `EffectsDomain` variant (`{ kind: "effects", labels: Set<string> }`) carrying the chunk-1 flat-label representation. Lattice ops generalised: `intersectDomains` does set intersection on effect-effect, opaque on mixed-kind; `joinDomains` does set union; `impliesDomain` returns `b.labels ⊆ a.labels` (wider implies narrower) for effect-effect, false on mixed-kind. `PredicateSet` gains `effectiveEffects()` (unions all effects-source predicates) alongside the existing `effectiveDomain()` (which now skips effects predicates). `PredicateSource` adds `"effects-declared"` and `"effects-inferred"`. `src/effects.ts` adds `effectPredicatesForFunction(fn): PredicateSet` and `effectPredicatesForValue(v)` — derive a uniform predicate-set view from the chunk-1 storage (`effects_attach` body wrap + `inferFunctionEffects` walker), one predicate per source. Underlying chunk-1 storage unchanged; this layer is on-demand derivation. Storage migration (replacing `effects_attach` with direct predicate attachment on the function MultiValue) deferred to Slice 2 where it interacts with HOF param-effect bounds. All chunk-1 tests pass under their existing API; 13 new tests verify the EffectsDomain machinery and helper extraction.
+- ✅ Provability arc — Phase D1 Slice 2 Stage 0 (`&` for type/effect conjunction): added `&` as a distinct infix operator at a new precedence level (`amp`, between `or` and `and`) so refinements and effect conjunctions read on a separate axis from logical AND. `typed_amp_impl` handles the type-side cases (refinement creation now; type intersection and effect conjunction in later stages). `typed_and_impl` simplified to purely logical AND. All existing refinement uses (`Int && _ > 0`) migrated to `&` (`Int & _ > 0`) across `lib/math.alg`, `lib/contracts.alg` (comment), and the `tests/refinements.alg` / `tests/contracts-demo.alg` / `tests/refinement-propagation-demo.alg` / `tests/refinement-subtype-demo.alg` / `tests/predicate-set-demo.alg` / `tests/math-pilot-demo.alg` / `tests/invariant-demo.alg` files plus inline test-suite assertions. Compound predicates (`Int & _ > 0 && _ < 100`) now build a *single* refinement with a compound predicate body — `domainFromPredicate` recognises the conjunction as one interval `[1, 99]`, more precise than the previous chained-refinement form's per-clause domain.
 - ✅ Provability arc — Phase D1 sub-chunk 1.3 (Notification category + opaque marking on stdlib HOFs): `CompilationReport` gains a `notifications: Notification[]` collection (`Notification = { kind, message, binding? }`) for informational diagnostics that don't halt compilation. `buildType` / `buildGenericType` accept `methodEffects: Record<string, string[]>`; `Array.map` / `Array.filter` / `Array.reduce` are tagged `effects: ["opaque"]` so callers' inferred sets reflect the soundness limit until Slice 2's effect polymorphism resolves precisely. Bound primitives produced by `type_dispatch` propagate the underlying primitive's effects (previously stripped). Static walker in `src/effects.ts` recognises `type_dispatch(obj, "map" | "filter" | "reduce")` patterns and adds `opaque` (necessary because the static walk can't follow runtime dot-dispatch through `type_dispatch`). `checkEffectsDeclarations` filters `opaque` out of mismatch computation so `effects pure` functions calling stdlib HOFs don't halt; `opaqueEffectNotices` emits a separate `effects-opaque-from-stdlib-hof` notification for visibility. Per-project notification severity (notification → error/warning/ignore) tracked separately on the backlog.
 - ✅ Provability arc — Phase C Chunk 3 (`requires` / `ensures` body-form contracts): function bodies can declare contracts at the head:
   ```

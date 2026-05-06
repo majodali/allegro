@@ -5,8 +5,8 @@
 // STATICALLY — the compiler proves `_ > 1000` implies `_ > 100` without
 // executing the predicate. No runtime check, no performance cost.
 
-BigInt     = Int && _ > 100
-VeryBigInt = Int && _ > 1000
+BigInt     = Int & _ > 100
+VeryBigInt = Int & _ > 1000
 
 describe(x: BigInt): String => "big"
 

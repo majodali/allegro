@@ -14,7 +14,7 @@
 
 use contracts
 
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 // Both clauses present. `requires` runs as a runtime check at entry;
 // `ensures` is statically discharged because `x + x` with `x ≥ 1`

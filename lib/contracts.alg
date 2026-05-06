@@ -30,7 +30,7 @@
 //       a / b
 //
 // `_` in `ensures` refers to the function's return value, matching the
-// refinement-predicate convention (`Int && _ > 0`). At parse time the
+// refinement-predicate convention (`Int & _ > 0`). At parse time the
 // preprocessor rewrites `_` references inside ensures predicates into a
 // one-param lambda over `_`, so a single result evaluation feeds every
 // post-condition check.

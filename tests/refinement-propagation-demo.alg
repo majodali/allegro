@@ -5,7 +5,7 @@
 // introspection summary shows inferred invariants on downstream values
 // without any annotation from the user.
 
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 x = PositiveInt(5)     // domain: ≥ 1 (attached on construction)
 y = x + 3              // domain: ≥ 4

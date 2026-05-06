@@ -83,6 +83,9 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     // `Type && _ > 0` refinements).
     case "or":   return makeExpr(prim("typed_or"),   [buildExpr(c[0], paramMap), makeComposedFn([], buildExpr(lastChild(c), paramMap))]);
     case "and":  return makeExpr(prim("typed_and"),  [buildExpr(c[0], paramMap), makeComposedFn([], buildExpr(lastChild(c), paramMap))]);
+    // `&` — type/effect conjunction. The RHS is wrapped in a zero-arg thunk
+    // so the primitive can extract its body as a refinement predicate.
+    case "amp":  return makeExpr(prim("typed_amp"),  [buildExpr(c[0], paramMap), makeComposedFn([], buildExpr(lastChild(c), paramMap))]);
     case "eq":   return makeExpr(prim("bits_eq"),    [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
     case "neq":  return makeExpr(prim("bits_neq"),   [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
     case "lt":   return makeExpr(prim("bits_lt"),    [buildExpr(c[0], paramMap), buildExpr(lastChild(c), paramMap)]);
@@ -1051,7 +1054,7 @@ function collectArgs(tree: ParseTree, paramMap: Map<string, any>): any[] {
 }
 
 const BUILTIN_EXPRESSION_TAGS = new Set([
-  "or","and","eq","neq","lt","gt","lte","gte","add","sub","mul","div","mod",
+  "or","and","amp","eq","neq","lt","gt","lte","gte","add","sub","mul","div","mod",
   "neg","not","call","dot","bracket","paren","if","lambda1","lambda1_typed","lambdaN",
   "number","float","bool","none_lit","string","ident",
   "array_lit","object_lit",

@@ -2435,19 +2435,19 @@ q.x + q.y`);
 // nested refinements naturally.
 
 test("mixin on refined type: constructor still checks predicate", () => {
-  const result = evalStd(`PI = (Int && _ > 0).mixin({double: self => self + self})
+  const result = evalStd(`PI = (Int & _ > 0).mixin({double: self => self + self})
 PI(5)`);
   eq(Number((primaryOf(result!) as BitsValue).data), 5);
 });
 
 test("mixin on refined type: predicate failure produces error", () => {
-  const result = evalStd(`PI = (Int && _ > 0).mixin({double: self => self + self})
+  const result = evalStd(`PI = (Int & _ > 0).mixin({double: self => self + self})
 PI(0 - 5)`);
   eq((result as any).components?.has("error"), true);
 });
 
 test("mixin on refined type: method call works", () => {
-  const result = evalStd(`PI = (Int && _ > 0).mixin({double: self => self + self})
+  const result = evalStd(`PI = (Int & _ > 0).mixin({double: self => self + self})
 PI(7).double()`);
   eq(Number((primaryOf(result!) as BitsValue).data), 14);
 });
@@ -2455,20 +2455,20 @@ PI(7).double()`);
 test("mixin on doubly-refined type: both predicates checked (inner passes)", () => {
   // Compound `&&` refinement + mixin. Must check both _ > 0 AND _ < 100,
   // then run mixin method.
-  const result = evalStd(`T = (Int && _ > 0 && _ < 100).mixin({triple: self => self * 3})
+  const result = evalStd(`T = (Int & _ > 0 && _ < 100).mixin({triple: self => self * 3})
 T(50).triple()`);
   eq(Number((primaryOf(result!) as BitsValue).data), 150);
 });
 
 test("mixin on doubly-refined type: outer predicate failure produces error", () => {
   // _ > 0 holds but _ < 100 fails — inner check should catch it
-  const result = evalStd(`T = (Int && _ > 0 && _ < 100).mixin({triple: self => self * 3})
+  const result = evalStd(`T = (Int & _ > 0 && _ < 100).mixin({triple: self => self * 3})
 T(500)`);
   eq((result as any).components?.has("error"), true);
 });
 
 test("mixin on doubly-refined type: inner predicate failure produces error", () => {
-  const result = evalStd(`T = (Int && _ > 0 && _ < 100).mixin({triple: self => self * 3})
+  const result = evalStd(`T = (Int & _ > 0 && _ < 100).mixin({triple: self => self * 3})
 T(0 - 10)`);
   eq((result as any).components?.has("error"), true);
 });
@@ -2556,7 +2556,7 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
 });
 
 test("mixin on refined type: instanceof still works", () => {
-  const result = evalStd(`T = (Int && _ > 0).mixin({double: self => self + self})
+  const result = evalStd(`T = (Int & _ > 0).mixin({double: self => self + self})
 T(5) instanceof T`);
   eq(Number((primaryOf(result!) as BitsValue).data), 1);
 });
@@ -3085,31 +3085,31 @@ PositiveInt(5) instanceof Int
 // == Refinement types: && syntax ==
 
 test("refinement: && syntax creates refined type", () => {
-  const result = evalStd(`PositiveInt = Int && _ > 0
+  const result = evalStd(`PositiveInt = Int & _ > 0
 PositiveInt(5)`);
   eq(Number((primaryOf(result!) as BitsValue).data), 5);
 });
 
 test("refinement: && syntax fails on invalid value", () => {
-  const result = evalStd(`PositiveInt = Int && _ > 0
+  const result = evalStd(`PositiveInt = Int & _ > 0
 PositiveInt(0 - 5)`);
   eq((result as any).components?.has("error"), true);
 });
 
 test("refinement: compound predicate with && and &&", () => {
-  const result = evalStd(`SmallPos = Int && _ > 0 && _ < 100
+  const result = evalStd(`SmallPos = Int & _ > 0 && _ < 100
 SmallPos(50)`);
   eq(Number((primaryOf(result!) as BitsValue).data), 50);
 });
 
 test("refinement: compound predicate rejects out-of-range", () => {
-  const result = evalStd(`SmallPos = Int && _ > 0 && _ < 100
+  const result = evalStd(`SmallPos = Int & _ > 0 && _ < 100
 SmallPos(150)`);
   eq((result as any).components?.has("error"), true);
 });
 
 test("refinement: bare Int satisfies refined type at call site if predicate passes", () => {
-  const result = evalStd(`PositiveInt = Int && _ > 0
+  const result = evalStd(`PositiveInt = Int & _ > 0
 double(x: PositiveInt): Int => x * 2
 double(5)`);
   eq(Number((primaryOf(result!) as BitsValue).data), 10);
@@ -3118,7 +3118,7 @@ double(5)`);
 test("refinement: call site rejects value failing predicate", () => {
   let threw = false;
   try {
-    evalStd(`PositiveInt = Int && _ > 0
+    evalStd(`PositiveInt = Int & _ > 0
 f(x: PositiveInt): Int => x
 f(0 - 5)`);
   } catch (e) {
@@ -3128,7 +3128,7 @@ f(0 - 5)`);
 });
 
 test("refinement: already-refined value passes without re-checking", () => {
-  const result = evalStd(`PositiveInt = Int && _ > 0
+  const result = evalStd(`PositiveInt = Int & _ > 0
 f(x: PositiveInt): Int => x
 x = PositiveInt(7)
 f(x)`);
@@ -3148,7 +3148,7 @@ test("refinement: logical AND short-circuits", () => {
 // == preserveOps ==
 
 test("preserveOps: lifted add preserves refined type", () => {
-  const result = evalStd(`PositiveInt = (Int && _ > 0).preserveOps()
+  const result = evalStd(`PositiveInt = (Int & _ > 0).preserveOps()
 x = PositiveInt(5)
 y = x + 3
 y instanceof PositiveInt`);
@@ -3156,21 +3156,21 @@ y instanceof PositiveInt`);
 });
 
 test("preserveOps: lifted op produces error on predicate failure", () => {
-  const result = evalStd(`PositiveInt = (Int && _ > 0).preserveOps()
+  const result = evalStd(`PositiveInt = (Int & _ > 0).preserveOps()
 x = PositiveInt(5)
 x - 10`);
   eq((result as any).components?.has("error"), true);
 });
 
 test("preserveOps: lifted op value is still correct", () => {
-  const result = evalStd(`PositiveInt = (Int && _ > 0).preserveOps()
+  const result = evalStd(`PositiveInt = (Int & _ > 0).preserveOps()
 x = PositiveInt(5)
 x + 3`);
   eq(Number((primaryOf(result!) as BitsValue).data), 8);
 });
 
 test("preserveOps: specific ops can be lifted", () => {
-  const result = evalStd(`PositiveInt = (Int && _ > 0).preserveOps(add)
+  const result = evalStd(`PositiveInt = (Int & _ > 0).preserveOps(add)
 x = PositiveInt(5)
 y = x + 3
 y instanceof PositiveInt`);
@@ -3908,7 +3908,7 @@ test("Phase C: entailsPredicate uses set's tightest fact", () => {
 
 test("Phase C: predicate sets propagate through arithmetic in evaluator", () => {
   const src = `
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 x = PositiveInt(5)
 y = x + 10
 `;
@@ -3986,7 +3986,7 @@ assert_stmt(x > 0)
 test("Phase C Chunk 2: discharged assert is silent", () => {
   // Already-known fact discharges statically; no error.
   const src = `
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 x = PositiveInt(5)
 assert_stmt(x > 0)
 `;
@@ -6113,18 +6113,18 @@ test("grammar2/std: binary literal", () => {
 });
 
 test("grammar2/std: refinement type creation", () => {
-  // Int && _ > 0 creates a refined type
-  const r = evalStandard2("PI = Int && _ > 0\nPI(5)");
+  // Int & _ > 0 creates a refined type
+  const r = evalStandard2("PI = Int & _ > 0\nPI(5)");
   eq(Number((primaryOf(r) as BitsValue).data), 5);
 });
 
 test("grammar2/std: refinement check failure produces error", () => {
-  const r = evalStandard2("PI = Int && _ > 0\nPI(0 - 5)");
+  const r = evalStandard2("PI = Int & _ > 0\nPI(0 - 5)");
   eq((r as any).components?.has("error"), true);
 });
 
 test("grammar2/std: compound refinement predicates", () => {
-  const r = evalStandard2("SmallPos = Int && _ > 0 && _ < 100\nSmallPos(50)");
+  const r = evalStandard2("SmallPos = Int & _ > 0 && _ < 100\nSmallPos(50)");
   eq(Number((primaryOf(r) as BitsValue).data), 50);
 });
 

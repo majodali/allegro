@@ -2,7 +2,7 @@
 // discharged statically via abstract-domain propagation. No runtime
 // predicate evaluation — the compiler proves `≥ 2` implies `≥ 1`.
 
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 double_pos(x: PositiveInt): PositiveInt => x + x
 
 x = PositiveInt(5)

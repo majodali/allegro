@@ -1,12 +1,12 @@
 // Phase C Chunk 4: Type.invariant — type-internal lifecycle invariants.
 //
 // Two complementary ways to declare typed constraints:
-//   - `&&` refinement for single-value types (PositiveInt = Int && _ > 0)
+//   - `&` refinement for single-value types (PositiveInt = Int & _ > 0)
 //   - `.invariant(self => …)` for records / multi-predicate cases
 // Mechanically the same: constructor checks; predicate's domain attaches
 // to the value's predicate set; downstream propagation inherits the fact.
 
-// Single-value invariant — equivalent to `Int && _ > 0` but composes via
+// Single-value invariant — equivalent to `Int & _ > 0` but composes via
 // the fluent API so multiple constraints can chain.
 PositiveInt = Int.invariant(self => self > 0)
 ten = PositiveInt(10)

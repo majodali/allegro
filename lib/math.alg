@@ -7,7 +7,7 @@
 //
 // Phase C Chunk 4 demonstrates two equivalent ways to express a typed
 // constraint:
-//   - `Int && _ > 0`              (refinement type, value-level)
+//   - `Int & _ > 0`               (refinement type, value-level)
 //   - `Int.invariant(self > 0)`   (lifecycle invariant, multi-clause)
 // Mechanically equivalent for single-value types; `invariant` is the
 // natural form for record/struct types where the predicate references
@@ -23,11 +23,11 @@ export PI = 3.141592653589793
 export E = 2.718281828459045
 export TAU = 6.283185307179586
 
-// Single-value refinements via `&&`. Equivalent to:
+// Single-value refinements via `&`. Equivalent to:
 //   Int.invariant(self => self > 0)
 //   Int.invariant(self => self >= 0)
-export PositiveInt = Int && _ > 0
-export NonNeg      = Int && _ >= 0
+export PositiveInt = Int & _ > 0
+export NonNeg      = Int & _ >= 0
 
 // A multi-field range. The invariant ties two fields together — the
 // natural shape for `invariant` rather than refinement-via-`&&`.
