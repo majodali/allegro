@@ -2373,6 +2373,20 @@ export function buildEffect(name: string, kind?: "pure" | "opaque"): ContextValu
     if (binding.value) addBinding(members, key, binding.value);
   }
   addBinding(eff, "__members", members);
+  // Attach an effect bound — the value-side check this type imposes when it
+  // appears as a parameter annotation (`f: pure`). The bound is the set of
+  // effect labels callers may legally produce; the discharge runs through
+  // `impliesDomain` on the predicate-set machinery, identical path to numeric
+  // refinements. `opaque` carries no bound — universal, anything passes.
+  if (kind === "pure") {
+    (eff as any).__effectBound = { kind: "effects", labels: new Set<string>() };
+  } else if (kind === "opaque") {
+    // No bound — universal. type_check skips the effect discharge entirely.
+  } else {
+    // Named effects (io, time, …): bound is the singleton {name}. Extension
+    // libraries will pass `kind` undefined when they call `buildEffect("io")`.
+    (eff as any).__effectBound = { kind: "effects", labels: new Set<string>([name]) };
+  }
   return eff;
 }
 

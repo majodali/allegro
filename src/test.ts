@@ -4356,18 +4356,50 @@ test("Phase D1.2: joinDomains effects ∪ effects = label union", () => {
   }
 });
 
-test("Phase D1.2: impliesDomain on effects (wider implies narrower)", () => {
-  // {io, net} implies {io} — having both covers a check for just io
-  eq(impliesDomain(effectsDomain(["io", "net"]), effectsDomain(["io"])), true);
-  // {io} does NOT imply {io, net} — narrower can't cover wider
-  eq(impliesDomain(effectsDomain(["io"]), effectsDomain(["io", "net"])), false);
+test("Phase D1.2: impliesDomain on effects (predicate semantics, matches numerics)", () => {
+  // Predicate-implication semantics: a implies b iff a.labels ⊆ b.labels —
+  // "actual fits inside the wider bound". This matches how impliesDomain
+  // works for numerics (a's interval ⊆ b's interval) so type_check_impl
+  // discharges effect predicates the same way it discharges numeric ones.
+  //
+  // The user-facing capability operator on Effect VALUES (`Effect.implies`,
+  // backed by `effectImplies` in types-std.ts) has the opposite orientation
+  // — that's a deliberately different helper for the user-level method.
+
+  // {io} fits inside the wider bound {io, net}
+  eq(impliesDomain(effectsDomain(["io"]), effectsDomain(["io", "net"])), true);
+  // {io, net} does NOT fit inside the tighter bound {io}
+  eq(impliesDomain(effectsDomain(["io", "net"]), effectsDomain(["io"])), false);
   // Equal sets imply each other
   eq(impliesDomain(effectsDomain(["io"]), effectsDomain(["io"])), true);
-  // pure (empty) implies pure but nothing else
+  // pure (∅) implies pure
   eq(impliesDomain(effectsDomain(), effectsDomain()), true);
-  eq(impliesDomain(effectsDomain(), effectsDomain(["io"])), false);
-  // Anything implies pure (the empty set is universally entailed)
-  eq(impliesDomain(effectsDomain(["io"]), effectsDomain()), true);
+  // pure (∅) fits inside any wider bound
+  eq(impliesDomain(effectsDomain(), effectsDomain(["io"])), true);
+  // {io} does NOT fit inside pure (∅)
+  eq(impliesDomain(effectsDomain(["io"]), effectsDomain()), false);
+});
+
+test("Phase D1.2: entailsPredicate on effect predicate set (consumer test)", () => {
+  // Integration check: a PredicateSet carrying an effect predicate should
+  // discharge a target effect domain when actual ⊆ target. This exercises
+  // the path type_check_impl uses in Slice 2 Stage A — the test missing from
+  // 1.2 that would have caught the impliesDomain orientation bug.
+  const pureSet = new PredicateSet([
+    makePredicate(effectsDomain(), "effects-inferred"),
+  ]);
+  // Pure function fits a {io} bound
+  eq(entailsPredicate(pureSet, effectsDomain(["io"])), true);
+  // Pure function fits a pure bound
+  eq(entailsPredicate(pureSet, effectsDomain()), true);
+
+  const ioSet = new PredicateSet([
+    makePredicate(effectsDomain(["io"]), "effects-inferred"),
+  ]);
+  // {io} function does NOT fit a pure bound
+  eq(entailsPredicate(ioSet, effectsDomain()), false);
+  // {io} function fits a {io, net} bound
+  eq(entailsPredicate(ioSet, effectsDomain(["io", "net"])), true);
 });
 
 test("Phase D1.2: mixed-kind operations don't pollute results", () => {
@@ -4410,12 +4442,16 @@ test("Phase D1.2: PredicateSet.effectiveDomain skips effects predicates", () => 
 });
 
 test("Phase D1.2: entailsPredicate works for effects targets", () => {
+  // Predicate-implication semantics: an actual effect set entails a target
+  // bound iff actual ⊆ bound (actual fits inside the wider/equal bound).
   const set = new PredicateSet([
     makePredicate(effectsDomain(["io", "net"]), "effects-declared"),
   ]);
-  // Set says {io, net}, target {io} — entailed (wider covers narrower)
-  eq(entailsPredicate(set, effectsDomain(["io"])), true);
-  // Target {time} — not entailed
+  // Actual {io, net} fits a wider bound {io, net, time}
+  eq(entailsPredicate(set, effectsDomain(["io", "net", "time"])), true);
+  // Actual {io, net} does NOT fit a tighter bound {io}
+  eq(entailsPredicate(set, effectsDomain(["io"])), false);
+  // Actual {io, net} does NOT fit a disjoint bound {time}
   eq(entailsPredicate(set, effectsDomain(["time"])), false);
 });
 
@@ -4480,6 +4516,97 @@ test("Phase D1.2: effectPredicatesForFunction surfaces both declared and inferre
     if (dec && dec.shape.kind === "effects") eq(dec.shape.labels.has("io"), true);
     if (inf && inf.shape.kind === "effects") eq(inf.shape.labels.has("io"), true);
   }
+});
+
+// --- Phase D1 Slice 2 Stage A: effect bounds via type_check ---
+
+test("Stage A: pureEffect carries an empty-labels effect bound", () => {
+  // The bound is what type_check pulls when discharging `f: pure`.
+  const bound = (pureEffect as any).__effectBound;
+  eq(bound !== undefined, true);
+  eq(bound.kind, "effects");
+  eq(bound.labels.size, 0);
+});
+
+test("Stage A: opaqueEffect carries no effect bound (universal)", () => {
+  const bound = (opaqueEffect as any).__effectBound;
+  eq(bound, undefined);
+});
+
+test("Stage A: ParamValue carries optional predicates field", () => {
+  // makeParam declares the field at construction so V8 hidden classes stay
+  // stable. Default is undefined (no bound).
+  const p = makeParam(0, "f");
+  eq("predicates" in p, true);
+  eq(p.predicates, undefined);
+});
+
+test("Stage A: f: pure accepts a pure function", () => {
+  const src = `pure_caller(f: pure) =>
+  42
+sq(x) =>
+  x * x
+pure_caller(sq)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("Stage A: f: pure rejects a function that uses print", () => {
+  // print is tagged with effects=["io"]; greet's inferred set is {io}, so
+  // the bound `pure` ({}) is exceeded.
+  const src = `pure_caller(f: pure) =>
+  42
+greet(name) =>
+  print("hi " + name)
+  name
+pure_caller(greet)
+`;
+  let threw = false;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true, "expected effect-bound rejection");
+  eq(msg.includes("pure"), true, "error mentions the expected bound");
+  eq(msg.includes("io"), true, "error mentions the actual effect");
+});
+
+test("Stage A: f: opaque accepts any function", () => {
+  // opaque has no bound — universal — so any function passes.
+  const src = `any_caller(f: opaque) =>
+  42
+greet(name) =>
+  print("hi " + name)
+  name
+any_caller(greet)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("Stage A: x: pure binding accepts a pure function", () => {
+  // Binding annotation goes through type_check_impl rather than
+  // applyComposed's checkArgType — same effect-bound discharge.
+  const src = `sq(x) =>
+  x * x
+y: pure = sq
+42
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("Stage A: x: pure binding rejects an io function", () => {
+  const src = `greet(name) =>
+  print("hi " + name)
+  name
+y: pure = greet
+42
+`;
+  let threw = false;
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { threw = true; }
+  eq(threw, true);
 });
 
 // --- Phase D1 sub-chunk 1.3: opaque marking + Notification category ---

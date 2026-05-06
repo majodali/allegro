@@ -357,10 +357,14 @@ export function propagateNeg(a: AbstractDomain): AbstractDomain {
  *  satisfies `b`.) Used for subtyping on refinements. */
 export function impliesDomain(a: AbstractDomain, b: AbstractDomain): boolean {
   if (b.kind === "opaque") return false;    // can't verify an opaque predicate
-  // Effects: a implies b iff b's labels ⊆ a's labels (having the wider effect
-  // set covers a check for a narrower one). Mixed-kind never implies.
+  // Effects: a implies b iff a.labels ⊆ b.labels — same predicate-implication
+  // semantics as numerics ("every value satisfying a also satisfies b"). For
+  // effects-as-bounds: an actual effect set fits inside a wider allowed bound.
+  // The user-facing capability operator (`effectImplies` in types-std.ts) has
+  // the opposite orientation — that's a deliberately different helper for the
+  // value-side `Effect.implies` method.
   if (a.kind === "effects" && b.kind === "effects") {
-    for (const l of b.labels) if (!a.labels.has(l)) return false;
+    for (const l of a.labels) if (!b.labels.has(l)) return false;
     return true;
   }
   if (a.kind === "effects" || b.kind === "effects") return false;

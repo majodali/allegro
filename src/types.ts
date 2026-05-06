@@ -52,6 +52,11 @@ export interface ParamValue {
   position: number;
   owner: ComposedFunctionValue | null;
   _name?: string; // debugging hint
+  /** Phase D1 Slice 2 Stage A: predicates declared on this parameter (effect
+   *  bounds, refinement bounds, …). Stored on the Param itself rather than
+   *  on a side-table keyed by index, so the HOF walker (Stage B) can pull
+   *  them directly when it sees `Param(p)` being called inside a body. */
+  predicates?: import("./refinements.js").PredicateSet;
 }
 
 // --- Symbol: named reference resolved during compilation ---
@@ -162,7 +167,10 @@ export function makePrimitive(
 }
 
 export function makeParam(position: number, name?: string): ParamValue {
-  return { kind: ValueKind.Param, position, owner: null, _name: name };
+  // Always declare `predicates: undefined` so V8/JSC see a stable hidden class
+  // shape across all Params, whether or not effect/refinement bounds end up
+  // being attached later.
+  return { kind: ValueKind.Param, position, owner: null, _name: name, predicates: undefined };
 }
 
 export function makeSymbol(name: string): SymbolValue {

@@ -10,7 +10,8 @@ import {
   getType, getTypeName, withType, typeMethod, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
-import { propagateSetForPrimitive, withPredicates, PredicateSet } from "./refinements.js";
+import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
+import { effectPredicatesForValue } from "./effects.js";
 
 const MAX_DEPTH = 10000;
 
@@ -465,6 +466,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
         position: p.position,
         owner: null as any,
         _name: p._name,
+        predicates: p.predicates,
       } as ParamValue));
       // Rewrite Param references in the new body that point to old params,
       // remapping them to the cloned params (matched by position).
@@ -523,6 +525,28 @@ function checkArgType(
 ): void {
   // Normalize bare generics to Generic[Any]
   let expected = normalizeType(expectedType);
+
+  // Phase D1 Slice 2 Stage A: effect-bound discharge. If the expected type
+  // carries an `__effectBound` (an EffectsDomain attached at construction by
+  // `buildEffect`), pull the arg's effect predicates and check actual ⊆ bound
+  // via the same `impliesDomain` path used for numeric refinements. `opaque`
+  // has no bound — anything passes; we skip the check entirely. Functions
+  // without inferred effects (untyped or non-function args) behave as pure.
+  const effBound = (expected as any).__effectBound as AbstractDomain | undefined;
+  if (effBound && effBound.kind === "effects") {
+    const argSet = effectPredicatesForValue(arg);
+    const actualEff: EffectsDomain = argSet
+      ? (argSet.effectiveEffects() ?? { kind: "effects", labels: new Set<string>() })
+      : { kind: "effects", labels: new Set<string>() };
+    if (!impliesDomain(actualEff, effBound)) {
+      const expectedName = typeContextName(expected) ?? "<effect>";
+      const actualLabels = [...actualEff.labels].sort().join(", ") || "pure";
+      throw new AllegroError(
+        `Type error: argument ${argIndex} expected effect bound \`${expectedName}\`, got effects \`${actualLabels}\``,
+      );
+    }
+    return;
+  }
 
   // Refinement type handling: if expected is a refined type, check the value
   // against the refinement's BASE (via __extends chain), then evaluate the predicate.

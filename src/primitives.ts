@@ -1498,9 +1498,10 @@ import {
   structuralWrap, makeUnionType, wrapType, buildRefinedType,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
+import { effectPredicatesForValue as _effectPredicatesForValue } from "./effects.js";
 import {
   domainOf as _domainOf, impliesDomain as _impliesDomain,
-  AbstractDomain as _AbstractDomain,
+  AbstractDomain as _AbstractDomain, EffectsDomain as _EffectsDomain,
   domainFromPredicate,
   predicatesOf as _predicatesOf, withPredicates as _withPredicates,
   PredicateSet as _PredicateSet, entailsPredicate as _entailsPredicate,
@@ -1991,6 +1992,26 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Any matches everything
   if (expectedName === "Any") return v;
+
+  // Phase D1 Slice 2 Stage A: effect-bound discharge. Same shape as the
+  // checkArgType path in evaluator.ts — `__effectBound` on the expected type
+  // (set by buildEffect for `pure` / named effects; absent on `opaque`)
+  // triggers an actual ⊆ bound check via impliesDomain. Reuses the predicate
+  // entailment infrastructure rather than introducing a parallel channel.
+  const effBound = (expectedCtx as any).__effectBound as _AbstractDomain | undefined;
+  if (effBound && effBound.kind === "effects") {
+    const argSet = _effectPredicatesForValue(v);
+    const actualEff: _EffectsDomain = argSet
+      ? (argSet.effectiveEffects() ?? { kind: "effects", labels: new Set<string>() })
+      : { kind: "effects", labels: new Set<string>() };
+    if (!_impliesDomain(actualEff, effBound)) {
+      const actualLabels = [...actualEff.labels].sort().join(", ") || "pure";
+      throw new AllegroError(
+        `Type error: expected effect bound \`${expectedName}\`, got effects \`${actualLabels}\``,
+      );
+    }
+    return v;
+  }
 
   // Refinement-type handling: if expected is a refined type, check the value
   // against the BASE (via __extends), then either (a) discharge via abstract
