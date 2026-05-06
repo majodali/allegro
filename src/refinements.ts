@@ -437,6 +437,7 @@ export type PredicateSource =
   | "literal"           // from a literal value's known constant
   | "effects-declared"  // from an `effects` body-form clause — D1 sub-chunk 1.2
   | "effects-inferred"  // from bottom-up effect inference — D1 sub-chunk 1.2
+  | "effects-bound"     // bound declared on a parameter (`f: pure`) — Slice 2 Stage A/B
   ;
 
 export interface Predicate {

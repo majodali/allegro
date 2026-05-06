@@ -184,6 +184,19 @@ export function walkValueEffects(v: Value, seen: Set<ComposedFunctionValue>): Ef
         }
       } else if (fn0.kind === ValueKind.ComposedFunction) {
         for (const e of inferFunctionEffects(fn0, seen)) result.add(e);
+      } else if (fn0.kind === ValueKind.Param) {
+        // Phase D1 Slice 2 Stage B: function-typed param being called. Read
+        // its declared effect bound from `Param.predicates` (stamped by
+        // `typed_function_impl` from the param-type annotation's
+        // `__effectBound`). Without a bound, we treat it as opaque — honest
+        // about the unknown rather than silently zero-effect.
+        const preds = (fn0 as any).predicates as PredicateSet | undefined;
+        const eff = preds?.effectiveEffects();
+        if (eff) {
+          for (const l of eff.labels) result.add(l);
+        } else {
+          result.add("opaque");
+        }
       }
       // If `v.fn` is itself a complex expression (e.g. a `type_dispatch` call
       // producing a bound method, an `if-then-else` choosing between funcs,

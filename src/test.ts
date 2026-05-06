@@ -4609,6 +4609,102 @@ y: pure = greet
   eq(threw, true);
 });
 
+// --- Phase D1 Slice 2 Stage B: HOF inference walker ---
+
+test("Stage B: unbounded function-typed param → opaque inferred", () => {
+  // caller calls `f` (no bound) — inference must mark opaque, since we
+  // don't statically know what `f` does.
+  const src = `caller(f) =>
+  f(42)
+caller
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("caller")!.value!);
+  eq(fn.kind, ValueKind.ComposedFunction);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn);
+    eq(inferred.has("opaque"), true);
+  }
+});
+
+test("Stage B: f: pure bound → pure inferred", () => {
+  // The bound stamps the Param with predicates {effects: ∅}; the walker
+  // pulls them when seeing Expression(Param(f), …) and adds nothing.
+  const src = `pure_caller(f: pure) =>
+  f(42)
+pure_caller
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("pure_caller")!.value!);
+  eq(fn.kind, ValueKind.ComposedFunction);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn);
+    eq(inferred.size, 0, "expected pure inferred set");
+  }
+});
+
+test("Stage B: typed_function stamps Param.predicates from __effectBound", () => {
+  // Verify the storage wiring directly: the Param of a typed function with
+  // `f: pure` annotation carries a PredicateSet with one effects-bound
+  // predicate whose labels are empty.
+  const src = `bounded(f: pure) =>
+  f(0)
+bounded
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("bounded")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const p = fn.params[0];
+    eq(p.predicates !== undefined, true);
+    if (p.predicates) {
+      const eff = p.predicates.effectiveEffects();
+      eq(eff !== null, true);
+      eq(eff!.labels.size, 0);
+      eq(p.predicates.preds[0].source, "effects-bound");
+    }
+  }
+});
+
+test("Stage B: declared `effects pure` on unbounded param call emits notification, no halt", () => {
+  // The opaque label from the param call gets filtered (1.3's tolerance);
+  // the user gets a notification rather than an error.
+  const src = `caller(f) =>
+  effects_attach(
+    f(0),
+    typed_array()
+  )
+`;
+  let threw = false;
+  let report: any;
+  try {
+    const r = runtimeEval(src, undefined, [typeExt], undefined, true);
+    report = r.compilationReport;
+  } catch (e: any) {
+    threw = true;
+  }
+  eq(threw, false, "opaque-from-param shouldn't halt declaration check");
+  const notes = report.notifications.filter(
+    (n: any) => n.kind === "effects-opaque-from-stdlib-hof" && n.binding === "caller",
+  );
+  eq(notes.length >= 1, true);
+});
+
+test("Stage B: declared `effects pure` on `f: pure` param verifies cleanly (no notification)", () => {
+  // With the bound, inferred = pure too; declared = pure matches; the
+  // opaque notification doesn't fire since opaque isn't in inferred.
+  const src = `caller(f: pure) =>
+  effects_attach(
+    f(0),
+    typed_array()
+  )
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "effects-opaque-from-stdlib-hof" && n.binding === "caller",
+  );
+  eq(notes.length, 0, "no opaque notification when bound matches declaration");
+});
+
 // --- Phase D1 sub-chunk 1.3: opaque marking + Notification category ---
 
 test("Phase D1.3: CompilationReport carries notifications array", () => {

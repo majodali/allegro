@@ -1638,6 +1638,26 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       returnType = rtp;
     }
   }
+  // Phase D1 Slice 2 Stage B: stamp param-level effect predicates on each
+  // ParamValue. The annotation `f: pure` flows through paramTypes here; the
+  // HOF walker (`src/effects.ts walkValueEffects`) reads `Param.predicates`
+  // to collect effects when the param is called. Without this, function-
+  // typed params would always look effect-less inside their declarer.
+  const fnPrimary = primaryOf(fn);
+  if (fnPrimary.kind === ValueKind.ComposedFunction) {
+    const cFn = fnPrimary as any;
+    const params = cFn.params as Array<{ predicates?: _PredicateSet }>;
+    for (let i = 0; i < Math.min(params.length, paramTypes.length); i++) {
+      const pt = paramTypes[i];
+      if (!pt || pt.kind !== ValueKind.Context) continue;
+      const bound = (pt as any).__effectBound as _AbstractDomain | undefined;
+      if (bound && bound.kind === "effects") {
+        const pred = { shape: bound, source: "effects-bound" as const };
+        params[i].predicates = new _PredicateSet([pred]);
+      }
+    }
+  }
+
   const fnType = makeFunctionType(paramTypes, returnType);
   return withType(fn, fnType);
 };
