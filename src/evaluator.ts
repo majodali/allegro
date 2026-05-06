@@ -410,7 +410,10 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
     case ValueKind.ComposedFunction: {
       const newBody = remapParams(value.body, paramMap);
       if (newBody === value.body) return value;
-      return { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
+      const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
+      if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
+      if ((value as any).__effectVarParams) (newFn as any).__effectVarParams = (value as any).__effectVarParams;
+      return newFn;
     }
     case ValueKind.MultiValue: {
       const newP = remapParams(value.primary, paramMap);
@@ -479,6 +482,10 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
         body: remappedBody,
       };
       for (const p of newFn.params) p.owner = newFn;
+      // Preserve generic-param / effect-var-param metadata across clones so
+      // Slice 2's polymorphism resolution still works after substitution.
+      if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
+      if ((value as any).__effectVarParams) (newFn as any).__effectVarParams = (value as any).__effectVarParams;
       return newFn;
     }
 

@@ -4762,6 +4762,92 @@ test("Stage C1: export NAME[generic_decl](...) parses", () => {
   eq(Number((primaryOf(result!) as BitsValue).data), 123);
 });
 
+// --- Phase D1 Slice 2 Stage C2: effect-variable unification at call sites ---
+
+test("Stage C2: __effectVarParams metadata records var positions", () => {
+  // For `apply[e: Effect](g: e, x: Int): Int`, position 0 is the e-bound
+  // param. Stamping in typed_function_impl records this mapping.
+  const src = `apply[e: Effect](g: e, x: Int): Int => g(x)\napply`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("apply")!.value!);
+  const map = (fn as any).__effectVarParams as Map<string, number[]> | undefined;
+  eq(map !== undefined, true);
+  if (map) {
+    eq(map.has("e"), true);
+    eq(JSON.stringify(map.get("e")), "[0]");
+  }
+});
+
+test("Stage C2: pure-callback call resolves effect var to pure", () => {
+  // `apply` is polymorphic. caller calls apply with a pure lambda. The
+  // walker should resolve `__effectvar:e` to pure (empty), making caller's
+  // inferred set pure too. Lookup resolves cross-binding `apply` reference.
+  const src = `apply[e: Effect](g: e, x: Int): Int => g(x)
+caller(arr) =>
+  apply((y: Int): Int => y * 2, 7)
+caller
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
+  const fn = primaryOf(evalCtx.bindings.get("caller")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    eq(inferred.size, 0, "expected pure inferred from pure-callback resolution");
+  }
+});
+
+test("Stage C2: io-callback call resolves effect var to io", () => {
+  // Same shape, but the lambda uses print → walker resolves to {io}.
+  // One-line lambda body to avoid indentation parsing issues.
+  const src = `apply[e: Effect](g: e, x: Int): Int => g(x)
+caller(arr) =>
+  apply((y: Int): Int => print(y), 7)
+caller
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
+  const fn = primaryOf(evalCtx.bindings.get("caller")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    eq(inferred.has("io"), true, "expected io propagated from print callback");
+  }
+});
+
+test("Stage C2: unknown function arg resolves to opaque", () => {
+  // When the caller forwards an unbounded param into a polymorphic call,
+  // we can't resolve concretely — the var becomes opaque (conservative).
+  const src = `apply[e: Effect](g: e, x: Int): Int => g(x)
+forwarder(unknown_fn, n) =>
+  apply(unknown_fn, n)
+forwarder
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
+  const fn = primaryOf(evalCtx.bindings.get("forwarder")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    eq(inferred.has("opaque"), true);
+  }
+});
+
+test("Stage C2: bounded-param forward resolves precisely", () => {
+  // forwarder declares `f: pure`, so the param's predicates carry pure;
+  // when forwarded into apply, the var resolves to pure (not opaque).
+  const src = `apply[e: Effect](g: e, x: Int): Int => g(x)
+forwarder(f: pure, n: Int) =>
+  apply(f, n)
+forwarder
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
+  const fn = primaryOf(evalCtx.bindings.get("forwarder")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    eq(inferred.has("opaque"), false, "expected precise pure, not opaque");
+    eq(inferred.size, 0, "expected empty inferred set");
+  }
+});
+
 // --- Phase D1 sub-chunk 1.3: opaque marking + Notification category ---
 
 test("Phase D1.3: CompilationReport carries notifications array", () => {

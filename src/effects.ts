@@ -123,14 +123,25 @@ function extractLabelArray(v: Value): EffectSet {
 // can switch to fixpoint when it bites.
 
 /** Infer a function's effect set by walking its body. Used by the
- *  precompile pass (declaration check) and by introspection (display). */
+ *  precompile pass (declaration check) and by introspection (display).
+ *
+ *  Optional `lookup` callback resolves source-binding `Symbol("name")`
+ *  references encountered as call targets — necessary for cross-binding
+ *  effect-variable resolution (Slice 2 Stage C2). When omitted, source
+ *  Symbols are treated as opaque (the chunk-1 behaviour). Runtime call
+ *  sites pass `(n) => evalCtx.bindings.get(n)?.value` so polymorphic
+ *  functions defined in one binding propagate effects through callers.
+ */
+export type EffectsLookup = (name: string) => Value | undefined;
+
 export function inferFunctionEffects(
   fn: ComposedFunctionValue,
   seen: Set<ComposedFunctionValue> = new Set(),
+  lookup?: EffectsLookup,
 ): EffectSet {
   if (seen.has(fn)) return PURE;
   seen.add(fn);
-  return walkValueEffects(fn.body, seen);
+  return walkValueEffects(fn.body, seen, lookup);
 }
 
 /** Method names recognised as higher-order functions on stdlib types. When
@@ -139,10 +150,62 @@ export function inferFunctionEffects(
  *  placeholder until Slice 2's effect-polymorphism resolves precisely. */
 const HOF_METHOD_NAMES: Set<string> = new Set(["map", "filter", "reduce"]);
 
+/** Compute the effects of a value being passed as a function argument — the
+ *  effects it would produce if called. Used by Stage C2 to resolve
+ *  `__effectvar:NAME` markers at call sites: walk the arg, get effects.
+ *
+ *  - ComposedFunction: recurse via `inferFunctionEffects`
+ *  - PrimitiveFunction: read `.effects` directly
+ *  - MultiValue: peel and retry
+ *  - Param with predicates: pull effective effects (covers nested polymorphism)
+ *  - Anything else (unresolved Symbol, untyped literal): conservative `opaque`
+ */
+function effectsOfFunctionArg(
+  v: Value,
+  seen: Set<ComposedFunctionValue>,
+  lookup?: EffectsLookup,
+): EffectSet {
+  const p = primaryOf(v);
+  // Peel `typed_function(fn, …)` call expressions — common for inline lambdas
+  // with annotations like `(y: Int): Int => y * 2` which become a typed_function
+  // call rather than a bare ComposedFunction at the AST level.
+  if (p.kind === ValueKind.Expression) {
+    const callTarget = primaryOf((p as any).fn);
+    if (callTarget.kind === ValueKind.PrimitiveFunction
+        && (callTarget as any).name === "typed_function"
+        && (p as any).args.length >= 1) {
+      return effectsOfFunctionArg((p as any).args[0], seen, lookup);
+    }
+  }
+  if (p.kind === ValueKind.ComposedFunction) {
+    return inferFunctionEffects(p, seen, lookup);
+  }
+  if (p.kind === ValueKind.Symbol && lookup) {
+    const resolved = lookup((p as any).name);
+    if (resolved) return effectsOfFunctionArg(resolved, seen, lookup);
+  }
+  if (p.kind === ValueKind.PrimitiveFunction) {
+    const out = new Set<string>();
+    if (p.effects) for (const e of p.effects) out.add(e);
+    return out;
+  }
+  if (p.kind === ValueKind.Param) {
+    const preds = (p as any).predicates as PredicateSet | undefined;
+    const eff = preds?.effectiveEffects();
+    if (eff) return new Set(eff.labels);
+  }
+  // Unknown — conservative opaque.
+  return new Set(["opaque"]);
+}
+
 /** Walk an arbitrary Value tree and accumulate the effects from its
  *  primitive calls and transitively-called functions. Used internally
  *  by inferFunctionEffects; exposed for tests. */
-export function walkValueEffects(v: Value, seen: Set<ComposedFunctionValue>): EffectSet {
+export function walkValueEffects(
+  v: Value,
+  seen: Set<ComposedFunctionValue>,
+  lookup?: EffectsLookup,
+): EffectSet {
   switch (v.kind) {
     case ValueKind.Bits:
     case ValueKind.Symbol:
@@ -158,12 +221,19 @@ export function walkValueEffects(v: Value, seen: Set<ComposedFunctionValue>): Ef
       // D1 chunk 1 — they'll need analysis through call sites in chunk 2.
       return PURE;
     case ValueKind.MultiValue:
-      return walkValueEffects(v.primary, seen);
+      return walkValueEffects(v.primary, seen, lookup);
     case ValueKind.Expression: {
       // Special-case effects_attach: skip the metadata arg, walk the body.
-      const fn0 = primaryOf(v.fn);
+      let fn0 = primaryOf(v.fn);
+      // Slice 2 Stage C2: resolve source-binding Symbol call targets via
+      // optional lookup. Without this, cross-binding polymorphism inference
+      // can't follow `apply` from `forwarder`'s body to apply's value.
+      if (fn0.kind === ValueKind.Symbol && lookup) {
+        const resolved = lookup((fn0 as any).name);
+        if (resolved) fn0 = primaryOf(resolved);
+      }
       if (fn0.kind === ValueKind.PrimitiveFunction && fn0.name === "effects_attach") {
-        if (v.args.length === 2) return walkValueEffects(v.args[0], seen);
+        if (v.args.length === 2) return walkValueEffects(v.args[0], seen, lookup);
       }
       let result: EffectSet = new Set();
       // Effects from the function being called.
@@ -183,7 +253,29 @@ export function walkValueEffects(v: Value, seen: Set<ComposedFunctionValue>): Ef
           }
         }
       } else if (fn0.kind === ValueKind.ComposedFunction) {
-        for (const e of inferFunctionEffects(fn0, seen)) result.add(e);
+        // Phase D1 Slice 2 Stage C2: effect-variable resolution. The callee
+        // may have stamped `__effectvar:NAME` markers in its inferred set
+        // (one per effect-variable param). Resolve each marker by walking
+        // the corresponding arg as a function value — its effects flow into
+        // the caller's set in place of the marker.
+        const effectVarParams = (fn0 as any).__effectVarParams as Map<string, number[]> | undefined;
+        const calleeEffects = inferFunctionEffects(fn0, seen, lookup);
+        for (const lbl of calleeEffects) {
+          if (effectVarParams && lbl.startsWith("__effectvar:")) {
+            const varName = lbl.slice("__effectvar:".length);
+            const positions = effectVarParams.get(varName);
+            if (positions) {
+              for (const pos of positions) {
+                if (pos < v.args.length) {
+                  const argEff = effectsOfFunctionArg(v.args[pos], seen, lookup);
+                  for (const e of argEff) result.add(e);
+                }
+              }
+              continue;
+            }
+          }
+          result.add(lbl);
+        }
       } else if (fn0.kind === ValueKind.Param) {
         // Phase D1 Slice 2 Stage B: function-typed param being called. Read
         // its declared effect bound from `Param.predicates` (stamped by
@@ -205,12 +297,12 @@ export function walkValueEffects(v: Value, seen: Set<ComposedFunctionValue>): Ef
       // entirely because the call's `fn` is an Expression rather than a
       // direct PrimitiveFunction reference.
       if (v.fn.kind === ValueKind.Expression) {
-        for (const e of walkValueEffects(v.fn, seen)) result.add(e);
+        for (const e of walkValueEffects(v.fn, seen, lookup)) result.add(e);
       }
       // Effects from evaluating each argument (since they may contain
       // primitive calls themselves — Allegro is eager for non-lazy prims).
       for (const arg of v.args) {
-        const argEffects = walkValueEffects(arg, seen);
+        const argEffects = walkValueEffects(arg, seen, lookup);
         for (const e of argEffects) result.add(e);
       }
       return result;
