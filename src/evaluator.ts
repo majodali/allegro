@@ -351,6 +351,29 @@ function applyComposed(
             const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
             if (resolvedParamType.kind !== ValueKind.Context) continue; // unresolved type var
             checkArgType(evalArgs[i], resolvedParamType as ContextValue, i, enrichedCtx, depth, depCollector);
+            // Stage D — Surface C call-site enforcement. When the param-type
+            // slot has no `__effectBound` but `param_effects f: pure` stamped
+            // an effect bound onto the Param's predicates, run the same
+            // actual ⊆ bound discharge through `impliesDomain` so Surface C
+            // matches Surface A's call-site rejection of mismatched callbacks.
+            const ptHasEffBound = (resolvedParamType as any).__effectBound !== undefined;
+            if (!ptHasEffBound && i < currentFn.params.length) {
+              const preds = (currentFn.params[i] as any).predicates as PredicateSet | undefined;
+              const surfaceCBound = preds?.effectiveEffects();
+              if (surfaceCBound) {
+                const argSet = effectPredicatesForValue(evalArgs[i]);
+                const actualEff: EffectsDomain = argSet
+                  ? (argSet.effectiveEffects() ?? { kind: "effects", labels: new Set<string>() })
+                  : { kind: "effects", labels: new Set<string>() };
+                if (!impliesDomain(actualEff, surfaceCBound)) {
+                  const want = [...surfaceCBound.labels].sort().join(", ") || "pure";
+                  const got  = [...actualEff.labels].sort().join(", ") || "pure";
+                  throw new AllegroError(
+                    `Type error: argument ${i} expected effect bound \`${want}\` (from param_effects), got effects \`${got}\``,
+                  );
+                }
+              }
+            }
           }
         }
       }

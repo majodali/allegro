@@ -3766,6 +3766,7 @@ fileTest(path.join(testsDir, "contracts-demo.alg"));
 
 // Phase D1: function-body effect declarations.
 fileTest(path.join(testsDir, "effects-demo.alg"));
+fileTest(path.join(testsDir, "effects-surface-c-demo.alg"));
 
 // --- Phase B: abstract-domain unit tests ---
 
@@ -5021,14 +5022,134 @@ test("Stage C3: polymorphic body with extra effect under-declared fires mismatch
      `expected io in mismatch, got: ${msg}`);
 });
 
+// --- Phase D1 Slice 2 Stage D: param_effects body-form (Surface C) ---
+//
+// The test harness doesn't load the `lib/effects.alg` grammar extension, so
+// the surface form `param_effects f: pure` isn't parseable here. Tests
+// hand-build the lowered shape `param_effects_attach(body, paramRef, effSym, …)`
+// to verify the typed_function_impl peel-and-stamp pass and the call-site
+// enforcement path. End-to-end surface verification is in tests/effects-demo.alg.
+
+test("Stage D: param_effects_attach stamps Param.predicates with effect bound", () => {
+  // Hand-built lowered shape mirroring what the block preprocessor emits.
+  // `apply_pure(g)` → param_effects_attach(g(g), Param(g), pure).
+  const src = `apply_pure(g, x: Int): Int =>
+  param_effects_attach(g(x), g, pure)
+
+apply_pure
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("apply_pure")!.value!);
+  eq(fn.kind, ValueKind.ComposedFunction);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const gPredicates = (fn.params[0] as any).predicates;
+    eq(gPredicates !== undefined, true, "g should have predicates stamped");
+    if (gPredicates) {
+      const eff = gPredicates.effectiveEffects();
+      eq(eff !== undefined, true);
+      eq(eff?.kind, "effects");
+      eq(eff?.labels.size, 0, `pure has empty labels, got: ${[...(eff?.labels ?? [])].join(",")}`);
+    }
+  }
+});
+
+test("Stage D: pure-bound param accepts pure callback at call site", () => {
+  const src = `apply_pure(g, x: Int): Int =>
+  param_effects_attach(g(x), g, pure)
+
+apply_pure((y: Int): Int => y + 1, 5)
+`;
+  let threw = false;
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true;
+  }
+  eq(threw, false, "pure callback should pass pure-bound param");
+});
+
+test("Stage D: pure-bound param rejects io callback at call site", () => {
+  const src = `apply_pure(g, x: Int): Int =>
+  param_effects_attach(g(x), g, pure)
+
+apply_pure((y: Int): Int => print(y), 5)
+`;
+  let threw = false;
+  let msg = "";
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true; msg = String(e.message ?? e);
+  }
+  eq(threw, true, "io callback should fail pure-bound param");
+  eq(msg.toLowerCase().includes("effect bound"), true,
+     `expected 'effect bound' in message, got: ${msg}`);
+  eq(msg.toLowerCase().includes("param_effects"), true,
+     `expected 'param_effects' attribution in message, got: ${msg}`);
+});
+
+test("Stage D: opaque-bound param leaves predicates unset (universal)", () => {
+  // Mirrors Surface A's behaviour: `f: opaque` has no `__effectBound`, so
+  // predicates stay undefined — any effects allowed.
+  const src = `forwarder(g, x: Int): Int =>
+  param_effects_attach(g(x), g, opaque)
+
+forwarder
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("forwarder")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const preds = (fn.params[0] as any).predicates;
+    eq(preds === undefined, true, "opaque should not stamp predicates");
+  }
+});
+
+test("Stage D: walker reads Surface C bound and propagates effects to caller", () => {
+  // Inside `apply_pure`, `g(x)` is a Param call. The walker reads
+  // g.predicates (stamped by Stage D) and treats the call as pure.
+  // Without Surface C the param call would be opaque.
+  const src = `apply_pure(g, x: Int): Int =>
+  param_effects_attach(g(x), g, pure)
+
+apply_pure
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("apply_pure")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn);
+    eq(inferred.has("opaque"), false, `Surface C should give precise pure, got: ${[...inferred].join(",")}`);
+    eq(inferred.size, 0, `expected pure (∅), got: ${[...inferred].join(",")}`);
+  }
+});
+
+test("Stage D: multiple param_effects markers stamp independently", () => {
+  // Two separate markers, each stamping a different param.
+  const src = `pipe(f, g, x: Int): Int =>
+  param_effects_attach(g(f(x)), f, pure, g, pure)
+
+pipe
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("pipe")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const fEff = (fn.params[0] as any).predicates?.effectiveEffects();
+    const gEff = (fn.params[1] as any).predicates?.effectiveEffects();
+    eq(fEff !== undefined, true, "f should have predicates");
+    eq(gEff !== undefined, true, "g should have predicates");
+    eq(fEff?.labels.size, 0, "f bound is pure");
+    eq(gEff?.labels.size, 0, "g bound is pure");
+  }
+});
+
 test("Stage C3: typed function declaration check now fires (asFunction peels typed_function)", () => {
   // Pre-C3, typed function bindings stayed as `typed_function(…)` Expressions
   // at compile time, so checkEffectsDeclarations couldn't reach the body.
   // Stage C3's asFunction peels the Expression to find the inner function.
+  // The block preprocessor wraps `effects_attach(body, …)` inside the
+  // `type_check(…, returnType)` envelope `maybeTyped` adds; Stage C3's
+  // unwrapEffectsAttach peels the type_check layer too.
   const src = `bad(x: Int): Int =>
-  effects pure
-  print(x)
-  x
+  effects_attach(seq(print(x), x), typed_array())
 `;
   let threw = false;
   let msg = "";
@@ -5038,8 +5159,10 @@ test("Stage C3: typed function declaration check now fires (asFunction peels typ
     threw = true; msg = String(e.message ?? e);
   }
   eq(threw, true, "typed-function mismatch should now halt");
-  eq(msg.toLowerCase().includes("io"), true,
-     `expected io in message, got: ${msg}`);
+  eq(msg.toLowerCase().includes("effects mismatch"), true,
+     `expected 'effects mismatch' in message, got: ${msg}`);
+  eq(msg.toLowerCase().includes("undeclared: io"), true,
+     `expected 'undeclared: io' in message, got: ${msg}`);
 });
 
 // --- Phase D1 sub-chunk 1.3: opaque marking + Notification category ---

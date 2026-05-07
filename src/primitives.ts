@@ -1698,6 +1698,53 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (effectVarParams.size > 0) {
       (cFn as any).__effectVarParams = effectVarParams;
     }
+    // Stage D — Surface C `param_effects f: pure` body-form. The block
+    // preprocessor wraps the body with `param_effects_attach(body, paramRef1,
+    // effSym1, …)`. Peel the outermost wrapper, evaluate each effect Symbol
+    // in the call ctx (so `pure`/`io`/etc. resolve via extensions), and stamp
+    // the matching Param's predicates from `__effectBound`. By-name match
+    // against `cFn.params[i].name` survives `remapParams` clones since the
+    // names are preserved across substitution.
+    // Peel one layer of `type_check(…, returnType)` (the wrapper `maybeTyped`
+    // adds for typed-return functions) before looking for the param_effects
+    // wrapper. Mirrors the same peel in `unwrapEffectsAttach` for declared
+    // effect sets.
+    let bodyExpr: Value = cFn.body;
+    if (bodyExpr.kind === ValueKind.Expression) {
+      const tcTarget = primaryOf((bodyExpr as any).fn);
+      if (tcTarget.kind === ValueKind.PrimitiveFunction
+          && (tcTarget as any).name === "type_check"
+          && (bodyExpr as any).args.length >= 1
+          && (bodyExpr as any).args[0].kind === ValueKind.Expression) {
+        bodyExpr = (bodyExpr as any).args[0];
+      }
+    }
+    if (bodyExpr.kind === ValueKind.Expression) {
+      const target = primaryOf((bodyExpr as any).fn);
+      if (target.kind === ValueKind.PrimitiveFunction
+          && (target as any).name === "param_effects_attach") {
+        const wrapArgs = (bodyExpr as any).args as Value[];
+        for (let i = 1; i + 1 < wrapArgs.length; i += 2) {
+          const paramRef = primaryOf(wrapArgs[i]);
+          if (paramRef.kind !== ValueKind.Param) continue;
+          const paramName = (paramRef as any)._name as string | undefined;
+          if (!paramName) continue;
+          const idx = (cFn.params as any[]).findIndex(p => p._name === paramName);
+          if (idx < 0) continue;
+          const effVal = evalFn!(wrapArgs[i + 1], ctx!);
+          const effPrim = primaryOf(effVal);
+          if (effPrim.kind !== ValueKind.Context) continue;
+          const bound = (effPrim as any).__effectBound as _AbstractDomain | undefined;
+          if (bound && bound.kind === "effects") {
+            (cFn.params[idx] as any).predicates = new _PredicateSet([
+              { shape: { kind: "effects", labels: new Set(bound.labels) }, source: "effects-bound" as const },
+            ]);
+          }
+          // `__effectBound` absent = opaque (universal). Leave predicates
+          // unset, matching Surface A's behaviour.
+        }
+      }
+    }
   }
 
   const fnType = makeFunctionType(paramTypes, returnType);
@@ -2859,6 +2906,28 @@ const effects_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return evalFn!(args[0], ctx!);
 };
 
+// Stage D — param_effects body-form (Surface C).
+//
+// `param_effects f: pure` lowers to `param_effects_decl_marker(Param(f), pure)`
+// at parse time. The block preprocessor collects these markers and wraps the
+// body's result with `param_effects_attach(body, paramRef1, effSym1, …)` —
+// the metadata is recovered by `typed_function_impl` to stamp each named
+// param's `predicates` with an effect bound, identical shape to Surface A's
+// `f: pure` param-type-slot stamping.
+
+const param_effects_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  // Marker. The block preprocessor extracts and consumes these at parse time;
+  // a stray marker at runtime is a no-op. Mirrors `effects_decl_marker`.
+  return noneSingleton;
+};
+
+const param_effects_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // Transparent passthrough at runtime: evaluate args[0] (the body) and
+  // return. The remaining args are metadata for `typed_function_impl`'s
+  // peel-and-stamp pass.
+  return evalFn!(args[0], ctx!);
+};
+
 // --- Typed binary operator helper ---
 
 function makeTypedBinOp(opName: string): PrimitiveFnImpl {
@@ -3028,6 +3097,8 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   // Phase D1: effect-declaration markers.
   effects_decl_marker: makePrimitive("effects_decl_marker", effects_decl_marker_impl, true),
   effects_attach: makePrimitive("effects_attach", effects_attach_impl, true),
+  param_effects_decl_marker: makePrimitive("param_effects_decl_marker", param_effects_decl_marker_impl, true),
+  param_effects_attach: makePrimitive("param_effects_attach", param_effects_attach_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

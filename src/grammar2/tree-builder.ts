@@ -741,6 +741,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   const requiresStmts: any[] = [];
   const ensuresLambdas: any[] = [];
   const declaredEffects: any[] = [];   // typed_array Expression of Symbol(label)
+  const paramEffects: Array<{ paramRef: any; effSym: any }> = [];
   const filteredStmts: BuiltBinding[] = [];
   for (const s of stmts) {
     if (s.key === null && isPrimitiveCall(s.value, "requires_stmt")) {
@@ -762,6 +763,16 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // wrapper code below collects all declarations into one labels array.
       const labelsArg = (s.value as any).args[0];
       declaredEffects.push(labelsArg);
+      continue;
+    }
+    if (s.key === null && isPrimitiveCall(s.value, "param_effects_decl_marker")) {
+      // Stage D — Surface C `param_effects name: eff`. Args: [paramRef,
+      // effSym]. The paramRef is already a Param value (the lambda's
+      // paramMap converted the matched ident at template substitution).
+      const margs = (s.value as any).args as any[];
+      if (margs.length >= 2) {
+        paramEffects.push({ paramRef: margs[0], effSym: margs[1] });
+      }
       continue;
     }
     filteredStmts.push(s);
@@ -862,6 +873,18 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     }
     const labelsAst = makeExpr(prim("typed_array"), mergedSymbols);
     result = makeExpr(prim("effects_attach"), [result, labelsAst]);
+  }
+
+  // Stage D — wrap with `param_effects_attach(result, paramRef1, effSym1, …)`
+  // so `typed_function_impl` can peel and stamp Param.predicates from the
+  // metadata. Lazy passthrough at runtime, identical Param-bound shape to
+  // Surface A (`f: pure` in the param-type slot).
+  if (paramEffects.length > 0) {
+    const flatArgs: any[] = [result];
+    for (const pe of paramEffects) {
+      flatArgs.push(pe.paramRef, pe.effSym);
+    }
+    result = makeExpr(prim("param_effects_attach"), flatArgs);
   }
 
   return result;

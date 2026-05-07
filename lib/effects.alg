@@ -42,4 +42,16 @@
 effects_grammar = grammar {
   stmt_form "effects" labels:ident ** ","
     => labels => effects_decl_marker(labels)
+
+  // Stage D — Surface C param-bound declaration. Useful when the param has a
+  // non-trivial type and you don't want to fold the effect into the type
+  // expression. `param_effects f: pure` lowers to a marker the block-expr
+  // preprocessor extracts; the bound is stamped on the Param at typed_function
+  // setup time, identical predicate shape to `f: pure` in the param-type slot.
+  //
+  //   process(arr: Array[Int], f) =>
+  //     param_effects f: pure
+  //     arr.map(f)
+  stmt_form "param_effects" n:ident ":" e:ident
+    => (n, e) => param_effects_decl_marker(n, e)
 }
