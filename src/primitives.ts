@@ -1496,6 +1496,7 @@ import {
   AnyType, Type, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
   structuralWrap, makeUnionType, wrapType, buildRefinedType,
+  Effect as _Effect, effectUnion as _effectUnion,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 import { effectPredicatesForValue as _effectPredicatesForValue } from "./effects.js";
@@ -1750,6 +1751,27 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     throw new AllegroError(`'&' requires a type on the left (got ${ln})`);
   }
   const thunk = args[1];
+  // Stage C3: if `left` is an Effect-extending type, evaluate the right operand
+  // (peeling the thunk wrapper) and dispatch to effect conjunction. The walker
+  // reads body-level effects via __effectvar markers; this branch handles
+  // value-level effect arithmetic (`pure & io`, `e1 & e2` in return positions
+  // once both resolve, etc.). When the right side is unresolved (a symbolic
+  // effect variable), return a residual so the expression survives until call
+  // sites bind concrete values.
+  const leftPrim = primaryOf(left);
+  if (leftPrim.kind === ValueKind.Context && isEffectExtending(leftPrim as ContextValue)) {
+    const right = (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0)
+      ? evalFn!(thunk.body, ctx!)
+      : evalFn!(args[1], ctx!);
+    if (!isResolved(right)) {
+      return makeExpr(makePrimitive("typed_amp", typed_amp_impl, true), [left, right]);
+    }
+    const rightPrim = primaryOf(right);
+    if (rightPrim.kind === ValueKind.Context && isEffectExtending(rightPrim as ContextValue)) {
+      return wrapType(_effectUnion(leftPrim as ContextValue, rightPrim as ContextValue));
+    }
+    throw new AllegroError(`'&' on an Effect type expects another Effect on the right (got ${getTypeName(right) ?? "untyped"})`);
+  }
   if (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0) {
     // Refinement: extract the raw body and wrap as `_ => body`.
     const predicate = buildFn(["_"], thunk.body) as Value;
@@ -1764,6 +1786,24 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
   throw new AllegroError("'&' between two types not yet supported (Stage 0); use a predicate body like 'Int & _ > 0'");
 };
+
+/** True if `t` extends Effect (i.e. `t` is `Effect`, `pure`, `opaque`, or any
+ *  user-declared effect type built via `buildEffect`). Walks the `__extends`
+ *  chain by identity. */
+function isEffectExtending(t: ContextValue): boolean {
+  if (t === _Effect) return true;
+  let current: ContextValue | null = t;
+  while (current) {
+    const ext = current.bindings.get("__extends")?.value;
+    if (ext?.kind === ValueKind.Context) {
+      if (ext === _Effect) return true;
+      current = ext as ContextValue;
+    } else {
+      current = null;
+    }
+  }
+  return false;
+}
 
 const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const left = evalFn!(args[0], ctx!);

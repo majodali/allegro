@@ -77,14 +77,27 @@ export function formatEffects(e: EffectSet): string {
 // declared label list at compile time.
 
 /** If `v` is `effects_attach(body, labels_array)`, return the inner body
- *  and the extracted label set. Otherwise null. */
+ *  and the extracted label set. Otherwise null.
+ *
+ *  Typed function bodies are wrapped by `maybeTyped` in the tree-builder:
+ *  `type_check(effects_attach(body, labels), returnType)`. Peel one layer of
+ *  `type_check` so the declaration check fires on typed functions just like
+ *  untyped ones — needed for Stage C3 polymorphic functions whose return
+ *  type annotations always trigger the type_check wrap. */
 export function unwrapEffectsAttach(v: Value): { body: Value; declared: EffectSet } | null {
   if (v.kind !== ValueKind.Expression) return null;
-  const fn = primaryOf(v.fn);
+  let target = v;
+  let fn = primaryOf(target.fn);
+  if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "type_check"
+      && target.args.length >= 1
+      && target.args[0].kind === ValueKind.Expression) {
+    target = target.args[0] as any;
+    fn = primaryOf(target.fn);
+  }
   if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "effects_attach") return null;
-  if (v.args.length !== 2) return null;
-  const declared = extractLabelArray(v.args[1]);
-  return { body: v.args[0], declared };
+  if (target.args.length !== 2) return null;
+  const declared = extractLabelArray(target.args[1]);
+  return { body: target.args[0], declared };
 }
 
 /** Extract a set of label strings from a `typed_array(Symbol(L1), Symbol(L2), …)`
@@ -346,10 +359,26 @@ export function effectDifference(inferred: EffectSet, declared: EffectSet): Effe
 // list of mismatches; callers decide whether to throw or just record.
 
 /** Locate a ComposedFunction inside a value, peeling MultiValue wrappers
- *  (typed-function envelope) and noticing legitimate non-function values. */
+ *  (typed-function envelope) and `typed_function(fn, …)` call expressions.
+ *
+ *  Source bindings often arrive at compile-time as unevaluated Expressions of
+ *  the shape `typed_function(ComposedFunction(...), paramCount, paramTypes...,
+ *  returnType)` — even though by runtime they evaluate to a MultiValue
+ *  wrapping the inner function. This helper walks both shapes so the
+ *  declaration check fires on declared functions before evaluation, not only
+ *  after. Slice 2 Stage C3: covers polymorphic functions whose declared
+ *  effect sets need to be checked at compile time, not deferred to a callsite. */
 function asFunction(v: Value): ComposedFunctionValue | null {
   const p = primaryOf(v);
   if (p.kind === ValueKind.ComposedFunction) return p;
+  if (p.kind === ValueKind.Expression) {
+    const target = primaryOf(p.fn);
+    if (target.kind === ValueKind.PrimitiveFunction
+        && (target as any).name === "typed_function"
+        && p.args.length >= 1) {
+      return asFunction(p.args[0]);
+    }
+  }
   return null;
 }
 
@@ -419,6 +448,19 @@ export function checkEffectsDeclarations(
     const inferred = inferFunctionEffects(fn);
     const inferredHard = new Set(inferred);
     inferredHard.delete("opaque");
+    // Slice 2 Stage C3: polymorphic declarations like `effects e` for a
+    // function declared `[e: Effect]` see the walker's symbolic marker
+    // `__effectvar:e` in the inferred set. Normalise the marker to its bare
+    // name (`e`) so the declared set's symbolic labels match. The marker
+    // form is only meaningful at call sites where it resolves to actual
+    // effect labels — at definition time the bare name is the contract.
+    for (const lbl of [...inferredHard]) {
+      if (lbl.startsWith("__effectvar:")) {
+        const bare = lbl.slice("__effectvar:".length);
+        inferredHard.delete(lbl);
+        inferredHard.add(bare);
+      }
+    }
     const missing = effectDifference(inferredHard, wrap.declared);
     if (missing.size > 0) {
       mismatches.push({

@@ -4848,6 +4848,200 @@ forwarder
   }
 });
 
+// --- Phase D1 Slice 2 Stage C3: multi-variable polymorphism + effect
+//                                 expressions in return position ---
+
+test("Stage C3: multi-variable apply2[e1, e2] propagates each var independently", () => {
+  // Walker iterates inferred labels and resolves each marker via its own
+  // positions list — multi-variable falls out of the existing infrastructure.
+  const src = `apply2[e1: Effect, e2: Effect](g1: e1, g2: e2, x: Int): Int =>
+  g2(g1(x))
+io_then_pure(x: Int) =>
+  apply2((y: Int): Int => print(y), (y: Int): Int => y + 1, x)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
+  const fn = primaryOf(evalCtx.bindings.get("io_then_pure")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    eq(inferred.has("io"), true, `expected io from g1, got: ${[...inferred].join(",")}`);
+    eq(inferred.has("opaque"), false, "expected precise resolution, not opaque");
+  }
+});
+
+test("Stage C3: multi-variable resolution is positional, not pooled", () => {
+  // apply2[e1, e2] should not contaminate position 0's effect with position 1's.
+  // Callsite passes pure at pos 0, io at pos 1 → caller infers exactly {io}.
+  const src = `apply2[e1: Effect, e2: Effect](g1: e1, g2: e2, x: Int): Int =>
+  g2(g1(x))
+pure_then_io(x: Int) =>
+  apply2((y: Int): Int => y + 1, (y: Int): Int => print(y), x)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
+  const fn = primaryOf(evalCtx.bindings.get("pure_then_io")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    eq(inferred.has("io"), true);
+    eq(inferred.size, 1, `expected just {io}, got: ${[...inferred].join(",")}`);
+  }
+});
+
+test("Stage C3: idempotent twice[e](f: e, x): same effect var, no duplication", () => {
+  // f(f(x)) calls f twice — inferred set's marker labels naturally dedupe via
+  // Set semantics, so e & e == e falls out without special handling.
+  const src = `twice[e: Effect](f: e, x: Int): Int =>
+  f(f(x))
+twice_io(x: Int) =>
+  twice((y: Int): Int => print(y), x)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
+  const fn = primaryOf(evalCtx.bindings.get("twice_io")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    eq(inferred.has("io"), true);
+    eq(inferred.size, 1, `expected single io, got: ${[...inferred].join(",")}`);
+  }
+});
+
+test("Stage C3: typed_amp(pure, opaque) returns opaque (effect lattice top)", () => {
+  // Effect & Effect dispatches to effectUnion. opaque absorbs everything.
+  const src = `result = pure & opaque\nresult\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const v = evalCtx.bindings.get("result")!.value!;
+  const p = primaryOf(v);
+  eq(p.kind, ValueKind.Context);
+  if (p.kind === ValueKind.Context) {
+    const name = p.bindings.get("__name")?.value;
+    eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "opaque");
+  }
+});
+
+test("Stage C3: typed_amp(pure, pure) returns pure (idempotence at value level)", () => {
+  const src = `result = pure & pure\nresult\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const v = evalCtx.bindings.get("result")!.value!;
+  const p = primaryOf(v);
+  if (p.kind === ValueKind.Context) {
+    const name = p.bindings.get("__name")?.value;
+    eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "pure");
+  }
+});
+
+test("Stage C3: typed_amp on Effect with non-Effect right operand errors", () => {
+  // `pure & 42` — left is an Effect, but right resolves to an Int. The
+  // Effect-conjunction branch evaluates the thunk and rejects non-Effect.
+  let threw = false;
+  let msg = "";
+  try {
+    runtimeEval(`result = pure & 42\nresult\n`, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true; msg = String(e.message ?? e);
+  }
+  eq(threw, true, "expected error on Effect & non-Effect");
+  eq(msg.toLowerCase().includes("effect"), true,
+     `expected message about Effect, got: ${msg}`);
+});
+
+test("Stage C3: auto-promotion (no [e: Effect] decl) yields opaque, not silent zero", () => {
+  // Honest soundness: an unannotated function-typed param has no Param
+  // predicates, so the walker's Param-call branch falls through to opaque.
+  const src = `forwarder(f, x: Int): Int => f(x)\nforwarder\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("forwarder")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(fn);
+    eq(inferred.has("opaque"), true,
+       `expected opaque for unannotated function param, got: ${[...inferred].join(",")}`);
+  }
+});
+
+test("Stage C3: explicit [e: Effect] annotation gives precise propagation, auto-promotion gives opaque", () => {
+  // Side-by-side: same shape, different declarations. The annotated form
+  // resolves precisely at the call site; the unannotated form stays opaque.
+  const src = `apply_poly[e: Effect](g: e, x: Int): Int => g(x)
+apply_auto(g, x: Int): Int => g(x)
+ann_caller(x: Int) =>
+  apply_poly((y: Int): Int => y + 1, x)
+auto_caller(x: Int) =>
+  apply_auto((y: Int): Int => y + 1, x)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
+  const ann = primaryOf(evalCtx.bindings.get("ann_caller")!.value!);
+  const auto = primaryOf(evalCtx.bindings.get("auto_caller")!.value!);
+  if (ann.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(ann, undefined, lookup);
+    eq(inferred.size, 0, `annotated resolved precisely (pure): got ${[...inferred].join(",")}`);
+  }
+  if (auto.kind === ValueKind.ComposedFunction) {
+    const inferred = inferFunctionEffects(auto, undefined, lookup);
+    eq(inferred.has("opaque"), true,
+       `unannotated stays opaque: got ${[...inferred].join(",")}`);
+  }
+});
+
+test("Stage C3: polymorphic function declaring `effects e` verifies (marker normalises to bare name)", () => {
+  // The walker stamps __effectvar:e in the inferred set, but the declaration
+  // check normalises the marker to its bare name `e` so the symbolic
+  // declaration matches at definition time. Concrete resolution happens at
+  // call sites where the marker resolves to actual labels.
+  //
+  // Hand-built effects_attach since the test harness doesn't load the
+  // effects grammar; mirrors existing Phase D1 tests' shape.
+  const src = `apply[e: Effect](g: e, x: Int): Int =>
+  effects_attach(g(x), typed_array(e))
+`;
+  let threw = false;
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true;
+  }
+  eq(threw, false, "polymorphic effects e should verify against __effectvar:e");
+});
+
+test("Stage C3: polymorphic body with extra effect under-declared fires mismatch", () => {
+  // bad_apply declares `effects e` but its body also runs print (io) outside
+  // the polymorphic call. inferred = {__effectvar:e, io}; normalised to
+  // {e, io}; declared = {e}; missing = {io} → halt.
+  const src = `bad_apply[e: Effect](g: e, x: Int): Int =>
+  effects_attach(seq(print("trace"), g(x)), typed_array(e))
+`;
+  let threw = false;
+  let msg = "";
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true; msg = String(e.message ?? e);
+  }
+  eq(threw, true, "extra io should produce mismatch");
+  eq(msg.toLowerCase().includes("io"), true,
+     `expected io in mismatch, got: ${msg}`);
+});
+
+test("Stage C3: typed function declaration check now fires (asFunction peels typed_function)", () => {
+  // Pre-C3, typed function bindings stayed as `typed_function(…)` Expressions
+  // at compile time, so checkEffectsDeclarations couldn't reach the body.
+  // Stage C3's asFunction peels the Expression to find the inner function.
+  const src = `bad(x: Int): Int =>
+  effects pure
+  print(x)
+  x
+`;
+  let threw = false;
+  let msg = "";
+  try {
+    runtimeEval(src, undefined, [typeExt], undefined, true);
+  } catch (e: any) {
+    threw = true; msg = String(e.message ?? e);
+  }
+  eq(threw, true, "typed-function mismatch should now halt");
+  eq(msg.toLowerCase().includes("io"), true,
+     `expected io in message, got: ${msg}`);
+});
+
 // --- Phase D1 sub-chunk 1.3: opaque marking + Notification category ---
 
 test("Phase D1.3: CompilationReport carries notifications array", () => {
