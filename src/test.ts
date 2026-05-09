@@ -3767,6 +3767,7 @@ fileTest(path.join(testsDir, "contracts-demo.alg"));
 // Phase D1: function-body effect declarations.
 fileTest(path.join(testsDir, "effects-demo.alg"));
 fileTest(path.join(testsDir, "effects-surface-c-demo.alg"));
+fileTest(path.join(testsDir, "fn-type-demo.alg"));
 
 // --- Phase B: abstract-domain unit tests ---
 
@@ -5139,6 +5140,129 @@ pipe
     eq(fEff?.labels.size, 0, "f bound is pure");
     eq(gEff?.labels.size, 0, "g bound is pure");
   }
+});
+
+// --- Phase D1 Slice 2 Stage E: function-type-expression syntax ---
+//
+// `(A) => B` in type-expression position lowers to `type_function(A, B)`,
+// which evaluates to a concrete `Function[ParamTypes, ReturnType]`. Curried
+// types (`(A) => (B) => C`) parse right-recursively. The grammar lives in
+// `type_expr_atom`; lambda parsing only fires at expression positions, so
+// `(Int) => Int` in type-position is unambiguous.
+
+test("Stage E: single-param function-type annotation accepts matching arg", () => {
+  const src = `inc(x: Int): Int => x + 1
+apply1(f: (Int) => Int, x: Int): Int => f(x)
+apply1(inc, 41)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("Stage E: multi-param function-type annotation accepts matching arg", () => {
+  const src = `add(x: Int, y: Int): Int => x + y
+apply2(f: (Int, Int) => Int, a: Int, b: Int): Int => f(a, b)
+apply2(add, 3, 4)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("Stage E: zero-param function-type annotation works", () => {
+  const src = `get_99(): Int => 99
+run(f: () => Int): Int => f()
+run(get_99)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 99);
+});
+
+test("Stage E: curried function-type return parses right-recursively", () => {
+  // `(Int) => (Int) => Int` parses as `(Int) => ((Int) => Int)` — a
+  // function from Int returning a function from Int to Int.
+  const src = `add(x: Int, y: Int): Int => x + y
+apply_curried(f: (Int) => (Int) => Int, a: Int, b: Int): Int =>
+  (f(a))(b)
+make_adder(n: Int): (Int) => Int =>
+  (x: Int): Int => x + n
+apply_curried(make_adder, 3, 4)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 7);
+});
+
+test("Stage E: function-type as binding annotation accepts matching value", () => {
+  const src = `id_int(x: Int): Int => x
+y: (Int) => Int = id_int
+y(42)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 42);
+});
+
+test("Stage E: function-type rejects non-function arg at call site", () => {
+  // Passing a non-function where a function-type is expected fires the
+  // standard type_check rejection.
+  const src = `apply1(f: (Int) => Int, x: Int): Int => f(x)
+apply1(42, 5)
+`;
+  let threw = false;
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { threw = true; }
+  eq(threw, true, "passing 42 instead of a function should fail");
+});
+
+test("Stage E: type_function primitive lowers to FunctionType[paramTypes, returnType]", () => {
+  // The grammar emits `type_function(paramType1, …, returnType)`; the
+  // primitive turns it into a concrete FunctionType identical to what
+  // `makeFunctionType` produces in TypeScript.
+  const src = `t = type_function(Int, Int)
+t
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const v = evalCtx.bindings.get("t")!.value!;
+  const p = primaryOf(v);
+  eq(p.kind, ValueKind.Context);
+  if (p.kind === ValueKind.Context) {
+    const name = p.bindings.get("__name")?.value;
+    eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "Function");
+  }
+});
+
+test("Stage E: zero-param type_function emits Function[arr(), R]", () => {
+  const src = `t = type_function(Int)
+t
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const v = evalCtx.bindings.get("t")!.value!;
+  const p = primaryOf(v);
+  if (p.kind === ValueKind.Context) {
+    const name = p.bindings.get("__name")?.value;
+    eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "Function");
+  }
+});
+
+test("Stage E: function-type used as Array element type", () => {
+  // Compose with generics: `Array[(Int) => Int]` — array of functions.
+  const src = `inc(x: Int): Int => x + 1
+dbl(x: Int): Int => x * 2
+fns: Array[(Int) => Int] = [inc, dbl]
+fns[0](5) + fns[1](5)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 16);
+});
+
+test("Stage E: function-type compatible with return-type annotation", () => {
+  // make_adder: returns a function (closure over n). Annotation `(Int) => Int`
+  // verifies the lambda's inferred type matches.
+  const src = `make_adder(n: Int): (Int) => Int =>
+  (x: Int): Int => x + n
+add5 = make_adder(5)
+add5(10)
+`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 15);
 });
 
 test("Stage C3: typed function declaration check now fires (asFunction peels typed_function)", () => {

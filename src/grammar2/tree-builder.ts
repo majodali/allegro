@@ -1167,9 +1167,10 @@ function collectGenericParams(tree: ParseTree): GenericParam[] {
 function findTypeExpr(tree: ParseTree): ParseTree | null {
   if (tree.kind !== "branch") return null;
   // A type_expr is tagged as `type_union`, `type_generic`, `type_structural`,
-  // or `ident`. Search recursively.
+  // `type_function` (Stage E), or `ident`. Search recursively.
   if (tree.tag === "type_union" || tree.tag === "type_generic" ||
-      tree.tag === "type_structural" || tree.tag === "ident") {
+      tree.tag === "type_structural" || tree.tag === "type_function" ||
+      tree.tag === "ident") {
     return tree;
   }
   for (const ch of tree.children) {
@@ -1184,11 +1185,41 @@ function findTypeExpr(tree: ParseTree): ParseTree | null {
  *   - ident                    → Symbol(name)
  *   - type_generic             → type_apply(Symbol(name), [args...])
  *   - type_union               → type_union(left, right)
+ *   - type_function            → type_function(paramType1, …, paramTypeN, returnType)
  */
 function buildTypeExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   if (tree.kind !== "branch") throw new Error("buildTypeExpr: not a branch");
   if (tree.tag === "ident") {
     return makeSymbol(textOf(tree));
+  }
+  if (tree.tag === "type_function") {
+    // Children: ["(", ws_any, opt(rep(type_expr, sep=",")), ws_any, ")",
+    //           ws, "=>", ws, type_expr]. Walk children in order; collect
+    //           type_exprs found before the `=>` literal as paramTypes, the
+    //           one after as returnType. Lower to a `type_function` primitive
+    //           call: paramType1, …, paramTypeN, returnType (return last).
+    const paramTypes: any[] = [];
+    let returnType: any | undefined = undefined;
+    let sawArrow = false;
+    const walkChild = (t: ParseTree): void => {
+      if (t.kind === "leaf" && t.text === "=>") { sawArrow = true; return; }
+      if (t.kind !== "branch") return;
+      const inner = findTypeExpr(t);
+      if (inner) {
+        if (sawArrow) {
+          if (returnType === undefined) returnType = buildTypeExpr(inner, paramMap);
+        } else {
+          paramTypes.push(buildTypeExpr(inner, paramMap));
+        }
+        return;
+      }
+      for (const c of t.children) walkChild(c);
+    };
+    for (const ch of tree.children) walkChild(ch);
+    if (returnType === undefined) {
+      throw new Error("type_function: missing return type");
+    }
+    return makeExpr(prim("type_function"), [...paramTypes, returnType]);
   }
   if (tree.tag === "type_generic") {
     // Children: [ident, "[", ws, rep-of-type_expr, ws, "]"]
@@ -1213,7 +1244,8 @@ function buildTypeExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     // Children: [type_expr_atom, ws, "|", ws, type_expr]
     const parts = tree.children.filter(ch =>
       ch.kind === "branch" && (ch.tag === "ident" || ch.tag === "type_generic" ||
-        ch.tag === "type_union" || ch.tag === "type_structural")
+        ch.tag === "type_union" || ch.tag === "type_structural" ||
+        ch.tag === "type_function")
     );
     if (parts.length < 2) throw new Error("type_union: expected 2 parts");
     return makeExpr(prim("type_union"),
@@ -1267,7 +1299,9 @@ function buildLambda(tree: ParseTree, outerParamMap: Map<string, any>): any {
     for (const ch of c) {
       if (ch === identTree) { seen = true; continue; }
       if (!seen) continue;
-      if (ch.kind === "branch" && (ch.tag === "type_generic" || ch.tag === "type_union" || ch.tag === "ident")) {
+      if (ch.kind === "branch" && (ch.tag === "type_generic" || ch.tag === "type_union"
+          || ch.tag === "type_structural" || ch.tag === "type_function"
+          || ch.tag === "ident")) {
         typeExpr = buildTypeExpr(ch, outerParamMap);
         break;
       }

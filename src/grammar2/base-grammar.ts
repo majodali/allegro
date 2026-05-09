@@ -626,6 +626,19 @@ export function buildBaseGrammar(): Grammar {
     rule: alt([
       // Structural wrap: ~Type
       seq([lit("~"), nonterm("type_expr_atom")], { name: "type_structural" }),
+      // Function type: (T1, T2, …) => R   — Stage E. Right-recursive return
+      // (`(A) => (B) => C` parses as `(A) => ((B) => C)`) since the return
+      // type is itself `type_expr`. Tried before `type_generic` so the `(`
+      // opener is unambiguous; lambda parsing only fires in expression
+      // position, never inside a type_expr.
+      seq([lit("("), nonterm("ws_any"),
+           opt(rep(nonterm("type_expr"), {
+             min: 1,
+             sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]),
+           })),
+           nonterm("ws_any"), lit(")"),
+           nonterm("ws"), lit("=>"), nonterm("ws"), nonterm("type_expr")],
+        { name: "type_function" }),
       // Generic: Name[T, U, ...]
       seq([nonterm("ident"), lit("["), nonterm("ws_any"),
            rep(nonterm("type_expr"), { min: 1, sep: seq([nonterm("ws_any"), lit(","), nonterm("ws_any")]) }),

@@ -2369,6 +2369,29 @@ const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
 // --- type_apply: apply type arguments to a generic type ---
 
+// --- Stage E: type_function — build a concrete FunctionType from a type
+//     expression like `(A, B) => C`. Args are the parameter types in source
+//     order followed by the return type as the LAST arg. Empty `()` means a
+//     zero-param function. Curried `(A) => (B) => C` parses right-recursively
+//     so the return type itself is a `type_function` call.
+
+const type_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length < 1) {
+    throw new AllegroError("type_function: expected at least the return type");
+  }
+  const evalArgs: Value[] = [];
+  for (const a of args) {
+    const v = evalFn!(a, ctx!);
+    if (!isResolved(v)) {
+      return makeExpr(makePrimitive("type_function", type_function_impl, true), args);
+    }
+    evalArgs.push(primaryOf(v));
+  }
+  const returnType = evalArgs[evalArgs.length - 1];
+  const paramTypes = evalArgs.slice(0, -1);
+  return wrapType(makeFunctionType(paramTypes, returnType));
+};
+
 const type_apply_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const generic = evalFn!(args[0], ctx!);
   if (!isResolved(generic)) {
@@ -3082,6 +3105,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   type_instanceof: makePrimitive("type_instanceof", type_instanceof_impl, true),
   type_subtypeof: makePrimitive("type_subtypeof", type_subtypeof_impl, true),
   type_apply: makePrimitive("type_apply", type_apply_impl, true),
+  type_function: makePrimitive("type_function", type_function_impl, true),
   type_union: makePrimitive("type_union", type_union_impl, true),
   structural_wrap: makePrimitive("structural_wrap", structural_wrap_impl, true),
   type_refine: makePrimitive("type_refine", type_refine_impl, true),
