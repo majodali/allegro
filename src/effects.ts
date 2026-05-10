@@ -157,11 +157,6 @@ export function inferFunctionEffects(
   return walkValueEffects(fn.body, seen, lookup);
 }
 
-/** Method names recognised as higher-order functions on stdlib types. When
- *  the static walker sees `type_dispatch(obj, "map" | "filter" | "reduce")`,
- *  it conservatively adds `opaque` to the inferred effect set. Sub-chunk 1.3
- *  placeholder until Slice 2's effect-polymorphism resolves precisely. */
-const HOF_METHOD_NAMES: Set<string> = new Set(["map", "filter", "reduce"]);
 
 /** Compute the effects of a value being passed as a function argument — the
  *  effects it would produce if called. Used by Stage C2 to resolve
@@ -252,19 +247,12 @@ export function walkValueEffects(
       // Effects from the function being called.
       if (fn0.kind === ValueKind.PrimitiveFunction) {
         if (fn0.effects) for (const e of fn0.effects) result.add(e);
-        // Phase D1 sub-chunk 1.3: dot-dispatch on an unresolved object goes
-        // through `type_dispatch(obj, fieldName)`, returning a bound method.
-        // Static inference can't follow into the runtime dispatch, but for
-        // known stdlib HOF method names we conservatively mark `opaque` so
-        // callers' inferred sets reflect the soundness limit. Slice 2's
-        // effect polymorphism will replace this with precise inference.
-        if (fn0.name === "type_dispatch" && v.args.length === 2) {
-          const fieldArg = primaryOf(v.args[1]);
-          if (fieldArg.kind === ValueKind.Bits) {
-            const fieldName = bitsToString(fieldArg as BitsValue);
-            if (HOF_METHOD_NAMES.has(fieldName)) result.add("opaque");
-          }
-        }
+        // F3b: the type_dispatch HOF special-case is no longer needed.
+        // PE-driven propagation (F1) + polymorphic Param-call handling
+        // (F2c) flow `arr.map(cb)`'s callback effects through `mapAllegro`'s
+        // body without the conservative opaque marker. The walker still
+        // needs to honor the receiver's type-dispatch resolution when it
+        // shows up — but that's covered by recursing into v.fn below.
       } else if (fn0.kind === ValueKind.ComposedFunction) {
         // Phase D1 Slice 2 Stage C2: effect-variable resolution. The callee
         // may have stamped `__effectvar:NAME` markers in its inferred set

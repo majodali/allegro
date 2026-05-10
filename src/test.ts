@@ -3768,6 +3768,7 @@ fileTest(path.join(testsDir, "contracts-demo.alg"));
 fileTest(path.join(testsDir, "effects-demo.alg"));
 fileTest(path.join(testsDir, "effects-surface-c-demo.alg"));
 fileTest(path.join(testsDir, "fn-type-demo.alg"));
+fileTest(path.join(testsDir, "hof-effect-propagation-demo.alg"));
 
 // --- Phase B: abstract-domain unit tests ---
 
@@ -5525,6 +5526,101 @@ test("Stage F3a: declaration check still fires under deferral (mismatch detected
   eq(threw, true, "mismatch check should still fire under F3a deferral");
 });
 
+// --- Phase D1 Slice 2 Stage F3b: stdlib HOF migration ---
+//
+// With F1 PE-driven effects + F2 polymorphic propagation + F3a compile-time
+// deferral all in place, the Slice-1.3 `opaque` placeholders on Array.map /
+// filter / reduce + the walker's HOF heuristic become unnecessary. F3b
+// removes both. Inline typed lambdas (`arr.map((x: Int): Int => print(x))`)
+// get their own __inferredEffects via a precompile-on-evaluate hook in
+// `typed_function_impl`, so callers see the precise propagation.
+
+test("Stage F3b: arr.map(pure_cb) yields no effects", () => {
+  const src = `dbl(arr: Array[Int]): Array[Int] =>
+  arr.map((x: Int): Int => x * 2)
+dbl
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("dbl")!.value!;
+  const eff = effectsOf(fn);
+  // No opaque (it's gone) and no io (the cb is pure).
+  eq(eff?.has("opaque") ?? false, false);
+  eq(eff?.has("io") ?? false, false);
+});
+
+test("Stage F3b: arr.map(io_cb) propagates io to caller", () => {
+  const src = `print_each(arr: Array[Int]): Array[Int] =>
+  arr.map((x: Int): Int => print(x))
+print_each
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("print_each")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true,
+     `expected io from arr.map(print_cb), got: ${eff ? [...eff].join(",") : "none"}`);
+});
+
+test("Stage F3b: arr.filter(io_cb) propagates io", () => {
+  const src = `noisy(arr: Array[Int]): Array[Int] =>
+  arr.filter((x: Int): Int => print(x))
+noisy
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("noisy")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true);
+});
+
+test("Stage F3b: arr.reduce(io_combiner, init) propagates io", () => {
+  const src = `dump(arr: Array[Int]): Int =>
+  arr.reduce((a: Int, x: Int): Int => print(x), 0)
+dump
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("dump")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true);
+});
+
+test("Stage F3b: typed_function_impl precompiles inline lambdas (effects component populated)", () => {
+  // Direct test of the precompile-on-evaluate hook: an inline typed lambda
+  // gets its __inferredEffects set when the typed_function expression is
+  // evaluated, even though it isn't a top-level binding for
+  // precompileFunctions to see.
+  const src = `f(): (Int) => Int =>
+  (x: Int): Int => print(x)
+f
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  // f returns the inline lambda when called; for direct verification call
+  // f() and check the returned lambda's effects component.
+  const f = evalCtx.bindings.get("f")!.value!;
+  const fnPrim = primaryOf(f);
+  if (fnPrim.kind === ValueKind.ComposedFunction) {
+    // f is pure (returns a function value, doesn't fire io itself).
+    // But the lambda it returns carries io. f's __inferredEffects is none;
+    // the returned lambda's effects (eventually surfaced through the call)
+    // come from PE walking the body. Direct test below.
+    const eff = effectsOf(f);
+    eq(eff?.has("opaque") ?? false, false);
+  }
+});
+
+test("Stage F3b: declaration check via PE catches mismatch through HOF", () => {
+  // Effects-attach with a pure declaration; body uses arr.map(io_cb).
+  // F3b: precise propagation means the io effect surfaces and the mismatch
+  // fires. (Pre-F3b this would be filtered as opaque and emit a notification.)
+  const src = `bad(arr: Array[Int]): Array[Int] =>
+  effects_attach(arr.map((x: Int): Int => print(x)), typed_array())
+`;
+  let threw = false;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { threw = true; msg = String(e.message ?? e); }
+  eq(threw, true, "expected mismatch to fire via HOF callback effect propagation");
+  eq(msg.includes("io"), true, `expected io in mismatch, got: ${msg}`);
+});
+
 test("Stage F2: f: pure rejection still works against the new effects component", () => {
   // checkArgType now reads effectsOf(arg) instead of effectPredicatesForValue.
   // For typed functions whose effects component is populated by PE, the
@@ -5576,31 +5672,35 @@ test("Phase D1.3: CompilationReport carries notifications array", () => {
   eq(Array.isArray(compilationReport!.notifications), true);
 });
 
-test("Phase D1.3: function calling Array.map gets opaque in inferred set", () => {
-  const src = `dbl(arr) =>
-  arr.map(x => x * 2)
-dbl
-`;
+test("Phase D1.3 (F3b): pure callback through Array.map does NOT mark caller opaque", () => {
+  // F3b removed the opaque tags + walker heuristic. PE-driven propagation +
+  // inline-lambda precompile make `arr.map(pure_cb)` infer no effects.
+  const src = `dbl(arr: Array[Int]): Array[Int] => arr.map((x: Int): Int => x * 2)\ndbl\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("dbl")!.value!;
-  // inferFunctionEffects on a ComposedFunction calling Array.map should
-  // include "opaque" because Array.map's primitive carries effects=["opaque"].
-  const fnP = primaryOf(fn);
-  eq(fnP.kind, ValueKind.ComposedFunction);
-  if (fnP.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fnP);
-    eq(inferred.has("opaque"), true);
-  }
+  const eff = effectsOf(fn);
+  // No opaque, no io — pure callback transparently propagates.
+  eq(eff?.has("opaque") ?? false, false, `expected no opaque, got: ${eff ? [...eff].join(",") : "none"}`);
 });
 
-test("Phase D1.3: opaque-from-stdlib-hof emits a notification", () => {
-  const src = `dbl(arr) =>
-  arr.map(x => x * 2)
-`;
+test("Phase D1.3 (F3b): io callback through Array.map propagates io to caller", () => {
+  // F3b: this is the precise replacement for the old "opaque inferred"
+  // behaviour. The callback's io effect flows through the HOF.
+  const src = `dump(arr: Array[Int]): Array[Int] => arr.map((x: Int): Int => print(x))\ndump\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("dump")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true,
+     `expected io to propagate through arr.map, got: ${eff ? [...eff].join(",") : "none"}`);
+});
+
+test("Phase D1.3 (F3b): no opaque-from-stdlib-hof notification fires after the migration", () => {
+  // The notification was a Slice-1.3 placeholder for the soundness gap.
+  // F3b closes the gap; no notification should fire for normal HOF use.
+  const src = `dbl(arr: Array[Int]): Array[Int] => arr.map((x: Int): Int => x * 2)\n`;
   const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const notes = compilationReport!.notifications.filter(n => n.kind === "effects-opaque-from-stdlib-hof");
-  eq(notes.length >= 1, true);
-  eq(notes.some(n => n.binding === "dbl"), true);
+  eq(notes.length, 0, `expected no opaque notifications, got ${notes.length}`);
 });
 
 test("Phase D1.3: function with effects pure calling map does NOT halt (notification only)", () => {

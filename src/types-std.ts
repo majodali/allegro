@@ -2054,11 +2054,11 @@ export const ArrayType: ContextValue = buildGenericType(
   ["T"],
   arrayMethods,
   undefined,
-  // Phase D1 sub-chunk 1.3: until Slice 2's effect polymorphism lands,
-  // map/filter/reduce can do anything their callback does. Tag as `opaque`
-  // so callers' inferred sets reflect the soundness limit; the analyzer
-  // emits a notification rather than halting (callbacks are usually pure).
-  { methodEffects: { map: ["opaque"], filter: ["opaque"], reduce: ["opaque"] } },
+  // F3b: opaque tags removed. With PE-driven effect propagation (F1) +
+  // polymorphic Param-call handling (F2c) + compile-time deferral (F3a),
+  // `arr.map(cb)` correctly propagates `cb`'s effects through the Allegro-
+  // built `mapAllegro` body's `fn(arr[i])` Param-call. Callers see the
+  // precise effect set instead of the conservative `opaque` placeholder.
 );
 
 // =============================================================================

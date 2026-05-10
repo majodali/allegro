@@ -1,7 +1,7 @@
 // Allegretto - Primitive Functions
 
 import {
-  Value, ValueKind, BitsValue, ContextValue,
+  Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn,
   AllegroError, makeBits, makeInt, makeFloat, bitsToFloat, makePrimitive, makeExpr,
   makeParam, makeComposedFn, makeContext, makeMultiValue,
@@ -1504,6 +1504,13 @@ import {
   effectsOf as _effectsOf,
   effectsOfWithFallback as _effectsOfWithFallback,
 } from "./effects.js";
+import { precompileFunction as _precompileFunction } from "./evaluator.js";
+
+// F3b: tracks ComposedFunctions whose body is currently being precompiled,
+// so the recursive call inside `factorial(n) => factorial(n-1)` doesn't
+// re-enter precompile and loop forever. Cleared when the precompile call
+// completes or throws.
+const _precompileInProgress = new WeakSet<ComposedFunctionValue>();
 import {
   domainOf as _domainOf, impliesDomain as _impliesDomain,
   AbstractDomain as _AbstractDomain, EffectsDomain as _EffectsDomain,
@@ -1747,6 +1754,25 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
   }
 
+  // F3b: trigger PE-driven body inference on inline typed functions too.
+  // Top-level functions get this via `precompileFunctions` in runtime.ts;
+  // inline lambdas like `arr.map((x: Int): Int => print(x))` need it here
+  // so the cb's effects component is populated when the outer call's
+  // applyPrimitive runs its arg-effects loop.
+  if (fnPrimary.kind === ValueKind.ComposedFunction
+      && (fnPrimary as any).__inferredEffects === undefined
+      && !_precompileInProgress.has(fnPrimary as ComposedFunctionValue)) {
+    _precompileInProgress.add(fnPrimary as ComposedFunctionValue);
+    try {
+      _precompileFunction(fnPrimary as ComposedFunctionValue, paramTypes, ctx!);
+    } catch (_e) {
+      // Body PE may fail (e.g. type errors that surface only at full
+      // resolution). Leave __inferredEffects undefined; downstream paths
+      // fall back to the walker.
+    } finally {
+      _precompileInProgress.delete(fnPrimary as ComposedFunctionValue);
+    }
+  }
   const fnType = makeFunctionType(paramTypes, returnType);
   let typed = withType(fn, fnType);
   // Stage F1: attach the body's inferred effect set (stashed by
