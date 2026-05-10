@@ -203,9 +203,9 @@ function effectsOfFunctionArg(
     return out;
   }
   if (p.kind === ValueKind.Param) {
-    const preds = (p as any).predicates as PredicateSet | undefined;
-    const eff = preds?.effectiveEffects();
-    if (eff) return new Set(eff.labels);
+    // F2: read directly from Param.effectBound (was Param.predicates).
+    const bound = (p as any).effectBound as EffectSet | undefined;
+    if (bound) return new Set(bound);
   }
   // Unknown — conservative opaque.
   return new Set(["opaque"]);
@@ -290,15 +290,14 @@ export function walkValueEffects(
           result.add(lbl);
         }
       } else if (fn0.kind === ValueKind.Param) {
-        // Phase D1 Slice 2 Stage B: function-typed param being called. Read
-        // its declared effect bound from `Param.predicates` (stamped by
-        // `typed_function_impl` from the param-type annotation's
-        // `__effectBound`). Without a bound, we treat it as opaque — honest
-        // about the unknown rather than silently zero-effect.
-        const preds = (fn0 as any).predicates as PredicateSet | undefined;
-        const eff = preds?.effectiveEffects();
-        if (eff) {
-          for (const l of eff.labels) result.add(l);
+        // Phase D1 Slice 2 Stage B (F2): function-typed param being called.
+        // Read its declared effect bound from `Param.effectBound` directly
+        // (migrated from `Param.predicates` in F2). Without a bound, we
+        // treat it as opaque — honest about the unknown rather than
+        // silently zero-effect.
+        const bound = (fn0 as any).effectBound as EffectSet | undefined;
+        if (bound) {
+          for (const l of bound) result.add(l);
         } else {
           result.add("opaque");
         }
@@ -445,7 +444,12 @@ export function checkEffectsDeclarations(
     if (!fn) continue;
     const wrap = unwrapEffectsAttach(fn.body);
     if (!wrap) continue;
-    const inferred = inferFunctionEffects(fn);
+    // F2: prefer the PE-stashed inferred set (`__inferredEffects`, set by
+    // precompileFunction) over running the walker. Fall back to the walker
+    // for legacy paths that didn't precompile (rare in practice — every
+    // typed function definition goes through precompileFunctions).
+    const stashed = (fn as any).__inferredEffects as EffectSet | undefined;
+    const inferred = stashed ?? inferFunctionEffects(fn);
     const inferredHard = new Set(inferred);
     inferredHard.delete("opaque");
     // Slice 2 Stage C3: polymorphic declarations like `effects e` for a
@@ -541,6 +545,22 @@ export function effectsOf(v: Value): EffectSet | null {
   if (v.kind !== ValueKind.MultiValue) return null;
   const c = (v as MultiValueType).components.get(EFFECTS_COMPONENT_KEY);
   return c ? decodeEffects(c) : null;
+}
+
+/** Read effects with a walker fallback for functions whose effects component
+ *  isn't populated (e.g. untyped functions that didn't go through the
+ *  typed-function precompile path). The component is the canonical source
+ *  in F2; this helper exists to bridge legacy producers during the migration
+ *  and will narrow to plain `effectsOf` once every function value carries
+ *  its effects component. */
+export function effectsOfWithFallback(v: Value): EffectSet | null {
+  const direct = effectsOf(v);
+  if (direct !== null) return direct;
+  const p = primaryOf(v);
+  if (p.kind === ValueKind.ComposedFunction) {
+    return inferFunctionEffects(p);
+  }
+  return null;
 }
 
 /** Attach an effect set as a MultiValue component, unioning with any prior

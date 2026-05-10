@@ -52,11 +52,19 @@ export interface ParamValue {
   position: number;
   owner: ComposedFunctionValue | null;
   _name?: string; // debugging hint
-  /** Phase D1 Slice 2 Stage A: predicates declared on this parameter (effect
-   *  bounds, refinement bounds, …). Stored on the Param itself rather than
-   *  on a side-table keyed by index, so the HOF walker (Stage B) can pull
-   *  them directly when it sees `Param(p)` being called inside a body. */
+  /** Phase D1 Slice 2 Stage A: predicates declared on this parameter
+   *  (refinement bounds — currently unused; reserved for future). Effect
+   *  bounds moved to `effectBound` in F2 since effects describe
+   *  computations and refinements describe data, with different lattices. */
   predicates?: import("./refinements.js").PredicateSet;
+  /** Phase D1 Slice 2 Stage F2: effect bound for function-typed params.
+   *  Set by `typed_function_impl` from a param-type annotation's
+   *  `__effectBound` (Surface A: `f: pure`), by Stage C2 marker stamping
+   *  (`__effectvar:NAME` for polymorphic effect variables), and by the
+   *  Surface C `param_effects` body-form peel-and-stamp pass. The walker
+   *  / PE Param-call branch reads this slot directly; call-site
+   *  enforcement runs the same `impliesDomain` discharge against it. */
+  effectBound?: import("./effects.js").EffectSet;
 }
 
 // --- Symbol: named reference resolved during compilation ---
@@ -167,10 +175,10 @@ export function makePrimitive(
 }
 
 export function makeParam(position: number, name?: string): ParamValue {
-  // Always declare `predicates: undefined` so V8/JSC see a stable hidden class
-  // shape across all Params, whether or not effect/refinement bounds end up
-  // being attached later.
-  return { kind: ValueKind.Param, position, owner: null, _name: name, predicates: undefined };
+  // Always declare optional fields so V8/JSC see a stable hidden class shape
+  // across all Params, whether or not bounds end up being attached later.
+  return { kind: ValueKind.Param, position, owner: null, _name: name,
+           predicates: undefined, effectBound: undefined };
 }
 
 export function makeSymbol(name: string): SymbolValue {

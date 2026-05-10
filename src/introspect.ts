@@ -233,14 +233,16 @@ export function summarizeValue(v: Value): ValueSummary {
   }
   const dom = preds?.effectiveDomain() ?? domainOf(v);
 
-  // Phase D1: if the value is a function, compute inferred effects and
-  // (if present) extract declared effects from the `effects_attach`
-  // wrapper at the body root.
+  // Phase D1 (F2): if the value is a function, read inferred effects from
+  // the `effects` MultiValue component (PE-populated) when present, fall
+  // back to the walker for legacy paths. Declared effects come from the
+  // body's `effects_attach` wrapper.
   let inferredEffects: EffectSet | null = null;
   let declaredEffects: EffectSet | null = null;
   const fnPrim = primaryOf(v);
   if (fnPrim.kind === ValueKind.ComposedFunction) {
-    inferredEffects = inferFunctionEffects(fnPrim);
+    const stashed = (fnPrim as any).__inferredEffects as EffectSet | undefined;
+    inferredEffects = stashed ?? inferFunctionEffects(fnPrim);
     const wrap = unwrapEffectsAttach(fnPrim.body);
     if (wrap) declaredEffects = wrap.declared;
   }

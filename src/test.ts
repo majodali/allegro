@@ -4646,10 +4646,10 @@ pure_caller
   }
 });
 
-test("Stage B: typed_function stamps Param.predicates from __effectBound", () => {
-  // Verify the storage wiring directly: the Param of a typed function with
-  // `f: pure` annotation carries a PredicateSet with one effects-bound
-  // predicate whose labels are empty.
+test("Stage B (F2): typed_function stamps Param.effectBound from __effectBound", () => {
+  // F2 storage migration: effect bounds now live on Param.effectBound (a
+  // plain Set<string>) instead of Param.predicates (a PredicateSet).
+  // Refinement bounds stay reserved on Param.predicates for future use.
   const src = `bounded(f: pure) =>
   f(0)
 bounded
@@ -4658,13 +4658,8 @@ bounded
   const fn = primaryOf(evalCtx.bindings.get("bounded")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
     const p = fn.params[0];
-    eq(p.predicates !== undefined, true);
-    if (p.predicates) {
-      const eff = p.predicates.effectiveEffects();
-      eq(eff !== null, true);
-      eq(eff!.labels.size, 0);
-      eq(p.predicates.preds[0].source, "effects-bound");
-    }
+    eq(p.effectBound !== undefined, true);
+    eq(p.effectBound?.size, 0, `pure has empty labels`);
   }
 });
 
@@ -5032,9 +5027,9 @@ test("Stage C3: polymorphic body with extra effect under-declared fires mismatch
 // to verify the typed_function_impl peel-and-stamp pass and the call-site
 // enforcement path. End-to-end surface verification is in tests/effects-demo.alg.
 
-test("Stage D: param_effects_attach stamps Param.predicates with effect bound", () => {
+test("Stage D (F2): param_effects_attach stamps Param.effectBound with effect bound", () => {
   // Hand-built lowered shape mirroring what the block preprocessor emits.
-  // `apply_pure(g)` → param_effects_attach(g(g), Param(g), pure).
+  // F2 stores effect bounds on Param.effectBound directly (was Param.predicates).
   const src = `apply_pure(g, x: Int): Int =>
   param_effects_attach(g(x), g, pure)
 
@@ -5044,14 +5039,9 @@ apply_pure
   const fn = primaryOf(evalCtx.bindings.get("apply_pure")!.value!);
   eq(fn.kind, ValueKind.ComposedFunction);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const gPredicates = (fn.params[0] as any).predicates;
-    eq(gPredicates !== undefined, true, "g should have predicates stamped");
-    if (gPredicates) {
-      const eff = gPredicates.effectiveEffects();
-      eq(eff !== undefined, true);
-      eq(eff?.kind, "effects");
-      eq(eff?.labels.size, 0, `pure has empty labels, got: ${[...(eff?.labels ?? [])].join(",")}`);
-    }
+    const gBound = (fn.params[0] as any).effectBound as Set<string> | undefined;
+    eq(gBound !== undefined, true, "g should have effectBound stamped");
+    eq(gBound?.size, 0, `pure has empty labels, got: ${[...(gBound ?? [])].join(",")}`);
   }
 });
 
@@ -5101,8 +5091,8 @@ forwarder
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = primaryOf(evalCtx.bindings.get("forwarder")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const preds = (fn.params[0] as any).predicates;
-    eq(preds === undefined, true, "opaque should not stamp predicates");
+    const bound = (fn.params[0] as any).effectBound;
+    eq(bound === undefined, true, "opaque should not stamp effectBound");
   }
 });
 
@@ -5124,7 +5114,7 @@ apply_pure
   }
 });
 
-test("Stage D: multiple param_effects markers stamp independently", () => {
+test("Stage D (F2): multiple param_effects markers stamp Param.effectBound independently", () => {
   // Two separate markers, each stamping a different param.
   const src = `pipe(f, g, x: Int): Int =>
   param_effects_attach(g(f(x)), f, pure, g, pure)
@@ -5134,12 +5124,12 @@ pipe
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = primaryOf(evalCtx.bindings.get("pipe")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const fEff = (fn.params[0] as any).predicates?.effectiveEffects();
-    const gEff = (fn.params[1] as any).predicates?.effectiveEffects();
-    eq(fEff !== undefined, true, "f should have predicates");
-    eq(gEff !== undefined, true, "g should have predicates");
-    eq(fEff?.labels.size, 0, "f bound is pure");
-    eq(gEff?.labels.size, 0, "g bound is pure");
+    const fBound = (fn.params[0] as any).effectBound as Set<string> | undefined;
+    const gBound = (fn.params[1] as any).effectBound as Set<string> | undefined;
+    eq(fBound !== undefined, true, "f should have effectBound");
+    eq(gBound !== undefined, true, "g should have effectBound");
+    eq(fBound?.size, 0, "f bound is pure");
+    eq(gBound?.size, 0, "g bound is pure");
   }
 });
 
@@ -5360,6 +5350,104 @@ test("Stage F1: empty effects on a value with no prior set is a no-op", () => {
   const v1 = withEffects(v, new Set());
   // No wrapping should occur when there's nothing to add.
   eq(v1, v, "expected the same value back");
+});
+
+// --- Phase D1 Slice 2 Stage F2: consumer migration to the effects
+//                                 component + Param.effectBound + PE-driven
+//                                 polymorphic propagation ---
+
+test("Stage F2: Param.effectBound carries Surface A pure annotation", () => {
+  const src = `bounded(f: pure): Int => f(0)\nbounded\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = primaryOf(evalCtx.bindings.get("bounded")!.value!);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    const bound = (fn.params[0] as any).effectBound;
+    eq(bound !== undefined, true, "f should carry effectBound");
+    eq(bound?.size, 0, "pure has empty labels");
+    // Predicate-set-based storage is no longer used for effects.
+    eq(fn.params[0].predicates, undefined, "predicates slot stays empty");
+  }
+});
+
+test("Stage F2: PE residual at unresolved-Param call carries effectBound", () => {
+  // F2c: when PE evaluates `Expression(Param_with_effectBound, args)`, the
+  // residual carries the bound's labels via the effects component. This is
+  // what lets polymorphic functions populate __inferredEffects for the
+  // outer function during precompile.
+  const src = `apply[e: Effect](g: e, x: Int): Int => g(x)\napply\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("apply")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("__effectvar:e"), true,
+     `expected effect-variable marker on apply, got: ${eff ? [...eff].join(",") : "none"}`);
+});
+
+test("Stage F2: polymorphic apply propagates io callback's effects to caller", () => {
+  // End-to-end: caller calls apply with an io-tagged callback. PE walks
+  // through apply's body (using Param-call effect propagation), substitutes
+  // the callback at the call site, and surfaces io on caller's effects.
+  const src = `apply[e: Effect](g: e, x: Int): Int => g(x)
+caller(x: Int): Int => apply((y: Int): Int => print(y), x)
+caller
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("caller")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true,
+     `expected io to propagate, got: ${eff ? [...eff].join(",") : "none"}`);
+});
+
+test("Stage F2: unannotated function-typed Param stays opaque", () => {
+  // No effectBound on f → PE Param-call branch defaults to opaque,
+  // matching the walker's conservative semantics.
+  const src = `forwarder(f, x: Int): Int => f(x)\nforwarder\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("forwarder")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("opaque"), true,
+     `expected opaque from unannotated param call, got: ${eff ? [...eff].join(",") : "none"}`);
+});
+
+test("Stage F2: checkEffectsDeclarations reads __inferredEffects (no walker call)", () => {
+  // Hand-built effects_attach to declare a mismatching pure bound. If
+  // checkEffectsDeclarations reads the PE-stashed set correctly, the
+  // mismatch should still fire (inferred io ⊄ declared pure).
+  const src = `bad(x: Int): Int =>
+  effects_attach(seq(print(x), x), typed_array())
+`;
+  let threw = false;
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { threw = true; }
+  eq(threw, true, "pure declaration with io body should still halt under F2");
+});
+
+test("Stage F2: introspection reads inferred effects from component (when populated)", () => {
+  // After precompile, the function value's __inferredEffects is set; the
+  // inspector reads it directly.
+  const src = `greet(x: Int): Int => print(x)\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("greet")!.value!;
+  const summary = summarizeValue(fn);
+  eq(summary.inferredEffects?.has("io"), true);
+});
+
+test("Stage F2: f: pure rejection still works against the new effects component", () => {
+  // checkArgType now reads effectsOf(arg) instead of effectPredicatesForValue.
+  // For typed functions whose effects component is populated by PE, the
+  // bound discharge runs against the component.
+  const src = `pure_caller(f: pure): Int => 42
+greet(name: String): String =>
+  print("hi " + name)
+  name
+pure_caller(greet)
+`;
+  let threw = false;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { threw = true; msg = e.message; }
+  eq(threw, true, "expected effect-bound rejection");
+  eq(msg.includes("pure"), true);
+  eq(msg.includes("io"), true);
 });
 
 test("Stage C3: typed function declaration check now fires (asFunction peels typed_function)", () => {

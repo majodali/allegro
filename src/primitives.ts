@@ -1500,8 +1500,9 @@ import {
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 import {
-  effectPredicatesForValue as _effectPredicatesForValue,
   withEffects as _withEffects,
+  effectsOf as _effectsOf,
+  effectsOfWithFallback as _effectsOfWithFallback,
 } from "./effects.js";
 import {
   domainOf as _domainOf, impliesDomain as _impliesDomain,
@@ -1655,7 +1656,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const fnPrimary = primaryOf(fn);
   if (fnPrimary.kind === ValueKind.ComposedFunction) {
     const cFn = fnPrimary as any;
-    const params = cFn.params as Array<{ predicates?: _PredicateSet }>;
+    const params = cFn.params as Array<{ effectBound?: Set<string> }>;
     const genericParams = (cFn as any).__genericParams as Array<{ name: string; kind?: any }> | undefined;
     const effectVarNames = new Set<string>();
     if (genericParams) {
@@ -1670,12 +1671,12 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       const pt = paramTypes[i];
       if (!pt) continue;
       // Concrete Effect-extending type (pure / opaque / named effect): stamp
-      // the literal bound, as Stage A already does.
+      // the literal bound (F2: writes to Param.effectBound directly, not
+      // wrapped in a PredicateSet).
       if (pt.kind === ValueKind.Context) {
         const bound = (pt as any).__effectBound as _AbstractDomain | undefined;
         if (bound && bound.kind === "effects") {
-          const pred = { shape: bound, source: "effects-bound" as const };
-          params[i].predicates = new _PredicateSet([pred]);
+          params[i].effectBound = new Set(bound.labels);
         }
         continue;
       }
@@ -1685,13 +1686,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       if (pt.kind === ValueKind.Symbol) {
         const symName = (pt as any).name as string;
         if (effectVarNames.has(symName)) {
-          const dom: _AbstractDomain = {
-            kind: "effects",
-            labels: new Set<string>([`__effectvar:${symName}`]),
-          };
-          params[i].predicates = new _PredicateSet([
-            { shape: dom, source: "effects-bound" as const },
-          ]);
+          params[i].effectBound = new Set<string>([`__effectvar:${symName}`]);
           const arr = effectVarParams.get(symName) ?? [];
           arr.push(i);
           effectVarParams.set(symName, arr);
@@ -1739,9 +1734,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
           if (effPrim.kind !== ValueKind.Context) continue;
           const bound = (effPrim as any).__effectBound as _AbstractDomain | undefined;
           if (bound && bound.kind === "effects") {
-            (cFn.params[idx] as any).predicates = new _PredicateSet([
-              { shape: { kind: "effects", labels: new Set(bound.labels) }, source: "effects-bound" as const },
-            ]);
+            (cFn.params[idx] as any).effectBound = new Set(bound.labels);
           }
           // `__effectBound` absent = opaque (universal). Leave predicates
           // unset, matching Surface A's behaviour.
@@ -2161,12 +2154,15 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // entailment infrastructure rather than introducing a parallel channel.
   const effBound = (expectedCtx as any).__effectBound as _AbstractDomain | undefined;
   if (effBound && effBound.kind === "effects") {
-    const argSet = _effectPredicatesForValue(v);
-    const actualEff: _EffectsDomain = argSet
-      ? (argSet.effectiveEffects() ?? { kind: "effects", labels: new Set<string>() })
-      : { kind: "effects", labels: new Set<string>() };
-    if (!_impliesDomain(actualEff, effBound)) {
-      const actualLabels = [...actualEff.labels].sort().join(", ") || "pure";
+    // F2: read effects from the value's `effects` MultiValue component
+    // (PE-populated) rather than via the predicate-set view. Walker
+    // fallback covers untyped functions whose effects component isn't
+    // populated yet (the typed-function precompile path is the only
+    // PE producer in F2).
+    const argEff = _effectsOfWithFallback(v) ?? new Set<string>();
+    const actualDom: _EffectsDomain = { kind: "effects", labels: argEff };
+    if (!_impliesDomain(actualDom, effBound)) {
+      const actualLabels = [...argEff].sort().join(", ") || "pure";
       throw new AllegroError(
         `Type error: expected effect bound \`${expectedName}\`, got effects \`${actualLabels}\``,
       );

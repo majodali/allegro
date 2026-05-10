@@ -11,7 +11,7 @@ import {
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
-import { effectPredicatesForValue, effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
+import { effectsOf, effectsOfWithFallback, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 
 const MAX_DEPTH = 10000;
 
@@ -178,10 +178,42 @@ function evaluateExpr(
 
   // Function not resolved — partially evaluate args
   const evalArgs = expr.args.map(a => evaluate(a, ctx, depth + 1, depCollector));
-  if (fn === expr.fn && evalArgs.every((a, i) => a === expr.args[i])) {
-    return expr;
+  // F2c: when the unresolved function is a Param with an effectBound (set by
+  // typed_function_impl from `f: pure` annotations or by Surface C's
+  // `param_effects`), propagate those effects onto the residual so PE's
+  // upward flow surfaces them in the enclosing function's inferred set.
+  // Without this, polymorphic `apply[e](g: e, x): Int => g(x)` would lose
+  // the e-effect when precompiling the body's residual `Param(g)(x)` call.
+  let residualEffects: Set<string> | null = null;
+  if (fn.kind === ValueKind.Param) {
+    const bound = (fn as any).effectBound as Set<string> | undefined;
+    if (bound && bound.size > 0) {
+      residualEffects = new Set(bound);
+    } else if (!bound) {
+      // No effectBound — function-typed param could do anything. Match
+      // the walker's conservative "opaque" semantics so PE-driven inference
+      // doesn't silently zero out effects on forwarding cases. An empty
+      // bound (set with size 0, e.g. `f: pure`) means literally pure and
+      // is left empty.
+      residualEffects = new Set(["opaque"]);
+    }
   }
-  return makeExpr(fn, evalArgs);
+  // Also union any effects already on the evaluated args (deferred residuals
+  // that were effectful upstream).
+  for (const a of evalArgs) {
+    const e = effectsOf(a);
+    if (e && e.size > 0) {
+      if (!residualEffects) residualEffects = new Set();
+      for (const lbl of e) residualEffects.add(lbl);
+    }
+  }
+  let residual: Value;
+  if (fn === expr.fn && evalArgs.every((a, i) => a === expr.args[i])) {
+    residual = expr;
+  } else {
+    residual = makeExpr(fn, evalArgs);
+  }
+  return residualEffects ? withEffects(residual, residualEffects) : residual;
 }
 
 // --- Apply primitive ---
@@ -388,23 +420,27 @@ function applyComposed(
             const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
             if (resolvedParamType.kind !== ValueKind.Context) continue; // unresolved type var
             checkArgType(evalArgs[i], resolvedParamType as ContextValue, i, enrichedCtx, depth, depCollector);
-            // Stage D — Surface C call-site enforcement. When the param-type
-            // slot has no `__effectBound` but `param_effects f: pure` stamped
-            // an effect bound onto the Param's predicates, run the same
-            // actual ⊆ bound discharge through `impliesDomain` so Surface C
-            // matches Surface A's call-site rejection of mismatched callbacks.
+            // Stage D — Surface C call-site enforcement (F2): when the
+            // param-type slot has no `__effectBound` but `param_effects
+            // f: pure` stamped an effect bound onto the Param.effectBound
+            // slot, run the same actual ⊆ bound discharge so Surface C
+            // matches Surface A's rejection of mismatched callbacks. F2
+            // reads effects directly from the arg's `effects` MultiValue
+            // component (PE-populated) rather than via the predicate-set
+            // view. Skip when the bound is a Stage C2 effect-variable
+            // marker (`__effectvar:NAME`) — those are placeholders the
+            // walker resolves at call sites, not concrete bounds.
             const ptHasEffBound = (resolvedParamType as any).__effectBound !== undefined;
             if (!ptHasEffBound && i < currentFn.params.length) {
-              const preds = (currentFn.params[i] as any).predicates as PredicateSet | undefined;
-              const surfaceCBound = preds?.effectiveEffects();
-              if (surfaceCBound) {
-                const argSet = effectPredicatesForValue(evalArgs[i]);
-                const actualEff: EffectsDomain = argSet
-                  ? (argSet.effectiveEffects() ?? { kind: "effects", labels: new Set<string>() })
-                  : { kind: "effects", labels: new Set<string>() };
-                if (!impliesDomain(actualEff, surfaceCBound)) {
-                  const want = [...surfaceCBound.labels].sort().join(", ") || "pure";
-                  const got  = [...actualEff.labels].sort().join(", ") || "pure";
+              const surfaceCBound = (currentFn.params[i] as any).effectBound as EffectSet | undefined;
+              const isMarkerBound = surfaceCBound && [...surfaceCBound].some(l => l.startsWith("__effectvar:"));
+              if (surfaceCBound && !isMarkerBound) {
+                const argEff = effectsOfWithFallback(evalArgs[i]) ?? new Set<string>();
+                const boundDom: EffectsDomain = { kind: "effects", labels: surfaceCBound };
+                const actualDom: EffectsDomain = { kind: "effects", labels: argEff };
+                if (!impliesDomain(actualDom, boundDom)) {
+                  const want = [...surfaceCBound].sort().join(", ") || "pure";
+                  const got  = [...argEff].sort().join(", ") || "pure";
                   throw new AllegroError(
                     `Type error: argument ${i} expected effect bound \`${want}\` (from param_effects), got effects \`${got}\``,
                   );
@@ -530,6 +566,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
         owner: null as any,
         _name: p._name,
         predicates: p.predicates,
+        effectBound: p.effectBound,
       } as ParamValue));
       // Rewrite Param references in the new body that point to old params,
       // remapping them to the cloned params (matched by position).
@@ -593,21 +630,20 @@ function checkArgType(
   // Normalize bare generics to Generic[Any]
   let expected = normalizeType(expectedType);
 
-  // Phase D1 Slice 2 Stage A: effect-bound discharge. If the expected type
-  // carries an `__effectBound` (an EffectsDomain attached at construction by
-  // `buildEffect`), pull the arg's effect predicates and check actual ⊆ bound
-  // via the same `impliesDomain` path used for numeric refinements. `opaque`
-  // has no bound — anything passes; we skip the check entirely. Functions
-  // without inferred effects (untyped or non-function args) behave as pure.
+  // Phase D1 Slice 2 Stage A (F2): effect-bound discharge. If the expected
+  // type carries an `__effectBound` (an EffectsDomain attached at
+  // construction by `buildEffect`), pull the arg's effects from its
+  // `effects` MultiValue component (PE-populated in F1) and check actual ⊆
+  // bound via the same `impliesDomain` path used for numeric refinements.
+  // `opaque` has no bound — anything passes; we skip the check entirely.
+  // Args without an effects component behave as pure.
   const effBound = (expected as any).__effectBound as AbstractDomain | undefined;
   if (effBound && effBound.kind === "effects") {
-    const argSet = effectPredicatesForValue(arg);
-    const actualEff: EffectsDomain = argSet
-      ? (argSet.effectiveEffects() ?? { kind: "effects", labels: new Set<string>() })
-      : { kind: "effects", labels: new Set<string>() };
-    if (!impliesDomain(actualEff, effBound)) {
+    const argEff = effectsOfWithFallback(arg) ?? new Set<string>();
+    const actualDom: EffectsDomain = { kind: "effects", labels: argEff };
+    if (!impliesDomain(actualDom, effBound)) {
       const expectedName = typeContextName(expected) ?? "<effect>";
-      const actualLabels = [...actualEff.labels].sort().join(", ") || "pure";
+      const actualLabels = [...argEff].sort().join(", ") || "pure";
       throw new AllegroError(
         `Type error: argument ${argIndex} expected effect bound \`${expectedName}\`, got effects \`${actualLabels}\``,
       );
@@ -756,14 +792,21 @@ export function precompileFunction(
         (domCtx as any).__abstractDomain = dom;
         components.set("domain", domCtx);
       }
-      const placeholder = makeMultiValue(
-        makeParamHelper(param.position, param._name),
-        components,
-      );
+      // F2: preserve effectBound on the placeholder so PE's Param-call
+      // residual path can attach the e-effect when the body calls this
+      // param. Without this, polymorphic functions would lose their
+      // effect-variable markers during precompile.
+      const innerParam = makeParamHelper(param.position, param._name);
+      if (param.effectBound) (innerParam as any).effectBound = param.effectBound;
+      const placeholder = makeMultiValue(innerParam, components);
       placeholders.push(placeholder);
     } else {
-      // Untyped or type variable — leave as bare Param
-      placeholders.push(makeParamHelper(param.position, param._name));
+      // Untyped or type variable — leave as bare Param. Same effectBound
+      // copy so polymorphic params with no concrete type annotation still
+      // propagate (e.g. Stage C2 markers stamped via __genericParams).
+      const bare = makeParamHelper(param.position, param._name);
+      if (param.effectBound) (bare as any).effectBound = param.effectBound;
+      placeholders.push(bare);
     }
   }
 
