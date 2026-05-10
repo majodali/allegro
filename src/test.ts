@@ -4202,6 +4202,7 @@ import {
   PURE, effectUnion as effectLabelSetUnion, effectSubset as effectLabelSetSubset,
   effectDifference, formatEffects,
   inferFunctionEffects, unwrapEffectsAttach,
+  effectsOf, withEffects,
 } from "./effects.js";
 import { ComposedFunctionValue } from "./types.js";
 
@@ -5263,6 +5264,102 @@ add5(10)
 `;
   const result = evalStd(src);
   eq(Number((primaryOf(result!) as BitsValue).data), 15);
+});
+
+// --- Phase D1 Slice 2 Stage F1: effects-as-component substrate (PE-driven) ---
+//
+// Effects move from a parallel walker pass into a first-class MultiValue
+// component populated by partial evaluation. `applyPrimitive` propagates
+// effects from the primitive's static tags + each evaluated arg's `effects`
+// component + the result's own component (when method dispatch attaches it).
+// Lazy primitives accumulate via a tracking `evalFn` wrapper — seq, eval_if
+// (Rule 2), effects_attach all union effects from their subcalls without
+// per-primitive bookkeeping. Function values get their inferred effect set
+// stamped at precompile time so `effectsOf(fn)` returns it directly without
+// invoking the walker.
+
+test("Stage F1: print result carries io effect via component", () => {
+  const { value } = runtimeEval(`print(42)\n`, undefined, [typeExt], undefined, true);
+  eq(value !== null, true);
+  const eff = effectsOf(value!);
+  eq(eff !== null, true);
+  eq(eff?.has("io"), true, `expected io, got: ${[...(eff ?? [])].join(",")}`);
+});
+
+test("Stage F1: pure arithmetic carries no effects component", () => {
+  const { value } = runtimeEval(`1 + 2\n`, undefined, [typeExt], undefined, true);
+  const eff = value ? effectsOf(value) : null;
+  eq(eff === null || eff.size === 0, true,
+     `expected no effects, got: ${eff ? [...eff].join(",") : "null"}`);
+});
+
+test("Stage F1: effects propagate through deferred residual into outer call", () => {
+  // print returns its arg; `0 + print(5)` evaluates print eagerly (firing io)
+  // and threads the {io} component through bits_add's arg-effect union.
+  const { value } = runtimeEval(`0 + print(5)\n`, undefined, [typeExt], undefined, true);
+  const eff = value ? effectsOf(value) : null;
+  eq(eff?.has("io"), true, `expected io to propagate, got: ${eff ? [...eff].join(",") : "null"}`);
+});
+
+test("Stage F1: eval_if Rule 2 unions effects from both branches in residual", () => {
+  // Cond unresolved at compile time (function-param) → both branches PE'd →
+  // residual carries union of branch effects.
+  const src = `maybe_log(x: Int, flag: Int): Int =>
+  if flag == 0 then print(x) else x
+maybe_log
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("maybe_log")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true, `expected io from then-branch, got: ${eff ? [...eff].join(",") : "null"}`);
+});
+
+test("Stage F1: pure function value has no effects component", () => {
+  const src = `sq(x: Int): Int => x * x\nsq\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("sq")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff === null || eff.size === 0, true,
+     `expected no effects on pure fn, got: ${eff ? [...eff].join(",") : "null"}`);
+});
+
+test("Stage F1: io function value carries io effects component", () => {
+  const src = `greet(x: Int): Int => print(x)\ngreet\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("greet")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true, `expected io on greet, got: ${eff ? [...eff].join(",") : "null"}`);
+});
+
+test("Stage F1: transitive call propagates effects through PE", () => {
+  // outer calls inner; inner calls print. PE evaluates outer's body, which
+  // evaluates inner's call, which propagates print's io effect upward.
+  const src = `inner(x: Int): Int => print(x)
+outer(x: Int): Int => inner(x)
+outer
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("outer")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true, `expected io to propagate through outer, got: ${eff ? [...eff].join(",") : "null"}`);
+});
+
+test("Stage F1: withEffects union with prior set", () => {
+  // Direct unit test on the helper.
+  const v = makeInt(42);
+  const v1 = withEffects(v, new Set(["io"]));
+  const v2 = withEffects(v1, new Set(["net"]));
+  const eff = effectsOf(v2);
+  eq(eff?.has("io"), true);
+  eq(eff?.has("net"), true);
+  eq(eff?.size, 2);
+});
+
+test("Stage F1: empty effects on a value with no prior set is a no-op", () => {
+  const v = makeInt(42);
+  const v1 = withEffects(v, new Set());
+  // No wrapping should occur when there's nothing to add.
+  eq(v1, v, "expected the same value back");
 });
 
 test("Stage C3: typed function declaration check now fires (asFunction peels typed_function)", () => {

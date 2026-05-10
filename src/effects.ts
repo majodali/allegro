@@ -25,8 +25,8 @@
 // =============================================================================
 
 import {
-  Value, ValueKind, ComposedFunctionValue, primaryOf, BitsValue,
-  bitsToString,
+  Value, ValueKind, ComposedFunctionValue, ContextValue, MultiValueType,
+  primaryOf, makeMultiValue, BitsValue, bitsToString,
 } from "./types.js";
 import {
   EffectsDomain, Predicate, PredicateSet, makePredicate,
@@ -494,4 +494,77 @@ export function opaqueEffectNotices(
     });
   }
   return notices;
+}
+
+// =============================================================================
+// Effects-as-component substrate (Stage F1)
+// =============================================================================
+//
+// Effects live as a first-class MultiValue component named `"effects"`,
+// alongside `type` and `error`. This separates them from refinement predicates
+// (which describe data) — effects describe COMPUTATIONS (functions and
+// deferred residuals).
+//
+// PE propagates the component through `applyPrimitive`: a primitive carrying
+// `effects: ["io"]` produces a result whose `effects` component is `{io}`,
+// unioned with any effects already present on its evaluated args. Lazy
+// primitives accumulate via a tracking `evalFn` wrapper so seq / eval_if /
+// other branchers naturally propagate without per-primitive bookkeeping.
+//
+// Storage mirrors `withPredicates`: the component value is a Context with a
+// JS-side `__effectSet` field. Encoding is hidden behind `withEffects` /
+// `effectsOf`; consumers shouldn't reach into the component directly.
+
+export const EFFECTS_COMPONENT_KEY = "effects";
+
+function encodeEffects(eff: EffectSet): Value {
+  const ctx: ContextValue = {
+    kind: ValueKind.Context,
+    bindings: new Map(),
+    bindingList: [],
+  };
+  (ctx as any).__effectSet = eff;
+  return ctx;
+}
+
+function decodeEffects(v: Value): EffectSet | null {
+  if (v.kind !== ValueKind.Context) return null;
+  const set = (v as any).__effectSet as EffectSet | undefined;
+  return set ?? null;
+}
+
+/** Read a value's effect set from its `effects` component. Returns null when
+ *  the value carries no effect annotation (treat as `pure` at consumer
+ *  discretion — most consumers want a defined-but-empty set rather than
+ *  null). */
+export function effectsOf(v: Value): EffectSet | null {
+  if (v.kind !== ValueKind.MultiValue) return null;
+  const c = (v as MultiValueType).components.get(EFFECTS_COMPONENT_KEY);
+  return c ? decodeEffects(c) : null;
+}
+
+/** Attach an effect set as a MultiValue component, unioning with any prior
+ *  set on the value. No-op when `eff` is empty AND the value has no prior
+ *  effects (to avoid wrapping pure values in MultiValues unnecessarily). */
+export function withEffects(v: Value, eff: EffectSet): Value {
+  const prior = effectsOf(v);
+  if (eff.size === 0 && prior === null) return v;
+  const merged = prior ? effectUnion(prior, eff) : eff;
+  if (merged.size === 0) return v;
+  const existing = v.kind === ValueKind.MultiValue ? v.components : new Map<string, Value>();
+  const comps = new Map(existing);
+  comps.set(EFFECTS_COMPONENT_KEY, encodeEffects(merged));
+  return makeMultiValue(primaryOf(v), comps);
+}
+
+/** Compute the union of multiple effect sets. Null and undefined entries are
+ *  treated as empty sets so callers can pass `effectsOf(v)` directly without
+ *  null-checking. */
+export function unionEffectSets(...sets: (EffectSet | null | undefined)[]): EffectSet {
+  const out: EffectSet = new Set();
+  for (const s of sets) {
+    if (!s) continue;
+    for (const e of s) out.add(e);
+  }
+  return out;
 }

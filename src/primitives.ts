@@ -1499,7 +1499,10 @@ import {
   Effect as _Effect, effectUnion as _effectUnion,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
-import { effectPredicatesForValue as _effectPredicatesForValue } from "./effects.js";
+import {
+  effectPredicatesForValue as _effectPredicatesForValue,
+  withEffects as _withEffects,
+} from "./effects.js";
 import {
   domainOf as _domainOf, impliesDomain as _impliesDomain,
   AbstractDomain as _AbstractDomain, EffectsDomain as _EffectsDomain,
@@ -1748,7 +1751,17 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   const fnType = makeFunctionType(paramTypes, returnType);
-  return withType(fn, fnType);
+  let typed = withType(fn, fnType);
+  // Stage F1: attach the body's inferred effect set (stashed by
+  // `precompileFunction` after PE) as the `effects` MultiValue component.
+  // Callers see the function's effects via `effectsOf` — the canonical
+  // location for the function's effects (replacing the predicate-set/walker
+  // path during the F1 → F2 migration).
+  const inferredEff = (fnPrimary as any).__inferredEffects as Set<string> | undefined;
+  if (inferredEff && inferredEff.size > 0) {
+    typed = _withEffects(typed, inferredEff);
+  }
+  return typed;
 };
 
 // --- Logical operators (short-circuiting) ---

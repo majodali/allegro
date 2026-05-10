@@ -11,7 +11,7 @@ import {
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
-import { effectPredicatesForValue } from "./effects.js";
+import { effectPredicatesForValue, effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 
 const MAX_DEPTH = 10000;
 
@@ -193,14 +193,42 @@ function applyPrimitive(
   depth: number,
   depCollector?: DepCollector,
 ): Value {
-  const evalFn = (v: Value, c: ContextValue) => evaluate(v, c, depth + 1, depCollector);
+  // Stage F1: track effects fired during this primitive's evaluation so we
+  // can attach the union to the result via the `effects` MultiValue component.
+  // For lazy primitives we wrap evalFn to harvest effects from each subcall;
+  // for eager primitives we read effects off the evaluated args after the
+  // fact (logic further down).
+  const trackedEffects: EffectSet = new Set();
+  const evalFn = (v: Value, c: ContextValue) => {
+    const r = evaluate(v, c, depth + 1, depCollector);
+    if (fn.lazy) {
+      const e = effectsOf(r);
+      if (e) for (const lbl of e) trackedEffects.add(lbl);
+    }
+    return r;
+  };
 
   if (fn.lazy) {
-    return fn.fn(args, ctx, evalFn);
+    const result = fn.fn(args, ctx, evalFn);
+    // Pick up the primitive's own effect tags AND any effects already
+    // attached to the result (e.g. via a withEffects call inside the impl).
+    if (fn.effects) for (const e of fn.effects) trackedEffects.add(e);
+    const resultEff = effectsOf(result);
+    if (resultEff) for (const e of resultEff) trackedEffects.add(e);
+    return trackedEffects.size > 0 ? withEffects(result, trackedEffects) : result;
   }
 
   // Eager: evaluate all args
   const evalArgs = args.map(a => evaluate(a, ctx, depth + 1, depCollector));
+  // Stage F1: pre-compute the unioned effect set from the primitive's static
+  // tags + each evaluated arg's `effects` component. Used by every return
+  // path below so deferred computations carry their effects forward.
+  const eagerEffSet: EffectSet = unionEffectSets(
+    fn.effects ? new Set(fn.effects) : null,
+    ...evalArgs.map(a => effectsOf(a)),
+  );
+  const attachEff = (v: Value): Value =>
+    eagerEffSet.size > 0 ? withEffects(v, eagerEffSet) : v;
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
     // Even though args aren't fully resolved, their type components
@@ -213,11 +241,11 @@ function applyPrimitive(
           // Propagate left operand's type as the residual's type.
           // For comparisons this is imprecise (should be Bool), but the
           // correct type will be determined when the expression fully evaluates.
-          return makeMultiValue(residual, new Map([["type", typeComp]]));
+          return attachEff(makeMultiValue(residual, new Map([["type", typeComp]])));
         }
       }
     }
-    return residual;
+    return attachEff(residual);
   }
 
   // Error propagation: if any evaluated arg has an error component, propagate
@@ -229,7 +257,7 @@ function applyPrimitive(
         const components = new Map<string, Value>([["error", errComp]]);
         const typeComp = (arg as MultiValueType).components.get("type");
         if (typeComp) components.set("type", typeComp);
-        return makeMultiValue(makeExpr(fn, evalArgs), components);
+        return attachEff(makeMultiValue(makeExpr(fn, evalArgs), components));
       }
     }
   }
@@ -258,6 +286,7 @@ function applyPrimitive(
           if (result.kind === ValueKind.MultiValue) out = result;
           else if (result.kind === ValueKind.Bits)  out = makeMultiValue(result, new Map([["type", typeComp]]));
           else                                       out = result;
+          out = attachEff(out);
           return propagatedSet ? withPredicates(out, propagatedSet) : out;
         }
       }
@@ -281,6 +310,14 @@ function applyPrimitive(
   } else {
     out = result;
   }
+  // Stage F1: union the primitive's tags + arg effects (computed at the top
+  // of the function) + any effects the result itself carries from method
+  // dispatch. Attach via `withEffects` so consumers read through `effectsOf`.
+  const resultEff = effectsOf(out);
+  if (resultEff && resultEff.size > 0) {
+    for (const e of resultEff) eagerEffSet.add(e);
+  }
+  out = attachEff(out);
   return propagatedSet ? withPredicates(out, propagatedSet) : out;
 }
 
@@ -699,7 +736,7 @@ export function precompileFunction(
   fn: ComposedFunctionValue,
   paramTypes: Value[],
   ctx: ContextValue,
-): { inferredReturnType: Value | null; errors: string[] } {
+): { inferredReturnType: Value | null; inferredEffects: EffectSet | null; errors: string[] } {
   const errors: string[] = [];
 
   // Create typed placeholders for each param
@@ -737,10 +774,20 @@ export function precompileFunction(
   try {
     const result = evaluate(substituted, ctx, 0);
     const inferredType = getType(result);
-    return { inferredReturnType: inferredType, errors };
+    // Stage F1: read the body's accumulated effects from the result's
+    // `effects` component (set by applyPrimitive's PE propagation) and
+    // stash on the ComposedFunction so typed_function_impl can attach the
+    // component to the function value's MultiValue. Caller (`precompileFunctions`
+    // in runtime.ts) doesn't need to do anything extra; the next evaluation
+    // of the typed_function expression picks up the stashed set.
+    const inferredEffects = effectsOf(result);
+    if (inferredEffects && inferredEffects.size > 0) {
+      (fn as any).__inferredEffects = inferredEffects;
+    }
+    return { inferredReturnType: inferredType, inferredEffects, errors };
   } catch (e: any) {
     // Compile-time type error detected
     errors.push(e.message);
-    return { inferredReturnType: null, errors };
+    return { inferredReturnType: null, inferredEffects: null, errors };
   }
 }
