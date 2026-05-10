@@ -241,6 +241,25 @@ function applyPrimitive(
   };
 
   if (fn.lazy) {
+    // F3a: compile-time deferral for lazy primitives that carry effects.
+    // print/fetch/delay are lazy (they need access to the evalFn closure)
+    // but ALSO effectful — without this branch, the eager-path deferral
+    // check is bypassed and the side effect fires at compile time. We
+    // still evaluate args (via the tracking evalFn so each arg's effects
+    // propagate into the residual), then return `makeExpr(fn, evalArgs)`
+    // instead of running the impl. The impl runs at runtime when the
+    // residual evaluates outside compile-mode.
+    if ((ctx as any).__compileMode && fn.effects && fn.effects.length > 0) {
+      const evalArgs = args.map(a => evalFn(a, ctx));
+      // Add fn's effects + tracked subcall effects + arg effects.
+      if (fn.effects) for (const e of fn.effects) trackedEffects.add(e);
+      for (const a of evalArgs) {
+        const e = effectsOf(a);
+        if (e) for (const lbl of e) trackedEffects.add(lbl);
+      }
+      const residual = makeExpr(fn, evalArgs);
+      return trackedEffects.size > 0 ? withEffects(residual, trackedEffects) : residual;
+    }
     const result = fn.fn(args, ctx, evalFn);
     // Pick up the primitive's own effect tags AND any effects already
     // attached to the result (e.g. via a withEffects call inside the impl).
@@ -261,6 +280,16 @@ function applyPrimitive(
   );
   const attachEff = (v: Value): Value =>
     eagerEffSet.size > 0 ? withEffects(v, eagerEffSet) : v;
+  // Stage F3: compile-time deferral. When PE is operating inside a function
+  // body being precompiled (`ctx.__compileMode = true`) and the primitive
+  // has its own effect tags, return a residual instead of executing. The
+  // residual carries the effects component so callers see the inferred
+  // set; the actual side effect fires when the function is invoked at
+  // runtime (the call site's ctx isn't compile-mode). Pure primitives
+  // still fold eagerly — only effectful ones defer.
+  if ((ctx as any).__compileMode && fn.effects && fn.effects.length > 0) {
+    return attachEff(makeExpr(fn, evalArgs));
+  }
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
     // Even though args aren't fully resolved, their type components
@@ -401,6 +430,10 @@ function applyComposed(
           }
           if (bindings.size > 0) {
             enrichedCtx = makeContext();
+            // F3a: propagate compile-mode through enrichedCtx so deferral
+            // continues to apply inside transitively-called function bodies
+            // during precompile.
+            if ((ctx as any).__compileMode) (enrichedCtx as any).__compileMode = true;
             for (const [key, binding] of ctx.bindings) {
               enrichedCtx.bindings.set(key, binding);
               enrichedCtx.bindingList.push(binding);
@@ -814,6 +847,15 @@ export function precompileFunction(
   const substituted = substituteParams(fn, placeholders);
 
   // Partially evaluate the body
+  // F3a: mark the ctx as compile-mode so applyPrimitive defers effectful
+  // primitives. This prevents `print("trace")` inside a function body from
+  // firing at compile time — the deferred residual still surfaces effects
+  // upward via PE for inference, but the side effect waits until the
+  // function is invoked at runtime (where ctx isn't compile-mode).
+  // Restore on exit so the same compileCtx can be reused for other
+  // bindings without leaking state.
+  const wasCompileMode = (ctx as any).__compileMode;
+  (ctx as any).__compileMode = true;
   try {
     const result = evaluate(substituted, ctx, 0);
     const inferredType = getType(result);
@@ -832,5 +874,7 @@ export function precompileFunction(
     // Compile-time type error detected
     errors.push(e.message);
     return { inferredReturnType: null, inferredEffects: null, errors };
+  } finally {
+    (ctx as any).__compileMode = wasCompileMode;
   }
 }

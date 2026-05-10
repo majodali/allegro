@@ -5431,6 +5431,100 @@ test("Stage F2: introspection reads inferred effects from component (when popula
   eq(summary.inferredEffects?.has("io"), true);
 });
 
+// --- Phase D1 Slice 2 Stage F3a: compile-time deferral of effectful primitives ---
+//
+// When PE evaluates a primitive's args inside a function body being
+// precompiled (`ctx.__compileMode = true`) and the primitive carries a
+// non-empty `.effects` tag, applyPrimitive returns a residual `makeExpr(fn,
+// evalArgs)` instead of executing the impl. The residual still carries the
+// effects component so callers see the inferred set; the side effect itself
+// fires when the function is invoked at runtime, where ctx isn't compile-mode.
+//
+// This fixes a long-standing latent issue where `print("trace")` inside a
+// function body fired during compile (precompile evaluated the body for
+// type/effect inference, and lazy primitives like print bypassed any
+// deferral check).
+
+test("Stage F3a: print inside a function body does NOT fire at compile time", () => {
+  // Capture stdout to verify nothing prints during precompile.
+  const captured: string[] = [];
+  const origLog = console.log;
+  console.log = (...args: any[]) => { captured.push(args.join(" ")); };
+  try {
+    runtimeEval(`unused(x: Int): Int =>
+  print(x)
+`, undefined, [typeExt], undefined, true);
+  } finally {
+    console.log = origLog;
+  }
+  eq(captured.length, 0, `expected no compile-time prints, got: ${captured.join(",")}`);
+});
+
+test("Stage F3a: print fires when the function is actually called at runtime", () => {
+  const captured: string[] = [];
+  const origLog = console.log;
+  console.log = (...args: any[]) => { captured.push(args.join(" ")); };
+  try {
+    runtimeEval(`f(x: Int): Int =>
+  print(x)
+f(42)
+`, undefined, [typeExt], undefined, true);
+  } finally {
+    console.log = origLog;
+  }
+  eq(captured.length, 1, `expected exactly one print, got: ${captured.join(",")}`);
+  eq(captured[0], "42");
+});
+
+test("Stage F3a: top-level print fires immediately (not in compile-mode)", () => {
+  const captured: string[] = [];
+  const origLog = console.log;
+  console.log = (...args: any[]) => { captured.push(args.join(" ")); };
+  try {
+    runtimeEval(`print(99)\n`, undefined, [typeExt], undefined, true);
+  } finally {
+    console.log = origLog;
+  }
+  eq(captured.length, 1, "top-level print should fire");
+  eq(captured[0], "99");
+});
+
+test("Stage F3a: pure primitives still fold at compile time", () => {
+  // Arithmetic on resolved literals continues to evaluate eagerly during
+  // precompile — only effectful primitives defer.
+  const src = `sq(x: Int): Int => x * x\nsq(7)\n`;
+  const result = evalStd(src);
+  eq(Number((primaryOf(result!) as BitsValue).data), 49);
+});
+
+test("Stage F3a: deferred residual carries effects component", () => {
+  // The residual `print("trace")` inside a function body still surfaces
+  // its io effect upward via the effects MultiValue component, so the
+  // function value's __inferredEffects picks it up.
+  const src = `f(x: Int): Int =>
+  effects_attach(seq(print(x), x), typed_array(io))
+f
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const fn = evalCtx.bindings.get("f")!.value!;
+  const eff = effectsOf(fn);
+  eq(eff?.has("io"), true,
+     `expected io on f even with deferred print, got: ${eff ? [...eff].join(",") : "none"}`);
+});
+
+test("Stage F3a: declaration check still fires under deferral (mismatch detected)", () => {
+  // `print` doesn't fire during precompile, but its effect tag flows
+  // through PE into the inferred set, so a `pure` declaration mismatch
+  // is still caught.
+  const src = `bad(x: Int): Int =>
+  effects_attach(seq(print(x), x), typed_array())
+`;
+  let threw = false;
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { threw = true; }
+  eq(threw, true, "mismatch check should still fire under F3a deferral");
+});
+
 test("Stage F2: f: pure rejection still works against the new effects component", () => {
   // checkArgType now reads effectsOf(arg) instead of effectPredicatesForValue.
   // For typed functions whose effects component is populated by PE, the

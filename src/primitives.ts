@@ -1533,12 +1533,16 @@ function augmentScopePredicates(parent: ContextValue, extra: Map<string, _Predic
     const existing = sp.get(k) as _PredicateSet | undefined;
     sp.set(k, existing ? _mergePredicateSets(existing, v) : v);
   }
-  return {
+  const newCtx: ContextValue = {
     kind: ValueKind.Context,
     bindings: parent.bindings,
     bindingList: parent.bindingList,
     scopePredicates: sp,
   };
+  // F3a: propagate compile-mode flag through scope-predicate enrichment so
+  // deferral applies inside if-branches during precompile.
+  if ((parent as any).__compileMode) (newCtx as any).__compileMode = true;
+  return newCtx;
 }
 
 // --- typed_int / typed_string: wrap raw values with type ---
