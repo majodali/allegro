@@ -4202,10 +4202,20 @@ guard(x) =>
 import {
   PURE, effectUnion as effectLabelSetUnion, effectSubset as effectLabelSetSubset,
   effectDifference, formatEffects,
-  inferFunctionEffects, unwrapEffectsAttach,
+  unwrapEffectsAttach,
   effectsOf, withEffects,
+  EffectSet,
 } from "./effects.js";
 import { ComposedFunctionValue } from "./types.js";
+
+// Helper: read the precompile-stashed effects from a function value,
+// returning an empty set when no effects are recorded. After walker removal,
+// tests verify the same property by reading the `effects` MultiValue
+// component (or the `__inferredEffects` stash on bare ComposedFunctions)
+// instead of invoking the walker directly.
+function inferredEffectsOf(v: Value): EffectSet {
+  return effectsOf(v) ?? new Set<string>();
+}
 
 test("Phase D1: empty EffectSet formats as 'pure'", () => {
   eq(formatEffects(PURE), "pure");
@@ -4226,7 +4236,7 @@ test("Phase D1: pure function has empty inferred effect set", () => {
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("f")!.value as Value;
   const fnP = primaryOf(fn) as ComposedFunctionValue;
-  const inferred = inferFunctionEffects(fnP);
+  const inferred = inferredEffectsOf(fnP);
   eq(inferred.size, 0, "no effects from arithmetic");
 });
 
@@ -4238,7 +4248,7 @@ test("Phase D1: function calling print infers io", () => {
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("f")!.value as Value;
   const fnP = primaryOf(fn) as ComposedFunctionValue;
-  const inferred = inferFunctionEffects(fnP);
+  const inferred = inferredEffectsOf(fnP);
   eq(inferred.has("io"), true, `expected io inferred, got: ${[...inferred].join(",")}`);
 });
 
@@ -4324,9 +4334,6 @@ import {
   effectsDomain, formatDomain, intersectDomains, joinDomains, impliesDomain,
   PredicateSet, makePredicate, entailsPredicate,
 } from "./refinements.js";
-import {
-  effectPredicatesForFunction, effectPredicatesForValue,
-} from "./effects.js";
 
 test("Phase D1.2: effectsDomain constructor builds EffectsDomain", () => {
   const d = effectsDomain(["io", "time"]);
@@ -4459,7 +4466,11 @@ test("Phase D1.2: entailsPredicate works for effects targets", () => {
   eq(entailsPredicate(set, effectsDomain(["time"])), false);
 });
 
-test("Phase D1.2: effectPredicatesForFunction yields inferred predicate for pure body", () => {
+// Post-walker-removal: the predicate-set bridge is gone. The inferred set
+// lives directly on the function value (effects MultiValue component, or
+// __inferredEffects stash on bare ComposedFunctions). These three tests now
+// verify the same effect-inference property via `effectsOf`.
+test("Phase D1.2: pure body yields empty inferred effects", () => {
   const src = `
 sq(x) =>
   x * x
@@ -4467,19 +4478,11 @@ sq
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("sq")!.value!;
-  const set = effectPredicatesForValue(fn);
-  eq(set !== null, true);
-  if (set) {
-    // Just an inferred predicate (no `effects` clause)
-    const inf = set.preds.find(p => p.source === "effects-inferred");
-    eq(inf !== undefined, true);
-    if (inf && inf.shape.kind === "effects") {
-      eq(inf.shape.labels.size, 0);
-    }
-  }
+  const eff = inferredEffectsOf(fn);
+  eq(eff.size, 0);
 });
 
-test("Phase D1.2: effectPredicatesForFunction yields inferred io for print body", () => {
+test("Phase D1.2: print body yields inferred io", () => {
   const src = `
 greet(name) =>
   print("hi " + name)
@@ -4488,18 +4491,11 @@ greet
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("greet")!.value!;
-  const set = effectPredicatesForValue(fn);
-  eq(set !== null, true);
-  if (set) {
-    const inf = set.preds.find(p => p.source === "effects-inferred");
-    eq(inf !== undefined, true);
-    if (inf && inf.shape.kind === "effects") {
-      eq(inf.shape.labels.has("io"), true);
-    }
-  }
+  const eff = inferredEffectsOf(fn);
+  eq(eff.has("io"), true);
 });
 
-test("Phase D1.2: effectPredicatesForFunction surfaces both declared and inferred", () => {
+test("Phase D1.2: declared and inferred coexist on function value", () => {
   // Use the same direct primitive shape the chunk-1 tests use, to avoid
   // depending on the `use effects` grammar load path here.
   const src = `f(x) =>
@@ -4510,16 +4506,14 @@ test("Phase D1.2: effectPredicatesForFunction surfaces both declared and inferre
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("f")!.value!;
-  const set = effectPredicatesForValue(fn);
-  eq(set !== null, true);
-  if (set) {
-    const dec = set.preds.find(p => p.source === "effects-declared");
-    const inf = set.preds.find(p => p.source === "effects-inferred");
-    eq(dec !== undefined, true);
-    eq(inf !== undefined, true);
-    if (dec && dec.shape.kind === "effects") eq(dec.shape.labels.has("io"), true);
-    if (inf && inf.shape.kind === "effects") eq(inf.shape.labels.has("io"), true);
-  }
+  // Inferred set on the function — io from the print call.
+  const inferred = inferredEffectsOf(fn);
+  eq(inferred.has("io"), true);
+  // Declared set on the body — io from the effects_attach metadata.
+  const fnP = primaryOf(fn) as ComposedFunctionValue;
+  const wrap = unwrapEffectsAttach(fnP.body);
+  eq(wrap !== null, true);
+  if (wrap) eq(wrap.declared.has("io"), true);
 });
 
 // --- Phase D1 Slice 2 Stage A: effect bounds via type_check ---
@@ -4626,7 +4620,7 @@ caller
   const fn = primaryOf(evalCtx.bindings.get("caller")!.value!);
   eq(fn.kind, ValueKind.ComposedFunction);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), true);
   }
 });
@@ -4642,7 +4636,7 @@ pure_caller
   const fn = primaryOf(evalCtx.bindings.get("pure_caller")!.value!);
   eq(fn.kind, ValueKind.ComposedFunction);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.size, 0, "expected pure inferred set");
   }
 });
@@ -4790,7 +4784,7 @@ caller
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
   const fn = primaryOf(evalCtx.bindings.get("caller")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.size, 0, "expected pure inferred from pure-callback resolution");
   }
 });
@@ -4807,7 +4801,7 @@ caller
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
   const fn = primaryOf(evalCtx.bindings.get("caller")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("io"), true, "expected io propagated from print callback");
   }
 });
@@ -4824,7 +4818,7 @@ forwarder
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
   const fn = primaryOf(evalCtx.bindings.get("forwarder")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), true);
   }
 });
@@ -4841,7 +4835,7 @@ forwarder
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
   const fn = primaryOf(evalCtx.bindings.get("forwarder")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), false, "expected precise pure, not opaque");
     eq(inferred.size, 0, "expected empty inferred set");
   }
@@ -4862,7 +4856,7 @@ io_then_pure(x: Int) =>
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
   const fn = primaryOf(evalCtx.bindings.get("io_then_pure")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("io"), true, `expected io from g1, got: ${[...inferred].join(",")}`);
     eq(inferred.has("opaque"), false, "expected precise resolution, not opaque");
   }
@@ -4880,7 +4874,7 @@ pure_then_io(x: Int) =>
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
   const fn = primaryOf(evalCtx.bindings.get("pure_then_io")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("io"), true);
     eq(inferred.size, 1, `expected just {io}, got: ${[...inferred].join(",")}`);
   }
@@ -4898,7 +4892,7 @@ twice_io(x: Int) =>
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
   const fn = primaryOf(evalCtx.bindings.get("twice_io")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn, undefined, lookup);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("io"), true);
     eq(inferred.size, 1, `expected single io, got: ${[...inferred].join(",")}`);
   }
@@ -4950,34 +4944,42 @@ test("Stage C3: auto-promotion (no [e: Effect] decl) yields opaque, not silent z
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = primaryOf(evalCtx.bindings.get("forwarder")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), true,
        `expected opaque for unannotated function param, got: ${[...inferred].join(",")}`);
   }
 });
 
-test("Stage C3: explicit [e: Effect] annotation gives precise propagation, auto-promotion gives opaque", () => {
-  // Side-by-side: same shape, different declarations. The annotated form
-  // resolves precisely at the call site; the unannotated form stays opaque.
+test("Stage C3: explicit [e: Effect] annotation propagates through forwarded params, auto-promotion stays opaque", () => {
+  // Side-by-side: same shape, different declarations. When the cb is a
+  // forwarded param (not an inline lambda), only the explicit `[e: Effect]`
+  // form propagates the cb's actual effects up to the caller; the auto-
+  // promoted form has no way to express the dependency and stays opaque.
+  //
+  // Inline-lambda cb cases now resolve precisely on BOTH sides via PE — that
+  // case lives in the C2 tests above. This test focuses on the case where
+  // PE alone is insufficient: forwarding an unbounded function-typed param.
   const src = `apply_poly[e: Effect](g: e, x: Int): Int => g(x)
 apply_auto(g, x: Int): Int => g(x)
-ann_caller(x: Int) =>
-  apply_poly((y: Int): Int => y + 1, x)
-auto_caller(x: Int) =>
-  apply_auto((y: Int): Int => y + 1, x)
+ann_caller(f: pure, x: Int): Int =>
+  apply_poly(f, x)
+auto_caller(f, x: Int): Int =>
+  apply_auto(f, x)
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
   const ann = primaryOf(evalCtx.bindings.get("ann_caller")!.value!);
   const auto = primaryOf(evalCtx.bindings.get("auto_caller")!.value!);
   if (ann.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(ann, undefined, lookup);
-    eq(inferred.size, 0, `annotated resolved precisely (pure): got ${[...inferred].join(",")}`);
+    const inferred = inferredEffectsOf(ann);
+    eq(inferred.has("opaque"), false,
+       `annotated form should resolve precisely from f: pure: got ${[...inferred].join(",")}`);
+    eq(inferred.size, 0,
+       `annotated form should be pure: got ${[...inferred].join(",")}`);
   }
   if (auto.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(auto, undefined, lookup);
+    const inferred = inferredEffectsOf(auto);
     eq(inferred.has("opaque"), true,
-       `unannotated stays opaque: got ${[...inferred].join(",")}`);
+       `unannotated forwarded param stays opaque: got ${[...inferred].join(",")}`);
   }
 });
 
@@ -5109,7 +5111,7 @@ apply_pure
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = primaryOf(evalCtx.bindings.get("apply_pure")!.value!);
   if (fn.kind === ValueKind.ComposedFunction) {
-    const inferred = inferFunctionEffects(fn);
+    const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), false, `Surface C should give precise pure, got: ${[...inferred].join(",")}`);
     eq(inferred.size, 0, `expected pure (∅), got: ${[...inferred].join(",")}`);
   }
@@ -5779,11 +5781,14 @@ test("Phase A: summarizeModule grades a clean module 'proven-safe'", () => {
 
 test("Phase A: safetyGradeFor classifies edge cases", () => {
   eq(safetyGradeFor(undefined), "partial");
-  eq(safetyGradeFor({ inferred: [], errors: [], unresolved: [], bindingTypes: new Map() }),
+  eq(safetyGradeFor({ inferred: [], unresolved: [], bindingTypes: new Map(), notifications: [] }),
      "proven-safe");
-  eq(safetyGradeFor({ inferred: [], errors: [], unresolved: ["foo"], bindingTypes: new Map() }),
+  eq(safetyGradeFor({ inferred: [], unresolved: ["foo"], bindingTypes: new Map(), notifications: [] }),
      "partial");
-  eq(safetyGradeFor({ inferred: [], errors: [{ name: "f", message: "boom" }], unresolved: [], bindingTypes: new Map() }),
+  eq(safetyGradeFor({
+       inferred: [], unresolved: [], bindingTypes: new Map(),
+       notifications: [{ kind: "test", severity: "error", binding: "f", message: "boom" }],
+     }),
      "has-errors");
 });
 

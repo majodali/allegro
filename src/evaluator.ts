@@ -11,7 +11,7 @@ import {
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
-import { effectsOf, effectsOfWithFallback, withEffects, unionEffectSets, EffectSet } from "./effects.js";
+import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 
 const MAX_DEPTH = 10000;
 
@@ -468,7 +468,7 @@ function applyComposed(
               const surfaceCBound = (currentFn.params[i] as any).effectBound as EffectSet | undefined;
               const isMarkerBound = surfaceCBound && [...surfaceCBound].some(l => l.startsWith("__effectvar:"));
               if (surfaceCBound && !isMarkerBound) {
-                const argEff = effectsOfWithFallback(evalArgs[i]) ?? new Set<string>();
+                const argEff = effectsOf(evalArgs[i]) ?? new Set<string>();
                 const boundDom: EffectsDomain = { kind: "effects", labels: surfaceCBound };
                 const actualDom: EffectsDomain = { kind: "effects", labels: argEff };
                 if (!impliesDomain(actualDom, boundDom)) {
@@ -672,7 +672,7 @@ function checkArgType(
   // Args without an effects component behave as pure.
   const effBound = (expected as any).__effectBound as AbstractDomain | undefined;
   if (effBound && effBound.kind === "effects") {
-    const argEff = effectsOfWithFallback(arg) ?? new Set<string>();
+    const argEff = effectsOf(arg) ?? new Set<string>();
     const actualDom: EffectsDomain = { kind: "effects", labels: argEff };
     if (!impliesDomain(actualDom, effBound)) {
       const expectedName = typeContextName(expected) ?? "<effect>";
@@ -857,15 +857,32 @@ export function precompileFunction(
   const wasCompileMode = (ctx as any).__compileMode;
   (ctx as any).__compileMode = true;
   try {
-    const result = evaluate(substituted, ctx, 0);
-    const inferredType = getType(result);
+    let result: Value | TailCall = evaluate(substituted, ctx, 0);
+    // Untyped functions like `forwarder(g, y) => apply(g, y)` produce a
+    // TailCall at the body's top expression (markTailCalls flagged it).
+    // applyComposed would normally consume the TailCall in its tco_loop,
+    // but precompileFunction calls `evaluate` directly. Drive the loop
+    // here so we land on a real Value whose effects component reflects
+    // the tail-recursive call chain.
+    let guard = 0;
+    while (isTailCall(result)) {
+      if (++guard > 10000) {
+        errors.push("precompile tail-call loop exceeded bound");
+        return { inferredReturnType: null, inferredEffects: null, errors };
+      }
+      const tc = result as TailCall;
+      const next = substituteParams(tc.fn, tc.args);
+      result = evaluate(next, ctx, 0);
+    }
+    const finalValue = result as Value;
+    const inferredType = getType(finalValue);
     // Stage F1: read the body's accumulated effects from the result's
     // `effects` component (set by applyPrimitive's PE propagation) and
     // stash on the ComposedFunction so typed_function_impl can attach the
     // component to the function value's MultiValue. Caller (`precompileFunctions`
     // in runtime.ts) doesn't need to do anything extra; the next evaluation
     // of the typed_function expression picks up the stashed set.
-    const inferredEffects = effectsOf(result);
+    const inferredEffects = effectsOf(finalValue);
     if (inferredEffects && inferredEffects.size > 0) {
       (fn as any).__inferredEffects = inferredEffects;
     }

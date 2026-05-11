@@ -1502,7 +1502,6 @@ import { isResolved } from "./types.js";
 import {
   withEffects as _withEffects,
   effectsOf as _effectsOf,
-  effectsOfWithFallback as _effectsOfWithFallback,
 } from "./effects.js";
 import { precompileFunction as _precompileFunction } from "./evaluator.js";
 
@@ -1654,16 +1653,16 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       returnType = rtp;
     }
   }
-  // Phase D1 Slice 2 Stage B: stamp param-level effect predicates on each
-  // ParamValue. The annotation `f: pure` flows through paramTypes here; the
-  // HOF walker (`src/effects.ts walkValueEffects`) reads `Param.predicates`
-  // to collect effects when the param is called. Without this, function-
-  // typed params would always look effect-less inside their declarer.
+  // Stamp param-level effect bounds on each ParamValue. The annotation
+  // `f: pure` flows through paramTypes here; PE's Param-call branch reads
+  // `Param.effectBound` to propagate effects when the param is called.
+  // Without this, function-typed params would always look effect-less
+  // inside their declarer.
   //
   // Stage C2: also detect effect-variable param types (paramType is a Symbol
   // matching an Effect-kinded entry in the function's `__genericParams`) and
-  // stamp the Param with a variable-marker predicate. The marker labels are
-  // resolved at call sites by `walkValueEffects` against the actual arg.
+  // stamp the Param with a `__effectvar:NAME` marker. The marker labels are
+  // resolved at call sites by substitution against the actual arg's effects.
   const fnPrimary = primaryOf(fn);
   if (fnPrimary.kind === ValueKind.ComposedFunction) {
     const cFn = fnPrimary as any;
@@ -1693,7 +1692,8 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       }
       // Effect variable: paramType is a Symbol whose name matches an Effect-
       // kinded generic-param declaration. Stamp the Param with a marker
-      // labelled `__effectvar:NAME` so the walker knows to resolve it.
+      // labelled `__effectvar:NAME` so PE's substitution resolves it at the
+      // call site against the actual arg's effects.
       if (pt.kind === ValueKind.Symbol) {
         const symName = (pt as any).name as string;
         if (effectVarNames.has(symName)) {
@@ -1768,7 +1768,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     } catch (_e) {
       // Body PE may fail (e.g. type errors that surface only at full
       // resolution). Leave __inferredEffects undefined; downstream paths
-      // fall back to the walker.
+      // treat the absence as pure / no effects recorded.
     } finally {
       _precompileInProgress.delete(fnPrimary as ComposedFunctionValue);
     }
@@ -2185,11 +2185,10 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const effBound = (expectedCtx as any).__effectBound as _AbstractDomain | undefined;
   if (effBound && effBound.kind === "effects") {
     // F2: read effects from the value's `effects` MultiValue component
-    // (PE-populated) rather than via the predicate-set view. Walker
-    // fallback covers untyped functions whose effects component isn't
-    // populated yet (the typed-function precompile path is the only
-    // PE producer in F2).
-    const argEff = _effectsOfWithFallback(v) ?? new Set<string>();
+    // (PE-populated) rather than via the predicate-set view. `effectsOf`
+    // also reads `__inferredEffects` from bare ComposedFunctions so
+    // untyped functions are covered through the same path.
+    const argEff = _effectsOf(v) ?? new Set<string>();
     const actualDom: _EffectsDomain = { kind: "effects", labels: argEff };
     if (!_impliesDomain(actualDom, effBound)) {
       const actualLabels = [...argEff].sort().join(", ") || "pure";

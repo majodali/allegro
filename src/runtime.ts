@@ -462,32 +462,55 @@ function markTailCallsInValue(v: any, seen: Set<any>): void {
 
 // --- Compilation Report ---
 
-/** Notification — informational diagnostic that does NOT halt compilation by
- *  default. Per-project severity (notification → error / warning / ignore) is
- *  tracked separately on the backlog; for now notifications are surfaced as
- *  their own collection alongside errors and warnings, never blocking. */
+/** A diagnostic emitted during compilation. The single category that replaced
+ *  the former errors / warnings / notifications split — every diagnostic now
+ *  carries a `kind` tag and a `severity`, so per-project config can remap
+ *  rules without changing the storage. Filtering helpers below select by
+ *  severity for consumers that only want one tier. */
+export type Severity = "error" | "warning" | "info";
+
 export interface Notification {
-  /** Tag identifying the rule that fired. Stable string for project config
-   *  to filter on. Examples: `"effects-opaque-from-stdlib-hof"`. */
-  kind:     string;
+  /** Stable rule tag — project config keys on this to remap severity.
+   *  Examples: `"effects-mismatch"`, `"return-type-mismatch"`,
+   *  `"precompile-eval"`, `"effects-opaque-from-stdlib-hof"`. */
+  kind:      string;
   /** Human-readable message. */
-  message:  string;
-  /** Binding the notification is anchored to, if applicable. */
-  binding?: string;
+  message:   string;
+  /** Severity at emission. Error halts compilation when surfaced through
+   *  `evalSource`'s throw; warning and info do not. */
+  severity:  Severity;
+  /** Binding the diagnostic is anchored to, if applicable. */
+  binding?:  string;
 }
 
 export interface CompilationReport {
   /** Functions with inferred return types */
   inferred: { name: string; returnType: string }[];
-  /** Type errors detected at compile time */
-  errors: { name: string; message: string }[];
   /** Bindings still unresolved after compilation */
   unresolved: string[];
   /** Inferred types for all bindings (populated during evaluation) */
   bindingTypes: Map<string, string>;
-  /** Phase D1 sub-chunk 1.3: informational diagnostics with project-
-   *  configurable severity. Does not halt compilation in this slice. */
+  /** All diagnostics — errors, warnings, and informational notices. Filter
+   *  via `notificationsBySeverity` / `reportErrors` / `reportHasErrors`. */
   notifications: Notification[];
+}
+
+/** Filter notifications by one severity. */
+export function notificationsBySeverity(
+  report: CompilationReport,
+  severity: Severity,
+): Notification[] {
+  return report.notifications.filter(n => n.severity === severity);
+}
+
+/** Convenience: the error-severity slice (most common consumer pattern). */
+export function reportErrors(report: CompilationReport): Notification[] {
+  return notificationsBySeverity(report, "error");
+}
+
+/** Convenience: does the report carry any error-severity notification? */
+export function reportHasErrors(report: CompilationReport): boolean {
+  return report.notifications.some(n => n.severity === "error");
 }
 
 /**
@@ -499,7 +522,7 @@ function precompileFunctions(
   extensions?: Extension[],
   typed?: boolean,
 ): CompilationReport {
-  const report: CompilationReport = { inferred: [], errors: [], unresolved: [], bindingTypes: new Map(), notifications: [] };
+  const report: CompilationReport = { inferred: [], unresolved: [], bindingTypes: new Map(), notifications: [] };
   if (!typed) return report;
 
   // Build a minimal context for pre-compilation (primitives + extensions)
@@ -540,34 +563,57 @@ function precompileFunctions(
       val = evaluate(b.value, compileCtx, 0);
     } catch (e: any) {
       // Skip bindings that can't be evaluated at compile time
-      report.errors.push({ name: b.key ?? "?", message: `precompile eval: ${e.message}` });
+      report.notifications.push({
+        kind:     "precompile-eval",
+        severity: "error",
+        binding:  b.key ?? "?",
+        message:  `precompile eval: ${e.message}`,
+      });
       continue;
     }
 
-    // Check if this is a typed function (MultiValue with FunctionType)
-    if (val.kind !== ValueKind.MultiValue) continue;
-
-    const fnType = getType(val);
-    if (!fnType) continue;
-    const typeName = getTypeName(val);
-    if (typeName !== "Function") continue;
-
-    const fn = val.primary;
-    if (fn.kind !== ValueKind.ComposedFunction) continue;
-
-    const paramTypes = getFunctionParamTypes(fnType);
-    if (!paramTypes) continue;
+    // Precompile any function-shaped binding. Three forms in standard mode:
+    //   - MultiValue + FunctionType (typed function via `typed_function`)
+    //   - MultiValue + UntypedFunction (wrapped primitive)
+    //   - bare ComposedFunction (user-defined without type annotations)
+    // For untyped forms paramTypes is null; precompileFunction uses bare-
+    // Param placeholders and we get effect inference via PE residuals,
+    // even though return-type inference is weaker without typed args.
+    let fn: Value;
+    let fnType: Value | null = null;
+    let paramTypes: Value[] | null = null;
+    if (val.kind === ValueKind.MultiValue) {
+      fnType = getType(val);
+      if (!fnType) continue;
+      const typeName = getTypeName(val);
+      const isTyped = typeName === "Function";
+      const isUntyped = typeName === "UntypedFunction";
+      if (!isTyped && !isUntyped) continue;
+      if (val.primary.kind !== ValueKind.ComposedFunction) continue;
+      fn = val.primary;
+      paramTypes = isTyped ? getFunctionParamTypes(fnType) : null;
+      if (isTyped && !paramTypes) continue;
+    } else if (val.kind === ValueKind.ComposedFunction) {
+      fn = val;
+    } else {
+      continue;
+    }
 
     // Pre-compile: partially evaluate body with typed placeholders
     const { inferredReturnType, errors: fnErrors } = precompileFunction(
       fn as ComposedFunctionValue,
-      paramTypes,
+      paramTypes ?? [],
       compileCtx,
     );
 
     if (fnErrors.length > 0) {
       for (const err of fnErrors) {
-        report.errors.push({ name: b.key, message: err });
+        report.notifications.push({
+          kind:     "precompile-type-error",
+          severity: "error",
+          binding:  b.key,
+          message:  err,
+        });
       }
     }
 
@@ -580,17 +626,19 @@ function precompileFunctions(
         : "unknown";
       report.inferred.push({ name: b.key, returnType: inferredStr });
 
-      // Check against explicit return type if declared
-      const declaredReturn = getFunctionReturnType(fnType);
+      // Check against explicit return type if declared (typed functions only)
+      const declaredReturn = fnType ? getFunctionReturnType(fnType) : null;
       if (declaredReturn && declaredReturn.kind === ValueKind.Context) {
         const declaredName = (declaredReturn as ContextValue).bindings.get("__name")?.value;
         const declaredStr = declaredName && declaredName.kind === ValueKind.Bits
           ? bitsToString(declaredName as BitsValue)
           : null;
         if (declaredStr && inferredStr !== "unknown" && declaredStr !== inferredStr && declaredStr !== "Any") {
-          report.errors.push({
-            name: b.key,
-            message: `Return type mismatch: declared ${declaredStr}, inferred ${inferredStr}`,
+          report.notifications.push({
+            kind:     "return-type-mismatch",
+            severity: "error",
+            binding:  b.key,
+            message:  `Return type mismatch: declared ${declaredStr}, inferred ${inferredStr}`,
           });
         }
       }
@@ -909,16 +957,22 @@ export function evalSource(
     const fxMismatches = checkEffectsDeclarations(fileCtx.bindingList);
     if (fxMismatches.length > 0) {
       for (const m of fxMismatches) {
-        compilationReport.errors.push({ name: m.binding, message: formatMismatch(m) });
+        compilationReport.notifications.push({
+          kind:     "effects-mismatch",
+          severity: "error",
+          binding:  m.binding,
+          message:  formatMismatch(m),
+        });
       }
       const lines = fxMismatches.map(m => "  " + formatMismatch(m));
       throw new Error("effects declaration check failed:\n" + lines.join("\n"));
     }
     for (const n of opaqueEffectNotices(fileCtx.bindingList)) {
       compilationReport.notifications.push({
-        kind:    "effects-opaque-from-stdlib-hof",
-        binding: n.binding,
-        message: n.message,
+        kind:     "effects-opaque-from-stdlib-hof",
+        severity: "info",
+        binding:  n.binding,
+        message:  n.message,
       });
     }
   }

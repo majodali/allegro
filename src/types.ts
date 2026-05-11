@@ -52,18 +52,20 @@ export interface ParamValue {
   position: number;
   owner: ComposedFunctionValue | null;
   _name?: string; // debugging hint
-  /** Phase D1 Slice 2 Stage A: predicates declared on this parameter
-   *  (refinement bounds — currently unused; reserved for future). Effect
-   *  bounds moved to `effectBound` in F2 since effects describe
-   *  computations and refinements describe data, with different lattices. */
+  /** Reserved for future refinement-predicate bounds on parameters.
+   *  Currently unused at runtime — the F2 migration moved effect bounds to
+   *  `effectBound` because effects describe computations and refinements
+   *  describe data, with different lattices and lifetimes. The slot stays
+   *  reserved so refinement-bound annotations (`x: PositiveInt`) can later
+   *  flow through here without another schema change. */
   predicates?: import("./refinements.js").PredicateSet;
-  /** Phase D1 Slice 2 Stage F2: effect bound for function-typed params.
-   *  Set by `typed_function_impl` from a param-type annotation's
-   *  `__effectBound` (Surface A: `f: pure`), by Stage C2 marker stamping
-   *  (`__effectvar:NAME` for polymorphic effect variables), and by the
-   *  Surface C `param_effects` body-form peel-and-stamp pass. The walker
-   *  / PE Param-call branch reads this slot directly; call-site
-   *  enforcement runs the same `impliesDomain` discharge against it. */
+  /** Effect bound for function-typed params. Set by `typed_function_impl`
+   *  from a param-type annotation's `__effectBound` (Surface A: `f: pure`),
+   *  by Stage C2 marker stamping (`__effectvar:NAME` for polymorphic effect
+   *  variables), and by the Surface C `param_effects` body-form peel-and-
+   *  stamp pass. PE's Param-call branch reads this slot directly to
+   *  propagate effects from param body to caller; call-site enforcement
+   *  runs `impliesDomain` against it. */
   effectBound?: import("./effects.js").EffectSet;
 }
 

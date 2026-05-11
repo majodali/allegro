@@ -876,7 +876,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   }
 
   // Stage D — wrap with `param_effects_attach(result, paramRef1, effSym1, …)`
-  // so `typed_function_impl` can peel and stamp Param.predicates from the
+  // so `typed_function_impl` can peel and stamp `Param.effectBound` from the
   // metadata. Lazy passthrough at runtime, identical Param-bound shape to
   // Surface A (`f: pure` in the param-type slot).
   if (paramEffects.length > 0) {

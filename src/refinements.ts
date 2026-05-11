@@ -74,9 +74,10 @@ export interface OpaqueDomain {
  *
  * `pure` is the empty set; `opaque` (Slice 2's universal effect) is currently
  * encoded by callers outside this domain — we'll formalise it when anonymous
- * conjunctions land. For 1.2, the labels are concrete strings tagged with
- * `source: "effects-inferred"` (from `inferFunctionEffects`) or
- * `source: "effects-declared"` (from an `effects` body-form clause).
+ * conjunctions land. The labels are concrete strings tagged with
+ * `source: "effects-inferred"` (from PE-driven inference in
+ * `precompileFunction`) or `source: "effects-declared"` (from an `effects`
+ * body-form clause).
  */
 export interface EffectsDomain {
   kind:   "effects";

@@ -17,6 +17,7 @@ import {
   primaryOf, bitsToString, bitsToFloat, isResolved,
 } from "./types.js";
 import type { CompilationReport } from "./runtime.js";
+import { reportErrors, reportHasErrors } from "./runtime.js";
 import { getTypeName } from "./types-std.js";
 import {
   domainOf, formatDomain, AbstractDomain,
@@ -24,7 +25,7 @@ import {
   deriveBranchPredicates, domainFromPredicate,
 } from "./refinements.js";
 import {
-  EffectSet, formatEffects, inferFunctionEffects, unwrapEffectsAttach,
+  EffectSet, formatEffects, effectsOf, unwrapEffectsAttach,
   effectDifference,
 } from "./effects.js";
 
@@ -233,16 +234,15 @@ export function summarizeValue(v: Value): ValueSummary {
   }
   const dom = preds?.effectiveDomain() ?? domainOf(v);
 
-  // Phase D1 (F2): if the value is a function, read inferred effects from
-  // the `effects` MultiValue component (PE-populated) when present, fall
-  // back to the walker for legacy paths. Declared effects come from the
-  // body's `effects_attach` wrapper.
+  // If the value is a function, read inferred effects via `effectsOf`,
+  // which checks the `effects` MultiValue component first and falls back
+  // to the ComposedFunction's `__inferredEffects` stash. Declared effects
+  // come from the body's `effects_attach` wrapper.
   let inferredEffects: EffectSet | null = null;
   let declaredEffects: EffectSet | null = null;
   const fnPrim = primaryOf(v);
   if (fnPrim.kind === ValueKind.ComposedFunction) {
-    const stashed = (fnPrim as any).__inferredEffects as EffectSet | undefined;
-    inferredEffects = stashed ?? inferFunctionEffects(fnPrim);
+    inferredEffects = effectsOf(v);
     const wrap = unwrapEffectsAttach(fnPrim.body);
     if (wrap) declaredEffects = wrap.declared;
   }
@@ -468,7 +468,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
  */
 export function safetyGradeFor(report: CompilationReport | undefined): SafetyGrade {
   if (!report) return "partial";
-  if (report.errors.length > 0)     return "has-errors";
+  if (reportHasErrors(report))      return "has-errors";
   if (report.unresolved.length > 0) return "partial";
   // No errors, everything resolved. The "proven-safe" grade is still a
   // loose promise at this phase — we're only checking that the compiler
@@ -531,16 +531,15 @@ export function summarizeModule(
   }
 
   const warnings: string[] = [];
-  if (report?.errors) {
-    for (const e of report.errors) warnings.push(`error in ${e.name}: ${e.message}`);
-  }
+  const errors = report ? reportErrors(report) : [];
+  for (const e of errors) warnings.push(`error in ${e.binding ?? "?"}: ${e.message}`);
 
   return {
     grade:            safetyGradeForSummary(bindings, report),
     bindingCount:     bindings.length,
     resolvedCount,
     unresolvedNames:  bindings.filter(b => !b.resolved).map(b => b.key),
-    typeErrorCount:   report?.errors.length ?? 0,
+    typeErrorCount:   errors.length,
     warnings,
     bindings,
   };
