@@ -1515,7 +1515,7 @@ import {
   withEffects as _withEffects,
   effectsOf as _effectsOf,
 } from "./effects.js";
-import { precompileFunction as _precompileFunction } from "./evaluator.js";
+import { precompileFunction as _precompileFunction, isTailCall as _isTailCall } from "./evaluator.js";
 
 // F3b: tracks ComposedFunctions whose body is currently being precompiled,
 // so the recursive call inside `factorial(n) => factorial(n-1)` doesn't
@@ -2162,6 +2162,13 @@ const type_of_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Step 1: Evaluate
   const v = evalFn!(args[0], ctx!);
+  // Forward TailCalls untouched so applyComposed's tco_loop can catch them.
+  // Without this, a typed-return function whose body's tail call goes through
+  // type_check (the wrapper that `: ReturnType` adds) would crash on the
+  // sentinel — the intermediate type check is bypassed but the eventual
+  // base-case value is still type-checked through the same wrapper, so
+  // correctness is preserved.
+  if (_isTailCall(v)) return v as any;
   const expectedType = evalFn!(args[1], ctx!);
   // If the expected type isn't resolved, defer completely
   if (!isResolved(expectedType)) {
@@ -2900,6 +2907,10 @@ const ensures_decl_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
 const ensures_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) throw new AllegroError(`ensures_check: expected 2 args, got ${args.length}`);
   const result = evalFn!(args[0], ctx!);
+  // Forward TailCalls (tail-position calls inside the function body). The
+  // ensures lambda's check runs at the eventual base-case value through
+  // the same wrapper, so soundness is preserved.
+  if (_isTailCall(result)) return result as any;
   const lambda = evalFn!(args[1], ctx!);
   if (!isResolved(result) || !isResolved(lambda)) {
     return makeExpr(makePrimitive("ensures_check", ensures_check_impl, true), [result, lambda]);
@@ -2975,7 +2986,9 @@ const effects_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Transparent passthrough: evaluate the wrapped body and return its
   // value. The second arg (declared-labels metadata) is recovered at
   // compile time by the inference walker via `unwrapEffectsAttach` —
-  // never evaluated here.
+  // never evaluated here. TailCalls (from tail-position recursive calls
+  // inside the body) propagate unchanged so applyComposed's tco_loop
+  // catches them.
   return evalFn!(args[0], ctx!);
 };
 

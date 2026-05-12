@@ -6121,6 +6121,43 @@ test("Phase E Stage 3: `partial` overrides `decreases`", () => {
 
 fileTest(path.join(testsDir, "totality-decreases-demo.alg"));
 
+// --- Tail-call through typed-return wrapper (type_check forwards TailCalls) ---
+
+test("Tail-recursive typed function returns correctly", () => {
+  // The body `countdown(n - 1)` is in tail position; the recursive call
+  // produces a TailCall sentinel inside the eval_if else thunk. Before the
+  // type_check / ensures_check TailCall-forwarding fix, the sentinel
+  // propagated through the type_check wrapper as a fake Value and the
+  // function returned an unresolved Expression.
+  const src = `countdown(n: Int): Int =>
+  if n == 0 then 0 else countdown(n - 1)
+countdown(5)
+`;
+  const { value } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(value !== null, true);
+  if (value) {
+    const p = primaryOf(value);
+    eq(p.kind, ValueKind.Bits);
+    eq(Number((p as BitsValue).data), 0);
+  }
+});
+
+test("Deep tail-recursion through type_check doesn't blow the stack", () => {
+  // 100k deep recursion would overflow without TCO. With the fix, the
+  // TailCall sentinel bubbles up through type_check to applyComposed's
+  // tco_loop and the call resolves in O(1) stack.
+  const src = `countdown(n: Int): Int =>
+  if n == 0 then 0 else countdown(n - 1)
+countdown(100000)
+`;
+  const { value } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  if (value) {
+    const p = primaryOf(value);
+    eq(p.kind, ValueKind.Bits);
+    eq(Number((p as BitsValue).data), 0);
+  }
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

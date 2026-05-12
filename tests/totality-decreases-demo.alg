@@ -18,17 +18,25 @@ use totality
 // Bare-param metric — verifies same as Stage 2, but the clause says it
 // explicitly. With `decreases n` we trust the user about the bound, so
 // even un-refined Int is accepted (this would fire on Stage 2 alone).
-sum_down(n: Int): Int =>
+countdown(n: Int): Int =>
   decreases n
-  if n == 0 then 0 else n + sum_down(n - 1)
+  if n == 0 then 0 else countdown(n - 1)
 
-// Lexicographic metric via array literal. Useful when no single param
-// strictly decreases but a tuple does.
-sum_two_down(m: Int, n: Int): Int =>
+// Lexicographic metric via array literal. Ackermann's classic measure:
+//   (m, n) decreases lex on every recursive call — either m strictly
+//   decreases, or m stays and n strictly decreases.
+ack_inner(m: Int, n: Int): Int =>
   decreases [m, n]
-  if m == 0 then n else m + sum_two_down(m - 1, n)
+  if m == 0 then n + 1 else
+    if n == 0 then ack_inner(m - 1, 1) else
+      ack_inner(m - 1, ack_inner(m, n - 1))
 
 // Runtime evaluation works regardless of the analyzer — the wrapper is
-// a passthrough.
-print(sum_down(5))                  // expect: 15
-print(sum_two_down(3, 10))          // expect: 16
+// a passthrough. (Note: `countdown` is tail-recursive AND uses a typed
+// return; the type_check wrapper now forwards TailCalls so applyComposed's
+// tco_loop can catch them, giving full TCO through the typed-return
+// path.)
+print(countdown(5))           // expect: 0
+print(countdown(1000))        // expect: 0
+print(ack_inner(2, 3))        // expect: 9
+print(ack_inner(3, 2))        // expect: 29

@@ -29,7 +29,7 @@ interface TailCall {
   fnRaw?: Value;
 }
 
-function isTailCall(v: any): v is TailCall {
+export function isTailCall(v: any): v is TailCall {
   return v && v.__tailCall === true;
 }
 
