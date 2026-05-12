@@ -14,6 +14,7 @@ import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf, GrammarFragment } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
+import { checkExhaustiveness } from "./totality.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -973,6 +974,26 @@ export function evalSource(
         severity: "info",
         binding:  n.binding,
         message:  n.message,
+      });
+    }
+    // Phase E Stage 1 — exhaustiveness check for `when/is/then`. Findings
+    // surface as `info` notifications (project config can promote to error).
+    // `partial`-marked functions skip the check; subjects with unknown types
+    // stay silent. The type lookup resolves Symbol references in param-type
+    // annotations (`b: Bool`) against the standard extensions' bindings.
+    const exhTypeLookup = (name: string): Value | undefined => {
+      for (const ext of extensions ?? []) {
+        const v = ext.bindings?.[name];
+        if (v !== undefined) return v;
+      }
+      return undefined;
+    };
+    for (const f of checkExhaustiveness(fileCtx.bindingList, exhTypeLookup)) {
+      compilationReport.notifications.push({
+        kind:     "totality-exhaustiveness",
+        severity: "info",
+        binding:  f.binding,
+        message:  f.message,
       });
     }
   }

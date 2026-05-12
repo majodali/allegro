@@ -607,6 +607,18 @@ function evalThenBranch(
 const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 5) throw new AllegroError(`eval_when: need 5 args, got ${args.length}`);
   const subject = evalFn!(args[0], ctx!);
+
+  // Phase E prerequisite: when the subject is unresolved (e.g., inside
+  // `precompileFunction` with a typed Param placeholder, or any other
+  // pre-runtime PE), defer matching by returning a residual eval_when
+  // expression. Without this, a chain whose patterns can't be statically
+  // decided would fall through to `when_no_match` and throw — turning a
+  // legitimate compile-time scenario into a spurious precompile error.
+  // The residual evaluates normally once the subject is resolved.
+  if (!isResolved(subject)) {
+    return makeExpr(eval_when_value, [subject, args[1], args[2], args[3], args[4]]);
+  }
+
   const pattern = evalFn!(args[1], ctx!);
   const guardFn = args[2];     // guard function or literal Int(1) for no guard
   const thenBranch = args[3];
@@ -2989,6 +3001,31 @@ const param_effects_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return evalFn!(args[0], ctx!);
 };
 
+// Phase E Stage 0 — totality opt-out (`partial` body-form).
+//
+// `partial` body-form clauses lower to `partial_decl_marker()` at parse time
+// (zero-arg marker). The block-expression preprocessor recognises these
+// markers and wraps the function body's result expression with
+// `partial_attach(body)`. At runtime `partial_attach` is a transparent
+// passthrough; the wrapper is metadata for the totality analyzer (Stage 1+)
+// which peels it to skip exhaustiveness / termination checks for the
+// annotated function.
+
+const partial_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  // Marker. The block preprocessor extracts and consumes these at parse
+  // time; if one survives to runtime, it's a no-op.
+  return noneSingleton;
+};
+
+const partial_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) {
+    throw new AllegroError(`partial_attach: expected 1 arg, got ${args.length}`);
+  }
+  // Transparent passthrough at runtime; analyzer recovers the partial
+  // annotation at compile time via `unwrapPartialAttach`.
+  return evalFn!(args[0], ctx!);
+};
+
 // --- Typed binary operator helper ---
 
 function makeTypedBinOp(opName: string): PrimitiveFnImpl {
@@ -3161,6 +3198,8 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   effects_attach: makePrimitive("effects_attach", effects_attach_impl, true),
   param_effects_decl_marker: makePrimitive("param_effects_decl_marker", param_effects_decl_marker_impl, true),
   param_effects_attach: makePrimitive("param_effects_attach", param_effects_attach_impl, true),
+  partial_decl_marker: makePrimitive("partial_decl_marker", partial_decl_marker_impl, true),
+  partial_attach: makePrimitive("partial_attach", partial_attach_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

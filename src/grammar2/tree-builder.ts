@@ -742,6 +742,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   const ensuresLambdas: any[] = [];
   const declaredEffects: any[] = [];   // typed_array Expression of Symbol(label)
   const paramEffects: Array<{ paramRef: any; effSym: any }> = [];
+  let partialMarked = false;
   const filteredStmts: BuiltBinding[] = [];
   for (const s of stmts) {
     if (s.key === null && isPrimitiveCall(s.value, "requires_stmt")) {
@@ -773,6 +774,13 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       if (margs.length >= 2) {
         paramEffects.push({ paramRef: margs[0], effSym: margs[1] });
       }
+      continue;
+    }
+    if (s.key === null && isPrimitiveCall(s.value, "partial_decl_marker")) {
+      // Phase E Stage 0 — `partial` opt-out. No args; presence alone is
+      // the signal. Multiple `partial` clauses in one body are idempotent
+      // (the wrapper is attached at most once).
+      partialMarked = true;
       continue;
     }
     filteredStmts.push(s);
@@ -885,6 +893,14 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       flatArgs.push(pe.paramRef, pe.effSym);
     }
     result = makeExpr(prim("param_effects_attach"), flatArgs);
+  }
+
+  // Phase E Stage 0 — wrap with `partial_attach(result)` if a `partial`
+  // clause appeared anywhere in the body. Runtime passthrough; the totality
+  // analyzer (Stage 1+) peels it to skip exhaustiveness / termination
+  // checks for opted-out functions.
+  if (partialMarked) {
+    result = makeExpr(prim("partial_attach"), [result]);
   }
 
   return result;

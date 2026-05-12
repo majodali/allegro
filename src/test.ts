@@ -5735,6 +5735,171 @@ test("Phase D1.3: pure function NOT calling stdlib HOF emits no opaque notificat
   eq(notes.length, 0);
 });
 
+// --- Phase E Stage 0: totality substrate (`partial` opt-out) ---
+
+import {
+  isFunctionPartial, unwrapPartialAttach,
+  NOTIF_TOTALITY_EXHAUSTIVENESS, NOTIF_TOTALITY_NONTERMINATION,
+  NOTIF_TOTALITY_NEEDS_ANNOTATION,
+} from "./totality.js";
+
+test("Phase E Stage 0: notification kind constants exist", () => {
+  eq(NOTIF_TOTALITY_EXHAUSTIVENESS, "totality-exhaustiveness");
+  eq(NOTIF_TOTALITY_NONTERMINATION, "totality-nontermination");
+  eq(NOTIF_TOTALITY_NEEDS_ANNOTATION, "totality-needs-annotation");
+});
+
+test("Phase E Stage 0: unwrapPartialAttach detects the wrapper directly", () => {
+  // Hand-build `partial_attach(42)` and verify the helper peels it.
+  const inner = makeInt(42);
+  const wrapped = makeExpr(makePrimitive("partial_attach", () => inner, true), [inner]);
+  const recovered = unwrapPartialAttach(wrapped);
+  eq(recovered !== null, true);
+  eq(recovered === inner, true);
+});
+
+test("Phase E Stage 0: unwrapPartialAttach peels one type_check layer", () => {
+  // Typed-return functions wrap as type_check(partial_attach(body), returnType).
+  const inner = makeInt(7);
+  const wrapped = makeExpr(makePrimitive("partial_attach", () => inner, true), [inner]);
+  const typed   = makeExpr(makePrimitive("type_check", () => wrapped, true),
+                           [wrapped, makeInt(0)]);
+  const recovered = unwrapPartialAttach(typed);
+  eq(recovered !== null, true);
+  eq(recovered === inner, true);
+});
+
+test("Phase E Stage 0: unwrapPartialAttach returns null for unwrapped bodies", () => {
+  const plain = makeExpr(makePrimitive("bits_add", () => makeInt(0), false), [makeInt(1), makeInt(2)]);
+  eq(unwrapPartialAttach(plain), null);
+});
+
+test("Phase E Stage 0: isFunctionPartial detects opt-out via wrapped body", () => {
+  // Construct: a ComposedFunction whose body is `partial_attach(42)`.
+  // Skips the grammar load path; verifies the runtime detection.
+  const body = makeInt(42);
+  const wrapped = makeExpr(makePrimitive("partial_attach", () => body, true), [body]);
+  const fn = makeComposedFn([], wrapped);
+  eq(isFunctionPartial(fn), true);
+});
+
+test("Phase E Stage 0: isFunctionPartial returns false for un-annotated functions", () => {
+  const fn = makeComposedFn([], makeInt(42));
+  eq(isFunctionPartial(fn), false);
+});
+
+fileTest(path.join(testsDir, "totality-partial-demo.alg"));
+
+// --- Phase E Stage 1: exhaustiveness check for when/is/then ---
+
+test("Phase E Stage 1: non-exhaustive Bool fires totality-exhaustiveness", () => {
+  const src = `classify(b: Bool): String =>
+  when b is true then "yes"
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-exhaustiveness" && n.binding === "classify"
+  );
+  eq(notes.length, 1, `expected 1 notification, got ${notes.length}`);
+  eq(notes[0].severity, "info");
+  eq(notes[0].message.includes("Bool"), true);
+  eq(notes[0].message.includes("false"), true);
+});
+
+test("Phase E Stage 1: complete Bool coverage is clean", () => {
+  const src = `classify(b: Bool): String =>
+  when b
+    is true then "yes"
+    is false then "no"
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-exhaustiveness"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 1: explicit else discharges the check", () => {
+  const src = `classify(b: Bool): String =>
+  when b is true then "yes" else "no"
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-exhaustiveness"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 1: wildcard `is _` discharges the check", () => {
+  const src = `classify(b: Bool): String =>
+  when b
+    is true then "yes"
+    is _ then "other"
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-exhaustiveness"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 1: bind-to-name pattern discharges the check", () => {
+  // `is n` binds the subject to `n` — matches anything, so the chain is
+  // total even without an explicit else.
+  const src = `classify(x: Int): String =>
+  when x
+    is 1 then "one"
+    is n then "other"
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-exhaustiveness"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 1: Int with no fallback fires generic note", () => {
+  const src = `classify(n: Int): String =>
+  when n is 0 then "zero"
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-exhaustiveness" && n.binding === "classify"
+  );
+  eq(notes.length, 1);
+  eq(notes[0].message.includes("Int"), true);
+});
+
+test("Phase E Stage 1: unknown subject type stays silent", () => {
+  // Untyped param: no type signature, subject type unknown — analyzer
+  // doesn't emit (avoids false positives).
+  const src = `classify(x) =>
+  when x is 1 then "one"
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-exhaustiveness"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 1: missing both `true` and `false`", () => {
+  // Pattern is a literal that's neither true nor false (impossible, but
+  // exercises the both-missing path). Use a non-Bool literal to verify
+  // the message reports both missing.
+  const src = `classify(b: Bool): String =>
+  when b is 5 then "huh"
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-exhaustiveness" && n.binding === "classify"
+  );
+  eq(notes.length, 1);
+  eq(notes[0].message.includes("both"), true);
+});
+
+fileTest(path.join(testsDir, "totality-exhaustiveness-demo.alg"));
+
 // --- Phase A: introspection / semantic summary ---
 
 import {
