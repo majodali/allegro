@@ -743,6 +743,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   const declaredEffects: any[] = [];   // typed_array Expression of Symbol(label)
   const paramEffects: Array<{ paramRef: any; effSym: any }> = [];
   let partialMarked = false;
+  let decreasesMetric: any | null = null;
   const filteredStmts: BuiltBinding[] = [];
   for (const s of stmts) {
     if (s.key === null && isPrimitiveCall(s.value, "requires_stmt")) {
@@ -781,6 +782,13 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // the signal. Multiple `partial` clauses in one body are idempotent
       // (the wrapper is attached at most once).
       partialMarked = true;
+      continue;
+    }
+    if (s.key === null && isPrimitiveCall(s.value, "decreases_decl_marker")) {
+      // Phase E Stage 3 — user-supplied termination metric. The arg is the
+      // metric expression. Last writer wins if multiple clauses appear.
+      const margs = (s.value as any).args as any[];
+      if (margs.length >= 1) decreasesMetric = margs[0];
       continue;
     }
     filteredStmts.push(s);
@@ -901,6 +909,13 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   // checks for opted-out functions.
   if (partialMarked) {
     result = makeExpr(prim("partial_attach"), [result]);
+  }
+
+  // Phase E Stage 3 — wrap with `decreases_attach(result, metric)` when a
+  // `decreases <expr>` clause appeared. Runtime passthrough; the analyzer
+  // peels it via `unwrapDecreasesAttach` to verify (or trust) the metric.
+  if (decreasesMetric !== null) {
+    result = makeExpr(prim("decreases_attach"), [result, decreasesMetric]);
   }
 
   return result;

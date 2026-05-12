@@ -3026,6 +3026,28 @@ const partial_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return evalFn!(args[0], ctx!);
 };
 
+// Phase E Stage 3 — `decreases <metric>` body-form for hand-rolled
+// termination metrics. The body preprocessor extracts the marker and wraps
+// the function body with `decreases_attach(body, metric)`. The runtime
+// behaviour is a passthrough; the analyzer recovers the metric expression
+// at compile time via `unwrapDecreasesAttach` to verify (or trust) the
+// decrease across recursive calls.
+
+const decreases_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  // Marker. Extracted by the block preprocessor at parse time; surviving
+  // markers at runtime are no-ops (mirrors `effects_decl_marker`).
+  return noneSingleton;
+};
+
+const decreases_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) {
+    throw new AllegroError(`decreases_attach: expected 2 args, got ${args.length}`);
+  }
+  // Transparent passthrough at runtime; the metric (args[1]) is metadata
+  // for the totality analyzer and is never evaluated here.
+  return evalFn!(args[0], ctx!);
+};
+
 // --- Typed binary operator helper ---
 
 function makeTypedBinOp(opName: string): PrimitiveFnImpl {
@@ -3200,6 +3222,8 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   param_effects_attach: makePrimitive("param_effects_attach", param_effects_attach_impl, true),
   partial_decl_marker: makePrimitive("partial_decl_marker", partial_decl_marker_impl, true),
   partial_attach: makePrimitive("partial_attach", partial_attach_impl, true),
+  decreases_decl_marker: makePrimitive("decreases_decl_marker", decreases_decl_marker_impl, true),
+  decreases_attach: makePrimitive("decreases_attach", decreases_attach_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

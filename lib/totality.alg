@@ -42,6 +42,15 @@
 //                  rendering
 
 totality_grammar = grammar {
+  // Opt-out: skip the totality analyzer for this function.
   stmt_form "partial"
     => () => partial_decl_marker()
+
+  // User-supplied termination metric. The metric is an expression in scope
+  // of the function's params (and any other bindings). The analyzer verifies
+  // the metric strictly decreases on each recursive call when it can, and
+  // trusts the user otherwise. Use an array literal for lexicographic
+  // tuples: `decreases [m, n]` checks `(m, n)` decreases lexicographically.
+  stmt_form "decreases" metric:expr
+    => metric => decreases_decl_marker(metric)
 }

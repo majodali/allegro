@@ -29,35 +29,56 @@ export const NOTIF_TOTALITY_NONTERMINATION = "totality-nontermination";
 /** Function calls a partial dependency without itself being marked partial. */
 export const NOTIF_TOTALITY_NEEDS_ANNOTATION = "totality-needs-annotation";
 
-// --- partial_attach wrapper helpers ---
+// --- Body-wrapper peelers ---
+//
+// Function bodies get layered with various passthrough wrappers at parse
+// time: `type_check(…, returnType)` for typed-return functions, plus
+// `partial_attach`, `decreases_attach`, `effects_attach`, etc. Each
+// analyzer needs to find its specific wrapper, ignoring the others. The
+// generic `findAttachWrapper` walks the head expression peeling unrelated
+// decorators until it finds the named target.
 
-/** Recognise `partial_attach(body)` wrapping at the head of a function body
- *  (possibly nested inside a `type_check(body, returnType)` envelope added
- *  by typed-return functions). Returns the inner body when the wrapper is
- *  present, null otherwise. */
-export function unwrapPartialAttach(body: Value): Value | null {
+const _WRAPPER_NAMES = new Set([
+  "type_check", "partial_attach", "decreases_attach",
+  "effects_attach", "param_effects_attach",
+]);
+
+function findAttachWrapper(body: Value, wantName: string): ExpressionValue | null {
   let cur = body;
-  // Peel one optional type_check layer (typed functions wrap the return).
-  if (cur.kind === ValueKind.Expression) {
-    const fn = primaryOf(cur.fn);
-    if (fn.kind === ValueKind.PrimitiveFunction
-        && (fn as any).name === "type_check"
-        && cur.args.length >= 1) {
-      cur = cur.args[0];
-    }
+  for (let i = 0; i < 16; i++) {
+    if (cur.kind !== ValueKind.Expression) return null;
+    const fn = primaryOf((cur as ExpressionValue).fn);
+    if (fn.kind !== ValueKind.PrimitiveFunction) return null;
+    const name = (fn as any).name as string;
+    if (name === wantName) return cur as ExpressionValue;
+    if (!_WRAPPER_NAMES.has(name)) return null;
+    if ((cur as ExpressionValue).args.length < 1) return null;
+    cur = (cur as ExpressionValue).args[0];
   }
-  if (cur.kind !== ValueKind.Expression) return null;
-  const fn = primaryOf(cur.fn);
-  if (fn.kind !== ValueKind.PrimitiveFunction) return null;
-  if ((fn as any).name !== "partial_attach") return null;
-  if (cur.args.length < 1) return null;
-  return cur.args[0];
+  return null;
 }
 
-/** Is the function's body wrapped with `partial_attach`? Stage 1+ analyzers
- *  consult this to skip the totality check on opted-out functions. */
+/** Recognise `partial_attach(body)` anywhere in the head wrapper stack.
+ *  Returns the inner body when found, null otherwise. */
+export function unwrapPartialAttach(body: Value): Value | null {
+  const w = findAttachWrapper(body, "partial_attach");
+  if (!w) return null;
+  return w.args[0];
+}
+
+/** Is the function's body wrapped with `partial_attach`? Analyzers consult
+ *  this to skip the totality check on opted-out functions. */
 export function isFunctionPartial(fn: ComposedFunctionValue): boolean {
   return unwrapPartialAttach(fn.body) !== null;
+}
+
+/** Recognise `decreases_attach(body, metric)` in the head wrapper stack.
+ *  Returns `{ body, metric }` when found, null otherwise. Stage 3+. */
+export function unwrapDecreasesAttach(body: Value): { body: Value; metric: Value } | null {
+  const w = findAttachWrapper(body, "decreases_attach");
+  if (!w) return null;
+  if (w.args.length < 2) return null;
+  return { body: w.args[0], metric: w.args[1] };
 }
 
 // =============================================================================
@@ -399,7 +420,26 @@ export function checkTermination(
     const calls = findRecursiveCalls(cfn.body, b.key);
     if (calls.length === 0) continue; // non-recursive — trivially terminating
 
-    // For each recursive call, attempt to find a decreasing position.
+    // Stage 3: if the user supplied a `decreases <metric>` clause, treat
+    // it as a contract. We verify what we can; anything unrecognised is
+    // trusted. Only fire when the analyzer can prove the metric does NOT
+    // decrease (or when the metric is a recognised pattern but the chain
+    // isn't decreasing).
+    const decAttach = unwrapDecreasesAttach(cfn.body);
+    if (decAttach) {
+      const reasons = checkUserMetric(decAttach.metric, calls, paramTypeAsts, typeLookup);
+      if (reasons.length > 0) {
+        const unique = [...new Set(reasons)];
+        findings.push({
+          binding: b.key,
+          message: `\`decreases\` metric does not provably decrease: ${unique.join("; ")}`,
+        });
+      }
+      continue;
+    }
+
+    // For each recursive call, attempt to find a decreasing position via
+    // Stage 2's auto-detection.
     const nonDecreasingReasons: string[] = [];
     for (const call of calls) {
       const reason = whyNotDecreasing(call, paramTypeAsts, typeLookup);
@@ -414,6 +454,97 @@ export function checkTermination(
     }
   }
   return findings;
+}
+
+/** Verify a user-supplied `decreases <metric>` clause. Returns one reason per
+ *  failed call when the metric is a recognised pattern but the verification
+ *  fails; returns empty when:
+ *    - the metric verifies (all calls show decrease)
+ *    - the metric is unrecognised (trust the user — Stage 3 minimum)
+ *
+ *  Recognised metric shapes:
+ *    1. Bare Param  — same semantics as Stage 2's auto-detect.
+ *    2. `typed_array(p1, p2, …)` — lexicographic over the listed positions.
+ */
+function checkUserMetric(
+  metric: Value,
+  calls: ExpressionValue[],
+  paramTypeAsts: Value[],
+  typeLookup?: TypeLookup,
+): string[] {
+  const reasons: string[] = [];
+
+  // Shape 1: bare Param.
+  if (metric.kind === ValueKind.Param) {
+    const pos = (metric as any).position as number;
+    const name = (metric as any)._name ?? `param${pos}`;
+    for (const call of calls) {
+      if (pos >= call.args.length) continue;
+      const decrease = recognizeParamMinusK(call.args[pos]);
+      if (!decrease || decrease.pos !== pos) {
+        reasons.push(`metric \`${name}\` does not decrease on at least one recursive call`);
+        continue;
+      }
+      // The decrease is established positionally; for `decreases` clauses
+      // we trust the user about the bound (the explicit clause is the
+      // commitment). Skip the type-domain check that Stage 2 enforces.
+    }
+    return reasons;
+  }
+
+  // Shape 2: typed_array of params → lexicographic.
+  if (metric.kind === ValueKind.Expression) {
+    const fn = primaryOf((metric as ExpressionValue).fn);
+    if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
+      const components = (metric as ExpressionValue).args;
+      // For each call, walk through components left-to-right. The metric
+      // strictly decreases if SOME component strictly decreases AND ALL
+      // earlier components stay equal (i.e. the same param passes through
+      // unchanged in those positions).
+      for (const call of calls) {
+        const decreasedAt = findLexDecreasePosition(components, call);
+        if (decreasedAt < 0) {
+          reasons.push(`lexicographic metric does not decrease on at least one recursive call`);
+        }
+      }
+      return reasons;
+    }
+  }
+
+  // Anything else: trust the user. No verification, no notification.
+  return reasons;
+}
+
+/** Walk lex-tuple components: return the index of the first strictly-
+ *  decreasing component where all earlier components are stable (same Param
+ *  passes through), or -1 if no such index exists. */
+function findLexDecreasePosition(components: Value[], call: ExpressionValue): number {
+  for (let i = 0; i < components.length; i++) {
+    // All earlier components must stay equal — for Stage 3 minimum we
+    // require each earlier component to be a Param at some position p such
+    // that call.args[p] is the same Param (no change).
+    let earlierStable = true;
+    for (let j = 0; j < i; j++) {
+      const c = components[j];
+      if (c.kind !== ValueKind.Param) { earlierStable = false; break; }
+      const pos = (c as any).position as number;
+      if (pos >= call.args.length) { earlierStable = false; break; }
+      const argP = primaryOf(call.args[pos]);
+      if (argP.kind !== ValueKind.Param || (argP as any).position !== pos) {
+        earlierStable = false; break;
+      }
+    }
+    if (!earlierStable) continue;
+
+    // Component i should strictly decrease.
+    const c = components[i];
+    if (c.kind !== ValueKind.Param) continue;
+    const pos = (c as any).position as number;
+    if (pos >= call.args.length) continue;
+    const decrease = recognizeParamMinusK(call.args[pos]);
+    if (decrease && decrease.pos === pos) return i;
+  }
+  return -1;
 }
 
 /** Collect every `Expression(Symbol(fnName), …)` occurrence in `body`. */

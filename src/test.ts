@@ -5987,6 +5987,140 @@ loop_n(static: Int, n: NonNeg): Int =>
 
 fileTest(path.join(testsDir, "totality-termination-demo.alg"));
 
+// --- Phase E Stage 3: decreases body-form ---
+//
+// These tests build the post-preprocessing shape directly
+// (`decreases_attach(body, metric)`) to avoid pre-scanning a `use totality`
+// header. The runtime semantics + analyzer hooks are what we're exercising.
+
+import {
+  unwrapDecreasesAttach,
+} from "./totality.js";
+
+test("Phase E Stage 3: unwrapDecreasesAttach detects the wrapper", () => {
+  const body = makeInt(42);
+  const metric = makeInt(7);
+  const wrapped = makeExpr(
+    makePrimitive("decreases_attach", () => body, true),
+    [body, metric],
+  );
+  const r = unwrapDecreasesAttach(wrapped);
+  eq(r !== null, true);
+  if (r) eq(r.metric === metric, true);
+});
+
+test("Phase E Stage 3: unwrapDecreasesAttach peels through other wrappers", () => {
+  // decreases_attach nested under type_check + partial_attach.
+  const body = makeInt(1);
+  const metric = makeInt(0);
+  const decW = makeExpr(makePrimitive("decreases_attach", () => body, true), [body, metric]);
+  const partW = makeExpr(makePrimitive("partial_attach", () => decW, true), [decW]);
+  const typed = makeExpr(makePrimitive("type_check", () => partW, true), [partW, makeInt(0)]);
+  const r = unwrapDecreasesAttach(typed);
+  eq(r !== null, true);
+  if (r) eq(r.metric === metric, true);
+});
+
+test("Phase E Stage 3: `decreases n` trusts unbounded Int (no Stage 2 notification)", () => {
+  // Build factorial-shape with decreases_attach(body, Param(n)) directly.
+  // The analyzer sees the bare-Param metric and verifies positional
+  // decrease without the type-bound check Stage 2 requires.
+  const src = `f(n: Int): Int =>
+  decreases_attach(
+    if n == 0 then 0 else n + f(n - 1),
+    n
+  )
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0, `expected clean, got: ${notes.map(n => n.message).join("; ")}`);
+});
+
+test("Phase E Stage 3: `decreases n` catches non-decreasing recursive call", () => {
+  // Function recurses on `n` unchanged — even with `decreases n`, the
+  // analyzer sees that n doesn't decrease and fires.
+  const src = `bad(n: Int): Int =>
+  decreases_attach(
+    bad(n),
+    n
+  )
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination" && n.binding === "bad"
+  );
+  eq(notes.length, 1);
+  eq(notes[0].message.includes("does not decrease"), true);
+});
+
+test("Phase E Stage 3: lex-tuple metric verifies positional decrease", () => {
+  // decreases [a, b] — for the recursive call to decrease, the analyzer
+  // checks each position's recursive arg against the corresponding param.
+  // Here `a` decreases (a - 1) so the lex tuple is decreasing.
+  const src = `k(a: Int, b: Int): Int =>
+  decreases_attach(
+    if a == 0 then b else b + k(a - 1, b),
+    typed_array(a, b)
+  )
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0, `expected clean, got: ${notes.map(n => n.message).join("; ")}`);
+});
+
+test("Phase E Stage 3: lex-tuple with no decreasing component fires", () => {
+  // a passes through unchanged, b passes through unchanged — no
+  // position decreases. Lex check fails.
+  const src = `bad(a: Int, b: Int): Int =>
+  decreases_attach(
+    bad(a, b),
+    typed_array(a, b)
+  )
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination" && n.binding === "bad"
+  );
+  eq(notes.length, 1);
+});
+
+test("Phase E Stage 3: unrecognised metric is trusted (no notification)", () => {
+  // Metric is a runtime expression the analyzer can't statically pattern-
+  // match. Per Stage 3 policy, trust the user — don't fire.
+  const src = `f(n: Int, m: Int): Int =>
+  decreases_attach(
+    if n == 0 then m else f(n - 1, m + 1),
+    n + m
+  )
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 3: `partial` overrides `decreases`", () => {
+  // A function marked both partial AND decreases gets no notification —
+  // partial is the strongest opt-out.
+  const src = `loop(n: Int): Int =>
+  partial_attach(
+    decreases_attach(loop(n), n)
+  )
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+fileTest(path.join(testsDir, "totality-decreases-demo.alg"));
+
 // --- Phase A: introspection / semantic summary ---
 
 import {
