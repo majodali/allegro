@@ -5900,6 +5900,93 @@ test("Phase E Stage 1: missing both `true` and `false`", () => {
 
 fileTest(path.join(testsDir, "totality-exhaustiveness-demo.alg"));
 
+// --- Phase E Stage 2: structural termination check ---
+
+test("Phase E Stage 2: factorial with bounded NonNeg is provably terminating", () => {
+  const src = `
+NonNeg = Int & _ >= 0
+factorial(n: NonNeg): Int =>
+  if n == 0 then 1 else n * factorial(n - 1)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0, `expected clean, got: ${JSON.stringify(notes)}`);
+});
+
+test("Phase E Stage 2: factorial with unbounded Int fires nontermination notification", () => {
+  const src = `factorial(n: Int): Int =>
+  if n == 0 then 1 else n * factorial(n - 1)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination" && n.binding === "factorial"
+  );
+  eq(notes.length, 1);
+  eq(notes[0].severity, "info");
+  eq(notes[0].message.includes("non-negative"), true);
+});
+
+test("Phase E Stage 2: non-recursive function is silent", () => {
+  const src = `square(n: Int): Int => n * n\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 2: recursive call with no decreasing param fires", () => {
+  const src = `bad(n: Int): Int => bad(n)\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination" && n.binding === "bad"
+  );
+  eq(notes.length, 1);
+  eq(notes[0].message.includes("no parameter strictly decreases"), true);
+});
+
+test("Phase E Stage 2: untyped recursive function stays silent", () => {
+  // Conservative: with no static type on the param, the analyzer can't
+  // prove or disprove termination, so it stays silent. Existing untyped
+  // Allegro code keeps running without spurious info-notifications.
+  const src = `factorial(n) => if n == 0 then 1 else n * factorial(n - 1)\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 2: partial opt-out skips termination check", () => {
+  // Build the partial_attach wrapping directly to avoid the use-totality
+  // header (which the test harness doesn't pre-scan).
+  const src = `loop(n: Int): Int => partial_attach(loop(n))\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 2: recursion on a different position than the bounded one fires", () => {
+  // `f(static, n: NonNeg)` — recursion passes static unchanged, n - 1.
+  // Position 1 decreases; should be clean.
+  const src = `
+NonNeg = Int & _ >= 0
+loop_n(static: Int, n: NonNeg): Int =>
+  if n == 0 then static else loop_n(static, n - 1)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0, `expected clean, got: ${notes.map(n => n.message).join("; ")}`);
+});
+
+fileTest(path.join(testsDir, "totality-termination-demo.alg"));
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

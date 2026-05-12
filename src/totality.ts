@@ -16,6 +16,7 @@ import {
   ContextValue, BitsValue,
   primaryOf, bitsToString,
 } from "./types.js";
+import { getFunctionParamTypes } from "./types-std.js";
 
 // --- Reserved notification kinds (consumed by Stage 1+) ---
 
@@ -90,24 +91,42 @@ export interface ExhaustivenessFinding {
  *  against the bindings layered into evalCtx. */
 export type TypeLookup = (name: string) => Value | undefined;
 
-/** Peel `typed_function(ComposedFunction(…), paramCount, paramType1…paramTypeN,
- *  returnType)` and `partial_attach` wrappers around a binding's raw AST to
- *  reach the underlying ComposedFunction. Returns the inner function plus the
- *  per-position paramType Value (still as AST Symbols / Expressions —
- *  callers resolve via the lookup). */
+/** Peel a binding's value to reach the underlying ComposedFunction plus its
+ *  per-position parameter types. Handles three shapes:
+ *    - Raw `ComposedFunction` (untyped function).
+ *    - `typed_function(ComposedFunction(…), paramCount, paramType1…, returnType)`
+ *      Expression (pre-evaluation AST).
+ *    - `MultiValue(ComposedFunction, {type: FunctionType})` (post-evaluation,
+ *      which is the common case once the binding has been touched).
+ *  paramType values come back as the most precise form available — type
+ *  Context for post-eval, Symbol/Expression for pre-eval (callers resolve via
+ *  `TypeLookup`). */
 function peelFunctionAst(v: Value): {
   cfn: ComposedFunctionValue;
   paramTypeAsts: Value[];
 } | null {
-  const p = primaryOf(v);
-  if (p.kind === ValueKind.ComposedFunction) {
-    return { cfn: p as ComposedFunctionValue, paramTypeAsts: [] };
+  // Post-evaluation: MultiValue + FunctionType.
+  if (v.kind === ValueKind.MultiValue) {
+    const mv = v as any;
+    const tComp = mv.components.get("type") as Value | undefined;
+    const prim = mv.primary;
+    if (prim.kind === ValueKind.ComposedFunction) {
+      let paramTypeAsts: Value[] = [];
+      if (tComp && tComp.kind === ValueKind.Context) {
+        const types = getFunctionParamTypes(tComp as ContextValue);
+        if (types) paramTypeAsts = types;
+      }
+      return { cfn: prim as ComposedFunctionValue, paramTypeAsts };
+    }
   }
-  if (p.kind !== ValueKind.Expression) return null;
-  const target = primaryOf((p as ExpressionValue).fn);
+  if (v.kind === ValueKind.ComposedFunction) {
+    return { cfn: v as ComposedFunctionValue, paramTypeAsts: [] };
+  }
+  if (v.kind !== ValueKind.Expression) return null;
+  const target = primaryOf((v as ExpressionValue).fn);
   if (target.kind !== ValueKind.PrimitiveFunction) return null;
   if ((target as any).name !== "typed_function") return null;
-  const args = (p as ExpressionValue).args;
+  const args = (v as ExpressionValue).args;
   if (args.length < 3) return null;
   // args[0] = inner function (maybe nested typed_function), args[1] = paramCount,
   // args[2..2+paramCount-1] = paramTypes, last = returnType.
@@ -124,6 +143,7 @@ function peelFunctionAst(v: Value): {
   }
   return { cfn: inner.cfn, paramTypeAsts };
 }
+
 
 /** Walk every binding's function body and emit one finding per non-exhaustive
  *  `when/is/then` chain. `typeLookup` is consulted when a subject's static
@@ -330,6 +350,189 @@ function hasWildcardOrBinding(cases: ChainCase[]): boolean {
     // Bind-to-name: pattern is a bare Symbol like `is n`. Matches anything.
     if (p.kind === ValueKind.Symbol) return true;
   }
+  return false;
+}
+
+// =============================================================================
+// Stage 2 — Structural termination check
+// =============================================================================
+//
+// For each recursive function, look for evidence that the recursion strictly
+// decreases on a well-founded order. The Stage 2 minimum recognises the
+// common arithmetic pattern: a parameter `n` whose recursive-call argument is
+// `n - K` for some literal K > 0, AND `n` has a refined type with a non-
+// negative lower bound (so the strictly-decreasing chain is bounded below).
+//
+// Mutual recursion (call graph cycles through other bindings) is deferred to
+// Stage 4. Higher-order recursion (via stdlib HOFs like map/reduce) is
+// deferred to Stage 5. `decreases <expr>` body-form (user-supplied metrics)
+// is Stage 3.
+//
+// Confidence policy: emit `totality-nontermination` only when the function
+// has at least one recursive call we can detect AND we can't prove ANY of
+// its call sites are decreasing. Functions whose recursive call we can't
+// match as `param - K` still get notified — totality isn't proven.
+
+export interface TerminationFinding {
+  binding: string;
+  message: string;
+}
+
+/** Walk every function binding and emit one finding per recursive function
+ *  whose termination can't be shown. `typeLookup` resolves Symbol-typed
+ *  param annotations (`n: NonNeg`) to their concrete type Context — the
+ *  runtime's lookup evaluates user-defined type bindings via a compile-mode
+ *  context, so the returned value carries `__abstractDomain` for refined
+ *  types. */
+export function checkTermination(
+  bindings: Iterable<{ key: string | null; value: Value | undefined }>,
+  typeLookup?: TypeLookup,
+): TerminationFinding[] {
+  const findings: TerminationFinding[] = [];
+  for (const b of bindings) {
+    if (!b.key || !b.value) continue;
+    const peeled = peelFunctionAst(b.value);
+    if (!peeled) continue;
+    const { cfn, paramTypeAsts } = peeled;
+    if (isFunctionPartial(cfn)) continue;
+
+    const calls = findRecursiveCalls(cfn.body, b.key);
+    if (calls.length === 0) continue; // non-recursive — trivially terminating
+
+    // For each recursive call, attempt to find a decreasing position.
+    const nonDecreasingReasons: string[] = [];
+    for (const call of calls) {
+      const reason = whyNotDecreasing(call, paramTypeAsts, typeLookup);
+      if (reason) nonDecreasingReasons.push(reason);
+    }
+    if (nonDecreasingReasons.length > 0) {
+      const reasons = [...new Set(nonDecreasingReasons)];
+      const msg = reasons.length === 1
+        ? `recursive call may not terminate: ${reasons[0]}`
+        : `recursive calls may not terminate: ${reasons.join("; ")}`;
+      findings.push({ binding: b.key, message: msg });
+    }
+  }
+  return findings;
+}
+
+/** Collect every `Expression(Symbol(fnName), …)` occurrence in `body`. */
+function findRecursiveCalls(body: Value, fnName: string): ExpressionValue[] {
+  const out: ExpressionValue[] = [];
+  const seen = new Set<Value>();
+  function walk(v: Value): void {
+    if (!v || typeof v !== "object") return;
+    if (seen.has(v)) return;
+    seen.add(v);
+    if (v.kind === ValueKind.Expression) {
+      const e = v as ExpressionValue;
+      const fn = primaryOf(e.fn);
+      if (fn.kind === ValueKind.Symbol && (fn as any).name === fnName) {
+        out.push(e);
+      }
+      walk(e.fn);
+      for (const a of e.args) walk(a);
+    } else if (v.kind === ValueKind.ComposedFunction) {
+      walk((v as ComposedFunctionValue).body);
+    } else if (v.kind === ValueKind.MultiValue) {
+      walk((v as any).primary);
+    }
+  }
+  walk(body);
+  return out;
+}
+
+/** Return a string explaining why the call isn't provably decreasing, or null
+ *  when at least one decreasing-on-bounded-param position is found. */
+function whyNotDecreasing(
+  call: ExpressionValue,
+  paramTypeAsts: Value[],
+  typeLookup?: TypeLookup,
+): string | null {
+  // Find any "param - K > 0" decrease patterns first, regardless of type.
+  const decreases: { pos: number; name: string }[] = [];
+  for (let i = 0; i < call.args.length; i++) {
+    const decrease = recognizeParamMinusK(call.args[i]);
+    if (decrease && decrease.pos === i) decreases.push(decrease);
+  }
+
+  // Provably decreasing if any decrease position has a non-negative lower
+  // bound. We need to see the param's static type to verify the bound, so
+  // skip positions without type info entirely (stays silent on untyped
+  // params).
+  for (const d of decreases) {
+    const pt = paramTypeAsts[d.pos];
+    if (pt && typeHasNonNegativeLowerBound(pt, typeLookup)) {
+      return null;
+    }
+  }
+
+  // Decrease found AND we have typed positions — none with non-negative
+  // bound. Flag as "decreases but unbounded" so the user knows what to add.
+  for (const d of decreases) {
+    if (paramTypeAsts[d.pos]) {
+      return `param \`${d.name}\` decreases but has no non-negative lower bound (consider \`${d.name}: NonNeg\` or similar)`;
+    }
+  }
+
+  // Decrease found but no type info at all — stay silent. Can't prove
+  // either way; existing untyped Allegro code shouldn't get noise from the
+  // analyzer.
+  if (decreases.length > 0) return null;
+
+  // No decrease pattern anywhere — clear non-termination signal, fire
+  // regardless of typing.
+  return `no parameter strictly decreases on the recursive call (consider a \`decreases\` clause or \`partial\`)`;
+}
+
+/** Recognise `Param(pos) - K` where K is a positive literal. Returns the
+ *  param's position and source name, or null. Handles MultiValue-wrapped
+ *  literals. */
+function recognizeParamMinusK(v: Value): { pos: number; name: string } | null {
+  if (v.kind !== ValueKind.Expression) return null;
+  const fn = primaryOf((v as ExpressionValue).fn);
+  if (fn.kind !== ValueKind.PrimitiveFunction) return null;
+  const fnName = (fn as any).name as string;
+  if (fnName !== "bits_sub" && fnName !== "typed_sub") return null;
+  const args = (v as ExpressionValue).args;
+  if (args.length !== 2) return null;
+  const left = primaryOf(args[0]);
+  if (left.kind !== ValueKind.Param) return null;
+  const right = primaryOf(args[1]);
+  if (right.kind !== ValueKind.Bits) return null;
+  const k = (right as BitsValue).data;
+  if (k <= 0n) return null;
+  return {
+    pos:  (left as any).position,
+    name: (left as any)._name ?? `param${(left as any).position}`,
+  };
+}
+
+/** Does this type Context (or Symbol resolvable to one) carry an abstract
+ *  domain whose lower bound is non-negative? Recognised forms: interval with
+ *  `lo >= 0`, exact equal with `value >= 0`. Symbols are resolved via the
+ *  caller-supplied typeLookup, which evaluates the binding to its concrete
+ *  form when needed. */
+function typeHasNonNegativeLowerBound(
+  t: Value,
+  typeLookup?: TypeLookup,
+  seen: Set<Value> = new Set(),
+): boolean {
+  if (seen.has(t)) return false;
+  seen.add(t);
+  let cur = t;
+  if (cur.kind === ValueKind.MultiValue) cur = (cur as any).primary;
+  if (cur.kind === ValueKind.Symbol) {
+    const name = (cur as any).name as string;
+    const resolved = typeLookup?.(name);
+    if (!resolved) return false;
+    return typeHasNonNegativeLowerBound(resolved, typeLookup, seen);
+  }
+  if (cur.kind !== ValueKind.Context) return false;
+  const dom = (cur as any).__abstractDomain;
+  if (!dom) return false;
+  if (dom.kind === "interval") return dom.lo >= 0;
+  if (dom.kind === "eq")       return dom.value >= 0;
   return false;
 }
 

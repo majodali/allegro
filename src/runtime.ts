@@ -14,7 +14,7 @@ import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf, GrammarFragment } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
-import { checkExhaustiveness } from "./totality.js";
+import { checkExhaustiveness, checkTermination } from "./totality.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -976,21 +976,58 @@ export function evalSource(
         message:  n.message,
       });
     }
-    // Phase E Stage 1 — exhaustiveness check for `when/is/then`. Findings
-    // surface as `info` notifications (project config can promote to error).
-    // `partial`-marked functions skip the check; subjects with unknown types
-    // stay silent. The type lookup resolves Symbol references in param-type
-    // annotations (`b: Bool`) against the standard extensions' bindings.
-    const exhTypeLookup = (name: string): Value | undefined => {
-      for (const ext of extensions ?? []) {
-        const v = ext.bindings?.[name];
-        if (v !== undefined) return v;
+    // Phase E Stages 1-2 — totality analyzers. The exhaustiveness check
+    // (Stage 1) and structural-termination check (Stage 2) both need to
+    // resolve Symbol-typed param annotations (`b: Bool`, `n: NonNeg`) to
+    // their underlying type Context (the one carrying `__abstractDomain`
+    // for refinement domains). We build a small compile-mode ctx mirroring
+    // `precompileFunctions` so we can `evaluate` user-defined type bindings
+    // (`NonNeg = Int & _ >= 0`) on demand, in addition to looking up
+    // extension-provided types (Int, Bool, …).
+    const totalityCompileCtx = makeContext();
+    for (const [name, prim] of Object.entries(primitives)) {
+      const binding = { key: name, value: prim as Value, isUse: false };
+      totalityCompileCtx.bindings.set(name, binding);
+      totalityCompileCtx.bindingList.push(binding);
+    }
+    if (extensions) {
+      for (const ext of extensions) {
+        for (const [name, value] of Object.entries(ext.bindings)) {
+          const binding = { key: name, value, isUse: false };
+          totalityCompileCtx.bindings.set(name, binding);
+          totalityCompileCtx.bindingList.push(binding);
+        }
       }
-      return undefined;
+    }
+    for (const b of fileCtx.bindingList) {
+      if (b.key !== null && b.value !== undefined) {
+        totalityCompileCtx.bindings.set(b.key, { key: b.key, value: b.value, isUse: false });
+      }
+    }
+    const exhTypeLookup = (name: string): Value | undefined => {
+      const binding = totalityCompileCtx.bindings.get(name);
+      if (!binding?.value) return undefined;
+      try {
+        return evaluate(binding.value, totalityCompileCtx, 0);
+      } catch {
+        return binding.value;
+      }
     };
     for (const f of checkExhaustiveness(fileCtx.bindingList, exhTypeLookup)) {
       compilationReport.notifications.push({
         kind:     "totality-exhaustiveness",
+        severity: "info",
+        binding:  f.binding,
+        message:  f.message,
+      });
+    }
+    // Phase E Stage 2 — structural termination check. Notifications fire
+    // for recursive functions whose calls aren't shown to decrease on a
+    // bounded parameter. Confidence policy: only fire when at least one
+    // call is suspect — non-recursive functions are silent.
+    for (const f of checkTermination(fileCtx.bindingList, exhTypeLookup)) {
+      compilationReport.notifications.push({
+        kind:     "totality-nontermination",
         severity: "info",
         binding:  f.binding,
         message:  f.message,
