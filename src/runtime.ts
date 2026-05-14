@@ -482,6 +482,12 @@ export interface Notification {
   severity:  Severity;
   /** Binding the diagnostic is anchored to, if applicable. */
   binding?:  string;
+  /** Phase E Stage 6: concrete witness illustrating the failure. For
+   *  totality notifications, this is a trace or sample input that would
+   *  trigger the unsoundness, e.g. `factorial(n=any) → factorial(n)` for
+   *  non-decreasing recursion, or `f(false) falls through` for missing
+   *  Bool cases. Renderers surface this prominently when present. */
+  counterexample?: string;
 }
 
 export interface CompilationReport {
@@ -1015,10 +1021,11 @@ export function evalSource(
     };
     for (const f of checkExhaustiveness(fileCtx.bindingList, exhTypeLookup)) {
       compilationReport.notifications.push({
-        kind:     "totality-exhaustiveness",
-        severity: "info",
-        binding:  f.binding,
-        message:  f.message,
+        kind:            "totality-exhaustiveness",
+        severity:        "info",
+        binding:         f.binding,
+        message:         f.message,
+        counterexample:  f.counterexample,
       });
     }
     // Phase E Stage 2 — structural termination check. Notifications fire
@@ -1027,10 +1034,11 @@ export function evalSource(
     // call is suspect — non-recursive functions are silent.
     for (const f of checkTermination(fileCtx.bindingList, exhTypeLookup)) {
       compilationReport.notifications.push({
-        kind:     "totality-nontermination",
-        severity: "info",
-        binding:  f.binding,
-        message:  f.message,
+        kind:            "totality-nontermination",
+        severity:        "info",
+        binding:         f.binding,
+        message:         f.message,
+        counterexample:  f.counterexample,
       });
     }
   }

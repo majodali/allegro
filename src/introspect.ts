@@ -16,7 +16,7 @@ import {
   BitsValue, PrimitiveFunctionValue, ParamValue,
   primaryOf, bitsToString, bitsToFloat, isResolved,
 } from "./types.js";
-import type { CompilationReport } from "./runtime.js";
+import type { CompilationReport, Notification } from "./runtime.js";
 import { reportErrors, reportHasErrors } from "./runtime.js";
 import { getTypeName } from "./types-std.js";
 import {
@@ -113,6 +113,9 @@ export interface BindingSummary {
   typeName:   string | null;
   resolved:   boolean;
   summary:    ValueSummary;
+  /** Stage 6: totality / exhaustiveness notices anchored to this binding,
+   *  with counterexamples surfaced inline by the renderer. */
+  totalityNotices?: Notification[];
 }
 
 // =============================================================================
@@ -519,6 +522,21 @@ export function summarizeModule(
   const excluded = opts?.excludeBindings ?? new Set<string>();
   const include = opts?.includeBindings ? new Set(opts.includeBindings) : null;
 
+  // Stage 6: pre-group totality notifications by binding for per-binding
+  // rendering. Both `totality-exhaustiveness` and `totality-nontermination`
+  // are anchored to a binding via `Notification.binding`; we surface them
+  // inline below their owner.
+  const totalityByBinding = new Map<string, Notification[]>();
+  if (report) {
+    for (const n of report.notifications) {
+      if (!n.binding) continue;
+      if (n.kind !== "totality-exhaustiveness" && n.kind !== "totality-nontermination") continue;
+      const arr = totalityByBinding.get(n.binding) ?? [];
+      arr.push(n);
+      totalityByBinding.set(n.binding, arr);
+    }
+  }
+
   for (const [key, b] of evalCtx.bindings) {
     if (!b.value) continue;
     if (excluded.has(key)) continue;
@@ -527,7 +545,8 @@ export function summarizeModule(
     const summary = summarizeValue(b.value);
     const typeName = report?.bindingTypes.get(key) ?? summary.typeName;
     if (summary.resolved) resolvedCount++;
-    bindings.push({ key, typeName, resolved: summary.resolved, summary });
+    const totalityNotices = totalityByBinding.get(key);
+    bindings.push({ key, typeName, resolved: summary.resolved, summary, totalityNotices });
   }
 
   const warnings: string[] = [];
@@ -642,6 +661,19 @@ export function renderModuleSummary(summary: ModuleSummary): string {
         } else {
           // Mismatch — declared is missing labels.
           lines.push(`      effects:    declared \`${formatEffects(dec)}\`, inferred \`${formatEffects(inf)}\` — undeclared: \`${formatEffects(missing)}\` ✗`);
+        }
+      }
+    }
+    // Stage 6: totality notices anchored to this binding, with concrete
+    // counterexamples when the analyzer produced one. The notices are
+    // info-severity by default (non-blocking); the renderer's job is to
+    // make them legible enough that a user notices.
+    if (b.totalityNotices && b.totalityNotices.length > 0) {
+      lines.push(`      totality:`);
+      for (const n of b.totalityNotices) {
+        lines.push(`        ${n.message}`);
+        if (n.counterexample) {
+          lines.push(`          counterexample: ${n.counterexample}`);
         }
       }
     }

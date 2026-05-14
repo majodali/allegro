@@ -6329,6 +6329,106 @@ b(x: Int): Int => x + 1
 
 fileTest(path.join(testsDir, "totality-hof-demo.alg"));
 
+// --- Phase E Stage 6: counterexample rendering ---
+//
+// Totality notifications now carry a `counterexample` field — a concrete
+// trace or sample input illustrating the failure shape. Renderers surface
+// it inline; programmatic consumers read it structurally.
+
+test("Phase E Stage 6: Bool exhaustiveness emits missing-literal counterexample", () => {
+  const src = `f(b: Bool): Int => when b is true then 1\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const note = compilationReport!.notifications.find(
+    n => n.kind === "totality-exhaustiveness" && n.binding === "f"
+  );
+  eq(note !== undefined, true);
+  if (note) {
+    eq(note.counterexample !== undefined, true);
+    eq(note.counterexample!.includes("false"), true);
+    eq(note.counterexample!.includes("f("), true);
+  }
+});
+
+test("Phase E Stage 6: self-recursion no-decrease emits trace counterexample", () => {
+  const src = `bad(n: Int): Int => bad(n)\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const note = compilationReport!.notifications.find(
+    n => n.kind === "totality-nontermination" && n.binding === "bad"
+  );
+  eq(note !== undefined, true);
+  if (note) {
+    eq(note.counterexample !== undefined, true);
+    eq(note.counterexample!.includes("bad(n)"), true);
+    eq(note.counterexample!.includes("same input"), true);
+  }
+});
+
+test("Phase E Stage 6: mutual recursion emits cycle-path counterexample", () => {
+  const src = `
+a(n: Int): Int => if n == 0 then 0 else b(n)
+b(n: Int): Int => if n == 0 then 0 else a(n)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const aNote = compilationReport!.notifications.find(
+    n => n.kind === "totality-nontermination" && n.binding === "a"
+  );
+  eq(aNote !== undefined, true);
+  if (aNote) {
+    eq(aNote.counterexample !== undefined, true);
+    eq(aNote.counterexample!.includes("a("), true);
+    eq(aNote.counterexample!.includes("b("), true);
+    eq(aNote.counterexample!.includes("cycle"), true);
+  }
+});
+
+test("Phase E Stage 6: HOF non-decrease emits receiver-shape counterexample", () => {
+  const src = `recursive_map(arr: Array[Int]): Array[Int] => arr.map(recursive_map)\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const note = compilationReport!.notifications.find(
+    n => n.kind === "totality-nontermination" && n.binding === "recursive_map"
+  );
+  eq(note !== undefined, true);
+  if (note) {
+    eq(note.counterexample !== undefined, true);
+    eq(note.counterexample!.includes("arr.map(recursive_map)"), true);
+    eq(note.counterexample!.includes("not smaller"), true);
+  }
+});
+
+test("Phase E Stage 6: failing `decreases` clause emits metric counterexample", () => {
+  const src = `bad(n: Int): Int => decreases_attach(bad(n), n)\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const note = compilationReport!.notifications.find(
+    n => n.kind === "totality-nontermination" && n.binding === "bad"
+  );
+  eq(note !== undefined, true);
+  if (note) {
+    eq(note.counterexample !== undefined, true);
+    eq(note.counterexample!.includes("decreases n"), true);
+  }
+});
+
+test("Phase E Stage 6: rendered summary surfaces counterexamples per binding", () => {
+  const src = `bad(n: Int): Int => bad(n)\nfc(b: Bool): Int => when b is true then 1\n`;
+  const { evalCtx, compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const excluded = new Set<string>([...Object.keys(primRegistry), ...Object.keys(typeExt.bindings)]);
+  const summary = summarizeModule(evalCtx, compilationReport, { excludeBindings: excluded });
+  const rendered = renderModuleSummary(summary);
+  eq(rendered.includes("totality:"), true, `rendered should mention totality block:\n${rendered}`);
+  eq(rendered.includes("counterexample:"), true);
+  eq(rendered.includes("bad(n)"), true);
+  // The Bool counterexample should also appear.
+  eq(rendered.includes("fc(false)"), true);
+});
+
+test("Phase E Stage 6: non-totality notifications carry no counterexample by default", () => {
+  // Effects-mismatch notifications shouldn't get a counterexample —
+  // Stage 6 only populates the field for totality / exhaustiveness today.
+  // (This anchors the API contract: counterexample is optional.)
+  const note: any = { kind: "effects-mismatch", message: "x", severity: "error" };
+  eq(note.counterexample, undefined);
+});
+
 test("Phase E Stage 4: non-recursive helper alongside mutual cycle stays silent", () => {
   // `id` is non-recursive (no edge into the SCC) — should be untouched.
   // Mutual cycle of a/b fires on its own.

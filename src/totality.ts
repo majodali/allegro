@@ -104,6 +104,9 @@ export interface ExhaustivenessFinding {
   binding: string;
   /** Source-readable description of what's missing. */
   message: string;
+  /** Stage 6: concrete witness — a sample input that falls through, e.g.
+   *  `\`f(false)\` is unmatched` for a missing Bool case. */
+  counterexample?: string;
 }
 
 /** Resolution helpers used to look up named type references (`Bool`, `Int`, …)
@@ -186,8 +189,13 @@ export function checkExhaustiveness(
     if (isFunctionPartial(cfn)) continue;
 
     walkForWhen(cfn.body, (subject, cases, hasExplicitElse) => {
-      const msg = analyzeChain(subject, cases, hasExplicitElse, cfn, paramTypeAsts, typeLookup);
-      if (msg) findings.push({ binding: b.key!, message: msg });
+      const r = analyzeChain(subject, cases, hasExplicitElse, cfn, paramTypeAsts, typeLookup);
+      if (r) {
+        const counterexample = r.missingLiteral !== undefined
+          ? `\`${b.key}(${r.missingLiteral})\` is unmatched`
+          : undefined;
+        findings.push({ binding: b.key!, message: r.message, counterexample });
+      }
     });
   }
 
@@ -317,8 +325,10 @@ function resolveTypeName(t: Value, typeLookup: TypeLookup | undefined): string |
 }
 
 /** Given a subject and its case-list, decide whether the chain is exhaustive
- *  enough to skip the notification. Returns a message describing the missing
- *  case(s), or null when no notification should fire. */
+ *  enough to skip the notification. Returns a structured result describing
+ *  the missing case(s) plus, when known, the specific literal value (for
+ *  Stage 6 counterexample rendering). Returns null when no notification
+ *  should fire. */
 function analyzeChain(
   subject: Value,
   cases: ChainCase[],
@@ -326,7 +336,7 @@ function analyzeChain(
   _fn: ComposedFunctionValue,
   paramTypeAsts: Value[],
   typeLookup: TypeLookup | undefined,
-): string | null {
+): { message: string; missingLiteral?: string } | null {
   if (hasExplicitElse) return null;
   if (hasWildcardOrBinding(cases)) return null;
 
@@ -336,17 +346,25 @@ function analyzeChain(
     const literalValues = collectBoolLiterals(cases);
     if (literalValues.has(true) && literalValues.has(false)) return null;
     if (!literalValues.has(true) && !literalValues.has(false)) {
-      return `non-exhaustive \`when\` over Bool: missing both \`true\` and \`false\` cases (and no \`else\` branch)`;
+      return {
+        message: `non-exhaustive \`when\` over Bool: missing both \`true\` and \`false\` cases (and no \`else\` branch)`,
+        missingLiteral: "false", // either witnesses the gap; pick one
+      };
     }
     const missing = literalValues.has(true) ? "false" : "true";
-    return `non-exhaustive \`when\` over Bool: missing \`${missing}\` case (and no \`else\` branch)`;
+    return {
+      message: `non-exhaustive \`when\` over Bool: missing \`${missing}\` case (and no \`else\` branch)`,
+      missingLiteral: missing,
+    };
   }
 
   // Other types: emit a generic note only when we can name the type AND no
   // pattern looks like a finite-domain cover. The unknown-type case stays
   // silent.
   if (typeName) {
-    return `non-exhaustive \`when\` over ${typeName}: no \`else\` branch and no wildcard \`is _\` case`;
+    return {
+      message: `non-exhaustive \`when\` over ${typeName}: no \`else\` branch and no wildcard \`is _\` case`,
+    };
   }
   return null;
 }
@@ -397,6 +415,11 @@ function hasWildcardOrBinding(cases: ChainCase[]): boolean {
 export interface TerminationFinding {
   binding: string;
   message: string;
+  /** Stage 6: concrete witness — a recursion trace illustrating the
+   *  non-terminating shape, e.g. `factorial(n=any) → factorial(n) [same input]`
+   *  for self-recursion with no decrease, or `a(x) → b(x) → a(x) [cycle]`
+   *  for mutual recursion. */
+  counterexample?: string;
 }
 
 /** Walk every function binding and emit one finding per recursive function
@@ -464,6 +487,7 @@ export function checkTermination(
         findings.push({
           binding: b.key,
           message: `\`decreases\` metric does not provably decrease: ${unique.join("; ")}`,
+          counterexample: renderMetricCounterexample(b.key, decAttach.metric, cycleCalls),
         });
       }
       continue;
@@ -498,10 +522,78 @@ export function checkTermination(
       const msg = reasons.length === 1
         ? `recursive call may not terminate${cycleNote}: ${reasons[0]}`
         : `recursive calls may not terminate${cycleNote}: ${reasons.join("; ")}`;
-      findings.push({ binding: b.key, message: msg });
+      const counterexample = renderTerminationCounterexample(b.key, cycleCalls, peeled.cfn, scc);
+      findings.push({ binding: b.key, message: msg, counterexample });
     }
   }
   return findings;
+}
+
+/** Stage 6: render a concrete trace illustrating the non-terminating cycle.
+ *  The shape varies by edge kind and cycle size; the goal is a one-line
+ *  witness a user can mentally execute. */
+function renderTerminationCounterexample(
+  bindingName: string,
+  cycleCalls: CallSite[],
+  cfn: ComposedFunctionValue,
+  scc: Set<string>,
+): string | undefined {
+  // Collect param names from the caller for naming.
+  const paramNames = cfn.params.map(p => (p as any)._name as string | undefined ?? "_");
+  const sampleArgs = paramNames.join(", ");
+
+  if (scc.size > 1) {
+    // Mutual recursion: build a path through the cycle.
+    const path = [bindingName];
+    const cyclesOut = new Set<string>();
+    for (const s of cycleCalls) {
+      if (s.callee !== bindingName) cyclesOut.add(s.callee);
+    }
+    for (const c of cyclesOut) path.push(c);
+    path.push(bindingName); // close the loop visually
+    return `${path.map(n => `${n}(${sampleArgs})`).join(" → ")} [cycle, no decrease]`;
+  }
+
+  // Self-recursion: pick the first cycle call to render.
+  const first = cycleCalls[0];
+  if (first.kind === "direct") {
+    return `${bindingName}(${sampleArgs}) → ${bindingName}(${sampleArgs}) [same input passes back]`;
+  }
+  // HOF edge.
+  const recv = primaryOf(first.receiver);
+  const recvDesc = recv.kind === ValueKind.Param
+    ? ((recv as any)._name ?? "arr")
+    : "<receiver>";
+  return `${bindingName}(${sampleArgs}) calls ${recvDesc}.${first.method}(${bindingName}) — receiver is not smaller, recursion loops`;
+}
+
+/** Stage 6: render a counterexample for a failing `decreases` metric. The
+ *  user attested a metric; we point at the first cycle call where it doesn't
+ *  decrease. */
+function renderMetricCounterexample(
+  bindingName: string,
+  metric: Value,
+  cycleCalls: CallSite[],
+): string | undefined {
+  const first = cycleCalls.find((s): s is CallSite & { kind: "direct" } => s.kind === "direct");
+  if (!first) return undefined;
+  let metricDesc = "<metric>";
+  const mp = primaryOf(metric);
+  if (mp.kind === ValueKind.Param) {
+    metricDesc = (mp as any)._name ?? `param${(mp as any).position}`;
+  } else if (mp.kind === ValueKind.Expression) {
+    const fn = primaryOf((mp as ExpressionValue).fn);
+    if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
+      metricDesc = `[${(mp as ExpressionValue).args
+        .map(a => {
+          const p = primaryOf(a);
+          if (p.kind === ValueKind.Param) return (p as any)._name ?? `param${(p as any).position}`;
+          return "_";
+        })
+        .join(", ")}]`;
+    }
+  }
+  return `\`decreases ${metricDesc}\` does not decrease on ${bindingName}(…) → ${bindingName}(…) at call site`;
 }
 
 /** Stage 5: a call site is either a direct call `Expression(Symbol(name), …)`
