@@ -409,25 +409,51 @@ export function checkTermination(
   bindings: Iterable<{ key: string | null; value: Value | undefined }>,
   typeLookup?: TypeLookup,
 ): TerminationFinding[] {
-  const findings: TerminationFinding[] = [];
+  // Materialise bindings once — needed twice (call-graph build + per-binding
+  // analysis) and the input may be a one-shot iterator.
+  const bindingList: Array<{ key: string; value: Value }> = [];
   for (const b of bindings) {
-    if (!b.key || !b.value) continue;
+    if (b.key && b.value) bindingList.push({ key: b.key, value: b.value });
+  }
+
+  // Build the call graph + peel each binding's function shape ahead of time
+  // so the analysis loop can look up any callee's paramTypeAsts.
+  const peeledByName = new Map<string, { cfn: ComposedFunctionValue; paramTypeAsts: Value[] }>();
+  const callGraph = new Map<string, Set<string>>();
+  for (const b of bindingList) {
     const peeled = peelFunctionAst(b.value);
     if (!peeled) continue;
-    const { cfn, paramTypeAsts } = peeled;
+    peeledByName.set(b.key, peeled);
+    const callees = new Set<string>();
+    collectCalleeNames(peeled.cfn.body, callees);
+    callGraph.set(b.key, callees);
+  }
+  // Compute SCCs: each function name maps to its SCC's member set. Mutual
+  // recursion = SCC size > 1; pure self-recursion = SCC size 1 with self
+  // edge; non-recursive = SCC size 1 without self edge.
+  const sccs = tarjanSCCs(callGraph);
+
+  const findings: TerminationFinding[] = [];
+  for (const b of bindingList) {
+    const peeled = peeledByName.get(b.key);
+    if (!peeled) continue;
+    const { cfn } = peeled;
     if (isFunctionPartial(cfn)) continue;
 
-    const calls = findRecursiveCalls(cfn.body, b.key);
-    if (calls.length === 0) continue; // non-recursive — trivially terminating
+    const scc = sccs.get(b.key) ?? new Set([b.key]);
+    // All calls in this function's body that target an SCC member —
+    // self-edges (self-recursion) and inter-edges (mutual recursion) alike.
+    const cycleCalls: { callee: string; call: ExpressionValue }[] = [];
+    findCallsToCycle(cfn.body, scc, cycleCalls);
+    if (cycleCalls.length === 0) continue; // not part of any recursion cycle
 
-    // Stage 3: if the user supplied a `decreases <metric>` clause, treat
-    // it as a contract. We verify what we can; anything unrecognised is
-    // trusted. Only fire when the analyzer can prove the metric does NOT
-    // decrease (or when the metric is a recognised pattern but the chain
-    // isn't decreasing).
+    // Stage 3: user-supplied `decreases` clause. The metric refers to the
+    // caller's params; verify each cycle call's caller-side decrease shape
+    // against the caller's param-type info.
     const decAttach = unwrapDecreasesAttach(cfn.body);
     if (decAttach) {
-      const reasons = checkUserMetric(decAttach.metric, calls, paramTypeAsts, typeLookup);
+      const callsOnly = cycleCalls.map(e => e.call);
+      const reasons = checkUserMetric(decAttach.metric, callsOnly, peeled.paramTypeAsts, typeLookup);
       if (reasons.length > 0) {
         const unique = [...new Set(reasons)];
         findings.push({
@@ -438,22 +464,133 @@ export function checkTermination(
       continue;
     }
 
-    // For each recursive call, attempt to find a decreasing position via
-    // Stage 2's auto-detection.
-    const nonDecreasingReasons: string[] = [];
-    for (const call of calls) {
-      const reason = whyNotDecreasing(call, paramTypeAsts, typeLookup);
-      if (reason) nonDecreasingReasons.push(reason);
+    // Auto-detection: each cycle call should show `param - K` shape on a
+    // positional arg whose CALLEE's param type has a non-negative lower
+    // bound. Self-recursion uses the caller's own types (callee == caller);
+    // mutual recursion uses the called function's types. The check is the
+    // same `whyNotDecreasing` machinery — just keyed by the callee.
+    const nonDecreasing: string[] = [];
+    for (const { callee, call } of cycleCalls) {
+      const calleePeeled = peeledByName.get(callee);
+      const calleeTypes = calleePeeled?.paramTypeAsts ?? [];
+      const reason = whyNotDecreasing(call, calleeTypes, typeLookup);
+      if (reason) {
+        const prefix = callee === b.key ? "" : `call to \`${callee}\`: `;
+        nonDecreasing.push(prefix + reason);
+      }
     }
-    if (nonDecreasingReasons.length > 0) {
-      const reasons = [...new Set(nonDecreasingReasons)];
+    if (nonDecreasing.length > 0) {
+      const reasons = [...new Set(nonDecreasing)];
+      const cycleNote = scc.size > 1
+        ? ` (mutual recursion cycle: ${[...scc].join(" ↔ ")})`
+        : "";
       const msg = reasons.length === 1
-        ? `recursive call may not terminate: ${reasons[0]}`
-        : `recursive calls may not terminate: ${reasons.join("; ")}`;
+        ? `recursive call may not terminate${cycleNote}: ${reasons[0]}`
+        : `recursive calls may not terminate${cycleNote}: ${reasons.join("; ")}`;
       findings.push({ binding: b.key, message: msg });
     }
   }
   return findings;
+}
+
+/** Walk a function body collecting names of any function called via a
+ *  Symbol reference (i.e. a top-level binding name). Used to build the
+ *  call graph for SCC computation. */
+function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void {
+  if (!v || typeof v !== "object") return;
+  if (!seen) seen = new Set();
+  if (seen.has(v)) return;
+  seen.add(v);
+  if (v.kind === ValueKind.Expression) {
+    const e = v as ExpressionValue;
+    const fn = primaryOf(e.fn);
+    if (fn.kind === ValueKind.Symbol) out.add((fn as any).name);
+    collectCalleeNames(e.fn, out, seen);
+    for (const a of e.args) collectCalleeNames(a, out, seen);
+  } else if (v.kind === ValueKind.ComposedFunction) {
+    collectCalleeNames((v as ComposedFunctionValue).body, out, seen);
+  } else if (v.kind === ValueKind.MultiValue) {
+    collectCalleeNames((v as any).primary, out, seen);
+  }
+}
+
+/** Collect every `Expression(Symbol(name), …)` call where `name` is in
+ *  `cycle`. Used to find both self-recursion and mutual-recursion edges
+ *  in one pass. */
+function findCallsToCycle(
+  body: Value,
+  cycle: Set<string>,
+  out: { callee: string; call: ExpressionValue }[],
+  seen: Set<Value> = new Set(),
+): void {
+  if (!body || typeof body !== "object" || seen.has(body)) return;
+  seen.add(body);
+  if (body.kind === ValueKind.Expression) {
+    const e = body as ExpressionValue;
+    const fn = primaryOf(e.fn);
+    if (fn.kind === ValueKind.Symbol) {
+      const name = (fn as any).name as string;
+      if (cycle.has(name)) out.push({ callee: name, call: e });
+    }
+    findCallsToCycle(e.fn, cycle, out, seen);
+    for (const a of e.args) findCallsToCycle(a, cycle, out, seen);
+  } else if (body.kind === ValueKind.ComposedFunction) {
+    findCallsToCycle((body as ComposedFunctionValue).body, cycle, out, seen);
+  } else if (body.kind === ValueKind.MultiValue) {
+    findCallsToCycle((body as any).primary, cycle, out, seen);
+  }
+}
+
+/** Tarjan's strongly-connected-components algorithm. Returns a map from
+ *  each node to its SCC's member set. Non-function callees in the graph
+ *  (e.g. references to top-level value bindings that happen to share a
+ *  name with no function) are skipped via the `graph.has` check. */
+function tarjanSCCs(graph: Map<string, Set<string>>): Map<string, Set<string>> {
+  const index = new Map<string, number>();
+  const lowlink = new Map<string, number>();
+  const onStack = new Set<string>();
+  const stack: string[] = [];
+  const sccsList: Set<string>[] = [];
+  let counter = 0;
+
+  function strongconnect(v: string): void {
+    index.set(v, counter);
+    lowlink.set(v, counter);
+    counter++;
+    stack.push(v);
+    onStack.add(v);
+
+    const successors = graph.get(v) ?? new Set<string>();
+    for (const w of successors) {
+      if (!graph.has(w)) continue; // skip names that aren't functions
+      if (!index.has(w)) {
+        strongconnect(w);
+        lowlink.set(v, Math.min(lowlink.get(v)!, lowlink.get(w)!));
+      } else if (onStack.has(w)) {
+        lowlink.set(v, Math.min(lowlink.get(v)!, index.get(w)!));
+      }
+    }
+
+    if (lowlink.get(v) === index.get(v)) {
+      const scc = new Set<string>();
+      let w: string;
+      do {
+        w = stack.pop()!;
+        onStack.delete(w);
+        scc.add(w);
+      } while (w !== v);
+      sccsList.push(scc);
+    }
+  }
+
+  for (const v of graph.keys()) {
+    if (!index.has(v)) strongconnect(v);
+  }
+  const result = new Map<string, Set<string>>();
+  for (const scc of sccsList) {
+    for (const name of scc) result.set(name, scc);
+  }
+  return result;
 }
 
 /** Verify a user-supplied `decreases <metric>` clause. Returns one reason per
@@ -545,32 +682,6 @@ function findLexDecreasePosition(components: Value[], call: ExpressionValue): nu
     if (decrease && decrease.pos === pos) return i;
   }
   return -1;
-}
-
-/** Collect every `Expression(Symbol(fnName), …)` occurrence in `body`. */
-function findRecursiveCalls(body: Value, fnName: string): ExpressionValue[] {
-  const out: ExpressionValue[] = [];
-  const seen = new Set<Value>();
-  function walk(v: Value): void {
-    if (!v || typeof v !== "object") return;
-    if (seen.has(v)) return;
-    seen.add(v);
-    if (v.kind === ValueKind.Expression) {
-      const e = v as ExpressionValue;
-      const fn = primaryOf(e.fn);
-      if (fn.kind === ValueKind.Symbol && (fn as any).name === fnName) {
-        out.push(e);
-      }
-      walk(e.fn);
-      for (const a of e.args) walk(a);
-    } else if (v.kind === ValueKind.ComposedFunction) {
-      walk((v as ComposedFunctionValue).body);
-    } else if (v.kind === ValueKind.MultiValue) {
-      walk((v as any).primary);
-    }
-  }
-  walk(body);
-  return out;
 }
 
 /** Return a string explaining why the call isn't provably decreasing, or null

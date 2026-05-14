@@ -6121,6 +6121,115 @@ test("Phase E Stage 3: `partial` overrides `decreases`", () => {
 
 fileTest(path.join(testsDir, "totality-decreases-demo.alg"));
 
+// --- Phase E Stage 4: mutual recursion via SCC ---
+//
+// The call-graph analyzer groups bindings into strongly-connected components.
+// Within each SCC, EVERY call to an SCC member must be provably decreasing
+// (against the callee's param types) for the whole cycle to terminate.
+
+test("Phase E Stage 4: mutual recursion with NonNeg decreases is provably terminating", () => {
+  // isEven/isOdd: classic even/odd. Each call decreases n by 1; both params
+  // are NonNeg-bounded so the chain is bounded below.
+  const src = `
+NonNeg = Int & _ >= 0
+isEven(n: NonNeg): Int =>
+  if n == 0 then 1 else isOdd(n - 1)
+isOdd(n: NonNeg): Int =>
+  if n == 0 then 0 else isEven(n - 1)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0, `expected clean, got: ${notes.map(n => n.message).join("; ")}`);
+});
+
+test("Phase E Stage 4: mutual recursion with no decrease fires on both", () => {
+  // Each function has a base case but the recursive call doesn't decrease.
+  // SCC contains both; neither cycle call decreases; both fire.
+  const src = `
+a(n: Int): Int => if n == 0 then 0 else b(n)
+b(n: Int): Int => if n == 0 then 0 else a(n)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 2);
+  for (const n of notes) {
+    eq(n.message.includes("mutual recursion cycle"), true,
+       `expected mutual-cycle message, got: ${n.message}`);
+  }
+});
+
+test("Phase E Stage 4: mutual recursion where one side doesn't decrease fires", () => {
+  // a→b decreases, b→a does not. The cycle isn't shown to terminate so
+  // `b` reports.
+  const src = `
+NonNeg = Int & _ >= 0
+a(n: NonNeg): Int => if n == 0 then 0 else b(n - 1)
+b(n: NonNeg): Int => if n == 0 then 0 else a(n)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  // `a` calls `b` with n-1 (decreases against b's NonNeg) — clean.
+  // `b` calls `a` with n unchanged — fires.
+  const bNote = notes.find(n => n.binding === "b");
+  eq(bNote !== undefined, true,
+    `expected b to fire, got: ${notes.map(n => `${n.binding}: ${n.message}`).join("; ")}`);
+  if (bNote) eq(bNote.message.includes("mutual recursion cycle"), true);
+});
+
+test("Phase E Stage 4: self-recursion still reported as such (SCC size 1)", () => {
+  // SCC contains only `bad`. The message should NOT mention a mutual cycle
+  // — Stage 2's wording is preserved for the self-recursion case.
+  const src = `bad(n: Int): Int => bad(n)\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination" && n.binding === "bad"
+  );
+  eq(notes.length, 1);
+  eq(notes[0].message.includes("mutual recursion cycle"), false,
+    `self-recursion shouldn't mention mutual cycle: ${notes[0].message}`);
+});
+
+test("Phase E Stage 4: three-function mutual cycle terminates correctly", () => {
+  // A→B→C→A — all three in one SCC. Each call decreases n by 1 against
+  // NonNeg. Should be clean across all three.
+  const src = `
+NonNeg = Int & _ >= 0
+f1(n: NonNeg): Int => if n == 0 then 0 else f2(n - 1)
+f2(n: NonNeg): Int => if n == 0 then 0 else f3(n - 1)
+f3(n: NonNeg): Int => if n == 0 then 0 else f1(n - 1)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0, `expected clean, got: ${notes.map(n => n.message).join("; ")}`);
+});
+
+fileTest(path.join(testsDir, "totality-mutual-demo.alg"));
+
+test("Phase E Stage 4: non-recursive helper alongside mutual cycle stays silent", () => {
+  // `id` is non-recursive (no edge into the SCC) — should be untouched.
+  // Mutual cycle of a/b fires on its own.
+  const src = `
+id(n: Int): Int => n
+a(n: Int): Int => if n == 0 then 0 else b(n)
+b(n: Int): Int => if n == 0 then 0 else a(n)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  const ids = notes.map(n => n.binding).sort();
+  eq(ids.join(","), "a,b",
+    `expected only a,b to fire, got: ${notes.map(n => n.binding).join(",")}`);
+});
+
 // --- Tail-call through typed-return wrapper (type_check forwards TailCalls) ---
 
 test("Tail-recursive typed function returns correctly", () => {
