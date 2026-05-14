@@ -6213,6 +6213,122 @@ f3(n: NonNeg): Int => if n == 0 then 0 else f1(n - 1)
 
 fileTest(path.join(testsDir, "totality-mutual-demo.alg"));
 
+// --- Phase E Stage 5: HOF-mediated recursion ---
+//
+// Recursive references reach the analyzer indirectly when passed as callbacks
+// to stdlib HOFs (`arr.map(self)`, `arr.filter(self)`, `arr.reduce(self, …)`).
+// Stage 5 detects these and verifies the HOF call is well-founded — the
+// receiver must be structurally smaller than a caller parameter.
+
+test("Phase E Stage 5: non-recursive HOF call stays silent", () => {
+  const src = `
+double_self(x: Int): Int => x * 2
+double_list(arr: Array[Int]): Array[Int] => arr.map(double_self)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 5: arr.map(self) with bare-Param receiver fires", () => {
+  // The receiver `arr` is the function's own param, so the recursion
+  // would loop on the same data — not structurally smaller.
+  const src = `recursive_map(arr: Array[Int]): Array[Int] => arr.map(recursive_map)\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination" && n.binding === "recursive_map"
+  );
+  eq(notes.length, 1);
+  eq(notes[0].message.includes("HOF-mediated"), true);
+  eq(notes[0].message.includes(".map"), true);
+});
+
+test("Phase E Stage 5: structurally-smaller receiver discharges the check", () => {
+  // `t.children.map(tree_sum)` — receiver is `t.children`, a field access
+  // on a parameter. Treated as structurally smaller (sub-component of t).
+  const src = `tree_sum(t: Object): Int => t.children.map(tree_sum).reduce((a, x) => a + x, 0)\n`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0, `expected clean, got: ${notes.map(n => n.message).join("; ")}`);
+});
+
+test("Phase E Stage 5: decreases clause overrides HOF check", () => {
+  const src = `recursive_map(arr: Array[Int]): Array[Int] =>
+  decreases_attach(arr.map(recursive_map), arr)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 5: partial overrides HOF check", () => {
+  const src = `loop_map(arr: Array[Int]): Array[Int] =>
+  partial_attach(arr.map(loop_map))
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase E Stage 5: filter and reduce are detected too", () => {
+  const src = `
+keep_evens(arr: Array[Int]): Array[Int] => arr.filter(keep_evens)
+sum_all(arr: Array[Int]): Int => arr.reduce(sum_all, 0)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  // Both bindings are recursive via HOFs on bare-Param receivers.
+  const names = notes.map(n => n.binding).sort();
+  eq(names.join(","), "keep_evens,sum_all");
+  for (const n of notes) {
+    eq(n.message.includes("HOF-mediated"), true);
+  }
+});
+
+test("Phase E Stage 5: mutual HOF cycle fires on both", () => {
+  // a.map → b, b.map → a. SCC = {a, b}; each cycle edge is HOF-mediated
+  // with a bare-Param receiver. Both fire.
+  const src = `
+a(arr: Array[Int]): Array[Int] => arr.map(b)
+b(arr: Array[Int]): Array[Int] => arr.map(a)
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 2);
+  for (const n of notes) {
+    eq(n.message.includes("mutual recursion cycle"), true);
+    eq(n.message.includes("HOF-mediated"), true);
+  }
+});
+
+test("Phase E Stage 5: HOF callback to non-cycle member stays silent", () => {
+  // `b` doesn't call back to `a`, so no cycle exists — non-recursive HOF
+  // use is fine.
+  const src = `
+a(arr: Array[Int]): Array[Int] => arr.map(b)
+b(x: Int): Int => x + 1
+`;
+  const { compilationReport } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "totality-nontermination"
+  );
+  eq(notes.length, 0);
+});
+
+fileTest(path.join(testsDir, "totality-hof-demo.alg"));
+
 test("Phase E Stage 4: non-recursive helper alongside mutual cycle stays silent", () => {
   // `id` is non-recursive (no edge into the SCC) — should be untouched.
   // Mutual cycle of a/b fires on its own.

@@ -442,18 +442,23 @@ export function checkTermination(
 
     const scc = sccs.get(b.key) ?? new Set([b.key]);
     // All calls in this function's body that target an SCC member —
-    // self-edges (self-recursion) and inter-edges (mutual recursion) alike.
-    const cycleCalls: { callee: string; call: ExpressionValue }[] = [];
+    // self-edges (self-recursion) and inter-edges (mutual recursion) alike,
+    // plus Stage 5 HOF-mediated edges (callback passed to map/filter/reduce).
+    const cycleCalls: CallSite[] = [];
     findCallsToCycle(cfn.body, scc, cycleCalls);
     if (cycleCalls.length === 0) continue; // not part of any recursion cycle
 
     // Stage 3: user-supplied `decreases` clause. The metric refers to the
     // caller's params; verify each cycle call's caller-side decrease shape
-    // against the caller's param-type info.
+    // against the caller's param-type info. Stage 5 HOF edges are accepted
+    // without metric verification (the `decreases` clause is the contract;
+    // we trust it).
     const decAttach = unwrapDecreasesAttach(cfn.body);
     if (decAttach) {
-      const callsOnly = cycleCalls.map(e => e.call);
-      const reasons = checkUserMetric(decAttach.metric, callsOnly, peeled.paramTypeAsts, typeLookup);
+      const directCalls = cycleCalls
+        .filter((s): s is CallSite & { kind: "direct" } => s.kind === "direct")
+        .map(s => s.call);
+      const reasons = checkUserMetric(decAttach.metric, directCalls, peeled.paramTypeAsts, typeLookup);
       if (reasons.length > 0) {
         const unique = [...new Set(reasons)];
         findings.push({
@@ -464,18 +469,24 @@ export function checkTermination(
       continue;
     }
 
-    // Auto-detection: each cycle call should show `param - K` shape on a
-    // positional arg whose CALLEE's param type has a non-negative lower
-    // bound. Self-recursion uses the caller's own types (callee == caller);
-    // mutual recursion uses the called function's types. The check is the
-    // same `whyNotDecreasing` machinery — just keyed by the callee.
+    // Auto-detection.
+    //   - Direct calls: verify `param - K` shape against the CALLEE's param
+    //     type. Self-recursion uses the caller's own types (callee == caller);
+    //     mutual recursion uses the called function's types.
+    //   - HOF calls (Stage 5): verify the receiver is structurally smaller
+    //     than a caller parameter via `param.field` access.
     const nonDecreasing: string[] = [];
-    for (const { callee, call } of cycleCalls) {
-      const calleePeeled = peeledByName.get(callee);
-      const calleeTypes = calleePeeled?.paramTypeAsts ?? [];
-      const reason = whyNotDecreasing(call, calleeTypes, typeLookup);
+    for (const site of cycleCalls) {
+      let reason: string | null;
+      if (site.kind === "direct") {
+        const calleePeeled = peeledByName.get(site.callee);
+        const calleeTypes = calleePeeled?.paramTypeAsts ?? [];
+        reason = whyNotDecreasing(site.call, calleeTypes, typeLookup);
+      } else {
+        reason = whyHofCallNotDecreasing(site);
+      }
       if (reason) {
-        const prefix = callee === b.key ? "" : `call to \`${callee}\`: `;
+        const prefix = site.callee === b.key ? "" : `call to \`${site.callee}\`: `;
         nonDecreasing.push(prefix + reason);
       }
     }
@@ -493,9 +504,44 @@ export function checkTermination(
   return findings;
 }
 
+/** Stage 5: a call site is either a direct call `Expression(Symbol(name), …)`
+ *  or an indirect call where the function value flows into a stdlib HOF
+ *  callback slot (`arr.map(self)` / `arr.filter(self)` / `arr.reduce(self, init)`).
+ *  Each variant carries enough information for termination verification. */
+type CallSite =
+  | { kind: "direct"; callee: string; call: ExpressionValue }
+  | { kind: "hof"; callee: string; method: "map" | "filter" | "reduce"; receiver: Value };
+
+const _HOF_METHODS = new Set(["map", "filter", "reduce"]);
+
+/** Recognise `Expression(Expression(type_dispatch, [receiver, Bits("map"|...)]), [cb, ...])`.
+ *  Returns the HOF method name + receiver + ordered args, or null if the
+ *  expression isn't a stdlib HOF dispatch. */
+function matchStdlibHof(
+  e: ExpressionValue,
+): { method: "map" | "filter" | "reduce"; receiver: Value; args: Value[] } | null {
+  const outerFn = primaryOf(e.fn);
+  if (outerFn.kind !== ValueKind.Expression) return null;
+  const dispFn = primaryOf((outerFn as ExpressionValue).fn);
+  if (dispFn.kind !== ValueKind.PrimitiveFunction) return null;
+  if ((dispFn as any).name !== "type_dispatch") return null;
+  const dispArgs = (outerFn as ExpressionValue).args;
+  if (dispArgs.length !== 2) return null;
+  const methodVal = primaryOf(dispArgs[1]);
+  if (methodVal.kind !== ValueKind.Bits) return null;
+  const method = bitsToString(methodVal as BitsValue);
+  if (!_HOF_METHODS.has(method)) return null;
+  return {
+    method: method as "map" | "filter" | "reduce",
+    receiver: dispArgs[0],
+    args: e.args,
+  };
+}
+
 /** Walk a function body collecting names of any function called via a
- *  Symbol reference (i.e. a top-level binding name). Used to build the
- *  call graph for SCC computation. */
+ *  Symbol reference. Used to build the call graph for SCC computation.
+ *  Stage 5: also picks up callbacks passed to stdlib HOFs — `arr.map(f)`
+ *  contributes `f` as a callee. */
 function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void {
   if (!v || typeof v !== "object") return;
   if (!seen) seen = new Set();
@@ -505,6 +551,14 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
     const e = v as ExpressionValue;
     const fn = primaryOf(e.fn);
     if (fn.kind === ValueKind.Symbol) out.add((fn as any).name);
+    // Stage 5: HOF callback positions.
+    const hof = matchStdlibHof(e);
+    if (hof) {
+      for (const a of hof.args) {
+        const ap = primaryOf(a);
+        if (ap.kind === ValueKind.Symbol) out.add((ap as any).name);
+      }
+    }
     collectCalleeNames(e.fn, out, seen);
     for (const a of e.args) collectCalleeNames(a, out, seen);
   } else if (v.kind === ValueKind.ComposedFunction) {
@@ -514,13 +568,12 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
   }
 }
 
-/** Collect every `Expression(Symbol(name), …)` call where `name` is in
- *  `cycle`. Used to find both self-recursion and mutual-recursion edges
- *  in one pass. */
+/** Collect every cycle call in `body` — direct (`Expression(Symbol(name), …)`)
+ *  and HOF-mediated (Symbol callback inside a stdlib map/filter/reduce). */
 function findCallsToCycle(
   body: Value,
   cycle: Set<string>,
-  out: { callee: string; call: ExpressionValue }[],
+  out: CallSite[],
   seen: Set<Value> = new Set(),
 ): void {
   if (!body || typeof body !== "object" || seen.has(body)) return;
@@ -530,7 +583,20 @@ function findCallsToCycle(
     const fn = primaryOf(e.fn);
     if (fn.kind === ValueKind.Symbol) {
       const name = (fn as any).name as string;
-      if (cycle.has(name)) out.push({ callee: name, call: e });
+      if (cycle.has(name)) out.push({ kind: "direct", callee: name, call: e });
+    }
+    // Stage 5: HOF callback positions.
+    const hof = matchStdlibHof(e);
+    if (hof) {
+      for (const a of hof.args) {
+        const ap = primaryOf(a);
+        if (ap.kind === ValueKind.Symbol) {
+          const name = (ap as any).name as string;
+          if (cycle.has(name)) {
+            out.push({ kind: "hof", callee: name, method: hof.method, receiver: hof.receiver });
+          }
+        }
+      }
     }
     findCallsToCycle(e.fn, cycle, out, seen);
     for (const a of e.args) findCallsToCycle(a, cycle, out, seen);
@@ -539,6 +605,36 @@ function findCallsToCycle(
   } else if (body.kind === ValueKind.MultiValue) {
     findCallsToCycle((body as any).primary, cycle, out, seen);
   }
+}
+
+/** Stage 5 termination check for an HOF cycle edge. An HOF call is
+ *  well-founded when the receiver is structurally smaller than a caller
+ *  parameter — Stage 5 minimum recognises `param.field` access (the field
+ *  is a sub-component of the record, so iterating it terminates by
+ *  structural induction). Bare-Param receivers (e.g. `arr.map(self)` on
+ *  the function's own array param) are NOT decreasing and fire. */
+function isHofReceiverStructurallySmaller(receiver: Value): boolean {
+  const p = primaryOf(receiver);
+  if (p.kind !== ValueKind.Expression) return false;
+  const inner = primaryOf((p as ExpressionValue).fn);
+  if (inner.kind !== ValueKind.PrimitiveFunction) return false;
+  if ((inner as any).name !== "type_dispatch") return false;
+  const args = (p as ExpressionValue).args;
+  if (args.length !== 2) return false;
+  const recvArg = primaryOf(args[0]);
+  // `param.field` shape: dispatch's first arg is a bare Param. The field
+  // value is a sub-component by record-structural induction.
+  return recvArg.kind === ValueKind.Param;
+}
+
+/** Explain why an HOF cycle edge doesn't terminate, or null when it does. */
+function whyHofCallNotDecreasing(site: CallSite & { kind: "hof" }): string | null {
+  if (isHofReceiverStructurallySmaller(site.receiver)) return null;
+  const recv = primaryOf(site.receiver);
+  const recvDesc = recv.kind === ValueKind.Param
+    ? `param \`${(recv as any)._name ?? `param${(recv as any).position}`}\``
+    : "the receiver";
+  return `HOF-mediated recursive call via \`.${site.method}\`: ${recvDesc} is not structurally smaller than any parameter (consider a \`decreases\` clause or \`partial\`)`;
 }
 
 /** Tarjan's strongly-connected-components algorithm. Returns a map from
