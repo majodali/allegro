@@ -693,6 +693,21 @@ export function buildBaseGrammar(): Grammar {
 
   addProduction(g, { name: "stmt",
     rule: alt([
+      // Phase F1 — provability surface. `theorem`/`verify` are core to
+      // Allegro's defining feature, so they live in the base grammar (not
+      // an opt-in lib extension). Tried before binding/fn_decl/expr so the
+      // leading keyword wins; they are NOT reserved words — `theorem` /
+      // `verify` as ordinary identifiers still parse via backtracking to
+      // `binding` / `expr` (same approach as the `grammar` atom).
+      //
+      // theorem NAME: <prop>  — named, referenceable proof binding
+      seq([lit("theorem"), nonterm("ws_req"),
+           nonterm("ident"),
+           nonterm("ws"), lit(":"), nonterm("ws"), nonterm("expr")],
+        { name: "theorem_decl" }),
+      // verify <prop>  — anonymous, one-shot proof by evaluation
+      seq([lit("verify"), nonterm("ws_req"), nonterm("expr")],
+        { name: "verify_stmt" }),
       // import NAME
       seq([lit("import"), nonterm("ws_req"), nonterm("ident")],
         { name: "import_stmt" }),

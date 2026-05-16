@@ -2394,6 +2394,41 @@ export const pureEffect: ContextValue = buildEffect("pure", "pure");
 export const opaqueEffect: ContextValue = buildEffect("opaque", "opaque");
 
 // =============================================================================
+// Proof meta-type (Phase F1 substrate)
+// =============================================================================
+//
+// A Proof is a Value that witnesses a proposition. Phase F1's only proof
+// constructor is `proof_by_eval` (discharge by partial evaluation): if the
+// proposition folds to `true`, the witness is valid. Later chunks add
+// refinement-domain proofs (F2) and proof combinators (F3).
+//
+// Internally a proof is a Context with `__type = Proof`, a `__proposition`
+// binding holding a source-rendered string of what was proved, and a
+// `__discharged` flag. Failed proofs are Error-typed values carrying the
+// counterexample (reusing Phase E Stage 6 machinery) — `checkProofs` in
+// `src/proofs.ts` surfaces them as error-severity notifications.
+
+export const Proof: ContextValue = makeContext();
+addBinding(Proof, "__name", stringToBits("Proof"));
+addBinding(Proof, "__type", Type);
+addBinding(Proof, "__members", makeContext());
+
+/** Construct a discharged proof witness for a proposition. `proposition`
+ *  is the source-rendered text of what was proved (for display / export). */
+export function makeProof(proposition: string): Value {
+  const p = makeContext();
+  addBinding(p, "__proposition", stringToBits(proposition));
+  addBinding(p, "__discharged", makeInt(1));
+  return withType(p, Proof);
+}
+
+/** Is this value a discharged Proof? */
+export function isProof(v: Value): boolean {
+  const t = getType(v);
+  return t === Proof || getTypeName(v) === "Proof";
+}
+
+// =============================================================================
 // Type System Extension
 // =============================================================================
 
@@ -2445,6 +2480,8 @@ export function createTypeSystem(): Extension {
       Effect: wrapType(Effect) as any,
       pure: wrapType(pureEffect) as any,
       opaque: wrapType(opaqueEffect) as any,
+      // Proof meta-type (Phase F1)
+      Proof: wrapType(Proof) as any,
       // Literal bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,

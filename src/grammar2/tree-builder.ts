@@ -1414,6 +1414,39 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
     return { key: textOf(identTree), value: undefined as any };
   }
 
+  if (tag === "theorem_decl") {
+    // theorem NAME: <prop>  — Phase F1. A named, referenceable binding
+    // whose value is a `proof_by_eval` of the proposition. The proposition's
+    // source text is captured via `textOf` and passed as the first arg
+    // (label only, never re-parsed) for counterexample / export rendering.
+    const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
+    if (!identTree) throw new Error("theorem_decl: missing name");
+    const name = textOf(identTree);
+    // Proposition is the last expression-tagged child (after `:`).
+    const propTree = [...c].reverse().find(
+      ch => ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag),
+    );
+    if (!propTree) throw new Error("theorem_decl: missing proposition");
+    const propSrc = textOf(propTree).trim();
+    const value = makeExpr(prim("proof_by_eval"),
+      [stringToBits(propSrc), buildExpr(propTree, outerParamMap)]);
+    return { key: name, value };
+  }
+
+  if (tag === "verify_stmt") {
+    // verify <prop>  — Phase F1. Anonymous one-shot proof by evaluation.
+    // Bare expression: the proof Value is produced and discarded; its only
+    // purpose is the compile-time discharge check (`checkProofs`).
+    const propTree = [...c].reverse().find(
+      ch => ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag),
+    );
+    if (!propTree) throw new Error("verify_stmt: missing proposition");
+    const propSrc = textOf(propTree).trim();
+    const value = makeExpr(prim("proof_by_eval"),
+      [stringToBits(propSrc), buildExpr(propTree, outerParamMap)]);
+    return { key: null, value };
+  }
+
   if (tag === "export_binding") {
     // export NAME[: type] = expr — build binding, wrap with export primitive.
     const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");

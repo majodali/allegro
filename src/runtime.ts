@@ -15,6 +15,7 @@ import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf, GrammarFragment } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
 import { checkExhaustiveness, checkTermination } from "./totality.js";
+import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -1072,12 +1073,21 @@ export function evalSource(
   let lastValue: Value | null = null;
   const completedInThisPass = new Set<string>();
   let bareCounter = 0;
+  // Phase F1: failed proofs collected during evaluation. `theorem`/`verify`
+  // evaluate to a Proof value; a non-discharged one is a finding.
+  const proofFindings: ProofFinding[] = [];
 
   for (const b of fileCtx.bindingList) {
     if (b.value === undefined) continue;
 
     const collector: DepCollector = { incompleteRefs: new Set() };
     const val = evaluate(b.value, evalCtx, 0, collector);
+
+    // Phase F1: surface failed proofs (both anonymous `verify` and named
+    // `theorem` bindings evaluate to a Proof value).
+    if (isFailedProof(val)) {
+      proofFindings.push(describeFailedProof(val, b.key));
+    }
 
     if (b.key === null) {
       // Bare expression
@@ -1149,6 +1159,25 @@ export function evalSource(
   // Forward-chain: propagate completions to re-evaluate dependent residuals
   if (completedInThisPass.size > 0) {
     propagateCompletions(registry, evalCtx, completedInThisPass);
+  }
+
+  // Phase F1: a failed proof is unsound by construction. Surface every
+  // finding as an error-severity notification and halt — same "build
+  // safety in" treatment as a failed effects declaration.
+  if (proofFindings.length > 0 && compilationReport) {
+    for (const f of proofFindings) {
+      compilationReport.notifications.push({
+        kind:           "proof-failure",
+        severity:       "error",
+        binding:        f.binding ?? undefined,
+        message:        formatProofFinding(f),
+        counterexample: f.counterexample,
+      });
+    }
+    throw new Error(
+      "proof check failed:\n" +
+      proofFindings.map(f => "  " + formatProofFinding(f)).join("\n"),
+    );
   }
 
   return { value: lastValue, evalCtx, compilationReport, registry };

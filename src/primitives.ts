@@ -1509,6 +1509,7 @@ import {
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
   structuralWrap, makeUnionType, wrapType, buildRefinedType,
   Effect as _Effect, effectUnion as _effectUnion,
+  makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 import {
@@ -3061,6 +3062,68 @@ const decreases_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return evalFn!(args[0], ctx!);
 };
 
+// --- Phase F1: proof terms ---
+//
+// `proof_by_eval(propSrc, propExpr)` — the F1 proof constructor. Lazy on
+// the proposition (arg 1, unevaluated). Discharge-by-partial-evaluation:
+// evaluate the proposition; if it folds to `true` (Bits 1) the proof is
+// established and we return a discharged `Proof` value. If it folds to
+// `false` or stays unresolved, we return a *failed* Proof — a Proof-typed
+// Context with `__discharged = 0` carrying the reason + counterexample.
+// `checkProofs` (src/proofs.ts) scans bindings for failed proofs and
+// surfaces them as error-severity notifications that halt compilation
+// (a failed proof is unsound by construction — "build safety in").
+//
+// `propSrc` is the source-rendered text of the proposition (captured by
+// the tree-builder via `textOf`), used for display / counterexamples /
+// future Lean export. It is NOT re-parsed — purely a label.
+
+function makeFailedProof(prop: string, reason: string, counterexample?: string): Value {
+  const p = makeContext();
+  p.bindings.set("__proposition", { key: "__proposition", value: stringToBits(prop), isUse: false });
+  p.bindings.set("__discharged",  { key: "__discharged",  value: makeInt(0), isUse: false });
+  p.bindings.set("__reason",      { key: "__reason",      value: stringToBits(reason), isUse: false });
+  if (counterexample !== undefined) {
+    p.bindings.set("__counterexample", { key: "__counterexample", value: stringToBits(counterexample), isUse: false });
+  }
+  return withType(p, _Proof);
+}
+
+const proof_by_eval_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) {
+    throw new AllegroError(`proof_by_eval: expected 2 args (propSrc, prop), got ${args.length}`);
+  }
+  const srcP = primaryOf(args[0]);
+  const propSrc = srcP.kind === ValueKind.Bits ? bitsToString(srcP as BitsValue) : "<proposition>";
+
+  const result = evalFn!(args[1], ctx!);
+  const rp = primaryOf(result);
+
+  if (rp.kind === ValueKind.Bits) {
+    const data = (rp as BitsValue).data;
+    if (data === 1n) {
+      // Discharged by evaluation.
+      return _makeProof(propSrc);
+    }
+    if (data === 0n) {
+      // Definitively false — a disproof. Render the counterexample.
+      return makeFailedProof(
+        propSrc,
+        `proposition is false`,
+        `\`${propSrc}\` evaluates to false`,
+      );
+    }
+  }
+  // Unresolved (or non-Bool primary) — PE could not discharge it. F1's
+  // contract is "provable BY EVALUATION"; anything that doesn't fold is a
+  // failure of this specific proof strategy (F2/F3 add other strategies).
+  return makeFailedProof(
+    propSrc,
+    `could not be discharged by evaluation`,
+    `\`${propSrc}\` did not reduce to a constant Bool (PE left a residual)`,
+  );
+};
+
 // --- Typed binary operator helper ---
 
 function makeTypedBinOp(opName: string): PrimitiveFnImpl {
@@ -3237,6 +3300,8 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   partial_attach: makePrimitive("partial_attach", partial_attach_impl, true),
   decreases_decl_marker: makePrimitive("decreases_decl_marker", decreases_decl_marker_impl, true),
   decreases_attach: makePrimitive("decreases_attach", decreases_attach_impl, true),
+  // Phase F1: proof by partial evaluation. Lazy on the proposition arg.
+  proof_by_eval: makePrimitive("proof_by_eval", proof_by_eval_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),
