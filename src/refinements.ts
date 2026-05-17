@@ -725,8 +725,11 @@ export function propagateForPrimitive(
   return null;
 }
 
-/** Read a domain from a value OR derive it from a concrete literal. */
-function domainOrFromValue(v: Value): AbstractDomain | null {
+/** Read a domain from a value OR derive it from a concrete literal.
+ *  Exported for Phase F2 (`proof_refines`) — the proof constructor needs a
+ *  value's effective domain whether it came from a refinement, a predicate
+ *  set, arithmetic propagation, or is just a bare integer literal. */
+export function domainOrFromValue(v: Value): AbstractDomain | null {
   const dom = domainOf(v);
   if (dom) return dom;
   const lit = asIntLiteral(v);

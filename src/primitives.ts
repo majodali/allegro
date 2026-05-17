@@ -1532,6 +1532,8 @@ import {
   mergePredicateSets as _mergePredicateSets,
   deriveBranchPredicates as _deriveBranchPredicates,
   PredicateSource as _PredicateSource,
+  domainOrFromValue as _domainOrFromValue,
+  counterexampleFor as _counterexampleFor,
 } from "./refinements.js";
 
 /**
@@ -3099,6 +3101,14 @@ const proof_by_eval_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const result = evalFn!(args[1], ctx!);
   const rp = primaryOf(result);
 
+  // Composition (F2+): the proposition may itself evaluate to a Proof —
+  // e.g. `theorem t: proof_refines(5, PositiveInt)` or any future proof
+  // combinator. A discharged Proof passes straight through (re-labelled
+  // with the theorem's source); a failed one propagates its reason.
+  if (_isProof(result)) {
+    return result;
+  }
+
   if (rp.kind === ValueKind.Bits) {
     const data = (rp as BitsValue).data;
     if (data === 1n) {
@@ -3122,6 +3132,98 @@ const proof_by_eval_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     `could not be discharged by evaluation`,
     `\`${propSrc}\` did not reduce to a constant Bool (PE left a residual)`,
   );
+};
+
+// --- Phase F2: proof by refinement-domain entailment ---
+//
+// `proof_refines(value, refinedType)` — witnesses that `value` provably
+// inhabits `refinedType`, discharged through the SAME abstract-domain
+// lattice used by Phase B/C refinement checks (`impliesDomain`). This is
+// the second proof strategy (F1 = proof_by_eval); both produce the same
+// Proof / failed-Proof shape so `checkProofs` stays the single surfacing
+// point and composition under `theorem` / `verify` is automatic.
+//
+// The discharge: read `value`'s effective abstract domain (predicate set,
+// propagated domain, or — for a bare literal — `eq(k)`), read the refined
+// type's `__abstractDomain`, and check entailment. On failure, reuse the
+// Phase B counterexample generator to produce a concrete breaking value.
+
+function fmtDomain(d: any): string {
+  if (!d) return "?";
+  if (d.kind === "interval") {
+    if (d.lo === d.hi) return `== ${d.lo}`;
+    if (d.lo === -Infinity) return `≤ ${d.hi}`;
+    if (d.hi === Infinity)  return `≥ ${d.lo}`;
+    return `∈ [${d.lo}, ${d.hi}]`;
+  }
+  if (d.kind === "eq") return `== ${d.value}`;
+  if (d.kind === "ne") return `≠ ${d.value}`;
+  if (d.kind === "effects") return `effects {${[...d.labels].join(", ")}}`;
+  return "opaque";
+}
+
+const proof_refines_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) {
+    throw new AllegroError(`proof_refines: expected 2 args (value, refinedType), got ${args.length}`);
+  }
+  const value = evalFn!(args[0], ctx!);
+  const refined = evalFn!(args[1], ctx!);
+
+  // The refined type's OWN name (its `__name` binding), not its meta-type.
+  const rtCtx = primaryOf(refined) as any;
+  const nameBinding = rtCtx?.bindings?.get?.("__name")?.value;
+  const typeName = (nameBinding && primaryOf(nameBinding).kind === ValueKind.Bits)
+    ? bitsToString(primaryOf(nameBinding) as BitsValue)
+    : (getTypeName(refined) ?? "<type>");
+  // Render the value: a 64-bit Int as its signed integer, else "value".
+  const litP = primaryOf(value);
+  let valDesc = "value";
+  if (litP.kind === ValueKind.Bits && (litP as BitsValue).length === 64) {
+    const d = (litP as BitsValue).data;
+    const signed = d >= 0x8000000000000000n ? d - 0x10000000000000000n : d;
+    valDesc = String(signed);
+  }
+  const propSrc = `${valDesc} refines ${typeName}`;
+
+  if (!isResolved(value) || !isResolved(refined)) {
+    return makeFailedProof(propSrc, `operands did not resolve`,
+      `\`proof_refines\` needs both the value and the refined type resolved`);
+  }
+
+  // Expected: the refined type's abstract domain (set by buildRefinedType /
+  // Type.invariant via domainFromPredicate).
+  const rt = primaryOf(refined) as any;
+  const expected = (rt && rt.__abstractDomain)
+    ? rt.__abstractDomain
+    : (rt && rt.bindings?.get?.("__predicate")?.value
+        ? domainFromPredicate(rt.bindings.get("__predicate").value)
+        : null);
+  if (!expected || expected.kind === "opaque") {
+    return makeFailedProof(propSrc,
+      `\`${typeName}\` is not a refinement type with a recognised domain`,
+      `proof_refines discharges refinement membership (interval / eq / ne shapes); for base-type facts use proof_by_eval`);
+  }
+
+  // Actual: the value's effective domain — predicate set, propagated
+  // domain, or a bare literal lifted to `eq(k)`.
+  const actual = _domainOrFromValue(value);
+  if (!actual) {
+    return makeFailedProof(propSrc,
+      `value has no recognised abstract domain`,
+      `\`${valDesc}\` carries neither a refinement predicate nor a concrete literal the lattice can reason about`);
+  }
+
+  if (_impliesDomain(actual, expected)) {
+    return _makeProof(propSrc);
+  }
+
+  // Not entailed — produce a concrete counterexample where possible.
+  const cex = _counterexampleFor(actual, expected);
+  const cexStr = cex !== null
+    ? `${cex} satisfies the value's domain (${fmtDomain(actual)}) but violates \`${typeName}\` (${fmtDomain(expected)})`
+    : `value's domain ${fmtDomain(actual)} does not entail \`${typeName}\`'s ${fmtDomain(expected)}`;
+  return makeFailedProof(propSrc,
+    `domain does not entail \`${typeName}\``, cexStr);
 };
 
 // --- Typed binary operator helper ---
@@ -3302,6 +3404,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   decreases_attach: makePrimitive("decreases_attach", decreases_attach_impl, true),
   // Phase F1: proof by partial evaluation. Lazy on the proposition arg.
   proof_by_eval: makePrimitive("proof_by_eval", proof_by_eval_impl, true),
+  // Phase F2: proof by refinement-domain entailment. Eager — both operands
+  // are ordinary values.
+  proof_refines: makePrimitive("proof_refines", proof_refines_impl),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),
