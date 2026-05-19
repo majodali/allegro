@@ -43,3 +43,11 @@ export chain(ps) =>
 //   ∴ f(b) == c    [trans]
 export rewrite(eqAB, f, eqFAC) =>
   proof_trans(proof_cong(f, proof_sym(eqAB)), eqFAC)
+
+// Phase F5 wrappers — readable aliases for the universal-quantification
+// proof constructors. `by_cases_bool(p)` proves `∀b: Bool, p(b)` by
+// enumerating the two values. `by_induction(p, base, step)` proves
+// `∀n: NonNeg, p(n)` via bounded sample verification (Stage F5 minimum
+// — full symbolic induction is a follow-on).
+export by_cases_bool(p) => prove_for_all_bool(p)
+export by_induction(p, base, step) => prove_induction(p, base, step)

@@ -3483,6 +3483,107 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     `the \`by\` proof term is discharged but the proposition \`${propSrc}\` did not reduce to true`);
 };
 
+// --- Phase F5: universal quantification + induction ---
+//
+// Two new proof constructors, both returning a discharged Proof when the
+// universal claim holds and a failed Proof otherwise. Both compose with
+// `theorem` / `verify` via the F2 passthrough (`proof_by_eval` accepts a
+// proposition that already evaluates to a Proof).
+//
+// `prove_for_all_bool(predicate)` — proves `∀b: Bool, predicate(b)` by
+// evaluating predicate(true) and predicate(false). Bool is the canonical
+// finite-domain quantification.
+//
+// `prove_induction(predicate, base_proof, step_fn)` — proves
+// `∀n: NonNeg, predicate(n)`. Stage-5 minimum uses BOUNDED SAMPLE
+// VERIFICATION: verify base, then invoke `step_fn(n, ih)` for n = 0..K-1
+// (K=4), threading the previous step's proof as the induction hypothesis.
+// Each step must return a discharged Proof AND `predicate(n+1)` must fold
+// to true. Full symbolic induction (reasoning over an unbounded n) is F5+.
+//
+// The induction-step contract: `step_fn(n, ih_proof) => proof_of_P(n+1)`.
+// The user is responsible for the step's correctness over all n; the
+// sample verification catches obvious bugs but isn't a soundness proof.
+// Documented as such in the rendered counterexamples on failure.
+
+const _INDUCTION_SAMPLE_K = 4;
+
+const prove_for_all_bool_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) {
+    throw new AllegroError(`prove_for_all_bool: expected 1 arg (predicate), got ${args.length}`);
+  }
+  const pred = evalFn!(args[0], ctx!);
+  if (!isResolved(pred)) {
+    return makeFailedProof(`forall b: Bool, p(b)`, `predicate did not resolve`,
+      `prove_for_all_bool needs the predicate function resolved`);
+  }
+  // Allegro Bool values are typed `MultiValue(Bits(0|1), {type: Bool})`.
+  // Bare Bits work too — the predicate's type check will wrap as needed.
+  const trueRes  = evalFn!(makeExpr(pred, [fromBool(true)]),  ctx!);
+  const falseRes = evalFn!(makeExpr(pred, [fromBool(false)]), ctx!);
+  const tp = primaryOf(trueRes), fp = primaryOf(falseRes);
+  const tOk = tp.kind === ValueKind.Bits && (tp as BitsValue).data === 1n;
+  const fOk = fp.kind === ValueKind.Bits && (fp as BitsValue).data === 1n;
+  if (tOk && fOk) {
+    return _makeProof(`forall b: Bool, p(b)`);
+  }
+  const missing = !tOk && !fOk ? "both `true` and `false`"
+    : !tOk ? "`true`" : "`false`";
+  return makeFailedProof(`forall b: Bool, p(b)`,
+    `predicate fails for ${missing}`,
+    `the universal claim breaks on the case(s) ${missing} — predicate must reduce to true for every value of the quantified domain`);
+};
+
+const prove_induction_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 3) {
+    throw new AllegroError(`prove_induction: expected 3 args (predicate, base_proof, step_fn), got ${args.length}`);
+  }
+  const pred      = evalFn!(args[0], ctx!);
+  const baseProof = evalFn!(args[1], ctx!);
+  const stepFn    = evalFn!(args[2], ctx!);
+
+  if (!isResolved(pred) || !isResolved(stepFn)) {
+    return makeFailedProof(`forall n: NonNeg, p(n)`,
+      `predicate or step function did not resolve`,
+      `prove_induction needs both the predicate and step function resolved at call time`);
+  }
+  if (!isDischargedProofVal(baseProof)) {
+    return makeFailedProof(`forall n: NonNeg, p(n)`,
+      `base case is not a discharged proof`,
+      `the first argument must be a discharged Proof of \`predicate(0)\``);
+  }
+  // Sanity-check the base case: predicate(0) must fold to true.
+  const p0 = evalFn!(makeExpr(pred, [makeInt(0)]), ctx!);
+  const p0p = primaryOf(p0);
+  if (p0p.kind !== ValueKind.Bits || (p0p as BitsValue).data !== 1n) {
+    return makeFailedProof(`forall n: NonNeg, p(n)`,
+      `predicate(0) does not hold`,
+      `the base case proof claims P(0) but PE of \`predicate(0)\` did not reduce to true`);
+  }
+
+  // Bounded sample verification. For n = 0..K-1, invoke step_fn(n, ih)
+  // and require: result is a discharged Proof; predicate(n+1) folds true.
+  // Thread the step's output as the next ih.
+  let ih = baseProof;
+  for (let n = 0; n < _INDUCTION_SAMPLE_K; n++) {
+    const stepResult = evalFn!(makeExpr(stepFn, [makeInt(n), ih]), ctx!);
+    if (!isDischargedProofVal(stepResult)) {
+      return makeFailedProof(`forall n: NonNeg, p(n)`,
+        `step proof failed at n=${n}`,
+        `step(${n}, ih) did not produce a discharged proof — the inductive step doesn't construct a witness at this sample`);
+    }
+    const pn1 = evalFn!(makeExpr(pred, [makeInt(n + 1)]), ctx!);
+    const pn1p = primaryOf(pn1);
+    if (pn1p.kind !== ValueKind.Bits || (pn1p as BitsValue).data !== 1n) {
+      return makeFailedProof(`forall n: NonNeg, p(n)`,
+        `predicate(${n + 1}) does not hold`,
+        `the step at n=${n} claims P(${n + 1}) but PE of \`predicate(${n + 1})\` did not reduce to true`);
+    }
+    ih = stepResult;
+  }
+  return _makeProof(`forall n: NonNeg, p(n) [verified base + ${_INDUCTION_SAMPLE_K} inductive steps]`);
+};
+
 // --- Typed binary operator helper ---
 
 function makeTypedBinOp(opName: string): PrimitiveFnImpl {
@@ -3674,6 +3775,10 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   proof_cong:  makePrimitive("proof_cong",  proof_cong_impl,  true),
   // Lazy on the proposition (needs the AST) and proof term.
   proof_check: makePrimitive("proof_check", proof_check_impl, true),
+  // Phase F5: universal quantification — both lazy (they receive function
+  // values and proof values; lazy avoids `primaryOf` arg-stripping).
+  prove_for_all_bool: makePrimitive("prove_for_all_bool", prove_for_all_bool_impl, true),
+  prove_induction:    makePrimitive("prove_induction",    prove_induction_impl,    true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

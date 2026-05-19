@@ -6878,6 +6878,122 @@ theorem bad: 1 + 1 == 9 by tactics.chain([e1, e2])
 
 fileTest(path.join(testsDir, "proofs-tactics-demo.alg"), [tacticsExt]);
 
+// --- Phase F5: universal quantification + bounded induction ---
+//
+// `prove_for_all_bool(p)` discharges over the two Bool values.
+// `prove_induction(p, base, step)` discharges over NonNeg by
+// bounded sample verification (K=4): verify base, then invoke step(n, ih)
+// for n=0..3 threading the proof through, requiring each step's result to
+// be a discharged Proof and predicate(n+1) to fold true.
+
+test("Phase F5: prove_for_all_bool discharges a tautology over Bool", () => {
+  const { evalCtx } = runtimeEval(
+    `theorem t: prove_for_all_bool(b => b == b)\n`,
+    undefined, [typeExt], undefined, true,
+  );
+  eq(_isDischargedProof(evalCtx.bindings.get("t")?.value), true);
+});
+
+test("Phase F5: prove_for_all_bool fails when the predicate misses a case", () => {
+  let msg = "";
+  try {
+    runtimeEval(`theorem bad: prove_for_all_bool(b => b == true)\n`,
+      undefined, [typeExt], undefined, true);
+  } catch (e: any) { msg = e.message; }
+  eq(msg.includes("proof check failed"), true);
+  eq(msg.includes("false"), true, `should name the missing case, got: ${msg}`);
+});
+
+test("Phase F5: prove_for_all_bool reports both missing cases", () => {
+  let msg = "";
+  try {
+    runtimeEval(`theorem bad: prove_for_all_bool(b => false)\n`,
+      undefined, [typeExt], undefined, true);
+  } catch (e: any) { msg = e.message; }
+  eq(msg.includes("true"), true);
+  eq(msg.includes("false"), true);
+});
+
+test("Phase F5: prove_induction discharges P(n) = n == n", () => {
+  const src = `
+theorem base: 0 == 0
+theorem all: prove_induction(n => n == n, base, (n, ih) => proof_refl(n + 1))
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("all")?.value), true);
+});
+
+test("Phase F5: prove_induction discharges P(n) = n + 0 == n via PE", () => {
+  // Each sample n has n+0 == n folding to n == n; proof_refl establishes it.
+  const src = `
+theorem base: 0 + 0 == 0
+theorem all: prove_induction(n => n + 0 == n, base, (n, ih) => proof_refl(n + 1))
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("all")?.value), true);
+});
+
+test("Phase F5: prove_induction fails on a predicate that's false past base", () => {
+  // P(n) = n == 0 — true at n=0, false at n=1 (sample verification catches it).
+  const src = `
+theorem base: 0 == 0
+theorem bad: prove_induction(n => n == 0, base, (n, ih) => proof_refl(n + 1))
+`;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { msg = e.message; }
+  eq(msg.includes("proof check failed"), true);
+  eq(msg.includes("predicate(1)"), true, `expected n=1 counterexample, got: ${msg}`);
+});
+
+test("Phase F5: prove_induction fails when step returns a non-Proof", () => {
+  const src = `
+theorem base: 0 == 0
+theorem bad: prove_induction(n => n == n, base, (n, ih) => 42)
+`;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { msg = e.message; }
+  eq(msg.includes("step proof failed"), true);
+});
+
+test("Phase F5: prove_induction fails when base is not a discharged Proof", () => {
+  const src = `
+not_a_proof = 99
+theorem bad: prove_induction(n => n == n, not_a_proof, (n, ih) => proof_refl(n + 1))
+`;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { msg = e.message; }
+  eq(msg.includes("base case is not a discharged proof"), true);
+});
+
+test("Phase F5: prove_for_all_bool composes under verify", () => {
+  const { compilationReport } = runtimeEval(
+    `verify prove_for_all_bool(b => b == b)\n`,
+    undefined, [typeExt], undefined, true,
+  );
+  const notes = compilationReport!.notifications.filter(n => n.kind === "proof-failure");
+  eq(notes.length, 0);
+});
+
+test("Phase F5: tactics.by_cases_bool wraps prove_for_all_bool", () => {
+  const src = `import tactics\ntheorem t: tactics.by_cases_bool(b => b == b)\n`;
+  const { evalCtx } = tacticsEval(src);
+  eq(_isDischargedProof(evalCtx.bindings.get("t")?.value), true);
+});
+
+test("Phase F5: tactics.by_induction wraps prove_induction", () => {
+  const src = `import tactics
+theorem base: 0 == 0
+theorem all: tactics.by_induction(n => n == n, base, (n, ih) => proof_refl(n + 1))
+`;
+  const { evalCtx } = tacticsEval(src);
+  eq(_isDischargedProof(evalCtx.bindings.get("all")?.value), true);
+});
+
+fileTest(path.join(testsDir, "proofs-induction-demo.alg"), [tacticsExt]);
+
 // --- Phase A: introspection / semantic summary ---
 
 import {
