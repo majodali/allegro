@@ -6791,6 +6791,93 @@ theorem p: proof_refines(5, PositiveInt)
 
 fileTest(path.join(testsDir, "proofs-combinators-demo.alg"));
 
+// --- Phase F4: tactic library (lib/tactics.alg) ---
+//
+// Tactics are pure Allegro composing the F1–F3 primitives. The module is
+// loaded the same way the modules.alg test loads `mymath`: eval the lib
+// source, collect bindings, wrap as a module Context, provide via an
+// extension so `import tactics` resolves.
+
+const tacticsSource = fs.readFileSync(path.join("lib", "tactics.alg"), "utf-8");
+const tacticsResult = runtimeEval(tacticsSource, undefined, [typeExt], undefined, true);
+const tacticsBindings: Record<string, Value> = {};
+for (const [key, binding] of tacticsResult.evalCtx.bindings) {
+  if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+    tacticsBindings[key] = binding.value;
+  }
+}
+const tacticsModuleCtx = extensionToContext({ name: "tactics", bindings: tacticsBindings });
+const tacticsExt: Extension = { name: "tactics", bindings: { tactics: tacticsModuleCtx } };
+
+function tacticsEval(src: string) {
+  return runtimeEval(src, undefined, [typeExt, tacticsExt], undefined, true);
+}
+
+test("Phase F4: tactics.same proves reflexivity", () => {
+  const { evalCtx } = tacticsEval(`import tactics\ntheorem r: 9 == 9 by tactics.same(9)\n`);
+  eq(_isDischargedProof(evalCtx.bindings.get("r")?.value), true);
+});
+
+test("Phase F4: tactics.flip is symmetry", () => {
+  const { evalCtx } = tacticsEval(
+    `import tactics\ntheorem ab: 3 + 1 == 4\ntheorem ba: 4 == 3 + 1 by tactics.flip(ab)\n`,
+  );
+  eq(_isDischargedProof(evalCtx.bindings.get("ba")?.value), true);
+});
+
+test("Phase F4: tactics.chain folds transitivity over a list", () => {
+  const src = `import tactics
+theorem e1: 1 + 1 == 2
+theorem e2: 2 == 6 / 3
+theorem e3: 6 / 3 == 2 * 1
+theorem all: 1 + 1 == 2 * 1 by tactics.chain([e1, e2, e3])
+`;
+  const { evalCtx } = tacticsEval(src);
+  eq(_isDischargedProof(evalCtx.bindings.get("all")?.value), true);
+});
+
+test("Phase F4: tactics.chain with a single element is identity", () => {
+  const { evalCtx } = tacticsEval(
+    `import tactics\ntheorem e1: 5 == 5\ntheorem one: 5 == 5 by tactics.chain([e1])\n`,
+  );
+  eq(_isDischargedProof(evalCtx.bindings.get("one")?.value), true);
+});
+
+test("Phase F4: tactics.under lifts an equality through a function", () => {
+  const src = `import tactics
+sq(x: Int): Int => x * x
+theorem ab: 4 == 2 + 2
+theorem fab: sq(4) == sq(2 + 2) by tactics.under(sq, ab)
+`;
+  const { evalCtx } = tacticsEval(src);
+  eq(_isDischargedProof(evalCtx.bindings.get("fab")?.value), true);
+});
+
+test("Phase F4: tactics.rewrite substitutes via an equality", () => {
+  const src = `import tactics
+inc(x: Int): Int => x + 1
+theorem ab: 3 == 1 + 2
+theorem fac: inc(3) == 4
+theorem fbc: inc(1 + 2) == 4 by tactics.rewrite(ab, inc, fac)
+`;
+  const { evalCtx } = tacticsEval(src);
+  eq(_isDischargedProof(evalCtx.bindings.get("fbc")?.value), true);
+});
+
+test("Phase F4: a mismatched chain surfaces the inner transitivity reason", () => {
+  const src = `import tactics
+theorem e1: 1 + 1 == 2
+theorem e2: 9 == 9
+theorem bad: 1 + 1 == 9 by tactics.chain([e1, e2])
+`;
+  let msg = "";
+  try { tacticsEval(src); } catch (e: any) { msg = e.message; }
+  eq(msg.includes("proof check failed"), true);
+  eq(msg.includes("middle terms differ"), true, `got: ${msg}`);
+});
+
+fileTest(path.join(testsDir, "proofs-tactics-demo.alg"), [tacticsExt]);
+
 // --- Phase A: introspection / semantic summary ---
 
 import {
