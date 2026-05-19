@@ -700,10 +700,15 @@ export function buildBaseGrammar(): Grammar {
       // `verify` as ordinary identifiers still parse via backtracking to
       // `binding` / `expr` (same approach as the `grammar` atom).
       //
-      // theorem NAME: <prop>  — named, referenceable proof binding
+      // theorem NAME: <prop> [by <proofterm>]  — named, referenceable
+      // proof binding. Without `by`, the proof is discharged by evaluation
+      // (F1). With `by`, the proof term (F3 combinators / F2 proof_refines /
+      // any Proof-valued expr) is checked against the proposition. `by` (not
+      // `=>`) avoids the lambda ambiguity `a == (b => proofterm)`.
       seq([lit("theorem"), nonterm("ws_req"),
            nonterm("ident"),
-           nonterm("ws"), lit(":"), nonterm("ws"), nonterm("expr")],
+           nonterm("ws"), lit(":"), nonterm("ws"), nonterm("expr"),
+           opt(seq([nonterm("ws_req"), lit("by"), nonterm("ws_req"), nonterm("expr")]))],
         { name: "theorem_decl" }),
       // verify <prop>  — anonymous, one-shot proof by evaluation
       seq([lit("verify"), nonterm("ws_req"), nonterm("expr")],

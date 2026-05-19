@@ -3091,6 +3091,95 @@ function makeFailedProof(prop: string, reason: string, counterexample?: string):
   return withType(p, _Proof);
 }
 
+// --- Phase F3: equality-structured proofs + combinators ---
+//
+// F1/F2 proofs carry only a `__proposition` string. The combinators
+// (refl/sym/trans/cong) operate on EQUALITY proofs, which additionally
+// carry the two sides as evaluated Values (`__eq_lhs` / `__eq_rhs`) so a
+// proof can be mechanically composed with another. `proof_by_eval` is
+// extended to stash these when the proposition is structurally `L == R`.
+
+function _valDesc(v: Value): string {
+  const p = primaryOf(v);
+  if (p.kind === ValueKind.Bits && (p as BitsValue).length === 64) {
+    const d = (p as BitsValue).data;
+    return String(d >= 0x8000000000000000n ? d - 0x10000000000000000n : d);
+  }
+  if (p.kind === ValueKind.Bits) {
+    try { return `"${bitsToString(p as BitsValue)}"`; } catch { return "value"; }
+  }
+  return "value";
+}
+
+/** Attach equality operands to a discharged proof (mutates its primary
+ *  Context — the proof is freshly built by its constructor). */
+function attachEqOperands(proof: Value, lhs: Value, rhs: Value): Value {
+  const ctx = primaryOf(proof) as ContextValue;
+  ctx.bindings.set("__eq_lhs", { key: "__eq_lhs", value: lhs, isUse: false });
+  ctx.bindings.set("__eq_rhs", { key: "__eq_rhs", value: rhs, isUse: false });
+  return proof;
+}
+
+/** Read the equality operands off a proof, or null if it isn't an
+ *  equality proof. */
+function eqOperandsOf(v: Value): { lhs: Value; rhs: Value } | null {
+  const ctx = proofCtx(v);
+  if (!ctx) return null;
+  const l = ctx.bindings.get("__eq_lhs")?.value;
+  const r = ctx.bindings.get("__eq_rhs")?.value;
+  if (!l || !r) return null;
+  return { lhs: l, rhs: r };
+}
+
+/** Recognise a proof Context structurally — a Context carrying the proof
+ *  marker bindings. Robust to a stripped `type` component (eager primitives
+ *  receive `primaryOf`'d args, so a Proof MultiValue arrives as a bare
+ *  Context). */
+function proofCtx(v: Value): ContextValue | null {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.Context) return null;
+  const c = p as ContextValue;
+  return c.bindings?.has?.("__discharged") ? c : null;
+}
+
+/** Is `v` a discharged Proof? */
+function isDischargedProofVal(v: Value): boolean {
+  const c = proofCtx(v);
+  if (!c) return false;
+  const d = c.bindings.get("__discharged")?.value;
+  return !!d && primaryOf(d).kind === ValueKind.Bits
+    && (primaryOf(d) as BitsValue).data === 1n;
+}
+
+/** Value-level equality for proof operands (concrete Bits, else identity). */
+function proofValEqual(a: Value, b: Value): boolean {
+  const pa = primaryOf(a), pb = primaryOf(b);
+  if (pa.kind === ValueKind.Bits && pb.kind === ValueKind.Bits) {
+    return (pa as BitsValue).data === (pb as BitsValue).data
+      && (pa as BitsValue).length === (pb as BitsValue).length;
+  }
+  return pa === pb;
+}
+
+/** Recognise `Expression(bits_eq | typed_eq, [L, R])` and return the two
+ *  side ASTs (unevaluated). */
+function eqExprSides(propExpr: Value): { l: Value; r: Value } | null {
+  if (!propExpr || propExpr.kind !== ValueKind.Expression) return null;
+  const fn = primaryOf((propExpr as ExpressionValue).fn);
+  if (fn.kind !== ValueKind.PrimitiveFunction) return null;
+  const n = (fn as any).name as string;
+  if (n !== "bits_eq" && n !== "typed_eq") return null;
+  const a = (propExpr as ExpressionValue).args;
+  if (a.length !== 2) return null;
+  return { l: a[0], r: a[1] };
+}
+
+/** Build a discharged equality proof for `lhs == rhs`. */
+function makeEqProof(lhs: Value, rhs: Value, propSrc?: string): Value {
+  const src = propSrc ?? `${_valDesc(lhs)} == ${_valDesc(rhs)}`;
+  return attachEqOperands(_makeProof(src), lhs, rhs);
+}
+
 const proof_by_eval_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) {
     throw new AllegroError(`proof_by_eval: expected 2 args (propSrc, prop), got ${args.length}`);
@@ -3112,7 +3201,16 @@ const proof_by_eval_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (rp.kind === ValueKind.Bits) {
     const data = (rp as BitsValue).data;
     if (data === 1n) {
-      // Discharged by evaluation.
+      // Discharged by evaluation. If the proposition is structurally an
+      // equality, stash the two sides so combinators (F3) can compose it.
+      const sides = eqExprSides(args[1]);
+      if (sides) {
+        const lv = evalFn!(sides.l, ctx!);
+        const rv = evalFn!(sides.r, ctx!);
+        if (isResolved(lv) && isResolved(rv)) {
+          return makeEqProof(lv, rv, propSrc);
+        }
+      }
       return _makeProof(propSrc);
     }
     if (data === 0n) {
@@ -3224,6 +3322,165 @@ const proof_refines_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     : `value's domain ${fmtDomain(actual)} does not entail \`${typeName}\`'s ${fmtDomain(expected)}`;
   return makeFailedProof(propSrc,
     `domain does not entail \`${typeName}\``, cexStr);
+};
+
+// --- Phase F3: proof combinators ---
+//
+// refl / sym / trans / cong build equality proofs from equality proofs.
+// Each is sound by construction: the resulting `__eq_lhs` / `__eq_rhs`
+// follow from the equational rule, and the inputs are required to be
+// discharged equality proofs (else a failed Proof propagates, surfaced
+// by `checkProofs` like any other proof failure).
+
+/** `proof_refl(x)` — reflexivity: `x == x`, always discharged. */
+const proof_refl_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) throw new AllegroError(`proof_refl: expected 1 arg, got ${args.length}`);
+  const x = evalFn!(args[0], ctx!);
+  if (!isResolved(x)) {
+    return makeFailedProof(`refl`, `operand did not resolve`,
+      `proof_refl needs its operand resolved`);
+  }
+  return makeEqProof(x, x);
+};
+
+/** `proof_sym(p)` — symmetry: from `a == b`, derive `b == a`. */
+const proof_sym_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) throw new AllegroError(`proof_sym: expected 1 arg, got ${args.length}`);
+  const p = evalFn!(args[0], ctx!);
+  if (!isDischargedProofVal(p)) {
+    return makeFailedProof(`sym`, `argument is not a discharged proof`,
+      `proof_sym(p) requires p to be a discharged equality proof`);
+  }
+  const ops = eqOperandsOf(p);
+  if (!ops) {
+    return makeFailedProof(`sym`, `argument is not an equality proof`,
+      `proof_sym only applies to proofs of \`a == b\``);
+  }
+  return makeEqProof(ops.rhs, ops.lhs);
+};
+
+/** `proof_trans(p1, p2)` — transitivity: from `a == b` and `b == c`,
+ *  derive `a == c`. Requires p1's RHS to value-match p2's LHS. */
+const proof_trans_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) throw new AllegroError(`proof_trans: expected 2 args, got ${args.length}`);
+  const p1 = evalFn!(args[0], ctx!);
+  const p2 = evalFn!(args[1], ctx!);
+  if (!isDischargedProofVal(p1) || !isDischargedProofVal(p2)) {
+    return makeFailedProof(`trans`, `arguments must be discharged proofs`,
+      `proof_trans(p1, p2) requires both to be discharged equality proofs`);
+  }
+  const a = eqOperandsOf(p1);
+  const b = eqOperandsOf(p2);
+  if (!a || !b) {
+    return makeFailedProof(`trans`, `arguments must be equality proofs`,
+      `proof_trans only chains proofs of \`a == b\``);
+  }
+  if (!proofValEqual(a.rhs, b.lhs)) {
+    return makeFailedProof(
+      `${_valDesc(a.lhs)} == ${_valDesc(b.rhs)}`,
+      `transitivity middle terms differ`,
+      `p1 proves \`… == ${_valDesc(a.rhs)}\` but p2 proves \`${_valDesc(b.lhs)} == …\` — the shared term must match`,
+    );
+  }
+  return makeEqProof(a.lhs, b.rhs);
+};
+
+/** `proof_cong(f, p)` — congruence: from `a == b`, derive `f(a) == f(b)`
+ *  for any function `f` (sound for pure f; the new equality is recorded
+ *  from the actual applications). */
+const proof_cong_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 2) throw new AllegroError(`proof_cong: expected 2 args (f, p), got ${args.length}`);
+  const f = evalFn!(args[0], ctx!);
+  const p = evalFn!(args[1], ctx!);
+  if (!isDischargedProofVal(p)) {
+    return makeFailedProof(`cong`, `second argument is not a discharged proof`,
+      `proof_cong(f, p) requires p to be a discharged equality proof`);
+  }
+  const ops = eqOperandsOf(p);
+  if (!ops) {
+    return makeFailedProof(`cong`, `second argument is not an equality proof`,
+      `proof_cong only applies to proofs of \`a == b\``);
+  }
+  const fa = evalFn!(makeExpr(f, [ops.lhs]), ctx!);
+  const fb = evalFn!(makeExpr(f, [ops.rhs]), ctx!);
+  if (!isResolved(fa) || !isResolved(fb)) {
+    return makeFailedProof(`cong`, `f(a) / f(b) did not resolve`,
+      `proof_cong needs f applied to both sides to reduce`);
+  }
+  return makeEqProof(fa, fb);
+};
+
+// --- Phase F3: `theorem NAME: P by <proofterm>` checker ---
+//
+// `proof_check(propSrc, propExpr, proofExpr)` — lazy on propExpr (needs
+// the AST to detect the equality shape) and on proofExpr (evaluated here).
+// Soundness: the proof term must actually establish the stated
+// proposition, not merely be *some* discharged proof — otherwise
+// `theorem bad: 1 == 2 by proof_refl(5)` would pass.
+const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 3) {
+    throw new AllegroError(`proof_check: expected 3 args (propSrc, prop, proof), got ${args.length}`);
+  }
+  const srcP = primaryOf(args[0]);
+  const propSrc = srcP.kind === ValueKind.Bits ? bitsToString(srcP as BitsValue) : "<proposition>";
+
+  const proof = evalFn!(args[2], ctx!);
+  if (!isDischargedProofVal(proof)) {
+    // If the proof term is itself a *failed* proof (e.g. a combinator
+    // rejected its inputs), propagate that specific reason rather than the
+    // generic message — the user wants to know WHY the term didn't hold.
+    const fctx = proofCtx(proof);
+    if (fctx) {
+      const rv = fctx.bindings.get("__reason")?.value;
+      const cv = fctx.bindings.get("__counterexample")?.value;
+      const reason = rv && primaryOf(rv).kind === ValueKind.Bits
+        ? bitsToString(primaryOf(rv) as BitsValue) : "proof term did not discharge";
+      const cex = cv && primaryOf(cv).kind === ValueKind.Bits
+        ? bitsToString(primaryOf(cv) as BitsValue) : undefined;
+      return makeFailedProof(propSrc, `\`by\` proof failed: ${reason}`, cex);
+    }
+    return makeFailedProof(propSrc, `proof term is not a Proof`,
+      `\`theorem … by <term>\` requires <term> to evaluate to a discharged Proof`);
+  }
+
+  // Equality proposition: the proof must establish exactly L == R (value-
+  // level), not some unrelated equality.
+  const sides = eqExprSides(args[1]);
+  if (sides) {
+    const L = evalFn!(sides.l, ctx!);
+    const R = evalFn!(sides.r, ctx!);
+    const ops = eqOperandsOf(proof);
+    if (!ops) {
+      return makeFailedProof(propSrc, `proof term is not an equality proof`,
+        `the proposition is an equality but the supplied proof doesn't carry equality operands`);
+    }
+    if (isResolved(L) && isResolved(R)
+        && proofValEqual(ops.lhs, L) && proofValEqual(ops.rhs, R)) {
+      // Relabel with the theorem's source and return the (already
+      // discharged, eq-structured) proof.
+      const relabeled = makeEqProof(ops.lhs, ops.rhs, propSrc);
+      return relabeled;
+    }
+    return makeFailedProof(propSrc,
+      `proof term establishes a different equality`,
+      `theorem claims \`${propSrc}\` but the proof proves \`${_valDesc(ops.lhs)} == ${_valDesc(ops.rhs)}\``);
+  }
+
+  // Non-equality proposition: fall back to eval-consistency. The proof
+  // term is already known discharged (checked above); accept when the
+  // proposition itself folds true, OR is itself a discharged Proof
+  // (composition — e.g. `theorem p: proof_refines(5, T) by proof_refines(5, T)`).
+  const propVal = evalFn!(args[1], ctx!);
+  const pv = primaryOf(propVal);
+  if (pv.kind === ValueKind.Bits && (pv as BitsValue).data === 1n) {
+    return _makeProof(propSrc);
+  }
+  if (isDischargedProofVal(propVal)) {
+    return _makeProof(propSrc);
+  }
+  return makeFailedProof(propSrc,
+    `proposition not established`,
+    `the \`by\` proof term is discharged but the proposition \`${propSrc}\` did not reduce to true`);
 };
 
 // --- Typed binary operator helper ---
@@ -3407,6 +3664,16 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   // Phase F2: proof by refinement-domain entailment. Eager — both operands
   // are ordinary values.
   proof_refines: makePrimitive("proof_refines", proof_refines_impl),
+  // Phase F3: proof combinators + the `theorem … by <term>` checker. All
+  // lazy so they receive un-`primaryOf`'d args — a Proof flows in as its
+  // full MultiValue (eager primitives get `primaryOf`'d args, which strips
+  // the `Proof` type component and the proof's structured operands).
+  proof_refl:  makePrimitive("proof_refl",  proof_refl_impl,  true),
+  proof_sym:   makePrimitive("proof_sym",   proof_sym_impl,   true),
+  proof_trans: makePrimitive("proof_trans", proof_trans_impl, true),
+  proof_cong:  makePrimitive("proof_cong",  proof_cong_impl,  true),
+  // Lazy on the proposition (needs the AST) and proof term.
+  proof_check: makePrimitive("proof_check", proof_check_impl, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

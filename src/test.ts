@@ -6685,6 +6685,112 @@ test("Phase F2: failed proof_refines surfaces a proof-failure notification kind"
 
 fileTest(path.join(testsDir, "proofs-refines-demo.alg"));
 
+// --- Phase F3: proof combinators + `theorem … by <proofterm>` ---
+//
+// refl/sym/trans/cong build equality proofs from equality proofs. The
+// `by` clause checks a proof term against the stated proposition (sound:
+// the term must establish exactly that proposition, not merely be *some*
+// discharged proof). Named theorems become composable proof bindings.
+
+test("Phase F3: proof_refl proves x == x", () => {
+  const src = `theorem r: 5 == 5 by proof_refl(5)\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("r")?.value), true);
+});
+
+test("Phase F3: proof_sym flips a named equality proof", () => {
+  const src = `
+theorem ab: 3 + 1 == 4
+theorem ba: 4 == 3 + 1 by proof_sym(ab)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("ab")?.value), true);
+  eq(_isDischargedProof(evalCtx.bindings.get("ba")?.value), true);
+});
+
+test("Phase F3: proof_trans chains two equality proofs", () => {
+  const src = `
+theorem ab: 2 + 2 == 4
+theorem bc: 4 == 8 / 2
+theorem ac: 2 + 2 == 8 / 2 by proof_trans(ab, bc)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("ac")?.value), true);
+});
+
+test("Phase F3: proof_trans with mismatched middle term halts (inner reason)", () => {
+  const src = `
+theorem ab: 1 + 1 == 2
+theorem cd: 3 == 3
+theorem bad: 1 + 1 == 3 by proof_trans(ab, cd)
+`;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { msg = e.message; }
+  eq(msg.includes("proof check failed"), true);
+  eq(msg.includes("middle terms differ"), true,
+    `expected the propagated inner reason, got: ${msg}`);
+});
+
+test("Phase F3: proof_cong lifts an equality through a function", () => {
+  const src = `
+double(x: Int): Int => x * 2
+theorem ab: 3 == 1 + 2
+theorem fab: double(3) == double(1 + 2) by proof_cong(double, ab)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("fab")?.value), true);
+});
+
+test("Phase F3: `by` is sound — a proof of the wrong fact is rejected", () => {
+  // proof_refl(5) proves 5 == 5, NOT 1 == 2.
+  const src = `theorem bad: 1 == 2 by proof_refl(5)\n`;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { msg = e.message; }
+  eq(msg.includes("proof check failed"), true);
+  eq(msg.includes("different equality"), true, `got: ${msg}`);
+});
+
+test("Phase F3: nested combinators compose (trans of trans)", () => {
+  const src = `
+theorem e1: 1 + 1 == 2
+theorem e2: 2 == 2 * 1
+theorem e3: 2 * 1 == 2
+theorem chain: 1 + 1 == 2 by proof_trans(e1, proof_trans(e2, e3))
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("chain")?.value), true);
+});
+
+test("Phase F3: a bare combinator binding is checked by checkProofs", () => {
+  // No `theorem`/`verify` — an ordinary binding to a combinator result.
+  // A failed combinator still surfaces (checkProofs scans all bindings).
+  const src = `bad = proof_trans(proof_refl(1), proof_refl(2))\n`;
+  let msg = "";
+  try { runtimeEval(src, undefined, [typeExt], undefined, true); }
+  catch (e: any) { msg = e.message; }
+  eq(msg.includes("proof check failed"), true);
+  eq(msg.includes("middle terms differ"), true, `got: ${msg}`);
+});
+
+test("Phase F3: plain `theorem N: P` (no by) still discharges by eval (F1)", () => {
+  const src = `theorem t: 3 + 4 == 7\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("t")?.value), true);
+});
+
+test("Phase F3: F2 proof_refines composes under a no-by theorem", () => {
+  const src = `
+PositiveInt = Int & _ > 0
+theorem p: proof_refines(5, PositiveInt)
+`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("p")?.value), true);
+});
+
+fileTest(path.join(testsDir, "proofs-combinators-demo.alg"));
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

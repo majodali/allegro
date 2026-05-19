@@ -1415,21 +1415,54 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
   }
 
   if (tag === "theorem_decl") {
-    // theorem NAME: <prop>  — Phase F1. A named, referenceable binding
-    // whose value is a `proof_by_eval` of the proposition. The proposition's
-    // source text is captured via `textOf` and passed as the first arg
-    // (label only, never re-parsed) for counterexample / export rendering.
+    // theorem NAME: <prop> [by <proofterm>]. Without `by` the proof is
+    // discharged by evaluation (F1: `proof_by_eval`). With `by`, the proof
+    // term is checked against the proposition (F3: `proof_check`). The
+    // proposition's source text is captured via `textOf` (label only,
+    // never re-parsed) for counterexample / export rendering.
     const identTree = c.find(ch => ch.kind === "branch" && ch.tag === "ident");
     if (!identTree) throw new Error("theorem_decl: missing name");
     const name = textOf(identTree);
-    // Proposition is the last expression-tagged child (after `:`).
-    const propTree = [...c].reverse().find(
-      ch => ch.kind === "branch" && ch.tag && EXPRESSION_TAGS.has(ch.tag),
-    );
+    // Structure: `theorem` ws IDENT ws ':' ws PROP [ ws 'by' ws PROOF ].
+    // `ident` is itself in EXPRESSION_TAGS, so we can't just grab the first
+    // expr-tagged child — key off the `:` delimiter, and split the proof
+    // term off at the `by` leaf (which lives inside the opt-clause branch).
+    const colonIdx = c.findIndex(ch => ch.kind === "leaf" && ch.text === ":");
+    if (colonIdx < 0) throw new Error("theorem_decl: missing ':'");
+    let propTree: ParseTree | null = null;
+    let byClause: ParseTree | null = null;
+    for (let i = colonIdx + 1; i < c.length; i++) {
+      const ch = c[i];
+      if (ch.kind !== "branch") continue;
+      // The opt `by` clause is the branch whose source text starts with
+      // `by` (after trimming) — its inner expression is the proof term.
+      if (!propTree && ch.tag && EXPRESSION_TAGS.has(ch.tag)) {
+        propTree = ch;
+        continue;
+      }
+      if (propTree && textOf(ch).trimStart().startsWith("by")) {
+        byClause = ch;
+        break;
+      }
+    }
     if (!propTree) throw new Error("theorem_decl: missing proposition");
     const propSrc = textOf(propTree).trim();
-    const value = makeExpr(prim("proof_by_eval"),
-      [stringToBits(propSrc), buildExpr(propTree, outerParamMap)]);
+    const proofTree: ParseTree | null = byClause ? findInner(byClause) : null;
+    let value: any;
+    if (proofTree) {
+      // F3: check the proof term against the proposition. `proof_check` is
+      // lazy on the proposition (needs the AST to detect equality shape)
+      // and evaluates the proof term itself.
+      value = makeExpr(prim("proof_check"), [
+        stringToBits(propSrc),
+        buildExpr(propTree, outerParamMap),
+        buildExpr(proofTree, outerParamMap),
+      ]);
+    } else {
+      // F1: discharge by evaluation.
+      value = makeExpr(prim("proof_by_eval"),
+        [stringToBits(propSrc), buildExpr(propTree, outerParamMap)]);
+    }
     return { key: name, value };
   }
 
