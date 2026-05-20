@@ -7122,6 +7122,71 @@ test("Phase F7: function without `proven` is unaffected", () => {
 
 fileTest(path.join(testsDir, "proofs-proven-demo.alg"), [provenExt]);
 
+// --- Phase G: provable stdlib pilot (`lib/provable.alg`) ---
+//
+// A small lib of utility functions whose correctness properties are
+// expressed as 23 named theorems. Loading the lib checks every theorem
+// (F1 PE-discharge, F3 combinators, F5 universal-Bool). This is the
+// first lib that walks the talk of the provability arc — Phase G's pilot.
+
+const provableSource = fs.readFileSync(path.join("lib", "provable.alg"), "utf-8");
+const provableResult = runtimeEval(provableSource, undefined, [typeExt], undefined, true);
+
+// Collect non-prim/non-type bindings into a module Context, wrap as an
+// extension so `import provable` in downstream files resolves.
+const provableBindings: Record<string, Value> = {};
+for (const [key, binding] of provableResult.evalCtx.bindings) {
+  if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+    provableBindings[key] = binding.value;
+  }
+}
+const provableModuleCtx = extensionToContext({ name: "provable", bindings: provableBindings });
+const provableExt: Extension = { name: "provable", bindings: { provable: provableModuleCtx } };
+
+test("Phase G: lib/provable.alg loads with all theorems discharged", () => {
+  // Loading the lib runs checkProofs / checkProvenClauses on its
+  // theorems. A failure would throw at runtimeEval time; the fact that
+  // provableResult exists is the headline result.
+  const notes = provableResult.compilationReport!.notifications;
+  const fails = notes.filter(n =>
+    n.kind === "proof-failure" || n.kind === "proven-failed",
+  );
+  eq(fails.length, 0, `expected clean, got: ${fails.map(n => n.message).join("; ")}`);
+});
+
+test("Phase G: provable lib exports all expected functions", () => {
+  for (const name of ["abs", "sign", "square", "min2", "max2", "negate"]) {
+    eq(provableBindings[name] !== undefined, true, `missing export: ${name}`);
+  }
+});
+
+test("Phase G: at least 20 named theorems shipped (real load on F-arc)", () => {
+  // Count discharged Proof bindings in the lib.
+  let count = 0;
+  for (const [, b] of provableResult.evalCtx.bindings) {
+    const v: any = b.value;
+    if (v && _isDischargedProof(v)) count++;
+  }
+  eq(count >= 20, true, `expected ≥20 theorems, got ${count}`);
+});
+
+test("Phase G: downstream consumer sees the lib + its functions work", () => {
+  const src = `import provable\nx = provable.abs(0 - 5)\ny = provable.square(7)\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt, provableExt], undefined, true);
+  const x = evalCtx.bindings.get("x")?.value;
+  const y = evalCtx.bindings.get("y")?.value;
+  eq(Number((primaryOf(x!) as BitsValue).data), 5);
+  eq(Number((primaryOf(y!) as BitsValue).data), 49);
+});
+
+test("Phase G: a downstream theorem about the lib's functions discharges", () => {
+  const src = `import provable\ntheorem t: provable.abs(0 - 100) == 100\n`;
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt, provableExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("t")?.value), true);
+});
+
+fileTest(path.join(testsDir, "provable-demo.alg"), [provableExt]);
+
 // --- Phase A: introspection / semantic summary ---
 
 import {
