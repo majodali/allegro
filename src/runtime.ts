@@ -16,6 +16,7 @@ import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionVa
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
 import { checkExhaustiveness, checkTermination } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
+import { checkProvenClauses, formatProvenFinding } from "./proven.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -1178,6 +1179,39 @@ export function evalSource(
       "proof check failed:\n" +
       proofFindings.map(f => "  " + formatProofFinding(f)).join("\n"),
     );
+  }
+
+  // Phase F7: `proven` clauses on functions. Sample each annotated
+  // function's typed param(s) and verify the predicate holds. Same
+  // halt-on-error treatment as F1 proof failures; "skipped" cases
+  // (multi-param, non-sampleable types) surface as info notifications.
+  if (compilationReport) {
+    const provenResults = checkProvenClauses(evalCtx);
+    for (const f of provenResults.infos) {
+      compilationReport.notifications.push({
+        kind:     "proven-skipped",
+        severity: "info",
+        binding:  f.binding,
+        message:  formatProvenFinding(f),
+      });
+    }
+    if (provenResults.errors.length > 0) {
+      for (const f of provenResults.errors) {
+        compilationReport.notifications.push({
+          kind:           "proven-failed",
+          severity:       "error",
+          binding:        f.binding,
+          message:        formatProvenFinding(f),
+          counterexample: f.counterexample,
+        });
+      }
+      throw new Error(
+        "proven clause failed:\n" +
+        provenResults.errors.map(f => "  " + formatProvenFinding(f)
+          + (f.counterexample ? `\n    counterexample: ${f.counterexample}` : "")
+        ).join("\n"),
+      );
+    }
   }
 
   return { value: lastValue, evalCtx, compilationReport, registry };

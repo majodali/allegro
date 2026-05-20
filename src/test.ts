@@ -6994,6 +6994,134 @@ theorem all: tactics.by_induction(n => n == n, base, (n, ih) => proof_refl(n + 1
 
 fileTest(path.join(testsDir, "proofs-induction-demo.alg"), [tacticsExt]);
 
+// --- Phase F7: `proven` clause on function declarations ---
+//
+// `proven <prop>` attaches a theorem to a function. The compiler verifies
+// it at definition time by bounded sampling (K=4 inputs over the param's
+// type). The user-visible [impl, proof] pair contract — the surface AI
+// agents target in Phase H.
+
+const provenSource = fs.readFileSync(path.join("lib", "proven.alg"), "utf-8");
+const provenResult = runtimeEval(provenSource, undefined, [typeExt], undefined, true);
+const provenBindings: Record<string, Value> = {};
+for (const [key, binding] of provenResult.evalCtx.bindings) {
+  if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+    provenBindings[key] = binding.value;
+  }
+}
+const provenFragment = extractGrammarFragment(provenResult.evalCtx);
+const provenExt: Extension = {
+  name: "proven",
+  bindings: provenBindings,
+  grammarFragment: provenFragment,
+} as any;
+
+function provenEval(src: string) {
+  return runtimeEval(src, undefined, [typeExt, provenExt], undefined, true);
+}
+
+test("Phase F7: proven holds on Int sample [0, 1, 5, -3]", () => {
+  // square(x) * 0 == 0 is a tautology — all samples pass.
+  const src = `square(x: Int): Int =>
+  proven square(x) * 0 == 0
+  x * x
+`;
+  const { compilationReport } = provenEval(src);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "proven-failed",
+  );
+  eq(notes.length, 0, `expected clean, got: ${notes.map(n => n.message).join("; ")}`);
+});
+
+test("Phase F7: proven holds on NonNeg sample [0, 1, 2, 3]", () => {
+  const src = `NonNeg = Int & _ >= 0
+sq(x: NonNeg): Int =>
+  proven sq(x) >= 0
+  x * x
+`;
+  const { compilationReport } = provenEval(src);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "proven-failed",
+  );
+  eq(notes.length, 0, `expected clean, got: ${notes.map(n => n.message).join("; ")}`);
+});
+
+test("Phase F7: a non-tautology fails with a concrete counterexample", () => {
+  // x >= 0 is false at x = -3 (one of the Int samples).
+  const src = `bad(x: Int): Int =>
+  proven x >= 0
+  x
+`;
+  let msg = "";
+  try { provenEval(src); } catch (e: any) { msg = e.message; }
+  eq(msg.includes("proven clause failed"), true);
+  eq(msg.includes("-3"), true, `expected counterexample x = -3, got: ${msg}`);
+});
+
+test("Phase F7: Bool param enumerates [true, false]", () => {
+  // neg(neg(b)) == b is a tautology over Bool.
+  const src = `neg(b: Bool): Bool =>
+  proven neg(neg(b)) == b
+  if b then false else true
+`;
+  const { compilationReport } = provenEval(src);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "proven-failed",
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase F7: multi-param emits a 'skipped' info notification", () => {
+  const src = `add(x: Int, y: Int): Int =>
+  proven add(x, y) >= 0
+  x + y
+`;
+  const { compilationReport } = provenEval(src);
+  const skipped = compilationReport!.notifications.filter(
+    n => n.kind === "proven-skipped" && n.binding === "add",
+  );
+  eq(skipped.length, 1);
+  eq(skipped[0].severity, "info");
+});
+
+test("Phase F7: untyped param emits a 'skipped' info notification", () => {
+  const src = `id(x) =>
+  proven id(x) == x
+  x
+`;
+  const { compilationReport } = provenEval(src);
+  const skipped = compilationReport!.notifications.filter(
+    n => n.kind === "proven-skipped" && n.binding === "id",
+  );
+  eq(skipped.length, 1);
+});
+
+test("Phase F7: multiple proven clauses on one function compose", () => {
+  // Two independent tautologies attached to the same function.
+  const src = `NonNeg = Int & _ >= 0
+sq(x: NonNeg): Int =>
+  proven sq(x) >= 0
+  proven sq(x) * 0 == 0
+  x * x
+`;
+  const { compilationReport } = provenEval(src);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "proven-failed",
+  );
+  eq(notes.length, 0);
+});
+
+test("Phase F7: function without `proven` is unaffected", () => {
+  const src = `plain(x: Int): Int => x + 1\n`;
+  const { compilationReport } = provenEval(src);
+  const notes = compilationReport!.notifications.filter(
+    n => n.kind === "proven-failed" || n.kind === "proven-skipped",
+  );
+  eq(notes.length, 0);
+});
+
+fileTest(path.join(testsDir, "proofs-proven-demo.alg"), [provenExt]);
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

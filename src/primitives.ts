@@ -3064,6 +3064,29 @@ const decreases_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return evalFn!(args[0], ctx!);
 };
 
+// Phase F7 — `proven <prop>` body-form clauses lower to
+// `proven_decl_marker(predicate)` at parse time. The block preprocessor
+// extracts these markers and wraps the function body with
+// `proven_attach(body, pred1, pred2, ...)` (variadic — multiple proven
+// clauses compose). At runtime `proven_attach` is a transparent
+// passthrough; `checkProvenClauses` (src/proven.ts) peels it at compile
+// time, samples the function with K=4 inputs, and verifies each predicate.
+
+const proven_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  // Marker. The block preprocessor extracts it; if one survives to
+  // runtime, it's a no-op (mirrors the other body-form markers).
+  return noneSingleton;
+};
+
+const proven_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length < 1) {
+    throw new AllegroError(`proven_attach: expected at least 1 arg (body), got ${args.length}`);
+  }
+  // Transparent passthrough at runtime; the predicates (args[1..]) are
+  // metadata for `checkProvenClauses` and are never evaluated here.
+  return evalFn!(args[0], ctx!);
+};
+
 // --- Phase F1: proof terms ---
 //
 // `proof_by_eval(propSrc, propExpr)` — the F1 proof constructor. Lazy on
@@ -3760,6 +3783,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   partial_attach: makePrimitive("partial_attach", partial_attach_impl, true),
   decreases_decl_marker: makePrimitive("decreases_decl_marker", decreases_decl_marker_impl, true),
   decreases_attach: makePrimitive("decreases_attach", decreases_attach_impl, true),
+  // Phase F7: `proven` clause marker + passthrough wrapper.
+  proven_decl_marker: makePrimitive("proven_decl_marker", proven_decl_marker_impl, true),
+  proven_attach: makePrimitive("proven_attach", proven_attach_impl, true),
   // Phase F1: proof by partial evaluation. Lazy on the proposition arg.
   proof_by_eval: makePrimitive("proof_by_eval", proof_by_eval_impl, true),
   // Phase F2: proof by refinement-domain entailment. Eager — both operands

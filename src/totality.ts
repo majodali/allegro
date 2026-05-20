@@ -40,10 +40,10 @@ export const NOTIF_TOTALITY_NEEDS_ANNOTATION = "totality-needs-annotation";
 
 const _WRAPPER_NAMES = new Set([
   "type_check", "partial_attach", "decreases_attach",
-  "effects_attach", "param_effects_attach",
+  "effects_attach", "param_effects_attach", "proven_attach",
 ]);
 
-function findAttachWrapper(body: Value, wantName: string): ExpressionValue | null {
+export function findAttachWrapper(body: Value, wantName: string): ExpressionValue | null {
   let cur = body;
   for (let i = 0; i < 16; i++) {
     if (cur.kind !== ValueKind.Expression) return null;
@@ -79,6 +79,15 @@ export function unwrapDecreasesAttach(body: Value): { body: Value; metric: Value
   if (!w) return null;
   if (w.args.length < 2) return null;
   return { body: w.args[0], metric: w.args[1] };
+}
+
+/** Recognise `proven_attach(body, pred1, …, predN)` in the head wrapper
+ *  stack. Returns `{ body, predicates }` when found, null otherwise. F7. */
+export function unwrapProvenAttach(body: Value): { body: Value; predicates: Value[] } | null {
+  const w = findAttachWrapper(body, "proven_attach");
+  if (!w) return null;
+  if (w.args.length < 1) return null;
+  return { body: w.args[0], predicates: w.args.slice(1) };
 }
 
 // =============================================================================

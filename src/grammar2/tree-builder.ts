@@ -683,7 +683,10 @@ function isPatternTag(tag: string | undefined): boolean {
 function isPrimitiveCall(value: any, primName: string): boolean {
   if (!value || typeof value !== "object") return false;
   if (value.kind !== "Expression") return false;
-  const fn = value.fn;
+  // The fn may be a MultiValue-wrapped function (e.g. when a stmt_form's
+  // template was evaluated in a lib module's typed env). Peel to primary.
+  let fn = value.fn;
+  if (fn && fn.kind === "MultiValue") fn = fn.primary;
   if (!fn) return false;
   if (fn.kind === "PrimitiveFunction" && fn.name === primName) return true;
   if (fn.kind === "Symbol" && fn.name === primName) return true;
@@ -744,6 +747,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   const paramEffects: Array<{ paramRef: any; effSym: any }> = [];
   let partialMarked = false;
   let decreasesMetric: any | null = null;
+  const provenPredicates: any[] = []; // F7 — accumulated across multiple `proven` clauses
   const filteredStmts: BuiltBinding[] = [];
   for (const s of stmts) {
     if (s.key === null && isPrimitiveCall(s.value, "requires_stmt")) {
@@ -789,6 +793,14 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // metric expression. Last writer wins if multiple clauses appear.
       const margs = (s.value as any).args as any[];
       if (margs.length >= 1) decreasesMetric = margs[0];
+      continue;
+    }
+    if (s.key === null && isPrimitiveCall(s.value, "proven_decl_marker")) {
+      // Phase F7 — `proven <prop>`. The arg is the predicate expression
+      // (which references the function's Params in scope). Multiple
+      // `proven` clauses accumulate as independent theorems to check.
+      const margs = (s.value as any).args as any[];
+      if (margs.length >= 1) provenPredicates.push(margs[0]);
       continue;
     }
     filteredStmts.push(s);
@@ -916,6 +928,13 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   // peels it via `unwrapDecreasesAttach` to verify (or trust) the metric.
   if (decreasesMetric !== null) {
     result = makeExpr(prim("decreases_attach"), [result, decreasesMetric]);
+  }
+
+  // Phase F7 — wrap with `proven_attach(result, pred1, ...)` when one or
+  // more `proven <prop>` clauses appeared. Runtime passthrough; the
+  // analyzer (`checkProvenClauses`) peels it and samples the function.
+  if (provenPredicates.length > 0) {
+    result = makeExpr(prim("proven_attach"), [result, ...provenPredicates]);
   }
 
   return result;
