@@ -7187,6 +7187,197 @@ test("Phase G: a downstream theorem about the lib's functions discharges", () =>
 
 fileTest(path.join(testsDir, "provable-demo.alg"), [provableExt]);
 
+// --- Phase H1: Proof Collaboration Protocol — JSON formats ---
+//
+// Three canonical schemas (Obligation, Verdict, Authorship). JSON is
+// the wire format; basic plain-text renderers are also exercised.
+
+import {
+  PCP_VERSION,
+  Obligation, Verdict, Authorship,
+  makeObligation, makeAuthorship, AUTO_PE_AUTHORSHIP,
+  hashProposition,
+  serializeObligation, parseObligation,
+  serializeVerdict,    parseVerdict,
+  serializeAuthorship, parseAuthorship,
+  formatObligation, formatVerdict, formatAuthorship,
+} from "./pcp.js";
+
+test("Phase H1: hashProposition is whitespace-insensitive and deterministic", () => {
+  const a = hashProposition("abs(0) == 0");
+  const b = hashProposition("abs(0)   ==   0");   // extra spaces
+  const c = hashProposition(" abs(0) == 0\n");   // leading + trailing
+  const d = hashProposition("abs(0) == 1");      // genuinely different
+  eq(a, b);
+  eq(a, c);
+  eq(a !== d, true);
+  eq(/^[0-9a-f]+$/.test(a), true, "hash is hex");
+});
+
+test("Phase H1: Obligation round-trips through JSON", () => {
+  const o: Obligation = makeObligation({
+    theoremName: "abs_idem_13",
+    proposition: "abs(abs(13)) == abs(13)",
+    function:    {
+      name: "abs", signature: "(x: Int): Int",
+      paramTypes: ["Int"], returnType: "Int",
+    },
+    imports: ["provable"],
+    lemmas:  ["abs_zero", "abs_pos"],
+  });
+  const wire = serializeObligation(o);
+  const back = parseObligation(wire);
+  // Re-serialize and assert byte-identical (canonical round-trip).
+  eq(serializeObligation(back), wire);
+  eq(back.theorem.name, "abs_idem_13");
+  eq(back.theorem.propositionHash.length > 0, true);
+  eq(back.function?.name, "abs");
+  eq(back.context.lemmas.length, 2);
+});
+
+test("Phase H1: Obligation rejects wrong version", () => {
+  const malformed = `{"version":"pcp/9","theorem":{"name":"t","proposition":"x","propositionHash":"0"},"context":{"imports":[],"lemmas":[]}}`;
+  throws(() => parseObligation(malformed), "unsupported version");
+});
+
+test("Phase H1: Obligation validates required fields", () => {
+  // Missing context entirely.
+  throws(() => parseObligation(`{"version":"pcp/1","theorem":{"name":"t","proposition":"x","propositionHash":"0"}}`),
+    "context missing");
+});
+
+test("Phase H1: Verdict round-trips", () => {
+  const v: Verdict = {
+    version: PCP_VERSION,
+    verified: false,
+    theorems: [
+      {
+        name: "abs_zero",
+        proposition: "abs(0) == 0",
+        status: "discharged",
+        authorship: AUTO_PE_AUTHORSHIP(),
+      },
+      {
+        name: "bad",
+        proposition: "1 == 2",
+        status: "failed",
+        failure: {
+          kind: "proof-failure",
+          reason: "proposition is false",
+          counterexample: "`1 == 2` evaluates to false",
+        },
+      },
+    ],
+    totalityFindings: [
+      { binding: "loop", kind: "totality-nontermination",
+        message: "loops on n", counterexample: "loop(n) → loop(n)" },
+    ],
+  };
+  const wire = serializeVerdict(v);
+  const back = parseVerdict(wire);
+  eq(back.verified, false);
+  eq(back.theorems.length, 2);
+  eq(back.theorems[0].status, "discharged");
+  eq(back.theorems[1].failure?.counterexample?.includes("evaluates to false"), true);
+  eq(back.totalityFindings?.[0].binding, "loop");
+  eq(serializeVerdict(back), wire);
+});
+
+test("Phase H1: Verdict rejects malformed status", () => {
+  const bad = `{"version":"pcp/1","verified":false,"theorems":[{"name":"t","proposition":"x","status":"bogus"}]}`;
+  throws(() => parseVerdict(bad), "status must be");
+});
+
+test("Phase H1: Authorship round-trips with single prover", () => {
+  const a: Authorship = makeAuthorship({
+    prover: "claude-opus-4-7",
+    proverVersion: "2026-05",
+    attemptsUsed: 3,
+    effortBudgetUsed: { tokens: 1500, attempts: 3 },
+    role: "primary",
+    verifiedAt: "2026-05-20T12:00:00.000Z",
+  });
+  const wire = serializeAuthorship(a);
+  const back = parseAuthorship(wire);
+  eq(serializeAuthorship(back), wire);
+  eq(back.provers[0].prover, "claude-opus-4-7");
+  eq(back.provers[0].attemptsUsed, 3);
+  eq(back.provers[0].effortBudgetUsed?.tokens, 1500);
+});
+
+test("Phase H1: Authorship supports multiple provers (hybrid workflows)", () => {
+  const a: Authorship = {
+    provers: [
+      { prover: "claude-opus-4-7", role: "primary",    attemptsUsed: 2 },
+      { prover: "user:alice",      role: "review" },
+    ],
+    verifiedAt: "2026-05-20T12:00:00.000Z",
+  };
+  const wire = serializeAuthorship(a);
+  const back = parseAuthorship(wire);
+  eq(back.provers.length, 2);
+  eq(back.provers[0].role, "primary");
+  eq(back.provers[1].role, "review");
+});
+
+test("Phase H1: Authorship rejects empty prover list", () => {
+  const bad = `{"provers":[],"verifiedAt":"2026-05-20T12:00:00Z"}`;
+  throws(() => parseAuthorship(bad), "non-empty array");
+});
+
+test("Phase H1: AUTO_PE_AUTHORSHIP yields valid round-trippable record", () => {
+  const a = AUTO_PE_AUTHORSHIP();
+  const wire = serializeAuthorship(a);
+  const back = parseAuthorship(wire);
+  eq(back.provers[0].prover, "auto-PE");
+  eq(typeof back.verifiedAt, "string");
+});
+
+test("Phase H1: formatObligation produces a readable summary", () => {
+  const o = makeObligation({
+    theoremName: "abs_idem_13",
+    proposition: "abs(abs(13)) == abs(13)",
+    function: { name: "abs", signature: "(x: Int): Int", paramTypes: ["Int"], returnType: "Int" },
+    imports: ["provable"],
+    lemmas:  ["abs_zero"],
+  });
+  const text = formatObligation(o);
+  eq(text.includes("abs_idem_13"), true);
+  eq(text.includes("abs(abs(13))"), true);
+  eq(text.includes("provable"), true);
+  eq(text.includes("abs_zero"), true);
+});
+
+test("Phase H1: formatVerdict surfaces success ratio + counterexamples", () => {
+  const v: Verdict = {
+    version: PCP_VERSION,
+    verified: false,
+    theorems: [
+      { name: "good", proposition: "1 == 1", status: "discharged", authorship: AUTO_PE_AUTHORSHIP() },
+      { name: "bad",  proposition: "1 == 2", status: "failed",
+        failure: { kind: "proof-failure", reason: "evaluates false", counterexample: "1 ≠ 2" } },
+    ],
+  };
+  const text = formatVerdict(v);
+  eq(text.includes("1/2 discharged"), true);
+  eq(text.includes("✓ good"), true);
+  eq(text.includes("✗ bad"), true);
+  eq(text.includes("evaluates false"), true);
+  eq(text.includes("counterexample: 1 ≠ 2"), true);
+});
+
+test("Phase H1: formatAuthorship lists ordered contributors with effort", () => {
+  const a = makeAuthorship({
+    prover: "claude-opus-4-7", proverVersion: "2026-05",
+    attemptsUsed: 4, effortBudgetUsed: { tokens: 2200 },
+  });
+  const text = formatAuthorship(a);
+  eq(text.includes("claude-opus-4-7"), true);
+  eq(text.includes("@2026-05"), true);
+  eq(text.includes("4 attempts"), true);
+  eq(text.includes("2200 tokens"), true);
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {
