@@ -77,6 +77,11 @@ export interface PriorAttempt {
   candidate: string;
   /** Verifier's response to that candidate. */
   verdict: Verdict;
+  /** H3: free-form tags describing which proof strategies the prover
+   *  applied in this attempt (`"proof_by_eval"`, `"prove_induction"`,
+   *  `"tactics.chain"`, …). The compiler doesn't parse these — they
+   *  round-trip so the next round's hints can say "don't repeat". */
+  strategiesUsed?: string[];
 }
 
 export interface SourceLocation {
@@ -102,6 +107,37 @@ export interface Verdict {
   totalityFindings?: TotalityFinding[];
   /** Effects-declaration mismatches (Phase D1) — fatal. */
   effectMismatches?: EffectMismatch[];
+  /** H3: structured guidance for the next attempt. Generated from the
+   *  failure modes in this verdict + any priorAttempts metadata. */
+  iterationHints?: IterationHints;
+}
+
+// =============================================================================
+// Iteration hints (H3)
+// =============================================================================
+//
+// Compiler-side, transparent, limited heuristics. The PROVER (LLM, human)
+// does the real proof search — these hints just nudge it past common
+// pitfalls (PE residual? wrong proposition? trivial counterexample?).
+
+export interface IterationHints {
+  /** Per-theorem or global suggestions for what to try next. */
+  suggestions: Suggestion[];
+  /** Strategies the prover already tried in prior attempts (aggregated
+   *  + deduplicated). Workers should avoid repeating these. */
+  strategiesTried?: string[];
+}
+
+export interface Suggestion {
+  /** Either the theorem name this suggestion is about, or `"<global>"`
+   *  for module-level advice. */
+  theoremName: string;
+  /** Free-form, human-readable. Workers parse on `suggestedConstruct`
+   *  rather than the message text. */
+  message: string;
+  /** Optional machine-readable handle for the suggested tactic /
+   *  primitive (`"prove_for_all_bool"`, `"tactics.chain"`, …). */
+  suggestedConstruct?: string;
 }
 
 export type TheoremStatus = "discharged" | "failed" | "skipped";
@@ -413,6 +449,20 @@ export function formatVerdict(v: Verdict): string {
       lines.push(`    [${em.binding}] declared=${em.declared.join(",") || "∅"} inferred=${em.inferred.join(",") || "∅"} missing=${em.missing.join(",") || "∅"}`);
     }
   }
+  if (v.iterationHints) {
+    if (v.iterationHints.suggestions.length > 0) {
+      lines.push(`  hints:`);
+      for (const s of v.iterationHints.suggestions) {
+        lines.push(`    [${s.theoremName}] ${s.message}`);
+        if (s.suggestedConstruct) {
+          lines.push(`      try: ${s.suggestedConstruct}`);
+        }
+      }
+    }
+    if (v.iterationHints.strategiesTried && v.iterationHints.strategiesTried.length > 0) {
+      lines.push(`  already tried: ${v.iterationHints.strategiesTried.join(", ")}`);
+    }
+  }
   return lines.join("\n");
 }
 
@@ -436,10 +486,16 @@ function _ctxString(ctx: ContextValue, key: string): string | undefined {
  *  Proof-typed binding becomes a TheoremResult; totality findings and
  *  effect mismatches are pulled from notifications. `verified` is true
  *  iff every theorem discharged and no error-severity notification fired
- *  (effects-mismatch, return-type-mismatch, …). */
+ *  (effects-mismatch, return-type-mismatch, …).
+ *
+ *  When `obligation` is supplied, the H3 `iterationHints` field is
+ *  populated using both the current verdict's failures AND any
+ *  `strategiesUsed` recorded by the prover in prior attempts. Without
+ *  an obligation, hints reflect this attempt only. */
 export function buildVerdict(
   evalCtx: ContextValue,
   report: CompilationReport | undefined,
+  obligation?: Obligation,
 ): Verdict {
   const theorems: TheoremResult[] = [];
   for (const [key, binding] of evalCtx.bindings) {
@@ -538,12 +594,128 @@ export function buildVerdict(
   }
 
   const hasFailedTheorem = theorems.some(t => t.status === "failed");
+  const iterationHints = generateHints(theorems, report, obligation);
   return {
     version: PCP_VERSION,
     verified: !anyError && !hasFailedTheorem,
     theorems,
     ...(totalityFindings.length > 0 ? { totalityFindings } : {}),
     ...(effectMismatches.length > 0 ? { effectMismatches } : {}),
+    ...(iterationHints.suggestions.length > 0 || iterationHints.strategiesTried
+        ? { iterationHints } : {}),
+  };
+}
+
+/** H3: generate compiler-side hints from the failure modes in a Verdict
+ *  + any strategies the prover recorded in prior attempts. Heuristics
+ *  are deliberately limited and transparent — workers do the real proof
+ *  search; the compiler nudges past common pitfalls. */
+export function generateHints(
+  theorems: TheoremResult[],
+  report: CompilationReport | undefined,
+  obligation?: Obligation,
+): IterationHints {
+  const suggestions: Suggestion[] = [];
+
+  for (const t of theorems) {
+    if (t.status === "discharged" || !t.failure) continue;
+    const name   = t.name;
+    const kind   = t.failure.kind;
+    const reason = t.failure.reason ?? "";
+    const cex    = t.failure.counterexample ?? "";
+
+    // F1 proof-failure shapes (most common).
+    if (kind === "proof-failure") {
+      if (reason.includes("did not reduce to a constant Bool") ||
+          cex.includes("PE left a residual")) {
+        suggestions.push({
+          theoremName: name,
+          message: "PE left a residual — try a combinator (`proof_refl` / `proof_sym` / `proof_trans` / `proof_cong`) or `prove_for_all_bool` for finite-domain quantification",
+          suggestedConstruct: "proof_trans",
+        });
+      } else if (reason.includes("evaluates to false") || cex.includes("evaluates to false")) {
+        suggestions.push({
+          theoremName: name,
+          message: "proposition is false on the supplied inputs — revise the theorem statement or the function it references; check the counterexample",
+        });
+      } else if (reason.includes("transitivity middle terms differ") ||
+                 cex.includes("middle terms")) {
+        suggestions.push({
+          theoremName: name,
+          message: "in `proof_trans(p1, p2)` the RHS of p1 must value-match the LHS of p2 — inspect the intermediate term and consider `tactics.chain([…])` for a longer chain",
+          suggestedConstruct: "tactics.chain",
+        });
+      } else if (reason.includes("different equality") ||
+                 reason.includes("establishes a different")) {
+        suggestions.push({
+          theoremName: name,
+          message: "the `by` proof term establishes a different fact than the theorem claims — match the proposition exactly",
+        });
+      }
+    }
+
+    // F7 proven-failed shapes (sampled witness).
+    if (kind === "proven-failed") {
+      // Counterexample format: "at <param> = <value>: <reason>"
+      const m = /at (\w+)\s*=\s*([^:]+):/.exec(cex);
+      if (m) {
+        suggestions.push({
+          theoremName: name,
+          message: `the implementation violates the predicate at \`${m[1]} = ${m[2].trim()}\` — revise the impl or weaken the proven clause`,
+        });
+      } else {
+        suggestions.push({
+          theoremName: name,
+          message: "sampling found a counterexample to the proven clause — see counterexample",
+        });
+      }
+    }
+
+    if (kind === "proven-skipped") {
+      if (reason.includes("F7 minimum supports single-param")) {
+        suggestions.push({
+          theoremName: name,
+          message: "F7 sampling supports single-param functions only — split the function or attach the theorem at a single-param helper",
+        });
+      } else if (reason.includes("no type annotation")) {
+        suggestions.push({
+          theoremName: name,
+          message: "the param has no type annotation; F7 needs `Int` / `NonNeg` / `PositiveInt` / `Bool` to sample",
+          suggestedConstruct: "type-annotation",
+        });
+      } else if (reason.includes("not sampleable")) {
+        suggestions.push({
+          theoremName: name,
+          message: "the param type isn't a sampleable shape (F7 minimum); restructure the function or prove via combinators / `prove_induction`",
+        });
+      }
+    }
+  }
+
+  // Global lemma reminder — surfaced once when an obligation supplies
+  // lemmas (otherwise the prover would have to scan the obligation
+  // separately).
+  if (obligation && obligation.context.lemmas.length > 0) {
+    const top = obligation.context.lemmas.slice(0, 5).join(", ");
+    const more = obligation.context.lemmas.length > 5
+      ? ` … (${obligation.context.lemmas.length - 5} more)` : "";
+    suggestions.push({
+      theoremName: "<global>",
+      message: `${obligation.context.lemmas.length} lemma(s) in scope: ${top}${more}. Consider \`proof_trans\` / \`tactics.chain\` for chaining.`,
+    });
+  }
+
+  // Aggregate strategies the prover tried (round-tripped). Workers use
+  // this to avoid repeating.
+  const triedSet = new Set<string>();
+  for (const pa of obligation?.priorAttempts ?? []) {
+    for (const s of pa.strategiesUsed ?? []) triedSet.add(s);
+  }
+  const strategiesTried = triedSet.size > 0 ? Array.from(triedSet).sort() : undefined;
+
+  return {
+    suggestions,
+    ...(strategiesTried ? { strategiesTried } : {}),
   };
 }
 

@@ -7554,6 +7554,144 @@ test("Phase H2: CLI `obligations --json` emits one JSON per theorem", () => {
   }
 });
 
+// --- Phase H3: iteration hints ---
+//
+// Compiler-side, transparent heuristics that nudge the prover past
+// common pitfalls. The Verdict carries them in `iterationHints`.
+// generateHints also folds in `strategiesUsed` from prior attempts.
+
+import { generateHints, IterationHints } from "./pcp.js";
+
+test("Phase H3: false-proposition failure gets a 'revise theorem' hint", () => {
+  const src = `theorem bad: 5 == 6\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  const hints = verdict.iterationHints!;
+  eq(hints !== undefined, true);
+  const sug = hints.suggestions.find(s => s.theoremName === "bad");
+  eq(sug !== undefined, true);
+  eq(sug!.message.includes("revise the theorem"), true);
+});
+
+test("Phase H3: PE-residual failure suggests a combinator", () => {
+  const src = `theorem t: unknown_var > 0\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  const sug = verdict.iterationHints!.suggestions.find(s => s.theoremName === "t");
+  eq(sug !== undefined, true);
+  eq(sug!.message.includes("combinator"), true);
+  eq(sug!.suggestedConstruct, "proof_trans");
+});
+
+test("Phase H3: proof_trans middle-term mismatch hint suggests tactics.chain", () => {
+  const src = `theorem ab: 1 + 1 == 2
+theorem cd: 5 == 5
+theorem bad: 1 + 1 == 9 by proof_trans(ab, cd)
+`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  const sug = verdict.iterationHints!.suggestions.find(s => s.theoremName === "bad");
+  eq(sug !== undefined, true);
+  eq(sug!.message.includes("intermediate term"), true);
+  eq(sug!.suggestedConstruct, "tactics.chain");
+});
+
+test("Phase H3: wrong proof term (different equality) is flagged", () => {
+  const src = `theorem bad: 1 == 2 by proof_refl(5)\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  const sug = verdict.iterationHints!.suggestions.find(s => s.theoremName === "bad");
+  eq(sug !== undefined, true);
+  eq(sug!.message.includes("different fact"), true);
+});
+
+test("Phase H3: clean module produces no iteration hints", () => {
+  const src = `theorem t: 3 + 4 == 7\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  // No failures → no suggestions; hints field is omitted (undefined).
+  eq(verdict.iterationHints, undefined);
+});
+
+test("Phase H3: obligation context surfaces a global lemma reminder", () => {
+  const src = `theorem a: 1 == 1\ntheorem b: 2 == 2\ntheorem c: 3 == 4\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  // Synthesise an obligation that lists a + b as available lemmas.
+  const obligation = makeObligation({
+    theoremName: "c",
+    proposition: "3 == 4",
+    lemmas: ["a", "b"],
+  });
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport, obligation);
+  const global = verdict.iterationHints!.suggestions.find(
+    s => s.theoremName === "<global>",
+  );
+  eq(global !== undefined, true);
+  eq(global!.message.includes("2 lemma(s)"), true);
+  eq(global!.message.includes("a, b"), true);
+});
+
+test("Phase H3: strategiesTried aggregates across priorAttempts", () => {
+  const obligation = makeObligation({
+    theoremName: "t",
+    proposition: "x",
+    priorAttempts: [
+      {
+        attemptNumber: 1, candidate: "",
+        verdict: { version: PCP_VERSION, verified: false, theorems: [] },
+        strategiesUsed: ["proof_by_eval", "proof_refl"],
+      },
+      {
+        attemptNumber: 2, candidate: "",
+        verdict: { version: PCP_VERSION, verified: false, theorems: [] },
+        strategiesUsed: ["proof_trans", "proof_by_eval"], // proof_by_eval dedupes
+      },
+    ],
+  });
+  const verdict: Verdict = {
+    version: PCP_VERSION,
+    verified: false,
+    theorems: [{
+      name: "t", proposition: "x", status: "failed",
+      failure: { kind: "proof-failure", reason: "did not reduce to a constant Bool" },
+    }],
+  };
+  const hints = generateHints(verdict.theorems, undefined, obligation);
+  eq(JSON.stringify(hints.strategiesTried),
+     JSON.stringify(["proof_by_eval", "proof_refl", "proof_trans"]));
+});
+
+test("Phase H3: PriorAttempt.strategiesUsed round-trips through JSON", () => {
+  const obligation = makeObligation({
+    theoremName: "t", proposition: "x",
+    priorAttempts: [{
+      attemptNumber: 1, candidate: "verify x",
+      verdict: { version: PCP_VERSION, verified: false, theorems: [] },
+      strategiesUsed: ["proof_by_eval", "tactics.chain"],
+    }],
+  });
+  const wire = serializeObligation(obligation);
+  const back = parseObligation(wire);
+  eq(JSON.stringify(back.priorAttempts?.[0].strategiesUsed),
+     JSON.stringify(["proof_by_eval", "tactics.chain"]));
+});
+
+test("Phase H3: formatVerdict renders hints section", () => {
+  const src = `theorem t: 1 == 2\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  const text = formatVerdict(verdict);
+  eq(text.includes("hints:"), true);
+  eq(text.includes("[t]"), true);
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

@@ -660,16 +660,20 @@ async function runPcpVerify(
   const { buildVerdict, parseObligation, checkObligationSatisfied,
           serializeVerdict, formatVerdict } = await import("./pcp.js");
   const result = await pcpLoadAndEval(filename, isStandard);
-  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
-
-  // Cross-check against an obligation if supplied.
+  // If an obligation is supplied, pass it through to buildVerdict so
+  // iteration hints reflect the lemma context + prior-attempt strategies.
+  let obligation = undefined;
   if (obligationPath) {
     const obligationText = fs.readFileSync(obligationPath, "utf-8");
-    const obligation = parseObligation(obligationText);
+    obligation = parseObligation(obligationText);
+  }
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport, obligation);
+
+  // Cross-check the obligation: the candidate must satisfy the named
+  // theorem with a matching propositionHash (blocks trivial-pass).
+  if (obligation) {
     const err = checkObligationSatisfied(obligation, verdict);
     if (err) {
-      // Annotate the verdict: even if the candidate's own theorems
-      // discharge, the OBLIGATION wasn't met. Surface the mismatch.
       (verdict as any).verified = false;
       (verdict as any).obligationMismatch = err;
     }
