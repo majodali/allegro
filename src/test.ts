@@ -7378,6 +7378,182 @@ test("Phase H1: formatAuthorship lists ordered contributors with effort", () => 
   eq(text.includes("2200 tokens"), true);
 });
 
+// --- Phase H2: verify / obligations CLI helpers ---
+//
+// We test the conversion helpers (buildVerdict, extractObligations,
+// checkObligationSatisfied) directly. The CLI subcommands are also
+// smoke-tested via child_process to confirm the wiring.
+
+import {
+  buildVerdict, extractObligations, checkObligationSatisfied,
+} from "./pcp.js";
+import { spawnSync } from "child_process";
+
+test("Phase H2: buildVerdict captures discharged + failed theorems from soft-fail eval", () => {
+  // Mix of passing + failing top-level theorems, evaluated with softFail.
+  const src = `theorem ok: 3 + 5 == 8\ntheorem bad: 1 == 2\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(verdict.verified, false);
+  const names = verdict.theorems.map(t => t.name).sort();
+  eq(names.includes("ok"), true);
+  eq(names.includes("bad"), true);
+  const ok = verdict.theorems.find(t => t.name === "ok");
+  eq(ok?.status, "discharged");
+  eq(ok?.authorship?.provers[0].prover, "auto-PE");
+  const bad = verdict.theorems.find(t => t.name === "bad");
+  eq(bad?.status, "failed");
+  eq(bad?.failure?.kind, "proof-failure");
+});
+
+test("Phase H2: buildVerdict surfaces anonymous verify failures", () => {
+  // `verify P` is a bare expr — failures appear as proof-failure
+  // notifications rather than bindings. buildVerdict must still find them.
+  const src = `verify 1 == 2\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(verdict.verified, false);
+  const v = verdict.theorems.find(t => t.name === "<verify>");
+  eq(v !== undefined, true);
+  eq(v?.status, "failed");
+});
+
+test("Phase H2: buildVerdict returns verified=true on a clean module", () => {
+  const src = `theorem t: 3 + 4 == 7\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(verdict.verified, true);
+  eq(verdict.theorems.length, 1);
+});
+
+test("Phase H2: extractObligations enumerates every theorem by default", () => {
+  const src = `theorem a: 1 == 1\ntheorem b: 1 == 2\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const obligations = extractObligations(result.evalCtx, result.compilationReport);
+  const names = obligations.map(o => o.theorem.name).sort();
+  eq(names.length >= 2, true);
+  eq(names.includes("a"), true);
+  eq(names.includes("b"), true);
+});
+
+test("Phase H2: extractObligations --pending omits discharged proofs", () => {
+  const src = `theorem a: 1 == 1\ntheorem b: 1 == 2\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const pending = extractObligations(result.evalCtx, result.compilationReport,
+                                     { pendingOnly: true });
+  const names = pending.map(o => o.theorem.name).sort();
+  eq(names.includes("a"), false, "discharged `a` should be omitted");
+  eq(names.includes("b"), true);
+});
+
+test("Phase H2: extractObligations populates lemma list for the prover", () => {
+  const src = `theorem a: 1 == 1\ntheorem b: 2 == 2\ntheorem c: 1 == 2\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const oblig = extractObligations(result.evalCtx, result.compilationReport);
+  const cOb = oblig.find(o => o.theorem.name === "c");
+  // c is failed; lemmas should include the two discharged theorems.
+  eq(cOb?.context.lemmas.includes("a"), true);
+  eq(cOb?.context.lemmas.includes("b"), true);
+  eq(cOb?.context.lemmas.includes("c"), false, "self-exclude");
+});
+
+test("Phase H2: checkObligationSatisfied — match", () => {
+  const obligation = makeObligation({
+    theoremName: "t",
+    proposition: "3 + 5 == 8",
+  });
+  const verdict: Verdict = {
+    version: PCP_VERSION,
+    verified: true,
+    theorems: [{
+      name: "t",
+      proposition: "3 + 5 == 8",
+      status: "discharged",
+      authorship: AUTO_PE_AUTHORSHIP(),
+    }],
+  };
+  eq(checkObligationSatisfied(obligation, verdict), null);
+});
+
+test("Phase H2: checkObligationSatisfied — missing theorem", () => {
+  const obligation = makeObligation({ theoremName: "t", proposition: "x" });
+  const verdict: Verdict = { version: PCP_VERSION, verified: true, theorems: [] };
+  const err = checkObligationSatisfied(obligation, verdict);
+  eq(err !== null && err.includes("not present"), true);
+});
+
+test("Phase H2: checkObligationSatisfied — proposition mismatch (different fact)", () => {
+  const obligation = makeObligation({ theoremName: "t", proposition: "3 + 5 == 8" });
+  const verdict: Verdict = {
+    version: PCP_VERSION,
+    verified: true,
+    theorems: [{
+      name: "t",
+      proposition: "1 == 1",       // different proposition — trivial-pass attack
+      status: "discharged",
+      authorship: AUTO_PE_AUTHORSHIP(),
+    }],
+  };
+  const err = checkObligationSatisfied(obligation, verdict);
+  eq(err !== null && err.includes("different proposition"), true);
+});
+
+test("Phase H2: checkObligationSatisfied — theorem not discharged", () => {
+  const obligation = makeObligation({ theoremName: "t", proposition: "1 == 2" });
+  const verdict: Verdict = {
+    version: PCP_VERSION,
+    verified: false,
+    theorems: [{
+      name: "t",
+      proposition: "1 == 2",
+      status: "failed",
+      failure: { kind: "proof-failure", reason: "false" },
+    }],
+  };
+  const err = checkObligationSatisfied(obligation, verdict);
+  eq(err !== null && err.includes("is failed"), true);
+});
+
+test("Phase H2: CLI `verify` exits 0 on success, 1 on failure", () => {
+  const okFile  = path.join(testsDir, "proofs-demo.alg");
+  const failTmp = path.join("/tmp", `pcp-fail-${Date.now()}.alg`);
+  fs.writeFileSync(failTmp, "verify 1 == 2\n");
+  try {
+    const ok = spawnSync("npx", ["tsx", "src/index.ts", "verify", okFile, "--json"],
+                         { encoding: "utf-8" });
+    eq(ok.status, 0, `verify on passing file should exit 0, got ${ok.status}: ${ok.stderr}`);
+    const fail = spawnSync("npx", ["tsx", "src/index.ts", "verify", failTmp, "--json"],
+                           { encoding: "utf-8" });
+    eq(fail.status, 1, `verify on failing file should exit 1, got ${fail.status}`);
+    // JSON parses (no extra text on stdout).
+    const v = JSON.parse(fail.stdout.trim());
+    eq(v.verified, false);
+  } finally {
+    fs.unlinkSync(failTmp);
+  }
+});
+
+test("Phase H2: CLI `obligations --json` emits one JSON per theorem", () => {
+  const r = spawnSync("npx", ["tsx", "src/index.ts", "obligations",
+                              path.join(testsDir, "proofs-demo.alg"), "--json"],
+                      { encoding: "utf-8" });
+  eq(r.status, 0);
+  // Each line is one JSON object.
+  const lines = r.stdout.trim().split("\n").filter(l => l.length > 0);
+  eq(lines.length >= 2, true);
+  for (const line of lines) {
+    const o = JSON.parse(line);
+    eq(o.version, PCP_VERSION);
+    eq(typeof o.theorem.name, "string");
+  }
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

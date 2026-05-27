@@ -889,6 +889,12 @@ export function evalSource(
   grammarExtension?: GrammarExtension,
   typed?: boolean,
   futureManager?: import("./futures.js").FutureManager,
+  /** Phase H2: when true, proof / proven / effects failures push their
+   *  notifications as usual but do NOT throw. The caller gets the full
+   *  evalCtx + compilationReport and decides how to surface the failures
+   *  (e.g. the `allegro verify` CLI emits them as a Verdict). Default
+   *  false (compilation halts on failure — "build safety in"). */
+  softFail?: boolean,
 ): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
@@ -974,7 +980,9 @@ export function evalSource(
         });
       }
       const lines = fxMismatches.map(m => "  " + formatMismatch(m));
-      throw new Error("effects declaration check failed:\n" + lines.join("\n"));
+      if (!softFail) {
+        throw new Error("effects declaration check failed:\n" + lines.join("\n"));
+      }
     }
     for (const n of opaqueEffectNotices(fileCtx.bindingList)) {
       compilationReport.notifications.push({
@@ -1175,10 +1183,12 @@ export function evalSource(
         counterexample: f.counterexample,
       });
     }
-    throw new Error(
-      "proof check failed:\n" +
-      proofFindings.map(f => "  " + formatProofFinding(f)).join("\n"),
-    );
+    if (!softFail) {
+      throw new Error(
+        "proof check failed:\n" +
+        proofFindings.map(f => "  " + formatProofFinding(f)).join("\n"),
+      );
+    }
   }
 
   // Phase F7: `proven` clauses on functions. Sample each annotated
@@ -1205,12 +1215,14 @@ export function evalSource(
           counterexample: f.counterexample,
         });
       }
-      throw new Error(
+      if (!softFail) {
+        throw new Error(
         "proven clause failed:\n" +
         provenResults.errors.map(f => "  " + formatProvenFinding(f)
           + (f.counterexample ? `\n    counterexample: ${f.counterexample}` : "")
         ).join("\n"),
-      );
+        );
+      }
     }
   }
 

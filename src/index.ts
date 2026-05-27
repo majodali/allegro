@@ -477,8 +477,10 @@ const flagless = argv.filter(a => !a.startsWith("--"));
 const standard = !baseMode;
 
 // Subcommand detection: first positional arg can be a subcommand.
-//   allegro inspect <file>   — Phase A: emit a module summary for review
-//   allegro <file>            — run the file (existing behaviour)
+//   allegro inspect <file>          — Phase A: emit a module summary
+//   allegro verify <file> [...]      — Phase H2: PCP verification verdict
+//   allegro obligations <file> [...] — Phase H2: PCP obligation enumeration
+//   allegro <file>                   — run the file (existing behaviour)
 if (flagless[0] === "inspect") {
   const filename = flagless[1];
   if (!filename) {
@@ -486,6 +488,33 @@ if (flagless[0] === "inspect") {
     process.exit(1);
   }
   runInspect(filename, standard).catch(e => {
+    console.error(e.message);
+    process.exit(1);
+  });
+} else if (flagless[0] === "verify") {
+  const filename = flagless[1];
+  if (!filename) {
+    console.error("usage: allegro verify <file> [--obligation O.json] [--json]");
+    process.exit(1);
+  }
+  const obligationPath = (() => {
+    const i = argv.indexOf("--obligation");
+    return i >= 0 ? argv[i + 1] : undefined;
+  })();
+  const asJson = argv.includes("--json");
+  runPcpVerify(filename, standard, obligationPath, asJson).catch(e => {
+    console.error(e.message);
+    process.exit(1);
+  });
+} else if (flagless[0] === "obligations") {
+  const filename = flagless[1];
+  if (!filename) {
+    console.error("usage: allegro obligations <file> [--pending] [--json]");
+    process.exit(1);
+  }
+  const pendingOnly = argv.includes("--pending");
+  const asJson = argv.includes("--json");
+  runPcpObligations(filename, standard, pendingOnly, asJson).catch(e => {
     console.error(e.message);
     process.exit(1);
   });
@@ -569,4 +598,119 @@ async function runInspect(filename: string, isStandard: boolean): Promise<void> 
   console.log(`allegro inspect — ${filename}`);
   console.log("=".repeat(60));
   console.log(renderModuleSummary(summary));
+}
+
+/**
+ * Phase H2: load a file with the same grammar / module pipeline `inspect`
+ * uses, but evaluate in softFail mode so we see failed proofs without
+ * the throw. Returns the evaluator's outputs for the verify / obligations
+ * subcommands to convert into PCP shapes.
+ */
+async function pcpLoadAndEval(filename: string, isStandard: boolean) {
+  const source = fs.readFileSync(filename, "utf-8");
+  const sourceDir = path.dirname(path.resolve(filename));
+  let extensions: Extension[] = isStandard ? [...getStdExtensions()] : [];
+
+  const { directives, headerEnd } = scanUses(source);
+  const moduleNames = directives.filter(d => d.kind === "module").map(d => d.name!);
+  if (moduleNames.length > 0) {
+    const grammarExts = await loadGrammarModules(moduleNames, sourceDir, extensions);
+    extensions = [...extensions, ...grammarExts];
+  }
+  const cleanSource = source.slice(headerEnd);
+
+  if (isStandard) {
+    const { parse: g2parse } = await import("./grammar2/engine.js");
+    const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
+    const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
+    const { buildProgram } = await import("./grammar2/tree-builder.js");
+    const g2Fragments = collectFragments(extensions);
+    const grammar = g2Fragments.length > 0 ? getGrammarWithFragments(g2Fragments) : getBaseGrammar();
+    const result0 = g2parse(grammar, cleanSource.replace(/\r\n/g, "\n"));
+    if (result0.ok) {
+      const fileCtx: any = buildProgram(result0.tree);
+      if (fileCtx) {
+        const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);
+        extensions = [...extensions, ...moduleExts];
+      }
+    }
+  }
+
+  // Suppress program prints — the PCP commands surface structured data,
+  // not user-program I/O.
+  const origLog = console.log;
+  console.log = () => {};
+  let result;
+  try {
+    // softFail=true: failed proofs / proven / effects push notifications
+    // but do NOT throw, so the verdict can describe them.
+    result = evalSource(cleanSource, undefined, extensions, undefined, isStandard, undefined, true);
+  } finally {
+    console.log = origLog;
+  }
+  return result;
+}
+
+async function runPcpVerify(
+  filename: string,
+  isStandard: boolean,
+  obligationPath: string | undefined,
+  asJson: boolean,
+): Promise<void> {
+  const { buildVerdict, parseObligation, checkObligationSatisfied,
+          serializeVerdict, formatVerdict } = await import("./pcp.js");
+  const result = await pcpLoadAndEval(filename, isStandard);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+
+  // Cross-check against an obligation if supplied.
+  if (obligationPath) {
+    const obligationText = fs.readFileSync(obligationPath, "utf-8");
+    const obligation = parseObligation(obligationText);
+    const err = checkObligationSatisfied(obligation, verdict);
+    if (err) {
+      // Annotate the verdict: even if the candidate's own theorems
+      // discharge, the OBLIGATION wasn't met. Surface the mismatch.
+      (verdict as any).verified = false;
+      (verdict as any).obligationMismatch = err;
+    }
+  }
+
+  if (asJson) {
+    console.log(serializeVerdict(verdict));
+  } else {
+    console.log(formatVerdict(verdict));
+    if ((verdict as any).obligationMismatch) {
+      console.log(`  obligation mismatch: ${(verdict as any).obligationMismatch}`);
+    }
+  }
+  process.exit(verdict.verified ? 0 : 1);
+}
+
+async function runPcpObligations(
+  filename: string,
+  isStandard: boolean,
+  pendingOnly: boolean,
+  asJson: boolean,
+): Promise<void> {
+  const { extractObligations, serializeObligation, formatObligation } =
+    await import("./pcp.js");
+  const result = await pcpLoadAndEval(filename, isStandard);
+  const obligations = extractObligations(result.evalCtx, result.compilationReport, {
+    pendingOnly,
+    sourceFile: filename,
+  });
+
+  if (asJson) {
+    // One JSON object per line — easy to stream / pipe.
+    for (const o of obligations) console.log(serializeObligation(o));
+  } else {
+    if (obligations.length === 0) {
+      console.log(`(no ${pendingOnly ? "pending " : ""}obligations in ${filename})`);
+    } else {
+      for (const o of obligations) {
+        console.log(formatObligation(o));
+        console.log("-".repeat(40));
+      }
+    }
+  }
 }

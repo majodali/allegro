@@ -22,6 +22,11 @@
 // **Schema version is "pcp/1".** Forward-compatible additions get
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
+import type { ContextValue, BitsValue } from "./types.js";
+import { ValueKind, primaryOf, bitsToString } from "./types.js";
+import { isDischargedProof, isFailedProof } from "./proofs.js";
+import type { CompilationReport, Notification } from "./runtime.js";
+
 export const PCP_VERSION = "pcp/1" as const;
 
 // =============================================================================
@@ -409,6 +414,254 @@ export function formatVerdict(v: Verdict): string {
     }
   }
   return lines.join("\n");
+}
+
+// =============================================================================
+// Conversion: internal compiler state → PCP wire shapes (H2)
+// =============================================================================
+//
+// `buildVerdict` and `extractObligations` are the bridge between the
+// evaluator's internal state (evalCtx + CompilationReport) and the PCP
+// JSON formats. CLI subcommands + workers consume these to surface the
+// verifier's view to external provers.
+
+function _ctxString(ctx: ContextValue, key: string): string | undefined {
+  const b = ctx.bindings.get(key)?.value;
+  if (!b) return undefined;
+  const p = primaryOf(b);
+  return p.kind === ValueKind.Bits ? bitsToString(p as BitsValue) : undefined;
+}
+
+/** Build a Verdict by walking evalCtx + the CompilationReport. Every
+ *  Proof-typed binding becomes a TheoremResult; totality findings and
+ *  effect mismatches are pulled from notifications. `verified` is true
+ *  iff every theorem discharged and no error-severity notification fired
+ *  (effects-mismatch, return-type-mismatch, …). */
+export function buildVerdict(
+  evalCtx: ContextValue,
+  report: CompilationReport | undefined,
+): Verdict {
+  const theorems: TheoremResult[] = [];
+  for (const [key, binding] of evalCtx.bindings) {
+    const v = binding.value;
+    if (!v) continue;
+    if (isDischargedProof(v)) {
+      const ctx = primaryOf(v) as ContextValue;
+      theorems.push({
+        name: key,
+        proposition: _ctxString(ctx, "__proposition") ?? "<unknown>",
+        status: "discharged",
+        authorship: AUTO_PE_AUTHORSHIP(),
+      });
+    } else if (isFailedProof(v)) {
+      const ctx = primaryOf(v) as ContextValue;
+      theorems.push({
+        name: key,
+        proposition: _ctxString(ctx, "__proposition") ?? "<unknown>",
+        status: "failed",
+        failure: {
+          kind: "proof-failure",
+          reason: _ctxString(ctx, "__reason") ?? "proof did not discharge",
+          counterexample: _ctxString(ctx, "__counterexample"),
+        },
+      });
+    }
+  }
+
+  const totalityFindings: TotalityFinding[] = [];
+  const effectMismatches: EffectMismatch[] = [];
+  let anyError = false;
+  if (report) {
+    for (const n of report.notifications) {
+      if (n.severity === "error") anyError = true;
+      if (n.kind.startsWith("totality-")) {
+        totalityFindings.push({
+          binding: n.binding ?? "?",
+          kind: n.kind,
+          message: n.message,
+          counterexample: n.counterexample,
+        });
+      } else if (n.kind === "effects-mismatch") {
+        // The Notification carries the formatted message; parsing declared/
+        // inferred/missing out of it is best-effort. Surface message
+        // verbatim and leave structured fields empty for H2 minimum.
+        effectMismatches.push({
+          binding: n.binding ?? "?",
+          declared: [],
+          inferred: [],
+          missing:  [],
+        });
+      } else if (n.kind === "proof-failure") {
+        // Failed `theorem` / `verify` (bare and named). Named failures
+        // also appear as failed-Proof bindings above; dedup by name +
+        // proposition. Anonymous verifies (binding is undefined) ALWAYS
+        // surface here.
+        const name = n.binding ?? "<verify>";
+        const already = theorems.find(
+          t => t.name === name && t.status === "failed",
+        );
+        if (!already) {
+          theorems.push({
+            name,
+            proposition: n.message,
+            status: "failed",
+            failure: {
+              kind: "proof-failure",
+              reason: n.message,
+              counterexample: n.counterexample,
+            },
+          });
+        }
+      } else if (n.kind === "proven-failed") {
+        theorems.push({
+          name: n.binding ?? "<proven>",
+          proposition: n.message,
+          status: "failed",
+          failure: {
+            kind: "proven-failed",
+            reason: n.message,
+            counterexample: n.counterexample,
+          },
+        });
+      } else if (n.kind === "proven-skipped") {
+        theorems.push({
+          name: n.binding ?? "<proven>",
+          proposition: n.message,
+          status: "skipped",
+          failure: {
+            kind: "proven-skipped",
+            reason: n.message,
+          },
+        });
+      }
+    }
+  }
+
+  const hasFailedTheorem = theorems.some(t => t.status === "failed");
+  return {
+    version: PCP_VERSION,
+    verified: !anyError && !hasFailedTheorem,
+    theorems,
+    ...(totalityFindings.length > 0 ? { totalityFindings } : {}),
+    ...(effectMismatches.length > 0 ? { effectMismatches } : {}),
+  };
+}
+
+/** Extract Obligations from an evaluated module — one per Proof-typed
+ *  binding. When `pendingOnly` is true, only theorems that didn't
+ *  discharge (failed or skipped) are included; otherwise every theorem
+ *  is enumerated (useful for cataloguing). */
+export function extractObligations(
+  evalCtx: ContextValue,
+  report: CompilationReport | undefined,
+  opts?: { pendingOnly?: boolean; sourceFile?: string },
+): Obligation[] {
+  const obligations: Obligation[] = [];
+  // Collect the lemma names (discharged proof bindings) for context.
+  const lemmas: string[] = [];
+  for (const [key, b] of evalCtx.bindings) {
+    if (b.value && isDischargedProof(b.value)) lemmas.push(key);
+  }
+
+  for (const [key, binding] of evalCtx.bindings) {
+    const v = binding.value;
+    if (!v) continue;
+    const discharged = isDischargedProof(v);
+    const failed     = isFailedProof(v);
+    if (!discharged && !failed) continue;
+    if (opts?.pendingOnly && discharged) continue;
+
+    const ctx = primaryOf(v) as ContextValue;
+    const proposition = _ctxString(ctx, "__proposition") ?? "<unknown>";
+
+    // Prior attempt context: if failed, package the failure as a single
+    // PriorAttempt with the candidate slot empty (we don't know what
+    // text was tried — the proof was inline). H4 workers will populate
+    // candidate text when they own the loop.
+    const priorAttempts: PriorAttempt[] | undefined = failed
+      ? [{
+          attemptNumber: 1,
+          candidate: "",
+          verdict: {
+            version: PCP_VERSION,
+            verified: false,
+            theorems: [{
+              name: key, proposition, status: "failed",
+              failure: {
+                kind: "proof-failure",
+                reason: _ctxString(ctx, "__reason") ?? "did not discharge",
+                counterexample: _ctxString(ctx, "__counterexample"),
+              },
+            }],
+          },
+        }]
+      : undefined;
+
+    obligations.push(makeObligation({
+      theoremName: key,
+      proposition,
+      // Lemmas exclude this binding itself.
+      lemmas: lemmas.filter(l => l !== key),
+      ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
+      ...(priorAttempts ? { priorAttempts } : {}),
+    }));
+  }
+
+  // Also surface unmet `proven` clauses on functions via the
+  // CompilationReport's proven-failed / proven-skipped notifications.
+  if (report) {
+    for (const n of report.notifications) {
+      if (n.kind !== "proven-failed" && n.kind !== "proven-skipped") continue;
+      if (opts?.pendingOnly === false) continue; // already covered via bindings
+      obligations.push(makeObligation({
+        theoremName: n.binding ?? "<proven>",
+        proposition: n.message,
+        ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
+        priorAttempts: [{
+          attemptNumber: 1,
+          candidate: "",
+          verdict: {
+            version: PCP_VERSION,
+            verified: false,
+            theorems: [{
+              name: n.binding ?? "<proven>",
+              proposition: n.message,
+              status: n.kind === "proven-failed" ? "failed" : "skipped",
+              failure: {
+                kind: n.kind,
+                reason: n.message,
+                counterexample: n.counterexample,
+              },
+            }],
+          },
+        }],
+      }));
+    }
+  }
+
+  return obligations;
+}
+
+/** Did the candidate satisfy the obligation? Used by `allegro verify
+ *  --obligation O.json`: the obligation's theorem must appear in the
+ *  verdict as discharged, with matching propositionHash. Returns null
+ *  on satisfaction, an error message on mismatch. */
+export function checkObligationSatisfied(
+  obligation: Obligation,
+  verdict: Verdict,
+): string | null {
+  const t = verdict.theorems.find(t => t.name === obligation.theorem.name);
+  if (!t) {
+    return `obligation theorem \`${obligation.theorem.name}\` not present in candidate`;
+  }
+  if (t.status !== "discharged") {
+    return `obligation theorem \`${obligation.theorem.name}\` is ${t.status}`;
+  }
+  const candidateHash = hashProposition(t.proposition);
+  if (candidateHash !== obligation.theorem.propositionHash) {
+    return `candidate proves a different proposition: obligation hash ${obligation.theorem.propositionHash}, candidate hash ${candidateHash}`;
+  }
+  return null;
 }
 
 export function formatAuthorship(a: Authorship): string {
