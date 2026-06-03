@@ -518,6 +518,22 @@ if (flagless[0] === "inspect") {
     console.error(e.message);
     process.exit(1);
   });
+} else if (flagless[0] === "propose") {
+  // Phase H4b: human-interactive worker. Emits a Markdown TODO for
+  // pending obligations + their hints. The user edits the source file,
+  // re-runs `allegro verify`, iterates.
+  const filename = flagless[1];
+  if (!filename) {
+    console.error("usage: allegro propose <file> [--output FILE.md] [--all]");
+    process.exit(1);
+  }
+  const outputIdx = argv.indexOf("--output");
+  const outputPath = outputIdx >= 0 ? argv[outputIdx + 1] : undefined;
+  const includeAll = argv.includes("--all");
+  runPcpPropose(filename, standard, includeAll, outputPath).catch(e => {
+    console.error(e.message);
+    process.exit(1);
+  });
 } else if (flagless.length > 0) {
   const filename = flagless[0];
   const source = fs.readFileSync(filename, "utf-8");
@@ -716,5 +732,64 @@ async function runPcpObligations(
         console.log("-".repeat(40));
       }
     }
+  }
+}
+
+/**
+ * Phase H4b: human-interactive worker. Loads the file, builds a Verdict
+ * (so we have hints), enumerates obligations, and emits a Markdown TODO
+ * showing each pending obligation with its failure context + suggestions.
+ * The developer reads the TODO, edits the source, re-runs `verify` to
+ * iterate.
+ */
+async function runPcpPropose(
+  filename: string,
+  isStandard: boolean,
+  includeAll: boolean,
+  outputPath: string | undefined,
+): Promise<void> {
+  const { buildVerdict, extractObligations, formatTodo } = await import("./pcp.js");
+  const result = await pcpLoadAndEval(filename, isStandard);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+
+  // Total = ALL obligations (the denominator). Sections = pending only,
+  // unless --all was supplied (then everything goes into the TODO).
+  const allObligations = extractObligations(result.evalCtx, result.compilationReport,
+                                            { sourceFile: filename });
+  const sectionObligations = includeAll
+    ? allObligations
+    : extractObligations(result.evalCtx, result.compilationReport,
+                          { pendingOnly: true, sourceFile: filename });
+
+  // Group hints by theorem name so each section sees only its own.
+  const hintsByName = new Map<string, any[]>();
+  for (const s of verdict.iterationHints?.suggestions ?? []) {
+    const arr = hintsByName.get(s.theoremName) ?? [];
+    arr.push(s);
+    hintsByName.set(s.theoremName, arr);
+  }
+  // Failure context per theorem.
+  const failureByName = new Map<string, any>();
+  for (const t of verdict.theorems) {
+    if (t.failure) failureByName.set(t.name, t.failure);
+  }
+
+  const sections = sectionObligations.map(o => ({
+    obligation: o,
+    hints:      hintsByName.get(o.theorem.name),
+    failure:    failureByName.get(o.theorem.name),
+  }));
+
+  const md = formatTodo({
+    filename,
+    totalObligations: allObligations.length,
+    sections,
+  });
+
+  if (outputPath) {
+    fs.writeFileSync(outputPath, md, "utf-8");
+    console.log(`wrote ${outputPath} (${sections.length} pending of ${allObligations.length})`);
+  } else {
+    console.log(md);
   }
 }

@@ -7692,6 +7692,104 @@ test("Phase H3: formatVerdict renders hints section", () => {
   eq(text.includes("[t]"), true);
 });
 
+// --- Phase H4b: human-interactive worker (propose / TODO Markdown) ---
+//
+// `formatTodo` produces a human-readable Markdown work-list of pending
+// obligations + hints. `allegro propose` CLI uses it; tests cover both
+// the formatter and the CLI smoke path.
+
+import { formatTodo, TodoSection } from "./pcp.js";
+
+test("Phase H4b: formatTodo on a clean file says 'nothing pending'", () => {
+  const md = formatTodo({ filename: "x.alg", totalObligations: 3, sections: [] });
+  eq(md.includes("All 3 obligation(s) discharged"), true);
+  eq(md.includes("Nothing pending"), true);
+});
+
+test("Phase H4b: formatTodo renders each pending section with proposition + hints", () => {
+  const ob = makeObligation({
+    theoremName: "bad", proposition: "5 == 6",
+    function: { name: "f", signature: "(x: Int): Int", paramTypes: ["Int"], returnType: "Int" },
+    lemmas: ["lemma_a", "lemma_b"],
+  });
+  const md = formatTodo({
+    filename: "x.alg",
+    totalObligations: 1,
+    sections: [{
+      obligation: ob,
+      hints: [
+        { theoremName: "bad",
+          message: "revise the theorem",
+          suggestedConstruct: undefined },
+        { theoremName: "bad",
+          message: "or try a combinator",
+          suggestedConstruct: "proof_trans" },
+      ],
+      failure: { kind: "proof-failure",
+                 reason: "proposition is false",
+                 counterexample: "5 != 6" },
+    }],
+  });
+  eq(md.includes("# Proof TODO"), true);
+  eq(md.includes("1 pending"), true);
+  eq(md.includes("## `bad`"), true);
+  eq(md.includes("```allegro\n5 == 6\n```"), true);
+  eq(md.includes("**Function:** `f (x: Int): Int`"), true);
+  eq(md.includes("revise the theorem"), true);
+  // Suggested construct rendered as italic-code aside.
+  eq(md.includes("*(try `proof_trans`)*"), true);
+  eq(md.includes("**Lemmas in scope:** `lemma_a`, `lemma_b`"), true);
+  eq(md.includes("counterexample: `5 != 6`"), true);
+});
+
+test("Phase H4b: formatTodo truncates long lemma lists", () => {
+  const lemmas = ["l1","l2","l3","l4","l5","l6","l7","l8","l9","l10"];
+  const ob = makeObligation({ theoremName: "t", proposition: "x", lemmas });
+  const md = formatTodo({
+    filename: "x.alg", totalObligations: 1,
+    sections: [{ obligation: ob }],
+  });
+  // Top-8 shown + "+2 more" annotation.
+  eq(md.includes("l8"), true);
+  eq(md.includes("+2 more"), true);
+});
+
+test("Phase H4b: CLI `propose` exits 0 and writes Markdown for a failing file", () => {
+  const failTmp = path.join("/tmp", `pcp-todo-${Date.now()}.alg`);
+  fs.writeFileSync(failTmp, "theorem t: 5 == 6\n");
+  try {
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "propose", failTmp],
+                        { encoding: "utf-8" });
+    eq(r.status, 0, `expected exit 0, got ${r.status}: ${r.stderr}`);
+    eq(r.stdout.includes("# Proof TODO"), true);
+    eq(r.stdout.includes("## `t`"), true);
+    eq(r.stdout.includes("5 == 6"), true);
+    // The hint for "proposition is false" should appear.
+    eq(r.stdout.includes("revise the theorem"), true);
+  } finally {
+    fs.unlinkSync(failTmp);
+  }
+});
+
+test("Phase H4b: CLI `propose --output` writes to file", () => {
+  const failTmp = path.join("/tmp", `pcp-todo-${Date.now()}.alg`);
+  const mdTmp   = path.join("/tmp", `pcp-todo-${Date.now()}.md`);
+  fs.writeFileSync(failTmp, "theorem bad: 1 == 2\n");
+  try {
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "propose",
+                                failTmp, "--output", mdTmp],
+                        { encoding: "utf-8" });
+    eq(r.status, 0);
+    eq(fs.existsSync(mdTmp), true, "Markdown file should be written");
+    const md = fs.readFileSync(mdTmp, "utf-8");
+    eq(md.includes("# Proof TODO"), true);
+    eq(md.includes("## `bad`"), true);
+  } finally {
+    fs.unlinkSync(failTmp);
+    if (fs.existsSync(mdTmp)) fs.unlinkSync(mdTmp);
+  }
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {

@@ -854,3 +854,98 @@ export function formatAuthorship(a: Authorship): string {
   }
   return lines.join("\n");
 }
+
+// =============================================================================
+// Markdown TODO renderer (H4b — human-interactive worker)
+// =============================================================================
+//
+// `formatTodo` produces a Markdown summary of pending obligations and
+// the iteration hints attached to each. Optimised for human reading —
+// the `allegro propose` CLI subcommand uses this to give a developer a
+// curated worklist they can act on without spelunking the JSON.
+//
+// Each obligation gets a section header with the theorem name + status,
+// the proposition rendered in a fenced code block, and any associated
+// hints / counterexamples as bullets. A leading file-level summary
+// counts pending vs. total so the developer sees how much is left.
+
+export interface TodoSection {
+  obligation: Obligation;
+  /** Suggestions specifically for this theorem (from a Verdict's
+   *  iterationHints, filtered by name). Pre-extracted so the renderer
+   *  doesn't need the full verdict. */
+  hints?: Suggestion[];
+  /** Optional last-known failure context (counterexample / reason). */
+  failure?: TheoremFailure;
+}
+
+export function formatTodo(args: {
+  filename: string;
+  totalObligations: number;
+  sections: TodoSection[];
+}): string {
+  const lines: string[] = [];
+  const pendingCount = args.sections.length;
+  lines.push(`# Proof TODO — \`${args.filename}\``);
+  lines.push("");
+  if (pendingCount === 0) {
+    lines.push(`All ${args.totalObligations} obligation(s) discharged. Nothing pending.`);
+    return lines.join("\n");
+  }
+  lines.push(`**${pendingCount} pending** of ${args.totalObligations} obligation(s).`);
+  lines.push("");
+
+  for (const s of args.sections) {
+    const ob = s.obligation;
+    lines.push(`## \`${ob.theorem.name}\``);
+    lines.push("");
+    lines.push("**Proposition:**");
+    lines.push("");
+    lines.push("```allegro");
+    lines.push(ob.theorem.proposition);
+    lines.push("```");
+    lines.push("");
+
+    if (ob.function) {
+      lines.push(`**Function:** \`${ob.function.name} ${ob.function.signature}\``);
+      lines.push("");
+    }
+
+    if (s.failure) {
+      lines.push("**Last failure:**");
+      lines.push(`- reason: ${s.failure.reason}`);
+      if (s.failure.counterexample) {
+        lines.push(`- counterexample: \`${s.failure.counterexample}\``);
+      }
+      lines.push("");
+    }
+
+    if (s.hints && s.hints.length > 0) {
+      lines.push("**Hints:**");
+      for (const h of s.hints) {
+        lines.push(`- ${h.message}` +
+          (h.suggestedConstruct ? ` *(try \`${h.suggestedConstruct}\`)*` : ""));
+      }
+      lines.push("");
+    }
+
+    if (ob.context.lemmas.length > 0) {
+      const top = ob.context.lemmas.slice(0, 8).join("`, `");
+      const more = ob.context.lemmas.length > 8
+        ? ` *(+${ob.context.lemmas.length - 8} more)*` : "";
+      lines.push(`**Lemmas in scope:** \`${top}\`${more}`);
+      lines.push("");
+    }
+
+    if (ob.priorAttempts && ob.priorAttempts.length > 0) {
+      lines.push(`**Prior attempts:** ${ob.priorAttempts.length}`);
+      lines.push("");
+    }
+
+    lines.push("---");
+    lines.push("");
+  }
+
+  lines.push("_When done, run `allegro verify` on the source file to confirm._");
+  return lines.join("\n");
+}
