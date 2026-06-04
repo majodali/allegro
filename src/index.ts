@@ -534,6 +534,26 @@ if (flagless[0] === "inspect") {
     console.error(e.message);
     process.exit(1);
   });
+} else if (flagless[0] === "prove") {
+  // Phase H4a: LLM worker. Asks Claude to fill in pending proof terms,
+  // verifies each via the kernel, iterates up to --max-attempts.
+  const filename = flagless[1];
+  if (!filename) {
+    console.error(
+      "usage: allegro prove <file> [--max-attempts N] [--model MODEL] [--output FILE.alg] [--json]");
+    process.exit(1);
+  }
+  const maxIdx = argv.indexOf("--max-attempts");
+  const maxAttempts = maxIdx >= 0 ? Number(argv[maxIdx + 1]) : 5;
+  const modelIdx = argv.indexOf("--model");
+  const model = modelIdx >= 0 ? argv[modelIdx + 1] : undefined;
+  const outputIdx = argv.indexOf("--output");
+  const outputPath = outputIdx >= 0 ? argv[outputIdx + 1] : undefined;
+  const asJson = argv.includes("--json");
+  runPcpProve(filename, maxAttempts, model, outputPath, asJson).catch(e => {
+    console.error(e.message);
+    process.exit(1);
+  });
 } else if (flagless.length > 0) {
   const filename = flagless[0];
   const source = fs.readFileSync(filename, "utf-8");
@@ -792,4 +812,57 @@ async function runPcpPropose(
   } else {
     console.log(md);
   }
+}
+
+
+/**
+ * Phase H4a: LLM worker. Runs the proof loop against Claude, splices
+ * each successful proof term into the source, optionally writes the
+ * proved source to --output (default: stdout summary).
+ */
+async function runPcpProve(
+  filename: string,
+  maxAttempts: number,
+  model: string | undefined,
+  outputPath: string | undefined,
+  asJson: boolean,
+): Promise<void> {
+  const { runLlmWorker, createAnthropicClient } = await import("../pcp/llm-worker.js");
+  const client = await createAnthropicClient({ model });
+  const result = await runLlmWorker({
+    filename,
+    maxAttempts,
+    enableLlm: true,
+    client,
+  });
+  if (outputPath) {
+    fs.writeFileSync(outputPath, result.sourceAfter, "utf-8");
+  }
+  if (asJson) {
+    console.log(JSON.stringify({
+      filename,
+      allDischarged: result.allDischarged,
+      summary: result.summary,
+      perObligation: result.perObligation.map(o => ({
+        name: o.name, discharged: o.discharged, attempts: o.attempts,
+        finalTerm: o.finalTerm,
+        authorship: o.authorship,
+      })),
+    }));
+  } else {
+    console.log(`allegro prove — ${filename}`);
+    console.log("=".repeat(60));
+    console.log(`Summary: ${result.summary.discharged} discharged, ${result.summary.pending} pending`);
+    for (const o of result.perObligation) {
+      const mark = o.discharged ? "✓" : "✗";
+      console.log(`  ${mark} ${o.name} (${o.attempts} attempt(s))`);
+      if (o.finalTerm) console.log(`      proof: ${o.finalTerm.split("\\n")[0]}`);
+      if (!o.discharged && o.history.length > 0) {
+        const last = o.history[o.history.length - 1];
+        if (last.reason) console.log(`      last failure: ${last.reason}`);
+      }
+    }
+    if (outputPath) console.log(`Wrote proved source to ${outputPath}`);
+  }
+  process.exit(result.allDischarged ? 0 : 1);
 }

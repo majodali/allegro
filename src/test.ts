@@ -7790,6 +7790,196 @@ test("Phase H4b: CLI `propose --output` writes to file", () => {
   }
 });
 
+// --- Phase H4a: LLM worker pure helpers ---
+//
+// The orchestrator (`runLlmWorker`) needs a live API key to close the
+// loop end-to-end — skipped in CI. The pure helpers (code-block
+// extraction, splicing, prompt construction, strategy classification)
+// are tested in isolation.
+
+import {
+  extractCodeBlocks, spliceProof, buildIterationMessage,
+  classifyStrategy, loadPrimer, runLlmWorker, LlmClient,
+} from "../pcp/llm-worker.js";
+
+test("Phase H4a: extractCodeBlocks finds ```allegro blocks", () => {
+  const text = "Here is the proof.\n\n```allegro\nproof_trans(ab, bc)\n```\n\nDone.";
+  const blocks = extractCodeBlocks(text);
+  eq(blocks.length, 1);
+  eq(blocks[0], "proof_trans(ab, bc)");
+});
+
+test("Phase H4a: extractCodeBlocks finds multiple blocks in order", () => {
+  const text = "```allegro\nproof_refl(5)\n```\nbetween\n```allegro\nproof_sym(t1)\n```";
+  const blocks = extractCodeBlocks(text);
+  eq(blocks.length, 2);
+  eq(blocks[0], "proof_refl(5)");
+  eq(blocks[1], "proof_sym(t1)");
+});
+
+test("Phase H4a: extractCodeBlocks falls back to any fenced block if no allegro tag", () => {
+  const text = "```\nproof_refl(5)\n```";
+  const blocks = extractCodeBlocks(text);
+  eq(blocks.length, 1);
+  eq(blocks[0], "proof_refl(5)");
+});
+
+test("Phase H4a: extractCodeBlocks returns empty array when no blocks", () => {
+  eq(extractCodeBlocks("plain text response").length, 0);
+});
+
+test("Phase H4a: spliceProof appends `by <term>` to a bare theorem", () => {
+  const src = `theorem foo: 1 + 1 == 2\nx = 42\n`;
+  const out = spliceProof(src, "foo", "proof_refl(2)");
+  eq(out.includes("theorem foo: 1 + 1 == 2 by proof_refl(2)"), true);
+  eq(out.includes("x = 42"), true);
+});
+
+test("Phase H4a: spliceProof replaces an existing `by` clause", () => {
+  const src = `theorem foo: 1 + 1 == 2 by old_proof\n`;
+  const out = spliceProof(src, "foo", "proof_refl(2)");
+  eq(out.includes("by proof_refl(2)"), true);
+  eq(out.includes("old_proof"), false);
+});
+
+test("Phase H4a: spliceProof throws when theorem not found", () => {
+  const src = `theorem other: 1 == 1\n`;
+  throws(() => spliceProof(src, "missing", "proof_refl(1)"),
+    "could not locate `theorem missing`");
+});
+
+test("Phase H4a: buildIterationMessage includes obligation + hints + lemmas", () => {
+  const msg = buildIterationMessage({
+    obligationName: "ac",
+    proposition:    "a == c",
+    lemmas:         ["ab", "bc"],
+    failureReason:  "could not be discharged by evaluation",
+    failureCounterexample: "`a == c` did not reduce",
+    hints: [
+      { message: "try a combinator", suggestedConstruct: "proof_trans" },
+    ],
+    strategiesTried: ["proof_by_eval"],
+    attemptNumber:   2,
+  });
+  eq(msg.includes("Attempt 2"), true);
+  eq(msg.includes("```allegro\na == c\n```"), true);
+  eq(msg.includes("ab, bc"), true);
+  eq(msg.includes("could not be discharged"), true);
+  eq(msg.includes("try a combinator"), true);
+  eq(msg.includes("`proof_trans`"), true);
+  eq(msg.includes("avoid repeating"), true);
+  eq(msg.includes("proof_by_eval"), true);
+  eq(msg.includes("ONE fenced"), true);
+});
+
+test("Phase H4a: classifyStrategy recognises combinators and tactics", () => {
+  eq(JSON.stringify(classifyStrategy("proof_refl(5)")),                JSON.stringify(["proof_refl"]));
+  eq(JSON.stringify(classifyStrategy("proof_trans(ab, bc)")),          JSON.stringify(["proof_trans"]));
+  eq(JSON.stringify(classifyStrategy("tactics.chain([a, b])")),        JSON.stringify(["tactics.chain"]));
+  eq(JSON.stringify(classifyStrategy("prove_for_all_bool(b => b)")),   JSON.stringify(["prove_for_all_bool"]));
+  eq(JSON.stringify(classifyStrategy("proof_trans(proof_sym(x), y)")), JSON.stringify(["proof_sym", "proof_trans"]));
+  eq(JSON.stringify(classifyStrategy("plain_text")),                   JSON.stringify([]));
+});
+
+test("Phase H4a: loadPrimer returns the F-arc primer doc", () => {
+  const primer = loadPrimer();
+  eq(primer.includes("Proving in Allegro"), true);
+  eq(primer.includes("proof_by_eval"), true);
+  eq(primer.includes("proof_refines"), true);
+  eq(primer.includes("prove_for_all_bool"), true);
+});
+
+async function runH4aAsyncTests(): Promise<void> {
+  // The source needs a PENDING obligation for the worker to process. A
+  // bare `theorem t: 1 + 1 == 2` auto-discharges via PE, leaving
+  // extractObligations(pendingOnly) empty. Use a `by` clause with a
+  // proof that establishes the WRONG fact (proof_refl(99) proves
+  // 99 == 99, not 1 + 1 == 2), so verification fails → pending →
+  // the mock client's replacement can splice in and discharge.
+  const PENDING_SRC = "theorem t: 1 + 1 == 2 by proof_refl(99)\n";
+
+  await asyncTest("Phase H4a: runLlmWorker uses a mock client and closes the loop", async () => {
+    const tmp = path.join("/tmp", `pcp-h4a-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, PENDING_SRC);
+    try {
+      const mockClient: LlmClient = {
+        modelId: () => "mock-model",
+        async send() { return "```allegro\nproof_refl(2)\n```"; },
+      };
+      const result = await runLlmWorker({
+        filename: tmp, maxAttempts: 3, enableLlm: true,
+        client: mockClient, primer: "(mock primer)",
+      });
+      eq(result.allDischarged, true,
+         `expected allDischarged=true; got ${JSON.stringify(result.summary)}`);
+      eq(result.summary.discharged, 1);
+      eq(result.perObligation[0].name, "t");
+      eq(result.perObligation[0].discharged, true);
+      eq(result.perObligation[0].finalTerm, "proof_refl(2)");
+      eq(result.perObligation[0].authorship?.provers[0].prover, "mock-model");
+      eq(result.sourceAfter.includes("by proof_refl(2)"), true);
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
+
+  await asyncTest("Phase H4a: runLlmWorker reports pending when client returns bad term", async () => {
+    const tmp = path.join("/tmp", `pcp-h4a-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, PENDING_SRC);
+    try {
+      const badClient: LlmClient = {
+        modelId: () => "mock-model",
+        // proof_refl(99) proves 99 == 99, not 1 + 1 == 2 → rejected.
+        async send() { return "```allegro\nproof_refl(99)\n```"; },
+      };
+      const result = await runLlmWorker({
+        filename: tmp, maxAttempts: 2, enableLlm: true,
+        client: badClient, primer: "(mock primer)",
+      });
+      eq(result.allDischarged, false);
+      eq(result.summary.pending, 1);
+      eq(result.perObligation[0].attempts, 2);
+      eq(result.perObligation[0].discharged, false);
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
+
+  await asyncTest("Phase H4a: runLlmWorker handles malformed response (no code block)", async () => {
+    const tmp = path.join("/tmp", `pcp-h4a-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, PENDING_SRC);
+    try {
+      const wordy: LlmClient = {
+        modelId: () => "mock-model",
+        async send() { return "I think the proof is proof_refl(2) but I'm not sure"; },
+      };
+      const result = await runLlmWorker({
+        filename: tmp, maxAttempts: 2, enableLlm: true,
+        client: wordy, primer: "(mock primer)",
+      });
+      eq(result.allDischarged, false);
+      eq(result.perObligation[0].history.length, 2);
+      eq(result.perObligation[0].history[0].reason?.includes("no fenced"), true);
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
+}
+
+test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
+  const tmp = path.join("/tmp", `pcp-h4a-${Date.now()}.alg`);
+  fs.writeFileSync(tmp, "theorem t: 1 == 1\n");
+  try {
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", tmp],
+                        { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(r.status, 1);
+    eq(r.stderr.includes("ANTHROPIC_API_KEY"), true);
+    eq(r.stderr.includes("propose"), true, "should mention the human-worker fallback");
+  } finally {
+    fs.unlinkSync(tmp);
+  }
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 import {
@@ -9992,7 +10182,7 @@ async function runAsyncTests(): Promise<void> {
 
 // --- Run all tests (sync + async) and report ---
 
-runModuleTests().then(() => runAsyncTests()).then(() => {
+runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then(() => {
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
   if (failures.length > 0) {

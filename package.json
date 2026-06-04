@@ -12,6 +12,7 @@
     "build:web": "esbuild web/allegro-web.ts --bundle --outfile=web/dist/allegro.js --format=iife --global-name=AllegroBundle --platform=browser"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.0",
     "parser-generator": "^0.1.0"
   },
   "devDependencies": {
