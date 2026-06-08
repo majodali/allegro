@@ -605,6 +605,93 @@ async function runModuleTests(): Promise<void> {
     const exts = await loader.loadAll();
     eq(evalNumExt("factorial(5)", exts), 120);
   });
+
+  // Nested `use` pre-scan inside libraries. Without this, libs can only
+  // use base-grammar constructs — body-form clauses like `proven`,
+  // `assert`, `requires`/`ensures`, and `effects` are unavailable
+  // inside `lib/*.alg`. The loader scans the lib source's header,
+  // recursively loads the referenced modules through the same loader,
+  // and parses the lib body with the resulting extended grammar.
+  await asyncTest("module: nested `use proven` resolves through loader", async () => {
+    const libDir = path.resolve("lib");
+    const loader = new ModuleLoader({
+      modules: [{ id: "neg2lib" }],
+      resolve: (id) => {
+        if (id === "neg2lib") return "/mock/neg2lib.alg";
+        // Forward `proven` to the real system lib so the body-form
+        // grammar is actually loaded — verifies the recursive load path.
+        const p = path.join(libDir, `${id}.alg`);
+        return fs.existsSync(p) ? p : null;
+      },
+      readFile: async (p) => {
+        if (p === "/mock/neg2lib.alg") {
+          return (
+            "use proven\n" +
+            "\n" +
+            "// `proven neg2(neg2(b)) == b` is checked at definition time by\n" +
+            "// bounded sampling over Bool. Both values are exercised; this\n" +
+            "// would halt compilation if the property didn't hold.\n" +
+            "neg2(b: Bool): Bool =>\n" +
+            "  proven neg2(neg2(b)) == b\n" +
+            "  if b then false else true\n"
+          );
+        }
+        return fs.readFileSync(p, "utf-8");
+      },
+      extensions: [typeExt],
+    });
+    const exts = await loader.loadAll();
+    eq(exts.length >= 1, true, "loader should produce at least the neg2lib extension");
+    const neg2Ext = exts.find(e => e.name === "neg2lib");
+    eq(neg2Ext !== undefined, true, "neg2lib extension should be present");
+    eq("neg2" in neg2Ext!.bindings, true, "neg2 binding should be exported from neg2lib");
+  });
+
+  // Counterexample: a lib whose `proven` clause is FALSE should halt
+  // compilation cleanly (failed proof reaches the kernel via the loader's
+  // resolveSymbols/buildEvalCtx path with `proven` body-form active).
+  await asyncTest("module: nested `use proven` reports failed `proven` clause", async () => {
+    const libDir = path.resolve("lib");
+    const loader = new ModuleLoader({
+      modules: [{ id: "badlib" }],
+      resolve: (id) => {
+        if (id === "badlib") return "/mock/badlib.alg";
+        const p = path.join(libDir, `${id}.alg`);
+        return fs.existsSync(p) ? p : null;
+      },
+      readFile: async (p) => {
+        if (p === "/mock/badlib.alg") {
+          return (
+            "use proven\n" +
+            "\n" +
+            "// Bool-domain enumeration exercises both true and false;\n" +
+            "// neither produces `bad(b) == true`, so the proven clause fails.\n" +
+            "bad(b: Bool): Bool =>\n" +
+            "  proven bad(b) == true\n" +
+            "  b\n"
+          );
+        }
+        return fs.readFileSync(p, "utf-8");
+      },
+      extensions: [typeExt],
+    });
+    await asyncThrows(() => loader.loadAll(), "proven");
+  });
+
+  // `use grammar { … }` literals inside libs are not yet supported.
+  // The loader should reject them with a clear error rather than silently
+  // ignoring or parsing them as ordinary statements (which fails opaquely).
+  await asyncTest("module: nested `use grammar { … }` literal is rejected", async () => {
+    const loader = new ModuleLoader({
+      modules: [{ id: "litlib" }],
+      resolve: (id) => id === "litlib" ? "/mock/litlib.alg" : null,
+      readFile: async () =>
+        "use grammar { infix \"@@\" prec(mul) left => (l, r) => l + r }\n" +
+        "answer = 42\n",
+      extensions: [typeExt],
+    });
+    await asyncThrows(() => loader.loadAll(), "use grammar");
+  });
 }
 
 // == Grammar Extensions ==

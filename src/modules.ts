@@ -3,13 +3,12 @@
 // Loads .alg files as anonymous extensions.
 // =============================================================================
 
-import { parse as grammar2Parse } from "./grammar2/engine.js";
-import { getBaseGrammar } from "./grammar2/base-grammar.js";
-import { buildProgram } from "./grammar2/tree-builder.js";
-import { buildEvalCtx, resolvePrimitives, resolveSymbols, Extension } from "./runtime.js";
-import { evaluate, remapParams } from "./evaluator.js";
+import { evalSource, Extension } from "./runtime.js";
+import { remapParams } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, primaryOf, AllegroError } from "./types.js";
 import { withType } from "./types-std.js";
+import { primitives } from "./primitives.js";
+import { scanUses } from "./use-scanner.js";
 
 // --- Types ---
 
@@ -245,56 +244,101 @@ export class ModuleLoader {
       depExtensions.push(depExt);
     }
 
-    // 4. Read and parse module source via grammar2
+    // 4. Read module source.
     const source = await this.readFile(resolvedPath);
-    const normalized = source.replace(/\r\n/g, "\n");
-    const parseResult = grammar2Parse(getBaseGrammar(), normalized);
-    if (!parseResult.ok) {
-      throw new Error(`Module '${id}': parse error at position ${parseResult.error.position}: ${parseResult.error.message}`);
-    }
-    const fileCtx = buildProgram(parseResult.tree);
-    if (!fileCtx) {
-      // Empty module
-      const ext: Extension = { name: id, bindings: {} };
-      this.cache.set(resolvedPath, ext);
-      loading.delete(id);
-      return ext;
-    }
 
-    // 5. Resolve symbols and build evaluation context
-    //    Include standard extensions so modules can use types (Float, Int, etc.)
-    const allExtensions = [...this.extensions, ...depExtensions];
-    resolveSymbols(fileCtx, undefined, allExtensions);
-    const evalCtx = buildEvalCtx(fileCtx, undefined, allExtensions);
-
-    // 6. Evaluate bare expressions (side effects)
-    for (const b of fileCtx.bindingList) {
-      if (b.key === null && b.value !== undefined) {
-        evaluate(b.value, evalCtx);
+    // 4a. Pre-scan for `use` directives. Lib files use the same `use NAME`
+    //     syntax as top-level files; without this, body-form modules like
+    //     `proven`, `effects`, `contracts` couldn't be consumed from libs.
+    //     Module and member forms are recursively loaded via this same
+    //     loader so transitive uses resolve through the same path resolver.
+    //     `use grammar { … }` literal blocks are not yet supported inside
+    //     libs (they'd need a bootstrap evalSource recursion); throw a clear
+    //     error rather than silently ignoring.
+    const scan = scanUses(source);
+    const nestedUseModules = new Set<string>();
+    for (const d of scan.directives) {
+      if (d.kind === "module") {
+        nestedUseModules.add(d.name!);
+      } else if (d.kind === "member") {
+        // First-iteration policy: member-form load brings in the full module's
+        // fragments. Narrowing (only the named Grammar binding) can be added
+        // later if a lib needs to disambiguate sibling Grammar values.
+        nestedUseModules.add(d.moduleName!);
+      } else if (d.kind === "literal") {
+        throw new Error(
+          `Module '${id}': \`use grammar { … }\` literal blocks are not yet ` +
+          `supported inside library modules. Define the grammar in a separate ` +
+          `module file and \`use\` it by name.`,
+        );
       }
     }
 
-    // 7. Extract source-defined bindings as exports
-    //    If any binding has an "exported" component, only export those.
-    //    Otherwise export all source-defined bindings (backward compat).
+    const useExtensions: Extension[] = [];
+    for (const useName of nestedUseModules) {
+      const useExt = await this.loadModule(useName, loading);
+      useExtensions.push(useExt);
+    }
+
+    // 4b. Delegate parse + symbol resolution + precompile + effect / totality /
+    //     proof checks + evaluation to evalSource. Strip the use-header so
+    //     evalSource sees only the module body. evalSource picks up the
+    //     `use`d modules' grammar fragments through the extensions list
+    //     (collectFragments scans ext.bindings for Grammar values).
+    //
+    //     Using evalSource keeps lib loading and top-level file loading on
+    //     the SAME pipeline: a buggy lib gets the same totality /
+    //     proven-clause / effects-mismatch treatment user code does.
+    //     Halt-on-error is preserved (softFail=false).
+    //
+    //     typed=true: libs are Allegro Standard. Untyped literals like
+    //     `pi = 3` get wrapped as Int; primitives that lib code calls get
+    //     UntypedFunction wrappers. Consumers (top-level files) see the
+    //     wrapped values via the module type's __getMember.
+    const cleanSource = source.slice(scan.headerEnd);
+    const allExtensions = [...this.extensions, ...depExtensions, ...useExtensions];
+    let evalCtx: ContextValue;
+    try {
+      const result = evalSource(
+        cleanSource,
+        /* base */ undefined,
+        allExtensions,
+        /* grammarExtension */ undefined,
+        /* typed */ true,
+      );
+      evalCtx = result.evalCtx;
+    } catch (e: any) {
+      throw new Error(`Module '${id}': ${e.message}`);
+    }
+
+    // 5. Extract source-defined bindings as exports. We use the evalCtx's
+    //    final bindings rather than fileCtx.bindingList because evalSource
+    //    has already populated them with the evaluated values.
+    //
+    //    Source bindings are everything in evalCtx that didn't come from
+    //    primitives, extensions, or the base context — i.e., names not
+    //    present in any of those layers.
+    const nonSourceNames = new Set<string>(Object.keys(primitives));
+    for (const ext of allExtensions) {
+      for (const name of Object.keys(ext.bindings)) nonSourceNames.add(name);
+      if (ext.moduleObject) nonSourceNames.add(ext.name);
+    }
+
     const allBindings: Record<string, Value> = {};
     const exportedBindings: Record<string, Value> = {};
     let hasExports = false;
 
-    for (const b of fileCtx.bindingList) {
-      if (b.key !== null && b.value !== undefined) {
-        const ctxBinding = evalCtx.bindings.get(b.key);
-        if (ctxBinding?.value !== undefined) {
-          const evaluated = evaluate(ctxBinding.value, evalCtx);
-          allBindings[b.key] = evaluated;
-          // Check for "exported" component
-          if (evaluated.kind === ValueKind.MultiValue) {
-            const exp = evaluated.components.get("exported");
-            if (exp) {
-              hasExports = true;
-              exportedBindings[b.key] = evaluated;
-            }
-          }
+    for (const [key, binding] of evalCtx.bindings) {
+      if (nonSourceNames.has(key)) continue;
+      if (key.startsWith("__bare_") || key.startsWith("__future_")) continue;
+      if (binding.value === undefined) continue;
+      const evaluated = binding.value;
+      allBindings[key] = evaluated;
+      if (evaluated.kind === ValueKind.MultiValue) {
+        const exp = evaluated.components.get("exported");
+        if (exp) {
+          hasExports = true;
+          exportedBindings[key] = evaluated;
         }
       }
     }
