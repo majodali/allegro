@@ -14,6 +14,11 @@ import { Grammar, parseGrammar } from "./parser.js";
 import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
+import { resolveProgram } from "./codegen/resolve.js";
+import { emitProgram } from "./codegen/js.js";
+import * as os from "os";
+// `fs`, `path`, and `spawnSync` are already imported at module scope below
+// (used by the H4a / bench tests) and hoist to the whole module.
 
 // --- Test infrastructure ---
 
@@ -10347,6 +10352,76 @@ async function runBenchmarkTests(): Promise<void> {
     }
   });
 }
+
+// == Phase I — codegen (JS backend) ==
+//
+// The correctness bar is behavioral parity: the emitted JS, run through
+// node, prints what the interpreter prints. These tests emit, run via a
+// temp module, and diff stdout.
+
+function cgEmit(src: string, typed = true): string {
+  const ext = createTypeSystem();
+  return emitProgram(resolveProgram(src + "\n", [ext], typed));
+}
+
+function cgRun(src: string, typed = true): string {
+  const js = cgEmit(src, typed);
+  const tmp = path.join(os.tmpdir(),
+    `alg-cg-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
+  fs.writeFileSync(tmp, js);
+  try {
+    const r = spawnSync(process.execPath, [tmp], { encoding: "utf8" });
+    if (r.status !== 0) throw new Error(`node exited ${r.status}: ${r.stderr}`);
+    return r.stdout.trim();
+  } finally {
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+  }
+}
+
+test("codegen: arithmetic + precedence parity", () => {
+  eq(cgRun("print(3 + 4 * 2)"), "11");
+});
+
+test("codegen: integer division truncates", () => {
+  eq(cgRun("print(17 / 5)"), "3");
+});
+
+test("codegen: recursive factorial", () => {
+  eq(cgRun("factorial(n) => if n == 0 then 1 else n * factorial(n - 1)\nprint(factorial(5))"), "120");
+});
+
+test("codegen: mutually-shaped recursion (fib)", () => {
+  eq(cgRun("fib(n) => if n <= 1 then n else fib(n - 1) + fib(n - 2)\nprint(fib(10))"), "55");
+});
+
+test("codegen: higher-order lambda call", () => {
+  eq(cgRun("apply(f, x) => f(x)\nprint(apply(x => x + 10, 32))"), "42");
+});
+
+test("codegen: conditional with negation", () => {
+  eq(cgRun("abs(x) => if x < 0 then 0 - x else x\nprint(abs(-42))\nprint(abs(7))"), "42\n7");
+});
+
+test("codegen: base (Allegretto) mode parity", () => {
+  eq(cgRun("x = 3 + 4 * 2\nprint(x)", false), "11");
+});
+
+test("codegen: basics.alg end-to-end parity", () => {
+  const src = fs.readFileSync(path.join(process.cwd(), "basics.alg"), "utf8");
+  eq(cgRun(src), "11\n42\n120\n42\n55\n42\n7");
+});
+
+test("codegen: unsupported primitive raises CodegenError", () => {
+  // Dot-access lowers to `type_dispatch`, which the I1 backend does not
+  // lower — it must fail loudly, not emit silently-wrong output.
+  throws(() => cgEmit('print("hello".length)'), "unsupported primitive");
+});
+
+test("codegen: unsupported object literal raises CodegenError", () => {
+  // Object literals lower to a `typed_object(...)` call the I1 backend does
+  // not yet handle — it must fail loudly rather than emit wrong output.
+  throws(() => cgEmit("p = {x: 1}\nprint(p)"), "unsupported primitive");
+});
 
 // --- Run all tests (sync + async) and report ---
 

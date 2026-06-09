@@ -338,6 +338,19 @@ if (flagless[0] === "inspect") {
     console.error(e.message);
     process.exit(1);
   });
+} else if (flagless[0] === "emit") {
+  const filename = flagless[1];
+  if (!filename) {
+    console.error("usage: allegro emit <file> [--out FILE.js] [--run]");
+    process.exit(1);
+  }
+  const outIdx = argv.indexOf("--out");
+  const outPath = outIdx >= 0 ? argv[outIdx + 1] : undefined;
+  const run = argv.includes("--run");
+  runEmit(filename, standard, outPath, run).catch(e => {
+    console.error(e.message);
+    process.exit(1);
+  });
 } else if (flagless[0] === "verify") {
   const filename = flagless[1];
   if (!filename) {
@@ -481,6 +494,95 @@ async function runInspect(filename: string, isStandard: boolean): Promise<void> 
   console.log(`allegro inspect — ${filename}`);
   console.log("=".repeat(60));
   console.log(renderModuleSummary(summary));
+}
+
+/**
+ * Phase I: code generation. Lower a source file to a JavaScript (ESM)
+ * module. Loads the same grammar / module pipeline `inspect` uses, refuses
+ * to emit if compilation reports error-severity findings ("build safety
+ * in"), then resolves the pre-evaluation program and emits JS.
+ *
+ *   allegro emit <file> [--out FILE.js] [--run]
+ */
+async function runEmit(
+  filename: string,
+  isStandard: boolean,
+  outPath: string | undefined,
+  run: boolean,
+): Promise<void> {
+  const source = fs.readFileSync(filename, "utf-8");
+  const sourceDir = path.dirname(path.resolve(filename));
+  let extensions: Extension[] = isStandard ? [...getStdExtensions()] : [];
+
+  // Resolve `use …` grammar modules (same as runInspect).
+  const { directives, headerEnd } = scanUses(source);
+  const moduleNames = directives.filter(d => d.kind === "module").map(d => d.name!);
+  if (moduleNames.length > 0) {
+    const grammarExts = await loadGrammarModules(moduleNames, sourceDir, extensions);
+    extensions = [...extensions, ...grammarExts];
+  }
+  const cleanSource = source.slice(headerEnd);
+
+  // Load `import …` modules so references resolve (same as runInspect).
+  if (isStandard) {
+    const { parse: g2parse } = await import("./grammar2/engine.js");
+    const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
+    const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
+    const { buildProgram } = await import("./grammar2/tree-builder.js");
+    const g2Fragments = collectFragments(extensions);
+    const grammar = g2Fragments.length > 0 ? getGrammarWithFragments(g2Fragments) : getBaseGrammar();
+    const result0 = g2parse(grammar, cleanSource.replace(/\r\n/g, "\n"));
+    if (result0.ok) {
+      const fileCtx: any = buildProgram(result0.tree);
+      if (fileCtx) {
+        const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);
+        extensions = [...extensions, ...moduleExts];
+      }
+    }
+  }
+
+  // Error gate: compile the program exactly as `allegro run` would (no
+  // softFail), suppressing program output. evalSource throws on the
+  // genuine "don't emit unsound code" failures — effects-declaration
+  // mismatches, failed proofs, failed `proven` clauses. (Benign
+  // precompile-eval notices, e.g. PE recursion limits on untyped recursive
+  // functions, are recorded but not thrown — the program still runs, so we
+  // still emit.) A throw here means refuse to emit.
+  const origLog = console.log;
+  console.log = () => {};
+  try {
+    evalSource(cleanSource, undefined, extensions, undefined, isStandard);
+  } catch (e: any) {
+    throw new Error(`refusing to emit — compilation failed:\n  ${e.message}`);
+  } finally {
+    console.log = origLog;
+  }
+
+  // Resolve the pre-evaluation program and emit JS.
+  const { resolveProgram } = await import("./codegen/resolve.js");
+  const { emitProgram } = await import("./codegen/js.js");
+  const program = resolveProgram(cleanSource, extensions, isStandard);
+  const js = emitProgram(program);
+
+  if (outPath) {
+    fs.writeFileSync(outPath, js);
+    console.error(`wrote ${outPath}`);
+  } else if (!run) {
+    process.stdout.write(js);
+  }
+
+  if (run) {
+    const os = await import("os");
+    const { spawnSync } = await import("child_process");
+    const tmp = path.join(os.tmpdir(), `allegro-emit-${process.pid}-${Date.now()}.mjs`);
+    fs.writeFileSync(tmp, js);
+    try {
+      const r = spawnSync(process.execPath, [tmp], { stdio: "inherit" });
+      if (r.status !== 0) process.exitCode = r.status ?? 1;
+    } finally {
+      try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+    }
+  }
 }
 
 /**
