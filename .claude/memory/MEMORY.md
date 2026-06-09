@@ -1,0 +1,19 @@
+- [project_state.md](project_state.md) — Allegro narrative arc: foundation done, mid-flight in the provability arc; defer to CLAUDE.md for inventory
+- [user_role.md](user_role.md) — User is language designer focused on formal semantics and extensibility
+- [design_provability_thesis.md](design_provability_thesis.md) — Provability + safety as Allegro's defining feature; PE-as-discharge + AI [impl, proof] pairs primary, SMT use-case-driven
+- [design_vivace_vision.md](design_vivace_vision.md) — Allegro Vivace usability hypothesis (model-driven, AI-collaborative, opt-in formal methods) with seven open gaps tagged WIP
+- [design_business_rules_define_domain.md](design_business_rules_define_domain.md) — Rules define the domain, not vice versa; extend the language when a rule won't fit
+- [design_proof_exportability.md](design_proof_exportability.md) — Proofs should be exportable to external checkers (Lean/Coq); pairs with transitive assurance
+- [design_pattern_matching.md](design_pattern_matching.md) — Pattern matching uses when/is/then; destructuring/guards/MultiValue access shipped; unification + when-branch refinement deferred
+- [design_brace_offside_modes.md](design_brace_offside_modes.md) — Support both braces and offside-rule modes (like Scala/F#)
+- [design_type_definitions.md](design_type_definitions.md) — Three type mechanisms (extends/newtype/where), fluent API first
+- [project_website_loop.md](project_website_loop.md) — allegrolang.org (S3+CloudFront) is updated alongside features; user uses it as a sandbox
+- [user_parser_experiments.md](user_parser_experiments.md) — User has homegrown LL(k)+Pratt parser experiment (deferred); codegen IS scheduled as Phase I of provability arc
+- [feedback_claude_md.md](feedback_claude_md.md) — Always update CLAUDE.md before every commit
+- [feedback_backlog_md.md](feedback_backlog_md.md) — Always update BACKLOG.md before every commit
+- [feedback_phase_delivery.md](feedback_phase_delivery.md) — Stay close on current work; for upcoming work write a plan and let user decide chunks
+- [feedback_test_modification.md](feedback_test_modification.md) — Add test conditions freely; never remove or change without discussing first
+- [feedback_naming_conventions.md](feedback_naming_conventions.md) — No stuttering names; three locked tier names (no further Italian); flat phase numbers
+- [feedback_review_and_redo.md](feedback_review_and_redo.md) — Every feature/syntax element gets reviewed and possibly redefined from scratch once we have a corpus
+- [design_effects_as_values.md](design_effects_as_values.md) — Effects are values of type Effect; structure via member access; specialization via application; lattice ops are typed methods
+- [design_type_system_meta_types.md](design_type_system_meta_types.md) — NominalType collapses into Type with optional __name; MI deferred (explicit-conflict design captured); NominalType-as-mixin a third option also deferred
