@@ -10267,9 +10267,90 @@ async function runAsyncTests(): Promise<void> {
   });
 }
 
+// --- PCP benchmark suite (bench/) ---
+//
+// The benchmark harness lives outside src/ (like pcp/), resolved by tsx at
+// runtime. These tests pin the corpus shape and the deterministic baselines
+// (reference + auto-PE + soundness gates) so a regression in the proof
+// kernel surfaces here, and exercise the LLM-baseline path with a mock
+// client (no API key needed).
+
+import { CORPUS, WRONG_SENTINEL_TERM } from "../bench/manifest.js";
+import { runBenchmark, stripProof } from "../bench/harness.js";
+import type { LlmClient as BenchLlmClient } from "../pcp/llm-worker.js";
+
+async function runBenchmarkTests(): Promise<void> {
+  test("PCP benchmark: corpus has 10 graded entries spanning all categories", () => {
+    eq(CORPUS.length, 10);
+    const cats = new Set(CORPUS.map(e => e.category));
+    eq(cats.has("refl-trivial"), true);
+    eq(cats.has("combinator"), true);
+    eq(cats.has("type-bound"), true);
+    // Every entry targets a `goal` theorem and points at an existing file.
+    for (const e of CORPUS) {
+      eq(e.goalTheorem, "goal", `entry ${e.id} targets goal`);
+      eq(fs.existsSync(path.resolve(e.file)), true, `entry ${e.id} file exists`);
+    }
+    // 8 entries carry a soundness-gated `by` slot; 2 are auto-PE-only.
+    eq(CORPUS.filter(e => e.referenceProof !== null).length, 8);
+    eq(CORPUS.filter(e => e.referenceProof === null).length, 2);
+  });
+
+  test("PCP benchmark: stripProof removes a by clause, leaves bare theorems alone", () => {
+    eq(stripProof("theorem goal: 7 == 7 by proof_refl(7)\n", "goal").trim(),
+       "theorem goal: 7 == 7");
+    // No `by` clause → unchanged.
+    eq(stripProof("theorem goal: 7 == 7\n", "goal").trim(), "theorem goal: 7 == 7");
+    // Leaves other theorems untouched.
+    const multi = "theorem ab: 1 == 1\ntheorem goal: 2 == 2 by proof_refl(2)\n";
+    eq(stripProof(multi, "goal").includes("theorem ab: 1 == 1"), true);
+    eq(stripProof(multi, "goal").includes("by proof_refl"), false);
+  });
+
+  await asyncTest("PCP benchmark: deterministic baselines all pass (corpus is healthy)", async () => {
+    const report = await runBenchmark();
+    eq(report.totals.entries, 10);
+    eq(report.totals.referencePassed, 10, "every curated proof discharges");
+    eq(report.totals.autoPePassed, 10, "auto-PE discharges every bare proposition");
+    eq(report.totals.gatedEntries, 8);
+    eq(report.totals.gateRejectedWrong, 8, "every soundness gate rejects the wrong term");
+    eq(report.totals.llmRan, false, "no LLM baseline without a client");
+  });
+
+  await asyncTest("PCP benchmark: LLM baseline converges with a mock client", async () => {
+    // A mock prover that answers each gated obligation with its reference
+    // term, selected by matching the proposition text in the user message.
+    const refByProp: Array<[string, string]> = CORPUS
+      .filter(e => e.referenceProof !== null)
+      .map(e => {
+        // Recover the proposition from the bare form for matching.
+        const src = fs.readFileSync(path.resolve(e.file), "utf-8");
+        const m = src.match(new RegExp(`theorem\\s+${e.goalTheorem}\\s*:\\s*([^\\n]*?)(\\s+by\\s+|\\s*$)`, "m"));
+        const prop = (m?.[1] ?? "").trim();
+        return [prop, e.referenceProof!] as [string, string];
+      });
+    const client: BenchLlmClient = {
+      modelId: () => "mock-bench",
+      async send({ userMessage }: { userMessage: string }) {
+        for (const [prop, term] of refByProp) {
+          if (prop && userMessage.includes(prop)) return "```allegro\n" + term + "\n```";
+        }
+        return "```allegro\n" + WRONG_SENTINEL_TERM + "\n```";
+      },
+    };
+    const report = await runBenchmark({ llm: true, client, only: ["t01", "t05", "t08"], maxAttempts: 3 });
+    eq(report.totals.llmRan, true);
+    eq(report.totals.llmAttempted, 3, "three gated obligations were given to the worker");
+    eq(report.totals.llmDischarged, 3, "the mock prover converged on all three");
+    for (const r of report.results) {
+      eq(r.llm?.discharged, true, `entry ${r.id} converged`);
+    }
+  });
+}
+
 // --- Run all tests (sync + async) and report ---
 
-runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then(() => {
+runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then(() => runBenchmarkTests()).then(() => {
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
   if (failures.length > 0) {
