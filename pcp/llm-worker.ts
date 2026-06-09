@@ -30,6 +30,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { classifyProofStrategy } from "../src/pcp.js";
 
 // -----------------------------------------------------------------------------
 // Pure helpers (no SDK / no API key needed)
@@ -134,28 +135,10 @@ export function buildIterationMessage(args: {
 
 /** Determine the "strategy" tag for an attempted proof term — used to
  *  populate PriorAttempt.strategiesUsed so the H3 hint generator can
- *  warn against repetition. Cheap heuristic: scan for known proof-term
- *  constructors. */
+ *  warn against repetition. Delegates to the canonical classifier in
+ *  `src/pcp.ts` so the worker and the catalog share one vocabulary. */
 export function classifyStrategy(proofTerm: string): string[] {
-  const tags = new Set<string>();
-  const checks: Array<[RegExp, string]> = [
-    [/\bproof_by_eval\b/,    "proof_by_eval"],
-    [/\bproof_refines\b/,    "proof_refines"],
-    [/\bproof_refl\b/,       "proof_refl"],
-    [/\bproof_sym\b/,        "proof_sym"],
-    [/\bproof_trans\b/,      "proof_trans"],
-    [/\bproof_cong\b/,       "proof_cong"],
-    [/\btactics\.same\b/,    "tactics.same"],
-    [/\btactics\.flip\b/,    "tactics.flip"],
-    [/\btactics\.under\b/,   "tactics.under"],
-    [/\btactics\.step\b/,    "tactics.step"],
-    [/\btactics\.chain\b/,   "tactics.chain"],
-    [/\btactics\.rewrite\b/, "tactics.rewrite"],
-    [/\bprove_for_all_bool\b/, "prove_for_all_bool"],
-    [/\bprove_induction\b/,  "prove_induction"],
-  ];
-  for (const [re, tag] of checks) if (re.test(proofTerm)) tags.add(tag);
-  return Array.from(tags).sort();
+  return classifyProofStrategy(proofTerm);
 }
 
 // -----------------------------------------------------------------------------
@@ -217,8 +200,9 @@ export async function createAnthropicClient(opts: LlmClientOptions = {}): Promis
 // -----------------------------------------------------------------------------
 
 import {
-  Obligation, Verdict, Authorship, PriorAttempt,
+  Obligation, Verdict, Authorship, PriorAttempt, ProofCatalog,
   buildVerdict, extractObligations, makeAuthorship,
+  parseCatalog, findCitableLemmas,
 } from "../src/pcp.js";
 import { evalSource } from "../src/runtime.js";
 import { createTypeSystem } from "../src/types-std.js";
@@ -252,6 +236,13 @@ export interface RunWorkerOptions {
   enableLlm?:      boolean;
   client?:         LlmClient;
   primer?:         string;
+  /** H5: path to a `proofs.json` catalog. When supplied, citable lemmas
+   *  (entries sharing dependencies with the goal) are surfaced to the
+   *  LLM so it can cite existing proofs instead of reproving. */
+  catalogPath?:    string;
+  /** H5: an already-parsed catalog (takes precedence over catalogPath).
+   *  Used by tests and callers that hold the catalog in memory. */
+  catalog?:        ProofCatalog;
 }
 
 /** Drive the loop end-to-end. For each pending obligation:
@@ -278,6 +269,17 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
     throw new Error("runLlmWorker: enableLlm is true but no client supplied");
   }
 
+  // H5: load a proof catalog so the worker can cite existing lemmas.
+  let catalog: ProofCatalog | undefined = opts.catalog;
+  if (!catalog && opts.catalogPath && fs.existsSync(opts.catalogPath)) {
+    try {
+      catalog = parseCatalog(fs.readFileSync(opts.catalogPath, "utf-8"));
+    } catch {
+      // A malformed catalog is non-fatal — proceed without citations.
+      catalog = undefined;
+    }
+  }
+
   const perObligation: WorkerResult["perObligation"] = [];
 
   for (const ob of pending) {
@@ -292,10 +294,18 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
       // We re-build a verdict-shaped picture from the most recent prior attempt.
       const lastVerdict = priorAttempts[priorAttempts.length - 1]?.verdict;
       const lastFailure = lastVerdict?.theorems.find(t => t.name === ob.theorem.name)?.failure;
+      // H5: augment the in-scope lemma list with catalog entries whose
+      // dependencies overlap this goal — the prover can cite these.
+      const cited = catalog
+        ? findCitableLemmas(catalog, ob.theorem.proposition, { limit: 8 })
+            .map(e => e.name)
+            .filter(n => n !== ob.theorem.name)
+        : [];
+      const lemmas = Array.from(new Set([...ob.context.lemmas, ...cited]));
       const userMessage = buildIterationMessage({
         obligationName:        ob.theorem.name,
         proposition:           ob.theorem.proposition,
-        lemmas:                ob.context.lemmas,
+        lemmas,
         failureReason:         lastFailure?.reason,
         failureCounterexample: lastFailure?.counterexample,
         hints: lastVerdict?.iterationHints?.suggestions

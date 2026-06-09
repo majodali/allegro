@@ -22,7 +22,7 @@
 // **Schema version is "pcp/1".** Forward-compatible additions get
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
-import type { ContextValue, BitsValue } from "./types.js";
+import type { ContextValue, BitsValue, Value } from "./types.js";
 import { ValueKind, primaryOf, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
 import type { CompilationReport, Notification } from "./runtime.js";
@@ -947,5 +947,258 @@ export function formatTodo(args: {
   }
 
   lines.push("_When done, run `allegro verify` on the source file to confirm._");
+  return lines.join("\n");
+}
+
+// =============================================================================
+// Proof-library catalog (H5)
+// =============================================================================
+//
+// A catalog enumerates the *discharged* theorems in a module so any
+// prover can CITE existing lemmas instead of reproving them. It is the
+// read-side counterpart to `extractObligations` (which surfaces the
+// *pending* burden); a catalog surfaces the *settled* facts.
+//
+// JSON is canonical — a worker reads `proofs.json` before proposing and
+// matches a new goal's dependencies against the catalog via
+// `findCitableLemmas`. The plain-text renderer is for direct CLI use.
+//
+// Each entry records the theorem name + proposition (+ stable hash), the
+// identifiers the proposition references (so a prover can match a new
+// goal against a citable lemma), any refined types referenced, a
+// heuristic proof-strategy tag, the source `by` term when present, and
+// authorship.
+
+export interface CatalogEntry {
+  name: string;
+  proposition: string;
+  propositionHash: string;
+  /** Identifiers (functions / lemmas / types) referenced in the
+   *  proposition source. Used by `findCitableLemmas` to match a new
+   *  goal against settled facts. */
+  dependencies: string[];
+  /** Subset of `dependencies` that resolve to refined types in the
+   *  module — useful for domain-aware citation. Omitted when empty. */
+  refinementTypes?: string[];
+  /** Heuristic proof-strategy tags. Auto-PE-discharged theorems (no
+   *  `by` term) get `["auto-PE"]`; theorems with a `by` term get the
+   *  constructors detected in it (`proof_trans`, `tactics.chain`, …),
+   *  or `["by"]` when no known constructor is recognised. */
+  strategy: string[];
+  /** The source `by <term>`, when the theorem declaration carried one. */
+  proofTerm?: string;
+  authorship: Authorship;
+  location?: SourceLocation;
+}
+
+export interface ProofCatalog {
+  version: typeof PCP_VERSION;
+  /** Source file the catalog was generated from, when known. */
+  source?: string;
+  /** ISO 8601 UTC generation timestamp. */
+  generatedAt: string;
+  entries: CatalogEntry[];
+}
+
+export function serializeCatalog(c: ProofCatalog): string {
+  return JSON.stringify(c, null, 2);
+}
+
+export function parseCatalog(text: string): ProofCatalog {
+  const raw = JSON.parse(text);
+  validateCatalog(raw);
+  return raw as ProofCatalog;
+}
+
+function validateCatalog(c: any): void {
+  _require(c && typeof c === "object",       "catalog must be an object");
+  _require(c.version === PCP_VERSION,        `unsupported version: ${c.version}`);
+  _require(typeof c.generatedAt === "string", "catalog.generatedAt must be a string");
+  _require(Array.isArray(c.entries),         "catalog.entries must be an array");
+  for (const e of c.entries) {
+    _require(typeof e.name === "string",            "entry.name must be a string");
+    _require(typeof e.proposition === "string",     "entry.proposition must be a string");
+    _require(typeof e.propositionHash === "string", "entry.propositionHash must be a string");
+    _require(Array.isArray(e.dependencies),         "entry.dependencies must be an array");
+    _require(Array.isArray(e.strategy),             "entry.strategy must be an array");
+    _require(e.authorship && Array.isArray(e.authorship.provers),
+                                                    "entry.authorship.provers must be an array");
+  }
+}
+
+/** Language keywords / literals that aren't meaningful dependencies. */
+const CATALOG_STOPWORDS = new Set([
+  "if", "then", "else", "when", "is", "of", "and", "or", "not",
+  "true", "false", "none", "error", "instanceof", "subtypeof",
+  "import", "export", "by", "forall",
+]);
+
+/** Pull identifier references out of a proposition's source text.
+ *  Returns sorted, de-duplicated identifiers, skipping a small set of
+ *  language keywords / literals so the dependency list stays meaningful.
+ *  Dotted member chains (`tactics.chain`) are kept whole. Numbers are
+ *  excluded — the regex requires a leading letter / underscore. */
+export function extractDependencies(proposition: string): string[] {
+  const ids = new Set<string>();
+  const re = /[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(proposition)) !== null) {
+    const tok = m[0];
+    if (CATALOG_STOPWORDS.has(tok)) continue;
+    ids.add(tok);
+  }
+  return Array.from(ids).sort();
+}
+
+/** Known proof-term constructors → strategy tag. Mirrors the worker's
+ *  classifier (pcp/llm-worker.ts) so the catalog and the prior-attempt
+ *  strategy records use the same vocabulary. */
+const _PROOF_CONSTRUCTORS: Array<[RegExp, string]> = [
+  [/\bproof_by_eval\b/,      "proof_by_eval"],
+  [/\bproof_refines\b/,      "proof_refines"],
+  [/\bproof_refl\b/,         "proof_refl"],
+  [/\bproof_sym\b/,          "proof_sym"],
+  [/\bproof_trans\b/,        "proof_trans"],
+  [/\bproof_cong\b/,         "proof_cong"],
+  [/\btactics\.same\b/,      "tactics.same"],
+  [/\btactics\.flip\b/,      "tactics.flip"],
+  [/\btactics\.under\b/,     "tactics.under"],
+  [/\btactics\.step\b/,      "tactics.step"],
+  [/\btactics\.chain\b/,     "tactics.chain"],
+  [/\btactics\.rewrite\b/,   "tactics.rewrite"],
+  [/\bprove_for_all_bool\b/, "prove_for_all_bool"],
+  [/\bprove_induction\b/,    "prove_induction"],
+];
+
+/** Tag a proof term with the constructors it uses. Empty when the term
+ *  references no known constructor. */
+export function classifyProofStrategy(proofTerm: string): string[] {
+  const tags = new Set<string>();
+  for (const [re, tag] of _PROOF_CONSTRUCTORS) if (re.test(proofTerm)) tags.add(tag);
+  return Array.from(tags).sort();
+}
+
+/** Does this evaluated value resolve to a refined type? Refined types
+ *  carry a `__predicate` binding on their type Context (set by
+ *  `buildRefinedType`). */
+function _isRefinedType(v: Value): boolean {
+  const p = primaryOf(v);
+  if (p.kind !== ValueKind.Context) return false;
+  return (p as ContextValue).bindings.has("__predicate");
+}
+
+/** Locate the `by <term>` clause of a single-line theorem declaration in
+ *  source. Mirrors the splicer's matching shape (pcp/llm-worker.ts). */
+function _extractByTerm(sourceText: string, theoremName: string): string | undefined {
+  const escName = theoremName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(
+    `^[ \\t]*theorem\\s+${escName}\\s*:[^\\n]*?\\sby\\s+([^\\n]+?)\\s*$`, "m");
+  const m = sourceText.match(re);
+  return m ? m[1].trim() : undefined;
+}
+
+/** Catalog authorship from source: PE-discharged theorems are `auto-PE`;
+ *  theorems carrying a `by` term were proved by a prover we can't
+ *  identify from source alone, recorded as `source`. */
+function _catalogAuthorship(hasByTerm: boolean): Authorship {
+  return hasByTerm
+    ? makeAuthorship({ prover: "source", role: "primary" })
+    : AUTO_PE_AUTHORSHIP();
+}
+
+/** Build a ProofCatalog from an evaluated module — one entry per
+ *  discharged Proof binding. Supply `sourceText` to recover `by` terms
+ *  and classify proof strategies; without it every entry is `auto-PE`. */
+export function buildCatalog(
+  evalCtx: ContextValue,
+  _report: CompilationReport | undefined,
+  opts?: { sourceFile?: string; sourceText?: string },
+): ProofCatalog {
+  // Pre-compute refined-type binding names for dependency tagging.
+  const refinedTypeNames = new Set<string>();
+  for (const [k, b] of evalCtx.bindings) {
+    if (b.value && _isRefinedType(b.value)) refinedTypeNames.add(k);
+  }
+
+  const entries: CatalogEntry[] = [];
+  for (const [key, binding] of evalCtx.bindings) {
+    const v = binding.value;
+    if (!v || !isDischargedProof(v)) continue;
+    const ctx = primaryOf(v) as ContextValue;
+    const proposition = _ctxString(ctx, "__proposition") ?? "<unknown>";
+    const dependencies = extractDependencies(proposition);
+    const refs = dependencies.filter(d => refinedTypeNames.has(d));
+    const proofTerm = opts?.sourceText ? _extractByTerm(opts.sourceText, key) : undefined;
+    const tags = proofTerm ? classifyProofStrategy(proofTerm) : [];
+    const strategy = proofTerm
+      ? (tags.length > 0 ? tags : ["by"])
+      : ["auto-PE"];
+    entries.push({
+      name: key,
+      proposition,
+      propositionHash: hashProposition(proposition),
+      dependencies,
+      ...(refs.length > 0 ? { refinementTypes: refs } : {}),
+      strategy,
+      ...(proofTerm ? { proofTerm } : {}),
+      authorship: _catalogAuthorship(proofTerm !== undefined),
+      ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
+    });
+  }
+
+  return {
+    version: PCP_VERSION,
+    ...(opts?.sourceFile ? { source: opts.sourceFile } : {}),
+    generatedAt: new Date().toISOString(),
+    entries,
+  };
+}
+
+/** Retrieval: catalog entries that share at least one dependency with a
+ *  target goal — candidate lemmas a prover could cite (`proof_trans` /
+ *  `tactics.chain`) instead of reproving. Ranked by overlap count
+ *  (descending), then name. `target` may be a proposition string (its
+ *  dependencies are extracted) or a pre-computed dependency list. */
+export function findCitableLemmas(
+  catalog: ProofCatalog,
+  target: string | string[],
+  opts?: { limit?: number },
+): CatalogEntry[] {
+  const targetDeps = new Set(
+    Array.isArray(target) ? target : extractDependencies(target));
+  const scored: Array<{ entry: CatalogEntry; overlap: number }> = [];
+  for (const e of catalog.entries) {
+    const overlap = e.dependencies.filter(d => targetDeps.has(d)).length;
+    if (overlap > 0) scored.push({ entry: e, overlap });
+  }
+  scored.sort((a, b) =>
+    b.overlap - a.overlap || a.entry.name.localeCompare(b.entry.name));
+  const limited = opts?.limit ? scored.slice(0, opts.limit) : scored;
+  return limited.map(s => s.entry);
+}
+
+/** Minimal plain-text catalog render for direct CLI use. */
+export function formatCatalog(c: ProofCatalog): string {
+  const lines: string[] = [];
+  const where = c.source ? ` — ${c.source}` : "";
+  lines.push(
+    `Proof catalog${where} (${c.entries.length} discharged theorem(s), generated ${c.generatedAt})`);
+  if (c.entries.length === 0) {
+    lines.push("  (no discharged theorems)");
+    return lines.join("\n");
+  }
+  for (const e of c.entries) {
+    lines.push("");
+    lines.push(`  ${e.name}: ${e.proposition}`);
+    lines.push(`    strategy: ${e.strategy.join(", ")}` +
+      (e.proofTerm ? ` (by ${e.proofTerm})` : ""));
+    if (e.dependencies.length > 0) {
+      lines.push(`    depends on: ${e.dependencies.join(", ")}`);
+    }
+    if (e.refinementTypes && e.refinementTypes.length > 0) {
+      lines.push(`    refinements: ${e.refinementTypes.join(", ")}`);
+    }
+    lines.push(`    proved by: ${e.authorship.provers.map(p => p.prover).join(", ")}`);
+  }
   return lines.join("\n");
 }

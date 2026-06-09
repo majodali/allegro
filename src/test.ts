@@ -8051,6 +8051,42 @@ async function runH4aAsyncTests(): Promise<void> {
       fs.unlinkSync(tmp);
     }
   });
+
+  await asyncTest("Phase H5: runLlmWorker surfaces citable catalog lemmas in the prompt", async () => {
+    // The goal references `f`; the catalog has a lemma sharing that
+    // dependency, so the worker should surface its name to the LLM.
+    const tmp = path.join("/tmp", `pcp-h5-${Date.now()}.alg`);
+    // `proof_refl(99)` proves 99 == 99, not f(2) == 2 → pending.
+    fs.writeFileSync(tmp, "f(x) => x\ntheorem t: f(2) == 2 by proof_refl(99)\n");
+    const catalog = {
+      version: "pcp/1" as const,
+      generatedAt: new Date().toISOString(),
+      entries: [{
+        name: "helpful_lemma", proposition: "f(0) == 0",
+        propositionHash: "0", dependencies: ["f"],
+        strategy: ["auto-PE"],
+        authorship: { provers: [{ prover: "auto-PE" }], verifiedAt: "" },
+      }],
+    };
+    let sawLemma = false;
+    try {
+      const spy: LlmClient = {
+        modelId: () => "mock-model",
+        async send({ userMessage }) {
+          if (userMessage.includes("helpful_lemma")) sawLemma = true;
+          return "```allegro\nproof_refl(2)\n```";
+        },
+      };
+      const result = await runLlmWorker({
+        filename: tmp, maxAttempts: 1, enableLlm: true,
+        client: spy, primer: "(mock primer)", catalog,
+      });
+      eq(result.allDischarged, true);
+      eq(sawLemma, true, "the catalog lemma name should appear in the prompt");
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
 }
 
 test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
@@ -10347,6 +10383,123 @@ async function runBenchmarkTests(): Promise<void> {
     }
   });
 }
+
+// --- Phase H5: proof-library catalog ---
+//
+// The catalog enumerates a module's *discharged* theorems so a prover
+// can cite existing lemmas instead of reproving. We test the generator
+// (buildCatalog), the dependency extractor, the retrieval helper
+// (findCitableLemmas), strategy classification, and JSON round-trip.
+
+import {
+  buildCatalog, findCitableLemmas, extractDependencies,
+  classifyProofStrategy, serializeCatalog, parseCatalog,
+  formatCatalog,
+} from "./pcp.js";
+
+test("Phase H5: buildCatalog enumerates only discharged theorems (auto-PE)", () => {
+  const src = `theorem a: 1 == 1\ntheorem b: 1 == 2\ntheorem c: 3 + 4 == 7\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const catalog = buildCatalog(result.evalCtx, result.compilationReport);
+  const names = catalog.entries.map(e => e.name).sort();
+  eq(names.includes("a"), true);
+  eq(names.includes("c"), true);
+  eq(names.includes("b"), false, "failed `b` must not be catalogued");
+  const a = catalog.entries.find(e => e.name === "a");
+  eq(a?.strategy.join(","), "auto-PE");
+  eq(a?.authorship.provers[0].prover, "auto-PE");
+});
+
+test("Phase H5: buildCatalog recovers `by` term + classifies strategy", () => {
+  const src = `theorem refl_t: 5 == 5 by proof_refl(5)\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const catalog = buildCatalog(result.evalCtx, result.compilationReport,
+                               { sourceText: src });
+  const e = catalog.entries.find(en => en.name === "refl_t");
+  eq(e !== undefined, true);
+  eq(e?.proofTerm, "proof_refl(5)");
+  eq(e?.strategy.join(","), "proof_refl");
+  eq(e?.authorship.provers[0].prover, "source");
+});
+
+test("Phase H5: extractDependencies skips keywords, keeps dotted chains", () => {
+  const deps = extractDependencies("abs(abs(13)) == abs(13)");
+  eq(deps.join(","), "abs");
+  const dotted = extractDependencies("tactics.chain(a) == b");
+  eq(dotted.includes("tactics.chain"), true);
+  eq(dotted.includes("a"), true);
+  eq(dotted.includes("b"), true);
+  // forall / Bool keyword-ish tokens: `forall` is a stopword, `Bool` is not.
+  const q = extractDependencies("forall b: Bool, negate(b) == b");
+  eq(q.includes("forall"), false);
+  eq(q.includes("negate"), true);
+});
+
+test("Phase H5: classifyProofStrategy tags known constructors", () => {
+  eq(classifyProofStrategy("proof_trans(p1, p2)").join(","), "proof_trans");
+  eq(classifyProofStrategy("tactics.chain([a, b])").join(","), "tactics.chain");
+  eq(classifyProofStrategy("42").length, 0);
+});
+
+test("Phase H5: findCitableLemmas ranks entries by dependency overlap", () => {
+  const src =
+    `theorem abs_zero: 3 + 4 == 7\n` +     // dep: (none meaningful) — numbers only
+    `theorem t_abs: abs(0 - 4) == 4\n` +   // dep: abs
+    `theorem t_sq: square(3) == 9\n`;      // dep: square
+  // abs / square aren't defined here, so those theorems won't discharge.
+  // Build a catalog directly from synthetic entries instead to test ranking.
+  const catalog = {
+    version: "pcp/1" as const,
+    generatedAt: new Date().toISOString(),
+    entries: [
+      { name: "l_abs",   proposition: "abs(x) == x",     propositionHash: "0",
+        dependencies: ["abs", "x"],          strategy: ["auto-PE"],
+        authorship: { provers: [{ prover: "auto-PE" }], verifiedAt: "" } },
+      { name: "l_absSq", proposition: "abs(square(x))",  propositionHash: "1",
+        dependencies: ["abs", "square", "x"], strategy: ["auto-PE"],
+        authorship: { provers: [{ prover: "auto-PE" }], verifiedAt: "" } },
+      { name: "l_other", proposition: "foo(y) == y",     propositionHash: "2",
+        dependencies: ["foo", "y"],          strategy: ["auto-PE"],
+        authorship: { provers: [{ prover: "auto-PE" }], verifiedAt: "" } },
+    ],
+  };
+  const cites = findCitableLemmas(catalog, "abs(square(z))");
+  // l_absSq overlaps on {abs, square} = 2; l_abs on {abs} = 1; l_other = 0.
+  eq(cites.map(c => c.name).join(","), "l_absSq,l_abs");
+  const limited = findCitableLemmas(catalog, "abs(square(z))", { limit: 1 });
+  eq(limited.map(c => c.name).join(","), "l_absSq");
+});
+
+test("Phase H5: catalog round-trips through JSON; validate rejects bad version", () => {
+  const src = `theorem t: 2 + 2 == 4\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const catalog = buildCatalog(result.evalCtx, result.compilationReport,
+                               { sourceFile: "x.alg", sourceText: src });
+  const round = parseCatalog(serializeCatalog(catalog));
+  eq(round.entries.length, catalog.entries.length);
+  eq(round.entries[0].name, "t");
+  eq(round.source, "x.alg");
+  // formatCatalog renders without throwing.
+  const text = formatCatalog(catalog);
+  eq(text.includes("Proof catalog"), true);
+  // Validation rejects a wrong version.
+  throws(() => parseCatalog(JSON.stringify({ version: "pcp/2", generatedAt: "", entries: [] })),
+         "unsupported version");
+});
+
+test("Phase H5: catalog tags refined-type dependencies", () => {
+  const src = `PositiveInt = Int & _ > 0\ntheorem t: PositiveInt(5) == 5\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true,
+                             undefined, /*softFail*/ true);
+  const catalog = buildCatalog(result.evalCtx, result.compilationReport,
+                               { sourceText: src });
+  const e = catalog.entries.find(en => en.name === "t");
+  eq(e !== undefined, true);
+  eq(e?.refinementTypes?.includes("PositiveInt"), true);
+});
 
 // --- Run all tests (sync + async) and report ---
 

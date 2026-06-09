@@ -176,7 +176,19 @@ learning the F-arc surface).
 workers together prove the protocol is genuinely neutral — same
 contract, two implementations.
 
-### H5 — Proof-library catalog (optional, deferrable)
+### H5 — Proof-library catalog (optional, deferrable) — ✅ SHIPPED
+
+**Status.** Shipped. `allegro catalog <file> [--json] [--output
+proofs.json]` emits a `ProofCatalog` of the file's discharged theorems.
+Schema + generator (`buildCatalog`) + dependency extractor
+(`extractDependencies`) + strategy classifier (`classifyProofStrategy`,
+now the canonical one the worker delegates to) + retrieval helper
+(`findCitableLemmas`) + renderers live in `src/pcp.ts`. The LLM worker
+reads a catalog via `--catalog proofs.json` (`runLlmWorker` opts
+`catalogPath` / `catalog`) and merges citable lemma names into each
+obligation's prompt. 8 new tests; 986/986 green. Refinement *domain*
+rendering (beyond just naming the refined type) and a richer per-project
+auto-`proofs.json` lifecycle remain as polish.
 
 **What.** A `proofs.json` per project (and via `allegro catalog
 file.alg --json`) cataloging discharged theorems: name, proposition

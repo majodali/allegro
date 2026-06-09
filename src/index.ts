@@ -387,7 +387,7 @@ if (flagless[0] === "inspect") {
   const filename = flagless[1];
   if (!filename) {
     console.error(
-      "usage: allegro prove <file> [--max-attempts N] [--model MODEL] [--output FILE.alg] [--json]");
+      "usage: allegro prove <file> [--max-attempts N] [--model MODEL] [--output FILE.alg] [--catalog proofs.json] [--json]");
     process.exit(1);
   }
   const maxIdx = argv.indexOf("--max-attempts");
@@ -396,8 +396,25 @@ if (flagless[0] === "inspect") {
   const model = modelIdx >= 0 ? argv[modelIdx + 1] : undefined;
   const outputIdx = argv.indexOf("--output");
   const outputPath = outputIdx >= 0 ? argv[outputIdx + 1] : undefined;
+  const catalogIdx = argv.indexOf("--catalog");
+  const catalogPath = catalogIdx >= 0 ? argv[catalogIdx + 1] : undefined;
   const asJson = argv.includes("--json");
-  runPcpProve(filename, maxAttempts, model, outputPath, asJson).catch(e => {
+  runPcpProve(filename, maxAttempts, model, outputPath, asJson, catalogPath).catch(e => {
+    console.error(e.message);
+    process.exit(1);
+  });
+} else if (flagless[0] === "catalog") {
+  // Phase H5: emit a proof-library catalog of the file's discharged
+  // theorems so a prover can cite existing lemmas instead of reproving.
+  const filename = flagless[1];
+  if (!filename) {
+    console.error("usage: allegro catalog <file> [--json] [--output proofs.json]");
+    process.exit(1);
+  }
+  const asJson = argv.includes("--json");
+  const outputIdx = argv.indexOf("--output");
+  const outputPath = outputIdx >= 0 ? argv[outputIdx + 1] : undefined;
+  runPcpCatalog(filename, standard, asJson, outputPath).catch(e => {
     console.error(e.message);
     process.exit(1);
   });
@@ -603,6 +620,38 @@ async function runPcpObligations(
 }
 
 /**
+ * Phase H5: emit a proof-library catalog of the file's discharged
+ * theorems. JSON is canonical (`--json` / `--output proofs.json`); the
+ * default stdout render is the minimal plain-text form. With `--output`,
+ * the catalog is always written as JSON (the canonical on-disk shape a
+ * worker reads) and a one-line confirmation is printed.
+ */
+async function runPcpCatalog(
+  filename: string,
+  isStandard: boolean,
+  asJson: boolean,
+  outputPath: string | undefined,
+): Promise<void> {
+  const { buildCatalog, serializeCatalog, formatCatalog } = await import("./pcp.js");
+  const sourceText = fs.readFileSync(filename, "utf-8");
+  const result = await pcpLoadAndEval(filename, isStandard);
+  const catalog = buildCatalog(result.evalCtx, result.compilationReport, {
+    sourceFile: filename,
+    sourceText,
+  });
+
+  if (outputPath) {
+    fs.writeFileSync(outputPath, serializeCatalog(catalog));
+    console.log(`wrote ${catalog.entries.length} catalog entr${
+      catalog.entries.length === 1 ? "y" : "ies"} to ${outputPath}`);
+  } else if (asJson) {
+    console.log(serializeCatalog(catalog));
+  } else {
+    console.log(formatCatalog(catalog));
+  }
+}
+
+/**
  * Phase H4b: human-interactive worker. Loads the file, builds a Verdict
  * (so we have hints), enumerates obligations, and emits a Markdown TODO
  * showing each pending obligation with its failure context + suggestions.
@@ -673,6 +722,7 @@ async function runPcpProve(
   model: string | undefined,
   outputPath: string | undefined,
   asJson: boolean,
+  catalogPath?: string,
 ): Promise<void> {
   const { runLlmWorker, createAnthropicClient } = await import("../pcp/llm-worker.js");
   const client = await createAnthropicClient({ model });
@@ -681,6 +731,7 @@ async function runPcpProve(
     maxAttempts,
     enableLlm: true,
     client,
+    ...(catalogPath ? { catalogPath } : {}),
   });
   if (outputPath) {
     fs.writeFileSync(outputPath, result.sourceAfter, "utf-8");
