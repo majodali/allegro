@@ -1508,6 +1508,7 @@ import {
   AnyType, Type, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
   structuralWrap, makeUnionType, wrapType, buildRefinedType,
+  tryRenderFailure,
   Effect as _Effect, effectUnion as _effectUnion,
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
 } from "./types-std.js";
@@ -2199,6 +2200,16 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Any matches everything
   if (expectedName === "Any") return v;
 
+  // Domain-failure rendering hook: route a failed type check through the
+  // expected type's `__renderFailure` (if the model defines one) before
+  // throwing, so model DSLs surface their own vocabulary instead of the
+  // kernel's. No renderer ⇒ the default message, unchanged.
+  const failTypeCheck = (message: string, kind: string): never => {
+    const rendered = tryRenderFailure(
+      expectedCtx, { failedType: expectedCtx, actual: v, kind, message }, ctx, evalFn);
+    throw new AllegroError(rendered ?? message);
+  };
+
   // Phase D1 Slice 2 Stage A: effect-bound discharge. Same shape as the
   // checkArgType path in evaluator.ts — `__effectBound` on the expected type
   // (set by buildEffect for `pure` / named effects; absent on `opaque`)
@@ -2272,7 +2283,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const checkResult = directInstanceof.fn([v], undefined as any, undefined as any);
     const checkP = primaryOf(checkResult);
     if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
-      throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
+      failTypeCheck(`Type error: expected ${expectedName}, got ${actualName}`, "type-mismatch");
     }
     return v;
   }
@@ -2285,12 +2296,12 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       const checkResult = instanceofMethod.fn([expectedCtx, v], undefined as any, undefined as any);
       const checkP = primaryOf(checkResult);
       if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
-        throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
+        failTypeCheck(`Type error: expected ${expectedName}, got ${actualName}`, "type-mismatch");
       }
       // Check refinement predicate if present
       const predCheck = checkRefinementPredicate(v, expectedCtx, actualType, ctx!, evalFn!);
       if (predCheck.ok === false) {
-        throw new AllegroError(`Type error: refinement predicate failed for ${expectedName}`);
+        failTypeCheck(`Type error: refinement predicate failed for ${expectedName}`, "refinement");
       }
       if (predCheck.ok === null) {
         // Unresolved predicate — return a residual type_check
@@ -2302,7 +2313,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Fallback: name-based check (for types without the hierarchy yet)
   if (actualName !== expectedName) {
-    throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
+    failTypeCheck(`Type error: expected ${expectedName}, got ${actualName}`, "type-mismatch");
   }
 
   // Check type arguments if the expected type has them

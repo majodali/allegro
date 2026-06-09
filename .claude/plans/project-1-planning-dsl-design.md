@@ -383,12 +383,26 @@ work inside any lib file. 974/974 green. Unblocks `lib/planning.alg`.
 
 **Next chunk (suggested ordering):**
 
-1. Domain counterexample renderer hook — small infrastructure piece in
-   `src/runtime.ts` / `src/introspect.ts` so libs can register
-   per-notification-kind renderers. Probably ~50-100 LOC.
+1. ✅ Domain counterexample renderer hook (stage-(b)) — LANDED. Refined to
+   a type-meta-method design rather than the notification-kind registry
+   sketched here, per the agreed model lifecycle (validation stages a/b/c;
+   renderers are Allegro, part of the model definition; the kernel carries
+   zero model knowledge). `T.onFailure(renderer)` attaches an Allegro
+   `__renderFailure`; the kernel routes construction / type-check /
+   constraint-proof failures through it, passing a NON-error structured
+   descriptor (`message`/`actual`/`constraint`/`counterexample`/`failedType`/`failureKind`/`invariantIndex`),
+   and falls back to the default message when absent.
+   `buildFailureRendererType` clones (never mutates a shared builtin like
+   `Int`) and wraps `__construct` so the renderer works in either
+   declaration order. Wired into `refined.__construct`,
+   `invariant.__construct`, `type_check_impl`, `checkArgType`. Demo
+   `tests/render-hook-demo.alg`; 7 tests; 985/985 green. Stage-(c)
+   custom-analysis emission route deferred into the `lib/planning.alg`
+   chunk (where the analyzer that produces those findings lives).
 2. `lib/planning.alg` scaffolding — types + grammar + DAG analyzer.
    Larger; might split into stages (types first, then grammar, then
-   each analyzer check as its own stage).
+   each analyzer check as its own stage). Stage-(c) findings emit via the
+   model's own analyzer functions (domain-legible by construction).
 3. Worked example `tests/planning-release-demo.alg` running through
    the new lib against the SoftwareRelease example.
 

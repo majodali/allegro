@@ -9887,6 +9887,80 @@ test("grammar2/std: dot-access.alg runs end-to-end through grammar2", () => {
   }
 });
 
+// --- Domain-failure rendering hook (Vivace models — stage-(b) validation) ---
+
+/** Run an .alg source through the standard-2 path, capturing print output. */
+function captureStd2(source: string): string[] {
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (msg: any) => printed.push(String(msg));
+  try {
+    evalStandard2(source);
+  } finally {
+    console.log = origLog;
+  }
+  return printed;
+}
+
+test("render-hook: demo file renders DSL messages, leaves bare types unchanged", () => {
+  const source = fs.readFileSync(path.join(testsDir, "render-hook-demo.alg"), "utf-8");
+  const printed = captureStd2(source);
+  const expected: string[] = [];
+  for (const line of source.split(/\r?\n/)) {
+    const m = line.match(/\/\/\s*expect:\s*(.*)/);
+    if (m) expected.push(m[1].trim());
+  }
+  eq(printed.length, expected.length);
+  for (let i = 0; i < expected.length; i++) eq(printed[i], expected[i], `line ${i}`);
+});
+
+test("render-hook: refinement failure without a renderer keeps the default message", () => {
+  const out = captureStd2(`Plain = Int & _ <= 100\nprint(error of Plain(200))\n`);
+  eq(out[0], "refinement check failed: expected ≤ 100 (got 200)");
+});
+
+test("render-hook: a renderer surfaces the DSL message on construction failure", () => {
+  const out = captureStd2(
+    `Budget = (Int & _ <= 5000).onFailure(f => "over by domain {constraint of f}")\n` +
+    `print(error of Budget(6000))\n`);
+  eq(out[0], "over by domain ≤ 5000");
+});
+
+test("render-hook: onFailure does not pollute the base type it derives from", () => {
+  // Attaching a renderer to Int must NOT make a later, unrelated refinement of
+  // Int inherit it — the builder clones rather than mutating.
+  const out = captureStd2(
+    `Tagged = Int.onFailure(f => "TAGGED")\n` +
+    `Plain = Int & _ <= 100\n` +
+    `print(error of Plain(200))\n`);
+  eq(out[0], "refinement check failed: expected ≤ 100 (got 200)");
+});
+
+test("render-hook: renderer receives a structured, non-error descriptor", () => {
+  // The descriptor carries `actual` / `constraint` / `counterexample` /
+  // `failureKind` as data (not an error value — otherwise propagation would
+  // stop the renderer from running).
+  const out = captureStd2(
+    `R = (Int & _ <= 10).onFailure(f =>\n` +
+    `  "kind={failureKind of f} actual={actual of f} got={counterexample of f} bound={constraint of f}")\n` +
+    `print(error of R(42))\n`);
+  eq(out[0], "kind=refinement actual=42 got=42 bound=≤ 10");
+});
+
+test("render-hook: a renderer on a base type is inherited by a refinement", () => {
+  const out = captureStd2(
+    `Quota = Int.onFailure(f => "quota: {message of f}")\n` +
+    `Small = Quota & _ < 10\n` +
+    `print(error of Small(42))\n`);
+  eq(out[0], "quota: refinement check failed: expected ≤ 9 (got 42)");
+});
+
+test("render-hook: a passing construction is unaffected by the renderer", () => {
+  const out = captureStd2(
+    `Budget = (Int & _ <= 5000).onFailure(f => "nope")\nprint(Budget(3000))\n`);
+  eq(out[0], "3000");
+});
+
 test("grammar2/base: basics.alg runs end-to-end, matches expected output", () => {
   // Phase 2b acceptance: parse, build, and evaluate the full basics.alg through
   // the new grammar2 path. The expected output from CLAUDE.md is the seven

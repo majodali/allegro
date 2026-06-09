@@ -9,6 +9,7 @@ import {
 import {
   getType, getTypeName, withType, typeMethod, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
+  tryRenderFailure,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
@@ -700,7 +701,11 @@ function checkArgType(
         const p = primaryOf(result);
         if (p.kind === ValueKind.Bits && p.data === 0n) {
           const name = typeContextName(expected) ?? "<refined>";
-          throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}`);
+          const msg = `Type error: argument ${argIndex} failed refinement predicate for ${name}`;
+          const rendered = tryRenderFailure(
+            expected, { failedType: expected, actual: arg, kind: "refinement", message: msg },
+            ctx, (e, c) => evaluate(e, c, depth + 1, depCollector));
+          throw new AllegroError(rendered ?? msg);
         }
       }
       return;
@@ -723,7 +728,11 @@ function checkArgType(
     const result = evaluate(makeExpr(predicate, [arg]), ctx, depth + 1, depCollector);
     const p = primaryOf(result);
     if (p.kind === ValueKind.Bits && p.data === 0n) {
-      throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`);
+      const msg = `Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`;
+      const rendered = tryRenderFailure(
+        expected, { failedType: expected, actual: arg, kind: "refinement", message: msg },
+        ctx, (e, c) => evaluate(e, c, depth + 1, depCollector));
+      throw new AllegroError(rendered ?? msg);
     }
     // If unresolved, best-effort accept (partial evaluation will retry)
   };

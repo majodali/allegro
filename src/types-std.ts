@@ -20,6 +20,7 @@ import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, 
 const META_METHOD_NAMES = new Set([
   "instanceof", "subtypeof", "extend", "where", "distinct",
   "constructor", "interface", "preserveOps", "mixin", "invariant",
+  "onFailure",
 ]);
 
 // --- Helpers ---
@@ -572,6 +573,202 @@ function buildInterfaceType(
   return ifaceType;
 }
 
+// =============================================================================
+// Domain-failure rendering hook (Vivace models — stage-(b) validation)
+// =============================================================================
+//
+// When a typed model object is constructed (or type-checked) and a type
+// constraint fails, the kernel produces a failure in *kernel* vocabulary
+// ("refinement check failed: expected ≥ 1 (got -5)"). A model DSL needs
+// that rendered in its OWN vocabulary. The model definition supplies an
+// Allegro renderer as a `__renderFailure` meta-method on its types; the
+// kernel routes the (enriched) failure value through it. The kernel
+// carries zero model knowledge — it only looks up and invokes the hook.
+
+/** Meta-method binding a type may define to render its own failures. */
+export const RENDER_FAILURE_KEY = "__renderFailure";
+
+export interface FailureComponents {
+  /** The type whose constraint/check failed — dispatch + `__name` source. */
+  failedType: ContextValue;
+  /** The offending value, passed through so the renderer can display it. */
+  actual: Value;
+  /** Coarse failure kind: "refinement" | "invariant" | "type-mismatch". */
+  kind: string;
+  /** Default kernel message; used when the type has no renderer. */
+  message: string;
+  /** Formatted constraint the value violated, e.g. "≥ 1" (optional). */
+  constraint?: string;
+  /** Formatted offending value, e.g. "-5" (optional). */
+  counterexample?: string;
+  /** 1-based clause index for invariant failures (optional). */
+  invariantIndex?: number;
+}
+
+/**
+ * Build an enriched Error MultiValue for a stage-(b) failure. Beyond the
+ * default `error` string + `type: Error`, it carries structured components
+ * (`__failedType`, `__actual`, `__failureKind`, and the optional
+ * `__constraint` / `__counterexample` / `__invariantIndex`) so downstream
+ * consumers (introspection, future JSON surfaces) can read the failure as
+ * data. Non-renderer consumers see exactly the old shape (the `error`
+ * string), so behaviour is unchanged when no renderer exists.
+ */
+export function makeFailureValue(f: FailureComponents): Value {
+  const components = new Map<string, Value>();
+  components.set("error", withType(stringToBits(f.message), StringType));
+  components.set("type", ErrorType);
+  components.set("__failedType", f.failedType);
+  components.set("__actual", f.actual);
+  components.set("__failureKind", withType(stringToBits(f.kind), StringType));
+  if (f.constraint !== undefined) {
+    components.set("__constraint", withType(stringToBits(f.constraint), StringType));
+  }
+  if (f.counterexample !== undefined) {
+    components.set("__counterexample", withType(stringToBits(f.counterexample), StringType));
+  }
+  if (f.invariantIndex !== undefined) {
+    components.set("__invariantIndex", makeInt(f.invariantIndex));
+  }
+  return makeMultiValue(makeInt(0), components);
+}
+
+/**
+ * Build the value handed to a `__renderFailure` renderer. This is NOT an
+ * error value: it carries no `error` component and is typed `Object`, so the
+ * evaluator's error-propagation doesn't short-circuit the renderer (passing
+ * the raw Error value would make the renderer never run). The renderer reads
+ * the failure as data via component access:
+ *   `message of f` / `actual of f` / `constraint of f` /
+ *   `counterexample of f` / `failedType of f` / `failureKind of f` /
+ *   `invariantIndex of f`
+ * Absent optional components return `none`.
+ */
+function makeFailureDescriptor(f: FailureComponents): Value {
+  const components = new Map<string, Value>();
+  components.set("type", ObjectType);
+  components.set("message", withType(stringToBits(f.message), StringType));
+  components.set("actual", f.actual);
+  components.set("failedType", f.failedType);
+  components.set("failureKind", withType(stringToBits(f.kind), StringType));
+  if (f.constraint !== undefined) {
+    components.set("constraint", withType(stringToBits(f.constraint), StringType));
+  }
+  if (f.counterexample !== undefined) {
+    components.set("counterexample", withType(stringToBits(f.counterexample), StringType));
+  }
+  if (f.invariantIndex !== undefined) {
+    components.set("invariantIndex", makeInt(f.invariantIndex));
+  }
+  return makeMultiValue(makeInt(0), components);
+}
+
+/**
+ * Domain-failure rendering hook. Look up `__renderFailure` on `type` (a
+ * direct meta-binding — `extend`, `buildRefinedType`, and
+ * `buildInvariantedType` all copy bindings forward, so a renderer defined on
+ * a base model type is inherited by every derived element type). If present,
+ * invoke it with a non-error failure descriptor (see `makeFailureDescriptor`)
+ * and return the rendered string; otherwise return null so callers fall back
+ * to the default kernel message. A throwing, residual, or non-String result
+ * is treated as absent — the renderer must never mask the original failure.
+ */
+export function tryRenderFailure(
+  type: ContextValue,
+  f: FailureComponents,
+  ctx: ContextValue | undefined,
+  evalFn: ((e: Value, c: ContextValue) => Value) | undefined,
+): string | null {
+  if (!evalFn || !ctx) return null;
+  const rendererRaw = type.bindings.get(RENDER_FAILURE_KEY)?.value;
+  if (!rendererRaw) return null;
+  // In standard mode the renderer arrives as a typed/wrapped function value;
+  // unwrap to the underlying callable before invoking.
+  const renderer = primaryOf(rendererRaw);
+  if (renderer.kind !== ValueKind.PrimitiveFunction &&
+      renderer.kind !== ValueKind.ComposedFunction) {
+    return null;
+  }
+  let result: Value;
+  try {
+    result = evalFn(makeExpr(renderer, [makeFailureDescriptor(f)]), ctx);
+  } catch {
+    return null;
+  }
+  const p = primaryOf(result);
+  if (p.kind === ValueKind.Bits) return bitsToString(p as BitsValue);
+  return null;
+}
+
+/**
+ * Build a type that carries a domain-failure renderer (`__renderFailure`).
+ * Does NOT mutate the parent — it clones the bindings and adds the renderer,
+ * so attaching a renderer to a shared builtin (e.g. `Int.onFailure(...)`)
+ * never pollutes that builtin for other code.
+ *
+ * The constructor is wrapped so the renderer participates regardless of
+ * declaration order:
+ *   - `(Int & pred).onFailure(R)` — the predicate failure happens inside the
+ *     parent (refined) constructor, which returns an enriched error; the
+ *     wrapper re-renders that error through R (the parent has no renderer).
+ *   - `Int.onFailure(R)` then `& pred` — the refinement copies `__renderFailure`
+ *     forward, so the refinement's own constructor renders via R directly;
+ *     here the wrapper's error branch simply isn't reached.
+ * A successful construction flows through unchanged.
+ */
+export function buildFailureRendererType(parentType: ContextValue, renderer: Value): ContextValue {
+  const newType = makeContext();
+  for (const [key, binding] of parentType.bindings) {
+    if (key === "__construct") continue;
+    if (binding.value) addBinding(newType, key, binding.value);
+  }
+  // Carry forward non-binding meta so refinements / arithmetic still see it.
+  if ((parentType as any).__abstractDomain) (newType as any).__abstractDomain = (parentType as any).__abstractDomain;
+  if ((parentType as any).__invariantsList) (newType as any).__invariantsList = (parentType as any).__invariantsList;
+  addBinding(newType, RENDER_FAILURE_KEY, renderer);
+
+  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
+    addBinding(newType, "__construct", makePrimitive("renderer.__construct", (args, ctx, evalFn) => {
+      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
+      // Parent produced an error (e.g. a refinement predicate failed): re-render
+      // it through this type's renderer, reconstructing the failure descriptor
+      // from the enriched error's structured components.
+      if (value.kind === ValueKind.MultiValue) {
+        const comps = (value as MultiValueType).components;
+        if (comps.has("error")) {
+          const readStr = (k: string): string | undefined => {
+            const c = comps.get(k);
+            if (!c) return undefined;
+            const p = primaryOf(c);
+            return p.kind === ValueKind.Bits ? bitsToString(p as BitsValue) : undefined;
+          };
+          const idxComp = comps.get("__invariantIndex");
+          const invIdx = idxComp && primaryOf(idxComp).kind === ValueKind.Bits
+            ? Number((primaryOf(idxComp) as BitsValue).data) : undefined;
+          const constraint = readStr("__constraint");
+          const counterexample = readStr("__counterexample");
+          const fc: FailureComponents = {
+            failedType: newType,
+            actual: comps.get("__actual") ?? makeInt(0),
+            kind: readStr("__failureKind") ?? "refinement",
+            message: readStr("error") ?? "constraint failed",
+            ...(constraint !== undefined ? { constraint } : {}),
+            ...(counterexample !== undefined ? { counterexample } : {}),
+            ...(invIdx !== undefined ? { invariantIndex: invIdx } : {}),
+          };
+          const rendered = tryRenderFailure(newType, fc, ctx, evalFn);
+          if (rendered !== null) {
+            comps.set("error", withType(stringToBits(rendered), StringType));
+          }
+        }
+      }
+      return value;
+    }, true));
+  }
+  return newType;
+}
+
 /**
  * Build a refined type: inherits parent, wraps constructor with predicate check.
  */
@@ -633,14 +830,14 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
         // sees what constraint the value violated.
         const dom = (refinedType as any).__abstractDomain;
         const primary = primaryOf(value);
-        let cexDesc = "";
+        let cexStr = "";
         if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
           const signed = (primary as BitsValue).data >= 0x8000000000000000n
             ? (primary as BitsValue).data - 0x10000000000000000n
             : (primary as BitsValue).data;
-          cexDesc = ` (got ${signed})`;
+          cexStr = `${signed}`;
         }
-        let constraintDesc = "";
+        let constraintStr = "";
         if (dom && dom.kind !== "opaque") {
           // Lazy-import formatDomain to avoid a static circular dep with refinements.ts
           // (types-std already imports refinements, but this keeps the failure path
@@ -656,13 +853,24 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
             if (d.kind === "eq") return `== ${d.value}`;
             return "<predicate>";
           };
-          constraintDesc = `: expected ${formatDomain(dom)}`;
+          constraintStr = formatDomain(dom);
         }
-        const msg = `refinement check failed${constraintDesc}${cexDesc}`;
-        const components = new Map<string, Value>();
-        components.set("error", withType(stringToBits(msg), StringType));
-        components.set("type", ErrorType);
-        return makeMultiValue(makeInt(0), components);
+        const msg = `refinement check failed`
+          + (constraintStr ? `: expected ${constraintStr}` : "")
+          + (cexStr ? ` (got ${cexStr})` : "");
+        const fc: FailureComponents = {
+          failedType: refinedType, actual: value, kind: "refinement", message: msg,
+          ...(constraintStr ? { constraint: constraintStr } : {}),
+          ...(cexStr ? { counterexample: cexStr } : {}),
+        };
+        const failure = makeFailureValue(fc);
+        // Domain-failure rendering hook: if the model defines `__renderFailure`,
+        // surface its DSL-vocabulary message instead of the kernel default.
+        const rendered = tryRenderFailure(refinedType, fc, ctx, evalFn);
+        if (rendered !== null) {
+          (failure as MultiValueType).components.set("error", withType(stringToBits(rendered), StringType));
+        }
+        return failure;
       }
 
       // Re-tag with refined type, and attach the abstract domain so downstream
@@ -752,10 +960,16 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
           // we can recognise them; otherwise just say "invariant N failed."
           const idx = i;
           const msg = `invariant ${idx + 1} failed`;
-          const components = new Map<string, Value>();
-          components.set("error", withType(stringToBits(msg), StringType));
-          components.set("type", ErrorType);
-          return makeMultiValue(makeInt(0), components);
+          const fc: FailureComponents = {
+            failedType: newType, actual: value, kind: "invariant",
+            message: msg, invariantIndex: idx + 1,
+          };
+          const failure = makeFailureValue(fc);
+          const rendered = tryRenderFailure(newType, fc, ctx, evalFn);
+          if (rendered !== null) {
+            (failure as MultiValueType).components.set("error", withType(stringToBits(rendered), StringType));
+          }
+          return failure;
         }
       }
 
@@ -1084,6 +1298,18 @@ addBinding(typeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
 addBinding(typeMembers, "mixin", makeMethodDescriptor("mixin",
   makePrimitive("Type.mixin", (args) => {
     return wrapType(buildMixinType(args[0] as ContextValue, args[1]));
+  })
+));
+// `T.onFailure(renderer)` — derive a type carrying a domain-failure renderer,
+// so stage-(b) constraint failures on values of this type (or types derived
+// from it) surface in the model's vocabulary. Returns a NEW type (no mutation
+// of `T` — attaching to a shared builtin like `Int` never pollutes it). The
+// renderer is a `__renderFailure` meta-binding that `buildRefinedType` /
+// `buildInvariantedType` / `extend` copy forward, so a renderer on a base
+// model type is inherited by every constrained subtype.
+addBinding(typeMembers, "onFailure", makeMethodDescriptor("onFailure",
+  makePrimitive("Type.onFailure", (args) => {
+    return wrapType(buildFailureRendererType(args[0] as ContextValue, args[1]));
   })
 ));
 addBinding(Type, "__members", typeMembers);
