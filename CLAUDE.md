@@ -1,5 +1,14 @@
 # Allegro — Project Summary & Instructions
 
+## Documentation map (read first)
+
+- **Vision, thesis, design principles:** `docs/VISION.md` (Tier 0 — never edit without maintainer sign-off)
+- **Process, lifecycle, quality guidelines, agent rules:** `docs/PROCESS.md` (Tier 0)
+- **Durable design truth per area:** `docs/design/` (type system, effects, pattern matching, grammar)
+- **Plans:** `.claude/plans/` — read `README.md` (manifest) first
+- **What's next:** `BACKLOG.md`
+- This file is the session contract: build/run, architecture summary, invariants. It is being slimmed per the 2026-06 documentation refactor — history will move to `docs/CHANGELOG.md`.
+
 ## Build & Run
 
 ```bash

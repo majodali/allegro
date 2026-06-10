@@ -1,11 +1,8 @@
 ---
 name: feedback-update-claude-md
-description: Always update CLAUDE.md before every commit to keep it current
+description: PROMOTED — see docs/PROCESS.md §5 landing checklist and §7 (update the RIGHT doc per content type)
 type: feedback
 ---
-
-Update CLAUDE.md before every commit, not after. The user explicitly requested this.
-
-**Why:** CLAUDE.md is the primary reference for the project state. If it falls behind, future conversations start with stale context, leading to incorrect assumptions and wasted effort.
-
-**How to apply:** Before running `git commit`, check if any of these changed: file descriptions, test counts, syntax examples, architecture descriptions, "What's Next" items. Update CLAUDE.md as part of the same commit.
+**Promoted to `docs/PROCESS.md` §5/§7 (2026-06).** Docs update before every
+commit — but routed by content type: CHANGELOG for history, design docs for
+design deltas, BACKLOG for status, CLAUDE.md only for invariants/commands.
