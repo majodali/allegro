@@ -7,6 +7,7 @@ convention and will be renamed/archived during the documentation refactor.
 
 | Plan | Topic | Status | Notes |
 |---|---|---|---|
+| `structured-values-unification.md` | Unify MultiValue + Context records into one Structure primitive; channels; sealing | **draft (discussion)** | The pre-backlog design discussion; resolve base-language questions (B1–B8) first |
 | `project-1-planning-dsl-design.md` | Vivace pilot 1: planning DSL model + conventions | **active** | Current design target for `lib/planning.alg` |
 | `crystal-proving-curry.md` | Provability arc strategy (Phases A–J) | **active (roadmap)** | Design principles promoted to `docs/VISION.md` (2026-06); Phases A–C/E–H status historical; D2–D5, F6, I, J outline still the live roadmap |
 | `phase-h-plan.md` | PCP (Proof Collaboration Protocol) | landed (H1–H4b + bench) | Pending: H5 catalog, H6 multi-strategy, H7 effort budgets |
