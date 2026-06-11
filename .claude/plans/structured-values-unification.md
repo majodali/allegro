@@ -35,6 +35,10 @@ annotation channels extensible with declared propagation rules.
 | D14 | **Slot keys are symbol \| string \| number; channel keys are always namespaced symbols.** Symbols gain optional namespaces; type-defined member identifiers become symbols rather than strings. Resolves B1: one slot space, partitioned by key sort — user data (string/number keys) cannot collide with channels. `primary` is a channel symbol, so duck-typed transparency is safe. |
 | D15 | **MultiValue wrapper is flattened for structures**: channels attach directly. Scalar primaries (Bits etc.) use a *transparent structure* (empty data plane + `primary` channel) — same construct, not a distinct wrapper kind. |
 | D16 | Reading a potentially-unresolvable value is an **effect**, dischargeable by a **resolvability/completion proof** — the first productive proofs×effects interaction (supersedes the orthogonality memo's claim for this case). Program correctness may not depend on unresolvable values. |
+| D17 | A structure **cannot** have both data slots and a `primary` channel — transparent values have an empty data plane (closes B2). |
+| D18 | Arrays are **numeric-keyed structures** — no separate vector primitive (ratifies D9/B6). |
+| D19 | The unified construct is named **Structure** (closes B7). |
+| D20 | **Symbols are unique values tied to their registering Scope** — the registering scope IS the namespace. Scopes that register symbols can carry FQNs and/or descriptive names; FQNs are unique and default to the module file path. Symbols are the **existing Symbol value kind, redefined** to meet these needs (not a new kind). Syntax: bare name where unambiguous (`x.type`); `x[type]` requires `type` bound via import (disambiguates across namespaces); namespace-qualified via imported namespace (`x[allegretto.type]` vs `x[algebra.type]`). |
 
 ## Open questions — base language (resolve first)
 
@@ -42,38 +46,52 @@ annotation channels extensible with declared propagation rules.
   sorts: channels are namespaced symbols, data slots are string/number/symbol).
   Residual sub-questions moved to B9 (symbol semantics) and B10 (channel
   write control).
-- **B2. Transparency marker.** Largely resolved by D14+D15: `primary` is a
-  channel symbol, duck-typing safe. Remaining to ratify: can a structure have
-  both data slots and a primary? (Lean: no — transparent values have an empty
-  data plane.)
+- **B2. Transparency marker.** **RESOLVED by D17** — no structure has both
+  data slots and a primary.
 - **B3. Absence and incompleteness.** Core **RESOLVED by D11+D12**: structures
   always structurally complete; incompleteness is a future value in a slot;
   absent-optional = `none`; no operation throws on incompleteness. Remaining
-  async cluster split into B11–B13 (dedicated session).
-- **B4. Sealing primitive.** Shape of the base mechanism: seal-at-construction
-  bit + host-side brand; sealed ⇒ complete (no future-valued slots)? sealed ⇒
-  identity equality? Who can unseal (nobody)?
+  async cluster split into B11–B14 (dedicated session).
+- **B4. Sealing → immutability + brand (reframed).** Maintainer: sealing may
+  be nothing more than immutability; prefer general **immutability support**
+  — easy to adopt, define, detect, and obvious to users (all-values-immutable
+  preferred personally, but Allegro stays flexible). Claude's decomposition
+  proposal: seal = **immutability + constructor-authority brand**; the brand
+  half may fall out of B10's channel-write capabilities (you cannot forge
+  `type: Proof` without the type-channel writer), in which case no separate
+  `seal` op exists — base provides immutability + channel control only.
+  Verify against the forgery scenarios before adopting. Sub-questions:
+  - *Depth*: immutable values may reference only immutable values (deep
+    immutability — maintainer assumption, Claude agrees). O(1) construction
+    check via an immutable bit on referenced values.
+  - *Channel narrowing vs immutability*: see S9 / the knowledge-channel
+    split — narrowing must be flow-knowledge on derived references or
+    scope-held facts, never in-place channel mutation (in-place would make
+    observable channels depend on evaluation order — breaks confluence).
+  - *Identity equality* for branded immutables (interacts with S2).
 - **B5. Scope kind.** Scopes keep `Binding.isUse`, unresolved bindings,
   scopePredicates, parent layering. Name: **Scope** (proposed) vs keep
   Context. What of today's Context primitives (`ctx_*`) — do they target
   scopes, structures, or both?
-- **B6. Base array mechanism.** Ratify: numeric-keyed structures with
-  guaranteed O(1) indexed access in the host implementation (dense-elements
-  region); no separate vector primitive.
-- **B7. Name for the unified construct.** Candidates: **Structure**
-  (front-runner), Composite, Frame, Object, NamedTuple, StructuredValue.
-  Record vetoed (persistence connotation).
+- **B6. Base array mechanism.** **RESOLVED by D18** — numeric-keyed
+  structures, O(1) indexed host implementation, no vector primitive.
+- **B7. Name.** **RESOLVED by D19** — **Structure**. (Scope for the
+  evaluation construct still pending under B5.)
 - **B8. Minimal base surface.** Enumerate exactly what Allegretto must provide:
   structure construction/read, channel plane + propagation hook registration,
   sealing, scope ops. Everything else (typing, visibility, equality policy,
   collections) must be expressible as extensions — this is the layering proof.
-- **B9. Symbol value semantics** (new, from D14). Interning/identity rules;
-  namespace **ownership** (who may construct symbols in a namespace — likely
-  tied to the registering module/extension; unowned construction =
-  forgeability, reopening the collision/forgery risk); relationship to the
-  existing Symbol value kind (compile-time-resolved named *reference* / AST
-  node) — disentangle (new interned-identifier kind?) or unify carefully;
-  literal syntax for symbols and namespaced symbols.
+- **B9. Symbol value semantics.** Core **RESOLVED by D20** (scope-as-
+  namespace, FQNs, redefine the existing Symbol kind, bare/import/qualified
+  syntax). Ownership/forgeability is answered: symbols are *registered* in a
+  scope, not freely constructible into foreign namespaces. Residual design
+  work: the redefinition itself — today's Symbol is a compile-time-resolved
+  AST reference; the new Symbol is also a runtime unique value. Resolution
+  timing (when does a bare `type` in source bind to a registered symbol —
+  same lexical-scoping pass?), identity across re-evaluation/sessions,
+  serialization/printing of namespaced symbols, and the ambiguity rule for
+  bare names (error vs innermost-scope-wins when two imports register the
+  same simple name).
 - **B10. Channel write control** (new). How extensions get controlled access
   to channel functionality. Current lean: channel *registration* is a base op
   (symbol + propagation rule) returning a **writer capability**; writes
@@ -100,6 +118,22 @@ annotation channels extensible with declared propagation rules.
   future-of-future flattening ruling; per-slot read overhead (is-it-a-future
   check — PE/shapes can discharge statically when type known); memory
   retention of resolution machinery; equality on futures → residual per D11.
+- **B14. Async construction guard for immutables** (new, maintainer
+  proposal, lean: adopt). Conservative route: transparent incomplete slots
+  allowed only in **synchronous** construction (knot-tying within a pass);
+  in the async case the **constructor invocation is held as the residual**
+  — the immutable value never exists in incomplete state, so immutable
+  values contain no interior-mutating cells at all, and reading an immutable
+  value is never a blocking effect (blocking concentrates at the
+  construction guard — simplifies effect calculation). Known downsides to
+  weigh: (1) loss of partial access/pipelining — a 10-slot record with one
+  pending fetch makes all 10 slots wait; escape hatch: declare the slot
+  **explicitly `Future[T]`-typed** (the future IS the complete value; its
+  interior state is owned by future semantics, not the structure); (2)
+  mutually-referencing immutable structures across an async boundary become
+  unconstructible (sync knot-tying still works); (3) consumers shift from
+  reading-residuals to construction-residuals — roughly neutral churn.
+  Settle alongside B11–B13 in the async session.
 
 ## Open questions — Standard layer
 
@@ -140,7 +174,23 @@ annotation channels extensible with declared propagation rules.
   of the discharge: completion proofs remove the effect (like domain
   implication discharges refinement checks); declared liveness axioms for
   external sources (B11); what the undischarged residue looks like in
-  introspection/verdicts so it informs without drowning.
+  introspection/verdicts so it informs without drowning. (If B14 is adopted,
+  most of the noise vanishes structurally — reads of immutables never block.)
+- **S9. Imputed vs declared type** (new, maintainer note). The `type`
+  channel as used so far is the **imputed type** — always the same as or
+  narrower than the **declared type** (the shape/class definition), and
+  narrowable at each operation in an expression. The declared type must be
+  maintained separately because it carries member definitions (dispatch).
+  The imputed type overlaps in purpose with the `predicates` channel —
+  unify or distinguish, and disambiguate the two names. Claude's lean:
+  **declared type = the shape**, fixed at construction, part of value
+  identity, lives with the data plane (I1: the type IS the hidden class);
+  **imputed type + predicates unify into flow knowledge** — a monotonic
+  knowledge lattice (base-type bound + abstract domains + predicate set)
+  attached to *occurrences* (derived references / scope-held facts per B4),
+  excluded from value identity and equality. Naming candidates: declared →
+  `shape` or `class`; imputed+predicates → `knowledge` / `facts` /
+  `refinement`.
 
 ## Implementation questions (after design settles)
 
@@ -174,8 +224,10 @@ annotation channels extensible with declared propagation rules.
    layering proof; the unification must *shrink* the kind count, not grow it.
 6. **Interior mutation via futures** (D12/B13) — write-once cells are
    monotonic and confluent (single-assignment dataflow precedent), but they
-   are the first crack in pure immutability; keep the discipline explicit
-   and host-enforced.
+   are the first crack in pure immutability. **B14's construction guard, if
+   adopted, eliminates the crack for immutable values entirely** (immutables
+   never contain unresolved cells); the cell discipline then applies only to
+   mutable/transient values and the construction-residual machinery.
 7. **Unprovable liveness for async sources** — completion proofs for
    external events bottom out in declared axioms (B11); axioms must be
    visible in verdicts (a proof resting on "fetch eventually resolves" is
@@ -183,14 +235,19 @@ annotation channels extensible with declared propagation rules.
 
 ## Next steps
 
-1. Ratify D11–D16 (this round's resolutions: B1, B2-core, B3-core).
-2. Next base questions in queue: **B9 (symbol semantics) + B10 (channel
-   write control)** — they gate D14's soundness; then B4 (sealing shape),
-   B5–B8.
-3. Dedicated session: async cluster **B11–B13** (+S8) — deadlock,
-   resolvability proofs, liveness axioms, detection effects.
+1. Ratify D17–D20 follow-ons: the B4 sealing→immutability decomposition
+   (does the brand reduce to B10 channel capabilities?) and the S9
+   knowledge-channel split — both proposed by Claude this round, awaiting
+   maintainer review.
+2. Remaining base questions in queue: **B4 (immutability semantics)**,
+   B5 (Scope), B8 (minimal base surface), B10 (channel write control),
+   B9-residual (Symbol redefinition details).
+3. Dedicated session: async cluster **B11–B14** (+S8) — deadlock,
+   resolvability proofs, liveness axioms, detection effects, construction
+   guard ratification.
 4. Dedicated session: meta-types + equality (S1, S2) — feeds the
-   meta-protocol registry.
+   meta-protocol registry. S9 likely joins this session (identity/equality
+   must exclude knowledge channels).
 5. Parser design discussion (separate track, `docs/design/grammar.md` §2).
 6. Then: finalize BACKLOG rebuild; draft `docs/design/structures.md`;
    implementation plan with chunks per PROCESS §4.
