@@ -29,26 +29,27 @@ annotation channels extensible with declared propagation rules.
 | D8 | Equality is type-customizable, with declared laws; proofs record which equality they discharged under. Reference-equality-by-accident (the `proofValEqual` bug) is disallowed by design. |
 | D9 | Arrays: no refs-inside-Bits (Bits stays pure reference-free data). Direction: base numeric-keyed structures with O(1) indexed host implementation + Standard encapsulated collection types choosing representations (packed Bits for primitive elements, dense structure storage otherwise). To ratify (B6/S4). |
 | D10 | Functions keep returning annotated values: the return is a structure whose channels are populated per propagation rules. When the result is itself a structure, channels attach directly — no wrapper nesting. |
+| D11 | **No operation errors on an incomplete value.** Operations on unresolved values produce residuals ("blocking" always means residual production, never throw). Explicit incompleteness *detection* is a separate introspection surface and is itself effectful (B12). |
+| D12 | **Structures are always structurally complete.** Incompleteness is a value: an unresolved future occupying a slot, never a structure state. (Ratifies B3's core; downsides reviewed in B13 — headline: futures become write-once monotonic cells, confluent but interior-mutating.) |
+| D13 | `seal` on a structure containing unresolved future-valued slots: emit a **warning and invalidate any proofs derived from the seal**. (The residual-seal alternative — seal completes when slots resolve — would require proving resolved values are not causally downstream of the seal; no known use case, deferred.) |
+| D14 | **Slot keys are symbol \| string \| number; channel keys are always namespaced symbols.** Symbols gain optional namespaces; type-defined member identifiers become symbols rather than strings. Resolves B1: one slot space, partitioned by key sort — user data (string/number keys) cannot collide with channels. `primary` is a channel symbol, so duck-typed transparency is safe. |
+| D15 | **MultiValue wrapper is flattened for structures**: channels attach directly. Scalar primaries (Bits etc.) use a *transparent structure* (empty data plane + `primary` channel) — same construct, not a distinct wrapper kind. |
+| D16 | Reading a potentially-unresolvable value is an **effect**, dischargeable by a **resolvability/completion proof** — the first productive proofs×effects interaction (supersedes the orthogonality memo's claim for this case). Program correctness may not depend on unresolvable values. |
 
 ## Open questions — base language (resolve first)
 
-- **B1. Channel/data namespace.** One namespace (channels are slots; collision
-  hazards: user field named `type`, accidental transparency via a `primary`
-  key) vs **two planes in one construct** (data slots + annotation channels —
-  current lean) vs distinguished key values (symbol-like keys). DECIDE FIRST —
-  most other questions depend on it.
-- **B2. Transparency marker.** Presence of `primary` (duck) vs explicit flag.
-  If B1 = two planes, `primary` lives in the annotation plane and duck-typing
-  is safe. Interaction: can a structure have both data slots and a primary?
-  (Lean: no — transparent values have an empty data plane; ratify.)
-- **B3. Absence and incompleteness.** Proposed resolution to ratify:
-  structures are always structurally complete — a slot is present or absent;
-  *incompleteness is a value, not a structure state* (futures/unresolved as a
-  first-class value kind occupying slots, unifying scope forward-chaining
-  `__future_N` machinery). Absent-optional = `none`. Blocking-read semantics,
-  async-by-default visibility, and whether reading a future is an effect —
-  needs its own session (known: maintainer sees records completed over time,
-  sync and async; design must support that via slot-valued futures).
+- **B1. Channel/data namespace.** **RESOLVED by D14** (distinguished key
+  sorts: channels are namespaced symbols, data slots are string/number/symbol).
+  Residual sub-questions moved to B9 (symbol semantics) and B10 (channel
+  write control).
+- **B2. Transparency marker.** Largely resolved by D14+D15: `primary` is a
+  channel symbol, duck-typing safe. Remaining to ratify: can a structure have
+  both data slots and a primary? (Lean: no — transparent values have an empty
+  data plane.)
+- **B3. Absence and incompleteness.** Core **RESOLVED by D11+D12**: structures
+  always structurally complete; incompleteness is a future value in a slot;
+  absent-optional = `none`; no operation throws on incompleteness. Remaining
+  async cluster split into B11–B13 (dedicated session).
 - **B4. Sealing primitive.** Shape of the base mechanism: seal-at-construction
   bit + host-side brand; sealed ⇒ complete (no future-valued slots)? sealed ⇒
   identity equality? Who can unseal (nobody)?
@@ -66,6 +67,39 @@ annotation channels extensible with declared propagation rules.
   structure construction/read, channel plane + propagation hook registration,
   sealing, scope ops. Everything else (typing, visibility, equality policy,
   collections) must be expressible as extensions — this is the layering proof.
+- **B9. Symbol value semantics** (new, from D14). Interning/identity rules;
+  namespace **ownership** (who may construct symbols in a namespace — likely
+  tied to the registering module/extension; unowned construction =
+  forgeability, reopening the collision/forgery risk); relationship to the
+  existing Symbol value kind (compile-time-resolved named *reference* / AST
+  node) — disentangle (new interned-identifier kind?) or unify carefully;
+  literal syntax for symbols and namespaced symbols.
+- **B10. Channel write control** (new). How extensions get controlled access
+  to channel functionality. Current lean: channel *registration* is a base op
+  (symbol + propagation rule) returning a **writer capability**; writes
+  require the capability; reads are unrestricted (introspection/PCP need
+  them). Mechanism-in-base, policy-with-capability-holder — avoids both
+  free-for-all forgery and base-surface bloat from bespoke per-channel ops.
+  Alternative (all channel ops through base operations) on the table.
+- **B11. Completion semantics: sync vs async** (new, split from B3). The two
+  cases are distinct; nearly all concerns stem from **async**. Headline:
+  **deadlock — resolvability/completion must be provable.** Sync completion
+  (forward-chaining within a pass) is deterministic; deadlock = dependency
+  cycle, statically detectable. Async resolution depends on external events;
+  liveness needs declared assumptions (e.g. "fetch eventually resolves or
+  errors") as axioms feeding completion proofs. Possibly the most important
+  proof use case (D16). Needs the dedicated session.
+- **B12. Incompleteness detection** (new, split from B3). Use cases needing
+  to *observe* unresolvedness: non-blocking I/O, deadlock detection, effect
+  accounting. An `is_resolved`-style op's result depends on scheduling — it
+  breaks confluence/determinism, so it must itself be an effect. Enumerate
+  the use cases and the minimal detection surface.
+- **B13. Future value mechanics** (new, split from B3). Write-once monotonic
+  cell (interior mutation, but single-assignment ⇒ confluent — Oz/IVar
+  precedent) vs structure-replacement propagation (today's residual model);
+  future-of-future flattening ruling; per-slot read overhead (is-it-a-future
+  check — PE/shapes can discharge statically when type known); memory
+  retention of resolution machinery; equality on futures → residual per D11.
 
 ## Open questions — Standard layer
 
@@ -94,6 +128,19 @@ annotation channels extensible with declared propagation rules.
 - **S6. Channel registry.** Standard channel set (type, error, effects,
   predicates, source, warnings) with propagation rules; registration surface
   for extension channels; interaction with introspection and PCP verdicts.
+- **S7. Member-identifier namespace** (new, from D14). Type members become
+  symbol-keyed: which namespace do member names live in — per-type,
+  per-module, or a shared/global member namespace? Constraint: **structural
+  typing requires member names comparable across independently defined
+  types**, which argues for a shared namespace (per-type symbols would break
+  `__members`-comparison conformance). Dot-dispatch interning point; back
+  compat with string-keyed `typeMethod` lookups during migration.
+- **S8. Blocking-read effect ergonomics** (new, from D16). The effect fires
+  on any read of a potentially-unresolvable value — noisy by default. Shape
+  of the discharge: completion proofs remove the effect (like domain
+  implication discharges refinement checks); declared liveness axioms for
+  external sources (B11); what the undischarged residue looks like in
+  introspection/verdicts so it informs without drowning.
 
 ## Implementation questions (after design settles)
 
@@ -112,24 +159,38 @@ annotation channels extensible with declared propagation rules.
 ## Risks raised (with current mitigations)
 
 1. **Dataflow semantics leaking into structures** (records completed over
-   time) — mitigated by B3's "incompleteness is a value" proposal; needs the
-   dedicated absence/async session before ratification.
+   time) — contained by D12 (incompleteness is a value); residual risk is
+   the async cluster (deadlock/unresolvability), addressed by B11 + D16
+   (resolvability proofs).
 2. **Namespace collision under duck typing** (user `type` field vs type
-   channel; accidental `primary` transparency) — mitigated by B1 two-plane
-   lean.
+   channel; accidental `primary` transparency) — RESOLVED by D14 (key-sort
+   partition); residual risk is symbol-namespace **forgeability**, owned by
+   B9/B10 (ownership + writer capabilities).
 3. **Forgery through the base door** — if sealing were Standard-layer policy
    only, Allegretto code could forge Proofs; hence D4's mechanism-in-base.
 4. **Custom equality × proofs** — proofs must name their equality (S2), else
    `proof_trans` becomes unsound across equality views.
 5. **Base-simplicity erosion** — every addition to Allegretto must pass B8's
    layering proof; the unification must *shrink* the kind count, not grow it.
+6. **Interior mutation via futures** (D12/B13) — write-once cells are
+   monotonic and confluent (single-assignment dataflow precedent), but they
+   are the first crack in pure immutability; keep the discipline explicit
+   and host-enforced.
+7. **Unprovable liveness for async sources** — completion proofs for
+   external events bottom out in declared axioms (B11); axioms must be
+   visible in verdicts (a proof resting on "fetch eventually resolves" is
+   weaker than a closed proof and must say so).
 
 ## Next steps
 
-1. Resolve B1–B8 (base first, per maintainer direction), starting with B1.
-2. Dedicated session: absence/futures/async semantics (B3).
-3. Dedicated session: meta-types + equality (S1, S2) — feeds the
+1. Ratify D11–D16 (this round's resolutions: B1, B2-core, B3-core).
+2. Next base questions in queue: **B9 (symbol semantics) + B10 (channel
+   write control)** — they gate D14's soundness; then B4 (sealing shape),
+   B5–B8.
+3. Dedicated session: async cluster **B11–B13** (+S8) — deadlock,
+   resolvability proofs, liveness axioms, detection effects.
+4. Dedicated session: meta-types + equality (S1, S2) — feeds the
    meta-protocol registry.
-4. Parser design discussion (separate track, `docs/design/grammar.md` §2).
-5. Then: finalize BACKLOG rebuild; draft `docs/design/structures.md`;
+5. Parser design discussion (separate track, `docs/design/grammar.md` §2).
+6. Then: finalize BACKLOG rebuild; draft `docs/design/structures.md`;
    implementation plan with chunks per PROCESS §4.
