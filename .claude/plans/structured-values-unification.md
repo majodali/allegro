@@ -73,6 +73,16 @@ annotation channels extensible with declared propagation rules.
   scopePredicates, parent layering. Name: **Scope** (proposed) vs keep
   Context. What of today's Context primitives (`ctx_*`) — do they target
   scopes, structures, or both?
+  - *Current inventory* (src/primitives.ts §CONTEXT): `ctx_new`,
+    `ctx_bind` (copy-on-write add), `ctx_resolve` (throws on missing or
+    unbound), `ctx_bindings` (enumerate), `ctx_use` (declare a
+    name-without-value slot: `{value: undefined, isUse: true}`).
+  - *Finding*: `Binding.isUse` is near-vestigial — `ctx_use` is its only
+    producer and REPL carry-forward its only reader; everything that
+    matters (forward-chaining, unresolved scan, futures' `__future_N`
+    slots) keys off `value === undefined` instead. The pair is an ad-hoc
+    precursor of the **unresolved channel** concept — the rewrite should
+    subsume both into channel-resolution state rather than port them.
 - **B6. Base array mechanism.** **RESOLVED by D18** — numeric-keyed
   structures, O(1) indexed host implementation, no vector primitive.
 - **B7. Name.** **RESOLVED by D19** — **Structure**. (Scope for the
@@ -81,6 +91,10 @@ annotation channels extensible with declared propagation rules.
   structure construction/read, channel plane + propagation hook registration,
   sealing, scope ops. Everything else (typing, visibility, equality policy,
   collections) must be expressible as extensions — this is the layering proof.
+  Maintainer note: the rewrite's scale means **every existing primitive gets
+  re-evaluated** against the new model (keep / re-target to Structure or
+  Scope / subsume into channels / drop) — B8 should produce that full audit
+  table, not just the new-surface list.
 - **B9. Symbol value semantics.** Core **RESOLVED by D20** (scope-as-
   namespace, FQNs, redefine the existing Symbol kind, bare/import/qualified
   syntax). Ownership/forgeability is answered: symbols are *registered* in a
@@ -134,6 +148,25 @@ annotation channels extensible with declared propagation rules.
   unconstructible (sync knot-tying still works); (3) consumers shift from
   reading-residuals to construction-residuals — roughly neutral churn.
   Settle alongside B11–B13 in the async session.
+  **Maintainer caveat (adopted-with-reservation)**: downside (1) cuts
+  against the PE thesis — partial access is critical to it. Candidate
+  PE shortcuts (compiler sees through the construction guard and
+  residualizes `s.x` against the already-resolved channel) exist but
+  need a soundness analysis before adoption: the key hazard is that
+  construction-time invariant/refinement checks run AT the guard — a
+  partial read could observe a field of a structure that ultimately
+  fails its invariant and never exists. Tracked as **B15**.
+- **B15. Partial access under the construction guard** (new, from B14
+  reservation). Analyze PE shortcuts that recover pipelining on
+  under-construction immutables without reintroducing interior mutation.
+  Sketch: projecting an already-resolved channel out of a held
+  constructor is referentially sound *iff* the projection cannot be
+  observed when construction would fail — i.e. either (a) the structure
+  has no construction-time invariants (shape-only), provable statically,
+  or (b) the projected residual stays guarded (entangled with the
+  constructor's success), making it a proof obligation, not a semantics
+  change. Decide which shortcuts are admissible and what the kernel must
+  prove for each. Belongs to the async session alongside B11–B14.
 
 ## Open questions — Standard layer
 
@@ -242,9 +275,9 @@ annotation channels extensible with declared propagation rules.
 2. Remaining base questions in queue: **B4 (immutability semantics)**,
    B5 (Scope), B8 (minimal base surface), B10 (channel write control),
    B9-residual (Symbol redefinition details).
-3. Dedicated session: async cluster **B11–B14** (+S8) — deadlock,
+3. Dedicated session: async cluster **B11–B15** (+S8) — deadlock,
    resolvability proofs, liveness axioms, detection effects, construction
-   guard ratification.
+   guard ratification, partial-access PE shortcuts soundness.
 4. Dedicated session: meta-types + equality (S1, S2) — feeds the
    meta-protocol registry. S9 likely joins this session (identity/equality
    must exclude knowledge channels).
