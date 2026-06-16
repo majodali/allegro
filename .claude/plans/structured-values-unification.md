@@ -39,6 +39,9 @@ annotation channels extensible with declared propagation rules.
 | D18 | Arrays are **numeric-keyed structures** — no separate vector primitive (ratifies D9/B6). |
 | D19 | The unified construct is named **Structure** (closes B7). |
 | D20 | **Symbols are unique values tied to their registering Scope** — the registering scope IS the namespace. Scopes that register symbols can carry FQNs and/or descriptive names; FQNs are unique and default to the module file path. Symbols are the **existing Symbol value kind, redefined** to meet these needs (not a new kind). Syntax: bare name where unambiguous (`x.type`); `x[type]` requires `type` bound via import (disambiguates across namespaces); namespace-qualified via imported namespace (`x[allegretto.type]` vs `x[algebra.type]`). |
+| D21 | **No separate `seal` primitive.** The constructor-authority "brand" decomposes into (a) channel-write authority (B10/D23), (b) data-immutability (D22), and (c) non-fabricating propagation rules for integrity channels. Trust is **global and structural** — there is no per-value brand bit and no provenance tag; the base guarantees no one without the capability could have originated an integrity channel (memory-safety-style systemic guarantee). Channel→owner is static (from registration + D20 FQN) for audit. Verified against forgery scenarios A–F (proposition swap, channel copy, propagation fabrication, capability forgery). |
+| D22 | **Structures are immutable by default.** Integrity guarantees (D21) assume data-immutability — born-immutable, so immutability is a property, not a `seal` op. Mutable/transient values (future linear-types work) cannot carry integrity channels without first *finalizing* to immutable (the only seal-shaped operation, deferred with the mutability story). Deep immutability: immutable values reference only immutable values (O(1) construction check via an immutable bit) — trivial under default-immutable, load-bearing once mutability lands and under futures (B13/B14/Risk 6). |
+| D23 | **Channel writes are capability-gated; reads are free by default.** Registration is a base op `channel_register(symbol, propagation-rule, read-visibility?) → writer-capability`. **Origination** (setting a channel value from nothing) requires the capability; **propagation** (deriving result channels through operations per the registered rule) is automatic, performed by the evaluator, authority-free. **Constraint**: integrity-critical channels may only register **non-fabricating** propagation rules (`drop` or `computed`-with-recheck); `viral`/`union` on an authority channel is a forgery vector (scenario C). Read-visibility is a per-channel attribute (default public; read-gated/secret channels are S3 policy). **Open fork**: capability as a first-class **delegable token** (recommended — composable, supports tactic/PCP delegation, audited via D20) vs **scope-ambient** authority (the registering module may write; simpler, no threading, but authority = code location, not a passable value). |
 
 ## Open questions — base language (resolve first)
 
@@ -52,23 +55,25 @@ annotation channels extensible with declared propagation rules.
   always structurally complete; incompleteness is a future value in a slot;
   absent-optional = `none`; no operation throws on incompleteness. Remaining
   async cluster split into B11–B14 (dedicated session).
-- **B4. Sealing → immutability + brand (reframed).** Maintainer: sealing may
-  be nothing more than immutability; prefer general **immutability support**
-  — easy to adopt, define, detect, and obvious to users (all-values-immutable
-  preferred personally, but Allegro stays flexible). Claude's decomposition
-  proposal: seal = **immutability + constructor-authority brand**; the brand
-  half may fall out of B10's channel-write capabilities (you cannot forge
-  `type: Proof` without the type-channel writer), in which case no separate
-  `seal` op exists — base provides immutability + channel control only.
-  Verify against the forgery scenarios before adopting. Sub-questions:
+- **B4. Sealing → immutability + brand (reframed).** Core **RESOLVED by
+  D21+D22**: the brand reduces to B10 channel-write authority + data-
+  immutability + non-fabricating propagation rules; no separate `seal` op.
+  Verified against forgery scenarios A–F (see B10). Residual sub-questions:
   - *Depth*: immutable values may reference only immutable values (deep
-    immutability — maintainer assumption, Claude agrees). O(1) construction
-    check via an immutable bit on referenced values.
-  - *Channel narrowing vs immutability*: see S9 / the knowledge-channel
-    split — narrowing must be flow-knowledge on derived references or
-    scope-held facts, never in-place channel mutation (in-place would make
-    observable channels depend on evaluation order — breaks confluence).
-  - *Identity equality* for branded immutables (interacts with S2).
+    immutability). O(1) construction check via an immutable bit. Trivial
+    under D22's default-immutable; becomes load-bearing once mutability
+    lands and interacts with futures — under B14 immutables never reference
+    unresolved cells (clean); without B14 the referenced future is a
+    monotonic write-once cell (Risk 6).
+  - *Channel narrowing vs immutability*: **RESOLVED via S9** — narrowing is
+    knowledge-plane (derived references / scope-held facts, per
+    scopePredicates), never value mutation; consistent with immutability.
+    In-place narrowing would make observable channels depend on evaluation
+    order (breaks confluence) and is disallowed.
+  - *Identity equality* for branded immutables → **deferred to S2**:
+    structural-including-integrity-channels is sound (channels are
+    unforgeable, so structural equality can't admit a forged twin); identity
+    is an opt-in per type; never accidental reference equality (D8).
 - **B5. Scope kind.** Scopes keep `Binding.isUse`, unresolved bindings,
   scopePredicates, parent layering. Name: **Scope** (proposed) vs keep
   Context. What of today's Context primitives (`ctx_*`) — do they target
@@ -91,10 +96,10 @@ annotation channels extensible with declared propagation rules.
   structure construction/read, channel plane + propagation hook registration,
   sealing, scope ops. Everything else (typing, visibility, equality policy,
   collections) must be expressible as extensions — this is the layering proof.
-  Maintainer note: the rewrite's scale means **every existing primitive gets
-  re-evaluated** against the new model (keep / re-target to Structure or
-  Scope / subsume into channels / drop) — B8 should produce that full audit
-  table, not just the new-surface list.
+  **Maintainer note**: at this rewrite's scale, *every* existing primitive
+  needs re-evaluation against the new model — B8 should produce a full
+  audit table (keep / re-express as extension / subsume into channel ops /
+  delete), not just the new-surface list.
 - **B9. Symbol value semantics.** Core **RESOLVED by D20** (scope-as-
   namespace, FQNs, redefine the existing Symbol kind, bare/import/qualified
   syntax). Ownership/forgeability is answered: symbols are *registered* in a
@@ -106,13 +111,29 @@ annotation channels extensible with declared propagation rules.
   serialization/printing of namespaced symbols, and the ambiguity rule for
   bare names (error vs innermost-scope-wins when two imports register the
   same simple name).
-- **B10. Channel write control** (new). How extensions get controlled access
-  to channel functionality. Current lean: channel *registration* is a base op
-  (symbol + propagation rule) returning a **writer capability**; writes
-  require the capability; reads are unrestricted (introspection/PCP need
-  them). Mechanism-in-base, policy-with-capability-holder — avoids both
-  free-for-all forgery and base-surface bloat from bespoke per-channel ops.
-  Alternative (all channel ops through base operations) on the table.
+- **B10. Channel write control.** Core **RESOLVED by D23**: capability-gated
+  writes, free reads, registration returns a writer capability, origination
+  vs propagation split, non-fabricating-rule constraint for integrity
+  channels. Mechanism-in-base, policy-with-capability-holder. **Open fork**
+  (capability token vs scope-ambient authority) recorded on D23.
+  *Forgery-scenario log* (the verification D21 cites):
+  - **A** (forge `discharged` from nothing): blocked — `channel_write` needs
+    the capability, held privately by the proof kernel.
+  - **B** (swap a real proof's proposition, keep `discharged`): blocked —
+    data-immutability (D22). This is why write-authority alone is
+    insufficient; immutability is the second leg.
+  - **C** (combine a real proof with a fake operand hoping `discharged`
+    propagates): blocked iff the channel's propagation rule is non-fabricating
+    (`drop`/`computed`-recheck) — hence D23's constraint. A `viral`/`union`
+    rule here WOULD forge.
+  - **D** (read a real `discharged` value, write it onto a fake): blocked —
+    reads are free but the *write* still needs the capability. Confirms
+    read-freedom is safe.
+  - **E** (capability leaks): standard ocap risk; the base guarantees safety
+    *given* the holder keeps it private (S3 encapsulation). Assumption, not a
+    base flaw.
+  - **F** (forge the capability itself): blocked — capabilities are
+    unforgeable (host-opaque token, or scope-ambient identity).
 - **B11. Completion semantics: sync vs async** (new, split from B3). The two
   cases are distinct; nearly all concerns stem from **async**. Headline:
   **deadlock — resolvability/completion must be provable.** Sync completion
@@ -251,6 +272,10 @@ annotation channels extensible with declared propagation rules.
    B9/B10 (ownership + writer capabilities).
 3. **Forgery through the base door** — if sealing were Standard-layer policy
    only, Allegretto code could forge Proofs; hence D4's mechanism-in-base.
+   **RESOLVED by D21+D23**: integrity = capability-gated channel origination
+   + data-immutability + non-fabricating propagation; verified against
+   forgery scenarios A–F (B10). Residual: capability privacy (ocap, S3) and
+   the capability-token-vs-ambient fork (D23).
 4. **Custom equality × proofs** — proofs must name their equality (S2), else
    `proof_trans` becomes unsound across equality views.
 5. **Base-simplicity erosion** — every addition to Allegretto must pass B8's
@@ -268,13 +293,17 @@ annotation channels extensible with declared propagation rules.
 
 ## Next steps
 
-1. Ratify D17–D20 follow-ons: the B4 sealing→immutability decomposition
-   (does the brand reduce to B10 channel capabilities?) and the S9
-   knowledge-channel split — both proposed by Claude this round, awaiting
-   maintainer review.
-2. Remaining base questions in queue: **B4 (immutability semantics)**,
-   B5 (Scope), B8 (minimal base surface), B10 (channel write control),
-   B9-residual (Symbol redefinition details).
+1. Ratify the B4+B10 round (D21–D23): brand reduces to B10 (no `seal` op),
+   default-immutability, capability-gated channels. **Two items need an
+   explicit call**: (a) the capability-token-vs-scope-ambient fork (D23);
+   (b) **D13 is now obsolete** — it was framed around a `seal` op over
+   possibly-incomplete structures; under D21 (no seal op) + B14 (construction
+   guard) the scenario can't arise, so D13 should be retired or rewritten as
+   a construction-time warning. Plus the still-open S9 knowledge-channel split.
+2. Remaining base questions in queue: B5 (Scope), B8 (minimal base surface),
+   B9-residual (Symbol redefinition details). The B8 audit now has a concrete
+   channel surface to place: `channel_register` / `channel_write` /
+   `channel_read` + `immutable?` (D22/D23).
 3. Dedicated session: async cluster **B11–B15** (+S8) — deadlock,
    resolvability proofs, liveness axioms, detection effects, construction
    guard ratification, partial-access PE shortcuts soundness.
