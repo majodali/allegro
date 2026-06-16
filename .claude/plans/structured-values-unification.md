@@ -41,7 +41,8 @@ annotation channels extensible with declared propagation rules.
 | D20 | **Symbols are unique values tied to their registering Scope** — the registering scope IS the namespace. Scopes that register symbols can carry FQNs and/or descriptive names; FQNs are unique and default to the module file path. Symbols are the **existing Symbol value kind, redefined** to meet these needs (not a new kind). Syntax: bare name where unambiguous (`x.type`); `x[type]` requires `type` bound via import (disambiguates across namespaces); namespace-qualified via imported namespace (`x[allegretto.type]` vs `x[algebra.type]`). |
 | D21 | **No separate `seal` primitive.** The constructor-authority "brand" decomposes into (a) channel-write authority (B10/D23), (b) data-immutability (D22), and (c) non-fabricating propagation rules for integrity channels. Trust is **global and structural** — there is no per-value brand bit and no provenance tag; the base guarantees no one without the capability could have originated an integrity channel (memory-safety-style systemic guarantee). Channel→owner is static (from registration + D20 FQN) for audit. Verified against forgery scenarios A–F (proposition swap, channel copy, propagation fabrication, capability forgery). |
 | D22 | **Structures are immutable by default.** Integrity guarantees (D21) assume data-immutability — born-immutable, so immutability is a property, not a `seal` op. Mutable/transient values (future linear-types work) cannot carry integrity channels without first *finalizing* to immutable (the only seal-shaped operation, deferred with the mutability story). Deep immutability: immutable values reference only immutable values (O(1) construction check via an immutable bit) — trivial under default-immutable, load-bearing once mutability lands and under futures (B13/B14/Risk 6). |
-| D23 | **Channel writes are capability-gated; reads are free by default.** Registration is a base op `channel_register(symbol, propagation-rule, read-visibility?) → writer-capability`. **Origination** (setting a channel value from nothing) requires the capability; **propagation** (deriving result channels through operations per the registered rule) is automatic, performed by the evaluator, authority-free. **Constraint**: integrity-critical channels may only register **non-fabricating** propagation rules (`drop` or `computed`-with-recheck); `viral`/`union` on an authority channel is a forgery vector (scenario C). Read-visibility is a per-channel attribute (default public; read-gated/secret channels are S3 policy). **Open fork**: capability as a first-class **delegable token** (recommended — composable, supports tactic/PCP delegation, audited via D20) vs **scope-ambient** authority (the registering module may write; simpler, no threading, but authority = code location, not a passable value). |
+| D23 | **Channel writes are capability-gated; reads are free by default.** Registration is a base op `channel_register(symbol, propagation-rule, read-visibility?) → writer` returning the channel's write operation as a closure (D24); reads go through an unrestricted global `channel_read(symbol, value)`. **Origination** (setting a channel value from nothing) requires the writer; **propagation** (deriving result channels through operations per the registered rule) is automatic, performed by the evaluator, authority-free. **Constraint**: integrity-critical channels may only register **non-fabricating** propagation rules (`drop` or `computed`-with-recheck); `viral`/`union` on an authority channel is a forgery vector (scenario C). Read-visibility is a per-channel attribute (default public; read-gated/secret channels are S3 policy). **Capability shape RESOLVED by D24** (first-class delegable token, realized as a closure). |
+| D24 | **Capability shape: first-class delegable token, realized as a PrimitiveFunction closure.** `channel_register` returns the channel's *writer* — a closure over private authority (existing value kind #2, so **no new kind**; satisfies Risk 5). The closure IS the write op; there is no separate `channel_write` primitive. Reads use an unrestricted global `channel_read(symbol, value)`. **Attenuation** = wrap the writer in a re-checking closure (the proof kernel's canonical pattern: stamp `discharged` only after re-running `proof_check`); **delegation** = pass the closure. Chosen over scope-ambient authority because (i) authority is a *value*, hence provable in-language (thesis fit) and trackable in the PE dataflow graph (+ future D3 taint); (ii) it unifies with the D2 effect-capability roadmap (`net[host:port]` budgets are attenuated tokens) — one authority mechanism, not two; (iii) **change-cost asymmetry**: scope-ambient is recoverable as a usage pattern (a module captures its writer privately and never exports it → module-private write), so token→ambient is ~free, while ambient→token would be a base-API + call-site + re-audit break that D2 forces anyway. Obligations (all follow from PrimitiveFunction, but stated as soundness requirements because the PCP serialization boundary is load-bearing): writers are **non-serializable**, **print redacted**, **identity-equal only** (S2). Cross-process trust therefore bottoms out in **re-verification** (PCP hash-match), never transported authority. Two writers always exist in the TCB: the user-facing writer closure (origination) and the trusted evaluator core (rule-governed propagation, D23) — the core is privileged under any scheme. |
 
 ## Open questions — base language (resolve first)
 
@@ -93,9 +94,12 @@ annotation channels extensible with declared propagation rules.
 - **B7. Name.** **RESOLVED by D19** — **Structure**. (Scope for the
   evaluation construct still pending under B5.)
 - **B8. Minimal base surface.** Enumerate exactly what Allegretto must provide:
-  structure construction/read, channel plane + propagation hook registration,
-  sealing, scope ops. Everything else (typing, visibility, equality policy,
-  collections) must be expressible as extensions — this is the layering proof.
+  structure construction/read, channel plane (`channel_register → writer`
+  closure + propagation-rule hooks per D24, free `channel_read`), immutability
+  (D22), scope ops. No `seal` op (D21); no separate `channel_write` (the
+  registration-returned writer is the op, D24). Everything else (typing,
+  visibility, equality policy, collections) must be expressible as
+  extensions — this is the layering proof.
   **Maintainer note**: at this rewrite's scale, *every* existing primitive
   needs re-evaluation against the new model — B8 should produce a full
   audit table (keep / re-express as extension / subsume into channel ops /
@@ -114,11 +118,14 @@ annotation channels extensible with declared propagation rules.
 - **B10. Channel write control.** Core **RESOLVED by D23**: capability-gated
   writes, free reads, registration returns a writer capability, origination
   vs propagation split, non-fabricating-rule constraint for integrity
-  channels. Mechanism-in-base, policy-with-capability-holder. **Open fork**
-  (capability token vs scope-ambient authority) recorded on D23.
+  channels. Mechanism-in-base, policy-with-capability-holder. **Capability
+  shape RESOLVED by D24** — first-class delegable token realized as a
+  PrimitiveFunction closure (the registration-returned writer); scope-ambient
+  authority is recovered as a usage pattern (module captures its writer
+  privately and never exports it).
   *Forgery-scenario log* (the verification D21 cites):
-  - **A** (forge `discharged` from nothing): blocked — `channel_write` needs
-    the capability, held privately by the proof kernel.
+  - **A** (forge `discharged` from nothing): blocked — origination requires
+    the writer closure, held privately by the proof kernel.
   - **B** (swap a real proof's proposition, keep `discharged`): blocked —
     data-immutability (D22). This is why write-authority alone is
     insufficient; immutability is the second leg.
@@ -132,8 +139,8 @@ annotation channels extensible with declared propagation rules.
   - **E** (capability leaks): standard ocap risk; the base guarantees safety
     *given* the holder keeps it private (S3 encapsulation). Assumption, not a
     base flaw.
-  - **F** (forge the capability itself): blocked — capabilities are
-    unforgeable (host-opaque token, or scope-ambient identity).
+  - **F** (forge the capability itself): blocked — the writer is a
+    PrimitiveFunction closure (D24), unconstructible from Allegretto.
 - **B11. Completion semantics: sync vs async** (new, split from B3). The two
   cases are distinct; nearly all concerns stem from **async**. Headline:
   **deadlock — resolvability/completion must be provable.** Sync completion
@@ -201,7 +208,11 @@ annotation channels extensible with declared propagation rules.
   type-customizable `equals` with declared laws (reflexivity/symmetry/
   transitivity as dischargeable theorems); proof terms carry the equality
   they used; `proof_trans` requires matching equalities. Role of `~`:
-  re-purpose as selection of the structural-comparison view? |
+  re-purpose as selection of the structural-comparison view?
+  **Capability writers** (D24) are **identity-equal only** — never
+  structurally compared, never reference-equal-by-accident (D8) — so authority
+  cannot be reconstructed by building a structurally-equal value (moot for
+  opaque closures, but stated as a framework requirement). |
 - **S3. Visibility/access control.** Attribute set (public / internal-to-
   defining-extension / …); requires an ownership notion tied to the module
   system. Enforcement point: dispatch reads slot attributes (Standard);
@@ -274,8 +285,9 @@ annotation channels extensible with declared propagation rules.
    only, Allegretto code could forge Proofs; hence D4's mechanism-in-base.
    **RESOLVED by D21+D23**: integrity = capability-gated channel origination
    + data-immutability + non-fabricating propagation; verified against
-   forgery scenarios A–F (B10). Residual: capability privacy (ocap, S3) and
-   the capability-token-vs-ambient fork (D23).
+   forgery scenarios A–F (B10). Capability shape resolved (D24, delegable
+   closure). Residual: capability privacy (ocap, S3 — the owner must not
+   export its writer closure).
 4. **Custom equality × proofs** — proofs must name their equality (S2), else
    `proof_trans` becomes unsound across equality views.
 5. **Base-simplicity erosion** — every addition to Allegretto must pass B8's
@@ -293,17 +305,17 @@ annotation channels extensible with declared propagation rules.
 
 ## Next steps
 
-1. Ratify the B4+B10 round (D21–D23): brand reduces to B10 (no `seal` op),
-   default-immutability, capability-gated channels. **Two items need an
-   explicit call**: (a) the capability-token-vs-scope-ambient fork (D23);
-   (b) **D13 is now obsolete** — it was framed around a `seal` op over
-   possibly-incomplete structures; under D21 (no seal op) + B14 (construction
-   guard) the scenario can't arise, so D13 should be retired or rewritten as
-   a construction-time warning. Plus the still-open S9 knowledge-channel split.
+1. Ratify the B4+B10 round (D21–D24): brand reduces to B10 (no `seal` op),
+   default-immutability, capability-gated channels, capability = delegable
+   closure (D24). **Remaining explicit call**: **D13 is now obsolete** — it
+   was framed around a `seal` op over possibly-incomplete structures; under
+   D21 (no seal op) + B14 (construction guard) the scenario can't arise, so
+   D13 should be retired or rewritten as a construction-time warning. Plus the
+   still-open S9 knowledge-channel split.
 2. Remaining base questions in queue: B5 (Scope), B8 (minimal base surface),
    B9-residual (Symbol redefinition details). The B8 audit now has a concrete
-   channel surface to place: `channel_register` / `channel_write` /
-   `channel_read` + `immutable?` (D22/D23).
+   channel surface to place: `channel_register` (→ writer closure) /
+   `channel_read` + `immutable?` (D22/D24).
 3. Dedicated session: async cluster **B11–B15** (+S8) — deadlock,
    resolvability proofs, liveness axioms, detection effects, construction
    guard ratification, partial-access PE shortcuts soundness.
