@@ -31,7 +31,7 @@ annotation channels extensible with declared propagation rules.
 | D10 | Functions keep returning annotated values: the return is a structure whose channels are populated per propagation rules. When the result is itself a structure, channels attach directly — no wrapper nesting. |
 | D11 | **No operation errors on an incomplete value.** Operations on unresolved values produce residuals ("blocking" always means residual production, never throw). Explicit incompleteness *detection* is a separate introspection surface and is itself effectful (B12). |
 | D12 | **Structures are always structurally complete.** Incompleteness is a value: an unresolved future occupying a slot, never a structure state. (Ratifies B3's core; downsides reviewed in B13 — headline: futures become write-once monotonic cells, confluent but interior-mutating.) |
-| D13 | `seal` on a structure containing unresolved future-valued slots: emit a **warning and invalidate any proofs derived from the seal**. (The residual-seal alternative — seal completes when slots resolve — would require proving resolved values are not causally downstream of the seal; no known use case, deferred.) |
+| D13 | **RETIRED** (2026-06). The `seal` op was only ever discussed conceptually; D21 removed it (integrity = capability-gated channel origination + data-immutability, no seal primitive). The original concern — sealing a structure with unresolved future slots — cannot arise: under D21 there is no seal op, and under B14's construction guard immutables never contain unresolved cells. Any residual "freeze a transient" need is folded into the deferred transient→immutable finalization (D22). |
 | D14 | **Slot keys are symbol \| string \| number; channel keys are always namespaced symbols.** Symbols gain optional namespaces; type-defined member identifiers become symbols rather than strings. Resolves B1: one slot space, partitioned by key sort — user data (string/number keys) cannot collide with channels. `primary` is a channel symbol, so duck-typed transparency is safe. |
 | D15 | **MultiValue wrapper is flattened for structures**: channels attach directly. Scalar primaries (Bits etc.) use a *transparent structure* (empty data plane + `primary` channel) — same construct, not a distinct wrapper kind. |
 | D16 | Reading a potentially-unresolvable value is an **effect**, dischargeable by a **resolvability/completion proof** — the first productive proofs×effects interaction (supersedes the orthogonality memo's claim for this case). Program correctness may not depend on unresolvable values. |
@@ -43,6 +43,8 @@ annotation channels extensible with declared propagation rules.
 | D22 | **Structures are immutable by default.** Integrity guarantees (D21) assume data-immutability — born-immutable, so immutability is a property, not a `seal` op. Mutable/transient values (future linear-types work) cannot carry integrity channels without first *finalizing* to immutable (the only seal-shaped operation, deferred with the mutability story). Deep immutability: immutable values reference only immutable values (O(1) construction check via an immutable bit) — trivial under default-immutable, load-bearing once mutability lands and under futures (B13/B14/Risk 6). |
 | D23 | **Channel writes are capability-gated; reads are free by default.** Registration is a base op `channel_register(symbol, propagation-rule, read-visibility?) → writer` returning the channel's write operation as a closure (D24); reads go through an unrestricted global `channel_read(symbol, value)`. **Origination** (setting a channel value from nothing) requires the writer; **propagation** (deriving result channels through operations per the registered rule) is automatic, performed by the evaluator, authority-free. **Constraint**: integrity-critical channels may only register **non-fabricating** propagation rules (`drop` or `computed`-with-recheck); `viral`/`union` on an authority channel is a forgery vector (scenario C). Read-visibility is a per-channel attribute (default public; read-gated/secret channels are S3 policy). **Capability shape RESOLVED by D24** (first-class delegable token, realized as a closure). |
 | D24 | **Capability shape: first-class delegable token, realized as a PrimitiveFunction closure.** `channel_register` returns the channel's *writer* — a closure over private authority (existing value kind #2, so **no new kind**; satisfies Risk 5). The closure IS the write op; there is no separate `channel_write` primitive. Reads use an unrestricted global `channel_read(symbol, value)`. **Attenuation** = wrap the writer in a re-checking closure (the proof kernel's canonical pattern: stamp `discharged` only after re-running `proof_check`); **delegation** = pass the closure. Chosen over scope-ambient authority because (i) authority is a *value*, hence provable in-language (thesis fit) and trackable in the PE dataflow graph (+ future D3 taint); (ii) it unifies with the D2 effect-capability roadmap (`net[host:port]` budgets are attenuated tokens) — one authority mechanism, not two; (iii) **change-cost asymmetry**: scope-ambient is recoverable as a usage pattern (a module captures its writer privately and never exports it → module-private write), so token→ambient is ~free, while ambient→token would be a base-API + call-site + re-audit break that D2 forces anyway. Obligations (all follow from PrimitiveFunction, but stated as soundness requirements because the PCP serialization boundary is load-bearing): writers are **non-serializable**, **print redacted**, **identity-equal only** (S2). Cross-process trust therefore bottoms out in **re-verification** (PCP hash-match), never transported authority. Two writers always exist in the TCB: the user-facing writer closure (origination) and the trusted evaluator core (rule-governed propagation, D23) — the core is privileged under any scheme. |
+| D25 | **Scope** is the evaluation-environment role of today's Context (D1's split): name→value bindings, lexical **parent-chain layering**, the unresolved-binding / forward-chaining substrate, and a scope-held **facts plane** (S9 knowledge applied to names). It shares the slot+channel substrate with Structure but is a **distinct role** with its own operations — resolution-through-parent, forward-chaining, and fact layering are scope behaviours with no meaning on data Structures, and the separation stops an evaluation environment being mistaken for user data (no type-dispatch on `scope.x`). The `Context` kind-name is retired: record-role → Structure (D1/D15), scope-role → Scope. Whether Scope is literally a Structure tagged with a `scope` channel or a thin distinct kind is an I-level call; the design commitment is *shared substrate + distinct protocol*. Kind count does not grow (Context + MultiValue → Structure + Scope; 3 roles → 2). |
+| D26 | **Scope op surface + `ctx_*` disposition.** `scope_new(parent?)` (refactor `ctx_new` — explicit parent enables a real chain vs today's O(n) flatten-copy); `scope_extend(scope, name, value) → scope'` (refactor `ctx_bind` — O(1) immutable layer, not a whole-map copy); `scope_lookup(scope, name)` (refactor `ctx_resolve` — walk the chain; bound → value with merged facts; **unresolved → residual, never throw** per D11; a genuinely-absent name is a compile-time lexical-resolution error per D20, not a runtime throw); `scope_bindings(scope)` (keep `ctx_bindings` — introspection / REPL / module export; own slots by default). **RETIRE `ctx_use` and the `Binding.isUse` flag** — an unresolved binding is a slot holding an **unresolved future cell** (D12/B13), so the `isUse` / `value === undefined` duality collapses to one representation; the REPL carry-forward (isUse's only reader) keys off cell-resolved-state. New `scope_assume(scope, name, predicate) → scope'` replaces the in-place `scopePredicates` mutation: the **facts plane is immutable-layered** — branch-then / assert / requires push a *child scope* carrying the fact and discard it on exit (no mutate-and-pop), which is exactly S9's monotonic knowledge attached to occurrences. The evaluator's internal Symbol resolution (already residualises on unresolved + merges scopePredicates) and the reflective `scope_*` primitives now share **one** resolution semantics, not the current two divergent paths (evaluator residualises; `ctx_resolve` throws). |
 
 ## Open questions — base language (resolve first)
 
@@ -75,20 +77,35 @@ annotation channels extensible with declared propagation rules.
     structural-including-integrity-channels is sound (channels are
     unforgeable, so structural equality can't admit a forged twin); identity
     is an opt-in per type; never accidental reference equality (D8).
-- **B5. Scope kind.** Scopes keep `Binding.isUse`, unresolved bindings,
-  scopePredicates, parent layering. Name: **Scope** (proposed) vs keep
-  Context. What of today's Context primitives (`ctx_*`) — do they target
-  scopes, structures, or both?
+- **B5. Scope kind.** **RESOLVED by D25+D26** — name **Scope**; the
+  evaluation-environment role of Context, shared substrate with Structure,
+  distinct protocol; op surface refactors `ctx_new/bind/resolve/bindings`,
+  retires `ctx_use` + `isUse`, adds `scope_assume`.
   - *Current inventory* (src/primitives.ts §CONTEXT): `ctx_new`,
     `ctx_bind` (copy-on-write add), `ctx_resolve` (throws on missing or
     unbound), `ctx_bindings` (enumerate), `ctx_use` (declare a
     name-without-value slot: `{value: undefined, isUse: true}`).
-  - *Finding*: `Binding.isUse` is near-vestigial — `ctx_use` is its only
-    producer and REPL carry-forward its only reader; everything that
-    matters (forward-chaining, unresolved scan, futures' `__future_N`
-    slots) keys off `value === undefined` instead. The pair is an ad-hoc
-    precursor of the **unresolved channel** concept — the rewrite should
-    subsume both into channel-resolution state rather than port them.
+  - *Findings (validated against the code, 2026-06)*:
+    - `Binding.isUse` is vestigial — only `ctx_use` produces it (primitives.ts),
+      only REPL carry-forward (runtime.ts) reads it. **Retired** (D26); an
+      unresolved binding becomes a slot holding an unresolved future cell
+      (D12/B13), unifying with futures' `__future_N` slots and the
+      forward-chaining unresolved scan.
+    - **No parent pointer exists today.** `ContextValue` carries only
+      `bindings` / `bindingList` / `scopePredicates`; lexical layering is done
+      by **flatten-copying** primitives + extensions + source into one flat
+      map (runtime.ts), and `ctx_bind` / `ctx_use` copy the whole map per add
+      (O(n)). The "parent layering" was aspirational — D25 commits to a real
+      parent chain, which the immutable facts plane *requires* (flatten-copy
+      can't represent discard-on-branch-exit).
+    - **Two resolution paths exist.** The evaluator's Symbol case
+      (evaluator.ts) already does D11 — unresolved → residual + records the
+      incomplete dependency — and merges `scopePredicates`; the `ctx_resolve`
+      primitive instead **throws** on missing/unbound. D26 unifies them on the
+      evaluator's (residualising) semantics.
+    - `scopePredicates` is **mutated in place** (`(ctx as any).scopePredicates
+      = new Map()`, branch/assert push-and-pop). D26 replaces this with
+      immutable child-scope layering — the S9 knowledge plane.
 - **B6. Base array mechanism.** **RESOLVED by D18** — numeric-keyed
   structures, O(1) indexed host implementation, no vector primitive.
 - **B7. Name.** **RESOLVED by D19** — **Structure**. (Scope for the
@@ -312,10 +329,11 @@ annotation channels extensible with declared propagation rules.
    D21 (no seal op) + B14 (construction guard) the scenario can't arise, so
    D13 should be retired or rewritten as a construction-time warning. Plus the
    still-open S9 knowledge-channel split.
-2. Remaining base questions in queue: B5 (Scope), B8 (minimal base surface),
-   B9-residual (Symbol redefinition details). The B8 audit now has a concrete
-   channel surface to place: `channel_register` (→ writer closure) /
-   `channel_read` + `immutable?` (D22/D24).
+2. Remaining base questions in queue: B8 (minimal base surface), B9-residual
+   (Symbol redefinition details — feeds whether Scope keys are symbols per D20).
+   The B8 audit now has a concrete surface to place: `channel_register`
+   (→ writer closure) / `channel_read` + `immutable?` (D22/D24); `scope_new` /
+   `scope_extend` / `scope_lookup` / `scope_bindings` / `scope_assume` (D26).
 3. Dedicated session: async cluster **B11–B15** (+S8) — deadlock,
    resolvability proofs, liveness axioms, detection effects, construction
    guard ratification, partial-access PE shortcuts soundness.
