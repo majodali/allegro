@@ -45,6 +45,8 @@ annotation channels extensible with declared propagation rules.
 | D24 | **Capability shape: first-class delegable token, realized as a PrimitiveFunction closure.** `channel_register` returns the channel's *writer* — a closure over private authority (existing value kind #2, so **no new kind**; satisfies Risk 5). The closure IS the write op; there is no separate `channel_write` primitive. Reads use an unrestricted global `channel_read(symbol, value)`. **Attenuation** = wrap the writer in a re-checking closure (the proof kernel's canonical pattern: stamp `discharged` only after re-running `proof_check`); **delegation** = pass the closure. Chosen over scope-ambient authority because (i) authority is a *value*, hence provable in-language (thesis fit) and trackable in the PE dataflow graph (+ future D3 taint); (ii) it unifies with the D2 effect-capability roadmap (`net[host:port]` budgets are attenuated tokens) — one authority mechanism, not two; (iii) **change-cost asymmetry**: scope-ambient is recoverable as a usage pattern (a module captures its writer privately and never exports it → module-private write), so token→ambient is ~free, while ambient→token would be a base-API + call-site + re-audit break that D2 forces anyway. Obligations (all follow from PrimitiveFunction, but stated as soundness requirements because the PCP serialization boundary is load-bearing): writers are **non-serializable**, **print redacted**, **identity-equal only** (S2). Cross-process trust therefore bottoms out in **re-verification** (PCP hash-match), never transported authority. Two writers always exist in the TCB: the user-facing writer closure (origination) and the trusted evaluator core (rule-governed propagation, D23) — the core is privileged under any scheme. |
 | D25 | **Scope** is the evaluation-environment role of today's Context (D1's split): name→value bindings, lexical **parent-chain layering**, the unresolved-binding / forward-chaining substrate, and a scope-held **facts plane** (S9 knowledge applied to names). It shares the slot+channel substrate with Structure but is a **distinct role** with its own operations — resolution-through-parent, forward-chaining, and fact layering are scope behaviours with no meaning on data Structures, and the separation stops an evaluation environment being mistaken for user data (no type-dispatch on `scope.x`). The `Context` kind-name is retired: record-role → Structure (D1/D15), scope-role → Scope. Whether Scope is literally a Structure tagged with a `scope` channel or a thin distinct kind is an I-level call; the design commitment is *shared substrate + distinct protocol*. Kind count does not grow (Context + MultiValue → Structure + Scope; 3 roles → 2). |
 | D26 | **Scope op surface + `ctx_*` disposition.** `scope_new(parent?)` (refactor `ctx_new` — explicit parent enables a real chain vs today's O(n) flatten-copy); `scope_extend(scope, name, value) → scope'` (refactor `ctx_bind` — O(1) immutable layer, not a whole-map copy); `scope_lookup(scope, name)` (refactor `ctx_resolve` — walk the chain; bound → value with merged facts; **unresolved → residual, never throw** per D11; a genuinely-absent name is a compile-time lexical-resolution error per D20, not a runtime throw); `scope_bindings(scope)` (keep `ctx_bindings` — introspection / REPL / module export; own slots by default). **RETIRE `ctx_use` and the `Binding.isUse` flag** — an unresolved binding is a slot holding an **unresolved future cell** (D12/B13), so the `isUse` / `value === undefined` duality collapses to one representation; the REPL carry-forward (isUse's only reader) keys off cell-resolved-state. New `scope_assume(scope, name, predicate) → scope'` replaces the in-place `scopePredicates` mutation: the **facts plane is immutable-layered** — branch-then / assert / requires push a *child scope* carrying the fact and discard it on exit (no mutate-and-pop), which is exactly S9's monotonic knowledge attached to occurrences. The evaluator's internal Symbol resolution (already residualises on unresolved + merges scopePredicates) and the reflective `scope_*` primitives now share **one** resolution semantics, not the current two divergent paths (evaluator residualises; `ctx_resolve` throws). |
+| D27 | **Minimal base surface (the layering proof).** Allegretto's irreducible base is ~40 primitives in five groups: **Bits** (arithmetic / comparison / bit-ops / encoding — `bits_*`); **Expression** (DAG construct / introspect / eval — `expr_*`); **Structure** (`struct_new`, `struct_get(key)`, `struct_with` CoW-derive, `struct_slots`; transparent/scalar values via the `primary` channel per D15/D17); **Channel plane** (`channel_register(symbol, rule, read_vis?) → writer` per D24, free `channel_read`, evaluator-applied propagation); **Scope** (`scope_new/extend/lookup/bindings/assume` per D26); plus core control (`eval_if`, `seq`, `id`), `Param`/`Symbol`, and immutability (`immutable?`). **Everything else now in `src/primitives.ts` is NOT base**: the entire type system, logical ops, proofs, refinements, effects, contracts, totality, the grammar-tooling primitives, and IO (`print`/`fetch`/`delay`) are Standard-layer extensions or environment-provided capabilities. The unification therefore doesn't just merge value kinds — it **relocates the type system and the whole provability stack out of the base**, which is the layering proof B8 demanded. Validates Risk 5: the base shrinks from well over 100 registered primitives to ~40. |
+| D28 | **Subsumption mechanics for the audit.** (a) `mv_*` + `component_get` → channel/slot ops: `mv_primary`/`mv_get`/`component_get` → `channel_read`; `mv_set` → `channel_write` (now capability-checked); `mv_components` → channel enumeration (free). (b) `make_error` → `channel_write` on the **error channel** — a *public-writer* channel (no capability) whose **viral** propagation rule reproduces today's automatic error propagation. (c) The entire **`*_attach` passthrough family** (`effects_attach`, `partial_attach`, `decreases_attach`, `proven_attach`, `param_effects_attach`, and the transparent `seq`/`type_check` forwarding) **collapses into `channel_write`** on the relevant channel (effects / predicates / totality); the matching `*_decl_marker` parse helpers move to the grammar/extension layer. (d) Channels span **gated** (integrity: `discharged` owned by the proof kernel, `type` owned by the type-system extension) and **public** (error, warnings, source) — one mechanism (you need the writer), and policy is whether the owner exports it (D23/D24). **Finding**: the pervasive "registered lazy so it receives un-`primaryOf`'d args" workaround on every proof/typed primitive is a direct symptom of the D3 stripping asymmetry — per-channel propagation (D3/D15) removes the need, so the proof kernel and typed ops drop the lazy hack. |
 
 ## Open questions — base language (resolve first)
 
@@ -110,17 +112,41 @@ annotation channels extensible with declared propagation rules.
   structures, O(1) indexed host implementation, no vector primitive.
 - **B7. Name.** **RESOLVED by D19** — **Structure**. (Scope for the
   evaluation construct still pending under B5.)
-- **B8. Minimal base surface.** Enumerate exactly what Allegretto must provide:
-  structure construction/read, channel plane (`channel_register → writer`
-  closure + propagation-rule hooks per D24, free `channel_read`), immutability
-  (D22), scope ops. No `seal` op (D21); no separate `channel_write` (the
-  registration-returned writer is the op, D24). Everything else (typing,
-  visibility, equality policy, collections) must be expressible as
-  extensions — this is the layering proof.
-  **Maintainer note**: at this rewrite's scale, *every* existing primitive
-  needs re-evaluation against the new model — B8 should produce a full
-  audit table (keep / re-express as extension / subsume into channel ops /
-  delete), not just the new-surface list.
+- **B8. Minimal base surface.** **RESOLVED by D27+D28.** The base is the ~40
+  primitives D27 enumerates; the full re-evaluation of every registered
+  primitive (the maintainer-requested audit) follows. Disposition legend:
+  **KEEP** (base), **REFACTOR** (base, reshaped per a Scope/Structure
+  decision), **SUBSUME** (folds into channel/slot ops), **EXTENSION**
+  (Standard-layer or grammar/module lib), **ENV** (environment-provided
+  capability), **DELETE**.
+
+  | Current primitives | Disposition | Target |
+  |---|---|---|
+  | `bits_*` (21: new/length/get/set/slice/concat, and/or/xor/not, eq/neq, add/sub/mul/div/mod, lt/gt/lte/gte) | KEEP | base Bits ops |
+  | `expr_*` (8: apply/fn/args/arg/argc/param/function/eval) | KEEP | base Expression ops |
+  | `eval_if`, `seq`, `id` | KEEP | base control / util |
+  | `ctx_new/bind/resolve/bindings` | REFACTOR | `scope_new/extend/lookup/bindings` (D26) |
+  | `ctx_use` | DELETE | unresolved = future-cell slot (D26) |
+  | `mv_new/primary/get/set/components`, `component_get` | SUBSUME | `channel_read` / `channel_write` / channel-enum (D28a) |
+  | `make_error` | SUBSUME | `channel_write` on the public, viral error channel (D28b) |
+  | `eval_when`, `when_wildcard`, `when_struct_destruct`, `when_no_match` | EXTENSION | pattern-matching lib over `eval_if` + struct reads (judgment call — could stay base control) |
+  | `when_type_destruct` | EXTENSION | needs the Standard `type` channel |
+  | `typed_int/string/float/bool/array/object/function`, `typed_add..gte`, `typed_and/amp/or/not` | EXTENSION | Standard type system (owns the gated `type` channel) |
+  | `type_dispatch/of/check/instanceof/subtypeof/apply/function/union/refine`, `structural_wrap`, `type_check_binding` | EXTENSION | Standard type system |
+  | `export` | EXTENSION | module system |
+  | `assert_invariant`, `assume_invariant`, `assert_stmt`, `requires_stmt`, `ensures_decl/check` | EXTENSION | contracts/invariants lib; checks become predicate-channel writes + `scope_assume` |
+  | `*_decl_marker` + `*_attach` (effects / param_effects / partial / decreases / proven) | SUBSUME / EXTENSION | `*_attach` → `channel_write` (D28c); `*_decl_marker` → grammar templates |
+  | `proof_by_eval/refines/refl/sym/trans/cong/check`, `prove_for_all_bool/induction` | EXTENSION | proof kernel (canonical `discharged`-writer holder); drops the lazy hack (D28 finding) |
+  | `grammar_*`, `grammar2*` (bundle), `register_*`, `grammar_fragment_*`, `grammar_rule_*`, `grammar_combine/override/without` | EXTENSION | grammar-tooling lib (engine stays host code) |
+  | `print` (io), `fetch` (net), `delay` (time) | ENV | environment capabilities, effect-labelled |
+
+  *Findings*: (1) the type system, proofs, effects, contracts, and totality —
+  the bulk of `primitives.ts` — are all EXTENSION, confirming D4's
+  mechanism-in-base / policy-in-extensions line concretely. (2) The `*_attach`
+  zoo exists only to smuggle metadata through the `primaryOf`-stripping
+  evaluator; channels delete the whole family (D28c). (3) IO is not base —
+  `print`/`fetch`/`delay` are environment capabilities, which is why they carry
+  effect labels.
 - **B9. Symbol value semantics.** Core **RESOLVED by D20** (scope-as-
   namespace, FQNs, redefine the existing Symbol kind, bare/import/qualified
   syntax). Ownership/forgeability is answered: symbols are *registered* in a
@@ -329,11 +355,12 @@ annotation channels extensible with declared propagation rules.
    D21 (no seal op) + B14 (construction guard) the scenario can't arise, so
    D13 should be retired or rewritten as a construction-time warning. Plus the
    still-open S9 knowledge-channel split.
-2. Remaining base questions in queue: B8 (minimal base surface), B9-residual
-   (Symbol redefinition details — feeds whether Scope keys are symbols per D20).
-   The B8 audit now has a concrete surface to place: `channel_register`
-   (→ writer closure) / `channel_read` + `immutable?` (D22/D24); `scope_new` /
-   `scope_extend` / `scope_lookup` / `scope_bindings` / `scope_assume` (D26).
+2. Remaining base question in queue: B9-residual (Symbol redefinition
+   details — resolution timing, identity across sessions, and whether Scope
+   keys become symbols per D20). With B8 resolved (D27/D28) the base surface is
+   fully enumerated and the type/proof/effect stack is confirmed
+   extension-layer; the **synchronous base design is essentially complete** —
+   only the async cluster (B11–B15) and B9-residual remain.
 3. Dedicated session: async cluster **B11–B15** (+S8) — deadlock,
    resolvability proofs, liveness axioms, detection effects, construction
    guard ratification, partial-access PE shortcuts soundness.
