@@ -47,6 +47,8 @@ annotation channels extensible with declared propagation rules.
 | D26 | **Scope op surface + `ctx_*` disposition.** `scope_new(parent?)` (refactor `ctx_new` — explicit parent enables a real chain vs today's O(n) flatten-copy); `scope_extend(scope, name, value) → scope'` (refactor `ctx_bind` — O(1) immutable layer, not a whole-map copy); `scope_lookup(scope, name)` (refactor `ctx_resolve` — walk the chain; bound → value with merged facts; **unresolved → residual, never throw** per D11; a genuinely-absent name is a compile-time lexical-resolution error per D20, not a runtime throw); `scope_bindings(scope)` (keep `ctx_bindings` — introspection / REPL / module export; own slots by default). **RETIRE `ctx_use` and the `Binding.isUse` flag** — an unresolved binding is a slot holding an **unresolved future cell** (D12/B13), so the `isUse` / `value === undefined` duality collapses to one representation; the REPL carry-forward (isUse's only reader) keys off cell-resolved-state. New `scope_assume(scope, name, predicate) → scope'` replaces the in-place `scopePredicates` mutation: the **facts plane is immutable-layered** — branch-then / assert / requires push a *child scope* carrying the fact and discard it on exit (no mutate-and-pop), which is exactly S9's monotonic knowledge attached to occurrences. The evaluator's internal Symbol resolution (already residualises on unresolved + merges scopePredicates) and the reflective `scope_*` primitives now share **one** resolution semantics, not the current two divergent paths (evaluator residualises; `ctx_resolve` throws). |
 | D27 | **Minimal base surface (the layering proof).** Allegretto's irreducible base is ~40 primitives in five groups: **Bits** (arithmetic / comparison / bit-ops / encoding — `bits_*`); **Expression** (DAG construct / introspect / eval — `expr_*`); **Structure** (`struct_new`, `struct_get(key)`, `struct_with` CoW-derive, `struct_slots`; transparent/scalar values via the `primary` channel per D15/D17); **Channel plane** (`channel_register(symbol, rule, read_vis?) → writer` per D24, free `channel_read`, evaluator-applied propagation); **Scope** (`scope_new/extend/lookup/bindings/assume` per D26); plus core control (`eval_if`, `seq`, `id`), `Param`/`Symbol`, and immutability (`immutable?`). **Everything else now in `src/primitives.ts` is NOT base**: the entire type system, logical ops, proofs, refinements, effects, contracts, totality, the grammar-tooling primitives, and IO (`print`/`fetch`/`delay`) are Standard-layer extensions or environment-provided capabilities. The unification therefore doesn't just merge value kinds — it **relocates the type system and the whole provability stack out of the base**, which is the layering proof B8 demanded. Validates Risk 5: the base shrinks from well over 100 registered primitives to ~40. |
 | D28 | **Subsumption mechanics for the audit.** (a) `mv_*` + `component_get` → channel/slot ops: `mv_primary`/`mv_get`/`component_get` → `channel_read`; `mv_set` → `channel_write` (now capability-checked); `mv_components` → channel enumeration (free). (b) `make_error` → `channel_write` on the **error channel** — a *public-writer* channel (no capability) whose **viral** propagation rule reproduces today's automatic error propagation. (c) The entire **`*_attach` passthrough family** (`effects_attach`, `partial_attach`, `decreases_attach`, `proven_attach`, `param_effects_attach`, and the transparent `seq`/`type_check` forwarding) **collapses into `channel_write`** on the relevant channel (effects / predicates / totality); the matching `*_decl_marker` parse helpers move to the grammar/extension layer. (d) Channels span **gated** (integrity: `discharged` owned by the proof kernel, `type` owned by the type-system extension) and **public** (error, warnings, source) — one mechanism (you need the writer), and policy is whether the owner exports it (D23/D24). **Finding**: the pervasive "registered lazy so it receives un-`primaryOf`'d args" workaround on every proof/typed primitive is a direct symptom of the D3 stripping asymmetry — per-channel propagation (D3/D15) removes the need, so the proof kernel and typed ops drop the lazy hack. |
+| D29 | **Symbol redefinition (base — resolves B9-residual).** The existing Symbol kind becomes a first-class runtime value with **defining-context (Scope) identity** → an FQN (default: module path + name). **Same FQN = same symbol** (interned), so conformance/structural comparison is symbol-identity comparison. Each symbol carries a **canonical base-name string** projection, used for serialization, printing, and the string-projection matching path (D30). Resolution: a bare name binds to a symbol via the same scope/import layering that resolves bindings (extended with a symbol-registry layer). **Single governing principle**: base-name is a convenience projection, the symbol (FQN) is identity, and wherever a base-name is ambiguous (multiple symbols share it) **explicit qualification (`x[ns.name]`) is required, else error** — this recurs identically at import resolution, type-level member binding (D30 multi-match), and value-level dot-access. Equality = FQN (declared; feeds S2/D8; never accidental reference equality). Serialization/print = FQN, abbreviated to the base name when unambiguous. Scope *binding* keys may stay strings (D14: only channels/members must be symbols). |
+| D30 | **Member-symbol conformance model (Standard type-system layer, per D27 — resolves S7 + B9's crux).** Types **draw member symbols from declared contexts** (interfaces / base types / mixins): a member whose base name matches a drawn context's symbol **binds to that imported symbol**; non-matching members get a **type-local** symbol. A single member definition may bind to **multiple symbols** — the diamond (same base name across independent interfaces) and, generally, arbitrary symbols; extension/override may bind several inherited members with one definition. **Multiple matches → error by default**, forcing explicit resolution; an opt-in keyword/annotation may permit auto-multi-bind if verbosity warrants. Conformance (`instanceof`/interface) is a **symbol-identity** membership check over `__members` — therefore **declared, not accidental** (the maintainer's preferred default; retroactive/third-party conformance is via **mixins / partial type declarations**). The **loose/accidental** structural path — `~T` and anonymous `{…}` pattern destructuring — matches by **string-projection** and is aimed primarily at **data values, not types**. **Observation (forward to S1 / syntax track)**: type-extend, interface-implement, and mixin are the *same* operation — composing a set of member declarations (± definitions, ± new nominal identity, ± structural marker); whether distinct construction methods/keywords are needed is a syntax-design question, deferred. Duck-typing earns its place only where declared conformance is clumsy — watch for that in syntax design. |
 
 ## Open questions — base language (resolve first)
 
@@ -150,14 +152,13 @@ annotation channels extensible with declared propagation rules.
 - **B9. Symbol value semantics.** Core **RESOLVED by D20** (scope-as-
   namespace, FQNs, redefine the existing Symbol kind, bare/import/qualified
   syntax). Ownership/forgeability is answered: symbols are *registered* in a
-  scope, not freely constructible into foreign namespaces. Residual design
-  work: the redefinition itself — today's Symbol is a compile-time-resolved
-  AST reference; the new Symbol is also a runtime unique value. Resolution
-  timing (when does a bare `type` in source bind to a registered symbol —
-  same lexical-scoping pass?), identity across re-evaluation/sessions,
-  serialization/printing of namespaced symbols, and the ambiguity rule for
-  bare names (error vs innermost-scope-wins when two imports register the
-  same simple name).
+  scope, not freely constructible into foreign namespaces. **Residual RESOLVED
+  by D29** (base) **+ D30** (Standard type-system layer): the AST-reference-vs-
+  runtime-value duality, resolution timing (bare name binds via the scope/
+  import layering pass, extended with a symbol registry), cross-session
+  identity (FQN, interned), serialization/printing (FQN, base-name shorthand
+  when unambiguous), and the bare-name ambiguity rule (ambiguous → error,
+  qualify with `x[ns.name]`) are all covered there.
 - **B10. Channel write control.** Core **RESOLVED by D23**: capability-gated
   writes, free reads, registration returns a writer capability, origination
   vs propagation split, non-fabricating-rule constraint for integrity
@@ -277,6 +278,12 @@ annotation channels extensible with declared propagation rules.
   types**, which argues for a shared namespace (per-type symbols would break
   `__members`-comparison conformance). Dot-dispatch interning point; back
   compat with string-keyed `typeMethod` lookups during migration.
+  **RESOLVED by D30**: not a single global member table but **FQN-interned
+  symbols with a per-type draw-from import** — a member binds to an interface's
+  symbol when the type declares the draw and the base name matches, so
+  `__members`-comparison conformance is symbol-identity (declared, not
+  accidental). The cross-type comparability S7 needs is met by *sharing the
+  drawn interface's symbol*, not by a global namespace.
 - **S8. Blocking-read effect ergonomics** (new, from D16). The effect fires
   on any read of a potentially-unresolvable value — noisy by default. Shape
   of the discharge: completion proofs remove the effect (like domain
@@ -355,12 +362,13 @@ annotation channels extensible with declared propagation rules.
    D21 (no seal op) + B14 (construction guard) the scenario can't arise, so
    D13 should be retired or rewritten as a construction-time warning. Plus the
    still-open S9 knowledge-channel split.
-2. Remaining base question in queue: B9-residual (Symbol redefinition
-   details — resolution timing, identity across sessions, and whether Scope
-   keys become symbols per D20). With B8 resolved (D27/D28) the base surface is
-   fully enumerated and the type/proof/effect stack is confirmed
-   extension-layer; the **synchronous base design is essentially complete** —
-   only the async cluster (B11–B15) and B9-residual remain.
+2. **Synchronous base design complete (D1–D30).** All base questions (B1–B10)
+   are resolved; B9's residual is closed by D29 (base symbols) + D30
+   (Standard-layer conformance). The only open *base* cluster is the **async
+   session (B11–B15)** — deadlock, resolvability proofs, liveness axioms,
+   detection effects, the construction guard, partial-access PE soundness.
+   Standard-layer questions S1–S9 are partly resolved (S7 by D30; S9 pending)
+   and can proceed in parallel or during promotion.
 3. Dedicated session: async cluster **B11–B15** (+S8) — deadlock,
    resolvability proofs, liveness axioms, detection effects, construction
    guard ratification, partial-access PE shortcuts soundness.
