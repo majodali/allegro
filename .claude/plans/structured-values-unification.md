@@ -49,6 +49,11 @@ annotation channels extensible with declared propagation rules.
 | D28 | **Subsumption mechanics for the audit.** (a) `mv_*` + `component_get` → channel/slot ops: `mv_primary`/`mv_get`/`component_get` → `channel_read`; `mv_set` → `channel_write` (now capability-checked); `mv_components` → channel enumeration (free). (b) `make_error` → `channel_write` on the **error channel** — a *public-writer* channel (no capability) whose **viral** propagation rule reproduces today's automatic error propagation. (c) The entire **`*_attach` passthrough family** (`effects_attach`, `partial_attach`, `decreases_attach`, `proven_attach`, `param_effects_attach`, and the transparent `seq`/`type_check` forwarding) **collapses into `channel_write`** on the relevant channel (effects / predicates / totality); the matching `*_decl_marker` parse helpers move to the grammar/extension layer. (d) Channels span **gated** (integrity: `discharged` owned by the proof kernel, `type` owned by the type-system extension) and **public** (error, warnings, source) — one mechanism (you need the writer), and policy is whether the owner exports it (D23/D24). **Finding**: the pervasive "registered lazy so it receives un-`primaryOf`'d args" workaround on every proof/typed primitive is a direct symptom of the D3 stripping asymmetry — per-channel propagation (D3/D15) removes the need, so the proof kernel and typed ops drop the lazy hack. |
 | D29 | **Symbol redefinition (base — resolves B9-residual).** The existing Symbol kind becomes a first-class runtime value with **defining-context (Scope) identity** → an FQN (default: module path + name). **Same FQN = same symbol** (interned), so conformance/structural comparison is symbol-identity comparison. Each symbol carries a **canonical base-name string** projection, used for serialization, printing, and the string-projection matching path (D30). Resolution: a bare name binds to a symbol via the same scope/import layering that resolves bindings (extended with a symbol-registry layer). **Single governing principle**: base-name is a convenience projection, the symbol (FQN) is identity, and wherever a base-name is ambiguous (multiple symbols share it) **explicit qualification (`x[ns.name]`) is required, else error** — this recurs identically at import resolution, type-level member binding (D30 multi-match), and value-level dot-access. Equality = FQN (declared; feeds S2/D8; never accidental reference equality). Serialization/print = FQN, abbreviated to the base name when unambiguous. Scope *binding* keys may stay strings (D14: only channels/members must be symbols). |
 | D30 | **Member-symbol conformance model (Standard type-system layer, per D27 — resolves S7 + B9's crux).** Types **draw member symbols from declared contexts** (interfaces / base types / mixins): a member whose base name matches a drawn context's symbol **binds to that imported symbol**; non-matching members get a **type-local** symbol. A single member definition may bind to **multiple symbols** — the diamond (same base name across independent interfaces) and, generally, arbitrary symbols; extension/override may bind several inherited members with one definition. **Multiple matches → error by default**, forcing explicit resolution; an opt-in keyword/annotation may permit auto-multi-bind if verbosity warrants. Conformance (`instanceof`/interface) is a **symbol-identity** membership check over `__members` — therefore **declared, not accidental** (the maintainer's preferred default; retroactive/third-party conformance is via **mixins / partial type declarations**). The **loose/accidental** structural path — `~T` and anonymous `{…}` pattern destructuring — matches by **string-projection** and is aimed primarily at **data values, not types**. **Observation (forward to S1 / syntax track)**: type-extend, interface-implement, and mixin are the *same* operation — composing a set of member declarations (± definitions, ± new nominal identity, ± structural marker); whether distinct construction methods/keywords are needed is a syntax-design question, deferred. Duck-typing earns its place only where declared conformance is clumsy — watch for that in syntax design. |
+| D31 | **Completion = totality ∧ liveness (async-cluster core frame).** A computation *completes* iff it **terminates** (internal, well-founded) **and** everything it awaits **resolves** (external, liveness). Incompleteness has exactly two sources, each a **completion effect**: the **blocking-read** effect (reading a value that may never resolve — external, D16) and the **divergence** effect `div` (calling a function that may never return — internal). Both are undecidable; both discharge by proof (liveness axiom / termination witness). An **incomplete value** is uniformly either an unresolved future (awaiting liveness) or a `div` residual (awaiting termination that may never come). Deadlock in the sync regime is a dependency **cycle** among unresolved bindings — statically detectable in the `DependencyRegistry` graph. Resolves B11's framing. |
+| D32 | **Triggered construction guard (adopts B14 in triggered form; resolves B14+B15).** The guard fires only when a structure carries a **value-inspecting invariant** — a refinement / `Type.invariant` predicate that reads field *values* (field *types*, incl. `Future[T]`, discharge on the slot without the value and never trigger it). **No such invariant → no guard**: the structure is a D12 structure that may hold futures in slots, and **partial access is free** (resolved slots read, future slots residual per D11) — this preserves PE-thesis pipelining. **Has one → construction is held as a residual** until the referenced fields resolve, so the invariant is checked before the value exists (build safety in). **Partial access under the guard (B15)**: a projection `r.f` is admissible when `f` is not referenced by a still-pending invariant, but stays **guarded by construction success** (errors/residuals if the invariant ultimately fails — speculative, error-propagation as rollback); fields a pending invariant references block until it discharges. **Soundness link**: value-inspecting invariant predicates **must be total** (`div`-free) or the guard could hang — the guard needs both halves of completion (inputs resolve ∧ check terminates). |
+| D33 | **Futures & incompleteness model (resolves B13 + B12).** A **future** is the sole *external* locus of incompleteness — a pending async result at the I/O boundary (`fetch`/`delay`) or an explicit `Future[T]` slot — represented as a **write-once monotonic cell** (single-assignment ⇒ confluent; Oz/IVar). It is the only surviving interior-mutating cell, confined to the I/O edge (invariant-bearing immutables contain none, per D32; shape-only structures may hold future slots — accepted, monotonic). `Future[Future[T]]` **flattens** (monadic join); equality on an unresolved future → **residual** (D11), never blocks. Forward-chaining (`FutureManager` / `applyPhase` / `propagateCompletions`) is retained as the resolution cascade. **Incompleteness detection** (`is_resolved`, non-blocking select) is scheduling-dependent → **must be an effect** (extension-level, not base), quarantining nondeterministic observation from the confluent pure core (resolves B12). |
+| D34 | **Discharging completion effects (resolves B11 liveness + promotes totality; fork 2).** Both completion effects discharge by proof, **strict by default** (undischarged until discharged). **Divergence** (`div`): promoted from a Phase-E *info notification* to a first-class **computed** effect — its inference *is* the termination analysis (SCC + lexicographic metrics), not a flat union. Spectrum: (1) auto-proven total (Phase E checker); (2) user-witnessed total (`decreases <metric>`, kernel-*checked*); (3) admitted total (`assume terminates` / trusted `partial`) → axiom; (4) undischarged partial → caller inherits `div`, correctness may not depend on completion (D16, internal side). `div` is **discharge-only** — no runtime handler (divergence is uncatchable in pure semantics). **Liveness** (blocking-read): discharged by a **declared liveness axiom** (irreducibly external — admitted, not proved). **Shared mechanism**: **project-level axiom patterns** (e.g. `fetch <url-pattern>`; "trust `lib/legacy/` as total") are blanket defaults for low-assurance projects; every admitted axiom is **verdict-visible** (Risk 7). |
+| D35 | **Resource complexity is not a core effect.** Time/space growth is a **quantitative performance** property, orthogonal to the completion/correctness axis — kept out of the io/div tier. It splits: **static asymptotic bounds** (`O(g(n))`) = a *theorem over a cost measure* → a **deferred proof-genre extension** (needs a cost model + per-dimension input measures + recurrence solving; sound-but-incomplete like termination, heavier); **resource budgets** (fuel/step or live-space ceilings) = **capabilities** (D2 budget machinery) whose overflow is a **catchable `ResourceExhausted`** outcome (definite/observable, unlike `div`). Fuel is a `decreases` witness, so **budgeted code is total by construction** — budgets convert unbounded `div` into bounded, catchable failure, and a static bound (if available) sizes the budget. Distinct from the existing `time` effect (real-world clock observation). |
 
 ## Open questions — base language (resolve first)
 
@@ -185,27 +190,31 @@ annotation channels extensible with declared propagation rules.
     base flaw.
   - **F** (forge the capability itself): blocked — the writer is a
     PrimitiveFunction closure (D24), unconstructible from Allegretto.
-- **B11. Completion semantics: sync vs async** (new, split from B3). The two
-  cases are distinct; nearly all concerns stem from **async**. Headline:
+- **B11. Completion semantics: sync vs async** (new, split from B3).
+  **RESOLVED by D31 + D34.** The two cases are distinct; nearly all concerns stem from **async**. Headline:
   **deadlock — resolvability/completion must be provable.** Sync completion
   (forward-chaining within a pass) is deterministic; deadlock = dependency
   cycle, statically detectable. Async resolution depends on external events;
   liveness needs declared assumptions (e.g. "fetch eventually resolves or
   errors") as axioms feeding completion proofs. Possibly the most important
   proof use case (D16). Needs the dedicated session.
-- **B12. Incompleteness detection** (new, split from B3). Use cases needing
+- **B12. Incompleteness detection** (new, split from B3). **RESOLVED by D33**
+  (detection is an extension-level effect). Use cases needing
   to *observe* unresolvedness: non-blocking I/O, deadlock detection, effect
   accounting. An `is_resolved`-style op's result depends on scheduling — it
   breaks confluence/determinism, so it must itself be an effect. Enumerate
   the use cases and the minimal detection surface.
-- **B13. Future value mechanics** (new, split from B3). Write-once monotonic
+- **B13. Future value mechanics** (new, split from B3). **RESOLVED by D33.**
+  Write-once monotonic
   cell (interior mutation, but single-assignment ⇒ confluent — Oz/IVar
   precedent) vs structure-replacement propagation (today's residual model);
   future-of-future flattening ruling; per-slot read overhead (is-it-a-future
   check — PE/shapes can discharge statically when type known); memory
   retention of resolution machinery; equality on futures → residual per D11.
 - **B14. Async construction guard for immutables** (new, maintainer
-  proposal, lean: adopt). Conservative route: transparent incomplete slots
+  proposal, lean: adopt). **RESOLVED by D32 — adopted in *triggered* form
+  (fires only on value-inspecting invariants), which recovers partial access.**
+  Conservative route: transparent incomplete slots
   allowed only in **synchronous** construction (knot-tying within a pass);
   in the async case the **constructor invocation is held as the residual**
   — the immutable value never exists in incomplete state, so immutable
@@ -229,7 +238,9 @@ annotation channels extensible with declared propagation rules.
   partial read could observe a field of a structure that ultimately
   fails its invariant and never exists. Tracked as **B15**.
 - **B15. Partial access under the construction guard** (new, from B14
-  reservation). Analyze PE shortcuts that recover pipelining on
+  reservation). **RESOLVED by D32** (guarded projection; fields untouched by a
+  pending invariant are projectable but stay guarded by construction success).
+  Analyze PE shortcuts that recover pipelining on
   under-construction immutables without reintroducing interior mutation.
   Sketch: projecting an already-resolved channel out of a held
   constructor is referentially sound *iff* the projection cannot be
@@ -284,7 +295,11 @@ annotation channels extensible with declared propagation rules.
   `__members`-comparison conformance is symbol-identity (declared, not
   accidental). The cross-type comparability S7 needs is met by *sharing the
   drawn interface's symbol*, not by a global namespace.
-- **S8. Blocking-read effect ergonomics** (new, from D16). The effect fires
+- **S8. Blocking-read effect ergonomics** (new, from D16). **RESOLVED by
+  D31 + D34** — under the triggered guard most reads are of resolved values
+  (no effect); genuine future-reads discharge via completion proof / liveness
+  axiom, and undischarged residue surfaces in verdicts as "rests on axiom X".
+  The effect fires
   on any read of a potentially-unresolvable value — noisy by default. Shape
   of the discharge: completion proofs remove the effect (like domain
   implication discharges refinement checks); declared liveness axioms for
@@ -324,9 +339,10 @@ annotation channels extensible with declared propagation rules.
 ## Risks raised (with current mitigations)
 
 1. **Dataflow semantics leaking into structures** (records completed over
-   time) — contained by D12 (incompleteness is a value); residual risk is
-   the async cluster (deadlock/unresolvability), addressed by B11 + D16
-   (resolvability proofs).
+   time) — contained by D12 (incompleteness is a value). **Async cluster now
+   closed (D31–D35)**: deadlock is a static dependency cycle (D31), and
+   unresolvability is the blocking-read completion effect discharged by
+   liveness axioms (D34).
 2. **Namespace collision under duck typing** (user `type` field vs type
    channel; accidental `primary` transparency) — RESOLVED by D14 (key-sort
    partition); residual risk is symbol-namespace **forgeability**, owned by
@@ -344,37 +360,31 @@ annotation channels extensible with declared propagation rules.
    layering proof; the unification must *shrink* the kind count, not grow it.
 6. **Interior mutation via futures** (D12/B13) — write-once cells are
    monotonic and confluent (single-assignment dataflow precedent), but they
-   are the first crack in pure immutability. **B14's construction guard, if
-   adopted, eliminates the crack for immutable values entirely** (immutables
-   never contain unresolved cells); the cell discipline then applies only to
-   mutable/transient values and the construction-residual machinery.
-7. **Unprovable liveness for async sources** — completion proofs for
-   external events bottom out in declared axioms (B11); axioms must be
-   visible in verdicts (a proof resting on "fetch eventually resolves" is
-   weaker than a closed proof and must say so).
+   are the first crack in pure immutability. **Contained by D32 + D33**: the
+   triggered guard keeps invariant-bearing immutables cell-free, so the only
+   surviving cells are I/O-edge write-once futures (monotonic/confluent).
+   Shape-only structures may hold future slots — accepted, monotonic — which
+   is the deliberate trade for partial access (D32).
+7. **Unprovable liveness for async sources** — **RESOLVED by D34**: liveness
+   bottoms out in declared, **verdict-visible** axioms, strict by default,
+   with project-level axiom patterns (`fetch <url-pattern>`) as blanket
+   defaults for low-assurance projects. The same mechanism admits internal
+   termination axioms (`assume terminates`). A proof resting on an axiom is
+   weaker than a closed proof and says so.
 
 ## Next steps
 
-1. Ratify the B4+B10 round (D21–D24): brand reduces to B10 (no `seal` op),
-   default-immutability, capability-gated channels, capability = delegable
-   closure (D24). **Remaining explicit call**: **D13 is now obsolete** — it
-   was framed around a `seal` op over possibly-incomplete structures; under
-   D21 (no seal op) + B14 (construction guard) the scenario can't arise, so
-   D13 should be retired or rewritten as a construction-time warning. Plus the
-   still-open S9 knowledge-channel split.
-2. **Synchronous base design complete (D1–D30).** All base questions (B1–B10)
-   are resolved; B9's residual is closed by D29 (base symbols) + D30
-   (Standard-layer conformance). The only open *base* cluster is the **async
-   session (B11–B15)** — deadlock, resolvability proofs, liveness axioms,
-   detection effects, the construction guard, partial-access PE soundness.
-   Standard-layer questions S1–S9 are partly resolved (S7 by D30; S9 pending)
-   and can proceed in parallel or during promotion.
-3. Dedicated session: async cluster **B11–B15** (+S8) — deadlock,
-   resolvability proofs, liveness axioms, detection effects, construction
-   guard ratification, partial-access PE shortcuts soundness.
-4. Dedicated session: meta-types + equality (S1, S2) — feeds the
-   meta-protocol registry. S9 likely joins this session (identity/equality
-   must exclude knowledge channels).
-5. Parser design discussion (separate track, `docs/design/grammar.md` §2).
-6. Then: finalize BACKLOG rebuild; draft `docs/design/structures.md`;
-   implementation plan with chunks per PROCESS §4.
+1. **Base design complete (D1–D35).** All base questions B1–B15 are resolved
+   — the synchronous core (D1–D30) plus the async cluster (D31–D35). D13 is
+   retired (not obsolete-pending — the `seal` op is gone).
+2. **Standard-layer queue**: S9 (imputed-vs-declared type / knowledge-channel
+   split) is the main open one; S1 (meta-type construction) and S2 (equality
+   framework) feed the meta-protocol registry. S3–S6 are constrained by the
+   settled base and can be specced during promotion. (S7 resolved by D30; S8
+   by D31+D34.)
+3. Dedicated session: meta-types + equality (S1, S2) — S9 likely joins it
+   (identity/equality must exclude knowledge channels).
+4. Parser design discussion (separate track, `docs/design/grammar.md` §2).
+5. **Promotion (now unblocked for the base)**: draft `docs/design/structures.md`
+   from D1–D35; rebuild `BACKLOG.md`; write the implementation plan with chunks
+   per PROCESS §4 (I2's accessor-layer-first sequencing).
