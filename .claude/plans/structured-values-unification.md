@@ -54,6 +54,9 @@ annotation channels extensible with declared propagation rules.
 | D33 | **Futures & incompleteness model (resolves B13 + B12).** A **future** is the sole *external* locus of incompleteness — a pending async result at the I/O boundary (`fetch`/`delay`) or an explicit `Future[T]` slot — represented as a **write-once monotonic cell** (single-assignment ⇒ confluent; Oz/IVar). It is the only surviving interior-mutating cell, confined to the I/O edge (invariant-bearing immutables contain none, per D32; shape-only structures may hold future slots — accepted, monotonic). `Future[Future[T]]` **flattens** (monadic join); equality on an unresolved future → **residual** (D11), never blocks. Forward-chaining (`FutureManager` / `applyPhase` / `propagateCompletions`) is retained as the resolution cascade. **Incompleteness detection** (`is_resolved`, non-blocking select) is scheduling-dependent → **must be an effect** (extension-level, not base), quarantining nondeterministic observation from the confluent pure core (resolves B12). |
 | D34 | **Discharging completion effects (resolves B11 liveness + promotes totality; fork 2).** Both completion effects discharge by proof, **strict by default** (undischarged until discharged). **Divergence** (`div`): promoted from a Phase-E *info notification* to a first-class **computed** effect — its inference *is* the termination analysis (SCC + lexicographic metrics), not a flat union. Spectrum: (1) auto-proven total (Phase E checker); (2) user-witnessed total (`decreases <metric>`, kernel-*checked*); (3) admitted total (`assume terminates`, or a project axiom covering a `partial`-marked function) → axiom; (4) undischarged — `partial`-marked or unproven — caller inherits `div`, correctness may not depend on completion (D16, internal side). (`partial` itself always means case 4, "may not terminate"; only an explicit axiom lifts it to case 3.) `div` is **discharge-only** — no runtime handler (divergence is uncatchable in pure semantics). **Liveness** (blocking-read): discharged by a **declared liveness axiom** (irreducibly external — admitted, not proved). **Shared mechanism**: **project-level axiom patterns** (e.g. `fetch <url-pattern>`; "trust `lib/legacy/` as total") are blanket defaults for low-assurance projects; every admitted axiom is **verdict-visible** (Risk 7). |
 | D35 | **Resource complexity is not a core effect.** Time/space growth is a **quantitative performance** property, orthogonal to the completion/correctness axis — kept out of the io/div tier. It splits: **static asymptotic bounds** (`O(g(n))`) = a *theorem over a cost measure* → a **deferred proof-genre extension** (needs a cost model + per-dimension input measures + recurrence solving; sound-but-incomplete like termination, heavier); **resource budgets** (fuel/step or live-space ceilings) = **capabilities** (D2 budget machinery) whose overflow is a **catchable `ResourceExhausted`** outcome (definite/observable, unlike `div`). Fuel is a `decreases` witness, so **budgeted code is total by construction** — budgets convert unbounded `div` into bounded, catchable failure, and a static bound (if available) sizes the budget. Distinct from the existing `time` effect (real-world clock observation). |
+| D36 | **Shape/knowledge split (resolves S9).** The `type` channel's two roles separate: **`shape`** (declared type — layout, member set, nominal identity; fixed at construction, immutable, part of value identity; the I1 hidden class; the dispatch member source) and **`knowledge`** (imputed type + predicates unified into **one monotonic lattice**: base-type bound + abstract domains + predicate set; **excluded from value identity and equality**). Knowledge has **two carriers**, same lattice: **intrinsic** — certified at construction (e.g. `PositiveInt(5)`'s `>0`), rides the value across scope boundaries — and **occurrence** — flow-derived facts in D26's scope facts plane (`scope_assume`); effective knowledge at a use = **meet** of the two. This unifies the imputed half of `type`, on-value `predicates`, and `scopePredicates` into one construct with two carriers. **Dispatch**: runtime dispatch is **virtual on actual shape** (overrides run, Liskov); knowledge is the **static availability gate** + PE-resolution enabler (`x.method()` resolves at compile time when knowledge suffices, else residualises). **Annotations are knowledge upper-bounds** = member-hiding abstraction boundaries (`x: Animal` over a Dog hides Dog's members until narrowed; crossing a boundary sets the new occurrence's starting knowledge — monotonicity holds per scope). **Refinements are excluded from equality**: `PositiveInt(5) == Int(5)` (same shape, same data; the certificate rides along, sound because passing the bare value re-verifies). **Knowledge-observation is effectful**: `instanceof` on a refinement means **pure predicate re-check** (recomputes from data — congruence-safe, not effectful); **certificate-peeking** ("was this *constructed* as PositiveInt?") is a separate, *effectful* introspection op — keeping `proof_cong` sound (congruence holds only for knowledge-independent functions) without making a common operation noisy. |
+| D37 | **Equality framework (resolves S2).** Equality **dispatches on shape, never knowledge** — required for a globally stable equivalence relation (knowledge-dispatch would make `a == b` vary by program point). Resolution: (1) **same shape** → that shape's `equals`; (2) **different shapes** → coerce **both** operands to the **least common type** via *declared* coercions and run its `equals` — symmetric by construction, hence commutative; (3) **no common type → not equal** (conservative default; a `distinct` type is unequal to everything until it declares a coherent coercion). **Laws and their discharge split by kind**: reflexivity/symmetry/transitivity of a custom `equals` = per-type theorems (D38 obligations; kernel-auto for the default structural equals); coercions carry **equality-preservation** (`x ==_A y ⟹ coerce(x) ==_B coerce(y)`) and **pairwise coherence** (commuting composition triangles) obligations — the *new* declaration bears the proof, existing types never re-verify (open-world, as D30/D23); **monotonicity/stability under knowledge refinement is structural, not a theorem** — `equals` must be **pure and knowledge-independent** (free of the D36 observation effect), checked mechanically at definition. **Value-equality is not Leibniz substitutivity**: equal values may differ in knowledge; `proof_cong` applies only to knowledge-independent functions (guaranteed by the effect check). Capability writers (D24) remain identity-equal only. Proofs record **which equality and which law tier** they discharged under (extends D8): a `proof_trans` chain resting on an *admitted* transitivity is verdict-visibly weaker than one resting on a proven one. Equality proofs are stable under knowledge narrowing (established at shape level ⟹ never invalidated by refinement). |
+| D38 | **Lawful interfaces (generalizes D37's laws; the mechanism D8 promised).** Interfaces may carry **law members** — named theorem *templates* quantified over the implementing type — alongside operation signatures (`Equatable = interface({equals: (T,T) => Bool [pure], law refl: …, law sym: …, law trans: …})`). Drawing from a lawful interface (D30) makes conformance **semantic**: binding an implementation **instantiates each law into a pending Obligation** (H1 schema) attached to that implementation at definition time; coercion registration likewise generates its D37 obligations. **Discharge = the D34 spectrum, verbatim**: (1) kernel-auto (PE / `prove_for_all_bool` on finite domains; **generic proofs** for kernel-supplied default implementations — the structural `equals` is proven lawful once, parametrically); (2) witnessed (`by` proof term at the implementation site); (3) **sampled-falsification** (F7 machinery: a counterexample **halts compilation** with concrete inputs; a clean pass is survival, *not* proof); (4) admitted (`assume law` / **project-level pattern axioms** for low-assurance projects) — always verdict-visible; (5) pending → exported via `allegro obligations` to PCP workers (H4) — law obligations are exactly the well-posed proof tasks the LLM-prover loop targets. **Default is STRICT** (maintainer-confirmed, matching D34 fork 2): unproven + unadmitted = pending, and **law-dependent contexts refuse it** (`proof_trans` demands the equality's `trans`; sort demands `Ordered` totality). **Amortization**: unchanged inherited implementations inherit their proofs (same definition ⟹ same theorem); refinement subtypes are free (same shape, same `equals`); only *custom* implementations and overrides bear fresh obligations. **Generality**: equality is instance #1 — `Ordered` (antisymmetry/totality/consistency-with-equals), `Monoid` (associativity/identity), `Semiring` (**distributivity — a cross-operation law lives on the interface declaring all participating members**), Functor laws for `map` (`map(id)==id`, composition — discharged laws license PE rewrites, feeding compilation). Laws require effect-bounded (`pure`) members for proposition stability (Stage D bounds). Standalone facts remain plain `theorem`s; feeds S1's define-a-kind recipe. |
 
 ## Open questions — base language (resolve first)
 
@@ -259,22 +262,16 @@ annotation channels extensible with declared propagation rules.
   hand-rolled copies). Self-reference + inheritance subtleties; may pull on
   multiple inheritance (revisit trigger in `type-system.md` §2). Define a
   "define a kind" recipe as a library operation.
-- **S2. Equality framework.** Default equality per category (structural for
-  unsealed structures, identity for sealed and for memoized nominal types);
-  type-customizable `equals` with declared laws (reflexivity/symmetry/
-  transitivity as dischargeable theorems); proof terms carry the equality
-  they used; `proof_trans` requires matching equalities. (`~`'s role is
-  answered by D30 — the loose string-projection structural path.)
-  **Capability writers** (D24) are **identity-equal only** — never
-  structurally compared, never reference-equal-by-accident (D8) — so authority
-  cannot be reconstructed by building a structurally-equal value (moot for
-  opaque closures, but stated as a framework requirement).
-  **In-flight (2026-07, with S9)**: a fuller framework is drafted in
-  discussion — equality dispatches on *shape* (not knowledge), cross-shape
-  resolves by *symmetric coercion to a least common type* (else unequal),
-  laws split into per-type theorems (transitivity) + per-coercion coherence
-  obligations + a *structural* monotonicity check (`equals` must be
-  knowledge-independent). To be recorded with S9's resolution.
+- **S2. Equality framework.** **RESOLVED by D37 + D38**: shape-dispatch,
+  symmetric coercion to a least common type (else unequal — conservative
+  default), law/obligation split (per-type theorems; per-coercion
+  preservation + coherence; structural monotonicity via the
+  knowledge-independence effect check), capability writers identity-equal
+  only, proofs record equality + law tier. (`~`'s role is answered by D30 —
+  the loose string-projection structural path.) The original per-category
+  defaults survive as: structural `equals` is the kernel-supplied lawful
+  default; identity is per-type opt-in (memoized nominal types, capability
+  writers); never accidental reference equality (D8).
 - **S3. Visibility/access control.** Attribute set (public / internal-to-
   defining-extension / …); requires an ownership notion tied to the module
   system. Enforcement point: dispatch reads slot attributes (Standard);
@@ -313,36 +310,18 @@ annotation channels extensible with declared propagation rules.
   external sources (B11); what the undischarged residue looks like in
   introspection/verdicts so it informs without drowning. (If B14 is adopted,
   most of the noise vanishes structurally — reads of immutables never block.)
-- **S9. Imputed vs declared type** (new, maintainer note). The `type`
-  channel as used so far is the **imputed type** — always the same as or
-  narrower than the **declared type** (the shape/class definition), and
-  narrowable at each operation in an expression. The declared type must be
-  maintained separately because it carries member definitions (dispatch).
-  The imputed type overlaps in purpose with the `predicates` channel —
-  unify or distinguish, and disambiguate the two names. Claude's lean:
-  **declared type = the shape**, fixed at construction, part of value
-  identity, lives with the data plane (I1: the type IS the hidden class);
-  **imputed type + predicates unify into flow knowledge** — a monotonic
-  knowledge lattice (base-type bound + abstract domains + predicate set)
-  attached to *occurrences* (derived references / scope-held facts per B4),
-  excluded from value identity and equality. Naming candidates: declared →
-  `shape` or `class`; imputed+predicates → `knowledge` / `facts` /
-  `refinement`.
-  **In-flight (2026-07, near-resolved — recording pending two maintainer
-  subtleties)**: split confirmed as `shape` (declared, on the value, dispatch
-  member source) vs `knowledge` (imputed + predicates, one lattice, **two
-  carriers**: *intrinsic* — certified at construction, rides the value — and
-  *occurrence* — D26 scope facts; effective knowledge = meet of the two).
-  Runtime dispatch is **virtual on actual shape**; knowledge is the *static
-  availability gate* + PE-resolution enabler (annotations are knowledge
-  upper-bounds = member-hiding abstraction boundaries). Refinements are
-  excluded from equality (`PositiveInt(5) == Int(5)`), sound because
-  `equals` dispatches on shape. Congruence (`proof_cong`) holds only for
-  knowledge-independent functions; knowledge-*observation* (certificate
-  peeking, as distinct from pure predicate re-check) must be effectful —
-  with an open refinement: `instanceof` on a refinement should mean pure
-  predicate re-check, certificate-peek being a separate effectful
-  introspection op.
+- **S9. Imputed vs declared type** (new, maintainer note). **RESOLVED by
+  D36**: the `type` channel splits into **`shape`** (declared — fixed at
+  construction, part of identity, the dispatch member source and I1 hidden
+  class) and **`knowledge`** (imputed type + predicates unified into one
+  monotonic lattice, two carriers — intrinsic on the value, occurrence in
+  D26's scope facts; effective = meet). Runtime dispatch is virtual on
+  actual shape with knowledge as the static availability gate; annotations
+  are knowledge upper-bounds (member-hiding abstraction boundaries);
+  refinements are excluded from equality; knowledge-*observation* is
+  effectful, with `instanceof`-on-refinement defined as pure predicate
+  re-check (certificate-peek is a separate effectful introspection op).
+  Names chosen: **`shape`** / **`knowledge`**.
 
 ## Implementation questions (after design settles)
 
@@ -377,8 +356,12 @@ annotation channels extensible with declared propagation rules.
    forgery scenarios A–F (B10). Capability shape resolved (D24, delegable
    closure). Residual: capability privacy (ocap, S3 — the owner must not
    export its writer closure).
-4. **Custom equality × proofs** — proofs must name their equality (S2), else
-   `proof_trans` becomes unsound across equality views.
+4. **Custom equality × proofs** — **RESOLVED by D37 + D38**: proofs record
+   which equality *and which law tier* they discharged under; `proof_trans`
+   demands the equality's discharged/admitted transitivity; monotonicity is
+   structural (knowledge-independence effect check), so equality proofs can't
+   rot under refinement. Residual: obligation-discharge honesty (a sampled
+   law is survival, not proof — tiering must stay visible in verdicts).
 5. **Base-simplicity erosion** — every addition to Allegretto must pass B8's
    layering proof; the unification must *shrink* the kind count, not grow it.
 6. **Interior mutation via futures** (D12/B13) — write-once cells are
@@ -400,14 +383,15 @@ annotation channels extensible with declared propagation rules.
 1. **Base design complete (D1–D35).** All base questions B1–B15 are resolved
    — the synchronous core (D1–D30) plus the async cluster (D31–D35). D13 is
    retired (not obsolete-pending — the `seal` op is gone).
-2. **Standard-layer queue**: S9 (imputed-vs-declared type / knowledge-channel
-   split) is the main open one; S1 (meta-type construction) and S2 (equality
-   framework) feed the meta-protocol registry. S3–S6 are constrained by the
-   settled base and can be specced during promotion. (S7 resolved by D30; S8
-   by D31+D34.)
-3. Dedicated session: meta-types + equality (S1, S2) — S9 likely joins it
-   (identity/equality must exclude knowledge channels).
-4. Parser design discussion (separate track, `docs/design/grammar.md` §2).
-5. **Promotion (now unblocked for the base)**: draft `docs/design/structures.md`
-   from D1–D35; rebuild `BACKLOG.md`; write the implementation plan with chunks
+2. **Standard-layer queue**: S9 resolved (D36 — shape/knowledge), S2 resolved
+   (D37 equality + D38 lawful interfaces). Remaining: **S1** (meta-type
+   construction — the define-a-kind recipe, now including D38 law
+   declaration), **S3** (visibility), **S4** (collections), **S5**
+   (variance/constraints), **S6** (channel registry — incl. the gated
+   `effects` channel and channel-removal/erasure rules). All are constrained
+   enough by the settled base to spec during promotion; S1 is the only one
+   likely to need a dedicated discussion.
+3. Parser design discussion (separate track, `docs/design/grammar.md` §2).
+4. **Promotion (the natural next step)**: draft `docs/design/structures.md`
+   from D1–D38; rebuild `BACKLOG.md`; write the implementation plan with chunks
    per PROCESS §4 (I2's accessor-layer-first sequencing).
