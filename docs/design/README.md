@@ -17,6 +17,7 @@ Every section is tagged with its implementation status:
 
 | Doc | Area |
 |---|---|
+| `structures.md` | **(draft, pending sign-off)** Structured-values unification: Structure/Scope split, channel plane, symbols, shape/knowledge, equality, lawful interfaces, kinds, async/completion, minimal base surface |
 | `type-system.md` | Meta-types, type definition mechanisms, the meta-property protocol |
 | `effects.md` | Effect system: schema, lattice, inference, subversion analysis |
 | `pattern-matching.md` | `when/is/then`, destructuring, guards, deferred extensions |

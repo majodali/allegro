@@ -1,10 +1,10 @@
 # Structured-values unification — design discussion
 
-> Status: **draft — active design discussion** (pre-implementation).
-> This is the "backlog for the pre-backlog discussion": settled decisions,
-> open questions (base language first), and risks. Outcome will be promoted
-> to `docs/design/structures.md` (new) + deltas to `type-system.md`,
-> `effects.md`, and the rebuilt `BACKLOG.md`.
+> Status: **design complete (D1–D40) — promotion in progress.**
+> This document is the decision log and rationale record. The distilled
+> design is drafted in `docs/design/structures.md` (pending maintainer
+> sign-off); deltas to `type-system.md`, `effects.md`, and the rebuilt
+> `BACKLOG.md` follow.
 > Participants: maintainer + Claude, 2026-06 – 2026-07.
 
 ## Context
