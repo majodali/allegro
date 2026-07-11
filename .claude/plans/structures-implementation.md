@@ -2,7 +2,7 @@
 
 > Status: **draft** (pending maintainer approval of chunk boundaries;
 > per PROCESS §3 no chunk starts without explicit go-ahead).
-> Design: `docs/design/structures.md` (decision log:
+> Design: `docs/design/allegretto/structures.md` (decision log:
 > `structured-values-unification.md`, D1–D40).
 > Related backlog: the BACKLOG rebuild follows this plan and will mirror its
 > phase structure; absorbed items noted in §7.
@@ -26,7 +26,7 @@ condition changes.
 
 ## 2. Settled decisions
 
-All in `docs/design/structures.md`; not re-litigated here. The plan-relevant
+All in `docs/design/allegretto/structures.md`; not re-litigated here. The plan-relevant
 ones:
 
 - **Sequencing** (I2): accessor layer + slot registry first (valuable
@@ -301,12 +301,12 @@ carry over as-is. The rebuilt BACKLOG mirrors this plan's phases as its
 
 ## 8. Doc-update checklist
 
-- `docs/design/structures.md`: status tags flip per section as phases land
+- `docs/design/allegretto/structures.md`: status tags flip per section as phases land
   ([designed] → [partial] → [implemented]); deviations recorded same-commit.
-- `docs/design/type-system.md`: meta-property registry updated per C1.1
+- `docs/design/standard/type-system.md`: meta-property registry updated per C1.1
   (the registry module becomes its implementation); shape/knowledge section
   after Phase 3; kind recipe after Phase 6.
-- `docs/design/effects.md`: effect-channel + Effect-re-derivation deltas
+- `docs/design/standard/effects.md`: effect-channel + Effect-re-derivation deltas
   (C1.5, C6.2).
 - `docs/CHANGELOG.md`: entry per chunk. `BACKLOG.md`: rebuilt on plan
   approval, then ticked per chunk.

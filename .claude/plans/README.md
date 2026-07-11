@@ -5,7 +5,7 @@ work. New plans use **descriptive names** with sequence identifiers.
 
 | Plan | Topic | Status | Notes |
 |---|---|---|---|
-| `structured-values-unification.md` | Structures design discussion — decision log D1–D40 | **landed (design)** | Promoted to `docs/design/structures.md` (draft pending sign-off). Archives after the D39/B8/B10 tables are inlined into the design doc (see BACKLOG revalidation register). |
+| `structured-values-unification.md` | Structures design discussion — decision log D1–D40 | **landed (design)** | Promoted to `docs/design/allegretto/structures.md` (draft pending sign-off). Archives after the D39/B8/B10 tables are inlined into the design doc (see BACKLOG revalidation register). |
 | `structures-implementation.md` | Structures unification implementation — phases 0–6, boundary-test-first | **draft** | Chunk boundaries pending maintainer approval; BACKLOG rebuild follows this plan |
 
 ## Archive

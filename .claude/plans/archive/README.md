@@ -33,4 +33,4 @@ or **discarded**.
 | `groovy-gathering-micali.md` | Grammar extension Phase 1 | **Discarded** — pre-grammar2, superseded; audit verified its one durable idea (parse-time no-eval template substitution) carried into Phase 6 docs. |
 | `project-1-planning-dsl-design.md` | Vivace pilot 1: planning DSL | Settled v1 design (outcome-DAG model, 12 conventions, rejections, `SoftwareRelease` example, Shape 1/2 + pilot roster) → **register: planning DSL** — likely mostly substrate-orthogonal, revalidate before creating `docs/design/planning-dsl.md`. |
 
-Register location: `BACKLOG.md` §"V1 revalidation register".
+Register items now live in `BACKLOG.md` as `[reval]`-tagged backlog entries (IDs stable).

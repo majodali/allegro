@@ -2,7 +2,7 @@
 
 > Status: **design complete (D1–D40) — promotion in progress.**
 > This document is the decision log and rationale record. The distilled
-> design is drafted in `docs/design/structures.md` (pending maintainer
+> design is drafted in `docs/design/allegretto/structures.md` (pending maintainer
 > sign-off); deltas to `type-system.md`, `effects.md`, and the rebuilt
 > `BACKLOG.md` follow.
 > Participants: maintainer + Claude, 2026-06 – 2026-07.
@@ -24,7 +24,7 @@ annotation channels extensible with declared propagation rules.
 | D3 | The lazy/eager `primaryOf` stripping asymmetry is replaced by per-channel propagation semantics. |
 | D4 | The type system (typing, visibility, variance, equality policy) stays OUTSIDE Allegretto. The base carries only: the structure kind, the channel plane substrate, and the **sealing mechanism** (mechanism in base, policy in extensions). |
 | D5 | Strict typing of all structures is a Standard-layer guarantee; Allegretto structures may be untyped (duck-typed with a limited set of defined slot keys). |
-| D6 | `__*` prefixes are retired; meta-slots become declared slots with visibility/access attributes, recorded in a registry (`docs/design/type-system.md` §4). |
+| D6 | `__*` prefixes are retired; meta-slots become declared slots with visibility/access attributes, recorded in a registry (`docs/design/standard/type-system.md` §4). |
 | D7 | Internal `Type : Type` self-reference is kept; universe stratification is handled by translation at the proof-export boundary. |
 | D8 | Equality is type-customizable, with declared laws; proofs record which equality they discharged under. Reference-equality-by-accident (the `proofValEqual` bug) is disallowed by design. |
 | D9 | Arrays: no refs-inside-Bits (Bits stays pure reference-free data). Direction: base numeric-keyed structures with O(1) indexed host implementation + Standard encapsulated collection types choosing representations (packed Bits for primitive elements, dense structure storage otherwise). To ratify (B6/S4). |
@@ -397,8 +397,8 @@ annotation channels extensible with declared propagation rules.
    knowledge on type-values), **S6** (channel registry — incl. the gated
    `effects` channel and channel-removal/erasure rules) — are mechanical
    enough to spec during promotion.
-3. Parser design discussion (separate track, `docs/design/grammar.md` §2).
-4. **Promotion (the natural next step)**: draft `docs/design/structures.md`
+3. Parser design discussion (separate track, `docs/design/extension/grammar.md` §2).
+4. **Promotion (the natural next step)**: draft `docs/design/allegretto/structures.md`
    from D1–D40; rebuild `BACKLOG.md`; write the implementation plan with chunks
    per PROCESS §4 (I2's accessor-layer-first sequencing). Include the D40
    migration deltas (`pure subtypeof Effect` flips) and the MI-memo update in

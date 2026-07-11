@@ -1,7 +1,11 @@
 # Design documents (Tier 1)
 
-Durable design truth, one document per area. Updated in the same PR as the
-change that alters the design (see `docs/PROCESS.md` §3, deviation rule).
+Durable design truth, one document per area, organized by **language layer**
+(see `layers.md` — the architectural spine: layers, tracks, milestones).
+Updated in the same PR as the change that alters the design (see
+`docs/PROCESS.md` §3, deviation rule). Each layer folder's README is that
+layer's **boundary contract** — what it provides, what it may depend on,
+and the invariants the boundary tests enforce.
 
 ## Status convention
 
@@ -13,22 +17,18 @@ Every section is tagged with its implementation status:
 - **[under revision]** — previously settled, now being redesigned (says why
   and what supersedes it)
 
-## Documents
+## Structure
 
-| Doc | Area |
-|---|---|
-| `structures.md` | **(draft, pending sign-off)** Structured-values unification: Structure/Scope split, channel plane, symbols, shape/knowledge, equality, lawful interfaces, kinds, async/completion, minimal base surface |
-| `type-system.md` | Meta-types, type definition mechanisms, the meta-property protocol |
-| `effects.md` | Effect system: schema, lattice, inference, subversion analysis |
-| `pattern-matching.md` | `when/is/then`, destructuring, guards, deferred extensions |
-| `grammar.md` | Parser & grammar-extension design decisions and goals (the formalism itself: `../grammar-formalism.md`) |
-| `../grammar-formalism.md` | Grammar 2 formalism specification |
-| `../proving-in-allegro.md` | Proving surface primer (participant-neutral; also the PCP LLM worker's system primer) |
+| Location | Layer / scope | Documents |
+|---|---|---|
+| `layers.md` | The spine | Layer model, capability tracks, milestone register |
+| `allegretto/` | **L0** base language | `structures.md` (v2 design — draft pending sign-off); planned: `architecture.md` |
+| `extension/` | **L1** extension substrate | `grammar.md`; planned: `modules.md` (loading contract). Formalism spec stays at `../grammar-formalism.md` (referenced by Tier-0 PROCESS and by source code) |
+| `standard/` | **L2** Allegro Standard | `type-system.md`, `effects.md`, `pattern-matching.md`; planned, revalidation-gated (BACKLOG register): `contracts.md`, `totality.md`, `proofs.md`, `pcp.md` |
+| `vivace/` | **L3** Vivace | planned, revalidation-gated: `planning-dsl.md` |
+| `platform/` | Capability tracks | planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
 
-Planned (created when their design discussions happen or content is
-promoted): `architecture.md` (value kinds, evaluator, PE model),
-`proofs.md` (discharge-strength taxonomy, proof-term design), `modules.md`,
-`pcp.md`, `contracts.md`, `totality.md`, `planning-dsl.md`. The last four
-are gated on the **v1 revalidation register** in `BACKLOG.md` — their
-source material is v1-era archived plans and must be revalidated against
-`structures.md` before promotion.
+Top-level consumables (not design truth, kept at `docs/`):
+`../grammar-formalism.md` (Grammar 2 spec), `../proving-in-allegro.md`
+(participant-neutral proving primer; loaded at runtime by the PCP LLM
+worker).

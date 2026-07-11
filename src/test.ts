@@ -10348,9 +10348,22 @@ async function runBenchmarkTests(): Promise<void> {
   });
 }
 
+// --- Doc-reference lint (PROCESS §10) ---
+
+import { lintDocRefs } from "../scripts/doc-ref-lint.js";
+import * as nodePath from "path";
+
+function runDocLintTests(): void {
+  test("doc-ref lint: all tracked markdown doc references resolve", () => {
+    const findings = lintDocRefs(nodePath.resolve(import.meta.dirname, ".."));
+    const rendered = findings.map((f) => `${f.file}:${f.line} → ${f.ref}`).join("; ");
+    eq(rendered, "", "dangling doc references");
+  });
+}
+
 // --- Run all tests (sync + async) and report ---
 
-runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then(() => runBenchmarkTests()).then(() => {
+runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then(() => runBenchmarkTests()).then(() => runDocLintTests()).then(() => {
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
   if (failures.length > 0) {
