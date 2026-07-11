@@ -1,316 +1,256 @@
 # Allegro — Backlog
 
-## V1 revalidation register (2026-07 triage)
+> Tier 2. **One list, implementation order.** Layer/track tags and
+> milestones (M1–M10) are defined in `docs/design/layers.md`; boundary
+> contracts live in each layer's `docs/design/<layer>/README.md`. Items
+> carry stable IDs (`B-###`) — reference them from commits, plans, and
+> CHANGELOG entries; IDs never change meaning even when the list reorders.
+> The **head** is sequenced; the **tail** is banded by layer/track in
+> spine order and not yet sequenced. Completed work moves to
+> `docs/CHANGELOG.md` — it does not accumulate here. The v1 feature set
+> awaiting disposition through the rewrite lives in `V1-INVENTORY.md`.
+>
+> **Revalidation-register items** (tagged `[reval]`) carry v1 design whose
+> only record is an archived plan (`.claude/plans/archive/README.md` has
+> the triage record). Working one means: read the archived source,
+> revalidate against `docs/design/allegretto/structures.md` and the code,
+> then incorporate into the named target doc or discard with a note here.
 
-V1 design/implementation ran through provability Phase H; the 2026-06
-review sent the project back to the drawing board (outcome:
-`docs/design/structures.md`). The v1-era plans were moved to
-`.claude/plans/archive/` (triage record in `archive/README.md`). Each
-entry below is design content whose **only record is an archived plan**:
-not necessarily wrong, but requiring thorough revalidation against the new
-design before it may be incorporated into `docs/design/` or acted on.
-Working an entry means: read the archived source, revalidate against
-`structures.md` (and the implementation as it stands), then incorporate
-into the named target or discard with a note here.
+## Sequenced head
 
-- [ ] **Contracts (Phase C) design** — predicate-set model (provenance
-  taxonomy, union+dedup branch-rejoin, Horn-only simplification),
-  branch-refinement shape recognition, `assert` scope semantics +
-  conservative assert→requires promotion, `requires`/`ensures` lowering
-  with sink-based call-site checks and the `_`-is-result convention,
-  `Type.invariant` constructor enforcement + inheritance, the deliberate
-  `assume` rejection in favor of the constructor pattern, and the
-  "shape → refinement; relationship → contract" guidance. Sources:
-  `archive/lucid-discharging-lambek.md`, `archive/crystal-proving-curry.md`
-  §Phase C. Revalidate against `structures.md` §4 (facts plane) / §6
-  (knowledge). Target: new `docs/design/contracts.md`.
-- [ ] **PCP protocol design** — Obligation/Verdict/Authorship schemas,
-  ordered multi-prover authorship, trivial-pass-attack prevention,
-  iteration-hints design, JSON-canonical output philosophy, H5 proof
-  catalog, H7 effort budgets/escalation/reproducibility,
-  adversarial-worker single-check-point stance, four-baseline benchmark
-  methodology. Source: `archive/phase-h-plan.md`; shipping shape is
-  `src/pcp.ts` + `docs/proving-in-allegro.md`. Target: new
-  `docs/design/pcp.md`.
-- [ ] **Totality current-arc decisions** — notify-at-`info`-by-default
-  severity policy (**in tension with `structures.md` D34 strict-by-default
-  — reconcile explicitly as a migration decision**), per-type-kind
-  exhaustiveness taxonomy (incl. `__extends`-root-as-closed-sum),
-  refinement-aware dead-code detection, mutual-recursion lexicographic
-  design, totality polymorphism (`[t: Totality]` mirroring effects),
-  `decreases`-metric obligations, counterexample shapes. Source:
-  `archive/phase-e-totality-plan.md`. Target: new `docs/design/totality.md`.
-- [ ] **Provability roadmap remainder** — D2 parametric capabilities,
-  D3–D5 information-flow/budgets/behavioral-spec taxonomy, F6 Lean-export
-  mapping (proof terms → Lean, refinements → subtypes, verified-substrate
-  `Allegro.lean`), Phases I (codegen) and J (review UX). Sources:
-  `archive/crystal-proving-curry.md`, `archive/phase-f-plan.md` §F6.
-  Revalidate ordering/shape against the structures rewrite before
-  scheduling any of it. Lean mapping targets planned `docs/design/proofs.md`.
-- [ ] **Planning DSL (Vivace pilot 1)** — outcome-DAG model, the 12 pinned
-  DSL conventions, deliberate keyword rejections, `SoftwareRelease`
-  canonical example; plus Shape 1/Shape 2 strategy + three-pilot roster
-  (Tier-0 `VISION.md` material — propose, don't land). Source:
-  `archive/project-1-planning-dsl-design.md`. Likely mostly
-  substrate-orthogonal — revalidate lightly, then create
-  `docs/design/planning-dsl.md`. `lib/planning.alg` implementation stays
-  paused until then.
-- [ ] **Grammar formalism sync** — fold the shipped extension error/warning
-  codes (`E_INCOMPATIBLE_GRAMMARS`, `W_PRODUCTION_REPLACED`,
-  `E_PRECEDENCE_CONSTRAINT_CONFLICT`) and base-chain semantics into
-  `docs/grammar-formalism.md` §6–7 (decisions now recorded in
-  `docs/design/grammar.md` §4); the never-shipped Phase 6 ideas
-  (`combine`/`override`/`without` combinators, restricted-`use`
-  compile-time-expression whitelist) fold into Phase 8 scope when planned.
-  Source: `archive/dappled-cascading-cantor.md`.
-- [ ] **Effects nits** — add the silent-capture rationale for explicit
-  `[e: Effect]` declaration to `docs/design/effects.md` §2 (one sentence);
-  the `applyComposed` compile-time-tracing hypothesis from
-  `archive/polyphonic-tracing-plotkin.md` P9 is a research item, file or
-  drop when effects work resumes.
-- [ ] **Structures promotion completion** — inline the D39 slot-disposition
-  table, B8 primitive audit, and B10 forgery-scenario table from
-  `.claude/plans/structured-values-unification.md` into
-  `docs/design/structures.md` as appendices; then archive that plan.
-- [ ] **Doc hygiene** — `docs/proving-in-allegro.md` is accurate for the
-  shipping v1 surface but must be revised when the structures rewrite
-  lands (it is the PCP LLM worker's system primer — keep in sync);
-  CLAUDE.md still carries stale `memory/design_*.md` path references (the
-  files live under `.claude/memory/` and are now pointers) — fix during
-  the scheduled CLAUDE.md slimming; doc-reference lint remains tracked CI
-  debt (PROCESS §10).
+Implementation chunks reference `.claude/plans/structures-implementation.md`
+(status: draft — chunk boundaries pending maintainer approval; PROCESS §3
+go-ahead required per phase).
 
-## 1. Milestones
+- [ ] **B-001** · L0 · Boundary-test harness + baseline (chunk C0.1):
+  accessor lint w/ ratchet, invariant property checks, forgery-suite
+  skeleton, perf floor — plan §Phase 0
+- [ ] **B-002** · L0 · docs: inline the D39 slot-disposition, B8 primitive
+  audit, and B10 forgery tables into `docs/design/allegretto/structures.md`
+  as appendices; then archive `structured-values-unification.md`
+- [ ] **B-003** · L1 · `[reval]` docs: sync shipped extension error codes +
+  base-chain semantics into `docs/grammar-formalism.md` §6–7 (decisions:
+  `docs/design/extension/grammar.md` §4; source:
+  `.claude/plans/archive/dappled-cascading-cantor.md`)
+- [ ] **B-004** · L2 · `[reval]` docs: effects nits — silent-capture
+  rationale for explicit `[e: Effect]` into
+  `docs/design/standard/effects.md` §2; `applyComposed` tracing hypothesis
+  (archive: polyphonic-tracing-plotkin P9) filed or dropped
+- [ ] **B-005** · T-tooling · CI: run `tsc --noEmit` + `src/test.ts`
+  (which now includes the doc-ref lint) on push — PROCESS §10 debt.
+  Note: `tsc --noEmit` reports 17 pre-existing errors on the current tree
+  (TS2300 duplicate imports in test.ts, TS2304 `ExpressionValue`, TS6059
+  out-of-rootDir — the documented bench/pcp convention); CI needs those
+  fixed or a sanctioned invocation defined first
+- [ ] **B-006** · L0 · Slot & channel registry + typed accessors (C1.1)
+- [ ] **B-007** · L0 · Accessor migration, core files (C1.2)
+- [ ] **B-008** · L0 · Accessor migration, rest + lint hard-fail (C1.3)
+- [ ] **B-009** · L0 · Channel writers — origination capabilities +
+  forgery suite v1 (C1.4)
+- [ ] **B-010** · L0 · Propagation table; delete `primaryOf` asymmetry +
+  `*_attach` family; forgery suite v2 (C1.5) — first conscious-delta chunk
+- [ ] **B-011** · L0 · Scope protocol + parent chain (C2.1)
+- [ ] **B-012** · L0 · Facts plane via `scope_assume` (C2.2)
+- [ ] **B-013** · L0 · Resolution unification; retire `ctx_use`;
+  unresolved-binding-as-future-cell (C2.3)
+- [ ] **B-014** · L2 · `[reval]` Contracts design revalidation →
+  `contracts.md` in `docs/design/standard/`: predicate-set model, branch
+  refinement, assert/requires/ensures lowering, sink-based checks,
+  invariant inheritance, `assume` rejection + constructor pattern,
+  refinement-vs-contract guidance (sources:
+  `.claude/plans/archive/lucid-discharging-lambek.md`,
+  `.claude/plans/archive/crystal-proving-curry.md` §Phase C; substrate:
+  structures.md §4/§6) — natural slot: with Phases 2–3
+- [ ] **B-015** · L0 · Shape/knowledge channel split; dispatch on shape
+  (C3.1)
+- [ ] **B-016** · L0 · Annotations as knowledge bounds; narrowing; carrier
+  meet (C3.2)
+- [ ] **B-017** · L0 · Observation effect; pure recheck vs certificate
+  peek; congruence tests (C3.3)
+- [ ] **B-018** · L2 · `[reval]` Totality design revalidation →
+  `totality.md` in `docs/design/standard/`: severity policy (**reconcile
+  v1 info-by-default with structures.md D34 strict-by-default as an
+  explicit migration decision**), exhaustiveness taxonomy, mutual-recursion
+  lexicographic design, totality polymorphism, decreases obligations,
+  counterexample shapes (source:
+  `.claude/plans/archive/phase-e-totality-plan.md`)
+- [ ] **B-019** · L0 · Structure kind — representation swap behind
+  accessors (C4.1)
+- [ ] **B-020** · L0 · Arrays as numeric structures w/ dense region (C4.2)
+- [ ] **B-021** · L0 · Transparency cutover; retire `primaryOf` + wrapper
+  shims (C4.3) — second conscious-delta chunk
+- [ ] **B-022** · L0 · FQN symbols: interning, registration, projection
+  (C5.1)
+- [ ] **B-023** · L2 · Symbol-keyed members + draw-from binding; diamond
+  multi-bind; ambiguity rule (C5.2)
+- [ ] **B-024** · L2 · define-a-kind recipe; constructor authority;
+  `Type : Type` fixed point (C6.1)
+- [ ] **B-025** · L2 · Effect re-derived through the recipe; anonymous
+  conjunctions; `pure subtypeof Effect` flip (C6.2)
+- [ ] **B-026** · L2 · Proof re-derived (kernel-private authority);
+  slot-disposition sweep; forgery battery re-run (C6.3) — **M1 exit
+  criterion**
+- [ ] **B-027** · L2 · Equality protocol + lawful interfaces — design
+  ratification pass on structures.md §7–8, then own plan
+  (`equality-and-laws.md`) per structures-implementation §3
+- [ ] **B-028** · L0 · Completion effects & futures — own plan
+  (`completion-effects.md`): `div`, blocking-read, triggered guard,
+  discharge tiers (structures.md §10)
+- [ ] **B-029** · L2 · `[reval]` PCP protocol design revalidation →
+  `pcp.md` in `docs/design/standard/`: schemas, multi-prover authorship,
+  trivial-pass prevention, hints, catalog (H5), budgets/escalation (H7),
+  benchmark methodology (source:
+  `.claude/plans/archive/phase-h-plan.md`; shipping shape `src/pcp.ts`)
+- [ ] **B-030** · L2 · M3 sweep: disposition every remaining `TBD` in
+  `V1-INVENTORY.md`; re-verify canaries (provable.alg theorems, bench
+  corpus, stdlib effects tags)
+- [ ] **B-031** · L2 · docs: revise `docs/proving-in-allegro.md` to the
+  v2 surface (it is the PCP LLM worker's system primer — must track the
+  shipping kernel); re-baseline `bench/`
 
-High-level goals, roughly ordered by dependency:
+## Banded tail (not yet sequenced)
 
-- **Allegro Standard complete** — all core types fully typed, type inference, pattern matching, error handling, string interpolation. The language is usable for real programs.
-- **DSL ready** — grammar extension DSL defined in Allegro, embeddable grammars, custom syntax as importable modules.
-- **Multi-phase build pipeline** — project configuration, phase-specific resources, phase gate checks. The partial evaluation compilation model works end-to-end.
-- **Tracing and debugging** — execution tracing, expression graph inspection, source location in errors, step-through debugging.
-- **Standard library** — filesystem, networking, process management, math, collections. Enough to write useful tools.
-- **Fully bootstrapped** — parser, type system, module system all implemented in Allegro. TypeScript runtime is just a thin host.
-- **In-browser sandbox** — core + standard library running in the browser, interactive REPL, shareable programs.
-- **Target code generation** — expression graph → JavaScript / WASM / native. Partial evaluation as optimization.
-- **Performance optimization** — memoization as Standard feature, continuation-based TCO (Stage 2), JIT-style hotspot optimization.
-- **Package ecosystem** — versioning, dependency resolution, registry. Third-party modules.
+### L1 — extension substrate (M2)
 
-## 2. Detailed Features
+- [ ] **B-032** · Grammar extension Phase 8: per-scope `use X in { block }`,
+  single-pass `use` with mid-parse expressions, parse-time builder lambdas
+  (parser/evaluator reentry); fold in the never-shipped Phase 6 ideas
+  (`combine`/`override`/`without`, restricted-`use` whitelist — archive:
+  dappled-cascading-cantor)
+- [ ] **B-033** · Grammar 2 Phase 7+: indent-engine extensions, full GLL
+  left recursion, precedence analyzer, remaining stratified-grammar
+  migration
+- [ ] **B-034** · Alt-order de-significance + label-directed tree-builder
+  (the §2 corrections in `docs/design/extension/grammar.md`) — the parser
+  design discussion track
+- [ ] **B-035** · Earley parser retirement in favor of `grammar2_*`
+- [ ] **B-036** · Parse error recovery (`@error` productions + `@sync`)
+- [ ] **B-037** · Embeddable grammars (different parser mid-file/per-module)
+- [ ] **B-038** · `modules.md` loading contract (the L1 half of the module
+  split); circular-dependency policy
+- [ ] **B-039** · Mid-statement grammar switching (low priority)
 
-### Type System
-- [x] Subtyping / extends — single Type meta-type, shape-aware nominal + structural instanceof/subtypeof, `~` structural operator (now via `__name` erasure)
-- [x] Collapse `NominalType` into `Type` with optional `__name` — single meta-type, shape-aware comparison (nominal if both operands named and expected type isn't an interface; structural otherwise). `NominalType` retained as back-compat alias (`NominalType === Type`). `~T` projects to anonymous via `__name` erasure (preserves `__extends`/`__members`/`__construct`/etc.; adds `__wraps` back-link). Substrate for the upcoming `Effect` meta-type. See `memory/design_type_system_meta_types.md`.
-- [ ] Multiple inheritance (deferred) — `__extends: Type[]` with multiple parents, graph-reachability for `instanceof`/`subtypeof`, **explicit error on member conflict** (no MRO; mirrors Mixin's policy). User resolves conflicts by explicit override. Trigger: a second concrete use case beyond Effect surfaces, or Phase G/H domain library work pulls on it. See `memory/design_type_system_meta_types.md`.
-- [ ] `NominalType`-as-mixin (alternative path, deferred alongside MI) — model nominal-vs-structural as a behavior set added via mixin rather than a separate meta-type. Worth considering when re-evaluating MI.
-- [x] Interfaces — `Type.interface({...})`, structural type matching (no explicit `implements`), parent member inheritance, auto-naming
-- [x] Mixins — `.mixin({method: fn, ...})` adds methods to types, ComposedFunction dispatch, error on conflict
-- [x] Union types — `Int | String`, `type_union` primitive, union instanceof checks alternatives
-- [x] Full type inference — evaluation IS type inference. Typed args flow into untyped functions, types propagate through call chains, polymorphic specialization at each call site. CompilationReport.bindingTypes records all inferred types.
-- [x] Return type inference — via compile-time partial evaluation of typed function bodies
-- [ ] Variance — covariant/contravariant/invariant type parameters
-- [ ] Scalar type builder — `Scalar(bitLength)` for new Bits-backed types with custom encoding
-- [ ] Packed Bits structures — buffers, tuples, vectors of same-type scalars as Bits representations
-- [x] Rename NamedType → NominalType (clearer purpose: nominal vs structural checking)
-- [ ] Type constraints — `where T: Comparable`
-- [x] Binding type annotations — `x: Int = 42`, `type_check_binding` primitive
-- [x] Pattern matching — `when/is/then` with resolve-first semantics, multi-case, wildcard, binding
-- [x] Destructuring patterns — type `is Type(field)` and structural `is {field}`, nested sub-patterns
-- [x] Guard clauses — `and` keyword in patterns, `and`/`or` as keyword synonyms for `&&`/`||`
-- [x] Nested destructuring — colon introduces sub-pattern in field specs, recursive matching
-- [ ] Patterns as boolean expressions with unification — full expression parsing in pattern mode (future)
-- [x] Generics — `Array[T]`, `Function[ParamTypes, ReturnType]`, memoized type constructors
-- [x] Function types and unification — type variables bind progressively at call sites
-- [x] UntypedFunction — wraps base primitives in standard mode
-- [x] Any type — matches any type, bare generics auto-apply Any
-- [x] `instanceof` infix — `x instanceof T` returns Bool
-- [x] `subtypeof` infix — `S subtypeof T` returns Bool
-- [x] Type constructors — `__construct` mechanism, built-in constructors for Int/Float/String/Bool
-- [x] Fluent type API — `extend`, `where`, `distinct`, `constructor` methods on Type/NominalType
-- [x] Meta-type dispatch — type-level methods via `__type` binding on raw Contexts
-- [x] Auto-naming — types bound to symbols get named after evaluation
-- [x] Member descriptors (`__members`) — unified Method/Field descriptor types, type methods and fields in `__members` collection, structural checking via `__members` comparison, meta-type methods (instanceof, subtypeof, extend, where, distinct, constructor) in `__members`
+### L2 — Standard (M3)
 
-### Partial Evaluation & Compilation
-- [ ] Formalize multi-phase partial evaluation (invocation → config → compile → emit → package → deploy → execute)
-- [x] Compile-time type inference — precompileFunctions pass, type propagation through residuals
-- [x] Phase gate checks — CompilationReport with inferred types, errors, unresolved bindings
-- [x] Notification category in CompilationReport (replace errors+warnings) — `CompilationReport.notifications: Notification[]` is now the single diagnostic collection; each entry carries a stable `kind` tag and a `severity: "error" | "warning" | "info"`. `notificationsBySeverity` / `reportErrors` / `reportHasErrors` helpers filter by tier. Push sites: `effects-mismatch` / `return-type-mismatch` / `precompile-eval` / `precompile-type-error` (error) and `effects-opaque-from-stdlib-hof` (info). Per-project config remap by `kind` is the next step — the substrate is ready. Grammar analyzer keeps its own separate `errors`/`warnings` report for now (different domain).
-- [ ] Per-project severity config — config object that remaps `Notification.kind` to a different severity (e.g. downgrade `effects-mismatch` from error to warning for legacy modules). Plumbing point: `reportErrors` / `reportHasErrors` would consult the config before deciding. Substrate from notification migration is in place; just needs the config surface + loader.
-- [ ] Target code generation (expression graph → executable)
-- [ ] Tree shaking via partial evaluation
-- [x] Forward-chaining partial evaluation — DepCollector tracks incomplete dependencies during evaluation. DependencyRegistry tracks reactive bindings. propagateCompletions re-evaluates dependents when bindings complete. applyPhase provides new bindings and triggers cascading re-evaluation. Memoization disabled (replaced by this mechanism).
-- [ ] Memoization as Standard feature (only for fully resolved expressions, optional optimization)
-- [ ] Continuation-based TCO (Stage 2 — attach continuations for non-tail recursive calls)
-- [x] eval_if Rule 2 — partial evaluation of both branches when condition undefined
-- [x] Tail call optimization (Stage 1) — O(1) stack for tail-recursive functions
-- [x] Symbol resolution — compile-time lexical scoping, direct references
+- [ ] **B-040** · Qualified import (`import math.round`); re-exports
+- [ ] **B-041** · Collections: Map/Set as typed generic structures;
+  persistent representations (S4)
+- [ ] **B-042** · Scalar type builder (`Scalar(bitLength)`) + packed Bits
+  structures (S4)
+- [ ] **B-043** · User-defined type declaration syntax (sugar for
+  extend/where/distinct/interface — deferred until API patterns settle)
+- [ ] **B-044** · Error handling surface (try/catch or channel-consuming
+  equivalent — design with S6 error-channel removal rules)
+- [ ] **B-045** · Regular expressions (stdlib + literal syntax)
+- [ ] **B-046** · Configurable mutability: linear types, transient
+  mutation, transient→immutable finalization (structures.md §13)
+- [ ] **B-047** · Sync/async type modifiers (async-by-default + `sync`
+  hint — revisit under completion effects)
+- [ ] **B-048** · Algebraic effects (`perform`/`handle`/`resume`; needs
+  continuations — see B-072)
+- [ ] **B-049** · Patterns as boolean expressions with unification
+- [ ] **B-050** · Variance + type constraints (`where T: Comparable`) —
+  absorbed conceptually by knowledge-on-type-values (S5); surface design
+  remains
 
-### Parser & Grammar
-- [ ] Grammar extension DSL — define new syntax from Allegro code
-- [ ] Runtime grammar extension Phase 8 — parser/evaluator reentry threads deferred from Phase 7: per-scope (block-local) grammar activation via `use X in { block }`; single-pass `use X` with arbitrary mid-parse expressions (currently restricted to pre-scanner bootstrap forms); arbitrary-builder parse-time lambdas (templates that evaluate at parse time rather than just substituting). All three share the evaluator-reentry-from-parser architecture work.
-- [ ] Embeddable grammars — switch to different parser mid-file or per-module
-- [ ] Mid-statement grammar switching (low priority)
-- [ ] Bootstrap parser in Allegro
-- [ ] Error recovery improvements (currently skips to next statement)
-- [x] Hybrid parser (Pratt + recursive descent) — O(n) expression parsing
-- [x] Dynamic lexer config — extensions register new operators/keywords
-- [x] Keyword disambiguation — true/false/import/export/when/is/of/none/error/instanceof/subtypeof properly handled
-- [x] Float literals via maximal munch
-- [x] Source location tracking in tokens
-- [x] Expression continuation via offside rule — multi-line if/then/else, operator continuation, nested expressions. Lexer suppresses Newline before Indent, parser tracks continuationDepth.
-- [x] Earley parser retained for standalone grammars
-- [x] Runtime grammar extension Phase 1 — module-scoped `register_infix`/`register_prefix`/`register_postfix`/`register_expr_prefix` primitives, `use_grammar NAME` header (superseded by Phase 6's `use X`), lambda body substituted as AST template (no eval at parse time)
-- [x] Runtime grammar extension Phase 6 — `grammar { infix/prefix/postfix/expr_prefix … }` block, named precedence (`prec(X)`, `at(X)`, `above(X)`, `below(Y)`, combined forms, operator-symbol lookup `at("*")`), anonymous level gensyms, data-driven stratified-stack level insertion in `fragments.ts` (LEVELS array + surgery on base productions), `use NAME` / `use import NAME` pre-scanner replacing `use_grammar`, cross-fragment conflict detection (`E_OPERATOR_CONFLICT`, `E_KEYWORD_CONFLICT`, `E_PRECEDENCE_CYCLE`). Demo: `lib/pow.alg` rewritten to `grammar { infix "**" prec(pow) above(mul) below(unary) right => (l, r) => pow_int(l, r); expr_prefix "neg" => x => 0 - x }`.
-- [x] Runtime grammar extension Phase 6b — EBNF mini-grammar for rule bodies (`"lit"`, `/regex/`, ident refs, `s:rule` labels, `a*`/`a+`/`a?` postfix, `a ** sep` sep-rep, `(a | b)` groups), multi-token `expr_form parts => template` (e.g. `match x with p => e | …`) and `stmt_form parts => template`, user sub-rules via `rule NAME = body => template` (add/replace) and `rule NAME += body => template` (append alternative), positional-label template binding via `substituteParams` at parse time, auto-interleaved whitespace between seq items and around rep separators. Demo: `lib/match_expr.alg` provides `match x with …` in three rule declarations. Fix: `typeLiterals` no longer re-wraps already-typed MultiValues, preventing nested `MultiValue(MultiValue(Bits, T), T)` when a module's typed values flow through a consumer's typing pass.
-- [x] Runtime grammar extension Phase 7 — `new grammar { … }` for fresh empty-base grammars, `grammar extends X { … }` for non-Allegro bases, `use grammar { … }` hosting-file literal (declare + activate inline), `use NAME.MEMBER` dotted module refs to select a specific Grammar binding. Hygienic template substitution (free Symbols resolve at module-definition time, not consumer-eval time). Selector-based surgery: `rule foo -= alt` removes a named alternative, `rule foo[alt] = body => template` replaces one. Analyzer additions: `W_PRODUCTION_REPLACED` (silent base-production shadow), `E_INCOMPATIBLE_GRAMMARS` (fragment base-chain mismatch).
-- [x] Provability arc Phase A — introspection surface. `src/introspect.ts` exposes `summarizeValue` / `summarizeModule` / `safetyGradeFor` / `renderModuleSummary`. CLI: `allegro inspect <file>` emits module summary with per-binding type, primitives used, external refs, safety grade. Web sandbox: Inspect button on every demo shows the same summary with a colour-coded grade badge. No new analyses — Phase A makes existing inference visible so it becomes a reviewable artifact. See `.claude/plans/crystal-proving-curry.md`.
-- [x] Provability arc Phase B — abstract-domain representation alongside runtime predicates: interval / equality / inequality / opaque kinds. `domainFromPredicate` pattern-recognises `_ > k`, `_ >= k`, `_ < k`, `_ <= k`, `_ != k`, `_ == k`, conjunctions. Lattice ops (`intersectDomains`, `joinDomains`, `impliesDomain`). Propagation through `+`, `-`, `*`. Evaluator's `applyPrimitive` attaches domain to results when an operand has one; pure-literal arithmetic untouched. Subtyping check elevated to compile-time via `impliesDomain` in both `type_check_impl` and `checkRefinementPredicate` — domain `≥ 4` passed where `_ > 0` is expected discharges statically with no runtime predicate. Counterexample on construction failure: error includes both constraint and violating value. Pilot: `lib/math.alg`'s `double_pos(x: PositiveInt): PositiveInt`. Deferred to later phases: relational refinements (joint over multiple variables), bounded quantification (∀ i ∈ xs), float intervals, flow-sensitive narrowing in if-then-else, full SMT integration.
-- [x] Provability arc Phase C Chunks 1+2 — predicate sets per binding (`PredicateSet` carries multiple `Predicate`s with source attribution: refinement-type / type-invariant / assert / branch-then / branch-else / requires / ensures / propagation). `applyPrimitive` propagates sets through arithmetic. `eval_if` derives branch predicates and pushes them onto a scope-local `scopePredicates: Map<string, PredicateSet>` carried on `ContextValue`. `assert P` is a stmt_form (`lib/invariants.alg`) that tries static discharge from the bindings' accumulated predicates, narrows scope on success, halts with `AllegroError` and a counterexample on failure.
-- [x] Provability arc Phase C Chunk 4 — `Type.invariant(self => P)` and `NominalType.invariant`. New types carry `__invariantsList: Value[]` and check every clause on construction; multi-clause chaining (`Int.invariant(self > 0).invariant(self < 100)`) reports per-clause failures. Multi-field record invariants reference fields via `self.field`. `extend` carries invariants forward. Pilot: `lib/math.alg` `Range`. Introspection renders `[N invariants]` and `safetyGradeForSummary` flags Error-typed bindings.
-- [x] Provability arc Phase C Chunk 3 — `requires` / `ensures` body-form contracts (`lib/contracts.alg`). Function bodies declare clauses at the head: `requires P` (caller obligation, runtime check at entry, tagged with `source: "requires"` for static discharge) and `ensures P` (implementer guarantee; `_` refers to the result; the predicate compiles to a one-param lambda; `ensures_check(result, lambda)` runs at function exit and attaches the post-condition to the result's predicate set). Tree-builder's `buildBlockExpr` preprocessor hoists requires checks ahead of body via the new `seq` primitive and wraps the result with ensures checks. Introspection: `ValueSummary.requires` / `.ensures` / `.promotionSuggestions` (in-body asserts referencing only function params get flagged for promotion). Pilot: `lib/math.alg` adds `divide`. Demo: `tests/contracts-demo.alg`.
-- [ ] Provability arc Phase C polish — sink-based runtime check generation (move requires checks to call sites with caller-side static discharge); relational predicates over multiple bindings (`a < b`); body-form `assumes P` for trust-boundary asserts; ensures lambdas referencing function params (Phase D relational tracking).
-- [x] Provability arc Phase D1 — effect types via extensible flat labels. `PrimitiveFunctionValue` gains optional `effects: string[]`; the standard library tags `print`/`fetch`/`delay` with `io`/`net`/`time`. Bottom-up inference (`src/effects.ts` `inferFunctionEffects`) walks function bodies, accumulates labels from primitives and transitively-called functions, breaks cycles. Surface syntax: `effects label1, label2` body-form clause via `lib/effects.alg` grammar (stmt_form). The block-expression preprocessor recognises markers and wraps the result with `effects_attach(body, labels)` — a runtime passthrough that's metadata for the analyzer. `evalSource` runs `checkEffectsDeclarations` post-precompile; mismatches (inferred ⊄ declared) throw with a full listing. Introspection surfaces inferred and declared sets in three formats. Demo: `tests/effects-demo.alg`. Pilot: `lib/math.alg` adds `effects pure` to `sqrt`/`pow`/`abs`/`double_pos`. Decision artifacts in `previews/d1-effects.alg`.
-- [ ] Provability arc Phase D1 chunk 2 — higher-order effect annotations (`f: pure (a) => b`); effect-polymorphic functions; `mutation` label after mutable references land. (Sub-chunk 1.1 partial: Effect meta-type substrate landed — see below. Slice 2 covers HOF surface, polymorphism, stdlib annotations, runtime-fallback config.)
-- [x] Provability arc Phase D1 sub-chunk 1.1 — Effect meta-type substrate. `src/types-std.ts` defines `Effect` (`__type = Type`, lattice methods in `__members`), `pureEffect` and `opaqueEffect` (lattice bottom and top, built via `buildEffect(name, kind?)`). TS lattice helpers `effectSubsetOf` / `effectImplies` / `effectIntersect` / `effectUnion` walk `__extends` by identity; conservative fallbacks (`pureEffect` for no-overlap intersect, `opaqueEffect` for non-equal non-trivial union) until Slice 2 introduces anonymous conjunctions. Standard extension exposes `Effect`, `pure`, `opaque` as Allegro source bindings. `pure subtypeof Effect` discharges via existing nominal subtype check. Anonymous conjunction creation and `&` operator surface deferred to Slice 2.
-- [x] Provability arc Phase D1 sub-chunk 1.2 — effects in PredicateSet. `src/refinements.ts` `AbstractDomain` adds `EffectsDomain` (`{ kind: "effects", labels: Set<string> }`); `intersectDomains` / `joinDomains` / `impliesDomain` generalised to handle effect-effect operands (set intersection / union / subset-of-wider) and mixed-kind operands (opaque / false). `PredicateSet` adds `effectiveEffects()` alongside `effectiveDomain()` (which now skips effects predicates so kinds don't pollute each other). `PredicateSource` adds `"effects-declared"` and `"effects-inferred"`. `src/effects.ts` adds `effectPredicatesForFunction` / `effectPredicatesForValue` — uniform predicate-set view derived from the chunk-1 storage (`effects_attach` + `inferFunctionEffects`). Chunk-1 behavior preserved (storage unchanged). Storage migration of `effects_attach` to direct predicate attachment deferred to Slice 2.
-- [x] Provability arc Phase D1 sub-chunk 1.3 — Notification category + stdlib HOF opaque marking. `CompilationReport.notifications: Notification[]` collection (informational diagnostics, never halts). `Array.map` / `Array.filter` / `Array.reduce` tagged `effects: ["opaque"]` via `methodEffects` option on `buildType` / `buildGenericType`; `type_dispatch` propagates effects through bound primitives. Static walker recognises `type_dispatch(obj, "map" | "filter" | "reduce")` patterns and adds `opaque` (compile-time can't follow runtime dispatch). `checkEffectsDeclarations` filters `opaque` out of mismatch computation; `opaqueEffectNotices` emits `effects-opaque-from-stdlib-hof` notifications for visibility. End of Slice 1 — substrate complete, Slice 2 closes the soundness gap with effect polymorphism.
-- [x] Provability arc Phase D1 Slice 2 F1-F3 cleanup — walker removal + notification migration + universalize precompile. Four sub-slices delivered in one pass: (1) Param.predicates docstring tightened, stale comments in primitives.ts / tree-builder.ts updated post-F2 storage migration. (2) `CompilationReport.errors` collapsed into `notifications` with `severity: "error" | "warning" | "info"`; helpers `notificationsBySeverity` / `reportErrors` / `reportHasErrors`; effect / return-type / precompile errors carry stable `kind` tags. (3) `precompileFunctions` driver extended to handle untyped top-level functions and bare ComposedFunction bindings (no paramTypes → bare-Param placeholders, effect inference only); `effectsOf` reads `__inferredEffects` from ComposedFunction primaries as fallback; `precompileFunction` consumes TailCalls (untyped tail-recursive bodies previously returned an unconsumed TailCall, dropping the inferred effects). (4) Walker deleted: `inferFunctionEffects`, `walkValueEffects`, `effectsOfFunctionArg`, `effectsOfWithFallback`, `effectPredicatesForFunction`, `effectPredicatesForValue` removed (~290 LOC). Fallback callers replaced with `effectsOf`. Walker-direct tests rewritten via a thin `inferredEffectsOf` helper. Stage C3 auto-promotion test reframed (PE now resolves inline lambdas precisely on BOTH sides; explicit `[e: Effect]` declaration still matters for forwarded params). Net: 9 files touched, 254 added / 420 removed; 793/793 green. Demos pass. Architectural payoff: effects are now purely PE-derived, no parallel inference algorithm — same engine resolves types, refinements, and effects through one substrate.
-- [x] Provability arc Phase D1 Slice 2 Stage F3b — stdlib HOF migration. Opaque tags on Array.map/filter/reduce removed; walker's `type_dispatch` HOF heuristic removed. `arr.map(io_cb)` now propagates the cb's io effect precisely instead of marking opaque. Mechanism: PE walks the Allegro-built mapAllegro body, hits the cb Param-call, reads cb's effects component (populated by typed_function_impl's new precompile-on-evaluate hook for inline typed lambdas, guarded by a `_precompileInProgress` WeakSet for recursion safety). 2 D1.3 tests updated; 6 new tests; demo `tests/hof-effect-propagation-demo.alg`. 793/793 green.
-- [x] Provability arc Phase D1 Slice 2 Stage F3a — compile-time deferral of effectful primitives. PE inside `precompileFunction` sets `ctx.__compileMode = true`; `applyPrimitive` checks this flag together with `fn.effects` length and returns a residual `makeExpr(fn, evalArgs)` instead of executing. Residual carries effects component so the inferred set still surfaces upward. Side effect fires at runtime when ctx isn't compile-mode. Both eager and lazy primitive paths honor the flag (lazy was the culprit — print/fetch/delay are all lazy). `enrichedCtx` and `augmentScopePredicates` propagate the flag through ctx-creation points. Pure primitives still fold; declaration check still fires (effects flow through the residual). Fixes the long-standing `print("trace")` firing-at-compile issue. 6 new tests; 785/785 green.
-- [x] Provability arc Phase D1 Slice 2 Stage F2 — consumer migration to effects component + Param.effectBound + PE polymorphic propagation. Param storage moves from `predicates` to dedicated `effectBound: EffectSet` (refinement vs effect lattices stay separate). `typed_function_impl` Stage A/C2/D paths write to `effectBound` directly. Walker + PE Param-call read from `effectBound`. New PE Param-call branch attaches the residual's effects from the param's bound — fixes polymorphic forwarders like `apply[e](g: e, x)` populating `__inferredEffects` for callers. Unannotated function-typed Params default to `opaque` (matches walker). `precompileFunction` copies `effectBound` onto placeholder Params. Consumers: `checkEffectsDeclarations` and introspect read `__inferredEffects` first; `checkArgType` / `type_check_impl` read `effectsOfWithFallback(arg)`. Stage D enforcement skips Stage C2 marker bounds. Walker kept alive as fallback for legacy untyped functions. 7 new tests; 779/779 green.
-- [x] Provability arc Phase D1 Slice 2 Stage F1 — effects-as-component substrate (PE-driven). `effects` is now a first-class MultiValue component alongside `type` / `error`. `applyPrimitive` propagates: eager prims union `fn.effects` + arg effects + result effects; lazy prims use a tracking `evalFn` wrapper so seq / eval_if / effects_attach accumulate naturally. Precompile stashes the body-result's effects on `cFn.__inferredEffects`; `typed_function_impl` attaches the component to the typed MultiValue. Pure-literal arithmetic stays uninstrumented. Walker / predicate-set stays alive in parallel during F1→F2 migration. Architectural payoff: effects describe computations (function values, deferred residuals); refinements describe data — the split prevents lattice cross-contamination and sets up F3's compile-time deferral as a one-component check. 9 new tests covering primitive propagation, deferred-residual flow-through, eval_if branch union, and function-value inferred-effects component.
-- [x] Provability arc Phase D1 Slice 2 Stage E — function-type-expression syntax. `(A) => B` parseable in any type-expression position; lowers to `type_function(paramType1, …, paramTypeN, returnType)` evaluating to a concrete `Function[ParamTypes, ReturnType]` identical to `makeFunctionType`. Multi-param `(A, B) => C`, zero-param `() => A`, and curried `(A) => (B) => C` (right-recursive on return type) all work. Composes with generics (`Array[(Int) => Int]`). Grammar lives in `type_expr_atom` tried before `type_generic`. Tree-builder dispatches via the existing `findTypeExpr` helper. Type-check / unification / call-site enforcement work unchanged. Limit: `instanceof (Int) => Int` parses the RHS as a lambda; use `instanceof Function[…]` for that case. Does NOT yet improve Array.map/filter/reduce effect propagation — Stage E ships only the syntax substrate; the stdlib HOF migration with polymorphic effect types is the follow-on slice.
-- [x] Provability arc Phase D1 Slice 2 Stage D — Surface C `param_effects` body-form. Effect-bound declaration alternative to Surface A's param-type slot, useful when the param has a non-trivial type and you don't want to fold the effect into the type expression. `lib/effects.alg` adds `param_effects n: e` stmt_form. Block preprocessor (`buildBlockExpr`) extracts `param_effects_decl_marker(paramRef, effSym)` calls and wraps body with `param_effects_attach(body, paramRef1, effSym1, …)`. `typed_function_impl` peels the `type_check` layer + `param_effects_attach` wrapper, evaluates each effect Symbol against the call ctx, and stamps `Param.predicates` from the Effect's `__effectBound` (by-name match on `_name`). Call-site enforcement: `evaluator.applyComposed` checks `Param.predicates` as a fallback when the param-type slot lacks `__effectBound` — same `impliesDomain` discharge with `(from param_effects)` attribution in error messages. Walker propagation works through the existing Stage B `Param(p)` branch. Surface A and C can coexist; both stamp idempotently. Demo: `tests/effects-surface-c-demo.alg`.
-- [x] Provability arc Phase D1 Slice 2 Stage C3 — multi-variable polymorphism + effect expressions in return position + declaration-check repair. Multi-variable cases (`apply2[e1: Effect, e2: Effect](g1: e1, g2: e2, …)`) and idempotence (`twice[e: Effect](f: e, x): f(f(x))`) fall out of the Stage C2 walker's per-marker positional resolution and Set-based label dedup — no new code. Effect-conjunction at the value level: `typed_amp_impl` now detects Effect-extending operands (via `__extends` chain identity), evaluates the right-side thunk, and dispatches to `effectUnion` (lattice join). Refinement path is preserved as the fallback. Two declaration-check repairs surfaced while validating the new tests: (1) `asFunction` in `src/effects.ts` now peels unevaluated `typed_function(ComposedFunction(…), …)` Expressions so `checkEffectsDeclarations` reaches typed function bodies pre-evaluation (was stopping at the outer Expression); (2) `unwrapEffectsAttach` peels one layer of `type_check(…, returnType)` (the wrapper `maybeTyped` adds for typed-return functions). `__effectvar:NAME` markers in the inferred set are normalised to bare names against the declared set so polymorphic `effects e` declarations verify at definition time. Auto-promotion validation: an unannotated function-typed param produces `opaque` honestly (no silent zero); the explicit `[e: Effect]` form produces precise propagation. Tests in `src/test.ts` cover all five behaviours.
-- [x] Provability arc Phase D1 Slice 2 Stage C2 — effect-variable unification at call sites. `typed_function_impl` stamps Param predicates with `__effectvar:NAME` markers when paramType is a Symbol matching an Effect-kinded generic-param. Walker resolves markers at call sites by walking the corresponding arg via `effectsOfFunctionArg`. `EffectsLookup` callback threaded through inference for cross-binding Symbol resolution. `effectsOfFunctionArg` peers into `typed_function(fn, …)` expressions so inline annotated lambdas resolve. Metadata-preservation fix: `typeLiterals` / `resolveSymbols` / `subst` / `remapParams` carry `__genericParams` / `__effectVarParams` across ComposedFunction clones.
-- [x] Provability arc Phase D1 Slice 2 Stage C1 — generic param list grammar. Function declarations accept optional `[T, e: Effect, …]` between the name and parens (`fn_decl` and `export_fn_decl`). Tree-builder collects via `collectGenericParams` and stamps `__genericParams` on the underlying ComposedFunction. Behavior unchanged — substrate for Stage C2's effect-variable unification.
-- [x] Provability arc Phase D1 Slice 2 Stage B — HOF inference walker. `walkValueEffects` recognises `Expression(Param(p), …)` and pulls `p.predicates.effectiveEffects()`; missing bound → opaque (conservative). `typed_function_impl` stamps `Param.predicates` from `__effectBound` at definition time. New `PredicateSource: "effects-bound"`. 1.3 `type_dispatch(obj, "map" | …)` heuristic remains for stdlib HOFs called on dynamic receivers (cleans up in Stage E). Alias tracking via existing predicate propagation. `f: pure` bounded params produce precise pure inference; unbounded param calls under `effects pure` declaration emit the existing opaque notification rather than halting.
-- [x] Provability arc Phase D1 Slice 2 Stage A — effect bounds via `type_check`. `buildEffect` attaches `__effectBound: EffectsDomain` to Effect-extending types at construction (`pure` → `{}`, `opaque` → no bound, named effects → `{name}`); `type_check_impl` and `evaluator.checkArgType` discharge effect bounds through the same `impliesDomain` path used for numeric refinements. The 1.2 `impliesDomain` orientation for effects fixed (predicate-implication semantics, matching numerics: actual ⊆ bound); `effectImplies` retains capability semantics as the user-facing operator. `ParamValue` extended with optional `predicates: PredicateSet` field (initialised undefined; carried through `remapParams` clone in `subst()`). `f: pure` works end-to-end through both function-call and binding-annotation paths.
-- [x] Provability arc Phase D1 Slice 2 Stage 0 — `&` operator for type/effect conjunction. New precedence level `amp` between `or` and `and`; `typed_amp_impl` handles refinement creation (type intersection and effect conjunction land in later Slice 2 stages). `typed_and_impl` simplified to purely logical AND — `&&` no longer creates refinements. All `T && _ > p` migrated to `T & _ > p` across `lib/math.alg`, tests, and inline test-suite assertions. CLAUDE.md examples updated. Compound predicates now build a single refinement with a compound predicate body (`Int & _ > 0 && _ < 100` → one refinement with `_ > 0 && _ < 100` predicate; `domainFromPredicate` recognises the conjunction as one interval `[1, 99]`).
-- [ ] Provability arc Phase D2 — parametric capability types (`net[api.example.com:443]`), per-module capability budgets, third-party connection detection. Built on D1's substrate.
-- [ ] Provability arc Phase D — effect types in function signatures (pure / io / net / time / rand / mutation), inferred and subtype-checked.
-- [x] Provability arc Phase E — totality and termination analysis. All six stages (0-6) landed: partial opt-out + exhaustiveness for `when/is/then`; structural termination via `param - K` on bounded types; `decreases` body-form for user-attested metrics; mutual recursion via SCC; HOF-mediated recursion through stdlib map/filter/reduce; counterexample rendering on every notification kind.
-- [x] Provability arc Phase E Stage 6 — counterexample rendering. Totality notifications gain an optional `counterexample?: string` field carrying a concrete trace or sample input. Shapes: Bool exhaustiveness emits `` `f(false)` is unmatched ``; self-recursion no-decrease emits `bad(n) → bad(n) [same input passes back]`; mutual recursion emits a cycle path `a(n) → b(n) → a(n) [cycle, no decrease]`; HOF non-decrease emits `recursive_map(arr) calls arr.map(recursive_map) — receiver is not smaller, recursion loops`; failing `decreases` clause emits `` `decreases n` does not decrease on bad(…) → bad(…) at call site ``. Two render helpers (`renderTerminationCounterexample`, `renderMetricCounterexample`) build the strings from the SCC + call-site data. `BindingSummary` gets `totalityNotices?: Notification[]`; `summarizeModule` pre-groups totality notifications by binding; `renderModuleSummary` surfaces a `totality:` block per binding with each message and an indented `counterexample:` line. The `allegro inspect` CLI and web Inspect button now show concrete witnesses inline. 7 new unit tests; 851/851 green; Phase E complete.
-- [x] Provability arc Phase E Stage 5 — HOF-mediated recursion through stdlib `map`/`filter`/`reduce`. Function callbacks passed to HOFs were invisible to the call-graph analyzer (only direct `Expression(Symbol(name), …)` calls counted). Stage 5 adds a second edge kind via a new `CallSite` discriminated union: when the body contains a stdlib HOF dispatch (`Expression(Expression(type_dispatch, [receiver, "map"|"filter"|"reduce"]), [cb, …])`) and any `cb` is a `Symbol(name)` in the cycle, that's an HOF edge carrying the method name + receiver. `collectCalleeNames` was updated in parallel so HOF callbacks contribute to call-graph / SCC computation. Verification: direct calls keep the Stages 2-4 path (`whyNotDecreasing` on the callee's param types); HOF edges run `whyHofCallNotDecreasing` which checks `isHofReceiverStructurallySmaller(receiver)` — Stage 5 minimum recognises only `param.field` access (i.e. `Expression(type_dispatch, [Param(p), Bits(field)])`) as decreasing (field is a sub-component by structural induction). Bare-Param receivers (`arr.map(self)` on the function's own array param) fail and fire. `decreases` clauses skip HOF verification (user-attested metric); `partial` opt-out skips everything. Composes with Stages 2-4: mutual recursion through HOFs is detected as a size-2 SCC with both edges being HOF kind; per-binding message includes the mutual-cycle suffix. Doesn't yet verify the field's static type is Array (the structural-induction argument requires it); also doesn't handle computed sub-arrays like `arr.slice(…).map(self)` — those fall through to the failure path. 8 new unit tests + demo (`tests/totality-hof-demo.alg`); 844/844 green.
-- [x] Provability arc Phase E Stage 4 — mutual recursion via SCC. `checkTermination` builds a call graph from each binding's body (`collectCalleeNames` walks Expressions collecting Symbol-referenced callees), computes SCCs via Tarjan's algorithm, and treats self-recursion (size-1 SCC with self-edge) + mutual recursion (size ≥ 2 SCC) uniformly. Each cycle call is verified against the CALLEE's `paramTypeAsts`, so `a(n: NonNeg) => if n == 0 then 0 else b(n - 1)` proves termination through b's NonNeg bound. Mutual-cycle messages add a `(mutual recursion cycle: a ↔ b)` suffix and `call to \`callee\`:` per-reason prefix; self-recursion wording unchanged. `partial` opt-out is per-binding (a partial member of a cycle doesn't discharge the whole cycle). Non-cycle members (e.g. a helper `id` alongside `a↔b`) stay silent. Replaces `findRecursiveCalls` with `findCallsToCycle` in one pass. 6 new unit tests + demo (`tests/totality-mutual-demo.alg`); 834/834 green.
-- [x] Tail-call through typed-return wrapper — `type_check` and `ensures_check` now forward TailCalls so applyComposed's tco_loop catches them. Pre-existing latent bug surfaced by Phase E Stage 3's `countdown(n: Int): Int => if n == 0 then 0 else countdown(n - 1)` shape: the body `type_check(eval_if(…), Int)` has type_check at the head (tail-position-marked), and `countdown(n - 1)` inside the else thunk is also marked (markTailCallsInValue treats every ComposedFunction body as a function-like body, so eval_if's 0-param thunks get their bodies marked). At runtime the TailCall sentinel from the inner call propagates up through eval_if's return, through type_check's `evalFn(args[0])`, and crashes type_check (which tries to read `.kind` on the sentinel). Fix: type_check / ensures_check detect TailCalls via the now-exported `isTailCall` and forward them unchanged. Soundness preserved — the intermediate type check is skipped on TailCall but the eventual base-case value still passes through the same wrapper. Performance preserved — TCO works through typed returns (verified with 100k-deep `countdown`). The transparent passthroughs (`effects_attach`, `partial_attach`, `decreases_attach`, `param_effects_attach`, `seq`) already forwarded since they just return whatever evalFn returns. 2 new regression tests.
-- [x] Provability arc Phase E Stage 3 — `decreases <metric>` body-form. New stmt_form in `lib/totality.alg` (`decreases metric:expr => metric => decreases_decl_marker(metric)`). Block preprocessor extracts the marker and wraps the body with `decreases_attach(body, metric)`. `unwrapDecreasesAttach` peels via a shared `findAttachWrapper` helper that walks through any of the layered wrapper kinds (`type_check`/`partial_attach`/`decreases_attach`/`effects_attach`/`param_effects_attach`) — same generic peeler now backs `unwrapPartialAttach` too, so `partial` + `decreases` (or any combination) coexist cleanly. Analyzer semantics: `decreases` is a user commitment — verify what we can, trust the rest. Recognised shapes: (1) bare `Param` — positional decrease via `recognizeParamMinusK`, no type-bound check (the explicit clause IS the commitment, unlike Stage 2's strict policy); (2) `typed_array(p1, p2, …)` (i.e. array literal `[a, b]`) — lexicographic decrease, verified component-wise with `findLexDecreasePosition` (earlier components must stay equal, then some position decreases). Unrecognised metric → silent (trust). `partial` opt-out overrides `decreases`. 9 new unit tests + demo (`tests/totality-decreases-demo.alg`); 826/826 green.
-- [x] Provability arc Phase E Stage 2 — structural termination check. `checkTermination` walks every recursive function's body, locates `Expression(Symbol(fnName), …)` self-calls, and verifies at least one positional argument shape `bits_sub(Param(pos), Bits k)` with `k > 0` where the corresponding param has a refined type whose abstract domain has `lo >= 0` (interval) or `value >= 0` (equal). Confidence policy: silent on non-recursive functions and on recursive functions whose decreasing param has no static type (untyped Allegro code keeps running clean). Fires `totality-nontermination` (severity `info`) when: (a) recursion exists but no parameter strictly decreases, OR (b) decrease detected but param's type is unbounded below — message names the param and suggests `NonNeg` / similar. Symbol-typed annotations (`n: NonNeg` where `NonNeg = Int & _ >= 0` is a source binding) resolve via a `totalityCompileCtx` that mirrors `precompileFunctions`' approach: primitives + extensions + source bindings, so user-defined refinement types evaluate on demand. 7 new unit tests + demo (`tests/totality-termination-demo.alg`); 817/817 green.
-- [x] Provability arc Phase E Stage 0+1 — totality substrate + exhaustiveness for `when/is/then`. `partial` body-form (`lib/totality.alg`) opts a function out of the totality analyzer; `partial_attach(body)` wraps the result, peeled by `isFunctionPartial` / `unwrapPartialAttach` (`src/totality.ts`). Three notification kinds reserved (`totality-exhaustiveness`, `totality-nontermination`, `totality-needs-annotation`) all default to `info`. Stage 1: `checkExhaustiveness` walks every function binding's `eval_when` chains; for each chain without an explicit `else` or wildcard / bind-to-name pattern, resolves the subject's static type (Param via the typed_function signature's paramType ASTs + Symbol lookup against extensions) and emits a notification when the type is finite-domain Bool with missing literals, or uncountable (Int/Float/String) with no fallback. Confidence policy: stay silent when the subject type can't be determined. Prerequisite fix: `eval_when` now returns a residual when its subject is unresolved (Rule 2 analogue) — previously fell through to `when_no_match` which threw, producing spurious precompile errors. 9 new unit tests + 2 demo files (`tests/totality-partial-demo.alg`, `tests/totality-exhaustiveness-demo.alg`); 809/809 green.
-- [ ] Provability arc Phase F — proof terms as first-class values, tactic library, counterexample-driven development. (F1-F5 + F7 done — see below; plan in `.claude/plans/phase-f-plan.md`. F6 Lean export pending — long-term trust-chain piece, orthogonal to the rest.)
-- [x] Provability arc Phase F7 — `proven` clause on function declarations. The [impl, proof] pair surface for Phase H AI collaboration. `proven <prop>` body-form attaches a theorem to a function; compiler verifies by BOUNDED SAMPLING (K=4 inputs over the param's type — Bool enumerates, refined Int reads `__abstractDomain.lo` for samples, plain Int uses mixed boundary/neg). lib/proven.alg stmt_form → proven_decl_marker; buildBlockExpr extracts (multiple clauses accumulate) and wraps body with proven_attach. src/proven.ts checkProvenClauses peels via unwrapProvenAttach (added to totality.ts wrapper names), substParams walks predicate AST replacing Params with typed sample MultiValues, evaluates via standard evaluator, requires fold-to-true. Failure halts with concrete counterexample; multi-param / non-sampleable types emit proven-skipped info. Critical infrastructure fix: isPrimitiveCall in tree-builder now peels MultiValue-wrapped fn refs (lib templates resolve to UntypedFunction MultiValues) — without this, ALL body-form markers from lib modules would silently fail to extract. 8 unit tests + demo (`tests/proofs-proven-demo.alg`); 912/912 green.
-- [x] Provability arc Phase F5 — universal quantification + bounded induction. Two new lazy primitives: `prove_for_all_bool(predicate)` enumerates the Bool domain (∀b, p(b)) by evaluating p(true) and p(false); `prove_induction(predicate, base_proof, step_fn)` discharges ∀n: NonNeg, p(n) by BOUNDED SAMPLE VERIFICATION (Stage-5 minimum, K=4): verify base_proof discharged + predicate(0) folds true, then invoke step_fn(n, ih) for n=0..3 threading the previous step's result as ih, requiring each return to be a discharged Proof and predicate(n+1) to fold true. Counterexamples name the failing n + reason. Full symbolic induction is F5+ (would need reasoning over unbounded n beyond PE-as-discharge). `lib/tactics.alg` adds `by_cases_bool` / `by_induction` wrappers. Composes with theorem/verify via F2 proof_by_eval passthrough. 10 unit tests + demo (`tests/proofs-induction-demo.alg`); 903/903 green.
-- [x] Provability arc Phase F4 — tactic library (pure Allegro). `lib/tactics.alg` composes F1–F3 proof primitives into reusable strategies; no new host primitives, demonstrating the combinator core is expressive enough to build proof tactics in Allegro itself. Exports `same`/`flip`/`under`/`step`/`chain`/`rewrite`. `chain` folds `proof_trans` over an Array of equality proofs (`[a==b, b==c, c==d] ⊢ a==d`); `rewrite(eqAB, f, eqFAC)` substitutes a by b inside f given f(a)==c ⊢ f(b)==c, composed as `proof_trans(proof_cong(f, proof_sym(eqAB)), eqFAC)`. Module loaded via the modules.alg pattern (extensionToContext); failed tactic outputs surface through checkProofs with the inner reason propagated via proof_check. 7 unit tests + demo (`tests/proofs-tactics-demo.alg`); 891/891 green.
-- [x] Provability arc Phase F3 — proof combinators + `theorem … by <proofterm>`. Equality proofs carry `__eq_lhs`/`__eq_rhs` (stashed by an extended `proof_by_eval` on `bits_eq`/`typed_eq` props). Combinators: `proof_refl`, `proof_sym`, `proof_trans` (middle-term value-match), `proof_cong` (applies f to both sides). `theorem N: P by <term>` grammar slot (`by`, non-reserved, avoids the `=>` lambda ambiguity); `proof_check` (lazy) enforces soundness — the term must establish exactly P (equality props value-matched against the proof's operands; wrong-fact proofs rejected), failed terms propagate their inner reason, non-equality props fall back to eval-consistency + accept discharged-Proof propositions (F2 compose). Critical fixes: combinators registered LAZY (eager primitives get `primaryOf`'d args which strip the Proof type + operands); structural proof recognition via `proofCtx` (the `__discharged` binding) not the type component; `theorem_decl` tree-builder keyed off `:`/`by` delimiters (forward `c.find(EXPRESSION_TAGS)` had grabbed the theorem-name ident as the proposition → self-referential infinite recursion). Named theorems compose (nested `proof_trans`); bare combinator bindings still surfaced by `checkProofs`. 11 unit tests + demo (`tests/proofs-combinators-demo.alg`); 883/883 green.
-- [x] Provability arc Phase F2 — proof by refinement-domain entailment. `proof_refines(value, refinedType)` discharges through the existing `impliesDomain` lattice (Phase B/C machinery — no parallel infra). Reads the refined type's `__abstractDomain` and the value's domain via newly-exported `domainOrFromValue` (predicate set / propagated / bare literal `eq(k)`); entailment → discharged Proof, else failed Proof with a `counterexampleFor`-generated witness. `proof_by_eval` now passes Proof values through (an `_isProof` check), so `theorem`/`verify` compose with `proof_refines`. Predicate-set entailment composes (`SmallPos(50)` ⊆ `NonNeg`). Base types without a refinement domain rejected with guidance. Display fixes: refined type's own `__name`, signed-int rendering. 8 unit tests + demo (`tests/proofs-refines-demo.alg`); 872/872 green.
-- [x] Provability arc Phase F1 — proof terms substrate. `Proof` meta-type (`src/types-std.ts`, mirrors `Effect`), bound into the standard extension. `proof_by_eval(propSrc, propExpr)` lazy primitive (`src/primitives.ts`): PE the proposition — true → discharged Proof, false → failed Proof with `\`P\` evaluates to false` counterexample, unresolved → failed Proof (`could not be discharged by evaluation`; F1's contract is provable-by-evaluation). Base-grammar surface (provability is Allegro's defining feature, not opt-in): `theorem NAME: <prop>` (named referenceable Proof binding) and `verify <prop>` (anonymous one-shot), tried before binding/fn_decl/expr, non-reserved (backtrack to ordinary binding so `theorem = 42` still parses). `buildStmt` captures proposition source via `textOf` (label only). `src/proofs.ts` `checkProofs` + helpers; `evalSource` loop collects failed proofs and throws with error-severity `proof-failure` notifications ("build safety in" — same as effects-mismatch). PE-as-discharge demonstrated: `verify f(2) == 3` discharges via PE folding `f(2)`→3→true. No `=> <proofterm>` slot yet (F3). 12 unit tests + demo (`tests/proofs-demo.alg`); 863/863 green.
-- [ ] Provability arc Phase G — provable standard library rewrite (map/filter/reduce/sort/search with algebraic theorems). Pilot landed — see below. Full rewrite of Array.map/filter/reduce + sort/search remains as expansion of the pilot.
-- [x] Provability arc Phase G pilot — `lib/provable.alg`. First library that walks the talk: utility functions (abs/sign/square/min2/max2/negate) ship with 23 named theorems about their correctness, all checked at lib load time. Discharge mix: F1 PE for concrete inputs, F3 proof_refl for reflexive, F5 prove_for_all_bool for the Bool involution law. No `use` headers (lib loader uses plain runtimeEval) and no cross-lib imports — proof primitives are in the standard env. Downstream consumers state local theorems via dot-access (`provable.abs(0 - 100) == 100`) that PE-discharge through the imported function values. Demonstrates the F-arc handles real lib code under real load. 5 unit tests + demo (`tests/provable-demo.alg`); 918/918 green.
-- [x] Lib loader pipeline unification — libs and top-level files now go through the SAME entry point (`evalSource`). The pre-scan for `use NAME` / `use import NAME` / `use NAME.MEMBER` directives at the head of a lib file is the same one top-level files use (shared `src/use-scanner.ts`); referenced modules are recursively loaded through `ModuleLoader.loadModule` itself so transitive uses resolve through the same path resolver. The lib's body (post-header) is handed to `evalSource` in typed=Allegro Standard mode with the union of std + dep + nested-use extensions, so every check the kernel runs on user code (typeLiterals, precompile, effects-mismatch, totality exhaustiveness / termination, F1 proof failures, F7 `proven`-clause sampling) also runs on lib code. A buggy lib (false `proven` clause, undeclared effect, non-exhaustive `when/is/then`) now halts compilation with the same error it would in user code, instead of silently producing broken bindings. `use grammar { … }` literal blocks inside libs are explicitly rejected with a clear error (deferred — they need a bootstrap evalSource recursion). Unblocks `proven`, `assert`, `requires`/`ensures`, `effects`, `decreases`, `partial` body-forms inside any lib file. 3 new module-loader regression tests (resolves through loader, reports failed proven, rejects literal use grammar); 974/974 green.
-- [ ] Provability arc Phase H — Proof Collaboration Protocol (PCP). Participant-neutral protocol: prover (LLM, human, SMT, hybrid) proposes [impl, proof], kernel verifies, structured iteration on failure. Plan in `.claude/plans/phase-h-plan.md`. H1+H2+H3+H4a+H4b + the benchmark suite done — see below. H5 (catalog), H6 (multi-strategy parallel), H7 (effort budgets + reproducibility) pending.
-- [x] Provability arc Phase H benchmark suite (`bench/`) — the falsifiable validation the plan pairs with H4. A 10-obligation graded corpus (`bench/corpus/*.alg`, solved form) measured across baselines through the SAME kernel `allegro verify` / `prove` use: **reference** (curated proof discharges — corpus validity), **auto-PE** (goal's `by` term stripped — the kernel's free coverage), **gate** (`by` term replaced by a wrong sentinel — `proof_check` must reject it), **LLM** (the gated/pending form handed to the Claude worker — convergence + attempts; optional, needs `ANTHROPIC_API_KEY`). `bench/manifest.ts` (corpus metadata + `WRONG_SENTINEL_TERM`), `bench/harness.ts` (`runBenchmark(opts)` → `BenchReport`; `stripProof` mirror of `spliceProof`; loads via `createTypeSystem()` only — corpus uses standard-env proof primitives, no module resolver), `bench/run.ts` (`npm run bench`; table or `--json`; `--llm`/`--model`/`--only`; exit 0 iff corpus healthy — LLM convergence never gates exit). Categories: refl-trivial (t01-03), combinator sym/trans/cong/rewrite (t04-08), type-bound `proof_refines`/`prove_for_all_bool` (t09-10, auto-PE-only, no `by` slot). **Headline finding**: PE-as-discharge is total over closed propositions — auto-PE discharges 10/10 with no prover; the prover's measurable work is supplying soundness-gated `by` terms (the 8 gated obligations), which is precisely the `allegro prove` loop. Deterministic baselines pinned by 4 tests in `src/test.ts` (`runBenchmarkTests`, incl. a mock-client LLM run); `bench/README.md` documents the design. 978/978 green.
-- [x] Provability arc Phase H4a — LLM worker (`allegro prove`). Closes the central thesis bet end-to-end. Subcommand `allegro prove <file> [--max-attempts N] [--model M] [--output FILE.alg] [--json]` extracts pending obligations, asks Claude (via `@anthropic-ai/sdk`, new dep) for proof terms, splices into source, verifies, iterates. Records authorship `{prover: <model-id>, attemptsUsed: N, role: "primary"}`. `pcp/llm-worker.ts` layers: pure helpers (extractCodeBlocks / spliceProof / buildIterationMessage / classifyStrategy) tested in isolation, lazy SDK import (no-key path errors cleanly pointing at `allegro propose`), orchestrator (runLlmWorker) ties them with mock-client tests covering success / bad-term retry / malformed response. Prompt caching on the participant-neutral system primer at `docs/proving-in-allegro.md` (same text humans read). Out of scope for minimum: `proven` body-form discharge, multi-strategy parallel (H6), token budgets (H7). 13 unit tests + 3 mock-client async tests + 1 CLI smoke; 971/971 green.
-- [x] Provability arc Phase H4b — human-interactive worker (`allegro propose`). First reference worker on the H1+H2+H3 substrate. Subcommand `allegro propose <file> [--output FILE.md] [--all]` loads the file (softFail), builds a Verdict, enumerates obligations + joins per-theorem hints, emits a Markdown TODO via new `formatTodo` helper. Sections include proposition (fenced `allegro` code block), function signature, last failure + counterexample, hints with suggested constructs as italic-code asides, lemma list (truncated at 8 with "+N more"), prior-attempts count. Pragmatic shape (vs. the plan's per-theorem scratch files): single Markdown work-list the developer reads while editing source in their own editor, re-runs `allegro verify` to iterate. Zero new dependencies — H4b proves the protocol is genuinely participant-neutral. Authorship recording (`--author`) deferred to H4b.1. 5 unit tests + 2 CLI smoke tests via spawnSync; 957/957 green.
-- [x] Provability arc Phase H3 — PCP iteration hints. Verdict gains `iterationHints` (suggestions + strategiesTried); PriorAttempt gains `strategiesUsed` (round-tripped). `generateHints(theorems, report, obligation?)` produces transparent compiler-side suggestions from failure patterns: PE-residual → suggest a combinator + `proof_trans` construct; false proposition → revise theorem; middle-term mismatch → `tactics.chain`; wrong proof → "different fact"; F7 `proven-failed` with `at <param> = <value>` counterexample → names violating input; F7 skip shapes → restructure suggestions. Global lemma reminder when obligation lists lemmas. strategiesTried aggregates + dedupes across priorAttempts. `buildVerdict` takes optional obligation; CLI's `verify --obligation` feeds it through. `formatVerdict` renders a hints: block. Sample evolution deferred to H3.1. 9 unit tests; 952/952 green.
-- [x] Provability arc Phase H2 — PCP `verify` / `obligations` CLI subcommands. `allegro verify <file> [--obligation O.json] [--json]` loads the file (mirrors `inspect`'s pipeline) with new `softFail` mode (suppresses proof-failure throws), builds a Verdict via `buildVerdict`, optionally cross-checks against an obligation (`checkObligationSatisfied` matches name + propositionHash to block trivial-pass attacks), emits plain-text or JSON. Exit 0/1 by `verified`. `allegro obligations <file> [--pending] [--json]` enumerates theorems as Obligations with lemma-list context (newline-delimited JSON for streaming). New `evalSource` `softFail` 7th arg. `buildVerdict` / `extractObligations` / `checkObligationSatisfied` helpers in src/pcp.ts. Anonymous `verify` failures surface as `<verify>` theorems via the proof-failure notification path. 11 unit tests + 2 CLI smoke tests; 943/943 green.
-- [x] Provability arc Phase H1 — PCP schemas. `src/pcp.ts` defines three canonical JSON schemas at version `"pcp/1"`: Obligation (theorem + function + context + prior attempts), Verdict (per-theorem status + counterexamples + totality findings + effect mismatches), Authorship (ordered prover list — supports multi-prover proofs from day one). Round-trip stable; validators reject wrong version + missing fields. Basic plain-text renderers (`formatObligation`/`formatVerdict`/`formatAuthorship`) for direct CLI use; JSON is the canonical wire format for IDEs/external tools. `hashProposition` (djb2, whitespace-canonicalised) for stable theorem-identity. Builders: `makeObligation`, `makeAuthorship`, `AUTO_PE_AUTHORSHIP()`. 14 unit tests; 931/931 green.
-- [ ] Provability arc Phase I — code generation (JS/WASM/native), informed by invariants and effects for aggressive but safe optimization.
-- [ ] Provability arc Phase J — review UX: semantic summary as primary artifact; drill-down to code on demand.
-- [x] Grammar 2 formalism Phase 1-5 — scannerless engine, builder primitives, TS analyzer (`src/grammar2/analyzer.ts`), Allegretto base grammar, hybrid parser + lexer retirement, `lib/grammar-analyzer.alg` Allegro-native port of the analyzer (all checks except FIRST), memo-bucketing perf fix (42-50× speedup, linear scaling restored).
-- [ ] Grammar 2 Phase 7+ — indent engine extensions, full GLL for left recursion, precedence analyzer, stratified-grammar migration of remaining Allegro syntax, Phase 9 target code emitter.
+### L2 — provability capability (M4)
 
-### Execution Context & Build Pipeline
-- [ ] Project root file (structure, phases, deps — replaces package.json + tsconfig)
-- [ ] Phase-specific resource declarations (`ctx_use` with type annotations)
-- [ ] CLI modes: `allegro run`, `allegro build`, `allegro test`
-- [ ] Multi-phase build pipeline implementation
+- [ ] **B-051** · `[reval]` Roadmap remainder revalidation: D2 parametric
+  capabilities, D3 information flow, D4 behavioral budgets, D5 declared
+  intent (source: `.claude/plans/archive/crystal-proving-curry.md`) —
+  revalidate against v2 before scheduling
+- [ ] **B-052** · F6 Lean export: proof terms → Lean, refinements →
+  subtypes, verified-substrate `Allegro.lean` → `proofs.md` in
+  `docs/design/standard/` (source:
+  `.claude/plans/archive/phase-f-plan.md` §F6)
+- [ ] **B-053** · Phase G expansion: provable stdlib rewrite (sort/search
+  + algebraic theorems on map/filter/reduce)
+- [ ] **B-054** · PCP H5 proof catalog (`proofs.json` per project)
+- [ ] **B-055** · PCP H6 multi-strategy parallel prover orchestration
+- [ ] **B-056** · PCP H7 effort budgets, escalation, reproducibility
+- [ ] **B-057** · Phase C polish (scope decided during B-014): sink-based
+  check generation at call sites, relational predicates (`a < b`),
+  `assumes` trust-boundary form, ensures referencing params
+- [ ] **B-058** · Per-project notification-severity config (kind →
+  severity remap; substrate shipped in v1)
 
-### Module System
-- [x] Standard library — `lib/math.alg` (sqrt, pow, sin, cos, abs, floor, ceil, round, min, max, clamp, sign, PI, E, TAU), `lib/functional.alg` (identity, constant, flip, compose, pipe, apply, twice, thrice, on), `lib/collections.alg` (range, zip, flatten, take, drop, head, tail, last, reverse, sum, product, contains, indexOf)
-- [x] System library resolution — local lib/ first, system lib/ fallback
-- [x] Standard parser in modules — modules can use typed syntax (Float, Int, etc.)
-- [ ] Qualified import (`import math.round`)
-- [ ] Re-exports
-- [ ] Module versioning and compatibility
-- [ ] Circular dependency handling (currently prohibited)
-- [x] Export keyword — `export name = value`
-- [x] Module encapsulation — type-directed access, unexported bindings hidden
-- [x] On-demand module loading from `lib/` directory
+### T-build (M6)
 
-### Language Features
-- [x] String interpolation — `"hello {name}"`, `"{expr}"`, escaped `\{`
-- [x] Implicit async via futures — FutureManager bridges JS Promises to forward-chaining. `delay(ms)` primitive. Deferred print. No `await` keyword needed.
-- [x] `fetch(url)` primitive — async HTTP GET, returns future resolving to String. Works in Node 18+ and browsers. Error responses become error values.
-- [x] Browser async demos — web sandboxes use `evalAllegroAsync` with streaming output. Fetch and delay demos on allegrolang.org.
-- [ ] Async I/O primitives — file read/write, WebSocket, timers (execution-context provided)
-- [ ] Sync/async type modifiers — explore async-by-default with `sync` optimization hint
-- [ ] Configurable mutability — linear types, transient mutation, semantic variants
-- [x] Error values — `error` keyword, automatic propagation through operations, Error type
-- [x] None type — `none` keyword, singleton value, returned for absent MultiValue components
-- [ ] Error handling — try/catch syntax (deferred; can use `if error of x is E` for now)
-- [ ] Algebraic effects — `perform`/`handle`/`resume` (requires continuations)
-- [x] Pipe operator (`|>`) — `x |> f` desugars to `f(x)`, left-associative, bp=3
-- [ ] Regular expressions
-- [x] Logical operators — `&&`, `||`, `!` with short-circuit semantics
-- [x] String operations — fully typed (17 methods)
-- [x] Array higher-order methods — map, filter, reduce
-- [x] Type annotations — function params and return types with generics
-- [x] MultiValue component access — `Y of x` syntax (e.g., `type of value`, `error of value`)
-- [x] Error propagation — errors as MultiValue components, auto-propagation in evaluator
-- [x] None type — `none` keyword, returned for absent components
+- [ ] **B-059** · Project root file (structure, phases, deps)
+- [ ] **B-060** · CLI modes: `allegro build` / `allegro test` (run/verify/
+  prove/propose/inspect/obligations exist)
+- [ ] **B-061** · Multi-phase build pipeline: design (per-layer
+  capabilities per 2026-07 ruling) then implementation; phase-gate checks
+- [ ] **B-062** · Typed phase-resource declarations (successor to retired
+  `ctx_use` — design with B-013)
+- [ ] **B-063** · Tree shaking via partial evaluation
 
-### Standard Libraries
-- [ ] Filesystem (read/write, provided by execution context)
-- [ ] Networking (HTTP, sockets)
-- [ ] Process management (spawn, signals)
-- [ ] Math (trig, pow, sqrt — as typed Allegro functions)
-- [ ] Collections (Map, Set — as typed generic structures)
-- [ ] Regex
+### T-tooling (M7)
 
-### Runtime & Tooling
-- [ ] Browser runtime (core is browser-compatible, needs packaging)
-- [ ] Debugging and execution/evaluation tracing
-- [ ] REPL improvements (multi-line input, better error display, tab completion)
-- [ ] Expression graph processing (query, transform, rewriting)
-- [ ] Language server protocol (LSP) for IDE integration
+- [ ] **B-064** · Execution tracing + step-through debugging
+- [ ] **B-065** · REPL improvements (multi-line, error display, completion)
+- [ ] **B-066** · Expression-graph processing (query/transform/rewrite)
+- [ ] **B-067** · LSP / IDE integration
+- [ ] **B-068** · Review UX (v1 "Phase J"): semantic summary as the primary
+  reviewable artifact, drill-down to code
+- [ ] **B-069** · CLAUDE.md slimming completion (history → CHANGELOG;
+  session contract only)
 
-### Long-term / Allegro Vivace (top tier, fka "Allegro High")
-- [ ] Logic programming extensions/DSL
-- [ ] Constraint programming
-- [ ] Data modeling DSL
-- [ ] Numerical methods
-- [ ] Sophisticated declarative composition
-- [ ] Multiple semantic models (functional, imperative, mixed) as extensions
-- [ ] Software-systems modeling DSL
-- [ ] Workflow/process DSL
-- [ ] Automatic-reasoning DSL
-- [ ] UI modeling DSL
-- [ ] Data/analytics DSL
-- [ ] v1 bootstrap domain models (3–5 candidates) — pick the ones that demonstrate end-to-end loop on real use cases
+### T-host
 
-### Vivace Usability Research (open gaps)
+- [ ] **B-070** · Browser runtime packaging (core is browser-compatible)
+- [ ] **B-071** · Async I/O capabilities: filesystem, networking, process,
+  WebSocket, timers (env-provided, effect-labeled)
 
-These track the gaps identified in the Vivace usability vision discussion. Each is a known-unsolved research/design question, not a coding task with a known shape. See `memory/design_vivace_vision.md` for the posture and partial answers.
+### T-backend (M8)
 
-- [ ] **Counterexample legibility — domain-specific rendering layer.** PE produces residual-expression counterexamples; non-experts can't read them. Need a rendering layer where each domain model emits failures in its own vocabulary ("task A and B can deadlock on queue Q", not a residual with substituted Params). Places constraints on domain-model authors. **Foundational** — coupled to the AI iteration loop.
-- [ ] **Model composition patterns.** Real systems compose multiple domain models (workflow + data + UI + analytics). When predicates from different models interact, who arbitrates? Who owns cross-domain predicates? Risk of combinatorial explosion in multi-domain [impl, proof] generation. Allegro design goal — composition patterns not yet designed.
-- [ ] **AI iteration loop — usable failure modes.** When PE produces a residual the agent can't discharge, what does the agent see? When the agent can't solve, how is failure surfaced (cross-domain counterexamples, agent-suggested problem restructuring, time-boxing)? Should feel like positive learning, not a frustrating maze. Agents will use multiple models with different capabilities. Coupled to counterexample rendering — same artifact serves humans and agents.
-- [ ] **Proof exportability.** Proofs should be re-checkable by external tools (Lean / Coq / similar). Real challenge: which base implementation components ship with the proof to make it concrete enough to check externally. Pairs with transitive assurance through dependencies. See `memory/design_proof_exportability.md`.
-- [ ] **Constraint-set completeness — organizational process (longest critical path).** "Release when constraints are right" — who decides? Under-spec lets bugs through; over-spec blocks legitimate code. Probably AI-assisted recursive review ("here's a constraint your code assumes but didn't state"). Deeper question is org design: what process do orgs need? How different from current? Translation must be comprehensible AND valuable. Needs external research / customer interviews — not internal design.
-- [ ] **Bootstrap economics.** Vivace's value depends on rich domain models. Until those exist, it's Allegro Standard with extra ceremony. Depends on user engagement; v1 models won't be mature; need to start somewhere. Roadmap question.
-- [ ] **Escape-hatch awareness — partly resolved by inversion.** Principle: business rules define the domain, not vice versa. If the language doesn't exist to express a rule, extend the language; don't drop a tier. Lack of expertise to define domain terms soundly is comparable to a developer today who can't write a GraphQL query — collaboration, time-boxing, learning. See `memory/design_business_rules_define_domain.md`. Open piece: tooling to detect "you're cycling on this rule, here are options" so developers don't blame the system rightly.
+- [ ] **B-072** · Code generation: expression graph → JS first;
+  continuations decision feeds B-048/B-073 (v1 "Phase I" — revalidate
+  against v2 graph shapes; Grammar 2 "Phase 9" emitter folds in here)
 
-## 3. Immediate To Do
+### T-perf
 
-Priority-ordered list of next items to implement:
+- [ ] **B-073** · Continuation-based TCO (Stage 2)
+- [ ] **B-074** · Memoization as opt-in Standard feature (re-decide after
+  Phase 4 representation data)
+- [ ] **B-075** · Parser constants / tokenizer layer if 1–2k-line corpus
+  demands (benchmark first)
 
-1. **User-defined type declaration syntax** — syntax sugar for `extend`/`where`/`distinct`/`interface` (deferred until API patterns are clear)
-2. ~~**Refinement types**~~ — ✅ Phase 1: `Int && _ > 0` syntax, predicate checks at construction/annotation/call sites, `.preserveOps()` operator lifting. Phase 2 deferred: algebraic constraint propagation (`y = x + 1` inheriting `_ > 1`), type parameter constraints (`Array[T] && T subtypeof Int`), flow-sensitive narrowing.
-3. ~~**Migrate array methods to Allegro**~~ — ✅ map/filter/reduce as Allegro ComposedFunctions (recursive AST construction)
-4. ~~**Mixins**~~ — ✅ `.mixin({method: fn})` adds Method descriptors to types, ComposedFunction method dispatch with self binding, error on name conflict
-4b. ~~**Parser combinators from Allegro**~~ — ✅ Phase 1: `grammar_new`/`grammar_terminal`/`grammar_phrase`/`grammar_choice`/`grammar_choice_add`/`grammar_repeat`/`grammar_optional`/`grammar_set_target`/`grammar_parse` primitives expose the Earley parser to Allegro. Parse returns tree of Allegro values (Terminal→String, Phrase→Array, Disjunction→transparent, Repetition→Array with delimiters stripped, Optional→value or none, errors→typed Error). Demo: `tests/grammar-regex.alg`. Phase 2 deferred: inline Allegro semantic actions, runtime extension of Allegro's own grammar (`register_infix`).
-5. ~~**Meta-type dispatch for ComposedFunction descriptors**~~ — ✅ `type_dispatch_impl`'s untyped-Context meta-type path now handles ComposedFunction method descriptors in addition to PrimitiveFunction, mirroring the typed-value path. Both the `__members` descriptor branch and the `typeMethod` direct-binding fallback handle both function kinds.
-6. ~~**Nested refinement + mixin constructor unwinding**~~ — ✅ `buildMixinType` rebuilt: now delegates to `parentConstruct` (which already chains all predicate checks through nested refinements) and retags with the mixin type, rather than manually unwinding one level. Also fixed a related error-propagation bug in `refined.__construct` where an error from a parent refinement check would get silently retagged instead of propagated.
-7. ~~**8-byte string literals collide with Int in `typeLiterals`**~~ — ✅ Fixed by wrapping string literals with `typed_string` primitive at parser time (hybrid-parser.ts lines 566, 666), so typeLiterals' length heuristic only applies to actual int literals.
-8. ~~**Stack overflow in `seq(zero_or_more(m), m2)` parser combinators**~~ — ✅ Fixed via the Param-sharing fix in evaluator.ts (see note 9).
-9. ~~**Mutual recursion between user functions and parse tree walkers fails silently**~~ — ✅ Root cause: in `subst()` (evaluator.ts), when descending into a ComposedFunction to substitute free variables, `newFn.params = value.params` shared the params array. Subsequent `p.owner = newFn` mutated the shared Param objects, so earlier closures created from the same factory had their params' owner overwritten to point to the *latest* closure. This caused inner-lambda param lookups to fail silently or stack-overflow. Fix: clone the params array AND each ParamValue, then remap Param references in the new body via a `paramMap` → newParam lookup. This is in `src/evaluator.ts` `subst()` ComposedFunction case, with a new `remapParams` helper. This fix also unlocks full mutual-recursion and combinator-composition patterns that previously failed.
+### T-bootstrap (M9)
+
+- [ ] **B-076** · Self-hosted parser (standard parser re-expressed via L3
+  parser generator per 2026-07 ruling)
+- [ ] **B-077** · Self-hosted type system / module system
+
+### T-ecosystem (M10)
+
+- [ ] **B-078** · Module versioning + compatibility; dependency
+  resolution; registry
+
+### L3 — Vivace (M5)
+
+- [ ] **B-079** · `[reval]` Planning DSL revalidation → `planning-dsl.md`
+  in `docs/design/vivace/`: outcome-DAG model, 12 conventions, rejections,
+  `SoftwareRelease` example; Shape 1/2 + pilot roster proposed into
+  VISION §4 (Tier 0 — propose, don't land). Source:
+  `.claude/plans/archive/project-1-planning-dsl-design.md`.
+  `lib/planning.alg` stays paused until then
+- [ ] **B-080** · Vivace DSL candidates (post-pilot roster): logic
+  programming, constraint programming, data modeling, numerical methods,
+  software-systems modeling, workflow/process, automatic reasoning, UI
+  modeling, data/analytics; semantic-model variants (functional/
+  imperative/mixed) as extensions
+- [ ] **B-081** · Counterexample legibility — domain-specific failure
+  rendering layer (foundational; coupled to the AI iteration loop; see
+  `docs/VISION.md` §4)
+- [ ] **B-082** · Model composition patterns (cross-domain predicates,
+  arbitration, multi-domain [impl, proof] explosion risk)
+- [ ] **B-083** · AI iteration loop — usable failure modes (residuals the
+  agent can't discharge; surfacing; time-boxing; shared artifact with
+  B-081)
+- [ ] **B-084** · Constraint-set completeness — organizational process
+  research (external interviews; longest critical path)
+- [ ] **B-085** · Bootstrap economics — Vivace value vs. domain-model
+  maturity (roadmap question)
+- [ ] **B-086** · Escape-hatch awareness tooling ("you're cycling on this
+  rule — options"); posture per `docs/VISION.md` §5 principle 4
