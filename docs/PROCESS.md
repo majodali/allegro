@@ -137,7 +137,7 @@ gotcha list lives in `CLAUDE.md`):
   forward TailCall sentinels and be peelable by the shared
   `findAttachWrapper` helper — never add a bespoke peeler.
 - **No new meta-property on type/value Contexts without registering it** in
-  the meta-protocol registry in `docs/design/type-system.md` (name, owner,
+  the meta-protocol registry in `docs/design/standard/type-system.md` (name, owner,
   contract, lifecycle). The `__`-prefix convention is an accreted artifact
   under revision — follow the registry's current guidance.
 
