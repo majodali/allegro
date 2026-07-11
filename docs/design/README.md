@@ -28,4 +28,7 @@ Every section is tagged with its implementation status:
 Planned (created when their design discussions happen or content is
 promoted): `architecture.md` (value kinds, evaluator, PE model),
 `proofs.md` (discharge-strength taxonomy, proof-term design), `modules.md`,
-`pcp.md`.
+`pcp.md`, `contracts.md`, `totality.md`, `planning-dsl.md`. The last four
+are gated on the **v1 revalidation register** in `BACKLOG.md` — their
+source material is v1-era archived plans and must be revalidated against
+`structures.md` before promotion.

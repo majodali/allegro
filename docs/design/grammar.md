@@ -58,9 +58,37 @@ itself is the subject of a dedicated parser design discussion.
   exists outside the repo and is explicitly deferred until Allegro feature
   work is done.
 
+## 4. Runtime grammar extension — recorded decisions [implemented]
+
+Decisions from the Phase 6/7 extension work that shipped but weren't part
+of the formalism spec (recovered from the archived Phase 6 plan in the
+2026-07 triage):
+
+- **Grammar-value base identity and prefix compatibility.** Every
+  `grammar { … }` value carries its base chain ("allegro", "empty" via
+  `new grammar`, or a module's grammar via `grammar extends X`). Two
+  grammars merge at `use` time iff one base chain is a prefix of the
+  other; otherwise `E_INCOMPATIBLE_GRAMMARS`. Modules do not transitively
+  re-export grammars — each consumer `use`s its own.
+- **Silent production replacement warns, does not error.** `rule foo = …`
+  overwriting a base production emits `W_PRODUCTION_REPLACED` — a
+  deliberate warn-not-error ruling: replacement is a legitimate extension
+  technique, but silent shadowing has bitten before, so it's surfaced.
+- **`left`/`right`/`none` are globally reserved for simplicity.** They are
+  logically context-sensitive (meaningful only inside `grammar { … }`
+  blocks) but Phase 6 reserved them globally; revisit if this breaks real
+  user code. New keywords added by extensions face the same choice.
+- **Template substitution is hygienic** (since Phase 7): free Symbols in
+  grammar templates resolve against the defining module's context at
+  definition time, so consumer rebindings can't hijack an extension.
+
+Syncing the shipped error/warning codes into `grammar-formalism.md` §6–7
+is tracked in the BACKLOG revalidation register.
+
 ---
 
 *Sources: `design_brace_offside_modes` (memory, promoted 2026-06);
 alt-order and tree-builder corrections from the 2026-06 review with
-maintainer ruling. Parser experiment context: `.claude/memory/
-user_parser_experiments.md`.*
+maintainer ruling; §4 recovered from
+`.claude/plans/archive/dappled-cascading-cantor.md` (2026-07 triage).
+Parser experiment context: `.claude/memory/user_parser_experiments.md`.*

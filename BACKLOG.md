@@ -1,5 +1,85 @@
 # Allegro — Backlog
 
+## V1 revalidation register (2026-07 triage)
+
+V1 design/implementation ran through provability Phase H; the 2026-06
+review sent the project back to the drawing board (outcome:
+`docs/design/structures.md`). The v1-era plans were moved to
+`.claude/plans/archive/` (triage record in `archive/README.md`). Each
+entry below is design content whose **only record is an archived plan**:
+not necessarily wrong, but requiring thorough revalidation against the new
+design before it may be incorporated into `docs/design/` or acted on.
+Working an entry means: read the archived source, revalidate against
+`structures.md` (and the implementation as it stands), then incorporate
+into the named target or discard with a note here.
+
+- [ ] **Contracts (Phase C) design** — predicate-set model (provenance
+  taxonomy, union+dedup branch-rejoin, Horn-only simplification),
+  branch-refinement shape recognition, `assert` scope semantics +
+  conservative assert→requires promotion, `requires`/`ensures` lowering
+  with sink-based call-site checks and the `_`-is-result convention,
+  `Type.invariant` constructor enforcement + inheritance, the deliberate
+  `assume` rejection in favor of the constructor pattern, and the
+  "shape → refinement; relationship → contract" guidance. Sources:
+  `archive/lucid-discharging-lambek.md`, `archive/crystal-proving-curry.md`
+  §Phase C. Revalidate against `structures.md` §4 (facts plane) / §6
+  (knowledge). Target: new `docs/design/contracts.md`.
+- [ ] **PCP protocol design** — Obligation/Verdict/Authorship schemas,
+  ordered multi-prover authorship, trivial-pass-attack prevention,
+  iteration-hints design, JSON-canonical output philosophy, H5 proof
+  catalog, H7 effort budgets/escalation/reproducibility,
+  adversarial-worker single-check-point stance, four-baseline benchmark
+  methodology. Source: `archive/phase-h-plan.md`; shipping shape is
+  `src/pcp.ts` + `docs/proving-in-allegro.md`. Target: new
+  `docs/design/pcp.md`.
+- [ ] **Totality current-arc decisions** — notify-at-`info`-by-default
+  severity policy (**in tension with `structures.md` D34 strict-by-default
+  — reconcile explicitly as a migration decision**), per-type-kind
+  exhaustiveness taxonomy (incl. `__extends`-root-as-closed-sum),
+  refinement-aware dead-code detection, mutual-recursion lexicographic
+  design, totality polymorphism (`[t: Totality]` mirroring effects),
+  `decreases`-metric obligations, counterexample shapes. Source:
+  `archive/phase-e-totality-plan.md`. Target: new `docs/design/totality.md`.
+- [ ] **Provability roadmap remainder** — D2 parametric capabilities,
+  D3–D5 information-flow/budgets/behavioral-spec taxonomy, F6 Lean-export
+  mapping (proof terms → Lean, refinements → subtypes, verified-substrate
+  `Allegro.lean`), Phases I (codegen) and J (review UX). Sources:
+  `archive/crystal-proving-curry.md`, `archive/phase-f-plan.md` §F6.
+  Revalidate ordering/shape against the structures rewrite before
+  scheduling any of it. Lean mapping targets planned `docs/design/proofs.md`.
+- [ ] **Planning DSL (Vivace pilot 1)** — outcome-DAG model, the 12 pinned
+  DSL conventions, deliberate keyword rejections, `SoftwareRelease`
+  canonical example; plus Shape 1/Shape 2 strategy + three-pilot roster
+  (Tier-0 `VISION.md` material — propose, don't land). Source:
+  `archive/project-1-planning-dsl-design.md`. Likely mostly
+  substrate-orthogonal — revalidate lightly, then create
+  `docs/design/planning-dsl.md`. `lib/planning.alg` implementation stays
+  paused until then.
+- [ ] **Grammar formalism sync** — fold the shipped extension error/warning
+  codes (`E_INCOMPATIBLE_GRAMMARS`, `W_PRODUCTION_REPLACED`,
+  `E_PRECEDENCE_CONSTRAINT_CONFLICT`) and base-chain semantics into
+  `docs/grammar-formalism.md` §6–7 (decisions now recorded in
+  `docs/design/grammar.md` §4); the never-shipped Phase 6 ideas
+  (`combine`/`override`/`without` combinators, restricted-`use`
+  compile-time-expression whitelist) fold into Phase 8 scope when planned.
+  Source: `archive/dappled-cascading-cantor.md`.
+- [ ] **Effects nits** — add the silent-capture rationale for explicit
+  `[e: Effect]` declaration to `docs/design/effects.md` §2 (one sentence);
+  the `applyComposed` compile-time-tracing hypothesis from
+  `archive/polyphonic-tracing-plotkin.md` P9 is a research item, file or
+  drop when effects work resumes.
+- [ ] **Structures promotion completion** — inline the D39 slot-disposition
+  table, B8 primitive audit, and B10 forgery-scenario table from
+  `.claude/plans/structured-values-unification.md` into
+  `docs/design/structures.md` as appendices; then archive that plan.
+- [ ] **Doc hygiene** — `docs/proving-in-allegro.md` is accurate for the
+  shipping v1 surface but must be revised when the structures rewrite
+  lands (it is the PCP LLM worker's system primer — keep in sync);
+  CLAUDE.md still carries stale `memory/design_*.md` path references (the
+  files live under `.claude/memory/` and are now pointers) — fix during
+  the scheduled CLAUDE.md slimming; doc-reference lint remains tracked CI
+  debt (PROCESS §10).
+
 ## 1. Milestones
 
 High-level goals, roughly ordered by dependency:
