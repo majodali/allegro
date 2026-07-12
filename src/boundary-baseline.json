@@ -1,0 +1,98 @@
+{
+  "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet — regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3.",
+  "hardFail": false,
+  "allowedFiles": [],
+  "lint": {
+    "src/effects.ts": {
+      "components-direct": 2,
+      "primaryOf-call": 9
+    },
+    "src/evaluator.ts": {
+      "components-direct": 12,
+      "dunder-string-literal": 11,
+      "bindings-get-dunder": 11,
+      "primaryOf-call": 5
+    },
+    "src/grammar2/builder.ts": {
+      "dunder-string-literal": 1,
+      "bindings-get-dunder": 1,
+      "primaryOf-call": 7
+    },
+    "src/grammar2/fragments.ts": {
+      "dunder-string-literal": 1,
+      "bindings-get-dunder": 1,
+      "primaryOf-call": 4
+    },
+    "src/introspect.ts": {
+      "components-direct": 1,
+      "primaryOf-call": 17
+    },
+    "src/modules.ts": {
+      "components-direct": 2,
+      "dunder-string-literal": 6,
+      "primaryOf-call": 1
+    },
+    "src/pcp.ts": {
+      "dunder-string-literal": 7,
+      "primaryOf-call": 4
+    },
+    "src/primitives.ts": {
+      "components-direct": 9,
+      "dunder-string-literal": 47,
+      "bindings-get-dunder": 28,
+      "primaryOf-call": 116
+    },
+    "src/proofs.ts": {
+      "dunder-string-literal": 5,
+      "bindings-get-dunder": 2,
+      "primaryOf-call": 6
+    },
+    "src/proven.ts": {
+      "components-direct": 1,
+      "dunder-string-literal": 2,
+      "bindings-get-dunder": 2,
+      "primaryOf-call": 6
+    },
+    "src/refinements.ts": {
+      "components-direct": 6,
+      "primaryOf-call": 14
+    },
+    "src/runtime.ts": {
+      "components-direct": 4,
+      "dunder-string-literal": 4,
+      "bindings-get-dunder": 3,
+      "primaryOf-call": 3
+    },
+    "src/totality.ts": {
+      "components-direct": 2,
+      "dunder-string-literal": 1,
+      "bindings-get-dunder": 1,
+      "primaryOf-call": 35
+    },
+    "src/types-std.ts": {
+      "components-direct": 6,
+      "dunder-string-literal": 148,
+      "bindings-get-dunder": 52,
+      "primaryOf-call": 55
+    }
+  },
+  "suiteFloor": 979,
+  "basicsOutput": [
+    "11",
+    "42",
+    "120",
+    "42",
+    "55",
+    "42",
+    "7"
+  ],
+  "perf": {
+    "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
+    "warnFactor": 2,
+    "workloadsMs": {
+      "basics": 1975,
+      "recursion-tco": 1274,
+      "collections": 647
+    }
+  }
+}

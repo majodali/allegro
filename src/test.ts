@@ -10361,9 +10361,19 @@ function runDocLintTests(): void {
   });
 }
 
+// --- Boundary-test harness (structures-implementation Phase 0 / B-001) ---
+
+import { runBoundaryTests, getSuiteFloor } from "./boundary-tests.js";
+
 // --- Run all tests (sync + async) and report ---
 
-runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then(() => runBenchmarkTests()).then(() => runDocLintTests()).then(() => {
+runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then(() => runBenchmarkTests()).then(() => runDocLintTests()).then(() => runBoundaryTests({ test, eq })).then(() => {
+  // Suite-count floor (boundary baseline): a mass-disablement tripwire.
+  const floor = getSuiteFloor();
+  if (passed + failed < floor) {
+    failed++;
+    failures.push(`suite shrank: ${passed + failed - 1} tests < committed floor ${floor} (src/boundary-baseline.json)`);
+  }
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
   if (failures.length > 0) {

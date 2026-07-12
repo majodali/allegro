@@ -22,9 +22,11 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
 (status: draft — chunk boundaries pending maintainer approval; PROCESS §3
 go-ahead required per phase).
 
-- [ ] **B-001** · L0 · Boundary-test harness + baseline (chunk C0.1):
+- [x] **B-001** · L0 · Boundary-test harness + baseline (chunk C0.1):
   accessor lint w/ ratchet, invariant property checks, forgery-suite
-  skeleton, perf floor — plan §Phase 0
+  skeleton, perf floor — plan §Phase 0. Landed 2026-07
+  (`src/boundary-tests.ts` + `src/boundary-baseline.json`); perf hard
+  threshold still a pending maintainer decision (warn-only at 2×)
 - [ ] **B-002** · L0 · docs: inline the D39 slot-disposition, B8 primitive
   audit, and B10 forgery tables into `docs/design/allegretto/structures.md`
   as appendices; then archive `structured-values-unification.md`

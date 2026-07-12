@@ -8,6 +8,40 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C0.1: Boundary-test harness + baseline (structures Phase 0, B-001)
+
+First chunk of the structures-unification implementation plan. New
+`src/boundary-tests.ts` wired into the suite, four instruments:
+
+- **Boundary lint** — counts forbidden direct-access patterns
+  (`.components`, `__*` string literals, `bindings.get("__…")`,
+  `primaryOf` outside its definition site) across production sources
+  (excludes generated `parser.ts`, `test.ts`, and the harness itself)
+  against a committed baseline (`src/boundary-baseline.json`: 14 files,
+  661 occurrences). Ratchet semantics: an increase fails the suite
+  (negative-tested); a decrease prints a tighten note; regenerate with
+  `npx tsx src/boundary-tests.ts --write-baseline`. A `hardFail` flag +
+  `allowedFiles` allowlist are in place for C1.3's flip to zero-tolerance.
+- **Invariant property checks** — deterministic (mulberry32, fixed seed)
+  generator builds 40 small well-typed-by-construction programs, evaluates
+  them through the public `evalSource` surface, and walks every result +
+  binding asserting W1 (a MultiValue's primary is never a MultiValue) and
+  W2 (a resolved `type` component's primary is a Context). Invariant set
+  grows per phase (transparency, key-sort partition, immutability).
+- **Forgery-suite skeleton** — D21's scenarios A–F as named, visible,
+  skipped entries with their blocking mechanism and unlock chunk recorded
+  (A/B/D/F → C1.4, C → C1.5, E → S3 enforcement).
+- **Baseline snapshot** — basics.alg print-output equivalence under the
+  standard type system; a suite-count floor (979, enforced in test.ts's
+  summary as a mass-disablement tripwire); a coarse perf floor over three
+  fixed workloads (basics, 50k TCO recursion, map/filter/reduce chain),
+  **warn-only at 2×** — the hard regression threshold is flagged as a
+  pending maintainer decision per plan §5.
+
+Plan status flipped to **active** (maintainer approved Phase 0). No
+production-code changes; zero behavior change. 984/984 green (979 + 5
+harness tests).
+
 ## 2026-07 — Layer model, docs reorg, backlog rebuild
 
 - `docs/design/layers.md`: the architectural spine — L0 Allegretto / L1

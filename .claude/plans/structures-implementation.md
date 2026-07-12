@@ -1,11 +1,21 @@
 # Structures unification — implementation plan
 
-> Status: **draft** (pending maintainer approval of chunk boundaries;
-> per PROCESS §3 no chunk starts without explicit go-ahead).
+> Status: **active** (maintainer approved Phase 0 start, 2026-07; per
+> PROCESS §3 each subsequent phase needs its own go-ahead).
 > Design: `docs/design/allegretto/structures.md` (decision log:
 > `structured-values-unification.md`, D1–D40).
-> Related backlog: the BACKLOG rebuild follows this plan and will mirror its
-> phase structure; absorbed items noted in §7.
+> Related backlog: items B-001…B-031 (sequenced head) mirror this plan's
+> phases; absorbed items noted in §7.
+>
+> **Chunk log:**
+> - C0.1 (B-001) landed 2026-07 — `src/boundary-tests.ts`: boundary lint
+>   (4 patterns, 14 files, 661-occurrence ratchet baseline in
+>   `src/boundary-baseline.json`, negative-tested), invariant property
+>   checks (deterministic generator, 40 programs, W1+W2), forgery skeleton
+>   A–F (visible, skipped, unlock chunks assigned), baseline snapshot
+>   (basics.alg output, suite floor 979 enforced in test.ts summary, perf
+>   floor warn-only at 2× — hard threshold pending maintainer decision).
+>   984/984 green.
 
 ## 1. Context
 
