@@ -313,3 +313,10 @@ carry over as-is. The rebuilt BACKLOG mirrors this plan's phases as its
 - `CLAUDE.md`: architecture map updates at phase boundaries (esp. Phases 2
   and 4); invariants section gains the boundary-lint rule at C1.3.
 - This plan: status → active on approval; chunk log appended as landed.
+- **Expected Tier-0 touch-ups** (flag for dedicated maintainer-ratified
+  commits when their chunks land): PROCESS §6's evaluator-invariant
+  bullets reference mechanisms this plan deletes — the lazy-primitive
+  `primaryOf` bullet and the `*_attach` peeler/TailCall bullet die at
+  C1.5; the `__genericParams`/`__effectVarParams` clone-preservation
+  bullet is superseded at C5/C6. Each is a propose-and-ratify edit, never
+  bundled silently.

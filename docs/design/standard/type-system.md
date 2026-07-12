@@ -84,23 +84,34 @@ currently `__`-prefixed: `__name`, `__type`, `__members`, `__extends`,
 `__effectVarParams`, `__inferredEffects`, and others.
 
 **Maintainer direction (2026-06):** the `__` prefix is an accreted artifact
-— it gestures at privacy and clash-avoidance but provides neither. The
-protocol is being redesigned in a dedicated design discussion covering:
+— it gestures at privacy and clash-avoidance but provides neither.
 
-- a **central registry** of meta-properties (name, owner subsystem,
-  contract, lifecycle) — to live in this document once settled;
-- the naming scheme that replaces `__` prefixes;
-- access discipline (shared typed accessors instead of scattered
-  `.bindings.get()` with optional chaining);
-- **sealing** for values whose integrity matters (Proof values must not be
-  forgeable by hand-built Contexts — 2026-06 review finding);
-- the boundary between MultiValue components (`type`, `error`, `effects`,
-  `predicates`) and Context meta-bindings — i.e. *which channel carries
-  what*, also a dedicated discussion topic.
+**The redesign discussion has since concluded (2026-07)** — outcome in
+`docs/design/allegretto/structures.md`; the questions this section
+enumerated resolved as follows:
 
-Until that lands: **no new meta-property without recording it here**, and
-follow the existing conventions for consistency rather than inventing
-variants.
+- **central registry** → becomes code: `src/slots.ts`, the D39
+  slot-disposition table as the registry, with a completeness walker
+  enforcing it mechanically (chunk C1.1 / backlog B-006);
+- **replacement naming scheme** → declared **symbol-keyed members** on the
+  owning kind (`Type.members`, `Effect.kind`, …) or registered
+  **channels** (`shape`, `knowledge`, `error`, `effects`, `discharged`) —
+  the full per-slot disposition is structures.md §9 (D39);
+- **access discipline** → the typed accessor layer, lint-enforced from
+  chunk C1.3;
+- **sealing** → no seal op: capability-gated channel origination +
+  immutability + non-fabricating propagation (structures.md §3, D21);
+  Proof unforgeability becomes an ordinary kernel-private capability;
+- **which channel carries what** → structures.md §3/§6 + the S6 channel
+  registry (specced during implementation).
+
+The retirement is **not yet implemented** — the shipping code still uses
+`__*` throughout, and this document describes that shipping behavior. The
+prefixes disappear as each slot's owning mechanism is rebuilt
+(B-006–B-026); the M1 exit sweep requires `__*` to survive only as
+registered host-side internals. Until then: **no new meta-property without
+recording it here**, and follow the existing conventions for consistency
+rather than inventing variants.
 
 ## 5. Known consistency notes
 
