@@ -23,7 +23,7 @@ Next" / completed-items section) will be migrated here verbatim during the
   contract**. `grammar-formalism.md` and `proving-in-allegro.md` stay at
   `docs/` (Tier-0 + runtime references). Reference sweep across Tiers 1–3;
   one Tier-0 path touch-up (PROCESS §6 registry pointer) landed as a
-  dedicated flagged commit.
+  dedicated flagged commit (36197b8) and was maintainer-ratified 2026-07.
 - Doc-reference lint (`scripts/doc-ref-lint.ts`) added and wired into the
   test suite — PROCESS §10 debt; caught and fixed 20+ dangling references
   (stale `memory/…` paths, archived-plan paths in CLAUDE.md/bench/primer).
