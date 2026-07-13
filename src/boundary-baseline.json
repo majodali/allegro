@@ -1,8 +1,14 @@
 {
   "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet — regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3.",
   "hardFail": false,
-  "allowedFiles": [],
+  "allowedFiles": [
+    "src/slots.ts"
+  ],
   "lint": {
+    "src/slots.ts": {
+      "components-direct": 3,
+      "dunder-string-literal": 74
+    },
     "src/effects.ts": {
       "components-direct": 2,
       "primaryOf-call": 9
@@ -90,9 +96,9 @@
     "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 1975,
-      "recursion-tco": 1274,
-      "collections": 647
+      "basics": 1066,
+      "recursion-tco": 773,
+      "collections": 541
     }
   }
 }

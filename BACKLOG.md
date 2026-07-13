@@ -19,8 +19,8 @@
 ## Sequenced head
 
 Implementation chunks reference `.claude/plans/structures-implementation.md`
-(status: draft — chunk boundaries pending maintainer approval; PROCESS §3
-go-ahead required per phase).
+(status: active — Phases 0–1 approved; PROCESS §3 go-ahead required per
+phase).
 
 - [x] **B-001** · L0 · Boundary-test harness + baseline (chunk C0.1):
   accessor lint w/ ratchet, invariant property checks, forgery-suite
@@ -44,7 +44,11 @@ go-ahead required per phase).
   (TS2300 duplicate imports in test.ts, TS2304 `ExpressionValue`, TS6059
   out-of-rootDir — the documented bench/pcp convention); CI needs those
   fixed or a sanctioned invocation defined first
-- [ ] **B-006** · L0 · Slot & channel registry + typed accessors (C1.1)
+- [x] **B-006** · L0 · Slot & channel registry + typed accessors (C1.1).
+  Landed 2026-07: `src/slots.ts` (D39 table as code, 56 registrations),
+  W3 registry-completeness invariant + corpus walk, accessor smoke tests.
+  Three slots not in D39's table got proposed dispositions flagged for
+  maintainer review: `__effectBound`, `exported`, `arity`
 - [ ] **B-007** · L0 · Accessor migration, core files (C1.2)
 - [ ] **B-008** · L0 · Accessor migration, rest + lint hard-fail (C1.3)
 - [ ] **B-009** · L0 · Channel writers — origination capabilities +

@@ -8,6 +8,43 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C1.1: Slot & channel registry + typed accessors (structures Phase 1, B-006)
+
+New `src/slots.ts` — the D39 disposition table as code, and the seam the
+Phase 4 representation swap will happen under.
+
+- **Registry**: 56 registrations covering every `__*` slot and MultiValue
+  component in production code (inventoried by grep, cross-checked against
+  D39). Each entry: current name, physical storage (context-binding /
+  js-property / mv-component / binding-name-prefix / label-marker), owning
+  kind, disposition (member / channel / base-concept / host-internal /
+  delete), and post-migration target. Exact + prefix matching
+  (`__future_`, `__grammar`, `__anon_`, …).
+- **Typed accessors** (read side): `getName`, `getMembers`, `getParent`,
+  `getConstruct`, `getPredicate`, proof/effect/generic field readers,
+  `asContext` (MultiValue peel), and channel-plane reads
+  (`channelReadRaw`, `channelList`) that treat `__type`/`__discharged` as
+  the shape/discharged channels they will become. No call-site migration
+  yet (that's C1.2/C1.3).
+- **W3 registry-completeness invariant** in the harness walker: any `__*`
+  Context-binding key or MultiValue component key not covered by the
+  registry is a violation — the D39 "no new `__*` slot" rule enforced
+  mechanically. Negative-tested (forged `__bogusSlot` + bogus component
+  both fire). Corpus walk: all 27 self-contained tests/*.alg files
+  evaluated and walked — zero unregistered keys on first pass.
+- **Lint hardening**: scan now includes untracked files (a new module full
+  of violations was previously invisible until committed). `src/slots.ts`
+  is the first `allowedFiles` entry — exempt from the ratchet as the
+  sanctioned home (its 74 dunder literals + 3 components accesses are
+  recorded transparently in the baseline).
+- **Three dispositions proposed, not in D39's table** (flagged for
+  maintainer review): `__effectBound` → Effect.bound (member, by analogy
+  to the refinement predicate/domain pair); `exported` component →
+  visibility/exports channel (module system); `arity` component →
+  Function member.
+
+986/986 green (2 new tests). Zero production-code behavior change.
+
 ## 2026-07 — C0.1: Boundary-test harness + baseline (structures Phase 0, B-001)
 
 First chunk of the structures-unification implementation plan. New

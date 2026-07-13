@@ -31,6 +31,8 @@ import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, channelReadRaw, SLOT_REGISTRY } from "./slots.js";
+import { bitsToString, BitsValue } from "./types.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const BASELINE_PATH = path.join(REPO_ROOT, "src", "boundary-baseline.json");
@@ -93,7 +95,9 @@ const SCAN_EXCLUDE = new Set([
 ]);
 
 function productionSources(): string[] {
-  return execSync("git ls-files 'src/*.ts' 'src/**/*.ts'", {
+  // --others --exclude-standard includes untracked files: a brand-new module
+  // full of violations must be visible to the ratchet before its first commit.
+  return execSync("git ls-files --cached --others --exclude-standard 'src/*.ts' 'src/**/*.ts'", {
     cwd: REPO_ROOT,
     encoding: "utf-8",
   })
@@ -134,9 +138,11 @@ export function runBoundaryLint(baseline: BoundaryBaseline): LintReport {
   for (const [file, patterns] of Object.entries(current)) {
     for (const [pattern, count] of Object.entries(patterns)) {
       total += count;
-      const allowed = baseline.allowedFiles.includes(file);
+      // The accessor module is the sanctioned home for slot access — exempt
+      // from the ratchet in both modes.
+      if (baseline.allowedFiles.includes(file)) continue;
       const base = baseline.lint[file]?.[pattern] ?? 0;
-      if (baseline.hardFail && !allowed && count > 0) {
+      if (baseline.hardFail && count > 0) {
         breaches.push(`${file} [${pattern}]: ${count} (hard-fail mode)`);
       } else if (count > base) {
         breaches.push(`${file} [${pattern}]: ${count} > baseline ${base}`);
@@ -255,6 +261,9 @@ export interface InvariantViolation {
 /** Walk a value tree checking well-formedness invariants.
  *  W1: a MultiValue's primary is never itself a MultiValue.
  *  W2: a resolved `type` component's primary is a Context.
+ *  W3 (C1.1): every `__*` Context-binding key and every MultiValue
+ *  component key is covered by the slot registry (`src/slots.ts`) —
+ *  the D39 "no new `__*` slot" rule enforced mechanically.
  *  (Grows per phase: transparency, key-sort partition, immutability.) */
 export function checkValueInvariants(v: Value | null | undefined, program: string, out: InvariantViolation[], seen: WeakSet<object> = new WeakSet(), depth = 0): void {
   if (!v || typeof v !== "object" || depth > 24) return;
@@ -273,12 +282,20 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
         out.push({ invariant: "W2 type-component-shape", detail: `type component primary has kind ${tp?.kind}`, program });
       }
     }
+    for (const key of mv.components.keys()) {
+      if (!isRegisteredComponentKey(key)) {
+        out.push({ invariant: "W3 registry-completeness", detail: `unregistered MultiValue component key "${key}"`, program });
+      }
+    }
     checkValueInvariants(mv.primary as Value, program, out, seen, depth + 1);
     for (const comp of mv.components.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
     return;
   }
   if (v.kind === ValueKind.Context) {
-    for (const b of (v as ContextValue).bindings.values()) {
+    for (const [key, b] of (v as ContextValue).bindings) {
+      if (key.startsWith("__") && !isRegisteredSlotKey(key)) {
+        out.push({ invariant: "W3 registry-completeness", detail: `unregistered slot key "${key}"`, program });
+      }
       checkValueInvariants(b.value as Value, program, out, seen, depth + 1);
     }
     return;
@@ -287,7 +304,43 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     const e = v as any;
     checkValueInvariants(e.fn, program, out, seen, depth + 1);
     for (const a of e.args ?? []) checkValueInvariants(a, program, out, seen, depth + 1);
+    return;
   }
+  if (v.kind === ValueKind.ComposedFunction) {
+    checkValueInvariants((v as any).body, program, out, seen, depth + 1);
+  }
+}
+
+/** C1.1 registry-completeness corpus: every self-contained tests/*.alg file
+ *  (no `use`/`import` header — those need the module loader) is evaluated
+ *  and its full binding environment walked. Types, refinements, interfaces,
+ *  mixins, proofs, generics — the richest meta-slot surface we have. */
+export function runRegistryCompletenessCorpus(): { files: number; walked: number; violations: InvariantViolation[] } {
+  const violations: InvariantViolation[] = [];
+  const testDir = path.join(REPO_ROOT, "tests");
+  const files = fs.readdirSync(testDir).filter((f) => f.endsWith(".alg"));
+  let walked = 0;
+  for (const f of files) {
+    const source = fs.readFileSync(path.join(testDir, f), "utf-8");
+    if (/^\s*(use|import)\s/m.test(source)) continue;
+    const origLog = console.log;
+    console.log = () => {};
+    try {
+      const { value, evalCtx } = evalSource(source, undefined, [createTypeSystem()], undefined, true);
+      walked++;
+      const seen = new WeakSet<object>();
+      checkValueInvariants(value, f, violations, seen);
+      for (const b of evalCtx.bindings.values()) {
+        checkValueInvariants(b.value as Value, f, violations, seen);
+      }
+    } catch {
+      // Files needing loader context (or expecting halts) are exercised by
+      // the main suite; the corpus walk only inspects what evaluates here.
+    } finally {
+      console.log = origLog;
+    }
+  }
+  return { files: files.length, walked, violations };
 }
 
 export interface PropertyRunResult {
@@ -414,6 +467,38 @@ export function runBoundaryTests({ test, eq }: Hooks): void {
       .join("; ");
     eq(rendered, "", `invariant violations (${result.violations.length} total)`);
     eq(result.succeeded >= result.programs * 0.8, true, `generator success rate ${result.succeeded}/${result.programs}`);
+  });
+
+  test("slot accessors (C1.1): read the current representation correctly", () => {
+    const { evalCtx } = evalSource(
+      "theorem t: 1 + 1 == 2\nx = 42",
+      undefined, [createTypeSystem()], undefined, true
+    );
+    // Type binding: MultiValue(IntType, {type: Type}) — asContext peels it.
+    const intCtx = asContext(evalCtx.bindings.get("Int")?.value as Value);
+    eq(intCtx !== null, true, "Int peels to a Context");
+    const namePrimary = primaryOf(getName(intCtx!) as Value) as BitsValue;
+    eq(bitsToString(namePrimary), "Int", "getName reads __name");
+    const members = asContext(getMembers(intCtx!) as Value);
+    eq(members !== null && members.bindings.size > 0, true, "getMembers reads __members");
+    // Channel reads: shape on a typed value, discharged on a proof.
+    const x = evalCtx.bindings.get("x")?.value as Value;
+    const shape = asContext(channelReadRaw(x, "shape") as Value);
+    eq(shape !== null, true, "shape channel readable on a typed value");
+    eq(bitsToString(primaryOf(getName(shape!) as Value) as BitsValue), "Int", "shape of 42 is Int");
+    const proofCtx = asContext(evalCtx.bindings.get("t")?.value as Value);
+    eq(proofCtx !== null, true, "theorem binding peels to a proof Context");
+    const discharged = channelReadRaw(proofCtx! as Value, "discharged");
+    eq(discharged !== undefined, true, "discharged channel readable on a proof");
+    // Registry self-checks: every registration has an owner + target.
+    eq(SLOT_REGISTRY.every((r) => r.owner.length > 0 && r.target.length > 0), true, "registry entries complete");
+  });
+
+  test("registry completeness (C1.1): no unregistered __* slot or component key in the corpus", () => {
+    const result = runRegistryCompletenessCorpus();
+    const unique = [...new Set(result.violations.map((v) => v.detail))];
+    eq(unique.slice(0, 5).join("; "), "", `unregistered keys (${unique.length} unique, across ${result.walked} corpus files)`);
+    eq(result.walked >= 15, true, `corpus coverage: ${result.walked} self-contained .alg files walked`);
   });
 
   test("forgery suite skeleton: D21 scenarios A–F are all present and tracked", () => {

@@ -16,6 +16,20 @@
 >   (basics.alg output, suite floor 979 enforced in test.ts summary, perf
 >   floor warn-only at 2× — hard threshold pending maintainer decision).
 >   984/984 green.
+> - C1.1 (B-006) landed 2026-07 — `src/slots.ts`: D39 disposition table as
+>   code (56 registrations: type/refinement/generic/proof/effect fields,
+>   channels, base concepts, host internals; exact + prefix matching),
+>   read-side typed accessors over the current representation,
+>   `channelReadRaw`/`channelList`. W3 registry-completeness invariant
+>   added to the harness walker (negative-tested) + corpus walk over 27
+>   self-contained tests/*.alg files — zero unregistered keys. Lint scan
+>   now includes untracked files; `src/slots.ts` is the sanctioned
+>   `allowedFiles` entry (exempt from ratchet; counts recorded — 74 dunder
+>   literals, 3 components accesses). Three slots absent from D39's table
+>   given proposed dispositions pending maintainer review: `__effectBound`
+>   → Effect.bound (member), `exported` → visibility/exports channel,
+>   `arity` → Function member. Maintainer perf ruling recorded: warn-only
+>   floor now, refined progressively. 986/986 green.
 
 ## 1. Context
 
