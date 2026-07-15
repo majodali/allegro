@@ -8,6 +8,41 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — Suite-cost pass + CI (B-005, pulled forward)
+
+Response to the maintainer's verification-cost concern. Profile findings
+(from the new per-test timing): 542s wall clock — 156s of it the boundary
+registry corpus walk *re-evaluating* .alg files the file tests had already
+evaluated, and ~200s in the totality-analyzer tests (pre-existing,
+tracked separately).
+
+- **Registry walk piggyback**: `runAlgFile` now walks each file's values
+  for registry completeness at evaluation time (memory traversal, ~ms);
+  the boundary section consumes the collected results instead of
+  re-evaluating the corpus. Coverage *improved* — all ~45 file tests are
+  walked now, including the `use`/`import` ones the standalone corpus
+  skipped. Standalone `runRegistryCompletenessCorpus` retained for
+  harness-independent use.
+- **Two-tier verification**: `ALLEGRO_TEST_FILTER=<regex>` runs only
+  matching tests for dev iteration (measured: 8s vs ~9min). Filtered runs
+  print a `DEV RUN` banner and suspend the suite floor — they are
+  explicitly not a landing gate. Landings still use the full suite, one
+  run per landed group, in the background.
+- **Timing in every summary**: wall clock, per-section times, 15 slowest
+  tests — suite-cost regressions are now visible on every run.
+- **tsc debt paid**: the TS2300 duplicate-import block in test.ts and the
+  TS2304 missing `ExpressionValue` import in primitives.ts are fixed. The
+  only remaining diagnostics are the 4 sanctioned TS6059s from the
+  documented bench/pcp/scripts out-of-rootDir convention.
+- **CI (B-005)**: `scripts/typecheck.sh` — the sanctioned invocation —
+  fails on any diagnostic except that TS6059 family (negative-tested with
+  an injected type error). `.github/workflows/ci.yml` runs typecheck +
+  the full suite on every push/PR; `npm run typecheck` added.
+
+Known remaining hotspot, deliberately untouched here (production-code
+change → own chunk): the totality-analyzer tests (~200s — an 84s single
+.alg file among them) look pathological and deserve investigation.
+
 ## 2026-07 — C1.2: Accessor migration, core files (structures Phase 1, B-007)
 
 `evaluator.ts` and `types-std.ts` — the two files that define how state is

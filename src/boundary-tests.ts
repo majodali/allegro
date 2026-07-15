@@ -444,9 +444,14 @@ export function runPerfWorkloads(): Record<string, number> {
 interface Hooks {
   test: (name: string, fn: () => void) => void;
   eq: (actual: unknown, expected: unknown, label?: string) => void;
+  /** Registry-walk results piggybacked on the suite's own .alg file tests
+   *  (walked at evaluation time in runAlgFile — no re-evaluation). When
+   *  absent (standalone invocation), the harness evaluates the corpus
+   *  itself via runRegistryCompletenessCorpus. */
+  corpus?: { files: number; violations: InvariantViolation[] };
 }
 
-export function runBoundaryTests({ test, eq }: Hooks): void {
+export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
   const baseline = loadBaseline();
 
   test("boundary lint: no forbidden-access pattern exceeds the committed baseline", () => {
@@ -495,10 +500,12 @@ export function runBoundaryTests({ test, eq }: Hooks): void {
   });
 
   test("registry completeness (C1.1): no unregistered __* slot or component key in the corpus", () => {
-    const result = runRegistryCompletenessCorpus();
+    const result = corpus
+      ? { walked: corpus.files, violations: corpus.violations }
+      : (() => { const r = runRegistryCompletenessCorpus(); return { walked: r.walked, violations: r.violations }; })();
     const unique = [...new Set(result.violations.map((v) => v.detail))];
     eq(unique.slice(0, 5).join("; "), "", `unregistered keys (${unique.length} unique, across ${result.walked} corpus files)`);
-    eq(result.walked >= 15, true, `corpus coverage: ${result.walked} self-contained .alg files walked`);
+    eq(result.walked >= 15, true, `corpus coverage: ${result.walked} .alg files walked`);
   });
 
   test("forgery suite skeleton: D21 scenarios A–F are all present and tracked", () => {

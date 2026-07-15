@@ -50,7 +50,18 @@ const testTimes: { name: string; ms: number }[] = [];
 const sectionTimes: { name: string; ms: number }[] = [];
 const suiteT0 = performance.now();
 
+// Dev-tier filter (two-tier verification discipline, 2026-07): set
+// ALLEGRO_TEST_FILTER to a regex to run only matching tests during
+// iteration. Filtered runs are DEV runs — the suite floor and full-gate
+// semantics are suspended, and the summary says so. Landings always use
+// the full unfiltered suite.
+const TEST_FILTER = process.env.ALLEGRO_TEST_FILTER
+  ? new RegExp(process.env.ALLEGRO_TEST_FILTER)
+  : null;
+let filteredOut = 0;
+
 function test(name: string, fn: () => void): void {
+  if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
   const t0 = performance.now();
   try {
     fn();
@@ -1617,7 +1628,17 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
 
   try {
     const exts = [typeExt, ...grammarExts, ...(extensions ?? [])];
-    runtimeEval(cleanSource, undefined, exts, undefined, true);
+    const { value: fileValue, evalCtx: fileCtx } = runtimeEval(cleanSource, undefined, exts, undefined, true);
+    // Registry-completeness piggyback: walk this file's values for the
+    // boundary harness HERE (memory traversal, ~ms) instead of re-evaluating
+    // the whole corpus in the boundary section (which cost 156s of the
+    // suite before the 2026-07 suite-cost pass).
+    corpusWalkFiles++;
+    const seen = new WeakSet<object>();
+    checkValueInvariants(fileValue, path.basename(filePath), corpusWalkViolations, seen);
+    for (const b of fileCtx.bindings.values()) {
+      checkValueInvariants(b.value as any, path.basename(filePath), corpusWalkViolations, seen);
+    }
   } catch (e: any) {
     console.log = origLog;
     throw e;
@@ -1642,6 +1663,12 @@ function runAlgFile(filePath: string, extensions?: Extension[]): void {
     }
   }
 }
+
+// Collected by runAlgFile's registry-completeness piggyback; consumed by the
+// boundary section at the end of the suite.
+import { checkValueInvariants, InvariantViolation } from "./boundary-tests.js";
+const corpusWalkViolations: InvariantViolation[] = [];
+let corpusWalkFiles = 0;
 
 function fileTest(filePath: string, extensions?: Extension[]): void {
   const basename = path.basename(filePath);
@@ -4433,10 +4460,7 @@ test("Phase D1: unwrapEffectsAttach extracts declared label set", () => {
 
 // --- Phase D1 sub-chunk 1.2: effects in PredicateSet ---
 
-import {
-  effectsDomain, formatDomain, intersectDomains, joinDomains, impliesDomain,
-  PredicateSet, makePredicate, entailsPredicate,
-} from "./refinements.js";
+import { effectsDomain, makePredicate } from "./refinements.js";
 
 test("Phase D1.2: effectsDomain constructor builds EffectsDomain", () => {
   const d = effectsDomain(["io", "time"]);
@@ -10389,15 +10413,21 @@ timedSection("modules", runModuleTests)
   .then(() => timedSection("h4a-llm-worker", runH4aAsyncTests))
   .then(() => timedSection("benchmark", runBenchmarkTests))
   .then(() => timedSection("doc-lint", async () => runDocLintTests()))
-  .then(() => timedSection("boundary", async () => runBoundaryTests({ test, eq })))
+  .then(() => timedSection("boundary", async () => runBoundaryTests({ test, eq, corpus: { files: corpusWalkFiles, violations: corpusWalkViolations } })))
   .then(() => {
   // Suite-count floor (boundary baseline): a mass-disablement tripwire.
-  const floor = getSuiteFloor();
-  if (passed + failed < floor) {
-    failed++;
-    failures.push(`suite shrank: ${passed + failed - 1} tests < committed floor ${floor} (src/boundary-baseline.json)`);
+  // Suspended under ALLEGRO_TEST_FILTER — filtered runs are dev runs.
+  if (!TEST_FILTER) {
+    const floor = getSuiteFloor();
+    if (passed + failed < floor) {
+      failed++;
+      failures.push(`suite shrank: ${passed + failed - 1} tests < committed floor ${floor} (src/boundary-baseline.json)`);
+    }
   }
   console.log(`\n${"=".repeat(50)}`);
+  if (TEST_FILTER) {
+    console.log(`DEV RUN (ALLEGRO_TEST_FILTER=${process.env.ALLEGRO_TEST_FILTER}) — ${filteredOut} tests filtered out; NOT a landing gate`);
+  }
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
   console.log(`Wall clock: ${((performance.now() - suiteT0) / 1000).toFixed(1)}s`);
   console.log(`Sections: ${sectionTimes.map((s) => `${s.name} ${(s.ms / 1000).toFixed(1)}s`).join(" | ")}`);

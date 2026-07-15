@@ -10,7 +10,8 @@
     "test": "tsx src/test.ts",
     "bench": "tsx bench/run.ts",
     "generate-parser": "tsx grammar/generate-parser.ts",
-    "build:web": "esbuild web/allegro-web.ts --bundle --outfile=web/dist/allegro.js --format=iife --global-name=AllegroBundle --platform=browser"
+    "build:web": "esbuild web/allegro-web.ts --bundle --outfile=web/dist/allegro.js --format=iife --global-name=AllegroBundle --platform=browser",
+    "typecheck": "bash scripts/typecheck.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.0",

@@ -38,12 +38,17 @@ phase).
   rationale for explicit `[e: Effect]` into
   `docs/design/standard/effects.md` §2; `applyComposed` tracing hypothesis
   (archive: polyphonic-tracing-plotkin P9) filed or dropped
-- [ ] **B-005** · T-tooling · CI: run `tsc --noEmit` + `src/test.ts`
-  (which now includes the doc-ref lint) on push — PROCESS §10 debt.
-  Note: `tsc --noEmit` reports 17 pre-existing errors on the current tree
-  (TS2300 duplicate imports in test.ts, TS2304 `ExpressionValue`, TS6059
-  out-of-rootDir — the documented bench/pcp convention); CI needs those
-  fixed or a sanctioned invocation defined first
+- [x] **B-005** · T-tooling · CI: typecheck + full suite on push. Landed
+  2026-07 (pulled forward per maintainer, suite-cost discussion): the
+  TS2300 duplicate imports and TS2304 `ExpressionValue` errors are FIXED;
+  `scripts/typecheck.sh` is the sanctioned invocation (fails on
+  everything except the documented TS6059 bench/pcp/scripts rootDir
+  convention; negative-tested); `.github/workflows/ci.yml` runs
+  typecheck + `npx tsx src/test.ts` on push/PR. Same landing: suite-cost
+  pass — registry corpus walk piggybacks on the .alg file tests
+  (156s → ~0), per-test/per-section timing in every summary,
+  `ALLEGRO_TEST_FILTER` dev tier (8s targeted runs; floor suspended,
+  DEV RUN banner)
 - [x] **B-006** · L0 · Slot & channel registry + typed accessors (C1.1).
   Landed 2026-07: `src/slots.ts` (D39 table as code, 56 registrations),
   W3 registry-completeness invariant + corpus walk, accessor smoke tests.
@@ -208,6 +213,13 @@ phase).
   reviewable artifact, drill-down to code
 - [ ] **B-069** · CLAUDE.md slimming completion (history → CHANGELOG;
   session contract only)
+- [ ] **B-087** · Totality-analyzer performance: the Stage 2/3 termination
+  tests cost ~200s of the suite (one 84s .alg file; a single factorial
+  check 42s — profile from the 2026-07 suite-cost pass). Looks
+  pathological (suspect: per-call-site refinement-type re-evaluation in
+  `totalityCompileCtx` without caching). Production-code change — needs
+  its own verified chunk; also the natural moment for the B-018 severity
+  reconciliation if the analyzer is being reworked anyway
 
 ### T-host
 

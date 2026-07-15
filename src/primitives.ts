@@ -2,7 +2,7 @@
 
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
-  PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn,
+  PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
   AllegroError, makeBits, makeInt, makeFloat, bitsToFloat, makePrimitive, makeExpr,
   makeParam, makeComposedFn, makeContext, makeMultiValue,
   primaryOf, stringToBits, bitsToString,
