@@ -33,6 +33,8 @@ import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY } from "./slots.js";
 import { bitsToString, BitsValue } from "./types.js";
+import { formatValue } from "./primitives.js";
+import { effectsOf } from "./effects.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const BASELINE_PATH = path.join(REPO_ROOT, "src", "boundary-baseline.json");
@@ -375,6 +377,45 @@ export function runInvariantPropertyChecks(programCount = 40, seed = 0xa11e6120)
   return { programs: programCount, succeeded, violations };
 }
 
+// --- 2b. Differential fixtures (C1.5 safety net) -----------------------------------
+//
+// Byte-for-byte recordings of channel-propagation behavior taken BEFORE the
+// C1.5 propagation table replaced the hand-rolled per-channel code. The
+// table must reproduce these exactly (maintainer ruling: observable-zero;
+// principled-rule divergences activate at C4.3). Two recorded WARTS are
+// intentional: `err-viral-chain` loses the error channel into a residual,
+// and `err-in-if-cond` silently takes the else branch — both are today's
+// behavior, preserved here, revisited at C4.3.
+export const DIFFERENTIAL_FIXTURES: { name: string; src: string; bind: string; expect: string }[] = [
+  { name: "err-viral-arith", src: 'e = error "boom"\nr = e + 5', bind: "r", expect: "fmt=error(boom) | eff=- | err=boom" },
+  { name: "err-viral-chain", src: 'e = error "boom"\nr = (e + 5) * 2 - 1', bind: "r", expect: "fmt=<expression> | eff=- | err=-" },
+  { name: "err-both-operands", src: 'a = error "one"\nb = error "two"\nr = a + b', bind: "r", expect: "fmt=error(one) | eff=- | err=one" },
+  { name: "err-in-if-cond", src: 'e = error "boom"\nr = if e then 1 else 2', bind: "r", expect: "fmt=2 | eff=- | err=-" },
+  { name: "err-through-method", src: 'e = error "boom"\nr = e + 1\ns = r.toString()', bind: "s", expect: "fmt=<expression> | eff=- | err=-" },
+  { name: "eff-inferred-io", src: "f(x) => print(x)\ng(x) => f(x)", bind: "g", expect: "fmt=<function(1)> | eff=io | err=-" },
+  { name: "eff-if-branches", src: "h(c, x) => if c then print(x) else x", bind: "h", expect: "fmt=<function(2)> | eff=io | err=-" },
+  { name: "eff-pure", src: "sq(x) => x * x", bind: "sq", expect: "fmt=<function(1)> | eff=- | err=-" },
+  { name: "typed-result-shape", src: "r = 2 + 3", bind: "r", expect: "fmt=5 | eff=- | err=-" },
+  { name: "typed-cmp-bool", src: "r = 3 < 5", bind: "r", expect: "fmt=true | eff=- | err=-" },
+  { name: "refined-preserve", src: "PI = (Int & _ > 0).preserveOps()\nx = PI(5)\ny = x + 3", bind: "y", expect: "fmt=8 | eff=- | err=-" },
+];
+
+export function runDifferentialFixture(f: { src: string; bind: string }): string {
+  const origLog = console.log;
+  console.log = () => {};
+  try {
+    const { evalCtx } = evalSource(f.src, undefined, [createTypeSystem()], undefined, true);
+    const v = evalCtx.bindings.get(f.bind)?.value as Value;
+    const eff = v ? effectsOf(v) : null;
+    const err = v ? channelReadRaw(v, "error") : undefined;
+    return `fmt=${formatValue(v)} | eff=${eff ? [...eff].sort().join(",") : "-"} | err=${err !== undefined ? formatValue(err as Value) : "-"}`;
+  } catch (e: any) {
+    return `THREW: ${String(e?.message ?? e).slice(0, 60)}`;
+  } finally {
+    console.log = origLog;
+  }
+}
+
 // --- 3. Forgery-scenario skeleton ---------------------------------------------
 
 export interface ForgeryScenario {
@@ -598,6 +639,14 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // Integrity channels reject fabricating rules at registration (D23).
     const fab = attack('w = channel_register("discharged2", "viral")');
     eq(fab.threw, null, "non-integrity user channel may be viral");
+  });
+
+  test("differential fixtures (C1.5): channel propagation matches the pre-table recording", () => {
+    const diffs = DIFFERENTIAL_FIXTURES
+      .map((f) => ({ f, got: runDifferentialFixture(f) }))
+      .filter((r) => r.got !== r.f.expect)
+      .map((r) => `${r.f.name}: expected [${r.f.expect}] got [${r.got}]`);
+    eq(diffs.join("; "), "", "differential divergence");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

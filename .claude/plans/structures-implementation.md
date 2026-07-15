@@ -357,11 +357,24 @@ PROCESS §6; the owning chunk is noted:
 
 1. `MultiValue(MultiValue(...))` non-nesting tests → reframed under
    transparency (C1.5 partially, C4.3 fully).
+   **RULED 2026-07 (C1.5 briefing):** C1.5 stays observable-zero — table
+   entries carry legacy-faithful merge policies (inner-shadows-outer)
+   with the principled rule (e.g. effects union) documented inline;
+   divergences activate at C4.3.
 2. `primaryOf` strip behaviors in eager primitives → propagation table
    (C1.5); lazy-registration workaround removal for proof/typed prims
    (C1.5).
+   **RULED 2026-07:** flip the 7 strip-dodging proof primitives
+   (`proof_refl/sym/trans/cong`, `proof_check`, `prove_for_all_bool`,
+   `prove_induction`) to a new eager-but-channel-aware registration mode;
+   `proof_by_eval`/`print`/`eval_if`/`seq` stay genuinely lazy. Impl args
+   stay data-plane for ordinary eager prims (transparency is C4.3).
 3. `*_attach` wrapper peeling tests (`findAttachWrapper` family) →
    writer/table equivalents (C1.5).
+   **RULED 2026-07:** five metadata wrappers only (`partial_attach`,
+   `decreases_attach`, `effects_attach`, `param_effects_attach`,
+   `proven_attach`); `type_check` and `requires`/`ensures` are real
+   runtime checks and keep their current form.
 4. `scopePredicates` mutate-and-pop internals → facts plane (C2.2;
    observable behavior should be identical — internals-shaped tests only).
 5. `type` component reads split into shape/knowledge (C3.1) —
