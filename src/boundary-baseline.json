@@ -1,5 +1,5 @@
 {
-  "note": "Boundary-test baseline. HARD-FAIL mode (since C1.3): any forbidden-access pattern outside allowedFiles fails the suite \u2014 the accessor layer is the only sanctioned slot/channel access path. Regenerate with npx tsx src/boundary-tests.ts --write-baseline (allowedFiles counts are informational).",
+  "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet — regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3.",
   "hardFail": true,
   "allowedFiles": [
     "src/slots.ts"
@@ -7,8 +7,9 @@
   "lint": {
     "src/slots.ts": {
       "components-direct": 5,
-      "dunder-string-literal": 144,
-      "bindings-get-dunder": 1
+      "dunder-string-literal": 149,
+      "bindings-get-dunder": 1,
+      "kernel-writer-acquisition": 1
     }
   },
   "suiteFloor": 979,
@@ -22,12 +23,12 @@
     "7"
   ],
   "perf": {
-    "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan \u00a75).",
+    "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 1698,
-      "recursion-tco": 1637,
-      "collections": 705
+      "basics": 1431,
+      "recursion-tco": 935,
+      "collections": 662
     }
   }
 }

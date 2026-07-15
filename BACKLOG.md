@@ -69,8 +69,13 @@ phase).
   `hardFail: true` — direct slot access outside the accessor layer now
   fails the suite (negative-tested). The base/extension boundary is
   mechanically enforced from here on
-- [ ] **B-009** · L0 · Channel writers — origination capabilities +
-  forgery suite v1 (C1.4)
+- [x] **B-009** · L0 · Channel writers — origination capabilities +
+  forgery suite v1 (C1.4). Landed 2026-07: one-shot channel registry
+  (epoch-sealed), kernel-private discharged writer at the two origination
+  sites, construction-path gates (object literal, mv_set),
+  `channel_register`/`channel_read`/`channel_list`/`channel_attenuate`
+  primitives, forgery A/B/D/F live (A was a REAL hole — object-literal
+  `{__discharged: 1}` forged a structurally-valid proof pre-C1.4)
 - [ ] **B-010** · L0 · Propagation table; delete `primaryOf` asymmetry +
   `*_attach` family; forgery suite v2 (C1.5) — first conscious-delta chunk
 - [ ] **B-011** · L0 · Scope protocol + parent chain (C2.1)

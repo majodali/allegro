@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace } from "./slots.js";
+import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch } from "./slots.js";
 import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
@@ -897,6 +897,9 @@ export function evalSource(
    *  false (compilation halts on failure — "build safety in"). */
   softFail?: boolean,
 ): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
+  // New pass: Allegro-minted channel registrations from prior passes are
+  // sealed (see ChannelEntry.epoch in slots.ts).
+  bumpChannelEpoch();
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 

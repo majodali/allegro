@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampDischarged, stampProofReason, stampProofCounterexample, stampEqOperands } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, CHANNEL_WRITER_BRAND } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -9,6 +9,12 @@ import {
   stringToBits, bitsToString,
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
+
+// Held write capability for the discharged integrity channel (C1.4, D21-D24).
+// Module-scope, never exported, never bound into any Allegro extension —
+// the proof kernel's failed-proof constructor is the only origination site
+// in this module.
+const dischargedWriter = kernelChannelWriter("discharged");
 import { grammar2Primitives } from "./grammar2/builder.js";
 import { BASE_OPERATORS_TO_LEVEL } from "./grammar2/base-grammar.js";
 
@@ -388,8 +394,61 @@ const mv_get: PrimitiveFnImpl = (args) => {
   throw new AllegroError(`mv_get: '${key}' not found`);
 };
 
+
+// --- Channel plane: registration, free reads, attenuation (C1.4, D23/D24) ---
+//
+// `channel_register(name, rule) → writer` mints the write capability for a
+// NEW channel; re-registration throws (forgery vector F). Reads are free.
+// The writer is a PrimitiveFunction closure — unconstructible from
+// Allegretto (D24); `channel_attenuate` wraps a held writer with a
+// predicate, restricting what it may write (delegable attenuation).
+
+const channel_register_impl: PrimitiveFnImpl = (args) => {
+  const name = bitsToString(asBits(args[0], "channel_register"));
+  const rule = bitsToString(asBits(args[1], "channel_register"));
+  const writer = registerChannel({ name, rule: rule as import("./slots.js").PropagationRule }, true);
+  const prim = makePrimitive(`<channel:${name} writer>`, (wargs) => {
+    if (wargs.length !== 2) throw new AllegroError(`channel writer '${name}': expected (value, channelValue)`);
+    return writer.write(wargs[0], wargs[1]);
+  });
+  (prim as any)[CHANNEL_WRITER_BRAND] = name;
+  return prim;
+};
+
+const channel_read_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  const name = bitsToString(asBits(dataOf(evalFn!(args[1], ctx!)), "channel_read"));
+  const c = channelReadRaw(v, name);
+  return c === undefined ? noneSingleton : c;
+};
+
+const channel_list_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn!(args[0], ctx!);
+  return makeArray(channelList(v).map((n) => withType(stringToBits(n), StringType)));
+};
+
+const channel_attenuate_impl: PrimitiveFnImpl = (args) => {
+  const base = dataOf(args[0]);
+  const brand = (base as any)[CHANNEL_WRITER_BRAND];
+  if (base.kind !== ValueKind.PrimitiveFunction || !brand) {
+    throw new AllegroError("channel_attenuate: first argument is not a channel writer");
+  }
+  const pred = dataOf(args[1]);
+  const prim = makePrimitive(`<channel:${brand} writer (attenuated)>`, (wargs, wctx, wevalFn) => {
+    const ok = wevalFn!(makeExpr(pred, [wargs[1]]), wctx!);
+    const okP = dataOf(ok);
+    if (okP.kind !== ValueKind.Bits || (okP as BitsValue).data === 0n) {
+      throw new AllegroError(`channel writer '${brand}': attenuation predicate rejected the write`);
+    }
+    return (base as PrimitiveFunctionValue).fn(wargs, wctx, wevalFn);
+  });
+  (prim as any)[CHANNEL_WRITER_BRAND] = brand;
+  return prim;
+};
+
 const mv_set: PrimitiveFnImpl = (args) => {
   const key = bitsToString(asBits(args[1], "mv_set"));
+  assertNotIntegrityKey(key, "mv_set");
   const val = args[2];
   if (args[0].kind === ValueKind.MultiValue) {
     const nc = cloneComponents(args[0]);
@@ -3108,7 +3167,7 @@ const proven_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 function makeFailedProof(prop: string, reason: string, counterexample?: string): Value {
   const p = makeContext();
   stampProposition(p, stringToBits(prop));
-  stampDischarged(p, makeInt(0));
+  dischargedWriter.write(p, makeInt(0));
   stampProofReason(p, stringToBits(reason));
   if (counterexample !== undefined) {
     stampProofCounterexample(p, stringToBits(counterexample));
@@ -3685,6 +3744,10 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   mv_primary: makePrimitive("mv_primary", mv_primary),
   mv_get: makePrimitive("mv_get", mv_get),
   mv_set: makePrimitive("mv_set", mv_set),
+  channel_register: makePrimitive("channel_register", channel_register_impl),
+  channel_read: makePrimitive("channel_read", channel_read_impl, true),
+  channel_list: makePrimitive("channel_list", channel_list_impl, true),
+  channel_attenuate: makePrimitive("channel_attenuate", channel_attenuate_impl),
   mv_components: makePrimitive("mv_components", mv_components),
   eval_if: eval_if_value,
   component_get: makePrimitive("component_get", component_get_impl, true),

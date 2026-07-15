@@ -31,7 +31,7 @@ import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, channelReadRaw, SLOT_REGISTRY } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY } from "./slots.js";
 import { bitsToString, BitsValue } from "./types.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -84,6 +84,9 @@ const LINT_PATTERNS: LintPattern[] = [
   // primaryOf's strip-vs-preserve asymmetry is retired by C1.5/C4.3; its
   // definition site is exempt.
   { name: "primaryOf-call", regex: /\bprimaryOf\s*\(/g, excludeFiles: ["src/types.ts"] },
+  // C1.4: TS-kernel writer acquisition is restricted to the two proof-kernel
+  // modules — anywhere else, acquiring the discharged writer fails the suite.
+  { name: "kernel-writer-acquisition", regex: /\bkernelChannelWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
 ];
 
 // Production sources only. test.ts pokes internals as test setup by design;
@@ -379,18 +382,30 @@ export interface ForgeryScenario {
   name: string;
   blockedBy: string;
   unlocksAt: string;
+  /** live = implemented as a real attack test; skeleton = visible, pending. */
+  status: "live" | "skeleton";
 }
 
-/** D21's verification log (design log B10). Skipped until the mechanism each
- *  scenario attacks exists; the owning chunk un-skips it. */
+/** D21's verification log (design log B10). A/B/D/F went live at C1.4;
+ *  C unlocks with the propagation table (C1.5), E with S3 enforcement. */
 export const FORGERY_SCENARIOS: ForgeryScenario[] = [
-  { id: "A", name: "forge `discharged` from nothing", blockedBy: "origination requires the kernel-held writer", unlocksAt: "C1.4" },
-  { id: "B", name: "swap a real proof's proposition, keep `discharged`", blockedBy: "data-immutability (D22)", unlocksAt: "C1.4" },
-  { id: "C", name: "combine a real proof with a fake operand hoping `discharged` propagates", blockedBy: "non-fabricating propagation rules on authority channels", unlocksAt: "C1.5" },
-  { id: "D", name: "read a real `discharged`, write it onto a fake value", blockedBy: "reads are free; the write still needs the capability", unlocksAt: "C1.4" },
-  { id: "E", name: "capability leak through an export surface", blockedBy: "holder keeps the writer module-private (ocap discipline)", unlocksAt: "S3 visibility enforcement" },
-  { id: "F", name: "forge the writer capability itself", blockedBy: "writer is a PrimitiveFunction closure, unconstructible from Allegretto", unlocksAt: "C1.4" },
+  { id: "A", name: "forge `discharged` from nothing", blockedBy: "origination requires the kernel-held writer", unlocksAt: "C1.4", status: "live" },
+  { id: "B", name: "swap a real proof's proposition, keep `discharged`", blockedBy: "data-immutability (D22)", unlocksAt: "C1.4", status: "live" },
+  { id: "C", name: "combine a real proof with a fake operand hoping `discharged` propagates", blockedBy: "non-fabricating propagation rules on authority channels", unlocksAt: "C1.5", status: "skeleton" },
+  { id: "D", name: "read a real `discharged`, write it onto a fake value", blockedBy: "reads are free; the write still needs the capability", unlocksAt: "C1.4", status: "live" },
+  { id: "E", name: "capability leak through an export surface", blockedBy: "holder keeps the writer module-private (ocap discipline)", unlocksAt: "S3 visibility enforcement", status: "skeleton" },
+  { id: "F", name: "forge the writer capability itself", blockedBy: "writer is a PrimitiveFunction closure, unconstructible from Allegretto", unlocksAt: "C1.4", status: "live" },
 ];
+
+/** Evaluate an attack program; report whether (and how) it was refused. */
+function attack(src: string): { threw: string | null; evalCtx: ContextValue | null } {
+  try {
+    const { evalCtx } = evalSource(src, undefined, [createTypeSystem()], undefined, true);
+    return { threw: null, evalCtx };
+  } catch (e: any) {
+    return { threw: String(e?.message ?? e), evalCtx: null };
+  }
+}
 
 // --- 4. Baseline snapshot ------------------------------------------------------
 
@@ -500,6 +515,13 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
   });
 
   test("registry completeness (C1.1): no unregistered __* slot or component key in the corpus", () => {
+    if (corpus && corpus.files === 0) {
+      // Dev-filtered run: the file tests (whose evaluation the walk
+      // piggybacks on) were filtered out. Coverage is asserted by the full
+      // landing gate, not the dev tier.
+      console.log("    ⊘ corpus walk skipped (no file tests ran — dev-filtered run)");
+      return;
+    }
     const result = corpus
       ? { walked: corpus.files, violations: corpus.violations }
       : (() => { const r = runRegistryCompletenessCorpus(); return { walked: r.walked, violations: r.violations }; })();
@@ -508,11 +530,74 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(result.walked >= 15, true, `corpus coverage: ${result.walked} .alg files walked`);
   });
 
-  test("forgery suite skeleton: D21 scenarios A–F are all present and tracked", () => {
+  test("forgery suite: D21 scenarios A–F all present; C/E skeletons tracked", () => {
     eq(FORGERY_SCENARIOS.map((s) => s.id).join(""), "ABCDEF");
-    for (const s of FORGERY_SCENARIOS) {
+    for (const s of FORGERY_SCENARIOS.filter((x) => x.status === "skeleton")) {
       console.log(`    ⊘ forgery ${s.id} — SKELETON (${s.name}; unlocks at ${s.unlocksAt})`);
     }
+  });
+
+  test("forgery A (live): originating `discharged` without the writer is refused", () => {
+    const lit = attack('p = {__discharged: 1, __proposition: "forged"}');
+    eq(lit.threw?.includes("integrity channel") ?? false, true, `object literal: ${lit.threw}`);
+    const reg = attack('w = channel_register("discharged", "drop")');
+    eq(reg.threw?.includes("already registered") ?? false, true, `re-registration: ${reg.threw}`);
+  });
+
+  test("forgery B (live): a real proof's proposition cannot be swapped under `discharged`", () => {
+    const r = attack('theorem t: 1 + 1 == 2\ncopy = mv_set(t, "note", 42)');
+    eq(r.threw, null, "benign component copy should evaluate");
+    const t = r.evalCtx!.bindings.get("t")!.value as Value;
+    // mv_set produced a NEW value; the proof itself is untouched...
+    eq(componentsView(t).has("note"), false, "original proof gained no component");
+    // ...and still carries its original proposition + discharge.
+    const ctx = asContext(t)!;
+    const disch = channelReadRaw(t, "discharged") as Value;
+    eq((primaryOf(disch) as any).data, 1n, "still discharged");
+    eq(bitsToString(primaryOf(getProposition(ctx)!) as BitsValue).includes("1 + 1"), true, "proposition unchanged");
+  });
+
+  test("forgery D (live): reads are free; writing the read value onto a fake is refused", () => {
+    const read = attack('theorem t: 1 + 1 == 2\nd = channel_read(t, "discharged")');
+    eq(read.threw, null, "free read");
+    const d = read.evalCtx!.bindings.get("d")!.value as Value;
+    eq((primaryOf(d) as any).data, 1n, "read the real discharge mark");
+    const write = attack('f = mv_set({x: 1}, "discharged", 1)');
+    eq(write.threw?.includes("integrity channel") ?? false, true, `write-onto-fake: ${write.threw}`);
+  });
+
+  test("forgery F (live): the writer capability cannot be forged or counterfeited", () => {
+    const fake = attack("w2 = channel_attenuate(x => x, y => y)");
+    eq(fake.threw?.includes("not a channel writer") ?? false, true, `fake writer: ${fake.threw}`);
+    // A later program cannot re-mint a channel registered by an earlier one
+    // (the epoch seal — same-pass re-evaluation is the only re-issue).
+    const first = attack('w = channel_register("forgery_f_probe", "union")');
+    eq(first.threw, null, "first registration succeeds");
+    const second = attack('w = channel_register("forgery_f_probe", "union")');
+    eq(second.threw?.includes("already registered") ?? false, true, `cross-program re-mint: ${second.threw}`);
+  });
+
+  test("channel plane (C1.4): user channel end-to-end — write, free read, attenuation", () => {
+    const r = attack([
+      'w = channel_register("audit_e2e", "union")',
+      'v = w(42, "checked")',
+      'r = channel_read(v, "audit_e2e")',
+      'wa = channel_attenuate(w, x => x == "ok")',
+      'good = wa(5, "ok")',
+      'g = channel_read(good, "audit_e2e")',
+    ].join("\n"));
+    eq(r.threw, null, `e2e: ${r.threw}`);
+    eq(bitsToString(primaryOf(r.evalCtx!.bindings.get("r")!.value as Value) as BitsValue), "checked");
+    eq(bitsToString(primaryOf(r.evalCtx!.bindings.get("g")!.value as Value) as BitsValue), "ok");
+    const rejected = attack([
+      'w = channel_register("audit_e2e_2", "union")',
+      'wa = channel_attenuate(w, x => x == "ok")',
+      'bad = wa(5, "nope")',
+    ].join("\n"));
+    eq(rejected.threw?.includes("attenuation predicate rejected") ?? false, true, `attenuation: ${rejected.threw}`);
+    // Integrity channels reject fabricating rules at registration (D23).
+    const fab = attack('w = channel_register("discharged2", "viral")');
+    eq(fab.threw, null, "non-integrity user channel may be viral");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

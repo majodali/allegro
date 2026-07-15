@@ -20,6 +20,7 @@ import {
   ValueKind,
   ContextValue,
   MultiValueType,
+  AllegroError,
 } from "./types.js";
 
 // --- Registry ------------------------------------------------------------------
@@ -116,6 +117,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "__bare_", storages: ["binding-name-prefix"], owner: "futures", disposition: "base-concept", target: "future cells (D33)", prefix: true },
 
   // --- Host-engine internals (never value slots) --------------------------------------
+  { name: "__channelWriterFor", storages: ["js-property"], owner: "channel plane", disposition: "host-internal", target: "n/a — brand on writer PrimitiveFunctions (C1.4); attenuation checks it" },
   { name: "__compileMode", storages: ["context-binding"], owner: "evaluator", disposition: "host-internal", target: "n/a" },
   { name: "__futureManager", storages: ["js-property"], owner: "futures", disposition: "host-internal", target: "n/a" },
   { name: "__tailCall", storages: ["js-property"], owner: "evaluator", disposition: "host-internal", target: "n/a" },
@@ -234,8 +236,9 @@ export function channelReadRaw(v: Value, channel: string): Value | undefined {
     if (v.kind === ValueKind.MultiValue) return (v as MultiValueType).components.get("type") as Value | undefined;
     if (v.kind === ValueKind.Context) return slotRead(v as ContextValue, "__type");
   }
-  if (channel === "discharged" && v.kind === ValueKind.Context) {
-    return slotRead(v as ContextValue, "__discharged");
+  if (channel === "discharged") {
+    const c = asContext(v);
+    if (c) return slotRead(c, "__discharged");
   }
   const ctx = asContext(v);
   if (ctx && (channel === "shape" || channel === "type")) return slotRead(ctx, "__type");
@@ -288,9 +291,11 @@ export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as an
 // Base concepts
 export function setSlotCount(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__length", v); }
 
-// Channel-plane writes (plain shims; C1.4 gates origination with capabilities)
+// Channel-plane writes. `writeShape` remains a plain shim (shape-dispatch
+// integrity is C3.1's concern); the discharged channel is capability-gated
+// below (C1.4) — its raw writers are module-private.
 export function writeShape(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__type", v); }
-export function writeDischarged(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
+function writeDischarged(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
 
 // Presence checks
 export function hasName(ctx: ContextValue): boolean { return ctx.bindings.has("__name"); }
@@ -304,7 +309,7 @@ function slotSet(ctx: ContextValue, key: string, value: Value): void {
   ctx.bindings.set(key, { key, value, isUse: false });
 }
 export function stampProposition(ctx: ContextValue, v: Value): void { slotSet(ctx, "__proposition", v); }
-export function stampDischarged(ctx: ContextValue, v: Value): void { slotSet(ctx, "__discharged", v); }
+function stampDischarged(ctx: ContextValue, v: Value): void { slotSet(ctx, "__discharged", v); }
 export function stampProofReason(ctx: ContextValue, v: Value): void { slotSet(ctx, "__reason", v); }
 export function stampProofCounterexample(ctx: ContextValue, v: Value): void { slotSet(ctx, "__counterexample", v); }
 export function stampEqOperands(ctx: ContextValue, lhs: Value, rhs: Value): void {
@@ -392,6 +397,141 @@ export function cloneComponents(v: Value): Map<string, Value> {
 export const EFFECT_VAR_MARKER = "__effectvar:";
 export function isEffectVarLabel(label: string): boolean { return label.startsWith(EFFECT_VAR_MARKER); }
 export function effectVarLabel(name: string): string { return EFFECT_VAR_MARKER + name; }
+
+// --- Channel registry + writer capabilities (C1.4, per D21–D24) -----------------------
+//
+// Registration is one-shot per channel name and returns the channel's write
+// operation as a closure (D24: the capability IS the closure — delegable,
+// attenuable, unconstructible from Allegretto). Reads are free (D23).
+// Integrity channels may only register non-fabricating propagation rules
+// (`drop` / `computed`) — `viral`/`union` on an authority channel is
+// forgery vector C (D23). Propagation rules are RECORDED here and consulted
+// by the C1.5 propagation table.
+
+export type PropagationRule = "viral" | "union" | "computed" | "positional" | "drop";
+
+export interface ChannelSpec {
+  name: string;
+  rule: PropagationRule;
+  /** Origination requires the writer capability. */
+  integrity?: boolean;
+  /** S3 policy attribute — recorded, not yet enforced (default public). */
+  readVisibility?: "public";
+  /** Binding-plane storage key, for channels predating the component plane. */
+  bindingKey?: string;
+}
+
+/** A held write capability for one channel. For binding-plane channels the
+ *  write mutates the target Context (origination on a fresh kernel value);
+ *  for component-plane channels it returns a new MultiValue. */
+export interface ChannelWriter {
+  channel: string;
+  write(target: Value, channelValue: Value): Value;
+}
+
+interface ChannelEntry {
+  spec: ChannelSpec;
+  writer: ChannelWriter;
+  /** evalSource pass in which an Allegro-minted channel was registered.
+   *  The evaluation loop legitimately re-evaluates top-level bindings
+   *  within one pass (fixpoint), so re-registration with an identical spec
+   *  in the SAME epoch returns the held writer; any later pass throws —
+   *  the capability belongs to whoever registered first. Kernel channels
+   *  use epoch -1: they never re-issue. */
+  epoch: number;
+  minted: boolean;
+}
+
+const CHANNEL_TABLE = new Map<string, ChannelEntry>();
+let channelEpoch = 0;
+
+/** Called at the start of each evalSource pass (see runtime.ts). */
+export function bumpChannelEpoch(): void { channelEpoch++; }
+
+function buildWriter(spec: ChannelSpec): ChannelWriter {
+  return {
+    channel: spec.name,
+    write(target: Value, channelValue: Value): Value {
+      if (spec.bindingKey) {
+        if (target.kind !== ValueKind.Context) {
+          throw new AllegroError(`channel '${spec.name}': binding-plane write target must be a Context`);
+        }
+        if (spec.name === "discharged") stampDischarged(target as ContextValue, channelValue);
+        else slotSet(target as ContextValue, spec.bindingKey, channelValue);
+        return target;
+      }
+      const comps = cloneComponents(target);
+      comps.set(spec.name, channelValue);
+      return { kind: ValueKind.MultiValue, primary: target.kind === ValueKind.MultiValue ? (target as MultiValueType).primary : target, components: comps } as Value;
+    },
+  };
+}
+
+/** One-shot channel registration → writer capability. Throws on duplicate
+ *  names (re-registration is forgery vector F) and on fabricating rules for
+ *  integrity channels (forgery vector C). */
+export function registerChannel(spec: ChannelSpec, minted = false): ChannelWriter {
+  const existing = CHANNEL_TABLE.get(spec.name);
+  if (existing) {
+    // Same-pass re-evaluation of the SAME Allegro registration site: hand
+    // back the held writer. Anything else is forgery vector F.
+    if (existing.minted && minted && existing.epoch === channelEpoch && existing.spec.rule === spec.rule) {
+      return existing.writer;
+    }
+    throw new AllegroError(`channel '${spec.name}' is already registered — the writer capability is held by its owner`);
+  }
+  if (spec.integrity && (spec.rule === "viral" || spec.rule === "union")) {
+    throw new AllegroError(`channel '${spec.name}': integrity channels may not register fabricating propagation rules (viral/union) — D23`);
+  }
+  const writer = buildWriter(spec);
+  CHANNEL_TABLE.set(spec.name, { spec, writer, epoch: minted ? channelEpoch : -1, minted });
+  return writer;
+}
+
+export function channelSpec(name: string): ChannelSpec | undefined {
+  return CHANNEL_TABLE.get(name)?.spec;
+}
+
+/** TS-kernel writer acquisition. Discipline is the boundary lint: call sites
+ *  outside the kernel modules (types-std.ts, primitives.ts) fail the suite.
+ *  The writer is never exposed to Allegro — extension bindings do not
+ *  include it, and Allegretto cannot construct a host closure (D24). */
+export function kernelChannelWriter(name: string): ChannelWriter {
+  const e = CHANNEL_TABLE.get(name);
+  if (!e) throw new AllegroError(`no such channel: '${name}'`);
+  return e.writer;
+}
+
+// Built-in channels, registered at module init. Rules per D36/D21–D24;
+// consulted by the C1.5 propagation table.
+registerChannel({ name: "shape", rule: "computed", bindingKey: "__type" });
+registerChannel({ name: "error", rule: "viral" });
+registerChannel({ name: "effects", rule: "union" });
+registerChannel({ name: "predicates", rule: "computed" });
+registerChannel({ name: "domain", rule: "computed" });
+registerChannel({ name: "discharged", rule: "drop", integrity: true, bindingKey: "__discharged" });
+registerChannel({ name: "warnings", rule: "union" });
+registerChannel({ name: "source", rule: "positional" });
+registerChannel({ name: "exported", rule: "drop" });
+
+/** Binding keys that only a channel writer may originate. User-reachable
+ *  construction paths (object literals, mv_set) consult this. */
+const INTEGRITY_BINDING_KEYS = new Set<string>(["__discharged"]);
+const INTEGRITY_CHANNEL_NAMES = new Set<string>(["discharged"]);
+
+/** Gate for user-reachable construction paths: throws if the key would
+ *  originate an integrity channel without holding its writer. */
+export function assertNotIntegrityKey(key: string, site: string): void {
+  if (INTEGRITY_BINDING_KEYS.has(key) || INTEGRITY_CHANNEL_NAMES.has(key)) {
+    throw new AllegroError(
+      `${site}: cannot originate integrity channel 'discharged' — origination requires the channel writer (D21–D24)`
+    );
+  }
+}
+
+/** Brand for Allegro-level channel-writer PrimitiveFunctions (host-internal
+ *  js-property; registered in SLOT_REGISTRY). Attenuation checks it. */
+export const CHANNEL_WRITER_BRAND = "__channelWriterFor";
 
 /** List the channels present on a value (component keys + binding-plane channels). */
 export function channelList(v: Value): string[] {

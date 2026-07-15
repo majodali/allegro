@@ -63,6 +63,32 @@
 >   file at ZERO violations except sanctioned slots.ts; `hardFail: true`
 >   flipped and negative-tested — the enforcement moment: direct slot
 >   access outside the accessor layer is now a suite failure.
+> - C1.4 (B-009) landed 2026-07 — channel writers + forgery suite v1.
+>   Channel registry in slots.ts: all 9 built-in channels registered with
+>   propagation rules (recorded now, consulted by C1.5); one-shot
+>   registration returns the writer closure (D24); integrity channels
+>   reject fabricating rules at registration (D23). `discharged` writer is
+>   kernel-private: acquired via `kernelChannelWriter` at exactly the two
+>   origination sites (primitives.ts failed proofs, types-std.ts
+>   makeProof), lint-restricted to those modules. Construction-path gates:
+>   object literals and mv_set refuse `__discharged`/`discharged` keys —
+>   closing a REAL pre-existing hole (an Allegro object literal
+>   `{__discharged: 1, __proposition: "forged"}` produced a structurally
+>   valid discharged proof; forgery A was live in the wild). Allegro
+>   surface: `channel_register(name, rule) → writer`,
+>   `channel_read`/`channel_list` (free, D23), `channel_attenuate(w, pred)`
+>   (delegable attenuation, D24; brand-checked). Registration is
+>   epoch-sealed: the evaluator's fixpoint loop re-evaluates top-level
+>   bindings within one pass, so same-pass identical re-registration
+>   returns the held writer; any later program's re-registration throws.
+>   Forgery A/B/D/F live as real attack tests (C unlocks at C1.5, E at
+>   S3). Scoping note: non-integrity channels (shape/error/effects/
+>   knowledge) keep their existing single-function origination chokepoints
+>   (withType, error creation, withEffects, withPredicates) — full writer
+>   indirection for them lands with C1.5's propagation table, where those
+>   functions collapse into writer + table entries. The hard-fail lint
+>   caught one drive-by dunder literal in my own new code (brand constant)
+>   — relocated to slots.ts.
 
 ## 1. Context
 

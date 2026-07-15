@@ -8,6 +8,49 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C1.4: Channel writers — origination capabilities (structures Phase 1, B-009)
+
+The channel plane gets its capability model (D21–D24), and the forgery
+suite goes live.
+
+- **Headline finding: forgery scenario A was a real hole.** Before this
+  chunk, the Allegro object literal `{__discharged: 1, __proposition:
+  "forged"}` produced a Context structurally indistinguishable from a
+  discharged proof — `proofCtx`'s structural check accepted it. Closed by
+  construction-path gates: object literals and `mv_set` refuse integrity-
+  channel keys with a clear D21–D24 error.
+- **Channel registry** (`src/slots.ts`): all 9 built-in channels
+  registered with their propagation rules (shape computed, error viral,
+  effects union, knowledge computed, discharged drop+integrity, …) —
+  recorded now, consulted by C1.5's propagation table. Registration is
+  one-shot and returns the write capability as a closure (D24);
+  integrity channels reject fabricating rules (viral/union) at
+  registration (D23).
+- **Kernel-private discharged writer**: acquired via
+  `kernelChannelWriter("discharged")` at exactly the two origination
+  sites — primitives.ts (failed proofs) and types-std.ts (`makeProof`).
+  A new lint pattern restricts acquisition to those two modules; the raw
+  stampers are no longer exported. The writer is never bound into any
+  Allegro extension.
+- **Allegro surface**: `channel_register(name, rule) → writer`,
+  `channel_read(value, name)` / `channel_list(value)` (authority-free,
+  D23), `channel_attenuate(writer, predicate)` (delegable attenuation,
+  D24 — brand-checked, so a hand-rolled lambda is refused). Registration
+  is epoch-sealed: the evaluator's fixpoint loop re-evaluates top-level
+  bindings within a pass, so same-pass identical re-registration returns
+  the held writer; a later program's re-registration throws (capability
+  held).
+- **Forgery suite v1**: A, B, D, F are live attack tests (object-literal
+  forge, proposition swap under discharge, free-read/gated-write,
+  writer counterfeit + cross-program re-mint). C unlocks at C1.5, E at
+  S3. The hard-fail lint proved itself mid-chunk by catching a drive-by
+  dunder literal in this chunk's own new code.
+- **Scoping decision** (recorded for review): non-integrity channels keep
+  their existing single-function origination chokepoints (withType,
+  error creation, withEffects, withPredicates); full writer indirection
+  for them lands with C1.5's propagation table, where those functions
+  collapse into writer + table entries.
+
 ## 2026-07 — C1.3: Accessor migration complete + lint hard-fail (structures Phase 1, B-008)
 
 The enforcement moment for the base/extension boundary. All 12 remaining

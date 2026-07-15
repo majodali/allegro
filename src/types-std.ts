@@ -21,7 +21,7 @@ import {
   setWraps, setVariants, setPredicate, setGenericParams, setGenericArgs,
   setGenericBackLink, markGeneric, setGenericConstructor, setProposition,
   setEffectKind, setEffectBound, setSlotCount, setAbstractDomain,
-  writeShape, writeDischarged, removeName, removeParent, removeShapeSlot,
+  writeShape, removeName, removeParent, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
   removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf,
 } from "./slots.js";
 
@@ -120,6 +120,11 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
 // =============================================================================
 
 /** Helper to add a binding to a Context */
+// Held write capability for the discharged integrity channel (C1.4, D21-D24).
+// Module-scope, never exported — makeProof is this module's only
+// origination site.
+const dischargedWriterStd = kernelChannelWriter("discharged");
+
 function addBinding(ctx: ContextValue, key: string, value: Value): void {
   ctx.bindings.set(key, { key, value, isUse: false });
   ctx.bindingList.push({ key, value, isUse: false });
@@ -1707,6 +1712,7 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
 export function makeObject(entries: [string, Value][]): Value {
   const ctx = makeContext();
   for (const [key, value] of entries) {
+    assertNotIntegrityKey(key, "object literal");
     ctx.bindings.set(key, { key, value, isUse: false });
     ctx.bindingList.push({ key, value, isUse: false });
   }
@@ -2403,7 +2409,7 @@ setMembers(Proof, makeContext());
 export function makeProof(proposition: string): Value {
   const p = makeContext();
   setProposition(p, stringToBits(proposition));
-  writeDischarged(p, makeInt(1));
+  dischargedWriterStd.write(p, makeInt(1));
   return withType(p, Proof);
 }
 
