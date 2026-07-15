@@ -43,7 +43,15 @@ function evalNum(source: string): number {
   return Number(p.data);
 }
 
+// Per-test timing — the summary prints the slowest tests so suite-cost
+// optimization stays evidence-based (see the "suite verification cost"
+// discussion, 2026-07).
+const testTimes: { name: string; ms: number }[] = [];
+const sectionTimes: { name: string; ms: number }[] = [];
+const suiteT0 = performance.now();
+
 function test(name: string, fn: () => void): void {
+  const t0 = performance.now();
   try {
     fn();
     passed++;
@@ -53,6 +61,14 @@ function test(name: string, fn: () => void): void {
     failures.push(msg);
     console.log(msg);
   }
+  testTimes.push({ name, ms: performance.now() - t0 });
+}
+
+async function timedSection<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const t0 = performance.now();
+  const r = await fn();
+  sectionTimes.push({ name, ms: performance.now() - t0 });
+  return r;
 }
 
 function eq(actual: any, expected: any, label?: string): void {
@@ -10367,7 +10383,14 @@ import { runBoundaryTests, getSuiteFloor } from "./boundary-tests.js";
 
 // --- Run all tests (sync + async) and report ---
 
-runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then(() => runBenchmarkTests()).then(() => runDocLintTests()).then(() => runBoundaryTests({ test, eq })).then(() => {
+sectionTimes.push({ name: "sync body (evaluator/types/grammar/.alg files)", ms: performance.now() - suiteT0 });
+timedSection("modules", runModuleTests)
+  .then(() => timedSection("async/futures", runAsyncTests))
+  .then(() => timedSection("h4a-llm-worker", runH4aAsyncTests))
+  .then(() => timedSection("benchmark", runBenchmarkTests))
+  .then(() => timedSection("doc-lint", async () => runDocLintTests()))
+  .then(() => timedSection("boundary", async () => runBoundaryTests({ test, eq })))
+  .then(() => {
   // Suite-count floor (boundary baseline): a mass-disablement tripwire.
   const floor = getSuiteFloor();
   if (passed + failed < floor) {
@@ -10376,6 +10399,11 @@ runModuleTests().then(() => runAsyncTests()).then(() => runH4aAsyncTests()).then
   }
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
+  console.log(`Wall clock: ${((performance.now() - suiteT0) / 1000).toFixed(1)}s`);
+  console.log(`Sections: ${sectionTimes.map((s) => `${s.name} ${(s.ms / 1000).toFixed(1)}s`).join(" | ")}`);
+  const slowest = [...testTimes].sort((a, b) => b.ms - a.ms).slice(0, 15);
+  console.log(`Slowest tests:`);
+  for (const t of slowest) console.log(`  ${(t.ms / 1000).toFixed(2).padStart(7)}s  ${t.name}`);
   if (failures.length > 0) {
     console.log("\nFailures:");
     for (const f of failures) console.log(`  ${f}`);
