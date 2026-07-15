@@ -8,6 +8,30 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C1.3: Accessor migration complete + lint hard-fail (structures Phase 1, B-008)
+
+The enforcement moment for the base/extension boundary. All 12 remaining
+files migrated (~360 sites: 222 mechanical `primaryOf` → `dataOf` renames
+plus ~100 individually-reviewed literal/component sites across
+primitives, totality, refinements, introspect, runtime, proofs, effects,
+pcp, proven, modules, and the two grammar2 files). Every production file
+is now at ZERO forbidden-access occurrences except the sanctioned
+`src/slots.ts`, and the baseline's `hardFail` flag is flipped: **direct
+slot access outside the accessor layer is a suite failure from this
+commit on** (negative-tested — a single injected occurrence trips it).
+
+Accessor layer additions: presence checks (`hasName`, `hasShapeSlot`,
+`hasDischarged`); set-only proof stampers (`stampProposition`,
+`stampDischarged`, `stampProofReason`, `stampProofCounterexample`,
+`stampEqOperands`) that mirror the proof kernel's map-only origination
+idiom exactly — these are the chokepoints C1.4 wraps with the
+discharged-channel writer capability; `renameInPlace` preserving the
+auto-naming pass's deliberate mutate-map-entry-only semantics.
+
+tsc clean under the sanctioned invocation; 986/986 green — zero behavior
+change. Phase 1 remaining: C1.4 (channel writers + forgery suite v1),
+C1.5 (propagation table — first conscious-delta chunk).
+
 ## 2026-07 — Suite-cost pass + CI (B-005, pulled forward)
 
 Response to the maintainer's verification-cost concern. Profile findings

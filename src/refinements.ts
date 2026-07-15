@@ -20,8 +20,9 @@
 // See .claude/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
+import { dataOf, cloneComponents, componentsView } from "./slots.js";
 import {
-  Value, ValueKind, primaryOf, BitsValue, ContextValue,
+  Value, ValueKind, BitsValue, ContextValue,
   makeMultiValue, makeInt, isResolved,
 } from "./types.js";
 
@@ -135,7 +136,7 @@ export function formatDomain(d: AbstractDomain): string {
  * use.
  */
 export function domainFromPredicate(predicate: Value): AbstractDomain {
-  const p = primaryOf(predicate);
+  const p = dataOf(predicate);
   if (p.kind !== ValueKind.ComposedFunction) {
     return { kind: "opaque", predicate };
   }
@@ -150,9 +151,9 @@ export function domainFromPredicate(predicate: Value): AbstractDomain {
  *  abstract domain. Returns null if the shape isn't recognised. */
 function interpretPredicateExpr(expr: Value, paramId: unknown): AbstractDomain | null {
   // Strip MultiValue wrapping (typed_and etc. may wrap results).
-  const e = primaryOf(expr);
+  const e = dataOf(expr);
   if (e.kind !== ValueKind.Expression) return null;
-  const fn = primaryOf(e.fn);
+  const fn = dataOf(e.fn);
   if (fn.kind !== ValueKind.PrimitiveFunction) return null;
 
   // Conjunction — combine the two sides.
@@ -162,7 +163,7 @@ function interpretPredicateExpr(expr: Value, paramId: unknown): AbstractDomain |
   if (fn.name === "typed_and") {
     if (e.args.length !== 2) return null;
     const leftDom  = interpretPredicateExpr(e.args[0], paramId);
-    const rightArg = primaryOf(e.args[1]);
+    const rightArg = dataOf(e.args[1]);
     let rightDom: AbstractDomain | null = null;
     if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
       rightDom = interpretPredicateExpr(rightArg.body, paramId);
@@ -218,12 +219,12 @@ function recogniseComparison(
 }
 
 function isParam(v: Value, paramId: unknown): boolean {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   return p.kind === ValueKind.Param && (p as any) === paramId;
 }
 
 function asIntLiteral(v: Value): number | null {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) return null;
   const b = p as BitsValue;
   if (b.length !== 64) return null;
@@ -600,10 +601,9 @@ const PREDICATES_COMPONENT_KEY = "predicates";
 
 /** Attach an abstract domain as a MultiValue component. Wraps if needed. */
 export function withDomain(v: Value, domain: AbstractDomain): Value {
-  const existing = v.kind === ValueKind.MultiValue ? v.components : new Map<string, Value>();
-  const comps = new Map(existing);
+  const comps = cloneComponents(v);
   comps.set(DOMAIN_COMPONENT_KEY, encodeDomain(domain));
-  return makeMultiValue(primaryOf(v), comps);
+  return makeMultiValue(dataOf(v), comps);
 }
 
 /** Read an abstract domain off a value, if one is present. With Phase C's
@@ -613,7 +613,7 @@ export function withDomain(v: Value, domain: AbstractDomain): Value {
 export function domainOf(v: Value): AbstractDomain | null {
   if (v.kind !== ValueKind.MultiValue) return null;
   // Phase C: prefer the predicate set if present.
-  const setComp = v.components.get(PREDICATES_COMPONENT_KEY);
+  const setComp = componentsView(v).get(PREDICATES_COMPONENT_KEY);
   if (setComp) {
     const set = decodePredicates(setComp);
     if (set) {
@@ -621,7 +621,7 @@ export function domainOf(v: Value): AbstractDomain | null {
       if (eff) return eff;
     }
   }
-  const c = v.components.get(DOMAIN_COMPONENT_KEY);
+  const c = componentsView(v).get(DOMAIN_COMPONENT_KEY);
   if (!c) return null;
   return decodeDomain(c);
 }
@@ -629,13 +629,12 @@ export function domainOf(v: Value): AbstractDomain | null {
 /** Attach a predicate set as a MultiValue component. Always merges with any
  *  existing set; never overwrites silently. */
 export function withPredicates(v: Value, set: PredicateSet): Value {
-  const existing = v.kind === ValueKind.MultiValue ? v.components : new Map<string, Value>();
-  const comps = new Map(existing);
+  const comps = cloneComponents(v);
   // Merge with any existing predicate set.
   const prior = predicatesOf(v);
   const merged = prior ? mergePredicateSets(prior, set) : set;
   comps.set(PREDICATES_COMPONENT_KEY, encodePredicates(merged));
-  return makeMultiValue(primaryOf(v), comps);
+  return makeMultiValue(dataOf(v), comps);
 }
 
 /** Read a value's predicate set, if any. Returns a fresh PredicateSet —
@@ -643,14 +642,14 @@ export function withPredicates(v: Value, set: PredicateSet): Value {
  *  value's stored encoding). */
 export function predicatesOf(v: Value): PredicateSet | null {
   if (v.kind !== ValueKind.MultiValue) return null;
-  const setComp = v.components.get(PREDICATES_COMPONENT_KEY);
+  const setComp = componentsView(v).get(PREDICATES_COMPONENT_KEY);
   if (setComp) {
     const set = decodePredicates(setComp);
     if (set) return set;
   }
   // Legacy fallback: lift a single-domain `domain` component into a
   // singleton set so old code paths continue to work during the migration.
-  const dc = v.components.get(DOMAIN_COMPONENT_KEY);
+  const dc = componentsView(v).get(DOMAIN_COMPONENT_KEY);
   if (dc) {
     const dom = decodeDomain(dc);
     if (dom) return new PredicateSet([{ shape: dom, source: "refinement-type" }]);
@@ -789,9 +788,9 @@ function collectNarrowing(
   source: PredicateSource,
   out: Map<string, PredicateSet>,
 ): void {
-  const e = primaryOf(expr);
+  const e = dataOf(expr);
   if (e.kind !== ValueKind.Expression) return;
-  const fn = primaryOf(e.fn);
+  const fn = dataOf(e.fn);
   if (fn.kind !== ValueKind.PrimitiveFunction) return;
 
   // Conjunction — `cond1 && cond2`.
@@ -800,7 +799,7 @@ function collectNarrowing(
   if (fn.name === "typed_and" && polarity === true) {
     if (e.args.length !== 2) return;
     collectNarrowing(e.args[0], true, source, out);
-    const rightArg = primaryOf(e.args[1]);
+    const rightArg = dataOf(e.args[1]);
     if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
       collectNarrowing(rightArg.body, true, source, out);
     } else {
@@ -811,8 +810,8 @@ function collectNarrowing(
 
   // Comparison — find which side is a Symbol and which is a literal.
   if (e.args.length !== 2) return;
-  const left = primaryOf(e.args[0]);
-  const right = primaryOf(e.args[1]);
+  const left = dataOf(e.args[0]);
+  const right = dataOf(e.args[1]);
   let symbolArg: Value | null = null;
   let literalArg: Value | null = null;
   let opOrder: "sym-lit" | "lit-sym" | null = null;
@@ -846,7 +845,7 @@ function collectNarrowing(
   }
   if (!dom) return;
 
-  const symPrim = primaryOf(symbolArg);
+  const symPrim = dataOf(symbolArg);
   if (symPrim.kind !== ValueKind.Symbol) return;
   const name = symPrim.name;
 

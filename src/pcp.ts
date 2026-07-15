@@ -23,7 +23,8 @@
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
 import type { ContextValue, BitsValue } from "./types.js";
-import { ValueKind, primaryOf, bitsToString } from "./types.js";
+import { dataOf, SLOT_KEYS } from "./slots.js";
+import { ValueKind, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
 import type { CompilationReport, Notification } from "./runtime.js";
 
@@ -478,7 +479,7 @@ export function formatVerdict(v: Verdict): string {
 function _ctxString(ctx: ContextValue, key: string): string | undefined {
   const b = ctx.bindings.get(key)?.value;
   if (!b) return undefined;
-  const p = primaryOf(b);
+  const p = dataOf(b);
   return p.kind === ValueKind.Bits ? bitsToString(p as BitsValue) : undefined;
 }
 
@@ -502,23 +503,23 @@ export function buildVerdict(
     const v = binding.value;
     if (!v) continue;
     if (isDischargedProof(v)) {
-      const ctx = primaryOf(v) as ContextValue;
+      const ctx = dataOf(v) as ContextValue;
       theorems.push({
         name: key,
-        proposition: _ctxString(ctx, "__proposition") ?? "<unknown>",
+        proposition: _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>",
         status: "discharged",
         authorship: AUTO_PE_AUTHORSHIP(),
       });
     } else if (isFailedProof(v)) {
-      const ctx = primaryOf(v) as ContextValue;
+      const ctx = dataOf(v) as ContextValue;
       theorems.push({
         name: key,
-        proposition: _ctxString(ctx, "__proposition") ?? "<unknown>",
+        proposition: _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>",
         status: "failed",
         failure: {
           kind: "proof-failure",
-          reason: _ctxString(ctx, "__reason") ?? "proof did not discharge",
-          counterexample: _ctxString(ctx, "__counterexample"),
+          reason: _ctxString(ctx, SLOT_KEYS.reason) ?? "proof did not discharge",
+          counterexample: _ctxString(ctx, SLOT_KEYS.counterexample),
         },
       });
     }
@@ -743,8 +744,8 @@ export function extractObligations(
     if (!discharged && !failed) continue;
     if (opts?.pendingOnly && discharged) continue;
 
-    const ctx = primaryOf(v) as ContextValue;
-    const proposition = _ctxString(ctx, "__proposition") ?? "<unknown>";
+    const ctx = dataOf(v) as ContextValue;
+    const proposition = _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>";
 
     // Prior attempt context: if failed, package the failure as a single
     // PriorAttempt with the candidate slot empty (we don't know what
@@ -761,8 +762,8 @@ export function extractObligations(
               name: key, proposition, status: "failed",
               failure: {
                 kind: "proof-failure",
-                reason: _ctxString(ctx, "__reason") ?? "did not discharge",
-                counterexample: _ctxString(ctx, "__counterexample"),
+                reason: _ctxString(ctx, SLOT_KEYS.reason) ?? "did not discharge",
+                counterexample: _ctxString(ctx, SLOT_KEYS.counterexample),
               },
             }],
           },

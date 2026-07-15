@@ -18,9 +18,10 @@
 // constructors; they reuse this same failed-Proof shape so `checkProofs`
 // stays the single surfacing point.
 
+import { dataOf, channelReadRaw, SLOT_KEYS } from "./slots.js";
 import {
   Value, ValueKind, ContextValue, BitsValue,
-  primaryOf, bitsToString,
+  bitsToString,
 } from "./types.js";
 import { getTypeName } from "./types-std.js";
 
@@ -38,31 +39,31 @@ export interface ProofFinding {
 /** Is this evaluated value a Proof that did NOT discharge? */
 export function isFailedProof(v: Value | undefined): boolean {
   if (!v) return false;
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Context) return false;
   if (getTypeName(v) !== "Proof") return false;
-  const d = (p as ContextValue).bindings.get("__discharged")?.value;
+  const d = channelReadRaw(p, "discharged");
   if (!d) return false;
-  const dp = primaryOf(d);
+  const dp = dataOf(d);
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 0n;
 }
 
 /** Is this a discharged (valid) Proof? */
 export function isDischargedProof(v: Value | undefined): boolean {
   if (!v) return false;
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Context) return false;
   if (getTypeName(v) !== "Proof") return false;
-  const d = (p as ContextValue).bindings.get("__discharged")?.value;
+  const d = channelReadRaw(p, "discharged");
   if (!d) return false;
-  const dp = primaryOf(d);
+  const dp = dataOf(d);
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 1n;
 }
 
 function ctxString(ctx: ContextValue, key: string): string | undefined {
   const b = ctx.bindings.get(key)?.value;
   if (!b) return undefined;
-  const p = primaryOf(b);
+  const p = dataOf(b);
   return p.kind === ValueKind.Bits ? bitsToString(p as BitsValue) : undefined;
 }
 
@@ -72,12 +73,12 @@ export function describeFailedProof(
   v: Value,
   binding: string | null,
 ): ProofFinding {
-  const ctx = primaryOf(v) as ContextValue;
+  const ctx = dataOf(v) as ContextValue;
   return {
     binding,
-    proposition:    ctxString(ctx, "__proposition") ?? "<proposition>",
-    reason:         ctxString(ctx, "__reason") ?? "proof did not discharge",
-    counterexample: ctxString(ctx, "__counterexample"),
+    proposition:    ctxString(ctx, SLOT_KEYS.proposition) ?? "<proposition>",
+    reason:         ctxString(ctx, SLOT_KEYS.reason) ?? "proof did not discharge",
+    counterexample: ctxString(ctx, SLOT_KEYS.counterexample),
   };
 }
 

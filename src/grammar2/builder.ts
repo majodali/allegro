@@ -13,6 +13,7 @@
 //   - error     → an error MultiValue with message + inner tree
 // =============================================================================
 
+import { dataOf, getSlotCount } from "../slots.js";
 import {
   Rule, Grammar, Guard, Production,
   lit, cls, regex, eof, empty, fail, indent as indentTerm,
@@ -27,7 +28,7 @@ import { parse as engineParse } from "./engine.js";
 import {
   Value, ValueKind, ContextValue, BitsValue, PrimitiveFnImpl,
   makePrimitive, makeContext, makeInt, makeMultiValue, stringToBits, bitsToString,
-  primaryOf, AllegroError,
+  AllegroError,
 } from "../types.js";
 import { makeArray, makeObject, withType, StringType, ErrorType, noneSingleton, IntType } from "../types-std.js";
 
@@ -50,7 +51,7 @@ function fetch(id: number, expectedKind: string): any {
 }
 
 function handleArg(v: Value, primName: string): number {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected grammar handle (integer), got ${p.kind}`);
   }
@@ -58,7 +59,7 @@ function handleArg(v: Value, primName: string): number {
 }
 
 function stringArg(v: Value, primName: string): string {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected String, got ${p.kind}`);
   }
@@ -66,7 +67,7 @@ function stringArg(v: Value, primName: string): string {
 }
 
 function intArg(v: Value, primName: string): number {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected Int, got ${p.kind}`);
   }
@@ -74,16 +75,16 @@ function intArg(v: Value, primName: string): number {
 }
 
 function arrayArg(v: Value, primName: string): Value[] {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Context) {
     throw new AllegroError(`${primName}: expected Array, got ${p.kind}`);
   }
   const ctx = p as ContextValue;
-  const lengthBinding = ctx.bindings.get("__length");
-  if (!lengthBinding?.value) {
-    throw new AllegroError(`${primName}: value is not an Array (no __length)`);
+  const lengthV = getSlotCount(ctx);
+  if (!lengthV) {
+    throw new AllegroError(`${primName}: value is not an Array (no length slot)`);
   }
-  const length = Number(((lengthBinding.value as any).data ?? 0n) as bigint);
+  const length = Number(((lengthV as any).data ?? 0n) as bigint);
   const out: Value[] = [];
   for (let i = 0; i < length; i++) {
     const b = ctx.bindings.get(String(i));
@@ -101,7 +102,7 @@ function handleToValue(id: number): Value {
 
 function readAttrs(v: Value | undefined, primName: string): import("./types.js").RuleAttrs | undefined {
   if (!v) return undefined;
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Context) {
     throw new AllegroError(`${primName}: attrs must be an Object`);
   }
@@ -181,7 +182,7 @@ const grammar2_rep_impl: PrimitiveFnImpl = (args) => {
   const item = fetch(handleArg(args[0], "grammar2_rep"), "Rule") as Rule;
   const opts: { min?: number; max?: number | null; sep?: Rule } = {};
   if (args[1]) {
-    const p = primaryOf(args[1]);
+    const p = dataOf(args[1]);
     if (p.kind !== ValueKind.Context) {
       throw new AllegroError("grammar2_rep: opts must be an Object");
     }
@@ -285,7 +286,7 @@ function treeToValue(tree: ParseTree): Value {
         ["type",  ErrorType],
       ]);
       const inner = tree.inner ? treeToValue(tree.inner) : makeInt(0);
-      return makeMultiValue(primaryOf(inner), components);
+      return makeMultiValue(dataOf(inner), components);
     }
   }
 }

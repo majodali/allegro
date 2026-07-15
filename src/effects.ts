@@ -24,9 +24,10 @@
 // syntax.
 // =============================================================================
 
+import { dataOf, isEffectVarLabel, EFFECT_VAR_MARKER, componentsView, cloneComponents } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ContextValue, MultiValueType,
-  primaryOf, makeMultiValue,
+  makeMultiValue,
 } from "./types.js";
 
 // =============================================================================
@@ -84,12 +85,12 @@ export function formatEffects(e: EffectSet): string {
 export function unwrapEffectsAttach(v: Value): { body: Value; declared: EffectSet } | null {
   if (v.kind !== ValueKind.Expression) return null;
   let target = v;
-  let fn = primaryOf(target.fn);
+  let fn = dataOf(target.fn);
   if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "type_check"
       && target.args.length >= 1
       && target.args[0].kind === ValueKind.Expression) {
     target = target.args[0] as any;
-    fn = primaryOf(target.fn);
+    fn = dataOf(target.fn);
   }
   if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "effects_attach") return null;
   if (target.args.length !== 2) return null;
@@ -103,12 +104,12 @@ export function unwrapEffectsAttach(v: Value): { body: Value; declared: EffectSe
  *  the analyzer treats that as "no declaration". */
 function extractLabelArray(v: Value): EffectSet {
   const out: EffectSet = new Set();
-  const e = primaryOf(v);
+  const e = dataOf(v);
   if (e.kind !== ValueKind.Expression) return out;
-  const fn = primaryOf(e.fn);
+  const fn = dataOf(e.fn);
   if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "typed_array") return out;
   for (const a of e.args) {
-    const p = primaryOf(a);
+    const p = dataOf(a);
     if (p.kind === ValueKind.Symbol) out.add(p.name);
     // Bits-encoded string literals would be `String "label"` — also accept.
     // (Not currently emitted by the grammar, but cheap to support.)
@@ -162,10 +163,10 @@ export function effectDifference(inferred: EffectSet, declared: EffectSet): Effe
  *  after. Slice 2 Stage C3: covers polymorphic functions whose declared
  *  effect sets need to be checked at compile time, not deferred to a callsite. */
 function asFunction(v: Value): ComposedFunctionValue | null {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind === ValueKind.ComposedFunction) return p;
   if (p.kind === ValueKind.Expression) {
-    const target = primaryOf(p.fn);
+    const target = dataOf(p.fn);
     if (target.kind === ValueKind.PrimitiveFunction
         && (target as any).name === "typed_function"
         && p.args.length >= 1) {
@@ -209,8 +210,8 @@ export function checkEffectsDeclarations(
     // form is only meaningful at call sites where it resolves to actual
     // effect labels — at definition time the bare name is the contract.
     for (const lbl of [...inferredHard]) {
-      if (lbl.startsWith("__effectvar:")) {
-        const bare = lbl.slice("__effectvar:".length);
+      if (isEffectVarLabel(lbl)) {
+        const bare = lbl.slice(EFFECT_VAR_MARKER.length);
         inferredHard.delete(lbl);
         inferredHard.add(bare);
       }
@@ -297,10 +298,10 @@ function decodeEffects(v: Value): EffectSet | null {
  *  Returns null when neither source has effects (consumer treats as pure). */
 export function effectsOf(v: Value): EffectSet | null {
   if (v.kind === ValueKind.MultiValue) {
-    const c = (v as MultiValueType).components.get(EFFECTS_COMPONENT_KEY);
+    const c = componentsView(v).get(EFFECTS_COMPONENT_KEY);
     if (c) return decodeEffects(c);
   }
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind === ValueKind.ComposedFunction) {
     const stash = (p as any).__inferredEffects as EffectSet | undefined;
     if (stash) return stash;
@@ -316,10 +317,9 @@ export function withEffects(v: Value, eff: EffectSet): Value {
   if (eff.size === 0 && prior === null) return v;
   const merged = prior ? effectUnion(prior, eff) : eff;
   if (merged.size === 0) return v;
-  const existing = v.kind === ValueKind.MultiValue ? v.components : new Map<string, Value>();
-  const comps = new Map(existing);
+  const comps = cloneComponents(v);
   comps.set(EFFECTS_COMPONENT_KEY, encodeEffects(merged));
-  return makeMultiValue(primaryOf(v), comps);
+  return makeMultiValue(dataOf(v), comps);
 }
 
 /** Compute the union of multiple effect sets. Null and undefined entries are

@@ -255,6 +255,13 @@ export function setInvariants(ctx: ContextValue, v: Value): void { slotWrite(ctx
 export function setWraps(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__wraps", v); }
 export function setVariants(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__union", v); }
 export function removeName(ctx: ContextValue): void { ctx.bindings.delete("__name"); }
+/** In-place rename used by the auto-naming pass. Mutates the bindings-map
+ *  entry ONLY — bindingList entries are separate objects and are
+ *  deliberately left untouched, mirroring the pre-accessor behavior. */
+export function renameInPlace(ctx: ContextValue, name: Value): void {
+  const b = ctx.bindings.get("__name");
+  if (b) b.value = name;
+}
 
 // Refinement fields
 export function setPredicate(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__predicate", v); }
@@ -284,6 +291,26 @@ export function setSlotCount(ctx: ContextValue, v: Value): void { slotWrite(ctx,
 // Channel-plane writes (plain shims; C1.4 gates origination with capabilities)
 export function writeShape(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__type", v); }
 export function writeDischarged(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
+
+// Presence checks
+export function hasName(ctx: ContextValue): boolean { return ctx.bindings.has("__name"); }
+export function hasShapeSlot(ctx: ContextValue): boolean { return ctx.bindings.has("__type"); }
+export function hasDischarged(ctx: ContextValue): boolean { return ctx.bindings.has("__discharged"); }
+
+// Set-only writes (bindings map, NO bindingList entry) — mirror the proof
+// kernel's origination idiom in primitives.ts exactly. These are the
+// chokepoints the C1.4 discharged-channel writer capability wraps.
+function slotSet(ctx: ContextValue, key: string, value: Value): void {
+  ctx.bindings.set(key, { key, value, isUse: false });
+}
+export function stampProposition(ctx: ContextValue, v: Value): void { slotSet(ctx, "__proposition", v); }
+export function stampDischarged(ctx: ContextValue, v: Value): void { slotSet(ctx, "__discharged", v); }
+export function stampProofReason(ctx: ContextValue, v: Value): void { slotSet(ctx, "__reason", v); }
+export function stampProofCounterexample(ctx: ContextValue, v: Value): void { slotSet(ctx, "__counterexample", v); }
+export function stampEqOperands(ctx: ContextValue, lhs: Value, rhs: Value): void {
+  slotSet(ctx, "__eq_lhs", lhs);
+  slotSet(ctx, "__eq_rhs", rhs);
+}
 
 // Slot-key constants — for the residual idioms (key filters in copy loops,
 // bindingList lookups) that need the literal itself. Call sites use these

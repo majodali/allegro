@@ -62,7 +62,13 @@ phase).
   both files at zero lint violations; ratchet 738 → 500), write-side
   accessor shims + SLOT_KEYS constants added to slots.ts; types.ts was
   already clean. 986/986 green — zero behavior change
-- [ ] **B-008** · L0 · Accessor migration, rest + lint hard-fail (C1.3)
+- [x] **B-008** · L0 · Accessor migration, rest + lint hard-fail (C1.3).
+  Landed 2026-07: all 12 remaining files migrated (~360 sites — 222
+  mechanical `dataOf` renames + ~100 reviewed individually); every
+  production file at ZERO violations except sanctioned `src/slots.ts`;
+  `hardFail: true` — direct slot access outside the accessor layer now
+  fails the suite (negative-tested). The base/extension boundary is
+  mechanically enforced from here on
 - [ ] **B-009** · L0 · Channel writers — origination capabilities +
   forgery suite v1 (C1.4)
 - [ ] **B-010** · L0 · Propagation table; delete `primaryOf` asymmetry +

@@ -50,6 +50,19 @@
 >   push in buildGenericType's markGeneric block collapsed into the
 >   shim. tsc at pre-existing baseline; 986/986 green — zero behavior
 >   change, suite as oracle.
+> - C1.3 (B-008) landed 2026-07 — remaining-file migration + hard-fail
+>   flip. All 12 files (primitives 200 sites, totality, refinements,
+>   introspect, runtime, proofs, effects, pcp, proven, modules, grammar2
+>   builder + fragments) migrated: 222 mechanical `dataOf` renames,
+>   ~100 reviewed sites. New accessors: `hasName`/`hasShapeSlot`/
+>   `hasDischarged`, set-only proof stampers (`stampProposition`/
+>   `stampDischarged`/`stampEqOperands` — deliberately map-only, no
+>   bindingList entry, mirroring the proof kernel's origination idiom;
+>   these are C1.4's capability chokepoints), `renameInPlace` (auto-
+>   naming's binding-object mutation, map-entry only). Every production
+>   file at ZERO violations except sanctioned slots.ts; `hardFail: true`
+>   flipped and negative-tested — the enforcement moment: direct slot
+>   access outside the accessor layer is now a suite failure.
 
 ## 1. Context
 

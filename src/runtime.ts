@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
+import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace } from "./slots.js";
 import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
@@ -12,7 +13,7 @@ import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf, GrammarFragment } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
 import { checkExhaustiveness, checkTermination } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
@@ -62,11 +63,11 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       // into its primary — the value was deliberately typed (e.g. by an
       // earlier typeLiterals pass in a module) and wrapping again would
       // produce a nested MultiValue(MultiValue(Bits, T), T) that later
-      // breaks `primaryOf(v) as BitsValue` extractions.
-      if (v.components.has("type")) return v;
+      // breaks `dataOf(v) as BitsValue` extractions.
+      if (channelReadRaw(v, "type") !== undefined) return v;
       const newPrimary = typeLiterals(v.primary, seen);
       if (newPrimary === v.primary) return v;
-      return makeMultiValue(newPrimary, new Map(v.components));
+      return makeMultiValue(newPrimary, cloneComponents(v));
     }
     default:
       return v;
@@ -343,7 +344,7 @@ function resolveNamedParams(
     case ValueKind.MultiValue: {
       const newP = resolveNamedParams(value.primary, resMap, selfName, seen);
       if (newP === value.primary) return value;
-      return makeMultiValue(newP, new Map(value.components));
+      return makeMultiValue(newP, cloneComponents(value));
     }
   }
   return value;
@@ -429,7 +430,7 @@ function resolveNamedParamsInner(
     case ValueKind.MultiValue: {
       const newP = resolveNamedParamsInner(value.primary, resMap, owner, ownParamNames, selfName, seen);
       if (newP === value.primary) return value;
-      return makeMultiValue(newP, new Map(value.components));
+      return makeMultiValue(newP, cloneComponents(value));
     }
   }
   return value;
@@ -628,7 +629,7 @@ function precompileFunctions(
 
     if (inferredReturnType) {
       const inferredName = inferredReturnType.kind === ValueKind.Context
-        ? (inferredReturnType as ContextValue).bindings.get("__name")?.value
+        ? getName(inferredReturnType as ContextValue)
         : null;
       const inferredStr = inferredName && inferredName.kind === ValueKind.Bits
         ? bitsToString(inferredName as BitsValue)
@@ -638,7 +639,7 @@ function precompileFunctions(
       // Check against explicit return type if declared (typed functions only)
       const declaredReturn = fnType ? getFunctionReturnType(fnType) : null;
       if (declaredReturn && declaredReturn.kind === ValueKind.Context) {
-        const declaredName = (declaredReturn as ContextValue).bindings.get("__name")?.value;
+        const declaredName = getName(declaredReturn as ContextValue);
         const declaredStr = declaredName && declaredName.kind === ValueKind.Bits
           ? bitsToString(declaredName as BitsValue)
           : null;
@@ -1121,14 +1122,14 @@ export function evalSource(
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
       const typeCtx = val.kind === ValueKind.Context ? val as ContextValue
-        : (val.kind === ValueKind.MultiValue && primaryOf(val).kind === ValueKind.Context)
-          ? primaryOf(val) as ContextValue : null;
-      if (typeCtx && typeCtx.bindings.has("__type")) {
-        const nameBinding = typeCtx.bindings.get("__name");
-        if (nameBinding?.value?.kind === ValueKind.Bits) {
-          const currentName = bitsToString(nameBinding.value as BitsValue);
+        : (val.kind === ValueKind.MultiValue && dataOf(val).kind === ValueKind.Context)
+          ? dataOf(val) as ContextValue : null;
+      if (typeCtx && hasShapeSlot(typeCtx)) {
+        const nameV = getName(typeCtx);
+        if (nameV?.kind === ValueKind.Bits) {
+          const currentName = bitsToString(nameV as BitsValue);
           if (currentName.startsWith("<")) {
-            nameBinding.value = stringToBits(b.key);
+            renameInPlace(typeCtx, stringToBits(b.key));
           }
         }
       }

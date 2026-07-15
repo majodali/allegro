@@ -21,10 +21,11 @@
 // type) is F7+ and likely requires either richer abstract-domain
 // machinery or an external SMT discharge.
 
+import { dataOf, getName, channelReadRaw } from "./slots.js";
 import {
   Value, ValueKind, ContextValue, ComposedFunctionValue, ExpressionValue,
   ParamValue, BitsValue,
-  primaryOf, bitsToString, makeInt, makeMultiValue,
+  bitsToString, makeInt, makeMultiValue,
 } from "./types.js";
 import { unwrapProvenAttach } from "./totality.js";
 import { evaluate } from "./evaluator.js";
@@ -60,9 +61,9 @@ function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | nul
  *  `null` when the type isn't one of the F7-minimum shapes; the caller
  *  records this as a "type not sampleable" info notification. */
 function pickSamples(typeCtx: ContextValue): Value[] | null {
-  const nameBinding = typeCtx.bindings.get("__name")?.value;
-  const name = nameBinding && primaryOf(nameBinding).kind === ValueKind.Bits
-    ? bitsToString(primaryOf(nameBinding) as BitsValue) : null;
+  const nameBinding = getName(typeCtx);
+  const name = nameBinding && dataOf(nameBinding).kind === ValueKind.Bits
+    ? bitsToString(dataOf(nameBinding) as BitsValue) : null;
 
   // Bool — enumerate the domain.
   if (name === "Bool") {
@@ -102,7 +103,7 @@ function pickSamples(typeCtx: ContextValue): Value[] | null {
 
 /** Render a sample value as a short string for counterexamples. */
 function describeSample(v: Value): string {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) return "?";
   const b = p as BitsValue;
   if (b.length !== 64) return "?";
@@ -194,7 +195,7 @@ export function checkProvenClauses(
       const mv = val as any;
       if (mv.primary?.kind === ValueKind.ComposedFunction) {
         cfn = mv.primary as ComposedFunctionValue;
-        const tComp = mv.components.get("type");
+        const tComp = channelReadRaw(mv, "type");
         if (tComp?.kind === ValueKind.Context) {
           paramTypes = getFunctionParamTypes(tComp as ContextValue);
         }
@@ -236,9 +237,9 @@ export function checkProvenClauses(
     }
     const samples = pickSamples(typeCtx);
     if (!samples) {
-      const tn = typeCtx.bindings.get("__name")?.value;
-      const tname = tn && primaryOf(tn).kind === ValueKind.Bits
-        ? bitsToString(primaryOf(tn) as BitsValue) : "<type>";
+      const tn = getName(typeCtx);
+      const tname = tn && dataOf(tn).kind === ValueKind.Bits
+        ? bitsToString(dataOf(tn) as BitsValue) : "<type>";
       infos.push({
         binding: name,
         proposition: renderPredicateShape(cfn),
@@ -262,7 +263,7 @@ export function checkProvenClauses(
           failed = { sample, reason: `evaluation threw: ${e.message}` };
           break;
         }
-        const rp = primaryOf(result);
+        const rp = dataOf(result);
         if (rp.kind !== ValueKind.Bits || (rp as BitsValue).data !== 1n) {
           const rendered = rp.kind === ValueKind.Bits
             ? `${rp.data}` : `<${rp.kind}>`;
