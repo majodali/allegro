@@ -26,9 +26,9 @@
     "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 1431,
-      "recursion-tco": 935,
-      "collections": 662
+      "basics": 1437,
+      "recursion-tco": 1025,
+      "collections": 761
     }
   }
 }

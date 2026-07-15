@@ -89,6 +89,25 @@
 >   functions collapse into writer + table entries. The hard-fail lint
 >   caught one drive-by dunder literal in my own new code (brand constant)
 >   — relocated to slots.ts.
+> - C1.5a (B-010 part 1) landed 2026-07 — propagation table + channel-
+>   aware mode. §6 deltas 1–3 ruled by maintainer (recorded in §6 above);
+>   11 differential fixtures recorded pre-change (incl. two legacy warts:
+>   chain-residual error loss, error-in-if-cond else-branch) and asserted
+>   every run. Generic table-driven `viralScan` replaces both hand-rolled
+>   error loops (applyPrimitive + applyComposed); union merges installable
+>   per channel (`installChannelMerge`; effects installs its own);
+>   `assertPropagationTableLinkage` fails startup if the registry drifts
+>   from what the evaluator implements (computed/grandfathered rules
+>   documented at the assertion). Third registration mode
+>   `channelAware` on makePrimitive: eager, args arrive with channels
+>   intact; 6 strip-dodging proof prims flipped (refl/sym/trans/cong,
+>   prove_for_all_bool, prove_induction). **Briefing correction**:
+>   proof_check reclassified as genuinely lazy — it reads the UNEVALUATED
+>   proposition AST via eqExprSides, so it keeps lazy registration (ruling
+>   said 7; investigation found 6 true strip-dodges). Forgery C live
+>   (drop-rule: executor exclusion + registration gate + combination
+>   test) — 5 of 6 scenarios now live. C1.5b (five-wrapper *_attach
+>   collapse) follows as its own landable unit.
 
 ## 1. Context
 

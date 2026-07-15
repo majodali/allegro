@@ -3417,7 +3417,7 @@ const proof_refines_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 /** `proof_refl(x)` — reflexivity: `x == x`, always discharged. */
 const proof_refl_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 1) throw new AllegroError(`proof_refl: expected 1 arg, got ${args.length}`);
-  const x = evalFn!(args[0], ctx!);
+  const x = args[0];
   if (!isResolved(x)) {
     return makeFailedProof(`refl`, `operand did not resolve`,
       `proof_refl needs its operand resolved`);
@@ -3428,7 +3428,7 @@ const proof_refl_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 /** `proof_sym(p)` — symmetry: from `a == b`, derive `b == a`. */
 const proof_sym_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 1) throw new AllegroError(`proof_sym: expected 1 arg, got ${args.length}`);
-  const p = evalFn!(args[0], ctx!);
+  const p = args[0];
   if (!isDischargedProofVal(p)) {
     return makeFailedProof(`sym`, `argument is not a discharged proof`,
       `proof_sym(p) requires p to be a discharged equality proof`);
@@ -3445,8 +3445,8 @@ const proof_sym_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
  *  derive `a == c`. Requires p1's RHS to value-match p2's LHS. */
 const proof_trans_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) throw new AllegroError(`proof_trans: expected 2 args, got ${args.length}`);
-  const p1 = evalFn!(args[0], ctx!);
-  const p2 = evalFn!(args[1], ctx!);
+  const p1 = args[0];
+  const p2 = args[1];
   if (!isDischargedProofVal(p1) || !isDischargedProofVal(p2)) {
     return makeFailedProof(`trans`, `arguments must be discharged proofs`,
       `proof_trans(p1, p2) requires both to be discharged equality proofs`);
@@ -3472,8 +3472,8 @@ const proof_trans_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
  *  from the actual applications). */
 const proof_cong_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) throw new AllegroError(`proof_cong: expected 2 args (f, p), got ${args.length}`);
-  const f = evalFn!(args[0], ctx!);
-  const p = evalFn!(args[1], ctx!);
+  const f = args[0];
+  const p = args[1];
   if (!isDischargedProofVal(p)) {
     return makeFailedProof(`cong`, `second argument is not a discharged proof`,
       `proof_cong(f, p) requires p to be a discharged equality proof`);
@@ -3594,7 +3594,7 @@ const prove_for_all_bool_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 1) {
     throw new AllegroError(`prove_for_all_bool: expected 1 arg (predicate), got ${args.length}`);
   }
-  const pred = evalFn!(args[0], ctx!);
+  const pred = args[0];
   if (!isResolved(pred)) {
     return makeFailedProof(`forall b: Bool, p(b)`, `predicate did not resolve`,
       `prove_for_all_bool needs the predicate function resolved`);
@@ -3620,9 +3620,9 @@ const prove_induction_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 3) {
     throw new AllegroError(`prove_induction: expected 3 args (predicate, base_proof, step_fn), got ${args.length}`);
   }
-  const pred      = evalFn!(args[0], ctx!);
-  const baseProof = evalFn!(args[1], ctx!);
-  const stepFn    = evalFn!(args[2], ctx!);
+  const pred      = args[0];
+  const baseProof = args[1];
+  const stepFn    = args[2];
 
   if (!isResolved(pred) || !isResolved(stepFn)) {
     return makeFailedProof(`forall n: NonNeg, p(n)`,
@@ -3855,19 +3855,19 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   // are ordinary values.
   proof_refines: makePrimitive("proof_refines", proof_refines_impl),
   // Phase F3: proof combinators + the `theorem … by <term>` checker. All
-  // lazy so they receive un-`primaryOf`'d args — a Proof flows in as its
+  // channel-aware (C1.5): eager, args arrive with channels intact — a Proof flows in as its
   // full MultiValue (eager primitives get `primaryOf`'d args, which strips
   // the `Proof` type component and the proof's structured operands).
-  proof_refl:  makePrimitive("proof_refl",  proof_refl_impl,  true),
-  proof_sym:   makePrimitive("proof_sym",   proof_sym_impl,   true),
-  proof_trans: makePrimitive("proof_trans", proof_trans_impl, true),
-  proof_cong:  makePrimitive("proof_cong",  proof_cong_impl,  true),
+  proof_refl:  makePrimitive("proof_refl",  proof_refl_impl,  false, undefined, true),
+  proof_sym:   makePrimitive("proof_sym",   proof_sym_impl,   false, undefined, true),
+  proof_trans: makePrimitive("proof_trans", proof_trans_impl, false, undefined, true),
+  proof_cong:  makePrimitive("proof_cong",  proof_cong_impl,  false, undefined, true),
   // Lazy on the proposition (needs the AST) and proof term.
   proof_check: makePrimitive("proof_check", proof_check_impl, true),
   // Phase F5: universal quantification — both lazy (they receive function
   // values and proof values; lazy avoids `primaryOf` arg-stripping).
-  prove_for_all_bool: makePrimitive("prove_for_all_bool", prove_for_all_bool_impl, true),
-  prove_induction:    makePrimitive("prove_induction",    prove_induction_impl,    true),
+  prove_for_all_bool: makePrimitive("prove_for_all_bool", prove_for_all_bool_impl, false, undefined, true),
+  prove_induction:    makePrimitive("prove_induction",    prove_induction_impl,    false, undefined, true),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

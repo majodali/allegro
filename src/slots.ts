@@ -467,6 +467,35 @@ function buildWriter(spec: ChannelSpec): ChannelWriter {
   };
 }
 
+let _viralCache: string[] | null = null;
+/** Component-plane channels with viral propagation (first occurrence wins,
+ *  carried onto the result residual). Cached; registration invalidates. */
+export function viralChannels(): string[] {
+  if (!_viralCache) {
+    _viralCache = [...CHANNEL_TABLE.values()]
+      .filter((e) => e.spec.rule === "viral" && !e.spec.bindingKey)
+      .map((e) => e.spec.name);
+  }
+  return _viralCache;
+}
+
+let _unionCache: string[] | null = null;
+/** Component-plane channels with union propagation (arg channels merged
+ *  onto the result via the installed merge). */
+export function unionChannels(): string[] {
+  if (!_unionCache) {
+    _unionCache = [...CHANNEL_TABLE.values()]
+      .filter((e) => e.spec.rule === "union" && !e.spec.bindingKey)
+      .map((e) => e.spec.name);
+  }
+  return _unionCache;
+}
+
+function invalidatePropagationCaches(): void {
+  _viralCache = null;
+  _unionCache = null;
+}
+
 /** One-shot channel registration → writer capability. Throws on duplicate
  *  names (re-registration is forgery vector F) and on fabricating rules for
  *  integrity channels (forgery vector C). */
@@ -485,6 +514,7 @@ export function registerChannel(spec: ChannelSpec, minted = false): ChannelWrite
   }
   const writer = buildWriter(spec);
   CHANNEL_TABLE.set(spec.name, { spec, writer, epoch: minted ? channelEpoch : -1, minted });
+  invalidatePropagationCaches();
   return writer;
 }
 
@@ -532,6 +562,35 @@ export function assertNotIntegrityKey(key: string, site: string): void {
 /** Brand for Allegro-level channel-writer PrimitiveFunctions (host-internal
  *  js-property; registered in SLOT_REGISTRY). Attenuation checks it. */
 export const CHANNEL_WRITER_BRAND = "__channelWriterFor";
+
+// --- Propagation table (C1.5) ---------------------------------------------------
+//
+// The evaluator consults these instead of hand-rolling per-channel code.
+// `viral` and `union` are fully generic; `computed` channels keep bespoke
+// domain logic at the annotated evaluator sites (that is what "computed"
+// means); `drop` channels never propagate — verified by forgery test C.
+//
+// MAINTAINER RULING (2026-07, plan §6 item 1): C1.5 is observable-zero.
+// Where a principled rule diverges from recorded behavior, the table
+// carries the legacy policy with the divergence documented here:
+//  - effects on MultiValue re-evaluation merge: legacy inner-shadows-outer
+//    (principled: union) — activates at C4.3.
+//  - error virality on chained residuals: legacy drops the channel after
+//    the first residual hop (see differential fixture `err-viral-chain`);
+//    revisited at C4.3.
+
+/** Union-merge behavior per channel, installed at module init by the
+ *  channel's owner (e.g. effects.ts) — slots.ts cannot import the encodings
+ *  without a cycle. */
+const CHANNEL_MERGES = new Map<string, (a: Value, b: Value) => Value>();
+export function installChannelMerge(name: string, merge: (a: Value, b: Value) => Value): void {
+  CHANNEL_MERGES.set(name, merge);
+}
+export function channelMerge(name: string): ((a: Value, b: Value) => Value) | undefined {
+  return CHANNEL_MERGES.get(name);
+}
+
+
 
 /** List the channels present on a value (component keys + binding-plane channels). */
 export function channelList(v: Value): string[] {

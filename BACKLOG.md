@@ -77,7 +77,12 @@ phase).
   primitives, forgery A/B/D/F live (A was a REAL hole — object-literal
   `{__discharged: 1}` forged a structurally-valid proof pre-C1.4)
 - [ ] **B-010** · L0 · Propagation table; delete `primaryOf` asymmetry +
-  `*_attach` family; forgery suite v2 (C1.5) — first conscious-delta chunk
+  `*_attach` family; forgery suite v2 (C1.5) — first conscious-delta
+  chunk. **Split 2026-07**: C1.5a landed (deltas ruled + differential
+  fixtures + table-driven viral scan + channel-aware mode with 6 proof
+  prims flipped — proof_check reclassified genuinely-lazy — + forgery C
+  live); C1.5b remaining: the five-wrapper `*_attach` collapse onto
+  function-value channels + peeler retirement
 - [ ] **B-011** · L0 · Scope protocol + parent chain (C2.1)
 - [ ] **B-012** · L0 · Facts plane via `scope_assume` (C2.2)
 - [ ] **B-013** · L0 · Resolution unification; retire `ctx_use`;

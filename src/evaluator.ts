@@ -12,7 +12,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf } from "./slots.js";
+import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec } from "./slots.js";
 
 const MAX_DEPTH = 10000;
 
@@ -310,19 +310,9 @@ function applyPrimitive(
     return attachEff(residual);
   }
 
-  // Error propagation: if any evaluated arg has an error component, propagate
-  // the error without executing this primitive.
-  for (const arg of evalArgs) {
-    if (arg.kind === ValueKind.MultiValue) {
-      const errComp = channelReadRaw(arg, "error");
-      if (errComp) {
-        const components = new Map<string, Value>([["error", errComp]]);
-        const typeComp = channelReadRaw(arg, "type");
-        if (typeComp) components.set("type", typeComp);
-        return attachEff(makeMultiValue(makeExpr(fn, evalArgs), components));
-      }
-    }
-  }
+  // Viral channels (propagation table): today just `error` — see viralScan.
+  const viralHit = viralScan(evalArgs, fn);
+  if (viralHit) return attachEff(viralHit);
 
   // Phase B: refinement-domain propagation. If the primitive is one of
   // bits_add / bits_sub / bits_mul and the operands carry abstract domains
@@ -355,8 +345,9 @@ function applyPrimitive(
     }
   }
 
-  // Unwrap multi-values for primitives
-  const primaryArgs = evalArgs.map(dataOf);
+  // Unwrap multi-values for primitives — unless the primitive registered as
+  // channel-aware (C1.5's third mode: eager, but channels arrive intact).
+  const primaryArgs = fn.channelAware ? evalArgs : evalArgs.map(dataOf);
   if (typeof fn.fn !== "function") {
     throw new AllegroError(`applyPrimitive: ${fn.name} has unresolved stub (fn=null). Check resolvePrimitives.`);
   }
@@ -383,6 +374,52 @@ function applyPrimitive(
   return propagatedSet ? withPredicates(out, propagatedSet) : out;
 }
 
+
+// --- C1.5 propagation table: generic viral scan ---
+//
+// Consults the channel registry: any component-plane channel registered
+// `viral` short-circuits the primitive when present on an arg — first arg
+// wins, the channel (plus the arg's shape) is carried onto the residual.
+// Today `error` is the only viral channel, so behavior is byte-identical
+// to the former hand-rolled loop (differential fixtures pin it); a newly
+// registered viral channel gets this path with zero evaluator changes.
+// Table linkage for the grandfathered/bespoke rules lives in
+// assertPropagationTableLinkage below.
+function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
+  const viral = viralChannels();
+  for (const arg of evalArgs) {
+    if (arg.kind !== ValueKind.MultiValue) continue;
+    for (const chan of viral) {
+      const comp = channelReadRaw(arg, chan);
+      if (comp) {
+        const components = new Map<string, Value>([[chan, comp]]);
+        const typeComp = channelReadRaw(arg, "type");
+        if (typeComp) components.set("type", typeComp);
+        return makeMultiValue(makeExpr(residualFn, evalArgs), components);
+      }
+    }
+  }
+  return null;
+}
+
+// The rules the evaluator still implements bespoke (shape/knowledge:
+// `computed` — domain logic IS the rule; effects: `union`, grandfathered on
+// its dedicated path until C4.3; discharged: `drop` — never propagates,
+// verified by forgery test C). If the registry drifts from what this file
+// implements, fail loudly at startup.
+(function assertPropagationTableLinkage() {
+  const expect: [string, string][] = [
+    ["error", "viral"], ["effects", "union"], ["shape", "computed"],
+    ["predicates", "computed"], ["domain", "computed"], ["discharged", "drop"],
+  ];
+  for (const [chan, rule] of expect) {
+    const spec = channelSpec(chan);
+    if (!spec || spec.rule !== rule) {
+      throw new Error(`propagation-table linkage: evaluator implements '${chan}' as ${rule}, registry says ${spec?.rule ?? "unregistered"}`);
+    }
+  }
+})();
+
 // --- Apply composed function ---
 
 function applyComposed(
@@ -401,18 +438,9 @@ function applyComposed(
   tco_loop: while (true) {
     const evalArgs = currentArgs.map(a => evaluate(a, ctx, depth + 1, depCollector));
 
-    // Error propagation: if any arg has an error component, propagate without executing
-    for (const arg of evalArgs) {
-      if (arg.kind === ValueKind.MultiValue) {
-        const errComp = channelReadRaw(arg, "error");
-        if (errComp) {
-          const components = new Map<string, Value>([["error", errComp]]);
-          const typeComp = channelReadRaw(arg, "type");
-          if (typeComp) components.set("type", typeComp);
-          return makeMultiValue(makeExpr(currentFn, evalArgs), components);
-        }
-      }
-    }
+    // Viral channels (propagation table): today just `error` — see viralScan.
+    const viralHit = viralScan(evalArgs, currentFn as unknown as Value);
+    if (viralHit) return viralHit;
 
     // Type variable unification
     let enrichedCtx = ctx;

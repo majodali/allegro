@@ -31,7 +31,7 @@ import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel } from "./slots.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
 import { effectsOf } from "./effects.js";
@@ -432,11 +432,18 @@ export interface ForgeryScenario {
 export const FORGERY_SCENARIOS: ForgeryScenario[] = [
   { id: "A", name: "forge `discharged` from nothing", blockedBy: "origination requires the kernel-held writer", unlocksAt: "C1.4", status: "live" },
   { id: "B", name: "swap a real proof's proposition, keep `discharged`", blockedBy: "data-immutability (D22)", unlocksAt: "C1.4", status: "live" },
-  { id: "C", name: "combine a real proof with a fake operand hoping `discharged` propagates", blockedBy: "non-fabricating propagation rules on authority channels", unlocksAt: "C1.5", status: "skeleton" },
+  { id: "C", name: "combine a real proof with a fake operand hoping `discharged` propagates", blockedBy: "non-fabricating propagation rules on authority channels", unlocksAt: "C1.5", status: "live" },
   { id: "D", name: "read a real `discharged`, write it onto a fake value", blockedBy: "reads are free; the write still needs the capability", unlocksAt: "C1.4", status: "live" },
   { id: "E", name: "capability leak through an export surface", blockedBy: "holder keeps the writer module-private (ocap discipline)", unlocksAt: "S3 visibility enforcement", status: "skeleton" },
   { id: "F", name: "forge the writer capability itself", blockedBy: "writer is a PrimitiveFunction closure, unconstructible from Allegretto", unlocksAt: "C1.4", status: "live" },
 ];
+
+function getTypeNameOf(v: Value): string | null {
+  const t = channelReadRaw(v, "type");
+  const tc = t ? asContext(t as Value) : null;
+  const nv = tc ? getName(tc) : undefined;
+  return nv ? bitsToString(primaryOf(nv) as BitsValue) : null;
+}
 
 /** Evaluate an attack program; report whether (and how) it was refused. */
 function attack(src: string): { threw: string | null; evalCtx: ContextValue | null } {
@@ -616,6 +623,25 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(first.threw, null, "first registration succeeds");
     const second = attack('w = channel_register("forgery_f_probe", "union")');
     eq(second.threw?.includes("already registered") ?? false, true, `cross-program re-mint: ${second.threw}`);
+  });
+
+  test("forgery C (live): `discharged` never propagates — drop rule enforced", () => {
+    // 1. The propagation executors exclude the authority channel entirely.
+    eq(viralChannels().includes("discharged"), false, "not viral");
+    eq(unionChannels().includes("discharged"), false, "not union");
+    // 2. Registration-side: an integrity channel cannot take a fabricating rule.
+    let threw = "";
+    try { registerChannel({ name: "forgeC_probe", rule: "viral", integrity: true }); }
+    catch (e: any) { threw = String(e.message); }
+    eq(threw.includes("may not register fabricating"), true, `registration gate: ${threw}`);
+    // 3. Propagation-side: combining a real proof with other values through
+    // operations never yields a discharged result.
+    const r = attack('theorem t: 1 + 1 == 2\narr = [t, t]\nc = channel_read(arr, "discharged")\nd = channel_read(t, "discharged")');
+    eq(r.threw, null, `combine: ${r.threw}`);
+    const c = r.evalCtx!.bindings.get("c")!.value as Value;
+    eq(getTypeNameOf(c), "None", "no discharge on the combination");
+    const d = r.evalCtx!.bindings.get("d")!.value as Value;
+    eq((primaryOf(d) as any).data, 1n, "the source proof itself still reads discharged");
   });
 
   test("channel plane (C1.4): user channel end-to-end — write, free read, attenuation", () => {

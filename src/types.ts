@@ -43,6 +43,9 @@ export interface PrimitiveFunctionValue {
    * function transitively calls.
    */
   effects?: string[];
+  /** C1.5: eager evaluation but args arrive as FULL values (channels intact)
+   *  — the third registration mode, replacing lazy-as-strip-dodge. */
+  channelAware?: boolean;
 }
 
 // --- Param: positional placeholder within function expressions ---
@@ -172,8 +175,9 @@ export function makePrimitive(
   fn: PrimitiveFnImpl,
   lazy?: boolean,
   effects?: string[],
+  channelAware?: boolean,
 ): PrimitiveFunctionValue {
-  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects };
+  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects, channelAware };
 }
 
 export function makeParam(position: number, name?: string): ParamValue {

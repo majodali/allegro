@@ -8,6 +8,44 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C1.5a: Propagation table + channel-aware mode (structures Phase 1, B-010 part 1)
+
+First conscious-delta chunk, first half. The three §6 deltas were
+discussed and ruled with the maintainer before work started (rulings
+recorded in the plan §6): observable-zero at C1.5 with principled-rule
+divergences deferred to C4.3; flip the strip-dodging proof primitives to
+a new eager-but-channel-aware mode; `*_attach` collapse scoped to the
+five metadata wrappers.
+
+- **Differential safety net first**: 11 byte-for-byte fixtures of channel
+  propagation recorded BEFORE any evaluator change — including two legacy
+  warts preserved deliberately (chained-residual error loss;
+  error-in-if-condition silently taking the else branch). Asserted every
+  suite run; revisited at C4.3.
+- **Propagation table**: generic `viralScan` driven by the channel
+  registry replaces both hand-rolled error loops — a newly registered
+  viral channel now propagates with zero evaluator changes. Union merges
+  are installable per channel (`installChannelMerge`; effects installs
+  its own encoding-aware merge). `assertPropagationTableLinkage` fails
+  startup if the registry ever drifts from what the evaluator implements
+  (shape/knowledge stay bespoke — that is what `computed` means; effects
+  grandfathered on its dedicated path until C4.3; discharged is `drop`).
+- **Channel-aware registration mode** (third mode on `makePrimitive`):
+  eager evaluation, but args arrive as full values with channels intact.
+  Six strip-dodging proof primitives flipped
+  (refl/sym/trans/cong, prove_for_all_bool, prove_induction). **Briefing
+  correction**: `proof_check` stays lazy — it reads the *unevaluated*
+  proposition AST (`eqExprSides`), making it genuinely lazy, not a
+  strip-dodge (the ruling said 7; the code says 6).
+- **Forgery C live** (5 of 6 scenarios now real attack tests): the
+  authority channel is excluded from both propagation executors,
+  fabricating rules are rejected at registration for integrity channels,
+  and combining a real proof with other values through operations never
+  yields a discharged result.
+
+C1.5b (the five-wrapper `*_attach` collapse onto function-value channels)
+follows as its own landable unit.
+
 ## 2026-07 — C1.4: Channel writers — origination capabilities (structures Phase 1, B-009)
 
 The channel plane gets its capability model (D21–D24), and the forgery

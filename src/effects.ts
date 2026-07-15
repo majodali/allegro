@@ -24,7 +24,7 @@
 // syntax.
 // =============================================================================
 
-import { dataOf, isEffectVarLabel, EFFECT_VAR_MARKER, componentsView, cloneComponents } from "./slots.js";
+import { dataOf, isEffectVarLabel, EFFECT_VAR_MARKER, componentsView, cloneComponents, installChannelMerge } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ContextValue, MultiValueType,
   makeMultiValue,
@@ -271,6 +271,14 @@ export function opaqueEffectNotices(
 // `effectsOf`; consumers shouldn't reach into the component directly.
 
 export const EFFECTS_COMPONENT_KEY = "effects";
+
+// C1.5: the effects channel's union-merge, installed into the propagation
+// table so generic executors can merge encoded effect sets without this
+// module's encoding leaking into slots.ts.
+installChannelMerge("effects", (a: Value, b: Value) => {
+  const merged = effectUnion(decodeEffects(a) ?? new Set(), decodeEffects(b) ?? new Set());
+  return encodeEffects(merged);
+});
 
 function encodeEffects(eff: EffectSet): Value {
   const ctx: ContextValue = {
