@@ -52,7 +52,11 @@ phase).
   member dissolving at C6.2; `exported` → scope-binding visibility (S3,
   Phase 2); `arity` → deleted (write-only, removed from
   wrapAsUntypedFunction)
-- [ ] **B-007** · L0 · Accessor migration, core files (C1.2)
+- [x] **B-007** · L0 · Accessor migration, core files (C1.2). Landed
+  2026-07: evaluator.ts + types-std.ts fully migrated (~250 sites,
+  both files at zero lint violations; ratchet 738 → 500), write-side
+  accessor shims + SLOT_KEYS constants added to slots.ts; types.ts was
+  already clean. 986/986 green — zero behavior change
 - [ ] **B-008** · L0 · Accessor migration, rest + lint hard-fail (C1.3)
 - [ ] **B-009** · L0 · Channel writers — origination capabilities +
   forgery suite v1 (C1.4)

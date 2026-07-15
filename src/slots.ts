@@ -156,13 +156,21 @@ export function slotRegistration(key: string): SlotRegistration | undefined {
 
 // --- Typed accessors (over the current representation) ---------------------------
 //
-// Read-side first (C1.1); write-side shims land with the channel writers
-// (C1.4). Accessors return the raw stored value — including MultiValue-
-// wrapped types (types are typed) — plus `asContext` to peel to the
-// primary Context where the caller needs the shape itself.
+// Read side landed with C1.1; write-side shims added in C1.2 for the
+// call-site migration (C1.4 turns the origination sites into capability-
+// gated writers on top of these). Accessors return the raw stored value —
+// including MultiValue-wrapped types (types are typed) — plus `asContext`
+// to peel to the primary Context where the caller needs the shape itself.
 
 function slotRead(ctx: ContextValue, name: string): Value | undefined {
   return ctx.bindings.get(name)?.value as Value | undefined;
+}
+
+/** Mirrors types-std's addBinding exactly (map + bindingList, duplicates
+ *  preserved on overwrite) — zero behavior change is the C1.2 oracle. */
+function slotWrite(ctx: ContextValue, key: string, value: Value): void {
+  ctx.bindings.set(key, { key, value, isUse: false });
+  ctx.bindingList.push({ key, value, isUse: false });
 }
 
 /** Peel a MultiValue wrapper down to its Context primary, if that's what it is. */
@@ -181,18 +189,20 @@ export function getParent(ctx: ContextValue): Value | undefined { return slotRea
 export function getConstruct(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__construct") ?? slotRead(ctx, "__constructor"); }
 export function getFallbackMember(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__getMember"); }
 export function isInterfaceType(ctx: ContextValue): boolean { return ctx.bindings.has("__interface"); }
+export function getInterfaceMarker(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__interface"); }
 export function getInvariants(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__invariantsList"); }
 export function getWraps(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__wraps"); }
 export function getVariants(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__union"); }
 
 // Refinement fields
 export function getPredicate(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__predicate"); }
-export function getAbstractDomain(ctx: ContextValue): unknown { return (ctx as any).__abstractDomain; }
+export function getAbstractDomain(ctx: ContextValue): any { return (ctx as any).__abstractDomain; }
 
 // GenericType fields
 export function getGenericArgs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__args"); }
 export function getGenericBackLink(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__generic"); }
 export function isGenericType(ctx: ContextValue): boolean { return ctx.bindings.has("__isGeneric"); }
+export function isGenericTypeSlot(ctx: ContextValue): boolean { return slotRead(ctx, "__isGeneric") !== undefined; }
 
 // Proof fields
 export function getProposition(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__proposition"); }
@@ -203,7 +213,7 @@ export function getEqRhs(ctx: ContextValue): Value | undefined { return slotRead
 
 // Effect fields
 export function getEffectKind(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__effect_kind"); }
-export function getEffectBound(ctx: ContextValue): unknown { return (ctx as any).__effectBound; }
+export function getEffectBound(ctx: ContextValue): any { return (ctx as any).__effectBound; }
 
 // Base concepts
 export function getSlotCount(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__length"); }
@@ -231,6 +241,130 @@ export function channelReadRaw(v: Value, channel: string): Value | undefined {
   if (ctx && (channel === "shape" || channel === "type")) return slotRead(ctx, "__type");
   return undefined;
 }
+
+// --- Write-side shims (C1.2) --------------------------------------------------------
+
+// Type fields
+export function setName(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__name", v); }
+export function setMembers(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__members", v); }
+export function setParent(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__extends", v); }
+export function setConstruct(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__construct", v); }
+export function setFallbackMember(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__getMember", v); }
+export function markInterface(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__interface", v); }
+export function setInvariants(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__invariantsList", v); }
+export function setWraps(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__wraps", v); }
+export function setVariants(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__union", v); }
+export function removeName(ctx: ContextValue): void { ctx.bindings.delete("__name"); }
+
+// Refinement fields
+export function setPredicate(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__predicate", v); }
+export function setAbstractDomain(ctx: ContextValue, d: unknown): void { (ctx as any).__abstractDomain = d; }
+
+// GenericType fields
+export function setGenericParams(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__params", v); }
+export function setGenericArgs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__args", v); }
+export function setGenericBackLink(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__generic", v); }
+export function markGeneric(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__isGeneric", v); }
+export function getGenericParamsSlot(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__params"); }
+
+// Proof fields
+export function setProposition(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__proposition", v); }
+export function setProofReason(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__reason", v); }
+export function setProofCounterexample(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__counterexample", v); }
+export function setEqLhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__eq_lhs", v); }
+export function setEqRhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__eq_rhs", v); }
+
+// Effect fields
+export function setEffectKind(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__effect_kind", v); }
+export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as any).__effectBound = d; }
+
+// Base concepts
+export function setSlotCount(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__length", v); }
+
+// Channel-plane writes (plain shims; C1.4 gates origination with capabilities)
+export function writeShape(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__type", v); }
+export function writeDischarged(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
+
+// Slot-key constants — for the residual idioms (key filters in copy loops,
+// bindingList lookups) that need the literal itself. Call sites use these
+// instead of raw strings so the lint sees zero literals outside this module.
+export const SLOT_KEYS = {
+  name: "__name",
+  members: "__members",
+  extends: "__extends",
+  construct: "__construct",
+  constructor: "__constructor",
+  getMember: "__getMember",
+  interface: "__interface",
+  invariantsList: "__invariantsList",
+  wraps: "__wraps",
+  union: "__union",
+  predicate: "__predicate",
+  params: "__params",
+  args: "__args",
+  generic: "__generic",
+  isGeneric: "__isGeneric",
+  type: "__type",
+  discharged: "__discharged",
+  effectKind: "__effect_kind",
+  length: "__length",
+  proposition: "__proposition",
+  reason: "__reason",
+  counterexample: "__counterexample",
+  eqLhs: "__eq_lhs",
+  eqRhs: "__eq_rhs",
+} as const;
+
+/** The "skip meta slots when copying user-visible bindings" test. */
+export function isMetaSlotKey(key: string): boolean {
+  return key.startsWith("__");
+}
+
+// Removal helpers (map + bindingList, mirroring the existing idiom exactly)
+export function removeParent(ctx: ContextValue): void { ctx.bindings.delete("__extends"); }
+export function removeShapeSlot(ctx: ContextValue): void { ctx.bindings.delete("__type"); }
+export function removeConstruct(ctx: ContextValue): void {
+  ctx.bindings.delete("__construct");
+  const idx = ctx.bindingList.findIndex((b) => b.key === "__construct");
+  if (idx >= 0) ctx.bindingList.splice(idx, 1);
+}
+
+// GenericType's own constructor slot ("__constructor" — the type-constructor
+// function, semantically distinct from a concrete type's "__construct")
+export function getGenericConstructor(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__constructor"); }
+export function setGenericConstructor(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__constructor", v); }
+
+// --- Data plane -----------------------------------------------------------------------
+
+/** Data-plane read: the accessor-layer name for what `primaryOf` does today.
+ *  Call sites migrate to this so the C1.5/C4.3 semantics change (the strip-
+ *  vs-preserve asymmetry retirement, then transparency cutover) happens in
+ *  exactly one place. */
+export { primaryOf as dataOf } from "./types.js";
+
+// --- Component plane (MultiValue) -------------------------------------------------------
+
+/** Read-only view over a value's components (empty for non-MultiValues). */
+export function componentsView(v: Value): ReadonlyMap<string, Value> {
+  if (v.kind === ValueKind.MultiValue) return (v as MultiValueType).components as Map<string, Value>;
+  return EMPTY_COMPONENTS;
+}
+const EMPTY_COMPONENTS: ReadonlyMap<string, Value> = new Map();
+
+/** Mutable copy of a value's components — the standard "carry components
+ *  forward onto a derived value" idiom. Empty map for non-MultiValues. */
+export function cloneComponents(v: Value): Map<string, Value> {
+  if (v.kind === ValueKind.MultiValue) return new Map((v as MultiValueType).components as Map<string, Value>);
+  return new Map();
+}
+
+// --- Label markers -------------------------------------------------------------------------
+
+/** Effect-variable marker prefix inside effect labels (Stage C2 machinery;
+ *  dissolves into declared generic-param structure per D39). */
+export const EFFECT_VAR_MARKER = "__effectvar:";
+export function isEffectVarLabel(label: string): boolean { return label.startsWith(EFFECT_VAR_MARKER); }
+export function effectVarLabel(name: string): string { return EFFECT_VAR_MARKER + name; }
 
 /** List the channels present on a value (component keys + binding-plane channels). */
 export function channelList(v: Value): string[] {

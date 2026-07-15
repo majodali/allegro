@@ -9,12 +9,6 @@
       "components-direct": 2,
       "primaryOf-call": 9
     },
-    "src/evaluator.ts": {
-      "components-direct": 12,
-      "dunder-string-literal": 11,
-      "bindings-get-dunder": 11,
-      "primaryOf-call": 5
-    },
     "src/grammar2/builder.ts": {
       "dunder-string-literal": 1,
       "bindings-get-dunder": 1,
@@ -66,20 +60,14 @@
       "primaryOf-call": 3
     },
     "src/slots.ts": {
-      "components-direct": 3,
-      "dunder-string-literal": 74
+      "components-direct": 5,
+      "dunder-string-literal": 134
     },
     "src/totality.ts": {
       "components-direct": 2,
       "dunder-string-literal": 1,
       "bindings-get-dunder": 1,
       "primaryOf-call": 35
-    },
-    "src/types-std.ts": {
-      "components-direct": 6,
-      "dunder-string-literal": 148,
-      "bindings-get-dunder": 52,
-      "primaryOf-call": 55
     }
   },
   "suiteFloor": 979,
@@ -96,9 +84,9 @@
     "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 1451,
-      "recursion-tco": 1010,
-      "collections": 627
+      "basics": 1130,
+      "recursion-tco": 917,
+      "collections": 595
     }
   }
 }

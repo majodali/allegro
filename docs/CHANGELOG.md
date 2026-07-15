@@ -8,6 +8,37 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C1.2: Accessor migration, core files (structures Phase 1, B-007)
+
+`evaluator.ts` and `types-std.ts` — the two files that define how state is
+accessed — now go entirely through the accessor layer. Zero lint
+violations in both; the ratchet drops 738 → 500 total occurrences.
+
+- **Write side added to `slots.ts`**: `setName` … `setSlotCount`,
+  `writeShape`/`writeDischarged` channel-plane shims (C1.4 gates
+  origination with capabilities on top of these), removal helpers
+  (`removeConstruct` collapses the delete + bindingList-splice triple),
+  `SLOT_KEYS` constants for residual key-filter idioms (copy loops,
+  bindingList lookups), `isMetaSlotKey`, `getInterfaceMarker`,
+  `isGenericTypeSlot`, `getGenericConstructor`/`setGenericConstructor`
+  (GenericType's `__constructor` is semantically distinct from a concrete
+  type's `__construct` — kept as separate accessors).
+- **`dataOf`** — the accessor-layer name for today's `primaryOf`. All ~60
+  core-file call sites renamed; the C1.5/C4.3 semantics change
+  (strip-vs-preserve retirement, then transparency cutover) now happens in
+  exactly one place. `cloneComponents`/`componentsView` cover the
+  component-carry idioms; effect-var label helpers absorb the
+  `"__effectvar:"` marker literals.
+- **Migration**: ~250 sites total (92 regular shapes mechanically, the
+  rest individually reviewed — binding-object reads, generic-type
+  readers, delete triples, error-component peeks, property-style
+  `__effectBound`/`__abstractDomain` accesses). `types.ts` was already
+  clean. One incidental cleanup: buildGenericType had a duplicate
+  bindingList push in its mark-as-generic block; collapsed into the shim.
+
+tsc at the pre-existing baseline; 986/986 green — zero behavior change,
+full suite as the oracle.
+
 ## 2026-07 — D39 addendum: three slot dispositions ratified (follow-up to C1.1)
 
 Detailed maintainer review of the three slots C1.1 flagged as absent from

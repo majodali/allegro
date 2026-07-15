@@ -3,7 +3,7 @@
 import {
   Value, ValueKind, ExpressionValue, ContextValue,
   ComposedFunctionValue, ParamValue, MultiValueType,
-  AllegroError, primaryOf, isResolved, makeExpr, makeMultiValue, makeContext,
+  AllegroError, isResolved, makeExpr, makeMultiValue, makeContext,
   DepCollector,
 } from "./types.js";
 import {
@@ -12,6 +12,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
+import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf } from "./slots.js";
 
 const MAX_DEPTH = 10000;
 
@@ -126,11 +127,11 @@ export function evaluate(
       // Inner (freshly-evaluated) components shadow outer (stale) components —
       // fresh resolved type info should replace pre-computed partial-eval types.
       if (ep.kind === ValueKind.MultiValue) {
-        const merged = new Map(value.components);
-        for (const [k, v] of (ep as MultiValueType).components) merged.set(k, v);
+        const merged = cloneComponents(value);
+        for (const [k, v] of componentsView(ep)) merged.set(k, v);
         return makeMultiValue((ep as MultiValueType).primary, merged);
       }
-      return makeMultiValue(ep, new Map(value.components));
+      return makeMultiValue(ep, cloneComponents(value));
     }
 
     case ValueKind.Expression: {
@@ -144,7 +145,7 @@ function evaluateExpr(
   expr: ExpressionValue, ctx: ContextValue, depth: number, depCollector?: DepCollector,
 ): Value | TailCall {
   const fnRaw = evaluate(expr.fn, ctx, depth + 1, depCollector);
-  const fn = primaryOf(fnRaw);
+  const fn = dataOf(fnRaw);
 
   if (fn.kind === ValueKind.PrimitiveFunction) {
     return applyPrimitive(fn, expr.args, ctx, depth, depCollector);
@@ -164,9 +165,9 @@ function evaluateExpr(
     : (fn.kind === ValueKind.MultiValue && (fn as MultiValueType).primary.kind === ValueKind.Context)
       ? (fn as MultiValueType).primary as ContextValue : null;
   if (fnCtx) {
-    const constructBinding = fnCtx.bindings.get("__construct");
-    if (constructBinding?.value) {
-      const ctor = constructBinding.value;
+    const ctorSlot = getConstruct(fnCtx);
+    if (ctorSlot) {
+      const ctor = ctorSlot;
       if (ctor.kind === ValueKind.PrimitiveFunction) {
         return applyPrimitive(ctor, expr.args, ctx, depth, depCollector);
       }
@@ -295,7 +296,7 @@ function applyPrimitive(
     // Even though args aren't fully resolved, their type components
     // may be known. Use type-level dispatch to infer the result type.
     if (evalArgs[0]?.kind === ValueKind.MultiValue) {
-      const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
+      const typeComp = channelReadRaw(evalArgs[0], "type");
       if (typeComp && typeComp.kind === ValueKind.Context) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
         if (methodName) {
@@ -313,10 +314,10 @@ function applyPrimitive(
   // the error without executing this primitive.
   for (const arg of evalArgs) {
     if (arg.kind === ValueKind.MultiValue) {
-      const errComp = (arg as MultiValueType).components.get("error");
+      const errComp = channelReadRaw(arg, "error");
       if (errComp) {
         const components = new Map<string, Value>([["error", errComp]]);
-        const typeComp = (arg as MultiValueType).components.get("type");
+        const typeComp = channelReadRaw(arg, "type");
         if (typeComp) components.set("type", typeComp);
         return attachEff(makeMultiValue(makeExpr(fn, evalArgs), components));
       }
@@ -333,13 +334,13 @@ function applyPrimitive(
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
   if (evalArgs[0]?.kind === ValueKind.MultiValue) {
-    const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
+    const typeComp = channelReadRaw(evalArgs[0], "type");
     if (typeComp && typeComp.kind === ValueKind.Context) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
       if (methodName) {
         const method = typeMethod(typeComp as ContextValue, methodName);
         if (method?.kind === ValueKind.PrimitiveFunction) {
-          const primaryArgs = evalArgs.map(primaryOf);
+          const primaryArgs = evalArgs.map(dataOf);
           const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
           // If the method already returned a typed value (MultiValue), use it as-is.
           // Methods know their return types (e.g., comparisons return Bool).
@@ -355,7 +356,7 @@ function applyPrimitive(
   }
 
   // Unwrap multi-values for primitives
-  const primaryArgs = evalArgs.map(primaryOf);
+  const primaryArgs = evalArgs.map(dataOf);
   if (typeof fn.fn !== "function") {
     throw new AllegroError(`applyPrimitive: ${fn.name} has unresolved stub (fn=null). Check resolvePrimitives.`);
   }
@@ -365,7 +366,7 @@ function applyPrimitive(
   // propagate the type to the result.
   let out: Value;
   if (result.kind === ValueKind.Bits && evalArgs[0]?.kind === ValueKind.MultiValue) {
-    const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
+    const typeComp = channelReadRaw(evalArgs[0], "type");
     if (typeComp) out = makeMultiValue(result, new Map([["type", typeComp]]));
     else          out = result;
   } else {
@@ -403,10 +404,10 @@ function applyComposed(
     // Error propagation: if any arg has an error component, propagate without executing
     for (const arg of evalArgs) {
       if (arg.kind === ValueKind.MultiValue) {
-        const errComp = (arg as MultiValueType).components.get("error");
+        const errComp = channelReadRaw(arg, "error");
         if (errComp) {
           const components = new Map<string, Value>([["error", errComp]]);
-          const typeComp = (arg as MultiValueType).components.get("type");
+          const typeComp = channelReadRaw(arg, "type");
           if (typeComp) components.set("type", typeComp);
           return makeMultiValue(makeExpr(currentFn, evalArgs), components);
         }
@@ -463,10 +464,10 @@ function applyComposed(
             // view. Skip when the bound is a Stage C2 effect-variable
             // marker (`__effectvar:NAME`) — those are placeholders the
             // walker resolves at call sites, not concrete bounds.
-            const ptHasEffBound = (resolvedParamType as any).__effectBound !== undefined;
+            const ptHasEffBound = getEffectBound(resolvedParamType) !== undefined;
             if (!ptHasEffBound && i < currentFn.params.length) {
               const surfaceCBound = (currentFn.params[i] as any).effectBound as EffectSet | undefined;
-              const isMarkerBound = surfaceCBound && [...surfaceCBound].some(l => l.startsWith("__effectvar:"));
+              const isMarkerBound = surfaceCBound && [...surfaceCBound].some(l => isEffectVarLabel(l));
               if (surfaceCBound && !isMarkerBound) {
                 const argEff = effectsOf(evalArgs[i]) ?? new Set<string>();
                 const boundDom: EffectsDomain = { kind: "effects", labels: surfaceCBound };
@@ -546,7 +547,7 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
     }
     case ValueKind.MultiValue: {
       const newP = remapParams(value.primary, paramMap);
-      return newP === value.primary ? value : makeMultiValue(newP, new Map(value.components));
+      return newP === value.primary ? value : makeMultiValue(newP, cloneComponents(value));
     }
   }
 }
@@ -631,7 +632,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
 
     case ValueKind.MultiValue: {
       const newP = subst(value.primary, owner, posMap, seen);
-      return newP === value.primary ? value : makeMultiValue(newP, new Map(value.components));
+      return newP === value.primary ? value : makeMultiValue(newP, cloneComponents(value));
     }
   }
 }
@@ -670,7 +671,7 @@ function checkArgType(
   // bound via the same `impliesDomain` path used for numeric refinements.
   // `opaque` has no bound — anything passes; we skip the check entirely.
   // Args without an effects component behave as pure.
-  const effBound = (expected as any).__effectBound as AbstractDomain | undefined;
+  const effBound = getEffectBound(expected) as AbstractDomain | undefined;
   if (effBound && effBound.kind === "effects") {
     const argEff = effectsOf(arg) ?? new Set<string>();
     const actualDom: EffectsDomain = { kind: "effects", labels: argEff };
@@ -687,9 +688,9 @@ function checkArgType(
   // Refinement type handling: if expected is a refined type, check the value
   // against the refinement's BASE (via __extends chain), then evaluate the predicate.
   // This allows a plain Int to satisfy PositiveInt if the predicate passes.
-  const refinementPredicate = expected.bindings.get("__predicate")?.value;
+  const refinementPredicate = getPredicate(expected);
   if (refinementPredicate) {
-    const base = expected.bindings.get("__extends")?.value;
+    const base = getParent(expected);
     if (base?.kind === ValueKind.Context) {
       // Recurse on the base type (unwraps nested refinements)
       checkArgType(arg, base as ContextValue, argIndex, ctx, depth, depCollector);
@@ -697,7 +698,7 @@ function checkArgType(
       const argType0 = getType(arg);
       if (argType0 !== expected && ctx && depth !== undefined) {
         const result = evaluate(makeExpr(refinementPredicate, [arg]), ctx, depth + 1, depCollector);
-        const p = primaryOf(result);
+        const p = dataOf(result);
         if (p.kind === ValueKind.Bits && p.data === 0n) {
           const name = typeContextName(expected) ?? "<refined>";
           throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}`);
@@ -716,12 +717,12 @@ function checkArgType(
   // Helper: evaluate refinement predicate on arg if expected type has one.
   // Short-circuits when argType is reference-equal to expected (same refined type).
   const checkRefinement = (): void => {
-    const predicate = expected.bindings.get("__predicate")?.value;
+    const predicate = getPredicate(expected);
     if (!predicate) return;
     if (argType === expected) return; // same refined type — predicate already holds
     if (!ctx || depth === undefined) return; // no eval context — best-effort skip
     const result = evaluate(makeExpr(predicate, [arg]), ctx, depth + 1, depCollector);
-    const p = primaryOf(result);
+    const p = dataOf(result);
     if (p.kind === ValueKind.Bits && p.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`);
     }
@@ -731,13 +732,15 @@ function checkArgType(
   const actualName = typeContextName(argType);
   if (actualName === expectedName) {
     // Names match — also check type args for generics (Array[Int] vs Array[String])
-    const expectedArgs = expected.bindings.get("__args")?.value;
-    const actualArgs = argType.bindings.get("__args")?.value;
+    const expectedArgs = getGenericArgs(expected);
+    const actualArgs = getGenericArgs(argType);
     if (expectedArgs?.kind === ValueKind.Context && actualArgs?.kind === ValueKind.Context) {
       const expCtx = expectedArgs as ContextValue;
       const actCtx = actualArgs as ContextValue;
-      const expLen = Number(expCtx.bindings.get("__length")?.value?.kind === ValueKind.Bits ? (expCtx.bindings.get("__length")!.value! as any).data : 0n);
-      const actLen = Number(actCtx.bindings.get("__length")?.value?.kind === ValueKind.Bits ? (actCtx.bindings.get("__length")!.value! as any).data : 0n);
+      const expLenV = getSlotCount(expCtx);
+      const actLenV = getSlotCount(actCtx);
+      const expLen = Number(expLenV?.kind === ValueKind.Bits ? (expLenV as any).data : 0n);
+      const actLen = Number(actLenV?.kind === ValueKind.Bits ? (actLenV as any).data : 0n);
       for (let j = 0; j < Math.min(expLen, actLen); j++) {
         const expArg = expCtx.bindings.get(String(j))?.value;
         const actArg = actCtx.bindings.get(String(j))?.value;
@@ -758,7 +761,7 @@ function checkArgType(
   const directInstanceof = expected.bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const checkResult = directInstanceof.fn([arg], undefined as any, undefined as any);
-    const checkP = primaryOf(checkResult);
+    const checkP = dataOf(checkResult);
     if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
     }
@@ -767,12 +770,12 @@ function checkArgType(
   }
 
   // Use meta-type instanceof (Type's shape-aware check: nominal if both named, structural otherwise)
-  const typeType = expected.bindings.get("__type")?.value as ContextValue | undefined;
+  const typeType = channelReadRaw(expected, "shape") as ContextValue | undefined;
   if (typeType) {
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const checkResult = instanceofMethod.fn([expected, arg], undefined as any, undefined as any);
-      const checkP = primaryOf(checkResult);
+      const checkP = dataOf(checkResult);
       if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
         throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
       }

@@ -35,6 +35,21 @@
 >   (write-only, never read; write removed from `wrapAsUntypedFunction`).
 >   Maintainer perf ruling recorded: warn-only floor now, refined
 >   progressively. 986/986 green.
+> - C1.2 (B-007) landed 2026-07 — core-file accessor migration.
+>   `slots.ts` gained the write side (`setName`…`writeShape`/
+>   `writeDischarged` shims mirroring addBinding exactly; C1.4 gates
+>   origination on top), removal helpers, `SLOT_KEYS` constants for
+>   residual key-filter idioms, `isMetaSlotKey`, `dataOf` (the accessor-
+>   layer name for primaryOf — the C1.5/C4.3 semantics change now happens
+>   in one place), `cloneComponents`/`componentsView`, effect-var label
+>   helpers, `getInterfaceMarker`/`isGenericTypeSlot`. `evaluator.ts`
+>   (39 sites incl. 2 property-style effectBound reads) and
+>   `types-std.ts` (~215 sites) migrated to accessors; `types.ts` was
+>   already clean. Both files now at ZERO lint violations; ratchet
+>   738 → 500 total. One incidental cleanup: a duplicate bindingList
+>   push in buildGenericType's markGeneric block collapsed into the
+>   shim. tsc at pre-existing baseline; 986/986 green — zero behavior
+>   change, suite as oracle.
 
 ## 1. Context
 

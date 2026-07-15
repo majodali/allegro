@@ -9,10 +9,22 @@ import {
   ComposedFunctionValue,
   makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue,
   makeComposedFn, makeParam,
-  primaryOf, stringToBits, bitsToString, AllegroError,
+  stringToBits, bitsToString, AllegroError,
   Extension,
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate } from "./refinements.js";
+import {
+  getName, getMembers, getParent, getConstruct, getInterfaceMarker, getPredicate,
+  getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
+  getSlotCount, getAbstractDomain, getEffectKind, isGenericTypeSlot,
+  setName, setMembers, setParent, setConstruct, setFallbackMember, markInterface,
+  setWraps, setVariants, setPredicate, setGenericParams, setGenericArgs,
+  setGenericBackLink, markGeneric, setGenericConstructor, setProposition,
+  setEffectKind, setEffectBound, setSlotCount, setAbstractDomain,
+  writeShape, writeDischarged, removeName, removeParent, removeShapeSlot,
+  removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf,
+} from "./slots.js";
+
 
 // --- Constants ---
 
@@ -27,7 +39,7 @@ const META_METHOD_NAMES = new Set([
 /** Get the type component from a value (if it's a MultiValue with "type") */
 export function getType(v: Value): ContextValue | null {
   if (v.kind === ValueKind.MultiValue) {
-    const t = v.components.get("type");
+    const t = channelReadRaw(v, "type");
     if (t && t.kind === ValueKind.Context) return t;
   }
   return null;
@@ -37,16 +49,16 @@ export function getType(v: Value): ContextValue | null {
 export function getTypeName(v: Value): string | null {
   const t = getType(v);
   if (!t) return null;
-  const nameBinding = t.bindings.get("__name");
-  if (!nameBinding?.value || nameBinding.value.kind !== ValueKind.Bits) return null;
-  return bitsToString(nameBinding.value);
+  const nameV = getName(t);
+  if (!nameV || nameV.kind !== ValueKind.Bits) return null;
+  return bitsToString(nameV);
 }
 
 /** Wrap a raw value with a type component */
 export function withType(v: Value, type: ContextValue): Value {
-  const primary = primaryOf(v);
+  const primary = dataOf(v);
   const components = v.kind === ValueKind.MultiValue
-    ? new Map(v.components)
+    ? cloneComponents(v)
     : new Map<string, Value>();
   components.set("type", type);
   return makeMultiValue(primary, components);
@@ -54,10 +66,10 @@ export function withType(v: Value, type: ContextValue): Value {
 
 /** Get the __name from a type Context directly (not from a typed value) */
 export function typeContextName(v: Value): string | null {
-  const ctx = v.kind === ValueKind.Context ? v : (v.kind === ValueKind.MultiValue ? primaryOf(v) : null);
+  const ctx = v.kind === ValueKind.Context ? v : (v.kind === ValueKind.MultiValue ? dataOf(v) : null);
   if (!ctx || ctx.kind !== ValueKind.Context) return null;
-  const nb = (ctx as ContextValue).bindings.get("__name");
-  if (nb?.value?.kind === ValueKind.Bits) return bitsToString(nb.value);
+  const nv = getName(ctx as ContextValue);
+  if (nv?.kind === ValueKind.Bits) return bitsToString(nv);
   return null;
 }
 
@@ -66,9 +78,9 @@ export function typeContextName(v: Value): string | null {
  *  or the raw value for direct bindings (backward compat during transition). */
 export function typeMethod(type: ContextValue, name: string): Value | null {
   // First: check __members for a Method descriptor
-  const membersBinding = type.bindings.get("__members");
-  if (membersBinding?.value?.kind === ValueKind.Context) {
-    const members = membersBinding.value as ContextValue;
+  const membersV = getMembers(type);
+  if (membersV?.kind === ValueKind.Context) {
+    const members = membersV as ContextValue;
     const memberBinding = members.bindings.get(name);
     if (memberBinding?.value?.kind === ValueKind.Context) {
       const desc = memberBinding.value as ContextValue;
@@ -148,8 +160,8 @@ function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
 }
 
 function isInterfaceType(t: ContextValue): boolean {
-  const m = t.bindings.get("__interface");
-  return m?.value?.kind === ValueKind.Bits && (m.value as BitsValue).data !== 0n;
+  const m = getInterfaceMarker(t);
+  return m?.kind === ValueKind.Bits && (m as BitsValue).data !== 0n;
 }
 
 /**
@@ -157,8 +169,8 @@ function isInterfaceType(t: ContextValue): boolean {
  * Compares __members collections by name.
  */
 function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
-  const aMembersVal = typeA.bindings.get("__members")?.value;
-  const bMembersVal = typeB.bindings.get("__members")?.value;
+  const aMembersVal = getMembers(typeA);
+  const bMembersVal = getMembers(typeB);
 
   if (bMembersVal?.kind === ValueKind.Context) {
     const bMembers = bMembersVal as ContextValue;
@@ -185,9 +197,9 @@ function nominalSubtypeof(typeA: ContextValue, typeB: ContextValue, nameB: strin
     if (nameA === nameB) {
       return typeArgsMatch(current, typeB);
     }
-    const extendsBinding = current.bindings.get("__extends");
-    if (extendsBinding?.value?.kind === ValueKind.Context) {
-      current = extendsBinding.value as ContextValue;
+    const parentV = getParent(current);
+    if (parentV?.kind === ValueKind.Context) {
+      current = parentV as ContextValue;
     } else {
       current = null;
     }
@@ -197,21 +209,21 @@ function nominalSubtypeof(typeA: ContextValue, typeB: ContextValue, nameB: strin
 
 /** Check that type arguments match (if the expected type has them) */
 function typeArgsMatch(actual: ContextValue, expected: ContextValue): boolean {
-  const expectedArgsB = expected.bindings.get("__args");
-  if (!expectedArgsB?.value || expectedArgsB.value.kind !== ValueKind.Context) return true; // no args to check
-  const actualArgsB = actual.bindings.get("__args");
-  if (!actualArgsB?.value || actualArgsB.value.kind !== ValueKind.Context) return true; // actual has no args — accept (bare generic)
+  const expectedArgsV = getGenericArgs(expected);
+  if (!expectedArgsV || expectedArgsV.kind !== ValueKind.Context) return true; // no args to check
+  const actualArgsV = getGenericArgs(actual);
+  if (!actualArgsV || actualArgsV.kind !== ValueKind.Context) return true; // actual has no args — accept (bare generic)
 
-  const expectedArgsCtx = expectedArgsB.value as ContextValue;
-  const actualArgsCtx = actualArgsB.value as ContextValue;
+  const expectedArgsCtx = expectedArgsV as ContextValue;
+  const actualArgsCtx = actualArgsV as ContextValue;
   const expElems = arrayElements(expectedArgsCtx);
   const actElems = arrayElements(actualArgsCtx);
 
   if (expElems.length !== actElems.length) return false;
 
   for (let i = 0; i < expElems.length; i++) {
-    const expArg = primaryOf(expElems[i]);
-    const actArg = primaryOf(actElems[i]);
+    const expArg = dataOf(expElems[i]);
+    const actArg = dataOf(actElems[i]);
     if (expArg.kind !== ValueKind.Context || actArg.kind !== ValueKind.Context) continue;
     const expName = getTypeNameFromCtx(expArg as ContextValue);
     const actName = getTypeNameFromCtx(actArg as ContextValue);
@@ -222,15 +234,15 @@ function typeArgsMatch(actual: ContextValue, expected: ContextValue): boolean {
 
 /** Get __name from a type Context */
 function getTypeNameFromCtx(type: ContextValue): string | null {
-  const nb = type.bindings.get("__name");
-  if (nb?.value?.kind === ValueKind.Bits) return bitsToString(nb.value);
+  const nv = getName(type);
+  if (nv?.kind === ValueKind.Bits) return bitsToString(nv);
   return null;
 }
 
 // --- Build Type (the single meta-type) ---
 
 export const Type: ContextValue = makeContext();
-addBinding(Type, "__name", stringToBits("Type"));
+setName(Type, stringToBits("Type"));
 // __members added after all meta-types are bootstrapped (see below)
 
 /**
@@ -254,11 +266,11 @@ export const NominalType: ContextValue = Type;
 export function structuralWrap(type: ContextValue): ContextValue {
   const wrapper = makeContext();
   for (const [key, binding] of type.bindings) {
-    if (key === "__name") continue; // erase name → anonymous → structural
+    if (key === SLOT_KEYS.name) continue; // erase name → anonymous → structural
     wrapper.bindings.set(key, { ...binding });
     wrapper.bindingList.push({ ...binding });
   }
-  addBinding(wrapper, "__wraps", type);
+  setWraps(wrapper, type);
   return wrapper;
 }
 
@@ -271,9 +283,9 @@ export function structuralWrap(type: ContextValue): ContextValue {
  */
 export function makeUnionType(alternatives: ContextValue[]): ContextValue {
   const union = makeContext();
-  addBinding(union, "__name", stringToBits(
+  setName(union, stringToBits(
     alternatives.map(a => {
-      const n = a.bindings.get("__name")?.value;
+      const n = getName(a);
       return n && n.kind === ValueKind.Bits ? bitsToString(n) : "?";
     }).join(" | ")
   ));
@@ -281,8 +293,8 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
   for (let i = 0; i < alternatives.length; i++) {
     addBinding(union, String(i), alternatives[i]);
   }
-  addBinding(union, "__length", makeInt(alternatives.length));
-  addBinding(union, "__union", makeInt(1)); // marker
+  setSlotCount(union, makeInt(alternatives.length));
+  setVariants(union, makeInt(1)); // marker
 
   // instanceof: value matches if it matches ANY alternative
   addBinding(union, "instanceof", makePrimitive("UnionType.instanceof", (args) => {
@@ -292,16 +304,16 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
     const valueName = getTypeName(value);
     for (let i = 0; i < alternatives.length; i++) {
       const alt = alternatives[i];
-      const altName = alt.bindings.get("__name")?.value;
+      const altName = getName(alt);
       const altNameStr = altName && altName.kind === ValueKind.Bits ? bitsToString(altName) : null;
       if (altNameStr && altNameStr === valueName) return makeInt(1);
       // Also check via the alternative's meta-type instanceof
-      const altMetaType = alt.bindings.get("__type")?.value as ContextValue | undefined;
+      const altMetaType = channelReadRaw(alt, "shape") as ContextValue | undefined;
       if (altMetaType) {
         const altInstanceof = typeMethod(altMetaType, "instanceof");
         if (altInstanceof?.kind === ValueKind.PrimitiveFunction) {
           const result = altInstanceof.fn([alt, value], undefined as any, undefined as any);
-          const rp = primaryOf(result);
+          const rp = dataOf(result);
           if (rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n) return makeInt(1);
         }
       }
@@ -313,25 +325,25 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
   addBinding(union, "subtypeof", makePrimitive("UnionType.subtypeof", (args) => {
     const target = args[0] as ContextValue;
     for (const alt of alternatives) {
-      const altMetaType = alt.bindings.get("__type")?.value as ContextValue | undefined;
+      const altMetaType = channelReadRaw(alt, "shape") as ContextValue | undefined;
       if (!altMetaType) return makeInt(0);
       const altSubtype = typeMethod(altMetaType, "subtypeof");
       if (!altSubtype || altSubtype.kind !== ValueKind.PrimitiveFunction) return makeInt(0);
       const result = altSubtype.fn([alt, target], undefined as any, undefined as any);
-      const rp = primaryOf(result);
+      const rp = dataOf(result);
       if (rp.kind === ValueKind.Bits && (rp as BitsValue).data === 0n) return makeInt(0);
     }
     return makeInt(1);
   }));
 
   // Set __type to Type (unions are structural)
-  addBinding(union, "__type", Type);
+  writeShape(union, Type);
 
   return union;
 }
 
 // Bootstrap: Type self-types
-addBinding(Type, "__type", Type);
+writeShape(Type, Type);
 
 // =============================================================================
 // Member Descriptor Types (bootstrap)
@@ -340,20 +352,20 @@ addBinding(Type, "__type", Type);
 
 /** Abstract base type for member descriptors */
 export const MemberType: ContextValue = makeContext();
-addBinding(MemberType, "__name", stringToBits("Member"));
-addBinding(MemberType, "__type", Type);
+setName(MemberType, stringToBits("Member"));
+writeShape(MemberType, Type);
 
 /** Method descriptor — a member with an implementation function */
 export const MethodType: ContextValue = makeContext();
-addBinding(MethodType, "__name", stringToBits("Method"));
-addBinding(MethodType, "__type", Type);
-addBinding(MethodType, "__extends", MemberType);
+setName(MethodType, stringToBits("Method"));
+writeShape(MethodType, Type);
+setParent(MethodType, MemberType);
 
 /** Field descriptor — a member representing instance data */
 export const FieldType: ContextValue = makeContext();
-addBinding(FieldType, "__name", stringToBits("Field"));
-addBinding(FieldType, "__type", Type);
-addBinding(FieldType, "__extends", MemberType);
+setName(FieldType, stringToBits("Field"));
+writeShape(FieldType, Type);
+setParent(FieldType, MemberType);
 
 /** Create a Method descriptor */
 export function makeMethodDescriptor(
@@ -362,7 +374,7 @@ export function makeMethodDescriptor(
   isGetter: boolean = false,
 ): ContextValue {
   const desc = makeContext();
-  addBinding(desc, "__type", MethodType);
+  writeShape(desc, MethodType);
   addBinding(desc, "name", stringToBits(name));
   addBinding(desc, "value", impl);
   if (isGetter) addBinding(desc, "getter", makeInt(1));
@@ -375,7 +387,7 @@ export function makeFieldDescriptor(
   fieldType: Value,
 ): ContextValue {
   const desc = makeContext();
-  addBinding(desc, "__type", FieldType);
+  writeShape(desc, FieldType);
   addBinding(desc, "name", stringToBits(name));
   addBinding(desc, "fieldType", fieldType);
   return desc;
@@ -383,12 +395,12 @@ export function makeFieldDescriptor(
 
 /** Check if a descriptor is a Method */
 export function isMethodDescriptor(desc: ContextValue): boolean {
-  return desc.bindings.get("__type")?.value === MethodType;
+  return channelReadRaw(desc, "shape") === MethodType;
 }
 
 /** Check if a descriptor is a Field */
 export function isFieldDescriptor(desc: ContextValue): boolean {
-  return desc.bindings.get("__type")?.value === FieldType;
+  return channelReadRaw(desc, "shape") === FieldType;
 }
 
 /** Check if a Method descriptor is a getter (auto-call with self) */
@@ -399,9 +411,9 @@ export function isGetterDescriptor(desc: ContextValue): boolean {
 
 /** Look up the full member descriptor from a type's __members */
 export function typeMemberDescriptor(type: ContextValue, name: string): ContextValue | null {
-  const membersBinding = type.bindings.get("__members");
-  if (!membersBinding?.value || membersBinding.value.kind !== ValueKind.Context) return null;
-  const members = membersBinding.value as ContextValue;
+  const membersV = getMembers(type);
+  if (!membersV || membersV.kind !== ValueKind.Context) return null;
+  const members = membersV as ContextValue;
   const memberBinding = members.bindings.get(name);
   if (!memberBinding?.value || memberBinding.value.kind !== ValueKind.Context) return null;
   return memberBinding.value as ContextValue;
@@ -421,13 +433,13 @@ function buildRecordType(
   metaType: ContextValue,
 ): ContextValue {
   // Extract field specs from the Object's Context
-  const fieldCtx = primaryOf(fieldSpecObj);
+  const fieldCtx = dataOf(fieldSpecObj);
   if (fieldCtx.kind !== ValueKind.Context) {
     throw new AllegroError("extend: argument must be an object literal {field: Type, ...}");
   }
   const fields: { name: string; type: Value }[] = [];
   for (const [key, binding] of (fieldCtx as ContextValue).bindings) {
-    if (key.startsWith("__")) continue;
+    if (isMetaSlotKey(key)) continue;
     if (binding.value) {
       fields.push({ name: key, type: binding.value });
     }
@@ -435,9 +447,9 @@ function buildRecordType(
 
   // Build the new type Context
   const newType = makeContext();
-  addBinding(newType, "__name", stringToBits("<anonymous>"));
-  addBinding(newType, "__type", metaType);
-  addBinding(newType, "__extends", parentType);
+  setName(newType, stringToBits("<anonymous>"));
+  writeShape(newType, metaType);
+  setParent(newType, parentType);
 
   // Build __members: Field descriptors for declared fields + Method descriptors for methods
   const members = makeContext();
@@ -449,7 +461,7 @@ function buildRecordType(
 
   // Copy non-meta Method descriptors from parent's __members
   const metaMethodNames = META_METHOD_NAMES;
-  const parentMembers = parentType.bindings.get("__members")?.value;
+  const parentMembers = getMembers(parentType);
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
       if (metaMethodNames.has(key)) continue;
@@ -471,10 +483,10 @@ function buildRecordType(
     }
     return withType(instance, newType);
   };
-  addBinding(newType, "__construct", makePrimitive("record.__construct", constructImpl, true));
+  setConstruct(newType, makePrimitive("record.__construct", constructImpl, true));
 
   // Auto-generate __getMember: field access on instances
-  addBinding(newType, "__getMember", makePrimitive("record.__getMember", (args) => {
+  setFallbackMember(newType, makePrimitive("record.__getMember", (args) => {
     const instanceCtx = args[0] as ContextValue;
     const fieldName = bitsToString(args[1] as BitsValue);
     const b = instanceCtx.bindings.get(fieldName);
@@ -495,8 +507,8 @@ function buildRecordType(
         if (valType) {
           const tsMethod = typeMethod(valType, "toString");
           if (tsMethod?.kind === ValueKind.PrimitiveFunction) {
-            const str = (tsMethod as PrimitiveFunctionValue).fn([primaryOf(val)], undefined as any, undefined as any);
-            const sp = primaryOf(str);
+            const str = (tsMethod as PrimitiveFunctionValue).fn([dataOf(val)], undefined as any, undefined as any);
+            const sp = dataOf(str);
             if (sp.kind === ValueKind.Bits) {
               parts.push(`${f.name}: ${bitsToString(sp as BitsValue)}`);
               continue;
@@ -510,7 +522,7 @@ function buildRecordType(
   }) as PrimitiveFnImpl);
   addBinding(members, "toString", makeMethodDescriptor("toString", toStringImpl));
 
-  addBinding(newType, "__members", members);
+  setMembers(newType, members);
 
   return newType;
 }
@@ -526,7 +538,7 @@ function buildInterfaceType(
   parentType: ContextValue,
   memberSpecObj: Value,
 ): ContextValue {
-  const specCtx = primaryOf(memberSpecObj);
+  const specCtx = dataOf(memberSpecObj);
   if (specCtx.kind !== ValueKind.Context) {
     throw new AllegroError("interface: argument must be an object literal {member: Type, ...}");
   }
@@ -534,7 +546,7 @@ function buildInterfaceType(
   // Extract declared members from the spec
   const declaredMembers: { name: string; type: Value }[] = [];
   for (const [key, binding] of (specCtx as ContextValue).bindings) {
-    if (key.startsWith("__")) continue;
+    if (isMetaSlotKey(key)) continue;
     if (binding.value) {
       declaredMembers.push({ name: key, type: binding.value });
     }
@@ -542,17 +554,17 @@ function buildInterfaceType(
 
   // Build the interface type Context
   const ifaceType = makeContext();
-  addBinding(ifaceType, "__name", stringToBits("<anonymous>"));
-  addBinding(ifaceType, "__type", Type); // structural — no ~ needed
-  addBinding(ifaceType, "__extends", parentType);
-  addBinding(ifaceType, "__interface", makeInt(1)); // marker
+  setName(ifaceType, stringToBits("<anonymous>"));
+  writeShape(ifaceType, Type); // structural — no ~ needed
+  setParent(ifaceType, parentType);
+  markInterface(ifaceType, makeInt(1)); // marker
 
   // Build __members: declared members as Field descriptors
   const members = makeContext();
 
   // Copy non-meta Method descriptors from parent's __members
   const metaMethodNames = META_METHOD_NAMES;
-  const parentMembers = parentType.bindings.get("__members")?.value;
+  const parentMembers = getMembers(parentType);
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
       if (metaMethodNames.has(key)) continue;
@@ -567,7 +579,7 @@ function buildInterfaceType(
     addBinding(members, m.name, makeFieldDescriptor(m.name, m.type));
   }
 
-  addBinding(ifaceType, "__members", members);
+  setMembers(ifaceType, members);
 
   return ifaceType;
 }
@@ -579,39 +591,37 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   const refinedType = makeContext();
   // Copy all bindings from parent (except __members, handled separately)
   for (const [key, binding] of parentType.bindings) {
-    if (key === "__members") continue;
+    if (key === SLOT_KEYS.members) continue;
     if (binding.value) {
       addBinding(refinedType, key, binding.value);
     }
   }
   // Copy __members from parent (shared reference is fine — same descriptors)
-  const parentMembers = parentType.bindings.get("__members")?.value;
+  const parentMembers = getMembers(parentType);
   if (parentMembers?.kind === ValueKind.Context) {
-    addBinding(refinedType, "__members", parentMembers);
+    setMembers(refinedType, parentMembers);
   }
   // Override __name
-  refinedType.bindings.delete("__name");
-  addBinding(refinedType, "__name", stringToBits("<refined>"));
+  removeName(refinedType);
+  setName(refinedType, stringToBits("<refined>"));
   // Set __extends to parent
-  refinedType.bindings.delete("__extends");
-  addBinding(refinedType, "__extends", parentType);
+  removeParent(refinedType);
+  setParent(refinedType, parentType);
   // Store predicate
-  addBinding(refinedType, "__predicate", predicate);
+  setPredicate(refinedType, predicate);
   // Phase B: recognise the predicate's algebraic shape (if any) and stash
   // an abstract domain. The domain lets downstream arithmetic propagate
   // refinement facts without re-evaluating the predicate. Opaque
   // predicates just get an opaque-tagged domain; runtime checks still
   // fire via __construct / type_check.
-  (refinedType as any).__abstractDomain = domainFromPredicate(predicate);
+  setAbstractDomain(refinedType, domainFromPredicate(predicate));
 
   // Wrap __construct with predicate check
-  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  const parentConstruct = getConstruct(parentType);
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    refinedType.bindings.delete("__construct");
-    const idx = refinedType.bindingList.findIndex(b => b.key === "__construct");
-    if (idx >= 0) refinedType.bindingList.splice(idx, 1);
+    removeConstruct(refinedType);
 
-    addBinding(refinedType, "__construct", makePrimitive("refined.__construct", (args, ctx, evalFn) => {
+    setConstruct(refinedType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
       // Call parent constructor
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
 
@@ -620,19 +630,18 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       // without re-tagging or running this predicate. Without this, a deeper
       // refinement's error would get silently retagged with the outer type.
       if (value.kind === ValueKind.MultiValue) {
-        const comps = (value as MultiValueType).components;
-        if (comps.has("error")) return value;
+        if (channelReadRaw(value, "error") !== undefined) return value;
       }
 
       // Apply predicate
       const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
-      const checkP = primaryOf(checkResult);
+      const checkP = dataOf(checkResult);
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
         // Predicate failed — return a targeted error. If the refined type has
         // a recognised abstract domain, render it in the message so the user
         // sees what constraint the value violated.
-        const dom = (refinedType as any).__abstractDomain;
-        const primary = primaryOf(value);
+        const dom = getAbstractDomain(refinedType);
+        const primary = dataOf(value);
         let cexDesc = "";
         if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
           const signed = (primary as BitsValue).data >= 0x8000000000000000n
@@ -668,8 +677,8 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       // Re-tag with refined type, and attach the abstract domain so downstream
       // arithmetic can propagate the refinement without re-parsing the
       // predicate.
-      const typed = withType(primaryOf(value), refinedType);
-      const dom = (refinedType as any).__abstractDomain;
+      const typed = withType(dataOf(value), refinedType);
+      const dom = getAbstractDomain(refinedType);
       if (dom) {
         // Phase C: attach a single-predicate set rather than a single
         // domain. The set is the canonical predicate-storage form;
@@ -714,7 +723,7 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
   // Copy parent's bindings (everything except __construct, which we wrap
   // below; everything else inherited).
   for (const [key, binding] of parentType.bindings) {
-    if (key === "__construct") continue;
+    if (key === SLOT_KEYS.construct) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
 
@@ -727,9 +736,9 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
 
   // Wrap parent's constructor so each invariant is checked after parent
   // construction.
-  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  const parentConstruct = getConstruct(parentType);
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    addBinding(newType, "__construct", makePrimitive("invariant.__construct", (args, ctx, evalFn) => {
+    setConstruct(newType, makePrimitive("invariant.__construct", (args, ctx, evalFn) => {
       // Call parent constructor first.
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
 
@@ -737,15 +746,14 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
       // have failed already; pass the error through unchanged rather than
       // re-tagging with this layer.
       if (value.kind === ValueKind.MultiValue) {
-        const comps = (value as MultiValueType).components;
-        if (comps.has("error")) return value;
+        if (channelReadRaw(value, "error") !== undefined) return value;
       }
 
       // Apply each invariant in declaration order. First failure → error.
       for (let i = 0; i < newInvariants.length; i++) {
         const inv = newInvariants[i];
         const checkResult = evalFn!(makeExpr(inv, [value]), ctx!);
-        const checkP = primaryOf(checkResult);
+        const checkP = dataOf(checkResult);
         if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
           // Build a counterexample-style error message. For invariants on
           // record types, render the field name(s) the predicate touched if
@@ -763,7 +771,7 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
       // abstract domain (if any) of each invariant to the value's
       // predicate set — same machinery as buildRefinedType so consumers
       // see the inferred refinement on the result.
-      const typed = withType(primaryOf(value), newType);
+      const typed = withType(dataOf(value), newType);
       try {
         const preds: Predicate[] = [];
         for (const inv of newInvariants) {
@@ -792,33 +800,31 @@ function buildDistinctType(parentType: ContextValue): ContextValue {
   const distinctType = makeContext();
   // Copy all bindings except __extends and __members (handled separately)
   for (const [key, binding] of parentType.bindings) {
-    if (key === "__extends") continue;
-    if (key === "__members") continue;
+    if (key === SLOT_KEYS.extends) continue;
+    if (key === SLOT_KEYS.members) continue;
     if (binding.value) {
       addBinding(distinctType, key, binding.value);
     }
   }
   // Copy __members from parent (shared reference — same descriptors)
-  const parentMembers = parentType.bindings.get("__members")?.value;
+  const parentMembers = getMembers(parentType);
   if (parentMembers?.kind === ValueKind.Context) {
-    addBinding(distinctType, "__members", parentMembers);
+    setMembers(distinctType, parentMembers);
   }
   // Override __name and __type
-  distinctType.bindings.delete("__name");
-  addBinding(distinctType, "__name", stringToBits("<distinct>"));
-  distinctType.bindings.delete("__type");
-  addBinding(distinctType, "__type", Type); // named → nominal comparison via shape dispatch
+  removeName(distinctType);
+  setName(distinctType, stringToBits("<distinct>"));
+  removeShapeSlot(distinctType);
+  writeShape(distinctType, Type); // named → nominal comparison via shape dispatch
 
   // Wrap __construct to re-tag with distinct type
-  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  const parentConstruct = getConstruct(parentType);
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    distinctType.bindings.delete("__construct");
-    const idx = distinctType.bindingList.findIndex(b => b.key === "__construct");
-    if (idx >= 0) distinctType.bindingList.splice(idx, 1);
+    removeConstruct(distinctType);
 
-    addBinding(distinctType, "__construct", makePrimitive("distinct.__construct", (args, ctx, evalFn) => {
+    setConstruct(distinctType, makePrimitive("distinct.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-      return withType(primaryOf(value), distinctType);
+      return withType(dataOf(value), distinctType);
     }, true));
   }
 
@@ -837,30 +843,30 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
   const defaultOps = ["add", "sub", "mul", "div", "mod", "neg"];
   const ops = opNames.length > 0 ? opNames : defaultOps;
 
-  const predicate = refinedType.bindings.get("__predicate")?.value;
-  const parentType = refinedType.bindings.get("__extends")?.value as ContextValue;
+  const predicate = getPredicate(refinedType);
+  const parentType = getParent(refinedType) as ContextValue;
   if (!predicate || !parentType || parentType.kind !== ValueKind.Context) {
     return refinedType; // not a refined type — nothing to do
   }
-  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  const parentConstruct = getConstruct(parentType);
 
   // Build new type (clone bindings except __members and __construct)
   const newType = makeContext();
   for (const [key, binding] of refinedType.bindings) {
-    if (key === "__members" || key === "__construct") continue;
+    if (key === SLOT_KEYS.members || key === SLOT_KEYS.construct) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
 
   // Rebuild __construct so it tags results with the NEW type
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    addBinding(newType, "__construct", makePrimitive("refined.__construct", (args, ctx, evalFn) => {
+    setConstruct(newType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
       const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
-      const checkP = primaryOf(checkResult);
+      const checkP = dataOf(checkResult);
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
         // Same constraint-rendering logic as buildRefinedType's __construct.
-        const dom = (refinedType as any).__abstractDomain;
-        const primary = primaryOf(value);
+        const dom = getAbstractDomain(refinedType);
+        const primary = dataOf(value);
         let cexDesc = "";
         if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
           const signed = (primary as BitsValue).data >= 0x8000000000000000n
@@ -888,12 +894,12 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
         components.set("type", ErrorType);
         return makeMultiValue(makeInt(0), components);
       }
-      return withType(primaryOf(value), newType);
+      return withType(dataOf(value), newType);
     }, true));
   }
 
   // Clone __members and add lifted operator descriptors
-  const parentMembers = refinedType.bindings.get("__members")?.value;
+  const parentMembers = getMembers(refinedType);
   const newMembers = makeContext();
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
@@ -901,7 +907,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
     }
   }
 
-  const newConstruct = newType.bindings.get("__construct")?.value as PrimitiveFunctionValue | undefined;
+  const newConstruct = getConstruct(newType) as PrimitiveFunctionValue | undefined;
 
   for (const opName of ops) {
     const parentDesc = parentMembers?.kind === ValueKind.Context
@@ -917,14 +923,14 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
       const parentResult = (parentOp as PrimitiveFunctionValue).fn(args, ctx as any, evalFn as any);
       // __construct is lazy — wrap the result in an identity expression so it evaluates to itself
       const identityPrim = makePrimitive("identity", (a) => a[0]);
-      const wrapped = makeExpr(identityPrim, [primaryOf(parentResult)]);
+      const wrapped = makeExpr(identityPrim, [dataOf(parentResult)]);
       return newConstruct.fn([wrapped], ctx as any, evalFn as any);
     }) as PrimitiveFnImpl);
 
     addBinding(newMembers, opName, makeMethodDescriptor(opName, liftedOp));
   }
 
-  addBinding(newType, "__members", newMembers);
+  setMembers(newType, newMembers);
   return newType;
 }
 
@@ -934,7 +940,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
  * Errors on name conflict (method already exists in __members).
  */
 function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
-  const specCtx = primaryOf(specObj);
+  const specCtx = dataOf(specObj);
   if (specCtx.kind !== ValueKind.Context) {
     throw new AllegroError("mixin: argument must be an object literal {method: fn, ...}");
   }
@@ -942,7 +948,7 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
   // Extract method specs
   const methods: { name: string; impl: Value }[] = [];
   for (const [key, binding] of (specCtx as ContextValue).bindings) {
-    if (key.startsWith("__")) continue;
+    if (isMetaSlotKey(key)) continue;
     if (binding.value) {
       methods.push({ name: key, impl: binding.value });
     }
@@ -951,12 +957,12 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
   // Build new type (clone baseType except __members and __construct)
   const newType = makeContext();
   for (const [key, binding] of baseType.bindings) {
-    if (key === "__members" || key === "__construct") continue;
+    if (key === SLOT_KEYS.members || key === SLOT_KEYS.construct) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
 
   // Clone __members and add mixin methods
-  const parentMembers = baseType.bindings.get("__members")?.value;
+  const parentMembers = getMembers(baseType);
   const newMembers = makeContext();
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
@@ -971,13 +977,13 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
     }
     // Wrap ComposedFunctions in a PrimitiveFn that the descriptor expects,
     // or use PrimitiveFunctions directly
-    const impl = primaryOf(m.impl);
+    const impl = dataOf(m.impl);
     if (impl.kind === ValueKind.PrimitiveFunction) {
       addBinding(newMembers, m.name, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
     } else if (impl.kind === ValueKind.ComposedFunction) {
       // Store the ComposedFunction directly — type_dispatch handles it
       const desc = makeContext();
-      addBinding(desc, "__type", MethodType);
+      writeShape(desc, MethodType);
       addBinding(desc, "name", stringToBits(m.name));
       addBinding(desc, "value", impl);
       addBinding(newMembers, m.name, desc);
@@ -986,7 +992,7 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
     }
   }
 
-  addBinding(newType, "__members", newMembers);
+  setMembers(newType, newMembers);
 
   // Rebuild __construct: delegate to parentConstruct (which already chains all
   // predicate checks through nested refinements), then retag with newType. This
@@ -995,15 +1001,14 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
   // correct for a single level but fragile if the shape ever changed. If the
   // parent's construct produces an error MultiValue (refinement failure), we
   // propagate it without retagging.
-  const parentConstruct = baseType.bindings.get("__construct")?.value;
+  const parentConstruct = getConstruct(baseType);
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    addBinding(newType, "__construct", makePrimitive("mixin.__construct", (args, ctx, evalFn) => {
+    setConstruct(newType, makePrimitive("mixin.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
       if (value.kind === ValueKind.MultiValue) {
-        const components = (value as MultiValueType).components;
-        if (components.has("error")) return value;
+        if (channelReadRaw(value, "error") !== undefined) return value;
       }
-      return withType(primaryOf(value), newType);
+      return withType(dataOf(value), newType);
     }, true));
   }
 
@@ -1053,12 +1058,10 @@ addBinding(typeMembers, "constructor", makeMethodDescriptor("constructor",
   makePrimitive("Type.constructor", (args) => {
     const type = args[0] as ContextValue;
     const fn = args[1];
-    type.bindings.delete("__construct");
-    const idx = type.bindingList.findIndex(b => b.key === "__construct");
-    if (idx >= 0) type.bindingList.splice(idx, 1);
-    addBinding(type, "__construct", makePrimitive("custom.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
+    removeConstruct(type);
+    setConstruct(type, makePrimitive("custom.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
       const result = ctorEvalFn!(makeExpr(fn, ctorArgs), ctorCtx!);
-      return withType(primaryOf(result), type);
+      return withType(dataOf(result), type);
     }, true));
     return wrapType(type);
   })
@@ -1073,7 +1076,7 @@ addBinding(typeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
     const type = args[0] as ContextValue;
     const opNames: string[] = [];
     for (let i = 1; i < args.length; i++) {
-      const p = primaryOf(args[i]);
+      const p = dataOf(args[i]);
       if (p.kind === ValueKind.Bits) {
         opNames.push(bitsToString(p as BitsValue));
       }
@@ -1086,7 +1089,7 @@ addBinding(typeMembers, "mixin", makeMethodDescriptor("mixin",
     return wrapType(buildMixinType(args[0] as ContextValue, args[1]));
   })
 ));
-addBinding(Type, "__members", typeMembers);
+setMembers(Type, typeMembers);
 
 // --- Type builder helper ---
 
@@ -1112,10 +1115,10 @@ function buildType(
   options?: { extends?: ContextValue; methodEffects?: Record<string, string[]> },
 ): ContextValue {
   const ctx = makeContext();
-  addBinding(ctx, "__name", stringToBits(name));
-  addBinding(ctx, "__type", Type);
+  setName(ctx, stringToBits(name));
+  writeShape(ctx, Type);
   if (options?.extends) {
-    addBinding(ctx, "__extends", options.extends);
+    setParent(ctx, options.extends);
   }
   // Build __members with Method descriptors
   const members = makeContext();
@@ -1125,7 +1128,7 @@ function buildType(
     const isGetter = getterNames.has(key);
     addBinding(members, key, makeMethodDescriptor(key, prim, isGetter));
   }
-  addBinding(ctx, "__members", members);
+  setMembers(ctx, members);
   return ctx;
 }
 
@@ -1137,7 +1140,7 @@ function toSigned(b: BitsValue): bigint {
 }
 
 function asBitsTyped(v: Value, ctx: string): BitsValue {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) throw new AllegroError(`${ctx}: expected Bits, got ${p.kind}`);
   return p;
 }
@@ -1415,7 +1418,7 @@ const boolMethods: Record<string, PrimitiveFnImpl> = {
 
 // =============================================================================
 // Array Type
-// Arrays are Contexts with numeric string keys ("0", "1", ...) and "__length".
+// Arrays are Contexts with numeric string keys ("0", "1", ...) plus the length slot.
 // =============================================================================
 
 /** Build a raw array Context (without type wrapping). Used internally. */
@@ -1426,10 +1429,7 @@ function makeRawArrayCtx(elements: Value[]): ContextValue {
     ctx.bindings.set(key, { key, value: elements[i], isUse: false });
     ctx.bindingList.push({ key, value: elements[i], isUse: false });
   }
-  const lenKey = "__length";
-  const lenVal = makeInt(elements.length);
-  ctx.bindings.set(lenKey, { key: lenKey, value: lenVal, isUse: false });
-  ctx.bindingList.push({ key: lenKey, value: lenVal, isUse: false });
+  setSlotCount(ctx, makeInt(elements.length));
   return ctx;
 }
 
@@ -1457,9 +1457,9 @@ export function makeArray(elements: Value[]): Value {
 }
 
 function arrayElements(ctx: ContextValue): Value[] {
-  const lenBinding = ctx.bindings.get("__length");
-  if (!lenBinding?.value) return [];
-  const len = Number((lenBinding.value as BitsValue).data);
+  const lenV = getSlotCount(ctx);
+  if (!lenV) return [];
+  const len = Number((lenV as BitsValue).data);
   const result: Value[] = [];
   for (let i = 0; i < len; i++) {
     const b = ctx.bindings.get(String(i));
@@ -1476,30 +1476,30 @@ function arrayElements(ctx: ContextValue): Value[] {
 
 // Inline primitives for use inside ComposedFunctions (no circular import)
 const arrLengthPrim = makePrimitive("arr_length", (args) => {
-  const ctx = primaryOf(args[0]) as ContextValue;
-  return withType(ctx.bindings.get("__length")?.value ?? makeInt(0), IntType);
+  const ctx = dataOf(args[0]) as ContextValue;
+  return withType(getSlotCount(ctx) ?? makeInt(0), IntType);
 });
 const arrGetPrim = makePrimitive("arr_get", (args) => {
-  const ctx = primaryOf(args[0]) as ContextValue;
-  const idx = Number(toSigned(asBitsTyped(primaryOf(args[1]), "arr_get")));
+  const ctx = dataOf(args[0]) as ContextValue;
+  const idx = Number(toSigned(asBitsTyped(dataOf(args[1]), "arr_get")));
   const b = ctx.bindings.get(String(idx));
   if (!b?.value) throw new AllegroError(`Array index ${idx} out of bounds`);
   return b.value;
 });
 const intGtePrim = makePrimitive("int_gte", (args) => {
   return withType(
-    makeInt(toSigned(asBitsTyped(primaryOf(args[0]), "int_gte")) >= toSigned(asBitsTyped(primaryOf(args[1]), "int_gte")) ? 1 : 0),
+    makeInt(toSigned(asBitsTyped(dataOf(args[0]), "int_gte")) >= toSigned(asBitsTyped(dataOf(args[1]), "int_gte")) ? 1 : 0),
     BoolType,
   );
 });
 const intAddPrim = makePrimitive("int_add", (args) => {
-  const a = toSigned(asBitsTyped(primaryOf(args[0]), "int_add"));
-  const b = toSigned(asBitsTyped(primaryOf(args[1]), "int_add"));
+  const a = toSigned(asBitsTyped(dataOf(args[0]), "int_add"));
+  const b = toSigned(asBitsTyped(dataOf(args[1]), "int_add"));
   return withType(makeInt(Number(a + b)), IntType);
 });
 const evalIfPrim = makePrimitive("eval_if", (args, ctx, evalFn) => {
   const cond = evalFn!(args[0], ctx!);
-  const condP = primaryOf(cond);
+  const condP = dataOf(cond);
   if (condP.kind === ValueKind.Bits) {
     const branch = (condP as BitsValue).data !== 0n ? args[1] : args[2];
     const evalBranch = evalFn!(branch, ctx!);
@@ -1517,8 +1517,8 @@ const makeArrayPrim = makePrimitive("make_array", (args, ctx, evalFn) => {
 const arrConcatPrim = makePrimitive("arr_concat", (args, ctx, evalFn) => {
   const a = evalFn!(args[0], ctx!);
   const b = evalFn!(args[1], ctx!);
-  const aCtx = primaryOf(a) as ContextValue;
-  const bCtx = primaryOf(b) as ContextValue;
+  const aCtx = dataOf(a) as ContextValue;
+  const bCtx = dataOf(b) as ContextValue;
   return makeArray([...arrayElements(aCtx), ...arrayElements(bCtx)]);
 }, true);
 
@@ -1647,8 +1647,7 @@ const reduceAllegro = buildReduceFn();
 const arrayMethods: Record<string, PrimitiveFnImpl> = {
   length: (args) => {
     const ctx = args[0] as ContextValue;
-    const lenBinding = ctx.bindings.get("__length");
-    return lenBinding?.value ?? makeInt(0);
+    return getSlotCount(ctx) ?? makeInt(0);
   },
   get: (args) => {
     const ctx = args[0] as ContextValue;
@@ -1659,7 +1658,7 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
   },
   concat: (args) => {
     const aCtx = args[0] as ContextValue;
-    const bCtx = primaryOf(args[1]) as ContextValue;
+    const bCtx = dataOf(args[1]) as ContextValue;
     return makeArray([...arrayElements(aCtx), ...arrayElements(bCtx)]);
   },
   slice: (args) => {
@@ -1797,7 +1796,7 @@ const objectGetMember = makePrimitive("Object.__getMember", (args) => {
   if (!b?.value) throw new AllegroError(`Object: field '${fieldName}' not found`);
   return b.value;
 });
-addBinding(ObjectType, "__getMember", objectGetMember);
+setFallbackMember(ObjectType, objectGetMember);
 export const UntypedFunctionType: ContextValue = buildType("UntypedFunction", untypedFnMethods);
 
 // None type — represents the absence of a value
@@ -1824,27 +1823,27 @@ export const ErrorType: ContextValue = buildType("Error", errorMethods);
 // =============================================================================
 
 // Int(x) — wrap a value with Int type
-addBinding(IntType, "__construct", makePrimitive("Int.__construct", (args, ctx, evalFn) => {
+setConstruct(IntType, makePrimitive("Int.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(primaryOf(v), IntType);
+  return withType(dataOf(v), IntType);
 }, true));
 
 // Float(x) — wrap a value with Float type
-addBinding(FloatType, "__construct", makePrimitive("Float.__construct", (args, ctx, evalFn) => {
+setConstruct(FloatType, makePrimitive("Float.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(primaryOf(v), FloatType);
+  return withType(dataOf(v), FloatType);
 }, true));
 
 // String(x) — wrap a value with String type
-addBinding(StringType, "__construct", makePrimitive("String.__construct", (args, ctx, evalFn) => {
+setConstruct(StringType, makePrimitive("String.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(primaryOf(v), StringType);
+  return withType(dataOf(v), StringType);
 }, true));
 
 // Bool(x) — wrap a value with Bool type
-addBinding(BoolType, "__construct", makePrimitive("Bool.__construct", (args, ctx, evalFn) => {
+setConstruct(BoolType, makePrimitive("Bool.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(primaryOf(v), BoolType);
+  return withType(dataOf(v), BoolType);
 }, true));
 
 // =============================================================================
@@ -1878,22 +1877,22 @@ export function buildGenericType(
     if (a.kind === ValueKind.Context) {
       const ctx = a as ContextValue;
       // Named type (Int, String, Array, etc.)
-      const nb = ctx.bindings.get("__name");
-      if (nb?.value?.kind === ValueKind.Bits) {
-        const typeName = bitsToString(nb.value);
+      const nv = getName(ctx);
+      if (nv?.kind === ValueKind.Bits) {
+        const typeName = bitsToString(nv);
         // Check for type args (concrete generic like Array[Int])
-        const argsB = ctx.bindings.get("__args");
-        if (argsB?.value?.kind === ValueKind.Context) {
-          const argsCtx = argsB.value as ContextValue;
+        const argsV = getGenericArgs(ctx);
+        if (argsV?.kind === ValueKind.Context) {
+          const argsCtx = argsV as ContextValue;
           const argElems = arrayElements(argsCtx);
           return `${typeName}[${argElems.map((e, i) => cacheKeyOne(e, i)).join(";")}]`;
         }
         return typeName;
       }
       // Array-like Context (used as param types list)
-      const lenB = ctx.bindings.get("__length");
-      if (lenB?.value?.kind === ValueKind.Bits) {
-        const len = Number((lenB.value as BitsValue).data);
+      const lenV = getSlotCount(ctx);
+      if (lenV?.kind === ValueKind.Bits) {
+        const len = Number((lenV as BitsValue).data);
         const elems: string[] = [];
         for (let i = 0; i < len; i++) {
           const eb = ctx.bindings.get(String(i));
@@ -1906,7 +1905,7 @@ export function buildGenericType(
     }
     if (a.kind === ValueKind.Bits) return `v:${(a as BitsValue).data}`;
     if (a.kind === ValueKind.MultiValue) {
-      const p = primaryOf(a);
+      const p = dataOf(a);
       if (p.kind === ValueKind.Bits) return `v:${(p as BitsValue).data}`;
       return cacheKeyOne(p, idx);
     }
@@ -1920,10 +1919,7 @@ export function buildGenericType(
   const ctx = buildType(name, methods, { methodEffects: options?.methodEffects });
 
   // Add __params (use raw array to avoid circular dep with ArrayType)
-  const paramsKey = "__params";
-  const paramsVal = makeRawArrayCtx(paramNames.map(n => stringToBits(n)));
-  ctx.bindings.set(paramsKey, { key: paramsKey, value: paramsVal, isUse: false });
-  ctx.bindingList.push({ key: paramsKey, value: paramsVal, isUse: false });
+  setGenericParams(ctx, makeRawArrayCtx(paramNames.map(n => stringToBits(n))));
 
   // Add __constructor
   const constructorFn = makePrimitive(`${name}.__constructor`, (args: Value[]) => {
@@ -1940,15 +1936,10 @@ export function buildGenericType(
     cache.set(key, concrete);
     return concrete;
   });
-  const ctorKey = "__constructor";
-  ctx.bindings.set(ctorKey, { key: ctorKey, value: constructorFn, isUse: false });
-  ctx.bindingList.push({ key: ctorKey, value: constructorFn, isUse: false });
+  setGenericConstructor(ctx, constructorFn);
 
   // Mark as generic
-  const genericKey = "__isGeneric";
-  const genericVal = makeInt(1);
-  ctx.bindings.set(genericKey, { key: genericKey, value: genericVal, isUse: false });
-  ctx.bindingList.push({ key: genericKey, value: genericVal, isUse: false });
+  markGeneric(ctx, makeInt(1));
 
   return ctx;
 }
@@ -1967,15 +1958,10 @@ function defaultConcreteType(
   const concrete = buildType(name, methods, { methodEffects });
 
   // __generic: reference to the generic type
-  const genKey = "__generic";
-  concrete.bindings.set(genKey, { key: genKey, value: generic, isUse: false });
-  concrete.bindingList.push({ key: genKey, value: generic, isUse: false });
+  setGenericBackLink(concrete, generic);
 
   // __args: the applied type arguments (raw array to avoid circular deps)
-  const argsKey = "__args";
-  const argsVal = makeRawArrayCtx(args);
-  concrete.bindings.set(argsKey, { key: argsKey, value: argsVal, isUse: false });
-  concrete.bindingList.push({ key: argsKey, value: argsVal, isUse: false });
+  setGenericArgs(concrete, makeRawArrayCtx(args));
 
   return concrete;
 }
@@ -1984,8 +1970,7 @@ function defaultConcreteType(
  * Check if a type is a generic type (has __isGeneric).
  */
 export function isGenericType(type: ContextValue): boolean {
-  const b = type.bindings.get("__isGeneric");
-  return b?.value !== undefined;
+  return isGenericTypeSlot(type);
 }
 
 /**
@@ -1993,9 +1978,9 @@ export function isGenericType(type: ContextValue): boolean {
  * Returns null if the type has no __args.
  */
 export function getTypeArgs(type: ContextValue): Value[] | null {
-  const b = type.bindings.get("__args");
-  if (!b?.value) return null;
-  const ctx = primaryOf(b.value);
+  const argsV = getGenericArgs(type);
+  if (!argsV) return null;
+  const ctx = dataOf(argsV);
   if (ctx.kind !== ValueKind.Context) return null;
   return arrayElements(ctx as ContextValue);
 }
@@ -2004,21 +1989,21 @@ export function getTypeArgs(type: ContextValue): Value[] | null {
  * Get the generic type from a concrete parameterized type.
  */
 export function getGenericType(type: ContextValue): ContextValue | null {
-  const b = type.bindings.get("__generic");
-  if (!b?.value || b.value.kind !== ValueKind.Context) return null;
-  return b.value;
+  const g = getGenericBackLink(type);
+  if (!g || g.kind !== ValueKind.Context) return null;
+  return g;
 }
 
 /**
  * Get the number of type parameters on a generic type.
  */
 function getGenericParamCount(generic: ContextValue): number {
-  const paramsBinding = generic.bindings.get("__params");
-  if (!paramsBinding?.value) return 0;
-  const paramsCtx = primaryOf(paramsBinding.value);
+  const paramsV = getGenericParamsSlot(generic);
+  if (!paramsV) return 0;
+  const paramsCtx = dataOf(paramsV);
   if (paramsCtx.kind !== ValueKind.Context) return 0;
-  const lenBinding = (paramsCtx as ContextValue).bindings.get("__length");
-  return lenBinding?.value ? Number((lenBinding.value as BitsValue).data) : 0;
+  const lenV = getSlotCount(paramsCtx as ContextValue);
+  return lenV ? Number((lenV as BitsValue).data) : 0;
 }
 
 /**
@@ -2038,11 +2023,11 @@ export function normalizeType(type: ContextValue): ContextValue {
  * Apply type arguments to a generic type, returning the concrete type.
  */
 export function applyGenericType(generic: ContextValue, args: Value[]): ContextValue {
-  const ctor = generic.bindings.get("__constructor");
-  if (!ctor?.value || ctor.value.kind !== ValueKind.PrimitiveFunction) {
-    throw new AllegroError(`Not a generic type: ${bitsToString(generic.bindings.get("__name")?.value as BitsValue ?? stringToBits("unknown"))}`);
+  const ctorV = getGenericConstructor(generic);
+  if (!ctorV || ctorV.kind !== ValueKind.PrimitiveFunction) {
+    throw new AllegroError(`Not a generic type: ${bitsToString(getName(generic) as BitsValue ?? stringToBits("unknown"))}`);
   }
-  return ctor.value.fn(args, undefined as any, undefined as any) as ContextValue;
+  return ctorV.fn(args, undefined as any, undefined as any) as ContextValue;
 }
 
 // =============================================================================
@@ -2085,7 +2070,7 @@ export function makeFunctionType(paramTypes: Value[], returnType: Value): Contex
 export function getFunctionParamTypes(fnType: ContextValue): Value[] | null {
   const args = getTypeArgs(fnType);
   if (!args || args.length < 2) return null;
-  const paramTypesCtx = primaryOf(args[0]);
+  const paramTypesCtx = dataOf(args[0]);
   if (paramTypesCtx.kind !== ValueKind.Context) return null;
   return arrayElements(paramTypesCtx as ContextValue);
 }
@@ -2155,7 +2140,7 @@ export function unifyTypes(
   // If expected is Any, always matches
   if (expectedType.kind === ValueKind.Context) {
     const expectedName = bitsToString(
-      ((expectedType as ContextValue).bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+      (getName(expectedType as ContextValue) as BitsValue) ?? stringToBits(""),
     );
     if (expectedName === "Any") return bindings;
   }
@@ -2168,10 +2153,10 @@ export function unifyTypes(
 
     // Check base name
     const expectedName = bitsToString(
-      (expectedCtx.bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+      (getName(expectedCtx) as BitsValue) ?? stringToBits(""),
     );
     const actualName = bitsToString(
-      (actualCtx.bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+      (getName(actualCtx) as BitsValue) ?? stringToBits(""),
     );
     if (expectedName !== actualName) {
       throw new AllegroError(`Type mismatch: expected ${expectedName}, got ${actualName}`);
@@ -2211,9 +2196,9 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
 
   if (typeExpr.kind === ValueKind.Context) {
     const ctx = typeExpr as ContextValue;
-    const argsBinding = ctx.bindings.get("__args");
-    if (argsBinding?.value) {
-      const argsCtx = primaryOf(argsBinding.value);
+    const argsV2 = getGenericArgs(ctx);
+    if (argsV2) {
+      const argsCtx = dataOf(argsV2);
       if (argsCtx.kind === ValueKind.Context) {
         const args = arrayElements(argsCtx as ContextValue);
         const resolvedArgs = args.map(a => resolveTypeWithBindings(a, bindings));
@@ -2257,12 +2242,12 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
 // =============================================================================
 
 function isPureEffect(e: ContextValue): boolean {
-  const m = e.bindings.get("__effect_kind")?.value;
+  const m = getEffectKind(e);
   return m?.kind === ValueKind.Bits && bitsToString(m as BitsValue) === "pure";
 }
 
 function isOpaqueEffect(e: ContextValue): boolean {
-  const m = e.bindings.get("__effect_kind")?.value;
+  const m = getEffectKind(e);
   return m?.kind === ValueKind.Bits && bitsToString(m as BitsValue) === "opaque";
 }
 
@@ -2276,7 +2261,7 @@ export function effectSubsetOf(e1: ContextValue, e2: ContextValue): boolean {
   // Walk e1's __extends chain looking for e2 by identity.
   let current: ContextValue | null = e1;
   while (current) {
-    const ext = current.bindings.get("__extends")?.value;
+    const ext = getParent(current);
     if (ext?.kind === ValueKind.Context) {
       if (ext === e2) return true;
       current = ext as ContextValue;
@@ -2317,39 +2302,39 @@ export function effectUnion(e1: ContextValue, e2: ContextValue): ContextValue {
 // --- Effect meta-type Context ---
 
 export const Effect: ContextValue = makeContext();
-addBinding(Effect, "__name", stringToBits("Effect"));
-addBinding(Effect, "__type", Type);
+setName(Effect, stringToBits("Effect"));
+writeShape(Effect, Type);
 
 const effectMembers = makeContext();
 addBinding(effectMembers, "subset_of", makeMethodDescriptor("subset_of",
   makePrimitive("Effect.subset_of", (args) => {
-    const e1 = primaryOf(args[0]) as ContextValue;
-    const e2 = primaryOf(args[1]) as ContextValue;
+    const e1 = dataOf(args[0]) as ContextValue;
+    const e2 = dataOf(args[1]) as ContextValue;
     return withType(makeInt(effectSubsetOf(e1, e2) ? 1 : 0), BoolType);
   })
 ));
 addBinding(effectMembers, "implies", makeMethodDescriptor("implies",
   makePrimitive("Effect.implies", (args) => {
-    const e1 = primaryOf(args[0]) as ContextValue;
-    const e2 = primaryOf(args[1]) as ContextValue;
+    const e1 = dataOf(args[0]) as ContextValue;
+    const e2 = dataOf(args[1]) as ContextValue;
     return withType(makeInt(effectImplies(e1, e2) ? 1 : 0), BoolType);
   })
 ));
 addBinding(effectMembers, "intersect", makeMethodDescriptor("intersect",
   makePrimitive("Effect.intersect", (args) => {
-    const e1 = primaryOf(args[0]) as ContextValue;
-    const e2 = primaryOf(args[1]) as ContextValue;
+    const e1 = dataOf(args[0]) as ContextValue;
+    const e2 = dataOf(args[1]) as ContextValue;
     return wrapType(effectIntersect(e1, e2));
   })
 ));
 addBinding(effectMembers, "union", makeMethodDescriptor("union",
   makePrimitive("Effect.union", (args) => {
-    const e1 = primaryOf(args[0]) as ContextValue;
-    const e2 = primaryOf(args[1]) as ContextValue;
+    const e1 = dataOf(args[0]) as ContextValue;
+    const e2 = dataOf(args[1]) as ContextValue;
     return wrapType(effectUnion(e1, e2));
   })
 ));
-addBinding(Effect, "__members", effectMembers);
+setMembers(Effect, effectMembers);
 
 /**
  * Build an effect type that extends Effect. Used for `pure` and `opaque` here;
@@ -2364,28 +2349,28 @@ addBinding(Effect, "__members", effectMembers);
  */
 export function buildEffect(name: string, kind?: "pure" | "opaque"): ContextValue {
   const eff = makeContext();
-  addBinding(eff, "__name", stringToBits(name));
-  addBinding(eff, "__type", Type);
-  addBinding(eff, "__extends", Effect);
-  if (kind) addBinding(eff, "__effect_kind", stringToBits(kind));
+  setName(eff, stringToBits(name));
+  writeShape(eff, Type);
+  setParent(eff, Effect);
+  if (kind) setEffectKind(eff, stringToBits(kind));
   const members = makeContext();
   for (const [key, binding] of effectMembers.bindings) {
     if (binding.value) addBinding(members, key, binding.value);
   }
-  addBinding(eff, "__members", members);
+  setMembers(eff, members);
   // Attach an effect bound — the value-side check this type imposes when it
   // appears as a parameter annotation (`f: pure`). The bound is the set of
   // effect labels callers may legally produce; the discharge runs through
   // `impliesDomain` on the predicate-set machinery, identical path to numeric
   // refinements. `opaque` carries no bound — universal, anything passes.
   if (kind === "pure") {
-    (eff as any).__effectBound = { kind: "effects", labels: new Set<string>() };
+    setEffectBound(eff, { kind: "effects", labels: new Set<string>() });
   } else if (kind === "opaque") {
     // No bound — universal. type_check skips the effect discharge entirely.
   } else {
     // Named effects (io, time, …): bound is the singleton {name}. Extension
     // libraries will pass `kind` undefined when they call `buildEffect("io")`.
-    (eff as any).__effectBound = { kind: "effects", labels: new Set<string>([name]) };
+    setEffectBound(eff, { kind: "effects", labels: new Set<string>([name]) });
   }
   return eff;
 }
@@ -2409,16 +2394,16 @@ export const opaqueEffect: ContextValue = buildEffect("opaque", "opaque");
 // `src/proofs.ts` surfaces them as error-severity notifications.
 
 export const Proof: ContextValue = makeContext();
-addBinding(Proof, "__name", stringToBits("Proof"));
-addBinding(Proof, "__type", Type);
-addBinding(Proof, "__members", makeContext());
+setName(Proof, stringToBits("Proof"));
+writeShape(Proof, Type);
+setMembers(Proof, makeContext());
 
 /** Construct a discharged proof witness for a proposition. `proposition`
  *  is the source-rendered text of what was proved (for display / export). */
 export function makeProof(proposition: string): Value {
   const p = makeContext();
-  addBinding(p, "__proposition", stringToBits(proposition));
-  addBinding(p, "__discharged", makeInt(1));
+  setProposition(p, stringToBits(proposition));
+  writeDischarged(p, makeInt(1));
   return withType(p, Proof);
 }
 
@@ -2440,9 +2425,9 @@ export function isProof(v: Value): boolean {
  * wherever it's actually needed.)
  */
 export function wrapAsUntypedFunction(fn: Value): Value {
-  const primary = primaryOf(fn);
+  const primary = dataOf(fn);
   const components = fn.kind === ValueKind.MultiValue
-    ? new Map(fn.components)
+    ? cloneComponents(fn)
     : new Map<string, Value>();
   components.set("type", UntypedFunctionType);
   return makeMultiValue(primary, components);
@@ -2453,7 +2438,7 @@ export function wrapAsUntypedFunction(fn: Value): Value {
  */
 /** Wrap a type Context as a typed MultiValue using its __type as meta-type */
 export function wrapType(type: ContextValue): Value {
-  const metaType = type.bindings.get("__type")?.value as ContextValue | undefined;
+  const metaType = channelReadRaw(type, "shape") as ContextValue | undefined;
   if (metaType) return withType(type, metaType);
   return type;
 }
