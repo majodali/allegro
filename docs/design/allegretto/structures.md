@@ -333,7 +333,19 @@ Proof gets `proposition`/`reason`/`counterexample`/`lhs`/`rhs`; Effect gets
 `__future_N` → real future cells). Host-engine internals stay host-side.
 **No new `__*` slot may be introduced**; new meta-slots are declared
 members or registered channels from day one. The full disposition table is
-in the plan doc (D39).
+in the plan doc (D39); as of C1.1 it is also **code** —
+`src/slots.ts` — and mechanically enforced by the boundary harness.
+
+*D39 addendum (maintainer-ratified 2026-07)* — three slots present in code
+but absent from D39's original table: **`__effectBound`** → member on the
+Effect instance for now; dissolves into the instance's canonical label-set
+representation when Effect re-derives through the kind recipe (C6.2), the
+annotation-bound reading becoming derived. **`exported`** → scope-binding
+visibility metadata (S3), a base concept of the Scope protocol; the current
+value-plane marker is a stopgap with a known aliasing wart (`y = x`
+silently exports `y`) and dissolves at the Phase 2 scope split / module
+rework. **`arity`** → deleted; it was write-only metadata never read
+anywhere, and arity is derivable from `Function[ParamTypes, ReturnType]`.
 
 **Validation criterion**: the recipe is done when **Effect and Proof are
 re-derived through it with zero hand-rolled residue** (D39's field tables

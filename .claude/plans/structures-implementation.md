@@ -26,10 +26,15 @@
 >   now includes untracked files; `src/slots.ts` is the sanctioned
 >   `allowedFiles` entry (exempt from ratchet; counts recorded — 74 dunder
 >   literals, 3 components accesses). Three slots absent from D39's table
->   given proposed dispositions pending maintainer review: `__effectBound`
->   → Effect.bound (member), `exported` → visibility/exports channel,
->   `arity` → Function member. Maintainer perf ruling recorded: warn-only
->   floor now, refined progressively. 986/986 green.
+>   given proposed dispositions, then reviewed in detail with the
+>   maintainer and **ratified 2026-07** (D39 addendum recorded in
+>   structures.md): `__effectBound` → member, dissolving into the instance
+>   label-set representation at C6.2; `exported` → scope-binding
+>   visibility metadata (S3, base concept; value-plane marker is a stopgap
+>   with a known aliasing wart, dissolves at Phase 2); `arity` → deleted
+>   (write-only, never read; write removed from `wrapAsUntypedFunction`).
+>   Maintainer perf ruling recorded: warn-only floor now, refined
+>   progressively. 986/986 green.
 
 ## 1. Context
 

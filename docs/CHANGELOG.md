@@ -8,6 +8,27 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — D39 addendum: three slot dispositions ratified (follow-up to C1.1)
+
+Detailed maintainer review of the three slots C1.1 flagged as absent from
+D39's table; all three rulings recorded in `structures.md` (D39 addendum)
+and `src/slots.ts`:
+
+- **`__effectBound`** → member on the Effect instance for now; dissolves
+  into the instance's canonical label-set representation when Effect
+  re-derives through the kind recipe (C6.2) — the bound is derivable
+  (pure → ∅, named → {name}), so it won't survive as standing storage.
+- **`exported`** → scope-binding visibility metadata (S3, base concept of
+  the Scope protocol), NOT a value channel: export-ness belongs to the
+  binding, and the current value-plane marker has an aliasing wart
+  (`y = x` silently exports `y`). Stopgap dissolves at the Phase 2 scope
+  split / module rework.
+- **`arity`** → deleted. It was write-only — set in
+  `wrapAsUntypedFunction`, read nowhere in the repo. The write and the
+  unused parameter are removed; registry entry retained as audit record.
+
+986/986 green.
+
 ## 2026-07 — C1.1: Slot & channel registry + typed accessors (structures Phase 1, B-006)
 
 New `src/slots.ts` — the D39 disposition table as code, and the seam the

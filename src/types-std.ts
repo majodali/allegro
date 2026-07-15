@@ -2434,17 +2434,17 @@ export function isProof(v: Value): boolean {
 
 /**
  * Wrap a function value (PrimitiveFunction or ComposedFunction) as UntypedFunction.
- * Attaches arity as a component when known.
+ * (An `arity` component was formerly attached here when known; it was
+ * write-only — never read anywhere — and was removed per the D39-addendum
+ * slot review, 2026-07. Arity is derivable from Function[ParamTypes, R]
+ * wherever it's actually needed.)
  */
-export function wrapAsUntypedFunction(fn: Value, arity?: number): Value {
+export function wrapAsUntypedFunction(fn: Value): Value {
   const primary = primaryOf(fn);
   const components = fn.kind === ValueKind.MultiValue
     ? new Map(fn.components)
     : new Map<string, Value>();
   components.set("type", UntypedFunctionType);
-  if (arity !== undefined) {
-    components.set("arity", makeInt(arity));
-  }
   return makeMultiValue(primary, components);
 }
 

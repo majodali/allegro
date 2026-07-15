@@ -5,10 +5,6 @@
     "src/slots.ts"
   ],
   "lint": {
-    "src/slots.ts": {
-      "components-direct": 3,
-      "dunder-string-literal": 74
-    },
     "src/effects.ts": {
       "components-direct": 2,
       "primaryOf-call": 9
@@ -69,6 +65,10 @@
       "bindings-get-dunder": 3,
       "primaryOf-call": 3
     },
+    "src/slots.ts": {
+      "components-direct": 3,
+      "dunder-string-literal": 74
+    },
     "src/totality.ts": {
       "components-direct": 2,
       "dunder-string-literal": 1,
@@ -96,9 +96,9 @@
     "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 1066,
-      "recursion-tco": 773,
-      "collections": 541
+      "basics": 1451,
+      "recursion-tco": 1010,
+      "collections": 627
     }
   }
 }

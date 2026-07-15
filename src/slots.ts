@@ -88,7 +88,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
 
   // --- Effect fields -------------------------------------------------------------
   { name: "__effect_kind", storages: ["context-binding"], owner: "Effect", disposition: "member", target: "Effect.kind" },
-  { name: "__effectBound", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect.bound", notes: "not named in D39's table; assigned by analogy to the refinement predicate/domain pair (Stage A bound on effect types) — flagged in C1.1 landing summary" },
+  { name: "__effectBound", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect instance label-set representation (dissolves at C6.2; the annotation-bound reading becomes derived)", notes: "D39 addendum, maintainer-ratified 2026-07: member for now; when Effect re-derives through the kind recipe an instance IS its label set, so the stored bound collapses into it" },
   { name: "__effectvar:", storages: ["label-marker"], owner: "Effect", disposition: "member", target: "declared generic-param structure on function types", prefix: true },
   { name: "__effectVarParams", storages: ["js-property"], owner: "Effect", disposition: "member", target: "declared generic-param structure on function types" },
 
@@ -105,8 +105,8 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "effects", storages: ["mv-component"], owner: "effects channel", disposition: "channel", target: "effects" },
   { name: "predicates", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
   { name: "domain", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
-  { name: "exported", storages: ["mv-component"], owner: "module system", disposition: "channel", target: "visibility/exports metadata", notes: "not named in D39's table; module-system marker — flagged in C1.1 landing summary" },
-  { name: "arity", storages: ["mv-component"], owner: "Function", disposition: "member", target: "Function arity member", notes: "not named in D39's table; set on UntypedFunction wrappers — flagged in C1.1 landing summary" },
+  { name: "exported", storages: ["mv-component"], owner: "module system", disposition: "base-concept", target: "scope-binding visibility metadata (S3; migrates at the Phase 2 scope split / module rework)", notes: "D39 addendum, maintainer-ratified 2026-07: export-ness is a property of a binding in the module Scope, not of the value — the value-plane marker is a stopgap with a known aliasing wart (`y = x` silently exports y) and dissolves once C2.1 gives bindings a visibility attribute" },
+  { name: "arity", storages: ["mv-component"], owner: "Function", disposition: "delete", target: "n/a — was write-only dead metadata; the write in wrapAsUntypedFunction was removed 2026-07", notes: "D39 addendum, maintainer-ratified 2026-07: never read anywhere in the repo; arity is derivable from Function[ParamTypes, ReturnType] where needed. Entry retained as the audit record" },
   { name: "warnings", storages: ["mv-component"], owner: "warnings channel", disposition: "channel", target: "warnings", notes: "documented in CLAUDE.md; currently unused in code" },
   { name: "source", storages: ["mv-component"], owner: "source channel", disposition: "channel", target: "source", notes: "documented in CLAUDE.md; currently unused in code" },
 

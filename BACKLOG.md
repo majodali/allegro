@@ -47,8 +47,11 @@ phase).
 - [x] **B-006** · L0 · Slot & channel registry + typed accessors (C1.1).
   Landed 2026-07: `src/slots.ts` (D39 table as code, 56 registrations),
   W3 registry-completeness invariant + corpus walk, accessor smoke tests.
-  Three slots not in D39's table got proposed dispositions flagged for
-  maintainer review: `__effectBound`, `exported`, `arity`
+  Three slots not in D39's table were reviewed with the maintainer and
+  ratified 2026-07 (D39 addendum in structures.md): `__effectBound` →
+  member dissolving at C6.2; `exported` → scope-binding visibility (S3,
+  Phase 2); `arity` → deleted (write-only, removed from
+  wrapAsUntypedFunction)
 - [ ] **B-007** · L0 · Accessor migration, core files (C1.2)
 - [ ] **B-008** · L0 · Accessor migration, rest + lint hard-fail (C1.3)
 - [ ] **B-009** · L0 · Channel writers — origination capabilities +
