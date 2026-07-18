@@ -8,6 +8,35 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C1.5b: `*_attach` collapse — body-form metadata off the AST (B-010 part 2; Phase 1 complete)
+
+The five metadata wrappers (`partial_attach`, `decreases_attach`,
+`effects_attach`, `param_effects_attach`, `proven_attach`) are now a
+parse-time encoding only. A new `collapseBodyMetadata` pass in
+`evalSource` — after symbol resolution (so metric/predicate ASTs carry
+resolved Params), before tail-call marking (which now sees real bodies) —
+peels the wrapper chain off every reachable function body, descending
+through `type_check` layers, and stashes the metadata as host-internal
+function properties (registered in SLOT_REGISTRY; preserved across
+subst/remapParams clones via `PRESERVED_FN_META_KEYS`).
+
+- Analyzers read properties instead of walking AST shapes: totality
+  (`isFunctionPartial`, the decreases-metric site), proven, effects
+  (`unwrapEffectsAttach` reimplemented over the property, same name),
+  introspection, and `typed_function_impl`'s param-effects stamping.
+- The peeler family is deleted (`findAttachWrapper`,
+  `unwrapPartialAttach`, `unwrapDecreasesAttach`, `unwrapProvenAttach`,
+  `_WRAPPER_NAMES`). The wrapper primitives stay registered as inert
+  passthroughs — defense for any uncollapsed path.
+- Six peeler-shaped unit tests reworked into collapse-equivalents, per
+  the §6 item-3 ruling (test-condition changes pre-discussed).
+- `type_check` and `requires`/`ensures` untouched (runtime checks, per
+  ruling).
+
+With C1.5b, **Phase 1 (accessor layer + channel plane) is complete**:
+registry, accessors, hard-fail lint, capability-gated origination,
+propagation table, and body-form metadata all live behind the boundary.
+
 ## 2026-07 — C1.5a: Propagation table + channel-aware mode (structures Phase 1, B-010 part 1)
 
 First conscious-delta chunk, first half. The three §6 deltas were

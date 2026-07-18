@@ -4449,7 +4449,7 @@ test("Phase D1: unwrapEffectsAttach extracts declared label set", () => {
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("f")!.value!;
   const fnP = primaryOf(fn) as ComposedFunctionValue;
-  const wrap = unwrapEffectsAttach(fnP.body);
+  const wrap = unwrapEffectsAttach(fnP);
   eq(wrap !== null, true, "expected effects_attach wrapper");
   if (wrap) {
     eq(wrap.declared.has("io"), true);
@@ -4638,7 +4638,7 @@ test("Phase D1.2: declared and inferred coexist on function value", () => {
   eq(inferred.has("io"), true);
   // Declared set on the body — io from the effects_attach metadata.
   const fnP = primaryOf(fn) as ComposedFunctionValue;
-  const wrap = unwrapEffectsAttach(fnP.body);
+  const wrap = unwrapEffectsAttach(fnP);
   eq(wrap !== null, true);
   if (wrap) eq(wrap.declared.has("io"), true);
 });
@@ -5865,7 +5865,7 @@ test("Phase D1.3: pure function NOT calling stdlib HOF emits no opaque notificat
 // --- Phase E Stage 0: totality substrate (`partial` opt-out) ---
 
 import {
-  isFunctionPartial, unwrapPartialAttach,
+  isFunctionPartial, collapseBodyMetadata,
   NOTIF_TOTALITY_EXHAUSTIVENESS, NOTIF_TOTALITY_NONTERMINATION,
   NOTIF_TOTALITY_NEEDS_ANNOTATION,
 } from "./totality.js";
@@ -5876,37 +5876,42 @@ test("Phase E Stage 0: notification kind constants exist", () => {
   eq(NOTIF_TOTALITY_NEEDS_ANNOTATION, "totality-needs-annotation");
 });
 
-test("Phase E Stage 0: unwrapPartialAttach detects the wrapper directly", () => {
-  // Hand-build `partial_attach(42)` and verify the helper peels it.
+test("C1.5b: collapseBodyMetadata stashes `partial` and unwraps the body", () => {
+  // Hand-build a function whose body is `partial_attach(42)` and verify the
+  // collapse pass stashes __partial and leaves the bare body.
   const inner = makeInt(42);
   const wrapped = makeExpr(makePrimitive("partial_attach", () => inner, true), [inner]);
-  const recovered = unwrapPartialAttach(wrapped);
-  eq(recovered !== null, true);
-  eq(recovered === inner, true);
+  const cfn = makeComposedFn([], wrapped);
+  collapseBodyMetadata(cfn);
+  eq(isFunctionPartial(cfn), true);
+  eq(cfn.body === inner, true);
 });
 
-test("Phase E Stage 0: unwrapPartialAttach peels one type_check layer", () => {
-  // Typed-return functions wrap as type_check(partial_attach(body), returnType).
+test("C1.5b: collapse descends through a type_check layer", () => {
   const inner = makeInt(7);
   const wrapped = makeExpr(makePrimitive("partial_attach", () => inner, true), [inner]);
-  const typed   = makeExpr(makePrimitive("type_check", () => wrapped, true),
-                           [wrapped, makeInt(0)]);
-  const recovered = unwrapPartialAttach(typed);
-  eq(recovered !== null, true);
-  eq(recovered === inner, true);
+  const typed = makeExpr(makePrimitive("type_check", () => wrapped, true), [wrapped, makeInt(0)]);
+  const cfn = makeComposedFn([], typed);
+  collapseBodyMetadata(cfn);
+  eq(isFunctionPartial(cfn), true);
+  // the type_check layer remains; the attach beneath it is gone
+  eq((cfn.body as any).args[0] === inner, true);
 });
 
-test("Phase E Stage 0: unwrapPartialAttach returns null for unwrapped bodies", () => {
-  const plain = makeExpr(makePrimitive("bits_add", () => makeInt(0), false), [makeInt(1), makeInt(2)]);
-  eq(unwrapPartialAttach(plain), null);
+test("C1.5b: collapse leaves unwrapped bodies untouched", () => {
+  const plain = makeInt(5);
+  const cfn = makeComposedFn([], plain);
+  collapseBodyMetadata(cfn);
+  eq(isFunctionPartial(cfn), false);
+  eq(cfn.body === plain, true);
 });
-
-test("Phase E Stage 0: isFunctionPartial detects opt-out via wrapped body", () => {
-  // Construct: a ComposedFunction whose body is `partial_attach(42)`.
-  // Skips the grammar load path; verifies the runtime detection.
+test("Phase E Stage 0 (C1.5b form): isFunctionPartial reads the collapsed property", () => {
+  // Construct: a ComposedFunction whose body is `partial_attach(42)`; the
+  // collapse pass (run by evalSource in real pipelines) stashes __partial.
   const body = makeInt(42);
   const wrapped = makeExpr(makePrimitive("partial_attach", () => body, true), [body]);
   const fn = makeComposedFn([], wrapped);
+  collapseBodyMetadata(fn);
   eq(isFunctionPartial(fn), true);
 });
 
@@ -6120,32 +6125,32 @@ fileTest(path.join(testsDir, "totality-termination-demo.alg"));
 // (`decreases_attach(body, metric)`) to avoid pre-scanning a `use totality`
 // header. The runtime semantics + analyzer hooks are what we're exercising.
 
-import {
-  unwrapDecreasesAttach,
-} from "./totality.js";
 
-test("Phase E Stage 3: unwrapDecreasesAttach detects the wrapper", () => {
+test("C1.5b: collapse stashes the `decreases` metric", () => {
   const body = makeInt(42);
   const metric = makeInt(7);
   const wrapped = makeExpr(
     makePrimitive("decreases_attach", () => body, true),
     [body, metric],
   );
-  const r = unwrapDecreasesAttach(wrapped);
-  eq(r !== null, true);
-  if (r) eq(r.metric === metric, true);
+  const cfn = makeComposedFn([], wrapped);
+  collapseBodyMetadata(cfn);
+  eq((cfn as any).__decreasesMetric === metric, true);
+  eq(cfn.body === body, true);
 });
 
-test("Phase E Stage 3: unwrapDecreasesAttach peels through other wrappers", () => {
+test("C1.5b: collapse peels a stacked wrapper chain under type_check", () => {
   // decreases_attach nested under type_check + partial_attach.
   const body = makeInt(1);
   const metric = makeInt(0);
   const decW = makeExpr(makePrimitive("decreases_attach", () => body, true), [body, metric]);
   const partW = makeExpr(makePrimitive("partial_attach", () => decW, true), [decW]);
   const typed = makeExpr(makePrimitive("type_check", () => partW, true), [partW, makeInt(0)]);
-  const r = unwrapDecreasesAttach(typed);
-  eq(r !== null, true);
-  if (r) eq(r.metric === metric, true);
+  const cfn = makeComposedFn([], typed);
+  collapseBodyMetadata(cfn);
+  eq((cfn as any).__partial === true, true);
+  eq((cfn as any).__decreasesMetric === metric, true);
+  eq((cfn.body as any).args[0] === body, true);
 });
 
 test("Phase E Stage 3: `decreases n` trusts unbounded Int (no Stage 2 notification)", () => {

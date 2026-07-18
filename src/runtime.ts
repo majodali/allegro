@@ -15,7 +15,7 @@ import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
-import { checkExhaustiveness, checkTermination } from "./totality.js";
+import { collapseBodyMetadata, checkExhaustiveness, checkTermination } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
@@ -440,6 +440,13 @@ function resolveNamedParamsInner(
  * Walk all bindings and mark tail-position calls in ComposedFunction bodies.
  */
 function markTailCallsInContext(fileCtx: any): void {
+  // C1.5b: collapse body-form metadata wrappers onto function properties
+  // BEFORE tail-call marking, so tail positions are computed on the real
+  // body (previously the passthrough wrappers had to forward TailCalls).
+  const collapseSeen = new Set<any>();
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) collapseBodyMetadata(b.value, collapseSeen);
+  }
   const seen = new Set<any>();
   for (const b of fileCtx.bindingList) {
     if (b.value !== undefined) {

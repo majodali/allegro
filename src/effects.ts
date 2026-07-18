@@ -82,21 +82,14 @@ export function formatEffects(e: EffectSet): string {
  *  `type_check` so the declaration check fires on typed functions just like
  *  untyped ones — needed for Stage C3 polymorphic functions whose return
  *  type annotations always trigger the type_check wrap. */
-export function unwrapEffectsAttach(v: Value): { body: Value; declared: EffectSet } | null {
-  if (v.kind !== ValueKind.Expression) return null;
-  let target = v;
-  let fn = dataOf(target.fn);
-  if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "type_check"
-      && target.args.length >= 1
-      && target.args[0].kind === ValueKind.Expression) {
-    target = target.args[0] as any;
-    fn = dataOf(target.fn);
-  }
-  if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "effects_attach") return null;
-  if (target.args.length !== 2) return null;
-  const declared = extractLabelArray(target.args[1]);
-  return { body: target.args[0], declared };
+export function unwrapEffectsAttach(fn: import("./types.js").ComposedFunctionValue): { declared: EffectSet } | null {
+  // C1.5b: the declared-effects clause is stashed on the function by
+  // collapseBodyMetadata (totality.ts) — no AST peeling.
+  const ast = (fn as any).__declaredEffectsAst as Value | undefined;
+  if (ast === undefined) return null;
+  return { declared: extractLabelArray(ast) };
 }
+
 
 /** Extract a set of label strings from a `typed_array(Symbol(L1), Symbol(L2), …)`
  *  Expression. Used to pull declared labels out of an effects_attach call's
@@ -192,7 +185,7 @@ export function checkEffectsDeclarations(
     if (!b.key || !b.value) continue;
     const fn = asFunction(b.value);
     if (!fn) continue;
-    const wrap = unwrapEffectsAttach(fn.body);
+    const wrap = unwrapEffectsAttach(fn);
     if (!wrap) continue;
     // Inferred set comes from `precompileFunction`'s stash on the
     // ComposedFunction. `precompileFunctions` precompiles every function

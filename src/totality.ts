@@ -39,57 +39,79 @@ export const NOTIF_TOTALITY_NEEDS_ANNOTATION = "totality-needs-annotation";
 // generic `findAttachWrapper` walks the head expression peeling unrelated
 // decorators until it finds the named target.
 
-const _WRAPPER_NAMES = new Set([
-  "type_check", "partial_attach", "decreases_attach",
-  "effects_attach", "param_effects_attach", "proven_attach",
+// --- C1.5b: body-form metadata collapse -------------------------------------
+//
+// The five metadata wrappers (partial/decreases/effects/param_effects/
+// proven `*_attach`) are a PARSE-TIME encoding only. `collapseBodyMetadata`
+// runs once per evalSource pass (after symbol resolution, before tail-call
+// marking): it peels the wrapper chain off every ComposedFunction body —
+// descending through `type_check` layers — and stashes the metadata as
+// host-internal properties on the function (registered in SLOT_REGISTRY):
+//   __partial, __decreasesMetric, __declaredEffectsAst,
+//   __paramEffectPairs, __provenClauses
+// Analyzers read the properties; the wrapper primitives remain registered
+// as inert passthroughs for any uncollapsed path (defense in depth).
+// `subst`/`remapParams` preserve the properties across clones.
+
+const ATTACH_NAMES = new Set([
+  "partial_attach", "decreases_attach", "effects_attach",
+  "param_effects_attach", "proven_attach",
 ]);
 
-export function findAttachWrapper(body: Value, wantName: string): ExpressionValue | null {
-  let cur = body;
-  for (let i = 0; i < 16; i++) {
-    if (cur.kind !== ValueKind.Expression) return null;
-    const fn = dataOf((cur as ExpressionValue).fn);
-    if (fn.kind !== ValueKind.PrimitiveFunction) return null;
+function collapseOneFunction(cfn: ComposedFunctionValue): void {
+  let getCur: () => Value = () => cfn.body;
+  let setCur: (v: Value) => void = (v) => { (cfn as any).body = v; };
+  for (let guard = 0; guard < 24; guard++) {
+    const cur = getCur();
+    if (cur.kind !== ValueKind.Expression) return;
+    const e = cur as ExpressionValue;
+    const fn = dataOf(e.fn);
+    if (fn.kind !== ValueKind.PrimitiveFunction) return;
     const name = (fn as any).name as string;
-    if (name === wantName) return cur as ExpressionValue;
-    if (!_WRAPPER_NAMES.has(name)) return null;
-    if ((cur as ExpressionValue).args.length < 1) return null;
-    cur = (cur as ExpressionValue).args[0];
+    if (name === "type_check") {
+      if (e.args.length < 1 || e.args[0].kind !== ValueKind.Expression) return;
+      getCur = () => e.args[0];
+      setCur = (v) => { e.args[0] = v; };
+      continue;
+    }
+    if (!ATTACH_NAMES.has(name)) return;
+    switch (name) {
+      case "partial_attach":       (cfn as any).__partial = true; break;
+      case "decreases_attach":     (cfn as any).__decreasesMetric = e.args[1]; break;
+      case "effects_attach":       (cfn as any).__declaredEffectsAst = e.args[1]; break;
+      case "param_effects_attach": (cfn as any).__paramEffectPairs = e.args.slice(1); break;
+      case "proven_attach":        (cfn as any).__provenClauses = e.args.slice(1); break;
+    }
+    setCur(e.args[0]);
   }
-  return null;
 }
 
-/** Recognise `partial_attach(body)` anywhere in the head wrapper stack.
- *  Returns the inner body when found, null otherwise. */
-export function unwrapPartialAttach(body: Value): Value | null {
-  const w = findAttachWrapper(body, "partial_attach");
-  if (!w) return null;
-  return w.args[0];
+/** Recursively collapse body-form metadata on every ComposedFunction
+ *  reachable from a binding value (top-level functions, typed_function
+ *  envelopes, nested lambdas). Idempotent. */
+export function collapseBodyMetadata(v: Value | undefined, seen: Set<Value> = new Set()): void {
+  if (!v || typeof v !== "object" || seen.has(v)) return;
+  seen.add(v);
+  if (v.kind === ValueKind.ComposedFunction) {
+    collapseOneFunction(v as ComposedFunctionValue);
+    collapseBodyMetadata((v as ComposedFunctionValue).body, seen);
+    return;
+  }
+  if (v.kind === ValueKind.Expression) {
+    const e = v as ExpressionValue;
+    collapseBodyMetadata(e.fn, seen);
+    for (const a of e.args) collapseBodyMetadata(a, seen);
+    return;
+  }
+  if (v.kind === ValueKind.MultiValue) {
+    collapseBodyMetadata((v as any).primary, seen);
+  }
 }
 
-/** Is the function's body wrapped with `partial_attach`? Analyzers consult
- *  this to skip the totality check on opted-out functions. */
 export function isFunctionPartial(fn: ComposedFunctionValue): boolean {
-  return unwrapPartialAttach(fn.body) !== null;
+  return (fn as any).__partial === true;
 }
 
-/** Recognise `decreases_attach(body, metric)` in the head wrapper stack.
- *  Returns `{ body, metric }` when found, null otherwise. Stage 3+. */
-export function unwrapDecreasesAttach(body: Value): { body: Value; metric: Value } | null {
-  const w = findAttachWrapper(body, "decreases_attach");
-  if (!w) return null;
-  if (w.args.length < 2) return null;
-  return { body: w.args[0], metric: w.args[1] };
-}
-
-/** Recognise `proven_attach(body, pred1, …, predN)` in the head wrapper
- *  stack. Returns `{ body, predicates }` when found, null otherwise. F7. */
-export function unwrapProvenAttach(body: Value): { body: Value; predicates: Value[] } | null {
-  const w = findAttachWrapper(body, "proven_attach");
-  if (!w) return null;
-  if (w.args.length < 1) return null;
-  return { body: w.args[0], predicates: w.args.slice(1) };
-}
 
 // =============================================================================
 // Stage 1 — Exhaustiveness check for `when/is/then`
@@ -486,18 +508,18 @@ export function checkTermination(
     // against the caller's param-type info. Stage 5 HOF edges are accepted
     // without metric verification (the `decreases` clause is the contract;
     // we trust it).
-    const decAttach = unwrapDecreasesAttach(cfn.body);
-    if (decAttach) {
+    const decMetric = (cfn as any).__decreasesMetric as Value | undefined;
+    if (decMetric) {
       const directCalls = cycleCalls
         .filter((s): s is CallSite & { kind: "direct" } => s.kind === "direct")
         .map(s => s.call);
-      const reasons = checkUserMetric(decAttach.metric, directCalls, peeled.paramTypeAsts, typeLookup);
+      const reasons = checkUserMetric(decMetric, directCalls, peeled.paramTypeAsts, typeLookup);
       if (reasons.length > 0) {
         const unique = [...new Set(reasons)];
         findings.push({
           binding: b.key,
           message: `\`decreases\` metric does not provably decrease: ${unique.join("; ")}`,
-          counterexample: renderMetricCounterexample(b.key, decAttach.metric, cycleCalls),
+          counterexample: renderMetricCounterexample(b.key, decMetric, cycleCalls),
         });
       }
       continue;

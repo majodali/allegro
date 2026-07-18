@@ -108,6 +108,24 @@
 >   (drop-rule: executor exclusion + registration gate + combination
 >   test) — 5 of 6 scenarios now live. C1.5b (five-wrapper *_attach
 >   collapse) follows as its own landable unit.
+> - C1.5b (B-010 part 2) landed 2026-07 — the *_attach collapse. New
+>   `collapseBodyMetadata` pass in evalSource (post-resolveSymbols,
+>   pre-markTailCalls — tail marking now sees real bodies): peels the
+>   five-wrapper chain off every reachable ComposedFunction body
+>   (descending through type_check layers), stashing metadata as
+>   host-internal properties (__partial, __decreasesMetric,
+>   __declaredEffectsAst, __paramEffectPairs, __provenClauses; registered
+>   in SLOT_REGISTRY; clone-preserved via PRESERVED_FN_META_KEYS in
+>   subst/remapParams). Analyzers migrated to property reads: totality
+>   (isFunctionPartial, decreases site), proven (checkProvenClauses),
+>   effects (unwrapEffectsAttach reimplemented over the property),
+>   introspect, typed_function_impl (param_effects stamping). Peeler
+>   family deleted (findAttachWrapper, unwrapPartialAttach,
+>   unwrapDecreasesAttach, unwrapProvenAttach, _WRAPPER_NAMES). Wrapper
+>   primitives retained as inert runtime passthroughs (defense for
+>   uncollapsed paths). Six peeler-shaped tests reworked into
+>   collapse-equivalents per the §6 item-3 ruling. B-010 complete;
+>   Phase 1 complete.
 
 ## 1. Context
 

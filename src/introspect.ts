@@ -247,7 +247,7 @@ export function summarizeValue(v: Value): ValueSummary {
   const fnPrim = dataOf(v);
   if (fnPrim.kind === ValueKind.ComposedFunction) {
     inferredEffects = effectsOf(v);
-    const wrap = unwrapEffectsAttach(fnPrim.body);
+    const wrap = unwrapEffectsAttach(fnPrim as import("./types.js").ComposedFunctionValue);
     if (wrap) declaredEffects = wrap.declared;
   }
 

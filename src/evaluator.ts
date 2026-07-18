@@ -12,7 +12,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec } from "./slots.js";
+import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, PRESERVED_FN_META_KEYS } from "./slots.js";
 
 const MAX_DEPTH = 10000;
 
@@ -571,6 +571,9 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
       const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
       if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
       if ((value as any).__effectVarParams) (newFn as any).__effectVarParams = (value as any).__effectVarParams;
+      for (const k of PRESERVED_FN_META_KEYS) {
+        if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
+      }
       return newFn;
     }
     case ValueKind.MultiValue: {
@@ -645,6 +648,9 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       // Slice 2's polymorphism resolution still works after substitution.
       if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
       if ((value as any).__effectVarParams) (newFn as any).__effectVarParams = (value as any).__effectVarParams;
+      for (const k of PRESERVED_FN_META_KEYS) {
+        if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
+      }
       return newFn;
     }
 

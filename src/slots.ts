@@ -118,6 +118,11 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
 
   // --- Host-engine internals (never value slots) --------------------------------------
   { name: "__channelWriterFor", storages: ["js-property"], owner: "channel plane", disposition: "host-internal", target: "n/a — brand on writer PrimitiveFunctions (C1.4); attenuation checks it" },
+  { name: "__partial", storages: ["js-property"], owner: "totality", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse); becomes a function-value channel entry at C4.x" },
+  { name: "__decreasesMetric", storages: ["js-property"], owner: "totality", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
+  { name: "__declaredEffectsAst", storages: ["js-property"], owner: "effects channel", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
+  { name: "__paramEffectPairs", storages: ["js-property"], owner: "Effect", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
+  { name: "__provenClauses", storages: ["js-property"], owner: "Proof", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
   { name: "__compileMode", storages: ["context-binding"], owner: "evaluator", disposition: "host-internal", target: "n/a" },
   { name: "__futureManager", storages: ["js-property"], owner: "futures", disposition: "host-internal", target: "n/a" },
   { name: "__tailCall", storages: ["js-property"], owner: "evaluator", disposition: "host-internal", target: "n/a" },
@@ -558,6 +563,14 @@ export function assertNotIntegrityKey(key: string, site: string): void {
     );
   }
 }
+
+/** Host-internal function-metadata properties preserved across
+ *  ComposedFunction clones (subst/remapParams) — the C1.5b collapsed
+ *  body-form metadata plus the PE effects stash. */
+export const PRESERVED_FN_META_KEYS = [
+  "__partial", "__decreasesMetric", "__declaredEffectsAst",
+  "__paramEffectPairs", "__provenClauses", "__inferredEffects",
+] as const;
 
 /** Brand for Allegro-level channel-writer PrimitiveFunctions (host-internal
  *  js-property; registered in SLOT_REGISTRY). Attenuation checks it. */

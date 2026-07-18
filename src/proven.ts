@@ -27,7 +27,7 @@ import {
   ParamValue, BitsValue,
   bitsToString, makeInt, makeMultiValue,
 } from "./types.js";
-import { unwrapProvenAttach } from "./totality.js";
+
 import { evaluate } from "./evaluator.js";
 import { getType, getTypeName, getFunctionParamTypes, BoolType, IntType } from "./types-std.js";
 
@@ -205,8 +205,8 @@ export function checkProvenClauses(
     }
     if (!cfn) continue;
 
-    const peeled = unwrapProvenAttach(cfn.body);
-    if (!peeled) continue;
+    const provenClauses = (cfn as any).__provenClauses as Value[] | undefined;
+    if (!provenClauses || provenClauses.length === 0) continue;
 
     // F7 minimum: single typed param. Multi-param + untyped emit info.
     if (cfn.params.length !== 1) {
@@ -250,8 +250,8 @@ export function checkProvenClauses(
 
     // For each predicate, sample.
     const param = cfn.params[0];
-    for (let pi = 0; pi < peeled.predicates.length; pi++) {
-      const predAst = peeled.predicates[pi];
+    for (let pi = 0; pi < provenClauses.length; pi++) {
+      const predAst = provenClauses[pi];
       let failed: { sample: Value; reason: string } | null = null;
       for (const sample of samples) {
         const posMap = new Map<number, Value>([[param.position, sample]]);

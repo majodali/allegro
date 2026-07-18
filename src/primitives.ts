@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, CHANNEL_WRITER_BRAND } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, CHANNEL_WRITER_BRAND } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -1783,49 +1783,29 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (effectVarParams.size > 0) {
       (cFn as any).__effectVarParams = effectVarParams;
     }
-    // Stage D — Surface C `param_effects f: pure` body-form. The block
-    // preprocessor wraps the body with `param_effects_attach(body, paramRef1,
-    // effSym1, …)`. Peel the outermost wrapper, evaluate each effect Symbol
-    // in the call ctx (so `pure`/`io`/etc. resolve via extensions), and stamp
-    // the matching Param's predicates from `__effectBound`. By-name match
-    // against `cFn.params[i].name` survives `remapParams` clones since the
-    // names are preserved across substitution.
-    // Peel one layer of `type_check(…, returnType)` (the wrapper `maybeTyped`
-    // adds for typed-return functions) before looking for the param_effects
-    // wrapper. Mirrors the same peel in `unwrapEffectsAttach` for declared
-    // effect sets.
-    let bodyExpr: Value = cFn.body;
-    if (bodyExpr.kind === ValueKind.Expression) {
-      const tcTarget = dataOf((bodyExpr as any).fn);
-      if (tcTarget.kind === ValueKind.PrimitiveFunction
-          && (tcTarget as any).name === "type_check"
-          && (bodyExpr as any).args.length >= 1
-          && (bodyExpr as any).args[0].kind === ValueKind.Expression) {
-        bodyExpr = (bodyExpr as any).args[0];
-      }
-    }
-    if (bodyExpr.kind === ValueKind.Expression) {
-      const target = dataOf((bodyExpr as any).fn);
-      if (target.kind === ValueKind.PrimitiveFunction
-          && (target as any).name === "param_effects_attach") {
-        const wrapArgs = (bodyExpr as any).args as Value[];
-        for (let i = 1; i + 1 < wrapArgs.length; i += 2) {
-          const paramRef = dataOf(wrapArgs[i]);
-          if (paramRef.kind !== ValueKind.Param) continue;
-          const paramName = (paramRef as any)._name as string | undefined;
-          if (!paramName) continue;
-          const idx = (cFn.params as any[]).findIndex(p => p._name === paramName);
-          if (idx < 0) continue;
-          const effVal = evalFn!(wrapArgs[i + 1], ctx!);
-          const effPrim = dataOf(effVal);
-          if (effPrim.kind !== ValueKind.Context) continue;
-          const bound = (effPrim as any).__effectBound as _AbstractDomain | undefined;
-          if (bound && bound.kind === "effects") {
-            (cFn.params[idx] as any).effectBound = new Set(bound.labels);
-          }
-          // `__effectBound` absent = opaque (universal). Leave predicates
-          // unset, matching Surface A's behaviour.
+    // Stage D — Surface C `param_effects f: pure` body-form. C1.5b: the
+    // (paramRef, effSym) pairs are stashed on the function by
+    // collapseBodyMetadata — no AST peeling. Evaluate each effect Symbol in
+    // the call ctx (so `pure`/`io`/etc. resolve via extensions) and stamp
+    // the matching Param's effectBound. By-name match against
+    // `cFn.params[i].name` survives `remapParams` clones.
+    const pePairs = (cFn as any).__paramEffectPairs as Value[] | undefined;
+    if (pePairs) {
+      for (let i = 0; i + 1 < pePairs.length; i += 2) {
+        const paramRef = dataOf(pePairs[i]);
+        if (paramRef.kind !== ValueKind.Param) continue;
+        const paramName = (paramRef as any)._name as string | undefined;
+        if (!paramName) continue;
+        const idx = (cFn.params as any[]).findIndex(p => p._name === paramName);
+        if (idx < 0) continue;
+        const effVal = evalFn!(pePairs[i + 1], ctx!);
+        const effPrim = dataOf(effVal);
+        if (effPrim.kind !== ValueKind.Context) continue;
+        const bound = getEffectBound(effPrim as ContextValue) as _AbstractDomain | undefined;
+        if (bound && bound.kind === "effects") {
+          (cFn.params[idx] as any).effectBound = new Set(bound.labels);
         }
+        // bound absent = opaque (universal) — leave unset, matching Surface A.
       }
     }
   }

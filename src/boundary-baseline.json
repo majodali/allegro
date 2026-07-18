@@ -7,7 +7,7 @@
   "lint": {
     "src/slots.ts": {
       "components-direct": 5,
-      "dunder-string-literal": 149,
+      "dunder-string-literal": 160,
       "bindings-get-dunder": 1,
       "kernel-writer-acquisition": 1
     }
@@ -26,9 +26,9 @@
     "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 1437,
-      "recursion-tco": 1025,
-      "collections": 761
+      "basics": 1386,
+      "recursion-tco": 951,
+      "collections": 702
     }
   }
 }
