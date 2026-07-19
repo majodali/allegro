@@ -727,8 +727,8 @@ async function runModuleTests(): Promise<void> {
 function makeCtxWith(bindings: Record<string, Value>): Value {
   const ctx = makeContext();
   for (const [name, value] of Object.entries(bindings)) {
-    ctx.bindings.set(name, { key: name, value, isUse: false });
-    ctx.bindingList.push({ key: name, value, isUse: false });
+    ctx.bindings.set(name, { key: name, value });
+    ctx.bindingList.push({ key: name, value });
   }
   return ctx;
 }
@@ -943,14 +943,14 @@ function buildJsonGrammar(): Grammar {
     for (const child of elementsNode.children) {
       if (child.val !== undefined) {
         const key = String(index);
-        result.bindings.set(key, { key, value: child.val as Value, isUse: false });
-        result.bindingList.push({ key, value: child.val as Value, isUse: false });
+        result.bindings.set(key, { key, value: child.val as Value });
+        result.bindingList.push({ key, value: child.val as Value });
         index++;
       }
     }
     const lenKey = "length";
-    result.bindings.set(lenKey, { key: lenKey, value: makeInt(index), isUse: false });
-    result.bindingList.push({ key: lenKey, value: makeInt(index), isUse: false });
+    result.bindings.set(lenKey, { key: lenKey, value: makeInt(index) });
+    result.bindingList.push({ key: lenKey, value: makeInt(index) });
     return result;
   });
 
@@ -975,8 +975,8 @@ function buildJsonGrammar(): Grammar {
     for (const child of entriesNode.children) {
       if (child.key !== undefined && child.val !== undefined) {
         const key = child.key as string;
-        result.bindings.set(key, { key, value: child.val as Value, isUse: false });
-        result.bindingList.push({ key, value: child.val as Value, isUse: false });
+        result.bindings.set(key, { key, value: child.val as Value });
+        result.bindingList.push({ key, value: child.val as Value });
       }
     }
     return result;
@@ -2645,30 +2645,30 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
     ["value", describeFn],
   ] as const;
   for (const [k, v] of descBindings) {
-    desc.bindings.set(k, { key: k, value: v as Value, isUse: false });
-    desc.bindingList.push({ key: k, value: v as Value, isUse: false });
+    desc.bindings.set(k, { key: k, value: v as Value });
+    desc.bindingList.push({ key: k, value: v as Value });
   }
-  metaMembers.bindings.set("describe", { key: "describe", value: desc, isUse: false });
-  metaMembers.bindingList.push({ key: "describe", value: desc, isUse: false });
-  metaType.bindings.set("__members", { key: "__members", value: metaMembers, isUse: false });
-  metaType.bindingList.push({ key: "__members", value: metaMembers, isUse: false });
-  metaType.bindings.set("__name", { key: "__name", value: stringToBits("MetaType"), isUse: false });
-  metaType.bindingList.push({ key: "__name", value: stringToBits("MetaType"), isUse: false });
+  metaMembers.bindings.set("describe", { key: "describe", value: desc });
+  metaMembers.bindingList.push({ key: "describe", value: desc });
+  metaType.bindings.set("__members", { key: "__members", value: metaMembers });
+  metaType.bindingList.push({ key: "__members", value: metaMembers });
+  metaType.bindings.set("__name", { key: "__name", value: stringToBits("MetaType") });
+  metaType.bindingList.push({ key: "__name", value: stringToBits("MetaType") });
 
   // Raw Context with __type = metaType.
   const target = makeContext();
-  target.bindings.set("__type", { key: "__type", value: metaType, isUse: false });
-  target.bindingList.push({ key: "__type", value: metaType, isUse: false });
-  target.bindings.set("__name", { key: "__name", value: stringToBits("Instance"), isUse: false });
-  target.bindingList.push({ key: "__name", value: stringToBits("Instance"), isUse: false });
+  target.bindings.set("__type", { key: "__type", value: metaType });
+  target.bindingList.push({ key: "__type", value: metaType });
+  target.bindings.set("__name", { key: "__name", value: stringToBits("Instance") });
+  target.bindingList.push({ key: "__name", value: stringToBits("Instance") });
 
   // Call type_dispatch(target, "describe") via the primitive.
   const typeDispatch = primRegistry["type_dispatch"] as any;
   // Lazy primitive — pass raw args (unevaluated) and an evalFn + ctx.
   const ctx = makeContext();
   // Seed ctx with the target under a name, and invoke the bound method.
-  ctx.bindings.set("x", { key: "x", value: target, isUse: false });
-  ctx.bindingList.push({ key: "x", value: target, isUse: false });
+  ctx.bindings.set("x", { key: "x", value: target });
+  ctx.bindingList.push({ key: "x", value: target });
   const boundMethod = typeDispatch.fn(
     [target, stringToBits("describe")],
     ctx,
@@ -3538,15 +3538,18 @@ test("reactive: applyPhase triggers dependent re-evaluation", () => {
   // Use ctx_use to declare 'config' as needed but undefined
   const { registry, evalCtx } = runtimeEval("x = 42\n", undefined, [typeExt], undefined, true);
 
-  // Manually add an incomplete binding to simulate a dependency
+  // Manually add an incomplete binding to simulate a dependency.
+  // C2.3b: ONE cell object, shared by the eval scope and the registry —
+  // the binding IS the future cell.
   const configSymbol = { kind: "Symbol" as const, name: "config" };
-  evalCtx.bindings.set("result", { key: "result", value: configSymbol as any, isUse: false });
-  registry.bindings.set("result", {
+  const cell = {
     key: "result",
-    currentValue: configSymbol as any,
+    value: configSymbol as any,
     incompleteDeps: new Set(["config"]),
     isComplete: false,
-  });
+  };
+  evalCtx.bindings.set("result", cell);
+  registry.bindings.set("result", cell);
   // Register dependency
   let deps = registry.dependents.get("config");
   if (!deps) { deps = new Set(); registry.dependents.set("config", deps); }
@@ -3558,14 +3561,14 @@ test("reactive: applyPhase triggers dependent re-evaluation", () => {
   // result should now be re-evaluated
   const rb = registry.bindings.get("result");
   eq(rb?.isComplete, true, "result should be complete after config provided");
-  eq(Number((primaryOf(rb!.currentValue) as BitsValue).data), 99, "result should be 99");
+  eq(Number((primaryOf(rb!.value!) as BitsValue).data), 99, "result should be 99");
 });
 
 test("reactive: depCollector records incomplete symbols during evaluation", () => {
   // Evaluate an expression that references an undefined symbol
   const ctx = makeContext();
-  ctx.bindings.set("a", { key: "a", value: makeInt(5), isUse: false });
-  ctx.bindingList.push({ key: "a", value: makeInt(5), isUse: false });
+  ctx.bindings.set("a", { key: "a", value: makeInt(5) });
+  ctx.bindingList.push({ key: "a", value: makeInt(5) });
   // 'b' is NOT defined
 
   const collector = { incompleteRefs: new Set<string>() };

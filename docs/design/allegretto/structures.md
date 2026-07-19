@@ -110,7 +110,15 @@ error propagation; D28), `warnings`, `source` (public), `effects`
 forgery), `discharged` (kernel-private). Channel-removal/erasure rules
 (e.g. error handling consumes the error channel) are S6 items.
 
-## 4. Scope [designed]
+## 4. Scope [partial]
+
+*Status (2026-07, C2.1–C2.3): implemented host-side over the current
+ContextValue representation — parent-chain layering + chain lookup (C2.1),
+facts plane (C2.2), resolution unification with future cells + root
+eval-context layering + `ctx_use`/`isUse` retirement + `ctx_resolve`
+residualising semantics (C2.3a/b). Still pending: Allegro-surface
+`scope_*` primitives and the Scope/Structure representation split (Phase
+4); the flat-Context compile ctxs used by analyzers migrate then.*
 
 Scope is the evaluation-environment role split out of Context (D25):
 name→value bindings, **lexical parent-chain layering** (today's

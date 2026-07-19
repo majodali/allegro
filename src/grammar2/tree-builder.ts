@@ -2230,7 +2230,7 @@ export function buildProgram(tree: ParseTree): any {
   const ctx = makeContext();
 
   function addStmt(stmt: BuiltBinding): void {
-    const b = { key: stmt.key, value: stmt.value, isUse: false };
+    const b = { key: stmt.key, value: stmt.value };
     (ctx as any).bindingList.push(b);
     if (stmt.key !== null) (ctx as any).bindings.set(stmt.key, b);
   }

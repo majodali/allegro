@@ -148,7 +148,34 @@
 >   tests: sibling isolation, parent-untouched, nested chain merge,
 >   own-layer isolation. §6 delta 4 honored: observable behavior
 >   identical, internals-shaped tests only.
-> - C2.3 (B-013) IN PROGRESS 2026-07 — working spec from recon:
+> - C2.3b (B-013 part 2) landed 2026-07 — future cells + root layering;
+>   **Phase 2 complete**. Unification: `Binding` gains the cell fields
+>   (`incompleteDeps`, `isComplete`; `value: undefined` = pending) and the
+>   `DependencyRegistry` tracks the SAME objects the eval scope's source
+>   layer holds — `ReactiveBinding`/`currentValue` deleted, dual writes
+>   collapsed to `resolveCell` in-place resolution (also fixes applyPhase's
+>   stale-bindingList wart). `buildEvalCtx` builds the real chain
+>   (primitives ← extensions ← base ← source; source layer returned; base
+>   flattened per pass into fresh copies so passes stay mutation-isolated,
+>   unresolved REPL bindings carried forward as pending cells).
+>   Unprovided imports install pending cells (absent-vs-unresolved now
+>   structurally distinguishable); `ctx_resolve` unified on residualising
+>   semantics per §4/D11 (absent → error value, pending → residual Symbol
+>   — the throw path retired; the one observable delta, mandated by the §4
+>   chunk description). Flat-view consumers: resolveSymbols + buildEvalCtx
+>   use new `scopeAllBindings`; proven.ts type lookup + the three
+>   `__futureManager` reads became chain-aware (`scopeHostRead` +
+>   slots.ts `HOST_KEYS`; fixes a latent miss under unification-enriched
+>   child ctxs); module extraction / introspect / PCP verdict walks now
+>   read the source layer correct-by-construction; markTailCallsInContext
+>   needed no migration (consumes the parser's file ctx, not the eval
+>   scope). `Binding.isUse` deleted with all ~60 literal sites. 6 new
+>   boundary tests (own-layer/chain-reach, ctx↔registry identity,
+>   pending-vs-absent incl. ctx_resolve, in-place applyPhase +
+>   forward-chain, ext-satisfied import, REPL isolation); 3 existing
+>   tests adjusted internals-shaped only (chain-aware lookups; unified
+>   cell construction — assertions unchanged). 1002/1002 green.
+> - C2.3 (B-013) opened 2026-07 — working spec from recon:
 >   Surface is smaller than feared: `isUse: true` originates at ONE site
 >   (primitives.ts:376, the `ctx_use` primitive at :367); everything else
 >   stamps `isUse: false`. Sub-steps: (1) map ctx_use's consumers (who

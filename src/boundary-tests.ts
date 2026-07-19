@@ -34,7 +34,11 @@ import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./typ
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel } from "./slots.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
-import { scopeNew, scopeExtend, scopeLookup, assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts } from "./scope.js";
+import { scopeNew, scopeExtend, scopeLookup, assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeAllBindings, makeCell, isPendingCell } from "./scope.js";
+import { applyPhase } from "./runtime.js";
+import { createFutureManager } from "./futures.js";
+import { primitives } from "./primitives.js";
+import { stringToBits } from "./types.js";
 import { PredicateSet, makePredicate, effectsDomain } from "./refinements.js";
 import { makeInt } from "./types.js";
 import { effectsOf } from "./effects.js";
@@ -550,7 +554,8 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       undefined, [createTypeSystem()], undefined, true
     );
     // Type binding: MultiValue(IntType, {type: Type}) — asContext peels it.
-    const intCtx = asContext(evalCtx.bindings.get("Int")?.value as Value);
+    // C2.3b: Int lives on the extensions layer of the root scope chain.
+    const intCtx = asContext(scopeLookup(evalCtx, "Int")?.value as Value);
     eq(intCtx !== null, true, "Int peels to a Context");
     const namePrimary = primaryOf(getName(intCtx!) as Value) as BitsValue;
     eq(bitsToString(namePrimary), "Int", "getName reads __name");
@@ -687,19 +692,19 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // holds exactly its own entries — no flatten-copy.
     const parent = scopeNew();
     for (let i = 0; i < 10000; i++) {
-      parent.bindings.set(`b${i}`, { key: `b${i}`, value: makeInt(i), isUse: false });
+      parent.bindings.set(`b${i}`, { key: `b${i}`, value: makeInt(i) });
     }
-    const child = scopeExtend(parent, [["x", { key: "x", value: makeInt(42), isUse: false }]]);
+    const child = scopeExtend(parent, [["x", { key: "x", value: makeInt(42) }]]);
     eq(child.bindings.size, 1, "child owns only its layer");
     eq((primaryOf(scopeLookup(child, "b9999")!.value!) as any).data, 9999n, "chain lookup reaches parent");
     eq((primaryOf(scopeLookup(child, "x")!.value!) as any).data, 42n, "own layer found");
     // Shadowing: nearest layer wins.
-    const shadow = scopeExtend(child, [["b0", { key: "b0", value: makeInt(777), isUse: false }]]);
+    const shadow = scopeExtend(child, [["b0", { key: "b0", value: makeInt(777) }]]);
     eq((primaryOf(scopeLookup(shadow, "b0")!.value!) as any).data, 777n, "child shadows parent");
     eq((primaryOf(scopeLookup(parent, "b0")!.value!) as any).data, 0n, "parent unchanged");
     // Deep chains stay correct.
     let deep = scopeNew();
-    deep.bindings.set("root", { key: "root", value: makeInt(1), isUse: false });
+    deep.bindings.set("root", { key: "root", value: makeInt(1) });
     for (let i = 0; i < 2000; i++) deep = scopeExtend(deep, []);
     eq((primaryOf(scopeLookup(deep, "root")!.value!) as any).data, 1n, "2000-layer chain lookup");
   });
@@ -711,7 +716,8 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // give it its shape slot form: typed objects carry shape via the MV
     // component; scope rejection keys on binding-plane shape — verify via a
     // type Context (which carries __type):
-    const intCtx = asContext(evalCtx.bindings.get("Int")!.value as Value)!;
+    // C2.3b: Int lives on the extensions layer of the root scope chain.
+    const intCtx = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
     let threw = "";
     try { scopeExtend(intCtx, []); } catch (e: any) { threw = String(e.message); }
     eq(threw.includes("cannot extend a data structure"), true, `scope-over-data: ${threw}`);
@@ -726,7 +732,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
 
   test("facts plane (C2.2): immutable layering, branch isolation, chain merge", () => {
     const parent = scopeNew();
-    parent.bindings.set("x", { key: "x", value: makeInt(1), isUse: false });
+    parent.bindings.set("x", { key: "x", value: makeInt(1) });
     const factA = new PredicateSet([makePredicate(effectsDomain(new Set(["a"])))]);
     const factB = new PredicateSet([makePredicate(effectsDomain(new Set(["b"])))]);
     const branchA = scopeAssume(parent, new Map([["x", factA]]));
@@ -744,6 +750,77 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     scopeOwnFacts(branchA).set("y", factB);
     eq(scopeFactsFor(parent, "y"), undefined);
     eq([...scopeFactsFor(branchA, "y")!.effectiveEffects()!.labels].join(","), "b");
+  });
+
+  // --- Resolution unification (C2.3b) ----------------------------------------
+
+  test("root layering (C2.3b): source bindings own the top layer; chain reaches extensions and primitives", () => {
+    const { evalCtx } = evalSource("x = 42", undefined, [createTypeSystem()], undefined, true);
+    eq(evalCtx.parent !== undefined, true, "root eval ctx is a layered chain");
+    eq(evalCtx.bindings.has("x"), true, "source binding on the own layer");
+    eq(evalCtx.bindings.has("Int"), false, "extension binding NOT on the own layer");
+    eq(scopeLookup(evalCtx, "Int") !== undefined, true, "chain lookup reaches the extensions layer");
+    eq(scopeLookup(evalCtx, "bits_add") !== undefined, true, "chain lookup reaches the primitives layer");
+    const flat = scopeAllBindings(evalCtx);
+    eq(flat.has("x") && flat.has("Int") && flat.has("bits_add"), true, "scopeAllBindings flattens every layer");
+  });
+
+  test("one representation (C2.3b): registry and eval scope share the SAME binding object", () => {
+    const { evalCtx, registry } = evalSource("x = 42", undefined, [createTypeSystem()], undefined, true);
+    eq(registry.bindings.get("x") === evalCtx.bindings.get("x"), true, "a named binding IS its registry cell");
+    // Async future: one pending cell in both views, pending until the
+    // Promise resolves (resolution behavior covered by the async suite).
+    const fm = createFutureManager();
+    const r2 = evalSource("y = delay(1)", undefined, [createTypeSystem()], undefined, true, fm);
+    const cell = r2.evalCtx.bindings.get("__future_0");
+    eq(cell !== undefined && cell === r2.registry.bindings.get("__future_0"), true, "future cell shared by ctx and registry");
+    eq(isPendingCell(cell), true, "future cell pending until its Promise resolves");
+  });
+
+  test("absent vs unresolved (C2.3b): declared import is a pending cell; undeclared name is absent", () => {
+    const { evalCtx, registry } = evalSource("import cfg\nx = 42", undefined, [createTypeSystem()], undefined, true);
+    const cell = evalCtx.bindings.get("cfg");
+    eq(isPendingCell(cell), true, "unprovided import is a pending cell on the source layer");
+    eq(registry.bindings.get("cfg") === cell, true, "pending cell tracked by the registry");
+    eq(scopeLookup(evalCtx, "no_such_name"), undefined, "undeclared name is absent — no cell on any layer");
+    // The reflective op mirrors the distinction: pending → residual Symbol,
+    // absent → Error-typed value. Never a throw (D11).
+    const sc = scopeNew();
+    sc.bindings.set("cfg", makeCell("cfg"));
+    const pending = (primitives.ctx_resolve as any).fn([sc, stringToBits("cfg")]);
+    eq(pending.kind === ValueKind.Symbol && pending.name === "cfg", true, "ctx_resolve residualises a pending cell");
+    const missing = (primitives.ctx_resolve as any).fn([sc, stringToBits("nope")]);
+    eq(getTypeNameOf(missing), "Error", "ctx_resolve returns an error value for an absent name");
+  });
+
+  test("applyPhase (C2.3b): resolves the pending cell in place and forward-chains dependents", () => {
+    const { evalCtx, registry } = evalSource("import cfg\ny = cfg", undefined, [createTypeSystem()], undefined, true);
+    const cell = evalCtx.bindings.get("cfg")!;
+    applyPhase(registry, evalCtx, new Map([["cfg", makeInt(7)]]));
+    eq(evalCtx.bindings.get("cfg") === cell, true, "same cell object resolved in place");
+    eq(cell.isComplete === true && cell.value !== undefined, true, "cell completed by the phase");
+    const listEntry = evalCtx.bindingList.find((b) => b.key === "cfg");
+    eq(listEntry === cell, true, "bindingList holds the same resolved cell — no stale duplicate");
+    const y = registry.bindings.get("y")!;
+    eq(y === evalCtx.bindings.get("y"), true, "dependent lives on the one representation too");
+    eq(y.isComplete, true, "dependent re-evaluated to completion");
+    eq(Number((primaryOf(y.value!) as BitsValue).data), 7, "dependent sees the resolved value");
+  });
+
+  test("import satisfied by an extension (C2.3b): resolves through the chain, no pending cell", () => {
+    const ext: Extension = { name: "m", bindings: { cfg: makeInt(9) } };
+    const { evalCtx } = evalSource("import cfg\nx = cfg", undefined, [createTypeSystem(), ext], undefined, true);
+    eq(evalCtx.bindings.has("cfg"), false, "provided import gets no cell on the source layer");
+    eq(Number((primaryOf(evalCtx.bindings.get("x")!.value!) as BitsValue).data), 9, "reference resolved through the extension layer");
+  });
+
+  test("REPL persistence (C2.3b): base chain flattens into a fresh layer — passes are mutation-isolated", () => {
+    const r1 = evalSource("a = 1", undefined, [createTypeSystem()], undefined, true);
+    const r2 = evalSource("b = a + 1", r1.evalCtx, [createTypeSystem()], undefined, true);
+    eq(Number((primaryOf(r2.evalCtx.bindings.get("b")!.value!) as BitsValue).data), 2, "prior-pass binding resolves through the base layer");
+    const a1 = r1.evalCtx.bindings.get("a")!;
+    const a2 = scopeLookup(r2.evalCtx, "a")!;
+    eq(a1 !== a2, true, "base flatten copies binding objects — later passes never alias earlier ctxs");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

@@ -211,7 +211,7 @@ Keywords (`if`, `then`, `else`, `when`, `is`, `of`, `import`, `export`, `true`, 
 - **Anonymous extensions**: named bindings injected by the execution context, layered between primitives and source
 - **ModuleLoader**: loads `.alg` files as extensions with dependency resolution, caching, circular dependency detection
 - **Import syntax**: `import name` — declarative, module values provided via extensions
-- **Context layering**: primitives → extensions → base (REPL persistence) → source bindings
+- **Context layering**: primitives → extensions → base (REPL persistence) → source bindings. C2.3b: real scope-chain layers (`src/scope.ts` parent links, O(1) extend, chain-walking lookup), not a flat copy — the returned eval ctx is the SOURCE layer; its own map holds only source-level bindings. Flat-view consumers use `scopeAllBindings` (chain flatten)
 - **Export system**: `export("name", value)` primitive marks bindings for export. `buildModuleObject` wraps exported bindings as a typed Object. Planned: full typed module interfaces with encapsulation via type-directed dispatch.
 - **Module objects**: imported modules are typed Objects — dot access dispatches through the module's type, exposing only exported fields.
 - **Module encapsulation**: `type_dispatch` enforces encapsulation for typed values — only fields listed on the type are accessible. Types use `__getMember` for controlled field access; module types restrict to exported fields only.
@@ -229,14 +229,16 @@ After partial evaluation, an expression's type is its `"type"` MultiValue compon
 ### Forward-Chaining Reactive Evaluation
 - `DepCollector` tracks incomplete symbol references during evaluation
 - `DependencyRegistry` maps incomplete bindings to their dependents
+- C2.3b resolution unification: an unresolved binding IS a future cell — `Binding` carries `value` (undefined while pending) + `incompleteDeps` + `isComplete`; the registry tracks the SAME objects the eval scope's source layer holds (no `currentValue` mirror, no dual writes). Declared-but-unresolved names (unprovided imports) get pending cells on the source layer — distinguishable from absent names, which have no binding on any layer
 - `propagateCompletions` re-evaluates dependent residuals when bindings complete (cascading)
-- `applyPhase` provides new bindings and triggers re-evaluation — used for imports, REPL, multi-phase builds
+- `applyPhase` resolves pending cells IN PLACE (or adds new bindings) and triggers re-evaluation — used for imports, REPL, multi-phase builds
 - Residuals are replaced (not mutated) on re-evaluation — no stale state
+- `ctx_resolve` (reflective op) never throws: absent name → Error-typed value; pending cell → residual Symbol (design §4, D11)
 - Memoization disabled — forward-chaining replaces it for incomplete expressions
 
 ### Implicit Async via Futures
 - `FutureManager` (`src/futures.ts`) bridges JavaScript Promises to forward-chaining
-- Async primitives (e.g., `delay(ms)`, `fetch(url)`) create synthetic bindings (`__future_N`) with `value: undefined`
+- Async primitives (e.g., `delay(ms)`, `fetch(url)`) create synthetic pending future cells (`__future_N`, `value: undefined`) shared by the eval scope and the registry
 - The evaluator treats them as unresolved Symbols — produces residuals naturally
 - When the Promise resolves, `applyPhase` provides the value and cascades re-evaluation
 - `print` defers on unresolved args — returns a residual that fires when the value resolves
@@ -297,9 +299,10 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
   - **`src/grammar2/analyzer.ts`** — Static grammar analyzer (Phase 3 per `docs/grammar-formalism.md` §7). Checks: reachability, defined-ness, nullability, FIRST sets, left recursion classification, infinite-Rep detection, reserved-set consistency. Alt-disjointness analysis machinery is in place but not enabled by default — our stratified grammar intentionally uses ordered-alt semantics in several places that would false-positive; opt-in via `analyzeWithDisjointnessCheck`. The analyzer runs once per unique Grammar identity (cached by WeakMap) and its `assertClean` hook is called from `evalSource` before parsing, so grammar extensions that break structural invariants (undefined nonterm, undefined reserved set, etc.) fail with clear diagnostics rather than opaque parse errors.
   - **`src/grammar2/to-allegro.ts`** — TS Grammar → Allegro Value bridge used by Phase 5's Allegro-native analyzer. Produces nested typed Objects mirroring the TS Rule/Production/Grammar shapes, so Allegro code can walk them with when/is/then pattern matching.
 - **`lib/grammar-analyzer.alg`** — Phase 5: Allegro-native port of the static grammar analyzer (~320 LOC). Exports `check_defined`, `check_reachable`, `compute_nullability` (fixed-point), `check_infinite_rep`, `check_reservations`, `check_left_recursion`, and a top-level `analyze(grammar) → {errors, warnings, nullable, leftRec}`. Consumes the TS-built Grammar converted via `to-allegro.ts`, returns arrays and records matching the TS analyzer's output one-for-one (verified by 11 parity tests in `src/test.ts`). FIRST-set computation is the only check not ported — it depends on finer-grained character-class analysis and is deferred. Parse+eval is ~3.7s on the current interpreter (down from ~40s before the memo-bucketing fix); amortized via module-level caching at test harness load.
-- **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode
+- **`src/runtime.ts`** — `evalSource` (hybrid parse → typeLiterals → resolveSymbols → markTailCalls → precompileFunctions → buildEvalCtx → evaluate), symbol resolution with lexical scoping, compile-time type inference via `precompileFunctions`, `CompilationReport`, UntypedFunction wrapping in standard mode. C2.3b: `buildEvalCtx` builds a scope CHAIN (primitives ← extensions ← base ← source) and returns the source layer; `DependencyRegistry` tracks the same `Binding` objects the source layer holds
+- **`src/scope.ts`** — Scope protocol (structures Phase 2): `scopeNew`/`scopeExtend` (O(1) layering), `scopeLookup` (chain walk), facts plane (`scopeAssume`/`scopeFactsFor`/`scopeOwnFacts`), future cells (`makeCell`/`isPendingCell`/`resolveCell`), `scopeAllBindings` chain flatten, `scopeHostRead` chain-aware host-field read, scope/structure plane rejection guards
 - **`src/modules.ts`** — ModuleLoader for .alg files with dependency resolution, caching, circular dependency detection. `buildModuleObject` for typed module exports with encapsulation
-- **`src/futures.ts`** — FutureManager: bridges JavaScript Promises to forward-chaining evaluation. Creates synthetic `__future_N` bindings, attaches `.then()` handlers that call `applyPhase`
+- **`src/futures.ts`** — FutureManager: bridges JavaScript Promises to forward-chaining evaluation. Creates pending `__future_N` future cells (shared by eval scope + registry), attaches `.then()` handlers that call `applyPhase`
 - **`src/index.ts`** — Entry point: file runner + REPL. Allegro Standard by default, `--base` flag for base mode. On-demand module loading from `lib/` directory
 - **`src/test.ts`** — 600+ tests: core evaluator, extensions, modules, grammar, standalone grammars, type system, generics, function types, unification, partial evaluation, union types, structural types, binding annotations, pattern matching, destructuring, multivalue access, error propagation, none type, instanceof, subtypeof, constructors, fluent type API, guard clauses, nested patterns, member descriptors, interfaces, typed types, refinement types, preserveOps, file-based .alg tests
 

@@ -8,6 +8,54 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C2.3b: Resolution unification — future cells + root layering (structures Phase 2 complete, B-013 part 2)
+
+An unresolved binding is now a **future cell**, and there is exactly one
+of it per name: the `Binding` object itself carries the reactive state
+(`value` — undefined while pending, `incompleteDeps`, `isComplete`), and
+the `DependencyRegistry` tracks the SAME objects the eval scope's source
+layer holds. The former `ReactiveBinding.currentValue` mirror and its
+dual-write dance (propagateCompletions updating registry + ctx separately)
+are gone; `applyPhase` resolves cells in place, which also fixes a
+pre-existing wart where it left stale `value: undefined` binding objects
+in `bindingList` while replacing the map entry.
+
+- **Root layering**: `buildEvalCtx` builds a real scope chain — primitives
+  ← extensions ← base ← source — and returns the source layer (`scopeNew`/
+  O(1) layers from C2.1). The own map of the returned ctx holds exactly
+  the source-level bindings, which simplified every "filter out the
+  primitives" consumer (module extraction, introspect, PCP verdict walk)
+  into correct-by-construction reads. The REPL base is flattened into a
+  fresh layer per pass (`scopeAllBindings` + copies) so completions in a
+  later pass can never mutate an earlier pass's ctx — byte-compatible with
+  the old flat copy, including carrying unresolved REPL bindings forward
+  as pending cells.
+- **Absent vs unresolved, distinguishable**: a declared-but-unprovided
+  `import foo` now installs a pending cell on the source layer (tracked by
+  the registry); a never-declared name has no binding on any layer. The
+  evaluator's observable behavior is unchanged (both residualise), but the
+  reflective `ctx_resolve` now surfaces the distinction per design §4/D11:
+  absent → Error-typed value, pending → residual Symbol — the old throw
+  path is retired (the §4-mandated delta deferred from C2.3a).
+- **Consumer migration**: `resolveSymbols` + `buildEvalCtx` flatten base
+  chains; `proven.ts` type lookup and the three `__futureManager` reads
+  became chain-aware (`scopeLookup` / `scopeHostRead` + `HOST_KEYS` —
+  fixing a latent miss where `print`/`delay`/`fetch` under a
+  unification-enriched child ctx couldn't see the manager);
+  `markTailCallsInContext` needed no change (it consumes the parser's
+  file context, not the eval scope). `Binding.isUse` deleted along with
+  all ~60 literal sites (C2.3a's parked cleanup).
+- **Boundary tests** (6 new): own-layer/chain-reach split, ctx↔registry
+  object identity for named/future/bare bindings, pending-cell vs absent
+  (including both `ctx_resolve` outcomes), applyPhase in-place resolution
+  + forward-chained dependents, extension-satisfied imports get no cell,
+  REPL pass mutation-isolation. Two C1.1/C2.1-era tests adjusted
+  internals-shaped only (`bindings.get("Int")` → `scopeLookup`) since Int
+  now lives on the extensions layer; one reactive test's hand-built
+  registry record reworked to the unified cell shape (assertions kept).
+
+Phase 2 (scope split) is complete. 1002/1002 green.
+
 ## 2026-07 — C2.3a: `ctx_use` + `isUse` retirement (structures Phase 2, B-013 part 1)
 
 Recon for C2.3 found the `ctx_use` surface already dead: the primitive

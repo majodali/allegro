@@ -126,8 +126,8 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
 const dischargedWriterStd = kernelChannelWriter("discharged");
 
 function addBinding(ctx: ContextValue, key: string, value: Value): void {
-  ctx.bindings.set(key, { key, value, isUse: false });
-  ctx.bindingList.push({ key, value, isUse: false });
+  ctx.bindings.set(key, { key, value });
+  ctx.bindingList.push({ key, value });
 }
 
 /**
@@ -1431,8 +1431,8 @@ function makeRawArrayCtx(elements: Value[]): ContextValue {
   const ctx = makeContext();
   for (let i = 0; i < elements.length; i++) {
     const key = String(i);
-    ctx.bindings.set(key, { key, value: elements[i], isUse: false });
-    ctx.bindingList.push({ key, value: elements[i], isUse: false });
+    ctx.bindings.set(key, { key, value: elements[i] });
+    ctx.bindingList.push({ key, value: elements[i] });
   }
   setSlotCount(ctx, makeInt(elements.length));
   return ctx;
@@ -1713,8 +1713,8 @@ export function makeObject(entries: [string, Value][]): Value {
   const ctx = makeContext();
   for (const [key, value] of entries) {
     assertNotIntegrityKey(key, "object literal");
-    ctx.bindings.set(key, { key, value, isUse: false });
-    ctx.bindingList.push({ key, value, isUse: false });
+    ctx.bindings.set(key, { key, value });
+    ctx.bindingList.push({ key, value });
   }
   return withType(ctx, ObjectType);
 }

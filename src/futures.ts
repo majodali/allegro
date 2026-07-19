@@ -7,6 +7,7 @@
 
 import { Value, ContextValue, makeSymbol, SymbolValue, makeMultiValue, stringToBits, isResolved } from "./types.js";
 import { DependencyRegistry, applyPhase } from "./runtime.js";
+import { makeCell } from "./scope.js";
 import { withType, ErrorType, StringType } from "./types-std.js";
 
 export interface FutureManager {
@@ -43,17 +44,13 @@ export function createFutureManager(): FutureManager {
       const name = `__future_${fm.counter++}`;
       const sym = makeSymbol(name);
 
-      // Add incomplete binding to evalCtx (value: undefined triggers unresolved path)
-      fm.evalCtx.bindings.set(name, { key: name, value: undefined, isUse: false });
-      fm.evalCtx.bindingList.push({ key: name, value: undefined, isUse: false });
-
-      // Register in dependency registry as incomplete
-      fm.registry.bindings.set(name, {
-        key: name,
-        currentValue: sym,
-        incompleteDeps: new Set(),
-        isComplete: false,
-      });
+      // One pending future cell, shared by the eval scope and the
+      // dependency registry (C2.3b: the binding IS the cell — value stays
+      // undefined until the Promise resolves it via applyPhase).
+      const cell = makeCell(name);
+      fm.evalCtx.bindings.set(name, cell);
+      fm.evalCtx.bindingList.push(cell);
+      fm.registry.bindings.set(name, cell);
 
       fm.pendingCount++;
 

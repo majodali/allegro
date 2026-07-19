@@ -5,6 +5,7 @@
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch } from "./slots.js";
+import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
@@ -160,9 +161,11 @@ export function resolveSymbols(
     }
   }
 
-  // Layer 3: Base context (REPL persistence)
+  // Layer 3: Base context (REPL persistence). The base may be a layered
+  // scope chain (C2.3b root layering) — flatten it so every persisted
+  // binding participates in resolution.
   if (base) {
-    for (const [key, binding] of base.bindings) {
+    for (const [key, binding] of scopeAllBindings(base)) {
       if (binding.value !== undefined) {
         resolutionMap.set(key, binding.value);
       }
@@ -545,19 +548,19 @@ function precompileFunctions(
   // Build a minimal context for pre-compilation (primitives + extensions)
   const compileCtx = makeContext();
   for (const [name, prim] of Object.entries(primitives)) {
-    const binding = { key: name, value: prim as Value, isUse: false };
+    const binding = { key: name, value: prim as Value };
     compileCtx.bindings.set(name, binding);
     compileCtx.bindingList.push(binding);
   }
   if (extensions) {
     for (const ext of extensions) {
       for (const [name, value] of Object.entries(ext.bindings)) {
-        const binding = { key: name, value, isUse: false };
+        const binding = { key: name, value };
         compileCtx.bindings.set(name, binding);
         compileCtx.bindingList.push(binding);
       }
       if (ext.moduleObject) {
-        const binding = { key: ext.name, value: ext.moduleObject, isUse: false };
+        const binding = { key: ext.name, value: ext.moduleObject };
         compileCtx.bindings.set(ext.name, binding);
         compileCtx.bindingList.push(binding);
       }
@@ -566,8 +569,8 @@ function precompileFunctions(
   // Add source bindings to compile context
   for (const b of fileCtx.bindingList) {
     if (b.key !== null && b.value !== undefined) {
-      compileCtx.bindings.set(b.key, { key: b.key, value: b.value, isUse: false });
-      compileCtx.bindingList.push({ key: b.key, value: b.value, isUse: false });
+      compileCtx.bindings.set(b.key, { key: b.key, value: b.value });
+      compileCtx.bindingList.push({ key: b.key, value: b.value });
     }
   }
 
@@ -675,11 +678,19 @@ function precompileFunctions(
 /**
  * Build an evaluation context from a parser file context.
  *
- * Context layers (bottom to top, later layers shadow earlier ones):
+ * C2.3b: the root context is a real SCOPE CHAIN (rootmost first):
  *   1. Primitives — base language built-ins
  *   2. Extensions — anonymous extensions from the execution context
- *   3. Base context — REPL persistence / pre-existing bindings
- *   4. Source bindings — parsed from the current source file
+ *   3. Base context — REPL persistence / pre-existing bindings (flattened
+ *      copies of the previous pass's chain, so completions in this pass
+ *      never mutate the previous pass's ctx)
+ *   4. Source bindings — parsed from the current source file (the layer
+ *      returned; its OWN map holds exactly the source-level bindings)
+ *
+ * Lookup walks the chain (scopeLookup) — nearer layers shadow. Source
+ * bindings that are declared but unresolved (e.g. `import foo` with no
+ * provider anywhere below) become PENDING FUTURE CELLS in the source
+ * layer, distinguishing them from genuinely absent names.
  */
 export function buildEvalCtx(
   fileCtx: any,
@@ -687,57 +698,83 @@ export function buildEvalCtx(
   extensions?: Extension[],
   typed?: boolean,
 ): ContextValue {
-  const evalCtx = makeContext();
-  evalCtx.isScope = true; // C2.1: root evaluation scope (flat until C2.3)
-
-  function addBinding(key: string, value: Value, isUse: boolean = false): void {
-    const binding = { key, value, isUse };
-    const existingIdx = evalCtx.bindingList.findIndex(x => x.key === key);
+  // Per-layer add with replace-or-push semantics (same-name re-adds within
+  // one layer replace the earlier entry rather than duplicating).
+  function addTo(layer: ContextValue, key: string, value: Value): void {
+    const binding: Binding = { key, value };
+    const existingIdx = layer.bindingList.findIndex(x => x.key === key);
     if (existingIdx >= 0) {
-      evalCtx.bindingList[existingIdx] = binding;
+      layer.bindingList[existingIdx] = binding;
     } else {
-      evalCtx.bindingList.push(binding);
+      layer.bindingList.push(binding);
     }
-    evalCtx.bindings.set(key, binding);
+    layer.bindings.set(key, binding);
   }
 
   // Layer 1: Primitives
   // In typed/standard mode, wrap function primitives as UntypedFunction
+  const primLayer = scopeNew();
   for (const [name, prim] of Object.entries(primitives)) {
     if (typed && (prim as any).kind === ValueKind.PrimitiveFunction) {
-      addBinding(name, wrapAsUntypedFunction(prim as Value));
+      addTo(primLayer, name, wrapAsUntypedFunction(prim as Value));
     } else {
-      addBinding(name, prim as Value);
+      addTo(primLayer, name, prim as Value);
     }
   }
 
   // Layer 2: Extensions (applied in order, later extensions shadow earlier ones)
-  if (extensions) {
+  let below: ContextValue = primLayer;
+  if (extensions && extensions.length > 0) {
+    const extLayer = scopeNew(below);
     for (const ext of extensions) {
       for (const [name, value] of Object.entries(ext.bindings)) {
-        addBinding(name, value);
+        addTo(extLayer, name, value);
       }
       // If extension has a typed module object, bind the module name to it.
       // This is what `import <name>` resolves to — the encapsulated module.
       if (ext.moduleObject) {
-        addBinding(ext.name, ext.moduleObject);
+        addTo(extLayer, ext.name, ext.moduleObject);
       }
     }
+    below = extLayer;
   }
 
-  // Layer 3: Base context (REPL persistence)
+  // Layer 3: Base context (REPL persistence). Flatten the base's own chain
+  // and copy each binding into a fresh object — in-place cell resolution in
+  // THIS pass must not reach back into the previous pass's ctx.
   if (base) {
-    for (const [key, binding] of base.bindings) {
-      // Skip primitives and extension bindings that were already added
-      // Only bring forward user-defined bindings from previous REPL inputs
-      addBinding(key, binding.value!);
+    const baseLayer = scopeNew(below);
+    for (const [key, binding] of scopeAllBindings(base)) {
+      if (binding.value !== undefined) {
+        addTo(baseLayer, key, binding.value);
+      } else {
+        // Carry unresolved bindings forward as fresh pending cells — a
+        // REPL `import foo` awaiting a later phase stays unresolved (and
+        // residualising) across passes, exactly as the flat copy did.
+        const cell = makeCell(key);
+        baseLayer.bindings.set(key, cell);
+        baseLayer.bindingList.push(cell);
+      }
     }
+    below = baseLayer;
   }
 
-  // Layer 4: Source bindings (already resolved by resolveSymbols)
+  // Layer 4: Source bindings (already resolved by resolveSymbols). This is
+  // the returned scope; dynamically-added bindings (futures, bare residuals,
+  // applyPhase completions) land here too.
+  const evalCtx = scopeNew(below);
   for (const b of fileCtx.bindingList) {
-    if (b.key !== null && b.value !== undefined) {
-      addBinding(b.key, b.value);
+    if (b.key === null) continue;
+    if (b.value !== undefined) {
+      addTo(evalCtx, b.key, b.value);
+    } else if (scopeLookup(below, b.key) === undefined && !evalCtx.bindings.has(b.key)) {
+      // Declared but unresolved with no provider below — a pending future
+      // cell awaiting a later phase (applyPhase resolves it in place).
+      // Names provided by a lower layer (e.g. `import math` satisfied by a
+      // module extension) resolve through the chain and get no cell.
+      const cell = makeCell(b.key);
+      evalCtx.bindings.set(b.key, cell);
+      evalCtx.bindingList.push(cell);
     }
   }
 
@@ -753,7 +790,7 @@ export function extensionToContext(ext: Extension): Value {
   if (ext.moduleObject) return ext.moduleObject;
   const ctx = makeContext();
   for (const [name, value] of Object.entries(ext.bindings)) {
-    const binding: Binding = { key: name, value, isUse: false };
+    const binding: Binding = { key: name, value };
     ctx.bindings.set(name, binding);
     ctx.bindingList.push(binding);
   }
@@ -764,23 +801,17 @@ export function extensionToContext(ext: Extension): Value {
 // Forward-Chaining Reactive Partial Evaluation
 // =============================================================================
 
-/** A binding tracked by the reactive evaluation system. */
-export interface ReactiveBinding {
-  key: string;
-  /** Current value — may be a residual Expression or final value */
-  currentValue: Value;
-  /** Names of incomplete dependencies (only meaningful when !isComplete) */
-  incompleteDeps: Set<string>;
-  /** True when currentValue is fully resolved */
-  isComplete: boolean;
-}
-
-/** Registry of reactive bindings and their dependency relationships. */
+/** Registry of reactive bindings and their dependency relationships.
+ *  C2.3b: the registry tracks the SAME `Binding` objects the evaluation
+ *  scope's source layer holds — a binding IS its future cell (value +
+ *  `incompleteDeps` + `isComplete` on one record). The former
+ *  `ReactiveBinding.currentValue` mirror and its dual-write dance are
+ *  gone: resolving a cell is one in-place write visible to both. */
 export interface DependencyRegistry {
   /** Maps incomplete binding name → set of binding keys that depend on it */
   dependents: Map<string, Set<string>>;
-  /** All reactive bindings by key */
-  bindings: Map<string, ReactiveBinding>;
+  /** All reactive bindings by key — shared with the eval scope's own layer */
+  bindings: Map<string, Binding>;
 }
 
 /** Create an empty dependency registry. */
@@ -821,21 +852,16 @@ function propagateCompletions(
 
   for (const key of worklist) {
     const rb = registry.bindings.get(key);
-    if (!rb || rb.isComplete) continue;
+    // Skip completed cells and cells still pending with no residual to
+    // re-evaluate (their completion comes directly through applyPhase).
+    if (!rb || rb.isComplete || rb.value === undefined) continue;
 
-    // Re-evaluate the residual in the updated context
+    // Re-evaluate the residual in the updated context. The residual is
+    // replaced (not mutated); the write goes to the ONE shared binding.
     const collector: DepCollector = { incompleteRefs: new Set() };
-    const newVal = evaluate(rb.currentValue, evalCtx, 0, collector);
-
-    // Replace the binding's value (not mutate)
-    rb.currentValue = newVal;
-    rb.incompleteDeps = collector.incompleteRefs;
-
-    const ctxBinding = evalCtx.bindings.get(key);
-    if (ctxBinding) ctxBinding.value = newVal;
-
+    const newVal = evaluate(rb.value, evalCtx, 0, collector);
     const nowComplete = isResolved(newVal);
-    rb.isComplete = nowComplete;
+    resolveCell(rb, newVal, nowComplete, collector.incompleteRefs);
 
     if (nowComplete) {
       newlyCompleted.add(key);
@@ -863,12 +889,21 @@ export function applyPhase(
   const completed = new Set<string>();
 
   for (const [name, value] of newBindings) {
-    const binding: Binding = { key: name, value, isUse: false };
-    evalCtx.bindings.set(name, binding);
-    // Also add to bindingList if not already present
-    if (!evalCtx.bindingList.some(b => b.key === name)) {
+    // Resolve an existing cell in place (pending import, async future) —
+    // the registry shares the object, so one write completes both views.
+    // Only genuinely new names get fresh bindings.
+    const existing = evalCtx.bindings.get(name);
+    const tracked = registry.bindings.get(name);
+    if (existing) {
+      resolveCell(existing, value, true);
+    } else {
+      const binding: Binding = { key: name, value, isComplete: true };
+      evalCtx.bindings.set(name, binding);
       evalCtx.bindingList.push(binding);
     }
+    // Defensive: a registry entry that predates the unification (or was
+    // installed by an external caller) may not alias the ctx binding.
+    if (tracked && tracked !== existing) resolveCell(tracked, value, true);
     completed.add(name);
   }
 
@@ -1014,14 +1049,14 @@ export function evalSource(
     // extension-provided types (Int, Bool, …).
     const totalityCompileCtx = makeContext();
     for (const [name, prim] of Object.entries(primitives)) {
-      const binding = { key: name, value: prim as Value, isUse: false };
+      const binding = { key: name, value: prim as Value };
       totalityCompileCtx.bindings.set(name, binding);
       totalityCompileCtx.bindingList.push(binding);
     }
     if (extensions) {
       for (const ext of extensions) {
         for (const [name, value] of Object.entries(ext.bindings)) {
-          const binding = { key: name, value, isUse: false };
+          const binding = { key: name, value };
           totalityCompileCtx.bindings.set(name, binding);
           totalityCompileCtx.bindingList.push(binding);
         }
@@ -1029,7 +1064,7 @@ export function evalSource(
     }
     for (const b of fileCtx.bindingList) {
       if (b.key !== null && b.value !== undefined) {
-        totalityCompileCtx.bindings.set(b.key, { key: b.key, value: b.value, isUse: false });
+        totalityCompileCtx.bindings.set(b.key, { key: b.key, value: b.value });
       }
     }
     const exhTypeLookup = (name: string): Value | undefined => {
@@ -1099,7 +1134,17 @@ export function evalSource(
   const proofFindings: ProofFinding[] = [];
 
   for (const b of fileCtx.bindingList) {
-    if (b.value === undefined) continue;
+    if (b.value === undefined) {
+      // Declared-but-unresolved source binding. If buildEvalCtx installed a
+      // pending cell for it (no provider on the chain), track the cell in
+      // the registry so it lives on the ONE unresolved representation
+      // applyPhase completes.
+      if (b.key !== null) {
+        const cell = evalCtx.bindings.get(b.key);
+        if (cell && cell.value === undefined) registry.bindings.set(b.key, cell);
+      }
+      continue;
+    }
 
     const collector: DepCollector = { incompleteRefs: new Set() };
     const val = evaluate(b.value, evalCtx, 0, collector);
@@ -1117,18 +1162,20 @@ export function evalSource(
       // that weren't seen by DepCollector because they were returned by primitives)
       if (!isResolved(val)) collectSymbolRefs(val, collector.incompleteRefs);
       // Track bare expressions with pending futures so forward-chaining
-      // can re-evaluate them (e.g., deferred print calls)
+      // can re-evaluate them (e.g., deferred print calls). One cell,
+      // shared by the eval scope and the registry.
       if (!isResolved(val) && collector.incompleteRefs.size > 0) {
         const bareKey = `__bare_${bareCounter++}`;
-        registry.bindings.set(bareKey, {
+        const cell: Binding = {
           key: bareKey,
-          currentValue: val,
+          value: val,
           incompleteDeps: collector.incompleteRefs,
           isComplete: false,
-        });
+        };
+        registry.bindings.set(bareKey, cell);
         registerDeps(registry, bareKey, collector.incompleteRefs);
-        evalCtx.bindings.set(bareKey, { key: bareKey, value: val, isUse: false });
-        evalCtx.bindingList.push({ key: bareKey, value: val, isUse: false });
+        evalCtx.bindings.set(bareKey, cell);
+        evalCtx.bindingList.push(cell);
       }
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
@@ -1145,10 +1192,6 @@ export function evalSource(
         }
       }
 
-      // Store evaluated value in eval context
-      const ctxBinding = evalCtx.bindings.get(b.key);
-      if (ctxBinding) ctxBinding.value = val;
-
       // Record inferred type in compilation report
       if (compilationReport) {
         const typeName = getTypeName(val);
@@ -1160,14 +1203,17 @@ export function evalSource(
       // Track Symbol dependencies from async futures in the result tree
       if (!isResolved(val)) collectSymbolRefs(val, collector.incompleteRefs);
 
-      // Register in reactive registry
+      // Store the evaluated value on the scope's binding and track that
+      // SAME object in the reactive registry — the binding is its cell.
       const complete = isResolved(val);
-      registry.bindings.set(b.key, {
-        key: b.key,
-        currentValue: val,
-        incompleteDeps: complete ? new Set() : collector.incompleteRefs,
-        isComplete: complete,
-      });
+      let ctxBinding = evalCtx.bindings.get(b.key);
+      if (!ctxBinding) {
+        ctxBinding = { key: b.key, value: val };
+        evalCtx.bindings.set(b.key, ctxBinding);
+        evalCtx.bindingList.push(ctxBinding);
+      }
+      resolveCell(ctxBinding, val, complete, collector.incompleteRefs);
+      registry.bindings.set(b.key, ctxBinding);
 
       if (complete) {
         completedInThisPass.add(b.key);

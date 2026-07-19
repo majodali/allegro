@@ -141,3 +141,65 @@ export function assertNotScope(v: Value, op: string): void {
     throw new AllegroError(`${op}: cannot operate on an evaluation scope as data (scope/structure plane violation)`);
   }
 }
+
+// --- Resolution unification (C2.3b) -------------------------------------------
+//
+// An UNRESOLVED binding is a slot holding a pending future cell — one
+// representation for REPL declarations awaiting a later phase, module
+// imports, forward-chaining residuals, and async futures alike (design
+// §4/§10, D33). The cell IS the Binding object: `value: undefined` means
+// pending, `incompleteDeps`/`isComplete` carry the reactive bookkeeping.
+// The DependencyRegistry holds the SAME objects as the owning scope's
+// layer — resolving a cell is one in-place write, never a dual update.
+//
+// Absent vs unresolved: a name with NO binding anywhere on the chain is
+// ABSENT (a lexical matter — the reflective op returns an error value); a
+// binding present with `value: undefined` is UNRESOLVED (residualises,
+// never throws — D11).
+
+/** Create a pending future-cell binding. */
+export function makeCell(key: string): Binding {
+  return { key, value: undefined, incompleteDeps: new Set(), isComplete: false };
+}
+
+/** Is this binding a pending (unresolved) future cell? */
+export function isPendingCell(b: Binding | undefined): boolean {
+  return b !== undefined && b.value === undefined;
+}
+
+/** Resolve a cell in place — the single write that completes a binding.
+ *  Also used to refine a residual toward completion (monotonic). */
+export function resolveCell(b: Binding, value: Value, complete: boolean, deps?: Set<string>): void {
+  b.value = value;
+  b.isComplete = complete;
+  b.incompleteDeps = complete ? undefined : (deps ?? b.incompleteDeps);
+}
+
+/** Chain-flatten: one merged map over every layer, rootmost first so
+ *  nearer layers shadow. For flat-view consumers (REPL persistence,
+ *  module extraction) — NOT for lookup (use scopeLookup). */
+export function scopeAllBindings(scope: ContextValue): Map<string, Binding> {
+  const layers: ContextValue[] = [];
+  let cur: ContextValue | undefined = scope;
+  while (cur) {
+    layers.push(cur);
+    cur = cur.parent;
+  }
+  const out = new Map<string, Binding>();
+  for (let i = layers.length - 1; i >= 0; i--) {
+    for (const [k, b] of layers[i].bindings) out.set(k, b);
+  }
+  return out;
+}
+
+/** Chain-walking read of a host-plane field (e.g. `__futureManager`) —
+ *  set on the root evaluation scope, readable from any child layer. */
+export function scopeHostRead(scope: ContextValue, key: string): unknown {
+  let cur: ContextValue | undefined = scope;
+  while (cur) {
+    const v = (cur as unknown as Record<string, unknown>)[key];
+    if (v !== undefined) return v;
+    cur = cur.parent;
+  }
+  return undefined;
+}

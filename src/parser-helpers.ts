@@ -214,7 +214,7 @@ export function substName(v: any, name: string, replacement: any): any {
 // --- Context building ---
 
 export function bind(ctx: any, name: string, value: any) {
-  const b = { key: name, value, isUse: false };
+  const b = { key: name, value };
   ctx.bindings.set(name, b);
   ctx.bindingList.push(b);
 }
@@ -255,7 +255,7 @@ export function buildFileCtx(repNode: any) {
     if (s.binding) {
       bind(ctx, s.binding.name, s.binding.value);
     } else if (s.val !== undefined) {
-      ctx.bindingList.push({ key: null, value: s.val, isUse: false });
+      ctx.bindingList.push({ key: null, value: s.val });
     }
   }
   return ctx;

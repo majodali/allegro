@@ -1,15 +1,15 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, CHANNEL_WRITER_BRAND } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, CHANNEL_WRITER_BRAND, HOST_KEYS } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
   AllegroError, makeBits, makeInt, makeFloat, bitsToFloat, makePrimitive, makeExpr,
-  makeParam, makeComposedFn, makeContext, makeMultiValue,
+  makeParam, makeComposedFn, makeContext, makeMultiValue, makeSymbol,
   stringToBits, bitsToString,
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
-import { assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeLookup } from "./scope.js";
+import { assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeLookup, scopeHostRead, isPendingCell } from "./scope.js";
 
 // Held write capability for the discharged integrity channel (C1.4, D21-D24).
 // Module-scope, never exported, never bound into any Allegro extension —
@@ -338,19 +338,29 @@ const ctx_bind: PrimitiveFnImpl = (args) => {
     newCtx.bindings.set(k, copy);
     newCtx.bindingList.push(copy);
   }
-  const binding = { key, value, isUse: false };
+  const binding = { key, value };
   newCtx.bindings.set(key, binding);
   newCtx.bindingList.push(binding);
   return newCtx;
 };
 
+// C2.3b resolution unification (design §4, D11): the old throw path is
+// retired. Absent name → error VALUE (a lexical matter; the reflective op
+// reports it, propagating like any error). Declared-but-unresolved (a
+// pending future cell) → residual Symbol, never a throw — it completes
+// when a later phase resolves the cell. Chain-aware for layered scopes.
 const ctx_resolve: PrimitiveFnImpl = (args) => {
   const ctx = asCtx(args[0], "ctx_resolve");
   const key = bitsToString(asBits(args[1], "ctx_resolve"));
-  const b = ctx.bindings.get(key);
-  if (!b) throw new AllegroError(`ctx_resolve: '${key}' not found`);
-  if (b.value === undefined) throw new AllegroError(`ctx_resolve: '${key}' is unbound`);
-  return b.value;
+  const b = scopeLookup(ctx, key);
+  if (!b) {
+    const components = new Map<string, Value>();
+    components.set("error", withType(stringToBits(`ctx_resolve: '${key}' not found`), StringType));
+    components.set("type", ErrorType);
+    return makeMultiValue(makeInt(0), components);
+  }
+  if (isPendingCell(b)) return makeSymbol(key);
+  return b.value!;
 };
 
 const ctx_bindings: PrimitiveFnImpl = (args) => {
@@ -823,8 +833,10 @@ const print_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // Value is pending (async future or other residual) — defer print
     return makeExpr(makePrimitive("print", print_impl, true), [v]);
   }
-  // Use FutureManager's onOutput if available (for async/web streaming)
-  const fm = (ctx as any)?.__futureManager;
+  // Use FutureManager's onOutput if available (for async/web streaming).
+  // C2.3b: chain-aware — the manager lives on the root evaluation scope,
+  // but print may run under a child layer (e.g. a unification-enriched ctx).
+  const fm = ctx ? scopeHostRead(ctx, HOST_KEYS.futureManager) as any : undefined;
   if (fm?.onOutput) {
     fm.onOutput(formatValue(v));
   } else {
@@ -849,7 +861,7 @@ const delay_wrapper: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("delay", delay_wrapper, true), [v]);
   }
   const ms = Number(asBits(dataOf(v), "delay").data);
-  const fm = (ctx as any)?.__futureManager as import("./futures.js").FutureManager | undefined;
+  const fm = (ctx ? scopeHostRead(ctx, HOST_KEYS.futureManager) : undefined) as import("./futures.js").FutureManager | undefined;
   if (!fm) {
     throw new AllegroError("delay: requires async runtime (no FutureManager available)");
   }
@@ -867,7 +879,7 @@ const fetch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("fetch", fetch_impl, true), [v]);
   }
   const url = bitsToString(asBits(dataOf(v), "fetch"));
-  const fm = (ctx as any)?.__futureManager as import("./futures.js").FutureManager | undefined;
+  const fm = (ctx ? scopeHostRead(ctx, HOST_KEYS.futureManager) : undefined) as import("./futures.js").FutureManager | undefined;
   if (!fm) {
     throw new AllegroError("fetch: requires async runtime (no FutureManager available)");
   }

@@ -146,8 +146,8 @@ export function buildModuleObject(
   // Build the underlying Context with ALL bindings (public + private)
   const ctx = makeContext();
   for (const [key, value] of Object.entries(capturedBindings)) {
-    ctx.bindings.set(key, { key, value, isUse: false });
-    ctx.bindingList.push({ key, value, isUse: false });
+    ctx.bindings.set(key, { key, value });
+    ctx.bindingList.push({ key, value });
   }
 
   // Build a module-specific type with __getMember for exported fields only.

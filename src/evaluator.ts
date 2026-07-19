@@ -464,7 +464,7 @@ function applyComposed(
             enrichedCtx = scopeExtend(
               ctx,
               [...bindings].map(([varName, typeVal]) =>
-                [varName, { key: varName, value: typeVal, isUse: false }] as [string, import("./types.js").Binding]
+                [varName, { key: varName, value: typeVal }] as [string, import("./types.js").Binding]
               ),
             );
             if (returnTypeExpr && (returnTypeExpr.kind === ValueKind.Param || returnTypeExpr.kind === ValueKind.Symbol)) {

@@ -22,6 +22,7 @@
 // machinery or an external SMT discharge.
 
 import { dataOf, getName, channelReadRaw } from "./slots.js";
+import { scopeLookup } from "./scope.js";
 import {
   Value, ValueKind, ContextValue, ComposedFunctionValue, ExpressionValue,
   ParamValue, BitsValue,
@@ -50,7 +51,9 @@ function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | nul
   if (cur.kind === ValueKind.MultiValue) cur = (cur as any).primary;
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
-    const b = evalCtx.bindings.get(name);
+    // C2.3b: chain-aware — type names (Int, Bool, user refinements) may
+    // live on any layer of the root scope chain, not the source layer.
+    const b = scopeLookup(evalCtx, name);
     if (!b?.value) return null;
     return resolveTypeContext(b.value, evalCtx);
   }

@@ -176,8 +176,8 @@ function slotRead(ctx: ContextValue, name: string): Value | undefined {
 /** Mirrors types-std's addBinding exactly (map + bindingList, duplicates
  *  preserved on overwrite) — zero behavior change is the C1.2 oracle. */
 function slotWrite(ctx: ContextValue, key: string, value: Value): void {
-  ctx.bindings.set(key, { key, value, isUse: false });
-  ctx.bindingList.push({ key, value, isUse: false });
+  ctx.bindings.set(key, { key, value });
+  ctx.bindingList.push({ key, value });
 }
 
 /** Peel a MultiValue wrapper down to its Context primary, if that's what it is. */
@@ -311,7 +311,7 @@ export function hasDischarged(ctx: ContextValue): boolean { return ctx.bindings.
 // kernel's origination idiom in primitives.ts exactly. These are the
 // chokepoints the C1.4 discharged-channel writer capability wraps.
 function slotSet(ctx: ContextValue, key: string, value: Value): void {
-  ctx.bindings.set(key, { key, value, isUse: false });
+  ctx.bindings.set(key, { key, value });
 }
 export function stampProposition(ctx: ContextValue, v: Value): void { slotSet(ctx, "__proposition", v); }
 function stampDischarged(ctx: ContextValue, v: Value): void { slotSet(ctx, "__discharged", v); }
@@ -350,6 +350,13 @@ export const SLOT_KEYS = {
   counterexample: "__counterexample",
   eqLhs: "__eq_lhs",
   eqRhs: "__eq_rhs",
+} as const;
+
+/** Host-plane (js-property) keys — registered as host-internal in the
+ *  SLOT_REGISTRY. Call sites read them via scope.ts's chain-aware
+ *  `scopeHostRead` using these constants, never raw literals. */
+export const HOST_KEYS = {
+  futureManager: "__futureManager",
 } as const;
 
 /** The "skip meta slots when copying user-visible bindings" test. */

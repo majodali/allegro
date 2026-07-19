@@ -102,11 +102,19 @@ export interface ExpressionValue {
 
 export interface Binding {
   key: string | null;
+  /** The bound value. `undefined` while the binding is a PENDING FUTURE
+   *  CELL (declared-but-unresolved import, async future) — the evaluator
+   *  residualises references to it. C2.3b: this is the ONE unresolved
+   *  representation; there is no separate reactive-binding record. */
   value: Value | undefined;
-  /** RETIRED (C2.3a): was the ctx_use marker; write-only cargo with zero
-   *  semantic readers. Optional during the literal-site cleanup; deleted
-   *  entirely with C2.3b's future-cell unification. */
-  isUse?: boolean;
+  /** C2.3b future-cell state (host-plane, maintained by the reactive
+   *  registry): names of incomplete dependencies while this binding's
+   *  value is a residual. Absent on untracked bindings. */
+  incompleteDeps?: Set<string>;
+  /** C2.3b: completion flag. `false` while pending or residual; `true`
+   *  once the value is fully resolved. Absent on untracked bindings
+   *  (data-plane contexts, compile ctxs) — treat as complete. */
+  isComplete?: boolean;
 }
 
 export interface ContextValue {
