@@ -110,6 +110,12 @@ export interface ContextValue {
   kind: ValueKind.Context;
   bindings: Map<string, Binding>;
   bindingList: Binding[];
+  /** C2.1 scope protocol: parent-chain layer link (evaluation scopes only —
+   *  host-plane field, never a value slot). Lookup walks the chain. */
+  parent?: ContextValue;
+  /** C2.1: marks evaluation scopes vs data Contexts. Set by scopeNew/
+   *  scopeExtend and the root eval-context builders. */
+  isScope?: boolean;
   /**
    * Phase C scope-local predicate narrowing. When a binding is referenced
    * within a scope that has additional predicates known about it (e.g. from

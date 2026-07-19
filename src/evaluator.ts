@@ -13,6 +13,7 @@ import {
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, PRESERVED_FN_META_KEYS } from "./slots.js";
+import { scopeLookup, scopeExtend, scopeCompileMode, scopePredicateFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
 
@@ -102,16 +103,15 @@ export function evaluate(
       return value;
 
     case ValueKind.Symbol: {
-      const resolved = ctx.bindings.get(value.name);
+      const resolved = scopeLookup(ctx, value.name);
       if (resolved?.value !== undefined) {
         let result = evaluate(resolved.value, ctx, depth + 1, depCollector);
         // Phase C Chunk 2: augment with any scope-local predicates for this
         // name (from branch conditions or in-scope `assert` statements).
-        if (ctx.scopePredicates) {
-          const scopePred = ctx.scopePredicates.get(value.name);
-          if (scopePred) {
-            result = withPredicates(result, scopePred as PredicateSet);
-          }
+        // C2.1: chain-aware — nearest layer wins.
+        const scopePred = scopePredicateFor(ctx, value.name);
+        if (scopePred) {
+          result = withPredicates(result, scopePred as PredicateSet);
         }
         return result;
       }
@@ -250,7 +250,7 @@ function applyPrimitive(
     // propagate into the residual), then return `makeExpr(fn, evalArgs)`
     // instead of running the impl. The impl runs at runtime when the
     // residual evaluates outside compile-mode.
-    if ((ctx as any).__compileMode && fn.effects && fn.effects.length > 0) {
+    if (scopeCompileMode(ctx) && fn.effects && fn.effects.length > 0) {
       const evalArgs = args.map(a => evalFn(a, ctx));
       // Add fn's effects + tracked subcall effects + arg effects.
       if (fn.effects) for (const e of fn.effects) trackedEffects.add(e);
@@ -288,7 +288,7 @@ function applyPrimitive(
   // set; the actual side effect fires when the function is invoked at
   // runtime (the call site's ctx isn't compile-mode). Pure primitives
   // still fold eagerly — only effectful ones defer.
-  if ((ctx as any).__compileMode && fn.effects && fn.effects.length > 0) {
+  if (scopeCompileMode(ctx) && fn.effects && fn.effects.length > 0) {
     return attachEff(makeExpr(fn, evalArgs));
   }
   if (!evalArgs.every(isResolved)) {
@@ -458,20 +458,15 @@ function applyComposed(
             unifyTypes(argType, paramTypes[i], bindings);
           }
           if (bindings.size > 0) {
-            enrichedCtx = makeContext();
-            // F3a: propagate compile-mode through enrichedCtx so deferral
-            // continues to apply inside transitively-called function bodies
-            // during precompile.
-            if ((ctx as any).__compileMode) (enrichedCtx as any).__compileMode = true;
-            for (const [key, binding] of ctx.bindings) {
-              enrichedCtx.bindings.set(key, binding);
-              enrichedCtx.bindingList.push(binding);
-            }
-            for (const [varName, typeVal] of bindings) {
-              const binding = { key: varName, value: typeVal, isUse: false };
-              enrichedCtx.bindings.set(varName, binding);
-              enrichedCtx.bindingList.push(binding);
-            }
+            // C2.1: O(1) child layer over the call ctx — replaces the
+            // former flatten-copy of every inherited binding. Compile-mode
+            // reads are chain-aware (scopeCompileMode), so no flag copying.
+            enrichedCtx = scopeExtend(
+              ctx,
+              [...bindings].map(([varName, typeVal]) =>
+                [varName, { key: varName, value: typeVal, isUse: false }] as [string, import("./types.js").Binding]
+              ),
+            );
             if (returnTypeExpr && (returnTypeExpr.kind === ValueKind.Param || returnTypeExpr.kind === ValueKind.Symbol)) {
               inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
             }
@@ -674,8 +669,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
 // --- Context helpers ---
 
 export function resolveInContext(ctx: ContextValue, name: string): Value | undefined {
-  const b = ctx.bindings.get(name);
-  return b?.value;
+  return scopeLookup(ctx, name)?.value;
 }
 
 // --- Call-site type checking ---

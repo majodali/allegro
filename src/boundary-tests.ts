@@ -34,6 +34,8 @@ import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./typ
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel } from "./slots.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
+import { scopeNew, scopeExtend, scopeLookup, assertNotScope } from "./scope.js";
+import { makeInt } from "./types.js";
 import { effectsOf } from "./effects.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -673,6 +675,48 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       .filter((r) => r.got !== r.f.expect)
       .map((r) => `${r.f.name}: expected [${r.f.expect}] got [${r.got}]`);
     eq(diffs.join("; "), "", "differential divergence");
+  });
+
+  test("scope protocol (C2.1): O(1) extend, chain lookup, shadowing", () => {
+    // Structural O(1) proof: a child layered over a 10k-binding parent
+    // holds exactly its own entries — no flatten-copy.
+    const parent = scopeNew();
+    for (let i = 0; i < 10000; i++) {
+      parent.bindings.set(`b${i}`, { key: `b${i}`, value: makeInt(i), isUse: false });
+    }
+    const child = scopeExtend(parent, [["x", { key: "x", value: makeInt(42), isUse: false }]]);
+    eq(child.bindings.size, 1, "child owns only its layer");
+    eq((primaryOf(scopeLookup(child, "b9999")!.value!) as any).data, 9999n, "chain lookup reaches parent");
+    eq((primaryOf(scopeLookup(child, "x")!.value!) as any).data, 42n, "own layer found");
+    // Shadowing: nearest layer wins.
+    const shadow = scopeExtend(child, [["b0", { key: "b0", value: makeInt(777), isUse: false }]]);
+    eq((primaryOf(scopeLookup(shadow, "b0")!.value!) as any).data, 777n, "child shadows parent");
+    eq((primaryOf(scopeLookup(parent, "b0")!.value!) as any).data, 0n, "parent unchanged");
+    // Deep chains stay correct.
+    let deep = scopeNew();
+    deep.bindings.set("root", { key: "root", value: makeInt(1), isUse: false });
+    for (let i = 0; i < 2000; i++) deep = scopeExtend(deep, []);
+    eq((primaryOf(scopeLookup(deep, "root")!.value!) as any).data, 1n, "2000-layer chain lookup");
+  });
+
+  test("scope/structure plane rejection (C2.1): each plane refuses the other", () => {
+    // A shape-carrying data Context cannot be extended as a scope.
+    const { evalCtx } = evalSource("p = {a: 1}", undefined, [createTypeSystem()], undefined, true);
+    const dataCtx = asContext(evalCtx.bindings.get("p")!.value as Value)!;
+    // give it its shape slot form: typed objects carry shape via the MV
+    // component; scope rejection keys on binding-plane shape — verify via a
+    // type Context (which carries __type):
+    const intCtx = asContext(evalCtx.bindings.get("Int")!.value as Value)!;
+    let threw = "";
+    try { scopeExtend(intCtx, []); } catch (e: any) { threw = String(e.message); }
+    eq(threw.includes("cannot extend a data structure"), true, `scope-over-data: ${threw}`);
+    // Struct ops reject scopes.
+    const sc = scopeNew();
+    let threw2 = "";
+    try { assertNotScope(sc as Value, "type_dispatch"); } catch (e: any) { threw2 = String(e.message); }
+    eq(threw2.includes("plane violation"), true, `struct-on-scope: ${threw2}`);
+    // ...and pass data through untouched.
+    assertNotScope(dataCtx as Value, "type_dispatch");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

@@ -9,6 +9,7 @@ import {
   stringToBits, bitsToString,
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
+import { assertNotScope } from "./scope.js";
 
 // Held write capability for the discharged integrity channel (C1.4, D21-D24).
 // Module-scope, never exported, never bound into any Allegro extension —
@@ -2003,6 +2004,8 @@ const export_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 // --- type_dispatch: type-directed dot access ---
 
 const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  // C2.1: struct ops reject evaluation scopes (plane violation guard).
+  if (args[0]?.kind === ValueKind.Context) assertNotScope(args[0], "type_dispatch");
   const obj = evalFn!(args[0], ctx!);
   const fieldArg = evalFn!(args[1], ctx!);
   if (!isResolved(obj) || !isResolved(fieldArg)) {

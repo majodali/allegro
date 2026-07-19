@@ -8,6 +8,33 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C2.1: Scope protocol + parent chain (structures Phase 2, B-011)
+
+Phase 2 opens: scopes (evaluation) and structures (data) become distinct
+planes with real layering.
+
+- **`src/scope.ts`**: `scopeNew`/`scopeExtend`/`scopeLookup`/
+  `scopeBindings` over the current ContextValue, plus chain-aware reads
+  for the compile-mode flag and Phase-C scope predicates. `parent`/
+  `isScope` are host-plane fields on ContextValue — never value slots.
+- **Chain-walking Symbol lookup** in the evaluator (nearest layer wins;
+  degrades to today's flat lookup on legacy contexts — zero behavior
+  change, full suite as oracle).
+- **The unification flatten-copy is gone**: call-site type-variable
+  enrichment (`enrichedCtx`) previously copied every inherited binding —
+  hundreds per call — to add a few type variables; it now layers an O(1)
+  child scope. Structurally verified by boundary test (10k-binding
+  parent → child owns exactly its own entries; 2000-layer chain lookup;
+  shadowing semantics).
+- **Plane rejection both ways**: `scopeExtend` refuses shape-carrying
+  data Contexts; `type_dispatch` refuses evaluation scopes
+  (`assertNotScope`) — the "no type-dispatch on scopes" boundary test.
+- **Scoping deferral (recorded)**: the root evaluation context
+  (buildEvalCtx's primitives → extensions → base → source flattening)
+  stays flat until C2.3, whose resolution unification owns exactly the
+  consumers that iterate that flat view (REPL persistence, module
+  extraction, forward chaining). The root is marked `isScope` now.
+
 ## 2026-07 — C1.5b: `*_attach` collapse — body-form metadata off the AST (B-010 part 2; Phase 1 complete)
 
 The five metadata wrappers (`partial_attach`, `decreases_attach`,

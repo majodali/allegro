@@ -688,6 +688,7 @@ export function buildEvalCtx(
   typed?: boolean,
 ): ContextValue {
   const evalCtx = makeContext();
+  evalCtx.isScope = true; // C2.1: root evaluation scope (flat until C2.3)
 
   function addBinding(key: string, value: Value, isUse: boolean = false): void {
     const binding = { key, value, isUse };

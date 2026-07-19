@@ -87,7 +87,16 @@ phase).
   read properties; `findAttachWrapper` peeler family deleted; wrapper
   prims retained as inert passthroughs (defense). Peeler-shaped tests
   reworked to collapse-equivalents per ruling
-- [ ] **B-011** · L0 · Scope protocol + parent chain (C2.1)
+- [x] **B-011** · L0 · Scope protocol + parent chain (C2.1). Landed
+  2026-07: `src/scope.ts` (scopeNew/scopeExtend/scopeLookup/
+  scopeBindings + chain-aware compile-mode and predicate reads),
+  `parent`/`isScope` host-plane fields on ContextValue, chain-walking
+  Symbol lookup, O(1) child layering at the unification enrichedCtx site
+  (was a full flatten-copy per call), scope/structure mutual plane
+  rejection (type_dispatch guard + shape-carrying-parent rejection),
+  boundary tests (structural O(1), 2000-layer chains, shadowing).
+  Root-eval-ctx layering (buildEvalCtx) deferred to C2.3 where its flat
+  consumers (REPL, module extraction, forward chaining) get unified
 - [ ] **B-012** · L0 · Facts plane via `scope_assume` (C2.2)
 - [ ] **B-013** · L0 · Resolution unification; retire `ctx_use`;
   unresolved-binding-as-future-cell (C2.3)

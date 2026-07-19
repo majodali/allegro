@@ -126,6 +126,17 @@
 >   uncollapsed paths). Six peeler-shaped tests reworked into
 >   collapse-equivalents per the §6 item-3 ruling. B-010 complete;
 >   Phase 1 complete.
+> - C2.1 (B-011) landed 2026-07 — scope protocol + parent chain.
+>   `src/scope.ts` ops over ContextValue (`parent`/`isScope` host-plane
+>   fields); chain-walking Symbol lookup + chain-aware compile-mode and
+>   scope-predicate reads; the unification enrichedCtx flatten-copy
+>   replaced with O(1) child layering; scope/structure mutual plane
+>   rejection (type_dispatch guard; shape-carrying-parent refusal);
+>   boundary tests: structural O(1) (10k-parent → 1-entry child),
+>   2000-layer chain lookup, shadowing, plane rejection both ways.
+>   Deferral recorded: buildEvalCtx root layering moves to C2.3 with its
+>   flat-view consumers (REPL, module extraction, forward chaining); the
+>   root is marked isScope now.
 
 ## 1. Context
 
