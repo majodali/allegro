@@ -26,6 +26,7 @@ import {
   makeContext,
 } from "./types.js";
 import { hasShapeSlot } from "./slots.js";
+import { PredicateSet, mergePredicateSets } from "./refinements.js";
 
 /** Create a fresh scope, optionally layered over a parent scope. */
 export function scopeNew(parent?: ContextValue): ContextValue {
@@ -90,17 +91,48 @@ export function scopeCompileMode(scope: ContextValue): boolean {
   return false;
 }
 
-/** Chain-aware scope-predicate lookup (Phase C narrowing): nearest layer
- *  with a predicate set for `name` wins. C2.2 replaces the storage with
- *  immutable fact layering; this keeps the read chain-correct meanwhile. */
-export function scopePredicateFor(scope: ContextValue, name: string): unknown | undefined {
+// --- Facts plane (C2.2) --------------------------------------------------------
+//
+// Facts (Phase-C predicate narrowing from branches, asserts, requires) live
+// as per-layer maps. `scopeAssume` pushes an IMMUTABLE child layer carrying
+// only the new facts — parent layers are never copied or mutated, and
+// branch exit is simply discarding the child (no pop). Reads merge across
+// the whole chain, rootmost first, so a child's facts refine (never
+// replace) what outer layers established — byte-identical to the former
+// copy-parent-then-merge behavior. Same-layer accumulation (an `assert`
+// adding facts for the REST of its own scope) writes to the scope's own
+// map — that is the layer's own state, not a parent mutation.
+
+/** Push an immutable fact layer over `parent`. O(1) in parent size. */
+export function scopeAssume(parent: ContextValue, facts: Map<string, PredicateSet>): ContextValue {
+  const child = scopeNew(parent);
+  child.scopePredicates = facts as Map<string, unknown>;
+  return child;
+}
+
+/** Merged fact set for `name` across all layers (rootmost first; nearer
+ *  layers refine). Undefined when no layer carries facts for the name. */
+export function scopeFactsFor(scope: ContextValue, name: string): PredicateSet | undefined {
+  let leafToRoot: PredicateSet[] | null = null;
   let cur: ContextValue | undefined = scope;
   while (cur) {
-    const sp = cur.scopePredicates?.get(name);
-    if (sp !== undefined) return sp;
+    const sp = cur.scopePredicates?.get(name) as PredicateSet | undefined;
+    if (sp !== undefined) (leafToRoot ??= []).push(sp);
     cur = cur.parent;
   }
-  return undefined;
+  if (!leafToRoot) return undefined;
+  let acc = leafToRoot[leafToRoot.length - 1];
+  for (let i = leafToRoot.length - 2; i >= 0; i--) {
+    acc = mergePredicateSets(acc, leafToRoot[i]);
+  }
+  return acc;
+}
+
+/** Record facts on the scope's OWN layer (assert/requires mid-scope
+ *  accumulation). Never touches parent layers. */
+export function scopeOwnFacts(scope: ContextValue): Map<string, unknown> {
+  if (!scope.scopePredicates) scope.scopePredicates = new Map();
+  return scope.scopePredicates;
 }
 
 /** Guard for the data plane: struct operations must never run on scopes. */

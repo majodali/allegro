@@ -9,7 +9,7 @@ import {
   stringToBits, bitsToString,
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
-import { assertNotScope } from "./scope.js";
+import { assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeLookup } from "./scope.js";
 
 // Held write capability for the discharged integrity channel (C1.4, D21-D24).
 // Module-scope, never exported, never bound into any Allegro extension —
@@ -1608,24 +1608,13 @@ import {
  * affect the parent.
  */
 function augmentScopePredicates(parent: ContextValue, extra: Map<string, _PredicateSet>): ContextValue {
-  const sp = new Map<string, unknown>();
-  if (parent.scopePredicates) {
-    for (const [k, v] of parent.scopePredicates) sp.set(k, v);
-  }
-  for (const [k, v] of extra) {
-    const existing = sp.get(k) as _PredicateSet | undefined;
-    sp.set(k, existing ? _mergePredicateSets(existing, v) : v);
-  }
-  const newCtx: ContextValue = {
-    kind: ValueKind.Context,
-    bindings: parent.bindings,
-    bindingList: parent.bindingList,
-    scopePredicates: sp,
-  };
-  // F3a: propagate compile-mode flag through scope-predicate enrichment so
-  // deferral applies inside if-branches during precompile.
-  if ((parent as any).__compileMode) (newCtx as any).__compileMode = true;
-  return newCtx;
+  // C2.2: immutable fact layering — the child carries ONLY the new facts;
+  // reads merge across the chain (scopeFactsFor), reproducing the former
+  // copy-parent-then-merge semantics without the copy. Compile-mode reads
+  // are chain-aware (scopeCompileMode), so no flag propagation needed.
+  // NOTE: the child shares the parent's BINDINGS via the scope chain, not
+  // via shared Maps — scopeAssume creates a real (empty-binding) layer.
+  return scopeAssume(parent, extra);
 }
 
 // --- typed_int / typed_string: wrap raw values with type ---
@@ -2661,7 +2650,7 @@ const assert_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
  *    existing facts, we know P holds; no runtime call needed. Otherwise
  *    evaluate P; if false, error with counterexample.
  *
- * 2. NARROW — for predicates derived from P, mutate ctx.scopePredicates so
+ * 2. NARROW — for predicates derived from P, record scope facts (scopeOwnFacts) so
  *    subsequent symbol references in this scope see the narrowed facts. The
  *    mutation is intentional: ctx is shared across statements in a scope, so
  *    later statements pick up the assertion's facts.
@@ -2684,13 +2673,14 @@ const assert_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   let allEntailed = narrowing.size > 0;
   if (allEntailed) {
     for (const [name, pset] of narrowing) {
-      const binding = ctx!.bindings.get(name);
+      const binding = scopeLookup(ctx!, name);
       if (!binding?.value) { allEntailed = false; break; }
       // For accurate entailment, also fold in any in-scope predicates from
       // the parent (e.g. earlier asserts within this same scope).
       let effectiveSet = _predicatesOf(binding.value);
-      if (ctx!.scopePredicates) {
-        const scoped = ctx!.scopePredicates.get(name) as _PredicateSet | undefined;
+      {
+        // C2.2: chain-merged facts (branch layers + earlier same-scope asserts).
+        const scoped = scopeFactsFor(ctx!, name);
         if (scoped) {
           effectiveSet = effectiveSet ? _mergePredicateSets(effectiveSet, scoped) : scoped;
         }
@@ -2732,7 +2722,7 @@ const assert_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
               return "?";
             };
             // Surface the actual value if available.
-            const binding = ctx!.bindings.get(name);
+            const binding = scopeLookup(ctx!, name);
             let actualDesc = "";
             if (binding?.value) {
               const p = dataOf(binding.value);
@@ -2754,10 +2744,7 @@ const assert_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Statically discharged or runtime check passed: narrow scope predicates
   // for the rest of this scope.
   if (narrowing.size > 0) {
-    if (!ctx!.scopePredicates) {
-      (ctx as any).scopePredicates = new Map();
-    }
-    const sp = ctx!.scopePredicates!;
+    const sp = scopeOwnFacts(ctx!);
     for (const [name, pset] of narrowing) {
       const existing = sp.get(name) as _PredicateSet | undefined;
       sp.set(name, existing ? _mergePredicateSets(existing, pset) : pset);
@@ -2813,7 +2800,7 @@ const assume_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
  * arg, which would mis-tag the result with the (often noneSingleton) first
  * arg's type. By being lazy we sidestep that path entirely.
  *
- * Side effects (assert mutating ctx.scopePredicates, print emitting output)
+ * Side effects (assert recording scope facts, print emitting output)
  * fire left-to-right because we evaluate args sequentially with the same
  * ctx. Used by the block-expression builder to preserve non-last bare
  * expressions, and by the contract preprocessor to splice requires checks
@@ -2848,11 +2835,12 @@ const requires_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   let allEntailed = narrowing.size > 0;
   if (allEntailed) {
     for (const [name, pset] of narrowing) {
-      const binding = ctx!.bindings.get(name);
+      const binding = scopeLookup(ctx!, name);
       if (!binding?.value) { allEntailed = false; break; }
       let effectiveSet = _predicatesOf(binding.value);
-      if (ctx!.scopePredicates) {
-        const scoped = ctx!.scopePredicates.get(name) as _PredicateSet | undefined;
+      {
+        // C2.2: chain-merged facts (branch layers + earlier same-scope asserts).
+        const scoped = scopeFactsFor(ctx!, name);
         if (scoped) {
           effectiveSet = effectiveSet ? _mergePredicateSets(effectiveSet, scoped) : scoped;
         }
@@ -2887,7 +2875,7 @@ const requires_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
               if (d.kind === "eq") return `== ${d.value}`;
               return "?";
             };
-            const binding = ctx!.bindings.get(name);
+            const binding = scopeLookup(ctx!, name);
             let actualDesc = "";
             if (binding?.value) {
               const p = dataOf(binding.value);
@@ -2907,10 +2895,7 @@ const requires_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   if (narrowing.size > 0) {
-    if (!ctx!.scopePredicates) {
-      (ctx as any).scopePredicates = new Map();
-    }
-    const sp = ctx!.scopePredicates!;
+    const sp = scopeOwnFacts(ctx!);
     for (const [name, pset] of narrowing) {
       // Re-tag with "requires" source — deriveBranchPredicates already used
       // "requires" as the source argument, but ensure consistency.

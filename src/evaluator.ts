@@ -13,7 +13,7 @@ import {
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, PRESERVED_FN_META_KEYS } from "./slots.js";
-import { scopeLookup, scopeExtend, scopeCompileMode, scopePredicateFor } from "./scope.js";
+import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
 
@@ -109,7 +109,7 @@ export function evaluate(
         // Phase C Chunk 2: augment with any scope-local predicates for this
         // name (from branch conditions or in-scope `assert` statements).
         // C2.1: chain-aware — nearest layer wins.
-        const scopePred = scopePredicateFor(ctx, value.name);
+        const scopePred = scopeFactsFor(ctx, value.name);
         if (scopePred) {
           result = withPredicates(result, scopePred as PredicateSet);
         }

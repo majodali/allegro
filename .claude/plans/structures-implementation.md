@@ -137,6 +137,17 @@
 >   Deferral recorded: buildEvalCtx root layering moves to C2.3 with its
 >   flat-view consumers (REPL, module extraction, forward chaining); the
 >   root is marked isScope now.
+> - C2.2 (B-012) landed 2026-07 — facts plane. `scopeAssume` immutable
+>   fact layers (no parent copying; branch exit = discard);
+>   `scopeFactsFor` chain-merge reads (rootmost first — byte-identical to
+>   the former copy-then-merge); `scopeOwnFacts` sanctioned own-layer
+>   writes for assert/requires; augmentScopePredicates delegates to
+>   scopeAssume; four entailment binding lookups made chain-aware (static
+>   discharge would otherwise silently degrade inside branches);
+>   `.scopePredicates` opacity lint restricted to scope.ts. Boundary
+>   tests: sibling isolation, parent-untouched, nested chain merge,
+>   own-layer isolation. §6 delta 4 honored: observable behavior
+>   identical, internals-shaped tests only.
 
 ## 1. Context
 

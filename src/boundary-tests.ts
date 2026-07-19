@@ -34,7 +34,8 @@ import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./typ
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel } from "./slots.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
-import { scopeNew, scopeExtend, scopeLookup, assertNotScope } from "./scope.js";
+import { scopeNew, scopeExtend, scopeLookup, assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts } from "./scope.js";
+import { PredicateSet, makePredicate, effectsDomain } from "./refinements.js";
 import { makeInt } from "./types.js";
 import { effectsOf } from "./effects.js";
 
@@ -91,6 +92,10 @@ const LINT_PATTERNS: LintPattern[] = [
   // C1.4: TS-kernel writer acquisition is restricted to the two proof-kernel
   // modules — anywhere else, acquiring the discharged writer fails the suite.
   { name: "kernel-writer-acquisition", regex: /\bkernelChannelWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
+  // C2.2: fact payloads are opaque outside the scope module — reads via
+  // scopeFactsFor, layer pushes via scopeAssume, own-layer writes via
+  // scopeOwnFacts. Direct .scopePredicates access anywhere else fails.
+  { name: "scope-facts-direct", regex: /\.scopePredicates\b/g, excludeFiles: ["src/scope.ts"] },
 ];
 
 // Production sources only. test.ts pokes internals as test setup by design;
@@ -717,6 +722,28 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(threw2.includes("plane violation"), true, `struct-on-scope: ${threw2}`);
     // ...and pass data through untouched.
     assertNotScope(dataCtx as Value, "type_dispatch");
+  });
+
+  test("facts plane (C2.2): immutable layering, branch isolation, chain merge", () => {
+    const parent = scopeNew();
+    parent.bindings.set("x", { key: "x", value: makeInt(1), isUse: false });
+    const factA = new PredicateSet([makePredicate(effectsDomain(new Set(["a"])))]);
+    const factB = new PredicateSet([makePredicate(effectsDomain(new Set(["b"])))]);
+    const branchA = scopeAssume(parent, new Map([["x", factA]]));
+    const branchB = scopeAssume(parent, new Map([["x", factB]]));
+    // Sibling branches are isolated; the parent never gains facts.
+    eq([...scopeFactsFor(branchA, "x")!.effectiveEffects()!.labels].join(","), "a");
+    eq([...scopeFactsFor(branchB, "x")!.effectiveEffects()!.labels].join(","), "b");
+    eq(scopeFactsFor(parent, "x"), undefined, "branch exit discards — parent untouched");
+    // Chain merge: a nested layer refines, outer facts still visible.
+    const factC = new PredicateSet([makePredicate(effectsDomain(new Set(["c"])))]);
+    const nested = scopeAssume(branchA, new Map([["x", factC]]));
+    const merged = [...scopeFactsFor(nested, "x")!.effectiveEffects()!.labels].sort().join(",");
+    eq(merged, "a,c", "nested layer merges with outer facts");
+    // Own-layer accumulation (assert semantics) never touches the parent.
+    scopeOwnFacts(branchA).set("y", factB);
+    eq(scopeFactsFor(parent, "y"), undefined);
+    eq([...scopeFactsFor(branchA, "y")!.effectiveEffects()!.labels].join(","), "b");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

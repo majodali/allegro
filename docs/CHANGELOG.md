@@ -8,6 +8,33 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C2.2: Facts plane via scopeAssume (structures Phase 2, B-012)
+
+The Phase-C predicate-narrowing machinery moves onto the scope chain as
+immutable fact layers.
+
+- **`scopeAssume(parent, facts)`**: pushes a child layer carrying ONLY
+  the new facts — no copying of parent facts (the old
+  `augmentScopePredicates` copied every inherited entry per branch).
+  Branch exit is discarding the child; parents are never mutated.
+- **`scopeFactsFor`** merges fact sets across the whole chain, rootmost
+  first — reproducing the former copy-parent-then-merge read semantics
+  byte-identically (per §6 delta 4: observable behavior unchanged,
+  internals-shaped change only). The C2.1 nearest-layer-wins read was
+  superseded by this merge — with single-layer storage they were
+  equivalent; with real layers, merging is the faithful semantics.
+- **`scopeOwnFacts`** is the sanctioned write path for assert/requires
+  mid-scope accumulation — the scope's own layer state, never a parent.
+- **Chain-aware entailment**: the four static-discharge binding lookups
+  in assert/requires previously read the own-layer map only — under
+  layering they now chain-walk (without this, static discharge would
+  silently degrade to runtime checks inside branches).
+- **Opacity lint**: direct `.scopePredicates` access outside `scope.ts`
+  fails the suite — fact payloads are opaque to everything but the facts
+  API (the plan's "base ops never inspect them" boundary).
+- Boundary tests: sibling-branch isolation, parent-untouched-after-
+  branch, nested-layer chain merge, own-layer accumulation isolation.
+
 ## 2026-07 — C2.1: Scope protocol + parent chain (structures Phase 2, B-011)
 
 Phase 2 opens: scopes (evaluation) and structures (data) become distinct

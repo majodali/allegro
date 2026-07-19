@@ -97,7 +97,13 @@ phase).
   boundary tests (structural O(1), 2000-layer chains, shadowing).
   Root-eval-ctx layering (buildEvalCtx) deferred to C2.3 where its flat
   consumers (REPL, module extraction, forward chaining) get unified
-- [ ] **B-012** · L0 · Facts plane via `scope_assume` (C2.2)
+- [x] **B-012** · L0 · Facts plane via `scope_assume` (C2.2). Landed
+  2026-07: `scopeAssume` pushes immutable fact layers (child carries only
+  new facts; parents never copied/mutated; branch exit = discard);
+  `scopeFactsFor` merges across the chain rootmost-first (reproducing the
+  former copy-then-merge byte-identically); `scopeOwnFacts` for assert/
+  requires same-scope accumulation; entailment binding lookups made
+  chain-aware; `.scopePredicates` opacity lint (scope.ts only)
 - [ ] **B-013** · L0 · Resolution unification; retire `ctx_use`;
   unresolved-binding-as-future-cell (C2.3)
 - [ ] **B-014** · L2 · `[reval]` Contracts design revalidation →
