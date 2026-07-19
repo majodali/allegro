@@ -364,20 +364,10 @@ const ctx_bindings: PrimitiveFnImpl = (args) => {
   return makeExpr(id_prim, pairs);
 };
 
-const ctx_use: PrimitiveFnImpl = (args) => {
-  const ctx = asCtx(args[0], "ctx_use");
-  const key = bitsToString(asBits(args[1], "ctx_use"));
-  const newCtx = makeContext();
-  for (const [k, b] of ctx.bindings) {
-    const copy = { ...b };
-    newCtx.bindings.set(k, copy);
-    newCtx.bindingList.push(copy);
-  }
-  const binding = { key, value: undefined, isUse: true };
-  newCtx.bindings.set(key, binding);
-  newCtx.bindingList.push(binding);
-  return newCtx;
-};
+// C2.3a: ctx_use retired — zero consumers anywhere (src, lib, tests);
+// the isUse flag it minted was write-only cargo. Unresolved bindings are
+// future-cells (C2.3b), not use-markers.
+
 
 // ============ MULTI-VALUE ============
 
@@ -3707,7 +3697,6 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   ctx_bind: makePrimitive("ctx_bind", ctx_bind),
   ctx_resolve: makePrimitive("ctx_resolve", ctx_resolve),
   ctx_bindings: makePrimitive("ctx_bindings", ctx_bindings),
-  ctx_use: makePrimitive("ctx_use", ctx_use),
   mv_new: makePrimitive("mv_new", mv_new),
   mv_primary: makePrimitive("mv_primary", mv_primary),
   mv_get: makePrimitive("mv_get", mv_get),

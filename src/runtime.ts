@@ -730,7 +730,7 @@ export function buildEvalCtx(
     for (const [key, binding] of base.bindings) {
       // Skip primitives and extension bindings that were already added
       // Only bring forward user-defined bindings from previous REPL inputs
-      addBinding(key, binding.value!, binding.isUse);
+      addBinding(key, binding.value!);
     }
   }
 

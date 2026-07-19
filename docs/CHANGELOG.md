@@ -8,6 +8,17 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C2.3a: `ctx_use` + `isUse` retirement (structures Phase 2, B-013 part 1)
+
+Recon for C2.3 found the `ctx_use` surface already dead: the primitive
+has zero consumers anywhere (src, lib, tests), and the `isUse` flag it
+minted was write-only cargo — one passive forward in buildEvalCtx, zero
+semantic readers. Deleted the primitive and its registration; the
+`Binding.isUse` field is optional with a retirement note (full deletion
+with C2.3b's future-cell unification, which cleans the literal sites).
+C2.3b working spec (future cells, root layering, flat-view consumer
+migration, absent-vs-unresolved tests) recorded in the plan chunk log.
+
 ## 2026-07 — C2.2: Facts plane via scopeAssume (structures Phase 2, B-012)
 
 The Phase-C predicate-narrowing machinery moves onto the scope chain as

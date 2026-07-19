@@ -105,7 +105,15 @@ phase).
   requires same-scope accumulation; entailment binding lookups made
   chain-aware; `.scopePredicates` opacity lint (scope.ts only)
 - [ ] **B-013** · L0 · Resolution unification; retire `ctx_use`;
-  unresolved-binding-as-future-cell (C2.3)
+  unresolved-binding-as-future-cell (C2.3). **C2.3a landed 2026-07**:
+  `ctx_use` primitive deleted (zero consumers found anywhere) and
+  `Binding.isUse` retired to optional (write-only cargo, one passive
+  forward, zero semantic readers). C2.3b remaining: future-cell
+  unification (`value: undefined` / `__future_N` / `__bare_N` on one
+  representation), buildEvalCtx root layering via scope chain + flat-view
+  consumer migration (REPL, module extraction, forward chaining),
+  absent-vs-unresolved boundary tests — working spec in the plan chunk
+  log
 - [ ] **B-014** · L2 · `[reval]` Contracts design revalidation →
   `contracts.md` in `docs/design/standard/`: predicate-set model, branch
   refinement, assert/requires/ensures lowering, sink-based checks,

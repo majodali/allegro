@@ -103,7 +103,10 @@ export interface ExpressionValue {
 export interface Binding {
   key: string | null;
   value: Value | undefined;
-  isUse: boolean;
+  /** RETIRED (C2.3a): was the ctx_use marker; write-only cargo with zero
+   *  semantic readers. Optional during the literal-site cleanup; deleted
+   *  entirely with C2.3b's future-cell unification. */
+  isUse?: boolean;
 }
 
 export interface ContextValue {

@@ -148,6 +148,28 @@
 >   tests: sibling isolation, parent-untouched, nested chain merge,
 >   own-layer isolation. §6 delta 4 honored: observable behavior
 >   identical, internals-shaped tests only.
+> - C2.3 (B-013) IN PROGRESS 2026-07 — working spec from recon:
+>   Surface is smaller than feared: `isUse: true` originates at ONE site
+>   (primitives.ts:376, the `ctx_use` primitive at :367); everything else
+>   stamps `isUse: false`. Sub-steps: (1) map ctx_use's consumers (who
+>   calls the primitive; who reads `.isUse` downstream — grep shows only
+>   runtime.ts:733 forwarding it in a copy loop) and confirm the Earley/
+>   REPL paths that used it are dead or migratable; (2) retire
+>   `Binding.isUse` (types.ts:106) + ctx_use primitive, or park with a
+>   deprecation error if Allegro-reachable; (3) unresolved-binding =
+>   future-cell: unify `value: undefined` bindings, `__future_N`, and
+>   `__bare_N` on one representation consumed by applyPhase
+>   (runtime.ts:858) + DependencyRegistry; (4) buildEvalCtx root layering
+>   via scopeExtend chain (primitives → extensions → base → source as
+>   layers), migrating flat-view consumers: modules.ts source-binding
+>   extraction, REPL persistence (index.ts), markTailCallsInContext,
+>   propagateCompletions; add `scopeAllBindings` chain-flatten helper for
+>   them; (5) boundary tests: absent-vs-unresolved distinguished (lexical
+>   error vs residual), every unresolved-consumer exercised (REPL,
+>   forward-chain, futures, imports) on the one representation.
+>   Ordering: (1-2) first (small, independently landable), then (3),
+>   then (4), then (5); land as C2.3a (isUse retirement) + C2.3b
+>   (future-cells + root layering) if size demands.
 
 ## 1. Context
 
