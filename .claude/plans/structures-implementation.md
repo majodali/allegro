@@ -175,6 +175,34 @@
 >   forward-chain, ext-satisfied import, REPL isolation); 3 existing
 >   tests adjusted internals-shaped only (chain-aware lookups; unified
 >   cell construction — assertions unchanged). 1002/1002 green.
+> - C3.1 (B-015) landed 2026-07 — shape/knowledge split, dispatch on
+>   shape. The shape boundary is mechanical: `typeShape` (slots.ts) walks
+>   `__extends` past refinement layers whose `__members` is the SAME
+>   OBJECT as the parent's (buildRefinedType shares by reference) —
+>   those layers are knowledge; preserveOps/mixin/extend mint their own
+>   member sets and ARE shapes (overrides dispatch, Liskov). Channel
+>   reads: `shape` → computed dispatch shape (identity on non-refined
+>   types, so the existing meta-type readers were unaffected); `type` →
+>   raw stored view; new `knowledge` channel (computed) + refinements.ts
+>   `Knowledge` record (`knowledgeOf` = bound certificate + predicate
+>   set; `knowledgeDomain` meet; `meetKnowledge` lattice op — the
+>   occurrence carrier already merges through the same
+>   mergePredicateSets in scopeFactsFor). Dispatch migrated:
+>   type_dispatch_impl + the evaluator PRIM_TO_METHOD site read
+>   typeShape(stored); error messages keep the stored name; zero
+>   observable change (transparent layers share the member object).
+>   `withType` gains the shape-fixed-at-construction refusal
+>   (cross-shape re-stamp throws; same-shape knowledge re-bounds pass).
+>   The guard flushed out the one real coercion path: typeLiterals
+>   guesses 64-bit literals as Int and the typed_* wrappers correct it
+>   (8-char string literals!) — made explicit as `withTypeReplacing`
+>   (construction-point semantics). 6 boundary tests (shape identity,
+>   preserveOps-is-a-shape, writer refusal, dispatch-ignores-knowledge,
+>   certificates ride a typed function boundary, lattice meet).
+>   **§6 delta 5 NOT activated**: no introspection change was needed —
+>   introspection renders the stored type as before; the output-format
+>   question moves to the C3.2 briefing (annotations make knowledge
+>   user-visible there). 1008/1008 green.
 > - C2.3 (B-013) opened 2026-07 — working spec from recon:
 >   Surface is smaller than feared: `isUse: true` originates at ONE site
 >   (primitives.ts:376, the `ctx_use` primitive at :367); everything else

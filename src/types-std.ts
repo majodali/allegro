@@ -22,7 +22,7 @@ import {
   setGenericBackLink, markGeneric, setGenericConstructor, setProposition,
   setEffectKind, setEffectBound, setSlotCount, setAbstractDomain,
   writeShape, removeName, removeParent, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
-  removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf,
+  removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape,
 } from "./slots.js";
 
 
@@ -54,8 +54,42 @@ export function getTypeName(v: Value): string | null {
   return bitsToString(nameV);
 }
 
-/** Wrap a raw value with a type component */
+/** Wrap a raw value with a type component.
+ *
+ *  C3.1 (D36): SHAPE IS FIXED AT CONSTRUCTION — this writer (the type
+ *  channel's origination chokepoint, per the C1.4 scoping note) refuses to
+ *  re-stamp a value with a type of a DIFFERENT shape. Same-shape re-stamps
+ *  are knowledge re-bounds (refinement certificate tagging at
+ *  construction, preserveOps result re-tagging) and remain legal. */
 export function withType(v: Value, type: ContextValue): Value {
+  const primary = dataOf(v);
+  const components = v.kind === ValueKind.MultiValue
+    ? cloneComponents(v)
+    : new Map<string, Value>();
+  const prior = components.get("type");
+  if (prior !== undefined && prior !== (type as Value)
+      && prior.kind === ValueKind.Context && type?.kind === ValueKind.Context) {
+    const priorShape = typeShape(prior as ContextValue);
+    const newShape = typeShape(type);
+    if (priorShape !== newShape) {
+      throw new AllegroError(
+        `withType: shape is fixed at construction — cannot re-stamp a value of shape ` +
+        `'${typeContextName(priorShape) ?? "<anonymous>"}' with '${typeContextName(newShape) ?? "<anonymous>"}'`,
+      );
+    }
+  }
+  components.set("type", type);
+  return makeMultiValue(primary, components);
+}
+
+/** Construction-time type replacement — the literal-typing / coercion
+ *  path. `typeLiterals` provisionally guesses every 64-bit literal as Int;
+ *  the `typed_*` wrappers are the literal's REAL construction point and
+ *  replace the guess outright (e.g. an 8-character string literal arrives
+ *  Int-guessed and leaves String). Non-type components (error, effects,
+ *  predicates) are preserved. Post-construction code uses `withType`,
+ *  which refuses cross-shape re-stamps (C3.1, D36). */
+export function withTypeReplacing(v: Value, type: ContextValue): Value {
   const primary = dataOf(v);
   const components = v.kind === ValueKind.MultiValue
     ? cloneComponents(v)

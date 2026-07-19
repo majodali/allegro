@@ -126,8 +126,18 @@ phase).
   `.claude/plans/archive/lucid-discharging-lambek.md`,
   `.claude/plans/archive/crystal-proving-curry.md` §Phase C; substrate:
   structures.md §4/§6) — natural slot: with Phases 2–3
-- [ ] **B-015** · L0 · Shape/knowledge channel split; dispatch on shape
-  (C3.1)
+- [x] **B-015** · L0 · Shape/knowledge channel split; dispatch on shape
+  (C3.1). Landed 2026-07: `typeShape` walk (member-transparent refinement
+  layers = knowledge, identified by parent-member-set object identity;
+  preserveOps/mixin/extend layers = shapes); `shape` channel reads the
+  computed dispatch shape, `type` stays the raw stored view; `knowledge`
+  channel + `knowledgeOf`/`knowledgeDomain`/`meetKnowledge` unified
+  intrinsic carrier (bound + domains + predicates, one lattice);
+  type_dispatch + evaluator operator dispatch read shape; `withType`
+  refuses cross-shape re-stamps (typed_* literal wrappers are
+  construction points via `withTypeReplacing`); 6 boundary tests. §6
+  delta 5 (introspection format) not activated — deferred to the C3.2
+  briefing
 - [ ] **B-016** · L0 · Annotations as knowledge bounds; narrowing; carrier
   meet (C3.2)
 - [ ] **B-017** · L0 · Observation effect; pure recheck vs certificate

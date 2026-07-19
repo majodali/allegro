@@ -168,7 +168,21 @@ values (D20, D29):
 - Scope *binding* keys may remain strings; only channels and type members
   must be symbols (D14).
 
-## 6. Shape and knowledge [designed]
+## 6. Shape and knowledge [partial]
+
+*Status (2026-07, C3.1): the two channels exist as the canonical read
+paths over the current storage — `shape` reads the computed dispatch shape
+(member-transparent refinement layers walked off by `typeShape`; a layer
+sharing its parent's member set by identity is knowledge, a layer minting
+members — preserveOps/mixin/extend — is a shape); `knowledge` is the
+unified intrinsic carrier (`knowledgeOf`: refinement bound + domains +
+predicates, one lattice with `meetKnowledge`). Dispatch (type_dispatch +
+the evaluator's operator dispatch) reads shape; `withType` refuses
+cross-shape re-stamps post-construction (the `typed_*` literal wrappers
+are construction points and replace typeLiterals' provisional guess).
+Still pending: annotations as occurrence-knowledge bounds + narrowing +
+carrier meet (C3.2), the observation effect (C3.3), physical storage under
+the knowledge channel (C4).*
 
 The old `type` channel conflated two things; they split (D36):
 

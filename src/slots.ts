@@ -227,26 +227,75 @@ export function getSlotCount(ctx: ContextValue): Value | undefined { return slot
 export function isFutureBindingName(name: string): boolean { return name.startsWith("__future_"); }
 export function isBareBindingName(name: string): boolean { return name.startsWith("__bare_"); }
 
+// --- Shape/knowledge split (C3.1, D36) ---------------------------------------------
+//
+// The old `type` channel conflated the DECLARED SHAPE (layout, member set,
+// nominal identity — the dispatch source, fixed at construction) with
+// KNOWLEDGE (imputed refinement bound + domains + predicates). C3.1 splits
+// the read paths over the current storage:
+//   - `type`  channel → the raw stored type (legacy view, knowledge-bearing
+//     refinement bound included) — unchanged for existing readers.
+//   - `shape` channel → the COMPUTED dispatch shape: the stored type with
+//     member-transparent refinement layers walked off.
+//
+// A refinement layer is member-transparent iff it carries a predicate AND
+// its `__members` is the SAME OBJECT as its parent's (`buildRefinedType`
+// shares the parent's member set by reference). Types that mint their own
+// member set — `preserveOps` (lifted operators), `mixin`, `extend` — ARE
+// shapes: their overrides must dispatch (Liskov). Walking past a
+// transparent layer never changes dispatch results (same member object,
+// copied direct bindings); it defines where shape ends and knowledge
+// begins.
+
+/** The dispatch shape of a type Context: walk `__extends` past
+ *  member-transparent refinement layers. Identity on non-refined types. */
+export function typeShape(t: ContextValue): ContextValue {
+  let cur = t;
+  for (let guard = 0; guard < 64; guard++) {
+    if (slotRead(cur, "__predicate") === undefined) return cur;
+    const parent = asContext(slotRead(cur, "__extends"));
+    if (!parent) return cur;
+    const ownMembers = slotRead(cur, "__members");
+    const parentMembers = slotRead(parent, "__members");
+    if (ownMembers !== undefined && ownMembers !== parentMembers) return cur;
+    cur = parent;
+  }
+  return cur;
+}
+
 // --- Channel plane (read side) ------------------------------------------------------
 
 /** Raw channel read on a value: MultiValue component lookup, plus the two
  *  Context-binding channels (`__type`, `__discharged`) that predate the
- *  component plane. Free of any authority, per D23 (reads are free). */
+ *  component plane. Free of any authority, per D23 (reads are free).
+ *
+ *  C3.1: `shape` reads the computed dispatch shape (refinement layers
+ *  walked off — identity for every non-refined type, including the
+ *  meta-type reads on type values); `type` stays the raw stored view. */
 export function channelReadRaw(v: Value, channel: string): Value | undefined {
   if (v.kind === ValueKind.MultiValue) {
     const comp = (v as MultiValueType).components.get(channel);
     if (comp !== undefined) return comp as Value;
   }
   if (channel === "shape" || channel === "type") {
-    if (v.kind === ValueKind.MultiValue) return (v as MultiValueType).components.get("type") as Value | undefined;
-    if (v.kind === ValueKind.Context) return slotRead(v as ContextValue, "__type");
+    let raw: Value | undefined;
+    if (v.kind === ValueKind.MultiValue) {
+      raw = (v as MultiValueType).components.get("type") as Value | undefined;
+    } else if (v.kind === ValueKind.Context) {
+      raw = slotRead(v as ContextValue, "__type");
+    } else {
+      const ctx = asContext(v);
+      raw = ctx ? slotRead(ctx, "__type") : undefined;
+    }
+    if (channel === "shape" && raw?.kind === ValueKind.Context) {
+      return typeShape(raw as ContextValue);
+    }
+    return raw;
   }
   if (channel === "discharged") {
     const c = asContext(v);
     if (c) return slotRead(c, "__discharged");
   }
-  const ctx = asContext(v);
-  if (ctx && (channel === "shape" || channel === "type")) return slotRead(ctx, "__type");
   return undefined;
 }
 
@@ -551,6 +600,12 @@ registerChannel({ name: "error", rule: "viral" });
 registerChannel({ name: "effects", rule: "union" });
 registerChannel({ name: "predicates", rule: "computed" });
 registerChannel({ name: "domain", rule: "computed" });
+// C3.1 (D36): the canonical knowledge channel — one lattice over the
+// imputed refinement bound + abstract domains + predicate set. Computed
+// view for now: `predicates`/`domain` components + the refinement layers
+// of the stored type are its physical storage until the C4 representation
+// swap. Read via refinements.ts `knowledgeOf`.
+registerChannel({ name: "knowledge", rule: "computed" });
 registerChannel({ name: "discharged", rule: "drop", integrity: true, bindingKey: "__discharged" });
 registerChannel({ name: "warnings", rule: "union" });
 registerChannel({ name: "source", rule: "positional" });

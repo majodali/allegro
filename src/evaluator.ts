@@ -12,7 +12,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, PRESERVED_FN_META_KEYS } from "./slots.js";
+import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, typeShape, PRESERVED_FN_META_KEYS } from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
@@ -328,7 +328,11 @@ function applyPrimitive(
     if (typeComp && typeComp.kind === ValueKind.Context) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
       if (methodName) {
-        const method = typeMethod(typeComp as ContextValue, methodName);
+        // C3.1 (D36): dispatch reads the SHAPE. Member-transparent
+        // refinement layers share the parent's member set, so walking them
+        // off never changes which method runs; preserveOps/mixin layers
+        // mint their own members and ARE shapes (their overrides run).
+        const method = typeMethod(typeShape(typeComp as ContextValue), methodName);
         if (method?.kind === ValueKind.PrimitiveFunction) {
           const primaryArgs = evalArgs.map(dataOf);
           const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);

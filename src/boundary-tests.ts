@@ -31,7 +31,9 @@ import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
+import { withType, getType, typeMethod } from "./types-std.js";
+import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
 import { scopeNew, scopeExtend, scopeLookup, assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeAllBindings, makeCell, isPendingCell } from "./scope.js";
@@ -821,6 +823,95 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const a1 = r1.evalCtx.bindings.get("a")!;
     const a2 = scopeLookup(r2.evalCtx, "a")!;
     eq(a1 !== a2, true, "base flatten copies binding objects — later passes never alias earlier ctxs");
+  });
+
+  // --- Shape/knowledge split (C3.1, D36) --------------------------------------
+
+  test("shape/knowledge split (C3.1): refined value — stored type is knowledge, shape is the base", () => {
+    const { evalCtx } = evalSource(
+      "PositiveInt = Int & _ > 0\nx = PositiveInt(5)",
+      undefined, [createTypeSystem()], undefined, true);
+    const x = evalCtx.bindings.get("x")!.value as Value;
+    const stored = getType(x)!;
+    eq(bitsToString(primaryOf(getName(stored)!) as BitsValue), "PositiveInt", "stored type keeps the refinement bound");
+    const shape = channelReadRaw(x, "shape") as ContextValue;
+    eq(bitsToString(primaryOf(getName(shape)!) as BitsValue), "Int", "shape channel reads the dispatch shape");
+    const intCtx = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
+    eq(shape === intCtx, true, "shape IS the Int type object (identity)");
+    const k = knowledgeOf(x)!;
+    eq(k !== null && k.bound === stored, true, "knowledge bound is the refinement certificate");
+    const dom = knowledgeDomain(k) as IntervalDomain | null;
+    eq(dom?.kind === "interval" && dom.lo === 1, true, "knowledge domain is ≥ 1");
+    eq(channelSpec("knowledge")?.rule, "computed", "knowledge channel registered");
+  });
+
+  test("shape/knowledge split (C3.1): a type that mints members IS a shape (preserveOps)", () => {
+    const { evalCtx } = evalSource(
+      "PI = (Int & _ > 0).preserveOps()\ny = PI(5)\nz = y + 3",
+      undefined, [createTypeSystem()], undefined, true);
+    const y = evalCtx.bindings.get("y")!.value as Value;
+    const shape = channelReadRaw(y, "shape") as ContextValue;
+    eq(bitsToString(primaryOf(getName(shape)!) as BitsValue), "PI", "preserveOps type has its own member set — dispatch must reach its overrides");
+    // ...and the lifted operator actually ran: z carries the PI tag.
+    const z = evalCtx.bindings.get("z")!.value as Value;
+    eq(bitsToString(primaryOf(getName(getType(z)!)!) as BitsValue), "PI", "lifted op re-tagged the result");
+  });
+
+  test("shape immutability (C3.1): the writer refuses cross-shape re-stamps; knowledge re-bounds pass", () => {
+    const { evalCtx } = evalSource(
+      "PositiveInt = Int & _ > 0\nx = 42\ns = \"hi\"",
+      undefined, [createTypeSystem()], undefined, true);
+    const x = evalCtx.bindings.get("x")!.value as Value;
+    const stringType = asContext(scopeLookup(evalCtx, "String")!.value as Value)!;
+    const intType = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
+    const refined = asContext(evalCtx.bindings.get("PositiveInt")!.value as Value)!;
+    let threw = "";
+    try { withType(x, stringType); } catch (e: any) { threw = String(e.message); }
+    eq(threw.includes("shape is fixed at construction"), true, `cross-shape re-stamp refused: ${threw}`);
+    withType(x, intType);   // same shape — legal
+    withType(x, refined);   // knowledge re-bound (refinement certificate) — legal
+  });
+
+  test("dispatch ignores knowledge (C3.1): narrowed knowledge never changes which member runs", () => {
+    // A refined value dispatches through its shape: Int's toString runs.
+    const r1 = evalSource(
+      "PositiveInt = Int & _ > 0\ns = PositiveInt(5).toString()",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(bitsToString(primaryOf(r1.evalCtx.bindings.get("s")!.value!) as BitsValue), "5", "refined value runs the shape's method");
+    // Attaching extra knowledge to a value must not affect dispatch.
+    const r2 = evalSource("h = \"hello\"", undefined, [createTypeSystem()], undefined, true);
+    const h = r2.evalCtx.bindings.get("h")!.value as Value;
+    const narrowed = withPredicates(h, new PredicateSet([makePredicate(effectsDomain(new Set(["irrelevant"])))]));
+    const shapeBefore = channelReadRaw(h, "shape");
+    const shapeAfter = channelReadRaw(narrowed, "shape");
+    eq(shapeBefore === shapeAfter, true, "attached knowledge leaves the shape untouched");
+    const lenGetter = typeMethod(typeShape(getType(narrowed)!), "length");
+    eq(lenGetter !== null, true, "member lookup through the shape is knowledge-independent");
+  });
+
+  test("certificates ride (C3.1): refinement knowledge survives a function boundary", () => {
+    const { evalCtx } = evalSource(
+      "PositiveInt = Int & _ > 0\nf(x: PositiveInt): PositiveInt => x\ny = f(PositiveInt(5))",
+      undefined, [createTypeSystem()], undefined, true);
+    const y = evalCtx.bindings.get("y")!.value as Value;
+    const k = knowledgeOf(y);
+    eq(k !== null, true, "knowledge present after passage");
+    const dom = knowledgeDomain(k!) as IntervalDomain | null;
+    eq(dom?.kind === "interval" && dom.lo >= 1, true, "certificate domain intact across the boundary");
+  });
+
+  test("knowledge lattice (C3.1): meet accumulates facts — domains intersect", () => {
+    const a: Knowledge = {
+      bound: null,
+      predicates: new PredicateSet([makePredicate({ kind: "interval", lo: 1, hi: Infinity })]),
+    };
+    const b: Knowledge = {
+      bound: null,
+      predicates: new PredicateSet([makePredicate({ kind: "interval", lo: -Infinity, hi: 99 })]),
+    };
+    const met = meetKnowledge(a, b);
+    const dom = knowledgeDomain(met) as IntervalDomain | null;
+    eq(dom?.kind === "interval" && dom.lo === 1 && dom.hi === 99, true, "meet of ≥1 and ≤99 is [1, 99]");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

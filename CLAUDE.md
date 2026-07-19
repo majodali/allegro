@@ -120,10 +120,11 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - Structural checking compares `__members` collections: every member in the expected type must exist in the actual type
 
 ### Type-Directed Dispatch
-- `type_dispatch` checks the value's type component, looks up member descriptor from `__members`, returns a self-bound closure
+- C3.1 shape/knowledge split (D36): dispatch reads the SHAPE — `typeShape` (src/slots.ts) walks past member-transparent refinement layers (predicate-carrying, `__members` shared with the parent by object identity); preserveOps/mixin/extend layers mint their own member sets and ARE shapes (their overrides run — Liskov). The stored `type` component keeps the full view (refinement bound included); `channelReadRaw(v, "shape")` returns the computed shape; `knowledgeOf(v)` (src/refinements.ts) returns the unified intrinsic-knowledge carrier (bound certificate + predicates, one lattice via `meetKnowledge`). `withType` refuses cross-shape re-stamps post-construction; the `typed_*` literal wrappers are construction points (`withTypeReplacing` corrects typeLiterals' 64-bit Int guess).
+- `type_dispatch` checks the value's shape, looks up member descriptor from `__members`, returns a self-bound closure
 - Getter descriptors are called immediately with self; method descriptors return bound functions
 - Field descriptors look up the field value on the instance's primary Context
-- The evaluator's `PRIM_TO_METHOD` mapping dispatches base operators (`bits_add` etc.) through `typeMethod()` when operands are typed
+- The evaluator's `PRIM_TO_METHOD` mapping dispatches base operators (`bits_add` etc.) through `typeMethod()` on the shape when operands are typed
 - Type methods return properly typed values — comparisons return Bool, arithmetic returns the operand type
 - No implicit fallback — missing type method is an error
 - Types can define `__getMember(self, fieldName)` as a fallback for fields not in `__members` (like Python's `__getattr__`). Object uses this for field access. Types without `__getMember` enforce strict encapsulation.

@@ -8,6 +8,57 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C3.1: Shape/knowledge split — two channels, dispatch on shape (structures Phase 3, B-015)
+
+The old `type` channel conflated the declared shape with what's known
+about a value (D36). C3.1 splits the READ paths over the current storage;
+the physical representation moves at C4.
+
+- **The shape boundary, mechanically**: `typeShape(t)` walks `__extends`
+  past member-transparent refinement layers. The transparency test is
+  object identity — `buildRefinedType` shares the parent's `__members` by
+  reference, so a predicate-carrying layer whose member set === its
+  parent's is knowledge; a layer that mints its own member set
+  (`preserveOps` lifted operators, `mixin`, `extend`) IS a shape and its
+  overrides dispatch (Liskov). Walking a transparent layer can never
+  change which member runs — the split defines where shape ends and
+  knowledge begins without touching behavior.
+- **Two channel reads**: `channelReadRaw(v, "shape")` now returns the
+  computed dispatch shape (identity for every non-refined type, so the
+  existing meta-type readers are unaffected); `type` stays the raw stored
+  view (bound included). New `knowledge` channel (computed) registered;
+  `knowledgeOf(v)` returns the unified intrinsic carrier — refinement
+  bound (the construction certificate) + predicate set — with
+  `knowledgeDomain` (meet of bound domain and predicate domain) and
+  `meetKnowledge` (one lattice; the occurrence carrier in the scope facts
+  plane merges through the same `mergePredicateSets`).
+- **Dispatch reads shape**: `type_dispatch_impl` and the evaluator's
+  `PRIM_TO_METHOD` operator dispatch resolve members through
+  `typeShape(storedType)`. Observable behavior identical (transparent
+  layers share the member object; error messages keep the stored type's
+  name); the dispatch/knowledge independence is now structural rather
+  than incidental.
+- **Shape is fixed at construction**: `withType` — the type channel's
+  origination chokepoint — refuses re-stamping a value with a
+  DIFFERENT-shaped type. Same-shape re-stamps (refinement certificate
+  tagging, preserveOps result re-tagging) remain legal. The guard flushed
+  out one real construction path: `typeLiterals` provisionally guesses
+  every 64-bit literal as Int, and the `typed_*` wrappers correct the
+  guess (an 8-character string literal arrives Int-guessed) — those are
+  construction points, now explicit via `withTypeReplacing`.
+- **Boundary tests** (6 new): stored-vs-shape reads on refined values
+  (shape identity with the base Int object), preserveOps-type-is-a-shape
+  (+ lifted op still re-tags), writer refusal on cross-shape re-stamp with
+  knowledge re-bounds passing, dispatch under attached knowledge
+  (narrowing never changes the member; refined values run the shape's
+  methods), certificates riding across a typed function boundary, and the
+  knowledge-lattice meet ([≥1] ∧ [≤99] = [1,99]).
+
+§6 delta 5 (introspection output format change) was NOT needed and is not
+activated — introspection still renders the stored type; the format
+question goes to the C3.2 briefing where annotations make knowledge
+user-visible. 1008/1008 green.
+
 ## 2026-07 — C2.3b: Resolution unification — future cells + root layering (structures Phase 2 complete, B-013 part 2)
 
 An unresolved binding is now a **future cell**, and there is exactly one

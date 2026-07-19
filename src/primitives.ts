@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, CHANNEL_WRITER_BRAND, HOST_KEYS } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, CHANNEL_WRITER_BRAND, HOST_KEYS } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -1565,7 +1565,7 @@ const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("w
 // ============ TYPE SYSTEM ============
 
 import {
-  getType, getTypeName, withType, typeMethod, typeMemberDescriptor,
+  getType, getTypeName, withType, withTypeReplacing, typeMethod, typeMemberDescriptor,
   isMethodDescriptor, isFieldDescriptor, isGetterDescriptor,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
@@ -1621,16 +1621,20 @@ function augmentScopePredicates(parent: ContextValue, extra: Map<string, _Predic
 
 // --- typed_int / typed_string: wrap raw values with type ---
 
+// The typed_* literal wrappers are the literal's real construction point:
+// typeLiterals provisionally guesses 64-bit literals as Int, and these
+// wrappers REPLACE the guess (withTypeReplacing) rather than re-stamp —
+// C3.1's shape-fixed-at-construction guard applies only after this point.
 const typed_int_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
   if (!isResolved(v)) return makeExpr(makePrimitive("typed_int", typed_int_impl, true), [v]);
-  return withType(v, IntType);
+  return withTypeReplacing(v, IntType);
 };
 
 const typed_string_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
   if (!isResolved(v)) return makeExpr(makePrimitive("typed_string", typed_string_impl, true), [v]);
-  return withType(v, StringType);
+  return withTypeReplacing(v, StringType);
 };
 
 const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
@@ -1646,13 +1650,13 @@ const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
     return withType(p, FloatType);
   }
-  return withType(v, FloatType);
+  return withTypeReplacing(v, FloatType);
 };
 
 const typed_bool_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
   if (!isResolved(v)) return makeExpr(makePrimitive("typed_bool", typed_bool_impl, true), [v]);
-  return withType(v, BoolType);
+  return withTypeReplacing(v, BoolType);
 };
 
 const typed_array_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
@@ -2003,7 +2007,12 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("type_dispatch", type_dispatch_impl, true), [obj, fieldArg]);
   }
   const fieldName = bitsToString(asBits(fieldArg, "type_dispatch"));
-  const type = getType(obj);
+  // C3.1 (D36): dispatch reads the SHAPE — member-transparent refinement
+  // layers (predicate-only, member set shared with the parent) never
+  // affect member lookup; preserveOps/mixin layers mint their own member
+  // sets and ARE shapes. Error messages keep the stored type's name.
+  const storedType = getType(obj);
+  const type = storedType ? typeShape(storedType) : null;
 
   if (type) {
     // Look up member descriptor from __members

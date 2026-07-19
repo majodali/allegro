@@ -20,7 +20,7 @@
 // See .claude/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { dataOf, cloneComponents, componentsView } from "./slots.js";
+import { dataOf, cloneComponents, componentsView, channelReadRaw, typeShape, getAbstractDomain } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue,
   makeMultiValue, makeInt, isResolved,
@@ -670,6 +670,72 @@ function encodePredicates(set: PredicateSet): Value {
 function decodePredicates(v: Value): PredicateSet | null {
   if (v.kind !== ValueKind.Context) return null;
   return (v as any).__predicateSet ?? null;
+}
+
+// =============================================================================
+// Knowledge carrier (C3.1, D36)
+//
+// KNOWLEDGE is everything established ABOUT a value — the imputed
+// refinement bound, abstract domains, and predicates — unified into one
+// monotonic lattice, excluded from value identity and dispatch. This is
+// the INTRINSIC carrier (certified at construction, rides the value across
+// scope boundaries); the OCCURRENCE carrier is the scope facts plane
+// (C2.2 `scopeAssume`/`scopeFactsFor`). C3.2 combines the two by meet.
+//
+// Computed view over the current storage: the refinement layers of the
+// stored `type` component (walked off by `typeShape`) + the on-value
+// `predicates`/`domain` components. The physical storage moves under the
+// `knowledge` channel at the C4 representation swap.
+// =============================================================================
+
+export interface Knowledge {
+  /** The imputed refinement bound — the stored type when it carries
+   *  member-transparent refinement layers (the construction certificate:
+   *  `PositiveInt` on a `PositiveInt(5)`). Null when the stored type IS
+   *  the dispatch shape. */
+  bound: ContextValue | null;
+  /** The on-value predicate set (Phase C), if any. */
+  predicates: PredicateSet | null;
+}
+
+/** The intrinsic knowledge riding a value, or null when it carries none. */
+export function knowledgeOf(v: Value): Knowledge | null {
+  const stored = channelReadRaw(v, "type");
+  let bound: ContextValue | null = null;
+  if (stored?.kind === ValueKind.Context) {
+    const shape = typeShape(stored as ContextValue);
+    if (shape !== stored) bound = stored as ContextValue;
+  }
+  const predicates = predicatesOf(v);
+  if (!bound && !predicates) return null;
+  return { bound, predicates };
+}
+
+/** The tightest single abstract domain the knowledge implies — the meet
+ *  of the bound's domain and the predicate set's effective domain. */
+export function knowledgeDomain(k: Knowledge): AbstractDomain | null {
+  const boundDom = (k.bound ? getAbstractDomain(k.bound) : null) as AbstractDomain | null;
+  const predDom = k.predicates?.effectiveDomain() ?? null;
+  if (boundDom && predDom) return intersectDomains(boundDom, predDom);
+  return boundDom ?? predDom;
+}
+
+/** Meet on the knowledge lattice — facts accumulate, never widen. Both
+ *  carriers share this op (intrinsic here; occurrence facts merge through
+ *  the same `mergePredicateSets` in `scopeFactsFor`). */
+export function meetKnowledge(a: Knowledge, b: Knowledge): Knowledge {
+  const predicates = a.predicates && b.predicates
+    ? mergePredicateSets(a.predicates, b.predicates)
+    : (a.predicates ?? b.predicates);
+  // Bound meet: when both carry a domain, keep the tighter bound; the
+  // domain-level meet is always available via knowledgeDomain.
+  let bound = a.bound ?? b.bound;
+  if (a.bound && b.bound) {
+    const da = getAbstractDomain(a.bound) as AbstractDomain | undefined;
+    const db = getAbstractDomain(b.bound) as AbstractDomain | undefined;
+    if (da && db && impliesDomain(db, da)) bound = b.bound;
+  }
+  return { bound, predicates };
 }
 
 /** Encode a domain into a Value so it can live as a component. We stash it
