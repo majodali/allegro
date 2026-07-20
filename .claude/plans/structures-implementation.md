@@ -436,7 +436,18 @@ matrix, three surfaces).*
 **C5.2 — Symbol-keyed members + draw-from.** Type members keyed by
 symbols; declared-context draw-from binding; multi-bind (diamond) support;
 multiple-distinct-match error; `~`/pattern matching stays on base-name
-projection.
+projection. This is the dissolution point for the `__members`/`__extends`
+string keys (D39: they become the declared members `Type.members` /
+`Type.parent`).
+*C3.1 dependency note (2026-07): `typeShape`'s shape/knowledge boundary
+keys on MEMBER-SET OBJECT IDENTITY — a refinement layer is
+member-transparent iff its member set is the SAME object as its parent's
+(`buildRefinedType` shares by reference; preserveOps/mixin/extend mint
+fresh sets). The C5.2 member-representation migration must either
+preserve that sharing invariant across the re-keying or replace the
+identity test with an explicit transparency marker on the type — decide
+in the C5.2 briefing before touching member storage, and carry the C3.1
+boundary tests (shape identity, preserveOps-is-a-shape) as the oracle.*
 *Boundary tests: declared-conformance vs loose-path separation (a
 same-named member from an undeclared context does NOT satisfy an
 interface check; `~T` still matches it); diamond multi-bind dispatches to
