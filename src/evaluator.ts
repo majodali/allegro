@@ -7,7 +7,7 @@ import {
   DepCollector,
 } from "./types.js";
 import {
-  getType, getTypeName, withType, typeMethod, getFunctionParamTypes, getFunctionReturnType,
+  getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
@@ -481,6 +481,11 @@ function applyComposed(
             const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
             if (resolvedParamType.kind !== ValueKind.Context) continue; // unresolved type var
             checkArgType(evalArgs[i], resolvedParamType as ContextValue, i, enrichedCtx, depth, depCollector);
+            // C3.2 (D36): the annotation is a knowledge upper-bound — the
+            // param crossing is an abstraction boundary. Stamp (widening)
+            // or reset (own-shape) the occurrence bound on the value that
+            // gets substituted into the body.
+            evalArgs[i] = applyBoundaryBound(evalArgs[i], resolvedParamType as ContextValue);
             // Stage D — Surface C call-site enforcement (F2): when the
             // param-type slot has no `__effectBound` but `param_effects
             // f: pure` stamped an effect bound onto the Param.effectBound

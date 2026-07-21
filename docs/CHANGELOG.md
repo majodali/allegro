@@ -8,6 +8,54 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C3.2: Annotations as knowledge bounds + narrowing (structures Phase 3, B-016)
+
+Type annotations become what D36 says they are: KNOWLEDGE UPPER-BOUNDS —
+member-hiding abstraction boundaries. A Dog crossing `a: Animal` keeps
+its shape (dispatch, equality, `when` matching all unchanged) but the
+occurrence may only touch Animal's members until narrowed. First
+user-visible behavior change of the structures arc, mandated by the
+ratified design.
+
+- **Boundary crossing**: `applyComposed` (call-site params) and
+  `type_check` (return annotations, binding annotations) stamp an
+  occurrence `bound` component (drop-propagation — bounds constrain the
+  occurrence, never derived results) when the declared type is WIDER than
+  the value's shape, and clear any inherited bound on own-shape crossings
+  ("the new occurrence's starting knowledge"). Only named nominal
+  concrete types participate — Any, function types, Effect annotations,
+  interfaces, unions, and generics are pass-throughs.
+- **Visibility gate**: `type_dispatch` refuses members absent from the
+  bound's declared surface with a teaching error (`'tricks' is not
+  visible through annotation 'Animal' — narrow with \`when … is Dog\`»);
+  visible members dispatch through the SHAPE as before (Liskov). Open
+  types are exempt: the base Object type (dynamic fields by design) and
+  fallback-only types with no declared members (module objects — their
+  `__getMember` is already the visibility policy).
+- **Narrowing**: a matched `when … is T` type pattern (bare or
+  destructuring) lifts the bound within the arm, both subject forms:
+  Symbol subjects get an O(1) scope shadow layer (C2.1 machinery — arm
+  exit is discard, the else arm keeps the outer view); substituted-param
+  subjects get a clone-on-write identity replacement of the subject value
+  inside the arm (substitution clones former param positions per call, so
+  the walk never touches shared ASTs).
+- **The meet never widens**: intrinsic knowledge (refinement
+  certificates, predicates) survives passage through looser annotations —
+  `PositiveInt(5)` through `x: Int` keeps its certificate; `knowledgeOf`
+  gains the `occurrenceBound` carrier and `knowledgeDomain` meets all
+  three sources.
+- **Delta 5 activated, additive-only**: introspection gains a
+  `bound: Animal (annotation)` line on bounded values; every existing
+  output is byte-identical. Website sandbox gains a "Knowledge Bounds"
+  example.
+- **Deferred, recorded in §6's status note**: operator-dispatch
+  visibility gating, knowledge-gated downcast refusal at call sites
+  (runtime-sound today), record undeclared-field openness.
+
+Demo `tests/knowledge-bounds-demo.alg`; 4 new boundary tests (two-sided
+visibility/dispatch matrix, both narrowing forms + arm-locality, boundary
+reset, intrinsic survival). 1013/1013 green.
+
 ## 2026-07 — C3.1: Shape/knowledge split — two channels, dispatch on shape (structures Phase 3, B-015)
 
 The old `type` channel conflated the declared shape with what's known

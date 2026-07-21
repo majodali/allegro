@@ -141,6 +141,7 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - Type expressions support generics: `f(arr: Array[Int]) => ...`
 - Untyped functions via base grammar still work (`f(x) => x + 1`)
 - Type checks at call site: `applyComposed` checks arg types against FunctionType param types before substitution. Handles unions, structural, generics with arg comparison. No type_check wrappers in function bodies.
+- C3.2 (D36): annotations are KNOWLEDGE UPPER-BOUNDS. Passing a Dog through `a: Animal` stamps an occurrence `bound` component — Dog-only members are hidden (`'tricks' is not visible through annotation 'Animal'`) until a `when a is Dog` type pattern narrows the arm; visible members still dispatch through the value's shape (overrides run). Crossing a boundary of the value's own shape resets the bound; intrinsic knowledge (refinement certificates) survives looser annotations. Named nominal concrete types only — Any/function/effect/interface/union/generic annotations set no bound; base Object and module types are open (no hiding).
 
 ### Type Hierarchy
 - **Type** — the single meta-type. All types have `__type = Type`. Type self-types (`Type.__type = Type`).

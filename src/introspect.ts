@@ -19,11 +19,12 @@ import {
 } from "./types.js";
 import type { CompilationReport, Notification } from "./runtime.js";
 import { reportErrors, reportHasErrors } from "./runtime.js";
-import { getTypeName } from "./types-std.js";
+import { getTypeName, typeContextName } from "./types-std.js";
 import {
   domainOf, formatDomain, AbstractDomain,
   predicatesOf, PredicateSet, Predicate,
   deriveBranchPredicates, domainFromPredicate,
+  occurrenceBoundOf,
 } from "./refinements.js";
 import {
   EffectSet, formatEffects, effectsOf, unwrapEffectsAttach,
@@ -40,6 +41,10 @@ export interface ValueSummary {
   kind:          ValueKind;
   /** Type name if the value is typed (e.g., "Int", "Function", "Array"). */
   typeName:      string | null;
+  /** C3.2 (D36): the occurrence bound's type name, when this value crossed
+   *  an annotation boundary wider than its shape (e.g. "Animal" on a value
+   *  whose typeName is "Dog"). Member visibility follows the bound. */
+  annotationBound: string | null;
   /** Whether the value is fully resolved (no residual Expression / Symbol). */
   resolved:      boolean;
   /** Total node count in the Value tree. */
@@ -251,9 +256,13 @@ export function summarizeValue(v: Value): ValueSummary {
     if (wrap) declaredEffects = wrap.declared;
   }
 
+  const boundCtx = occurrenceBoundOf(v);
+  const annotationBound = boundCtx ? (typeContextName(boundCtx) ?? "<anonymous>") : null;
+
   return {
     kind:             kindAtPrimary,
     typeName,
+    annotationBound,
     resolved:         isResolved(v),
     nodeCount,
     depth:            maxDepth,
@@ -605,6 +614,10 @@ export function renderModuleSummary(summary: ModuleSummary): string {
     } else if (b.summary.domain && b.summary.domain.kind !== "opaque") {
       // Fallback: legacy single-domain path.
       lines.push(`      refinement: ${formatDomain(b.summary.domain)}`);
+    }
+    // C3.2 (delta 5, additive): surface the occurrence bound when present.
+    if (b.summary.annotationBound) {
+      lines.push(`      bound: ${b.summary.annotationBound} (annotation)`);
     }
     if (b.summary.nodeCount > 1) {
       lines.push(`      nodes: ${b.summary.nodeCount}, depth: ${b.summary.depth}`);

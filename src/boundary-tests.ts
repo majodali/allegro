@@ -33,7 +33,7 @@ import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
 import { withType, getType, typeMethod } from "./types-std.js";
-import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, Knowledge, IntervalDomain } from "./refinements.js";
+import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
 import { scopeNew, scopeExtend, scopeLookup, assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeAllBindings, makeCell, isPendingCell } from "./scope.js";
@@ -900,14 +900,77 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(dom?.kind === "interval" && dom.lo >= 1, true, "certificate domain intact across the boundary");
   });
 
+  // --- Annotations as knowledge bounds (C3.2, D36) ----------------------------
+
+  const C32_TYPES = "Animal = Type.extend({legs: Int})\nDog = Animal.extend({legs: Int, tricks: Int})\n";
+
+  test("knowledge bounds (C3.2): the two-sided matrix — visibility follows knowledge, dispatch follows shape", () => {
+    // Visible through the bound: Animal declares `legs`.
+    const ok = evalSource(C32_TYPES + "f(a: Animal): Int => a.legs\nr = f(Dog(4, 7))",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(Number((primaryOf(ok.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 4, "base member visible through the bound");
+    // Hidden: `tricks` is Dog-only — the annotation gates it.
+    let threw = "";
+    try {
+      evalSource(C32_TYPES + "g(a: Animal): Int => a.tricks\nr = g(Dog(4, 7))",
+        undefined, [createTypeSystem()], undefined, true);
+    } catch (e: any) { threw = String(e.message); }
+    eq(threw.includes("not visible through annotation 'Animal'"), true, `subtype member hidden: ${threw}`);
+    // Dispatch source intact: the bounded value's stored type stays Dog.
+    const b = evalSource(C32_TYPES + "id2(a: Animal): Animal => a\nx = id2(Dog(4, 7))",
+      undefined, [createTypeSystem()], undefined, true);
+    const x = b.evalCtx.bindings.get("x")!.value as Value;
+    eq(getTypeNameOf(x), "Dog", "shape (dispatch source) untouched by the bound");
+    const bound = occurrenceBoundOf(x)!;
+    eq(bitsToString(primaryOf(getName(bound)!) as BitsValue), "Animal", "occurrence bound rides the value");
+    eq(knowledgeOf(x)?.occurrenceBound === bound, true, "knowledgeOf surfaces the occurrence carrier");
+  });
+
+  test("knowledge bounds (C3.2): `when … is T` narrows — both subject forms; else arm keeps the bound", () => {
+    // Symbol subject (scope-resolved binding): return boundary stamps the
+    // bound; the matched arm lifts it.
+    const r1 = evalSource(C32_TYPES + "mk(): Animal => Dog(2, 3)\na = mk()\nr = when a is Dog then a.tricks else 0 - 1",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(Number((primaryOf(r1.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 3, "Symbol-subject narrowing");
+    eq(occurrenceBoundOf(r1.evalCtx.bindings.get("a")!.value!) !== null, true, "narrowing is arm-local — the binding keeps its bound");
+    // Substituted-param subject: identity replacement inside the arm.
+    const r2 = evalSource(C32_TYPES + "g(a: Animal): Int => when a is Dog then a.tricks else 0 - 1\nr = g(Dog(4, 9))",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(Number((primaryOf(r2.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 9, "substituted-param narrowing");
+  });
+
+  test("knowledge bounds (C3.2): boundary crossing resets occurrence knowledge", () => {
+    const r = evalSource(
+      C32_TYPES +
+      "tc(d: Dog): Int => d.tricks\n" +
+      "via(a: Animal): Int => when a is Dog then tc(a) else 0 - 1\n" +
+      "r = via(Dog(4, 5))",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(Number((primaryOf(r.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 5, "own-shape boundary restores full knowledge");
+  });
+
+  test("knowledge bounds (C3.2): meet computed, not overwritten — intrinsic facts survive a looser annotation", () => {
+    const r = evalSource(
+      "PositiveInt = Int & _ > 0\nident(x: Int): Int => x\ny = ident(PositiveInt(5))",
+      undefined, [createTypeSystem()], undefined, true);
+    const y = r.evalCtx.bindings.get("y")!.value as Value;
+    const k = knowledgeOf(y)!;
+    eq(k !== null && k.bound !== null, true, "certificate survives passage through the wider annotation");
+    eq(k.occurrenceBound, null, "same-shape crossing sets no bound");
+    const dom = knowledgeDomain(k) as IntervalDomain | null;
+    eq(dom?.kind === "interval" && dom.lo >= 1, true, "domain intact — the meet never widens");
+  });
+
   test("knowledge lattice (C3.1): meet accumulates facts — domains intersect", () => {
     const a: Knowledge = {
       bound: null,
       predicates: new PredicateSet([makePredicate({ kind: "interval", lo: 1, hi: Infinity })]),
+      occurrenceBound: null,
     };
     const b: Knowledge = {
       bound: null,
       predicates: new PredicateSet([makePredicate({ kind: "interval", lo: -Infinity, hi: 99 })]),
+      occurrenceBound: null,
     };
     const met = meetKnowledge(a, b);
     const dom = knowledgeDomain(met) as IntervalDomain | null;

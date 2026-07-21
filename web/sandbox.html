@@ -247,6 +247,21 @@ UserId = Int.distinct()
 print(UserId(42) instanceof Int)
 print(UserId(42) instanceof UserId)`,
 
+  "Knowledge Bounds": `// C3.2: annotations are knowledge upper-bounds.
+// Passing a Dog through \`a: Animal\` hides Dog-only members
+// until a \`when ... is Dog\` type pattern narrows the occurrence.
+Animal = Type.extend({legs: Int})
+Dog = Animal.extend({legs: Int, tricks: Int})
+
+count_legs(a: Animal): Int => a.legs
+print(count_legs(Dog(4, 7)))
+
+describe(a: Animal): Int => when a is Dog then a.tricks else 0 - 1
+print(describe(Dog(4, 9)))
+
+// a.tricks WITHOUT narrowing would report:
+//   'tricks' is not visible through annotation 'Animal'`,
+
   "Arrays": `// Array operations
 nums = [1, 2, 3, 4, 5]
 print(nums.length)

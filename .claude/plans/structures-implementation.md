@@ -175,6 +175,31 @@
 >   forward-chain, ext-satisfied import, REPL isolation); 3 existing
 >   tests adjusted internals-shaped only (chain-aware lookups; unified
 >   cell construction — assertions unchanged). 1002/1002 green.
+> - C3.2 (B-016) landed 2026-07 — annotations as knowledge bounds +
+>   narrowing. Occurrence `bound` component (drop rule) stamped at
+>   annotation boundaries: applyComposed after checkArgType (params) and
+>   type_check's success returns (return + binding annotations) via
+>   `applyBoundaryBound` — wider-than-shape stamps, own-shape clears
+>   (boundary reset), non-nominal annotations (Any/Function/effects/
+>   interfaces/unions/generics) pass through. type_dispatch gates member
+>   VISIBILITY on the bound (declared-member surface; base Object +
+>   fallback-only module types exempt as open) while dispatching visible
+>   members through the SHAPE. Narrowing: matched `when … is T` type
+>   patterns lift the bound in-arm — Symbol subjects via an O(1)
+>   scopeExtend shadow (C2.1 machinery); substituted-param subjects via
+>   `replaceValueIdentity` clone-on-write (sound because substituteParams
+>   clones former param positions per call — recon initially found the
+>   substituted-subject idiom broken and this closed it). knowledgeOf
+>   gains `occurrenceBound`; knowledgeDomain meets bound + occurrence +
+>   predicates; intrinsic certificates survive looser annotations.
+>   **§6 delta 5 activated additive-only**: introspection adds a
+>   `bound: T (annotation)` line on bounded values; all existing outputs
+>   byte-identical. First user-visible behavior change of the arc
+>   (member hiding — D36-mandated); demo tests/knowledge-bounds-demo.alg,
+>   4 boundary tests, website "Knowledge Bounds" example. Deferred +
+>   recorded in structures.md §6 status: operator-dispatch visibility,
+>   knowledge-gated downcast refusal (runtime-sound today), record
+>   undeclared-field openness via __getMember. 1013/1013 green.
 > - C3.1 (B-015) landed 2026-07 — shape/knowledge split, dispatch on
 >   shape. The shape boundary is mechanical: `typeShape` (slots.ts) walks
 >   `__extends` past refinement layers whose `__members` is the SAME

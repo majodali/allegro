@@ -106,6 +106,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "effects", storages: ["mv-component"], owner: "effects channel", disposition: "channel", target: "effects" },
   { name: "predicates", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
   { name: "domain", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
+  { name: "bound", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36) — occurrence bound (C3.2 annotation boundary)" },
   { name: "exported", storages: ["mv-component"], owner: "module system", disposition: "base-concept", target: "scope-binding visibility metadata (S3; migrates at the Phase 2 scope split / module rework)", notes: "D39 addendum, maintainer-ratified 2026-07: export-ness is a property of a binding in the module Scope, not of the value — the value-plane marker is a stopgap with a known aliasing wart (`y = x` silently exports y) and dissolves once C2.1 gives bindings a visibility attribute" },
   { name: "arity", storages: ["mv-component"], owner: "Function", disposition: "delete", target: "n/a — was write-only dead metadata; the write in wrapAsUntypedFunction was removed 2026-07", notes: "D39 addendum, maintainer-ratified 2026-07: never read anywhere in the repo; arity is derivable from Function[ParamTypes, ReturnType] where needed. Entry retained as the audit record" },
   { name: "warnings", storages: ["mv-component"], owner: "warnings channel", disposition: "channel", target: "warnings", notes: "documented in CLAUDE.md; currently unused in code" },
@@ -606,6 +607,10 @@ registerChannel({ name: "domain", rule: "computed" });
 // of the stored type are its physical storage until the C4 representation
 // swap. Read via refinements.ts `knowledgeOf`.
 registerChannel({ name: "knowledge", rule: "computed" });
+// C3.2 (D36): the occurrence bound — set by annotation-boundary crossing,
+// consumed by the member-visibility gate. `drop`: a bound constrains the
+// occurrence it was stamped on, never results derived from it.
+registerChannel({ name: "bound", rule: "drop" });
 registerChannel({ name: "discharged", rule: "drop", integrity: true, bindingKey: "__discharged" });
 registerChannel({ name: "warnings", rule: "union" });
 registerChannel({ name: "source", rule: "positional" });

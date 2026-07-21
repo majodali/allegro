@@ -3883,6 +3883,7 @@ fileTest(path.join(testsDir, "refinement-propagation-demo.alg"));
 
 // Phase B: subtyping via abstract domains (no runtime predicate evaluation).
 fileTest(path.join(testsDir, "refinement-subtype-demo.alg"));
+fileTest(path.join(testsDir, "knowledge-bounds-demo.alg"));
 
 // Phase B: lib/math.alg pilot — `double_pos` discharges its PositiveInt
 // return type via abstract-domain implication.

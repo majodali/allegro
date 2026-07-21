@@ -138,8 +138,19 @@ phase).
   construction points via `withTypeReplacing`); 6 boundary tests. §6
   delta 5 (introspection format) not activated — deferred to the C3.2
   briefing
-- [ ] **B-016** · L0 · Annotations as knowledge bounds; narrowing; carrier
-  meet (C3.2)
+- [x] **B-016** · L0 · Annotations as knowledge bounds; narrowing; carrier
+  meet (C3.2). Landed 2026-07: occurrence `bound` component stamped at
+  annotation boundaries (call sites via applyComposed, returns + binding
+  annotations via type_check; named nominal concrete types only;
+  own-shape crossings reset), member-visibility gate in type_dispatch
+  (shape dispatch preserved — Liskov; Object/module open types exempt),
+  `when … is T` narrowing for Symbol subjects (scope shadow) AND
+  substituted-param subjects (clone-on-write identity replace),
+  knowledgeOf.occurrenceBound + three-source knowledgeDomain meet
+  (intrinsic survives looser annotations). Delta 5 activated
+  additive-only (`bound:` introspection line). Demo + 4 boundary tests;
+  website "Knowledge Bounds" example. Deferred (recorded in structures.md
+  §6): operator visibility, downcast gating, record-field openness
 - [ ] **B-017** · L0 · Observation effect; pure recheck vs certificate
   peek; congruence tests (C3.3)
 - [ ] **B-018** · L2 · `[reval]` Totality design revalidation →

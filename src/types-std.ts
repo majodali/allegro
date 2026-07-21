@@ -12,11 +12,11 @@ import {
   stringToBits, bitsToString, AllegroError,
   Extension,
 } from "./types.js";
-import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate } from "./refinements.js";
+import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
 import {
   getName, getMembers, getParent, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
-  getSlotCount, getAbstractDomain, getEffectKind, isGenericTypeSlot,
+  getSlotCount, getAbstractDomain, getEffectKind, getEffectBound, getVariants, isGenericTypeSlot,
   setName, setMembers, setParent, setConstruct, setFallbackMember, markInterface,
   setWraps, setVariants, setPredicate, setGenericParams, setGenericArgs,
   setGenericBackLink, markGeneric, setGenericConstructor, setProposition,
@@ -80,6 +80,37 @@ export function withType(v: Value, type: ContextValue): Value {
   }
   components.set("type", type);
   return makeMultiValue(primary, components);
+}
+
+/** C3.2 (D36): annotation-boundary crossing. Called AFTER the type check
+ *  passes, with the declared (annotation) type. Sets the new occurrence's
+ *  starting knowledge:
+ *   - declared type WIDER than the value's shape (a Dog crossing
+ *     `x: Animal`) → stamp the occurrence bound; member visibility
+ *     follows it until narrowed, dispatch stays on the shape.
+ *   - declared type of the value's OWN shape → reset (clear any inherited
+ *     bound; the new occurrence has full knowledge of the declared type).
+ *  Bounds are member-visibility constructs, so only named nominal
+ *  concrete types participate: Any, function types, Effect annotations,
+ *  interfaces (structural), unions, and generics are pass-throughs.
+ *  Intrinsic knowledge (certificates, predicates) is never touched —
+ *  effective knowledge is the meet, so a looser annotation cannot erase
+ *  what construction certified. */
+export function applyBoundaryBound(v: Value, expected: ContextValue): Value {
+  if (v.kind !== ValueKind.MultiValue) return v;
+  const name = typeContextName(expected);
+  if (!name || name === "Any" || name === "Function" || name === "UntypedFunction") return v;
+  if (getEffectBound(expected) !== undefined) return v;
+  if (getEffectKind(expected) !== undefined) return v;
+  if (getInterfaceMarker(expected) !== undefined) return v;
+  if (getVariants(expected) !== undefined) return v;
+  if (isGenericTypeSlot(expected) || getGenericArgs(expected) !== undefined) return v;
+  const stored = getType(v);
+  if (!stored) return v;
+  if (typeShape(stored) === typeShape(expected)) {
+    return occurrenceBoundOf(v) ? clearOccurrenceBound(v) : v;
+  }
+  return withOccurrenceBound(v, expected);
 }
 
 /** Construction-time type replacement — the literal-typing / coercion

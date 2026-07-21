@@ -170,19 +170,32 @@ values (D20, D29):
 
 ## 6. Shape and knowledge [partial]
 
-*Status (2026-07, C3.1): the two channels exist as the canonical read
-paths over the current storage — `shape` reads the computed dispatch shape
-(member-transparent refinement layers walked off by `typeShape`; a layer
-sharing its parent's member set by identity is knowledge, a layer minting
-members — preserveOps/mixin/extend — is a shape); `knowledge` is the
-unified intrinsic carrier (`knowledgeOf`: refinement bound + domains +
-predicates, one lattice with `meetKnowledge`). Dispatch (type_dispatch +
-the evaluator's operator dispatch) reads shape; `withType` refuses
-cross-shape re-stamps post-construction (the `typed_*` literal wrappers
-are construction points and replace typeLiterals' provisional guess).
-Still pending: annotations as occurrence-knowledge bounds + narrowing +
-carrier meet (C3.2), the observation effect (C3.3), physical storage under
-the knowledge channel (C4).*
+*Status (2026-07, C3.1+C3.2): the two channels exist as the canonical
+read paths over the current storage — `shape` reads the computed dispatch
+shape (member-transparent refinement layers walked off by `typeShape`; a
+layer sharing its parent's member set by identity is knowledge, a layer
+minting members — preserveOps/mixin/extend — is a shape); `knowledge` is
+the unified carrier (`knowledgeOf`: refinement bound + domains +
+predicates + occurrence bound, one lattice with `meetKnowledge`).
+Dispatch (type_dispatch + the evaluator's operator dispatch) reads shape;
+`withType` refuses cross-shape re-stamps post-construction. C3.2:
+annotations are occurrence-knowledge upper-bounds — crossing a boundary
+(`x: Animal` param, return annotation, binding annotation via
+`type_check`) stamps a `bound` component (drop-propagation) when the
+declared type is wider than the value's shape and clears it on own-shape
+crossings; `type_dispatch` gates member VISIBILITY on the bound while
+dispatching visible members through the shape (open types exempt: base
+Object, fallback-only module types). `when … is T` type patterns narrow
+within the matched arm (scope shadow layer for Symbol subjects;
+clone-on-write identity replacement for substituted-param subjects).
+Intrinsic knowledge survives looser annotations (the meet never widens).
+Deferred: operator-dispatch visibility gating (interacts with
+PRIM_TO_METHOD fallback semantics), knowledge-gated downcast refusal at
+call sites (an Animal-bounded Dog passed to `d: Dog` passes today —
+runtime-sound; static gating is an S3-adjacent discussion), record
+undeclared-field openness through `__getMember`. Still pending: the
+observation effect (C3.3), physical storage under the knowledge channel
+(C4).*
 
 The old `type` channel conflated two things; they split (D36):
 

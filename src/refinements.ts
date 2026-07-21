@@ -696,6 +696,41 @@ export interface Knowledge {
   bound: ContextValue | null;
   /** The on-value predicate set (Phase C), if any. */
   predicates: PredicateSet | null;
+  /** C3.2: the occurrence bound set by crossing an annotation boundary
+   *  (`x: Animal` receiving a Dog). An UPPER bound on what this occurrence
+   *  may assume — member visibility follows it; dispatch does not. Null
+   *  when no annotation boundary constrained this occurrence. */
+  occurrenceBound: ContextValue | null;
+}
+
+// C3.2: the occurrence-bound component. Set when a value crosses an
+// annotation boundary whose declared type is WIDER than the value's shape;
+// cleared when a boundary of the value's own shape is crossed (the new
+// occurrence starts with full knowledge) or when a `when … is T` type
+// pattern narrows. Propagation rule is `drop` — a bound constrains the
+// occurrence it was stamped on, never derived results.
+const BOUND_COMPONENT_KEY = "bound";
+
+/** Read the occurrence bound riding a value, if any. */
+export function occurrenceBoundOf(v: Value): ContextValue | null {
+  if (v.kind !== ValueKind.MultiValue) return null;
+  const b = componentsView(v).get(BOUND_COMPONENT_KEY);
+  return b?.kind === ValueKind.Context ? (b as ContextValue) : null;
+}
+
+/** Stamp an occurrence bound (annotation-boundary crossing). */
+export function withOccurrenceBound(v: Value, bound: ContextValue): Value {
+  const comps = cloneComponents(v);
+  comps.set(BOUND_COMPONENT_KEY, bound);
+  return makeMultiValue(dataOf(v), comps);
+}
+
+/** Remove the occurrence bound (narrowing / same-shape boundary reset). */
+export function clearOccurrenceBound(v: Value): Value {
+  if (occurrenceBoundOf(v) === null) return v;
+  const comps = cloneComponents(v);
+  comps.delete(BOUND_COMPONENT_KEY);
+  return makeMultiValue(dataOf(v), comps);
 }
 
 /** The intrinsic knowledge riding a value, or null when it carries none. */
@@ -707,22 +742,31 @@ export function knowledgeOf(v: Value): Knowledge | null {
     if (shape !== stored) bound = stored as ContextValue;
   }
   const predicates = predicatesOf(v);
-  if (!bound && !predicates) return null;
-  return { bound, predicates };
+  const occurrenceBound = occurrenceBoundOf(v);
+  if (!bound && !predicates && !occurrenceBound) return null;
+  return { bound, predicates, occurrenceBound };
 }
 
 /** The tightest single abstract domain the knowledge implies — the meet
- *  of the bound's domain and the predicate set's effective domain. */
+ *  of the intrinsic bound's domain, the occurrence bound's domain, and
+ *  the predicate set's effective domain. */
 export function knowledgeDomain(k: Knowledge): AbstractDomain | null {
+  const parts: AbstractDomain[] = [];
   const boundDom = (k.bound ? getAbstractDomain(k.bound) : null) as AbstractDomain | null;
+  if (boundDom) parts.push(boundDom);
+  const occDom = (k.occurrenceBound ? getAbstractDomain(k.occurrenceBound) : null) as AbstractDomain | null;
+  if (occDom) parts.push(occDom);
   const predDom = k.predicates?.effectiveDomain() ?? null;
-  if (boundDom && predDom) return intersectDomains(boundDom, predDom);
-  return boundDom ?? predDom;
+  if (predDom) parts.push(predDom);
+  if (parts.length === 0) return null;
+  return parts.reduce((acc, d) => intersectDomains(acc, d));
 }
 
 /** Meet on the knowledge lattice — facts accumulate, never widen. Both
  *  carriers share this op (intrinsic here; occurrence facts merge through
- *  the same `mergePredicateSets` in `scopeFactsFor`). */
+ *  the same `mergePredicateSets` in `scopeFactsFor`). Intrinsic facts
+ *  survive a looser occurrence bound: the meet keeps certificates and
+ *  predicates regardless of how wide the annotation is. */
 export function meetKnowledge(a: Knowledge, b: Knowledge): Knowledge {
   const predicates = a.predicates && b.predicates
     ? mergePredicateSets(a.predicates, b.predicates)
@@ -735,7 +779,8 @@ export function meetKnowledge(a: Knowledge, b: Knowledge): Knowledge {
     const db = getAbstractDomain(b.bound) as AbstractDomain | undefined;
     if (da && db && impliesDomain(db, da)) bound = b.bound;
   }
-  return { bound, predicates };
+  const occurrenceBound = a.occurrenceBound ?? b.occurrenceBound;
+  return { bound, predicates, occurrenceBound };
 }
 
 /** Encode a domain into a Value so it can live as a component. We stash it

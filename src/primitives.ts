@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, CHANNEL_WRITER_BRAND, HOST_KEYS } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -9,7 +9,7 @@ import {
   stringToBits, bitsToString,
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
-import { assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeLookup, scopeHostRead, isPendingCell } from "./scope.js";
+import { assertNotScope, scopeAssume, scopeExtend, scopeFactsFor, scopeOwnFacts, scopeLookup, scopeHostRead, isPendingCell } from "./scope.js";
 
 // Held write capability for the discharged integrity channel (C1.4, D21-D24).
 // Module-scope, never exported, never bound into any Allegro extension —
@@ -647,6 +647,53 @@ function evalElseBranch(elseBranch: Value, ctx: ContextValue, evalFn: EvalFn): V
 /**
  * Helper: evaluate the then-branch, applying extracted values for bindings.
  */
+/** C3.2 narrowing for substituted-value subjects: clone-on-write walk
+ *  replacing object-identity occurrences of `target` with `replacement`.
+ *  Clones only the path to each occurrence; ComposedFunctions get fresh
+ *  params + remapped bodies (the standard clone pattern — see
+ *  resolveNamedParams / typeLiterals). Data-plane Contexts are NOT
+ *  entered: narrowing narrows this occurrence's uses, not values stored
+ *  inside data structures. */
+function replaceValueIdentity(v: Value, target: Value, replacement: Value, seen?: Set<Value>): Value {
+  if (v === target) return replacement;
+  if (!v || typeof v !== "object") return v;
+  if (!seen) seen = new Set();
+  if (v.kind === ValueKind.ComposedFunction && seen.has(v)) return v;
+
+  switch (v.kind) {
+    case ValueKind.Expression: {
+      const newFn = replaceValueIdentity(v.fn, target, replacement, seen);
+      const newArgs = v.args.map(a => replaceValueIdentity(a, target, replacement, seen));
+      if (newFn === v.fn && newArgs.every((a, i) => a === v.args[i])) return v;
+      return makeExpr(newFn, newArgs);
+    }
+    case ValueKind.ComposedFunction: {
+      seen.add(v);
+      const newBody = replaceValueIdentity(v.body, target, replacement, seen);
+      if (newBody === v.body) return v;
+      const newParams = v.params.map(p => ({
+        kind: ValueKind.Param, position: p.position, owner: null as any, _name: p._name,
+      } as import("./types.js").ParamValue));
+      const paramMap = new Map<import("./types.js").ParamValue, import("./types.js").ParamValue>();
+      for (let i = 0; i < v.params.length; i++) paramMap.set(v.params[i], newParams[i]);
+      const remapped = _remapParams(newBody, paramMap);
+      const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: newParams, body: remapped };
+      for (const p of newFn.params) p.owner = newFn;
+      for (const k of PRESERVED_FN_META_KEYS) {
+        if ((v as any)[k] !== undefined) (newFn as any)[k] = (v as any)[k];
+      }
+      return newFn;
+    }
+    case ValueKind.MultiValue: {
+      const newP = replaceValueIdentity(v.primary, target, replacement, seen);
+      if (newP === v.primary) return v;
+      return makeMultiValue(newP, cloneComponents(v));
+    }
+    default:
+      return v;
+  }
+}
+
 function evalThenBranch(
   thenBranch: Value, extractedValues: Value[],
   ctx: ContextValue, evalFn: EvalFn,
@@ -689,6 +736,11 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const subjectP = dataOf(subject);
   let matched = false;
   let extractedValues: Value[] = [];
+  // C3.2 (D36): a matched TYPE pattern narrows the subject's occurrence
+  // knowledge within the arm — the annotation bound is lifted on the value
+  // bound into the branch, and (for Symbol subjects) on references to the
+  // subject's name inside the arm via an O(1) scope shadow layer.
+  let narrowedSubject: Value | null = null;
 
   if (isPatternPrim(pattern, "when_wildcard")) {
     matched = true;
@@ -712,6 +764,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         if (values) {
           matched = true;
           extractedValues = values;
+          narrowedSubject = clearOccurrenceBound(subject);
         }
       }
     }
@@ -746,7 +799,11 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       ) as BitsValue);
       if (subjectTypeName === patternName) {
         matched = true;
-        extractedValues = [subject]; // bind the value
+        // The pattern names the subject's own type — narrowed: the arm
+        // has full knowledge, so the occurrence bound is lifted both on
+        // the bound-into-branch value and (below) on the subject's name.
+        narrowedSubject = clearOccurrenceBound(subject);
+        extractedValues = [narrowedSubject]; // bind the value
       }
     } else if (subjectP.kind === ValueKind.Bits && patternP.kind === ValueKind.Bits) {
       matched = (subjectP as BitsValue).length === (patternP as BitsValue).length &&
@@ -757,12 +814,34 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   if (matched) {
+    // C3.2: within the matched arm, the subject's occurrence knowledge is
+    // narrowed. Two subject forms, two mechanisms:
+    //   - SYMBOL subject (scope-resolved binding): an O(1) child scope
+    //     layer shadows the name with the narrowed value (arm exit =
+    //     discard; the else arm keeps the outer view).
+    //   - VALUE subject (a substituted function param): occurrences of
+    //     the subject inside the arm are the SAME object substitution
+    //     placed there — a clone-on-write identity replacement swaps in
+    //     the narrowed value. Substitution clones the nodes on former
+    //     param positions per call, so the walk never touches shared ASTs.
+    let matchCtx = ctx!;
+    let armThen = thenBranch;
+    let armGuard = guardFn;
+    if (narrowedSubject && narrowedSubject !== subject) {
+      if (args[0].kind === ValueKind.Symbol) {
+        const subjectName = (args[0] as { name: string }).name;
+        matchCtx = scopeExtend(ctx!, [[subjectName, { key: subjectName, value: narrowedSubject }]]);
+      } else {
+        armThen = replaceValueIdentity(thenBranch, subject, narrowedSubject);
+        armGuard = replaceValueIdentity(guardFn, subject, narrowedSubject);
+      }
+    }
     // Evaluate guard if present
-    const evalGuard = evalFn!(guardFn, ctx!);
+    const evalGuard = evalFn!(armGuard, matchCtx);
     const guardP = dataOf(evalGuard);
     if (guardP.kind === ValueKind.ComposedFunction && (guardP as any).params?.length > 0) {
       // Guard is a function — apply with extracted values
-      const guardResult = evalFn!(makeExpr(evalGuard, extractedValues), ctx!);
+      const guardResult = evalFn!(makeExpr(evalGuard, extractedValues), matchCtx);
       const guardRP = dataOf(guardResult);
       if (guardRP.kind === ValueKind.Bits && (guardRP as BitsValue).data === 0n) {
         // Guard failed — fall through
@@ -773,7 +852,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       return evalElseBranch(elseBranch, ctx!, evalFn!);
     }
     // Guard passed (or is literal 1 / non-function truthy)
-    return evalThenBranch(thenBranch, extractedValues, ctx!, evalFn!);
+    return evalThenBranch(armThen, extractedValues, matchCtx, evalFn!);
   }
 
   return evalElseBranch(elseBranch, ctx!, evalFn!);
@@ -1565,7 +1644,7 @@ const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("w
 // ============ TYPE SYSTEM ============
 
 import {
-  getType, getTypeName, withType, withTypeReplacing, typeMethod, typeMemberDescriptor,
+  getType, getTypeName, withType, withTypeReplacing, applyBoundaryBound, typeContextName, typeMethod, typeMemberDescriptor,
   isMethodDescriptor, isFieldDescriptor, isGetterDescriptor,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
@@ -1580,7 +1659,7 @@ import {
   withEffects as _withEffects,
   effectsOf as _effectsOf,
 } from "./effects.js";
-import { precompileFunction as _precompileFunction, isTailCall as _isTailCall } from "./evaluator.js";
+import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams } from "./evaluator.js";
 
 // F3b: tracks ComposedFunctions whose body is currently being precompiled,
 // so the recursive call inside `factorial(n) => factorial(n-1)` doesn't
@@ -1598,6 +1677,7 @@ import {
   PredicateSource as _PredicateSource,
   domainOrFromValue as _domainOrFromValue,
   counterexampleFor as _counterexampleFor,
+  occurrenceBoundOf, clearOccurrenceBound,
 } from "./refinements.js";
 
 /**
@@ -2015,6 +2095,32 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const type = storedType ? typeShape(storedType) : null;
 
   if (type) {
+    // C3.2 (D36): member visibility follows KNOWLEDGE. An occurrence
+    // bound (stamped at an annotation boundary — `x: Animal` receiving a
+    // Dog) gates which members this occurrence may touch; a member that
+    // passes the gate still dispatches through the SHAPE, so overrides
+    // run (Liskov). Open types are exempt: the base Object type (dynamic
+    // fields by design) and fallback-only types with no declared member
+    // set (module objects — their __getMember IS the visibility policy).
+    const bound = occurrenceBoundOf(obj);
+    if (bound && bound !== storedType && bound !== dataOf(ObjectType as unknown as Value)) {
+      const boundMembers = getMembers(bound);
+      const membersEmpty = !boundMembers ||
+        (boundMembers.kind === ValueKind.Context && (boundMembers as ContextValue).bindings.size === 0);
+      const openType = membersEmpty && getFallbackMember(bound) !== undefined;
+      if (!openType) {
+        const visible = typeMemberDescriptor(bound, fieldName) !== null
+          || typeMethod(bound, fieldName) !== null;
+        if (!visible) {
+          const boundName = typeContextName(bound) ?? "<anonymous>";
+          const shapeName = getTypeName(obj) ?? "<unknown>";
+          throw new AllegroError(
+            `type_dispatch: '${fieldName}' is not visible through annotation '${boundName}' ` +
+            `(the value's type is '${shapeName}') — narrow with \`when … is ${shapeName}\``,
+          );
+        }
+      }
+    }
     // Look up member descriptor from __members
     const desc = typeMemberDescriptor(type, fieldName);
     if (desc) {
@@ -2318,7 +2424,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
       throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
     }
-    return v;
+    return applyBoundaryBound(v, expectedCtx);
   }
 
   // Use the meta-type's instanceof method
@@ -2340,7 +2446,10 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         // Unresolved predicate — return a residual type_check
         return makeExpr(makePrimitive("type_check", type_check_impl, true), [v, expectedType]);
       }
-      return v;
+      // C3.2: successful passage through an annotation (return type,
+      // binding annotation) is a boundary crossing — stamp/reset the
+      // occurrence bound.
+      return applyBoundaryBound(v, expectedCtx);
     }
   }
 
@@ -2372,7 +2481,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
   }
 
-  return v;
+  return applyBoundaryBound(v, expectedCtx);
 };
 
 // --- type_instanceof: boolean-returning type check (for `instanceof` infix) ---
