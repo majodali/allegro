@@ -1,8 +1,9 @@
 // Demo: C3.2 (D36) — annotations are knowledge upper-bounds.
 //
 // A type annotation is an abstraction boundary: `a: Animal` receiving a
-// Dog hides Dog's members until narrowed. Member VISIBILITY follows
-// knowledge; DISPATCH follows the value's shape. A `when … is T` type
+// Dog hides Dog's members until narrowed. Member AVAILABILITY follows
+// knowledge (an epistemic gate — not S3 access control); DISPATCH
+// follows the value's shape. A `when … is T` type
 // pattern narrows the occurrence within the matched arm; crossing a
 // boundary of the value's own shape restores full knowledge.
 

@@ -43,7 +43,7 @@ export interface ValueSummary {
   typeName:      string | null;
   /** C3.2 (D36): the occurrence bound's type name, when this value crossed
    *  an annotation boundary wider than its shape (e.g. "Animal" on a value
-   *  whose typeName is "Dog"). Member visibility follows the bound. */
+   *  whose typeName is "Dog"). Member availability follows the bound. */
   annotationBound: string | null;
   /** Whether the value is fully resolved (no residual Expression / Symbol). */
   resolved:      boolean;

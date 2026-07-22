@@ -915,7 +915,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       evalSource(C32_TYPES + "g(a: Animal): Int => a.tricks\nr = g(Dog(4, 7))",
         undefined, [createTypeSystem()], undefined, true);
     } catch (e: any) { threw = String(e.message); }
-    eq(threw.includes("not visible through annotation 'Animal'"), true, `subtype member hidden: ${threw}`);
+    eq(threw.includes("not available through annotation 'Animal'"), true, `subtype member hidden: ${threw}`);
     // Dispatch source intact: the bounded value's stored type stays Dog.
     const b = evalSource(C32_TYPES + "id2(a: Animal): Animal => a\nx = id2(Dog(4, 7))",
       undefined, [createTypeSystem()], undefined, true);

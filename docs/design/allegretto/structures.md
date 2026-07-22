@@ -183,9 +183,11 @@ annotations are occurrence-knowledge upper-bounds — crossing a boundary
 (`x: Animal` param, return annotation, binding annotation via
 `type_check`) stamps a `bound` component (drop-propagation) when the
 declared type is wider than the value's shape and clears it on own-shape
-crossings; `type_dispatch` gates member VISIBILITY on the bound while
-dispatching visible members through the shape (open types exempt: base
-Object, fallback-only module types). `when … is T` type patterns narrow
+crossings; `type_dispatch` gates member AVAILABILITY on the bound (see the
+Availability block below — "visibility" is reserved for S3 access
+control) while dispatching available members through the shape (open
+types exempt: base Object, fallback-only module types). `when … is T`
+type patterns narrow
 within the matched arm (scope shadow layer for Symbol subjects;
 clone-on-write identity replacement for substituted-param subjects).
 Intrinsic knowledge survives looser annotations (the meet never widens).
@@ -218,6 +220,39 @@ suffices, else residualises. Type annotations are **knowledge
 upper-bounds** — `x: Animal` over a Dog hides Dog's members until narrowed
 (`when x is Dog`); crossing an abstraction boundary sets the new
 occurrence's starting knowledge.
+
+**Availability** (terminology ratified 2026-07). What C3.2 gates is
+AVAILABILITY — an epistemic notion, distinct from S3's access control
+("visibility" is reserved for S3): *which members may this occurrence
+refer to, given its effective knowledge?* Availability is a **resolution
+outcome, not a property**. `a.m` in source is a base-name projection
+(§5's governing rule) — the text alone determines neither *which* symbol
+`m` is nor whether it is a symbol at all rather than a string data key.
+Resolution is a function of (text, knowledge), with four outcomes:
+
+1. **Member symbol** — knowledge names a closed (nominal) type whose
+   declared members project exactly one match. Inputs: text + knowledge —
+   never shape, never the instance's actual slots.
+2. **String key / fallback policy** — knowledge says the value is an OPEN
+   structure (Object, module): data-plane access under the structure's
+   own policy. Same text, different key sort — decided by knowledge.
+3. **Unavailable** — a closed type with no matching declaration (the
+   C3.2 refusal). Multiple distinct matches → the §5 qualification error.
+4. **Undetermined** — knowledge incomplete → **residual**, never a
+   premature error (D11); the determination fires when knowledge lands.
+
+**PE is the sole resolver.** There is no name table, no second checker:
+availability IS what partial evaluation does with a member access under
+current knowledge. "Compile time" vs "runtime" is not two mechanisms but
+*when the inputs land* — phases are PE steps, so the same determination
+may fire at precompile, at module load, or mid-execution after a future
+resolves. **Confluence invariant** (falsifiable): resolution is confluent
+over knowledge arrival — for fixed eventual knowledge, early (static) and
+late (residual-then-completed) resolution agree. Dispatch is the second
+stage of the same act: availability resolves text → symbol (by
+knowledge); dispatch resolves symbol → implementation (by shape). S3's
+access control will slot between them — evaluated by PE in the same act,
+with the call-site context as principal (see §13).
 
 **Observation is effectful; re-checking is pure.** `x instanceof
 PositiveInt` means **pure predicate re-check** (recomputes from data —
@@ -486,12 +521,29 @@ PROCESS §6 before modification, I3):
 
 ## 13. Deferred and open [designed]
 
-- **S3 visibility** (attribute set, module-tied ownership), **S4
-  collections** (representation choices, persistent structures), **S5
-  variance/constraints** (`where T: Comparable` — note: constraints are
-  knowledge on type-values, per §6/§9), **S6 channel registry** (standard
-  set, gated `effects`, channel-removal/erasure rules) — mechanical specs,
-  absorbed during promotion/implementation.
+- **S3 visibility / access control** — reframed 2026-07: enforcement is
+  NOT a separate attribute check at dispatch; it is **PE evaluating the
+  access with the call-site context as principal**, in the same act that
+  resolves availability (§6: availability resolves text → symbol; access
+  control admits the principal to the symbol; dispatch selects the
+  implementation by shape). Open design questions for the S3 session
+  (sequenced before C3.3, see BACKLOG): (1) what the principal is —
+  defining-module FQN, scope chain, or function provenance (substitution
+  means bodies evaluate in chains rooted at the caller); (2) mechanism
+  shape — capability-guarded accessors per the D24 pattern (possession =
+  permission, zero new mechanism; D24 already notes module-private write
+  as this usage) vs. declared attributes checked against the principal;
+  (3) whether denial is always static or may residualise / fire at
+  runtime; (4) whether authorization is judged against the resolved
+  symbol under the occurrence's KNOWLEDGE (protected-Dog through an
+  Animal bound); (5) which reflection surfaces (`channel_list`,
+  introspection, `ctx_bindings`) must respect it vs. be classified
+  effectful — intersects C3.3's observation effect.
+- **S4 collections** (representation choices, persistent structures),
+  **S5 variance/constraints** (`where T: Comparable` — note: constraints
+  are knowledge on type-values, per §6/§9), **S6 channel registry**
+  (standard set, gated `effects`, channel-removal/erasure rules) —
+  mechanical specs, absorbed during promotion/implementation.
 - **Transient mutation / linear types** — including transient→immutable
   finalization (the only seal-shaped operation).
 - **Static asymptotic complexity** as a proof genre (D35).

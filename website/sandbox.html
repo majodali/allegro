@@ -261,7 +261,7 @@ describe(a: Animal): Int => when a is Dog then a.tricks else 0 - 1
 print(describe(Dog(4, 9)))
 
 // a.tricks WITHOUT narrowing would report:
-//   'tricks' is not visible through annotation 'Animal'`,
+//   'tricks' is not available through annotation 'Animal'`,
 
   "Arrays": `// Array operations
 nums = [1, 2, 3, 4, 5]

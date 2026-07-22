@@ -608,7 +608,8 @@ registerChannel({ name: "domain", rule: "computed" });
 // swap. Read via refinements.ts `knowledgeOf`.
 registerChannel({ name: "knowledge", rule: "computed" });
 // C3.2 (D36): the occurrence bound — set by annotation-boundary crossing,
-// consumed by the member-visibility gate. `drop`: a bound constrains the
+// consumed by the member-AVAILABILITY gate (epistemic; "visibility" is
+// reserved for S3 access control). `drop`: a bound constrains the
 // occurrence it was stamped on, never results derived from it.
 registerChannel({ name: "bound", rule: "drop" });
 registerChannel({ name: "discharged", rule: "drop", integrity: true, bindingKey: "__discharged" });

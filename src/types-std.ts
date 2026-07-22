@@ -86,11 +86,11 @@ export function withType(v: Value, type: ContextValue): Value {
  *  passes, with the declared (annotation) type. Sets the new occurrence's
  *  starting knowledge:
  *   - declared type WIDER than the value's shape (a Dog crossing
- *     `x: Animal`) → stamp the occurrence bound; member visibility
+ *     `x: Animal`) → stamp the occurrence bound; member AVAILABILITY
  *     follows it until narrowed, dispatch stays on the shape.
  *   - declared type of the value's OWN shape → reset (clear any inherited
  *     bound; the new occurrence has full knowledge of the declared type).
- *  Bounds are member-visibility constructs, so only named nominal
+ *  Bounds are member-availability constructs, so only named nominal
  *  concrete types participate: Any, function types, Effect annotations,
  *  interfaces (structural), unions, and generics are pass-throughs.
  *  Intrinsic knowledge (certificates, predicates) is never touched —

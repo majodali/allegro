@@ -282,8 +282,15 @@ annotation channels extensible with declared propagation rules.
   writers); never accidental reference equality (D8).
 - **S3. Visibility/access control.** Attribute set (public / internal-to-
   defining-extension / …); requires an ownership notion tied to the module
-  system. Enforcement point: dispatch reads slot attributes (Standard);
-  sealing (base) backstops integrity.
+  system. ~~Enforcement point: dispatch reads slot attributes (Standard);
+  sealing (base) backstops integrity.~~ **Reframed 2026-07 (maintainer):
+  enforcement is PE evaluating the access with the call-site context as
+  principal — no mechanism apart from PE resolves what member text refers
+  to (symbol vs string key), whether it is available (knowledge), or
+  whether the principal is admitted to it.** Candidate shapes: D24
+  capability-guarded accessors (possession = permission) vs. declared
+  attributes checked against the principal. Question set recorded in
+  structures.md §13; design session sequenced before C3.3.
 - **S4. Collection types.** `Array[T]` / `Map` / `Set` as encapsulated types
   choosing representations (packed Bits for primitive element types; dense
   structure storage for reference elements; persistent structures — HAMT/RRB

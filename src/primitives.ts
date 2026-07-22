@@ -2095,13 +2095,17 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const type = storedType ? typeShape(storedType) : null;
 
   if (type) {
-    // C3.2 (D36): member visibility follows KNOWLEDGE. An occurrence
-    // bound (stamped at an annotation boundary — `x: Animal` receiving a
-    // Dog) gates which members this occurrence may touch; a member that
-    // passes the gate still dispatches through the SHAPE, so overrides
-    // run (Liskov). Open types are exempt: the base Object type (dynamic
-    // fields by design) and fallback-only types with no declared member
-    // set (module objects — their __getMember IS the visibility policy).
+    // C3.2 (D36): member AVAILABILITY follows KNOWLEDGE — an epistemic
+    // gate, not access control (that's S3). An occurrence bound (stamped
+    // at an annotation boundary — `x: Animal` receiving a Dog) determines
+    // which members this occurrence may refer to; a member that resolves
+    // still dispatches through the SHAPE, so overrides run (Liskov).
+    // This gate is the current-representation form of the single PE
+    // resolver (design §6): availability resolves text → symbol by
+    // knowledge; dispatch resolves symbol → implementation by shape.
+    // Open types are exempt: the base Object type (dynamic fields by
+    // design) and fallback-only types with no declared member set
+    // (module objects — their __getMember IS their own policy).
     const bound = occurrenceBoundOf(obj);
     if (bound && bound !== storedType && bound !== dataOf(ObjectType as unknown as Value)) {
       const boundMembers = getMembers(bound);
@@ -2115,7 +2119,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
           const boundName = typeContextName(bound) ?? "<anonymous>";
           const shapeName = getTypeName(obj) ?? "<unknown>";
           throw new AllegroError(
-            `type_dispatch: '${fieldName}' is not visible through annotation '${boundName}' ` +
+            `type_dispatch: '${fieldName}' is not available through annotation '${boundName}' ` +
             `(the value's type is '${shapeName}') — narrow with \`when … is ${shapeName}\``,
           );
         }

@@ -698,7 +698,7 @@ export interface Knowledge {
   predicates: PredicateSet | null;
   /** C3.2: the occurrence bound set by crossing an annotation boundary
    *  (`x: Animal` receiving a Dog). An UPPER bound on what this occurrence
-   *  may assume — member visibility follows it; dispatch does not. Null
+   *  may assume — member AVAILABILITY follows it; dispatch does not. Null
    *  when no annotation boundary constrained this occurrence. */
   occurrenceBound: ContextValue | null;
 }

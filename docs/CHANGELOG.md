@@ -8,6 +8,36 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — Availability: terminology + PE-sole-resolver semantics ratified (design delta to §6; S3 reframed)
+
+Maintainer discussion sharpened what C3.2's gate IS. Recorded in
+structures.md §6 as the **Availability** block:
+
+- **Availability is a resolution outcome, not a property** — `a.m` is a
+  base-name projection (§5); which symbol `m` is, or whether it is a
+  string data key at all, is decided by the occurrence's effective
+  knowledge, never by the text. Four outcomes: member symbol / string key
+  under an open structure's own policy / unavailable (closed type, no
+  declaration — the C3.2 refusal; multiple matches → §5 qualification
+  error) / undetermined → residual (D11).
+- **PE is the sole resolver.** No name table, no second checker — the
+  determination is what PE does with a member access under current
+  knowledge, firing whenever its inputs land (precompile, module load, or
+  after a future resolves). **Confluence invariant** (falsifiable): for
+  fixed eventual knowledge, early and late resolution agree. Dispatch is
+  stage two of the same act (symbol → implementation, by shape).
+- **S3 reframed** (structures.md §13 + the decision doc's S3 item):
+  access-control enforcement is NOT "dispatch reads slot attributes" — it
+  is PE evaluating the access with the call-site context as principal, in
+  the same act. Open questions (principal identity, capability-accessors
+  vs declared attributes, static vs residualising denial, authorization
+  under knowledge, reflection surfaces vs the C3.3 observation effect)
+  recorded there; design session filed as B-016a, sequenced before C3.3.
+- **Terminology**: "visibility" is reserved for S3; C3.2's concept is
+  availability. Error message renamed (`'tricks' is not available through
+  annotation 'Animal'`), comments and demo updated. Doc + rename only —
+  no semantic change. 1013/1013 green.
+
 ## 2026-07 — C3.2: Annotations as knowledge bounds + narrowing (structures Phase 3, B-016)
 
 Type annotations become what D36 says they are: KNOWLEDGE UPPER-BOUNDS —
