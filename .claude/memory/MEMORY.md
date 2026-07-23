@@ -7,6 +7,7 @@ below are thin pointers; do not expand them — update the canonical doc.
 
 ## Live session/user context
 - [user_role.md](user_role.md) — User is the language designer; formal semantics focus; discuss design before implementation
+- [feedback_tool_rejections.md](feedback_tool_rejections.md) — Tool rejections may be erroneous (interface bug); confirm verbally before treating one as deliberate
 - [user_parser_experiments.md](user_parser_experiments.md) — External LL(k)+Pratt parser experiment deferred; codegen is scheduled as Phase I, not on hold
 - [project_state.md](project_state.md) — Narrative arc pointer; defer to BACKLOG.md / CLAUDE.md for specifics
 
