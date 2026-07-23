@@ -27,7 +27,7 @@
 import { dataOf, isEffectVarLabel, EFFECT_VAR_MARKER, componentsView, cloneComponents, installChannelMerge } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ContextValue, MultiValueType,
-  makeMultiValue,
+  makeMultiValue, makeContext,
 } from "./types.js";
 
 // =============================================================================
@@ -274,11 +274,7 @@ installChannelMerge("effects", (a: Value, b: Value) => {
 });
 
 function encodeEffects(eff: EffectSet): Value {
-  const ctx: ContextValue = {
-    kind: ValueKind.Context,
-    bindings: new Map(),
-    bindingList: [],
-  };
+  const ctx: ContextValue = makeContext();
   (ctx as any).__effectSet = eff;
   return ctx;
 }

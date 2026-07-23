@@ -184,8 +184,16 @@ phase).
   lexicographic design, totality polymorphism, decreases obligations,
   counterexample shapes (source:
   `.claude/plans/archive/phase-e-totality-plan.md`)
-- [ ] **B-019** · L0 · Structure kind — representation swap behind
-  accessors (C4.1)
+- [x] **B-019** · L0 · Structure kind — representation swap behind
+  accessors (C4.1). Landed 2026-07: one host class (`src/structure.ts`)
+  behind makeMultiValue/makeContext (factory shims; 6 bypass sites
+  converted); single declared hidden class for both roles + scope fields
+  (~7% faster than the replaced literals); role fixed at construction;
+  D22 immutable bit declared (scope/future-cell/construction carve-outs
+  asserted); W4 structure-kind + W5 role-transparency corpus invariants +
+  3 boundary tests (roles, hostile channel-named data keys, monotonic
+  cell resolution). Physical plane separation + shape-ref field follow
+  inside structure.ts at C4.3/C5
 - [ ] **B-020** · L0 · Arrays as numeric structures w/ dense region (C4.2)
 - [ ] **B-021** · L0 · Transparency cutover; retire `primaryOf` + wrapper
   shims (C4.3) — second conscious-delta chunk

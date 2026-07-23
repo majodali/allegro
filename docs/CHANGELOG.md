@@ -8,6 +8,42 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C4.1: Structure kind — one host representation behind the factories (structures Phase 4, B-019)
+
+The representation swap begins. Every MultiValue and every Context is now
+an instance of ONE host class — `Structure` (`src/structure.ts`) — with
+`makeMultiValue`/`makeContext` as the promised constructor shims. The
+public field surface is unchanged (the 1000-test suite is the oracle);
+the object layout is now a single declared hidden class covering both
+roles plus the scope fields, which the A/B benchmark shows is ~7% FASTER
+than the per-shape object literals it replaced (the I1 hidden-class
+motivation, paying out at step one).
+
+- **Role fixed at construction** — `kind` is a plain field; the
+  evaluator's hot switch is untouched. Channel plane = `components`
+  (MultiValue role), slot plane = `bindings`/`bindingList` (Context
+  role); physical separation and the direct shape-ref field land inside
+  structure.ts with C4.3/C5 where the interception points exist.
+- **Six bypass sites converted** to the factories (encodePredicates /
+  encodeDomain / encodeEffects stashes, the evaluator's placeholder
+  domain ctx, the channel-writer wrap in slots.ts, proven.ts's
+  spread-clone). slots.ts + structure.ts are the two sanctioned
+  representation modules in the lint baseline.
+- **Invariant battery grows**: W4 structure-kind (every corpus
+  MultiValue/Context is a Structure instance — a stray literal anywhere
+  fails the walk), W5 role-transparency (D17: MultiValue role carries no
+  slot plane, Context role no primary), plus three C4.1 tests — factory
+  construction across roles (typed literal, object, refined type, eval
+  scope), hostile data keys named after channels living on the slot
+  plane without touching the channel plane, and the D22 future-cell
+  carve-out (in-place monotonic resolution).
+- **Immutable bit (D22)**: declared state — born-immutable default with
+  the standing carve-outs (scopes as mutable evaluator state, future
+  cells, grandfathered construction-phase population) documented and
+  asserted; freeze-enforcement tightens at C4.3.
+
+1020/1020 green; perf floor clean.
+
 ## 2026-07 — C3.3: Observation effect — instanceof is a pure re-check; certificate_peek is effectful (structures Phase 3 complete, B-017)
 
 D36's third leg: **re-checking is pure; observation is effectful.**

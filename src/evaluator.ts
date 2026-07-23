@@ -861,7 +861,7 @@ export function precompileFunction(
       const components = new Map<string, Value>([["type", paramType]]);
       const dom = (paramType as any).__abstractDomain;
       if (dom && dom.kind !== "opaque") {
-        const domCtx: ContextValue = { kind: ValueKind.Context, bindings: new Map(), bindingList: [] };
+        const domCtx: ContextValue = makeContext();
         (domCtx as any).__abstractDomain = dom;
         components.set("domain", domCtx);
       }

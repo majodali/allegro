@@ -21,6 +21,7 @@ import {
   ContextValue,
   MultiValueType,
   AllegroError,
+  makeMultiValue,
 } from "./types.js";
 
 // --- Registry ------------------------------------------------------------------
@@ -524,7 +525,7 @@ function buildWriter(spec: ChannelSpec): ChannelWriter {
       }
       const comps = cloneComponents(target);
       comps.set(spec.name, channelValue);
-      return { kind: ValueKind.MultiValue, primary: target.kind === ValueKind.MultiValue ? (target as MultiValueType).primary : target, components: comps } as Value;
+      return makeMultiValue(target.kind === ValueKind.MultiValue ? (target as MultiValueType).primary : target, comps) as Value;
     },
   };
 }

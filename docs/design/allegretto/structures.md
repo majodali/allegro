@@ -32,7 +32,19 @@ tooling become Standard-layer extensions built on channels. That is the
 layering proof the architecture demands — extensions are where the
 language lives.
 
-## 2. Structure [designed]
+## 2. Structure [partial]
+
+*Status (2026-07, C4.1): the KIND exists — every MultiValue and Context
+is an instance of one host class (`src/structure.ts`), constructed
+exclusively through the `makeMultiValue`/`makeContext` factory shims
+(six bypass sites converted; the W4 boundary invariant fails any future
+stray literal). One declared hidden class for all structures (measurably
+faster than the per-shape literals it replaced); role fixed at
+construction; D17 role-transparency (W5) and the D22 immutable bit (with
+the scope + future-cell + construction-phase carve-outs) asserted by the
+battery. Still pending: physical plane separation + shape ref field
+(inside structure.ts, with C4.3's transparency cutover), dense regions
+(C4.2), symbol keys (C5).*
 
 **Slot plane.** Keys are `symbol | string | number` (D14). Channel keys are
 always **namespaced symbols**, so user data (string/number keys) cannot

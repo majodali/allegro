@@ -1,6 +1,10 @@
 // Allegretto - Core Types
 // Five value kinds + Param placeholder
 
+// C4.1: the unified Structure class behind MultiValue/Context. structure.ts
+// imports only TYPES from this module, so there is no runtime cycle.
+import { newMultiValueStructure, newContextStructure } from "./structure.js";
+
 export enum ValueKind {
   Bits = "Bits",
   PrimitiveFunction = "PrimitiveFunction",
@@ -220,12 +224,17 @@ export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunct
   return fn;
 }
 
+// C4.1 (structures Phase 4): both factories are now SHIMS over the
+// unified Structure class (src/structure.ts) — one host representation,
+// one hidden class, constructed only here. The returned objects satisfy
+// the legacy interfaces field-for-field; the physical layout migrates
+// inside structure.ts from now on.
 export function makeContext(): ContextValue {
-  return { kind: ValueKind.Context, bindings: new Map(), bindingList: [] };
+  return newContextStructure() as unknown as ContextValue;
 }
 
 export function makeMultiValue(primary: Value, components?: Map<string, Value>): MultiValueType {
-  return { kind: ValueKind.MultiValue, primary, components: components ?? new Map() };
+  return newMultiValueStructure(primary, components ?? new Map()) as unknown as MultiValueType;
 }
 
 // --- Utilities ---

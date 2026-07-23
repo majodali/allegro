@@ -21,7 +21,7 @@
 // type) is F7+ and likely requires either richer abstract-domain
 // machinery or an external SMT discharge.
 
-import { dataOf, getName, channelReadRaw } from "./slots.js";
+import { dataOf, getName, channelReadRaw, componentsView } from "./slots.js";
 import { scopeLookup } from "./scope.js";
 import {
   Value, ValueKind, ContextValue, ComposedFunctionValue, ExpressionValue,
@@ -153,7 +153,7 @@ function substParams(
     case ValueKind.MultiValue: {
       seen.add(v);
       const mv = v as any;
-      return { ...mv, primary: substParams(mv.primary, cfn, posMap, seen) };
+      return makeMultiValue(substParams(mv.primary, cfn, posMap, seen), componentsView(v) as Map<string, import("./types.js").Value>);
     }
     case ValueKind.ComposedFunction: {
       seen.add(v);

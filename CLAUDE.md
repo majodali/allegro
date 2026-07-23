@@ -284,7 +284,8 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 
 ### Files
 
-- **`src/types.ts`** — Value types, constructors, utilities, Extension interface, string↔bits, float↔bits
+- **`src/types.ts`** — Value types, constructors, utilities, Extension interface, string↔bits, float↔bits. C4.1: `makeMultiValue`/`makeContext` are shims over the unified Structure class — construct structures ONLY through them (a stray object literal fails the W4 boundary invariant)
+- **`src/structure.ts`** — The unified host representation (structures Phase 4): one class behind both MultiValue and Context, role fixed at construction, single declared hidden class, D22 immutable bit. Physical layout changes happen inside this module
 - **`src/evaluator.ts`** — Recursive tree-walk evaluator, memoization, partial evaluation (Rule 1 + Rule 2 with type propagation through residuals), type-directed dispatch via `PRIM_TO_METHOD`, closure support, type variable unification at call sites, tail call optimization, `precompileFunction` for compile-time type inference
 - **`src/primitives.ts`** — All primitives: bits ops, expression/context/multi-value ops, type system (type_dispatch, type_check, type_apply, typed_int/string/float/bool/array/object, typed_function, typed operators, logical ops, unification), grammar primitives, print (lazy for type preservation)
 - **`src/types-std.ts`** — Eight core types as Context values with method bindings, generic type support (buildGenericType, memoized type constructors), type helpers (getType, getTypeName, withType), FunctionType, UntypedFunction, AnyType, makeArray, makeObject, createTypeSystem extension

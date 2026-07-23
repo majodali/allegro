@@ -23,7 +23,7 @@
 import { dataOf, cloneComponents, componentsView, channelReadRaw, typeShape, getAbstractDomain } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue,
-  makeMultiValue, makeInt, isResolved,
+  makeMultiValue, makeContext, makeInt, isResolved,
 } from "./types.js";
 
 // =============================================================================
@@ -658,11 +658,7 @@ export function predicatesOf(v: Value): PredicateSet | null {
 }
 
 function encodePredicates(set: PredicateSet): Value {
-  const ctx: ContextValue = {
-    kind: ValueKind.Context,
-    bindings: new Map(),
-    bindingList: [],
-  };
+  const ctx: ContextValue = makeContext();
   (ctx as any).__predicateSet = set;
   return ctx;
 }
@@ -787,11 +783,7 @@ export function meetKnowledge(a: Knowledge, b: Knowledge): Knowledge {
  *  on a Context with a hidden `__abstractDomain` field — cheap, opaque to the
  *  evaluator, decoded by the refinement helpers. */
 function encodeDomain(d: AbstractDomain): Value {
-  const ctx: ContextValue = {
-    kind: ValueKind.Context,
-    bindings: new Map(),
-    bindingList: [],
-  };
+  const ctx: ContextValue = makeContext();
   (ctx as any).__abstractDomain = d;
   return ctx;
 }

@@ -44,6 +44,8 @@ import { stringToBits } from "./types.js";
 import { PredicateSet, makePredicate, effectsDomain } from "./refinements.js";
 import { makeInt } from "./types.js";
 import { effectsOf } from "./effects.js";
+import { Structure, isStructure } from "./structure.js";
+import { dataOf } from "./slots.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const BASELINE_PATH = path.join(REPO_ROOT, "src", "boundary-baseline.json");
@@ -290,6 +292,13 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
 
   if (v.kind === ValueKind.MultiValue) {
     const mv = v as MultiValueType;
+    // C4.1 (W4): every MultiValue is an instance of the unified Structure
+    // class — a stray object literal bypassing the factory fails here.
+    if (!isStructure(v)) {
+      out.push({ invariant: "W4 structure-kind", detail: "MultiValue is not a Structure instance (bypassed makeMultiValue)", program });
+    } else if ((v as unknown as Structure).bindings !== undefined) {
+      out.push({ invariant: "W5 role-transparency", detail: "MultiValue role carries a slot plane (data slots + primary — D17)", program });
+    }
     if (mv.primary && (mv.primary as Value).kind === ValueKind.MultiValue) {
       out.push({ invariant: "W1 multivalue-non-nesting", detail: "MultiValue primary is itself a MultiValue", program });
     }
@@ -310,6 +319,12 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     return;
   }
   if (v.kind === ValueKind.Context) {
+    // C4.1 (W4): every Context is an instance of the unified Structure class.
+    if (!isStructure(v)) {
+      out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeContext)", program });
+    } else if ((v as unknown as Structure).primary !== undefined) {
+      out.push({ invariant: "W5 role-transparency", detail: "Context role carries a primary (data slots + primary — D17)", program });
+    }
     for (const [key, b] of (v as ContextValue).bindings) {
       if (key.startsWith("__") && !isRegisteredSlotKey(key)) {
         out.push({ invariant: "W3 registry-completeness", detail: `unregistered slot key "${key}"`, program });
@@ -1021,6 +1036,46 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const met = meetKnowledge(a, b);
     const dom = knowledgeDomain(met) as IntervalDomain | null;
     eq(dom?.kind === "interval" && dom.lo === 1 && dom.hi === 99, true, "meet of ≥1 and ≤99 is [1, 99]");
+  });
+
+  // --- Structure kind (C4.1) --------------------------------------------------
+
+  test("structure kind (C4.1): factories construct the unified representation; roles are transparent", () => {
+    const { evalCtx } = evalSource(
+      "x = 42\np = {a: 1}\nPositiveInt = Int & _ > 0\ny = PositiveInt(5)",
+      undefined, [createTypeSystem()], undefined, true);
+    const x = evalCtx.bindings.get("x")!.value!;
+    eq(isStructure(x), true, "typed literal (MultiValue role) is a Structure");
+    eq((x as unknown as Structure).immutable, true, "MultiValue role born immutable (D22)");
+    eq((x as unknown as Structure).bindings === undefined, true, "MultiValue role has no slot plane (D17 transparency)");
+    const p = dataOf(evalCtx.bindings.get("p")!.value!);
+    eq(isStructure(p), true, "object Context role is a Structure");
+    eq((p as unknown as Structure).primary === undefined, true, "Context role has no primary (D17)");
+    const y = evalCtx.bindings.get("y")!.value!;
+    eq(isStructure(y) && isStructure(getType(y)!), true, "refined value AND its type Context share the representation");
+    eq(isStructure(evalCtx), true, "evaluation scopes share the substrate (plane split stays isScope/parent)");
+  });
+
+  test("structure kind (C4.1): key-sort partition — hostile data keys never touch the channel plane", () => {
+    const r = evalSource(
+      "o = {type: 5, effects: 7}\nv = o.type + o.effects",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(Number((primaryOf(r.evalCtx.bindings.get("v")!.value!) as BitsValue).data), 12,
+      "data keys named after channels behave as plain fields (no channel confusion)");
+    const oVal = r.evalCtx.bindings.get("o")!.value!;
+    eq(getTypeNameOf(oVal), "Object", "the channel plane still reads the real type channel");
+    const oCtx = dataOf(oVal) as ContextValue;
+    eq(Number((primaryOf(oCtx.bindings.get("type")!.value!) as BitsValue).data), 5,
+      "the slot plane holds the hostile key independently");
+  });
+
+  test("structure kind (C4.1): future cells stay the sanctioned monotonic exception (D22 carve-out)", () => {
+    const { evalCtx, registry } = evalSource("import cfg\nz = cfg",
+      undefined, [createTypeSystem()], undefined, true);
+    const cell = evalCtx.bindings.get("cfg")!;
+    eq(isPendingCell(cell), true, "pending cell inside the (mutable, scope-role) structure");
+    applyPhase(registry, evalCtx, new Map([["cfg", makeInt(3)]]));
+    eq(Number((primaryOf(cell.value!) as BitsValue).data), 3, "single-assignment resolution in place — monotonic, not mutation");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {
