@@ -243,6 +243,12 @@ print(PositiveInt(5))
 x = PositiveInt(0 - 1)
 print(error of x)
 
+// C3.3: instanceof RE-CHECKS the predicate from data (pure, congruent)
+print(5 instanceof PositiveInt)
+// certificate_peek asks "was it CONSTRUCTED as PositiveInt?" (effectful)
+print(certificate_peek(PositiveInt(5), PositiveInt))
+print(certificate_peek(5, PositiveInt))
+
 // Distinct type (breaks subtypeof)
 UserId = Int.distinct()
 print(UserId(42) instanceof Int)

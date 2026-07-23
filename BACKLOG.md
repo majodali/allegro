@@ -166,8 +166,17 @@ phase).
   (symbols) + C6 (default mediator, modifier vocabulary in the kind
   recipe); surface-syntax defaults (public-by-default, names-public)
   proposed, decided at the surface chunk. C3.3 unblocked
-- [ ] **B-017** · L0 · Observation effect; pure recheck vs certificate
-  peek; congruence tests (C3.3)
+- [x] **B-017** · L0 · Observation effect; pure recheck vs certificate
+  peek; congruence tests (C3.3). Landed 2026-07 (Phase 3 complete):
+  instanceof on member-transparent refinements = pure predicate re-check
+  (recursive chain; fixes the congruence violation where
+  `5 instanceof PositiveInt` was false while the tagged twin was true);
+  preserveOps shapes stay nominal (typeShape boundary);
+  `certificate_peek(v, T)` new channel-aware primitive with the
+  "observe" effect label (provenance question — distinguishes §7-equal
+  values, priced by the effect calculus; `effects pure` + peek fails);
+  congruence + equality-ignores-knowledge boundary tests (D37
+  groundwork); demo + sandbox example
 - [ ] **B-018** · L2 · `[reval]` Totality design revalidation →
   `totality.md` in `docs/design/standard/`: severity policy (**reconcile
   v1 info-by-default with structures.md D34 strict-by-default as an

@@ -961,6 +961,52 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(dom?.kind === "interval" && dom.lo >= 1, true, "domain intact — the meet never widens");
   });
 
+  // --- Observation effect (C3.3, D36) -----------------------------------------
+
+  test("observation effect (C3.3): instanceof is a pure re-check — congruent over equal data", () => {
+    const r = evalSource(
+      "PositiveInt = Int & _ > 0\na = PositiveInt(5)\nb = 5\n" +
+      "ia = a instanceof PositiveInt\nib = b instanceof PositiveInt\nneg = (0 - 3) instanceof PositiveInt\n" +
+      "sa = a + 1\nsb = b + 1\nta = a.toString()\ntb = b.toString()\neqv = a == b",
+      undefined, [createTypeSystem()], undefined, true);
+    const num = (k: string) => Number((primaryOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
+    const str = (k: string) => bitsToString(primaryOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue);
+    eq(num("ia"), 1, "tagged value passes");
+    eq(num("ib"), 1, "equal bare data answers IDENTICALLY — re-check, not certificate peek");
+    eq(num("neg"), 0, "violating data fails");
+    eq(num("sa") === num("sb"), true, "pure arithmetic agrees on §7-equal values");
+    eq(str("ta") === str("tb"), true, "toString agrees on §7-equal values");
+    eq(num("eqv"), 1, "equality ignores knowledge (D37 groundwork)");
+  });
+
+  test("observation effect (C3.3): nested refinements re-check the whole chain; shapes stay nominal", () => {
+    const r = evalSource(
+      "SmallPos = Int & _ > 0 && _ < 100\nok = 50 instanceof SmallPos\nhigh = 150 instanceof SmallPos\n" +
+      "PI = (Int & _ > 0).preserveOps()\nbare = 8 instanceof PI\ntagged = PI(5) instanceof PI",
+      undefined, [createTypeSystem()], undefined, true);
+    const num = (k: string) => Number((primaryOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
+    eq(num("ok"), 1, "nested predicate chain re-checked (50 ∈ [1,99])");
+    eq(num("high"), 0, "chain refusal (150 ∉ [1,99])");
+    eq(num("bare"), 0, "preserveOps type is a SHAPE (own members) — instanceof stays nominal");
+    eq(num("tagged"), 1, "shape-constructed value passes nominally");
+  });
+
+  test("observation effect (C3.3): certificate_peek observes knowledge — effectful; instanceof stays pure", () => {
+    const r = evalSource(
+      "PositiveInt = Int & _ > 0\na = PositiveInt(5)\n" +
+      "pa = certificate_peek(a, PositiveInt)\npb = certificate_peek(5, PositiveInt)\n" +
+      "peeker(x: Int) => certificate_peek(x, PositiveInt)\n" +
+      "checker(x: Int) => x instanceof PositiveInt",
+      undefined, [createTypeSystem()], undefined, true);
+    const num = (k: string) => Number((primaryOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
+    eq(num("pa"), 1, "constructed-as-PositiveInt observed");
+    eq(num("pb"), 0, "the peek distinguishes §7-equal values — the very thing instanceof must not do");
+    const peekEff = effectsOf(r.evalCtx.bindings.get("peeker")!.value!);
+    eq(peekEff !== null && peekEff.has("observe"), true, "knowledge observation is inferred as an effect");
+    const checkEff = effectsOf(r.evalCtx.bindings.get("checker")!.value!);
+    eq(checkEff === null || checkEff.size === 0, true, "the pure re-check infers no effect");
+  });
+
   test("knowledge lattice (C3.1): meet accumulates facts — domains intersect", () => {
     const a: Knowledge = {
       bound: null,

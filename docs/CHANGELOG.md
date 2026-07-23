@@ -8,6 +8,42 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C3.3: Observation effect — instanceof is a pure re-check; certificate_peek is effectful (structures Phase 3 complete, B-017)
+
+D36's third leg: **re-checking is pure; observation is effectful.**
+
+- **`instanceof` on a member-transparent refinement is now a PURE
+  PREDICATE RE-CHECK** from data — recursive base check down the
+  refinement chain, then each layer's predicate (the identity/domain fast
+  paths are sound over immutable data). This fixes a real congruence
+  violation: previously `PositiveInt(5) instanceof PositiveInt` → true
+  but `5 instanceof PositiveInt` → false — a certificate peek disguised
+  as a type check, letting two shape-and-data-equal values answer
+  differently. Now both answer true (and `-3` answers false, by
+  re-check). Nested refinements re-check the whole chain
+  (`150 instanceof SmallPos` → false). **Shape-minting refined types
+  (preserveOps) stay nominal** — instanceof on a SHAPE is a shape
+  question, per the C3.1 typeShape boundary (`8 instanceof PI` remains
+  false; construction is the way in). No existing test asserted the old
+  peek semantics; the flip is the chunk's mandated behavior change.
+- **`certificate_peek(v, T)`** — the provenance question ("was v
+  CONSTRUCTED as T?") — is a new primitive, eager but channel-aware (the
+  certificate rides the value's channels), tagged with the **"observe"**
+  effect label. It distinguishes §7-equal values — exactly what a pure
+  function must not do — so the effect calculus prices it: a function
+  using it infers `observe` and cannot claim `effects pure`; F3a
+  compile-time deferral applies automatically. The walk covers refinement
+  certificate layers only (shape questions belong to instanceof).
+- **Congruence + equality groundwork** (for the D37 equality plan):
+  boundary tests assert pure-op interchangeability over §7-equal pairs
+  (arithmetic, toString, ==, instanceof) and that equality ignores
+  knowledge (`PositiveInt(5) == 5`).
+
+Demo `tests/observation-demo.alg`; 3 new boundary tests; sandbox example
+extended. **Phase 3 (shape/knowledge split) is complete over the current
+representation** — physical knowledge-channel storage moves at C4.
+1017/1017 green.
+
 ## 2026-07 — D41–D43: S3 access control settled — mediated member protocol, evidence is possession, extensible modifiers (B-016a session)
 
 The B-016a design session concluded; outcome ratified by the maintainer

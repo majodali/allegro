@@ -397,6 +397,11 @@ result = error "bad" + 5     // error propagates — result is still an error
 42 instanceof Int              // → true
 "hello" instanceof String      // → true
 NominalType subtypeof Type       // → true
+// C3.3 (D36): instanceof on a refinement is a PURE PREDICATE RE-CHECK from
+// data (congruent — `5 instanceof PositiveInt` → true, tagged or not);
+// preserveOps types are shapes and stay nominal. The provenance question
+// ("was it CONSTRUCTED as T?") is `certificate_peek(v, T)` — channel-aware,
+// tagged with the "observe" effect label; `effects pure` + peek fails.
 
 // Type constructors (calls __construct)
 Int(42)                        // wraps value with Int type

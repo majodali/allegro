@@ -175,6 +175,29 @@
 >   forward-chain, ext-satisfied import, REPL isolation); 3 existing
 >   tests adjusted internals-shaped only (chain-aware lookups; unified
 >   cell construction — assertions unchanged). 1002/1002 green.
+> - C3.3 (B-017) landed 2026-07 — observation effect; **Phase 3
+>   complete** (over the current representation; physical
+>   knowledge-channel storage moves at C4). `instanceof` on
+>   member-transparent refinements is now a PURE PREDICATE RE-CHECK:
+>   recursive base check down the chain + per-layer predicate via
+>   checkRefinementPredicate (identity/domain fast paths kept — sound
+>   over immutable data). Fixed a REAL congruence violation recon
+>   surfaced: `5 instanceof PositiveInt` was false while
+>   `PositiveInt(5) instanceof PositiveInt` was true — a certificate
+>   peek; both now answer by re-check (the flip is the chunk's mandated
+>   delta; no existing test asserted the peek). preserveOps types stay
+>   nominal — instanceof on a SHAPE is a shape question (same typeShape
+>   boundary as C3.1). New `certificate_peek(v, T)` primitive: the
+>   provenance question, channel-aware (certificate rides the channels;
+>   primaryOf would strip it), tagged effects ["observe"] — inference
+>   prices it, `effects pure` + peek fails, F3a deferral applies; walk
+>   covers refinement layers only. 3 boundary tests (congruence flip +
+>   pure-op interchangeability + equality-ignores-knowledge D37
+>   groundwork; nested chain + shapes-nominal; peek-effectful /
+>   instanceof-pure via effectsOf). Demo tests/observation-demo.alg.
+>   Deferred: full generated-corpus congruence property test (current
+>   corpus is a fixed pure-op list) — grows with the D37 equality plan.
+>   1017/1017 green.
 > - C3.2 (B-016) landed 2026-07 — annotations as knowledge bounds +
 >   narrowing. Occurrence `bound` component (drop rule) stamped at
 >   annotation boundaries: applyComposed after checkArgType (params) and

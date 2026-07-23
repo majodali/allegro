@@ -191,13 +191,18 @@ type patterns narrow
 within the matched arm (scope shadow layer for Symbol subjects;
 clone-on-write identity replacement for substituted-param subjects).
 Intrinsic knowledge survives looser annotations (the meet never widens).
-Deferred: operator-dispatch visibility gating (interacts with
-PRIM_TO_METHOD fallback semantics), knowledge-gated downcast refusal at
-call sites (an Animal-bounded Dog passed to `d: Dog` passes today —
-runtime-sound; static gating is an S3-adjacent discussion), record
-undeclared-field openness through `__getMember`. Still pending: the
-observation effect (C3.3), physical storage under the knowledge channel
-(C4).*
+C3.3: observation semantics implemented — `instanceof` on
+member-transparent refinements is a pure predicate re-check (recursive
+chain; congruent over shape-and-data-equal values; preserveOps shapes
+stay nominal), and `certificate_peek(v, T)` is the separate provenance
+op, channel-aware and tagged with the "observe" effect label so the
+effect calculus prices knowledge observation. **Phase 3 is complete over
+the current representation.** Deferred: operator-dispatch availability
+gating (interacts with PRIM_TO_METHOD fallback semantics),
+knowledge-gated downcast refusal at call sites (runtime-sound today),
+record undeclared-field openness through `__getMember`, generated-corpus
+congruence property testing (grows with the D37 equality plan). Still
+pending: physical storage under the knowledge channel (C4).*
 
 The old `type` channel conflated two things; they split (D36):
 

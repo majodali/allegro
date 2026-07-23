@@ -2509,6 +2509,36 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const actualType = getType(v);
   if (!actualType) return withType(makeInt(0), BoolType);
 
+  // C3.3 (D36): instanceof on a MEMBER-TRANSPARENT refinement is a PURE
+  // PREDICATE RE-CHECK from data — never a certificate peek. Two values
+  // equal in shape and data answer identically regardless of how they
+  // were constructed (congruence; the identity/domain fast paths inside
+  // checkRefinementPredicate are sound over immutable data — a re-check
+  // would agree). The base check recurses on the parent, unwinding nested
+  // refinements down to the shape. Shape-minting refined types
+  // (preserveOps — own member sets, per the C3.1 typeShape boundary)
+  // stay nominal: instanceof on a SHAPE is a shape question, answered
+  // purely from the value's own shape. Certificate-peeking is the
+  // separate, EFFECTFUL `certificate_peek` op.
+  if (getPredicate(expectedCtx as ContextValue) !== undefined
+      && typeShape(expectedCtx as ContextValue) !== expectedCtx) {
+    const base = getParent(expectedCtx as ContextValue);
+    if (base?.kind === ValueKind.Context) {
+      const baseRes = type_instanceof_impl([v, base], ctx, evalFn);
+      const brp = dataOf(baseRes);
+      if (brp.kind !== ValueKind.Bits) {
+        return makeExpr(makePrimitive("type_instanceof", type_instanceof_impl, true), [v, expectedType]);
+      }
+      if ((brp as BitsValue).data === 0n) return withType(makeInt(0), BoolType);
+      const predCheck = checkRefinementPredicate(v, expectedCtx as ContextValue, actualType, ctx!, evalFn!);
+      if (predCheck.ok === false) return withType(makeInt(0), BoolType);
+      if (predCheck.ok === null) {
+        return makeExpr(makePrimitive("type_instanceof", type_instanceof_impl, true), [v, expectedType]);
+      }
+      return withType(makeInt(1), BoolType);
+    }
+  }
+
   // Check via expected type's own instanceof (e.g., UnionType has direct binding, not in __members)
   const directInstanceof = (expectedCtx as ContextValue).bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
@@ -2540,6 +2570,40 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Fallback: name-based
   const actualName = getTypeName(v);
   return withType(makeInt(actualName === expectedName ? 1 : 0), BoolType);
+};
+
+// --- certificate_peek: knowledge observation (C3.3, D36) ---
+//
+// "Was this value CONSTRUCTED as T?" — reads the refinement-certificate
+// chain riding the value's stored type. This is knowledge observation and
+// therefore EFFECTFUL (label "observe"): two shape-and-data-equal values
+// may answer differently (`certificate_peek(PositiveInt(5), PositiveInt)`
+// → true; `certificate_peek(5, PositiveInt)` → false), so a pure function
+// consulting it would break congruence — proof_cong applies only to
+// knowledge-independent functions (D36/D37). `instanceof` is the pure,
+// congruence-safe question ("does the data satisfy T?"); this op answers
+// the provenance question and pays for it in the effect calculus.
+// Channel-aware registration: the certificate lives on the value's
+// channels — a primaryOf strip would erase exactly what this observes.
+// Only refinement layers carry certificates: the walk stops at the first
+// non-predicate layer (shape questions belong to instanceof).
+const certificate_peek_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 2) throw new AllegroError(`certificate_peek: need 2 args, got ${args.length}`);
+  const v = args[0];
+  const t = dataOf(args[1]);
+  if (t.kind !== ValueKind.Context) return withType(makeInt(0), BoolType);
+  const stored = getType(v);
+  if (!stored) return withType(makeInt(0), BoolType);
+  const tName = typeContextName(t as ContextValue);
+  let cur: ContextValue | null = stored;
+  for (let guard = 0; cur && guard < 64; guard++) {
+    if (cur === (t as ContextValue)) return withType(makeInt(1), BoolType);
+    if (tName !== null && typeContextName(cur) === tName) return withType(makeInt(1), BoolType);
+    if (getPredicate(cur) === undefined) break; // reached the shape — no more certificate layers
+    const p = getParent(cur);
+    cur = p !== undefined && dataOf(p).kind === ValueKind.Context ? (dataOf(p) as ContextValue) : null;
+  }
+  return withType(makeInt(0), BoolType);
 };
 
 // --- type_subtypeof: check if type S is a subtype of type T ---
@@ -3914,6 +3978,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   type_check: makePrimitive("type_check", type_check_impl, true),
   type_instanceof: makePrimitive("type_instanceof", type_instanceof_impl, true),
   type_subtypeof: makePrimitive("type_subtypeof", type_subtypeof_impl, true),
+  // C3.3: knowledge observation — eager but channel-aware (certificate
+  // rides the channels), tagged with the "observe" effect label.
+  certificate_peek: makePrimitive("certificate_peek", certificate_peek_impl, false, ["observe"], true),
   type_apply: makePrimitive("type_apply", type_apply_impl, true),
   type_function: makePrimitive("type_function", type_function_impl, true),
   type_union: makePrimitive("type_union", type_union_impl, true),
