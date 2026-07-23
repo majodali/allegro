@@ -151,18 +151,21 @@ phase).
   additive-only (`bound:` introspection line). Demo + 4 boundary tests;
   website "Knowledge Bounds" example. Deferred (recorded in structures.md
   §6): operator visibility, downcast gating, record-field openness
-- [ ] **B-016a** · L1 · S3 access-control design session — PE-with-
-  principal model (before C3.3). Maintainer reframing 2026-07: PE is the
-  sole gate for member resolution (text → symbol vs string key,
-  availability, AND authorization — the call-site context is the
-  principal, ambient in the same PE act). Settle: principal identity
-  (module FQN / scope chain / function provenance under substitution);
-  capability-guarded accessors (D24 pattern) vs declared attributes;
-  static-only vs residualising denial; authorization judged under the
-  occurrence's knowledge; reflection surfaces (channel_list,
-  introspection, ctx_bindings) vs the C3.3 observation effect. Question
-  set in structures.md §13; outcome recorded as D-entries before S3
-  implementation
+- [x] **B-016a** · L1 · S3 access-control design session — held 2026-07,
+  outcome ratified as **D41–D43** (decision log) + structures.md §6
+  pipeline / §13 rewrite. D41: mediated member protocol — one PE act,
+  four stages (project → availability → mediate via
+  `getMember(symbol, instance, context)` → dispatch); getMember never
+  does name resolution; PE folds static mediation. D42: evidence is
+  possession — evaluator-supplied reachability-capsule contexts, symbol
+  reachability as the default test, wire rule (foreign FQNs rebind
+  against exported registries only), D24 closures as the stronger tier.
+  D43: modifiers as extensible per-kind member attributes; non-pure
+  mediation allowed but effectful (effect calculus covers it); most
+  resolvers are pure possession checks. Implementation rides C5
+  (symbols) + C6 (default mediator, modifier vocabulary in the kind
+  recipe); surface-syntax defaults (public-by-default, names-public)
+  proposed, decided at the surface chunk. C3.3 unblocked
 - [ ] **B-017** · L0 · Observation effect; pure recheck vs certificate
   peek; congruence tests (C3.3)
 - [ ] **B-018** · L2 · `[reval]` Totality design revalidation →

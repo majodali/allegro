@@ -8,6 +8,48 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — D41–D43: S3 access control settled — mediated member protocol, evidence is possession, extensible modifiers (B-016a session)
+
+The B-016a design session concluded; outcome ratified by the maintainer
+and recorded as three decision-log entries + the structures.md §6
+pipeline block and §13 rewrite.
+
+- **D41 — mediated member protocol.** Member access is ONE PE act with
+  four stages: project (text → symbol, §5 base-name rules — only the
+  base resolver does name resolution) → availability (knowledge, D36) →
+  mediate (the shape's `getMember(symbol, instance, context)` maps the
+  resolved symbol to an accessor per the member's declared modifiers) →
+  dispatch (the accessor runs against the shape). PE folds the pipeline
+  when inputs are static — compiler-generated call sites specialize to
+  the raw accessor. Today's `type_dispatch` descriptor path becomes the
+  default mediator (C6); module types' export-enforcing `__getMember` is
+  the protocol's existing production instance. The no-implicit-fallback
+  refusal and the confluence invariant extend to mediation.
+- **D42 — evidence is possession.** No principal-identity lookup: the
+  context argument is evaluator-supplied and contexts are reachability
+  capsules (you cannot extend a scope you cannot reach). Default
+  evidence is symbol reachability (private = the member symbol stays in
+  the defining scope); denial is an availability outcome, static when
+  scope + knowledge are static. Wire rule: deserialized foreign-FQN
+  symbols rebind only against exported registries. D24 capability
+  closures stay as the stronger tier for authority-bearing operations.
+  Reachability ∧ availability compose by conjunction (holding
+  `Dog::tricks` doesn't help on an Animal-bounded occurrence).
+- **D43 — modifiers as extensible member attributes.** private /
+  protected / readonly / custom modifiers are Standard-layer attributes
+  of member declarations, defined per kind (D40 recipe input), never
+  redefinable globally. Static-evidence mediation is pure and folds at
+  compile time; non-pure mediation (runtime identity, tracing) is
+  ALLOWED but fully covered by the effect calculus — the modifier
+  declares its label and enclosing functions can't claim `effects pure`.
+  Expected distribution: the vast majority of resolvers are pure
+  possession checks. Surface defaults (public-by-default, names-public
+  in errors) recorded as proposed, decided at the surface-syntax chunk.
+
+Implementation rides C5 (symbols — C5.1 carries the wire-rule note) and
+C6 (default mediator + modifier vocabulary). C3.3 is unblocked. Docs
+only — no code change.
+
 ## 2026-07 — Availability: terminology + PE-sole-resolver semantics ratified (design delta to §6; S3 reframed)
 
 Maintainer discussion sharpened what C3.2's gate IS. Recorded in

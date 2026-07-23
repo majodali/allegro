@@ -453,6 +453,10 @@ discussed first).
 
 **C5.1 — FQN symbols.** Interning, scope registration, base-name
 projection, serialization by FQN.
+*D42 note (2026-07): deserialization never mints reachability — foreign
+FQNs rebind only against EXPORTED symbol registries; a private symbol
+arriving over the wire resolves to nothing. Design the registry surface
+with the export partition from day one.*
 *Boundary tests: same FQN ⇒ identity (across module reload); distinct
 scopes ⇒ distinct symbols with equal base names; the ambiguity rule fires
 identically at import resolution, member binding, and dot access (one test

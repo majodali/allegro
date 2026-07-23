@@ -248,11 +248,17 @@ current knowledge. "Compile time" vs "runtime" is not two mechanisms but
 may fire at precompile, at module load, or mid-execution after a future
 resolves. **Confluence invariant** (falsifiable): resolution is confluent
 over knowledge arrival — for fixed eventual knowledge, early (static) and
-late (residual-then-completed) resolution agree. Dispatch is the second
-stage of the same act: availability resolves text → symbol (by
-knowledge); dispatch resolves symbol → implementation (by shape). S3's
-access control will slot between them — evaluated by PE in the same act,
-with the call-site context as principal (see §13).
+late (residual-then-completed) resolution agree.
+
+**The full pipeline** (D41, one PE act, four stages): **project** (text →
+symbol, §5 base-name rules — only the base resolver does name
+resolution) → **availability** (knowledge gates reference, this section)
+→ **mediate** (the shape's `getMember(symbol, instance, context)` maps
+symbol → accessor per the member's declared modifiers; evidence is
+possession, D42/D43) → **dispatch** (the accessor runs against the
+shape — overrides run). Static inputs fold the whole pipeline away;
+non-pure mediation is effectful and surfaces in the effect calculus. The
+confluence invariant covers all four stages.
 
 **Observation is effectful; re-checking is pure.** `x instanceof
 PositiveInt` means **pure predicate re-check** (recomputes from data —
@@ -521,24 +527,24 @@ PROCESS §6 before modification, I3):
 
 ## 13. Deferred and open [designed]
 
-- **S3 visibility / access control** — reframed 2026-07: enforcement is
-  NOT a separate attribute check at dispatch; it is **PE evaluating the
-  access with the call-site context as principal**, in the same act that
-  resolves availability (§6: availability resolves text → symbol; access
-  control admits the principal to the symbol; dispatch selects the
-  implementation by shape). Open design questions for the S3 session
-  (sequenced before C3.3, see BACKLOG): (1) what the principal is —
-  defining-module FQN, scope chain, or function provenance (substitution
-  means bodies evaluate in chains rooted at the caller); (2) mechanism
-  shape — capability-guarded accessors per the D24 pattern (possession =
-  permission, zero new mechanism; D24 already notes module-private write
-  as this usage) vs. declared attributes checked against the principal;
-  (3) whether denial is always static or may residualise / fire at
-  runtime; (4) whether authorization is judged against the resolved
-  symbol under the occurrence's KNOWLEDGE (protected-Dog through an
-  Animal bound); (5) which reflection surfaces (`channel_list`,
-  introspection, `ctx_bindings`) must respect it vs. be classified
-  effectful — intersects C3.3's observation effect.
+- **S3 visibility / access control — SETTLED 2026-07 (D41–D43,
+  maintainer-ratified).** Member access is a mediated protocol: the
+  shape's `getMember(symbol, instance, context)` maps a resolved symbol
+  to an accessor, consulting the member declaration's MODIFIERS (D43:
+  declared attributes — private/protected/readonly/custom — defined per
+  kind at the Standard layer, extensible for one's own kinds only).
+  Evidence is POSSESSION (D42): the context is evaluator-supplied and a
+  reachability capsule; the default test is symbol reachability
+  (private = symbol stays in the defining scope; wire rule —
+  deserialized foreign FQNs rebind against exported registries only);
+  D24 closures remain the stronger tier for authority-bearing ops.
+  Denial is an availability outcome, static when scope + knowledge are
+  static. Non-pure mediation is allowed but EFFECTFUL (covered by the
+  effect calculus); the expected vast majority of resolvers are pure
+  possession checks that PE folds away. Reflection surfaces enumerate
+  only reachable symbols; names public by default (proposed).
+  Implementation rides C5 (symbols) + C6 (default mediator from
+  type_dispatch; modifier vocabulary in the kind recipe).
 - **S4 collections** (representation choices, persistent structures),
   **S5 variance/constraints** (`where T: Comparable` — note: constraints
   are knowledge on type-values, per §6/§9), **S6 channel registry**
