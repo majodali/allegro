@@ -3,7 +3,7 @@
 
 // C4.1: the unified Structure class behind MultiValue/Context. structure.ts
 // imports only TYPES from this module, so there is no runtime cycle.
-import { newMultiValueStructure, newContextStructure } from "./structure.js";
+import { newMultiValueStructure, newContextStructure, newDenseStructure } from "./structure.js";
 
 export enum ValueKind {
   Bits = "Bits",
@@ -235,6 +235,13 @@ export function makeContext(): ContextValue {
 
 export function makeMultiValue(primary: Value, components?: Map<string, Value>): MultiValueType {
   return newMultiValueStructure(primary, components ?? new Map()) as unknown as MultiValueType;
+}
+
+/** C4.2: construct a dense numeric-keyed structure (array context) — the
+ *  element array is adopted. Element reads go through slots.ts `indexGet`;
+ *  the legacy bindings view materializes lazily for stragglers. */
+export function makeDenseArrayCtx(elements: Value[]): ContextValue {
+  return newDenseStructure(elements) as unknown as ContextValue;
 }
 
 // --- Utilities ---

@@ -23,6 +23,7 @@ import {
   AllegroError,
   makeMultiValue,
 } from "./types.js";
+import { denseIndexGet, denseSlotCount, denseElements } from "./structure.js";
 
 // --- Registry ------------------------------------------------------------------
 
@@ -171,7 +172,16 @@ export function slotRegistration(key: string): SlotRegistration | undefined {
 // including MultiValue-wrapped types (types are typed) — plus `asContext`
 // to peel to the primary Context where the caller needs the shape itself.
 
+// C4.2: dense structures (array contexts) only ever hold numeric element
+// keys plus `__length` — every slot probe can answer WITHOUT materializing
+// the legacy bindings view. Keeps type-slot probes on arbitrary values
+// (auto-naming's hasShapeSlot, getName, …) off the materialization path.
+function isDense(ctx: ContextValue): boolean {
+  return (ctx as unknown as { dense?: unknown }).dense !== undefined;
+}
+
 function slotRead(ctx: ContextValue, name: string): Value | undefined {
+  if (isDense(ctx)) return name === "__length" ? denseSlotCount(ctx) : undefined;
   return ctx.bindings.get(name)?.value as Value | undefined;
 }
 
@@ -197,7 +207,7 @@ export function getMembers(ctx: ContextValue): Value | undefined { return slotRe
 export function getParent(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__extends"); }
 export function getConstruct(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__construct") ?? slotRead(ctx, "__constructor"); }
 export function getFallbackMember(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__getMember"); }
-export function isInterfaceType(ctx: ContextValue): boolean { return ctx.bindings.has("__interface"); }
+export function isInterfaceType(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__interface"); }
 export function getInterfaceMarker(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__interface"); }
 export function getInvariants(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__invariantsList"); }
 export function getWraps(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__wraps"); }
@@ -225,7 +235,14 @@ export function getEffectKind(ctx: ContextValue): Value | undefined { return slo
 export function getEffectBound(ctx: ContextValue): any { return (ctx as any).__effectBound; }
 
 // Base concepts
-export function getSlotCount(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__length"); }
+// C4.2: slot count and element reads are dense-aware — the dense region
+// is authoritative when present; the `__length` slot / string-keyed map
+// remain the fallback for non-dense numeric contexts.
+export function getSlotCount(ctx: ContextValue): Value | undefined { return denseSlotCount(ctx); }
+/** O(1) numeric element read (D18: arrays are numeric-keyed structures). */
+export function indexGet(ctx: ContextValue, i: number): Value | undefined { return denseIndexGet(ctx, i); }
+/** All elements of a numeric-keyed structure (dense fast path). */
+export function elementsOf(ctx: ContextValue): Value[] { return denseElements(ctx); }
 export function isFutureBindingName(name: string): boolean { return name.startsWith("__future_"); }
 export function isBareBindingName(name: string): boolean { return name.startsWith("__bare_"); }
 
@@ -354,9 +371,9 @@ export function writeShape(ctx: ContextValue, v: Value): void { slotWrite(ctx, "
 function writeDischarged(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
 
 // Presence checks
-export function hasName(ctx: ContextValue): boolean { return ctx.bindings.has("__name"); }
-export function hasShapeSlot(ctx: ContextValue): boolean { return ctx.bindings.has("__type"); }
-export function hasDischarged(ctx: ContextValue): boolean { return ctx.bindings.has("__discharged"); }
+export function hasName(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__name"); }
+export function hasShapeSlot(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__type"); }
+export function hasDischarged(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__discharged"); }
 
 // Set-only writes (bindings map, NO bindingList entry) — mirror the proof
 // kernel's origination idiom in primitives.ts exactly. These are the

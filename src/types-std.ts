@@ -7,7 +7,7 @@
 import {
   Value, ValueKind, BitsValue, ContextValue, MultiValueType, PrimitiveFnImpl, PrimitiveFunctionValue,
   ComposedFunctionValue,
-  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue,
+  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue, makeDenseArrayCtx,
   makeComposedFn, makeParam,
   stringToBits, bitsToString, AllegroError,
   Extension,
@@ -16,7 +16,7 @@ import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, 
 import {
   getName, getMembers, getParent, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
-  getSlotCount, getAbstractDomain, getEffectKind, getEffectBound, getVariants, isGenericTypeSlot,
+  getSlotCount, getAbstractDomain, getEffectKind, getEffectBound, getVariants, isGenericTypeSlot, indexGet, elementsOf,
   setName, setMembers, setParent, setConstruct, setFallbackMember, markInterface,
   setWraps, setVariants, setPredicate, setGenericParams, setGenericArgs,
   setGenericBackLink, markGeneric, setGenericConstructor, setProposition,
@@ -1492,15 +1492,11 @@ const boolMethods: Record<string, PrimitiveFnImpl> = {
 // =============================================================================
 
 /** Build a raw array Context (without type wrapping). Used internally. */
+// C4.2: numeric-keyed structures store elements in the dense region —
+// no per-element Binding objects, no string keys, no __length binding.
+// The legacy bindings view materializes lazily for stragglers.
 function makeRawArrayCtx(elements: Value[]): ContextValue {
-  const ctx = makeContext();
-  for (let i = 0; i < elements.length; i++) {
-    const key = String(i);
-    ctx.bindings.set(key, { key, value: elements[i] });
-    ctx.bindingList.push({ key, value: elements[i] });
-  }
-  setSlotCount(ctx, makeInt(elements.length));
-  return ctx;
+  return makeDenseArrayCtx(elements);
 }
 
 /** Create a typed Array value from a list of Allegro values.
@@ -1527,15 +1523,7 @@ export function makeArray(elements: Value[]): Value {
 }
 
 function arrayElements(ctx: ContextValue): Value[] {
-  const lenV = getSlotCount(ctx);
-  if (!lenV) return [];
-  const len = Number((lenV as BitsValue).data);
-  const result: Value[] = [];
-  for (let i = 0; i < len; i++) {
-    const b = ctx.bindings.get(String(i));
-    if (b?.value) result.push(b.value);
-  }
-  return result;
+  return elementsOf(ctx);
 }
 
 // =============================================================================
@@ -1552,9 +1540,9 @@ const arrLengthPrim = makePrimitive("arr_length", (args) => {
 const arrGetPrim = makePrimitive("arr_get", (args) => {
   const ctx = dataOf(args[0]) as ContextValue;
   const idx = Number(toSigned(asBitsTyped(dataOf(args[1]), "arr_get")));
-  const b = ctx.bindings.get(String(idx));
-  if (!b?.value) throw new AllegroError(`Array index ${idx} out of bounds`);
-  return b.value;
+  const v = indexGet(ctx, idx);
+  if (v === undefined) throw new AllegroError(`Array index ${idx} out of bounds`);
+  return v;
 });
 const intGtePrim = makePrimitive("int_gte", (args) => {
   return withType(
@@ -1722,9 +1710,9 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
   get: (args) => {
     const ctx = args[0] as ContextValue;
     const idx = Number(toSigned(asBitsTyped(args[1], "Array.get")));
-    const b = ctx.bindings.get(String(idx));
-    if (!b?.value) throw new AllegroError(`Array.get: index ${idx} out of bounds`);
-    return b.value;
+    const v = indexGet(ctx, idx);
+    if (v === undefined) throw new AllegroError(`Array.get: index ${idx} out of bounds`);
+    return v;
   },
   concat: (args) => {
     const aCtx = args[0] as ContextValue;
@@ -1966,8 +1954,8 @@ export function buildGenericType(
         const len = Number((lenV as BitsValue).data);
         const elems: string[] = [];
         for (let i = 0; i < len; i++) {
-          const eb = ctx.bindings.get(String(i));
-          if (eb?.value) elems.push(cacheKeyOne(eb.value, i));
+          const ev = indexGet(ctx, i);
+          if (ev !== undefined) elems.push(cacheKeyOne(ev, i));
         }
         return `arr(${elems.join(";")})`;
       }

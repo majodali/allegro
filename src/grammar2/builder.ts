@@ -13,7 +13,7 @@
 //   - error     → an error MultiValue with message + inner tree
 // =============================================================================
 
-import { dataOf, getSlotCount } from "../slots.js";
+import { dataOf, getSlotCount, indexGet } from "../slots.js";
 import {
   Rule, Grammar, Guard, Production,
   lit, cls, regex, eof, empty, fail, indent as indentTerm,
@@ -87,9 +87,9 @@ function arrayArg(v: Value, primName: string): Value[] {
   const length = Number(((lengthV as any).data ?? 0n) as bigint);
   const out: Value[] = [];
   for (let i = 0; i < length; i++) {
-    const b = ctx.bindings.get(String(i));
-    if (!b?.value) throw new AllegroError(`${primName}: array missing element ${i}`);
-    out.push(b.value);
+    const ev = indexGet(ctx, i);
+    if (ev === undefined) throw new AllegroError(`${primName}: array missing element ${i}`);
+    out.push(ev);
   }
   return out;
 }

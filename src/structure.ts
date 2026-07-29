@@ -1,30 +1,43 @@
 // =============================================================================
-// Structure — the unified host representation (structures Phase 4, C4.1 / B-019)
+// Structure — the unified host representation (structures Phase 4, C4.1–C4.2 / B-019–B-020)
 //
 // Design (docs/design/allegretto/structures.md §2, I1): an instance is
 // (shape ref, flat slot storage, channel storage, immutable bit, optional
-// dense region). C4.1 lands the KIND: every MultiValue and every Context
-// is now an instance of ONE host class, constructed exclusively through
-// the types.ts factories (`makeMultiValue` / `makeContext` are the shims
-// the plan promised). The public field surface (`primary`/`components`,
-// `bindings`/`bindingList`, scope fields) is unchanged — the ~1000-test
-// suite is the oracle — but the object layout is now a single declared
-// hidden class, and every later physical change (dense regions C4.2,
-// transparency cutover C4.3, symbol keys C5) happens inside this module.
+// dense region). C4.1 landed the KIND: every MultiValue and every Context
+// is an instance of ONE host class, constructed exclusively through the
+// types.ts factories (`makeMultiValue` / `makeContext` / `makeDenseArrayCtx`
+// are the shims the plan promised). The public field surface is unchanged
+// (the ~1000-test suite is the oracle) — the object layout is a single
+// declared hidden class, and every later physical change happens inside
+// this module.
+//
+// C4.2 lands the DENSE REGION (D18: arrays are numeric-keyed structures):
+// array contexts store their elements in a plain JS array (`dense`) — no
+// per-element Binding objects, no string keys, no `__length` binding. The
+// slot count IS `dense.length`. Compatibility: `bindings`/`bindingList`
+// are accessor-backed; for a dense structure the legacy map view is
+// MATERIALIZED LAZILY on first access (and then cached — arrays are
+// immutable, D22, and recon confirmed zero post-construction numeric
+// mutations). Hot paths use the slots.ts `indexGet`/`getSlotCount`
+// accessors and never materialize the view; stragglers (reflection,
+// struct-destructure patterns, walkers) hit the view once per array and
+// behave exactly as before. The W6 invariant asserts view/dense
+// coherence whenever a view exists.
 //
 // Role is FIXED at construction (a MultiValue never becomes a Context);
 // `kind` is a plain field so the evaluator's hot switch is unaffected.
 // The two planes map onto the current storage:
 //   - channel plane  → `components` (MultiValue role; every key is
 //     registry-checked by the W3 walker)
-//   - slot/data plane → `bindings` + `bindingList` (Context role;
-//     legacy `__*` meta-slots remain here until C5 re-keys them)
+//   - slot/data plane → `bindings` + `bindingList` (+ `dense` for
+//     numeric-keyed structures; legacy `__*` meta-slots remain here
+//     until C5 re-keys them)
 //
 // Immutable bit (D22): structures are born-immutable BY DEFAULT; the bit
 // is DECLARED state at C4.1, with the standing carve-outs enforced by the
 // boundary battery rather than by freezing (enforcement tightens at C4.3):
 //   - evaluation scopes are mutable evaluator state (not data — plane
-//     split, C2.1); `makeContext` marks them mutable when flagged;
+//     split, C2.1);
 //   - future cells are single-assignment monotonic (D33) — a pending
 //     cell inside an immutable structure does not violate deep
 //     immutability (the D22 carve-out);
@@ -33,8 +46,10 @@
 //     migrate (C6 recipe).
 // =============================================================================
 
-import type { Value, Binding, ContextValue } from "./types.js";
-import { ValueKind } from "./types.js";
+import type { Value, Binding, ContextValue, BitsValue } from "./types.js";
+import { ValueKind, makeInt } from "./types.js";
+
+const LENGTH_KEY = "__length";
 
 /** The one host representation behind MultiValue and Context. All fields
  *  are declared up front so every structure shares a single hidden class
@@ -47,8 +62,16 @@ export class Structure {
   components: Map<string, Value>;
 
   // --- Context role (record/type/scope: slot plane) ---
-  bindings: Map<string, Binding>;
-  bindingList: Binding[];
+  private _bindings: Map<string, Binding>;
+  private _bindingList: Binding[];
+
+  // --- C4.2 dense region (numeric-keyed structures — arrays) ---
+  /** Element storage for array contexts. When present, this IS the slot
+   *  plane; `_bindings`/`_bindingList` hold the lazily-materialized
+   *  legacy view (or stay undefined until someone asks). */
+  dense?: Value[];
+  /** Cached Bits for the slot count (avoids re-allocating per read). */
+  private _slotCountBits?: Value;
 
   // --- Scope-role fields (C2.1/C2.2; host-plane, never value slots) ---
   parent?: ContextValue;
@@ -64,13 +87,67 @@ export class Structure {
     this.kind = kind;
     this.primary = undefined as unknown as Value;
     this.components = undefined as unknown as Map<string, Value>;
-    this.bindings = undefined as unknown as Map<string, Binding>;
-    this.bindingList = undefined as unknown as Binding[];
+    this._bindings = undefined as unknown as Map<string, Binding>;
+    this._bindingList = undefined as unknown as Binding[];
+    this.dense = undefined;
+    this._slotCountBits = undefined;
     this.parent = undefined;
     this.isScope = undefined;
     this.scopePredicates = undefined;
     this.immutable = immutable;
   }
+
+  /** Legacy slot-plane view. For dense structures the map is materialized
+   *  on first access (then cached; W6 asserts coherence). Non-dense
+   *  structures return their storage directly — the getter is a
+   *  monomorphic two-check fast path on the scope-lookup hot loop. */
+  get bindings(): Map<string, Binding> {
+    if (this._bindings === undefined && this.dense !== undefined) materializeView(this);
+    return this._bindings;
+  }
+  set bindings(m: Map<string, Binding>) {
+    this._bindings = m;
+  }
+
+  get bindingList(): Binding[] {
+    if (this._bindingList === undefined && this.dense !== undefined) materializeView(this);
+    return this._bindingList;
+  }
+  set bindingList(l: Binding[]) {
+    this._bindingList = l;
+  }
+
+  /** True iff the legacy view has been materialized (dense structures). */
+  get viewMaterialized(): boolean {
+    return this.dense !== undefined && this._bindings !== undefined;
+  }
+
+  /** Slot count as a cached Bits value (dense structures only). */
+  slotCountBits(): Value {
+    if (this._slotCountBits === undefined) {
+      this._slotCountBits = makeInt(this.dense!.length);
+    }
+    return this._slotCountBits;
+  }
+}
+
+/** Build the legacy map/list view of a dense structure: one Binding per
+ *  element under its decimal string key, plus the `__length` slot. The
+ *  dense region stays authoritative for `indexGet`/`getSlotCount`. */
+function materializeView(s: Structure): void {
+  const bindings = new Map<string, Binding>();
+  const bindingList: Binding[] = [];
+  const dense = s.dense!;
+  for (let i = 0; i < dense.length; i++) {
+    const b: Binding = { key: String(i), value: dense[i] };
+    bindings.set(b.key as string, b);
+    bindingList.push(b);
+  }
+  const lenB: Binding = { key: LENGTH_KEY, value: s.slotCountBits() };
+  bindings.set(LENGTH_KEY, lenB);
+  bindingList.push(lenB);
+  s.bindings = bindings;
+  s.bindingList = bindingList;
 }
 
 /** Construct the MultiValue role. */
@@ -89,6 +166,46 @@ export function newContextStructure(): Structure {
   s.bindings = new Map();
   s.bindingList = [];
   return s;
+}
+
+/** C4.2: construct a dense numeric-keyed structure (array context). The
+ *  element array is adopted, not copied — callers hand over ownership
+ *  (arrays are immutable, D22). */
+export function newDenseStructure(elements: Value[]): Structure {
+  const s = new Structure(ValueKind.Context, true);
+  s.dense = elements;
+  return s;
+}
+
+/** O(1) element read on the dense region, with the legacy-map fallback
+ *  for non-dense numeric-keyed contexts (unions, hand-built tests). */
+export function denseIndexGet(ctx: ContextValue, i: number): Value | undefined {
+  const s = ctx as unknown as Structure;
+  if (s.dense !== undefined) return s.dense[i];
+  return ctx.bindings.get(String(i))?.value;
+}
+
+/** Dense-aware slot count read (Bits), or undefined when neither a dense
+ *  region nor a `__length` slot exists. */
+export function denseSlotCount(ctx: ContextValue): Value | undefined {
+  const s = ctx as unknown as Structure;
+  if (s.dense !== undefined) return s.slotCountBits();
+  return ctx.bindings.get(LENGTH_KEY)?.value;
+}
+
+/** All elements of a numeric-keyed structure (dense fast path). */
+export function denseElements(ctx: ContextValue): Value[] {
+  const s = ctx as unknown as Structure;
+  if (s.dense !== undefined) return s.dense.slice();
+  const lenV = denseSlotCount(ctx);
+  if (!lenV) return [];
+  const len = Number((lenV as BitsValue).data);
+  const out: Value[] = [];
+  for (let i = 0; i < len; i++) {
+    const b = ctx.bindings.get(String(i));
+    if (b?.value) out.push(b.value);
+  }
+  return out;
 }
 
 /** Is this value an instance of the unified representation? The W4

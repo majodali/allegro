@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -53,8 +53,8 @@ export function formatValue(v: Value): string {
           const len = lenV ? Number((lenV as BitsValue).data) : 0;
           const elems: string[] = [];
           for (let i = 0; i < len && i < 10; i++) {
-            const b = ctx.bindings.get(String(i));
-            if (b?.value) elems.push(formatValue(b.value));
+            const ev = indexGet(ctx, i);
+            if (ev !== undefined) elems.push(formatValue(ev));
           }
           if (len > 10) elems.push("...");
           return `[${elems.join(", ")}]`;
@@ -1050,9 +1050,9 @@ function arrayHandlesFromValue(v: Value, fnName: string): number[] {
   const len = lenB?.kind === ValueKind.Bits ? Number((lenB as BitsValue).data) : 0;
   const handles: number[] = [];
   for (let i = 0; i < len; i++) {
-    const itemB = ctx.bindings.get(String(i));
-    if (!itemB?.value) continue;
-    const ip = dataOf(itemB.value);
+    const itemV = indexGet(ctx, i);
+    if (itemV === undefined) continue;
+    const ip = dataOf(itemV);
     if (ip.kind !== ValueKind.Bits) {
       throw new AllegroError(`${fnName}: element ${i} is not a handle`);
     }

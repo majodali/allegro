@@ -12,7 +12,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, typeShape, PRESERVED_FN_META_KEYS } from "./slots.js";
+import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
@@ -779,8 +779,8 @@ function checkArgType(
       const expLen = Number(expLenV?.kind === ValueKind.Bits ? (expLenV as any).data : 0n);
       const actLen = Number(actLenV?.kind === ValueKind.Bits ? (actLenV as any).data : 0n);
       for (let j = 0; j < Math.min(expLen, actLen); j++) {
-        const expArg = expCtx.bindings.get(String(j))?.value;
-        const actArg = actCtx.bindings.get(String(j))?.value;
+        const expArg = indexGet(expCtx, j);
+        const actArg = indexGet(actCtx, j);
         if (expArg?.kind === ValueKind.Context && actArg?.kind === ValueKind.Context) {
           const expArgName = typeContextName(expArg);
           const actArgName = typeContextName(actArg);

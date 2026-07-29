@@ -8,6 +8,41 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-07 — C4.2: Arrays as numeric structures — the dense region (structures Phase 4, B-020)
+
+D18 lands physically: array contexts store their elements in the
+Structure's DENSE REGION — a plain JS array — with no per-element Binding
+objects, no decimal string keys, and no `__length` binding. The slot
+count IS `dense.length` (cached as Bits on first read).
+
+- **Single chokepoint, sole storage**: recon confirmed every
+  numeric-keyed context flows through `makeRawArrayCtx` (user arrays,
+  generic params/args, function param-type lists) and that NOTHING
+  mutates an array context after construction — so the dense region is
+  the only storage, not a mirror. `makeDenseArrayCtx` is the new
+  types.ts factory shim.
+- **Compatibility by lazy view**: `bindings`/`bindingList` on the
+  Structure class are now accessor-backed; a dense structure materializes
+  the legacy map/list view (elements under string keys + `__length`) on
+  first access and caches it — sound because arrays are immutable (D22).
+  Hot paths never touch it: ~10 element-access sites migrated to the new
+  slots.ts accessors (`indexGet` / dense-aware `getSlotCount` /
+  `elementsOf`), and every slot PROBE (`hasShapeSlot`, `getName`, … — the
+  auto-naming pass probes every binding value) answers dense structures
+  without materializing, since they can only ever hold numeric keys +
+  `__length`. The boundary test asserts a full bracket/length/map/reduce
+  pipeline runs with the view still unmaterialized.
+- **W6 dense-view-coherence** joins the walker: whenever a view exists it
+  must agree with the dense region (the region is authoritative).
+- **Boundary tests**: O(1) index access verified by a scaling test (50k
+  reads on 200 vs 200,000 elements, length-independent); array/object
+  duality (the string-key protocol answers from the materialized view,
+  dense stays authoritative after); existing arrays.alg / collections /
+  HOF tests as the differential oracle — all pass untouched. A/B
+  benchmark: mixed array+recursion workload ~3% faster than pre-C4.2.
+
+1023/1023 green.
+
 ## 2026-07 — C4.1: Structure kind — one host representation behind the factories (structures Phase 4, B-019)
 
 The representation swap begins. Every MultiValue and every Context is now

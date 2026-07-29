@@ -13,7 +13,7 @@
 // substitution templates.
 // =============================================================================
 
-import { dataOf, getSlotCount } from "../slots.js";
+import { dataOf, getSlotCount, indexGet } from "../slots.js";
 import {
   Grammar, Rule, makeGrammar, addProduction,
   lit, nonterm, seq, alt, rep, opt, regex as ruleRegex,
@@ -762,8 +762,8 @@ function getArrayField(ctx: ContextValue, key: string): Value[] {
   const len  = Number(((getSlotCount(arr) as any)?.data) ?? 0n);
   const out: Value[] = [];
   for (let i = 0; i < len; i++) {
-    const v = arr.bindings.get(String(i))?.value;
-    if (v) out.push(v);
+    const v = indexGet(arr, i);
+    if (v !== undefined) out.push(v);
   }
   return out;
 }

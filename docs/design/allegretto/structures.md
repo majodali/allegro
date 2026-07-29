@@ -34,7 +34,14 @@ language lives.
 
 ## 2. Structure [partial]
 
-*Status (2026-07, C4.1): the KIND exists — every MultiValue and Context
+*Status (2026-07, C4.1+C4.2): the KIND exists — every MultiValue and
+Context is a Structure instance, and the DENSE REGION is live: array
+contexts store elements in a plain JS array as the SOLE storage (no
+per-element Bindings, no string keys; count = dense.length); the legacy
+bindings view materializes lazily for stragglers (W6 asserts coherence;
+slot probes answer dense structures without materializing); element
+access via slots.ts `indexGet`/`elementsOf`, O(1) by scaling test.
+C4.1 details: every MultiValue and Context
 is an instance of one host class (`src/structure.ts`), constructed
 exclusively through the `makeMultiValue`/`makeContext` factory shims
 (six bypass sites converted; the W4 boundary invariant fails any future
@@ -43,8 +50,8 @@ faster than the per-shape literals it replaced); role fixed at
 construction; D17 role-transparency (W5) and the D22 immutable bit (with
 the scope + future-cell + construction-phase carve-outs) asserted by the
 battery. Still pending: physical plane separation + shape ref field
-(inside structure.ts, with C4.3's transparency cutover), dense regions
-(C4.2), symbol keys (C5).*
+(inside structure.ts, with C4.3's transparency cutover), symbol keys
+(C5).*
 
 **Slot plane.** Keys are `symbol | string | number` (D14). Channel keys are
 always **namespaced symbols**, so user data (string/number keys) cannot

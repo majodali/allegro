@@ -32,7 +32,7 @@ import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
-import { withType, getType, typeMethod } from "./types-std.js";
+import { withType, getType, typeMethod, makeArray } from "./types-std.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
@@ -45,7 +45,7 @@ import { PredicateSet, makePredicate, effectsDomain } from "./refinements.js";
 import { makeInt } from "./types.js";
 import { effectsOf } from "./effects.js";
 import { Structure, isStructure } from "./structure.js";
-import { dataOf } from "./slots.js";
+import { dataOf, indexGet, getSlotCount } from "./slots.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const BASELINE_PATH = path.join(REPO_ROOT, "src", "boundary-baseline.json");
@@ -324,6 +324,18 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
       out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeContext)", program });
     } else if ((v as unknown as Structure).primary !== undefined) {
       out.push({ invariant: "W5 role-transparency", detail: "Context role carries a primary (data slots + primary — D17)", program });
+    } else {
+      // C4.2 (W6): when a dense structure's legacy view exists, it must
+      // agree with the dense region — the region is authoritative.
+      const s = v as unknown as Structure;
+      if (s.dense !== undefined && s.viewMaterialized) {
+        for (let i = 0; i < s.dense.length; i++) {
+          if ((v as ContextValue).bindings.get(String(i))?.value !== s.dense[i]) {
+            out.push({ invariant: "W6 dense-view-coherence", detail: `view binding ${i} disagrees with the dense region`, program });
+            break;
+          }
+        }
+      }
     }
     for (const [key, b] of (v as ContextValue).bindings) {
       if (key.startsWith("__") && !isRegisteredSlotKey(key)) {
@@ -1076,6 +1088,55 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(isPendingCell(cell), true, "pending cell inside the (mutable, scope-role) structure");
     applyPhase(registry, evalCtx, new Map([["cfg", makeInt(3)]]));
     eq(Number((primaryOf(cell.value!) as BitsValue).data), 3, "single-assignment resolution in place — monotonic, not mutation");
+  });
+
+  // --- Dense arrays (C4.2, D18) -----------------------------------------------
+
+  test("dense region (C4.2): arrays store elements densely; hot paths never materialize the view", () => {
+    const { evalCtx } = evalSource(
+      "arr = [10, 20, 30]\na = arr[0]\nb = arr[2]\nn = arr.length\ns = arr.map(x => x + 1).reduce((acc, x) => acc + x, 0)",
+      undefined, [createTypeSystem()], undefined, true);
+    const arrCtx = dataOf(evalCtx.bindings.get("arr")!.value!) as unknown as Structure;
+    eq(arrCtx.dense !== undefined, true, "array context carries the dense region");
+    eq(arrCtx.viewMaterialized, false, "bracket access, length, map/reduce ran without materializing the legacy view");
+    eq(Number((primaryOf(evalCtx.bindings.get("s")!.value!) as BitsValue).data), 63, "HOF pipeline result correct over dense storage");
+  });
+
+  test("dense region (C4.2): O(1) index access — scaling test", () => {
+    const small = dataOf(makeArray(Array.from({ length: 200 }, (_, i) => makeInt(i)))) as ContextValue;
+    const big = dataOf(makeArray(Array.from({ length: 200_000 }, (_, i) => makeInt(i)))) as ContextValue;
+    const time = (ctx: ContextValue, len: number): number => {
+      const t0 = performance.now();
+      let acc = 0n;
+      for (let k = 0; k < 50_000; k++) {
+        const v = indexGet(ctx, (k * 7919) % len)!;
+        acc += (primaryOf(v) as BitsValue).data;
+      }
+      // acc consumed so the loop can't be optimized away
+      if (acc < 0n) throw new Error("unreachable");
+      return performance.now() - t0;
+    };
+    time(small, 200); // warmup
+    const tSmall = time(small, 200);
+    const tBig = time(big, 200_000);
+    eq(tBig < Math.max(tSmall, 1) * 5, true,
+      `index access is length-independent (200 elems: ${tSmall.toFixed(1)}ms, 200k elems: ${tBig.toFixed(1)}ms)`);
+  });
+
+  test("dense region (C4.2): array/object duality — the legacy view answers the string-key protocol", () => {
+    // A straggler reading the string-key protocol (bindings.get("0"))
+    // materializes the lazy view, which must agree with the dense region
+    // (W6) — and the dense region stays authoritative afterwards.
+    const r = evalSource("arr = [7, 8, 9]", undefined, [createTypeSystem()], undefined, true);
+    const arrCtx = dataOf(r.evalCtx.bindings.get("arr")!.value!) as unknown as Structure;
+    eq(arrCtx.viewMaterialized, false, "no view before the straggler read");
+    const viaMap = (arrCtx as unknown as ContextValue).bindings.get("0")?.value;
+    eq(Number((primaryOf(viaMap!) as BitsValue).data), 7, "string-key protocol answers from the materialized view");
+    eq(arrCtx.viewMaterialized, true, "the straggler path materialized the view");
+    eq(Number((primaryOf(indexGet(arrCtx as unknown as ContextValue, 1)!) as BitsValue).data), 8,
+      "dense region stays authoritative after materialization");
+    eq(Number(((arrCtx as unknown as ContextValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
+    eq((arrCtx as unknown as ContextValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

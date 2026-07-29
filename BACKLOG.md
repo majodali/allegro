@@ -194,7 +194,16 @@ phase).
   3 boundary tests (roles, hostile channel-named data keys, monotonic
   cell resolution). Physical plane separation + shape-ref field follow
   inside structure.ts at C4.3/C5
-- [ ] **B-020** · L0 · Arrays as numeric structures w/ dense region (C4.2)
+- [x] **B-020** · L0 · Arrays as numeric structures w/ dense region
+  (C4.2). Landed 2026-07: dense region is the SOLE element storage
+  (makeRawArrayCtx → makeDenseArrayCtx; no per-element Bindings, no
+  string keys, no __length binding; count = dense.length cached);
+  bindings/bindingList accessor-backed with lazy legacy view (immutable
+  arrays ⇒ cache-once); ~10 sites migrated to indexGet/elementsOf/
+  dense-aware getSlotCount; slot probes answer dense structures without
+  materializing; W6 view-coherence invariant; O(1) scaling + duality
+  boundary tests; existing array suites as differential oracle; ~3%
+  faster on the A/B workload
 - [ ] **B-021** · L0 · Transparency cutover; retire `primaryOf` + wrapper
   shims (C4.3) — second conscious-delta chunk
 - [ ] **B-022** · L0 · FQN symbols: interning, registration, projection
