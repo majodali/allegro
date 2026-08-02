@@ -213,7 +213,26 @@ interpreting facts (predicate lattices, implication) is Standard-layer.
 holding an unresolved future cell (§10) — one representation for REPL
 declarations, forward-chaining, and async futures alike.
 
-## 5. Symbols [designed]
+## 5. Symbols [partial]
+
+*Status (2026-08, C5.1): the identity substrate is live in
+`src/symbols.ts` — FQN interning (`registerScopeSymbol`; same FQN is the
+same object across re-evaluation, module reload, and loader instances),
+the D42 export partition (registration and exporting are separate acts on
+separate maps; `symbolFromWire` answers ONLY from the exported registry —
+a private or unknown FQN resolves to nothing and mints nothing),
+serialization (`symbolToWire` = the FQN; transient parser-minted symbols
+have no wire identity), and the §5 governing rule as ONE resolver
+(`projectBaseName`: distinct-target counting with multi-bind dedupe,
+explicit-qualification narrowing, identical behavior asserted across the
+three surface framings by the battery). `evalSource` registers every
+top-level binding under its defining scope's FQN (module file path via
+ModuleLoader, `<main>` otherwise); `SymbolValue` gained the optional
+`fqn` field. Parser-minted Symbols remain transient references resolved
+by base name against lexical scope (§5 allows string binding keys).
+Pending at C5.2: symbol-keyed type members, resolver adoption at member
+binding + dot access, the `x[ns.name]` qualification syntax,
+draw-from/multi-bind.*
 
 Symbols are the existing value kind **redefined** as first-class runtime
 values (D20, D29):

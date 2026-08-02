@@ -9,6 +9,7 @@ import { remapParams } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, AllegroError } from "./types.js";
 import { withType } from "./types-std.js";
 import { primitives } from "./primitives.js";
+import { markExported } from "./symbols.js";
 import { scanUses } from "./use-scanner.js";
 
 // --- Types ---
@@ -301,6 +302,9 @@ export class ModuleLoader {
         allExtensions,
         /* grammarExtension */ undefined,
         /* typed */ true,
+        /* futureManager */ undefined,
+        /* softFail */ undefined,
+        /* C5.1: the module file path IS the defining-scope FQN (§5) */ resolvedPath,
       );
       evalCtx = result.evalCtx;
     } catch (e: any) {
@@ -343,6 +347,14 @@ export class ModuleLoader {
       ? new Set(Object.keys(exportedBindings))
       : new Set(Object.keys(allBindings));
     const bindings = hasExports ? exportedBindings : allBindings;
+
+    // C5.1 (D42): populate the EXPORT PARTITION — only these symbols are
+    // reachable to foreign FQNs arriving over the wire (symbolFromWire).
+    // Registration of ALL module bindings already happened inside
+    // evalSource; exporting is the separate, narrower act.
+    for (const name of exportNames) {
+      markExported(resolvedPath, name);
+    }
 
     // Build typed module object for use with `import name` + dot access
     const moduleObj = buildModuleObject(id, allBindings, exportNames);

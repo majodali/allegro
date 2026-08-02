@@ -8,6 +8,45 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C5.1: FQN symbols — the identity substrate (structures Phase 5, B-022)
+
+Phase 5 opens with the symbol identity substrate (`src/symbols.ts`),
+implementing structures.md §5 with the D42 wire rule designed in from
+day one.
+
+- **Identity = FQN, enforced by interning.** `registerScopeSymbol(scope,
+  base)` returns THE symbol for `scope::base` — the same object across
+  re-evaluation, module reload, and fresh loader instances (the intern
+  table outlives them). `SymbolValue` gains an optional `fqn`; the base
+  name stays the convenience projection (printing, lexical resolution).
+  Parser-minted symbols (`makeSymbol`) remain TRANSIENT references with
+  no identity beyond their occurrence — §5 explicitly allows scope
+  binding keys to stay strings, so the hot resolution path is untouched.
+- **Registration is automatic at the defining scope.** `evalSource`
+  gains a `moduleFqn` parameter (default `<main>`) and registers every
+  top-level binding name under it; `ModuleLoader` passes the resolved
+  module file path (§5's default scope FQN).
+- **D42 export partition.** Registration and exporting are separate acts
+  on separate maps. `markExported` (called by the module loader for the
+  module's public interface) populates the export registry;
+  `symbolFromWire(fqn)` answers ONLY from it — a private
+  (registered-but-not-exported) or unknown FQN resolves to null, and a
+  failed rebind mints nothing (asserted by an intern-count check).
+  `symbolToWire` is the FQN; serializing a transient symbol is an error.
+- **The §5 governing rule as one resolver.** `projectBaseName(candidates,
+  base, qualifier?)` — zero targets → none; one distinct target → match
+  (a member multi-bound to several symbols dedupes to ONE target, §8);
+  multiple distinct targets → explicit qualification required, else an
+  ambiguity error naming every candidate FQN. The battery runs the same
+  matrix through three surface framings (import resolution, member
+  binding, dot access) and asserts identical outcomes — C5.2 adopts the
+  resolver at the latter two surfaces when members become symbol-keyed.
+
+5 new boundary tests + 1 module-loader integration test (registration +
+export partition + reload identity end-to-end); 1039/1039 green; tsc at
+the 4-error rootDir baseline. Deferred to C5.2: symbol-keyed members,
+`x[ns.name]` qualification syntax, draw-from binding.
+
 ## 2026-08 — C4.3c: Transparency at the eager boundary — primaryOf retired (structures Phase 4, B-021 part 3; B-021 complete)
 
 The last C4.3 sub-chunk lands scalar transparency (R4) and closes B-021.

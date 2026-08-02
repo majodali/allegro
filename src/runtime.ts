@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch } from "./slots.js";
+import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch, isBareBindingName, isFutureBindingName } from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
@@ -19,6 +19,7 @@ import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from ".
 import { collapseBodyMetadata, checkExhaustiveness, checkTermination } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
+import { registerScopeSymbol, MAIN_SCOPE_FQN } from "./symbols.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
@@ -939,6 +940,12 @@ export function evalSource(
    *  (e.g. the `allegro verify` CLI emits them as a Verdict). Default
    *  false (compilation halts on failure — "build safety in"). */
   softFail?: boolean,
+  /** C5.1: the defining-scope FQN for this source's top-level bindings
+   *  (default `<main>`; ModuleLoader passes the resolved module file path).
+   *  Every top-level binding name is REGISTERED as an FQN symbol —
+   *  identity = FQN, interned in src/symbols.ts. Exporting is a separate
+   *  act (the D42 partition), performed by the module loader. */
+  moduleFqn?: string,
 ): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
   // New pass: Allegro-minted channel registrations from prior passes are
   // sealed (see ChannelEntry.epoch in slots.ts).
@@ -1281,6 +1288,18 @@ export function evalSource(
         ).join("\n"),
         );
       }
+    }
+  }
+
+  // C5.1: register this source's top-level binding names as FQN symbols
+  // under the defining scope (module file path, or `<main>`). Registration
+  // is idempotent (interned — same FQN is the same object across re-eval
+  // and reload); synthetic bare/future markers are not names.
+  {
+    const scopeFqn = moduleFqn ?? MAIN_SCOPE_FQN;
+    for (const key of evalCtx.bindings.keys()) {
+      if (isBareBindingName(key) || isFutureBindingName(key)) continue;
+      registerScopeSymbol(scopeFqn, key);
     }
   }
 

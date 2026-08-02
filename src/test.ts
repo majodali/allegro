@@ -12,6 +12,7 @@ import { GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw } from "./slots.js";
+import { exportedSymbols, symbolFromWire } from "./symbols.js";
 import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, dataOf, isResolved, stringToBits, bitsToString } from "./types.js";
@@ -499,6 +500,25 @@ async function runModuleTests(): Promise<void> {
     });
     const exts = await loader.loadAll();
     eq(evalNumExt("pi + tau", exts), 9); // pi=3, tau=6
+  });
+
+  await asyncTest("module: C5.1 FQN symbols — registration + export partition across reload", async () => {
+    const config = {
+      modules: [{ id: "fqnlib" }],
+      resolve: (id: string) => id === "fqnlib" ? "/mock/fqnlib.alg" : null,
+      readFile: async () => "export shout(s) => s\nwhisper(s) => s\n",
+    };
+    await new ModuleLoader(config).loadAll();
+    const exported = exportedSymbols("/mock/fqnlib.alg");
+    eq(exported.has("shout"), true, "exported binding enters the export partition");
+    eq(exported.has("whisper"), false, "private binding stays out of the export partition");
+    const shout1 = symbolFromWire("/mock/fqnlib.alg::shout");
+    eq(shout1 !== null, true, "exported symbol rebinds over the wire");
+    eq(symbolFromWire("/mock/fqnlib.alg::whisper"), null, "private symbol resolves to nothing (D42)");
+    // Reload with a FRESH loader instance: same FQN ⇒ the identical symbol.
+    await new ModuleLoader(config).loadAll();
+    eq(symbolFromWire("/mock/fqnlib.alg::shout") === shout1, true,
+      "same FQN is the same object across module reload");
   });
 
   await asyncTest("module: transitive dependencies", async () => {

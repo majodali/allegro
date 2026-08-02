@@ -223,8 +223,18 @@ phase).
   THE accessor). Typed scalars keep the MultiValue tag per R6 (means
   "transparent scalar structure"; retirement expected at C6). All landed
   2026-08; 1033/1033 green
-- [ ] **B-022** · L0 · FQN symbols: interning, registration, projection
-  (C5.1)
+- [x] **B-022** · L0 · FQN symbols: interning, registration, projection
+  (C5.1). Landed 2026-08: `src/symbols.ts` substrate — FQN interning
+  (same FQN = same object across reload/loader instances), D42 export
+  partition (wire rebinds ONLY against exported registries; private/
+  unknown FQNs resolve to nothing, mint nothing), FQN serialization,
+  and the §5 ambiguity rule as one resolver (`projectBaseName`,
+  multi-bind target dedupe, qualification narrowing) verified identical
+  across the three surface framings. evalSource registers top-level
+  bindings under the defining scope (module path / `<main>`);
+  SymbolValue gains optional `fqn`; parser symbols stay transient.
+  Surface adoption (member binding, dot access, `x[ns.name]` syntax)
+  lands with C5.2
 - [ ] **B-023** · L2 · Symbol-keyed members + draw-from binding; diamond
   multi-bind; ambiguity rule (C5.2)
 - [ ] **B-024** · L2 · define-a-kind recipe; constructor authority;

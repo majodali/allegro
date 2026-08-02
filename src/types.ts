@@ -79,7 +79,13 @@ export interface ParamValue {
 
 export interface SymbolValue {
   kind: ValueKind.Symbol;
+  /** Base-name projection — printing, lexical resolution, loose matching. */
   name: string;
+  /** C5.1: fully-qualified name for REGISTERED symbols (identity = FQN;
+   *  interned in src/symbols.ts — same FQN is the same object). Absent on
+   *  transient parser-minted reference symbols, which have no identity
+   *  beyond their occurrence and resolve by base name against scope. */
+  fqn?: string;
 }
 
 // --- Composed Function: expression body with declared params ---
@@ -205,7 +211,9 @@ export function makeParam(position: number, name?: string): ParamValue {
 }
 
 export function makeSymbol(name: string): SymbolValue {
-  return { kind: ValueKind.Symbol, name };
+  // Transient reference symbol (no FQN). Declare the optional field for a
+  // stable hidden class shared with registered symbols (src/symbols.ts).
+  return { kind: ValueKind.Symbol, name, fqn: undefined };
 }
 
 export function makeExpr(fn: Value, args: Value[]): ExpressionValue {

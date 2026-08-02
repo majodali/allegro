@@ -48,6 +48,7 @@ import { effectsOf, withEffects } from "./effects.js";
 import { evaluate } from "./evaluator.js";
 import { makeSymbol } from "./types.js";
 import { Structure, isStructure } from "./structure.js";
+import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN } from "./symbols.js";
 import { dataOf, indexGet, getSlotCount } from "./slots.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -1240,6 +1241,109 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const withPreds = withPredicates(record, new PredicateSet([{ shape: { kind: "interval", lo: 0, hi: 10 }, source: "assert" }]));
     eq(getType(withPreds) !== null, true, "type channel preserved through withPredicates");
     eq(withPreds.kind, ValueKind.Context, "still a flattened Context");
+  });
+
+  // --- FQN symbols (C5.1) ------------------------------------------------------
+
+  test("fqn symbols (C5.1): same FQN is the same object — interned identity", () => {
+    const a = registerScopeSymbol("lib/geometry.alg", "area");
+    const b = registerScopeSymbol("lib/geometry.alg", "area");
+    eq(a === b, true, "re-registration returns the interned symbol");
+    eq(a.name, "area", "base-name projection preserved");
+    eq(symbolFqn(a), "lib/geometry.alg::area", "identity is the FQN");
+    eq(isRegisteredSymbol(a), true);
+    // Reload simulation: a fresh loader/eval pass re-registers the same
+    // scope — the intern table outlives it, so identity survives reload.
+    const c = registerScopeSymbol("lib/geometry.alg", "area");
+    eq(c === a, true, "identity survives re-registration across loader instances");
+  });
+
+  test("fqn symbols (C5.1): distinct scopes mint distinct symbols with equal base names", () => {
+    const a = registerScopeSymbol("lib/alpha.alg", "size");
+    const b = registerScopeSymbol("lib/beta.alg", "size");
+    eq(a !== b, true, "same base name, different defining scope — different identity");
+    eq(a.name === b.name, true, "base-name projections are equal");
+    // Transient parser symbols never alias registered identity.
+    const t = makeSymbol("size");
+    eq(isRegisteredSymbol(t), false, "parser-minted symbols are transient references");
+    eq(symbolFqn(t), null);
+  });
+
+  test("fqn symbols (C5.1): the ambiguity rule fires identically at all three surfaces", () => {
+    // One resolver (projectBaseName), three surface framings — import
+    // resolution (exported symbols of two modules), member binding
+    // (descriptor targets), dot access (same candidates reached through
+    // the access path). Each matrix row must produce the same outcome at
+    // every surface (C5.2 adopts the resolver at the latter two).
+    const m1 = registerScopeSymbol("lib/m1.alg", "draw");
+    const m2 = registerScopeSymbol("lib/m2.alg", "draw");
+    const only = registerScopeSymbol("lib/m1.alg", "unique_op");
+    const sharedTarget = { impl: "one-target" };
+
+    const surfaces: { name: string; candidates: () => BaseNameCandidate[] }[] = [
+      { name: "import-resolution", candidates: () => [{ symbol: m1 }, { symbol: m2 }, { symbol: only }] },
+      { name: "member-binding", candidates: () => [
+        { symbol: m1, target: { desc: "m1.draw" } }, { symbol: m2, target: { desc: "m2.draw" } }, { symbol: only, target: { desc: "m1.unique" } },
+      ] },
+      { name: "dot-access", candidates: () => [
+        { symbol: m1, target: { desc: "m1.draw" } }, { symbol: m2, target: { desc: "m2.draw" } }, { symbol: only, target: { desc: "m1.unique" } },
+      ] },
+    ];
+    for (const s of surfaces) {
+      const unique = projectBaseName(s.candidates(), "unique_op");
+      eq(unique.outcome, "match", `${s.name}: single target resolves`);
+      const amb = projectBaseName(s.candidates(), "draw");
+      eq(amb.outcome, "ambiguous", `${s.name}: two distinct targets are ambiguous`);
+      eq((amb as { message: string }).message.includes("qualify"), true,
+        `${s.name}: the error demands explicit qualification`);
+      const qual = projectBaseName(s.candidates(), "draw", "lib/m2.alg");
+      eq(qual.outcome === "match" && (qual as { symbol: typeof m2 }).symbol === m2, true,
+        `${s.name}: explicit qualification resolves`);
+      const missing = projectBaseName(s.candidates(), "draw", "lib/nowhere.alg");
+      eq(missing.outcome, "none", `${s.name}: qualification to an absent scope finds nothing`);
+      const absent = projectBaseName(s.candidates(), "no_such_member");
+      eq(absent.outcome, "none", `${s.name}: zero candidates`);
+    }
+    // §8 multi-bind: one member bound to two symbols is ONE target —
+    // stays unambiguous at every surface.
+    const d1 = registerScopeSymbol("lib/m1.alg", "render");
+    const d2 = registerScopeSymbol("lib/m3.alg", "render");
+    const multiBound = projectBaseName(
+      [{ symbol: d1, target: sharedTarget }, { symbol: d2, target: sharedTarget }], "render");
+    eq(multiBound.outcome, "match", "multi-bound single target stays unambiguous");
+  });
+
+  test("fqn symbols (C5.1, D42): the wire never mints — export partition only", () => {
+    registerScopeSymbol("lib/vault.alg", "secret_helper"); // registered, NOT exported
+    const pub = markExported("lib/vault.alg", "open_api");
+    eq(symbolFromWire("lib/vault.alg::open_api") === pub, true,
+      "an exported FQN rebinds to the identical symbol");
+    const before = internCount();
+    eq(symbolFromWire("lib/vault.alg::secret_helper"), null,
+      "a private (registered-but-not-exported) symbol resolves to NOTHING over the wire");
+    eq(symbolFromWire("lib/never-loaded.alg::anything"), null, "unknown module scope resolves to nothing");
+    eq(symbolFromWire("no-separator"), null, "malformed FQN resolves to nothing");
+    eq(internCount(), before, "failed rebinds mint no symbols (registry unchanged)");
+    eq(symbolToWire(pub), "lib/vault.alg::open_api", "wire form is the FQN");
+    let threw = false;
+    try { symbolToWire(makeSymbol("transient")); } catch { threw = true; }
+    eq(threw, true, "transient reference symbols have no wire identity");
+  });
+
+  test("fqn symbols (C5.1): evalSource registers top-level bindings under the scope FQN", () => {
+    evalSource("alpha_val = 1\nbeta_fn(x) => x", undefined, [createTypeSystem()],
+      undefined, true, undefined, undefined, "test/fqn-demo.alg");
+    const a1 = registerScopeSymbol("test/fqn-demo.alg", "alpha_val");
+    const b1 = registerScopeSymbol("test/fqn-demo.alg", "beta_fn");
+    eq(isRegisteredSymbol(a1) && isRegisteredSymbol(b1), true, "both bindings registered");
+    // Re-evaluating the same module scope yields the same identities.
+    evalSource("alpha_val = 2", undefined, [createTypeSystem()],
+      undefined, true, undefined, undefined, "test/fqn-demo.alg");
+    eq(registerScopeSymbol("test/fqn-demo.alg", "alpha_val") === a1, true,
+      "identity survives re-evaluation of the defining scope");
+    // Default scope: top-level/REPL registers under <main>.
+    evalSource("main_only = 7", undefined, [createTypeSystem()], undefined, true);
+    eq(symbolFqn(registerScopeSymbol(MAIN_SCOPE_FQN, "main_only")), "<main>::main_only");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------
