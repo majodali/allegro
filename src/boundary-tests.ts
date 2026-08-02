@@ -31,8 +31,9 @@ import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
-import { withType, getType, typeMethod, makeArray } from "./types-std.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
+import { withType, getType, typeMethod, makeArray, IntType, Type as TypeMeta } from "./types-std.js";
+import { makeMultiValue } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
@@ -304,6 +305,12 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     if (mv.primary && (mv.primary as Value).kind === ValueKind.MultiValue) {
       out.push({ invariant: "W1 multivalue-non-nesting", detail: "MultiValue primary is itself a MultiValue", program });
     }
+    // C4.3b (R5 reframe): an MV primary can never be a Context — such
+    // values flatten through makeMultiValue into a Context carrying the
+    // channel plane directly. MV-over-Context is unconstructible.
+    if (mv.primary && (mv.primary as Value).kind === ValueKind.Context) {
+      out.push({ invariant: "W1 multivalue-non-nesting", detail: "MultiValue primary is a Context (MV-over-Context must flatten — C4.3b)", program });
+    }
     const typeComp = mv.components.get("type");
     if (typeComp && (typeComp as Value).kind !== ValueKind.Expression) {
       const tp = primaryOf(typeComp as Value);
@@ -325,6 +332,9 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     if (!isStructure(v)) {
       out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeContext)", program });
     } else if ((v as unknown as Structure).primary !== undefined) {
+      // C4.3b (R5 reframe): the DATA planes are role-exclusive (a Context
+      // never carries a primary; an MV never carries slots) — the CHANNEL
+      // plane is universal (flattened Contexts carry components directly).
       out.push({ invariant: "W5 role-transparency", detail: "Context role carries a primary (data slots + primary — D17)", program });
     } else {
       // C4.2 (W6): when a dense structure's legacy view exists, it must
@@ -338,6 +348,17 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
           }
         }
       }
+    }
+    // C4.3b: W3 covers the Context role's channel plane too — flattened
+    // records/arrays carry registry-checked components directly.
+    const sComps = (v as unknown as Structure).components as Map<string, Value> | undefined;
+    if (sComps !== undefined) {
+      for (const key of sComps.keys()) {
+        if (!isRegisteredComponentKey(key)) {
+          out.push({ invariant: "W3 registry-completeness", detail: `unregistered Context component key "${key}"`, program });
+        }
+      }
+      for (const comp of sComps.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
     }
     for (const [key, b] of (v as ContextValue).bindings) {
       if (key.startsWith("__") && !isRegisteredSlotKey(key)) {
@@ -1150,6 +1171,75 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "dense region stays authoritative after materialization");
     eq(Number(((arrCtx as unknown as ContextValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
     eq((arrCtx as unknown as ContextValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
+  });
+
+  // --- MV-over-Context flatten (C4.3b) -----------------------------------------
+
+  test("flatten (C4.3b): typed records answer Context; dataOf is identity", () => {
+    const r = evalSource("p = {x: 1, y: 2}\ns = p.x + p.y",
+      undefined, [createTypeSystem()], undefined, true);
+    const p = r.evalCtx.bindings.get("p")!.value!;
+    eq(p.kind, ValueKind.Context, "a typed record IS a Context — no MultiValue wrapper");
+    eq(dataOf(p) === p, true, "dataOf is identity for flattened records");
+    eq(getType(p) !== null, true, "the type channel rides the record directly");
+    eq(Number((primaryOf(r.evalCtx.bindings.get("s")!.value!) as BitsValue).data), 3,
+      "field access dispatches through the flattened record's type");
+    eq(formatValue(p), "{x: 1, y: 2}", "flattened records print as records");
+  });
+
+  test("flatten (C4.3b): typed arrays answer Context with the dense region + channels", () => {
+    const r = evalSource("arr = [1, 2, 3]\nm = arr.map(x => x * 2)",
+      undefined, [createTypeSystem()], undefined, true);
+    const arr = r.evalCtx.bindings.get("arr")!.value!;
+    eq(arr.kind, ValueKind.Context, "a typed array IS a Context");
+    eq((arr as unknown as Structure).dense !== undefined, true, "dense region rides with the channel plane");
+    eq(getTypeNameOf(arr), "Array", "type channel present on the flattened array");
+    eq(formatValue(arr), "[1, 2, 3]", "flattened arrays print as arrays");
+    eq(formatValue(r.evalCtx.bindings.get("m")!.value!), "[2, 4, 6]", "HOFs work over flattened arrays");
+  });
+
+  test("flatten (C4.3b): user-visible type bindings ARE the internal singletons (identity)", () => {
+    const r = evalSource("x = 1", undefined, [createTypeSystem()], undefined, true);
+    const intBinding = scopeLookup(r.evalCtx, "Int")!.value!;
+    eq(intBinding === (IntType as unknown as Value), true,
+      "the Int binding is the IntType Context itself — no wrapper, one identity");
+    eq(getType(intBinding as Value) === (dataOf(TypeMeta as unknown as Value) as ContextValue), true,
+      "getType is total: a bare type Context answers its meta-type through __type");
+  });
+
+  test("flatten (C4.3b): `type of` and instanceof read type values uniformly", () => {
+    const r = evalSource("t = type of Int\nb = 42 instanceof Int\nm = Int instanceof Type",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(r.evalCtx.bindings.get("b")!.value!), "true", "value instanceof");
+    eq(formatValue(r.evalCtx.bindings.get("m")!.value!), "true", "type instanceof meta-type");
+    const t = r.evalCtx.bindings.get("t")!.value!;
+    eq(dataOf(t) === dataOf(TypeMeta as unknown as Value), true, "`type of Int` is the Type meta-type");
+  });
+
+  test("flatten (C4.3b): MV-over-Context is unconstructible — makeMultiValue flattens", () => {
+    const r = evalSource("p = {a: 5}", undefined, [createTypeSystem()], undefined, true);
+    const record = r.evalCtx.bindings.get("p")!.value!;
+    // The standard writer idiom: clone the channel plane, extend, re-derive
+    // (the given map is authoritative — deletion must stay expressible).
+    const comps = cloneComponents(record);
+    comps.set("exported", makeInt(1));
+    const stamped = makeMultiValue(dataOf(record), comps);
+    eq((stamped as Value).kind, ValueKind.Context, "wrapping a Context derives a flattened Context");
+    eq(channelReadRaw(stamped as Value, "exported") !== undefined, true, "the new channel rides");
+    eq(channelReadRaw(stamped as Value, "type") !== undefined, true, "cloned channels carry forward");
+    eq(dataOf(stamped as Value) === (stamped as Value), true, "the derived value is transparent to dataOf");
+    eq((record as ContextValue).bindings.get("a") === (stamped as unknown as ContextValue).bindings.get("a"), true,
+      "copy-on-write derive shares the data plane by reference");
+  });
+
+  test("flatten (C4.3b): channels survive scope-fact predicates on flattened records", () => {
+    // withPredicates on a flattened record must not strip its type channel
+    // (the hot symbol-resolution path attaches scope facts).
+    const r = evalSource("p = {x: 1}", undefined, [createTypeSystem()], undefined, true);
+    const record = r.evalCtx.bindings.get("p")!.value!;
+    const withPreds = withPredicates(record, new PredicateSet([{ shape: { kind: "interval", lo: 0, hi: 10 }, source: "assert" }]));
+    eq(getType(withPreds) !== null, true, "type channel preserved through withPredicates");
+    eq(withPreds.kind, ValueKind.Context, "still a flattened Context");
   });
 
   // --- Merge-policy activation (C4.3a, rulings R1–R3) --------------------------

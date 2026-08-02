@@ -232,7 +232,7 @@ export function summarizeValue(v: Value): ValueSummary {
   // didn't go through __construct — synthesise a singleton set from the
   // refined type Context's stored __abstractDomain.
   let preds = predicatesOf(v);
-  if (!preds && v.kind === ValueKind.MultiValue) {
+  if (!preds && (v.kind === ValueKind.MultiValue || v.kind === ValueKind.Context)) {
     const typeComp = channelReadRaw(v, "type");
     if (typeComp?.kind === ValueKind.Context) {
       const fromType = (typeComp as any).__abstractDomain;

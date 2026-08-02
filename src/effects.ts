@@ -294,10 +294,9 @@ function decodeEffects(v: Value): EffectSet | null {
  *       functions in standard mode).
  *  Returns null when neither source has effects (consumer treats as pure). */
 export function effectsOf(v: Value): EffectSet | null {
-  if (v.kind === ValueKind.MultiValue) {
-    const c = componentsView(v).get(EFFECTS_COMPONENT_KEY);
-    if (c) return decodeEffects(c);
-  }
+  // C4.3b: componentsView is total — flattened Contexts answer directly.
+  const c = componentsView(v).get(EFFECTS_COMPONENT_KEY);
+  if (c) return decodeEffects(c);
   const p = dataOf(v);
   if (p.kind === ValueKind.ComposedFunction) {
     const stash = (p as any).__inferredEffects as EffectSet | undefined;

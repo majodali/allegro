@@ -330,12 +330,12 @@ export class ModuleLoader {
       if (binding.value === undefined) continue;
       const evaluated = binding.value;
       allBindings[key] = evaluated;
-      if (evaluated.kind === ValueKind.MultiValue) {
-        const exp = componentsView(evaluated).get("exported");
-        if (exp) {
-          hasExports = true;
-          exportedBindings[key] = evaluated;
-        }
+      // C4.3b: componentsView is total — a flattened Context (exported
+      // record/module value) reports its `exported` marker directly.
+      const exp = componentsView(evaluated).get("exported");
+      if (exp) {
+        hasExports = true;
+        exportedBindings[key] = evaluated;
       }
     }
 

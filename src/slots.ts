@@ -292,14 +292,19 @@ export function typeShape(t: ContextValue): ContextValue {
  *  walked off — identity for every non-refined type, including the
  *  meta-type reads on type values); `type` stays the raw stored view. */
 export function channelReadRaw(v: Value, channel: string): Value | undefined {
-  if (v.kind === ValueKind.MultiValue) {
-    const comp = (v as MultiValueType).components.get(channel);
+  // C4.3b: the channel plane is universal — a flattened Context (typed
+  // record/array) carries `components` directly, so the generic lookup
+  // covers both roles. Contexts without channels have `components`
+  // undefined (lazy — plain contexts and scopes pay nothing).
+  const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
+  if (comps !== undefined) {
+    const comp = comps.get(channel);
     if (comp !== undefined) return comp as Value;
   }
   if (channel === "shape" || channel === "type") {
     let raw: Value | undefined;
     if (v.kind === ValueKind.MultiValue) {
-      raw = (v as MultiValueType).components.get("type") as Value | undefined;
+      raw = comps?.get("type") as Value | undefined;
     } else if (v.kind === ValueKind.Context) {
       raw = slotRead(v as ContextValue, "__type");
     } else {
@@ -456,18 +461,20 @@ export { primaryOf as dataOf } from "./types.js";
 
 // --- Component plane (MultiValue) -------------------------------------------------------
 
-/** Read-only view over a value's components (empty for non-MultiValues). */
+/** Read-only view over a value's components. C4.3b: the channel plane is
+ *  universal — flattened Contexts (typed records/arrays) carry components
+ *  directly; values without a channel plane view as empty. */
 export function componentsView(v: Value): ReadonlyMap<string, Value> {
-  if (v.kind === ValueKind.MultiValue) return (v as MultiValueType).components as Map<string, Value>;
-  return EMPTY_COMPONENTS;
+  const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
+  return comps !== undefined ? comps : EMPTY_COMPONENTS;
 }
 const EMPTY_COMPONENTS: ReadonlyMap<string, Value> = new Map();
 
 /** Mutable copy of a value's components — the standard "carry components
- *  forward onto a derived value" idiom. Empty map for non-MultiValues. */
+ *  forward onto a derived value" idiom. Empty map for channel-less values. */
 export function cloneComponents(v: Value): Map<string, Value> {
-  if (v.kind === ValueKind.MultiValue) return new Map((v as MultiValueType).components as Map<string, Value>);
-  return new Map();
+  const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
+  return comps !== undefined ? new Map(comps) : new Map();
 }
 
 // --- Label markers -------------------------------------------------------------------------
@@ -693,16 +700,21 @@ export function channelMerge(name: string): ((a: Value, b: Value) => Value) | un
 
 
 
-/** List the channels present on a value (component keys + binding-plane channels). */
+/** List the channels present on a value (component keys + binding-plane channels).
+ *  C4.3b: the channel plane is universal — flattened Contexts report their
+ *  component keys alongside the legacy binding-plane channels. */
 export function channelList(v: Value): string[] {
   const out: string[] = [];
-  if (v.kind === ValueKind.MultiValue) {
-    out.push(...(v as MultiValueType).components.keys());
+  const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
+  if (comps !== undefined) {
+    out.push(...comps.keys());
   }
   if (v.kind === ValueKind.Context) {
     const ctx = v as ContextValue;
-    if (ctx.bindings.has("__type")) out.push("shape");
-    if (ctx.bindings.has("__discharged")) out.push("discharged");
+    if (!isDense(ctx)) {
+      if (ctx.bindings.has("__type") && !out.includes("shape")) out.push("shape");
+      if (ctx.bindings.has("__discharged") && !out.includes("discharged")) out.push("discharged");
+    }
   }
   return out;
 }

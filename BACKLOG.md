@@ -210,10 +210,16 @@ phase).
   activation — error virality rides every residual hop (incl. unresolved
   application + type_dispatch residuals), error-in-if-cond propagates,
   effects union on MultiValue re-evaluation; three differential-fixture
-  expectations updated (pre-approved). Remaining: C4.3b (flatten
-  MV-over-Context, ~76 ValueKind.MultiValue checks), C4.3c (scalar
-  transparency, retire primaryOf/dataOf strip semantics, delete
-  non-nesting shims)
+  expectations updated (pre-approved). **C4.3b landed 2026-08**:
+  MV-over-Context flattened — makeMultiValue derives copy-on-write for
+  Context primaries (`deriveWithChannels`, given map authoritative);
+  typed records/arrays/modules/proofs answer Context with channels
+  riding directly; type bindings ARE the internal singletons (wrapType
+  identity); getType total; channel accessors + ~20 kind guards widened;
+  W-invariants reframed per R5 (data planes role-exclusive, channel
+  plane universal; W1 extended; W3 covers Context components).
+  Remaining: C4.3c (scalar transparency, retire primaryOf/dataOf strip
+  semantics, delete non-nesting shims)
 - [ ] **B-022** · L0 · FQN symbols: interning, registration, projection
   (C5.1)
 - [ ] **B-023** · L2 · Symbol-keyed members + draw-from binding; diamond

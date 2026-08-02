@@ -611,7 +611,7 @@ export function withDomain(v: Value, domain: AbstractDomain): Value {
  *  for backward compatibility — preferring the new `predicates` component
  *  over the legacy single-domain one. */
 export function domainOf(v: Value): AbstractDomain | null {
-  if (v.kind !== ValueKind.MultiValue) return null;
+  // C4.3b: componentsView is total — flattened Contexts answer directly.
   // Phase C: prefer the predicate set if present.
   const setComp = componentsView(v).get(PREDICATES_COMPONENT_KEY);
   if (setComp) {
@@ -641,7 +641,7 @@ export function withPredicates(v: Value, set: PredicateSet): Value {
  *  callers can mutate the returned object freely (it's not shared with the
  *  value's stored encoding). */
 export function predicatesOf(v: Value): PredicateSet | null {
-  if (v.kind !== ValueKind.MultiValue) return null;
+  // C4.3b: componentsView is total — flattened Contexts answer directly.
   const setComp = componentsView(v).get(PREDICATES_COMPONENT_KEY);
   if (setComp) {
     const set = decodePredicates(setComp);
@@ -709,7 +709,7 @@ const BOUND_COMPONENT_KEY = "bound";
 
 /** Read the occurrence bound riding a value, if any. */
 export function occurrenceBoundOf(v: Value): ContextValue | null {
-  if (v.kind !== ValueKind.MultiValue) return null;
+  // C4.3b: componentsView is total — flattened Contexts answer directly.
   const b = componentsView(v).get(BOUND_COMPONENT_KEY);
   return b?.kind === ValueKind.Context ? (b as ContextValue) : null;
 }

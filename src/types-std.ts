@@ -36,12 +36,14 @@ const META_METHOD_NAMES = new Set([
 
 // --- Helpers ---
 
-/** Get the type component from a value (if it's a MultiValue with "type") */
+/** Get the type channel from a value. C4.3b: total — flattened Contexts
+ *  (typed records/arrays) answer through their component plane, and bare
+ *  type Contexts answer their meta-type through the `__type` binding-plane
+ *  fallback (so `getType(IntType)` is `Type`, where it was null before the
+ *  flatten — type values and typed values read uniformly). */
 export function getType(v: Value): ContextValue | null {
-  if (v.kind === ValueKind.MultiValue) {
-    const t = channelReadRaw(v, "type");
-    if (t && t.kind === ValueKind.Context) return t;
-  }
+  const t = channelReadRaw(v, "type");
+  if (t && t.kind === ValueKind.Context) return t;
   return null;
 }
 
@@ -63,9 +65,10 @@ export function getTypeName(v: Value): string | null {
  *  construction, preserveOps result re-tagging) and remain legal. */
 export function withType(v: Value, type: ContextValue): Value {
   const primary = dataOf(v);
-  const components = v.kind === ValueKind.MultiValue
-    ? cloneComponents(v)
-    : new Map<string, Value>();
+  // C4.3b: cloneComponents is total — a flattened Context's channels carry
+  // forward (and its prior type makes the shape guard live for Contexts;
+  // construction-point re-tags use withTypeReplacing).
+  const components = cloneComponents(v);
   const prior = components.get("type");
   if (prior !== undefined && prior !== (type as Value)
       && prior.kind === ValueKind.Context && type?.kind === ValueKind.Context) {
@@ -97,7 +100,11 @@ export function withType(v: Value, type: ContextValue): Value {
  *  effective knowledge is the meet, so a looser annotation cannot erase
  *  what construction certified. */
 export function applyBoundaryBound(v: Value, expected: ContextValue): Value {
-  if (v.kind !== ValueKind.MultiValue) return v;
+  // C4.3b: flattened records answer Context — the C3.2 availability gate
+  // applies to them too (they're exactly the values annotation bounds
+  // matter most for). Other kinds (Bits, functions, residuals) pass their
+  // typed MultiValue form through as before.
+  if (v.kind !== ValueKind.MultiValue && v.kind !== ValueKind.Context) return v;
   const name = typeContextName(expected);
   if (!name || name === "Any" || name === "Function" || name === "UntypedFunction") return v;
   if (getEffectBound(expected) !== undefined) return v;
@@ -122,9 +129,7 @@ export function applyBoundaryBound(v: Value, expected: ContextValue): Value {
  *  which refuses cross-shape re-stamps (C3.1, D36). */
 export function withTypeReplacing(v: Value, type: ContextValue): Value {
   const primary = dataOf(v);
-  const components = v.kind === ValueKind.MultiValue
-    ? cloneComponents(v)
-    : new Map<string, Value>();
+  const components = cloneComponents(v);
   components.set("type", type);
   return makeMultiValue(primary, components);
 }
@@ -699,9 +704,7 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       // own refinement check failed further up the chain), propagate it
       // without re-tagging or running this predicate. Without this, a deeper
       // refinement's error would get silently retagged with the outer type.
-      if (value.kind === ValueKind.MultiValue) {
-        if (channelReadRaw(value, "error") !== undefined) return value;
-      }
+      if (channelReadRaw(value, "error") !== undefined) return value;
 
       // Apply predicate
       const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
@@ -747,7 +750,7 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       // Re-tag with refined type, and attach the abstract domain so downstream
       // arithmetic can propagate the refinement without re-parsing the
       // predicate.
-      const typed = withType(dataOf(value), refinedType);
+      const typed = withTypeReplacing(dataOf(value), refinedType);
       const dom = getAbstractDomain(refinedType);
       if (dom) {
         // Phase C: attach a single-predicate set rather than a single
@@ -815,9 +818,7 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
       // Error propagation: parent's own invariant / refinement check might
       // have failed already; pass the error through unchanged rather than
       // re-tagging with this layer.
-      if (value.kind === ValueKind.MultiValue) {
-        if (channelReadRaw(value, "error") !== undefined) return value;
-      }
+      if (channelReadRaw(value, "error") !== undefined) return value;
 
       // Apply each invariant in declaration order. First failure → error.
       for (let i = 0; i < newInvariants.length; i++) {
@@ -841,7 +842,7 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
       // abstract domain (if any) of each invariant to the value's
       // predicate set — same machinery as buildRefinedType so consumers
       // see the inferred refinement on the result.
-      const typed = withType(dataOf(value), newType);
+      const typed = withTypeReplacing(dataOf(value), newType);
       try {
         const preds: Predicate[] = [];
         for (const inv of newInvariants) {
@@ -894,7 +895,7 @@ function buildDistinctType(parentType: ContextValue): ContextValue {
 
     setConstruct(distinctType, makePrimitive("distinct.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-      return withType(dataOf(value), distinctType);
+      return withTypeReplacing(dataOf(value), distinctType);
     }, true));
   }
 
@@ -964,7 +965,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
         components.set("type", ErrorType);
         return makeMultiValue(makeInt(0), components);
       }
-      return withType(dataOf(value), newType);
+      return withTypeReplacing(dataOf(value), newType);
     }, true));
   }
 
@@ -1075,10 +1076,8 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
     setConstruct(newType, makePrimitive("mixin.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-      if (value.kind === ValueKind.MultiValue) {
-        if (channelReadRaw(value, "error") !== undefined) return value;
-      }
-      return withType(dataOf(value), newType);
+      if (channelReadRaw(value, "error") !== undefined) return value;
+      return withTypeReplacing(dataOf(value), newType);
     }, true));
   }
 
@@ -1131,7 +1130,7 @@ addBinding(typeMembers, "constructor", makeMethodDescriptor("constructor",
     removeConstruct(type);
     setConstruct(type, makePrimitive("custom.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
       const result = ctorEvalFn!(makeExpr(fn, ctorArgs), ctorCtx!);
-      return withType(dataOf(result), type);
+      return withTypeReplacing(dataOf(result), type);
     }, true));
     return wrapType(type);
   })
@@ -2207,7 +2206,11 @@ export function unifyTypes(
   // If expected is a concrete type
   if (expectedType.kind === ValueKind.Context && actualType) {
     const expectedCtx = expectedType as ContextValue;
-    const actualCtx = getType(actualType);
+    // Legacy-exact (C4.3b): only an MV-wrapped actual participates in name
+    // unification here — a bare type Context skips (getType on it would now
+    // report its META-type, which is not what this comparison wants; the
+    // call-site checkArgType does the real concrete-type check).
+    const actualCtx = actualType.kind === ValueKind.MultiValue ? getType(actualType) : null;
     if (!actualCtx) return bindings; // no type on actual, can't unify
 
     // Check base name
@@ -2495,10 +2498,15 @@ export function wrapAsUntypedFunction(fn: Value): Value {
 /**
  * Check if a value is a function (PrimitiveFunction or ComposedFunction).
  */
-/** Wrap a type Context as a typed MultiValue using its __type as meta-type */
+/** C4.3b: user-visible type bindings ARE the type Context — the former
+ *  MultiValue wrap is gone. A bare type Context already answers its
+ *  meta-type through `channelReadRaw(t, "type"/"shape")` (the `__type`
+ *  binding-plane fallback), and `getType` is total, so `type of Int`,
+ *  `Int instanceof Type`, and meta-method dispatch all read the same
+ *  storage the internal singletons use. Identity is the point: annotation
+ *  symbols and internal construction sites resolve to the SAME object, so
+ *  `actualType === expectedType` short-circuits keep working. */
 export function wrapType(type: ContextValue): Value {
-  const metaType = channelReadRaw(type, "shape") as ContextValue | undefined;
-  if (metaType) return withType(type, metaType);
   return type;
 }
 

@@ -22,8 +22,10 @@ import { BASE_OPERATORS_TO_LEVEL } from "./grammar2/base-grammar.js";
 // --- Value formatting ---
 
 export function formatValue(v: Value): string {
-  // Check for typed values (MultiValue with "type" component)
-  if (v.kind === ValueKind.MultiValue) {
+  // Typed-value display. C4.3b: flattened Contexts (typed records/arrays)
+  // carry channels directly, so the gate covers both roles and data reads
+  // go through dataOf (identity for Contexts) instead of `.primary`.
+  if (v.kind === ValueKind.MultiValue || v.kind === ValueKind.Context) {
     // Error values — show error component
     const errComp = channelReadRaw(v, "error");
     if (errComp !== undefined) {
@@ -34,21 +36,22 @@ export function formatValue(v: Value): string {
       const nameV = getName(typeComp as ContextValue);
       if (nameV && nameV.kind === ValueKind.Bits) {
         const typeName = bitsToString(nameV);
+        const data = dataOf(v);
         if (typeName === "None") {
           return "none";
         }
         if (typeName === "String") {
-          return bitsToString(v.primary as BitsValue);
+          return bitsToString(data as BitsValue);
         }
         if (typeName === "Bool") {
-          return (v.primary as BitsValue).data !== 0n ? "true" : "false";
+          return (data as BitsValue).data !== 0n ? "true" : "false";
         }
         if (typeName === "Float") {
-          return String(bitsToFloat(v.primary as BitsValue));
+          return String(bitsToFloat(data as BitsValue));
         }
         if (typeName === "Array") {
           // Display array elements
-          const ctx = v.primary as ContextValue;
+          const ctx = data as ContextValue;
           const lenV = getSlotCount(ctx);
           const len = lenV ? Number((lenV as BitsValue).data) : 0;
           const elems: string[] = [];
@@ -60,7 +63,7 @@ export function formatValue(v: Value): string {
           return `[${elems.join(", ")}]`;
         }
         if (typeName === "Object") {
-          const ctx = v.primary as ContextValue;
+          const ctx = data as ContextValue;
           const fields: string[] = [];
           for (const [key, binding] of ctx.bindings) {
             if (binding.value && fields.length < 5) {
@@ -71,7 +74,7 @@ export function formatValue(v: Value): string {
           return `{${fields.join(", ")}}`;
         }
         if (typeName === "Function") {
-          const p = v.primary;
+          const p = data;
           if (p.kind === ValueKind.ComposedFunction) {
             return `<function(${p.params.length})>`;
           }
@@ -79,9 +82,9 @@ export function formatValue(v: Value): string {
         }
         // Record types — check __members for Field descriptors
         const membersV = getMembers(typeComp as ContextValue);
-        if (membersV?.kind === ValueKind.Context && v.primary.kind === ValueKind.Context) {
+        if (membersV?.kind === ValueKind.Context && data.kind === ValueKind.Context) {
           const membersCtx = membersV as ContextValue;
-          const instanceCtx = v.primary as ContextValue;
+          const instanceCtx = data as ContextValue;
           const parts: string[] = [];
           for (const [key, binding] of membersCtx.bindings) {
             if (binding.value?.kind === ValueKind.Context && isFieldDescriptor(binding.value as ContextValue)) {
@@ -387,12 +390,11 @@ const mv_primary: PrimitiveFnImpl = (args) => dataOf(args[0]);
 
 const mv_get: PrimitiveFnImpl = (args) => {
   const key = bitsToString(asBits(args[1], "mv_get"));
-  if (args[0].kind === ValueKind.MultiValue) {
-    const c = componentsView(args[0]).get(key);
-    if (c === undefined) throw new AllegroError(`mv_get: '${key}' not found`);
-    return c;
-  }
-  throw new AllegroError(`mv_get: '${key}' not found`);
+  // C4.3b: channelReadRaw is total — flattened Contexts answer their
+  // channel plane (and binding-plane channels like a type value's meta-type).
+  const c = channelReadRaw(args[0], key) ?? componentsView(args[0]).get(key);
+  if (c === undefined) throw new AllegroError(`mv_get: '${key}' not found`);
+  return c;
 };
 
 
@@ -451,21 +453,18 @@ const mv_set: PrimitiveFnImpl = (args) => {
   const key = bitsToString(asBits(args[1], "mv_set"));
   assertNotIntegrityKey(key, "mv_set");
   const val = args[2];
-  if (args[0].kind === ValueKind.MultiValue) {
-    const nc = cloneComponents(args[0]);
-    nc.set(key, val);
-    return makeMultiValue(args[0].primary, nc);
-  }
-  return makeMultiValue(args[0], new Map([[key, val]]));
+  // C4.3b: cloneComponents is total and makeMultiValue flattens Context
+  // primaries, so one path covers MV, flattened Context, and bare values.
+  const nc = cloneComponents(args[0]);
+  nc.set(key, val);
+  return makeMultiValue(dataOf(args[0]), nc);
 };
 
 const mv_components: PrimitiveFnImpl = (args) => {
-  if (args[0].kind === ValueKind.MultiValue) {
-    const keys: Value[] = [];
-    for (const k of componentsView(args[0]).keys()) keys.push(stringToBits(k));
-    return makeExpr(id_prim, keys);
-  }
-  return makeExpr(id_prim, []);
+  // C4.3b: componentsView is total — flattened Contexts report their keys.
+  const keys: Value[] = [];
+  for (const k of componentsView(args[0]).keys()) keys.push(stringToBits(k));
+  return makeExpr(id_prim, keys);
 };
 
 // ============ EVAL_IF (lazy) ============
@@ -476,7 +475,8 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // C4.3a (R2): an error-carrying condition propagates the error instead of
   // branching on its (meaningless) primary — the legacy behavior silently
   // took the else branch (differential fixture err-in-if-cond).
-  if (cond.kind === ValueKind.MultiValue && channelReadRaw(cond, "error") !== undefined) {
+  if ((cond.kind === ValueKind.MultiValue || cond.kind === ValueKind.Context)
+      && channelReadRaw(cond, "error") !== undefined) {
     return cond;
   }
   const condP = dataOf(cond);
@@ -870,10 +870,11 @@ const component_get_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) throw new AllegroError(`component_get: need 2 args, got ${args.length}`);
   const value = evalFn!(args[0], ctx!);
   const key = bitsToString(dataOf(args[1]) as BitsValue);
-  if (value.kind === ValueKind.MultiValue) {
-    const c = componentsView(value).get(key);
-    if (c !== undefined) return c;
-  }
+  // C4.3b: channelReadRaw is total — flattened Contexts answer their channel
+  // plane, and bare type Contexts answer `type of Int` through the `__type`
+  // binding-plane fallback. componentsView covers ad-hoc mv_set keys.
+  const c = channelReadRaw(value, key) ?? componentsView(value).get(key);
+  if (c !== undefined) return c;
   // Component not found — return none instead of throwing
   return noneSingleton;
 };
@@ -2073,11 +2074,10 @@ const export_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(v)) {
     return makeExpr(makePrimitive("export", export_impl, true), [v]);
   }
-  // Wrap with exported marker
+  // Wrap with exported marker. C4.3b: cloneComponents is total, so an
+  // exported record/module value keeps its channels (type included).
   const primary = dataOf(v);
-  const components = v.kind === ValueKind.MultiValue
-    ? cloneComponents(v)
-    : new Map<string, Value>();
+  const components = cloneComponents(v);
   components.set("exported", makeInt(1));
   return makeMultiValue(primary, components);
 };
@@ -2094,7 +2094,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // member on an unresolved error-carrying value propagates the error
     // instead of dropping it (err-through-method). Resolved error values
     // still dispatch normally (Error's own members stay callable).
-    if (obj.kind === ValueKind.MultiValue) {
+    if (obj.kind === ValueKind.MultiValue || obj.kind === ValueKind.Context) {
       for (const chan of viralChannels()) {
         const comp = channelReadRaw(obj, chan);
         if (comp !== undefined) {
@@ -2200,6 +2200,17 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
           return method.fn([selfVal, ...evalArgs], callCtx, callEvalFn);
         };
         return makePrimitive(`bound:${fieldName}`, boundFn, true, method.effects);
+      }
+      // C4.3b: bind ComposedFunction methods with self too — mirrors both
+      // this path's descriptor branch and the untyped meta-dispatch fallback
+      // (which custom-meta-typed Contexts used to reach before getType went
+      // total; the two paths must agree on the returned shape).
+      if (method.kind === ValueKind.ComposedFunction) {
+        const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+          const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+          return callEvalFn!(makeExpr(method, [obj, ...evalArgs]), callCtx!);
+        };
+        return makePrimitive(`bound:${fieldName}`, boundFn, true);
       }
       return method;
     }
@@ -3870,8 +3881,10 @@ function makeTypedBinOp(opName: string): PrimitiveFnImpl {
     // Call method with primaries (methods operate on raw values)
     const result = method.fn([dataOf(left), dataOf(right)], ctx, evalFn);
     // Type methods already return properly typed values (e.g., comparisons return Bool,
-    // arithmetic returns the operand type). If the result is already a MultiValue, use it.
-    if (result.kind === ValueKind.MultiValue) return result;
+    // arithmetic returns the operand type). C4.3b: a typed result may be an
+    // MV (scalar) or a flattened Context (record/array) — check the channel,
+    // not the kind, so an already-typed result is never re-stamped.
+    if (getType(result) !== null) return result;
     // Otherwise wrap with the left operand's type (for raw Bits results)
     return withType(result, leftType);
   };

@@ -177,6 +177,35 @@ export function newDenseStructure(elements: Value[]): Structure {
   return s;
 }
 
+/** C4.3b: copy-on-write derive — a new Context-role structure SHARING the
+ *  source's data planes by reference (sound: data contexts are immutable,
+ *  D22) with the given channel plane attached. This is how channels attach
+ *  to records/types without a MultiValue wrapper: `makeMultiValue` with a
+ *  Context primary flattens through here, so MV-over-Context is
+ *  unconstructible. Scopes are evaluator state, not data — the channel
+ *  plane never attaches to them (C2.1 plane rejection). */
+export function deriveWithChannels(ctx: ContextValue, components: Map<string, Value>): Structure {
+  const src = ctx as unknown as Structure;
+  if (src.isScope) {
+    throw new Error("deriveWithChannels: channels cannot attach to an evaluation scope (plane rejection)");
+  }
+  const s = new Structure(ValueKind.Context, src.immutable);
+  if (src.dense !== undefined) {
+    s.dense = src.dense; // shared by reference — arrays are immutable
+  } else {
+    s.bindings = src.bindings;
+    s.bindingList = src.bindingList;
+  }
+  // The given map is AUTHORITATIVE — it becomes the derived structure's
+  // entire channel plane. Writers pre-clone via cloneComponents (total, so
+  // a flattened source's channels are in the clone) and then set/delete;
+  // merging here instead would make channel deletion (clearOccurrenceBound)
+  // impossible. Callers overlaying a partial map onto an already-channeled
+  // Context must clone-and-extend themselves (see evaluate's MV rebuild).
+  s.components = components;
+  return s;
+}
+
 /** O(1) element read on the dense region, with the legacy-map fallback
  *  for non-dense numeric-keyed contexts (unions, hand-built tests). */
 export function denseIndexGet(ctx: ContextValue, i: number): Value | undefined {

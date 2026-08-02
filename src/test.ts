@@ -11,6 +11,7 @@ import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
+import { channelReadRaw } from "./slots.js";
 import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, primaryOf, isResolved, stringToBits, bitsToString } from "./types.js";
@@ -4198,14 +4199,14 @@ ok = Range(1, 10)
 bad = Range(10, 1)
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  // ok constructs successfully and exposes fields
+  // ok constructs successfully and exposes fields. C4.3b: typed records are
+  // flattened Contexts (channels attach directly — no MultiValue wrapper).
   const okV = evalCtx.bindings.get("ok")!.value!;
-  eq(okV.kind, ValueKind.MultiValue);
+  eq(okV.kind, ValueKind.Context);
+  eq(getType(okV) !== null, true, "record carries its type channel directly");
   // bad fails the invariant
   const badV = evalCtx.bindings.get("bad")!.value!;
-  if (badV.kind === ValueKind.MultiValue) {
-    eq(badV.components.has("error"), true);
-  }
+  eq(channelReadRaw(badV, "error") !== undefined, true);
 });
 
 // --- Phase C Chunk 3: requires / ensures contracts ---

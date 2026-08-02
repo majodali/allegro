@@ -8,6 +8,72 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C4.3b: MV-over-Context flattened — records answer Context (structures Phase 4, B-021 part 2)
+
+The MultiValue-over-Context wrapper is gone: channels attach DIRECTLY to
+record/type structures, so a typed object is one structure with both a
+slot plane and a channel plane (D15/D17 — the first half of the
+transparency cutover; scalars follow at C4.3c).
+
+- **One chokepoint**: `makeMultiValue` with a Context primary flattens
+  through the new `structure.ts deriveWithChannels` — a copy-on-write
+  derive sharing the source's data planes by reference (immutable, D22)
+  with the given channel map attached. The given map is AUTHORITATIVE
+  (writers pre-clone via the now-total `cloneComponents`, then
+  set/delete — merging in the derive would make channel deletion, e.g.
+  `clearOccurrenceBound`, inexpressible). Every wrapper site (withType,
+  withEffects, withPredicates, channel writers, mv_set, export) flows
+  through it, so MV-over-Context is UNCONSTRUCTIBLE — asserted by the
+  extended W1 invariant.
+- **Records/arrays/modules/proofs answer `ValueKind.Context`** with
+  `dataOf` as identity. The dense region (C4.2) coexists with the
+  channel plane on the same structure.
+- **Type bindings ARE the internal singletons**: `wrapType` is identity
+  — `Int` is IntType itself. A bare type Context already answers its
+  meta-type through the `__type` binding-plane fallback, so `type of
+  Int`, `Int instanceof Type`, and meta-method dispatch read the same
+  storage internal code uses, and identity short-circuits
+  (`actualType === expectedType`, member-set sharing, memoization) hold
+  by construction.
+- **`getType` is total** (reads `channelReadRaw(v, "type")` for any
+  value). One consequence: bare Contexts carrying `__type` now route
+  through type_dispatch's TYPED path instead of the untyped meta-dispatch
+  fallback — the typed path's `typeMethod` fallback learned to self-bind
+  ComposedFunction methods so the two paths agree on the returned shape.
+  One legacy-exact carve-out: `unifyTypes` keeps its MV-only actual-type
+  participation (a bare type Context's meta-type is not what name
+  unification compares; the call-site checkArgType does the real check).
+- **Channel accessors are universal**: `channelReadRaw`,
+  `componentsView`, `cloneComponents`, `channelList` answer any
+  Structure (lazy — plain contexts and scopes pay one undefined check).
+  ~20 MV kind guards widened across evaluator (dispatch gate, viral
+  scans, residual typing), primitives (formatValue, mv_get/mv_set/
+  mv_components, `Y of x`, eval_if error guard, type_dispatch viral
+  branch, makeTypedBinOp), modules (export detection), totality
+  (when-subject type resolution), refinements/effects readers
+  (predicatesOf/domainOf/occurrenceBoundOf/effectsOf), and
+  `applyBoundaryBound` (the C3.2 availability gate applies to flattened
+  records).
+- **Hazard A resolved**: the six `__construct` re-tag sites
+  (refined/invarianted/distinct/preserveOps/mixin/custom-constructor)
+  switched to `withTypeReplacing` — they are construction points
+  re-tagging a parent-constructed instance, and `withType`'s
+  shape-immutability guard is now LIVE for Contexts (it was dead before
+  because a Context input's channels lived on the discarded wrapper).
+- **R5 reframe (pre-approved)**: W5 restated — the DATA planes are
+  role-exclusive (Context never carries `primary`; MV never carries
+  slots), the CHANNEL plane is universal. W1 extended: an MV primary can
+  never be a Context. W3 covers Context-role component keys + recurses
+  into their values. One internals-shaped test updated (record instance
+  kind: MultiValue → Context — the chunk's stated outcome).
+- Scope guard: `deriveWithChannels` rejects evaluation scopes (channels
+  never attach to scopes — C2.1 plane rejection).
+
+6 new boundary tests (records/arrays answer Context + print correctly;
+type-binding identity; `type of` uniformity; unconstructibility + data
+plane sharing; channels survive withPredicates); 1031/1031 green; tsc at
+the 4-error rootDir baseline.
+
 ## 2026-08 — C4.3a: Merge-policy activation — error virality + effects union (structures Phase 4, B-021 part 1)
 
 The first C4.3 sub-chunk activates the principled propagation rules that

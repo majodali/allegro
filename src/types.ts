@@ -3,7 +3,7 @@
 
 // C4.1: the unified Structure class behind MultiValue/Context. structure.ts
 // imports only TYPES from this module, so there is no runtime cycle.
-import { newMultiValueStructure, newContextStructure, newDenseStructure } from "./structure.js";
+import { newMultiValueStructure, newContextStructure, newDenseStructure, deriveWithChannels } from "./structure.js";
 
 export enum ValueKind {
   Bits = "Bits",
@@ -234,6 +234,16 @@ export function makeContext(): ContextValue {
 }
 
 export function makeMultiValue(primary: Value, components?: Map<string, Value>): MultiValueType {
+  // C4.3b: MV-over-Context is unconstructible — a Context primary flattens
+  // into a copy-on-write derive carrying the channel plane directly (one
+  // structure, both planes). Every wrapper site (withType, withEffects,
+  // channel writers, mv_set, …) flows through this single chokepoint, so
+  // typed records/types answer ValueKind.Context. The returned static type
+  // is a lie for that case; call sites read through the slots.ts accessors
+  // (dataOf is identity for Contexts), not `.primary`.
+  if (primary.kind === ValueKind.Context) {
+    return deriveWithChannels(primary as ContextValue, components ?? new Map()) as unknown as MultiValueType;
+  }
   return newMultiValueStructure(primary, components ?? new Map()) as unknown as MultiValueType;
 }
 

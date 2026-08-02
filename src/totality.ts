@@ -324,11 +324,15 @@ function resolveSubjectTypeName(
   paramTypeAsts: Value[],
   typeLookup: TypeLookup | undefined,
 ): string | null {
-  // Strip MultiValue wrappers.
-  if (subject.kind === ValueKind.MultiValue) {
+  // Strip MultiValue wrappers. C4.3b: flattened Contexts (typed records)
+  // answer through their channel plane too.
+  if (subject.kind === ValueKind.MultiValue || subject.kind === ValueKind.Context) {
     const t = channelReadRaw(subject as Value, "type");
     if (t) return resolveTypeName(t, typeLookup);
-    return resolveSubjectTypeName((subject as any).primary, paramTypeAsts, typeLookup);
+    if (subject.kind === ValueKind.MultiValue) {
+      return resolveSubjectTypeName((subject as any).primary, paramTypeAsts, typeLookup);
+    }
+    return null;
   }
   if (subject.kind === ValueKind.Param) {
     const pos = (subject as any).position as number;

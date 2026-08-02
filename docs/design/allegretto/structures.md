@@ -64,6 +64,25 @@ as planned. The host `ValueKind.MultiValue` tag stays through C4.3 but
 is not expected to survive beyond C6 — retirement is an expected outcome
 of the C6 kind-recipe work.*
 
+*C4.3b status (2026-08): MV-over-Context is UNCONSTRUCTIBLE — a Context
+primary handed to `makeMultiValue` flattens into a copy-on-write derive
+(`deriveWithChannels`: new Structure sharing the source's data planes by
+reference, the given channel map authoritative — deletion stays
+expressible). Typed records, arrays, module objects, and proof contexts
+answer `ValueKind.Context` with channels riding directly; `dataOf` is
+identity for them. User-visible type bindings ARE the internal type
+Contexts (the `wrapType` MV wrap is gone — one object, so identity
+short-circuits hold); `getType` is total (bare type Contexts answer
+their meta-type through the `__type` binding-plane fallback). The
+channel plane is universal: `channelReadRaw` / `componentsView` /
+`cloneComponents` / `channelList` answer any Structure; ~20 MV kind
+guards widened (dispatch, viral scans, formatValue, `type of`,
+exhaustiveness, export detection, boundary bounds). W-invariants
+reframed per R5: data planes role-exclusive, channel plane universal;
+W1 extended (MV primary can never be a Context); W3 covers Context-role
+component keys. Scalars (Bits primaries) remain MultiValues until
+C4.3c.*
+
 **Slot plane.** Keys are `symbol | string | number` (D14). Channel keys are
 always **namespaced symbols**, so user data (string/number keys) cannot
 collide with channels — the transparency and duck-typing hazards of the old

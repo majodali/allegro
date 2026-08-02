@@ -129,7 +129,9 @@ export function evaluate(
       // C4.3a (R3): union-rule channels (effects) merge by union via the
       // registry-installed merge instead of inner-shadows-outer — effects
       // observed before re-evaluation are facts, not stale guesses.
-      if (ep.kind === ValueKind.MultiValue) {
+      // C4.3b: a flattened Context result carries its channels directly —
+      // same merge, and makeMultiValue re-derives the flattened form.
+      if (ep.kind === ValueKind.MultiValue || ep.kind === ValueKind.Context) {
         const merged = cloneComponents(value);
         for (const [k, v] of componentsView(ep)) {
           const prev = merged.get(k);
@@ -137,7 +139,7 @@ export function evaluate(
             ? channelMerge(k) : undefined;
           merged.set(k, mergeFn ? mergeFn(prev!, v) : v);
         }
-        return makeMultiValue((ep as MultiValueType).primary, merged);
+        return makeMultiValue(dataOf(ep), merged);
       }
       return makeMultiValue(ep, cloneComponents(value));
     }
@@ -227,7 +229,8 @@ function evaluateExpr(
   // error value — err-through-method) or argument propagates instead of
   // being dropped at the application hop. First hit wins, matching viralScan.
   for (const cand of [fnRaw, ...evalArgs]) {
-    if (cand.kind !== ValueKind.MultiValue) continue;
+    // C4.3b: flattened Contexts carry channels too.
+    if (cand.kind !== ValueKind.MultiValue && cand.kind !== ValueKind.Context) continue;
     for (const chan of viralChannels()) {
       const comp = channelReadRaw(cand, chan);
       if (comp) {
@@ -327,7 +330,8 @@ function applyPrimitive(
     const residual = makeExpr(fn, evalArgs);
     // Even though args aren't fully resolved, their type components
     // may be known. Use type-level dispatch to infer the result type.
-    if (evalArgs[0]?.kind === ValueKind.MultiValue) {
+    // C4.3b: flattened Contexts carry the type channel too.
+    if (evalArgs[0]?.kind === ValueKind.MultiValue || evalArgs[0]?.kind === ValueKind.Context) {
       const typeComp = channelReadRaw(evalArgs[0], "type");
       if (typeComp && typeComp.kind === ValueKind.Context) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
@@ -351,7 +355,8 @@ function applyPrimitive(
   // Type-directed dispatch: if the first arg has a type with a matching method,
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
-  if (evalArgs[0]?.kind === ValueKind.MultiValue) {
+  // C4.3b: flattened Contexts (typed records/arrays) dispatch too.
+  if (evalArgs[0]?.kind === ValueKind.MultiValue || evalArgs[0]?.kind === ValueKind.Context) {
     const typeComp = channelReadRaw(evalArgs[0], "type");
     if (typeComp && typeComp.kind === ValueKind.Context) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
@@ -388,7 +393,8 @@ function applyPrimitive(
   // Type propagation: if the first arg had a type and the result is Bits,
   // propagate the type to the result.
   let out: Value;
-  if (result.kind === ValueKind.Bits && evalArgs[0]?.kind === ValueKind.MultiValue) {
+  if (result.kind === ValueKind.Bits
+      && (evalArgs[0]?.kind === ValueKind.MultiValue || evalArgs[0]?.kind === ValueKind.Context)) {
     const typeComp = channelReadRaw(evalArgs[0], "type");
     if (typeComp) out = makeMultiValue(result, new Map([["type", typeComp]]));
     else          out = result;
@@ -420,7 +426,8 @@ function applyPrimitive(
 function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
   const viral = viralChannels();
   for (const arg of evalArgs) {
-    if (arg.kind !== ValueKind.MultiValue) continue;
+    // C4.3b: flattened Contexts carry channels too.
+    if (arg.kind !== ValueKind.MultiValue && arg.kind !== ValueKind.Context) continue;
     for (const chan of viral) {
       const comp = channelReadRaw(arg, chan);
       if (comp) {
