@@ -8,6 +8,55 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C4.3a: Merge-policy activation — error virality + effects union (structures Phase 4, B-021 part 1)
+
+The first C4.3 sub-chunk activates the principled propagation rules that
+C1.5 recorded but deferred (maintainer rulings R1–R3, ratified 2026-08 at
+the C4.3 briefing; recorded in the implementation plan §6).
+
+- **R1 — error virality rides every residual hop.** The legacy behavior
+  lost the error channel after the first residual hop: `applyPrimitive`'s
+  unresolved-args early return ran BEFORE the viral scan, so
+  `(error "boom" + 5) * 2` produced a bare residual with the channel
+  dropped. The viral scan now runs first. Two further drop sites fixed
+  with the same rule: the unresolved-application residual path in
+  `evaluateExpr` (an error-carrying callee or argument propagates — this
+  is how `r.toString()` on an error-carrying residual now works) and
+  `type_dispatch`'s unresolved-object residual (the dispatch residual
+  carries the object's viral channels; RESOLVED error values still
+  dispatch normally, so Error's own members stay callable).
+- **R2 — error-in-if propagates.** `eval_if` checks the evaluated
+  condition for an error channel before branching: `if (error "boom")
+  then 1 else 2` now propagates the error instead of silently taking the
+  else branch on the error value's meaningless primary.
+- **R3 — effects union on MultiValue re-evaluation.** The
+  flatten-on-re-evaluation path in `evaluate` now merges union-rule
+  channels via the registry-installed channel merge (effects observed
+  before re-evaluation are facts, not stale guesses); all other channels
+  keep inner-shadows-outer (fresh type info replaces stale).
+- **Differential fixtures updated** (pre-approved test-condition changes
+  per the briefing): `err-viral-chain`, `err-in-if-cond`,
+  `err-through-method` now pin the principled `fmt=error(boom) |
+  err=boom` behavior. The C1.5 "recorded warts" comments in slots.ts and
+  boundary-tests.ts updated to match.
+- **Scaling-test robustness fix** (measurement methodology, not a
+  behavior condition): the C4.2 O(1) index-access test compared one
+  timed round of cache-resident (200-element) vs cache-missing
+  (200k-element) access with a 5× threshold — the honest cache-miss
+  ratio is 2–8× depending on heap state, so the test straddled its own
+  threshold (confirmed by A/B: baseline and patched trees both produce
+  ratios across the band in isolation). Now min-of-3 rounds per side
+  with a 20× threshold — far above cache noise, far below the ~1000×
+  an O(n) scan would show.
+- Rulings R4–R6 recorded for the following sub-chunks: strip-semantics
+  retirement and the non-nesting reframe land at C4.3c; the
+  `ValueKind.MultiValue` host tag stays through C4.3 but is not expected
+  to survive beyond C6 (retirement is an expected outcome of the C6
+  kind-recipe work — exact chunk decided at the C6.1 briefing).
+
+2 new boundary tests (deep-chain virality; effects-union flatten);
+1025/1025 green; tsc at the 4-error rootDir baseline.
+
 ## 2026-07 — C4.2: Arrays as numeric structures — the dense region (structures Phase 4, B-020)
 
 D18 lands physically: array contexts store their elements in the

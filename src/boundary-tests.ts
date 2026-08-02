@@ -43,7 +43,9 @@ import { primitives } from "./primitives.js";
 import { stringToBits } from "./types.js";
 import { PredicateSet, makePredicate, effectsDomain } from "./refinements.js";
 import { makeInt } from "./types.js";
-import { effectsOf } from "./effects.js";
+import { effectsOf, withEffects } from "./effects.js";
+import { evaluate } from "./evaluator.js";
+import { makeSymbol } from "./types.js";
 import { Structure, isStructure } from "./structure.js";
 import { dataOf, indexGet, getSlotCount } from "./slots.js";
 
@@ -421,17 +423,19 @@ export function runInvariantPropertyChecks(programCount = 40, seed = 0xa11e6120)
 //
 // Byte-for-byte recordings of channel-propagation behavior taken BEFORE the
 // C1.5 propagation table replaced the hand-rolled per-channel code. The
-// table must reproduce these exactly (maintainer ruling: observable-zero;
-// principled-rule divergences activate at C4.3). Two recorded WARTS are
-// intentional: `err-viral-chain` loses the error channel into a residual,
-// and `err-in-if-cond` silently takes the else branch — both are today's
-// behavior, preserved here, revisited at C4.3.
+// table must reproduce these exactly. C4.3a UPDATE (maintainer-ratified
+// rulings R1/R2, 2026-08): the two recorded WARTS were fixed — the error
+// channel now rides every hop of a residual chain (`err-viral-chain`,
+// `err-through-method`) and an error-carrying `if` condition propagates
+// the error instead of silently taking the else branch (`err-in-if-cond`).
+// The three expectations below were updated to the principled behavior as
+// pre-approved test-condition changes per the C4.3 briefing.
 export const DIFFERENTIAL_FIXTURES: { name: string; src: string; bind: string; expect: string }[] = [
   { name: "err-viral-arith", src: 'e = error "boom"\nr = e + 5', bind: "r", expect: "fmt=error(boom) | eff=- | err=boom" },
-  { name: "err-viral-chain", src: 'e = error "boom"\nr = (e + 5) * 2 - 1', bind: "r", expect: "fmt=<expression> | eff=- | err=-" },
+  { name: "err-viral-chain", src: 'e = error "boom"\nr = (e + 5) * 2 - 1', bind: "r", expect: "fmt=error(boom) | eff=- | err=boom" },
   { name: "err-both-operands", src: 'a = error "one"\nb = error "two"\nr = a + b', bind: "r", expect: "fmt=error(one) | eff=- | err=one" },
-  { name: "err-in-if-cond", src: 'e = error "boom"\nr = if e then 1 else 2', bind: "r", expect: "fmt=2 | eff=- | err=-" },
-  { name: "err-through-method", src: 'e = error "boom"\nr = e + 1\ns = r.toString()', bind: "s", expect: "fmt=<expression> | eff=- | err=-" },
+  { name: "err-in-if-cond", src: 'e = error "boom"\nr = if e then 1 else 2', bind: "r", expect: "fmt=error(boom) | eff=- | err=boom" },
+  { name: "err-through-method", src: 'e = error "boom"\nr = e + 1\ns = r.toString()', bind: "s", expect: "fmt=error(boom) | eff=- | err=boom" },
   { name: "eff-inferred-io", src: "f(x) => print(x)\ng(x) => f(x)", bind: "g", expect: "fmt=<function(1)> | eff=io | err=-" },
   { name: "eff-if-branches", src: "h(c, x) => if c then print(x) else x", bind: "h", expect: "fmt=<function(2)> | eff=io | err=-" },
   { name: "eff-pure", src: "sq(x) => x * x", bind: "sq", expect: "fmt=<function(1)> | eff=- | err=-" },
@@ -1117,9 +1121,18 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       return performance.now() - t0;
     };
     time(small, 200); // warmup
-    const tSmall = time(small, 200);
-    const tBig = time(big, 200_000);
-    eq(tBig < Math.max(tSmall, 1) * 5, true,
+    // Min-of-rounds (standard robust perf estimator) with a threshold sized
+    // to the signal: the big array can never be cache-resident, so an honest
+    // O(1) access pays 2–8× in cache misses depending on heap state — while
+    // a linear scan would pay ~1000× (200k/200 more work). 20× separates the
+    // two regimes with margin on both sides; a single-round 5× check was
+    // flaky against GC/cache noise.
+    let tSmall = Infinity, tBig = Infinity;
+    for (let round = 0; round < 3; round++) {
+      tSmall = Math.min(tSmall, time(small, 200));
+      tBig = Math.min(tBig, time(big, 200_000));
+    }
+    eq(tBig < Math.max(tSmall, 1) * 20, true,
       `index access is length-independent (200 elems: ${tSmall.toFixed(1)}ms, 200k elems: ${tBig.toFixed(1)}ms)`);
   });
 
@@ -1137,6 +1150,35 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "dense region stays authoritative after materialization");
     eq(Number(((arrCtx as unknown as ContextValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
     eq((arrCtx as unknown as ContextValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
+  });
+
+  // --- Merge-policy activation (C4.3a, rulings R1–R3) --------------------------
+
+  test("merge policies (C4.3a, R1): error channel rides a deep residual chain", () => {
+    // Four hops past the originating operation — the legacy behavior lost
+    // the channel after the first (the updated err-viral-chain fixture pins
+    // three hops; this covers depth beyond it).
+    const r = evalSource('e = error "boom"\nr = ((e + 1) * 2 - 3) / 4 + 5',
+      undefined, [createTypeSystem()], undefined, true);
+    const v = r.evalCtx.bindings.get("r")!.value!;
+    const err = channelReadRaw(v, "error");
+    eq(err !== undefined, true, "error channel survives every residual hop");
+    eq(formatValue(err as Value), "boom", "the original error payload rides unchanged");
+  });
+
+  test("merge policies (C4.3a, R3): effects union on MultiValue re-evaluation", () => {
+    // An outer MultiValue carrying {io} whose primary re-evaluates to a value
+    // carrying {net}: union-rule channels merge by union via the installed
+    // channel merge — the legacy inner-shadows-outer would have kept {net} only.
+    const scope = scopeExtend(scopeNew(), [
+      ["s", { key: "s", value: withEffects(makeInt(1), new Set(["net"])) }],
+    ]);
+    const outer = withEffects(makeSymbol("s"), new Set(["io"]));
+    const result = evaluate(outer, scope);
+    const eff = effectsOf(result);
+    eq(eff !== null && eff.has("io") && eff.has("net") && eff.size === 2, true,
+      `effects merged by union, got {${eff ? [...eff].sort().join(",") : ""}}`);
+    eq(Number((primaryOf(result) as BitsValue).data), 1, "primary resolved through the flatten");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

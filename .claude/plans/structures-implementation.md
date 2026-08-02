@@ -470,7 +470,14 @@ existing arrays.alg / collections tests as differential oracle.*
 empty-data-plane structures with `primary`; `primaryOf` retired in favor of
 transparency-aware accessors; the MultiValue/Context shims and their
 non-nesting hacks deleted. **Second conscious-delta chunk** (§6 items
-discussed first).
+discussed first — briefing delivered and ratified 2026-08, rulings R1–R6
+recorded in §6). Sub-chunks: **C4.3a** merge-policy activation (error
+virality through residual chains, error-in-if propagation, effects union
+on re-evaluation — the three pre-approved fixture expectation changes);
+**C4.3b** flatten MV-over-Context + audit the ~76 `ValueKind.MultiValue`
+checks (records answer Context protocol); **C4.3c** scalar transparency —
+retire `primaryOf` across ~285 `dataOf` sites, delete non-nesting
+hacks/shims.
 
 ### Phase 5 — Symbols + member identity
 
@@ -582,6 +589,31 @@ PROCESS §6; the owning chunk is noted:
 7. `buildEffect` per-instance member copying deleted (C6.2).
 8. `NominalType` alias: retained through Phase 6, retirement decided with
    the maintainer at C6.3.
+
+**RULED 2026-08 (C4.3 briefing — all recommendations ratified):**
+- **R1 (error virality through residual chains, activates C4.3a):** the
+  legacy behavior — the error channel is lost after the first residual hop
+  (`err-viral-chain`, `err-through-method` fixtures) — is a bug, not a
+  policy. Viral-channel scan runs before the unresolved-residual early
+  return; the channel rides every hop.
+- **R2 (error in `if` condition, C4.3a):** an error-carrying condition
+  propagates the error instead of silently taking the else branch
+  (`err-in-if-cond`).
+- **R3 (effects on MultiValue re-evaluation, C4.3a):** union-rule channels
+  merge by union on the flatten path (registry-installed merge), replacing
+  legacy inner-shadows-outer for `effects`. Non-union channels keep
+  inner-shadows-outer (fresh type info replaces stale).
+- **R4 (item 2 above, confirmed):** strip-semantics retirement proceeds at
+  C4.3c as planned — `primaryOf` retired for transparency-aware accessors.
+- **R5 (item 1 above, confirmed):** non-nesting tests reframed under
+  transparency at C4.3c.
+- **R6 (MultiValue kind):** `ValueKind.MultiValue` kept through C4.3 —
+  but maintainer sees no reason to keep it beyond C6; retirement is the
+  expected outcome of the C6 kind-recipe work (decide the exact chunk at
+  the C6.1 briefing).
+- The three affected DIFFERENTIAL_FIXTURES expectation changes
+  (`err-viral-chain`, `err-in-if-cond`, `err-through-method`) are
+  pre-approved test-condition changes per this briefing.
 
 ## 7. Backlog impact (input to the rebuild)
 

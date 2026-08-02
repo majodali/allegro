@@ -53,6 +53,17 @@ battery. Still pending: physical plane separation + shape ref field
 (inside structure.ts, with C4.3's transparency cutover), symbol keys
 (C5).*
 
+*C4.3 rulings (2026-08, maintainer-ratified — recorded in the
+implementation plan §6): merge policies activate at C4.3a — error
+virality survives residual chains (the first-hop-only loss was a bug),
+an error-carrying `if` condition propagates the error rather than
+silently taking the else branch, and union-rule channels (effects) merge
+by union on MultiValue re-evaluation instead of inner-shadows-outer.
+`primaryOf` strip retirement and the non-nesting reframe land at C4.3c
+as planned. The host `ValueKind.MultiValue` tag stays through C4.3 but
+is not expected to survive beyond C6 — retirement is an expected outcome
+of the C6 kind-recipe work.*
+
 **Slot plane.** Keys are `symbol | string | number` (D14). Channel keys are
 always **namespaced symbols**, so user data (string/number keys) cannot
 collide with channels — the transparency and duck-typing hazards of the old

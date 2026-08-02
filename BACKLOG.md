@@ -205,7 +205,15 @@ phase).
   boundary tests; existing array suites as differential oracle; ~3%
   faster on the A/B workload
 - [ ] **B-021** · L0 · Transparency cutover; retire `primaryOf` + wrapper
-  shims (C4.3) — second conscious-delta chunk
+  shims (C4.3) — second conscious-delta chunk. Briefing ratified 2026-08
+  (rulings R1–R6, plan §6). **C4.3a landed 2026-08**: merge-policy
+  activation — error virality rides every residual hop (incl. unresolved
+  application + type_dispatch residuals), error-in-if-cond propagates,
+  effects union on MultiValue re-evaluation; three differential-fixture
+  expectations updated (pre-approved). Remaining: C4.3b (flatten
+  MV-over-Context, ~76 ValueKind.MultiValue checks), C4.3c (scalar
+  transparency, retire primaryOf/dataOf strip semantics, delete
+  non-nesting shims)
 - [ ] **B-022** · L0 · FQN symbols: interning, registration, projection
   (C5.1)
 - [ ] **B-023** · L2 · Symbol-keyed members + draw-from binding; diamond

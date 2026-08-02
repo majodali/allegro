@@ -12,7 +12,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
+import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
@@ -126,9 +126,17 @@ export function evaluate(
       // If re-evaluation produced another MultiValue, FLATTEN rather than NEST.
       // Inner (freshly-evaluated) components shadow outer (stale) components —
       // fresh resolved type info should replace pre-computed partial-eval types.
+      // C4.3a (R3): union-rule channels (effects) merge by union via the
+      // registry-installed merge instead of inner-shadows-outer — effects
+      // observed before re-evaluation are facts, not stale guesses.
       if (ep.kind === ValueKind.MultiValue) {
         const merged = cloneComponents(value);
-        for (const [k, v] of componentsView(ep)) merged.set(k, v);
+        for (const [k, v] of componentsView(ep)) {
+          const prev = merged.get(k);
+          const mergeFn = prev !== undefined && channelSpec(k)?.rule === "union"
+            ? channelMerge(k) : undefined;
+          merged.set(k, mergeFn ? mergeFn(prev!, v) : v);
+        }
         return makeMultiValue((ep as MultiValueType).primary, merged);
       }
       return makeMultiValue(ep, cloneComponents(value));
@@ -214,6 +222,23 @@ function evaluateExpr(
   } else {
     residual = makeExpr(fn, evalArgs);
   }
+  // C4.3a (R1): viral channels ride the unresolved-application residual too.
+  // An error-carrying callee (e.g. the result of dispatching a method on an
+  // error value — err-through-method) or argument propagates instead of
+  // being dropped at the application hop. First hit wins, matching viralScan.
+  for (const cand of [fnRaw, ...evalArgs]) {
+    if (cand.kind !== ValueKind.MultiValue) continue;
+    for (const chan of viralChannels()) {
+      const comp = channelReadRaw(cand, chan);
+      if (comp) {
+        const components = new Map<string, Value>([[chan, comp]]);
+        const typeComp = channelReadRaw(cand, "type");
+        if (typeComp) components.set("type", typeComp);
+        const out = makeMultiValue(residual, components);
+        return residualEffects ? withEffects(out, residualEffects) : out;
+      }
+    }
+  }
   return residualEffects ? withEffects(residual, residualEffects) : residual;
 }
 
@@ -291,6 +316,13 @@ function applyPrimitive(
   if (scopeCompileMode(ctx) && fn.effects && fn.effects.length > 0) {
     return attachEff(makeExpr(fn, evalArgs));
   }
+  // Viral channels (propagation table): today just `error` — see viralScan.
+  // C4.3a (R1): runs BEFORE the unresolved-residual early return, so the
+  // channel rides every hop of a residual chain instead of being lost after
+  // the first (the legacy first-hop-only behavior was a bug, not a policy —
+  // see differential fixtures err-viral-chain / err-through-method).
+  const viralHit = viralScan(evalArgs, fn);
+  if (viralHit) return attachEff(viralHit);
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
     // Even though args aren't fully resolved, their type components
@@ -309,10 +341,6 @@ function applyPrimitive(
     }
     return attachEff(residual);
   }
-
-  // Viral channels (propagation table): today just `error` — see viralScan.
-  const viralHit = viralScan(evalArgs, fn);
-  if (viralHit) return attachEff(viralHit);
 
   // Phase B: refinement-domain propagation. If the primitive is one of
   // bits_add / bits_sub / bits_mul and the operands carry abstract domains

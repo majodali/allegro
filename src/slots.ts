@@ -669,14 +669,16 @@ export const CHANNEL_WRITER_BRAND = "__channelWriterFor";
 // domain logic at the annotated evaluator sites (that is what "computed"
 // means); `drop` channels never propagate — verified by forgery test C.
 //
-// MAINTAINER RULING (2026-07, plan §6 item 1): C1.5 is observable-zero.
-// Where a principled rule diverges from recorded behavior, the table
-// carries the legacy policy with the divergence documented here:
-//  - effects on MultiValue re-evaluation merge: legacy inner-shadows-outer
-//    (principled: union) — activates at C4.3.
-//  - error virality on chained residuals: legacy drops the channel after
-//    the first residual hop (see differential fixture `err-viral-chain`);
-//    revisited at C4.3.
+// MAINTAINER RULING (2026-08, C4.3a — activating the divergences deferred
+// at C1.5): the principled rules are now live —
+//  - effects on MultiValue re-evaluation merge by UNION via the installed
+//    channel merge (was inner-shadows-outer).
+//  - error virality rides EVERY hop of a residual chain, including the
+//    unresolved-application and type_dispatch residual paths (was dropped
+//    after the first hop — see differential fixtures `err-viral-chain`,
+//    `err-through-method`).
+//  - an error-carrying `if` condition propagates the error
+//    (`err-in-if-cond`; was silently taking the else branch).
 
 /** Union-merge behavior per channel, installed at module init by the
  *  channel's owner (e.g. effects.ts) — slots.ts cannot import the encodings

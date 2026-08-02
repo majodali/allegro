@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -473,6 +473,12 @@ const mv_components: PrimitiveFnImpl = (args) => {
 const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 3) throw new AllegroError(`eval_if: need 3 args, got ${args.length}`);
   const cond = evalFn!(args[0], ctx!);
+  // C4.3a (R2): an error-carrying condition propagates the error instead of
+  // branching on its (meaningless) primary — the legacy behavior silently
+  // took the else branch (differential fixture err-in-if-cond).
+  if (cond.kind === ValueKind.MultiValue && channelReadRaw(cond, "error") !== undefined) {
+    return cond;
+  }
   const condP = dataOf(cond);
   if (condP.kind === ValueKind.Bits) {
     const took_then = condP.data !== 0n;
@@ -2084,6 +2090,24 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const obj = evalFn!(args[0], ctx!);
   const fieldArg = evalFn!(args[1], ctx!);
   if (!isResolved(obj) || !isResolved(fieldArg)) {
+    // C4.3a (R1): viral channels ride the dispatch residual — dispatching a
+    // member on an unresolved error-carrying value propagates the error
+    // instead of dropping it (err-through-method). Resolved error values
+    // still dispatch normally (Error's own members stay callable).
+    if (obj.kind === ValueKind.MultiValue) {
+      for (const chan of viralChannels()) {
+        const comp = channelReadRaw(obj, chan);
+        if (comp !== undefined) {
+          const components = new Map<string, Value>([[chan, comp]]);
+          const typeComp = channelReadRaw(obj, "type");
+          if (typeComp) components.set("type", typeComp);
+          return makeMultiValue(
+            makeExpr(makePrimitive("type_dispatch", type_dispatch_impl, true), [obj, fieldArg]),
+            components,
+          );
+        }
+      }
+    }
     return makeExpr(makePrimitive("type_dispatch", type_dispatch_impl, true), [obj, fieldArg]);
   }
   const fieldName = bitsToString(asBits(fieldArg, "type_dispatch"));
