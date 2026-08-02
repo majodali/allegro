@@ -405,3 +405,14 @@ phase).
   maturity (roadmap question)
 - [ ] **B-086** · Escape-hatch awareness tooling ("you're cycling on this
   rule — options"); posture per `docs/VISION.md` §5 principle 4
+- [ ] **B-087** · Predicate/domain propagation onto residuals —
+  `propagateSetForPrimitive` runs only on the fully-resolved path, so a
+  residual's own `predicates` channel isn't pre-computed from operand
+  domains (deferred precision, not unsoundness: operand values inside
+  the residual keep their sets; propagation fires on completion, and
+  existing compile-time discharges read domains off the TYPE channel,
+  which Rule 1 does propagate). Maintainer ruling 2026-08: leave as-is
+  until a concrete set of use cases requires early discharge of derived
+  domains on unresolved arithmetic — then look deeply (likely a one-line
+  reorder in `applyPrimitive`, but validate interaction with Rule 2
+  branch predicates and precompile placeholders first)
