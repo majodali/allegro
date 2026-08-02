@@ -127,9 +127,11 @@ Before every commit that lands functionality:
 **Evaluator & runtime invariants** (the recurring lessons; the complete
 gotcha list lives in `CLAUDE.md`):
 
-- Eager primitives receive `primaryOf`'d args — MultiValue components
-  (type, effects, proof operands) are stripped. Any primitive that consumes
-  rich values (Proofs, Effects, predicate sets) must be registered **lazy**.
+- Eager primitives receive **full values** (channels intact — C4.3c
+  transparency); impls read data through `dataOf`/`asBits`. `lazy` is
+  purely an evaluation-control choice (receive arg ASTs + evalFn). The
+  propagation table alone governs channel behavior — never hand-roll
+  per-channel logic in an impl.
 - Every code path that clones a `ComposedFunction` must preserve its
   metadata (`__genericParams`, `__effectVarParams`, params/owner remapping).
   Use the shared helpers; never hand-clone.
