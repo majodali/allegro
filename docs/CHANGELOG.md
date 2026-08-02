@@ -8,6 +8,44 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C4.3c: Transparency at the eager boundary — primaryOf retired (structures Phase 4, B-021 part 3; B-021 complete)
+
+The last C4.3 sub-chunk lands scalar transparency (R4) and closes B-021.
+
+- **The eager boundary no longer strips.** `applyPrimitive` passes eager
+  impls the FULL values — channels intact; impls read data through the
+  accessors (`dataOf`/`asBits`/`asCtx`). The C1.2/C1.3 accessor
+  migration made this a zero-change flip: no production impl read args
+  raw, so the suite was green on the first run. The propagation table
+  alone governs channels (D28).
+- **`channelAware` registration mode DELETED** — it is now everyone's
+  default. The seven registrations (proof_refl/sym/trans/cong,
+  prove_for_all_bool, prove_induction, certificate_peek) became plain
+  eager primitives; the `PrimitiveFunctionValue.channelAware` field and
+  `makePrimitive`'s fifth parameter are gone. The D3 lazy/eager
+  arg-shape asymmetry with it: `lazy` is purely an evaluation-control
+  choice (receive arg ASTs + evalFn) — the "register lazy to dodge
+  stripping" idiom is dead.
+- **`primaryOf` RETIRED as a name.** `dataOf` is the one data-plane
+  accessor — defined in types.ts (identity for everything except a
+  transparent scalar structure), re-exported through slots.ts. The
+  remaining ~380 references (test suite + one import) renamed
+  mechanically; no `primaryOf` identifier survives in code.
+- Typed scalars keep the `ValueKind.MultiValue` tag per ruling R6 — the
+  tag now simply means "transparent scalar structure"; its retirement is
+  expected with the C6 kind recipe. The evaluator's MV re-evaluation
+  merge stays as the table-driven merge policy (it is the R3 rule, not a
+  nesting hack). Physical plane separation inside structure.ts (primary
+  as a channel-map entry) remains an internal-layout follow-on.
+- **Tier-0 touch-up flagged for maintainer ratification** (not bundled,
+  per plan §8): PROCESS.md's evaluator-invariants bullet "Eager
+  primitives receive `primaryOf`'d args … must be registered lazy" now
+  states a false invariant and needs its propose-and-ratify replacement.
+
+2 new boundary tests (an eager impl observes its args' channel plane;
+proof combinators are plain eager and still see Proof channels);
+1033/1033 green; tsc at the 4-error rootDir baseline.
+
 ## 2026-08 — C4.3b: MV-over-Context flattened — records answer Context (structures Phase 4, B-021 part 2)
 
 The MultiValue-over-Context wrapper is gone: channels attach DIRECTLY to

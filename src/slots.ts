@@ -453,11 +453,10 @@ export function setGenericConstructor(ctx: ContextValue, v: Value): void { slotW
 
 // --- Data plane -----------------------------------------------------------------------
 
-/** Data-plane read: the accessor-layer name for what `primaryOf` does today.
- *  Call sites migrate to this so the C1.5/C4.3 semantics change (the strip-
- *  vs-preserve asymmetry retirement, then transparency cutover) happens in
- *  exactly one place. */
-export { primaryOf as dataOf } from "./types.js";
+/** Data-plane read (C4.3c: `primaryOf` retired — this is THE accessor).
+ *  Identity for flattened Contexts and every non-scalar; unwraps the
+ *  `primary` of a transparent scalar structure. */
+export { dataOf } from "./types.js";
 
 // --- Component plane (MultiValue) -------------------------------------------------------
 

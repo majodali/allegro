@@ -382,13 +382,17 @@ function applyPrimitive(
     }
   }
 
-  // Unwrap multi-values for primitives — unless the primitive registered as
-  // channel-aware (C1.5's third mode: eager, but channels arrive intact).
-  const primaryArgs = fn.channelAware ? evalArgs : evalArgs.map(dataOf);
+  // C4.3c (R4): TRANSPARENCY — eager impls receive the full values,
+  // channels intact, and read data through the accessors (dataOf/asBits
+  // are identity-or-unwrap). The boundary no longer strips; the
+  // propagation table alone governs channels. This also retires the
+  // C1.5 `channelAware` registration mode (it is now everyone's default)
+  // and the "register lazy to dodge stripping" idiom — lazy is purely an
+  // evaluation-control choice again.
   if (typeof fn.fn !== "function") {
     throw new AllegroError(`applyPrimitive: ${fn.name} has unresolved stub (fn=null). Check resolvePrimitives.`);
   }
-  const result = fn.fn(primaryArgs, ctx, evalFn);
+  const result = fn.fn(evalArgs, ctx, evalFn);
 
   // Type propagation: if the first arg had a type and the result is Bits,
   // propagate the type to the result.

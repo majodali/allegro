@@ -83,6 +83,23 @@ W1 extended (MV primary can never be a Context); W3 covers Context-role
 component keys. Scalars (Bits primaries) remain MultiValues until
 C4.3c.*
 
+*C4.3c status (2026-08): TRANSPARENCY AT THE EAGER BOUNDARY (R4) —
+`applyPrimitive` no longer strips args for eager primitives; every impl
+receives full values (channels intact) and reads data through the
+accessors (`dataOf`/`asBits`/`asCtx` — the C1.2/C1.3 migration made
+this a zero-change flip). The C1.5 `channelAware` registration mode is
+DELETED (it is now everyone's default) and the D3 lazy/eager
+arg-asymmetry is gone: `lazy` is purely an evaluation-control choice
+(receive arg ASTs + evalFn). `primaryOf` is RETIRED as a name — `dataOf`
+is the one data-plane accessor, defined in types.ts and re-exported
+through slots.ts. The propagation table alone governs channels (D28).
+A typed scalar remains a `ValueKind.MultiValue`-tagged Structure (per
+ruling R6 the tag now simply means "transparent scalar structure";
+retirement expected with the C6 kind recipe). The physical plane
+separation inside structure.ts (primary as a true channel-map entry,
+shape ref field) remains an internal-layout follow-on — observable
+semantics are already transparent.*
+
 **Slot plane.** Keys are `symbol | string | number` (D14). Channel keys are
 always **namespaced symbols**, so user data (string/number keys) cannot
 collide with channels — the transparency and duck-typing hazards of the old

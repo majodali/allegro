@@ -47,9 +47,6 @@ export interface PrimitiveFunctionValue {
    * function transitively calls.
    */
   effects?: string[];
-  /** C1.5: eager evaluation but args arrive as FULL values (channels intact)
-   *  — the third registration mode, replacing lazy-as-strip-dodge. */
-  channelAware?: boolean;
 }
 
 // --- Param: positional placeholder within function expressions ---
@@ -196,9 +193,8 @@ export function makePrimitive(
   fn: PrimitiveFnImpl,
   lazy?: boolean,
   effects?: string[],
-  channelAware?: boolean,
 ): PrimitiveFunctionValue {
-  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects, channelAware };
+  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects };
 }
 
 export function makeParam(position: number, name?: string): ParamValue {
@@ -256,7 +252,11 @@ export function makeDenseArrayCtx(elements: Value[]): ContextValue {
 
 // --- Utilities ---
 
-export function primaryOf(v: Value): Value {
+/** Data-plane read: identity for everything except a transparent scalar
+ *  structure (MultiValue role), whose data lives in `primary`. C4.3c: the
+ *  former `primaryOf` name is retired — this IS the accessor (re-exported
+ *  through slots.ts; both import paths resolve to this one function). */
+export function dataOf(v: Value): Value {
   return v.kind === ValueKind.MultiValue ? v.primary : v;
 }
 

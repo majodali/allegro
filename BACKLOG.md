@@ -204,22 +204,25 @@ phase).
   materializing; W6 view-coherence invariant; O(1) scaling + duality
   boundary tests; existing array suites as differential oracle; ~3%
   faster on the A/B workload
-- [ ] **B-021** · L0 · Transparency cutover; retire `primaryOf` + wrapper
+- [x] **B-021** · L0 · Transparency cutover; retire `primaryOf` + wrapper
   shims (C4.3) — second conscious-delta chunk. Briefing ratified 2026-08
-  (rulings R1–R6, plan §6). **C4.3a landed 2026-08**: merge-policy
-  activation — error virality rides every residual hop (incl. unresolved
-  application + type_dispatch residuals), error-in-if-cond propagates,
-  effects union on MultiValue re-evaluation; three differential-fixture
-  expectations updated (pre-approved). **C4.3b landed 2026-08**:
-  MV-over-Context flattened — makeMultiValue derives copy-on-write for
-  Context primaries (`deriveWithChannels`, given map authoritative);
-  typed records/arrays/modules/proofs answer Context with channels
-  riding directly; type bindings ARE the internal singletons (wrapType
-  identity); getType total; channel accessors + ~20 kind guards widened;
-  W-invariants reframed per R5 (data planes role-exclusive, channel
-  plane universal; W1 extended; W3 covers Context components).
-  Remaining: C4.3c (scalar transparency, retire primaryOf/dataOf strip
-  semantics, delete non-nesting shims)
+  (rulings R1–R6, plan §6). **C4.3a**: merge-policy activation — error
+  virality rides every residual hop (incl. unresolved application +
+  type_dispatch residuals), error-in-if-cond propagates, effects union
+  on MultiValue re-evaluation; three differential-fixture expectations
+  updated (pre-approved). **C4.3b**: MV-over-Context flattened —
+  makeMultiValue derives copy-on-write for Context primaries
+  (`deriveWithChannels`, given map authoritative); typed records/arrays/
+  modules/proofs answer Context with channels riding directly; type
+  bindings ARE the internal singletons (wrapType identity); getType
+  total; channel accessors + ~20 kind guards widened; W-invariants
+  reframed per R5. **C4.3c**: transparency at the eager boundary —
+  applyPrimitive no longer strips args (impls receive full values, read
+  via dataOf/asBits); `channelAware` mode deleted (universal default);
+  lazy is purely evaluation control; `primaryOf` name retired (dataOf is
+  THE accessor). Typed scalars keep the MultiValue tag per R6 (means
+  "transparent scalar structure"; retirement expected at C6). All landed
+  2026-08; 1033/1033 green
 - [ ] **B-022** · L0 · FQN symbols: interning, registration, projection
   (C5.1)
 - [ ] **B-023** · L2 · Symbol-keyed members + draw-from binding; diamond

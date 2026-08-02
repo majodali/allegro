@@ -913,7 +913,7 @@ const when_no_match_impl: PrimitiveFnImpl = (args, _ctx, _evalFn) => {
 // ============ PRINT ============
 
 const print_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
-  // Lazy so we get the full MultiValue (with type info) instead of primaryOf
+  // Lazy for evaluation control: print defers on unresolved args (futures)
   const v = evalFn ? evalFn(args[0], ctx!) : args[0];
   if (!isResolved(v)) {
     // Value is pending (async future or other residual) — defer print
@@ -2618,8 +2618,8 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 // knowledge-independent functions (D36/D37). `instanceof` is the pure,
 // congruence-safe question ("does the data satisfy T?"); this op answers
 // the provenance question and pays for it in the effect calculus.
-// Channel-aware registration: the certificate lives on the value's
-// channels — a primaryOf strip would erase exactly what this observes.
+// The certificate lives on the value's channels — since C4.3c every eager
+// impl receives the full value, so nothing special is needed to see it.
 // Only refinement layers carry certificates: the walk stops at the first
 // non-predicate layer (shape questions belong to instanceof).
 const certificate_peek_impl: PrimitiveFnImpl = (args) => {
@@ -3406,9 +3406,8 @@ function eqOperandsOf(v: Value): { lhs: Value; rhs: Value } | null {
 }
 
 /** Recognise a proof Context structurally — a Context carrying the proof
- *  marker bindings. Robust to a stripped `type` component (eager primitives
- *  receive `primaryOf`'d args, so a Proof MultiValue arrives as a bare
- *  Context). */
+ *  marker bindings. Structural (not type-component-based) so it works on
+ *  any residual-stripped view of a proof as well as the full value. */
 function proofCtx(v: Value): ContextValue | null {
   const p = dataOf(v);
   if (p.kind !== ValueKind.Context) return null;
@@ -4017,7 +4016,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   type_subtypeof: makePrimitive("type_subtypeof", type_subtypeof_impl, true),
   // C3.3: knowledge observation — eager but channel-aware (certificate
   // rides the channels), tagged with the "observe" effect label.
-  certificate_peek: makePrimitive("certificate_peek", certificate_peek_impl, false, ["observe"], true),
+  certificate_peek: makePrimitive("certificate_peek", certificate_peek_impl, false, ["observe"]),
   type_apply: makePrimitive("type_apply", type_apply_impl, true),
   type_function: makePrimitive("type_function", type_function_impl, true),
   type_union: makePrimitive("type_union", type_union_impl, true),
@@ -4049,20 +4048,18 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   // Phase F2: proof by refinement-domain entailment. Eager — both operands
   // are ordinary values.
   proof_refines: makePrimitive("proof_refines", proof_refines_impl),
-  // Phase F3: proof combinators + the `theorem … by <term>` checker. All
-  // channel-aware (C1.5): eager, args arrive with channels intact — a Proof flows in as its
-  // full MultiValue (eager primitives get `primaryOf`'d args, which strips
-  // the `Proof` type component and the proof's structured operands).
-  proof_refl:  makePrimitive("proof_refl",  proof_refl_impl,  false, undefined, true),
-  proof_sym:   makePrimitive("proof_sym",   proof_sym_impl,   false, undefined, true),
-  proof_trans: makePrimitive("proof_trans", proof_trans_impl, false, undefined, true),
-  proof_cong:  makePrimitive("proof_cong",  proof_cong_impl,  false, undefined, true),
+  // Phase F3: proof combinators + the `theorem … by <term>` checker.
+  // Plain eager (C4.3c: every eager impl receives full values, channels
+  // intact — the former channelAware mode is the universal default).
+  proof_refl:  makePrimitive("proof_refl",  proof_refl_impl),
+  proof_sym:   makePrimitive("proof_sym",   proof_sym_impl),
+  proof_trans: makePrimitive("proof_trans", proof_trans_impl),
+  proof_cong:  makePrimitive("proof_cong",  proof_cong_impl),
   // Lazy on the proposition (needs the AST) and proof term.
   proof_check: makePrimitive("proof_check", proof_check_impl, true),
-  // Phase F5: universal quantification — both lazy (they receive function
-  // values and proof values; lazy avoids `primaryOf` arg-stripping).
-  prove_for_all_bool: makePrimitive("prove_for_all_bool", prove_for_all_bool_impl, false, undefined, true),
-  prove_induction:    makePrimitive("prove_induction",    prove_induction_impl,    false, undefined, true),
+  // Phase F5: universal quantification — plain eager since C4.3c.
+  prove_for_all_bool: makePrimitive("prove_for_all_bool", prove_for_all_bool_impl),
+  prove_induction:    makePrimitive("prove_induction",    prove_induction_impl),
   typed_add: makePrimitive("typed_add", makeTypedBinOp("add"), true),
   typed_sub: makePrimitive("typed_sub", makeTypedBinOp("sub"), true),
   typed_mul: makePrimitive("typed_mul", makeTypedBinOp("mul"), true),

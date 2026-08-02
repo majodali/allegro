@@ -30,7 +30,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
-import { Value, ValueKind, ContextValue, MultiValueType, primaryOf } from "./types.js";
+import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr } from "./types.js";
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
 import { withType, getType, typeMethod, makeArray, IntType, Type as TypeMeta } from "./types-std.js";
 import { makeMultiValue } from "./types.js";
@@ -97,9 +97,9 @@ const LINT_PATTERNS: LintPattern[] = [
   { name: "components-direct", regex: /\.components\b/g },
   { name: "dunder-string-literal", regex: /["']__[A-Za-z0-9_]*["']/g },
   { name: "bindings-get-dunder", regex: /bindings\.get\(\s*["']__/g },
-  // primaryOf's strip-vs-preserve asymmetry is retired by C1.5/C4.3; its
+  // dataOf's strip-vs-preserve asymmetry is retired by C1.5/C4.3; its
   // definition site is exempt.
-  { name: "primaryOf-call", regex: /\bprimaryOf\s*\(/g, excludeFiles: ["src/types.ts"] },
+  { name: "dataOf-call", regex: /\bprimaryOf\s*\(/g, excludeFiles: ["src/types.ts"] },
   // C1.4: TS-kernel writer acquisition is restricted to the two proof-kernel
   // modules — anywhere else, acquiring the discharged writer fails the suite.
   { name: "kernel-writer-acquisition", regex: /\bkernelChannelWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
@@ -313,7 +313,7 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     }
     const typeComp = mv.components.get("type");
     if (typeComp && (typeComp as Value).kind !== ValueKind.Expression) {
-      const tp = primaryOf(typeComp as Value);
+      const tp = dataOf(typeComp as Value);
       if (!tp || tp.kind !== ValueKind.Context) {
         out.push({ invariant: "W2 type-component-shape", detail: `type component primary has kind ${tp?.kind}`, program });
       }
@@ -507,7 +507,7 @@ function getTypeNameOf(v: Value): string | null {
   const t = channelReadRaw(v, "type");
   const tc = t ? asContext(t as Value) : null;
   const nv = tc ? getName(tc) : undefined;
-  return nv ? bitsToString(primaryOf(nv) as BitsValue) : null;
+  return nv ? bitsToString(dataOf(nv) as BitsValue) : null;
 }
 
 /** Evaluate an attack program; report whether (and how) it was refused. */
@@ -611,7 +611,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // C2.3b: Int lives on the extensions layer of the root scope chain.
     const intCtx = asContext(scopeLookup(evalCtx, "Int")?.value as Value);
     eq(intCtx !== null, true, "Int peels to a Context");
-    const namePrimary = primaryOf(getName(intCtx!) as Value) as BitsValue;
+    const namePrimary = dataOf(getName(intCtx!) as Value) as BitsValue;
     eq(bitsToString(namePrimary), "Int", "getName reads __name");
     const members = asContext(getMembers(intCtx!) as Value);
     eq(members !== null && members.bindings.size > 0, true, "getMembers reads __members");
@@ -619,7 +619,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const x = evalCtx.bindings.get("x")?.value as Value;
     const shape = asContext(channelReadRaw(x, "shape") as Value);
     eq(shape !== null, true, "shape channel readable on a typed value");
-    eq(bitsToString(primaryOf(getName(shape!) as Value) as BitsValue), "Int", "shape of 42 is Int");
+    eq(bitsToString(dataOf(getName(shape!) as Value) as BitsValue), "Int", "shape of 42 is Int");
     const proofCtx = asContext(evalCtx.bindings.get("t")?.value as Value);
     eq(proofCtx !== null, true, "theorem binding peels to a proof Context");
     const discharged = channelReadRaw(proofCtx! as Value, "discharged");
@@ -667,15 +667,15 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // ...and still carries its original proposition + discharge.
     const ctx = asContext(t)!;
     const disch = channelReadRaw(t, "discharged") as Value;
-    eq((primaryOf(disch) as any).data, 1n, "still discharged");
-    eq(bitsToString(primaryOf(getProposition(ctx)!) as BitsValue).includes("1 + 1"), true, "proposition unchanged");
+    eq((dataOf(disch) as any).data, 1n, "still discharged");
+    eq(bitsToString(dataOf(getProposition(ctx)!) as BitsValue).includes("1 + 1"), true, "proposition unchanged");
   });
 
   test("forgery D (live): reads are free; writing the read value onto a fake is refused", () => {
     const read = attack('theorem t: 1 + 1 == 2\nd = channel_read(t, "discharged")');
     eq(read.threw, null, "free read");
     const d = read.evalCtx!.bindings.get("d")!.value as Value;
-    eq((primaryOf(d) as any).data, 1n, "read the real discharge mark");
+    eq((dataOf(d) as any).data, 1n, "read the real discharge mark");
     const write = attack('f = mv_set({x: 1}, "discharged", 1)');
     eq(write.threw?.includes("integrity channel") ?? false, true, `write-onto-fake: ${write.threw}`);
   });
@@ -707,7 +707,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const c = r.evalCtx!.bindings.get("c")!.value as Value;
     eq(getTypeNameOf(c), "None", "no discharge on the combination");
     const d = r.evalCtx!.bindings.get("d")!.value as Value;
-    eq((primaryOf(d) as any).data, 1n, "the source proof itself still reads discharged");
+    eq((dataOf(d) as any).data, 1n, "the source proof itself still reads discharged");
   });
 
   test("channel plane (C1.4): user channel end-to-end — write, free read, attenuation", () => {
@@ -720,8 +720,8 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       'g = channel_read(good, "audit_e2e")',
     ].join("\n"));
     eq(r.threw, null, `e2e: ${r.threw}`);
-    eq(bitsToString(primaryOf(r.evalCtx!.bindings.get("r")!.value as Value) as BitsValue), "checked");
-    eq(bitsToString(primaryOf(r.evalCtx!.bindings.get("g")!.value as Value) as BitsValue), "ok");
+    eq(bitsToString(dataOf(r.evalCtx!.bindings.get("r")!.value as Value) as BitsValue), "checked");
+    eq(bitsToString(dataOf(r.evalCtx!.bindings.get("g")!.value as Value) as BitsValue), "ok");
     const rejected = attack([
       'w = channel_register("audit_e2e_2", "union")',
       'wa = channel_attenuate(w, x => x == "ok")',
@@ -750,17 +750,17 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     }
     const child = scopeExtend(parent, [["x", { key: "x", value: makeInt(42) }]]);
     eq(child.bindings.size, 1, "child owns only its layer");
-    eq((primaryOf(scopeLookup(child, "b9999")!.value!) as any).data, 9999n, "chain lookup reaches parent");
-    eq((primaryOf(scopeLookup(child, "x")!.value!) as any).data, 42n, "own layer found");
+    eq((dataOf(scopeLookup(child, "b9999")!.value!) as any).data, 9999n, "chain lookup reaches parent");
+    eq((dataOf(scopeLookup(child, "x")!.value!) as any).data, 42n, "own layer found");
     // Shadowing: nearest layer wins.
     const shadow = scopeExtend(child, [["b0", { key: "b0", value: makeInt(777) }]]);
-    eq((primaryOf(scopeLookup(shadow, "b0")!.value!) as any).data, 777n, "child shadows parent");
-    eq((primaryOf(scopeLookup(parent, "b0")!.value!) as any).data, 0n, "parent unchanged");
+    eq((dataOf(scopeLookup(shadow, "b0")!.value!) as any).data, 777n, "child shadows parent");
+    eq((dataOf(scopeLookup(parent, "b0")!.value!) as any).data, 0n, "parent unchanged");
     // Deep chains stay correct.
     let deep = scopeNew();
     deep.bindings.set("root", { key: "root", value: makeInt(1) });
     for (let i = 0; i < 2000; i++) deep = scopeExtend(deep, []);
-    eq((primaryOf(scopeLookup(deep, "root")!.value!) as any).data, 1n, "2000-layer chain lookup");
+    eq((dataOf(scopeLookup(deep, "root")!.value!) as any).data, 1n, "2000-layer chain lookup");
   });
 
   test("scope/structure plane rejection (C2.1): each plane refuses the other", () => {
@@ -858,20 +858,20 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const y = registry.bindings.get("y")!;
     eq(y === evalCtx.bindings.get("y"), true, "dependent lives on the one representation too");
     eq(y.isComplete, true, "dependent re-evaluated to completion");
-    eq(Number((primaryOf(y.value!) as BitsValue).data), 7, "dependent sees the resolved value");
+    eq(Number((dataOf(y.value!) as BitsValue).data), 7, "dependent sees the resolved value");
   });
 
   test("import satisfied by an extension (C2.3b): resolves through the chain, no pending cell", () => {
     const ext: Extension = { name: "m", bindings: { cfg: makeInt(9) } };
     const { evalCtx } = evalSource("import cfg\nx = cfg", undefined, [createTypeSystem(), ext], undefined, true);
     eq(evalCtx.bindings.has("cfg"), false, "provided import gets no cell on the source layer");
-    eq(Number((primaryOf(evalCtx.bindings.get("x")!.value!) as BitsValue).data), 9, "reference resolved through the extension layer");
+    eq(Number((dataOf(evalCtx.bindings.get("x")!.value!) as BitsValue).data), 9, "reference resolved through the extension layer");
   });
 
   test("REPL persistence (C2.3b): base chain flattens into a fresh layer — passes are mutation-isolated", () => {
     const r1 = evalSource("a = 1", undefined, [createTypeSystem()], undefined, true);
     const r2 = evalSource("b = a + 1", r1.evalCtx, [createTypeSystem()], undefined, true);
-    eq(Number((primaryOf(r2.evalCtx.bindings.get("b")!.value!) as BitsValue).data), 2, "prior-pass binding resolves through the base layer");
+    eq(Number((dataOf(r2.evalCtx.bindings.get("b")!.value!) as BitsValue).data), 2, "prior-pass binding resolves through the base layer");
     const a1 = r1.evalCtx.bindings.get("a")!;
     const a2 = scopeLookup(r2.evalCtx, "a")!;
     eq(a1 !== a2, true, "base flatten copies binding objects — later passes never alias earlier ctxs");
@@ -885,9 +885,9 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       undefined, [createTypeSystem()], undefined, true);
     const x = evalCtx.bindings.get("x")!.value as Value;
     const stored = getType(x)!;
-    eq(bitsToString(primaryOf(getName(stored)!) as BitsValue), "PositiveInt", "stored type keeps the refinement bound");
+    eq(bitsToString(dataOf(getName(stored)!) as BitsValue), "PositiveInt", "stored type keeps the refinement bound");
     const shape = channelReadRaw(x, "shape") as ContextValue;
-    eq(bitsToString(primaryOf(getName(shape)!) as BitsValue), "Int", "shape channel reads the dispatch shape");
+    eq(bitsToString(dataOf(getName(shape)!) as BitsValue), "Int", "shape channel reads the dispatch shape");
     const intCtx = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
     eq(shape === intCtx, true, "shape IS the Int type object (identity)");
     const k = knowledgeOf(x)!;
@@ -903,10 +903,10 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       undefined, [createTypeSystem()], undefined, true);
     const y = evalCtx.bindings.get("y")!.value as Value;
     const shape = channelReadRaw(y, "shape") as ContextValue;
-    eq(bitsToString(primaryOf(getName(shape)!) as BitsValue), "PI", "preserveOps type has its own member set — dispatch must reach its overrides");
+    eq(bitsToString(dataOf(getName(shape)!) as BitsValue), "PI", "preserveOps type has its own member set — dispatch must reach its overrides");
     // ...and the lifted operator actually ran: z carries the PI tag.
     const z = evalCtx.bindings.get("z")!.value as Value;
-    eq(bitsToString(primaryOf(getName(getType(z)!)!) as BitsValue), "PI", "lifted op re-tagged the result");
+    eq(bitsToString(dataOf(getName(getType(z)!)!) as BitsValue), "PI", "lifted op re-tagged the result");
   });
 
   test("shape immutability (C3.1): the writer refuses cross-shape re-stamps; knowledge re-bounds pass", () => {
@@ -929,7 +929,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const r1 = evalSource(
       "PositiveInt = Int & _ > 0\ns = PositiveInt(5).toString()",
       undefined, [createTypeSystem()], undefined, true);
-    eq(bitsToString(primaryOf(r1.evalCtx.bindings.get("s")!.value!) as BitsValue), "5", "refined value runs the shape's method");
+    eq(bitsToString(dataOf(r1.evalCtx.bindings.get("s")!.value!) as BitsValue), "5", "refined value runs the shape's method");
     // Attaching extra knowledge to a value must not affect dispatch.
     const r2 = evalSource("h = \"hello\"", undefined, [createTypeSystem()], undefined, true);
     const h = r2.evalCtx.bindings.get("h")!.value as Value;
@@ -960,7 +960,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // Visible through the bound: Animal declares `legs`.
     const ok = evalSource(C32_TYPES + "f(a: Animal): Int => a.legs\nr = f(Dog(4, 7))",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((primaryOf(ok.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 4, "base member visible through the bound");
+    eq(Number((dataOf(ok.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 4, "base member visible through the bound");
     // Hidden: `tricks` is Dog-only — the annotation gates it.
     let threw = "";
     try {
@@ -974,7 +974,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const x = b.evalCtx.bindings.get("x")!.value as Value;
     eq(getTypeNameOf(x), "Dog", "shape (dispatch source) untouched by the bound");
     const bound = occurrenceBoundOf(x)!;
-    eq(bitsToString(primaryOf(getName(bound)!) as BitsValue), "Animal", "occurrence bound rides the value");
+    eq(bitsToString(dataOf(getName(bound)!) as BitsValue), "Animal", "occurrence bound rides the value");
     eq(knowledgeOf(x)?.occurrenceBound === bound, true, "knowledgeOf surfaces the occurrence carrier");
   });
 
@@ -983,12 +983,12 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // bound; the matched arm lifts it.
     const r1 = evalSource(C32_TYPES + "mk(): Animal => Dog(2, 3)\na = mk()\nr = when a is Dog then a.tricks else 0 - 1",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((primaryOf(r1.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 3, "Symbol-subject narrowing");
+    eq(Number((dataOf(r1.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 3, "Symbol-subject narrowing");
     eq(occurrenceBoundOf(r1.evalCtx.bindings.get("a")!.value!) !== null, true, "narrowing is arm-local — the binding keeps its bound");
     // Substituted-param subject: identity replacement inside the arm.
     const r2 = evalSource(C32_TYPES + "g(a: Animal): Int => when a is Dog then a.tricks else 0 - 1\nr = g(Dog(4, 9))",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((primaryOf(r2.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 9, "substituted-param narrowing");
+    eq(Number((dataOf(r2.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 9, "substituted-param narrowing");
   });
 
   test("knowledge bounds (C3.2): boundary crossing resets occurrence knowledge", () => {
@@ -998,7 +998,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "via(a: Animal): Int => when a is Dog then tc(a) else 0 - 1\n" +
       "r = via(Dog(4, 5))",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((primaryOf(r.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 5, "own-shape boundary restores full knowledge");
+    eq(Number((dataOf(r.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 5, "own-shape boundary restores full knowledge");
   });
 
   test("knowledge bounds (C3.2): meet computed, not overwritten — intrinsic facts survive a looser annotation", () => {
@@ -1021,8 +1021,8 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "ia = a instanceof PositiveInt\nib = b instanceof PositiveInt\nneg = (0 - 3) instanceof PositiveInt\n" +
       "sa = a + 1\nsb = b + 1\nta = a.toString()\ntb = b.toString()\neqv = a == b",
       undefined, [createTypeSystem()], undefined, true);
-    const num = (k: string) => Number((primaryOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
-    const str = (k: string) => bitsToString(primaryOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue);
+    const num = (k: string) => Number((dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
+    const str = (k: string) => bitsToString(dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue);
     eq(num("ia"), 1, "tagged value passes");
     eq(num("ib"), 1, "equal bare data answers IDENTICALLY — re-check, not certificate peek");
     eq(num("neg"), 0, "violating data fails");
@@ -1036,7 +1036,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "SmallPos = Int & _ > 0 && _ < 100\nok = 50 instanceof SmallPos\nhigh = 150 instanceof SmallPos\n" +
       "PI = (Int & _ > 0).preserveOps()\nbare = 8 instanceof PI\ntagged = PI(5) instanceof PI",
       undefined, [createTypeSystem()], undefined, true);
-    const num = (k: string) => Number((primaryOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
+    const num = (k: string) => Number((dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
     eq(num("ok"), 1, "nested predicate chain re-checked (50 ∈ [1,99])");
     eq(num("high"), 0, "chain refusal (150 ∉ [1,99])");
     eq(num("bare"), 0, "preserveOps type is a SHAPE (own members) — instanceof stays nominal");
@@ -1050,7 +1050,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "peeker(x: Int) => certificate_peek(x, PositiveInt)\n" +
       "checker(x: Int) => x instanceof PositiveInt",
       undefined, [createTypeSystem()], undefined, true);
-    const num = (k: string) => Number((primaryOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
+    const num = (k: string) => Number((dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
     eq(num("pa"), 1, "constructed-as-PositiveInt observed");
     eq(num("pb"), 0, "the peek distinguishes §7-equal values — the very thing instanceof must not do");
     const peekEff = effectsOf(r.evalCtx.bindings.get("peeker")!.value!);
@@ -1097,12 +1097,12 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const r = evalSource(
       "o = {type: 5, effects: 7}\nv = o.type + o.effects",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((primaryOf(r.evalCtx.bindings.get("v")!.value!) as BitsValue).data), 12,
+    eq(Number((dataOf(r.evalCtx.bindings.get("v")!.value!) as BitsValue).data), 12,
       "data keys named after channels behave as plain fields (no channel confusion)");
     const oVal = r.evalCtx.bindings.get("o")!.value!;
     eq(getTypeNameOf(oVal), "Object", "the channel plane still reads the real type channel");
     const oCtx = dataOf(oVal) as ContextValue;
-    eq(Number((primaryOf(oCtx.bindings.get("type")!.value!) as BitsValue).data), 5,
+    eq(Number((dataOf(oCtx.bindings.get("type")!.value!) as BitsValue).data), 5,
       "the slot plane holds the hostile key independently");
   });
 
@@ -1112,7 +1112,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const cell = evalCtx.bindings.get("cfg")!;
     eq(isPendingCell(cell), true, "pending cell inside the (mutable, scope-role) structure");
     applyPhase(registry, evalCtx, new Map([["cfg", makeInt(3)]]));
-    eq(Number((primaryOf(cell.value!) as BitsValue).data), 3, "single-assignment resolution in place — monotonic, not mutation");
+    eq(Number((dataOf(cell.value!) as BitsValue).data), 3, "single-assignment resolution in place — monotonic, not mutation");
   });
 
   // --- Dense arrays (C4.2, D18) -----------------------------------------------
@@ -1124,7 +1124,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const arrCtx = dataOf(evalCtx.bindings.get("arr")!.value!) as unknown as Structure;
     eq(arrCtx.dense !== undefined, true, "array context carries the dense region");
     eq(arrCtx.viewMaterialized, false, "bracket access, length, map/reduce ran without materializing the legacy view");
-    eq(Number((primaryOf(evalCtx.bindings.get("s")!.value!) as BitsValue).data), 63, "HOF pipeline result correct over dense storage");
+    eq(Number((dataOf(evalCtx.bindings.get("s")!.value!) as BitsValue).data), 63, "HOF pipeline result correct over dense storage");
   });
 
   test("dense region (C4.2): O(1) index access — scaling test", () => {
@@ -1135,7 +1135,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       let acc = 0n;
       for (let k = 0; k < 50_000; k++) {
         const v = indexGet(ctx, (k * 7919) % len)!;
-        acc += (primaryOf(v) as BitsValue).data;
+        acc += (dataOf(v) as BitsValue).data;
       }
       // acc consumed so the loop can't be optimized away
       if (acc < 0n) throw new Error("unreachable");
@@ -1165,9 +1165,9 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const arrCtx = dataOf(r.evalCtx.bindings.get("arr")!.value!) as unknown as Structure;
     eq(arrCtx.viewMaterialized, false, "no view before the straggler read");
     const viaMap = (arrCtx as unknown as ContextValue).bindings.get("0")?.value;
-    eq(Number((primaryOf(viaMap!) as BitsValue).data), 7, "string-key protocol answers from the materialized view");
+    eq(Number((dataOf(viaMap!) as BitsValue).data), 7, "string-key protocol answers from the materialized view");
     eq(arrCtx.viewMaterialized, true, "the straggler path materialized the view");
-    eq(Number((primaryOf(indexGet(arrCtx as unknown as ContextValue, 1)!) as BitsValue).data), 8,
+    eq(Number((dataOf(indexGet(arrCtx as unknown as ContextValue, 1)!) as BitsValue).data), 8,
       "dense region stays authoritative after materialization");
     eq(Number(((arrCtx as unknown as ContextValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
     eq((arrCtx as unknown as ContextValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
@@ -1182,7 +1182,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(p.kind, ValueKind.Context, "a typed record IS a Context — no MultiValue wrapper");
     eq(dataOf(p) === p, true, "dataOf is identity for flattened records");
     eq(getType(p) !== null, true, "the type channel rides the record directly");
-    eq(Number((primaryOf(r.evalCtx.bindings.get("s")!.value!) as BitsValue).data), 3,
+    eq(Number((dataOf(r.evalCtx.bindings.get("s")!.value!) as BitsValue).data), 3,
       "field access dispatches through the flattened record's type");
     eq(formatValue(p), "{x: 1, y: 2}", "flattened records print as records");
   });
@@ -1242,6 +1242,38 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(withPreds.kind, ValueKind.Context, "still a flattened Context");
   });
 
+  // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------
+
+  test("transparency (C4.3c): eager impls receive full values — channels visible", () => {
+    // An eager primitive's impl can read its args' channel plane directly:
+    // the boundary no longer strips (R4 — the propagation table alone
+    // governs channels; impls read data through dataOf/asBits).
+    let seenTypeName: string | null = null;
+    let seenDataKind: ValueKind | null = null;
+    const probe = makePrimitive("__c43c_probe", (args) => {
+      const t = getType(args[0]);
+      seenTypeName = t ? bitsToString(getName(t) as BitsValue) : null;
+      seenDataKind = dataOf(args[0]).kind;
+      return makeInt(1);
+    });
+    const scope = scopeNew();
+    const typedFive = withType(makeInt(5), IntType as unknown as ContextValue);
+    evaluate(makeExpr(probe, [typedFive]), scope);
+    eq(seenTypeName, "Int", "the impl sees the arg's type channel");
+    eq(seenDataKind, ValueKind.Bits, "dataOf unwraps the transparent scalar to its data");
+  });
+
+  test("transparency (C4.3c): proof combinators are plain eager and still see Proof channels", () => {
+    // The former channelAware registration mode is retired — proof_refl is
+    // an ordinary eager primitive now, and the Proof structure (a flattened
+    // Context since C4.3b) arrives whole.
+    const r = evalSource("theorem t: 2 + 2 == 4 by proof_refl(4)\np = proof_refl(7)",
+      undefined, [createTypeSystem()], undefined, true);
+    const p = r.evalCtx.bindings.get("p")!.value!;
+    eq(channelReadRaw(p, "discharged") !== undefined, true, "proof discharged marker rides");
+    eq(primitives["proof_refl"].lazy ?? false, false, "proof_refl is plain eager");
+  });
+
   // --- Merge-policy activation (C4.3a, rulings R1–R3) --------------------------
 
   test("merge policies (C4.3a, R1): error channel rides a deep residual chain", () => {
@@ -1268,7 +1300,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const eff = effectsOf(result);
     eq(eff !== null && eff.has("io") && eff.has("net") && eff.size === 2, true,
       `effects merged by union, got {${eff ? [...eff].sort().join(",") : ""}}`);
-    eq(Number((primaryOf(result) as BitsValue).data), 1, "primary resolved through the flatten");
+    eq(Number((dataOf(result) as BitsValue).data), 1, "primary resolved through the flatten");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {
