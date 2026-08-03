@@ -13,6 +13,7 @@ import {
   Extension,
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
+import { kernelMemberFqn, fqnBaseName } from "./symbols.js";
 import {
   getName, getMembers, getParent, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
@@ -147,11 +148,16 @@ export function typeContextName(v: Value): string | null {
  *  Returns the PrimitiveFunctionValue (or other callable) for Method descriptors,
  *  or the raw value for direct bindings (backward compat during transition). */
 export function typeMethod(type: ContextValue, name: string): Value | null {
-  // First: check __members for a Method descriptor
+  // First: check __members for a Method descriptor. C5.2a: member sets are
+  // SYMBOL-KEYED (stored under the member symbol's FQN string; interning
+  // makes string-key identity symbol identity). The base name projects
+  // through the kernel scope — every member registers there during C5.2a,
+  // so the projection is deterministic (ruling R5); C5.2b generalizes to
+  // drawn/type-local scopes via projectBaseName.
   const membersV = getMembers(type);
   if (membersV?.kind === ValueKind.Context) {
     const members = membersV as ContextValue;
-    const memberBinding = members.bindings.get(name);
+    const memberBinding = members.bindings.get(kernelMemberFqn(name));
     if (memberBinding?.value?.kind === ValueKind.Context) {
       const desc = memberBinding.value as ContextValue;
       // For Method descriptors, return the implementation
@@ -165,6 +171,27 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
   const binding = type.bindings.get(name);
   if (!binding || binding.value === undefined) return null;
   return binding.value;
+}
+
+/** C5.2a: the member-set write chokepoint — stores the descriptor under
+ *  the member symbol's FQN key (kernel scope during C5.2a). Every
+ *  member-set write goes through here; `addBinding` remains for
+ *  descriptor internals and non-member contexts. */
+function addMember(members: ContextValue, baseName: string, desc: Value): void {
+  addBinding(members, kernelMemberFqn(baseName), desc);
+}
+
+/** Read-side projection view for consumers that iterate members by base
+ *  name (tests, tooling): baseName → descriptor. */
+export function memberDescriptorsOf(type: ContextValue): Map<string, ContextValue> {
+  const out = new Map<string, ContextValue>();
+  const membersV = getMembers(type);
+  if (membersV?.kind === ValueKind.Context) {
+    for (const [key, b] of (membersV as ContextValue).bindings) {
+      if (b.value?.kind === ValueKind.Context) out.set(fqnBaseName(key), b.value as ContextValue);
+    }
+  }
+  return out;
 }
 
 // =============================================================================
@@ -342,9 +369,15 @@ export function structuralWrap(type: ContextValue): ContextValue {
   const wrapper = makeContext();
   for (const [key, binding] of type.bindings) {
     if (key === SLOT_KEYS.name) continue; // erase name → anonymous → structural
+    if (key === SLOT_KEYS.members) continue; // shared explicitly below
     wrapper.bindings.set(key, { ...binding });
     wrapper.bindingList.push({ ...binding });
   }
+  // C5.2a (ruling R1): member-set sharing is EXPLICIT — the wrap is
+  // member-transparent (same member-set object as the wrapped type), which
+  // is what keeps typeShape's identity test sound across the re-keying.
+  const wrappedMembers = getMembers(type);
+  if (wrappedMembers) setMembers(wrapper, wrappedMembers);
   setWraps(wrapper, type);
   return wrapper;
 }
@@ -484,12 +517,13 @@ export function isGetterDescriptor(desc: ContextValue): boolean {
   return g !== undefined && g.kind === ValueKind.Bits && (g as BitsValue).data !== 0n;
 }
 
-/** Look up the full member descriptor from a type's __members */
+/** Look up the full member descriptor from a type's __members.
+ *  C5.2a: base name projects to the kernel member key (ruling R5). */
 export function typeMemberDescriptor(type: ContextValue, name: string): ContextValue | null {
   const membersV = getMembers(type);
   if (!membersV || membersV.kind !== ValueKind.Context) return null;
   const members = membersV as ContextValue;
-  const memberBinding = members.bindings.get(name);
+  const memberBinding = members.bindings.get(kernelMemberFqn(name));
   if (!memberBinding?.value || memberBinding.value.kind !== ValueKind.Context) return null;
   return memberBinding.value as ContextValue;
 }
@@ -531,15 +565,17 @@ function buildRecordType(
 
   // Add Field descriptors for each declared field
   for (const f of fields) {
-    addBinding(members, f.name, makeFieldDescriptor(f.name, f.type));
+    addMember(members, f.name, makeFieldDescriptor(f.name, f.type));
   }
 
-  // Copy non-meta Method descriptors from parent's __members
+  // Copy non-meta Method descriptors from parent's __members. C5.2a: keys
+  // are member-symbol FQNs — copied verbatim (same symbol, same key); the
+  // meta filter compares the base-name projection.
   const metaMethodNames = META_METHOD_NAMES;
   const parentMembers = getMembers(parentType);
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
-      if (metaMethodNames.has(key)) continue;
+      if (metaMethodNames.has(fqnBaseName(key))) continue;
       if (!members.bindings.has(key) && binding.value) {
         addBinding(members, key, binding.value);
       }
@@ -595,7 +631,7 @@ function buildRecordType(
     }
     return withType(stringToBits(`${typeName}(${parts.join(", ")})`), StringType);
   }) as PrimitiveFnImpl);
-  addBinding(members, "toString", makeMethodDescriptor("toString", toStringImpl));
+  addMember(members, "toString", makeMethodDescriptor("toString", toStringImpl));
 
   setMembers(newType, members);
 
@@ -637,12 +673,13 @@ function buildInterfaceType(
   // Build __members: declared members as Field descriptors
   const members = makeContext();
 
-  // Copy non-meta Method descriptors from parent's __members
+  // Copy non-meta Method descriptors from parent's __members (C5.2a:
+  // FQN keys copied verbatim; meta filter on the base-name projection).
   const metaMethodNames = META_METHOD_NAMES;
   const parentMembers = getMembers(parentType);
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
-      if (metaMethodNames.has(key)) continue;
+      if (metaMethodNames.has(fqnBaseName(key))) continue;
       if (binding.value) {
         addBinding(members, key, binding.value);
       }
@@ -651,7 +688,7 @@ function buildInterfaceType(
 
   // Add Field descriptors for each declared member
   for (const m of declaredMembers) {
-    addBinding(members, m.name, makeFieldDescriptor(m.name, m.type));
+    addMember(members, m.name, makeFieldDescriptor(m.name, m.type));
   }
 
   setMembers(ifaceType, members);
@@ -794,11 +831,17 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
   const newType = makeContext();
 
   // Copy parent's bindings (everything except __construct, which we wrap
-  // below; everything else inherited).
+  // below, and __members, shared explicitly; everything else inherited).
   for (const [key, binding] of parentType.bindings) {
     if (key === SLOT_KEYS.construct) continue;
+    if (key === SLOT_KEYS.members) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
+  // C5.2a (ruling R1): the invariant layer is member-transparent — it
+  // SHARES the parent's member-set object (knowledge, not shape), stated
+  // explicitly rather than riding through the blanket copy.
+  const parentMembersShared = getMembers(parentType);
+  if (parentMembersShared) setMembers(newType, parentMembersShared);
 
   // Inherit any existing invariants list from the parent and append the new
   // predicate. Stored as a hidden JS array so the constructor wrapper can
@@ -982,7 +1025,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
 
   for (const opName of ops) {
     const parentDesc = parentMembers?.kind === ValueKind.Context
-      ? (parentMembers as ContextValue).bindings.get(opName)?.value
+      ? (parentMembers as ContextValue).bindings.get(kernelMemberFqn(opName))?.value
       : null;
     if (!parentDesc || parentDesc.kind !== ValueKind.Context) continue;
     const parentOp = (parentDesc as ContextValue).bindings.get("value")?.value;
@@ -998,7 +1041,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
       return newConstruct.fn([wrapped], ctx as any, evalFn as any);
     }) as PrimitiveFnImpl);
 
-    addBinding(newMembers, opName, makeMethodDescriptor(opName, liftedOp));
+    addMember(newMembers, opName, makeMethodDescriptor(opName, liftedOp));
   }
 
   setMembers(newType, newMembers);
@@ -1042,22 +1085,22 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
   }
 
   for (const m of methods) {
-    // Check for conflict
-    if (newMembers.bindings.has(m.name)) {
+    // Check for conflict (C5.2a: the projection is the key)
+    if (newMembers.bindings.has(kernelMemberFqn(m.name))) {
       throw new AllegroError(`mixin: method '${m.name}' conflicts with existing member`);
     }
     // Wrap ComposedFunctions in a PrimitiveFn that the descriptor expects,
     // or use PrimitiveFunctions directly
     const impl = dataOf(m.impl);
     if (impl.kind === ValueKind.PrimitiveFunction) {
-      addBinding(newMembers, m.name, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
+      addMember(newMembers, m.name, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
     } else if (impl.kind === ValueKind.ComposedFunction) {
       // Store the ComposedFunction directly — type_dispatch handles it
       const desc = makeContext();
       writeShape(desc, MethodType);
       addBinding(desc, "name", stringToBits(m.name));
       addBinding(desc, "value", impl);
-      addBinding(newMembers, m.name, desc);
+      addMember(newMembers, m.name, desc);
     } else {
       throw new AllegroError(`mixin: '${m.name}' must be a function`);
     }
@@ -1089,41 +1132,41 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
 // operands are named, structural otherwise).
 
 const typeMembers = makeContext();
-addBinding(typeMembers, "instanceof", makeMethodDescriptor("instanceof",
+addMember(typeMembers, "instanceof", makeMethodDescriptor("instanceof",
   makePrimitive("Type.instanceof", (args) => {
     const type = args[0] as ContextValue;
     const value = args[1];
     return withType(makeInt(shapeAwareInstanceof(value, type) ? 1 : 0), BoolType);
   })
 ));
-addBinding(typeMembers, "subtypeof", makeMethodDescriptor("subtypeof",
+addMember(typeMembers, "subtypeof", makeMethodDescriptor("subtypeof",
   makePrimitive("Type.subtypeof", (args) => {
     const typeA = args[0] as ContextValue;
     const typeB = args[1] as ContextValue;
     return withType(makeInt(shapeAwareSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
   })
 ));
-addBinding(typeMembers, "extend", makeMethodDescriptor("extend",
+addMember(typeMembers, "extend", makeMethodDescriptor("extend",
   makePrimitive("Type.extend", (args, _ctx, _evalFn) => {
     return wrapType(buildRecordType(args[0] as ContextValue, args[1], Type));
   })
 ));
-addBinding(typeMembers, "where", makeMethodDescriptor("where",
+addMember(typeMembers, "where", makeMethodDescriptor("where",
   makePrimitive("Type.where", (args) => {
     return wrapType(buildRefinedType(args[0] as ContextValue, args[1]));
   })
 ));
-addBinding(typeMembers, "invariant", makeMethodDescriptor("invariant",
+addMember(typeMembers, "invariant", makeMethodDescriptor("invariant",
   makePrimitive("Type.invariant", (args) => {
     return wrapType(buildInvariantedType(args[0] as ContextValue, args[1]));
   })
 ));
-addBinding(typeMembers, "distinct", makeMethodDescriptor("distinct",
+addMember(typeMembers, "distinct", makeMethodDescriptor("distinct",
   makePrimitive("Type.distinct", (args) => {
     return wrapType(buildDistinctType(args[0] as ContextValue));
   })
 ));
-addBinding(typeMembers, "constructor", makeMethodDescriptor("constructor",
+addMember(typeMembers, "constructor", makeMethodDescriptor("constructor",
   makePrimitive("Type.constructor", (args) => {
     const type = args[0] as ContextValue;
     const fn = args[1];
@@ -1135,12 +1178,12 @@ addBinding(typeMembers, "constructor", makeMethodDescriptor("constructor",
     return wrapType(type);
   })
 ));
-addBinding(typeMembers, "interface", makeMethodDescriptor("interface",
+addMember(typeMembers, "interface", makeMethodDescriptor("interface",
   makePrimitive("Type.interface", (args) => {
     return wrapType(buildInterfaceType(args[0] as ContextValue, args[1]));
   })
 ));
-addBinding(typeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
+addMember(typeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
   makePrimitive("Type.preserveOps", (args) => {
     const type = args[0] as ContextValue;
     const opNames: string[] = [];
@@ -1153,7 +1196,7 @@ addBinding(typeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
     return wrapType(buildPreserveOps(type, opNames));
   })
 ));
-addBinding(typeMembers, "mixin", makeMethodDescriptor("mixin",
+addMember(typeMembers, "mixin", makeMethodDescriptor("mixin",
   makePrimitive("Type.mixin", (args) => {
     return wrapType(buildMixinType(args[0] as ContextValue, args[1]));
   })
@@ -1195,7 +1238,7 @@ function buildType(
     const fxLabels = options?.methodEffects?.[key];
     const prim = makePrimitive(`${name}.${key}`, fn, false, fxLabels);
     const isGetter = getterNames.has(key);
-    addBinding(members, key, makeMethodDescriptor(key, prim, isGetter));
+    addMember(members, key, makeMethodDescriptor(key, prim, isGetter));
   }
   setMembers(ctx, members);
   return ctx;
@@ -2368,28 +2411,28 @@ setName(Effect, stringToBits("Effect"));
 writeShape(Effect, Type);
 
 const effectMembers = makeContext();
-addBinding(effectMembers, "subset_of", makeMethodDescriptor("subset_of",
+addMember(effectMembers, "subset_of", makeMethodDescriptor("subset_of",
   makePrimitive("Effect.subset_of", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
     const e2 = dataOf(args[1]) as ContextValue;
     return withType(makeInt(effectSubsetOf(e1, e2) ? 1 : 0), BoolType);
   })
 ));
-addBinding(effectMembers, "implies", makeMethodDescriptor("implies",
+addMember(effectMembers, "implies", makeMethodDescriptor("implies",
   makePrimitive("Effect.implies", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
     const e2 = dataOf(args[1]) as ContextValue;
     return withType(makeInt(effectImplies(e1, e2) ? 1 : 0), BoolType);
   })
 ));
-addBinding(effectMembers, "intersect", makeMethodDescriptor("intersect",
+addMember(effectMembers, "intersect", makeMethodDescriptor("intersect",
   makePrimitive("Effect.intersect", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
     const e2 = dataOf(args[1]) as ContextValue;
     return wrapType(effectIntersect(e1, e2));
   })
 ));
-addBinding(effectMembers, "union", makeMethodDescriptor("union",
+addMember(effectMembers, "union", makeMethodDescriptor("union",
   makePrimitive("Effect.union", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
     const e2 = dataOf(args[1]) as ContextValue;

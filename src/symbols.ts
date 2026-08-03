@@ -36,6 +36,36 @@ export const FQN_SEP = "::";
 /** Default scope FQN for top-level / REPL evaluation (no module file). */
 export const MAIN_SCOPE_FQN = "<main>";
 
+/** C5.2a (ruling R5): the kernel scope — the defining scope for every
+ *  built-in type member (add, toString, get, instanceof, …). During
+ *  C5.2a every member of every type registers here, so each base name
+ *  projects to exactly one symbol and the re-keying is provably
+ *  observable-zero; C5.2b moves drawn/type-local members to their own
+ *  defining scopes. Hardcoded string entry points (PRIM_TO_METHOD, the
+ *  dot-access lowering) project into this scope deterministically. */
+export const KERNEL_SCOPE_FQN = "<kernel>";
+
+/** The kernel member symbol for a base name (interned). */
+export function kernelMemberSymbol(baseName: string): SymbolValue {
+  return registerScopeSymbol(KERNEL_SCOPE_FQN, baseName);
+}
+
+/** The storage key for a kernel member — member sets are keyed by the
+ *  member symbol's FQN string (interning makes FQN ↔ symbol 1:1, so
+ *  string-key identity IS symbol identity; the host map stays
+ *  Map<string, Binding>). */
+export function kernelMemberFqn(baseName: string): string {
+  return KERNEL_SCOPE_FQN + FQN_SEP + baseName;
+}
+
+/** Base-name projection of an FQN storage key. Tolerant: a key without a
+ *  separator projects to itself (lets mixed-key structures survive the
+ *  migration window; C5.2b tightens). */
+export function fqnBaseName(key: string): string {
+  const idx = key.lastIndexOf(FQN_SEP);
+  return idx > 0 ? key.slice(idx + FQN_SEP.length) : key;
+}
+
 // --- Interning (identity = FQN) ------------------------------------------------
 
 const INTERN = new Map<string, SymbolValue>();
@@ -179,9 +209,12 @@ function dedupeToResolution(hits: BaseNameCandidate[], baseName: string): BaseNa
   }
   const syms = [...targets.values()].map((c) => c.symbol);
   const fqns = syms.map((s) => s.fqn ?? `<transient ${s.name}>`).join(", ");
+  // R4 (C5.2 briefing): the qualification SYNTAX is deferred — the error
+  // names every candidate so the user can disambiguate by renaming or
+  // narrowing the draw; the syntax lands with the surface-syntax chunk.
   return {
     outcome: "ambiguous",
     candidates: syms,
-    message: `'${baseName}' is ambiguous — multiple distinct targets (${fqns}); qualify explicitly (x[ns.${baseName}])`,
+    message: `'${baseName}' is ambiguous — multiple distinct targets (${fqns}); explicit qualification required`,
   };
 }

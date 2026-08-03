@@ -9,10 +9,10 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw } from "./slots.js";
-import { exportedSymbols, symbolFromWire } from "./symbols.js";
+import { exportedSymbols, symbolFromWire, kernelMemberFqn } from "./symbols.js";
 import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, dataOf, isResolved, stringToBits, bitsToString } from "./types.js";
@@ -2224,10 +2224,10 @@ test("type hierarchy: structural_wrap makes type compare structurally by erasing
 // == Member Descriptors (__members) ==
 
 test("member descriptors: IntType has __members with Method descriptors", () => {
-  const members = IntType.bindings.get("__members")?.value;
-  eq(members !== undefined, true);
-  eq(members!.kind, ValueKind.Context);
-  const addDesc = (members as ContextValue).bindings.get("add")?.value;
+  // C5.2a: member sets are symbol-keyed — read through the projection view.
+  const members = memberDescriptorsOf(IntType);
+  eq(members.size > 0, true);
+  const addDesc = members.get("add");
   eq(addDesc !== undefined, true);
   eq(isMethodDescriptor(addDesc as ContextValue), true);
   eq(isFieldDescriptor(addDesc as ContextValue), false);
@@ -2257,17 +2257,17 @@ test("member descriptors: typeMethod reads from __members", () => {
 });
 
 test("member descriptors: Type has __members with meta-methods", () => {
-  const members = Type.bindings.get("__members")?.value;
-  eq(members !== undefined, true);
-  const extendDesc = (members as ContextValue).bindings.get("extend")?.value;
+  const members = memberDescriptorsOf(Type);
+  eq(members.size > 0, true);
+  const extendDesc = members.get("extend");
   eq(extendDesc !== undefined, true);
   eq(isMethodDescriptor(extendDesc as ContextValue), true);
 });
 
 test("member descriptors: NominalType has __members with meta-methods", () => {
-  const members = NominalType.bindings.get("__members")?.value;
-  eq(members !== undefined, true);
-  const instanceofDesc = (members as ContextValue).bindings.get("instanceof")?.value;
+  const members = memberDescriptorsOf(NominalType);
+  eq(members.size > 0, true);
+  const instanceofDesc = members.get("instanceof");
   eq(instanceofDesc !== undefined, true);
   eq(isMethodDescriptor(instanceofDesc as ContextValue), true);
 });
@@ -2277,13 +2277,13 @@ test("member descriptors: record type has Field descriptors", () => {
 Animal`);
   const typeCtx = dataOf(result!) as ContextValue;
   eq(typeCtx.kind, ValueKind.Context);
-  const members = typeCtx.bindings.get("__members")?.value;
-  eq(members !== undefined, true);
-  const nameDesc = (members as ContextValue).bindings.get("name")?.value;
+  const members = memberDescriptorsOf(typeCtx);
+  eq(members.size > 0, true);
+  const nameDesc = members.get("name");
   eq(nameDesc !== undefined, true);
   eq(isFieldDescriptor(nameDesc as ContextValue), true);
   // toString should be a Method descriptor
-  const tsDesc = (members as ContextValue).bindings.get("toString")?.value;
+  const tsDesc = members.get("toString");
   eq(tsDesc !== undefined, true);
   eq(isMethodDescriptor(tsDesc as ContextValue), true);
 });
@@ -2331,12 +2331,11 @@ test("effect: Effect meta-type has __type = Type", () => {
 });
 
 test("effect: Effect carries lattice methods in __members", () => {
-  const members = Effect.bindings.get("__members")?.value as ContextValue;
-  eq(members.kind, ValueKind.Context);
-  eq(members.bindings.has("subset_of"), true);
-  eq(members.bindings.has("implies"), true);
-  eq(members.bindings.has("intersect"), true);
-  eq(members.bindings.has("union"), true);
+  const members = memberDescriptorsOf(Effect);
+  eq(members.has("subset_of"), true);
+  eq(members.has("implies"), true);
+  eq(members.has("intersect"), true);
+  eq(members.has("union"), true);
 });
 
 test("effect: pure extends Effect via __extends", () => {
@@ -2450,12 +2449,12 @@ Printable`);
 
 test("interfaces: interface has Field descriptors in __members", () => {
   const result = dataOf(evalStd(`Type.interface({toString: Function, length: Int})`)!) as ContextValue;
-  const members = result.bindings.get("__members")?.value as ContextValue;
-  eq(members !== undefined, true);
-  const tsDesc = members.bindings.get("toString")?.value;
+  const members = memberDescriptorsOf(result);
+  eq(members.size > 0, true);
+  const tsDesc = members.get("toString");
   eq(tsDesc !== undefined, true);
   eq(isFieldDescriptor(tsDesc as ContextValue), true);
-  const lenDesc = members.bindings.get("length")?.value;
+  const lenDesc = members.get("length");
   eq(lenDesc !== undefined, true);
   eq(isFieldDescriptor(lenDesc as ContextValue), true);
 });
@@ -2482,11 +2481,11 @@ test("interfaces: parent member inheritance", () => {
   const result = evalStd(`WithExtra = Int.interface({extra: Int})
 WithExtra`);
   const iface = dataOf(result!) as ContextValue;
-  const members = iface.bindings.get("__members")?.value as ContextValue;
+  const members = memberDescriptorsOf(iface);
   // Should have 'add' from Int's __members
-  eq(members.bindings.has("add"), true);
+  eq(members.has("add"), true);
   // Should have 'extra' as declared
-  eq(members.bindings.has("extra"), true);
+  eq(members.has("extra"), true);
 });
 
 test("interfaces: NominalType.interface also creates structural type", () => {
@@ -2669,8 +2668,10 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
     desc.bindings.set(k, { key: k, value: v as Value });
     desc.bindingList.push({ key: k, value: v as Value });
   }
-  metaMembers.bindings.set("describe", { key: "describe", value: desc });
-  metaMembers.bindingList.push({ key: "describe", value: desc });
+  // C5.2a: member sets are keyed by the member symbol's FQN.
+  const describeKey = kernelMemberFqn("describe");
+  metaMembers.bindings.set(describeKey, { key: describeKey, value: desc });
+  metaMembers.bindingList.push({ key: describeKey, value: desc });
   metaType.bindings.set("__members", { key: "__members", value: metaMembers });
   metaType.bindingList.push({ key: "__members", value: metaMembers });
   metaType.bindings.set("__name", { key: "__name", value: stringToBits("MetaType") });

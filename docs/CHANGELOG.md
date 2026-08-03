@@ -8,6 +8,48 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C5.2a: Symbol-keyed member storage (structures Phase 5, B-023 part 1)
+
+The C5.2 briefing's rulings R1–R6 were ratified (recorded in the plan §6
+and structures.md §5) and the first sub-chunk lands: member sets are
+SYMBOL-KEYED, observable-zero by construction.
+
+- **Storage**: member descriptors live under the member symbol's FQN
+  string (`<kernel>::add`, …) — interning makes string-key identity
+  symbol identity, so the host map stays `Map<string, Binding>`. Every
+  member registers in the kernel scope (ruling R5), so each base name
+  projects to exactly one symbol and no ambiguity is possible yet;
+  C5.2b generalizes to drawn/type-local scopes via `projectBaseName`.
+- **One write chokepoint** (`addMember`) covers every origination site
+  (record fields, interface declarations, preserveOps lifts, mixin
+  methods, Type's ten meta-methods, Effect's lattice methods,
+  buildType). Inheritance copy loops carry FQN keys verbatim; the
+  name-based logic projects: meta-method exclusion filters and
+  formatValue's instance reads via `fqnBaseName`, the mixin conflict
+  check and preserveOps' parent-op lookup via `kernelMemberFqn`.
+  `typeMethod`/`typeMemberDescriptor` keep their name-based signatures —
+  projection happens inside. New `memberDescriptorsOf(type)` gives
+  tests/tooling a baseName→descriptor view so nothing reaches through
+  raw bindings anymore.
+- **Ruling R1 enforced**: typeShape's member-transparency-by-identity is
+  untouched — refinement/distinct layers still share the parent's
+  member-set object, and the two former IMPLICIT sharers
+  (buildInvariantedType, structuralWrap — blanket copy loops) now share
+  explicitly via `setMembers(child, parentMembers)`.
+- **Pre-fix**: `makeTypedBinOp` now dispatches through
+  `typeShape(leftType)`, matching the evaluator's PRIM_TO_METHOD path —
+  the two agreed before only via the sharing invariant.
+- **Ruling R4 applied**: the symbols.ts ambiguity message no longer
+  promises the deferred `x[ns.name]` qualification syntax.
+- Unions stay outside member storage (ruling R6, re-derived at C6);
+  instance field storage stays string-keyed and pattern matching stays
+  on the loose base-name path (ruling R2 non-goals).
+
+2 new boundary tests (FQN-keyed storage + projection roundtrip; sharing
+invariant across refined/invariant/wrap layers); 8 test.ts
+representation-reaching sites migrated to the projection view
+(assertions unchanged); 1041/1041 green; tsc at the 4-error baseline.
+
 ## 2026-08 — C5.1: FQN symbols — the identity substrate (structures Phase 5, B-022)
 
 Phase 5 opens with the symbol identity substrate (`src/symbols.ts`),

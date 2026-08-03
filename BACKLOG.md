@@ -236,7 +236,15 @@ phase).
   Surface adoption (member binding, dot access, `x[ns.name]` syntax)
   lands with C5.2
 - [ ] **B-023** · L2 · Symbol-keyed members + draw-from binding; diamond
-  multi-bind; ambiguity rule (C5.2)
+  multi-bind; ambiguity rule (C5.2). Briefing ratified 2026-08 (rulings
+  R1–R6, plan §6). **C5.2a landed 2026-08**: member sets symbol-keyed
+  (FQN string keys, kernel scope, one addMember write chokepoint,
+  projection at the read chokepoints + name-based filters); typeShape
+  sharing invariant intact with the two implicit sharers made explicit;
+  makeTypedBinOp typeShape pre-fix; memberDescriptorsOf projection view
+  for tests/tooling; observable-zero, 1041/1041. Remaining: C5.2b
+  (draw-from binding, per-context member scopes, multi-bind), C5.2c
+  (declared-conformance split — the conscious delta, flip lands last)
 - [ ] **B-024** · L2 · define-a-kind recipe; constructor authority;
   `Type : Type` fixed point (C6.1)
 - [ ] **B-025** · L2 · Effect re-derived through the recipe; anonymous

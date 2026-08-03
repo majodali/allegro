@@ -615,6 +615,42 @@ PROCESS §6; the owning chunk is noted:
   (`err-viral-chain`, `err-in-if-cond`, `err-through-method`) are
   pre-approved test-condition changes per this briefing.
 
+**RULED 2026-08 (C5.2 briefing — all recommendations ratified):**
+- **R1 (typeShape transparency test):** member-set OBJECT IDENTITY stays
+  the shape/knowledge boundary — the sharing invariant is preserved
+  across the re-keying (only the key type changes). The two implicit
+  sharers (buildInvariantedType, structuralWrap — blanket copy loops)
+  are made explicit as part of C5.2a. The C3.1 boundary oracles carry
+  over unchanged.
+- **R2 (D39 scope):** C5.2 dissolves `__members`/`__extends` ONLY.
+  Descriptor-internal fields (name/value/getter/fieldType), `__name`,
+  `__construct`, proof/effect fields, and the nominal walk's name-string
+  parent comparison stay until C6 (D39's field tables are C6's
+  checklist). Explicit non-goals: instance field storage stays
+  string-keyed (symbol-keyed members carry the base-name projection for
+  instance reads); pattern matching stays on strings by design (D30's
+  loose path).
+- **R3 (conformance flip + ordering):** sub-chunk order is a → b → c
+  with the declared-conformance flip LAST — draw-from must exist before
+  accidental matching is removed, or no interface check could ever be
+  true. The flip's test/doc migration (CLAUDE.md examples,
+  interfaces.alg, the interface test block; duck-typing migrates to
+  `~T`) is pre-approved per this briefing. Honest residue: retroactive
+  conformance of built-in types to user interfaces needs partial type
+  declarations (D30) — until that surface exists, `~T` is the
+  duck-typing path for core types.
+- **R4 (qualification syntax):** `x[ns.name]` DEFERRED to the
+  surface-syntax chunk (it collides with bracket indexing; nothing
+  in-tree can produce two same-named member symbols until draw-from
+  ships). Ambiguity lands as a detected error; the symbols.ts error
+  message is fixed to stop promising the unshipped syntax.
+- **R5 (kernel scope):** hardcoded operator/member names (add, toString,
+  get, …) register under one kernel scope FQN in C5.2a; string entry
+  points project into it deterministically.
+- **R6 (unions):** carved out explicitly — makeUnionType stays outside
+  member storage (dispatch via direct bindings) and re-derives at C6
+  (D39: `__union` → Type.variants).
+
 ## 7. Backlog impact (input to the rebuild)
 
 Absorbed/dissolved by this plan: variance + type constraints (→ S5,

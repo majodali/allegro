@@ -231,8 +231,39 @@ ModuleLoader, `<main>` otherwise); `SymbolValue` gained the optional
 `fqn` field. Parser-minted Symbols remain transient references resolved
 by base name against lexical scope (§5 allows string binding keys).
 Pending at C5.2: symbol-keyed type members, resolver adoption at member
-binding + dot access, the `x[ns.name]` qualification syntax,
-draw-from/multi-bind.*
+binding + dot access, draw-from/multi-bind.*
+
+*C5.2 rulings (2026-08, maintainer-ratified — recorded in the
+implementation plan §6): R1 — typeShape's member-transparency test stays
+member-set OBJECT IDENTITY (the sharing invariant is preserved across
+the re-keying; the two implicit sharers become explicit). R2 — only
+`__members`/`__extends` dissolve here; descriptor internals and the
+remaining D39 table wait for C6; instance field storage stays
+string-keyed and pattern matching stays on the loose base-name path by
+design. R3 — sub-chunk order a→b→c with the declared-conformance flip
+LAST (draw-from must exist first); the flip's test/doc migration is
+pre-approved; `~T` is the duck-typing path for core types until partial
+type declarations. R4 — the `x[ns.name]` qualification syntax is
+DEFERRED (collides with bracket indexing); ambiguity is a detected
+error. R5 — kernel member names register under one kernel scope FQN.
+R6 — unions stay outside member storage and re-derive at C6.*
+
+*C5.2a status (2026-08): member storage is SYMBOL-KEYED — member sets
+store descriptors under the member symbol's FQN string (interning makes
+string-key identity symbol identity; the host map stays
+Map<string, Binding>). Every member registers in the kernel scope
+(`<kernel>`), so each base name projects to exactly one symbol and the
+re-keying is observable-zero by construction. One write chokepoint
+(`addMember`) covers every origination site; copy loops carry FQN keys
+verbatim; the name-based filters/lookups (meta-method exclusion, mixin
+conflict check, preserveOps op lift, formatValue's instance reads)
+project through `fqnBaseName`/`kernelMemberFqn`. typeShape's sharing
+invariant is intact and the two former implicit sharers
+(invariant layers, structuralWrap) now share the parent's member-set
+object EXPLICITLY (ruling R1). Pre-fix landed: makeTypedBinOp
+dispatches through typeShape, matching the evaluator. Next: C5.2b
+draw-from binding (per-context member scopes, multi-bind), then C5.2c
+the declared-conformance split.*
 
 Symbols are the existing value kind **redefined** as first-class runtime
 values (D20, D29):

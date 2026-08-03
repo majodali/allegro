@@ -9,6 +9,7 @@ import {
   stringToBits, bitsToString,
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
+import { fqnBaseName } from "./symbols.js";
 import { assertNotScope, scopeAssume, scopeExtend, scopeFactsFor, scopeOwnFacts, scopeLookup, scopeHostRead, isPendingCell } from "./scope.js";
 
 // Held write capability for the discharged integrity channel (C1.4, D21-D24).
@@ -86,10 +87,13 @@ export function formatValue(v: Value): string {
           const membersCtx = membersV as ContextValue;
           const instanceCtx = data as ContextValue;
           const parts: string[] = [];
+          // C5.2a: member keys are symbol FQNs; the instance stays
+          // string-keyed (ruling R2) — project the base name for the read.
           for (const [key, binding] of membersCtx.bindings) {
             if (binding.value?.kind === ValueKind.Context && isFieldDescriptor(binding.value as ContextValue)) {
-              const fieldVal = instanceCtx.bindings.get(key)?.value;
-              if (fieldVal) parts.push(`${key}: ${formatValue(fieldVal)}`);
+              const fieldName = fqnBaseName(key);
+              const fieldVal = instanceCtx.bindings.get(fieldName)?.value;
+              if (fieldVal) parts.push(`${fieldName}: ${formatValue(fieldVal)}`);
             }
           }
           if (parts.length > 0) return `${typeName}(${parts.join(", ")})`;
@@ -3869,7 +3873,10 @@ function makeTypedBinOp(opName: string): PrimitiveFnImpl {
     if (!leftType) {
       throw new AllegroError(`typed_${opName}: left operand has no type`);
     }
-    const method = typeMethod(leftType, opName);
+    // C5.2a pre-fix: dispatch reads the SHAPE, matching the evaluator's
+    // PRIM_TO_METHOD path — the two agreed before only because refinement
+    // layers share the member-set object (C3.1).
+    const method = typeMethod(typeShape(leftType), opName);
     if (!method) {
       const typeName = getTypeName(left) ?? "unknown";
       throw new AllegroError(`typed_${opName}: type ${typeName} has no '${opName}' method`);

@@ -32,7 +32,7 @@ import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr } from "./types.js";
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
-import { withType, getType, typeMethod, makeArray, IntType, Type as TypeMeta } from "./types-std.js";
+import { withType, getType, typeMethod, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS } from "./types-std.js";
 import { makeMultiValue } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
@@ -48,7 +48,7 @@ import { effectsOf, withEffects } from "./effects.js";
 import { evaluate } from "./evaluator.js";
 import { makeSymbol } from "./types.js";
 import { Structure, isStructure } from "./structure.js";
-import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN } from "./symbols.js";
+import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN, KERNEL_SCOPE_FQN, kernelMemberFqn } from "./symbols.js";
 import { dataOf, indexGet, getSlotCount } from "./slots.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -1294,7 +1294,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       eq(unique.outcome, "match", `${s.name}: single target resolves`);
       const amb = projectBaseName(s.candidates(), "draw");
       eq(amb.outcome, "ambiguous", `${s.name}: two distinct targets are ambiguous`);
-      eq((amb as { message: string }).message.includes("qualify"), true,
+      eq((amb as { message: string }).message.includes("qualification"), true,
         `${s.name}: the error demands explicit qualification`);
       const qual = projectBaseName(s.candidates(), "draw", "lib/m2.alg");
       eq(qual.outcome === "match" && (qual as { symbol: typeof m2 }).symbol === m2, true,
@@ -1344,6 +1344,40 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // Default scope: top-level/REPL registers under <main>.
     evalSource("main_only = 7", undefined, [createTypeSystem()], undefined, true);
     eq(symbolFqn(registerScopeSymbol(MAIN_SCOPE_FQN, "main_only")), "<main>::main_only");
+  });
+
+  // --- Symbol-keyed members (C5.2a) --------------------------------------------
+
+  test("symbol-keyed members (C5.2a): member sets key by the kernel member FQN", () => {
+    const members = getMembers(dataOf(IntType as unknown as Value) as ContextValue) as ContextValue;
+    eq(members.bindings.has(kernelMemberFqn("add")), true, "storage key is the member symbol's FQN");
+    eq(members.bindings.has("add"), false, "bare string keys are gone from member storage");
+    // The chokepoints project base name → kernel symbol → key.
+    eq(typeMethod(dataOf(IntType as unknown as Value) as ContextValue, "add") !== null, true,
+      "typeMethod projects through the kernel scope");
+    // Every member key projects back to a base name.
+    for (const key of members.bindings.keys()) {
+      eq(key.startsWith(KERNEL_SCOPE_FQN), true, `member key '${key}' lives in the kernel scope (C5.2a)`);
+    }
+  });
+
+  test("symbol-keyed members (C5.2a): typeShape's sharing invariant survives the re-keying", () => {
+    // Refinement layers still SHARE the parent's member-set object (ruling
+    // R1), so member-transparency-by-identity keeps working — including the
+    // now-explicit sharers (invariant layers, structural wrap).
+    const r = evalSource(
+      "P = Int & _ > 0\nQ = Int.invariant(x => x > 0)",
+      undefined, [createTypeSystem()], undefined, true);
+    const intMembers = getMembers(dataOf(IntType as unknown as Value) as ContextValue);
+    for (const name of ["P", "Q"]) {
+      const t = dataOf(r.evalCtx.bindings.get(name)!.value!) as ContextValue;
+      eq(getMembers(t) === intMembers, true, `${name} shares Int's member-set object`);
+    }
+    const wrapped = structuralWrapTS(dataOf(IntType as unknown as Value) as ContextValue);
+    eq(getMembers(wrapped) === intMembers, true, "~Int (structuralWrap) shares Int's member-set object");
+    const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as ContextValue;
+    eq(typeShape(p) === dataOf(IntType as unknown as Value), true,
+      "typeShape walks the transparent layer off (identity test intact)");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------
