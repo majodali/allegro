@@ -32,7 +32,7 @@ import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr } from "./types.js";
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
-import { withType, getType, typeMethod, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS } from "./types-std.js";
+import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS } from "./types-std.js";
 import { makeMultiValue } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
@@ -1378,6 +1378,84 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as ContextValue;
     eq(typeShape(p) === dataOf(IntType as unknown as Value), true,
       "typeShape walks the transparent layer off (identity test intact)");
+  });
+
+  // --- Draw-from binding (C5.2b, D30) ------------------------------------------
+
+  test("draw-from (C5.2b): declared members bind drawn symbols; new names are type-local", () => {
+    const r = evalSource(
+      "Animal = Type.extend({name: String})\nDog = Animal.extend({name: String, age: Int})",
+      undefined, [createTypeSystem()], undefined, true);
+    const animal = dataOf(r.evalCtx.bindings.get("Animal")!.value!) as ContextValue;
+    const dog = dataOf(r.evalCtx.bindings.get("Dog")!.value!) as ContextValue;
+    const keyOf = (t: ContextValue, base: string): string | null => {
+      for (const key of (getMembers(t) as ContextValue).bindings.keys()) {
+        if (key.endsWith("::" + base)) return key;
+      }
+      return null;
+    };
+    const animalName = keyOf(animal, "name")!;
+    eq(animalName.startsWith("<type:"), true, "a field matching nothing drawn is TYPE-LOCAL");
+    eq(keyOf(dog, "name") === animalName, true,
+      "Dog's re-declared `name` DRAWS Animal's symbol — override keeps member identity");
+    const dogAge = keyOf(dog, "age")!;
+    eq(dogAge.startsWith("<type:"), true, "a new field gets a type-local symbol");
+    eq(dogAge.startsWith(animalName.slice(0, animalName.indexOf("::"))), false,
+      "Dog's local scope is distinct from Animal's");
+    // Dispatch and construction still work over drawn + local symbols.
+    const r2 = evalSource(
+      "Animal = Type.extend({name: String})\nDog = Animal.extend({name: String, age: Int})\nd = Dog(\"rex\", 3)\ns = d.name",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(r2.evalCtx.bindings.get("s")!.value!), "rex", "field access resolves through the drawn symbol");
+  });
+
+  test("draw-from (C5.2b): lifted preserveOps ops bind the parent op's symbol; meta wart fixed", () => {
+    const r = evalSource(
+      "PI = (Int & _ > 0).preserveOps()\nx = PI(5)\ny = x + 3",
+      undefined, [createTypeSystem()], undefined, true);
+    const pi = dataOf(r.evalCtx.bindings.get("PI")!.value!) as ContextValue;
+    const piMembers = getMembers(pi) as ContextValue;
+    const intMembers = getMembers(dataOf(IntType as unknown as Value) as ContextValue) as ContextValue;
+    // The lifted `add` sits under Int's own `add` key (an override — same symbol).
+    const intAddKey = [...intMembers.bindings.keys()].find((k) => k.endsWith("::add"))!;
+    eq(piMembers.bindings.has(intAddKey), true, "lifted op draws (binds) the parent op's symbol");
+    eq(piMembers.bindings.get(intAddKey)?.value !== intMembers.bindings.get(intAddKey)?.value, true,
+      "…with the lifted implementation, not the parent's");
+    // The wart fix: no meta-method names in the instance member set.
+    for (const key of piMembers.bindings.keys()) {
+      eq(["instanceof", "subtypeof", "extend", "where", "invariant", "distinct",
+          "constructor", "interface", "preserveOps", "mixin"].includes(key.split("::").pop()!), false,
+        `meta-method '${key}' must not ride into an instance member set`);
+    }
+    eq(formatValue(r.evalCtx.bindings.get("y")!.value!), "8", "lifted dispatch works");
+  });
+
+  test("draw-from (C5.2b): multi-bind — one target under several symbols stays unambiguous; distinct targets error", () => {
+    // Hand-build the diamond shapes the machinery must handle before any
+    // surface can produce them: a member set with two same-base-name keys.
+    const desc = typeMemberDescriptor(dataOf(IntType as unknown as Value) as ContextValue, "add")!;
+    const mkType = (twoTargets: boolean): ContextValue => {
+      const t = evalSource("T = Type.extend({v: Int})", undefined, [createTypeSystem()], undefined, true);
+      const ty = dataOf(t.evalCtx.bindings.get("T")!.value!) as ContextValue;
+      const members = getMembers(ty) as ContextValue;
+      const k1 = registerScopeSymbol("<type:testA>", "draw").fqn!;
+      const k2 = registerScopeSymbol("<type:testB>", "draw").fqn!;
+      const desc2 = twoTargets
+        ? typeMemberDescriptor(dataOf(IntType as unknown as Value) as ContextValue, "sub")!
+        : desc;
+      members.bindings.set(k1, { key: k1, value: desc as Value });
+      members.bindings.set(k2, { key: k2, value: desc2 as Value });
+      return ty;
+    };
+    // One descriptor multi-bound to two symbols = ONE target → resolves.
+    const multiBound = mkType(false);
+    eq(typeMemberDescriptor(multiBound, "draw") === desc, true,
+      "multi-bound member resolves — one target through two symbols");
+    // Two distinct descriptors under one base name → §5 ambiguity error.
+    const conflicted = mkType(true);
+    let threw = "";
+    try { typeMemberDescriptor(conflicted, "draw"); } catch (e: any) { threw = String(e.message); }
+    eq(threw.includes("ambiguous"), true, "distinct targets under one base name error at access");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------

@@ -261,9 +261,28 @@ project through `fqnBaseName`/`kernelMemberFqn`. typeShape's sharing
 invariant is intact and the two former implicit sharers
 (invariant layers, structuralWrap) now share the parent's member-set
 object EXPLICITLY (ruling R1). Pre-fix landed: makeTypedBinOp
-dispatches through typeShape, matching the evaluator. Next: C5.2b
-draw-from binding (per-context member scopes, multi-bind), then C5.2c
-the declared-conformance split.*
+dispatches through typeShape, matching the evaluator.*
+
+*C5.2b status (2026-08): DRAW-FROM BINDING is live (D30). Member
+declarations resolve their symbol at construction via `drawMemberKey`:
+a base name matching exactly one drawn (parent/base) member BINDS that
+symbol — override/implement keeps member identity (Dog re-declaring
+Animal's `name` stores under Animal's key; a preserveOps lift stores
+under the parent op's key); zero matches mint a TYPE-LOCAL symbol in
+the type's own member scope (`<type:N>`, per-construction — the name
+arrives after construction via auto-naming, so scopes are
+counter-keyed; name-stable scopes integrate later); several distinct
+targets error (§5 — a descriptor multi-bound to several symbols dedupes
+to one target and stays legal). Lookup chokepoints
+(`typeMethod`/`typeMemberDescriptor`) generalize: kernel fast path,
+then base-name projection scan with distinct-target ambiguity errors at
+the access surface. `structuralSubtypeof` compares by EXPLICIT
+base-name projection (behavior-preserving; C5.2c splits declared
+conformance off to symbol identity, leaving this as the loose path).
+Mixin's conflict check is projection-based; preserveOps' unfiltered
+copy wart is fixed (meta-methods no longer ride into instance member
+sets). Next: C5.2c — the declared-conformance split (the conscious
+delta, flip lands last per ruling R3).*
 
 Symbols are the existing value kind **redefined** as first-class runtime
 values (D20, D29):

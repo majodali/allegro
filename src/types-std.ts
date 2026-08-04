@@ -13,7 +13,7 @@ import {
   Extension,
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
-import { kernelMemberFqn, fqnBaseName } from "./symbols.js";
+import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope } from "./symbols.js";
 import {
   getName, getMembers, getParent, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
@@ -156,10 +156,9 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
   // drawn/type-local scopes via projectBaseName.
   const membersV = getMembers(type);
   if (membersV?.kind === ValueKind.Context) {
-    const members = membersV as ContextValue;
-    const memberBinding = members.bindings.get(kernelMemberFqn(name));
-    if (memberBinding?.value?.kind === ValueKind.Context) {
-      const desc = memberBinding.value as ContextValue;
+    const descV = memberBindingByName(membersV as ContextValue, name);
+    if (descV?.kind === ValueKind.Context) {
+      const desc = descV as ContextValue;
       // For Method descriptors, return the implementation
       const valueBinding = desc.bindings.get("value");
       if (valueBinding?.value) return valueBinding.value;
@@ -174,11 +173,69 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
 }
 
 /** C5.2a: the member-set write chokepoint — stores the descriptor under
- *  the member symbol's FQN key (kernel scope during C5.2a). Every
+ *  the member symbol's FQN key (kernel scope for built-in types). Every
  *  member-set write goes through here; `addBinding` remains for
  *  descriptor internals and non-member contexts. */
 function addMember(members: ContextValue, baseName: string, desc: Value): void {
   addBinding(members, kernelMemberFqn(baseName), desc);
+}
+
+/** C5.2b (D30): DRAW-FROM resolution at member declaration time. A member
+ *  declared on a type under construction binds its symbol by projecting
+ *  the base name against the DRAWN contexts (parent type / base / drawn
+ *  interfaces):
+ *    - exactly one distinct target  → bind THAT symbol (override /
+ *      implement keeps the drawn member's identity);
+ *    - zero targets                 → a TYPE-LOCAL symbol in the type's
+ *      own member scope;
+ *    - several distinct targets     → error (the §5 rule: explicit
+ *      resolution required; a member multi-bound to one descriptor
+ *      dedupes to one target and stays legal).
+ *  Returns the storage key (the bound symbol's FQN). */
+function drawMemberKey(drawnContexts: ContextValue[], baseName: string, localScope: string): string {
+  const matches = new Map<string, Value | undefined>(); // key → descriptor (target)
+  for (const drawn of drawnContexts) {
+    const membersV = getMembers(drawn);
+    if (membersV?.kind !== ValueKind.Context) continue;
+    for (const [key, b] of (membersV as ContextValue).bindings) {
+      if (fqnBaseName(key) === baseName) matches.set(key, b.value);
+    }
+  }
+  if (matches.size === 0) return memberFqnIn(localScope, baseName);
+  if (matches.size === 1) return [...matches.keys()][0];
+  // Distinct KEYS may still be one TARGET (multi-bound descriptor).
+  const targets = new Set(matches.values());
+  if (targets.size === 1) return [...matches.keys()][0];
+  throw new AllegroError(
+    `member '${baseName}' matches multiple distinct drawn members (${[...matches.keys()].join(", ")}) — explicit resolution required`,
+  );
+}
+
+/** C5.2b: store a descriptor under an explicit (draw-resolved) key. */
+function addMemberAt(members: ContextValue, key: string, desc: Value): void {
+  addBinding(members, key, desc);
+}
+
+/** C5.2b: base-name member lookup over a member set — kernel fast path
+ *  (built-in members, the hot dispatch case), then a projection scan for
+ *  drawn/type-local symbols. Multi-bound keys dedupe by descriptor
+ *  identity; several DISTINCT targets under one base name is the §5
+ *  ambiguity error at the access surface. */
+function memberBindingByName(members: ContextValue, name: string): Value | undefined {
+  const fast = members.bindings.get(kernelMemberFqn(name));
+  if (fast?.value !== undefined) return fast.value;
+  let found: Value | undefined;
+  for (const [key, b] of members.bindings) {
+    if (fqnBaseName(key) !== name || b.value === undefined) continue;
+    if (found === undefined) {
+      found = b.value;
+    } else if (found !== b.value) {
+      throw new AllegroError(
+        `member '${name}' is ambiguous — multiple distinct targets; explicit qualification required`,
+      );
+    }
+  }
+  return found;
 }
 
 /** Read-side projection view for consumers that iterate members by base
@@ -277,8 +334,17 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
   if (bMembersVal?.kind === ValueKind.Context) {
     const bMembers = bMembersVal as ContextValue;
     const aMembers = aMembersVal?.kind === ValueKind.Context ? aMembersVal as ContextValue : null;
-    for (const [key] of bMembers.bindings) {
-      if (!aMembers || !aMembers.bindings.has(key)) return false;
+    if (!aMembers) return bMembers.bindings.size === 0;
+    // C5.2b: comparison is EXPLICITLY by base-name projection — under
+    // per-type member scopes, drawn and type-local symbols differ by FQN
+    // while the loose structural path (~T, anonymous types, and — until
+    // the C5.2c flip — interfaces) matches by name (D30). C5.2c splits
+    // declared conformance off to symbol identity; this function then
+    // serves only the loose path.
+    const aNames = new Set<string>();
+    for (const key of aMembers.bindings.keys()) aNames.add(fqnBaseName(key));
+    for (const key of bMembers.bindings.keys()) {
+      if (!aNames.has(fqnBaseName(key))) return false;
     }
     return true;
   }
@@ -518,14 +584,15 @@ export function isGetterDescriptor(desc: ContextValue): boolean {
 }
 
 /** Look up the full member descriptor from a type's __members.
- *  C5.2a: base name projects to the kernel member key (ruling R5). */
+ *  C5.2b: base name resolves via the projection scan (kernel fast path;
+ *  drawn/type-local symbols by base-name projection; distinct-target
+ *  ambiguity errors per §5). */
 export function typeMemberDescriptor(type: ContextValue, name: string): ContextValue | null {
   const membersV = getMembers(type);
   if (!membersV || membersV.kind !== ValueKind.Context) return null;
-  const members = membersV as ContextValue;
-  const memberBinding = members.bindings.get(kernelMemberFqn(name));
-  if (!memberBinding?.value || memberBinding.value.kind !== ValueKind.Context) return null;
-  return memberBinding.value as ContextValue;
+  const descV = memberBindingByName(membersV as ContextValue, name);
+  if (!descV || descV.kind !== ValueKind.Context) return null;
+  return descV as ContextValue;
 }
 
 // =============================================================================
@@ -563,9 +630,14 @@ function buildRecordType(
   // Build __members: Field descriptors for declared fields + Method descriptors for methods
   const members = makeContext();
 
-  // Add Field descriptors for each declared field
+  // Add Field descriptors for each declared field. C5.2b (D30 draw-from):
+  // a field whose base name matches a drawn (parent) member binds THAT
+  // symbol (override/implement keeps identity); otherwise it gets a
+  // type-local symbol in this type's member scope.
+  const recordScope = newTypeMemberScope();
   for (const f of fields) {
-    addMember(members, f.name, makeFieldDescriptor(f.name, f.type));
+    addMemberAt(members, drawMemberKey([parentType], f.name, recordScope),
+      makeFieldDescriptor(f.name, f.type));
   }
 
   // Copy non-meta Method descriptors from parent's __members. C5.2a: keys
@@ -631,7 +703,9 @@ function buildRecordType(
     }
     return withType(stringToBits(`${typeName}(${parts.join(", ")})`), StringType);
   }) as PrimitiveFnImpl);
-  addMember(members, "toString", makeMethodDescriptor("toString", toStringImpl));
+  // toString draws the parent's symbol (an override, same member identity).
+  addMemberAt(members, drawMemberKey([parentType], "toString", recordScope),
+    makeMethodDescriptor("toString", toStringImpl));
 
   setMembers(newType, members);
 
@@ -686,9 +760,13 @@ function buildInterfaceType(
     }
   }
 
-  // Add Field descriptors for each declared member
+  // Add Field descriptors for each declared member. C5.2b: declarations
+  // draw from the parent (a matching base name binds the parent's member
+  // symbol); new names get interface-local symbols.
+  const ifaceScope = newTypeMemberScope();
   for (const m of declaredMembers) {
-    addMember(members, m.name, makeFieldDescriptor(m.name, m.type));
+    addMemberAt(members, drawMemberKey([parentType], m.name, ifaceScope),
+      makeFieldDescriptor(m.name, m.type));
   }
 
   setMembers(ifaceType, members);
@@ -1012,20 +1090,25 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
     }, true));
   }
 
-  // Clone __members and add lifted operator descriptors
+  // Clone __members and add lifted operator descriptors. C5.2b: the
+  // long-latent unfiltered copy is fixed — meta-method names no longer
+  // ride into instance member sets (the wart the symbol re-keying made
+  // visible; recon 2026-08).
   const parentMembers = getMembers(refinedType);
   const newMembers = makeContext();
   if (parentMembers?.kind === ValueKind.Context) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
+      if (META_METHOD_NAMES.has(fqnBaseName(key))) continue;
       if (binding.value) addBinding(newMembers, key, binding.value);
     }
   }
 
   const newConstruct = getConstruct(newType) as PrimitiveFunctionValue | undefined;
+  const liftScope = newTypeMemberScope();
 
   for (const opName of ops) {
     const parentDesc = parentMembers?.kind === ValueKind.Context
-      ? (parentMembers as ContextValue).bindings.get(kernelMemberFqn(opName))?.value
+      ? memberBindingByName(parentMembers as ContextValue, opName)
       : null;
     if (!parentDesc || parentDesc.kind !== ValueKind.Context) continue;
     const parentOp = (parentDesc as ContextValue).bindings.get("value")?.value;
@@ -1041,7 +1124,9 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
       return newConstruct.fn([wrapped], ctx as any, evalFn as any);
     }) as PrimitiveFnImpl);
 
-    addMember(newMembers, opName, makeMethodDescriptor(opName, liftedOp));
+    // The lift is an OVERRIDE — it draws (binds) the parent op's symbol.
+    addMemberAt(newMembers, drawMemberKey([refinedType], opName, liftScope),
+      makeMethodDescriptor(opName, liftedOp));
   }
 
   setMembers(newType, newMembers);
@@ -1084,23 +1169,28 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
     }
   }
 
+  const mixinScope = newTypeMemberScope();
   for (const m of methods) {
-    // Check for conflict (C5.2a: the projection is the key)
-    if (newMembers.bindings.has(kernelMemberFqn(m.name))) {
+    // Check for conflict — multi-bind-aware (C5.2b): the projection scan
+    // counts distinct TARGETS under the base name; any existing target is
+    // a conflict (mixin refuses same-name additions, D30 default).
+    if (memberBindingByName(newMembers, m.name) !== undefined) {
       throw new AllegroError(`mixin: method '${m.name}' conflicts with existing member`);
     }
+    // Mixin methods are NEW members by definition → type-local symbols.
+    const key = memberFqnIn(mixinScope, m.name);
     // Wrap ComposedFunctions in a PrimitiveFn that the descriptor expects,
     // or use PrimitiveFunctions directly
     const impl = dataOf(m.impl);
     if (impl.kind === ValueKind.PrimitiveFunction) {
-      addMember(newMembers, m.name, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
+      addMemberAt(newMembers, key, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
     } else if (impl.kind === ValueKind.ComposedFunction) {
       // Store the ComposedFunction directly — type_dispatch handles it
       const desc = makeContext();
       writeShape(desc, MethodType);
       addBinding(desc, "name", stringToBits(m.name));
       addBinding(desc, "value", impl);
-      addMember(newMembers, m.name, desc);
+      addMemberAt(newMembers, key, desc);
     } else {
       throw new AllegroError(`mixin: '${m.name}' must be a function`);
     }

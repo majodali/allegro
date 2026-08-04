@@ -66,6 +66,31 @@ export function fqnBaseName(key: string): string {
   return idx > 0 ? key.slice(idx + FQN_SEP.length) : key;
 }
 
+// --- Per-type member scopes (C5.2b, D30 draw-from) ----------------------------
+
+let _typeScopeCounter = 0;
+
+/** Mint a fresh member scope for a type under construction. Per-CONSTRUCTION
+ *  identity (monotonic counter): the type's user-visible name is assigned
+ *  by auto-naming AFTER construction, so it cannot key the scope. Members
+ *  minted here are type-local (D30: a declared member whose base name
+ *  matches no drawn context gets a type-local symbol). Known limitation,
+ *  by design for C5.2b: type-local member symbols are not stable across
+ *  re-evaluation of the defining source — nothing compares them across
+ *  evaluations yet (structural checks project base names until C5.2c;
+ *  member symbols are not exported). Name-stable scopes integrate with
+ *  auto-naming/module FQNs in a later chunk. */
+export function newTypeMemberScope(nameHint?: string): string {
+  _typeScopeCounter += 1;
+  return `<type:${_typeScopeCounter}${nameHint ? ":" + nameHint : ""}>`;
+}
+
+/** The member storage key for a base name in a given member scope. */
+export function memberFqnIn(scopeFqn: string, baseName: string): string {
+  registerScopeSymbol(scopeFqn, baseName);
+  return scopeFqn + FQN_SEP + baseName;
+}
+
 // --- Interning (identity = FQN) ------------------------------------------------
 
 const INTERN = new Map<string, SymbolValue>();

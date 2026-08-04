@@ -8,6 +8,46 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C5.2b: Draw-from binding (structures Phase 5, B-023 part 2)
+
+D30's draw-from lands: member declarations resolve their SYMBOL at
+construction time instead of blindly minting names.
+
+- **`drawMemberKey(drawnContexts, baseName, localScope)`** — the
+  resolution: a base name matching exactly one drawn (parent/base)
+  member BINDS that symbol, so overrides keep member identity (Dog
+  re-declaring Animal's `name` stores under Animal's key; a record's
+  `toString` binds the parent's toString symbol; a preserveOps lift
+  binds the parent op's symbol — asserted by the battery); zero matches
+  mint a TYPE-LOCAL symbol in the type's own member scope; several
+  distinct targets error per §5 (a descriptor multi-bound to several
+  symbols dedupes to ONE target and stays legal).
+- **Per-type member scopes** (`<type:N>`, per-construction counter —
+  the user-visible name arrives after construction via auto-naming, so
+  scopes cannot key on it; name-stable scopes integrate with module
+  FQNs in a later chunk; nothing compares type-local symbols across
+  evaluations yet, documented in symbols.ts).
+- **Lookup generalizes**: `typeMethod`/`typeMemberDescriptor` do a
+  kernel-scope fast path (the hot built-in dispatch case) then a
+  base-name projection scan; multiple DISTINCT targets under one base
+  name is the §5 ambiguity error at the access surface — the diamond
+  machinery is live and tested even though no surface syntax can
+  produce a diamond yet.
+- **`structuralSubtypeof` compares by explicit base-name projection** —
+  behavior-preserving under per-type scopes; this is the marked C5.2c
+  flip site (declared conformance moves to symbol identity, leaving
+  this function as the loose `~T`/anonymous path).
+- Mixin's conflict check is projection-based (multi-bind-aware);
+  mixin methods mint type-local symbols (new members by definition).
+  preserveOps' unfiltered member copy is fixed — Type's meta-method
+  names no longer ride into instance member sets (the latent wart the
+  re-keying made visible).
+
+3 new boundary tests (draw/override identity + local-scope
+distinctness; preserveOps symbol-drawing + wart fix; multi-bind
+one-target resolution + distinct-target ambiguity error); 1044/1044
+green; tsc at the 4-error rootDir baseline.
+
 ## 2026-08 — C5.2a: Symbol-keyed member storage (structures Phase 5, B-023 part 1)
 
 The C5.2 briefing's rulings R1–R6 were ratified (recorded in the plan §6

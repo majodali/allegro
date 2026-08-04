@@ -242,8 +242,15 @@ phase).
   projection at the read chokepoints + name-based filters); typeShape
   sharing invariant intact with the two implicit sharers made explicit;
   makeTypedBinOp typeShape pre-fix; memberDescriptorsOf projection view
-  for tests/tooling; observable-zero, 1041/1041. Remaining: C5.2b
-  (draw-from binding, per-context member scopes, multi-bind), C5.2c
+  for tests/tooling; observable-zero, 1041/1041. **C5.2b landed
+  2026-08**: draw-from binding — drawMemberKey resolution at
+  construction (match→bind drawn symbol, none→type-local scope
+  `<type:N>`, distinct targets→error); overrides keep member identity
+  (record fields, toString, preserveOps lifts); lookup chokepoints
+  generalize to base-name projection with kernel fast path +
+  access-surface ambiguity; structuralSubtypeof explicitly base-name
+  (the C5.2c flip site); mixin conflict projection-based; preserveOps
+  meta-copy wart fixed; 1044/1044. Remaining: C5.2c
   (declared-conformance split — the conscious delta, flip lands last)
 - [ ] **B-024** · L2 · define-a-kind recipe; constructor authority;
   `Type : Type` fixed point (C6.1)
