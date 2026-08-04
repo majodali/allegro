@@ -8,6 +8,50 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C5.2c: The declared-conformance split (structures Phase 5, B-023 part 3; B-023 complete)
+
+The ratified conscious delta lands (D30; migration pre-approved at the
+C5.2 briefing, sequenced flip-last per ruling R3).
+
+- **Interface conformance is DECLARED**: the check is symbol-identity
+  membership — every member symbol the interface declares must BE a
+  member symbol of the actual type. A type conforms by DRAWING the
+  interface's symbols (`Point = HasXY.extend({x, y})` binds them);
+  spelling the same member names is no longer enough. `42 instanceof
+  Printable` is now false: Int spells a `toString` but never declared
+  Printable's symbol.
+- **The loose path stays**: `~T` structural wraps and anonymous inline
+  types match by base-name projection — the explicit duck-typing
+  surface, aimed at data values. `structuralWrap` now erases the
+  `__interface` marker along with the name, so `~Printable` projects an
+  interface into the loose world (`v: ~Printable` accepts 42).
+- **Migration per the pre-approval**: `tests/interfaces.alg` rewritten
+  to document the split (accidental → false; declared via
+  extend-the-interface; `~T` duck-typing); `tests/typed-types.alg`'s
+  accidental assertion flipped with a comment; the two test.ts
+  accidental-conformance tests reframed as declared/loose pairs;
+  CLAUDE.md's interface + nominal-vs-structural sections and syntax
+  examples updated.
+- **Boundary contract asserted** (the plan's C5.2 matrix): a same-named
+  member from an undeclared context does NOT satisfy an interface
+  check; `~T` still matches it; the wrap provably erases the marker.
+- **Harness fix surfaced by the flip**: the legacy grammar2 end-to-end
+  harness (`evalStandard2` in test.ts) discarded evaluation results, so
+  every reference re-ran construction expressions — re-running
+  `Type.interface(...)` mints a fresh member scope, making
+  symbol-identity conformance spuriously fail against a second
+  construction of the "same" interface. It now writes evaluated values
+  back through the eval ctx, mirroring evalSource's loop (the real
+  pipeline was never affected).
+- Residue (recorded per ruling R3): retroactive conformance of built-in
+  types to user-defined interfaces needs partial type declarations —
+  until that surface exists, `~T` is the duck-typing path for core
+  types.
+
+1 new boundary test (the declared-vs-loose matrix); 1046/1046 green;
+tsc at the 4-error rootDir baseline. B-023 and the C5.2 chunk are
+complete.
+
 ## 2026-08 — C5.2b: Draw-from binding (structures Phase 5, B-023 part 2)
 
 D30's draw-from lands: member declarations resolve their SYMBOL at

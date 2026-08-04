@@ -335,12 +335,24 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
     const bMembers = bMembersVal as ContextValue;
     const aMembers = aMembersVal?.kind === ValueKind.Context ? aMembersVal as ContextValue : null;
     if (!aMembers) return bMembers.bindings.size === 0;
-    // C5.2b: comparison is EXPLICITLY by base-name projection — under
-    // per-type member scopes, drawn and type-local symbols differ by FQN
-    // while the loose structural path (~T, anonymous types, and — until
-    // the C5.2c flip — interfaces) matches by name (D30). C5.2c splits
-    // declared conformance off to symbol identity; this function then
-    // serves only the loose path.
+    // C5.2c (D30, the conformance split — the ratified conscious delta):
+    //  - An INTERFACE check is DECLARED conformance: SYMBOL-IDENTITY
+    //    membership — every member symbol the interface declares must BE
+    //    a member symbol of the actual type (same FQN key; interning
+    //    makes key identity symbol identity). Conformance is therefore
+    //    declared, never accidental: a type conforms by DRAWING the
+    //    interface's symbols (extending the interface binds them), not by
+    //    happening to spell the same names.
+    //  - The LOOSE path (~T structural wraps, anonymous inline types)
+    //    matches by base-name projection — the duck-typing surface, aimed
+    //    at data values. `~Interface` projects an interface into this
+    //    world (structuralWrap erases the marker along with the name).
+    if (isInterfaceType(typeB)) {
+      for (const key of bMembers.bindings.keys()) {
+        if (!aMembers.bindings.has(key)) return false;
+      }
+      return true;
+    }
     const aNames = new Set<string>();
     for (const key of aMembers.bindings.keys()) aNames.add(fqnBaseName(key));
     for (const key of bMembers.bindings.keys()) {
@@ -436,6 +448,10 @@ export function structuralWrap(type: ContextValue): ContextValue {
   for (const [key, binding] of type.bindings) {
     if (key === SLOT_KEYS.name) continue; // erase name → anonymous → structural
     if (key === SLOT_KEYS.members) continue; // shared explicitly below
+    // C5.2c: erase the interface marker too — `~T` projects the type into
+    // the LOOSE (base-name) world; a wrapped interface duck-types by name
+    // instead of demanding declared symbol identity.
+    if (key === SLOT_KEYS.interface) continue;
     wrapper.bindings.set(key, { ...binding });
     wrapper.bindingList.push({ ...binding });
   }

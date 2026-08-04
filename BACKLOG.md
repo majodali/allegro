@@ -235,23 +235,25 @@ phase).
   SymbolValue gains optional `fqn`; parser symbols stay transient.
   Surface adoption (member binding, dot access, `x[ns.name]` syntax)
   lands with C5.2
-- [ ] **B-023** · L2 · Symbol-keyed members + draw-from binding; diamond
+- [x] **B-023** · L2 · Symbol-keyed members + draw-from binding; diamond
   multi-bind; ambiguity rule (C5.2). Briefing ratified 2026-08 (rulings
-  R1–R6, plan §6). **C5.2a landed 2026-08**: member sets symbol-keyed
-  (FQN string keys, kernel scope, one addMember write chokepoint,
-  projection at the read chokepoints + name-based filters); typeShape
-  sharing invariant intact with the two implicit sharers made explicit;
-  makeTypedBinOp typeShape pre-fix; memberDescriptorsOf projection view
-  for tests/tooling; observable-zero, 1041/1041. **C5.2b landed
-  2026-08**: draw-from binding — drawMemberKey resolution at
-  construction (match→bind drawn symbol, none→type-local scope
-  `<type:N>`, distinct targets→error); overrides keep member identity
-  (record fields, toString, preserveOps lifts); lookup chokepoints
-  generalize to base-name projection with kernel fast path +
-  access-surface ambiguity; structuralSubtypeof explicitly base-name
-  (the C5.2c flip site); mixin conflict projection-based; preserveOps
-  meta-copy wart fixed; 1044/1044. Remaining: C5.2c
-  (declared-conformance split — the conscious delta, flip lands last)
+  R1–R6, plan §6). **C5.2a**: member sets symbol-keyed (FQN string
+  keys, kernel scope, one addMember write chokepoint, projection at the
+  read chokepoints); typeShape sharing invariant intact (implicit
+  sharers made explicit); makeTypedBinOp typeShape pre-fix;
+  memberDescriptorsOf projection view. **C5.2b**: draw-from binding —
+  drawMemberKey at construction (match→bind drawn symbol,
+  none→type-local scope, distinct targets→error); overrides keep member
+  identity; lookup generalizes (kernel fast path + base-name scan +
+  access-surface ambiguity); preserveOps meta-copy wart fixed.
+  **C5.2c**: the declared-conformance split (the ratified conscious
+  delta) — interface checks are symbol-identity membership (declared by
+  drawing, e.g. `HasXY.extend`), `~T`/anonymous stay base-name
+  (structuralWrap erases the interface marker); interfaces.alg /
+  typed-types.alg / CLAUDE.md migrated per pre-approval. All landed
+  2026-08; 1046/1046 green. Residue: retroactive conformance of
+  built-in types to user interfaces waits for partial type
+  declarations; `x[ns.name]` qualification syntax deferred (R4)
 - [ ] **B-024** · L2 · define-a-kind recipe; constructor authority;
   `Type : Type` fixed point (C6.1)
 - [ ] **B-025** · L2 · Effect re-derived through the recipe; anonymous

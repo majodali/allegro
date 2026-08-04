@@ -31,7 +31,7 @@ import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr } from "./types.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS } from "./types-std.js";
 import { makeMultiValue } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
@@ -1456,6 +1456,35 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     let threw = "";
     try { typeMemberDescriptor(conflicted, "draw"); } catch (e: any) { threw = String(e.message); }
     eq(threw.includes("ambiguous"), true, "distinct targets under one base name error at access");
+  });
+
+  // --- Declared-conformance split (C5.2c, D30 — the ratified conscious delta) --
+
+  test("conformance split (C5.2c): declared vs loose — one matrix, both paths", () => {
+    // The plan's C5.2 boundary contract: a same-named member from an
+    // UNDECLARED context does NOT satisfy an interface check, while ~T
+    // still matches it by base name.
+    const r = evalSource(
+      "Greets = Type.interface({greet: Function})\n" +
+      "Greeter = Greets.extend({greet: Function})\n" +
+      "Stranger = Type.extend({greet: Function})\n" +
+      "g = Greeter(0)\ns = Stranger(0)\n" +
+      "a = g instanceof Greets\n" +
+      "b = s instanceof Greets\n" +
+      "loose(v: ~Greets) => 1\n" +
+      "c = loose(s)",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(r.evalCtx.bindings.get("a")!.value!), "true",
+      "a type that DREW the interface's symbols conforms");
+    eq(formatValue(r.evalCtx.bindings.get("b")!.value!), "false",
+      "a same-named member from an undeclared context does NOT satisfy the interface");
+    eq(formatValue(r.evalCtx.bindings.get("c")!.value!), "1",
+      "~T still matches the undeclared type by base name (the loose path)");
+    // The wrap erases the interface marker — a wrapped interface IS the
+    // loose world, not declared conformance with the name hidden.
+    const greets = dataOf(r.evalCtx.bindings.get("Greets")!.value!) as ContextValue;
+    const wrapped = structuralWrapTS(greets);
+    eq(isInterfaceTypeSlots(wrapped), false, "structuralWrap erases the __interface marker");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------

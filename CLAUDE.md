@@ -154,8 +154,9 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - `__members` contains Field descriptors for declared members, plus inherited non-meta members from parent
 - No `__construct`, `__getMember`, or auto-generated methods — interfaces declare structure only
 - `__interface` marker binding distinguishes interfaces from record types
-- Conformance via structural `instanceof`: `42 instanceof Printable` checks that Int has all members Printable declares
-- Parent inheritance: `Int.interface({extra: Int})` requires all of Int's members plus `extra`
+- **Conformance is DECLARED (C5.2c, D30)**: an interface check is SYMBOL-IDENTITY membership — a type conforms by DRAWING the interface's member symbols (`Point = HasXY.extend({x: Int, y: Int})` binds them), not by spelling the same member names. `42 instanceof Printable` is false unless Int drew Printable's symbols.
+- **Duck-typing is `~T`** (the loose path): `~Printable` projects the interface into the base-name world — `v: ~Printable` accepts any value whose type has a same-named `toString`.
+- Parent inheritance: `Int.interface({extra: Int})` copies Int's member symbols plus `extra`
 - Auto-named when bound to a symbol: `Printable = Type.interface(...)` → name is "Printable"
 
 ### Mixins
@@ -168,10 +169,10 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 
 ### Nominal vs Structural Typing
 - Named types use **nominal** checking by default: `f(x: Animal)` requires x to be Animal or extend it.
-- **`~` operator** (structural wrap): `~Animal` uses structural checking — any type with Animal's fields matches.
-- **Interfaces** are inherently structural via the `__interface` marker on the type, even when named.
-- Dispatch happens inside Type's shape-aware `instanceof`/`subtypeof`: if the expected type carries `__interface` or has no `__name`, structural; if both operands are named concrete types, nominal.
-- `structuralWrap(type)` clones the type and erases its `__name`. Absence of `__name` is what triggers structural dispatch; `__wraps` keeps a back-link to the original named type.
+- **`~` operator** (structural wrap): `~Animal` uses LOOSE structural checking — any type with same-NAMED members matches (base-name projection, the duck-typing path).
+- **Interfaces** route through the structural branch via the `__interface` marker, but their check is DECLARED conformance: symbol-identity membership (C5.2c). `~Interface` erases the marker and duck-types by name.
+- Dispatch happens inside Type's shape-aware `instanceof`/`subtypeof`: expected carries `__interface` → declared symbol-identity check; expected has no `__name` → loose base-name check; both operands named concrete types → nominal.
+- `structuralWrap(type)` clones the type, erases its `__name` AND its `__interface` marker, and shares the member-set object. `__wraps` keeps a back-link to the original named type.
 - Unnamed type expressions (inline `{ ... }`) are always structural.
 
 ### Refinement Types
@@ -474,11 +475,14 @@ head(arr: Array[Int]): Int => arr[0]
 nums.map(x: Int => x * 2)
 (x: Int, y: Int): Int => x + y
 
-// Interfaces (structural type matching)
+// Interfaces (DECLARED conformance — C5.2c/D30)
 Printable = Type.interface({toString: Function})
-42 instanceof Printable           // true — Int has toString
-Sized = Type.interface({length: Int})
-"hello" instanceof Sized          // true — String has length
+42 instanceof Printable           // false — Int never DREW Printable's symbols
+HasXY = Type.interface({x: Int, y: Int})
+Point = HasXY.extend({x: Int, y: Int})   // extending the interface draws them
+Point(1, 2) instanceof HasXY      // true — declared conformance
+is_printable(v: ~Printable) => true      // ~T is the loose duck-typing path
+is_printable(42)                  // true — matches by base name
 
 // Refinement types (Int & predicate, _ is the value)
 PositiveInt = Int & _ > 0

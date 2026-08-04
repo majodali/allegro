@@ -19,4 +19,7 @@ print(Printable instanceof Type) // expect: true
 // Regular values still work
 print(42 instanceof Int) // expect: true
 print("hello" instanceof String) // expect: true
-print(42 instanceof Printable) // expect: true
+
+// C5.2c: interface conformance is DECLARED (symbol identity) — Int never
+// drew Printable's toString symbol, so the accidental match is gone.
+print(42 instanceof Printable) // expect: false

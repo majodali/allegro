@@ -2464,10 +2464,21 @@ test("interfaces: interface has no __construct", () => {
   eq(result.bindings.has("__construct"), false);
 });
 
-test("interfaces: instanceof passes for conforming type", () => {
+test("interfaces: instanceof passes for DECLARED conformance (C5.2c)", () => {
+  // Conformance is declared, not accidental: extending the interface
+  // draws its member symbols, and the check is symbol-identity membership.
+  const result = evalStd(`HasXY = Type.interface({x: Int, y: Int})
+Point = HasXY.extend({x: Int, y: Int})
+p = Point(1, 2)
+p instanceof HasXY`);
+  eq(Number((dataOf(result!) as BitsValue).data), 1);
+});
+
+test("interfaces: accidental conformance is gone (C5.2c conscious delta)", () => {
+  // Int spells a toString but never declared Printable's symbol.
   const result = evalStd(`Printable = Type.interface({toString: Function})
 42 instanceof Printable`);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((dataOf(result!) as BitsValue).data), 0);
 });
 
 test("interfaces: instanceof fails for non-conforming type", () => {
@@ -2504,10 +2515,16 @@ Printable`);
   eq(bitsToString(name as BitsValue), "Printable");
 });
 
-test("interfaces: string satisfies Sized interface via structural check", () => {
-  const result = evalStd(`Sized = Type.interface({length: Int})
+test("interfaces: ~T is the loose duck-typing path (C5.2c)", () => {
+  // The declared check refuses the accidental match; `~Sized` projects
+  // the interface into the base-name world and duck-types.
+  const declared = evalStd(`Sized = Type.interface({length: Int})
 "hello" instanceof Sized`);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((dataOf(declared!) as BitsValue).data), 0);
+  const loose = evalStd(`Sized = Type.interface({length: Int})
+has_size(v: ~Sized) => 1
+has_size("hello")`);
+  eq(Number((dataOf(loose!) as BitsValue).data), 1);
 });
 
 // == Edge cases ==
@@ -9327,7 +9344,21 @@ function evalStandard2(source: string): any {
   for (const b of fileCtx.bindingList) {
     if (b.value !== undefined) {
       const r = evalVal(b.value, ctx);
-      if (b.key === null) last = r;
+      // Mirror evalSource's loop: WRITE BACK the evaluated value (into the
+      // EVAL CTX binding — source references stay Symbols and resolve
+      // through it at runtime) so later references see the constructed
+      // object instead of re-evaluating the construction expression.
+      // C5.2b made the difference observable: re-running a
+      // `Type.interface(...)` expression mints a fresh member scope, so
+      // symbol-identity conformance would spuriously fail against a
+      // second construction of the "same" interface.
+      if (b.key !== null) {
+        b.value = r;
+        const ctxBinding = ctx.bindings.get(b.key);
+        if (ctxBinding) ctxBinding.value = r;
+      } else {
+        last = r;
+      }
     }
   }
   return last;

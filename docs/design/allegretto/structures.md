@@ -281,8 +281,26 @@ base-name projection (behavior-preserving; C5.2c splits declared
 conformance off to symbol identity, leaving this as the loose path).
 Mixin's conflict check is projection-based; preserveOps' unfiltered
 copy wart is fixed (meta-methods no longer ride into instance member
-sets). Next: C5.2c — the declared-conformance split (the conscious
-delta, flip lands last per ruling R3).*
+sets).*
+
+*C5.2c status (2026-08): THE CONFORMANCE SPLIT IS LIVE (D30 — the
+ratified conscious delta, migration pre-approved at the C5.2 briefing).
+An interface check is DECLARED conformance: symbol-identity membership
+(every member symbol the interface declares must BE a member symbol of
+the actual type) — a type conforms by drawing the interface's symbols
+(extending it binds them), never by accident. The LOOSE path (`~T`
+structural wraps, anonymous inline types) matches by base-name
+projection — the duck-typing surface; `structuralWrap` now erases the
+`__interface` marker along with the name, so `~Interface` projects into
+the loose world. Migrated per the pre-approval: `interfaces.alg` and
+`typed-types.alg` document the flip (`42 instanceof Printable` → false;
+declared conformance via `HasXY.extend`; `~Printable` duck-typing);
+CLAUDE.md examples updated. §8's declared-vs-loose boundary contract is
+asserted by the battery (same-named member from an undeclared context
+does NOT satisfy the interface; `~T` still matches it). Phase 5 C5.2 is
+COMPLETE; the residue per ruling R3: retroactive conformance of
+built-in types to user interfaces waits for partial type declarations —
+`~T` is the duck-typing path until then.*
 
 Symbols are the existing value kind **redefined** as first-class runtime
 values (D20, D29):
