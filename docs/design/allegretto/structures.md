@@ -499,12 +499,12 @@ tool for law-bearing abstractions, proof obligations, or access control.
 Expectation: its share of ABSTRACTION checks trends toward zero as
 declaration surfaces mature; its data half is permanent.*
 
-*D44 (PROPOSED 2026-08, ratification at the C6.1 briefing): declared
+*D44 (maintainer-ratified 2026-08): declared
 INHERITANCE dissolves — symbol-identity conformance is exactly as
 declared as a subtype edge, so the `__extends` chain between concrete
 types is redundant. The remaining relations: conformance (this
 section), refinement (§6 knowledge layers — the base link narrows to
-refinement structure, rename proposed `Type.refines`), composition
+refinement structure, renamed `Type.refines` (ratified)), composition
 (member-bundle inclusion — the one construction operation), and
 instance-of = shape-of (§9). Transitivity holds by member-set inclusion;
 diamonds dedupe by symbol identity or error explicitly; widening is a
