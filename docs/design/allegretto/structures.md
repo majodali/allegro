@@ -2,7 +2,7 @@
 
 > Tier 1 design doc — **draft, pending maintainer sign-off** (promoted from
 > the design discussion in `.claude/plans/structured-values-unification.md`,
-> which holds the full decision log D1–D40 and rationale; decision numbers
+> which holds the full decision log D1–D44 and rationale; decision numbers
 > below cite it). Status tags per `docs/design/README.md`. Everything here
 > is **[designed]** unless tagged otherwise — this document describes the
 > post-unification model, not current behavior (`CLAUDE.md` describes what
@@ -479,6 +479,38 @@ structural path** — `~T` and anonymous `{…}` pattern destructuring —
 matches by base-name string projection and is aimed at data values, not
 types. (Duck-typing earns its place only where declared conformance is
 clumsy — a standing watch item for syntax design.)
+
+*The loose path's long-term charter (maintainer discussion, 2026-08):
+declared conformance is for ABSTRACTIONS (semantics, laws, provability);
+structural matching is for DATA — the same axis as reference equality vs
+deep equality. The loose path earns permanent residence exactly where no
+authority could have declared anything: (1) data at boundaries — ingested
+JSON, parse trees, config records, wire payloads, values that arrive
+without declarations; (2) pattern matching and anonymous annotations —
+`is {x, y}` and `f(p: {x: Int})` are shape DESCRIPTIONS, not abstraction
+references; (3) the marked escape hatch (`~T`) that makes the strict
+default liveable — bridging independently-declared lookalike interfaces,
+using members of types that predate an interface; every occurrence is
+greppable and means either "promote me to a declaration" or "genuinely
+boundary data"; (4) the negotiation gradient — the project's thesis has
+humans and agents sketching shapes before codifying abstractions, and
+the loose path is the rung between untyped and declared. It is never the
+tool for law-bearing abstractions, proof obligations, or access control.
+Expectation: its share of ABSTRACTION checks trends toward zero as
+declaration surfaces mature; its data half is permanent.*
+
+*D44 (PROPOSED 2026-08, ratification at the C6.1 briefing): declared
+INHERITANCE dissolves — symbol-identity conformance is exactly as
+declared as a subtype edge, so the `__extends` chain between concrete
+types is redundant. The remaining relations: conformance (this
+section), refinement (§6 knowledge layers — the base link narrows to
+refinement structure, rename proposed `Type.refines`), composition
+(member-bundle inclusion — the one construction operation), and
+instance-of = shape-of (§9). Transitivity holds by member-set inclusion;
+diamonds dedupe by symbol identity or error explicitly; widening is a
+knowledge bound, not a representation change. Migration is decisive (no
+`extend` sugar). Full case analysis + call-site audit in the decision
+log D44.*
 
 **Lawful interfaces** (D38) — the mechanism D8 promised. Interfaces may
 carry **law members**: named theorem templates quantified over the

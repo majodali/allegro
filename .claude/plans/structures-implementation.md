@@ -518,6 +518,16 @@ one implementation through both symbols.*
 declarations, declared instance order, constructor authority via channel
 capability, operator-minted anonymous instances. `Type : Type` fixed point
 verified.
+*D44 note (2026-08): the C6.1 briefing's CENTERPIECE is ratifying D44
+(declared inheritance dissolves into conformance + refinement +
+composition — PROPOSED in the decision log with full case analysis and
+call-site audit). The recipe takes NO inheritance parameter; `extend`
+is removed decisively (no sugar — the composition operation gets its
+own name at the recipe's surface design); `Type.parent` narrows to
+refinement structure (rename proposed: `Type.refines`); the
+`nominalSubtypeof` name-string walk dies with the chain (dissolving
+its name-collision false positive); the deferred-MI memo's trigger
+conditions are superseded on ratification.*
 
 **C6.2 — Effect re-derived.** `buildEffect` member copying deleted;
 dispatch-through-shape for `io.union(time)`; anonymous conjunction
