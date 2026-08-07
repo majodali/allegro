@@ -62,7 +62,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // --- Type fields → declared members on Type -------------------------------
   { name: "__name", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.name" },
   { name: "__members", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.members" },
-  { name: "__extends", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.parent" },
+  { name: "__refines", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.refines" },
   { name: "__construct", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.construct", notes: "per-kind minting authority (D40 R2)" },
   { name: "__constructor", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.construct", notes: "alias of __construct; collapses into one member" },
   { name: "__getMember", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.fallbackMember" },
@@ -204,7 +204,7 @@ export function asContext(v: Value | null | undefined): ContextValue | null {
 // getTypeName with different semantics: value → type-name string)
 export function getName(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__name"); }
 export function getMembers(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__members"); }
-export function getParent(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__extends"); }
+export function getRefines(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__refines"); }
 export function getConstruct(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__construct") ?? slotRead(ctx, "__constructor"); }
 export function getFallbackMember(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__getMember"); }
 export function isInterfaceType(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__interface"); }
@@ -266,13 +266,13 @@ export function isBareBindingName(name: string): boolean { return name.startsWit
 // copied direct bindings); it defines where shape ends and knowledge
 // begins.
 
-/** The dispatch shape of a type Context: walk `__extends` past
+/** The dispatch shape of a type Context: walk `__refines` past
  *  member-transparent refinement layers. Identity on non-refined types. */
 export function typeShape(t: ContextValue): ContextValue {
   let cur = t;
   for (let guard = 0; guard < 64; guard++) {
     if (slotRead(cur, "__predicate") === undefined) return cur;
-    const parent = asContext(slotRead(cur, "__extends"));
+    const parent = asContext(slotRead(cur, "__refines"));
     if (!parent) return cur;
     const ownMembers = slotRead(cur, "__members");
     const parentMembers = slotRead(parent, "__members");
@@ -328,7 +328,7 @@ export function channelReadRaw(v: Value, channel: string): Value | undefined {
 // Type fields
 export function setName(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__name", v); }
 export function setMembers(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__members", v); }
-export function setParent(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__extends", v); }
+export function setRefines(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__refines", v); }
 export function setConstruct(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__construct", v); }
 export function setFallbackMember(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__getMember", v); }
 export function markInterface(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__interface", v); }
@@ -401,7 +401,7 @@ export function stampEqOperands(ctx: ContextValue, lhs: Value, rhs: Value): void
 export const SLOT_KEYS = {
   name: "__name",
   members: "__members",
-  extends: "__extends",
+  extends: "__refines",
   construct: "__construct",
   constructor: "__constructor",
   getMember: "__getMember",
@@ -438,7 +438,7 @@ export function isMetaSlotKey(key: string): boolean {
 }
 
 // Removal helpers (map + bindingList, mirroring the existing idiom exactly)
-export function removeParent(ctx: ContextValue): void { ctx.bindings.delete("__extends"); }
+export function removeRefines(ctx: ContextValue): void { ctx.bindings.delete("__refines"); }
 export function removeShapeSlot(ctx: ContextValue): void { ctx.bindings.delete("__type"); }
 export function removeConstruct(ctx: ContextValue): void {
   ctx.bindings.delete("__construct");

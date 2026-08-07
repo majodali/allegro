@@ -15,14 +15,14 @@ import {
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
 import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
 import {
-  getName, getMembers, getParent, getConstruct, getInterfaceMarker, getPredicate,
+  getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
   getSlotCount, getAbstractDomain, getEffectKind, getEffectBound, getVariants, isGenericTypeSlot, indexGet, elementsOf,
-  setName, setMembers, setParent, setConstruct, setFallbackMember, markInterface,
+  setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface,
   setWraps, setVariants, setPredicate, setGenericParams, setGenericArgs,
   setGenericBackLink, markGeneric, setGenericConstructor, setProposition,
   setEffectKind, setEffectBound, setSlotCount, setAbstractDomain,
-  writeShape, removeName, removeParent, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
+  writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
   removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape,
 } from "./slots.js";
 
@@ -313,7 +313,7 @@ export function memberDescriptorsOf(type: ContextValue): Map<string, ContextValu
 //
 // All type values have __type = Type. Comparison methods (instanceof / subtypeof)
 // are SHAPE-AWARE: when both operands have a __name, the comparison is nominal
-// (by name + __extends chain); when either operand has no __name, it's structural
+// (by name + __refines chain); when either operand has no __name, it's structural
 // (by __members compatibility). This collapses the older Type / NominalType split
 // into a single meta-type — the named-vs-anonymous distinction is now a property
 // of the type value, not of its meta-type.
@@ -343,7 +343,7 @@ function addBinding(ctx: ContextValue, key: string, value: Value): void {
 
 /**
  * Shape-aware instanceof: dispatch based on __name presence.
- *   - Both operand types named → nominal (by name + __extends chain)
+ *   - Both operand types named → nominal (by name + __refines chain)
  *   - Either operand anonymous (no __name) → structural (by __members compat)
  */
 function shapeAwareInstanceof(value: Value, expectedType: ContextValue): boolean {
@@ -381,7 +381,7 @@ function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
   }
   let cur: ContextValue | null = typeA;
   for (let guard = 0; guard < 64 && cur; guard++) {
-    const parentV = getParent(cur);
+    const parentV = getRefines(cur);
     if (parentV?.kind !== ValueKind.Context) break;
     cur = parentV as ContextValue;
     if (cur === typeB) return typeArgsMatch(typeA, typeB);
@@ -452,7 +452,7 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
 
 /**
  * Nominal subtypeof: typeA is the same as typeB by name (and type args), or
- * typeA's __extends chain reaches a type with that name. Caller has already
+ * typeA's __refines chain reaches a type with that name. Caller has already
  * confirmed both types carry a __name.
  */
 // C6.1a (D44): `nominalSubtypeof` — the name-string chain walk — is
@@ -511,7 +511,7 @@ export const NominalType: ContextValue = Type;
 /**
  * Create an anonymous projection of a named type. With shape-aware dispatch,
  * absence of __name flips comparisons from nominal to structural — so erasing
- * the name is exactly the `~T` semantics. All other bindings (__extends,
+ * the name is exactly the `~T` semantics. All other bindings (__refines,
  * __members, __construct, __predicate, __invariantsList, ...) are preserved,
  * so `~Int` still constructs Int values, has Int's methods, etc.; only its
  * type comparisons go structural.
@@ -622,13 +622,13 @@ writeShape(MemberType, Type);
 export const MethodType: ContextValue = makeContext();
 setName(MethodType, stringToBits("Method"));
 writeShape(MethodType, Type);
-setParent(MethodType, MemberType);
+setRefines(MethodType, MemberType);
 
 /** Field descriptor — a member representing instance data */
 export const FieldType: ContextValue = makeContext();
 setName(FieldType, stringToBits("Field"));
 writeShape(FieldType, Type);
-setParent(FieldType, MemberType);
+setRefines(FieldType, MemberType);
 
 /** Create a Method descriptor */
 export function makeMethodDescriptor(
@@ -714,7 +714,9 @@ function buildRecordType(
   const newType = makeContext();
   setName(newType, stringToBits("<anonymous>"));
   writeShape(newType, metaType);
-  setParent(newType, parentType);
+  // C6.1a (D44): composition mints NO is-a edge — Dog relates to Animal
+  // by holding its drawn member symbols (conformance), not by a chain
+  // link. `refines` is written only by refinement layers now.
 
   // Build __members: Field descriptors for declared fields + Method descriptors for methods
   const members = makeContext();
@@ -831,7 +833,8 @@ function buildInterfaceType(
   const ifaceType = makeContext();
   setName(ifaceType, stringToBits("<anonymous>"));
   writeShape(ifaceType, Type); // structural — no ~ needed
-  setParent(ifaceType, parentType);
+  // C6.1a (D44): no edge — interface conformance is symbol membership
+  // over the copied member set.
   markInterface(ifaceType, makeInt(1)); // marker
 
   // Build __members: declared members as Field descriptors
@@ -885,9 +888,9 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   // Override __name
   removeName(refinedType);
   setName(refinedType, stringToBits("<refined>"));
-  // Set __extends to parent
-  removeParent(refinedType);
-  setParent(refinedType, parentType);
+  // Set __refines to parent
+  removeRefines(refinedType);
+  setRefines(refinedType, parentType);
   // Store predicate
   setPredicate(refinedType, predicate);
   // Phase B: recognise the predicate's algebraic shape (if any) and stash
@@ -1081,7 +1084,7 @@ export function buildInvariantedType(parentType: ContextValue, predicate: Value)
  */
 function buildDistinctType(parentType: ContextValue): ContextValue {
   const distinctType = makeContext();
-  // Copy all bindings except __extends and __members (handled separately)
+  // Copy all bindings except __refines and __members (handled separately)
   for (const [key, binding] of parentType.bindings) {
     if (key === SLOT_KEYS.extends) continue;
     if (key === SLOT_KEYS.members) continue;
@@ -1127,7 +1130,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
   const ops = opNames.length > 0 ? opNames : defaultOps;
 
   const predicate = getPredicate(refinedType);
-  const parentType = getParent(refinedType) as ContextValue;
+  const parentType = getRefines(refinedType) as ContextValue;
   if (!predicate || !parentType || parentType.kind !== ValueKind.Context) {
     return refinedType; // not a refined type — nothing to do
   }
@@ -1399,7 +1402,6 @@ const getterNames = new Set(["length"]);
  * @param name     Type name (e.g., "Int", "String")
  * @param methods  Instance methods (dispatched via type_dispatch on values of this type)
  * @param options  Optional:
- *   - extends: parent type
  *   - methodEffects: per-method effect label list. Used to tag stdlib HOFs
  *     (`Array.map`, etc.) as `opaque` so callers' inferred effect sets reflect
  *     "may do anything the callback does" until Slice 2's effect polymorphism
@@ -1408,14 +1410,11 @@ const getterNames = new Set(["length"]);
 function buildType(
   name: string,
   methods: Record<string, PrimitiveFnImpl>,
-  options?: { extends?: ContextValue; methodEffects?: Record<string, string[]> },
+  options?: { methodEffects?: Record<string, string[]> },
 ): ContextValue {
   const ctx = makeContext();
   setName(ctx, stringToBits(name));
   writeShape(ctx, Type);
-  if (options?.extends) {
-    setParent(ctx, options.extends);
-  }
   // Build __members with Method descriptors. C6.1a: each named type
   // declares its members in its OWN name-stable scope — Int.add and
   // Float.add are DISTINCT symbols (neither drew from the other), so
@@ -2517,7 +2516,7 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
 // effects (`pure`, `opaque`, `io`, `time`, ...) are types that extend Effect and
 // participate in the lattice via the `subset_of` / `implies` / `intersect` /
 // `union` operations. Subtype relationships (`pure subtypeof Effect == true`)
-// fall out of the standard `__extends` machinery — Effect is a regular named
+// fall out of the standard `__refines` machinery — Effect is a regular named
 // type for the purposes of nominal subtype checks.
 //
 // Lattice:
@@ -2552,10 +2551,10 @@ export function effectSubsetOf(e1: ContextValue, e2: ContextValue): boolean {
   if (isOpaqueEffect(e1)) return false;
   if (isPureEffect(e2)) return false;
   if (e1 === e2) return true;
-  // Walk e1's __extends chain looking for e2 by identity.
+  // Walk e1's __refines chain looking for e2 by identity.
   let current: ContextValue | null = e1;
   while (current) {
-    const ext = getParent(current);
+    const ext = getRefines(current);
     if (ext?.kind === ValueKind.Context) {
       if (ext === e2) return true;
       current = ext as ContextValue;
@@ -2640,13 +2639,13 @@ setMembers(Effect, effectMembers);
  * eventual dot-dispatch (`pure.subset_of(opaque)`) can find them on the value
  * side. Today's dispatch flow finds them via `__type` (Type), which doesn't
  * carry effect methods — so the copy is the bridge until Slice 2 either walks
- * `__extends` for member lookup or formalises Effect-as-meta-type.
+ * `__refines` for member lookup or formalises Effect-as-meta-type.
  */
 export function buildEffect(name: string, kind?: "pure" | "opaque"): ContextValue {
   const eff = makeContext();
   setName(eff, stringToBits(name));
   writeShape(eff, Type);
-  setParent(eff, Effect);
+  setRefines(eff, Effect);
   if (kind) setEffectKind(eff, stringToBits(kind));
   const members = makeContext();
   for (const [key, binding] of effectMembers.bindings) {

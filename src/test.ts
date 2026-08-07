@@ -2339,12 +2339,12 @@ test("effect: Effect carries lattice methods in __members", () => {
 });
 
 test("effect: pure extends Effect via __extends", () => {
-  const ext = pureEffect.bindings.get("__extends")?.value;
+  const ext = pureEffect.bindings.get("__refines")?.value;
   eq(ext === Effect, true);
 });
 
 test("effect: opaque extends Effect via __extends", () => {
-  const ext = opaqueEffect.bindings.get("__extends")?.value;
+  const ext = opaqueEffect.bindings.get("__refines")?.value;
   eq(ext === Effect, true);
 });
 

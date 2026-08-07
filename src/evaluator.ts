@@ -12,7 +12,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getParent, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
@@ -762,11 +762,11 @@ function checkArgType(
   }
 
   // Refinement type handling: if expected is a refined type, check the value
-  // against the refinement's BASE (via __extends chain), then evaluate the predicate.
+  // against the refinement's BASE (via __refines chain), then evaluate the predicate.
   // This allows a plain Int to satisfy PositiveInt if the predicate passes.
   const refinementPredicate = getPredicate(expected);
   if (refinementPredicate) {
-    const base = getParent(expected);
+    const base = getRefines(expected);
     if (base?.kind === ValueKind.Context) {
       // Recurse on the base type (unwraps nested refinements)
       checkArgType(arg, base as ContextValue, argIndex, ctx, depth, depCollector);

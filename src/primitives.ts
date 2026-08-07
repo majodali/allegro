@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getParent, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -2014,13 +2014,13 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 };
 
 /** True if `t` extends Effect (i.e. `t` is `Effect`, `pure`, `opaque`, or any
- *  user-declared effect type built via `buildEffect`). Walks the `__extends`
+ *  user-declared effect type built via `buildEffect`). Walks the `__refines`
  *  chain by identity. */
 function isEffectExtending(t: ContextValue): boolean {
   if (t === _Effect) return true;
   let current: ContextValue | null = t;
   while (current) {
-    const ext = getParent(current);
+    const ext = getRefines(current);
     if (ext?.kind === ValueKind.Context) {
       if (ext === _Effect) return true;
       current = ext as ContextValue;
@@ -2415,13 +2415,13 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   // Refinement-type handling: if expected is a refined type, check the value
-  // against the BASE (via __extends), then either (a) discharge via abstract
+  // against the BASE (via __refines), then either (a) discharge via abstract
   // domain (Phase B subtyping), or (b) evaluate the predicate at runtime.
   // This lets a plain Int value satisfy PositiveInt when the predicate holds
   // — the standard refinement-as-subtype-of-base semantics.
   const refinementPredicate = getPredicate(expectedCtx);
   if (refinementPredicate) {
-    const base = getParent(expectedCtx);
+    const base = getRefines(expectedCtx);
     if (base?.kind === ValueKind.Context) {
       // Recurse on the base (unwraps nested refinements)
       const baseChecked = type_check_impl([v, base], ctx, evalFn);
@@ -2453,7 +2453,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Step 3: Check using the type's instanceof method
   // Type's instanceof is shape-aware:
-  // - Both operands named → nominal check (by __name and __extends chain)
+  // - Both operands named → nominal check (by __name and __refines chain)
   // - Either operand anonymous (~wrapped, interface, union, …) → structural check
   const actualType = getType(v);
   if (!actualType) throw new AllegroError("type_check: value has no type");
@@ -2561,7 +2561,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // separate, EFFECTFUL `certificate_peek` op.
   if (getPredicate(expectedCtx as ContextValue) !== undefined
       && typeShape(expectedCtx as ContextValue) !== expectedCtx) {
-    const base = getParent(expectedCtx as ContextValue);
+    const base = getRefines(expectedCtx as ContextValue);
     if (base?.kind === ValueKind.Context) {
       const baseRes = type_instanceof_impl([v, base], ctx, evalFn);
       const brp = dataOf(baseRes);
@@ -2639,7 +2639,7 @@ const certificate_peek_impl: PrimitiveFnImpl = (args) => {
     if (cur === (t as ContextValue)) return withType(makeInt(1), BoolType);
     if (tName !== null && typeContextName(cur) === tName) return withType(makeInt(1), BoolType);
     if (getPredicate(cur) === undefined) break; // reached the shape — no more certificate layers
-    const p = getParent(cur);
+    const p = getRefines(cur);
     cur = p !== undefined && dataOf(p).kind === ValueKind.Context ? (dataOf(p) as ContextValue) : null;
   }
   return withType(makeInt(0), BoolType);
