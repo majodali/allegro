@@ -450,12 +450,10 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
         const chain = (ctx as any).__grammarValue.baseChain?.join(" > ") ?? "?";
         return `Grammar (extends ${chain})`;
       }
-      // Phase C Chunk 4: a type that carries lifecycle invariants.
-      const invs = (ctx as any).__invariantsList as Value[] | undefined;
-      if (invs && invs.length > 0 && typeName) {
-        const noun = invs.length === 1 ? "invariant" : "invariants";
-        return `${typeName} object [${invs.length} ${noun}]`;
-      }
+      // C6.1b: lifecycle invariants are ordinary refinements now — the
+      // Phase C Chunk 4 `__invariantsList` rendering left with
+      // buildInvariantedType (refined types render their predicate/domain
+      // through the standard refinement summary instead).
       if (typeName) return `${typeName} object`;
       return "Context";
     }

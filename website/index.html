@@ -263,28 +263,26 @@ print(z)                    // 10</textarea>
 <!-- ================================================ -->
 <h3 id="invariants">Lifecycle invariants</h3>
 
-<p><code>Type.invariant(self => P)</code> declares a predicate that holds for every value of the type. The constructor checks every clause; multi-clause chaining reports per-clause failure messages. Multi-field invariants reference fields via <code>self.field</code>.</p>
+<p>Lifecycle invariants are ordinary refinements — the <code>&amp;</code> mint covers scalars and records alike. Chained <code>&amp;</code> clauses each form their own layer, so a failure reports the violated clause's constraint with a counterexample. Record predicates reference fields through <code>_</code>.</p>
 
 <div class="sandbox" id="s-invariants">
-<textarea class="sandbox-editor" rows="14">// Single-value invariant — equivalent to `Int && _ > 0` but composes
-// fluently when multiple constraints chain.
-PositiveInt = Int.invariant(self => self > 0)
+<textarea class="sandbox-editor" rows="14">// Single-value clause.
+PositiveInt = Int & _ > 0
 print(PositiveInt(10))           // 10
 
-// Multi-field record invariant: `lo <= hi` ties two fields together —
-// the natural shape for `invariant` rather than refinement-via-`&&`.
-Range = Type.define({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+// Multi-field record predicate: `lo <= hi` ties two fields together.
+Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi
 ok = Range(1, 100)
 print(ok.lo)                      // 1
 
 bad = Range(50, 5)
-print(error of bad)              // invariant 1 failed
+print(error of bad)              // refinement check failed
 
-// Chained: per-clause failure messages.
-SmallPos = Int.invariant(self => self > 0).invariant(self => self < 100)
+// Chained clauses — failures name the violated constraint.
+SmallPos = Int & _ > 0 & _ < 100
 print(SmallPos(50))              // 50
-print(error of SmallPos(0))      // invariant 1 failed
-print(error of SmallPos(200))    // invariant 2 failed</textarea>
+print(error of SmallPos(0))      // refinement check failed: expected ≥ 1 (got 0)
+print(error of SmallPos(200))    // refinement check failed: expected ≤ 99 (got 200)</textarea>
 <div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-invariants')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-invariants')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
@@ -499,14 +497,14 @@ print(UserId(42) instanceof UserId)</textarea>
 
 <div class="sandbox" id="s-interfaces">
 <textarea class="sandbox-editor" rows="12">// Declare an interface
-Printable = Type.interface({toString: Function})
+Printable = Interface.define({toString: Function})
 
 // Any type with toString satisfies it
 print(42 instanceof Printable)
 print("hello" instanceof Printable)
 
 // Interface with specific member
-Sized = Type.interface({length: Int})
+Sized = Interface.define({length: Int})
 print("hello" instanceof Sized)
 print(42 instanceof Sized)
 
@@ -519,11 +517,11 @@ print(Printable instanceof Type)</textarea>
 <!-- ================================================ -->
 <h2 id="mixins">Mixins</h2>
 
-<p>Add method implementations to types with <code>.mixin()</code>. Mixin methods receive <code>self</code> as their first argument and can access fields and call other methods.</p>
+<p>Method implementations are ordinary <code>define</code> spec entries — an entry whose value is a function becomes a method receiving <code>self</code> as its first argument. Reusable mixins are methods-only types (bundles) drawn alongside other bundles.</p>
 
 <div class="sandbox" id="s-mixins">
-<textarea class="sandbox-editor" rows="12">// Add methods to a record type
-Point = Type.define({x: Int, y: Int}, Int).mixin({magnitude: (self) => self.x * self.x + self.y * self.y, translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
+<textarea class="sandbox-editor" rows="12">// Methods live in the define spec, next to the fields they use
+Point = Type.define({x: Int, y: Int, magnitude: (self) => self.x * self.x + self.y * self.y, translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)}, Int)
 
 p = Point(3, 4)
 print(p.magnitude())
@@ -532,9 +530,9 @@ q = p.translate(10, 20)
 print(q.x)
 print(q.y)
 
-// Reusable mixin spec
-magSpec = {mag: (self) => self.x * self.x + self.y * self.y}
-Vec = Type.define({x: Int, y: Int}, Int).mixin(magSpec)
+// Reusable mixin: a methods-only define mints a BUNDLE, drawn like any other
+MagMixin = Type.define({mag: (self) => self.x * self.x + self.y * self.y})
+Vec = Type.define({x: Int, y: Int}, Int, MagMixin)
 print(Vec(5, 12).mag())</textarea>
 <div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-mixins')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-mixins')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>

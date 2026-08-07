@@ -2435,7 +2435,7 @@ test("effect Allegro source: pure does not subtypeof opaque (sibling subtypes)",
 // == Interfaces ==
 
 test("interfaces: Type.interface creates structural type with __interface marker", () => {
-  const result = evalStd(`Printable = Type.interface({toString: Function})
+  const result = evalStd(`Printable = Interface.define({toString: Function})
 Printable`);
   const iface = dataOf(result!) as ContextValue;
   eq(iface.kind, ValueKind.Context);
@@ -2448,7 +2448,7 @@ Printable`);
 });
 
 test("interfaces: interface has Field descriptors in __members", () => {
-  const result = dataOf(evalStd(`Type.interface({toString: Function, length: Int})`)!) as ContextValue;
+  const result = dataOf(evalStd(`Interface.define({toString: Function, length: Int})`)!) as ContextValue;
   const members = memberDescriptorsOf(result);
   eq(members.size > 0, true);
   const tsDesc = members.get("toString");
@@ -2460,14 +2460,14 @@ test("interfaces: interface has Field descriptors in __members", () => {
 });
 
 test("interfaces: interface has no __construct", () => {
-  const result = dataOf(evalStd(`Type.interface({x: Int})`)!) as ContextValue;
+  const result = dataOf(evalStd(`Interface.define({x: Int})`)!) as ContextValue;
   eq(result.bindings.has("__construct"), false);
 });
 
 test("interfaces: instanceof passes for DECLARED conformance (C5.2c)", () => {
   // Conformance is declared, not accidental: extending the interface
   // draws its member symbols, and the check is symbol-identity membership.
-  const result = evalStd(`HasXY = Type.interface({x: Int, y: Int})
+  const result = evalStd(`HasXY = Interface.define({x: Int, y: Int})
 Point = Type.define({x: Int, y: Int}, HasXY)
 p = Point(1, 2)
 p instanceof HasXY`);
@@ -2476,20 +2476,20 @@ p instanceof HasXY`);
 
 test("interfaces: accidental conformance is gone (C5.2c conscious delta)", () => {
   // Int spells a toString but never declared Printable's symbol.
-  const result = evalStd(`Printable = Type.interface({toString: Function})
+  const result = evalStd(`Printable = Interface.define({toString: Function})
 42 instanceof Printable`);
   eq(Number((dataOf(result!) as BitsValue).data), 0);
 });
 
 test("interfaces: instanceof fails for non-conforming type", () => {
-  const result = evalStd(`HasFoo = Type.interface({foo: Function})
+  const result = evalStd(`HasFoo = Interface.define({foo: Function})
 42 instanceof HasFoo`);
   eq(Number((dataOf(result!) as BitsValue).data), 0);
 });
 
 test("interfaces: parent member inheritance", () => {
-  // Int has add, sub, etc. in __members. Int.interface({extra: Int}) requires all of them plus extra.
-  const result = evalStd(`WithExtra = Int.interface({extra: Int})
+  // Int has add, sub, etc. in __members. Interface.define({extra: Int}, Int) requires all of them plus extra.
+  const result = evalStd(`WithExtra = Interface.define({extra: Int}, Int)
 WithExtra`);
   const iface = dataOf(result!) as ContextValue;
   const members = memberDescriptorsOf(iface);
@@ -2500,14 +2500,14 @@ WithExtra`);
 });
 
 test("interfaces: NominalType.interface also creates structural type", () => {
-  const result = evalStd(`Sized = Int.interface({length: Int})
+  const result = evalStd(`Sized = Interface.define({length: Int}, Int)
 Sized`);
   const iface = dataOf(result!) as ContextValue;
   eq(iface.bindings.get("__type")?.value === InterfaceKind, true);
 });
 
 test("interfaces: auto-named when bound to symbol", () => {
-  const result = evalStd(`Printable = Type.interface({toString: Function})
+  const result = evalStd(`Printable = Interface.define({toString: Function})
 Printable`);
   const iface = dataOf(result!) as ContextValue;
   const name = iface.bindings.get("__name")?.value;
@@ -2518,10 +2518,10 @@ Printable`);
 test("interfaces: ~T is the loose duck-typing path (C5.2c)", () => {
   // The declared check refuses the accidental match; `~Sized` projects
   // the interface into the base-name world and duck-types.
-  const declared = evalStd(`Sized = Type.interface({length: Int})
+  const declared = evalStd(`Sized = Interface.define({length: Int})
 "hello" instanceof Sized`);
   eq(Number((dataOf(declared!) as BitsValue).data), 0);
-  const loose = evalStd(`Sized = Type.interface({length: Int})
+  const loose = evalStd(`Sized = Interface.define({length: Int})
 has_size(v: ~Sized) => 1
 has_size("hello")`);
   eq(Number((dataOf(loose!) as BitsValue).data), 1);
@@ -2530,133 +2530,126 @@ has_size("hello")`);
 // == Edge cases ==
 
 test("edge case: empty interface satisfies any type", () => {
-  const result = evalStd(`EmptyIface = Type.interface({})
+  const result = evalStd(`EmptyIface = Interface.define({})
 42 instanceof EmptyIface`);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
-test("edge case: empty mixin produces identical type", () => {
-  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({})
-p = Point(3, 4)
-p.x + p.y`);
-  eq(Number((dataOf(result!) as BitsValue).data), 7);
-});
-
-test("edge case: preserveOps on non-refined type is no-op", () => {
-  const result = evalStd(`T = Int.preserveOps()
-T(42) + 0`);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
-});
-
-// == Mixins ==
-
-test("mixins: basic mixin adds method", () => {
-  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({mag: (self) => self.x + self.y})
-p = Point(3, 4)
-p.mag()`);
-  eq(Number((dataOf(result!) as BitsValue).data), 7);
-});
-
-test("mixins: field access via self works", () => {
-  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({getX: (self) => self.x})
-Point(10, 20).getX()`);
-  eq(Number((dataOf(result!) as BitsValue).data), 10);
-});
-
-test("mixins: constructor works on mixin type", () => {
-  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({sum: (self) => self.x + self.y})
-p = Point(5, 7)
-p.sum()`);
-  eq(Number((dataOf(result!) as BitsValue).data), 12);
-});
-
-test("mixins: error on name conflict", () => {
+test("edge case: Refinement spec without `where` errors", () => {
+  // The old `Int.preserveOps()` no-op has no spec-form equivalent — a
+  // Refinement spec demands its predicate.
   let threw = false;
   try {
-    evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({toString: (self) => "point"})`);
+    evalStd(`T = Refinement.define({refines: Int, preserve: "all"})`);
   } catch (e) {
     threw = true;
   }
   eq(threw, true);
 });
 
-test("mixins: reusable spec variable", () => {
-  const result = evalStd(`magMixin = {mag: (self) => self.x * self.x + self.y * self.y}
-A = Type.define({x: Int, y: Int}, Int).mixin(magMixin)
-B = Type.define({x: Int, y: Int}, Int).mixin(magMixin)
+// == Method members (C6.1b: the mixin surface is `define`) ==
+
+test("methods: method-valued spec entry adds method", () => {
+  const result = evalStd(`Point = Type.define({x: Int, y: Int, mag: (self) => self.x + self.y}, Int)
+p = Point(3, 4)
+p.mag()`);
+  eq(Number((dataOf(result!) as BitsValue).data), 7);
+});
+
+test("methods: field access via self works", () => {
+  const result = evalStd(`Point = Type.define({x: Int, y: Int, getX: (self) => self.x}, Int)
+Point(10, 20).getX()`);
+  eq(Number((dataOf(result!) as BitsValue).data), 10);
+});
+
+test("methods: constructor ignores method entries (positional args are fields)", () => {
+  const result = evalStd(`Point = Type.define({x: Int, y: Int, sum: (self) => self.x + self.y}, Int)
+p = Point(5, 7)
+p.sum()`);
+  eq(Number((dataOf(result!) as BitsValue).data), 12);
+});
+
+test("methods: same-name method entry OVERRIDES the drawn member (C5.2b draw)", () => {
+  // The old mixin surface REFUSED same-name additions; the unified define
+  // surface treats a matching declaration as an override that binds the
+  // drawn symbol — same rule as fields (C5.2b: override keeps identity).
+  const result = evalStd(`Point = Type.define({x: Int, y: Int, toString: (self) => "point!"}, Int)
+Point(1, 2).toString()`);
+  eq(bitsToString(dataOf(result!) as BitsValue), "point!");
+});
+
+test("methods: reusable mixin is a BUNDLE — methods-only define, drawn like any bundle", () => {
+  const result = evalStd(`MagMixin = Type.define({mag: (self) => self.x * self.x + self.y * self.y})
+A = Type.define({x: Int, y: Int}, Int, MagMixin)
+B = Type.define({x: Int, y: Int}, Int, MagMixin)
 A(3, 4).mag() + B(5, 12).mag()`);
   eq(Number((dataOf(result!) as BitsValue).data), 25 + 169);
 });
 
-test("mixins: method with extra args", () => {
-  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
+test("methods: bundle conformance — drawing the bundle's symbols declares it", () => {
+  const result = evalStd(`MagMixin = Type.define({mag: (self) => self.x * self.x + self.y * self.y})
+A = Type.define({x: Int, y: Int}, Int, MagMixin)
+A subtypeof MagMixin`);
+  eq(Number((dataOf(result!) as BitsValue).data), 1);
+});
+
+test("methods: method with extra args", () => {
+  const result = evalStd(`Point = Type.define({x: Int, y: Int, translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)}, Int)
 p = Point(1, 2)
 q = p.translate(10, 20)
 q.x + q.y`);
   eq(Number((dataOf(result!) as BitsValue).data), 33);
 });
 
-// == Regression: mixin + refinement nesting ==
-// Previously buildMixinType only unwound one level of refinement when rebuilding
-// __construct. Now it delegates to parentConstruct which chains through all
-// nested refinements naturally.
+// == Regression: methods over refinement nesting ==
+// Method layers on refined types delegate construction through the base's
+// construct, which chains all nested predicate checks naturally. Surface:
+// non-reserved entries in a Refinement spec are method implementations.
 
-test("mixin on refined type: constructor still checks predicate", () => {
-  const result = evalStd(`PI = (Int & _ > 0).mixin({double: self => self + self})
+test("Refinement spec methods: constructor still checks predicate", () => {
+  const result = evalStd(`PI = Refinement.define({refines: Int, where: p => p > 0, double: self => self + self})
 PI(5)`);
   eq(Number((dataOf(result!) as BitsValue).data), 5);
 });
 
-test("mixin on refined type: predicate failure produces error", () => {
-  const result = evalStd(`PI = (Int & _ > 0).mixin({double: self => self + self})
+test("Refinement spec methods: predicate failure produces error", () => {
+  const result = evalStd(`PI = Refinement.define({refines: Int, where: p => p > 0, double: self => self + self})
 PI(0 - 5)`);
   eq((result as any).components?.has("error"), true);
 });
 
-test("mixin on refined type: method call works", () => {
-  const result = evalStd(`PI = (Int & _ > 0).mixin({double: self => self + self})
+test("Refinement spec methods: method call works", () => {
+  const result = evalStd(`PI = Refinement.define({refines: Int, where: p => p > 0, double: self => self + self})
 PI(7).double()`);
   eq(Number((dataOf(result!) as BitsValue).data), 14);
 });
 
-test("mixin on doubly-refined type: both predicates checked (inner passes)", () => {
-  // Compound `&&` refinement + mixin. Must check both _ > 0 AND _ < 100,
-  // then run mixin method.
-  const result = evalStd(`T = (Int & _ > 0 && _ < 100).mixin({triple: self => self * 3})
+test("Refinement spec methods: compound predicate checked (inner passes)", () => {
+  const result = evalStd(`T = Refinement.define({refines: Int, where: w => w > 0 && w < 100, triple: self => self * 3})
 T(50).triple()`);
   eq(Number((dataOf(result!) as BitsValue).data), 150);
 });
 
-test("mixin on doubly-refined type: outer predicate failure produces error", () => {
-  // _ > 0 holds but _ < 100 fails — inner check should catch it
-  const result = evalStd(`T = (Int & _ > 0 && _ < 100).mixin({triple: self => self * 3})
+test("Refinement spec methods: upper-bound failure produces error", () => {
+  const result = evalStd(`T = Refinement.define({refines: Int, where: w => w > 0 && w < 100, triple: self => self * 3})
 T(500)`);
   eq((result as any).components?.has("error"), true);
 });
 
-test("mixin on doubly-refined type: inner predicate failure produces error", () => {
-  const result = evalStd(`T = (Int & _ > 0 && _ < 100).mixin({triple: self => self * 3})
+test("Refinement spec methods: lower-bound failure produces error", () => {
+  const result = evalStd(`T = Refinement.define({refines: Int, where: w => w > 0 && w < 100, triple: self => self * 3})
 T(0 - 10)`);
   eq((result as any).components?.has("error"), true);
 });
 
-test("mixin on chained-where type: .where().mixin() preserves predicate", () => {
-  // .where(lambda) + mixin — another nesting shape.
-  const result = evalStd(`T = Int.where(n => n > 0).where(n => n < 100).mixin({id: self => self})
-T(42).id()`);
+test("Refinement spec methods: refined base as `refines` chains predicates", () => {
+  // The refines slot accepts an already-refined base — layers chain.
+  const result = evalStd(`T = Refinement.define({refines: Int & _ > 0, where: q => q < 100, id: self => self})
+a = T(42).id()
+b = T(500)
+c = T(0 - 10)
+a`);
   eq(Number((dataOf(result!) as BitsValue).data), 42);
-});
-
-test("mixin on chained-where type: outer .where predicate failure caught", () => {
-  const result = evalStd(`T = Int.where(n => n > 0).where(n => n < 100).mixin({id: self => self})
-T(500)`);
-  eq((result as any).components?.has("error"), true);
-});
-
-test("mixin on chained-where type: inner .where predicate failure caught", () => {
-  const result = evalStd(`T = Int.where(n => n > 0).where(n => n < 100).mixin({id: self => self})
-T(0 - 10)`);
-  eq((result as any).components?.has("error"), true);
 });
 
 // Regression: meta-type dispatch for ComposedFunction descriptors.
@@ -2724,8 +2717,8 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
   eq(dataOf(result) === target, true, "bound method should pass target as self");
 });
 
-test("mixin on refined type: instanceof still works", () => {
-  const result = evalStd(`T = (Int & _ > 0).mixin({double: self => self + self})
+test("Refinement spec methods: instanceof still works", () => {
+  const result = evalStd(`T = Refinement.define({refines: Int, where: p => p > 0, double: self => self + self})
 T(5) instanceof T`);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
@@ -3228,7 +3221,7 @@ Point subtypeof Shape
 
 test("where: refinement passes", () => {
   const result = evalStd(`
-PositiveInt = Int.where(n => n > 0)
+PositiveInt = Int & _ > 0
 x = PositiveInt(5)
 x
 `);
@@ -3237,7 +3230,7 @@ x
 
 test("where: refinement fails → error", () => {
   const result = evalStd(`
-PositiveInt = Int.where(n => n > 0)
+PositiveInt = Int & _ > 0
 PositiveInt(0 - 1)
 `);
   eq((result as any).components?.has("error"), true);
@@ -3245,7 +3238,7 @@ PositiveInt(0 - 1)
 
 test("where: refined type instanceof parent", () => {
   const result = evalStd(`
-PositiveInt = Int.where(n => n > 0)
+PositiveInt = Int & _ > 0
 PositiveInt(5) instanceof Int
 `);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
@@ -3317,7 +3310,7 @@ test("refinement: logical AND short-circuits", () => {
 // == preserveOps ==
 
 test("preserveOps: lifted add preserves refined type", () => {
-  const result = evalStd(`PositiveInt = (Int & _ > 0).preserveOps()
+  const result = evalStd(`PositiveInt = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})
 x = PositiveInt(5)
 y = x + 3
 y instanceof PositiveInt`);
@@ -3325,21 +3318,21 @@ y instanceof PositiveInt`);
 });
 
 test("preserveOps: lifted op produces error on predicate failure", () => {
-  const result = evalStd(`PositiveInt = (Int & _ > 0).preserveOps()
+  const result = evalStd(`PositiveInt = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})
 x = PositiveInt(5)
 x - 10`);
   eq((result as any).components?.has("error"), true);
 });
 
 test("preserveOps: lifted op value is still correct", () => {
-  const result = evalStd(`PositiveInt = (Int & _ > 0).preserveOps()
+  const result = evalStd(`PositiveInt = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})
 x = PositiveInt(5)
 x + 3`);
   eq(Number((dataOf(result!) as BitsValue).data), 8);
 });
 
 test("preserveOps: specific ops can be lifted", () => {
-  const result = evalStd(`PositiveInt = (Int & _ > 0).preserveOps(add)
+  const result = evalStd(`PositiveInt = Refinement.define({refines: Int, where: p => p > 0, preserve: ["add"]})
 x = PositiveInt(5)
 y = x + 3
 y instanceof PositiveInt`);
@@ -4172,11 +4165,11 @@ assert_stmt(x > 0)
   eq(evalCtx.bindings.has("x"), true);
 });
 
-// --- Phase C Chunk 4: Type.invariant ---
+// --- Lifecycle invariants (C6.1b: invariants ARE refinements — `&`) ---
 
-test("Phase C Chunk 4: single-invariant type accepts and rejects", () => {
+test("invariants-as-refinements: single clause accepts and rejects", () => {
   const src = `
-PI = Int.invariant(self => self > 0)
+PI = Int & _ > 0
 ok = PI(5)
 bad = PI(0 - 5)
 `;
@@ -4192,9 +4185,9 @@ bad = PI(0 - 5)
   }
 });
 
-test("Phase C Chunk 4: chained invariants produce per-clause failure messages", () => {
+test("invariants-as-refinements: chained `&` clauses fail with per-clause domains", () => {
   const src = `
-SP = Int.invariant(self => self > 0).invariant(self => self < 100)
+SP = Int & _ > 0 & _ < 100
 mid = SP(50)
 low = SP(0)
 high = SP(200)
@@ -4212,7 +4205,7 @@ high = SP(200)
       const ep = dataOf(err);
       if (ep.kind === ValueKind.Bits) {
         const msg = bitsToString(ep as BitsValue);
-        eq(msg.includes("invariant 1"), true, `expected invariant 1 in: ${msg}`);
+        eq(msg.includes("≥ 1"), true, `expected the first clause's domain (≥ 1) in: ${msg}`);
       }
     }
   }
@@ -4224,15 +4217,15 @@ high = SP(200)
       const ep = dataOf(err);
       if (ep.kind === ValueKind.Bits) {
         const msg = bitsToString(ep as BitsValue);
-        eq(msg.includes("invariant 2"), true, `expected invariant 2 in: ${msg}`);
+        eq(msg.includes("≤ 99"), true, `expected the second clause's domain (≤ 99) in: ${msg}`);
       }
     }
   }
 });
 
-test("Phase C Chunk 4: multi-field record invariant", () => {
+test("invariants-as-refinements: multi-field record predicate via `_`", () => {
   const src = `
-Range = Type.define({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi
 ok = Range(1, 10)
 bad = Range(10, 1)
 `;
@@ -9349,7 +9342,7 @@ function evalStandard2(source: string): any {
       // through it at runtime) so later references see the constructed
       // object instead of re-evaluating the construction expression.
       // C5.2b made the difference observable: re-running a
-      // `Type.interface(...)` expression mints a fresh member scope, so
+      // `Interface.define(...)` expression mints a fresh member scope, so
       // symbol-identity conformance would spuriously fail against a
       // second construction of the "same" interface.
       if (b.key !== null) {

@@ -428,7 +428,7 @@ export function counterexampleFor(
 
 export type PredicateSource =
   | "refinement-type"   // from a refined type's constructor
-  | "type-invariant"    // from Type.invariant(...) — Chunk 4
+  | "type-invariant"    // reserved — invariants folded into refinements (C6.1b); no current producer
   | "assert"            // from an `assert P` statement — Chunk 2
   | "branch-then"       // from entering an if-then branch — Chunk 2
   | "branch-else"       // from entering an if-else branch — Chunk 2

@@ -116,11 +116,11 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - **Field descriptors**: `{__type: FieldType, name: String, fieldType: Type}` — typed field declarations (on record types)
 - `typeMethod(type, name)` reads from `__members` first, falls back to direct bindings — the single bridge function for all member access
 - `typeMemberDescriptor(type, name)` returns the full descriptor for dispatch-level access
-- The Type meta-type stores its methods (instanceof, subtypeof, define, where, distinct, constructor, interface, preserveOps, mixin, invariant) in `__members`. `instanceof` and `subtypeof` are conformance checks; the rest are pure builders. `Type.define(spec, ...bundles)` (D45) is THE record-type construction surface — self is the kind, bundles are drawn member sets; the old `X.extend(spec)` inheritance surface is removed (D44, no sugar).
+- The Type meta-type stores its kind API (instanceof, subtypeof, define, distinct, constructor) in `__members`. `instanceof` and `subtypeof` are conformance checks; `define` is the NAMED FACTORY delegating to the kind's `construct` authority. The fluent API (`extend`/`where`/`interface`/`mixin`/`preserveOps`/`invariant`) is REMOVED (D44/D45, no sugar): records/methods/bundles are `Type.define(spec, ...bundles)`, refinements and invariants are the `&` mint, interfaces are `Interface.define(spec, ...bundles)`, operator preservation is the Refinement spec's `preserve` option.
 - Structural checking compares `__members` collections: every member in the expected type must exist in the actual type
 
 ### Type-Directed Dispatch
-- C3.1 shape/knowledge split (D36): dispatch reads the SHAPE — `typeShape` (src/slots.ts) walks past member-transparent refinement layers (predicate-carrying, `__members` shared with the parent by object identity); preserveOps/mixin/define layers mint their own member sets and ARE shapes (their overrides run — Liskov). The stored `type` component keeps the full view (refinement bound included); `channelReadRaw(v, "shape")` returns the computed shape; `knowledgeOf(v)` (src/refinements.ts) returns the unified intrinsic-knowledge carrier (bound certificate + predicates, one lattice via `meetKnowledge`). `withType` refuses cross-shape re-stamps post-construction; the `typed_*` literal wrappers are construction points (`withTypeReplacing` corrects typeLiterals' 64-bit Int guess).
+- C3.1 shape/knowledge split (D36): dispatch reads the SHAPE — `typeShape` (src/slots.ts) walks past member-transparent refinement layers (predicate-carrying, `__members` shared with the parent by object identity); preserve-lifted, method-layer, and define types mint their own member sets and ARE shapes (their overrides run — Liskov). The stored `type` component keeps the full view (refinement bound included); `channelReadRaw(v, "shape")` returns the computed shape; `knowledgeOf(v)` (src/refinements.ts) returns the unified intrinsic-knowledge carrier (bound certificate + predicates, one lattice via `meetKnowledge`). `withType` refuses cross-shape re-stamps post-construction; the `typed_*` literal wrappers are construction points (`withTypeReplacing` corrects typeLiterals' 64-bit Int guess).
 - `type_dispatch` checks the value's shape, looks up member descriptor from `__members`, returns a self-bound closure
 - Getter descriptors are called immediately with self; method descriptors return bound functions
 - Field descriptors look up the field value on the instance's primary Context
@@ -143,29 +143,33 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - Type checks at call site: `applyComposed` checks arg types against FunctionType param types before substitution. Handles unions, structural, generics with arg comparison. No type_check wrappers in function bodies.
 - C3.2 (D36): annotations are KNOWLEDGE UPPER-BOUNDS. Passing a Dog through `a: Animal` stamps an occurrence `bound` component — Dog-only members are hidden (`'tricks' is not visible through annotation 'Animal'`) until a `when a is Dog` type pattern narrows the arm; visible members still dispatch through the value's shape (overrides run). Crossing a boundary of the value's own shape resets the bound; intrinsic knowledge (refinement certificates) survives looser annotations. Named nominal concrete types only — Any/function/effect/interface/union/generic annotations set no bound; base Object and module types are open (no hiding).
 
-### Type Hierarchy
-- **Type** — the single meta-type. All types have `__type = Type`. Type self-types (`Type.__type = Type`).
+### Type Hierarchy — the kind tower (C6.1b, D45)
+- **Type** — the root kind. Concrete/record types have `__type = Type`. Type self-types (`Type.__type = Type`, the D7 fixed point).
+- **Refinement** — a SUB-KIND of Type (draws Type's kind-members + declares `refines`/`constraints`). Refined types answer `__type = Refinement`; `Refinement(base, pred)` is the mint `&` sugars; the spec form is `Refinement.define({refines, where, preserve?, ...methods})`.
+- **Interface** — a REFINEMENT of Type (member-transparent over Type's kind API, restricted by the declaration-only predicate: instances hold no value-constructor authority). Interfaces answer `__type = Interface`.
+- The ratified half-lotus matrix: `Type : Type` ✓, `Refinement : Type` ✓, `Interface : Refinement : Type` ✓, `Refinement : Interface` ✗ (holds constructor authority). Pinned by a boundary battery.
+- Constructor authority (D45 R2): `construct` (`__construct` slot) is the per-kind minting member; call-as-function invokes it at every level (`Int(42)`, `Type({v: Int})`, `Refinement(Int, p => p > 0)`); `define` is the named factory delegating to it.
 - `instanceof`/`subtypeof` on Type are ONE unified conformance check (C6.1a, D44): identity, then the loose base-name path when the expected type is anonymous (`~T`, inline `{x: Int}`), then the `__refines` chain (refinement layers), then symbol-identity membership over `__members` (declared conformance — a type conforms by DRAWING the expected type's member symbols). The nominal name-walk is deleted; there is no declared is-a edge outside refinement.
 - **`NominalType`** is retained as a back-compat alias (`NominalType === Type`); existing code reading `Int instanceof NominalType` keeps working. The named-vs-anonymous distinction is now a property of the type value, not of its meta-type.
 - Multiple inheritance is deferred — see `.claude/memory/design_type_system_meta_types.md` for the explicit-conflict design and trigger conditions.
 
 ### Interfaces
-- Declared via `Type.interface({member: Type, ...})` — produces a structural type with `__type = Type`
+- Declared via `Interface.define({member: Type, ...})` — produces a declaration-only type with `__type = Interface`
 - `__members` contains Field descriptors for declared members, plus inherited non-meta members from parent
 - No `__construct`, `__getMember`, or auto-generated methods — interfaces declare structure only
 - `__interface` marker binding distinguishes interfaces from record types
 - **Conformance is DECLARED (C5.2c, D30)**: an interface check is SYMBOL-IDENTITY membership — a type conforms by DRAWING the interface's member symbols (`Point = Type.define({x: Int, y: Int}, HasXY)` binds them), not by spelling the same member names. `42 instanceof Printable` is false unless Int drew Printable's symbols.
 - **Duck-typing is `~T`** (the loose path): `~Printable` projects the interface into the base-name world — `v: ~Printable` accepts any value whose type has a same-named `toString`.
-- Parent inheritance: `Int.interface({extra: Int})` copies Int's member symbols plus `extra`
-- Auto-named when bound to a symbol: `Printable = Type.interface(...)` → name is "Printable"
+- Drawn bundles: `Interface.define({extra: Int}, Int)` copies Int's member symbols plus `extra`
+- Auto-named when bound to a symbol: `Printable = Interface.define(...)` → name is "Printable"
 
-### Mixins
-- Declared via `Type.mixin({method: fn, ...})` — adds Method descriptors to a type's `__members`
-- Returns a new type with the mixin methods added; does not mutate the base type
-- **Error on name conflict**: if a mixin method name already exists in the type's `__members`, throws an error
-- Mixin methods receive `self` (the full typed MultiValue) as first argument — enables field access (`self.x`) and method calls (`self.otherMethod()`) via type dispatch
-- Mixin methods are ComposedFunctions stored in Method descriptors; `type_dispatch_impl` handles self-binding for both PrimitiveFunction and ComposedFunction method descriptors
-- Reusable: put the spec in a variable and pass it to multiple `.mixin()` calls
+### Method Members (the mixin surface is `define` — C6.1b)
+- A `define` spec entry whose value is a FUNCTION VALUE is a method implementation: `Type.define({x: Int, mag: (self) => self.x * self.x}, Int)`. Function TYPES (`toString: Function`) still declare fields.
+- Methods receive `self` (the typed instance) as first argument — field access (`self.x`) and method calls dispatch through the type
+- A method whose name matches a drawn member OVERRIDES it (binds the drawn symbol — C5.2b, same rule as fields); methods do not participate in the positional constructor
+- **Reusable mixins are BUNDLES**: a methods-only spec (`MagMixin = Type.define({mag: (self) => ...})`) mints a pure member set with no auto-generated construct/toString, drawn like any bundle: `Type.define({x: Int, y: Int}, Int, MagMixin)` — and drawing it declares conformance (`A subtypeof MagMixin`)
+- Methods on refined scalars go through the Refinement spec: `Refinement.define({refines: Int, where: p => p > 0, double: self => self + self})` — non-reserved entries must be functions; same-name additions to the base error (no drawn bundle to override)
+- Method impls are ComposedFunctions stored in Method descriptors; `type_dispatch_impl` handles self-binding for both PrimitiveFunction and ComposedFunction descriptors
 
 ### Declared vs Loose Typing (C6.1a — nominal checking is gone)
 - Named types use **declared conformance** by default: `f(x: Animal)` requires x's type to hold Animal's member symbols (drawn via `Type.define(spec, Animal)`) or refine it. There is no name-based is-a walk.
@@ -176,14 +180,14 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - Unnamed type expressions (inline `{ ... }`) are always structural.
 
 ### Refinement Types
-- Declared via `Type & <predicate>` where `_` in the predicate refers to the value being checked: `PositiveInt = Int & _ > 0`. Equivalent to `Int.where(_ => _ > 0)`. (`&` is the type/effect conjunction operator, distinct from `&&` which is purely logical AND since Slice 2 Stage 0.)
+- Declared via `Type & <predicate>` where `_` in the predicate refers to the value being checked: `PositiveInt = Int & _ > 0`. THE constraint surface — `where` and `invariant` folded into it (C6.1b): chained `&` gives per-clause layers (`Int & _ > 0 & _ < 100`), and record predicates reach fields through `_` (`Type.define({lo: Int, hi: Int}) & _.lo <= _.hi`). (`&` is the type/effect conjunction operator, distinct from `&&` which is purely logical AND since Slice 2 Stage 0.)
 - `&&` in expression position is overloaded: if the left operand is a type (has meta-type Type), it creates a refined type via `buildRefinedType`. Otherwise it's logical AND. `typed_and_impl` dispatches at runtime.
 - Compound predicates: `Int & _ > 0 && _ < 100` parses as `Int & ((_ > 0) && (_ < 100))` because `&` is at a looser precedence than `&&`. The whole `_ > 0 && _ < 100` becomes a single predicate body; `domainFromPredicate` recognises the conjunction as a single interval (`[1, 99]`) for compile-time reasoning.
 - Predicate is an Allegro lambda with parameter `_`. `buildRefinedType` stores it as `__predicate` on the refined type.
 - **Construction check**: `__construct` wrapper evaluates the predicate on the constructed value. If false, returns an error value instead of the refined value.
 - **Annotation/call-site check**: `type_check_impl` and `checkArgType` evaluate `__predicate` after the nominal/structural base check passes. Short-circuits when `actualType === expectedType` (value was already refined through the same type).
 - **Partial evaluation integration**: predicates are Allegro expressions, so they partially evaluate naturally with known values. Unresolved predicates produce residual type checks.
-- **`preserveOps`**: `(Int & _ > 0).preserveOps(add, sub)` or `.preserveOps()` (all numeric ops). Creates a new refined type where named operators are lifted: after the parent op runs, the result is fed through `__construct`, re-running the predicate check and tagging with the refined type. This makes `x + 3` where `x: PositiveInt` produce a `PositiveInt` instead of bare `Int`.
+- **Operator preservation**: `Refinement.define({refines: Int, where: p => p > 0, preserve: ["add", "sub"]})` (or `preserve: "all"` for the default numeric set). Lifts the named operators: after the parent op runs, the result is fed through `__construct`, re-running the predicate check and tagging with the refined type. This makes `x + 3` where `x: PositiveInt` produce a `PositiveInt` instead of bare `Int`.
 
 ## Parser (Hybrid: Pratt + Recursive Descent)
 
@@ -322,10 +326,10 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - `generics.alg` — Array[Int], generic type annotations, type_apply
 - `function-types.alg` — function type signatures, type variable unification
 - `pattern-match.alg` — when/is/then pattern matching, multivalue access
-- `interfaces.alg` — Type.interface, structural conformance, parent inheritance
+- `interfaces.alg` — Interface.define, declared conformance, drawn bundles
 - `typed-types.alg` — types as typed values, Int instanceof NominalType, meta-type checks
 - `refinements.alg` — refinement types via `&`, compound predicates, preserveOps operator lifting
-- `mixins.alg` — mixin methods, field access via self, reusable specs, multi-arg methods
+- `mixins.alg` — method-valued define entries, field access via self, reusable bundles, multi-arg methods
 - `grammar-runtime.alg` — `use_grammar pow` header plus `**`/`neg` from `lib/pow.alg`
 
 ## Base Parser Syntax
@@ -476,9 +480,9 @@ nums.map(x: Int => x * 2)
 (x: Int, y: Int): Int => x + y
 
 // Interfaces (DECLARED conformance — C5.2c/D30)
-Printable = Type.interface({toString: Function})
+Printable = Interface.define({toString: Function})
 42 instanceof Printable           // false — Int never DREW Printable's symbols
-HasXY = Type.interface({x: Int, y: Int})
+HasXY = Interface.define({x: Int, y: Int})
 Point = Type.define({x: Int, y: Int}, HasXY)  // drawing the interface binds its symbols
 Point(1, 2) instanceof HasXY      // true — declared conformance
 is_printable(v: ~Printable) => true      // ~T is the loose duck-typing path
@@ -499,7 +503,7 @@ double(x: PositiveInt): Int => x * 2
 double(5)                         // → 10 (bare Int passes predicate check)
 
 // preserveOps — lift operators to preserve the refinement
-PI = (Int & _ > 0).preserveOps()
+PI = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})
 x = PI(5)
 y = x + 3                         // y: PositiveInt, re-checked after +
 y instanceof PI                   // → true
@@ -558,7 +562,7 @@ See `BACKLOG.md` for full roadmap. Key completed items:
 - ✅ Guard clauses (`and` keyword in patterns)
 - ✅ Nested destructuring (colon introduces sub-pattern, recursive matching)
 - ✅ Member descriptors (`__members`): unified Method/Field types, structural checking via member comparison, meta-type methods in `__members`
-- ✅ Interfaces: `Type.interface({...})` — structural type matching, no `implements` keyword needed
+- ✅ Interfaces: `Interface.define({...})` — structural type matching, no `implements` keyword needed
 - ✅ Types as typed values: `Int instanceof NominalType`, `type of Int` → NominalType, all type bindings wrapped as MultiValues
 - ✅ Array map/filter/reduce as Allegro ComposedFunctions (recursive AST construction, not imperative TypeScript loops)
 - ✅ Refinement types: `Type & _ > 0` syntax, predicate checking at construction/annotation/call sites, `preserveOps` operator lifting for refinement preservation through operators (`&&` was the original operator; migrated to `&` in Slice 2 Stage 0 to free `&&` for purely logical AND)

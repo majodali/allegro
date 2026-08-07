@@ -237,7 +237,7 @@ print(p.x)
 print(p instanceof Point)
 
 // Refinement type
-PositiveInt = Int.where(n => n > 0)
+PositiveInt = Int & _ > 0
 print(PositiveInt(5))
 x = PositiveInt(0 - 1)
 print(error of x)

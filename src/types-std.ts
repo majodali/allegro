@@ -29,10 +29,11 @@ import {
 
 // --- Constants ---
 
-/** Meta-method names that should NOT be copied into new types during define/interface */
+/** Meta-method names that should NOT be copied into new types during define/interface.
+ *  C6.1b: the fluent names (where/interface/preserveOps/mixin/invariant)
+ *  left with the fluent API; the surviving kind API is small. */
 const META_METHOD_NAMES = new Set([
-  "instanceof", "subtypeof", "define", "where", "distinct",
-  "constructor", "interface", "preserveOps", "mixin", "invariant",
+  "instanceof", "subtypeof", "define", "distinct", "constructor",
 ]);
 
 // --- Helpers ---
@@ -717,11 +718,22 @@ function buildRecordType(
   if (fieldCtx.kind !== ValueKind.Context) {
     throw new AllegroError("define: argument must be an object literal {field: Type, ...}");
   }
+  // C6.1b (D45): the spec unifies fields and methods — an entry whose
+  // value is a FUNCTION VALUE (ComposedFunction / PrimitiveFunction) is a
+  // method implementation (the old `.mixin()` surface); anything else —
+  // including function TYPES like `toString: Function` — declares a typed
+  // field. Methods do not participate in the positional constructor.
   const fields: { name: string; type: Value }[] = [];
+  const methods: { name: string; impl: Value }[] = [];
   for (const [key, binding] of (fieldCtx as ContextValue).bindings) {
     if (isMetaSlotKey(key)) continue;
     if (binding.value) {
-      fields.push({ name: key, type: binding.value });
+      const entry = dataOf(binding.value);
+      if (entry.kind === ValueKind.ComposedFunction || entry.kind === ValueKind.PrimitiveFunction) {
+        methods.push({ name: key, impl: entry });
+      } else {
+        fields.push({ name: key, type: binding.value });
+      }
     }
   }
 
@@ -749,6 +761,25 @@ function buildRecordType(
       makeFieldDescriptor(f.name, f.type));
   }
 
+  // Method entries (the unified mixin surface). A method whose base name
+  // matches a drawn member DRAWS that symbol — an override that keeps
+  // member identity (C5.2b); new names get type-local symbols. Methods
+  // receive `self` (the typed instance) as their first argument;
+  // type_dispatch handles both PrimitiveFunction and ComposedFunction
+  // descriptors with self-binding.
+  for (const m of methods) {
+    const key = drawMemberKey(drawn, m.name, recordScope);
+    if (m.impl.kind === ValueKind.PrimitiveFunction) {
+      addMemberAt(members, key, makeMethodDescriptor(m.name, m.impl as PrimitiveFunctionValue));
+    } else {
+      const desc = makeContext();
+      writeShape(desc, MethodType);
+      addBinding(desc, "name", stringToBits(m.name));
+      addBinding(desc, "value", m.impl);
+      addMemberAt(members, key, desc);
+    }
+  }
+
   // Copy non-meta Method descriptors from each drawn bundle's __members.
   // C5.2a: keys are member-symbol FQNs — copied verbatim (same symbol,
   // same key); the meta filter compares the base-name projection.
@@ -762,6 +793,19 @@ function buildRecordType(
         addBinding(members, key, binding.value);
       }
     }
+  }
+
+  // A METHODS-ONLY spec mints a BUNDLE — a pure member set meant to be
+  // drawn into other types (`Type.define(spec, ..., MagMixin)`), not
+  // instantiated. Bundles get no auto-generated construct / getMember /
+  // toString: the generated infrastructure would clash symbol-wise with
+  // every other concrete bundle at draw time (two auto-toStrings under
+  // one base name is the D44 explicit-conflict error). An empty spec
+  // (`Type.define({})`) still mints a full record type.
+  const isBundle = fields.length === 0 && methods.length > 0;
+  if (isBundle) {
+    setMembers(newType, members);
+    return newType;
   }
 
   // Auto-generate __construct: positional args in field order
@@ -814,9 +858,12 @@ function buildRecordType(
     return withType(stringToBits(`${typeName}(${parts.join(", ")})`), StringType);
   }) as PrimitiveFnImpl);
   // toString draws a bundle's symbol if one exists (an override, same
-  // member identity); otherwise it gets a type-local symbol.
-  addMemberAt(members, drawMemberKey(drawn, "toString", recordScope),
-    makeMethodDescriptor("toString", toStringImpl));
+  // member identity); otherwise it gets a type-local symbol. A toString
+  // METHOD supplied in the spec wins over the auto-generated one.
+  if (!methods.some((m) => m.name === "toString")) {
+    addMemberAt(members, drawMemberKey(drawn, "toString", recordScope),
+      makeMethodDescriptor("toString", toStringImpl));
+  }
 
   setMembers(newType, members);
 
@@ -831,12 +878,12 @@ function buildRecordType(
  * No __construct, __getMember, or auto-generated methods.
  */
 function buildInterfaceType(
-  parentType: ContextValue,
   memberSpecObj: Value,
+  drawn: ContextValue[],
 ): ContextValue {
   const specCtx = dataOf(memberSpecObj);
   if (specCtx.kind !== ValueKind.Context) {
-    throw new AllegroError("interface: argument must be an object literal {member: Type, ...}");
+    throw new AllegroError("Interface.define: argument must be an object literal {member: Type, ...}");
   }
 
   // Extract declared members from the spec
@@ -862,27 +909,30 @@ function buildInterfaceType(
   // Build __members: declared members as Field descriptors
   const members = makeContext();
 
-  // Copy non-meta Method descriptors from parent's __members (C5.2a:
-  // FQN keys copied verbatim; meta filter on the base-name projection).
-  const metaMethodNames = META_METHOD_NAMES;
-  const parentMembers = getMembers(parentType);
-  if (parentMembers?.kind === ValueKind.Context) {
-    for (const [key, binding] of (parentMembers as ContextValue).bindings) {
-      if (metaMethodNames.has(fqnBaseName(key))) continue;
-      if (binding.value) {
-        addBinding(members, key, binding.value);
-      }
-    }
-  }
-
-  // Add Field descriptors for each declared member. C5.2b: declarations
-  // draw from the parent (a matching base name binds the parent's member
-  // symbol); new names get interface-local symbols.
+  // Add Field descriptors for each declared member first. C5.2b:
+  // declarations draw from the bundles (a matching base name binds the
+  // drawn member symbol); new names get interface-local symbols.
   const ifaceScope = newTypeMemberScope();
   (ifaceType as any).__localMemberScope = ifaceScope;
   for (const m of declaredMembers) {
-    addMemberAt(members, drawMemberKey([parentType], m.name, ifaceScope),
+    addMemberAt(members, drawMemberKey(drawn, m.name, ifaceScope),
       makeFieldDescriptor(m.name, m.type));
+  }
+
+  // Copy non-meta members from each drawn bundle (C5.2a: FQN keys copied
+  // verbatim; meta filter on the base-name projection) — the old
+  // parent-inheritance form `Int.interface(spec)` is now
+  // `Interface.define(spec, Int)`.
+  const metaMethodNames = META_METHOD_NAMES;
+  for (const bundle of drawn) {
+    const bundleMembers = getMembers(bundle);
+    if (bundleMembers?.kind !== ValueKind.Context) continue;
+    for (const [key, binding] of (bundleMembers as ContextValue).bindings) {
+      if (metaMethodNames.has(fqnBaseName(key))) continue;
+      if (!members.bindings.has(key) && binding.value) {
+        addBinding(members, key, binding.value);
+      }
+    }
   }
 
   setMembers(ifaceType, members);
@@ -1002,109 +1052,10 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   return refinedType;
 }
 
-/**
- * Build an invarianted type (Phase C Chunk 4): a type that carries one or
- * more lifecycle invariants — predicates that must hold for every instance
- * throughout its lifetime. Multiple invariants chain via repeated
- * `.invariant()` calls; each is stored separately so introspection and
- * proof-search can address them by source.
- *
- * `invariant` is the multi-predicate, multi-field counterpart to `where`:
- *   - `where` is for value-level refinement on a primitive type
- *     (`Int && _ > 0`).
- *   - `invariant` is for record/struct types where the predicate references
- *     fields (`self.balance >= 0`) and where readability benefits from
- *     each rule being a separate clause.
- *
- * Mechanically the runtime story is the same as a refinement: the
- * constructor runs the predicate; failure produces a counterexample-bearing
- * error; success re-tags the value with the invarianted type and attaches
- * the predicate's recognised abstract domain to the value's predicate set.
- *
- * Inheritance: a derived type via `.extend` automatically inherits the
- * parent's invariants because the hidden `__invariantsList` field is
- * carried forward in the standard binding-copy loop. (Parent's invariants
- * stay separate from the child's via list concatenation.)
- */
-export function buildInvariantedType(parentType: ContextValue, predicate: Value): ContextValue {
-  const newType = makeContext();
-
-  // Copy parent's bindings (everything except __construct, which we wrap
-  // below, and __members, shared explicitly; everything else inherited).
-  for (const [key, binding] of parentType.bindings) {
-    if (key === SLOT_KEYS.construct) continue;
-    if (key === SLOT_KEYS.members) continue;
-    if (binding.value) addBinding(newType, key, binding.value);
-  }
-  // C5.2a (ruling R1): the invariant layer is member-transparent — it
-  // SHARES the parent's member-set object (knowledge, not shape), stated
-  // explicitly rather than riding through the blanket copy.
-  const parentMembersShared = getMembers(parentType);
-  if (parentMembersShared) setMembers(newType, parentMembersShared);
-
-  // Inherit any existing invariants list from the parent and append the new
-  // predicate. Stored as a hidden JS array so the constructor wrapper can
-  // iterate without going through the bindings table.
-  const parentInvariants = (parentType as any).__invariantsList ?? [];
-  const newInvariants: Value[] = [...parentInvariants, predicate];
-  (newType as any).__invariantsList = newInvariants;
-
-  // Wrap parent's constructor so each invariant is checked after parent
-  // construction.
-  const parentConstruct = getConstruct(parentType);
-  if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    setConstruct(newType, makePrimitive("invariant.__construct", (args, ctx, evalFn) => {
-      // Call parent constructor first.
-      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-
-      // Error propagation: parent's own invariant / refinement check might
-      // have failed already; pass the error through unchanged rather than
-      // re-tagging with this layer.
-      if (channelReadRaw(value, "error") !== undefined) return value;
-
-      // Apply each invariant in declaration order. First failure → error.
-      for (let i = 0; i < newInvariants.length; i++) {
-        const inv = newInvariants[i];
-        const checkResult = evalFn!(makeExpr(inv, [value]), ctx!);
-        const checkP = dataOf(checkResult);
-        if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
-          // Build a counterexample-style error message. For invariants on
-          // record types, render the field name(s) the predicate touched if
-          // we can recognise them; otherwise just say "invariant N failed."
-          const idx = i;
-          const msg = `invariant ${idx + 1} failed`;
-          const components = new Map<string, Value>();
-          components.set("error", withType(stringToBits(msg), StringType));
-          components.set("type", ErrorType);
-          return makeMultiValue(makeInt(0), components);
-        }
-      }
-
-      // Re-tag with the invarianted type. Also attach the recognised
-      // abstract domain (if any) of each invariant to the value's
-      // predicate set — same machinery as buildRefinedType so consumers
-      // see the inferred refinement on the result.
-      const typed = withTypeReplacing(dataOf(value), newType);
-      try {
-        const preds: Predicate[] = [];
-        for (const inv of newInvariants) {
-          const dom = domainFromPredicate(inv);
-          if (dom.kind !== "opaque") {
-            preds.push({ shape: dom, source: "type-invariant" });
-          }
-        }
-        if (preds.length > 0) {
-          return rfWithPredicates(typed, new PredicateSet(preds));
-        }
-      } catch {
-        /* fall through if the helper isn't available */
-      }
-      return typed;
-    }, true));
-  }
-
-  return newType;
-}
+// C6.1b (D45): buildInvariantedType is DELETED — lifecycle invariants are
+// ordinary refinements now (`T & pred`, chained per clause). The
+// `__invariantsList` slot has no remaining writer; its registry entry is
+// swept in C6.3's slot-disposition pass.
 
 /**
  * Build a distinct type: copies parent, breaks subtypeof chain.
@@ -1255,88 +1206,67 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
   return newType;
 }
 
-/**
- * Add mixin methods to a type. Takes a method spec object (key → function)
- * and returns a new type with the methods added to __members as Method descriptors.
- * Errors on name conflict (method already exists in __members).
- */
-function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
-  const specCtx = dataOf(specObj);
-  if (specCtx.kind !== ValueKind.Context) {
-    throw new AllegroError("mixin: argument must be an object literal {method: fn, ...}");
-  }
+// C6.1b (D45): buildMixinType is DELETED — method implementations are
+// method-valued entries in `define` specs (drawing resolves overrides),
+// and reusable mixins are ordinary bundle types drawn via
+// `Type.define(spec, ..., MixinBundle)`. What remains of its machinery
+// is buildMethodLayer below, reached through kind specs.
 
-  // Extract method specs
-  const methods: { name: string; impl: Value }[] = [];
-  for (const [key, binding] of (specCtx as ContextValue).bindings) {
-    if (isMetaSlotKey(key)) continue;
-    if (binding.value) {
-      methods.push({ name: key, impl: binding.value });
-    }
-  }
-
-  // Build new type (clone baseType except __members and __construct)
+/** Mint a member layer over a base type carrying additional method
+ *  implementations — the surviving core of the mixin machinery, reached
+ *  through kind specs (`Refinement.define({refines, where, double: self
+ *  => …})`). Clones the base's bindings, mints an OWN member set (a
+ *  shape layer — overrides run, C3.1), adds the methods as type-local
+ *  symbols, and retags construction through the base's construct chain.
+ *  Same-name additions are refused (no drawn bundles here, so a match
+ *  is a genuine clash with the base, not an override declaration). */
+function buildMethodLayer(baseType: ContextValue, methods: { name: string; impl: Value }[]): ContextValue {
   const newType = makeContext();
   for (const [key, binding] of baseType.bindings) {
     if (key === SLOT_KEYS.members || key === SLOT_KEYS.construct) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
-
-  // Clone __members and add mixin methods
-  const parentMembers = getMembers(baseType);
+  // The abstract domain rides as a JS-side property (not a binding) —
+  // carry it so downstream layers (preserve) keep constraint rendering.
+  const dom = getAbstractDomain(baseType);
+  if (dom !== undefined) setAbstractDomain(newType, dom);
   const newMembers = makeContext();
-  if (parentMembers?.kind === ValueKind.Context) {
-    for (const [key, binding] of (parentMembers as ContextValue).bindings) {
+  const baseMembers = getMembers(baseType);
+  if (baseMembers?.kind === ValueKind.Context) {
+    for (const [key, binding] of (baseMembers as ContextValue).bindings) {
+      if (META_METHOD_NAMES.has(fqnBaseName(key))) continue;
       if (binding.value) addBinding(newMembers, key, binding.value);
     }
   }
-
-  const mixinScope = newTypeMemberScope();
-  (newType as any).__localMemberScope = mixinScope;
+  const layerScope = newTypeMemberScope();
+  (newType as any).__localMemberScope = layerScope;
   for (const m of methods) {
-    // Check for conflict — multi-bind-aware (C5.2b): the projection scan
-    // counts distinct TARGETS under the base name; any existing target is
-    // a conflict (mixin refuses same-name additions, D30 default).
     if (memberBindingByName(newMembers, m.name) !== undefined) {
-      throw new AllegroError(`mixin: method '${m.name}' conflicts with existing member`);
+      throw new AllegroError(`method '${m.name}' conflicts with an existing member`);
     }
-    // Mixin methods are NEW members by definition → type-local symbols.
-    const key = memberFqnIn(mixinScope, m.name);
-    // Wrap ComposedFunctions in a PrimitiveFn that the descriptor expects,
-    // or use PrimitiveFunctions directly
+    const key = memberFqnIn(layerScope, m.name);
     const impl = dataOf(m.impl);
     if (impl.kind === ValueKind.PrimitiveFunction) {
       addMemberAt(newMembers, key, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
     } else if (impl.kind === ValueKind.ComposedFunction) {
-      // Store the ComposedFunction directly — type_dispatch handles it
       const desc = makeContext();
       writeShape(desc, MethodType);
       addBinding(desc, "name", stringToBits(m.name));
       addBinding(desc, "value", impl);
       addMemberAt(newMembers, key, desc);
     } else {
-      throw new AllegroError(`mixin: '${m.name}' must be a function`);
+      throw new AllegroError(`'${m.name}' must be a function`);
     }
   }
-
   setMembers(newType, newMembers);
-
-  // Rebuild __construct: delegate to parentConstruct (which already chains all
-  // predicate checks through nested refinements), then retag with newType. This
-  // handles arbitrary refinement depth naturally — a previous implementation
-  // tried to skip one level and re-apply the immediate predicate, which was
-  // correct for a single level but fragile if the shape ever changed. If the
-  // parent's construct produces an error MultiValue (refinement failure), we
-  // propagate it without retagging.
   const parentConstruct = getConstruct(baseType);
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    setConstruct(newType, makePrimitive("mixin.__construct", (args, ctx, evalFn) => {
+    setConstruct(newType, makePrimitive("methods.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
       if (channelReadRaw(value, "error") !== undefined) return value;
       return withTypeReplacing(dataOf(value), newType);
     }, true));
   }
-
   return newType;
 }
 
@@ -1386,16 +1316,12 @@ addMember(typeMembers, TYPE_MEMBER_SCOPE, "define", makeMethodDescriptor("define
     return (construct as PrimitiveFunctionValue).fn(args.slice(1), ctx, evalFn);
   })
 ));
-addMember(typeMembers, TYPE_MEMBER_SCOPE, "where", makeMethodDescriptor("where",
-  makePrimitive("Type.where", (args) => {
-    return wrapType(buildRefinedType(args[0] as ContextValue, args[1]));
-  })
-));
-addMember(typeMembers, TYPE_MEMBER_SCOPE, "invariant", makeMethodDescriptor("invariant",
-  makePrimitive("Type.invariant", (args) => {
-    return wrapType(buildInvariantedType(args[0] as ContextValue, args[1]));
-  })
-));
+// C6.1b (D45): the fluent API is REMOVED decisively — `where` and
+// `invariant` are the refinement mint (`T & pred`, chained for multiple
+// clauses); `interface` is `Interface.define(spec, ...bundles)`; `mixin`
+// is method-valued entries in `define` specs (or drawing a bundle);
+// `preserveOps` is the Refinement spec's `preserve` option. `distinct`
+// and `constructor` remain pending their own kind-spec designs.
 addMember(typeMembers, TYPE_MEMBER_SCOPE, "distinct", makeMethodDescriptor("distinct",
   makePrimitive("Type.distinct", (args) => {
     return wrapType(buildDistinctType(args[0] as ContextValue));
@@ -1411,29 +1337,6 @@ addMember(typeMembers, TYPE_MEMBER_SCOPE, "constructor", makeMethodDescriptor("c
       return withTypeReplacing(dataOf(result), type);
     }, true));
     return wrapType(type);
-  })
-));
-addMember(typeMembers, TYPE_MEMBER_SCOPE, "interface", makeMethodDescriptor("interface",
-  makePrimitive("Type.interface", (args) => {
-    return wrapType(buildInterfaceType(args[0] as ContextValue, args[1]));
-  })
-));
-addMember(typeMembers, TYPE_MEMBER_SCOPE, "preserveOps", makeMethodDescriptor("preserveOps",
-  makePrimitive("Type.preserveOps", (args) => {
-    const type = args[0] as ContextValue;
-    const opNames: string[] = [];
-    for (let i = 1; i < args.length; i++) {
-      const p = dataOf(args[i]);
-      if (p.kind === ValueKind.Bits) {
-        opNames.push(bitsToString(p as BitsValue));
-      }
-    }
-    return wrapType(buildPreserveOps(type, opNames));
-  })
-));
-addMember(typeMembers, TYPE_MEMBER_SCOPE, "mixin", makeMethodDescriptor("mixin",
-  makePrimitive("Type.mixin", (args) => {
-    return wrapType(buildMixinType(args[0] as ContextValue, args[1]));
   })
 ));
 setMembers(Type, typeMembers);
@@ -2171,13 +2074,70 @@ writeShape(RefinementKind, Type);
 }
 // Constructor authority (D45 R2): `Refinement(base, predicate)` IS the
 // refinement mint — the `&` operator (`Int & _ > 0`) is its operator form.
+// The kind-specific SPEC form (the surface `define` exposes) is
+//   Refinement.define({refines: T, where: pred, preserve: [ops] | "all"})
+// — `preserve` lifts the named operators (or the default numeric set) so
+// results re-check the predicate and keep the refined tag (the old
+// `.preserveOps()` fluent surface, folded into the spec per D45).
 setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx, evalFn) => {
-  const base = dataOf(evalFn!(args[0], ctx!));
-  if (base.kind !== ValueKind.Context) {
+  const first = dataOf(evalFn!(args[0], ctx!));
+  if (first.kind !== ValueKind.Context) {
     throw new AllegroError("Refinement: base must be a type");
   }
+  const specRefines = args.length === 1
+    ? (first as ContextValue).bindings.get("refines")?.value : undefined;
+  if (specRefines !== undefined) {
+    const base = dataOf(specRefines);
+    if (base.kind !== ValueKind.Context) {
+      throw new AllegroError("Refinement: `refines` must be a type");
+    }
+    const wherePred = (first as ContextValue).bindings.get("where")?.value;
+    if (wherePred === undefined) {
+      throw new AllegroError("Refinement: spec requires a `where` predicate");
+    }
+    let refined = buildRefinedType(base as ContextValue, dataOf(wherePred));
+    // Non-reserved spec entries are METHOD implementations layered onto
+    // the refined type (the old `.mixin()` on refinements): every entry
+    // beyond refines/where/preserve must be a function value. The method
+    // layer goes on BEFORE preserve — the preserve layer clones its
+    // input's member set (methods survive) and its lifted ops retag
+    // results with the OUTERMOST type, so `x + 3 instanceof PI` holds.
+    const RESERVED_REFINEMENT_KEYS = new Set(["refines", "where", "preserve"]);
+    const extraMethods: { name: string; impl: Value }[] = [];
+    for (const [k, b] of (first as ContextValue).bindings) {
+      if (isMetaSlotKey(k) || RESERVED_REFINEMENT_KEYS.has(k)) continue;
+      if (!b.value) continue;
+      const entry = dataOf(b.value);
+      if (entry.kind !== ValueKind.ComposedFunction && entry.kind !== ValueKind.PrimitiveFunction) {
+        throw new AllegroError(
+          `Refinement: spec entry '${k}' must be a method (function value) — fields live on record kinds`);
+      }
+      extraMethods.push({ name: k, impl: entry });
+    }
+    if (extraMethods.length > 0) {
+      refined = buildMethodLayer(refined, extraMethods);
+    }
+    const preserve = (first as ContextValue).bindings.get("preserve")?.value;
+    if (preserve !== undefined) {
+      const p = dataOf(preserve);
+      const opNames: string[] = [];
+      if (p.kind === ValueKind.Bits) {
+        const s = bitsToString(p as BitsValue);
+        if (s !== "all") throw new AllegroError(`Refinement: preserve must be "all" or a list of operator names (got "${s}")`);
+      } else if (p.kind === ValueKind.Context) {
+        for (const el of arrayElements(p as ContextValue)) {
+          const e = dataOf(el);
+          if (e.kind === ValueKind.Bits) opNames.push(bitsToString(e as BitsValue));
+        }
+      } else {
+        throw new AllegroError("Refinement: preserve must be \"all\" or a list of operator names");
+      }
+      refined = buildPreserveOps(refined, opNames);
+    }
+    return wrapType(refined);
+  }
   const predicate = evalFn!(args[1], ctx!);
-  return wrapType(buildRefinedType(base as ContextValue, predicate));
+  return wrapType(buildRefinedType(first as ContextValue, predicate));
 }, true));
 
 // Type's own constructor authority: `Type(spec, ...bundles)` mints a
@@ -2212,7 +2172,15 @@ setName(InterfaceKind, stringToBits("Interface"));
 removeConstruct(InterfaceKind);
 setConstruct(InterfaceKind, makePrimitive("Interface.__construct", (args, ctx, evalFn) => {
   const spec = evalFn!(args[0], ctx!);
-  return wrapType(buildInterfaceType(Type, spec));
+  const drawn: ContextValue[] = [];
+  for (let i = 1; i < args.length; i++) {
+    const b = dataOf(evalFn!(args[i], ctx!));
+    if (b.kind !== ValueKind.Context) {
+      throw new AllegroError("Interface: drawn bundles must be types");
+    }
+    drawn.push(b as ContextValue);
+  }
+  return wrapType(buildInterfaceType(spec, drawn));
 }, true));
 
 /** C6.1b: the kinds whose `define`/call-as-function mint type-values.

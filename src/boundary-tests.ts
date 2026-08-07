@@ -463,7 +463,7 @@ export const DIFFERENTIAL_FIXTURES: { name: string; src: string; bind: string; e
   { name: "eff-pure", src: "sq(x) => x * x", bind: "sq", expect: "fmt=<function(1)> | eff=- | err=-" },
   { name: "typed-result-shape", src: "r = 2 + 3", bind: "r", expect: "fmt=5 | eff=- | err=-" },
   { name: "typed-cmp-bool", src: "r = 3 < 5", bind: "r", expect: "fmt=true | eff=- | err=-" },
-  { name: "refined-preserve", src: "PI = (Int & _ > 0).preserveOps()\nx = PI(5)\ny = x + 3", bind: "y", expect: "fmt=8 | eff=- | err=-" },
+  { name: "refined-preserve", src: "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\nx = PI(5)\ny = x + 3", bind: "y", expect: "fmt=8 | eff=- | err=-" },
 ];
 
 export function runDifferentialFixture(f: { src: string; bind: string }): string {
@@ -900,7 +900,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
 
   test("shape/knowledge split (C3.1): a type that mints members IS a shape (preserveOps)", () => {
     const { evalCtx } = evalSource(
-      "PI = (Int & _ > 0).preserveOps()\ny = PI(5)\nz = y + 3",
+      "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\ny = PI(5)\nz = y + 3",
       undefined, [createTypeSystem()], undefined, true);
     const y = evalCtx.bindings.get("y")!.value as Value;
     const shape = channelReadRaw(y, "shape") as ContextValue;
@@ -1035,7 +1035,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
   test("observation effect (C3.3): nested refinements re-check the whole chain; shapes stay nominal", () => {
     const r = evalSource(
       "SmallPos = Int & _ > 0 && _ < 100\nok = 50 instanceof SmallPos\nhigh = 150 instanceof SmallPos\n" +
-      "PI = (Int & _ > 0).preserveOps()\nbare = 8 instanceof PI\ntagged = PI(5) instanceof PI",
+      "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\nbare = 8 instanceof PI\ntagged = PI(5) instanceof PI",
       undefined, [createTypeSystem()], undefined, true);
     const num = (k: string) => Number((dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
     eq(num("ok"), 1, "nested predicate chain re-checked (50 ∈ [1,99])");
@@ -1374,9 +1374,9 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
   test("symbol-keyed members (C5.2a): typeShape's sharing invariant survives the re-keying", () => {
     // Refinement layers still SHARE the parent's member-set object (ruling
     // R1), so member-transparency-by-identity keeps working — including the
-    // now-explicit sharers (invariant layers, structural wrap).
+    // now-explicit sharers (chained clause layers, structural wrap).
     const r = evalSource(
-      "P = Int & _ > 0\nQ = Int.invariant(x => x > 0)",
+      "P = Int & _ > 0\nQ = Int & _ > 0 & _ < 100",
       undefined, [createTypeSystem()], undefined, true);
     const intMembers = getMembers(dataOf(IntType as unknown as Value) as ContextValue);
     for (const name of ["P", "Q"]) {
@@ -1424,7 +1424,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
 
   test("draw-from (C5.2b): lifted preserveOps ops bind the parent op's symbol; meta wart fixed", () => {
     const r = evalSource(
-      "PI = (Int & _ > 0).preserveOps()\nx = PI(5)\ny = x + 3",
+      "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\nx = PI(5)\ny = x + 3",
       undefined, [createTypeSystem()], undefined, true);
     const pi = dataOf(r.evalCtx.bindings.get("PI")!.value!) as ContextValue;
     const piMembers = getMembers(pi) as ContextValue;
@@ -1478,7 +1478,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // UNDECLARED context does NOT satisfy an interface check, while ~T
     // still matches it by base name.
     const r = evalSource(
-      "Greets = Type.interface({greet: Function})\n" +
+      "Greets = Interface.define({greet: Function})\n" +
       "Greeter = Type.define({greet: Function}, Greets)\n" +
       "Stranger = Type.define({greet: Function})\n" +
       "g = Greeter(0)\ns = Stranger(0)\n" +
@@ -1505,8 +1505,8 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
   test("define (D45): Type.define(spec, ...bundles) — fresh, drawn, and diamond forms", () => {
     const r = evalSource(
       "Fresh = Type.define({v: Int})\n" +
-      "HasX = Type.interface({x: Int})\n" +
-      "HasY = Type.interface({y: Int})\n" +
+      "HasX = Interface.define({x: Int})\n" +
+      "HasY = Interface.define({y: Int})\n" +
       "Point = Type.define({x: Int, y: Int}, HasX, HasY)\n" +
       "p = Point(1, 2)\ns = p.x + p.y\n" +
       "a = Point subtypeof HasX\n" +
@@ -1570,7 +1570,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "P = Int & _ > 0\n" +
       "g = P instanceof Refinement\n" +            // refined types are Refinement instances
       "h = P instanceof Type\n" +                  // …conforming to Type through the kind
-      "Printable = Type.interface({toString: Function})\n" +
+      "Printable = Interface.define({toString: Function})\n" +
       "i = Printable instanceof Interface\n" +     // interfaces are Interface instances
       "j = Printable instanceof Refinement\n" +    // …but NOT Refinement instances
       "k = 42 instanceof Refinement\n" +           // data values are not types
@@ -1604,6 +1604,31 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // `type of P` IS the Refinement kind object (identity, not name match).
     const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as ContextValue;
     eq(getType(p) === RefinementKindTS, true, "a refined type's meta IS the Refinement kind");
+  });
+
+  test("kind tower (C6.1b, D45): the fluent API is gone; kind specs replace it", () => {
+    // Removed decisively (maintainer ruling): no sugar, no fallback.
+    for (const call of ["Int.where(n => n > 0)", "Interface.define({x: Int}).mixin({m: (s) => s})",
+                        "(Int & _ > 0).preserveOps()", "Int.invariant(s => s > 0)", "Type.interface({x: Int})"]) {
+      let threw = false;
+      try {
+        evalSource(`T = ${call}`, undefined, [createTypeSystem()], undefined, true);
+      } catch { threw = true; }
+      eq(threw, true, `fluent call must fail: ${call}`);
+    }
+    // The replacements, end to end: preserve lifts ops through the spec;
+    // spec methods dispatch; bundles draw.
+    const r = evalSource(
+      "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\", double: self => self + self})\n" +
+      "x = PI(5)\ny = x + 3\nz = y instanceof PI\nd = x.double()\n" +
+      "M = Type.define({mag: (self) => self.v * self.v})\n" +
+      "V = Type.define({v: Int}, M)\nm = V(9).mag()\nc = V subtypeof M",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(r.evalCtx.bindings.get("y")!.value!), "8", "preserve: lifted op keeps the refinement");
+    eq(formatValue(r.evalCtx.bindings.get("z")!.value!), "true", "…and the result answers instanceof");
+    eq(formatValue(r.evalCtx.bindings.get("d")!.value!), "10", "spec method dispatches with self");
+    eq(formatValue(r.evalCtx.bindings.get("m")!.value!), "81", "a methods-only BUNDLE draws into a record");
+    eq(formatValue(r.evalCtx.bindings.get("c")!.value!), "true", "drawing the bundle declares conformance");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------

@@ -597,9 +597,41 @@ interface diamonds resolve via draw-from, concrete-bundle conflicts
 error explicitly). Guards preserve pre-C6.2/C6.3 semantics: effect
 types keep chain-only subtyping until Effect is re-derived, and
 predicate-carrying shapes keep C3.3's construction-through-chain
-`instanceof`. Remaining for C6.1b: the kind recipe itself (Interface /
-Refinement as kinds, `construct` authority, fluent-API removal, the
-half-lotus battery, `&` as operator mint).*
+`instanceof`.*
+
+*Status (2026-08, C6.1b): the kind tower lands. Refinement is minted as
+a sub-kind of Type (draws Type's kind-members verbatim + declares
+`refines`/`constraints`); Interface is minted THROUGH the refinement
+mint itself (member-transparent over Type, restricted by the
+declaration-only predicate). `buildRefinedType` stamps `__type =
+Refinement`, `buildInterfaceType` stamps `__type = Interface`; the
+half-lotus matrix is a boundary battery and every cell answers as
+ratified — `Refinement : Interface` is FALSE precisely because the C3.3
+predicate re-check sees Refinement's constructor authority. Constructor
+authority is uniform: `construct` is the per-kind minting member,
+call-as-function invokes it at every level (`Type({v: Int})`,
+`Refinement(Int, p => p > 0)`), and `define` is a pure named factory
+delegating to it. The fluent API is REMOVED: `where`/`invariant` are
+the `&` mint (chained `&` = per-clause layers; record predicates reach
+fields via `_`); `interface` is `Interface.define(spec, ...bundles)`;
+`mixin` is method-valued `define` spec entries (same-name = override
+binding the drawn symbol) plus methods-only BUNDLE types drawn like any
+bundle; `preserveOps` is the Refinement spec's `preserve` option
+(`Refinement.define({refines, where, preserve: [...]|"all",
+...methods})`). The `&` operator IS `Refinement.construct`'s operator
+form — one conjunction story (Effect's `&` unifies through the same
+mint when C6.2 re-derives it). Two spec-shape decisions taken in-chunk,
+flagged for ratification: (1) mixin's refuse-same-name policy is
+superseded by C5.2b's declaration-override in the unified define
+surface; (2) the Refinement spec's reserved keys are
+`refines`/`where`/`preserve`, all other entries method implementations.
+`distinct` and `constructor` remain as Type members pending their own
+kind-spec designs — `distinct`'s sketch: a Distinct kind whose
+instances share the base's member set with fresh identity
+(`UserId = Distinct.define({base: Int})`); deferred until a consumer
+demands it (C6.2's Effect re-derivation may inform the spec).
+`__invariantsList` has no remaining writer; its slot-registry entry is
+swept in C6.3's disposition pass.*
 
 **Instance-of = shape-of** (D40; sharpened by D45 to shape-CONFORMS-TO):
 a kind is a type whose instances are

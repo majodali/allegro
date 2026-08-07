@@ -254,15 +254,21 @@ phase).
   2026-08; 1046/1046 green. Residue: retroactive conformance of
   built-in types to user interfaces waits for partial type
   declarations; `x[ns.name]` qualification syntax deferred (R4)
-- [ ] **B-024** · L2 · define-a-kind recipe; constructor authority;
+- [x] **B-024** · L2 · define-a-kind recipe; constructor authority;
   `Type : Type` fixed point (C6.1) — C6.1a landed 2026-08: unified
   conformance (nominal walk deleted), `__extends` → `__refines` with
   writers narrowed to refinement, name-stable per-type member scopes,
-  `Type.define(spec, ...bundles)` replacing `extend` (~42 sites
-  migrated, decisive per D44/D45). Remaining (C6.1b): Interface /
-  Refinement as kinds, `construct` authority member, fluent-API
-  removal, `&` operator mint, half-lotus battery, `distinct` sub-kind
-  spec
+  `Type.define(spec, ...bundles)` replacing `extend`. C6.1b landed
+  2026-08: Refinement + Interface as kinds (half-lotus battery green),
+  `construct` authority + call-as-function at every level, fluent API
+  removed (`&` mint absorbs where/invariant; Interface.define;
+  method-valued define entries + bundles absorb mixin; Refinement
+  spec's `preserve` absorbs preserveOps). Residue: `distinct` /
+  `constructor` kind-spec designs deferred with sketches in
+  structures.md §9; two in-chunk spec decisions flagged for maintainer
+  ratification (define's override-on-draw vs mixin's refuse;
+  Refinement spec reserved keys); `__invariantsList` slot swept in
+  C6.3
 - [ ] **B-025** · L2 · Effect re-derived through the recipe; anonymous
   conjunctions; `pure subtypeof Effect` flip (C6.2)
 - [ ] **B-026** · L2 · Proof re-derived (kernel-private authority);

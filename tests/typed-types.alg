@@ -13,7 +13,7 @@ Point = Type.define({x: Int, y: Int}, Int)
 print(Point instanceof NominalType) // expect: true
 
 // Interfaces are structural (Type)
-Printable = Type.interface({toString: Function})
+Printable = Interface.define({toString: Function})
 print(Printable instanceof Type) // expect: true
 
 // Regular values still work

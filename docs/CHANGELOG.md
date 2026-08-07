@@ -8,6 +8,68 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C6.1b: The kind tower — Refinement, Interface, construct authority, fluent API removed (structures Phase 6, B-024 part 2)
+
+D45's kind tower: kinds are just types, one construction surface at
+every meta-level.
+
+- **Refinement** — a SUB-KIND of Type: draws Type's kind-members
+  verbatim (conformance by symbol membership) and declares the instance
+  data every refined type carries (`refines`, `constraints`). Refined
+  types answer `__type = Refinement`; `type of (Int & _ > 0)` IS the
+  Refinement kind.
+- **Interface** — a REFINEMENT of Type, built through the refinement
+  mint itself: member-transparent over Type's kind API, restricted by
+  the declaration-only predicate (an instance of Interface holds no
+  value-constructor authority). Interfaces answer `__type = Interface`.
+- **The half-lotus matrix** (ratified, now a boundary battery):
+  `Type : Type` ✓, `Refinement : Type` ✓, `Interface : Refinement :
+  Type` ✓, `Refinement : Interface` ✗ — the last cell answers through
+  C3.3's predicate re-check seeing Refinement's constructor authority.
+- **Constructor authority (D45 R2)**: `construct` is the per-kind
+  minting member; call-as-function invokes it at every level —
+  `Type({v: Int})` mints a record type, `Refinement(Int, p => p > 0)`
+  is the mint `&` sugars, `Interface(spec, ...bundles)` mints
+  declarations. `define` is a pure NAMED FACTORY: validates the
+  dispatch target is a kind, delegates to its construct.
+- **The fluent API is REMOVED** (decisive, no sugar):
+  - `where`/`invariant` → the `&` mint. Chained `&` (left-assoc) gives
+    per-clause layers with domain-rendered counterexamples
+    (`refinement check failed: expected ≥ 1 (got 0)` replaces
+    `invariant 1 failed`); record predicates reach fields through `_`
+    (`Type.define({lo, hi}) & _.lo <= _.hi`). `buildInvariantedType`
+    deleted; `__invariantsList` has no writer (slot swept in C6.3).
+  - `interface` → `Interface.define(spec, ...bundles)`;
+    `buildInterfaceType` generalized from single parent to drawn
+    bundles.
+  - `mixin` → method-valued `define` spec entries (`{x: Int, mag:
+    (self) => ...}`); function VALUES are methods, function TYPES
+    (`toString: Function`) stay fields; a same-name method OVERRIDES
+    the drawn member (C5.2b declaration-override supersedes mixin's
+    refuse-same-name — flagged for ratification). Reusable mixins are
+    BUNDLES: a methods-only spec mints a pure member set (no
+    auto-generated construct/toString — which also keeps bundles
+    diamond-safe), drawn like any bundle and conferring declared
+    conformance. Methods on refined scalars go through the Refinement
+    spec's non-reserved entries. `buildMixinType` deleted; its core
+    survives as `buildMethodLayer`.
+  - `preserveOps` → the Refinement spec's `preserve` option
+    (`Refinement.define({refines, where, preserve: ["add"] | "all",
+    ...methods})`).
+- **Supporting**: `&`'s left-operand gate is kind-conformance
+  (`isTypeMeta`) so chained refinements stay types; the C3.3 subtypeof
+  guard generalized (ANY predicate-carrying expected demands
+  identity/chain — membership cannot discharge a predicate);
+  introspection's `__invariantsList` rendering removed; `Refinement` /
+  `Interface` bound in the standard extension.
+- **Deferred with design sketches**: `distinct` as a Distinct kind
+  (shared member set, fresh identity) and `constructor`'s spec —
+  recorded in structures.md §9; C6.2's Effect re-derivation may inform
+  both.
+
+Landed in two commits (kind tower + construct authority ecc83fa; fluent
+removal + migration). 1048/1048 green.
+
 ## 2026-08 — C6.1a: Unified conformance, `__refines`, and `Type.define` (structures Phase 6, B-024 part 1)
 
 The D44/D45 implementation slice: inheritance dissolves; one

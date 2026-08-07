@@ -5,7 +5,7 @@
 // path is `~T` (base-name projection), shown at the bottom.
 
 // Basic interface declaration
-Printable = Type.interface({toString: Function})
+Printable = Interface.define({toString: Function})
 
 // Accidental conformance is GONE: Int spells a `toString`, but it never
 // declared Printable's symbol.
@@ -13,7 +13,7 @@ print(42 instanceof Printable) // expect: false
 print("hello" instanceof Printable) // expect: false
 
 // Declared conformance: extending the interface draws its symbols.
-HasXY = Type.interface({x: Int, y: Int})
+HasXY = Interface.define({x: Int, y: Int})
 Point = Type.define({x: Int, y: Int}, HasXY)
 p = Point(3, 4)
 print(p instanceof HasXY) // expect: true
@@ -21,11 +21,11 @@ print(p.x + p.y) // expect: 7
 
 // An interface the type never drew stays unsatisfied — even with
 // same-named members present.
-HasXYZ = Type.interface({x: Int, y: Int, z: Int})
+HasXYZ = Interface.define({x: Int, y: Int, z: Int})
 print(p instanceof HasXYZ) // expect: false
 
 // Nonexistent member: still false, declared or loose.
-HasFoo = Type.interface({foo: Int})
+HasFoo = Interface.define({foo: Int})
 print(42 instanceof HasFoo) // expect: false
 
 // The LOOSE path: `~T` projects an interface into the base-name world —
