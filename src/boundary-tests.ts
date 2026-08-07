@@ -32,7 +32,7 @@ import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr } from "./types.js";
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
-import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS } from "./types-std.js";
+import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { makeMultiValue } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
@@ -1555,6 +1555,55 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       evalSource("T = Int.extend({x: Int})", undefined, [createTypeSystem()], undefined, true);
     } catch { gone = true; }
     eq(gone, true, "extend is no longer a member of Type");
+  });
+
+  // --- The kind tower (C6.1b, D45) ----------------------------------------------
+
+  test("kind tower (C6.1b, D45): the half-lotus matrix + kind construct authority", () => {
+    const r = evalSource(
+      "a = Type instanceof Type\n" +               // fixed point (D7)
+      "b = Refinement instanceof Type\n" +
+      "c = Interface instanceof Type\n" +
+      "d = Interface instanceof Refinement\n" +
+      "e = Refinement instanceof Interface\n" +    // ✗ — holds constructor authority
+      "f = Type instanceof Refinement\n" +         // ✗ — Type is not a refinement
+      "P = Int & _ > 0\n" +
+      "g = P instanceof Refinement\n" +            // refined types are Refinement instances
+      "h = P instanceof Type\n" +                  // …conforming to Type through the kind
+      "Printable = Type.interface({toString: Function})\n" +
+      "i = Printable instanceof Interface\n" +     // interfaces are Interface instances
+      "j = Printable instanceof Refinement\n" +    // …but NOT Refinement instances
+      "k = 42 instanceof Refinement\n" +           // data values are not types
+      // Constructor authority (D45 R2): call-as-function mints at every level.
+      "Anon = Type({v: Int})\n" +
+      "x = Anon(5)\nl = x.v\n" +
+      "Q = Refinement(Int, q => q > 0)\n" +        // the mint `&` sugars
+      "m = Q(5)\n" +
+      "n = Q(0 - 1)",
+      undefined, [createTypeSystem()], undefined, true);
+    const want: [string, string, string][] = [
+      ["a", "true", "Type : Type — the fixed point"],
+      ["b", "true", "Refinement : Type — drawn membership"],
+      ["c", "true", "Interface : Type — refinement of Type conforms"],
+      ["d", "true", "Interface : Refinement — built by the refinement mint"],
+      ["e", "false", "Refinement : Interface — constructor authority rejected by the predicate"],
+      ["f", "false", "Type : Refinement — Type is not a refinement"],
+      ["g", "true", "a refined type is an instance of Refinement"],
+      ["h", "true", "…and of Type, through kind conformance"],
+      ["i", "true", "an interface is an instance of Interface"],
+      ["j", "false", "…but not of Refinement"],
+      ["k", "false", "a data value is no kind's instance"],
+      ["l", "5", "Type({v: Int}) mints a working record type"],
+      ["m", "5", "Refinement(Int, pred) mints a working refined type"],
+    ];
+    for (const [name, expect, why] of want) {
+      eq(formatValue(r.evalCtx.bindings.get(name)!.value!), expect, `${name}: ${why}`);
+    }
+    eq(formatValue(r.evalCtx.bindings.get("n")!.value!).includes("refinement check failed"), true,
+      "the kind-minted refinement still rejects with a counterexample");
+    // `type of P` IS the Refinement kind object (identity, not name match).
+    const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as ContextValue;
+    eq(getType(p) === RefinementKindTS, true, "a refined type's meta IS the Refinement kind");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------

@@ -9,7 +9,7 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MemberType, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw } from "./slots.js";
 import { exportedSymbols, symbolFromWire, kernelMemberFqn } from "./symbols.js";
@@ -2443,8 +2443,8 @@ Printable`);
   const marker = iface.bindings.get("__interface")?.value;
   eq(marker !== undefined, true);
   eq((marker as BitsValue).data, 1n);
-  // __type = Type (structural)
-  eq(iface.bindings.get("__type")?.value === Type, true);
+  // C6.1b (D45): an interface is an instance of the Interface kind.
+  eq(iface.bindings.get("__type")?.value === InterfaceKind, true);
 });
 
 test("interfaces: interface has Field descriptors in __members", () => {
@@ -2503,7 +2503,7 @@ test("interfaces: NominalType.interface also creates structural type", () => {
   const result = evalStd(`Sized = Int.interface({length: Int})
 Sized`);
   const iface = dataOf(result!) as ContextValue;
-  eq(iface.bindings.get("__type")?.value === Type, true);
+  eq(iface.bindings.get("__type")?.value === InterfaceKind, true);
 });
 
 test("interfaces: auto-named when bound to symbol", () => {

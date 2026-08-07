@@ -1661,7 +1661,7 @@ import {
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
   AnyType, Type, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
-  structuralWrap, makeUnionType, wrapType, buildRefinedType,
+  structuralWrap, makeUnionType, wrapType, buildRefinedType, isTypeMeta,
   Effect as _Effect, effectUnion as _effectUnion,
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
 } from "./types-std.js";
@@ -1972,7 +1972,10 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("typed_amp", typed_amp_impl, true), [left, args[1]]);
   }
   const leftType = getType(left);
-  if (!leftType || leftType !== Type) {
+  // C6.1b: refined types answer meta `Refinement` (which conforms to
+  // Type), so the gate is kind-conformance, not identity — chained
+  // refinements (`PI & _ < 100`) stay types.
+  if (!leftType || leftType.kind !== ValueKind.Context || !isTypeMeta(leftType as ContextValue)) {
     const ln = leftType ? getTypeName(left) : "untyped";
     throw new AllegroError(`'&' requires a type on the left (got ${ln})`);
   }

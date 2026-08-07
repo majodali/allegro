@@ -390,12 +390,15 @@ function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
   // the lattice (buildEffect's member copies share key sets, which would
   // make pure/opaque mutually conformant under membership).
   if (getEffectKind(typeB) !== undefined) return false;
-  // C3.3 preserved: a predicate-carrying SHAPE (preserveOps — mints its
-  // own member set AND carries the refinement predicate) demands
-  // construction through it; its member symbols were DRAWN from the base,
-  // so membership alone cannot distinguish base values from certified
-  // ones. Chain/identity (checked above) is the only declared route.
-  if (getPredicate(typeB) !== undefined && typeShape(typeB) === typeB) return false;
+  // C3.3 preserved, generalized in C6.1b: a predicate-carrying expected
+  // type — transparent refinement, preserveOps shape, or the Interface
+  // kind — demands construction through its chain. Membership cannot
+  // discharge a predicate (its member symbols were drawn from the base,
+  // so membership cannot distinguish base values from certified ones);
+  // value-level discharge (domain implication, predicate re-check) lives
+  // in type_check / instanceof, not in the type-to-type relation.
+  // Chain/identity (checked above) is the only declared route.
+  if (getPredicate(typeB) !== undefined) return false;
   const aMembers = getMembers(typeA);
   const bMembers = getMembers(typeB);
   if (aMembers !== undefined && aMembers === bMembers) return false;
@@ -406,6 +409,14 @@ function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
 function isInterfaceType(t: ContextValue): boolean {
   const m = getInterfaceMarker(t);
   return m?.kind === ValueKind.Bits && (m as BitsValue).data !== 0n;
+}
+
+/** C6.1b (D45): is this meta Context a kind in the Type tower — Type
+ *  itself or a meta CONFORMING to it (Refinement, Interface)? Surfaces
+ *  that used to identity-check `=== Type` (e.g. `&`'s left-operand gate)
+ *  use this so refined types (meta Refinement) keep their type-hood. */
+export function isTypeMeta(meta: ContextValue): boolean {
+  return meta === Type || shapeAwareSubtypeof(meta, Type);
 }
 
 /**
@@ -840,7 +851,10 @@ function buildInterfaceType(
   // Build the interface type Context
   const ifaceType = makeContext();
   setName(ifaceType, stringToBits("<anonymous>"));
-  writeShape(ifaceType, Type); // structural — no ~ needed
+  // C6.1b (D45): an interface is an INSTANCE OF the Interface kind
+  // (declaration-only types). Interface conforms to Type through its
+  // refines edge, so `Printable instanceof Type` stays true.
+  writeShape(ifaceType, InterfaceKind);
   // C6.1a (D44): no edge — interface conformance is symbol membership
   // over the copied member set.
   markInterface(ifaceType, makeInt(1)); // marker
@@ -899,6 +913,11 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   // Set __refines to parent
   removeRefines(refinedType);
   setRefines(refinedType, parentType);
+  // C6.1b (D45): a refined type is an INSTANCE OF the Refinement kind —
+  // its meta answers Refinement (which conforms to Type by drawn
+  // membership, so `P instanceof Type` stays true through conformance).
+  removeShapeSlot(refinedType);
+  writeShape(refinedType, RefinementKind);
   // Store predicate
   setPredicate(refinedType, predicate);
   // Phase B: recognise the predicate's algebraic shape (if any) and stash
@@ -1342,29 +1361,29 @@ addMember(typeMembers, TYPE_MEMBER_SCOPE, "subtypeof", makeMethodDescriptor("sub
   })
 ));
 addMember(typeMembers, TYPE_MEMBER_SCOPE, "define", makeMethodDescriptor("define",
-  makePrimitive("Type.define", (args, _ctx, _evalFn) => {
+  makePrimitive("Type.define", (args, ctx, evalFn) => {
     // D45: `define` is THE construction surface, dispatched on a KIND —
-    // self is the kind whose instance is being minted, args[1] is the
-    // spec, args[2..] are drawn member bundles. In C6.1a the only kind is
-    // Type itself; Interface/Refinement arrive as kinds in C6.1b.
+    // self is the kind whose instance is being minted; the remaining args
+    // are the kind-specific spec. `define` is a NAMED FACTORY with no
+    // independent minting power: it validates the dispatch target is a
+    // kind, then delegates to the kind's `construct` authority (C6.1b
+    // kinds: Type — (spec, ...bundles) record mint; Refinement —
+    // (base, predicate) refinement mint; Interface — (spec) declaration
+    // mint).
     const kind = dataOf(args[0]);
-    if (kind !== Type) {
+    if (kind.kind !== ValueKind.Context || !isKind(kind as ContextValue)) {
       const name = kind.kind === ValueKind.Context
         ? (getTypeNameFromCtx(kind as ContextValue) ?? "<anonymous>") : "<value>";
       throw new AllegroError(
         `define must be dispatched on a kind — '${name}' is a type, not a kind. ` +
         `To draw ${name}'s members into a new type, pass it as a bundle: Type.define(spec, ${name})`);
     }
-    const spec = args[1];
-    const drawn: ContextValue[] = [];
-    for (let i = 2; i < args.length; i++) {
-      const b = dataOf(args[i]);
-      if (b.kind !== ValueKind.Context) {
-        throw new AllegroError("define: drawn bundles must be types");
-      }
-      drawn.push(b as ContextValue);
+    const construct = getConstruct(kind as ContextValue);
+    if (construct?.kind !== ValueKind.PrimitiveFunction) {
+      throw new AllegroError(
+        `define: kind '${getTypeNameFromCtx(kind as ContextValue)}' holds no constructor authority`);
     }
-    return wrapType(buildRecordType(spec, drawn, Type));
+    return (construct as PrimitiveFunctionValue).fn(args.slice(1), ctx, evalFn);
   })
 ));
 addMember(typeMembers, TYPE_MEMBER_SCOPE, "where", makeMethodDescriptor("where",
@@ -2100,6 +2119,109 @@ const anyMethods: Record<string, PrimitiveFnImpl> = {
 // =============================================================================
 
 export const AnyType: ContextValue = buildType("Any", anyMethods);
+
+// =============================================================================
+// The kind tower (C6.1b, D45): Refinement and Interface
+//
+// A KIND is a type whose instances are type-values. C6.1b mints the two
+// kinds D45 derives from D44's own relations:
+//
+//   Refinement — a SUB-KIND of Type: built by DRAWING Type's kind-members
+//   (composition; conformance by symbol membership) plus its own instance-
+//   data declarations (`refines`, `constraints`). Its instances are refined
+//   types: buildRefinedType stamps `__type = Refinement`. Holds constructor
+//   authority: `Refinement(base, predicate)` is the mint `&` sugars.
+//
+//   Interface — a REFINEMENT of Type: member-transparent over Type's kind
+//   API (shared member-set object, `__refines = Type`), restricted by the
+//   declaration-only predicate — an instance of Interface is a type that
+//   holds NO value-constructor authority. Its instances are interfaces:
+//   buildInterfaceType stamps `__type = Interface`.
+//
+// The ratified half-lotus matrix falls out of the existing machinery:
+//   Type : Type            ✓ (fixed point, D7)
+//   Refinement : Type      ✓ (meta Type; identity)
+//   Interface : Refinement ✓ (built BY the refinement mint; meta Refinement)
+//   Interface : Type       ✓ (Refinement conforms to Type by membership)
+//   Refinement : Interface ✗ (predicate re-check: Refinement holds
+//                             constructor authority — C3.3's instanceof
+//                             branch evaluates the declaration-only
+//                             predicate and rejects)
+// =============================================================================
+
+export const RefinementKind: ContextValue = makeContext();
+setName(RefinementKind, stringToBits("Refinement"));
+writeShape(RefinementKind, Type);
+{
+  const REFINEMENT_SCOPE = typeMemberScopeFqn("Refinement");
+  const refMembers = makeContext();
+  // Draw Type's kind API verbatim — same keys, same member symbols; the
+  // D44 conformance relation (`Refinement subtypeof Type`) holds by
+  // membership, and meta-dispatch on refined types finds the same
+  // implementations Type's instances use.
+  for (const [key, b] of typeMembers.bindings) {
+    if (b.value) addBinding(refMembers, key, b.value);
+  }
+  // Instance-data declarations: every refined type carries a base and its
+  // constraints. (AnyType is deliberately loose for `constraints` — the
+  // exact constraint-list type sharpens with `distinct`'s spec, C6.1b+.)
+  addMember(refMembers, REFINEMENT_SCOPE, "refines", makeFieldDescriptor("refines", Type));
+  addMember(refMembers, REFINEMENT_SCOPE, "constraints", makeFieldDescriptor("constraints", AnyType));
+  setMembers(RefinementKind, refMembers);
+}
+// Constructor authority (D45 R2): `Refinement(base, predicate)` IS the
+// refinement mint — the `&` operator (`Int & _ > 0`) is its operator form.
+setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx, evalFn) => {
+  const base = dataOf(evalFn!(args[0], ctx!));
+  if (base.kind !== ValueKind.Context) {
+    throw new AllegroError("Refinement: base must be a type");
+  }
+  const predicate = evalFn!(args[1], ctx!);
+  return wrapType(buildRefinedType(base as ContextValue, predicate));
+}, true));
+
+// Type's own constructor authority: `Type(spec, ...bundles)` mints a
+// record type — `Type.define` is the canonical named factory delegating
+// here. (Every construct bottoms out in the structure factories plus the
+// gated shape stamp — makeContext + writeShape inside buildRecordType.)
+setConstruct(Type, makePrimitive("Type.__construct", (args, ctx, evalFn) => {
+  const spec = evalFn!(args[0], ctx!);
+  const drawn: ContextValue[] = [];
+  for (let i = 1; i < args.length; i++) {
+    const b = dataOf(evalFn!(args[i], ctx!));
+    if (b.kind !== ValueKind.Context) {
+      throw new AllegroError("Type: drawn bundles must be types");
+    }
+    drawn.push(b as ContextValue);
+  }
+  return wrapType(buildRecordType(spec, drawn, Type));
+}, true));
+
+// Interface = the refinement mint applied to Type with the declaration-only
+// predicate. Its own construct is REPLACED (the wrapped Type-construct a
+// refinement would inherit mints records — an Interface instance is a
+// declaration, so the kind's authority is the interface mint instead).
+const declarationOnlyPredicate = makePrimitive("Interface.__declarationOnly", (args) => {
+  const t = dataOf(args[0]);
+  return makeInt(
+    t.kind === ValueKind.Context && getConstruct(t as ContextValue) === undefined ? 1 : 0);
+});
+export const InterfaceKind: ContextValue = buildRefinedType(Type, declarationOnlyPredicate);
+removeName(InterfaceKind);
+setName(InterfaceKind, stringToBits("Interface"));
+removeConstruct(InterfaceKind);
+setConstruct(InterfaceKind, makePrimitive("Interface.__construct", (args, ctx, evalFn) => {
+  const spec = evalFn!(args[0], ctx!);
+  return wrapType(buildInterfaceType(Type, spec));
+}, true));
+
+/** C6.1b: the kinds whose `define`/call-as-function mint type-values.
+ *  Effect and Proof join the tower when they are re-derived through the
+ *  recipe (C6.2 / C6.3). */
+function isKind(t: ContextValue): boolean {
+  return t === Type || t === RefinementKind || t === InterfaceKind;
+}
+
 export const IntType: ContextValue = buildType("Int", intMethods);
 export const FloatType: ContextValue = buildType("Float", floatMethods);
 export const StringType: ContextValue = buildType("String", stringMethods);
@@ -2784,9 +2906,11 @@ export function createTypeSystem(): Extension {
       Object: wrapType(ObjectType) as any,
       Function: wrapType(FunctionType) as any,
       UntypedFunction: wrapType(UntypedFunctionType) as any,
-      // Meta-types
+      // Meta-types — the kind tower (C6.1b, D45)
       Type: wrapType(Type) as any,
       NominalType: wrapType(NominalType) as any,
+      Refinement: wrapType(RefinementKind) as any,
+      Interface: wrapType(InterfaceKind) as any,
       None: wrapType(NoneType) as any,
       Error: wrapType(ErrorType) as any,
       // Effect meta-type + core absolutes
