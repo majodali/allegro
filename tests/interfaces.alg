@@ -14,7 +14,7 @@ print("hello" instanceof Printable) // expect: false
 
 // Declared conformance: extending the interface draws its symbols.
 HasXY = Type.interface({x: Int, y: Int})
-Point = HasXY.extend({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int}, HasXY)
 p = Point(3, 4)
 print(p instanceof HasXY) // expect: true
 print(p.x + p.y) // expect: 7

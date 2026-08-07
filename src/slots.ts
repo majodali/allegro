@@ -401,7 +401,7 @@ export function stampEqOperands(ctx: ContextValue, lhs: Value, rhs: Value): void
 export const SLOT_KEYS = {
   name: "__name",
   members: "__members",
-  extends: "__refines",
+  refines: "__refines",
   construct: "__construct",
   constructor: "__constructor",
   getMember: "__getMember",

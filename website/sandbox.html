@@ -231,7 +231,7 @@ when point
   is _ then print("origin")`,
 
   "Custom Types": `// Define a custom type using the fluent API
-Point = NominalType.extend({x: Int, y: Int})
+Point = NominalType.define({x: Int, y: Int})
 p = Point(10, 20)
 print(p)
 print(p.x)
@@ -257,8 +257,8 @@ print(UserId(42) instanceof UserId)`,
   "Knowledge Bounds": `// C3.2: annotations are knowledge upper-bounds.
 // Passing a Dog through \`a: Animal\` hides Dog-only members
 // until a \`when ... is Dog\` type pattern narrows the occurrence.
-Animal = Type.extend({legs: Int})
-Dog = Animal.extend({legs: Int, tricks: Int})
+Animal = Type.define({legs: Int})
+Dog = Type.define({legs: Int, tricks: Int}, Animal)
 
 count_legs(a: Animal): Int => a.legs
 print(count_legs(Dog(4, 7)))

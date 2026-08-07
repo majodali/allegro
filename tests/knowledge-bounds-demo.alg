@@ -7,8 +7,8 @@
 // pattern narrows the occurrence within the matched arm; crossing a
 // boundary of the value's own shape restores full knowledge.
 
-Animal = Type.extend({legs: Int})
-Dog = Animal.extend({legs: Int, tricks: Int})
+Animal = Type.define({legs: Int})
+Dog = Type.define({legs: Int, tricks: Int}, Animal)
 
 // Widening: through `a: Animal`, Animal's members are visible…
 count_legs(a: Animal): Int => a.legs

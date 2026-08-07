@@ -273,7 +273,7 @@ print(PositiveInt(10))           // 10
 
 // Multi-field record invariant: `lo <= hi` ties two fields together —
 // the natural shape for `invariant` rather than refinement-via-`&&`.
-Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+Range = Type.define({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
 ok = Range(1, 100)
 print(ok.lo)                      // 1
 
@@ -474,7 +474,7 @@ print(result)</textarea>
 
 <div class="sandbox" id="s-custom-types">
 <textarea class="sandbox-editor" rows="14">// Record type with fields and constructor
-Point = Int.extend({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int}, Int)
 p = Point(10, 20)
 print(p)
 print(p.x + p.y)
@@ -523,7 +523,7 @@ print(Printable instanceof Type)</textarea>
 
 <div class="sandbox" id="s-mixins">
 <textarea class="sandbox-editor" rows="12">// Add methods to a record type
-Point = Int.extend({x: Int, y: Int}).mixin({magnitude: (self) => self.x * self.x + self.y * self.y, translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
+Point = Type.define({x: Int, y: Int}, Int).mixin({magnitude: (self) => self.x * self.x + self.y * self.y, translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
 
 p = Point(3, 4)
 print(p.magnitude())
@@ -534,7 +534,7 @@ print(q.y)
 
 // Reusable mixin spec
 magSpec = {mag: (self) => self.x * self.x + self.y * self.y}
-Vec = Int.extend({x: Int, y: Int}).mixin(magSpec)
+Vec = Type.define({x: Int, y: Int}, Int).mixin(magSpec)
 print(Vec(5, 12).mag())</textarea>
 <div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-mixins')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-mixins')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>

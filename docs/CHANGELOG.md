@@ -8,6 +8,50 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C6.1a: Unified conformance, `__refines`, and `Type.define` (structures Phase 6, B-024 part 1)
+
+The D44/D45 implementation slice: inheritance dissolves; one
+construction surface.
+
+- **One conformance check** (`shapeAwareSubtypeof`): identity → loose
+  base-name path (anonymous expected) → `__refines` chain → symbol-
+  identity membership over `__members`. `nominalSubtypeof` (the name
+  walk) is DELETED — there is no declared is-a edge outside refinement.
+  Two guards preserve ruled pre-C6.2/C6.3 semantics: effect types stay
+  chain-only until Effect is re-derived through the kind recipe, and
+  predicate-carrying shapes keep C3.3's construction-through-chain
+  `instanceof` (`5 instanceof PI` stays false untagged).
+- **Name-stable per-type member scopes**: built-ins declare members in
+  their own scopes (`<type#Int>::add`), so near-identical built-ins
+  never conform accidentally (`3.14 instanceof Int` → false). Bound
+  user types stabilize their construction-time counter scope onto the
+  declaration site (`<type#<main>::Point>`) at auto-naming
+  (`stabilizeTypeMemberScope`) — fixpoint re-evaluation of a
+  declaration converges instead of minting fresh symbols per pass.
+- **`__extends` → `__refines`**: the physical edge is the refinement
+  relation (D44). Writers narrowed to refinement layers only —
+  `buildRecordType` / `buildInterfaceType` mint NO edge (composition
+  draws member symbols; conformance is membership, not ancestry).
+  Remaining writers: `buildRefinedType` (legitimate), the descriptor
+  taxonomy (dies C6.3), `buildEffect` (dies C6.2).
+- **`Type.define(spec, ...bundles)` replaces `extend`** (D45,
+  decisive — no sugar): self is the KIND, the spec declares fields,
+  bundles are drawn member sets. `X.extend(spec)` migrated to
+  `Type.define(spec, X)` across ~42 sites (tests/*.alg, lib/math.alg,
+  test.ts, boundary-tests, web sandboxes, docs). Non-kind dispatch
+  (`Int.define(…)`) errors with the migration form. Multi-bundle
+  interface diamonds resolve per-member via draw-from; two concrete
+  bundles with distinct same-named symbols (every record's own
+  `toString`) error explicitly at define time — D44's no-silent-
+  linearization rule, surfaced.
+- **Boundary contract asserted**: define's three forms (fresh, drawn,
+  interface diamond) + no-refines-edge invariant; non-kind guidance;
+  explicit concrete conflict; `extend` gone; per-type scope keys; the
+  stabilized-scope declaration-site invariant.
+
+Landed in three commits (unified conformance f8e6af9; rename 9d70ca1;
+define + migration). 1048/1048 green.
+
 ## 2026-08 — C5.2c: The declared-conformance split (structures Phase 5, B-023 part 3; B-023 complete)
 
 The ratified conscious delta lands (D30; migration pre-approved at the

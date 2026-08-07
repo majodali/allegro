@@ -2259,9 +2259,9 @@ test("member descriptors: typeMethod reads from __members", () => {
 test("member descriptors: Type has __members with meta-methods", () => {
   const members = memberDescriptorsOf(Type);
   eq(members.size > 0, true);
-  const extendDesc = members.get("extend");
-  eq(extendDesc !== undefined, true);
-  eq(isMethodDescriptor(extendDesc as ContextValue), true);
+  const defineDesc = members.get("define");
+  eq(defineDesc !== undefined, true);
+  eq(isMethodDescriptor(defineDesc as ContextValue), true);
 });
 
 test("member descriptors: NominalType has __members with meta-methods", () => {
@@ -2273,7 +2273,7 @@ test("member descriptors: NominalType has __members with meta-methods", () => {
 });
 
 test("member descriptors: record type has Field descriptors", () => {
-  const result = evalStd(`Animal = Int.extend({name: String, age: Int})
+  const result = evalStd(`Animal = Type.define({name: String, age: Int}, Int)
 Animal`);
   const typeCtx = dataOf(result!) as ContextValue;
   eq(typeCtx.kind, ValueKind.Context);
@@ -2289,7 +2289,7 @@ Animal`);
 });
 
 test("member descriptors: record field access via type_dispatch works", () => {
-  const result = evalStd(`Point = Int.extend({x: Int, y: Int})
+  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int)
 p = Point(3, 4)
 p.x + p.y`);
   eq(Number((dataOf(result!) as BitsValue).data), 7);
@@ -2313,7 +2313,7 @@ test("typed types: NominalType instanceof NominalType", () => {
 });
 
 test("typed types: user-defined type instanceof NominalType", () => {
-  const result = evalStd(`Point = Int.extend({x: Int, y: Int})
+  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int)
 Point instanceof NominalType`);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
@@ -2468,7 +2468,7 @@ test("interfaces: instanceof passes for DECLARED conformance (C5.2c)", () => {
   // Conformance is declared, not accidental: extending the interface
   // draws its member symbols, and the check is symbol-identity membership.
   const result = evalStd(`HasXY = Type.interface({x: Int, y: Int})
-Point = HasXY.extend({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int}, HasXY)
 p = Point(1, 2)
 p instanceof HasXY`);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
@@ -2536,7 +2536,7 @@ test("edge case: empty interface satisfies any type", () => {
 });
 
 test("edge case: empty mixin produces identical type", () => {
-  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({})
+  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({})
 p = Point(3, 4)
 p.x + p.y`);
   eq(Number((dataOf(result!) as BitsValue).data), 7);
@@ -2551,20 +2551,20 @@ T(42) + 0`);
 // == Mixins ==
 
 test("mixins: basic mixin adds method", () => {
-  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({mag: (self) => self.x + self.y})
+  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({mag: (self) => self.x + self.y})
 p = Point(3, 4)
 p.mag()`);
   eq(Number((dataOf(result!) as BitsValue).data), 7);
 });
 
 test("mixins: field access via self works", () => {
-  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({getX: (self) => self.x})
+  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({getX: (self) => self.x})
 Point(10, 20).getX()`);
   eq(Number((dataOf(result!) as BitsValue).data), 10);
 });
 
 test("mixins: constructor works on mixin type", () => {
-  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({sum: (self) => self.x + self.y})
+  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({sum: (self) => self.x + self.y})
 p = Point(5, 7)
 p.sum()`);
   eq(Number((dataOf(result!) as BitsValue).data), 12);
@@ -2573,7 +2573,7 @@ p.sum()`);
 test("mixins: error on name conflict", () => {
   let threw = false;
   try {
-    evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({toString: (self) => "point"})`);
+    evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({toString: (self) => "point"})`);
   } catch (e) {
     threw = true;
   }
@@ -2582,14 +2582,14 @@ test("mixins: error on name conflict", () => {
 
 test("mixins: reusable spec variable", () => {
   const result = evalStd(`magMixin = {mag: (self) => self.x * self.x + self.y * self.y}
-A = Int.extend({x: Int, y: Int}).mixin(magMixin)
-B = Int.extend({x: Int, y: Int}).mixin(magMixin)
+A = Type.define({x: Int, y: Int}, Int).mixin(magMixin)
+B = Type.define({x: Int, y: Int}, Int).mixin(magMixin)
 A(3, 4).mag() + B(5, 12).mag()`);
   eq(Number((dataOf(result!) as BitsValue).data), 25 + 169);
 });
 
 test("mixins: method with extra args", () => {
-  const result = evalStd(`Point = Int.extend({x: Int, y: Int}).mixin({translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
+  const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int).mixin({translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
 p = Point(1, 2)
 q = p.translate(10, 20)
 q.x + q.y`);
@@ -3135,40 +3135,40 @@ test("constructor: result passes instanceof", () => {
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
-// == Fluent Type API ==
+// == Type construction API (define, where, distinct, constructor) ==
 
-test("extend: create nominal record type", () => {
+test("define: create nominal record type", () => {
   const result = evalStd(`
-Point = NominalType.extend({x: Int, y: Int})
+Point = NominalType.define({x: Int, y: Int})
 p = Point(10, 20)
 p.x
 `);
   eq(Number((dataOf(result!) as BitsValue).data), 10);
 });
 
-test("extend: field access y", () => {
+test("define: field access y", () => {
   const result = evalStd(`
-Point = NominalType.extend({x: Int, y: Int})
+Point = NominalType.define({x: Int, y: Int})
 p = Point(10, 20)
 p.y
 `);
   eq(Number((dataOf(result!) as BitsValue).data), 20);
 });
 
-test("extend: instanceof works", () => {
+test("define: instanceof works", () => {
   const result = evalStd(`
-Point = NominalType.extend({x: Int, y: Int})
+Point = NominalType.define({x: Int, y: Int})
 p = Point(10, 20)
 p instanceof Point
 `);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
-test("extend: auto-naming propagates to instances", () => {
+test("define: auto-naming propagates to instances", () => {
   // Auto-naming now works correctly: Symbols resolve from evalCtx which
   // has the named type. Instances share the same type object.
   const result = evalStd(`
-Point = NominalType.extend({x: Int, y: Int})
+Point = NominalType.define({x: Int, y: Int})
 p = Point(1, 2)
 type of p
 `);
@@ -3177,28 +3177,28 @@ type of p
   eq(bitsToString(dataOf(nameB!.value!) as BitsValue), "Point");
 });
 
-test("extend: wrong arg count throws", () => {
+test("define: wrong arg count throws", () => {
   throws(() => evalStd(`
-Point = NominalType.extend({x: Int, y: Int})
+Point = NominalType.define({x: Int, y: Int})
 Point(10)
 `), "expects 2 args");
 });
 
-test("extend: formatValue shows named record", () => {
+test("define: formatValue shows named record", () => {
   const result = evalStd(`
-Point = NominalType.extend({x: Int, y: Int})
+Point = NominalType.define({x: Int, y: Int})
 Point(10, 20)
 `);
   eq(formatValue(result!), "Point(x: 10, y: 20)");
 });
 
-test("extend: print shows record (name finalized after eval)", () => {
+test("define: print shows record (name finalized after eval)", () => {
   const printed: string[] = [];
   const origLog = console.log;
   console.log = (msg: any) => printed.push(String(msg));
   try {
     evalStd(`
-Point = NominalType.extend({x: Int, y: Int})
+Point = NominalType.define({x: Int, y: Int})
 print(Point(3, 4))
 `);
   } finally {
@@ -3208,19 +3208,19 @@ print(Point(3, 4))
   eq(printed[0].includes("x: 3, y: 4"), true);
 });
 
-test("extend: structural type", () => {
+test("define: structural type", () => {
   const result = evalStd(`
-Pair = Type.extend({a: Int, b: Int})
+Pair = Type.define({a: Int, b: Int})
 p = Pair(1, 2)
 p.a
 `);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
-test("extend: subtypeof chain", () => {
+test("define: subtypeof chain", () => {
   const result = evalStd(`
-Shape = NominalType.extend({})
-Point = Shape.extend({x: Int, y: Int})
+Shape = NominalType.define({})
+Point = Type.define({x: Int, y: Int}, Shape)
 Point subtypeof Shape
 `);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
@@ -3375,7 +3375,7 @@ x + 0
 
 test("constructor: override", () => {
   const result = evalStd(`
-Point = NominalType.extend({x: Int, y: Int}).constructor((a, b) => {x: a * 2, y: b * 2})
+Point = NominalType.define({x: Int, y: Int}).constructor((a, b) => {x: a * 2, y: b * 2})
 p = Point(5, 10)
 p.x
 `);
@@ -3706,7 +3706,7 @@ test("inference: bool from comparison", () => {
 });
 
 test("inference: custom type", () => {
-  const { compilationReport: r } = runtimeEval("Point = NominalType.extend({x: Int, y: Int})\np = Point(1, 2)\n", undefined, [typeExt], undefined, true);
+  const { compilationReport: r } = runtimeEval("Point = NominalType.define({x: Int, y: Int})\np = Point(1, 2)\n", undefined, [typeExt], undefined, true);
   eq(r?.bindingTypes.get("p"), "Point");
 });
 
@@ -4232,7 +4232,7 @@ high = SP(200)
 
 test("Phase C Chunk 4: multi-field record invariant", () => {
   const src = `
-Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+Range = Type.define({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
 ok = Range(1, 10)
 bad = Range(10, 1)
 `;

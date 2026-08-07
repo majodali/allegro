@@ -29,9 +29,9 @@ import {
 
 // --- Constants ---
 
-/** Meta-method names that should NOT be inherited by child types during extend/interface */
+/** Meta-method names that should NOT be copied into new types during define/interface */
 const META_METHOD_NAMES = new Set([
-  "instanceof", "subtypeof", "extend", "where", "distinct",
+  "instanceof", "subtypeof", "define", "where", "distinct",
   "constructor", "interface", "preserveOps", "mixin", "invariant",
 ]);
 
@@ -685,22 +685,26 @@ export function typeMemberDescriptor(type: ContextValue, name: string): ContextV
 }
 
 // =============================================================================
-// Fluent Type API: extend, where, distinct, constructor
+// Type construction API: define, where, distinct, constructor
 // =============================================================================
 
 /**
- * Build a record type from a parent type and field specification.
+ * Build a record type from a field specification plus zero or more drawn
+ * member bundles (D45: `Type.define(spec, ...bundles)`). A field whose base
+ * name matches a drawn bundle's member binds THAT symbol (declared
+ * conformance); bundle methods not overridden are copied verbatim (same
+ * symbol, same key). No is-a edge is minted (D44).
  * Auto-generates __construct (positional args), __getMember (field access), toString.
  */
 function buildRecordType(
-  parentType: ContextValue,
   fieldSpecObj: Value,
+  drawn: ContextValue[],
   metaType: ContextValue,
 ): ContextValue {
   // Extract field specs from the Object's Context
   const fieldCtx = dataOf(fieldSpecObj);
   if (fieldCtx.kind !== ValueKind.Context) {
-    throw new AllegroError("extend: argument must be an object literal {field: Type, ...}");
+    throw new AllegroError("define: argument must be an object literal {field: Type, ...}");
   }
   const fields: { name: string; type: Value }[] = [];
   for (const [key, binding] of (fieldCtx as ContextValue).bindings) {
@@ -722,23 +726,26 @@ function buildRecordType(
   const members = makeContext();
 
   // Add Field descriptors for each declared field. C5.2b (D30 draw-from):
-  // a field whose base name matches a drawn (parent) member binds THAT
+  // a field whose base name matches a drawn bundle's member binds THAT
   // symbol (override/implement keeps identity); otherwise it gets a
-  // type-local symbol in this type's member scope.
+  // type-local symbol in this type's member scope. Multi-bundle diamonds
+  // resolve inside drawMemberKey (shared symbol → one key; distinct
+  // same-named symbols → explicit ambiguity error).
   const recordScope = newTypeMemberScope();
   (newType as any).__localMemberScope = recordScope;
   for (const f of fields) {
-    addMemberAt(members, drawMemberKey([parentType], f.name, recordScope),
+    addMemberAt(members, drawMemberKey(drawn, f.name, recordScope),
       makeFieldDescriptor(f.name, f.type));
   }
 
-  // Copy non-meta Method descriptors from parent's __members. C5.2a: keys
-  // are member-symbol FQNs — copied verbatim (same symbol, same key); the
-  // meta filter compares the base-name projection.
+  // Copy non-meta Method descriptors from each drawn bundle's __members.
+  // C5.2a: keys are member-symbol FQNs — copied verbatim (same symbol,
+  // same key); the meta filter compares the base-name projection.
   const metaMethodNames = META_METHOD_NAMES;
-  const parentMembers = getMembers(parentType);
-  if (parentMembers?.kind === ValueKind.Context) {
-    for (const [key, binding] of (parentMembers as ContextValue).bindings) {
+  for (const bundle of drawn) {
+    const bundleMembers = getMembers(bundle);
+    if (bundleMembers?.kind !== ValueKind.Context) continue;
+    for (const [key, binding] of (bundleMembers as ContextValue).bindings) {
       if (metaMethodNames.has(fqnBaseName(key))) continue;
       if (!members.bindings.has(key) && binding.value) {
         addBinding(members, key, binding.value);
@@ -795,8 +802,9 @@ function buildRecordType(
     }
     return withType(stringToBits(`${typeName}(${parts.join(", ")})`), StringType);
   }) as PrimitiveFnImpl);
-  // toString draws the parent's symbol (an override, same member identity).
-  addMemberAt(members, drawMemberKey([parentType], "toString", recordScope),
+  // toString draws a bundle's symbol if one exists (an override, same
+  // member identity); otherwise it gets a type-local symbol.
+  addMemberAt(members, drawMemberKey(drawn, "toString", recordScope),
     makeMethodDescriptor("toString", toStringImpl));
 
   setMembers(newType, members);
@@ -1086,7 +1094,7 @@ function buildDistinctType(parentType: ContextValue): ContextValue {
   const distinctType = makeContext();
   // Copy all bindings except __refines and __members (handled separately)
   for (const [key, binding] of parentType.bindings) {
-    if (key === SLOT_KEYS.extends) continue;
+    if (key === SLOT_KEYS.refines) continue;
     if (key === SLOT_KEYS.members) continue;
     if (binding.value) {
       addBinding(distinctType, key, binding.value);
@@ -1333,9 +1341,30 @@ addMember(typeMembers, TYPE_MEMBER_SCOPE, "subtypeof", makeMethodDescriptor("sub
     return withType(makeInt(shapeAwareSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
   })
 ));
-addMember(typeMembers, TYPE_MEMBER_SCOPE, "extend", makeMethodDescriptor("extend",
-  makePrimitive("Type.extend", (args, _ctx, _evalFn) => {
-    return wrapType(buildRecordType(args[0] as ContextValue, args[1], Type));
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "define", makeMethodDescriptor("define",
+  makePrimitive("Type.define", (args, _ctx, _evalFn) => {
+    // D45: `define` is THE construction surface, dispatched on a KIND —
+    // self is the kind whose instance is being minted, args[1] is the
+    // spec, args[2..] are drawn member bundles. In C6.1a the only kind is
+    // Type itself; Interface/Refinement arrive as kinds in C6.1b.
+    const kind = dataOf(args[0]);
+    if (kind !== Type) {
+      const name = kind.kind === ValueKind.Context
+        ? (getTypeNameFromCtx(kind as ContextValue) ?? "<anonymous>") : "<value>";
+      throw new AllegroError(
+        `define must be dispatched on a kind — '${name}' is a type, not a kind. ` +
+        `To draw ${name}'s members into a new type, pass it as a bundle: Type.define(spec, ${name})`);
+    }
+    const spec = args[1];
+    const drawn: ContextValue[] = [];
+    for (let i = 2; i < args.length; i++) {
+      const b = dataOf(args[i]);
+      if (b.kind !== ValueKind.Context) {
+        throw new AllegroError("define: drawn bundles must be types");
+      }
+      drawn.push(b as ContextValue);
+    }
+    return wrapType(buildRecordType(spec, drawn, Type));
   })
 ));
 addMember(typeMembers, TYPE_MEMBER_SCOPE, "where", makeMethodDescriptor("where",

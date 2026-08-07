@@ -15,7 +15,7 @@ print(ten)              // expect: 10
 // Multi-field record type with a relational invariant: `lo <= hi`.
 // `invariant` is the natural shape here — refinement-via-`&&` doesn't
 // extend cleanly to predicates that reference fields.
-Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+Range = Type.define({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
 ok = Range(1, 100)
 print(ok.lo)            // expect: 1
 print(ok.hi)            // expect: 100

@@ -9,7 +9,7 @@ print(Bool instanceof NominalType) // expect: true
 print(NominalType instanceof NominalType) // expect: true
 
 // User-defined types are typed
-Point = Int.extend({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int}, Int)
 print(Point instanceof NominalType) // expect: true
 
 // Interfaces are structural (Type)

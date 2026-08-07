@@ -255,7 +255,14 @@ phase).
   built-in types to user interfaces waits for partial type
   declarations; `x[ns.name]` qualification syntax deferred (R4)
 - [ ] **B-024** · L2 · define-a-kind recipe; constructor authority;
-  `Type : Type` fixed point (C6.1)
+  `Type : Type` fixed point (C6.1) — C6.1a landed 2026-08: unified
+  conformance (nominal walk deleted), `__extends` → `__refines` with
+  writers narrowed to refinement, name-stable per-type member scopes,
+  `Type.define(spec, ...bundles)` replacing `extend` (~42 sites
+  migrated, decisive per D44/D45). Remaining (C6.1b): Interface /
+  Refinement as kinds, `construct` authority member, fluent-API
+  removal, `&` operator mint, half-lotus battery, `distinct` sub-kind
+  spec
 - [ ] **B-025** · L2 · Effect re-derived through the recipe; anonymous
   conjunctions; `pure subtypeof Effect` flip (C6.2)
 - [ ] **B-026** · L2 · Proof re-derived (kernel-private authority);

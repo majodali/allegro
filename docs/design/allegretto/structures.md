@@ -294,7 +294,7 @@ projection — the duck-typing surface; `structuralWrap` now erases the
 `__interface` marker along with the name, so `~Interface` projects into
 the loose world. Migrated per the pre-approval: `interfaces.alg` and
 `typed-types.alg` document the flip (`42 instanceof Printable` → false;
-declared conformance via `HasXY.extend`; `~Printable` duck-typing);
+declared conformance via `Type.define(..., HasXY)`; `~Printable` duck-typing);
 CLAUDE.md examples updated. §8's declared-vs-loose boundary contract is
 asserted by the battery (same-named member from an undeclared context
 does NOT satisfy the interface; `~T` still matches it). Phase 5 C5.2 is
@@ -579,6 +579,27 @@ kind-specific specs; the `&` operator survives as the R3 operator mint
 (`Int & _ > 0` mints an anonymous Refinement exactly as `io & time`
 mints an anonymous Effect — one conjunction story); `distinct`'s
 sub-kind spec is a C6.1b design item.*
+
+*Status (2026-08, C6.1a): the D44/D45 implementation slice landed.
+Conformance is ONE check (`shapeAwareSubtypeof`): identity → loose path
+(anonymous expected) → `__refines` chain → symbol-identity membership;
+the nominal name-walk (`nominalSubtypeof`) is deleted. Built-ins declare
+members in name-stable per-type scopes (`<type#Int>::add`); bound user
+types stabilize their counter scope onto the declaration site
+(`<type#<main>::Point>`) at auto-naming, so fixpoint re-evaluation
+converges. The physical edge renamed `__extends` → `__refines` and its
+writers narrowed to refinement layers only — composition
+(`Type.define`), records, and interfaces mint NO is-a edge.
+`Type.define(spec, ...bundles)` replaced `extend` as the record
+construction surface (self = the kind; bundles = drawn member sets;
+non-kind dispatch errors with the migration form; multi-bundle
+interface diamonds resolve via draw-from, concrete-bundle conflicts
+error explicitly). Guards preserve pre-C6.2/C6.3 semantics: effect
+types keep chain-only subtyping until Effect is re-derived, and
+predicate-carrying shapes keep C3.3's construction-through-chain
+`instanceof`. Remaining for C6.1b: the kind recipe itself (Interface /
+Refinement as kinds, `construct` authority, fluent-API removal, the
+half-lotus battery, `&` as operator mint).*
 
 **Instance-of = shape-of** (D40; sharpened by D45 to shape-CONFORMS-TO):
 a kind is a type whose instances are

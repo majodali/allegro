@@ -31,7 +31,7 @@ import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr } from "./types.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS } from "./types-std.js";
 import { makeMultiValue } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
@@ -955,7 +955,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
 
   // --- Annotations as knowledge bounds (C3.2, D36) ----------------------------
 
-  const C32_TYPES = "Animal = Type.extend({legs: Int})\nDog = Animal.extend({legs: Int, tricks: Int})\n";
+  const C32_TYPES = "Animal = Type.define({legs: Int})\nDog = Type.define({legs: Int, tricks: Int}, Animal)\n";
 
   test("knowledge bounds (C3.2): the two-sided matrix — visibility follows knowledge, dispatch follows shape", () => {
     // Visible through the bound: Animal declares `legs`.
@@ -1394,7 +1394,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
 
   test("draw-from (C5.2b): declared members bind drawn symbols; new names are type-local", () => {
     const r = evalSource(
-      "Animal = Type.extend({name: String})\nDog = Animal.extend({name: String, age: Int})",
+      "Animal = Type.define({name: String})\nDog = Type.define({name: String, age: Int}, Animal)",
       undefined, [createTypeSystem()], undefined, true);
     const animal = dataOf(r.evalCtx.bindings.get("Animal")!.value!) as ContextValue;
     const dog = dataOf(r.evalCtx.bindings.get("Dog")!.value!) as ContextValue;
@@ -1417,7 +1417,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "Dog's local scope is distinct from Animal's");
     // Dispatch and construction still work over drawn + local symbols.
     const r2 = evalSource(
-      "Animal = Type.extend({name: String})\nDog = Animal.extend({name: String, age: Int})\nd = Dog(\"rex\", 3)\ns = d.name",
+      "Animal = Type.define({name: String})\nDog = Type.define({name: String, age: Int}, Animal)\nd = Dog(\"rex\", 3)\ns = d.name",
       undefined, [createTypeSystem()], undefined, true);
     eq(formatValue(r2.evalCtx.bindings.get("s")!.value!), "rex", "field access resolves through the drawn symbol");
   });
@@ -1436,7 +1436,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "…with the lifted implementation, not the parent's");
     // The wart fix: no meta-method names in the instance member set.
     for (const key of piMembers.bindings.keys()) {
-      eq(["instanceof", "subtypeof", "extend", "where", "invariant", "distinct",
+      eq(["instanceof", "subtypeof", "define", "where", "invariant", "distinct",
           "constructor", "interface", "preserveOps", "mixin"].includes(key.split("::").pop()!), false,
         `meta-method '${key}' must not ride into an instance member set`);
     }
@@ -1448,7 +1448,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // surface can produce them: a member set with two same-base-name keys.
     const desc = typeMemberDescriptor(dataOf(IntType as unknown as Value) as ContextValue, "add")!;
     const mkType = (twoTargets: boolean): ContextValue => {
-      const t = evalSource("T = Type.extend({v: Int})", undefined, [createTypeSystem()], undefined, true);
+      const t = evalSource("T = Type.define({v: Int})", undefined, [createTypeSystem()], undefined, true);
       const ty = dataOf(t.evalCtx.bindings.get("T")!.value!) as ContextValue;
       const members = getMembers(ty) as ContextValue;
       const k1 = registerScopeSymbol("<type:testA>", "draw").fqn!;
@@ -1479,8 +1479,8 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // still matches it by base name.
     const r = evalSource(
       "Greets = Type.interface({greet: Function})\n" +
-      "Greeter = Greets.extend({greet: Function})\n" +
-      "Stranger = Type.extend({greet: Function})\n" +
+      "Greeter = Type.define({greet: Function}, Greets)\n" +
+      "Stranger = Type.define({greet: Function})\n" +
       "g = Greeter(0)\ns = Stranger(0)\n" +
       "a = g instanceof Greets\n" +
       "b = s instanceof Greets\n" +
@@ -1498,6 +1498,63 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const greets = dataOf(r.evalCtx.bindings.get("Greets")!.value!) as ContextValue;
     const wrapped = structuralWrapTS(greets);
     eq(isInterfaceTypeSlots(wrapped), false, "structuralWrap erases the __interface marker");
+  });
+
+  // --- One construction surface (C6.1a, D45) -----------------------------------
+
+  test("define (D45): Type.define(spec, ...bundles) — fresh, drawn, and diamond forms", () => {
+    const r = evalSource(
+      "Fresh = Type.define({v: Int})\n" +
+      "HasX = Type.interface({x: Int})\n" +
+      "HasY = Type.interface({y: Int})\n" +
+      "Point = Type.define({x: Int, y: Int}, HasX, HasY)\n" +
+      "p = Point(1, 2)\ns = p.x + p.y\n" +
+      "a = Point subtypeof HasX\n" +
+      "b = Point subtypeof HasY\n" +
+      "c = Fresh subtypeof HasX",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(r.evalCtx.bindings.get("s")!.value!), "3",
+      "diamond record constructs and reads fields from both bundles");
+    eq(formatValue(r.evalCtx.bindings.get("a")!.value!), "true",
+      "Point drew HasX's member symbols — declared conformance");
+    eq(formatValue(r.evalCtx.bindings.get("b")!.value!), "true",
+      "…and HasY's — multi-bundle draws resolve per member");
+    eq(formatValue(r.evalCtx.bindings.get("c")!.value!), "false",
+      "an undrawn same-kind type does not conform");
+    // D44: composition mints NO is-a edge — conformance is symbol
+    // membership, the refines slot stays empty on defined records.
+    for (const name of ["Fresh", "Point"]) {
+      const t = dataOf(r.evalCtx.bindings.get(name)!.value!) as ContextValue;
+      eq(getRefines(t) === undefined, true, `${name}: define mints no refines edge`);
+    }
+  });
+
+  test("define (D45): non-kind dispatch guides migration; concrete conflicts are explicit; extend is gone", () => {
+    // `Int.define(...)` — dispatch finds Type's `define` through Int's
+    // shape, but self is a type, not a kind. The error names the D45 form.
+    let threw = "";
+    try {
+      evalSource("T = Int.define({x: Int})", undefined, [createTypeSystem()], undefined, true);
+    } catch (e: any) { threw = String(e.message); }
+    eq(threw.includes("not a kind"), true, `non-kind dispatch is rejected: ${threw}`);
+    eq(threw.includes("Type.define(spec, Int)"), true, "…and the error names the migration form");
+    // Two concrete record bundles both carry their own toString symbol —
+    // distinct targets under one base name is the explicit-conflict error
+    // (D44: no silent linearization), surfaced at define time.
+    let conflict = "";
+    try {
+      evalSource(
+        "A = Type.define({x: Int})\nB = Type.define({y: Int})\nC = Type.define({x: Int, y: Int}, A, B)",
+        undefined, [createTypeSystem()], undefined, true);
+    } catch (e: any) { conflict = String(e.message); }
+    eq(conflict.includes("explicit resolution required"), true,
+      `concrete-bundle conflict errors explicitly: ${conflict}`);
+    // Decisive migration (maintainer ruling): `extend` is REMOVED, not sugar.
+    let gone = false;
+    try {
+      evalSource("T = Int.extend({x: Int})", undefined, [createTypeSystem()], undefined, true);
+    } catch { gone = true; }
+    eq(gone, true, "extend is no longer a member of Type");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------

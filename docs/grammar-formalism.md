@@ -702,13 +702,13 @@ This formalism is expressible in Allegro's current type system:
 Rule = Terminal | NonTerm | Seq | Alt | Rep | Opt | Guarded
 
 // Each variant is a nominal type with specific fields
-Terminal = Type.extend({ match: TerminalMatch })
-Seq      = Type.extend({ items: Array[Rule] })
-Alt      = Type.extend({ options: Array[Rule], attrs: Object })
+Terminal = Type.define({ match: TerminalMatch })
+Seq      = Type.define({ items: Array[Rule] })
+Alt      = Type.define({ options: Array[Rule], attrs: Object })
 // ...
 
 // Grammar is a record type
-Grammar = Type.extend({
+Grammar = Type.define({
   productions: Object[String, Production],
   start:       String,
   reserved:    Object[String, Array[String]],

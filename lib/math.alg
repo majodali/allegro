@@ -31,7 +31,7 @@ export NonNeg      = Int & _ >= 0
 
 // A multi-field range. The invariant ties two fields together — the
 // natural shape for `invariant` rather than refinement-via-`&&`.
-export Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+export Range = Type.define({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
 
 // Phase D1 pilot: pure math functions declare `effects pure` so the
 // declaration is reviewable in the safety summary alongside contracts.
