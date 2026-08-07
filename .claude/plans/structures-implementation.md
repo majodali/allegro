@@ -520,7 +520,18 @@ capability, operator-minted anonymous instances. `Type : Type` fixed point
 verified.
 *D44 note (2026-08, RATIFIED — `Type.refines` name confirmed): the
 recipe is designed against the three-relation model (conformance +
-refinement + composition). The recipe takes NO inheritance parameter; `extend`
+refinement + composition).
+D45 note (2026-08, RATIFIED): ONE construction surface — `define` IS
+the recipe (no separate define_kind); Interface and Refinement become
+kinds (refinement-of-Type / sub-kind-of-Type respectively); instance-of
+= shape CONFORMS TO kind; the half-lotus matrix is a C6.1b battery
+test; constructor model: `construct` = the R2 authority member,
+call-as-function invokes it at every level, named factories delegate,
+everything bottoms out in struct_new + the gated shape stamp. C6.1b
+scope grows accordingly: Interface/Refinement kinds + fluent-API
+migration/removal + `&` as the R3 operator mint + `distinct` sub-kind
+spec design. C6.1 briefing rulings P2–P4 stand as briefed; P1 resolved
+as `Type.define` (unified-recipe reading). The recipe takes NO inheritance parameter; `extend`
 is removed decisively (no sugar — the composition operation gets its
 own name at the recipe's surface design); `Type.parent` narrows to
 refinement structure (renamed `Type.refines` (ratified)); the

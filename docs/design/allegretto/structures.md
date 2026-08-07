@@ -2,7 +2,7 @@
 
 > Tier 1 design doc — **draft, pending maintainer sign-off** (promoted from
 > the design discussion in `.claude/plans/structured-values-unification.md`,
-> which holds the full decision log D1–D44 and rationale; decision numbers
+> which holds the full decision log D1–D45 and rationale; decision numbers
 > below cite it). Status tags per `docs/design/README.md`. Everything here
 > is **[designed]** unless tagged otherwise — this document describes the
 > post-unification model, not current behavior (`CLAUDE.md` describes what
@@ -552,11 +552,40 @@ license PE rewrites, feeding compilation. Laws require effect-bounded
 
 ## 9. Kinds are just types [designed]
 
-**Instance-of = shape-of** (D40): a kind is a type whose instances are
+*D45 (maintainer-ratified 2026-08) extends this section — one
+construction surface, uniform at every meta-level: `define` IS the kind
+recipe's instance construction for Type (no separate `define_kind`; one
+implementation reading policy from the kind it is called on). Interface
+and Refinement become KINDS, related to Type by D44's own relations —
+Interface = a refinement of Type (restriction: declaration-only, no
+constructor authority), Refinement = a sub-kind of Type (extension:
+draws Type's kind-members, adds `refines` + `constraints`). Instance-of
+sharpens to SHAPE CONFORMS TO KIND (not shape identity) — required for
+the tower: the ratified "half-lotus" matrix is `Type : Type`,
+`Refinement : Type`, `Interface : Refinement : Type`, and `Refinement :
+Interface` is FALSE (Refinement holds constructor authority); the
+matrix is a C6.1b battery test. Constructor model: `construct` is the
+standardized per-kind minting-authority member (D39's `Type.construct`;
+the R2 capability); call-as-function invokes it at every level
+(`Int(42)`, `Effect("net")`, `Type({…})`); named constructors are
+static factories — own-members of the type value with NO independent
+minting power, delegating to `construct`; `Type.define` is Type's
+canonical named factory. Every `construct` bottoms out in `struct_new`
+plus the GATED shape stamp — the stamp is the mint, and Proof
+unforgeability becomes an ordinary capability instance (C6.3). The
+fluent API (`extend`/`interface`/`where`/`invariant`/`mixin`/
+`preserveOps`) is removed decisively in favor of `define` +
+kind-specific specs; the `&` operator survives as the R3 operator mint
+(`Int & _ > 0` mints an anonymous Refinement exactly as `io & time`
+mints an anonymous Effect — one conjunction story); `distinct`'s
+sub-kind spec is a C6.1b design item.*
+
+**Instance-of = shape-of** (D40; sharpened by D45 to shape-CONFORMS-TO):
+a kind is a type whose instances are
 type-values. `io : Effect`, `Int : Type`, `Effect : Type`, and `Type :
 Type` is the fixed point (D7 — no `Kind` above `Type`, no universe tower;
 stratification is handled by translation at the proof-export boundary).
-**Subtype-of (`parent`) is orthogonal** to instance-of.
+**The `refines` relation (D44) is orthogonal** to instance-of.
 
 **Members live once, on the kind.** `io.union(time)` dispatches through
 io's shape (Effect) exactly as `42.toString()` dispatches through Int — at
