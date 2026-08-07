@@ -213,8 +213,11 @@ function memberNameIndex(members: ContextValue): Map<string, Value[]> {
  *    - several distinct targets     → error (the §5 rule: explicit
  *      resolution required; a member multi-bound to one descriptor
  *      dedupes to one target and stays legal).
- *  Returns the storage key (the bound symbol's FQN). */
-function drawMemberKey(drawnContexts: ContextValue[], baseName: string, localScope: string): string {
+ *  Returns the storage KEYS (bound symbols' FQNs). C6.1b order ruling:
+ *  bundle order in a define call is NOT significant — when one target is
+ *  multi-bound under several drawn symbols, the declaration binds ALL of
+ *  them (instead of an order-dependent pick); distinct targets error. */
+function drawMemberKeys(drawnContexts: ContextValue[], baseName: string, localScope: string): string[] {
   const matches = new Map<string, Value | undefined>(); // key → descriptor (target)
   for (const drawn of drawnContexts) {
     const membersV = getMembers(drawn);
@@ -223,11 +226,11 @@ function drawMemberKey(drawnContexts: ContextValue[], baseName: string, localSco
       if (fqnBaseName(key) === baseName) matches.set(key, b.value);
     }
   }
-  if (matches.size === 0) return memberFqnIn(localScope, baseName);
-  if (matches.size === 1) return [...matches.keys()][0];
+  if (matches.size === 0) return [memberFqnIn(localScope, baseName)];
+  if (matches.size === 1) return [...matches.keys()];
   // Distinct KEYS may still be one TARGET (multi-bound descriptor).
   const targets = new Set(matches.values());
-  if (targets.size === 1) return [...matches.keys()][0];
+  if (targets.size === 1) return [...matches.keys()];
   throw new AllegroError(
     `member '${baseName}' matches multiple distinct drawn members (${[...matches.keys()].join(", ")}) — explicit resolution required`,
   );
@@ -757,8 +760,9 @@ function buildRecordType(
   const recordScope = newTypeMemberScope();
   (newType as any).__localMemberScope = recordScope;
   for (const f of fields) {
-    addMemberAt(members, drawMemberKey(drawn, f.name, recordScope),
-      makeFieldDescriptor(f.name, f.type));
+    for (const key of drawMemberKeys(drawn, f.name, recordScope)) {
+      addMemberAt(members, key, makeFieldDescriptor(f.name, f.type));
+    }
   }
 
   // Method entries (the unified mixin surface). A method whose base name
@@ -768,14 +772,17 @@ function buildRecordType(
   // type_dispatch handles both PrimitiveFunction and ComposedFunction
   // descriptors with self-binding.
   for (const m of methods) {
-    const key = drawMemberKey(drawn, m.name, recordScope);
+    let desc: Value;
     if (m.impl.kind === ValueKind.PrimitiveFunction) {
-      addMemberAt(members, key, makeMethodDescriptor(m.name, m.impl as PrimitiveFunctionValue));
+      desc = makeMethodDescriptor(m.name, m.impl as PrimitiveFunctionValue);
     } else {
-      const desc = makeContext();
-      writeShape(desc, MethodType);
-      addBinding(desc, "name", stringToBits(m.name));
-      addBinding(desc, "value", m.impl);
+      const d = makeContext();
+      writeShape(d, MethodType);
+      addBinding(d, "name", stringToBits(m.name));
+      addBinding(d, "value", m.impl);
+      desc = d;
+    }
+    for (const key of drawMemberKeys(drawn, m.name, recordScope)) {
       addMemberAt(members, key, desc);
     }
   }
@@ -783,14 +790,26 @@ function buildRecordType(
   // Copy non-meta Method descriptors from each drawn bundle's __members.
   // C5.2a: keys are member-symbol FQNs — copied verbatim (same symbol,
   // same key); the meta filter compares the base-name projection.
+  // C6.1b order ruling: bundle order is NOT significant. A spec
+  // declaration owns its keys (the explicit resolution); two bundles
+  // providing DIFFERENT descriptors for the same symbol is an explicit-
+  // conflict error, never a first-bundle-wins.
   const metaMethodNames = META_METHOD_NAMES;
+  const specKeys = new Set(members.bindings.keys());
   for (const bundle of drawn) {
     const bundleMembers = getMembers(bundle);
     if (bundleMembers?.kind !== ValueKind.Context) continue;
     for (const [key, binding] of (bundleMembers as ContextValue).bindings) {
       if (metaMethodNames.has(fqnBaseName(key))) continue;
-      if (!members.bindings.has(key) && binding.value) {
+      if (!binding.value) continue;
+      if (specKeys.has(key)) continue;
+      const existing = members.bindings.get(key)?.value;
+      if (existing === undefined) {
         addBinding(members, key, binding.value);
+      } else if (existing !== binding.value) {
+        throw new AllegroError(
+          `member '${fqnBaseName(key)}' is provided differently by two drawn bundles — ` +
+          `bundle order is not significant; resolve by declaring '${fqnBaseName(key)}' in the spec`);
       }
     }
   }
@@ -861,8 +880,10 @@ function buildRecordType(
   // member identity); otherwise it gets a type-local symbol. A toString
   // METHOD supplied in the spec wins over the auto-generated one.
   if (!methods.some((m) => m.name === "toString")) {
-    addMemberAt(members, drawMemberKey(drawn, "toString", recordScope),
-      makeMethodDescriptor("toString", toStringImpl));
+    const tsDesc = makeMethodDescriptor("toString", toStringImpl);
+    for (const key of drawMemberKeys(drawn, "toString", recordScope)) {
+      addMemberAt(members, key, tsDesc);
+    }
   }
 
   setMembers(newType, members);
@@ -915,22 +936,34 @@ function buildInterfaceType(
   const ifaceScope = newTypeMemberScope();
   (ifaceType as any).__localMemberScope = ifaceScope;
   for (const m of declaredMembers) {
-    addMemberAt(members, drawMemberKey(drawn, m.name, ifaceScope),
-      makeFieldDescriptor(m.name, m.type));
+    const desc = makeFieldDescriptor(m.name, m.type);
+    for (const key of drawMemberKeys(drawn, m.name, ifaceScope)) {
+      addMemberAt(members, key, desc);
+    }
   }
 
   // Copy non-meta members from each drawn bundle (C5.2a: FQN keys copied
   // verbatim; meta filter on the base-name projection) — the old
   // parent-inheritance form `Int.interface(spec)` is now
-  // `Interface.define(spec, Int)`.
+  // `Interface.define(spec, Int)`. C6.1b order ruling: bundle order is
+  // NOT significant — spec declarations own their keys; conflicting
+  // bundle-provided descriptors for one symbol error explicitly.
   const metaMethodNames = META_METHOD_NAMES;
+  const specKeys = new Set(members.bindings.keys());
   for (const bundle of drawn) {
     const bundleMembers = getMembers(bundle);
     if (bundleMembers?.kind !== ValueKind.Context) continue;
     for (const [key, binding] of (bundleMembers as ContextValue).bindings) {
       if (metaMethodNames.has(fqnBaseName(key))) continue;
-      if (!members.bindings.has(key) && binding.value) {
+      if (!binding.value) continue;
+      if (specKeys.has(key)) continue;
+      const existing = members.bindings.get(key)?.value;
+      if (existing === undefined) {
         addBinding(members, key, binding.value);
+      } else if (existing !== binding.value) {
+        throw new AllegroError(
+          `member '${fqnBaseName(key)}' is provided differently by two drawn bundles — ` +
+          `bundle order is not significant; resolve by declaring '${fqnBaseName(key)}' in the spec`);
       }
     }
   }
@@ -1198,8 +1231,10 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
     }) as PrimitiveFnImpl);
 
     // The lift is an OVERRIDE — it draws (binds) the parent op's symbol.
-    addMemberAt(newMembers, drawMemberKey([refinedType], opName, liftScope),
-      makeMethodDescriptor(opName, liftedOp));
+    const liftDesc = makeMethodDescriptor(opName, liftedOp);
+    for (const key of drawMemberKeys([refinedType], opName, liftScope)) {
+      addMemberAt(newMembers, key, liftDesc);
+    }
   }
 
   setMembers(newType, newMembers);
@@ -2183,11 +2218,17 @@ setConstruct(InterfaceKind, makePrimitive("Interface.__construct", (args, ctx, e
   return wrapType(buildInterfaceType(spec, drawn));
 }, true));
 
-/** C6.1b: the kinds whose `define`/call-as-function mint type-values.
- *  Effect and Proof join the tower when they are re-derived through the
- *  recipe (C6.2 / C6.3). */
+/** C6.1b (maintainer ruling): there is no reified `Kind` — D7 forbids a
+ *  universe above Type. Kind-hood is a CHECKABLE PROPERTY, not a
+ *  convention: a kind is exactly a type that holds Type's kind-member
+ *  symbols — Type itself (identity), Refinement (drawn), Interface
+ *  (transparent). Ordinary types can never acquire them accidentally:
+ *  the meta filter excludes the kind API from every draw, so kind-hood
+ *  requires a deliberate kind derivation. From Allegro, `K subtypeof
+ *  Type` IS the kind test. Effect and Proof join the tower when they
+ *  are re-derived through the recipe (C6.2 / C6.3). */
 function isKind(t: ContextValue): boolean {
-  return t === Type || t === RefinementKind || t === InterfaceKind;
+  return isTypeMeta(t);
 }
 
 export const IntType: ContextValue = buildType("Int", intMethods);

@@ -620,11 +620,22 @@ bundle; `preserveOps` is the Refinement spec's `preserve` option
 (`Refinement.define({refines, where, preserve: [...]|"all",
 ...methods})`). The `&` operator IS `Refinement.construct`'s operator
 form — one conjunction story (Effect's `&` unifies through the same
-mint when C6.2 re-derives it). Two spec-shape decisions taken in-chunk,
-flagged for ratification: (1) mixin's refuse-same-name policy is
-superseded by C5.2b's declaration-override in the unified define
-surface; (2) the Refinement spec's reserved keys are
+mint when C6.2 re-derives it). Both in-chunk spec decisions
+maintainer-ratified (2026-08): (1) override-on-draw supersedes mixin's
+refuse-same-name, WITH the order ruling — bundle order in a define call
+is NOT significant. A spec declaration binds ALL keys of a multi-bound
+drawn target (no order-dependent pick); two bundles providing different
+descriptors for one symbol is a define-time explicit-conflict error in
+either order, resolved by declaring the member in the spec (the spec
+declaration owns its keys). (2) the Refinement spec's reserved keys are
 `refines`/`where`/`preserve`, all other entries method implementations.
+Kind-hood ruling: there is NO reified `Kind` (D7 — no universe above
+Type) and it is not left as convention either — a kind is exactly a
+type holding Type's kind-member symbols (Type by identity, Refinement
+by drawing, Interface by transparency; the meta filter keeps ordinary
+types from acquiring them), so `K subtypeof Type` IS the kind test,
+answerable from Allegro; `isKind` in the implementation is that
+conformance predicate.
 `distinct` and `constructor` remain as Type members pending their own
 kind-spec designs — `distinct`'s sketch: a Distinct kind whose
 instances share the base's member set with fresh identity

@@ -1606,6 +1606,51 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(getType(p) === RefinementKindTS, true, "a refined type's meta IS the Refinement kind");
   });
 
+  test("kind tower (C6.1b ruling): bundle order is not significant; kind-hood is conformance", () => {
+    // Order symmetry: swapping bundles yields identical behavior.
+    const build = (order: string) => evalSource(
+      "HasX = Interface.define({x: Int})\nHasY = Interface.define({y: Int})\n" +
+      `P = Type.define({x: Int, y: Int}, ${order})\n` +
+      "s = P(1, 2).x + P(1, 2).y\na = P subtypeof HasX\nb = P subtypeof HasY",
+      undefined, [createTypeSystem()], undefined, true);
+    for (const order of ["HasX, HasY", "HasY, HasX"]) {
+      const r = build(order);
+      eq(formatValue(r.evalCtx.bindings.get("s")!.value!), "3", `constructs (${order})`);
+      eq(formatValue(r.evalCtx.bindings.get("a")!.value!), "true", `conforms to HasX (${order})`);
+      eq(formatValue(r.evalCtx.bindings.get("b")!.value!), "true", `conforms to HasY (${order})`);
+    }
+    // Two bundles overriding one shared symbol DIFFERENTLY: an explicit-
+    // conflict error in either order — never first-bundle-wins.
+    const conflictSrc = (defC: string) =>
+      "I = Interface.define({m: Function})\n" +
+      "A = Type.define({m: (self) => 1}, I)\n" +
+      "B = Type.define({m: (self) => 2}, I)\n" + defC;
+    for (const order of ["A, B", "B, A"]) {
+      let threw = "";
+      try {
+        evalSource(conflictSrc(`C = Type.define({v: Int}, ${order})`),
+          undefined, [createTypeSystem()], undefined, true);
+      } catch (e: any) { threw = String(e.message); }
+      eq(threw.includes("order is not significant"), true,
+        `bundle-bundle conflict errors (${order}): ${threw}`);
+    }
+    // Declaring the member in the spec IS the explicit resolution.
+    const rr = evalSource(
+      conflictSrc("C = Type.define({v: Int, m: (self) => 3}, A, B)\nz = C(0).m()"),
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(rr.evalCtx.bindings.get("z")!.value!), "3",
+      "a spec declaration resolves the conflict (overrides both)");
+    // Kind-hood is not a convention: no reified Kind (D7) — a kind is a
+    // type holding Type's kind-member symbols, so `subtypeof Type` IS the
+    // kind test, from Allegro itself.
+    const rk = evalSource(
+      "k1 = Refinement subtypeof Type\nk2 = Interface subtypeof Type\nk3 = Int subtypeof Type",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(rk.evalCtx.bindings.get("k1")!.value!), "true", "Refinement is a kind");
+    eq(formatValue(rk.evalCtx.bindings.get("k2")!.value!), "true", "Interface is a kind");
+    eq(formatValue(rk.evalCtx.bindings.get("k3")!.value!), "false", "Int is a type, not a kind");
+  });
+
   test("kind tower (C6.1b, D45): the fluent API is gone; kind specs replace it", () => {
     // Removed decisively (maintainer ruling): no sugar, no fallback.
     for (const call of ["Int.where(n => n > 0)", "Interface.define({x: Int}).mixin({m: (s) => s})",

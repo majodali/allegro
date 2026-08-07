@@ -67,8 +67,23 @@ every meta-level.
   recorded in structures.md §9; C6.2's Effect re-derivation may inform
   both.
 
+Follow-up (maintainer rulings, same chunk): (1) override-on-draw
+ratified WITH order-insensitivity — bundle order in a define call is
+NOT significant: a spec declaration binds ALL keys of a multi-bound
+drawn target, and two bundles providing different descriptors for one
+symbol error at define time in either order ("bundle order is not
+significant; resolve by declaring '<member>' in the spec" — the spec
+declaration is the explicit resolution and owns its keys).
+(2) Refinement spec shape ratified as-is. (3) Kind-hood: no reified
+`Kind` (D7), and no convention either — a kind is exactly a type
+holding Type's kind-member symbols, so `K subtypeof Type` is the kind
+test from Allegro; `isKind` becomes that conformance predicate
+(replacing the whitelist). Battery: order-swap symmetry, both-ways
+conflict, spec resolution, kind test.
+
 Landed in two commits (kind tower + construct authority ecc83fa; fluent
-removal + migration). 1048/1048 green.
+removal + migration ca725ea) plus the rulings follow-up. 1048/1048
+green (1049 with the order battery).
 
 ## 2026-08 — C6.1a: Unified conformance, `__refines`, and `Type.define` (structures Phase 6, B-024 part 1)
 

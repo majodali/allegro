@@ -263,12 +263,13 @@ phase).
   `construct` authority + call-as-function at every level, fluent API
   removed (`&` mint absorbs where/invariant; Interface.define;
   method-valued define entries + bundles absorb mixin; Refinement
-  spec's `preserve` absorbs preserveOps). Residue: `distinct` /
-  `constructor` kind-spec designs deferred with sketches in
-  structures.md §9; two in-chunk spec decisions flagged for maintainer
-  ratification (define's override-on-draw vs mixin's refuse;
-  Refinement spec reserved keys); `__invariantsList` slot swept in
-  C6.3
+  spec's `preserve` absorbs preserveOps). In-chunk decisions
+  maintainer-ratified: override-on-draw (with the order ruling —
+  bundle order not significant, explicit-conflict error resolved by
+  spec declaration), Refinement spec reserved keys, kind-hood =
+  conformance to Type (no reified Kind, no convention). Residue:
+  `distinct` / `constructor` kind-spec designs deferred with sketches
+  in structures.md §9; `__invariantsList` slot swept in C6.3
 - [ ] **B-025** · L2 · Effect re-derived through the recipe; anonymous
   conjunctions; `pure subtypeof Effect` flip (C6.2)
 - [ ] **B-026** · L2 · Proof re-derived (kernel-private authority);
