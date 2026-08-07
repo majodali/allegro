@@ -48,7 +48,7 @@ import { effectsOf, withEffects } from "./effects.js";
 import { evaluate } from "./evaluator.js";
 import { makeSymbol } from "./types.js";
 import { Structure, isStructure } from "./structure.js";
-import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN, KERNEL_SCOPE_FQN, kernelMemberFqn } from "./symbols.js";
+import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN, KERNEL_SCOPE_FQN, kernelMemberFqn, typeMemberScopeFqn } from "./symbols.js";
 import { dataOf, indexGet, getSlotCount } from "./slots.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -1348,17 +1348,27 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
 
   // --- Symbol-keyed members (C5.2a) --------------------------------------------
 
-  test("symbol-keyed members (C5.2a): member sets key by the kernel member FQN", () => {
+  test("symbol-keyed members (C5.2a/C6.1a): member sets key by per-type member FQNs", () => {
     const members = getMembers(dataOf(IntType as unknown as Value) as ContextValue) as ContextValue;
-    eq(members.bindings.has(kernelMemberFqn("add")), true, "storage key is the member symbol's FQN");
+    // C6.1a: built-ins moved OFF the shared kernel scope — Int declares
+    // its members in its OWN name-stable scope, so Int.add and Float.add
+    // are distinct symbols and cross-built-in conformance is never
+    // accidental under symbol membership.
+    const intScope = typeMemberScopeFqn("Int");
+    eq(members.bindings.has(intScope + "::add"), true, "storage key is the member symbol's FQN in Int's own scope");
     eq(members.bindings.has("add"), false, "bare string keys are gone from member storage");
-    // The chokepoints project base name → kernel symbol → key.
+    eq(members.bindings.has(kernelMemberFqn("add")), false, "the shared kernel scope is retired for built-ins");
     eq(typeMethod(dataOf(IntType as unknown as Value) as ContextValue, "add") !== null, true,
-      "typeMethod projects through the kernel scope");
-    // Every member key projects back to a base name.
+      "typeMethod projects by base name through the per-type scope");
     for (const key of members.bindings.keys()) {
-      eq(key.startsWith(KERNEL_SCOPE_FQN), true, `member key '${key}' lives in the kernel scope (C5.2a)`);
+      eq(key.startsWith(intScope), true, `member key '${key}' lives in Int's scope`);
     }
+    // The consequence the move exists for: near-identical built-ins do
+    // NOT conform to each other (Int and Float spell many same names).
+    const r = evalSource("a = 3.14 instanceof Int\nb = 42 instanceof Float",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(r.evalCtx.bindings.get("a")!.value!), "false", "Float value is not an Int");
+    eq(formatValue(r.evalCtx.bindings.get("b")!.value!), "false", "Int value is not a Float");
   });
 
   test("symbol-keyed members (C5.2a): typeShape's sharing invariant survives the re-keying", () => {
@@ -1395,12 +1405,15 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       return null;
     };
     const animalName = keyOf(animal, "name")!;
-    eq(animalName.startsWith("<type:"), true, "a field matching nothing drawn is TYPE-LOCAL");
+    eq(animalName.startsWith("<type"), true, "a field matching nothing drawn is TYPE-LOCAL");
+    // C6.1a: binding stabilized the local scope onto the declaration site.
+    eq(animalName.startsWith("<type#<main>::Animal>"), true, "bound types get name-stable member scopes");
     eq(keyOf(dog, "name") === animalName, true,
       "Dog's re-declared `name` DRAWS Animal's symbol — override keeps member identity");
     const dogAge = keyOf(dog, "age")!;
-    eq(dogAge.startsWith("<type:"), true, "a new field gets a type-local symbol");
-    eq(dogAge.startsWith(animalName.slice(0, animalName.indexOf("::"))), false,
+    eq(dogAge.startsWith("<type"), true, "a new field gets a type-local symbol");
+    const scopeOfKey = (k: string): string => k.slice(0, k.lastIndexOf("::"));
+    eq(scopeOfKey(dogAge) !== scopeOfKey(animalName), true,
       "Dog's local scope is distinct from Animal's");
     // Dispatch and construction still work over drawn + local symbols.
     const r2 = evalSource(

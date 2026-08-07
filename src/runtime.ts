@@ -19,8 +19,8 @@ import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from ".
 import { collapseBodyMetadata, checkExhaustiveness, checkTermination } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
-import { registerScopeSymbol, MAIN_SCOPE_FQN } from "./symbols.js";
-import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
+import { registerScopeSymbol, MAIN_SCOPE_FQN, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
+import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
 export type { Extension };
@@ -1196,6 +1196,13 @@ export function evalSource(
           if (currentName.startsWith("<")) {
             renameInPlace(typeCtx, stringToBits(b.key));
           }
+          // C6.1a: stabilize the type's LOCAL member symbols onto the
+          // declaration-site scope (module FQN + binding name) — the
+          // fixpoint may re-evaluate this declaration, and both
+          // constructions must yield the SAME member symbols for
+          // conformance to hold across passes.
+          stabilizeTypeMemberScope(typeCtx,
+            typeMemberScopeFqn(`${moduleFqn ?? MAIN_SCOPE_FQN}${FQN_SEP}${b.key}`));
         }
       }
 

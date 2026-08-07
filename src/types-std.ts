@@ -13,7 +13,7 @@ import {
   Extension,
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
-import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope } from "./symbols.js";
+import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
 import {
   getName, getMembers, getParent, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
@@ -172,12 +172,33 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
   return binding.value;
 }
 
-/** C5.2a: the member-set write chokepoint — stores the descriptor under
- *  the member symbol's FQN key (kernel scope for built-in types). Every
- *  member-set write goes through here; `addBinding` remains for
- *  descriptor internals and non-member contexts. */
-function addMember(members: ContextValue, baseName: string, desc: Value): void {
-  addBinding(members, kernelMemberFqn(baseName), desc);
+/** C6.1a: the member-set write chokepoint — stores the descriptor under
+ *  the member symbol's FQN key in the DECLARING TYPE's OWN scope (per-type
+ *  name-stable scopes; the shared kernel scope made cross-built-in
+ *  conformance accidental under symbol membership). `addBinding` remains
+ *  for descriptor internals and non-member contexts. */
+function addMember(members: ContextValue, scopeFqn: string, baseName: string, desc: Value): void {
+  addBinding(members, memberFqnIn(scopeFqn, baseName), desc);
+  (members as any).__memberNameIndex = undefined;
+}
+
+/** Lazy base-name index on a member set (JS-side cache field, like
+ *  `__predicateSet`'s precedent). Sound because member sets are
+ *  populated fully during construction before the first lookup and are
+ *  never mutated after (derived types clone into fresh sets). */
+function memberNameIndex(members: ContextValue): Map<string, Value[]> {
+  const cached = (members as any).__memberNameIndex as Map<string, Value[]> | undefined | null;
+  if (cached) return cached;
+  const idx = new Map<string, Value[]>();
+  for (const [key, b] of members.bindings) {
+    if (b.value === undefined) continue;
+    const base = fqnBaseName(key);
+    const arr = idx.get(base);
+    if (arr) arr.push(b.value);
+    else idx.set(base, [b.value]);
+  }
+  (members as any).__memberNameIndex = idx;
+  return idx;
 }
 
 /** C5.2b (D30): DRAW-FROM resolution at member declaration time. A member
@@ -211,9 +232,12 @@ function drawMemberKey(drawnContexts: ContextValue[], baseName: string, localSco
   );
 }
 
-/** C5.2b: store a descriptor under an explicit (draw-resolved) key. */
+/** C5.2b: store a descriptor under an explicit (draw-resolved) key.
+ *  Invalidates the lazy name index — construction-time lookups (mixin's
+ *  conflict check) may have built it on a partial set. */
 function addMemberAt(members: ContextValue, key: string, desc: Value): void {
   addBinding(members, key, desc);
+  (members as any).__memberNameIndex = undefined;
 }
 
 /** C5.2b: base-name member lookup over a member set — kernel fast path
@@ -222,20 +246,53 @@ function addMemberAt(members: ContextValue, key: string, desc: Value): void {
  *  identity; several DISTINCT targets under one base name is the §5
  *  ambiguity error at the access surface. */
 function memberBindingByName(members: ContextValue, name: string): Value | undefined {
-  const fast = members.bindings.get(kernelMemberFqn(name));
-  if (fast?.value !== undefined) return fast.value;
+  // C6.1a: the kernel fast path retired with the shared kernel scope; the
+  // lazy name index keeps dispatch O(1) per lookup.
+  const hits = memberNameIndex(members).get(name);
+  if (!hits || hits.length === 0) return undefined;
+  if (hits.length === 1) return hits[0];
   let found: Value | undefined;
-  for (const [key, b] of members.bindings) {
-    if (fqnBaseName(key) !== name || b.value === undefined) continue;
-    if (found === undefined) {
-      found = b.value;
-    } else if (found !== b.value) {
+  for (const v of hits) {
+    if (found === undefined) found = v;
+    else if (found !== v) {
       throw new AllegroError(
         `member '${name}' is ambiguous — multiple distinct targets; explicit qualification required`,
       );
     }
   }
   return found;
+}
+
+/** C6.1a: re-key a type's TYPE-LOCAL member symbols onto a name-stable
+ *  scope at auto-naming time. Counter scopes give per-construction
+ *  identity, but evalSource's fixpoint may re-evaluate a type
+ *  declaration — the same declaration must yield the SAME member symbols
+ *  or conformance between captures of different passes fails (the old
+ *  name-string walk masked this; symbol identity exposes it). Runs at
+ *  the binding step, before anything external draws the keys; drawn
+ *  (non-local) keys are untouched. */
+export function stabilizeTypeMemberScope(typeCtx: ContextValue, stableScope: string): void {
+  const local = (typeCtx as any).__localMemberScope as string | undefined;
+  if (!local || local === stableScope) return;
+  const membersV = getMembers(typeCtx);
+  if (membersV?.kind !== ValueKind.Context) return;
+  const members = membersV as ContextValue;
+  const renames: [string, string][] = [];
+  for (const key of members.bindings.keys()) {
+    if (key.startsWith(local + FQN_SEP)) {
+      renames.push([key, memberFqnIn(stableScope, fqnBaseName(key))]);
+    }
+  }
+  for (const [oldK, newK] of renames) {
+    const bnd = members.bindings.get(oldK)!;
+    members.bindings.delete(oldK);
+    members.bindings.set(newK, { key: newK, value: bnd.value });
+    for (const e of members.bindingList) {
+      if (e.key === oldK) (e as { key: string }).key = newK;
+    }
+  }
+  (members as any).__memberNameIndex = undefined;
+  (typeCtx as any).__localMemberScope = stableScope;
 }
 
 /** Read-side projection view for consumers that iterate members by base
@@ -304,18 +361,46 @@ function shapeAwareInstanceof(value: Value, expectedType: ContextValue): boolean
  *     typeA to be named, since an anonymous typeA can't match a name.
  */
 function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
-  if (isInterfaceType(typeB)) {
+  // C6.1a (D44/D45): ONE declared check — the nominal name-string chain
+  // walk is gone (its name-collision false positive with it). Order:
+  //  1. identity;
+  //  2. loose path — an UNNAMED, non-interface expected type (~T wraps,
+  //     anonymous inline types) matches by base-name projection;
+  //  3. refinement satisfaction — A's `refines` chain reaching B (a
+  //     knowledge layer over B's shape; identity walk);
+  //  4. shared-member-set guard — the same member-set OBJECT without a
+  //     refines path is knowledge-layer plumbing (`distinct`), NOT a
+  //     declaration: distinct types conform to nothing but themselves;
+  //  5. generic-args guard — Array[Int] vs Array[String] share member
+  //     symbols (one declaring generic), so args must match;
+  //  6. symbol-identity MEMBERSHIP — the D44 conformance relation, the
+  //     same check for interfaces and named concrete types alike.
+  if (typeA === typeB) return true;
+  if (!isInterfaceType(typeB) && getTypeNameFromCtx(typeB) === null) {
     return structuralSubtypeof(typeA, typeB);
   }
-  const nameB = getTypeNameFromCtx(typeB);
-  if (nameB === null) {
-    return structuralSubtypeof(typeA, typeB);
+  let cur: ContextValue | null = typeA;
+  for (let guard = 0; guard < 64 && cur; guard++) {
+    const parentV = getParent(cur);
+    if (parentV?.kind !== ValueKind.Context) break;
+    cur = parentV as ContextValue;
+    if (cur === typeB) return typeArgsMatch(typeA, typeB);
   }
-  const nameA = getTypeNameFromCtx(typeA);
-  if (nameA === null) {
-    return structuralSubtypeof(typeA, typeB);
-  }
-  return nominalSubtypeof(typeA, typeB, nameB);
+  // Effect instances keep chain/identity semantics until C6.2 re-derives
+  // the lattice (buildEffect's member copies share key sets, which would
+  // make pure/opaque mutually conformant under membership).
+  if (getEffectKind(typeB) !== undefined) return false;
+  // C3.3 preserved: a predicate-carrying SHAPE (preserveOps — mints its
+  // own member set AND carries the refinement predicate) demands
+  // construction through it; its member symbols were DRAWN from the base,
+  // so membership alone cannot distinguish base values from certified
+  // ones. Chain/identity (checked above) is the only declared route.
+  if (getPredicate(typeB) !== undefined && typeShape(typeB) === typeB) return false;
+  const aMembers = getMembers(typeA);
+  const bMembers = getMembers(typeB);
+  if (aMembers !== undefined && aMembers === bMembers) return false;
+  if (!typeArgsMatch(typeA, typeB)) return false;
+  return structuralSubtypeof(typeA, typeB);
 }
 
 function isInterfaceType(t: ContextValue): boolean {
@@ -335,19 +420,19 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
     const bMembers = bMembersVal as ContextValue;
     const aMembers = aMembersVal?.kind === ValueKind.Context ? aMembersVal as ContextValue : null;
     if (!aMembers) return bMembers.bindings.size === 0;
-    // C5.2c (D30, the conformance split — the ratified conscious delta):
-    //  - An INTERFACE check is DECLARED conformance: SYMBOL-IDENTITY
-    //    membership — every member symbol the interface declares must BE
-    //    a member symbol of the actual type (same FQN key; interning
-    //    makes key identity symbol identity). Conformance is therefore
-    //    declared, never accidental: a type conforms by DRAWING the
-    //    interface's symbols (extending the interface binds them), not by
-    //    happening to spell the same names.
-    //  - The LOOSE path (~T structural wraps, anonymous inline types)
-    //    matches by base-name projection — the duck-typing surface, aimed
-    //    at data values. `~Interface` projects an interface into this
-    //    world (structuralWrap erases the marker along with the name).
-    if (isInterfaceType(typeB)) {
+    // C5.2c/C6.1a (D30/D44): the conformance split.
+    //  - A DECLARED check (expected is an interface OR a named type — one
+    //    mechanism since D44 dissolved the nominal chain) is
+    //    SYMBOL-IDENTITY membership: every member symbol the expected
+    //    type declares must BE a member symbol of the actual type (same
+    //    FQN key; interning makes key identity symbol identity).
+    //    Conformance is declared, never accidental — a type conforms by
+    //    DRAWING the expected type's symbols, not by spelling the same
+    //    names.
+    //  - The LOOSE path (~T structural wraps, anonymous inline types —
+    //    expected is UNNAMED and unmarked) matches by base-name
+    //    projection — the duck-typing surface, aimed at data values.
+    if (isInterfaceType(typeB) || getTypeNameFromCtx(typeB) !== null) {
       for (const key of bMembers.bindings.keys()) {
         if (!aMembers.bindings.has(key)) return false;
       }
@@ -370,22 +455,10 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
  * typeA's __extends chain reaches a type with that name. Caller has already
  * confirmed both types carry a __name.
  */
-function nominalSubtypeof(typeA: ContextValue, typeB: ContextValue, nameB: string): boolean {
-  let current: ContextValue | null = typeA;
-  while (current) {
-    const nameA = getTypeNameFromCtx(current);
-    if (nameA === nameB) {
-      return typeArgsMatch(current, typeB);
-    }
-    const parentV = getParent(current);
-    if (parentV?.kind === ValueKind.Context) {
-      current = parentV as ContextValue;
-    } else {
-      current = null;
-    }
-  }
-  return false;
-}
+// C6.1a (D44): `nominalSubtypeof` — the name-string chain walk — is
+// DELETED. The declared relation is symbol-identity conformance
+// (shapeAwareSubtypeof); refinement satisfaction walks the `refines`
+// chain by object identity, never by name.
 
 /** Check that type arguments match (if the expected type has them) */
 function typeArgsMatch(actual: ContextValue, expected: ContextValue): boolean {
@@ -651,6 +724,7 @@ function buildRecordType(
   // symbol (override/implement keeps identity); otherwise it gets a
   // type-local symbol in this type's member scope.
   const recordScope = newTypeMemberScope();
+  (newType as any).__localMemberScope = recordScope;
   for (const f of fields) {
     addMemberAt(members, drawMemberKey([parentType], f.name, recordScope),
       makeFieldDescriptor(f.name, f.type));
@@ -780,6 +854,7 @@ function buildInterfaceType(
   // draw from the parent (a matching base name binds the parent's member
   // symbol); new names get interface-local symbols.
   const ifaceScope = newTypeMemberScope();
+  (ifaceType as any).__localMemberScope = ifaceScope;
   for (const m of declaredMembers) {
     addMemberAt(members, drawMemberKey([parentType], m.name, ifaceScope),
       makeFieldDescriptor(m.name, m.type));
@@ -1121,6 +1196,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
 
   const newConstruct = getConstruct(newType) as PrimitiveFunctionValue | undefined;
   const liftScope = newTypeMemberScope();
+  (newType as any).__localMemberScope = liftScope;
 
   for (const opName of ops) {
     const parentDesc = parentMembers?.kind === ValueKind.Context
@@ -1186,6 +1262,7 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
   }
 
   const mixinScope = newTypeMemberScope();
+  (newType as any).__localMemberScope = mixinScope;
   for (const m of methods) {
     // Check for conflict — multi-bind-aware (C5.2b): the projection scan
     // counts distinct TARGETS under the base name; any existing target is
@@ -1237,42 +1314,43 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
 // Single block — instanceof/subtypeof are shape-aware (nominal when both
 // operands are named, structural otherwise).
 
+const TYPE_MEMBER_SCOPE = typeMemberScopeFqn("Type");
 const typeMembers = makeContext();
-addMember(typeMembers, "instanceof", makeMethodDescriptor("instanceof",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "instanceof", makeMethodDescriptor("instanceof",
   makePrimitive("Type.instanceof", (args) => {
     const type = args[0] as ContextValue;
     const value = args[1];
     return withType(makeInt(shapeAwareInstanceof(value, type) ? 1 : 0), BoolType);
   })
 ));
-addMember(typeMembers, "subtypeof", makeMethodDescriptor("subtypeof",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "subtypeof", makeMethodDescriptor("subtypeof",
   makePrimitive("Type.subtypeof", (args) => {
     const typeA = args[0] as ContextValue;
     const typeB = args[1] as ContextValue;
     return withType(makeInt(shapeAwareSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
   })
 ));
-addMember(typeMembers, "extend", makeMethodDescriptor("extend",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "extend", makeMethodDescriptor("extend",
   makePrimitive("Type.extend", (args, _ctx, _evalFn) => {
     return wrapType(buildRecordType(args[0] as ContextValue, args[1], Type));
   })
 ));
-addMember(typeMembers, "where", makeMethodDescriptor("where",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "where", makeMethodDescriptor("where",
   makePrimitive("Type.where", (args) => {
     return wrapType(buildRefinedType(args[0] as ContextValue, args[1]));
   })
 ));
-addMember(typeMembers, "invariant", makeMethodDescriptor("invariant",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "invariant", makeMethodDescriptor("invariant",
   makePrimitive("Type.invariant", (args) => {
     return wrapType(buildInvariantedType(args[0] as ContextValue, args[1]));
   })
 ));
-addMember(typeMembers, "distinct", makeMethodDescriptor("distinct",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "distinct", makeMethodDescriptor("distinct",
   makePrimitive("Type.distinct", (args) => {
     return wrapType(buildDistinctType(args[0] as ContextValue));
   })
 ));
-addMember(typeMembers, "constructor", makeMethodDescriptor("constructor",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "constructor", makeMethodDescriptor("constructor",
   makePrimitive("Type.constructor", (args) => {
     const type = args[0] as ContextValue;
     const fn = args[1];
@@ -1284,12 +1362,12 @@ addMember(typeMembers, "constructor", makeMethodDescriptor("constructor",
     return wrapType(type);
   })
 ));
-addMember(typeMembers, "interface", makeMethodDescriptor("interface",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "interface", makeMethodDescriptor("interface",
   makePrimitive("Type.interface", (args) => {
     return wrapType(buildInterfaceType(args[0] as ContextValue, args[1]));
   })
 ));
-addMember(typeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "preserveOps", makeMethodDescriptor("preserveOps",
   makePrimitive("Type.preserveOps", (args) => {
     const type = args[0] as ContextValue;
     const opNames: string[] = [];
@@ -1302,7 +1380,7 @@ addMember(typeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
     return wrapType(buildPreserveOps(type, opNames));
   })
 ));
-addMember(typeMembers, "mixin", makeMethodDescriptor("mixin",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "mixin", makeMethodDescriptor("mixin",
   makePrimitive("Type.mixin", (args) => {
     return wrapType(buildMixinType(args[0] as ContextValue, args[1]));
   })
@@ -1338,13 +1416,18 @@ function buildType(
   if (options?.extends) {
     setParent(ctx, options.extends);
   }
-  // Build __members with Method descriptors
+  // Build __members with Method descriptors. C6.1a: each named type
+  // declares its members in its OWN name-stable scope — Int.add and
+  // Float.add are DISTINCT symbols (neither drew from the other), so
+  // symbol-membership conformance between built-ins is declared, never
+  // accidental.
+  const typeScope = typeMemberScopeFqn(name);
   const members = makeContext();
   for (const [key, fn] of Object.entries(methods)) {
     const fxLabels = options?.methodEffects?.[key];
     const prim = makePrimitive(`${name}.${key}`, fn, false, fxLabels);
     const isGetter = getterNames.has(key);
-    addMember(members, key, makeMethodDescriptor(key, prim, isGetter));
+    addMember(members, typeScope, key, makeMethodDescriptor(key, prim, isGetter));
   }
   setMembers(ctx, members);
   return ctx;
@@ -2516,29 +2599,30 @@ export const Effect: ContextValue = makeContext();
 setName(Effect, stringToBits("Effect"));
 writeShape(Effect, Type);
 
+const EFFECT_MEMBER_SCOPE = typeMemberScopeFqn("Effect");
 const effectMembers = makeContext();
-addMember(effectMembers, "subset_of", makeMethodDescriptor("subset_of",
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "subset_of", makeMethodDescriptor("subset_of",
   makePrimitive("Effect.subset_of", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
     const e2 = dataOf(args[1]) as ContextValue;
     return withType(makeInt(effectSubsetOf(e1, e2) ? 1 : 0), BoolType);
   })
 ));
-addMember(effectMembers, "implies", makeMethodDescriptor("implies",
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "implies", makeMethodDescriptor("implies",
   makePrimitive("Effect.implies", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
     const e2 = dataOf(args[1]) as ContextValue;
     return withType(makeInt(effectImplies(e1, e2) ? 1 : 0), BoolType);
   })
 ));
-addMember(effectMembers, "intersect", makeMethodDescriptor("intersect",
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "intersect", makeMethodDescriptor("intersect",
   makePrimitive("Effect.intersect", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
     const e2 = dataOf(args[1]) as ContextValue;
     return wrapType(effectIntersect(e1, e2));
   })
 ));
-addMember(effectMembers, "union", makeMethodDescriptor("union",
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "union", makeMethodDescriptor("union",
   makePrimitive("Effect.union", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
     const e2 = dataOf(args[1]) as ContextValue;

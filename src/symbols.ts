@@ -53,9 +53,22 @@ export function kernelMemberSymbol(baseName: string): SymbolValue {
 /** The storage key for a kernel member — member sets are keyed by the
  *  member symbol's FQN string (interning makes FQN ↔ symbol 1:1, so
  *  string-key identity IS symbol identity; the host map stays
- *  Map<string, Binding>). */
+ *  Map<string, Binding>). C6.1a: built-in types moved OFF the shared
+ *  kernel scope onto per-type scopes (`typeMemberScopeFqn`) — sharing
+ *  one scope made cross-built-in conformance accidental under D44/D45's
+ *  symbol-membership check (Int and Float "sharing" `add` without either
+ *  drawing it). The kernel scope remains only for genuinely shared
+ *  kernel machinery. */
 export function kernelMemberFqn(baseName: string): string {
   return KERNEL_SCOPE_FQN + FQN_SEP + baseName;
+}
+
+/** C6.1a: the NAME-STABLE member scope for a named type (built-ins,
+ *  generics' concrete instances — anything whose name exists at
+ *  construction). Distinct namespace from the counter-keyed anonymous
+ *  scopes (`<type:N…>` vs `<type#NAME>`). */
+export function typeMemberScopeFqn(typeName: string): string {
+  return `<type#${typeName}>`;
 }
 
 /** Base-name projection of an FQN storage key. Tolerant: a key without a
