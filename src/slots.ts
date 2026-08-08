@@ -90,7 +90,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "__eq_rhs", storages: ["context-binding"], owner: "Proof", disposition: "member", target: "rhs" },
 
   // --- Effect fields -------------------------------------------------------------
-  { name: "__effect_kind", storages: ["context-binding"], owner: "Effect", disposition: "member", target: "Effect.kind" },
+  { name: "__effectLabels", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect.labels", notes: "C6.2 (D40): the instance IS its label set — Set<string>, empty for pure, null for opaque (top); the `kind`/`labels` data bindings are the declared-member view. Replaces the retired __effect_kind slot (D39: -> Effect.kind, checked off)" },
   { name: "__effectBound", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect instance label-set representation (dissolves at C6.2; the annotation-bound reading becomes derived)", notes: "D39 addendum, maintainer-ratified 2026-07: member for now; when Effect re-derives through the kind recipe an instance IS its label set, so the stored bound collapses into it" },
   { name: "__effectvar:", storages: ["label-marker"], owner: "Effect", disposition: "member", target: "declared generic-param structure on function types", prefix: true },
   { name: "__effectVarParams", storages: ["js-property"], owner: "Effect", disposition: "member", target: "declared generic-param structure on function types" },
@@ -231,7 +231,7 @@ export function getEqLhs(ctx: ContextValue): Value | undefined { return slotRead
 export function getEqRhs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__eq_rhs"); }
 
 // Effect fields
-export function getEffectKind(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__effect_kind"); }
+export function getEffectLabels(ctx: ContextValue): Set<string> | null | undefined { return (ctx as any).__effectLabels; }
 export function getEffectBound(ctx: ContextValue): any { return (ctx as any).__effectBound; }
 
 // Base concepts
@@ -363,7 +363,7 @@ export function setEqLhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__
 export function setEqRhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__eq_rhs", v); }
 
 // Effect fields
-export function setEffectKind(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__effect_kind", v); }
+export function setEffectLabels(ctx: ContextValue, labels: Set<string> | null): void { (ctx as any).__effectLabels = labels; }
 export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as any).__effectBound = d; }
 
 // Base concepts
@@ -416,7 +416,6 @@ export const SLOT_KEYS = {
   isGeneric: "__isGeneric",
   type: "__type",
   discharged: "__discharged",
-  effectKind: "__effect_kind",
   length: "__length",
   proposition: "__proposition",
   reason: "__reason",

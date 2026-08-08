@@ -644,6 +644,33 @@ demands it (C6.2's Effect re-derivation may inform the spec).
 `__invariantsList` has no remaining writer; its slot-registry entry is
 swept in C6.3's disposition pass.*
 
+*Status (2026-08, C6.2): Effect re-derived through the recipe (D40) —
+the first external validation of the kind tower, joining it BY
+CONSTRUCTION (draws Type's kind-members → `Effect subtypeof Type` →
+isKind, no whitelist). Instances stamp `__type = Effect` and ARE their
+label sets (`pure` = {}, `Effect("io")` = {io}, `opaque` = top/null),
+memoized so label-set identity is physical identity (D37 equality by
+identity; `Effect("io") === Effect("io")`; the two operand orders of a
+conjunction are one Context). Members live once on the kind (§6 delta
+7): `io.union(time)` dispatches through shape; buildEffect's
+per-instance member copying and the `__refines = Effect` chain hack are
+deleted, and the D39 checklist advances — the `__effect_kind` slot is
+retired (→ the `kind` data field declared on Effect) and
+`__effectBound` becomes derived-at-mint from the label set. The R3
+operator mint closes the anonymous-conjunction debt: `io & time` mints
+an anonymous instance carrying the union set (typed_amp's opaque
+coercion gone). §6 deltas ruled and landed: `pure subtypeof Effect` is
+FALSE (instances do not CONFORM to their kind; `instanceof` is the
+relation) and `pure subtypeof opaque` stays false (instances of an
+order-carrying kind relate by the KIND'S ORDER — label-set inclusion
+via `subset_of`/`implies` — never by conformance; the C6.1a effect-kind
+guard is re-derived on that principle). Lattice ops are label-set ops:
+subset = inclusion, union/intersect = set join/meet with pure/opaque as
+bottom/top. formatValue renders type values (values whose meta is a
+kind) by name. The D39 Effect rows remaining for C6.3's sweep:
+`__effectvar:` markers / `__effectVarParams` (→ declared generic-param
+structure on function types).*
+
 **Instance-of = shape-of** (D40; sharpened by D45 to shape-CONFORMS-TO):
 a kind is a type whose instances are
 type-values. `io : Effect`, `Int : Type`, `Effect : Type`, and `Type :

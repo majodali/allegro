@@ -17,11 +17,11 @@ import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemb
 import {
   getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
-  getSlotCount, getAbstractDomain, getEffectKind, getEffectBound, getVariants, isGenericTypeSlot, indexGet, elementsOf,
+  getSlotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, getVariants, isGenericTypeSlot, indexGet, elementsOf,
   setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface,
   setWraps, setVariants, setPredicate, setGenericParams, setGenericArgs,
   setGenericBackLink, markGeneric, setGenericConstructor, setProposition,
-  setEffectKind, setEffectBound, setSlotCount, setAbstractDomain,
+  setEffectBound, setSlotCount, setAbstractDomain,
   writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
   removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape,
 } from "./slots.js";
@@ -110,7 +110,7 @@ export function applyBoundaryBound(v: Value, expected: ContextValue): Value {
   const name = typeContextName(expected);
   if (!name || name === "Any" || name === "Function" || name === "UntypedFunction") return v;
   if (getEffectBound(expected) !== undefined) return v;
-  if (getEffectKind(expected) !== undefined) return v;
+  if (getEffectLabels(expected) !== undefined) return v;
   if (getInterfaceMarker(expected) !== undefined) return v;
   if (getVariants(expected) !== undefined) return v;
   if (isGenericTypeSlot(expected) || getGenericArgs(expected) !== undefined) return v;
@@ -390,10 +390,11 @@ function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
     cur = parentV as ContextValue;
     if (cur === typeB) return typeArgsMatch(typeA, typeB);
   }
-  // Effect instances keep chain/identity semantics until C6.2 re-derives
-  // the lattice (buildEffect's member copies share key sets, which would
-  // make pure/opaque mutually conformant under membership).
-  if (getEffectKind(typeB) !== undefined) return false;
+  // C6.2 (D40): the expected type is an EFFECT INSTANCE — instances of an
+  // order-carrying kind relate by the KIND'S ORDER (label-set inclusion,
+  // surfaced as `implies`/`subset_of`), not by conformance. Identity was
+  // checked above; membership over memberless instances would be vacuous.
+  if (getEffectLabels(typeB) !== undefined) return false;
   // C3.3 preserved, generalized in C6.1b: a predicate-carrying expected
   // type — transparent refinement, preserveOps shape, or the Interface
   // kind — demands construction through its chain. Membership cannot
@@ -2670,59 +2671,68 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
 }
 
 // =============================================================================
-// Effect meta-type (Phase D1 sub-chunk 1.1 substrate)
+// Effect — the kind of effects (C6.2, D40)
 //
-// Effect is a type whose subtypes represent categories of side effects. Specific
-// effects (`pure`, `opaque`, `io`, `time`, ...) are types that extend Effect and
-// participate in the lattice via the `subset_of` / `implies` / `intersect` /
-// `union` operations. Subtype relationships (`pure subtypeof Effect == true`)
-// fall out of the standard `__refines` machinery — Effect is a regular named
-// type for the purposes of nominal subtype checks.
+// Effect is a KIND: it draws Type's kind-member symbols (so `Effect
+// subtypeof Type` holds — kind-hood is conformance to Type — and
+// define / call-as-function work uniformly) and declares its instances'
+// members: the `kind` / `labels` fields plus the lattice ops. D40 R1 —
+// Effect's declared instance ORDER is label-set inclusion, with join
+// (`union`) / meet (`intersect`) and `pure` / `opaque` as bottom / top.
 //
-// Lattice:
-//   `pure` (bottom)  ⊆  any specific effect  ⊆  `opaque` (top)
+// Members live ONCE, on the kind (D40; §6 delta 7): `io.union(time)`
+// dispatches through io's shape (Effect) exactly as `42.toString()`
+// dispatches through Int — buildEffect's per-instance member copying is
+// deleted, and so is the `__refines = Effect` chain hack (D44: effects
+// stop using the link; `pure instanceof Effect` is the check now, and
+// `pure subtypeof Effect` is FALSE — §6 delta 6).
 //
-// Anonymous conjunction creation (`io & time`) is deferred to Slice 2; for now,
-// `union` of two non-equal non-trivial effects falls back to `opaque` as a
-// sound over-approximation. `intersect` similarly returns `pure` when there's
-// no detectable overlap.
-//
-// Marker bindings:
-//   `__effect_kind` — "pure" or "opaque" on the two core absolutes; absent on
-//                     ordinary named effects. Used for fast-path dispatch in
-//                     the lattice ops without depending on identity comparison
-//                     to module-local Contexts.
+// An instance IS its label set (D39 __effectBound note): `pure` = {},
+// a named effect = {name}, an operator-minted conjunction (`io & time`,
+// D40 R3) = the union set, `opaque` = top (null — unbounded). Instances
+// are MEMOIZED by label set, so equal-set conjunctions are the SAME
+// Context and D37 equality falls out of identity.
 // =============================================================================
 
-function isPureEffect(e: ContextValue): boolean {
-  const m = getEffectKind(e);
-  return m?.kind === ValueKind.Bits && bitsToString(m as BitsValue) === "pure";
+export const Effect: ContextValue = makeContext();
+setName(Effect, stringToBits("Effect"));
+writeShape(Effect, Type);
+
+const EFFECT_MEMBER_SCOPE = typeMemberScopeFqn("Effect");
+const effectMembers = makeContext();
+// Draw Type's kind API verbatim — same member symbols, so `Effect
+// subtypeof Type` holds by membership and isKind(Effect) is true.
+for (const [key, b] of typeMembers.bindings) {
+  if (b.value) addBinding(effectMembers, key, b.value);
+}
+// Instance-data declarations (D39 checklist: __effect_kind → Effect.kind;
+// the label set is the Effect.labels declared view).
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "kind", makeFieldDescriptor("kind", StringType));
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "labels", makeFieldDescriptor("labels", ArrayType));
+
+/** The label set an effect instance carries: Set (empty for pure),
+ *  null for opaque (top), undefined for non-instances. */
+function labelsOf(e: ContextValue): Set<string> | null | undefined {
+  return getEffectLabels(e);
 }
 
-function isOpaqueEffect(e: ContextValue): boolean {
-  const m = getEffectKind(e);
-  return m?.kind === ValueKind.Bits && bitsToString(m as BitsValue) === "opaque";
+/** C6.2: is this Context an Effect INSTANCE (pure, opaque, a named
+ *  effect, or an operator-minted conjunction)? */
+export function isEffectInstance(t: ContextValue): boolean {
+  return getEffectLabels(t) !== undefined;
 }
 
-/** e1 ⊆ e2 in the effect lattice. */
+/** e1 ⊆ e2 in the effect lattice — label-set inclusion (D40 R1: the
+ *  kind's declared instance order). Top absorbs; the kind itself (no
+ *  label set) is treated as top on the right, identity-only on the left. */
 export function effectSubsetOf(e1: ContextValue, e2: ContextValue): boolean {
-  if (isOpaqueEffect(e2)) return true;       // anything ⊆ top
-  if (isPureEffect(e1)) return true;         // bottom ⊆ anything
-  if (isOpaqueEffect(e1)) return false;
-  if (isPureEffect(e2)) return false;
-  if (e1 === e2) return true;
-  // Walk e1's __refines chain looking for e2 by identity.
-  let current: ContextValue | null = e1;
-  while (current) {
-    const ext = getRefines(current);
-    if (ext?.kind === ValueKind.Context) {
-      if (ext === e2) return true;
-      current = ext as ContextValue;
-    } else {
-      current = null;
-    }
-  }
-  return false;
+  const l1 = labelsOf(e1);
+  const l2 = labelsOf(e2);
+  if (l2 === null || l2 === undefined) return true;  // top (or the kind) absorbs
+  if (l1 === null) return false;                      // top ⊄ anything bounded
+  if (l1 === undefined) return e1 === e2;
+  for (const l of l1) if (!l2.has(l)) return false;
+  return true;
 }
 
 /** e1 implies e2: knowing e1's effects discharges a check for e2. Equivalent
@@ -2731,35 +2741,65 @@ export function effectImplies(e1: ContextValue, e2: ContextValue): boolean {
   return effectSubsetOf(e2, e1);
 }
 
-/** Lattice meet (greatest lower bound). */
+// --- The mint (D40 R2/R3) ----------------------------------------------------
+// One writer; memoized by label set so label-set identity IS physical
+// identity (`Effect("io") === Effect("io")`; two `io & time` mints are
+// the same Context).
+
+const effectInstanceCache = new Map<string, ContextValue>();
+
+function mintEffect(labels: Set<string> | null, displayName?: string): ContextValue {
+  const key = labels === null ? "\u22a4" : [...labels].sort().join("\u0000");
+  const hit = effectInstanceCache.get(key);
+  if (hit) return hit;
+  const name = displayName ?? (labels === null ? "opaque"
+    : labels.size === 0 ? "pure"
+    : [...labels].sort().join(" & "));
+  const eff = makeContext();
+  setName(eff, stringToBits(name));
+  writeShape(eff, Effect); // instance-of the kind (D40)
+  setEffectLabels(eff, labels === null ? null : new Set(labels));
+  // Declared instance fields as ordinary data bindings (D39: members on
+  // the kind; storage is instance data, like record fields).
+  addBinding(eff, "kind", withType(stringToBits(
+    labels === null ? "opaque" : labels.size === 0 ? "pure" : "labeled"), StringType));
+  if (labels !== null) {
+    addBinding(eff, "labels",
+      makeArray([...labels].sort().map((l) => withType(stringToBits(l), StringType))));
+  }
+  // The annotation bound is DERIVED from the label set at mint (the D39
+  // addendum's collapse): callers through `f: <effect>` may produce at
+  // most these labels. `opaque` carries no bound — universal pass.
+  if (labels !== null) {
+    setEffectBound(eff, { kind: "effects", labels: new Set(labels) });
+  }
+  effectInstanceCache.set(key, eff);
+  return eff;
+}
+
+/** Lattice meet (greatest lower bound) — label-set intersection. */
 export function effectIntersect(e1: ContextValue, e2: ContextValue): ContextValue {
-  if (isPureEffect(e1) || isPureEffect(e2)) return pureEffect;
-  if (isOpaqueEffect(e1)) return e2;
-  if (isOpaqueEffect(e2)) return e1;
-  if (e1 === e2) return e1;
-  // Conservative: no statically detectable overlap → bottom. Slice 2 will
-  // handle conjunctions and refined overlap detection.
-  return pureEffect;
+  const l1 = labelsOf(e1);
+  const l2 = labelsOf(e2);
+  if (l1 === null) return e2;
+  if (l2 === null) return e1;
+  if (l1 === undefined || l2 === undefined) return pureEffect;
+  return mintEffect(new Set([...l1].filter((x) => l2.has(x))));
 }
 
-/** Lattice join (least upper bound). */
+/** Lattice join (least upper bound) — label-set union. Anonymous
+ *  conjunctions (`io & time`) mint here (D40 R3 — the deferred debt
+ *  closed): the result carries the union set, memoized. */
 export function effectUnion(e1: ContextValue, e2: ContextValue): ContextValue {
-  if (isOpaqueEffect(e1) || isOpaqueEffect(e2)) return opaqueEffect;
-  if (isPureEffect(e1)) return e2;
-  if (isPureEffect(e2)) return e1;
-  if (e1 === e2) return e1;
-  // Sound over-approximation pending Slice 2's anonymous conjunctions.
-  return opaqueEffect;
+  const l1 = labelsOf(e1);
+  const l2 = labelsOf(e2);
+  if (l1 === null || l2 === null) return opaqueEffect;
+  if (l1 === undefined || l2 === undefined) return opaqueEffect;
+  return mintEffect(new Set([...l1, ...l2]));
 }
 
-// --- Effect meta-type Context ---
-
-export const Effect: ContextValue = makeContext();
-setName(Effect, stringToBits("Effect"));
-writeShape(Effect, Type);
-
-const EFFECT_MEMBER_SCOPE = typeMemberScopeFqn("Effect");
-const effectMembers = makeContext();
+// The order ops are members ON THE KIND — instances dispatch through
+// their shape (io.union(time) finds Effect's member with self = io).
 addMember(effectMembers, EFFECT_MEMBER_SCOPE, "subset_of", makeMethodDescriptor("subset_of",
   makePrimitive("Effect.subset_of", (args) => {
     const e1 = dataOf(args[0]) as ContextValue;
@@ -2790,43 +2830,23 @@ addMember(effectMembers, EFFECT_MEMBER_SCOPE, "union", makeMethodDescriptor("uni
 ));
 setMembers(Effect, effectMembers);
 
-/**
- * Build an effect type that extends Effect. Used for `pure` and `opaque` here;
- * extension libraries will use the same builder for their own effects (`io`,
- * `time`, ...) once the public surface lands in Slice 2.
- *
- * The lattice methods are copied into the new type's `__members` so that
- * eventual dot-dispatch (`pure.subset_of(opaque)`) can find them on the value
- * side. Today's dispatch flow finds them via `__type` (Type), which doesn't
- * carry effect methods — so the copy is the bridge until Slice 2 either walks
- * `__refines` for member lookup or formalises Effect-as-meta-type.
- */
+// Constructor authority (D40 R2 / D45): `Effect("net")` mints a named
+// effect; `Effect.define("net")` is the named-factory route.
+setConstruct(Effect, makePrimitive("Effect.__construct", (args, ctx, evalFn) => {
+  const nameV = dataOf(evalFn!(args[0], ctx!));
+  if (nameV.kind !== ValueKind.Bits) {
+    throw new AllegroError("Effect: the label must be a string");
+  }
+  return wrapType(buildEffect(bitsToString(nameV as BitsValue)));
+}, true));
+
+/** Mint an effect instance. `kind` selects the two absolutes; named
+ *  effects carry the singleton label set. Memoized — same labels, same
+ *  Context. */
 export function buildEffect(name: string, kind?: "pure" | "opaque"): ContextValue {
-  const eff = makeContext();
-  setName(eff, stringToBits(name));
-  writeShape(eff, Type);
-  setRefines(eff, Effect);
-  if (kind) setEffectKind(eff, stringToBits(kind));
-  const members = makeContext();
-  for (const [key, binding] of effectMembers.bindings) {
-    if (binding.value) addBinding(members, key, binding.value);
-  }
-  setMembers(eff, members);
-  // Attach an effect bound — the value-side check this type imposes when it
-  // appears as a parameter annotation (`f: pure`). The bound is the set of
-  // effect labels callers may legally produce; the discharge runs through
-  // `impliesDomain` on the predicate-set machinery, identical path to numeric
-  // refinements. `opaque` carries no bound — universal, anything passes.
-  if (kind === "pure") {
-    setEffectBound(eff, { kind: "effects", labels: new Set<string>() });
-  } else if (kind === "opaque") {
-    // No bound — universal. type_check skips the effect discharge entirely.
-  } else {
-    // Named effects (io, time, …): bound is the singleton {name}. Extension
-    // libraries will pass `kind` undefined when they call `buildEffect("io")`.
-    setEffectBound(eff, { kind: "effects", labels: new Set<string>([name]) });
-  }
-  return eff;
+  if (kind === "pure") return mintEffect(new Set(), "pure");
+  if (kind === "opaque") return mintEffect(null, "opaque");
+  return mintEffect(new Set([name]), name);
 }
 
 export const pureEffect: ContextValue = buildEffect("pure", "pure");

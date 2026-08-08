@@ -2338,24 +2338,26 @@ test("effect: Effect carries lattice methods in __members", () => {
   eq(members.has("union"), true);
 });
 
-test("effect: pure extends Effect via __extends", () => {
-  const ext = pureEffect.bindings.get("__refines")?.value;
-  eq(ext === Effect, true);
+test("effect (C6.2): instances stamp shape = Effect — no refines chain hack", () => {
+  eq(pureEffect.bindings.get("__refines")?.value, undefined);
+  eq(opaqueEffect.bindings.get("__refines")?.value, undefined);
+  eq(getType(pureEffect) === Effect, true);
+  eq(getType(opaqueEffect) === Effect, true);
 });
 
-test("effect: opaque extends Effect via __extends", () => {
-  const ext = opaqueEffect.bindings.get("__refines")?.value;
-  eq(ext === Effect, true);
+test("effect (C6.2): instances carry `kind` as a declared data field", () => {
+  const pk = dataOf(pureEffect.bindings.get("kind")!.value!) as BitsValue;
+  eq(bitsToString(pk), "pure");
+  const ok = dataOf(opaqueEffect.bindings.get("kind")!.value!) as BitsValue;
+  eq(bitsToString(ok), "opaque");
 });
 
-test("effect: pure carries 'pure' kind marker", () => {
-  const k = pureEffect.bindings.get("__effect_kind")?.value as BitsValue;
-  eq(k.kind, ValueKind.Bits);
-});
-
-test("effect: opaque carries 'opaque' kind marker", () => {
-  const k = opaqueEffect.bindings.get("__effect_kind")?.value as BitsValue;
-  eq(k.kind, ValueKind.Bits);
+test("effect (C6.2): instances hold NO member copies — members live on the kind", () => {
+  eq(pureEffect.bindings.get("__members")?.value, undefined);
+  eq(opaqueEffect.bindings.get("__members")?.value, undefined);
+  // Dispatch still works — through the shape.
+  const result = evalStd("pure.subset_of(opaque)");
+  eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
 test("effect lattice: pure ⊆ opaque", () => {
@@ -2406,14 +2408,16 @@ test("effect lattice: union of equal effects is the effect", () => {
   eq(effectUnion(pureEffect, pureEffect) === pureEffect, true);
 });
 
-test("effect Allegro source: pure subtypeof Effect", () => {
+test("effect Allegro source (C6.2, §6 delta 6): pure subtypeof Effect is FALSE", () => {
+  // The pre-C6.2 true came from the __refines chain hack; an instance
+  // does not CONFORM to its kind — instance-of is the relation.
   const result = evalStd("pure subtypeof Effect");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((dataOf(result!) as BitsValue).data), 0);
 });
 
-test("effect Allegro source: opaque subtypeof Effect", () => {
-  const result = evalStd("opaque subtypeof Effect");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+test("effect Allegro source (C6.2): pure/opaque instanceof Effect is the check", () => {
+  eq(Number((dataOf(evalStd("pure instanceof Effect")!) as BitsValue).data), 1);
+  eq(Number((dataOf(evalStd("opaque instanceof Effect")!) as BitsValue).data), 1);
 });
 
 test("effect Allegro source: Effect subtypeof Effect", () => {
@@ -2426,8 +2430,9 @@ test("effect Allegro source: Int does not subtypeof Effect", () => {
   eq(Number((dataOf(result!) as BitsValue).data), 0);
 });
 
-test("effect Allegro source: pure does not subtypeof opaque (sibling subtypes)", () => {
-  // Both extend Effect but neither extends the other.
+test("effect Allegro source: pure does not subtypeof opaque (order is not conformance)", () => {
+  // Instances of an order-carrying kind relate by the KIND'S ORDER
+  // (pure.subset_of(opaque) is true), never by subtypeof conformance.
   const result = evalStd("pure subtypeof opaque");
   eq(Number((dataOf(result!) as BitsValue).data), 0);
 });

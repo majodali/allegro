@@ -270,8 +270,14 @@ phase).
   conformance to Type (no reified Kind, no convention). Residue:
   `distinct` / `constructor` kind-spec designs deferred with sketches
   in structures.md §9; `__invariantsList` slot swept in C6.3
-- [ ] **B-025** · L2 · Effect re-derived through the recipe; anonymous
-  conjunctions; `pure subtypeof Effect` flip (C6.2)
+- [x] **B-025** · L2 · Effect re-derived through the recipe; anonymous
+  conjunctions; `pure subtypeof Effect` flip (C6.2) — landed 2026-08:
+  Effect is a kind by construction (draws Type's kind API); instances
+  ARE their label sets (memoized — label-set identity is physical
+  identity); member copying + refines hack deleted; `io & time` mints
+  anonymous instances; `pure subtypeof Effect` false / `instanceof`
+  the check; `__effect_kind` slot retired. Residue for C6.3:
+  `__effectvar:` markers / `__effectVarParams` disposition
 - [ ] **B-026** · L2 · Proof re-derived (kernel-private authority);
   slot-disposition sweep; forgery battery re-run (C6.3) — **M1 exit
   criterion**

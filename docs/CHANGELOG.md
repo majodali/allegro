@@ -8,6 +8,52 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C6.2: Effect re-derived through the kind recipe (structures Phase 6, B-025)
+
+D40 executed: the first external validation of the kind tower — Effect
+rebuilt with zero hand-rolled residue in its kind structure.
+
+- **Effect is a KIND by construction**: it draws Type's kind-member
+  symbols, so `Effect subtypeof Type` holds by membership and
+  `isKind(Effect)` is true with no whitelist — `Effect.define("net")` /
+  `Effect("net")` work through the same construct-authority machinery
+  as every other kind.
+- **An instance IS its label set** (the D39 `__effectBound` note's
+  collapse): `pure` = {} (bottom), `Effect("io")` = {io}, `opaque` =
+  top. Instances stamp `__type = Effect`, carry `kind`/`labels` as
+  declared data fields, and are MEMOIZED by label set — label-set
+  identity is physical identity (`Effect("io") === Effect("io")`; both
+  operand orders of a conjunction are one Context), so D37 equality
+  falls out of identity.
+- **Members live once, on the kind** (§6 delta 7): `io.union(time)`
+  dispatches through io's shape exactly as `42.toString()` dispatches
+  through Int. buildEffect's per-instance member copying is DELETED;
+  so is the `__refines = Effect` chain hack (the D44 audit's "three
+  effect-lattice sites scheduled to die" are dead).
+- **Anonymous conjunctions land** (D40 R3 — the deferred debt closed):
+  `io & time` mints an anonymous Effect instance carrying the union
+  label set; typed_amp's opaque coercion is gone. Lattice ops are
+  label-set ops — subset = inclusion, union/intersect = join/meet with
+  pure/opaque as bottom/top.
+- **§6 deltas 6 (pre-approved) landed**: `pure subtypeof Effect` →
+  FALSE (an instance does not CONFORM to its kind; `pure instanceof
+  Effect` is the check). `pure subtypeof opaque` stays false — the
+  C6.1a effect-kind guard is re-derived on the principle that instances
+  of an order-carrying kind relate by the KIND'S ORDER
+  (`subset_of`/`implies`), never by conformance.
+- **D39 Effect checklist**: `__effect_kind` slot RETIRED (→ the `kind`
+  field declared on Effect); `__effectBound` derived-at-mint from the
+  label set; `__effectLabels` registered as the host-side carrier.
+  Remaining for C6.3's sweep: `__effectvar:` markers /
+  `__effectVarParams`.
+- **formatValue**: type values (values whose meta is a kind) render by
+  name — `print(io & time)` → "io & time"; kinds declaring instance
+  fields no longer push their instances into the record rendering.
+
+Battery: Effect-in-the-tower matrix, conjunction mint + memo identity
+both operand orders, order-vs-conformance split, no-copies/no-chain
+pins. 1049/1049 green.
+
 ## 2026-08 — C6.1b: The kind tower — Refinement, Interface, construct authority, fluent API removed (structures Phase 6, B-024 part 2)
 
 D45's kind tower: kinds are just types, one construction surface at

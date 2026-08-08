@@ -1676,6 +1676,58 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(formatValue(r.evalCtx.bindings.get("c")!.value!), "true", "drawing the bundle declares conformance");
   });
 
+  test("kind tower (C6.2, D40): Effect re-derived — kind, label instances, anonymous conjunctions", () => {
+    const r = evalSource(
+      // Effect joins the tower by construction (no whitelist).
+      "a = Effect instanceof Type\n" +
+      "b = Effect subtypeof Type\n" +
+      // §6 deltas 6+7: instance-of is the relation; conformance is not.
+      "c = pure instanceof Effect\n" +
+      "d = pure subtypeof Effect\n" +
+      // Constructor authority at the kind level (D40 R2).
+      "io = Effect(\"io\")\ntime = Effect(\"time\")\n" +
+      "e = io instanceof Effect\n" +
+      // The R3 operator mint: `io & time` IS an Effect instance carrying
+      // the union label set — the deferred anonymous-conjunction debt.
+      "conj = io & time\n" +
+      "f = conj instanceof Effect\n" +
+      "g = io.subset_of(conj)\n" +
+      "h = conj.subset_of(io)\n" +
+      // The order lives on the KIND; instances dispatch through shape
+      // (no per-instance member copies).
+      "i = io.union(time).subset_of(conj)\n" +
+      "j = conj.subset_of(io.union(time))",
+      undefined, [createTypeSystem()], undefined, true);
+    const want: [string, string, string][] = [
+      ["a", "true", "Effect is an instance of Type"],
+      ["b", "true", "…and a KIND — it drew Type's kind-member symbols"],
+      ["c", "true", "pure instanceof Effect — instance-of is the check (D40 R5)"],
+      ["d", "false", "pure subtypeof Effect — the chain-hack true is gone (§6 delta 6)"],
+      ["e", "true", "Effect(\"io\") mints an instance"],
+      ["f", "true", "io & time mints an ANONYMOUS Effect instance (R3)"],
+      ["g", "true", "{io} ⊆ {io, time} — the kind's declared order"],
+      ["h", "false", "{io, time} ⊄ {io}"],
+      ["i", "true", "union dispatches through the kind and equals the operator mint"],
+      ["j", "true", "…in both directions (same label set)"],
+    ];
+    for (const [name, expect, why] of want) {
+      eq(formatValue(r.evalCtx.bindings.get(name)!.value!), expect, `${name}: ${why}`);
+    }
+    // D37/D40: label-set identity is PHYSICAL identity (memoized mint) —
+    // two independent conjunction mints are the same Context.
+    const conj = dataOf(r.evalCtx.bindings.get("conj")!.value!) as ContextValue;
+    const viaUnion = dataOf(evalSource(
+      "x = Effect(\"time\") & Effect(\"io\")\nx",
+      undefined, [createTypeSystem()], undefined, true)
+      .evalCtx.bindings.get("x")!.value!) as ContextValue;
+    eq(conj === viaUnion, true, "equal label sets are the SAME instance, either operand order");
+    // No member copies on instances; no refines edge (the C6.1a guard's
+    // reason is gone — this pins its principled replacement).
+    eq(getMembers(conj), undefined, "instances hold no member copies — members live on the kind");
+    eq(getRefines(conj), undefined, "no refines chain hack");
+    eq(formatValue(r.evalCtx.bindings.get("conj")!.value!), "io & time", "conjunctions render their label set");
+  });
+
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------
 
   test("transparency (C4.3c): eager impls receive full values — channels visible", () => {

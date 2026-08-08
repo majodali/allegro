@@ -38,6 +38,15 @@ export function formatValue(v: Value): string {
       if (nameV && nameV.kind === ValueKind.Bits) {
         const typeName = bitsToString(nameV);
         const data = dataOf(v);
+        // C6.2: a TYPE VALUE — its meta is a KIND (Type, Refinement,
+        // Interface, Effect, …) — renders as its own name: `print(pure)`
+        // → "pure", `print(io & time)` → "io & time", `print(Int)` →
+        // "Int". Without this, kinds that declare instance fields (Effect's
+        // kind/labels) would render their instances through the record path.
+        if (data.kind === ValueKind.Context && isTypeMeta(typeComp as ContextValue)) {
+          const ownName = getName(data as ContextValue);
+          if (ownName?.kind === ValueKind.Bits) return bitsToString(ownName as BitsValue);
+        }
         if (typeName === "None") {
           return "none";
         }
@@ -1662,7 +1671,7 @@ import {
   AnyType, Type, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
   structuralWrap, makeUnionType, wrapType, buildRefinedType, isTypeMeta,
-  Effect as _Effect, effectUnion as _effectUnion,
+  Effect as _Effect, effectUnion as _effectUnion, isEffectInstance as _isEffectInstance,
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
@@ -2016,22 +2025,12 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   throw new AllegroError("'&' between two types not yet supported (Stage 0); use a predicate body like 'Int & _ > 0'");
 };
 
-/** True if `t` extends Effect (i.e. `t` is `Effect`, `pure`, `opaque`, or any
- *  user-declared effect type built via `buildEffect`). Walks the `__refines`
- *  chain by identity. */
+/** True if `t` is the Effect kind or one of its instances (`pure`,
+ *  `opaque`, named effects, operator-minted conjunctions). C6.2: the
+ *  `__refines = Effect` chain hack is gone — instances are identified by
+ *  their label set (the shape stamp's carrier). */
 function isEffectExtending(t: ContextValue): boolean {
-  if (t === _Effect) return true;
-  let current: ContextValue | null = t;
-  while (current) {
-    const ext = getRefines(current);
-    if (ext?.kind === ValueKind.Context) {
-      if (ext === _Effect) return true;
-      current = ext as ContextValue;
-    } else {
-      current = null;
-    }
-  }
-  return false;
+  return t === _Effect || _isEffectInstance(t);
 }
 
 const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
