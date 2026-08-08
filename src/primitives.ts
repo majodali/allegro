@@ -3363,11 +3363,11 @@ const proven_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
 function makeFailedProof(prop: string, reason: string, counterexample?: string): Value {
   const p = makeContext();
-  stampProposition(p, stringToBits(prop));
+  stampProposition(p, withType(stringToBits(prop), StringType));
   dischargedWriter.write(p, makeInt(0));
-  stampProofReason(p, stringToBits(reason));
+  stampProofReason(p, withType(stringToBits(reason), StringType));
   if (counterexample !== undefined) {
-    stampProofCounterexample(p, stringToBits(counterexample));
+    stampProofCounterexample(p, withType(stringToBits(counterexample), StringType));
   }
   return withType(p, _Proof);
 }

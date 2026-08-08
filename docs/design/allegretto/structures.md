@@ -671,6 +671,31 @@ kind) by name. The D39 Effect rows remaining for C6.3's sweep:
 `__effectvar:` markers / `__effectVarParams` (→ declared generic-param
 structure on function types).*
 
+*Status (2026-08, C6.3): Proof re-derived; Phase 6's validation
+criterion met — Effect AND Proof rebuilt through the recipe with zero
+hand-rolled residue in their kind structure. Proof draws Type's
+kind-members (a kind by construction) and declares its instances'
+fields per the executed D39 table: `proposition` / `reason` /
+`counterexample` / `lhs` / `rhs` are PLAIN instance-data bindings
+(typed Strings where textual) declared as Field members — `t.proposition`
+dispatches; the five `__*` proof rows are gone from the registry.
+Constructor authority is KERNEL-PRIVATE (D40 R2): Proof holds NO
+`construct` — `Proof.define` refuses ("no constructor authority"),
+call-as-function residualises inertly (ordinary PE; the result carries
+no shape stamp and no discharged channel — `instanceof Proof` false),
+and drawing Proof as a bundle mints a non-conforming lookalike whose
+instances never hold the discharged channel. The only mint is
+`makeProof` + the module-private discharged writer — unforgeability is
+an ordinary capability instance, re-verified by a forge-through-every-
+kind-surface battery. Sweep: `__invariantsList` registry row executed
+(no writer since C6.1b); the Method/Field descriptor taxonomy's
+refines edges removed and `MemberType` deleted (D44 audit item);
+`__isGeneric` (disposition: delete) stays registered pending
+GenericType's own re-derivation; `__effectvar:`/`__effectVarParams`
+stay registered pending the function-type generic-param structure.
+Decisions presented to the maintainer at this landing: MultiValue-kind
+retirement and the NominalType alias.*
+
 **Instance-of = shape-of** (D40; sharpened by D45 to shape-CONFORMS-TO):
 a kind is a type whose instances are
 type-values. `io : Effect`, `Int : Type`, `Effect : Type`, and `Type :

@@ -8,6 +8,46 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C6.3: Proof re-derived, kernel-private authority; slot sweep (structures Phase 6, B-026; M1 exit criterion)
+
+Phase 6's validation criterion met: Effect AND Proof rebuilt through
+the kind recipe with zero hand-rolled residue in their kind structure.
+
+- **Proof is a kind by construction**: draws Type's kind-member symbols
+  (`Proof subtypeof Type` by membership) and declares its instances'
+  fields — the D39 Proof table EXECUTED: `proposition` / `reason` /
+  `counterexample` / `lhs` / `rhs` are plain instance-data bindings
+  (typed Strings where textual) declared as Field members on the kind,
+  so `t.proposition` dispatches. The five `__*` proof rows leave the
+  registry; the physical renames happened inside the slots accessors
+  (consumers untouched).
+- **Constructor authority is KERNEL-PRIVATE** (D40 R2 / D45): Proof
+  holds NO `construct`. `Proof.define(...)` refuses ("holds no
+  constructor authority"); `Proof(...)` residualises inertly (ordinary
+  PE — no shape stamp, no discharged channel, `instanceof Proof`
+  false); drawing Proof as a bundle mints a non-conforming lookalike
+  (kind-API symbols are meta-filtered from draws) whose instances never
+  hold the discharged channel. The only mint is `makeProof` holding the
+  module-private discharged writer — holding a kind's construct IS
+  holding its mint, and not exporting it IS unforgeability: an ordinary
+  capability instance, not a special arrangement.
+- **Forgery battery re-run**: forge-a-proof attempted through every
+  kind surface (define, call-as-function, bundle-draw, object literal)
+  — all dead; the C1.4 construction gates stand.
+- **Slot sweep** (D39): `__invariantsList` row executed (no writer
+  since C6.1b); `__effect_kind` already retired at C6.2; the
+  Method/Field descriptor taxonomy's refines edges removed and
+  `MemberType` DELETED (the D44 audit's last taxonomy item);
+  `SLOT_KEYS` trimmed to match. Registered residue, each pinned to its
+  owner's future re-derivation: `__isGeneric` (GenericType),
+  `__effectvar:` / `__effectVarParams` (function-type generic-param
+  structure).
+- Battery additions: Proof-in-the-tower matrix, the four forge surfaces,
+  and a sweep test pinning the executed dispositions.
+
+1051/1051 green. Decisions presented to the maintainer at this
+landing: MultiValue-kind retirement; NominalType alias disposition.
+
 ## 2026-08 — C6.2: Effect re-derived through the kind recipe (structures Phase 6, B-025)
 
 D40 executed: the first external validation of the kind tower — Effect

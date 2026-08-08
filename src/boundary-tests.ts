@@ -31,7 +31,7 @@ import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr } from "./types.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, SLOT_KEYS, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { makeMultiValue } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
@@ -1726,6 +1726,80 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(getMembers(conj), undefined, "instances hold no member copies — members live on the kind");
     eq(getRefines(conj), undefined, "no refines chain hack");
     eq(formatValue(r.evalCtx.bindings.get("conj")!.value!), "io & time", "conjunctions render their label set");
+  });
+
+  test("kind tower (C6.3, D40/D45): Proof re-derived — kernel-private mint, forge attempts fail", () => {
+    // Proof joins the tower by construction, like Effect.
+    const r = evalSource(
+      "a = Proof instanceof Type\n" +
+      "b = Proof subtypeof Type\n" +
+      "theorem t1: 1 + 1 == 2\n" +
+      "c = t1 instanceof Proof\n" +
+      "d = t1.proposition",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(r.evalCtx.bindings.get("a")!.value!), "true", "Proof is an instance of Type");
+    eq(formatValue(r.evalCtx.bindings.get("b")!.value!), "true", "…and a kind — drew Type's kind API");
+    eq(formatValue(r.evalCtx.bindings.get("c")!.value!), "true", "a discharged theorem is a Proof instance");
+    eq(formatValue(r.evalCtx.bindings.get("d")!.value!), "1 + 1 == 2",
+      "instance fields are DECLARED members — `.proposition` dispatches (D39 executed)");
+    // Constructor authority is KERNEL-PRIVATE: every public mint surface fails.
+    // (1) The named factory refuses — no construct to delegate to.
+    let threw = "";
+    try {
+      evalSource("P = Proof.define({p: Int})", undefined, [createTypeSystem()], undefined, true);
+    } catch (e: any) { threw = String(e.message); }
+    eq(threw.includes("no constructor authority"), true, `Proof.define refused: ${threw}`);
+    // (2) Call-as-function has no construct to invoke — the call residualises
+    // (ordinary PE for an unresolvable application) and the result is NOT a
+    // Proof: an inert Expression with no shape stamp and no discharged channel.
+    const r2 = evalSource(
+      "p = Proof(\"x == x\")",
+      undefined, [createTypeSystem()], undefined, true);
+    const p = r2.evalCtx.bindings.get("p")!.value!;
+    eq(dataOf(p).kind === ValueKind.Expression, true,
+      "calling Proof mints nothing — the call stays an inert residual");
+    eq(channelReadRaw(p, "discharged") === undefined, true,
+      "…with no discharged channel");
+    // (3) Drawing Proof as a bundle copies FIELD declarations only — the
+    // lookalike holds no discharged channel, does not conform, and its
+    // instances are not Proofs.
+    const r3 = evalSource(
+      "Fake = Type.define({v: Int}, Proof)\n" +
+      "e = Fake subtypeof Proof\n" +
+      "f = Fake(1) instanceof Proof",
+      undefined, [createTypeSystem()], undefined, true);
+    eq(formatValue(r3.evalCtx.bindings.get("e")!.value!), "false",
+      "a bundle-draw lookalike does NOT conform (Proof's kind-API symbols are meta-filtered)");
+    eq(formatValue(r3.evalCtx.bindings.get("f")!.value!), "false",
+      "…and its instances are not Proof instances");
+    const r3b = evalSource(
+      "Fake = Type.define({v: Int}, Proof)\nx = Fake(1)\nx",
+      undefined, [createTypeSystem()], undefined, true);
+    const fakeInst = dataOf(r3b.evalCtx.bindings.get("x")!.value!);
+    eq(channelReadRaw(fakeInst, "discharged") === undefined, true,
+      "the lookalike constructs records — never discharged witnesses");
+    // (4) The object-literal forge stays dead (C1.4 gate; scenario A) —
+    // the construction gate THROWS on integrity-channel origination.
+    let forged = "";
+    try {
+      evalSource("p = {__discharged: 1, proposition: \"forged\"}",
+        undefined, [createTypeSystem()], undefined, true);
+    } catch (e: any) { forged = String(e.message); }
+    eq(forged.includes("origination requires the channel writer"), true,
+      `an object literal cannot forge a Proof — the gate throws: ${forged}`);
+  });
+
+  test("slot sweep (C6.3, D39): retired slots are gone from registry, keys, and code", () => {
+    const names = new Set(SLOT_REGISTRY.map((r) => r.name));
+    for (const retired of ["__effect_kind", "__invariantsList", "__proposition",
+                           "__reason", "__counterexample", "__eq_lhs", "__eq_rhs"]) {
+      eq(names.has(retired), false, `registry row executed: ${retired}`);
+    }
+    // The proof fields are plain instance data now — SLOT_KEYS agrees.
+    eq((SLOT_KEYS as any).proposition, "proposition", "SLOT_KEYS.proposition is a plain key");
+    eq((SLOT_KEYS as any).invariantsList, undefined, "SLOT_KEYS.invariantsList is swept");
+    // W3 (registry completeness over the value corpus) runs as its own
+    // standing invariant; this test pins the DISPOSITIONS this phase executed.
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------

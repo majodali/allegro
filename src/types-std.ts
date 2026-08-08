@@ -629,22 +629,20 @@ writeShape(Type, Type);
 // Member/Method/Field are named types created before buildType is available.
 // =============================================================================
 
-/** Abstract base type for member descriptors */
-export const MemberType: ContextValue = makeContext();
-setName(MemberType, stringToBits("Member"));
-writeShape(MemberType, Type);
+// C6.3 (D44 audit): the descriptor taxonomy's refines edges are gone —
+// MemberType (the abstract base) is deleted; Method and Field are the
+// two descriptor shapes, recognised by shape identity, related by
+// nothing (no chain, no shared members).
 
 /** Method descriptor — a member with an implementation function */
 export const MethodType: ContextValue = makeContext();
 setName(MethodType, stringToBits("Method"));
 writeShape(MethodType, Type);
-setRefines(MethodType, MemberType);
 
 /** Field descriptor — a member representing instance data */
 export const FieldType: ContextValue = makeContext();
 setName(FieldType, stringToBits("Field"));
 writeShape(FieldType, Type);
-setRefines(FieldType, MemberType);
 
 /** Create a Method descriptor */
 export function makeMethodDescriptor(
@@ -2853,30 +2851,52 @@ export const pureEffect: ContextValue = buildEffect("pure", "pure");
 export const opaqueEffect: ContextValue = buildEffect("opaque", "opaque");
 
 // =============================================================================
-// Proof meta-type (Phase F1 substrate)
+// Proof — the kind of proofs (C6.3, D40/D45; Phase F1 substrate)
 // =============================================================================
 //
-// A Proof is a Value that witnesses a proposition. Phase F1's only proof
-// constructor is `proof_by_eval` (discharge by partial evaluation): if the
-// proposition folds to `true`, the witness is valid. Later chunks add
-// refinement-domain proofs (F2) and proof combinators (F3).
+// A Proof is a Value that witnesses a proposition. Proof is a KIND: it
+// draws Type's kind-member symbols and declares its instances' fields
+// (proposition / reason / counterexample / lhs / rhs — the D39 table,
+// executed). Instances are Contexts stamped `__type = Proof` carrying
+// those fields as plain data bindings plus the `__discharged` INTEGRITY
+// CHANNEL.
 //
-// Internally a proof is a Context with `__type = Proof`, a `__proposition`
-// binding holding a source-rendered string of what was proved, and a
-// `__discharged` flag. Failed proofs are Error-typed values carrying the
-// counterexample (reusing Phase E Stage 6 machinery) — `checkProofs` in
-// `src/proofs.ts` surfaces them as error-severity notifications.
+// Constructor authority is KERNEL-PRIVATE (D40 R2 / D45): Proof holds
+// NO `construct` — `Proof(...)` and `Proof.define(...)` fail, and the
+// only mint is `makeProof`, which holds the module-private discharged
+// channel writer (the attenuated-capability pattern). Holding a kind's
+// construct IS holding its mint; not exporting it IS unforgeability —
+// an ordinary capability instance, not a special arrangement.
+//
+// Failed proofs are the same shape with `__discharged = 0` plus
+// reason/counterexample; `checkProofs` in `src/proofs.ts` surfaces them
+// as error-severity notifications.
 
 export const Proof: ContextValue = makeContext();
 setName(Proof, stringToBits("Proof"));
 writeShape(Proof, Type);
-setMembers(Proof, makeContext());
+{
+  const PROOF_MEMBER_SCOPE = typeMemberScopeFqn("Proof");
+  const proofMembers = makeContext();
+  // Draw Type's kind API — Proof joins the tower by construction.
+  for (const [key, b] of typeMembers.bindings) {
+    if (b.value) addBinding(proofMembers, key, b.value);
+  }
+  // Instance-data declarations (D39 Proof rows, executed at C6.3).
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "proposition", makeFieldDescriptor("proposition", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "reason", makeFieldDescriptor("reason", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "counterexample", makeFieldDescriptor("counterexample", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "lhs", makeFieldDescriptor("lhs", AnyType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "rhs", makeFieldDescriptor("rhs", AnyType));
+  setMembers(Proof, proofMembers);
+}
+// NO setConstruct(Proof, ...) — deliberately. See the header comment.
 
 /** Construct a discharged proof witness for a proposition. `proposition`
  *  is the source-rendered text of what was proved (for display / export). */
 export function makeProof(proposition: string): Value {
   const p = makeContext();
-  setProposition(p, stringToBits(proposition));
+  setProposition(p, withType(stringToBits(proposition), StringType));
   dischargedWriterStd.write(p, makeInt(1));
   return withType(p, Proof);
 }

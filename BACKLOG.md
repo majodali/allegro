@@ -278,8 +278,17 @@ phase).
   anonymous instances; `pure subtypeof Effect` false / `instanceof`
   the check; `__effect_kind` slot retired. Residue for C6.3:
   `__effectvar:` markers / `__effectVarParams` disposition
-- [ ] **B-026** · L2 · Proof re-derived (kernel-private authority);
-  slot-disposition sweep; forgery battery re-run (C6.3) — **M1 exit
+- [x] **B-026** · L2 · Proof re-derived (kernel-private authority);
+  slot-disposition sweep; forgery battery re-run (C6.3) — landed
+  2026-08: Proof is a kind by construction with declared instance
+  fields (D39 proof rows executed; `t.proposition` dispatches);
+  constructor authority kernel-private (no `construct` — makeProof +
+  discharged writer is the only mint; forge battery green through
+  define / call / bundle-draw / literal); `__invariantsList` swept;
+  MemberType deleted. Registered residue pinned to future owners:
+  `__isGeneric` (GenericType re-derivation), `__effectvar:` /
+  `__effectVarParams` (function-type generic params). MultiValue-kind
+  + NominalType-alias decisions presented to maintainer — **M1 exit
   criterion**
 - [ ] **B-027** · L2 · Equality protocol + lawful interfaces — design
   ratification pass on structures.md §7–8, then own plan

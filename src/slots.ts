@@ -67,7 +67,8 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "__constructor", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.construct", notes: "alias of __construct; collapses into one member" },
   { name: "__getMember", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.fallbackMember" },
   { name: "__interface", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.structural" },
-  { name: "__invariantsList", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.invariants" },
+  // __invariantsList — SWEPT at C6.3: no writer since C6.1b folded
+  // invariants into refinement layers (`&` chains).
   { name: "__wraps", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.wraps" },
   { name: "__union", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.variants" },
 
@@ -82,12 +83,11 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "__generic", storages: ["context-binding"], owner: "GenericType", disposition: "member", target: "generic (constructor back-link)" },
   { name: "__isGeneric", storages: ["context-binding"], owner: "GenericType", disposition: "delete", target: "n/a — the flag IS the kind (shape = GenericType)" },
 
-  // --- Proof fields ------------------------------------------------------------
-  { name: "__proposition", storages: ["context-binding"], owner: "Proof", disposition: "member", target: "proposition" },
-  { name: "__reason", storages: ["context-binding"], owner: "Proof", disposition: "member", target: "reason" },
-  { name: "__counterexample", storages: ["context-binding"], owner: "Proof", disposition: "member", target: "counterexample" },
-  { name: "__eq_lhs", storages: ["context-binding"], owner: "Proof", disposition: "member", target: "lhs" },
-  { name: "__eq_rhs", storages: ["context-binding"], owner: "Proof", disposition: "member", target: "rhs" },
+  // --- Proof fields — EXECUTED at C6.3 (D39 checklist): the five proof
+  // fields are plain instance-data bindings (proposition / reason /
+  // counterexample / lhs / rhs) declared as Field members on the Proof
+  // kind — no longer __-slots, so no registry rows. The discharged flag
+  // stays a CHANNEL (kernel-private writer), never a field.
 
   // --- Effect fields -------------------------------------------------------------
   { name: "__effectLabels", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect.labels", notes: "C6.2 (D40): the instance IS its label set — Set<string>, empty for pure, null for opaque (top); the `kind`/`labels` data bindings are the declared-member view. Replaces the retired __effect_kind slot (D39: -> Effect.kind, checked off)" },
@@ -224,11 +224,11 @@ export function isGenericType(ctx: ContextValue): boolean { return ctx.bindings.
 export function isGenericTypeSlot(ctx: ContextValue): boolean { return slotRead(ctx, "__isGeneric") !== undefined; }
 
 // Proof fields
-export function getProposition(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__proposition"); }
-export function getProofReason(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__reason"); }
-export function getProofCounterexample(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__counterexample"); }
-export function getEqLhs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__eq_lhs"); }
-export function getEqRhs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__eq_rhs"); }
+export function getProposition(ctx: ContextValue): Value | undefined { return slotRead(ctx, "proposition"); }
+export function getProofReason(ctx: ContextValue): Value | undefined { return slotRead(ctx, "reason"); }
+export function getProofCounterexample(ctx: ContextValue): Value | undefined { return slotRead(ctx, "counterexample"); }
+export function getEqLhs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "lhs"); }
+export function getEqRhs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "rhs"); }
 
 // Effect fields
 export function getEffectLabels(ctx: ContextValue): Set<string> | null | undefined { return (ctx as any).__effectLabels; }
@@ -356,11 +356,11 @@ export function markGeneric(ctx: ContextValue, v: Value): void { slotWrite(ctx, 
 export function getGenericParamsSlot(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__params"); }
 
 // Proof fields
-export function setProposition(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__proposition", v); }
-export function setProofReason(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__reason", v); }
-export function setProofCounterexample(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__counterexample", v); }
-export function setEqLhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__eq_lhs", v); }
-export function setEqRhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__eq_rhs", v); }
+export function setProposition(ctx: ContextValue, v: Value): void { slotWrite(ctx, "proposition", v); }
+export function setProofReason(ctx: ContextValue, v: Value): void { slotWrite(ctx, "reason", v); }
+export function setProofCounterexample(ctx: ContextValue, v: Value): void { slotWrite(ctx, "counterexample", v); }
+export function setEqLhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "lhs", v); }
+export function setEqRhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "rhs", v); }
 
 // Effect fields
 export function setEffectLabels(ctx: ContextValue, labels: Set<string> | null): void { (ctx as any).__effectLabels = labels; }
@@ -386,13 +386,13 @@ export function hasDischarged(ctx: ContextValue): boolean { return !isDense(ctx)
 function slotSet(ctx: ContextValue, key: string, value: Value): void {
   ctx.bindings.set(key, { key, value });
 }
-export function stampProposition(ctx: ContextValue, v: Value): void { slotSet(ctx, "__proposition", v); }
+export function stampProposition(ctx: ContextValue, v: Value): void { slotSet(ctx, "proposition", v); }
 function stampDischarged(ctx: ContextValue, v: Value): void { slotSet(ctx, "__discharged", v); }
-export function stampProofReason(ctx: ContextValue, v: Value): void { slotSet(ctx, "__reason", v); }
-export function stampProofCounterexample(ctx: ContextValue, v: Value): void { slotSet(ctx, "__counterexample", v); }
+export function stampProofReason(ctx: ContextValue, v: Value): void { slotSet(ctx, "reason", v); }
+export function stampProofCounterexample(ctx: ContextValue, v: Value): void { slotSet(ctx, "counterexample", v); }
 export function stampEqOperands(ctx: ContextValue, lhs: Value, rhs: Value): void {
-  slotSet(ctx, "__eq_lhs", lhs);
-  slotSet(ctx, "__eq_rhs", rhs);
+  slotSet(ctx, "lhs", lhs);
+  slotSet(ctx, "rhs", rhs);
 }
 
 // Slot-key constants — for the residual idioms (key filters in copy loops,
@@ -406,7 +406,6 @@ export const SLOT_KEYS = {
   constructor: "__constructor",
   getMember: "__getMember",
   interface: "__interface",
-  invariantsList: "__invariantsList",
   wraps: "__wraps",
   union: "__union",
   predicate: "__predicate",
@@ -417,11 +416,11 @@ export const SLOT_KEYS = {
   type: "__type",
   discharged: "__discharged",
   length: "__length",
-  proposition: "__proposition",
-  reason: "__reason",
-  counterexample: "__counterexample",
-  eqLhs: "__eq_lhs",
-  eqRhs: "__eq_rhs",
+  proposition: "proposition",
+  reason: "reason",
+  counterexample: "counterexample",
+  eqLhs: "lhs",
+  eqRhs: "rhs",
 } as const;
 
 /** Host-plane (js-property) keys — registered as host-internal in the
