@@ -14,6 +14,7 @@ import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain,
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
+import { isCarrier } from "./structure.js";
 
 const MAX_DEPTH = 10000;
 
@@ -95,9 +96,35 @@ export function evaluate(
   switch (value.kind) {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
-    case ValueKind.Context:
     case ValueKind.ComposedFunction:
       return value;
+
+    case ValueKind.Context: {
+      // C7.1: a CARRIER (primary present) re-evaluates its primary — a
+      // residual under channels is still pending computation; plain
+      // structures self-evaluate.
+      if (!isCarrier(value)) return value;
+      const mv = value as MultiValueType;
+      const ep = evaluate(mv.primary, ctx, depth + 1, depCollector);
+      if (ep === mv.primary) return value;
+      // If re-evaluation produced another structure, FLATTEN rather than NEST.
+      // Inner (freshly-evaluated) components shadow outer (stale) components —
+      // fresh resolved type info should replace pre-computed partial-eval types.
+      // C4.3a (R3): union-rule channels (effects) merge by union via the
+      // registry-installed merge instead of inner-shadows-outer — effects
+      // observed before re-evaluation are facts, not stale guesses.
+      if (ep.kind === ValueKind.Context) {
+        const merged = cloneComponents(mv);
+        for (const [k, v] of componentsView(ep)) {
+          const prev = merged.get(k);
+          const mergeFn = prev !== undefined && channelSpec(k)?.rule === "union"
+            ? channelMerge(k) : undefined;
+          merged.set(k, mergeFn ? mergeFn(prev!, v) : v);
+        }
+        return makeMultiValue(dataOf(ep), merged);
+      }
+      return makeMultiValue(ep, cloneComponents(mv));
+    }
 
     case ValueKind.Param:
       return value;
@@ -118,30 +145,6 @@ export function evaluate(
       // Symbol unresolved — record as incomplete dependency
       if (depCollector) depCollector.incompleteRefs.add(value.name);
       return value;
-    }
-
-    case ValueKind.MultiValue: {
-      const ep = evaluate(value.primary, ctx, depth + 1, depCollector);
-      if (ep === value.primary) return value;
-      // If re-evaluation produced another MultiValue, FLATTEN rather than NEST.
-      // Inner (freshly-evaluated) components shadow outer (stale) components —
-      // fresh resolved type info should replace pre-computed partial-eval types.
-      // C4.3a (R3): union-rule channels (effects) merge by union via the
-      // registry-installed merge instead of inner-shadows-outer — effects
-      // observed before re-evaluation are facts, not stale guesses.
-      // C4.3b: a flattened Context result carries its channels directly —
-      // same merge, and makeMultiValue re-derives the flattened form.
-      if (ep.kind === ValueKind.MultiValue || ep.kind === ValueKind.Context) {
-        const merged = cloneComponents(value);
-        for (const [k, v] of componentsView(ep)) {
-          const prev = merged.get(k);
-          const mergeFn = prev !== undefined && channelSpec(k)?.rule === "union"
-            ? channelMerge(k) : undefined;
-          merged.set(k, mergeFn ? mergeFn(prev!, v) : v);
-        }
-        return makeMultiValue(dataOf(ep), merged);
-      }
-      return makeMultiValue(ep, cloneComponents(value));
     }
 
     case ValueKind.Expression: {
@@ -169,11 +172,9 @@ function evaluateExpr(
     return applyComposed(fn, expr.args, ctx, depth, fnRaw, depCollector);
   }
 
-  // Context as function — constructor call via __construct
-  // Types may be wrapped as MultiValues (e.g., Int is MultiValue(IntType, {type: Type}))
-  const fnCtx = fn.kind === ValueKind.Context ? fn as ContextValue
-    : (fn.kind === ValueKind.MultiValue && (fn as MultiValueType).primary.kind === ValueKind.Context)
-      ? (fn as MultiValueType).primary as ContextValue : null;
+  // Context as function — constructor call via __construct. `fn` is
+  // already dataOf(fnRaw), so carriers are peeled.
+  const fnCtx = fn.kind === ValueKind.Context ? fn as ContextValue : null;
   if (fnCtx) {
     const ctorSlot = getConstruct(fnCtx);
     if (ctorSlot) {
@@ -230,7 +231,7 @@ function evaluateExpr(
   // being dropped at the application hop. First hit wins, matching viralScan.
   for (const cand of [fnRaw, ...evalArgs]) {
     // C4.3b: flattened Contexts carry channels too.
-    if (cand.kind !== ValueKind.MultiValue && cand.kind !== ValueKind.Context) continue;
+    if (cand.kind !== ValueKind.Context) continue;
     for (const chan of viralChannels()) {
       const comp = channelReadRaw(cand, chan);
       if (comp) {
@@ -331,7 +332,7 @@ function applyPrimitive(
     // Even though args aren't fully resolved, their type components
     // may be known. Use type-level dispatch to infer the result type.
     // C4.3b: flattened Contexts carry the type channel too.
-    if (evalArgs[0]?.kind === ValueKind.MultiValue || evalArgs[0]?.kind === ValueKind.Context) {
+    if (evalArgs[0]?.kind === ValueKind.Context) {
       const typeComp = channelReadRaw(evalArgs[0], "type");
       if (typeComp && typeComp.kind === ValueKind.Context) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
@@ -356,7 +357,7 @@ function applyPrimitive(
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
   // C4.3b: flattened Contexts (typed records/arrays) dispatch too.
-  if (evalArgs[0]?.kind === ValueKind.MultiValue || evalArgs[0]?.kind === ValueKind.Context) {
+  if (evalArgs[0]?.kind === ValueKind.Context) {
     const typeComp = channelReadRaw(evalArgs[0], "type");
     if (typeComp && typeComp.kind === ValueKind.Context) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
@@ -372,7 +373,7 @@ function applyPrimitive(
           // If the method already returned a typed value (MultiValue), use it as-is.
           // Methods know their return types (e.g., comparisons return Bool).
           let out: Value;
-          if (result.kind === ValueKind.MultiValue) out = result;
+          if (result.kind === ValueKind.Context) out = result;
           else if (result.kind === ValueKind.Bits)  out = makeMultiValue(result, new Map([["type", typeComp]]));
           else                                       out = result;
           out = attachEff(out);
@@ -398,7 +399,7 @@ function applyPrimitive(
   // propagate the type to the result.
   let out: Value;
   if (result.kind === ValueKind.Bits
-      && (evalArgs[0]?.kind === ValueKind.MultiValue || evalArgs[0]?.kind === ValueKind.Context)) {
+      && evalArgs[0]?.kind === ValueKind.Context) {
     const typeComp = channelReadRaw(evalArgs[0], "type");
     if (typeComp) out = makeMultiValue(result, new Map([["type", typeComp]]));
     else          out = result;
@@ -431,7 +432,7 @@ function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
   const viral = viralChannels();
   for (const arg of evalArgs) {
     // C4.3b: flattened Contexts carry channels too.
-    if (arg.kind !== ValueKind.MultiValue && arg.kind !== ValueKind.Context) continue;
+    if (arg.kind !== ValueKind.Context) continue;
     for (const chan of viral) {
       const comp = channelReadRaw(arg, chan);
       if (comp) {
@@ -488,7 +489,7 @@ function applyComposed(
     // Type variable unification
     let enrichedCtx = ctx;
     let inferredReturnType: Value | null = null;
-    if (currentFnRaw && currentFnRaw.kind === ValueKind.MultiValue) {
+    if (currentFnRaw && isCarrier(currentFnRaw)) {
       const fnType = getType(currentFnRaw);
       const _fnTypeName = fnType ? getTypeName(currentFnRaw) : null;
       if (fnType && _fnTypeName === "Function") {
@@ -593,9 +594,15 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
   switch (value.kind) {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
-    case ValueKind.Context:
     case ValueKind.Symbol:
       return value;
+    case ValueKind.Context: {
+      // C7.1: carriers walk their primary; plain structures are inert.
+      if (!isCarrier(value)) return value;
+      const mv = value as MultiValueType;
+      const newP = remapParams(mv.primary, paramMap);
+      return newP === mv.primary ? value : makeMultiValue(newP, cloneComponents(mv));
+    }
     case ValueKind.Param: {
       const replacement = paramMap.get(value);
       return replacement ?? value;
@@ -619,10 +626,6 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
       }
       return newFn;
     }
-    case ValueKind.MultiValue: {
-      const newP = remapParams(value.primary, paramMap);
-      return newP === value.primary ? value : makeMultiValue(newP, cloneComponents(value));
-    }
   }
 }
 
@@ -642,9 +645,15 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
   // (no circular function references in expression tree)
 
   switch (value.kind) {
+    case ValueKind.Context: {
+      // C7.1: carriers walk their primary; plain structures are inert.
+      if (!isCarrier(value)) return value;
+      const mv = value as MultiValueType;
+      const newP = subst(mv.primary, owner, posMap, seen);
+      return newP === mv.primary ? value : makeMultiValue(newP, cloneComponents(mv));
+    }
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
-    case ValueKind.Context:
       return value;
 
     case ValueKind.Param: {
@@ -707,10 +716,6 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       return newExpr;
     }
 
-    case ValueKind.MultiValue: {
-      const newP = subst(value.primary, owner, posMap, seen);
-      return newP === value.primary ? value : makeMultiValue(newP, cloneComponents(value));
-    }
   }
 }
 

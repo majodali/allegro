@@ -3,6 +3,7 @@
 // Bridges the parser's output to the evaluator.
 // =============================================================================
 
+import { isCarrier } from "./structure.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch, isBareBindingName, isFutureBindingName } from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
@@ -60,15 +61,16 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       if ((v as any).__effectVarParams) (newFn as any).__effectVarParams = (v as any).__effectVarParams;
       return newFn;
     }
-    case ValueKind.MultiValue: {
-      // If the MultiValue already carries a type component, don't recurse
-      // into its primary — the value was deliberately typed (e.g. by an
-      // earlier typeLiterals pass in a module) and wrapping again would
-      // produce a nested MultiValue(MultiValue(Bits, T), T) that later
-      // breaks `dataOf(v) as BitsValue` extractions.
+    case ValueKind.Context: {
+      // C7.1: only CARRIERS recurse — and only untyped ones. A carrier
+      // already holding a type component was deliberately typed (e.g. by
+      // an earlier typeLiterals pass in a module); re-wrapping would
+      // corrupt it. Plain structures are inert.
+      const pp = (v as { primary?: Value }).primary;
+      if (pp === undefined) return v;
       if (channelReadRaw(v, "type") !== undefined) return v;
-      const newPrimary = typeLiterals(v.primary, seen);
-      if (newPrimary === v.primary) return v;
+      const newPrimary = typeLiterals(pp, seen);
+      if (newPrimary === pp) return v;
       return makeMultiValue(newPrimary, cloneComponents(v));
     }
     default:
@@ -103,7 +105,7 @@ export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
     return v;
   }
 
-  if (v.kind === "MultiValue") {
+  if ((v as { primary?: unknown }).primary !== undefined) {
     v.primary = resolvePrimitives(v.primary, seen);
     return v;
   }
@@ -258,8 +260,9 @@ function patchNamedParams(
     if (!shadows) {
       patchNamedParams(value.body, name, binding, seen);
     }
-  } else if (value.kind === ValueKind.MultiValue) {
-    patchNamedParams(value.primary, name, binding, seen);
+  } else if (value.kind === ValueKind.Context) {
+    const pp = (value as { primary?: Value }).primary;
+    if (pp !== undefined) patchNamedParams(pp, name, binding, seen);
   }
 }
 
@@ -287,7 +290,6 @@ function resolveNamedParams(
 
   switch (value.kind) {
     case ValueKind.Bits:
-    case ValueKind.Context:
       return value;
 
     case ValueKind.PrimitiveFunction: {
@@ -345,9 +347,11 @@ function resolveNamedParams(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.MultiValue: {
-      const newP = resolveNamedParams(value.primary, resMap, selfName, seen);
-      if (newP === value.primary) return value;
+    case ValueKind.Context: {
+      const pp = (value as { primary?: Value }).primary;
+      if (pp === undefined) return value;
+      const newP = resolveNamedParams(pp, resMap, selfName, seen);
+      if (newP === pp) return value;
       return makeMultiValue(newP, cloneComponents(value));
     }
   }
@@ -373,7 +377,6 @@ function resolveNamedParamsInner(
 
   switch (value.kind) {
     case ValueKind.Bits:
-    case ValueKind.Context:
       return value;
 
     case ValueKind.PrimitiveFunction: {
@@ -431,9 +434,11 @@ function resolveNamedParamsInner(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.MultiValue: {
-      const newP = resolveNamedParamsInner(value.primary, resMap, owner, ownParamNames, selfName, seen);
-      if (newP === value.primary) return value;
+    case ValueKind.Context: {
+      const pp = (value as { primary?: Value }).primary;
+      if (pp === undefined) return value;
+      const newP = resolveNamedParamsInner(pp, resMap, owner, ownParamNames, selfName, seen);
+      if (newP === pp) return value;
       return makeMultiValue(newP, cloneComponents(value));
     }
   }
@@ -470,8 +475,8 @@ function markTailCallsInValue(v: any, seen: Set<any>): void {
   } else if (v.kind === "Expression") {
     markTailCallsInValue(v.fn, seen);
     for (const a of v.args) markTailCallsInValue(a, seen);
-  } else if (v.kind === "MultiValue") {
-    markTailCallsInValue(v.primary, seen);
+  } else if ((v as { primary?: unknown }).primary !== undefined) {
+    markTailCallsInValue((v as any).primary, seen);
   }
 }
 
@@ -603,15 +608,16 @@ function precompileFunctions(
     let fn: Value;
     let fnType: Value | null = null;
     let paramTypes: Value[] | null = null;
-    if (val.kind === ValueKind.MultiValue) {
+    if (isCarrier(val)) {
       fnType = getType(val);
       if (!fnType) continue;
       const typeName = getTypeName(val);
       const isTyped = typeName === "Function";
       const isUntyped = typeName === "UntypedFunction";
       if (!isTyped && !isUntyped) continue;
-      if (val.primary.kind !== ValueKind.ComposedFunction) continue;
-      fn = val.primary;
+      const valP = (val as { primary?: Value }).primary!;
+      if (valP.kind !== ValueKind.ComposedFunction) continue;
+      fn = valP;
       paramTypes = isTyped ? getFunctionParamTypes(fnType) : null;
       if (isTyped && !paramTypes) continue;
     } else if (val.kind === ValueKind.ComposedFunction) {
@@ -1128,7 +1134,10 @@ export function evalSource(
       collectSymbolRefs(v.fn, refs, seen);
       for (const a of v.args) collectSymbolRefs(a, refs, seen);
     }
-    if (v.kind === ValueKind.MultiValue) collectSymbolRefs(v.primary, refs, seen);
+    if (v.kind === ValueKind.Context) {
+      const pp = (v as { primary?: Value }).primary;
+      if (pp !== undefined) collectSymbolRefs(pp, refs, seen);
+    }
     if (v.kind === ValueKind.ComposedFunction) collectSymbolRefs(v.body, refs, seen);
   }
 
@@ -1186,9 +1195,7 @@ export function evalSource(
       }
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
-      const typeCtx = val.kind === ValueKind.Context ? val as ContextValue
-        : (val.kind === ValueKind.MultiValue && dataOf(val).kind === ValueKind.Context)
-          ? dataOf(val) as ContextValue : null;
+      const typeCtx = dataOf(val).kind === ValueKind.Context ? dataOf(val) as ContextValue : null;
       if (typeCtx && hasShapeSlot(typeCtx)) {
         const nameV = getName(typeCtx);
         if (nameV?.kind === ValueKind.Bits) {

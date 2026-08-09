@@ -103,7 +103,7 @@ export function collapseBodyMetadata(v: Value | undefined, seen: Set<Value> = ne
     for (const a of e.args) collapseBodyMetadata(a, seen);
     return;
   }
-  if (v.kind === ValueKind.MultiValue) {
+  if (v.kind === ValueKind.Context && (v as any).primary !== undefined) {
     collapseBodyMetadata((v as any).primary, seen);
   }
 }
@@ -161,8 +161,8 @@ function peelFunctionAst(v: Value): {
   cfn: ComposedFunctionValue;
   paramTypeAsts: Value[];
 } | null {
-  // Post-evaluation: MultiValue + FunctionType.
-  if (v.kind === ValueKind.MultiValue) {
+  // Post-evaluation: a typed-function carrier.
+  if (v.kind === ValueKind.Context && (v as any).primary !== undefined) {
     const mv = v as any;
     const tComp = channelReadRaw(mv, "type") as Value | undefined;
     const prim = mv.primary;
@@ -304,7 +304,7 @@ function walkForWhen(
     walkForWhen((v as ComposedFunctionValue).body, visit, visited);
     return;
   }
-  if (v.kind === ValueKind.MultiValue) {
+  if (v.kind === ValueKind.Context && (v as any).primary !== undefined) {
     walkForWhen((v as any).primary, visit, visited);
     return;
   }
@@ -324,13 +324,13 @@ function resolveSubjectTypeName(
   paramTypeAsts: Value[],
   typeLookup: TypeLookup | undefined,
 ): string | null {
-  // Strip MultiValue wrappers. C4.3b: flattened Contexts (typed records)
-  // answer through their channel plane too.
-  if (subject.kind === ValueKind.MultiValue || subject.kind === ValueKind.Context) {
+  // Strip carriers; flattened structures answer through the channel plane.
+  if (subject.kind === ValueKind.Context) {
     const t = channelReadRaw(subject as Value, "type");
     if (t) return resolveTypeName(t, typeLookup);
-    if (subject.kind === ValueKind.MultiValue) {
-      return resolveSubjectTypeName((subject as any).primary, paramTypeAsts, typeLookup);
+    const pp = (subject as { primary?: Value }).primary;
+    if (pp !== undefined) {
+      return resolveSubjectTypeName(pp, paramTypeAsts, typeLookup);
     }
     return null;
   }
@@ -348,8 +348,10 @@ function resolveSubjectTypeName(
 /** Resolve a type AST node to a concrete type name (e.g. "Bool", "Int"). */
 function resolveTypeName(t: Value, typeLookup: TypeLookup | undefined): string | null {
   // Direct Context type values carry __name.
-  if (t.kind === ValueKind.Context) return typeContextName(t);
-  if (t.kind === ValueKind.MultiValue) return resolveTypeName((t as any).primary, typeLookup);
+  if (t.kind === ValueKind.Context) {
+    const pp = (t as { primary?: Value }).primary;
+    return pp !== undefined ? resolveTypeName(pp, typeLookup) : typeContextName(t);
+  }
   // Symbol — look up against extensions (`Bool` etc.).
   if (t.kind === ValueKind.Symbol) {
     if (!typeLookup) return null;
@@ -691,7 +693,7 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
     for (const a of e.args) collectCalleeNames(a, out, seen);
   } else if (v.kind === ValueKind.ComposedFunction) {
     collectCalleeNames((v as ComposedFunctionValue).body, out, seen);
-  } else if (v.kind === ValueKind.MultiValue) {
+  } else if (v.kind === ValueKind.Context && (v as any).primary !== undefined) {
     collectCalleeNames((v as any).primary, out, seen);
   }
 }
@@ -730,7 +732,7 @@ function findCallsToCycle(
     for (const a of e.args) findCallsToCycle(a, cycle, out, seen);
   } else if (body.kind === ValueKind.ComposedFunction) {
     findCallsToCycle((body as ComposedFunctionValue).body, cycle, out, seen);
-  } else if (body.kind === ValueKind.MultiValue) {
+  } else if (body.kind === ValueKind.Context && (body as any).primary !== undefined) {
     findCallsToCycle((body as any).primary, cycle, out, seen);
   }
 }
@@ -987,7 +989,7 @@ function typeHasNonNegativeLowerBound(
   if (seen.has(t)) return false;
   seen.add(t);
   let cur = t;
-  if (cur.kind === ValueKind.MultiValue) cur = (cur as any).primary;
+  cur = dataOf(cur);
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
     const resolved = typeLookup?.(name);
@@ -1017,7 +1019,7 @@ function collectBoolLiterals(cases: ChainCase[]): Set<boolean> {
         if (b.data === 0n) out.add(false);
         else if (b.data === 1n) out.add(true);
       }
-    } else if (c.pattern.kind === ValueKind.MultiValue) {
+    } else if (c.pattern.kind === ValueKind.Context && (c.pattern as any).primary !== undefined) {
       const pp = dataOf(c.pattern);
       if (pp.kind === ValueKind.Bits) {
         const b = pp as BitsValue;

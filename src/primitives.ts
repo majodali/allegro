@@ -26,7 +26,7 @@ export function formatValue(v: Value): string {
   // Typed-value display. C4.3b: flattened Contexts (typed records/arrays)
   // carry channels directly, so the gate covers both roles and data reads
   // go through dataOf (identity for Contexts) instead of `.primary`.
-  if (v.kind === ValueKind.MultiValue || v.kind === ValueKind.Context) {
+  if (v.kind === ValueKind.Context) {
     // Error values — show error component
     const errComp = channelReadRaw(v, "error");
     if (errComp !== undefined) {
@@ -126,8 +126,6 @@ export function formatValue(v: Value): string {
       return `<expression>`;
     case ValueKind.Context:
       return `<context(${p.bindings.size})>`;
-    case ValueKind.MultiValue:
-      return formatValue(p.primary);
     case ValueKind.Param:
       return `<param:${p._name ?? p.position}>`;
     case ValueKind.Symbol:
@@ -324,9 +322,12 @@ function collectUnownedParams(v: Value, out: import("./types.js").ParamValue[], 
       collectUnownedParams(v.fn, out, seen);
       for (const a of v.args) collectUnownedParams(a, out, seen);
       break;
-    case ValueKind.MultiValue:
-      collectUnownedParams(v.primary, out, seen);
+    case ValueKind.Context: {
+      // C7.1: carriers walk their primary; plain structures are inert.
+      const pp = (v as { primary?: Value }).primary;
+      if (pp !== undefined) collectUnownedParams(pp, out, seen);
       break;
+    }
     case ValueKind.ComposedFunction:
       break; // don't descend - inner params are owned
     default:
@@ -488,7 +489,7 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // C4.3a (R2): an error-carrying condition propagates the error instead of
   // branching on its (meaningless) primary — the legacy behavior silently
   // took the else branch (differential fixture err-in-if-cond).
-  if ((cond.kind === ValueKind.MultiValue || cond.kind === ValueKind.Context)
+  if (cond.kind === ValueKind.Context
       && channelReadRaw(cond, "error") !== undefined) {
     return cond;
   }
@@ -703,9 +704,12 @@ function replaceValueIdentity(v: Value, target: Value, replacement: Value, seen?
       }
       return newFn;
     }
-    case ValueKind.MultiValue: {
-      const newP = replaceValueIdentity(v.primary, target, replacement, seen);
-      if (newP === v.primary) return v;
+    case ValueKind.Context: {
+      // C7.1: carriers walk their primary; plain structures are inert.
+      const pp = (v as { primary?: Value }).primary;
+      if (pp === undefined) return v;
+      const newP = replaceValueIdentity(pp, target, replacement, seen);
+      if (newP === pp) return v;
       return makeMultiValue(newP, cloneComponents(v));
     }
     default:
@@ -1500,9 +1504,12 @@ function resolveFreeSymbols(v: Value, ctx: ContextValue, seen: Set<Value> = new 
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
     }
-    case ValueKind.MultiValue: {
-      const newPrimary = resolveFreeSymbols(v.primary, ctx, seen);
-      if (newPrimary === v.primary) return v;
+    case ValueKind.Context: {
+      // C7.1: carriers walk their primary; plain structures are inert.
+      const pp = (v as { primary?: Value }).primary;
+      if (pp === undefined) return v;
+      const newPrimary = resolveFreeSymbols(pp, ctx, seen);
+      if (newPrimary === pp) return v;
       return makeMultiValue(newPrimary, cloneComponents(v));
     }
     default:
@@ -1744,7 +1751,7 @@ const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const p = dataOf(v);
   if (p.kind === ValueKind.Bits) {
     // Check if it's a string representation (non-64-bit) that needs parsing
-    if (p.length !== 64 || (v.kind === ValueKind.MultiValue && getTypeName(v) === "String")) {
+    if (p.length !== 64 || (v.kind === ValueKind.Context && getTypeName(v) === "String")) {
       const str = bitsToString(p);
       return withType(makeFloat(parseFloat(str)), FloatType);
     }
@@ -2100,7 +2107,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // member on an unresolved error-carrying value propagates the error
     // instead of dropping it (err-through-method). Resolved error values
     // still dispatch normally (Error's own members stay callable).
-    if (obj.kind === ValueKind.MultiValue || obj.kind === ValueKind.Context) {
+    if (obj.kind === ValueKind.Context) {
       for (const chan of viralChannels()) {
         const comp = channelReadRaw(obj, chan);
         if (comp !== undefined) {

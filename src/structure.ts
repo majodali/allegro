@@ -55,9 +55,13 @@ const LENGTH_KEY = "__length";
  *  are declared up front so every structure shares a single hidden class
  *  (the I1 motivation), whichever role it plays. */
 export class Structure {
-  kind: ValueKind.MultiValue | ValueKind.Context;
+  // C7.1 (D15/D46): ONE kind. The former MultiValue role is the CARRIER
+  // configuration — primary set, empty data plane — and it answers the
+  // same kind as every structure. `isCarrier` is the host-level
+  // discriminant (primary presence), not the kind tag.
+  kind: ValueKind.Context;
 
-  // --- MultiValue role (transparent value: primary + channel plane) ---
+  // --- Carrier configuration (transparent value: primary + channel plane) ---
   primary: Value;
   components: Map<string, Value>;
 
@@ -83,8 +87,8 @@ export class Structure {
    *  mutable; future cells are the sanctioned monotonic exception. */
   immutable: boolean;
 
-  constructor(kind: ValueKind.MultiValue | ValueKind.Context, immutable: boolean) {
-    this.kind = kind;
+  constructor(immutable: boolean) {
+    this.kind = ValueKind.Context;
     this.primary = undefined as unknown as Value;
     this.components = undefined as unknown as Map<string, Value>;
     this._bindings = undefined as unknown as Map<string, Binding>;
@@ -102,7 +106,12 @@ export class Structure {
    *  structures return their storage directly — the getter is a
    *  monomorphic two-check fast path on the scope-lookup hot loop. */
   get bindings(): Map<string, Binding> {
-    if (this._bindings === undefined && this.dense !== undefined) materializeView(this);
+    if (this._bindings === undefined) {
+      if (this.dense !== undefined) materializeView(this);
+      // C7.1: a carrier's data plane is EMPTY (D15) — materialize the
+      // empty view on first ask so record-shaped consumers see no slots.
+      else if (this.primary !== undefined) { this._bindings = new Map(); this._bindingList = []; }
+    }
     return this._bindings;
   }
   set bindings(m: Map<string, Binding>) {
@@ -110,7 +119,10 @@ export class Structure {
   }
 
   get bindingList(): Binding[] {
-    if (this._bindingList === undefined && this.dense !== undefined) materializeView(this);
+    if (this._bindingList === undefined) {
+      if (this.dense !== undefined) materializeView(this);
+      else if (this.primary !== undefined) { this._bindings = new Map(); this._bindingList = []; }
+    }
     return this._bindingList;
   }
   set bindingList(l: Binding[]) {
@@ -150,9 +162,17 @@ function materializeView(s: Structure): void {
   s.bindingList = bindingList;
 }
 
-/** Construct the MultiValue role. */
+/** C7.1: the host-level carrier discriminant — a structure whose data is
+ *  a non-Structure primary riding under an (empty) data plane. This is
+ *  the "MultiValue interface" as protocol, not kind (D46). */
+export function isCarrier(v: unknown): boolean {
+  return v instanceof Structure && (v as Structure).primary !== undefined;
+}
+
+/** Construct the CARRIER configuration (the D15 transparent structure:
+ *  empty data plane + primary channel). */
 export function newMultiValueStructure(primary: Value, components: Map<string, Value>): Structure {
-  const s = new Structure(ValueKind.MultiValue, true);
+  const s = new Structure(true);
   s.primary = primary;
   s.components = components;
   return s;
@@ -162,7 +182,7 @@ export function newMultiValueStructure(primary: Value, components: Map<string, V
  *  contexts carry the immutable bit (population-during-construction is
  *  the grandfathered builder idiom until the C6 recipe). */
 export function newContextStructure(): Structure {
-  const s = new Structure(ValueKind.Context, true);
+  const s = new Structure(true);
   s.bindings = new Map();
   s.bindingList = [];
   return s;
@@ -172,7 +192,7 @@ export function newContextStructure(): Structure {
  *  element array is adopted, not copied — callers hand over ownership
  *  (arrays are immutable, D22). */
 export function newDenseStructure(elements: Value[]): Structure {
-  const s = new Structure(ValueKind.Context, true);
+  const s = new Structure(true);
   s.dense = elements;
   return s;
 }
@@ -189,7 +209,7 @@ export function deriveWithChannels(ctx: ContextValue, components: Map<string, Va
   if (src.isScope) {
     throw new Error("deriveWithChannels: channels cannot attach to an evaluation scope (plane rejection)");
   }
-  const s = new Structure(ValueKind.Context, src.immutable);
+  const s = new Structure(src.immutable);
   if (src.dense !== undefined) {
     s.dense = src.dense; // shared by reference — arrays are immutable
   } else {

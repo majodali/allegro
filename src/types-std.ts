@@ -4,6 +4,7 @@
 // Types are attached to values as MultiValue "type" components.
 // =============================================================================
 
+import { isCarrier } from "./structure.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, MultiValueType, PrimitiveFnImpl, PrimitiveFunctionValue,
   ComposedFunctionValue,
@@ -106,7 +107,7 @@ export function applyBoundaryBound(v: Value, expected: ContextValue): Value {
   // applies to them too (they're exactly the values annotation bounds
   // matter most for). Other kinds (Bits, functions, residuals) pass their
   // typed MultiValue form through as before.
-  if (v.kind !== ValueKind.MultiValue && v.kind !== ValueKind.Context) return v;
+  if (v.kind !== ValueKind.Context) return v;
   const name = typeContextName(expected);
   if (!name || name === "Any" || name === "Function" || name === "UntypedFunction") return v;
   if (getEffectBound(expected) !== undefined) return v;
@@ -138,8 +139,10 @@ export function withTypeReplacing(v: Value, type: ContextValue): Value {
 
 /** Get the __name from a type Context directly (not from a typed value) */
 export function typeContextName(v: Value): string | null {
-  const ctx = v.kind === ValueKind.Context ? v : (v.kind === ValueKind.MultiValue ? dataOf(v) : null);
-  if (!ctx || ctx.kind !== ValueKind.Context) return null;
+  // dataOf peels a carrier (whose primary is never a Context — W1) and is
+  // identity for the bare type Contexts this reads.
+  const ctx = dataOf(v);
+  if (ctx.kind !== ValueKind.Context) return null;
   const nv = getName(ctx as ContextValue);
   if (nv?.kind === ValueKind.Bits) return bitsToString(nv);
   return null;
@@ -2322,6 +2325,14 @@ export function buildGenericType(
   }
 
   function cacheKeyOne(a: Value, idx: number): string {
+    // C7.1: carriers key by their DATA (a typed 3 and a typed 5 must not
+    // collide on the empty-bindings context key) — peel before the
+    // structure branch.
+    if (a.kind === ValueKind.Context && (a as { primary?: Value }).primary !== undefined) {
+      const p = dataOf(a);
+      if (p.kind === ValueKind.Bits) return `v:${(p as BitsValue).data}`;
+      return cacheKeyOne(p, idx);
+    }
     if (a.kind === ValueKind.Context) {
       const ctx = a as ContextValue;
       // Named type (Int, String, Array, etc.)
@@ -2352,11 +2363,6 @@ export function buildGenericType(
       return `ctx:${ctx.bindings.size}:${idx}`;
     }
     if (a.kind === ValueKind.Bits) return `v:${(a as BitsValue).data}`;
-    if (a.kind === ValueKind.MultiValue) {
-      const p = dataOf(a);
-      if (p.kind === ValueKind.Bits) return `v:${(p as BitsValue).data}`;
-      return cacheKeyOne(p, idx);
-    }
     // Params and Symbols (type variables) — unique per name
     if (a.kind === ValueKind.Param) return `param:${(a as any)._name ?? idx}`;
     if (a.kind === ValueKind.Symbol) return `sym:${(a as any).name}`;
@@ -2600,7 +2606,7 @@ export function unifyTypes(
     // unification here — a bare type Context skips (getType on it would now
     // report its META-type, which is not what this comparison wants; the
     // call-site checkArgType does the real concrete-type check).
-    const actualCtx = actualType.kind === ValueKind.MultiValue ? getType(actualType) : null;
+    const actualCtx = isCarrier(actualType) ? getType(actualType) : null;
     if (!actualCtx) return bindings; // no type on actual, can't unify
 
     // Check base name
@@ -2920,9 +2926,7 @@ export function isProof(v: Value): boolean {
  */
 export function wrapAsUntypedFunction(fn: Value): Value {
   const primary = dataOf(fn);
-  const components = fn.kind === ValueKind.MultiValue
-    ? cloneComponents(fn)
-    : new Map<string, Value>();
+  const components = cloneComponents(fn);
   components.set("type", UntypedFunctionType);
   return makeMultiValue(primary, components);
 }

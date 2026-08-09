@@ -686,7 +686,7 @@ function isPrimitiveCall(value: any, primName: string): boolean {
   // The fn may be a MultiValue-wrapped function (e.g. when a stmt_form's
   // template was evaluated in a lib module's typed env). Peel to primary.
   let fn = value.fn;
-  if (fn && fn.kind === "MultiValue") fn = fn.primary;
+  if (fn && (fn as { primary?: unknown }).primary !== undefined) fn = (fn as { primary?: any }).primary;
   if (!fn) return false;
   if (fn.kind === "PrimitiveFunction" && fn.name === primName) return true;
   if (fn.kind === "Symbol" && fn.name === primName) return true;

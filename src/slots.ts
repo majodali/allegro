@@ -192,10 +192,10 @@ function slotWrite(ctx: ContextValue, key: string, value: Value): void {
   ctx.bindingList.push({ key, value });
 }
 
-/** Peel a MultiValue wrapper down to its Context primary, if that's what it is. */
+/** Peel a carrier down to its Context primary, if that's what it is. */
 export function asContext(v: Value | null | undefined): ContextValue | null {
   if (!v) return null;
-  const p = v.kind === ValueKind.MultiValue ? ((v as MultiValueType).primary as Value) : v;
+  const p = (v as { primary?: Value }).primary ?? v;
   return p && p.kind === ValueKind.Context ? (p as ContextValue) : null;
 }
 
@@ -303,10 +303,12 @@ export function channelReadRaw(v: Value, channel: string): Value | undefined {
   }
   if (channel === "shape" || channel === "type") {
     let raw: Value | undefined;
-    if (v.kind === ValueKind.MultiValue) {
-      raw = comps?.get("type") as Value | undefined;
-    } else if (v.kind === ValueKind.Context) {
-      raw = slotRead(v as ContextValue, "__type");
+    if (v.kind === ValueKind.Context) {
+      // C7.1: a carrier's type rides in its components; a plain
+      // structure answers through the __type binding-plane fallback.
+      raw = (v as { primary?: Value }).primary !== undefined
+        ? (comps?.get("type") as Value | undefined)
+        : slotRead(v as ContextValue, "__type");
     } else {
       const ctx = asContext(v);
       raw = ctx ? slotRead(ctx, "__type") : undefined;
@@ -454,7 +456,8 @@ export function setGenericConstructor(ctx: ContextValue, v: Value): void { slotW
 /** Data-plane read (C4.3c: `primaryOf` retired — this is THE accessor).
  *  Identity for flattened Contexts and every non-scalar; unwraps the
  *  `primary` of a transparent scalar structure. */
-export { dataOf } from "./types.js";
+import { dataOf } from "./types.js";
+export { dataOf };
 
 // --- Component plane (MultiValue) -------------------------------------------------------
 
@@ -546,7 +549,9 @@ function buildWriter(spec: ChannelSpec): ChannelWriter {
       }
       const comps = cloneComponents(target);
       comps.set(spec.name, channelValue);
-      return makeMultiValue(target.kind === ValueKind.MultiValue ? (target as MultiValueType).primary : target, comps) as Value;
+      // makeMultiValue handles all three shapes: carrier primaries
+      // re-wrap (W1), record primaries derive, leaves take the carrier.
+      return makeMultiValue(dataOf(target), comps) as Value;
     },
   };
 }

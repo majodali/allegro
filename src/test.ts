@@ -38,7 +38,7 @@ function evalStr(source: string): string {
 function evalNum(source: string): number {
   const val = evalSource(source);
   if (val === null) throw new Error("No value produced");
-  const p = val.kind === ValueKind.MultiValue ? val.primary : val;
+  const p = dataOf(val);
   if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
   // Handle signed 64-bit
   if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
@@ -332,7 +332,7 @@ test("persistent context across evaluations", () => {
   const r1 = runtimeEval("x = 10\n");
   const r2 = runtimeEval("x + 5\n", r1.evalCtx);
   const p = r2.value!;
-  const v = p.kind === ValueKind.MultiValue ? p.primary : p;
+  const v = dataOf(p);
   if (v.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${v.kind}`);
   eq(Number(v.data), 15);
 });
@@ -341,7 +341,7 @@ test("persistent context: function then call", () => {
   const r1 = runtimeEval("double(n) => n * 2\n");
   const r2 = runtimeEval("double(21)\n", r1.evalCtx);
   const p = r2.value!;
-  const v = p.kind === ValueKind.MultiValue ? p.primary : p;
+  const v = dataOf(p);
   if (v.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${v.kind}`);
   eq(Number(v.data), 42);
 });
@@ -351,7 +351,7 @@ test("persistent context: redefine binding", () => {
   const r2 = runtimeEval("x = 20\n", r1.evalCtx);
   const r3 = runtimeEval("x\n", r2.evalCtx);
   const p = r3.value!;
-  const v = p.kind === ValueKind.MultiValue ? p.primary : p;
+  const v = dataOf(p);
   if (v.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${v.kind}`);
   eq(Number(v.data), 20);
 });
@@ -390,7 +390,7 @@ function evalNumExt(source: string, extensions?: Extension[]): number {
   const result = runtimeEval(source + "\n", undefined, extensions);
   const val = result.value;
   if (val === null) throw new Error("No value produced");
-  const p = val.kind === ValueKind.MultiValue ? val.primary : val;
+  const p = dataOf(val);
   if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
   if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
   return Number(p.data);
@@ -764,7 +764,7 @@ function evalNumGrammar(
   const result = runtimeEval(source + "\n", undefined, extensions, grammarExt);
   const val = result.value;
   if (val === null) throw new Error("No value produced");
-  const p = val.kind === ValueKind.MultiValue ? val.primary : val;
+  const p = dataOf(val);
   if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
   if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
   return Number(p.data);
@@ -839,7 +839,7 @@ test("allegro grammar: build extension from Allegro code", () => {
   const source = `grammar_build(grammar_add_import(grammar_add_dot_access(grammar_builder())))`;
   const result = runtimeEval(source + "\n");
   const val = result.value!;
-  const p = val.kind === ValueKind.MultiValue ? val.primary : val;
+  const p = dataOf(val);
   eq(p.kind, ValueKind.Bits, "grammar_build should return a handle");
   const handle = Number((p as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
@@ -851,7 +851,7 @@ test("allegro grammar: extension built from Allegro enables dot access", () => {
   // Step 1: Allegro code builds the grammar extension
   const buildResult = runtimeEval("ext = grammar_build(grammar_add_dot_access(grammar_builder()))\next\n");
   const extVal = buildResult.value!;
-  const extP = extVal.kind === ValueKind.MultiValue ? extVal.primary : extVal;
+  const extP = dataOf(extVal);
   const handle = Number((extP as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
 
@@ -865,7 +865,7 @@ test("allegro grammar: extension built from Allegro enables import", () => {
   // Step 1: Build extension from Allegro
   const buildResult = runtimeEval("ext = grammar_build(grammar_add_import(grammar_builder()))\next\n");
   const extVal = buildResult.value!;
-  const extP = extVal.kind === ValueKind.MultiValue ? extVal.primary : extVal;
+  const extP = dataOf(extVal);
   const handle = Number((extP as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
 
@@ -880,8 +880,7 @@ test("allegro grammar: full pipeline - build, then use dot + import", () => {
 grammar_build(grammar_add_import(grammar_add_dot_access(grammar_builder())))
 `;
   const buildResult = runtimeEval(buildSource);
-  const extP = buildResult.value!.kind === ValueKind.MultiValue
-    ? buildResult.value!.primary : buildResult.value!;
+  const extP = dataOf(buildResult.value!);
   const grammarExt = registryGet(Number((extP as BitsValue).data)) as GrammarExtension;
 
   // Step 2: Use it to parse a program with import + dot access
@@ -1734,17 +1733,16 @@ test("module export: export keyword marks value with exported component", () => 
   // Should still be usable as a number
   eq(Number((dataOf(result!) as BitsValue).data), 42);
   // Should have "exported" component
-  eq(result!.kind, ValueKind.MultiValue);
-  if (result!.kind === ValueKind.MultiValue) {
-    eq(result!.components.has("exported"), true);
+  eq(channelReadRaw(result!, "exported") !== undefined, true);
+  {
   }
 });
 
 test("module export: non-exported values don't have exported component", () => {
   const result = evalStd("x = 42\nx\n");
   // Should NOT have "exported" component
-  if (result!.kind === ValueKind.MultiValue) {
-    eq(result!.components.has("exported"), false);
+  {
+    eq(channelReadRaw(result!, "exported") === undefined, true);
   }
 });
 
@@ -1765,7 +1763,7 @@ test("module export: typed module object exposes exports via dot", () => {
     if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
       const evaluated = evaluate(binding.value, modResult.evalCtx);
       allBindings[key] = evaluated;
-      if (evaluated.kind === ValueKind.MultiValue && evaluated.components.has("exported")) {
+      if (channelReadRaw(evaluated, "exported") !== undefined) {
         exportedNames.add(key);
       }
     }
@@ -2320,7 +2318,7 @@ Point instanceof NominalType`);
 
 test("typed types: type of Int returns NominalType", () => {
   const result = evalStd("type of Int");
-  eq(result!.kind !== ValueKind.MultiValue || getType(result!) !== null, true);
+  eq(getType(result!) !== null || (result! as any).primary === undefined, true);
 });
 
 // == Effect meta-type (Phase D1 sub-chunk 1.1) ==
@@ -2984,7 +2982,8 @@ test("none: print", () => {
 test("error: creates error MultiValue", () => {
   const result = evalStd('error "something went wrong"');
   eq(result !== null, true);
-  eq(result!.kind, ValueKind.MultiValue);
+  eq(result!.kind, ValueKind.Context);
+  eq(getType(result!) !== null, true);
   eq((result as any).components.has("error"), true);
 });
 
@@ -4185,9 +4184,7 @@ bad = PI(0 - 5)
   if (okP.kind === ValueKind.Bits) eq(Number((okP as any).data), 5);
   // bad fails → Error-typed MultiValue
   const badV = evalCtx.bindings.get("bad")!.value!;
-  if (badV.kind === ValueKind.MultiValue) {
-    eq(badV.components.has("error"), true, "bad has error component");
-  }
+  eq(channelReadRaw(badV, "error") !== undefined, true, "bad has error component");
 });
 
 test("invariants-as-refinements: chained `&` clauses fail with per-clause domains", () => {
@@ -4204,8 +4201,8 @@ high = SP(200)
   if (midP.kind === ValueKind.Bits) eq(Number((midP as any).data), 50);
   // low fails on first invariant (self > 0)
   const lowV = evalCtx.bindings.get("low")!.value!;
-  if (lowV.kind === ValueKind.MultiValue) {
-    const err = lowV.components.get("error");
+  {
+    const err = channelReadRaw(lowV, "error");
     if (err) {
       const ep = dataOf(err);
       if (ep.kind === ValueKind.Bits) {
@@ -4216,8 +4213,8 @@ high = SP(200)
   }
   // high fails on second invariant (self < 100)
   const highV = evalCtx.bindings.get("high")!.value!;
-  if (highV.kind === ValueKind.MultiValue) {
-    const err = highV.components.get("error");
+  {
+    const err = channelReadRaw(highV, "error");
     if (err) {
       const ep = dataOf(err);
       if (ep.kind === ValueKind.Bits) {

@@ -200,10 +200,9 @@ export function summarizeValue(v: Value): ValueSummary {
         walk(node.body, depth + 1, seen);
         return;
       }
-      case ValueKind.MultiValue:
-        walk(node.primary, depth, seen);
-        return;
       case ValueKind.Context:
+        if ((node as any).primary !== undefined) walk((node as any).primary, depth, seen);
+        return;
       case ValueKind.Bits:
       case ValueKind.Param:
         return;
@@ -232,7 +231,7 @@ export function summarizeValue(v: Value): ValueSummary {
   // didn't go through __construct — synthesise a singleton set from the
   // refined type Context's stored __abstractDomain.
   let preds = predicatesOf(v);
-  if (!preds && (v.kind === ValueKind.MultiValue || v.kind === ValueKind.Context)) {
+  if (!preds && v.kind === ValueKind.Context) {
     const typeComp = channelReadRaw(v, "type");
     if (typeComp?.kind === ValueKind.Context) {
       const fromType = (typeComp as any).__abstractDomain;
@@ -421,7 +420,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return `Bits(len=${bits.length})`;
     }
     case ValueKind.Expression: {
-      const ev = v.kind === ValueKind.Expression ? v : (v.kind === ValueKind.MultiValue ? dataOf(v) as Value : v);
+      const ev = dataOf(v) as Value;
       if (ev.kind === ValueKind.Expression) {
         const fn = ev.fn;
         const fnName = fn.kind === ValueKind.PrimitiveFunction ? fn.name :
@@ -432,7 +431,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return "Expression";
     }
     case ValueKind.ComposedFunction: {
-      const cf = v.kind === ValueKind.ComposedFunction ? v : (v.kind === ValueKind.MultiValue ? dataOf(v) as ComposedFunctionValue : null);
+      const cf = dataOf(v).kind === ValueKind.ComposedFunction ? dataOf(v) as ComposedFunctionValue : null;
       if (cf && cf.kind === ValueKind.ComposedFunction) {
         const paramNames = cf.params.map(p => p._name ?? `_${p.position}`).join(", ");
         if (typeName === "Function") return `Function(${paramNames})`;
@@ -457,8 +456,6 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       if (typeName) return `${typeName} object`;
       return "Context";
     }
-    case ValueKind.MultiValue:
-      return `${typeName ?? "typed"} value`;
     case ValueKind.Param:
       return `Param <${(dataOf(v) as ParamValue)._name ?? "?"}>`;
   }

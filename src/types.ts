@@ -3,7 +3,7 @@
 
 // C4.1: the unified Structure class behind MultiValue/Context. structure.ts
 // imports only TYPES from this module, so there is no runtime cycle.
-import { newMultiValueStructure, newContextStructure, newDenseStructure, deriveWithChannels } from "./structure.js";
+import { newMultiValueStructure, newContextStructure, newDenseStructure, deriveWithChannels, isCarrier } from "./structure.js";
 
 export enum ValueKind {
   Bits = "Bits",
@@ -11,7 +11,6 @@ export enum ValueKind {
   ComposedFunction = "ComposedFunction",
   Expression = "Expression",
   Context = "Context",
-  MultiValue = "MultiValue",
   Param = "Param",
   Symbol = "Symbol",
 }
@@ -149,13 +148,18 @@ export interface ContextValue {
   scopePredicates?: Map<string, unknown>;
 }
 
-// --- Multi-Value: primary + named components ---
+// --- The carrier (C7.1, D15/D46): the former MultiValue KIND is now a
+// CONFIGURATION of Structure — a transparent structure with an empty
+// data plane whose data rides in `primary` and whose channels ride in
+// `components`. It answers the same kind as every structure; the
+// host-level discriminant is primary presence (`isCarrier`). The legacy
+// type name survives as the carrier's static shape so existing casts
+// keep compiling.
 
-export interface MultiValueType {
-  kind: ValueKind.MultiValue;
+export type MultiValueType = ContextValue & {
   primary: Value;
   components: Map<string, Value>;
-}
+};
 
 // --- Union type ---
 
@@ -165,7 +169,6 @@ export type Value =
   | ComposedFunctionValue
   | ExpressionValue
   | ContextValue
-  | MultiValueType
   | ParamValue
   | SymbolValue;
 
@@ -238,14 +241,18 @@ export function makeContext(): ContextValue {
 }
 
 export function makeMultiValue(primary: Value, components?: Map<string, Value>): MultiValueType {
-  // C4.3b: MV-over-Context is unconstructible — a Context primary flattens
-  // into a copy-on-write derive carrying the channel plane directly (one
-  // structure, both planes). Every wrapper site (withType, withEffects,
-  // channel writers, mv_set, …) flows through this single chokepoint, so
-  // typed records/types answer ValueKind.Context. The returned static type
-  // is a lie for that case; call sites read through the slots.ts accessors
-  // (dataOf is identity for Contexts), not `.primary`.
+  // C4.3b/C7.1: the ONE channel-attachment chokepoint. A record/array/type
+  // primary flattens into a copy-on-write derive (channels ride directly);
+  // a CARRIER primary re-wraps its inner data (W1: carriers never nest —
+  // the given channel map is authoritative, mirroring the derive); a
+  // non-Structure primary (Bits, functions, residuals) takes the D15
+  // transparent carrier. Call sites read data through dataOf, never
+  // `.primary`.
   if (primary.kind === ValueKind.Context) {
+    if (isCarrier(primary)) {
+      return newMultiValueStructure(
+        (primary as MultiValueType).primary, components ?? new Map()) as unknown as MultiValueType;
+    }
     return deriveWithChannels(primary as ContextValue, components ?? new Map()) as unknown as MultiValueType;
   }
   return newMultiValueStructure(primary, components ?? new Map()) as unknown as MultiValueType;
@@ -265,7 +272,10 @@ export function makeDenseArrayCtx(elements: Value[]): ContextValue {
  *  former `primaryOf` name is retired — this IS the accessor (re-exported
  *  through slots.ts; both import paths resolve to this one function). */
 export function dataOf(v: Value): Value {
-  return v.kind === ValueKind.MultiValue ? v.primary : v;
+  // Carrier check by primary presence — one property read; non-Structure
+  // values lack the field entirely.
+  const p = (v as { primary?: Value }).primary;
+  return p !== undefined ? p : v;
 }
 
 export function isResolved(v: Value): boolean {
@@ -273,13 +283,16 @@ export function isResolved(v: Value): boolean {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
     case ValueKind.ComposedFunction:
-    case ValueKind.Context:
       return true;
+    case ValueKind.Context: {
+      // C7.1: a carrier is as resolved as its primary (a residual under
+      // channels is still a residual); plain structures self-resolve.
+      const p = (v as { primary?: Value }).primary;
+      return p === undefined ? true : isResolved(p);
+    }
     case ValueKind.Param:
     case ValueKind.Symbol:
       return false;
-    case ValueKind.MultiValue:
-      return isResolved(v.primary);
     case ValueKind.Expression:
       return false;
   }

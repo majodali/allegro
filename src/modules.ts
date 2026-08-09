@@ -54,7 +54,6 @@ function captureModuleVars(
   switch (value.kind) {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
-    case ValueKind.Context:
       return value;
 
     case ValueKind.Param:
@@ -107,9 +106,11 @@ function captureModuleVars(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.MultiValue: {
-      const newP = captureModuleVars(value.primary, moduleBindings, ownParams, seen);
-      if (newP === value.primary) return value;
+    case ValueKind.Context: {
+      const pp = (value as { primary?: Value }).primary;
+      if (pp === undefined) return value;
+      const newP = captureModuleVars(pp, moduleBindings, ownParams, seen);
+      if (newP === pp) return value;
       return makeMultiValue(newP, cloneComponents(value));
     }
 

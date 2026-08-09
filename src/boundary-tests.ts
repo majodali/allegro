@@ -294,23 +294,23 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
   if (seen.has(v)) return;
   seen.add(v);
 
-  if (v.kind === ValueKind.MultiValue) {
+  if ((v as { primary?: Value }).primary !== undefined) {
+    // C7.1: the CARRIER configuration (D15) — primary present. Restated
+    // invariants: W4 carriers are Structures; W5 a carrier's data plane
+    // is EMPTY (the lazily-materialized view may exist but holds no
+    // slots); W1 a carrier's primary is never a carrier and never a
+    // plain Context (records flatten through makeMultiValue).
     const mv = v as MultiValueType;
-    // C4.1 (W4): every MultiValue is an instance of the unified Structure
-    // class — a stray object literal bypassing the factory fails here.
     if (!isStructure(v)) {
-      out.push({ invariant: "W4 structure-kind", detail: "MultiValue is not a Structure instance (bypassed makeMultiValue)", program });
-    } else if ((v as unknown as Structure).bindings !== undefined) {
-      out.push({ invariant: "W5 role-transparency", detail: "MultiValue role carries a slot plane (data slots + primary — D17)", program });
+      out.push({ invariant: "W4 structure-kind", detail: "carrier is not a Structure instance (bypassed makeMultiValue)", program });
+    } else if ((v as unknown as Structure).bindings !== undefined && (v as unknown as Structure).bindings.size > 0) {
+      out.push({ invariant: "W5 role-transparency", detail: "carrier carries data slots (data plane must be empty — D15)", program });
     }
-    if (mv.primary && (mv.primary as Value).kind === ValueKind.MultiValue) {
-      out.push({ invariant: "W1 multivalue-non-nesting", detail: "MultiValue primary is itself a MultiValue", program });
+    if (mv.primary && (mv.primary as Value & { primary?: Value }).primary !== undefined) {
+      out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is itself a carrier", program });
     }
-    // C4.3b (R5 reframe): an MV primary can never be a Context — such
-    // values flatten through makeMultiValue into a Context carrying the
-    // channel plane directly. MV-over-Context is unconstructible.
     if (mv.primary && (mv.primary as Value).kind === ValueKind.Context) {
-      out.push({ invariant: "W1 multivalue-non-nesting", detail: "MultiValue primary is a Context (MV-over-Context must flatten — C4.3b)", program });
+      out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is a Context (records flatten — C4.3b/C7.1)", program });
     }
     const typeComp = mv.components.get("type");
     if (typeComp && (typeComp as Value).kind !== ValueKind.Expression) {
@@ -1083,9 +1083,12 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
       "x = 42\np = {a: 1}\nPositiveInt = Int & _ > 0\ny = PositiveInt(5)",
       undefined, [createTypeSystem()], undefined, true);
     const x = evalCtx.bindings.get("x")!.value!;
-    eq(isStructure(x), true, "typed literal (MultiValue role) is a Structure");
-    eq((x as unknown as Structure).immutable, true, "MultiValue role born immutable (D22)");
-    eq((x as unknown as Structure).bindings === undefined, true, "MultiValue role has no slot plane (D17 transparency)");
+    eq(isStructure(x), true, "typed literal (a CARRIER) is a Structure");
+    eq((x as unknown as Structure).immutable, true, "carriers born immutable (D22)");
+    // C7.1 (D15): a carrier's data plane is EMPTY — the lazily-
+    // materialized view may exist, but it holds no slots.
+    eq((x as unknown as Structure).bindings.size, 0, "carrier data plane is empty (D15/D17 restated)");
+    eq(x.kind, ValueKind.Context, "the carrier answers the one structure kind (MultiValue kind retired)");
     const p = dataOf(evalCtx.bindings.get("p")!.value!);
     eq(isStructure(p), true, "object Context role is a Structure");
     eq((p as unknown as Structure).primary === undefined, true, "Context role has no primary (D17)");

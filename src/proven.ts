@@ -47,8 +47,7 @@ export interface ProvenFinding {
  *  evalCtx Symbol lookup if needed). Returns the Context that may carry
  *  `__name`, `__abstractDomain`, etc. */
 function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | null {
-  let cur: Value = t;
-  if (cur.kind === ValueKind.MultiValue) cur = (cur as any).primary;
+  let cur: Value = dataOf(t);
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
     // C2.3b: chain-aware — type names (Int, Bool, user refinements) may
@@ -133,7 +132,6 @@ function substParams(
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
     case ValueKind.Symbol:
-    case ValueKind.Context:
       return v;
     case ValueKind.Param: {
       const p = v as ParamValue;
@@ -150,10 +148,11 @@ function substParams(
       const args = e.args.map(a => substParams(a, cfn, posMap, seen));
       return { ...e, fn, args };
     }
-    case ValueKind.MultiValue: {
+    case ValueKind.Context: {
       seen.add(v);
-      const mv = v as any;
-      return makeMultiValue(substParams(mv.primary, cfn, posMap, seen), componentsView(v) as Map<string, import("./types.js").Value>);
+      const pp = (v as any).primary;
+      if (pp === undefined) return v;
+      return makeMultiValue(substParams(pp, cfn, posMap, seen), componentsView(v) as Map<string, import("./types.js").Value>);
     }
     case ValueKind.ComposedFunction: {
       seen.add(v);
@@ -194,7 +193,7 @@ export function checkProvenClauses(
     // Need a ComposedFunction body to peel + sample.
     let cfn: ComposedFunctionValue | null = null;
     let paramTypes: Value[] | null = null;
-    if (val.kind === ValueKind.MultiValue) {
+    if (val.kind === ValueKind.Context && (val as any).primary !== undefined) {
       const mv = val as any;
       if (mv.primary?.kind === ValueKind.ComposedFunction) {
         cfn = mv.primary as ComposedFunctionValue;
