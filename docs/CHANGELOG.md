@@ -8,6 +8,39 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C7.1: The MultiValue kind retires (D15 executed; D46; B-088) — the original thesis complete
+
+The chunk the whole journey pointed at: MultiValue and Context are
+gone as kinds; what remains is Structure + Scope over one substrate.
+
+- **The carrier** (D15): a typed scalar / typed function / residual-
+  with-components is a TRANSPARENT STRUCTURE — empty data plane +
+  `primary` — answering the one structure kind. Host-side discriminant
+  is primary presence (`isCarrier`); `MultiValueType` survives as the
+  carrier's static type. `evaluate` re-evaluates carrier primaries
+  through the C4.3a merge policies; `isResolved` follows the primary;
+  `makeMultiValue` stays the one chokepoint (records derive, carriers
+  re-wrap their inner data — W1 —, leaves take the carrier).
+- **`ValueKind.MultiValue` deleted**; the compiler-driven audit
+  re-routed ~120 sites across 14 files. Two hazard classes the audit
+  could NOT see, caught by the suite: four pre-existing duplicate
+  `case Context` clauses silently shadowing the new carrier cases (JS
+  allows duplicate switch cases), and three stealth STRING-LITERAL
+  kind comparisons (`v.kind === "MultiValue"`) in tree-builder's
+  isPrimitiveCall, resolvePrimitives, and markTailCallsInValue.
+- **`ValueKind.Context` → `ValueKind.Structure`** (D25's name
+  retirement completed; 201 sites); `ContextValue` aliases
+  `StructureValue` transitionally.
+- **`NominalType` retired** (~50 sites → `Type`): after D44 there is
+  no nominal checking left for the name to name.
+- **W1/W5 restated**: carriers never nest; a carrier's data plane is
+  EMPTY. cacheKeyOne keys carriers by their data (the empty-bindings
+  collision pinned out). CLAUDE.md's "Seven Value Kinds" reframed as
+  representations + computation forms with the D46 definitional
+  ladder; `kind` demoted to host discriminant.
+
+basics.alg byte-identical. 1052/1052 green.
+
 ## 2026-08 — C6.3: Proof re-derived, kernel-private authority; slot sweep (structures Phase 6, B-026; M1 exit criterion)
 
 Phase 6's validation criterion met: Effect AND Proof rebuilt through

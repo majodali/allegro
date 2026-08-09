@@ -468,7 +468,7 @@ print(result)</textarea>
 <!-- ================================================ -->
 <h2 id="custom-types">Custom Types</h2>
 
-<p>Create types using the fluent API. <code>extend</code> creates record types, <code>distinct</code> creates newtypes. Types themselves are typed values — <code>Int instanceof NominalType</code> is true.</p>
+<p>Create types using the fluent API. <code>extend</code> creates record types, <code>distinct</code> creates newtypes. Types themselves are typed values — <code>Int instanceof Type</code> is true.</p>
 
 <div class="sandbox" id="s-custom-types">
 <textarea class="sandbox-editor" rows="14">// Record type with fields and constructor
@@ -479,8 +479,8 @@ print(p.x + p.y)
 print(p instanceof Point)
 
 // Types are typed values
-print(Int instanceof NominalType)
-print(type of Point instanceof NominalType)
+print(Int instanceof Type)
+print(type of Point instanceof Type)
 
 // Distinct type (breaks subtypeof)
 UserId = Int.distinct()

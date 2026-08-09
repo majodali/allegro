@@ -321,15 +321,11 @@ export function memberDescriptorsOf(type: ContextValue): Map<string, ContextValu
 // All type values have __type = Type. Comparison methods (instanceof / subtypeof)
 // are SHAPE-AWARE: when both operands have a __name, the comparison is nominal
 // (by name + __refines chain); when either operand has no __name, it's structural
-// (by __members compatibility). This collapses the older Type / NominalType split
-// into a single meta-type — the named-vs-anonymous distinction is now a property
-// of the type value, not of its meta-type.
+// (by __members compatibility) — one meta-type; the named-vs-anonymous
+// distinction is a property of the type value, not of its meta-type.
 //
 // `~T` (structural wrap) erases __name to project a named type into anonymous form.
 //
-// `NominalType` is retained as a back-compat alias (= Type) so existing user code
-// reading `Int instanceof NominalType` continues to work. Multiple inheritance and
-// NominalType-as-mixin are deferred — see memory/design_type_system_meta_types.md.
 //
 // ConcreteType — interface (not a position in hierarchy). Concrete types have __construct.
 //
@@ -517,13 +513,8 @@ export const Type: ContextValue = makeContext();
 setName(Type, stringToBits("Type"));
 // __members added after all meta-types are bootstrapped (see below)
 
-/**
- * Back-compat alias. NominalType used to be a distinct meta-type; its semantics
- * (nominal comparison) now live inside Type's shape-aware methods, dispatching
- * on __name presence. Keeping the export means existing user code (and tests)
- * referring to `NominalType` continue to work.
- */
-export const NominalType: ContextValue = Type;
+// C7.1: the `NominalType` alias is RETIRED — after D44 there is no
+// nominal checking left for the name to name. `Type` is the one root kind.
 
 // --- Structural wrap (~): erase __name to make the type compare structurally ---
 
@@ -2961,7 +2952,6 @@ export function createTypeSystem(): Extension {
       UntypedFunction: wrapType(UntypedFunctionType) as any,
       // Meta-types — the kind tower (C6.1b, D45)
       Type: wrapType(Type) as any,
-      NominalType: wrapType(NominalType) as any,
       Refinement: wrapType(RefinementKind) as any,
       Interface: wrapType(InterfaceKind) as any,
       None: wrapType(NoneType) as any,

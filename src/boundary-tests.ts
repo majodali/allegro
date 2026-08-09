@@ -1805,6 +1805,35 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // standing invariant; this test pins the DISPOSITIONS this phase executed.
   });
 
+  // --- The carrier (C7.1, D15/D46): MultiValue-kind retirement ----------------
+
+  test("carrier (C7.1, D15): typed scalars are transparent structures — one kind, data + channels", () => {
+    const r = evalSource(
+      "x = 42\ns = \"hi\"\nf(a: Int): Int => a + 1\ny = f(x)\nP = Int & _ > 0\np = P(5)",
+      undefined, [createTypeSystem()], undefined, true);
+    const x = r.evalCtx.bindings.get("x")!.value!;
+    // The one kind: a typed scalar answers Structure (the MultiValue kind
+    // is deleted from the enum — this line not compiling would be the
+    // regression).
+    eq(x.kind, ValueKind.Structure, "a typed scalar answers the one structure kind");
+    // Duality: data through dataOf; channels through the channel plane.
+    eq(Number((dataOf(x) as BitsValue).data), 42, "dataOf reads the primary");
+    eq(getType(x) !== null, true, "the type channel rides");
+    eq(formatValue(x), "42", "display unchanged");
+    // D15: the carrier's data plane is EMPTY — record-shaped consumers
+    // see no slots, so a carrier can never be mistaken for a record.
+    eq((dataOf(r.evalCtx.bindings.get("s")!.value!) as BitsValue).kind, ValueKind.Bits,
+      "string carriers peel to Bits");
+    eq(formatValue(r.evalCtx.bindings.get("y")!.value!), "43", "typed calls flow through carriers");
+    eq(formatValue(r.evalCtx.bindings.get("p")!.value!), "5", "refined construction still certifies");
+    // W1 restated: carriers never nest — re-typing a carrier re-wraps its
+    // inner data, never the carrier.
+    const rewrapped = makeMultiValue(x, new Map([["type", dataOf(IntType as unknown as Value)]]));
+    eq((rewrapped as { primary?: Value }).primary !== undefined
+       && ((rewrapped as { primary: Value }).primary as { primary?: Value }).primary === undefined, true,
+      "makeMultiValue on a carrier re-wraps the inner data (no nesting)");
+  });
+
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------
 
   test("transparency (C4.3c): eager impls receive full values — channels visible", () => {

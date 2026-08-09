@@ -67,20 +67,32 @@ Base language API (expression DAGs, evaluation contexts)
           → Allegro Standard (typed literals, dot dispatch, logical ops, collections)
 ```
 
-## The Seven Value Kinds
+## Values: representations + computation forms (C7.1, D46)
 
-1. **Bits** — Vector of bits with a length. Encodes integers (64-bit), floats (IEEE 754), and strings (UTF-8).
-2. **PrimitiveFunction** — Opaque host-language function. May be `lazy` (receives unevaluated args).
-3. **ComposedFunction** — Expression body with declared parameter placeholders.
-4. **Expression** — A DAG node: function reference + ordered arguments. The core computational construct.
-5. **Context** — Evaluation context with named bindings. Also serves as the representation for Objects and Arrays.
-6. **MultiValue** — A primary value plus named string-keyed components (type, error, warnings, source).
-7. **Param** — A positional placeholder within function expressions, bound on invocation.
-8. **Symbol** — A named reference, resolved during compilation via lexical scoping. Created by the parser for identifiers, resolved by `resolveSymbols` to bindings or Params.
+A VALUE is (representation, channel plane). The host representations
+(the `ValueKind` taxonomy — a host discriminant, not language spec):
+
+- **Bits** — Vector of bits with a length. Encodes integers (64-bit), floats (IEEE 754), and strings (UTF-8).
+- **PrimitiveFunction** — Opaque host-language function. May be `lazy` (receives unevaluated args).
+- **ComposedFunction** — Expression body with declared parameter placeholders.
+- **Structure** — THE one composite representation (records, arrays, types, effects, proofs — data plane + channel plane). A **carrier** is a Structure in the D15 transparent configuration — EMPTY data plane + `primary` — carrying a non-Structure value's channels (typed scalars, typed functions, residuals-with-components); it answers the same kind, discriminated host-side by primary presence (`isCarrier`). The former `MultiValue` and `Context` kinds are RETIRED (`MultiValueType` survives as the carrier's static type). **Scope** is the evaluation-environment ROLE on the shared substrate (D25) — own protocol, never dispatched or typed.
+
+And the computation forms (things that evaluate to something else):
+
+- **Expression** — A DAG node: function reference + ordered arguments. The core computational construct.
+- **Param** — A positional placeholder within function expressions, bound on invocation.
+- **Symbol** — A named reference, resolved during compilation via lexical scoping. Created by the parser for identifiers, resolved by `resolveSymbols` to bindings or Params.
+
+The DEFINITIONAL LADDER (D46): representations (host, above) → values
+(representation + channels) → types (language-level classifiers over
+representations: Int over Bits, `Function[P,R]` over functions, record
+types over Structures) → kinds (types whose instances are type-values).
+`kind` is unobservable from Allegro — `type of`, patterns, and channel
+reads answer every language-level question.
 
 ## Type System (Allegro Standard)
 
-Types are Context values with `__name`, `__type`, `__members`, and other meta-bindings. A typed SCALAR (Bits primary) is a MultiValue where the primary is the data and the `"type"` component is the type Context; a typed RECORD/ARRAY is (since C4.3b) a **flattened Context** — channels attach directly to the structure (MV-over-Context is unconstructible; `makeMultiValue` with a Context primary derives copy-on-write), so records answer `ValueKind.Context` and `dataOf` is identity for them. **Types themselves are typed** — user-visible type bindings ARE the internal type Contexts (`Int` is IntType itself; its meta-type answers through the `__type` binding via the total `getType`/`channelReadRaw`). `Int instanceof Type` returns true, and `type of Int` returns Type. `NominalType` is preserved as a back-compat alias of `Type` (`NominalType === Type`), so `Int instanceof NominalType` and `NominalType.define(...)` continue to work. Internally, type infrastructure reads data via `dataOf()` (identity for Contexts).
+Types are Structure values with `__name`, `__type`, `__members`, and other meta-bindings. A typed SCALAR (Bits data) is a CARRIER — a transparent Structure with an empty data plane whose data rides in `primary` (C7.1/D15); a typed RECORD/ARRAY is a **flattened Structure** — channels attach directly (a Structure primary handed to `makeMultiValue` derives copy-on-write). Everything answers `ValueKind.Structure`; `dataOf` peels carriers and is identity for records. **Types themselves are typed** — user-visible type bindings ARE the internal type Contexts (`Int` is IntType itself; its meta-type answers through the `__type` binding via the total `getType`/`channelReadRaw`). `Int instanceof Type` returns true, and `type of Int` returns Type. The `NominalType` alias is RETIRED (C7.1) — after D44 there is no nominal checking left for the name to name; `Type` is the one root kind. Internally, type infrastructure reads data via `dataOf()` (identity for Contexts).
 
 ### Ten Core Types
 - **Int** — 64-bit signed integer. Arithmetic, comparison, toString, abs, toFloat.
@@ -152,7 +164,7 @@ Types are Context values with `__name`, `__type`, `__members`, and other meta-bi
 - **Effect** — a kind since C6.2 (D40): draws Type's kind API (no whitelist — kind-hood IS conformance to Type). Instances (`pure` = {}, `Effect("io")` = {io}, `opaque` = top) stamp `__type = Effect` and ARE their label sets, memoized so label-set identity is physical identity. Members live once on the kind (`io.union(time)` dispatches through shape; no per-instance copies, no refines chain). `io & time` mints an anonymous conjunction instance (the `&` operator is Effect's join). `pure instanceof Effect` is the membership check; `pure subtypeof Effect` is false (instances relate to each other by the kind's ORDER — `subset_of`/`implies`, label-set inclusion — never by conformance).
 - Constructor authority (D45 R2): `construct` (`__construct` slot) is the per-kind minting member; call-as-function invokes it at every level (`Int(42)`, `Type({v: Int})`, `Refinement(Int, p => p > 0)`); `define` is the named factory delegating to it.
 - `instanceof`/`subtypeof` on Type are ONE unified conformance check (C6.1a, D44): identity, then the loose base-name path when the expected type is anonymous (`~T`, inline `{x: Int}`), then the `__refines` chain (refinement layers), then symbol-identity membership over `__members` (declared conformance — a type conforms by DRAWING the expected type's member symbols). The nominal name-walk is deleted; there is no declared is-a edge outside refinement.
-- **`NominalType`** is retained as a back-compat alias (`NominalType === Type`); existing code reading `Int instanceof NominalType` keeps working. The named-vs-anonymous distinction is now a property of the type value, not of its meta-type.
+- The named-vs-anonymous distinction is a property of the type value, not of its meta-type. (The old `NominalType` alias is retired — C7.1.)
 - Multiple inheritance is deferred — see `.claude/memory/design_type_system_meta_types.md` for the explicit-conflict design and trigger conditions.
 
 ### Interfaces
@@ -329,7 +341,7 @@ Anonymous extensions are pre-loaded into the compilation context. Extension modu
 - `function-types.alg` — function type signatures, type variable unification
 - `pattern-match.alg` — when/is/then pattern matching, multivalue access
 - `interfaces.alg` — Interface.define, declared conformance, drawn bundles
-- `typed-types.alg` — types as typed values, Int instanceof NominalType, meta-type checks
+- `typed-types.alg` — types as typed values, Int instanceof Type, meta-type checks
 - `refinements.alg` — refinement types via `&`, compound predicates, preserveOps operator lifting
 - `mixins.alg` — method-valued define entries, field access via self, reusable bundles, multi-arg methods
 - `grammar-runtime.alg` — `use_grammar pow` header plus `**`/`neg` from `lib/pow.alg`
@@ -404,7 +416,7 @@ result = error "bad" + 5     // error propagates — result is still an error
 // Type operators
 42 instanceof Int              // → true
 "hello" instanceof String      // → true
-NominalType subtypeof Type       // → true
+Refinement subtypeof Type        // → true (kind-hood is conformance to Type)
 // C3.3 (D36): instanceof on a refinement is a PURE PREDICATE RE-CHECK from
 // data (congruent — `5 instanceof PositiveInt` → true, tagged or not);
 // preserveOps types are shapes and stay nominal. The provenance question

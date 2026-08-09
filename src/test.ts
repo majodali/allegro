@@ -9,7 +9,7 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, NominalType, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw } from "./slots.js";
 import { exportedSymbols, symbolFromWire, kernelMemberFqn } from "./symbols.js";
@@ -2140,14 +2140,14 @@ test("compile: non-typed functions not in inferred list", () => {
   eq(inferred, undefined, "untyped function should not be pre-compiled");
 });
 
-// == Type Hierarchy: Type, NominalType, Subtyping ==
+// == Type Hierarchy: Type, Type, Subtyping ==
 
-test("type hierarchy: all types have __type = NominalType", () => {
-  // Int, String, Bool, Float, Object should all have __type = NominalType
+test("type hierarchy: all types have __type = Type", () => {
+  // Int, String, Bool, Float, Object should all have __type = Type
   const intType = IntType.bindings.get("__type")?.value;
-  eq(intType === NominalType, true);
+  eq(intType === Type, true);
   const strType = StringType.bindings.get("__type")?.value;
-  eq(strType === NominalType, true);
+  eq(strType === Type, true);
 });
 
 test("type hierarchy: Type has __type = Type (self-referential)", () => {
@@ -2155,13 +2155,13 @@ test("type hierarchy: Type has __type = Type (self-referential)", () => {
   eq(ttType === Type, true);
 });
 
-test("type hierarchy: NominalType is an alias for Type", () => {
-  eq(NominalType === Type, true);
+test("type hierarchy: Type is an alias for Type", () => {
+  eq(Type === Type, true);
 });
 
 test("type hierarchy: nominal instanceof passes for matching type", () => {
   const result = evalStd("42");
-  const instanceofMethod = typeMethod(NominalType, "instanceof");
+  const instanceofMethod = typeMethod(Type, "instanceof");
   eq(instanceofMethod !== undefined && instanceofMethod !== null, true);
   if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = instanceofMethod.fn([IntType, result!], undefined as any, undefined as any);
@@ -2171,7 +2171,7 @@ test("type hierarchy: nominal instanceof passes for matching type", () => {
 
 test("type hierarchy: nominal instanceof fails for wrong type", () => {
   const result = evalStd("42");
-  const instanceofMethod = typeMethod(NominalType, "instanceof");
+  const instanceofMethod = typeMethod(Type, "instanceof");
   if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = instanceofMethod.fn([StringType, result!], undefined as any, undefined as any);
     eq(Number((dataOf(check) as BitsValue).data), 0);
@@ -2191,7 +2191,7 @@ test("type hierarchy: structural instanceof passes for compatible shape", () => 
 });
 
 test("type hierarchy: nominal subtypeof - same type", () => {
-  const subtypeofMethod = typeMethod(NominalType, "subtypeof");
+  const subtypeofMethod = typeMethod(Type, "subtypeof");
   if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = subtypeofMethod.fn([IntType, IntType], undefined as any, undefined as any);
     eq(Number((dataOf(check) as BitsValue).data), 1);
@@ -2199,7 +2199,7 @@ test("type hierarchy: nominal subtypeof - same type", () => {
 });
 
 test("type hierarchy: nominal subtypeof - different types", () => {
-  const subtypeofMethod = typeMethod(NominalType, "subtypeof");
+  const subtypeofMethod = typeMethod(Type, "subtypeof");
   if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
     const check = subtypeofMethod.fn([IntType, StringType], undefined as any, undefined as any);
     eq(Number((dataOf(check) as BitsValue).data), 0);
@@ -2262,8 +2262,8 @@ test("member descriptors: Type has __members with meta-methods", () => {
   eq(isMethodDescriptor(defineDesc as ContextValue), true);
 });
 
-test("member descriptors: NominalType has __members with meta-methods", () => {
-  const members = memberDescriptorsOf(NominalType);
+test("member descriptors: Type has __members with meta-methods", () => {
+  const members = memberDescriptorsOf(Type);
   eq(members.size > 0, true);
   const instanceofDesc = members.get("instanceof");
   eq(instanceofDesc !== undefined, true);
@@ -2295,28 +2295,28 @@ p.x + p.y`);
 
 // == Types as Typed Values ==
 
-test("typed types: Int instanceof NominalType", () => {
-  const result = evalStd("Int instanceof NominalType");
+test("typed types: Int instanceof Type", () => {
+  const result = evalStd("Int instanceof Type");
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
-test("typed types: String instanceof NominalType", () => {
-  const result = evalStd("String instanceof NominalType");
+test("typed types: String instanceof Type", () => {
+  const result = evalStd("String instanceof Type");
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
-test("typed types: NominalType instanceof NominalType", () => {
-  const result = evalStd("NominalType instanceof NominalType");
+test("typed types: Type instanceof Type", () => {
+  const result = evalStd("Type instanceof Type");
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
-test("typed types: user-defined type instanceof NominalType", () => {
+test("typed types: user-defined type instanceof Type", () => {
   const result = evalStd(`Point = Type.define({x: Int, y: Int}, Int)
-Point instanceof NominalType`);
+Point instanceof Type`);
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
 
-test("typed types: type of Int returns NominalType", () => {
+test("typed types: type of Int returns Type", () => {
   const result = evalStd("type of Int");
   eq(getType(result!) !== null || (result! as any).primary === undefined, true);
 });
@@ -2502,7 +2502,7 @@ WithExtra`);
   eq(members.has("extra"), true);
 });
 
-test("interfaces: NominalType.interface also creates structural type", () => {
+test("interfaces: Type.interface also creates structural type", () => {
   const result = evalStd(`Sized = Interface.define({length: Int}, Int)
 Sized`);
   const iface = dataOf(result!) as ContextValue;
@@ -3096,8 +3096,8 @@ test("instanceof: in if condition", () => {
 
 // == subtypeof ==
 
-test("subtypeof: NominalType subtypeof Type", () => {
-  const result = evalStd("NominalType subtypeof Type");
+test("subtypeof: Type subtypeof Type", () => {
+  const result = evalStd("Type subtypeof Type");
   eq(getTypeName(result!), "Bool");
   eq(Number((dataOf(result!) as BitsValue).data), 1);
 });
@@ -3136,7 +3136,7 @@ test("constructor: result passes instanceof", () => {
 
 test("define: create nominal record type", () => {
   const result = evalStd(`
-Point = NominalType.define({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int})
 p = Point(10, 20)
 p.x
 `);
@@ -3145,7 +3145,7 @@ p.x
 
 test("define: field access y", () => {
   const result = evalStd(`
-Point = NominalType.define({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int})
 p = Point(10, 20)
 p.y
 `);
@@ -3154,7 +3154,7 @@ p.y
 
 test("define: instanceof works", () => {
   const result = evalStd(`
-Point = NominalType.define({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int})
 p = Point(10, 20)
 p instanceof Point
 `);
@@ -3165,7 +3165,7 @@ test("define: auto-naming propagates to instances", () => {
   // Auto-naming now works correctly: Symbols resolve from evalCtx which
   // has the named type. Instances share the same type object.
   const result = evalStd(`
-Point = NominalType.define({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int})
 p = Point(1, 2)
 type of p
 `);
@@ -3176,14 +3176,14 @@ type of p
 
 test("define: wrong arg count throws", () => {
   throws(() => evalStd(`
-Point = NominalType.define({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int})
 Point(10)
 `), "expects 2 args");
 });
 
 test("define: formatValue shows named record", () => {
   const result = evalStd(`
-Point = NominalType.define({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int})
 Point(10, 20)
 `);
   eq(formatValue(result!), "Point(x: 10, y: 20)");
@@ -3195,7 +3195,7 @@ test("define: print shows record (name finalized after eval)", () => {
   console.log = (msg: any) => printed.push(String(msg));
   try {
     evalStd(`
-Point = NominalType.define({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int})
 print(Point(3, 4))
 `);
   } finally {
@@ -3216,7 +3216,7 @@ p.a
 
 test("define: subtypeof chain", () => {
   const result = evalStd(`
-Shape = NominalType.define({})
+Shape = Type.define({})
 Point = Type.define({x: Int, y: Int}, Shape)
 Point subtypeof Shape
 `);
@@ -3372,7 +3372,7 @@ x + 0
 
 test("constructor: override", () => {
   const result = evalStd(`
-Point = NominalType.define({x: Int, y: Int}).constructor((a, b) => {x: a * 2, y: b * 2})
+Point = Type.define({x: Int, y: Int}).constructor((a, b) => {x: a * 2, y: b * 2})
 p = Point(5, 10)
 p.x
 `);
@@ -3703,7 +3703,7 @@ test("inference: bool from comparison", () => {
 });
 
 test("inference: custom type", () => {
-  const { compilationReport: r } = runtimeEval("Point = NominalType.define({x: Int, y: Int})\np = Point(1, 2)\n", undefined, [typeExt], undefined, true);
+  const { compilationReport: r } = runtimeEval("Point = Type.define({x: Int, y: Int})\np = Point(1, 2)\n", undefined, [typeExt], undefined, true);
   eq(r?.bindingTypes.get("p"), "Point");
 });
 
@@ -9575,7 +9575,7 @@ test("grammar2/std: instanceof operator", () => {
 });
 
 test("grammar2/std: subtypeof operator", () => {
-  const r = evalStandard2("NominalType subtypeof Type");
+  const r = evalStandard2("Type subtypeof Type");
   eq(Number((dataOf(r) as BitsValue).data), 1);
 });
 

@@ -1,16 +1,16 @@
 // Types are typed values — they carry type information
 
-// Built-in types are instances of NominalType
-print(Int instanceof NominalType) // expect: true
-print(String instanceof NominalType) // expect: true
-print(Bool instanceof NominalType) // expect: true
+// Built-in types are instances of Type
+print(Int instanceof Type) // expect: true
+print(String instanceof Type) // expect: true
+print(Bool instanceof Type) // expect: true
 
 // Meta-types have their own types
-print(NominalType instanceof NominalType) // expect: true
+print(Type instanceof Type) // expect: true
 
 // User-defined types are typed
 Point = Type.define({x: Int, y: Int}, Int)
-print(Point instanceof NominalType) // expect: true
+print(Point instanceof Type) // expect: true
 
 // Interfaces are structural (Type)
 Printable = Interface.define({toString: Function})

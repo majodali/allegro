@@ -230,7 +230,7 @@ when point
   is _ then print("origin")`,
 
   "Custom Types": `// Define a custom type using the fluent API
-Point = NominalType.define({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int})
 p = Point(10, 20)
 print(p)
 print(p.x)
@@ -319,7 +319,7 @@ when error of result
   "Type System": `// Type hierarchy
 print(42 instanceof Int)
 print("hello" instanceof String)
-print(NominalType subtypeof Type)
+print(Type subtypeof Type)
 
 // Generics
 arr = [1, 2, 3]

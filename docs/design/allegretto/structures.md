@@ -91,6 +91,28 @@ evaluator must tell computation forms from self-evaluating data; the TS
 union narrows on it), but it is an implementation detail, not spec. The
 "seven value kinds" framing retires with chunk C7.1.
 
+*Status (2026-08, C7.1 — EXECUTED): the MultiValue kind is retired. The
+carrier is the D15 transparent structure (empty data plane + primary),
+answering the one structure kind, discriminated host-side by primary
+presence (`isCarrier` — the D46 host-level protocol). `ValueKind` is
+now: four leaf representations + `Structure` + the three computation
+forms; `ValueKind.Context` renamed `ValueKind.Structure` (D25's name
+retirement completed; `ContextValue` is a transitional alias of
+`StructureValue`). `makeMultiValue` remains the one channel-attachment
+chokepoint with three shapes: record data derives (C4.3b), carrier data
+re-wraps its inner primary (W1: carriers never nest), leaf data takes
+the carrier. W1/W5 restated: carriers never nest and their data plane
+is EMPTY (the lazily-materialized bindings view may exist but holds no
+slots). The `NominalType` alias is retired with it (nothing nominal
+left to name). Audit notes for the record: four pre-existing duplicate
+`case Context` clauses silently shadowed new carrier cases (JS permits
+duplicate switch cases — caught by the suite, not tsc), and three
+stealth string-literal kind comparisons (`v.kind === "MultiValue"`)
+hid from the compiler-driven audit in tree-builder/runtime — the
+class of hazard the kind-demotion doc note now warns about. The
+original thesis — MultiValue and Context collapse into Structure +
+Scope — is COMPLETE.*
+
 
 *C4.3 rulings (2026-08, maintainer-ratified — recorded in the
 implementation plan §6): merge policies activate at C4.3a — error
