@@ -2,8 +2,8 @@
 
 > Status: **active** (maintainer approved Phase 0 start, 2026-07; per
 > PROCESS §3 each subsequent phase needs its own go-ahead).
-> Design: `docs/design/allegretto/structures.md` (decision log:
-> `structured-values-unification.md`, D1–D40).
+> Design: `docs/design/allegretto/structures.md` (decision log D1–D46,
+> archived: `archive/structured-values-unification.md`).
 > Related backlog: items B-001…B-031 (sequenced head) mirror this plan's
 > phases; absorbed items noted in §7.
 >

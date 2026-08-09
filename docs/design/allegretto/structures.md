@@ -1,12 +1,13 @@
 # Structures, Scopes & Channels — design decisions
 
-> Tier 1 design doc — **draft, pending maintainer sign-off** (promoted from
-> the design discussion in `.claude/plans/structured-values-unification.md`,
-> which holds the full decision log D1–D46 and rationale; decision numbers
-> below cite it). Status tags per `docs/design/README.md`. Everything here
-> is **[designed]** unless tagged otherwise — this document describes the
-> post-unification model, not current behavior (`CLAUDE.md` describes what
-> ships today).
+> Tier 1 design doc. The full decision log D1–D46 with rationale is
+> ARCHIVED at `.claude/plans/archive/structured-values-unification.md`
+> (complete; every decision executed or pinned to a named owner —
+> B-002); decision numbers below cite it, and Appendices A–C carry the
+> three load-bearing tables. Status tags per `docs/design/README.md`.
+> This document describes the post-unification model; `CLAUDE.md`
+> describes what ships today — as of C7.1 the two have converged for
+> the substrate.
 
 ## 1. Overview [designed]
 
@@ -955,3 +956,86 @@ PROCESS §6 before modification, I3):
   member-set-composition semantics underneath, D30/D40); the duck-typing
   ergonomics watch (§8); `use X in { block }` per-scope grammar activation
   (Phase 8).
+
+
+---
+
+## Appendix A — D39 slot disposition (executed; the table is code)
+
+The authoritative disposition table is **`src/slots.ts` `SLOT_REGISTRY`** —
+it has been executable since C1.1 (the W3 corpus invariant fails any
+unregistered `__*` key) and each row was updated in place as its
+disposition EXECUTED. Post-C7.1 state of the original D39 inventory:
+
+- **Executed (row removed or rewritten)**: `__effect_kind` → the `kind`
+  field declared on Effect (C6.2); the five Proof fields → plain
+  instance-data bindings declared on the Proof kind (C6.3);
+  `__invariantsList` → swept, no writer since C6.1b; `arity` → deleted
+  (D39 addendum); `__extends` → `__refines`, writers narrowed to
+  refinement (C6.1a); the MultiValue component plane → the carrier's
+  channel plane (C7.1).
+- **Registered, pinned to a future owner**: `__isGeneric` (delete —
+  GenericType re-derivation, tranche C7.2), `__params`/`__args`/
+  `__generic` (GenericType members, C7.2), `__effectvar:` /
+  `__effectVarParams` (declared generic-param structure on function
+  types, C7.2), `exported` (S3 scope-binding visibility),
+  `__predicate`/`__abstractDomain` (Refinement members — physical
+  rename pending the same treatment Proof's fields got).
+- **Channels (stay)**: `__type` (shape), `__discharged` (integrity,
+  kernel-private writer), effects/knowledge host carriers.
+- **Host internals (stay, renamed freely)**: the engine-side `__*`
+  properties (grammar machinery, compile flags, tail-call sentinel,
+  memo caches, member-scope markers).
+
+## Appendix B — B8 minimal-base primitive audit (D27/D28; design target)
+
+The layering proof: Allegretto's irreducible base is **~40 primitives**;
+everything else in `src/primitives.ts` is Standard-layer extension or
+environment capability. This is the D27 DESIGN TARGET — the physical
+relocation of extension primitives out of the base registry is future
+work (it rides the M2/M3 formalization), but every subsequent design
+decision has been made against this table. Disposition legend: KEEP
+(base) · REFACTOR (base, reshaped) · SUBSUME (folds into channel/slot
+ops) · EXTENSION (Standard/lib) · ENV (environment capability) ·
+DELETE.
+
+| Primitives | Disposition | Target |
+|---|---|---|
+| `bits_*` (21) | KEEP | base Bits ops |
+| `expr_*` (8) | KEEP | base Expression ops |
+| `eval_if`, `seq`, `id` | KEEP | base control / util |
+| `ctx_new/bind/resolve/bindings` | REFACTOR | `scope_new/extend/lookup/bindings` (D26 — executed at C2) |
+| `ctx_use` | DELETE | executed at C2.3a |
+| `mv_new/primary/get/set/components`, `component_get` | SUBSUME | `channel_read` / channel writers / `channel_list` (D28a) |
+| `make_error` | SUBSUME | the public viral error channel's writer (D28b) |
+| `eval_when` + `when_*` | EXTENSION | pattern-matching lib over `eval_if` + struct reads |
+| `typed_*`, `type_*`, `structural_wrap` | EXTENSION | Standard type system (owns the gated `type` channel) |
+| `export` | EXTENSION | module system |
+| contract/invariant prims (`assert_stmt`, `requires_stmt`, `ensures_*`, …) | EXTENSION | contracts lib; checks = predicate-channel writes + `scope_assume` |
+| `*_decl_marker` + `*_attach` families | SUBSUME / EXTENSION | collapsed at C1.5b (metadata as host fn properties); markers → grammar templates |
+| proof prims (`proof_*`, `prove_*`) | EXTENSION | proof kernel (canonical `discharged`-writer holder) |
+| `grammar_*` / `grammar2_*` / `register_*` bundles | EXTENSION | grammar-tooling lib (engine stays host code) |
+| `print` (io), `fetch` (net), `delay` (time) | ENV | environment capabilities, effect-labelled |
+
+Findings that shaped the arc: the bulk of `primitives.ts` is EXTENSION
+(D4's mechanism-in-base line, concretely); the `*_attach` zoo existed
+only to smuggle metadata past the pre-C4.3c stripping boundary and is
+gone; IO is not base.
+
+## Appendix C — B10 forgery scenarios A–F (the soundness battery)
+
+The verification D21 cites, maintained live in `src/boundary-tests.ts`
+(grown v1 → v2 → the C6.3 re-run through every kind surface):
+
+| # | Attack | Verdict | Mechanism |
+|---|---|---|---|
+| A | Forge `discharged` from nothing (object literal) | BLOCKED (live test) | origination requires the writer closure, held privately by the proof kernel; the construction gate THROWS |
+| B | Swap a real proof's proposition, keep `discharged` | BLOCKED (live) | data-immutability (D22) — write-authority alone is insufficient; immutability is the second leg |
+| C | Combine a real proof with a fake operand hoping `discharged` propagates | BLOCKED (live) | integrity channels use non-fabricating propagation (`drop`/recheck) — a `viral`/`union` rule here WOULD forge, hence D23's registration-time constraint |
+| D | Read a real `discharged`, write it onto a fake | BLOCKED (live) | reads are free; the WRITE needs the capability — read-freedom is safe |
+| E | Capability leak through an export surface | SKELETON | standard ocap risk; the base is safe GIVEN holders keep writers private — unlocks as a live test at S3 visibility enforcement |
+| F | Forge the capability itself | BLOCKED (live) | the writer is a PrimitiveFunction closure (D24), unconstructible from Allegretto |
+
+C6.3 additions: forge-through-every-kind-surface (`Proof.define`
+refused, call-as-function inert, bundle-draw lookalikes non-conforming
+and channel-less).

@@ -8,6 +8,42 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — Tranche A docs closeout (B-002, B-031, B-003, B-004)
+
+Post-M1 documentation debt cleared before chunk C7.2; no code-behavior
+changes (one comment updated in `src/slots.ts`).
+
+- **B-002 — decision log archived.** The D39 slot-disposition executed
+  state, B8 primitive-audit table, and B10 forgery-scenario log are now
+  Appendices A–C of `docs/design/allegretto/structures.md`;
+  `structured-values-unification.md` (decision log D1–D46, complete —
+  every decision executed or pinned to a named backlog owner) moved to
+  `.claude/plans/archive/` with a triage-record row. Decision numbers
+  remain citable. Path references updated (plans manifest,
+  structures-implementation plan, BACKLOG, slots.ts header comment).
+  BACKLOG head re-sequenced to the maintainer-ratified tranche plan
+  (A: docs closeout; B: C7.2 kind residue; C: B-027 equality-first).
+- **B-031 — proving primer verified against the v2 kernel.**
+  `docs/proving-in-allegro.md` surface is current (refinements via `&`,
+  no fluent API, no MultiValue/NominalType); a smoke file of the
+  primer's own examples (F1 PE-discharge, F2 `proof_refines`, F3
+  combinators + `by`, F5 `prove_for_all_bool`) discharges end-to-end.
+  `bench/` re-baselined: reference/auto-PE/gate baselines healthy.
+- **B-003 — grammar-formalism sync.** `docs/grammar-formalism.md` gains
+  the shipped Phase 6/7 semantics: §6.2 base-chain compatibility
+  (`E_INCOMPATIBLE_GRAMMARS`, prefix rule, no transitive re-export),
+  the `use` activation surface (superseding the `use_grammar`
+  spelling), and a new §7.5 inventory of shipped diagnostic codes
+  (analyzer structural checks + `use`-time cross-fragment validation,
+  with the `W_ALT_OVERLAP` opt-in caveat).
+- **B-004 — effects nits closed.** Silent-capture rationale for
+  explicit `[e: Effect]` recorded in `docs/design/standard/effects.md`
+  §2 (bare `f: e` would capture an in-scope binding; shipped
+  auto-promotion is deliberately `opaque`, stricter than the plan's
+  fresh-variable equivalence). The archived P9 `applyComposed`
+  compile-time-tracing hypothesis is filed as resolved — validated by
+  construction by PE-driven inference (Slice 2 F1–F3).
+
 ## 2026-08 — C7.1: The MultiValue kind retires (D15 executed; D46; B-088) — the original thesis complete
 
 The chunk the whole journey pointed at: MultiValue and Context are

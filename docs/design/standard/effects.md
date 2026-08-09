@@ -92,6 +92,18 @@ non-trivial unions coerce to `opaque` (sound over-approximation)
 - Effect polymorphism: `[e: Effect]` generic params; the variable binds at
   call sites and propagates through inferred sets. Unannotated
   function-typed params are honestly `opaque`, not silently pure.
+
+  *Why the declaration must be explicit:* lowercase identifiers are effect
+  names by convention, so a bare `f: e` annotation would resolve to
+  whatever `e` is in scope — **silent capture** of an unrelated binding.
+  `[e: Effect]` declares a fresh variable, mirroring `[T]` for type
+  variables (where the explicit form stays optional because PascalCase
+  rarely collides). The original D1 plan expected auto-promotion to mint a
+  fresh effect variable per unannotated param with inference equivalent to
+  the explicit form; the shipped behavior is deliberately stricter —
+  auto-promotion yields `opaque`, making the explicit `[e: Effect]`
+  declaration the contract surface for precise propagation, not an
+  optional nicety.
 - Inference is automatic for all functions; declaration is optional and
   verified — never trusted.
 
@@ -169,6 +181,16 @@ practical cases arise.
 - **Runtime-effect-check fallback** (`allow | warn | error` project config
   for residual effect predicates at call sites) — designed in the D1 plans,
   not yet built.
+- ~~**`applyComposed` compile-time tracing hypothesis** (archived plan P9:
+  dynamic-application sites can usually trace to a union of the inputs'
+  effects at compile time)~~ — **resolved, validated by construction**
+  (Slice 2 F1–F3): effect inference is PE-driven, so `applyComposed`-mediated
+  effects trace at compile time wherever PE reaches — precompile stashes
+  each function's inferred set, Param-calls read `Param.effectBound`, inline
+  lambdas precompile on first evaluation. The predicted fall-through cases
+  (functions from runtime text, unannotated forwarded params) are honestly
+  `opaque`; their runtime-check fallback is the config item above. No
+  separate research piece remains.
 
 ---
 

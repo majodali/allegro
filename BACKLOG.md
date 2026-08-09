@@ -19,25 +19,50 @@
 ## Sequenced head
 
 Implementation chunks reference `.claude/plans/structures-implementation.md`
-(status: active — Phases 0–1 approved; PROCESS §3 go-ahead required per
-phase).
+(status: **complete** — Phases 0–7 landed; M1 exited 2026-08).
+
+**Current tranche sequence (maintainer-ratified 2026-08):**
+- **Tranche A — M1 closeout (docs):** B-002 (appendices + archive the
+  decision log), B-031 (primer verification + bench re-baseline),
+  B-003, B-004.
+- **Tranche B — kind-tower residue (chunk C7.2):** GenericType through
+  the recipe (retires `__isGeneric`, settles `__params`/`__args`/
+  `__generic`); `distinct` + `constructor` kind specs; `__effectvar:`/
+  `__effectVarParams` → declared generic-param structure. D39 checklist
+  to zero.
+- **Tranche C — next arc:** B-027 equality + lawful interfaces (design
+  ratification on structures.md §7–8 → `equality-and-laws.md`), then
+  S3 visibility (D41–D43, designed+ratified), then B-028 completion
+  effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
+- **Parked consciously:** B-087 (awaiting use cases), full
+  `ContextValue`→`StructureValue` reference migration (opportunistic),
+  perf hard threshold (maintainer decision, any time).
 
 - [x] **B-001** · L0 · Boundary-test harness + baseline (chunk C0.1):
   accessor lint w/ ratchet, invariant property checks, forgery-suite
   skeleton, perf floor — plan §Phase 0. Landed 2026-07
   (`src/boundary-tests.ts` + `src/boundary-baseline.json`); perf hard
   threshold still a pending maintainer decision (warn-only at 2×)
-- [ ] **B-002** · L0 · docs: inline the D39 slot-disposition, B8 primitive
+- [x] **B-002** · L0 · docs: inline the D39 slot-disposition, B8 primitive
   audit, and B10 forgery tables into `docs/design/allegretto/structures.md`
-  as appendices; then archive `structured-values-unification.md`
-- [ ] **B-003** · L1 · `[reval]` docs: sync shipped extension error codes +
+  as appendices; then archive `structured-values-unification.md`. Landed
+  2026-08 — Appendices A–C added; decision log moved to
+  `.claude/plans/archive/structured-values-unification.md` (triage row in
+  `archive/README.md`)
+- [x] **B-003** · L1 · `[reval]` docs: sync shipped extension error codes +
   base-chain semantics into `docs/grammar-formalism.md` §6–7 (decisions:
   `docs/design/extension/grammar.md` §4; source:
-  `.claude/plans/archive/dappled-cascading-cantor.md`)
-- [ ] **B-004** · L2 · `[reval]` docs: effects nits — silent-capture
+  `.claude/plans/archive/dappled-cascading-cantor.md`). Landed 2026-08:
+  §6.2 base-chain compatibility, §6.2 `use` activation surface, new §7.5
+  shipped-diagnostic-codes inventory
+- [x] **B-004** · L2 · `[reval]` docs: effects nits — silent-capture
   rationale for explicit `[e: Effect]` into
   `docs/design/standard/effects.md` §2; `applyComposed` tracing hypothesis
-  (archive: polyphonic-tracing-plotkin P9) filed or dropped
+  (archive: polyphonic-tracing-plotkin P9) filed or dropped. Landed
+  2026-08: rationale added to §2 Declaration surfaces (incl. shipped
+  opaque-auto-promotion deviation from the plan); P9 recorded in §6 as
+  resolved — validated by construction by PE-driven inference (Slice 2
+  F1–F3), no separate research piece remains
 - [x] **B-005** · T-tooling · CI: typecheck + full suite on push. Landed
   2026-07 (pulled forward per maintainer, suite-cost discussion): the
   TS2300 duplicate imports and TS2304 `ExpressionValue` errors are FIXED;

@@ -2,8 +2,8 @@
 // Slot & channel registry + typed accessors — structures Phase 1 (C1.1 / B-006)
 //
 // The D39 disposition table as code (design: docs/design/allegretto/
-// structures.md §"Slot disposition"; decision log D39 in
-// .claude/plans/structured-values-unification.md). Every `__*` slot and
+// structures.md §"Slot disposition" + Appendix A; decision log D39 archived
+// at .claude/plans/archive/structured-values-unification.md). Every `__*` slot and
 // MultiValue component in the codebase is registered here with its owner,
 // disposition, and post-migration target. The boundary harness walks test-
 // corpus values and fails on any unregistered `__*` key — the "no new `__*`
