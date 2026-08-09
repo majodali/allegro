@@ -6,7 +6,7 @@ work. New plans use **descriptive names** with sequence identifiers.
 | Plan | Topic | Status | Notes |
 |---|---|---|---|
 | `archive/structured-values-unification.md` | Structures design discussion — decision log D1–D46 | **archived (complete)** | Every decision executed or pinned to a named backlog owner; D39/B8/B10 tables inlined as `docs/design/allegretto/structures.md` Appendices A–C (B-002, 2026-08). Decision numbers remain citable. |
-| `structures-implementation.md` | Structures unification implementation — phases 0–6, boundary-test-first | **draft** | Chunk boundaries pending maintainer approval; BACKLOG rebuild follows this plan |
+| `structures-implementation.md` | Structures unification implementation — phases 0–7, boundary-test-first | **active** | Phases 0–7 landed; M1 exited 2026-08. Remaining: chunk C7.2 (kind residue — GenericType recipe, distinct/constructor specs, effect-var structure) per the BACKLOG tranche plan |
 
 ## Archive
 
