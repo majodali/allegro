@@ -137,7 +137,7 @@ export function scopeOwnFacts(scope: ContextValue): Map<string, unknown> {
 
 /** Guard for the data plane: struct operations must never run on scopes. */
 export function assertNotScope(v: Value, op: string): void {
-  if (v.kind === ValueKind.Context && isScopeCtx(v as ContextValue)) {
+  if (v.kind === ValueKind.Structure && isScopeCtx(v as ContextValue)) {
     throw new AllegroError(`${op}: cannot operate on an evaluation scope as data (scope/structure plane violation)`);
   }
 }

@@ -26,14 +26,14 @@ export function formatValue(v: Value): string {
   // Typed-value display. C4.3b: flattened Contexts (typed records/arrays)
   // carry channels directly, so the gate covers both roles and data reads
   // go through dataOf (identity for Contexts) instead of `.primary`.
-  if (v.kind === ValueKind.Context) {
+  if (v.kind === ValueKind.Structure) {
     // Error values — show error component
     const errComp = channelReadRaw(v, "error");
     if (errComp !== undefined) {
       return `error(${formatValue(errComp)})`;
     }
     const typeComp = channelReadRaw(v, "type");
-    if (typeComp && typeComp.kind === ValueKind.Context) {
+    if (typeComp && typeComp.kind === ValueKind.Structure) {
       const nameV = getName(typeComp as ContextValue);
       if (nameV && nameV.kind === ValueKind.Bits) {
         const typeName = bitsToString(nameV);
@@ -43,7 +43,7 @@ export function formatValue(v: Value): string {
         // → "pure", `print(io & time)` → "io & time", `print(Int)` →
         // "Int". Without this, kinds that declare instance fields (Effect's
         // kind/labels) would render their instances through the record path.
-        if (data.kind === ValueKind.Context && isTypeMeta(typeComp as ContextValue)) {
+        if (data.kind === ValueKind.Structure && isTypeMeta(typeComp as ContextValue)) {
           const ownName = getName(data as ContextValue);
           if (ownName?.kind === ValueKind.Bits) return bitsToString(ownName as BitsValue);
         }
@@ -92,14 +92,14 @@ export function formatValue(v: Value): string {
         }
         // Record types — check __members for Field descriptors
         const membersV = getMembers(typeComp as ContextValue);
-        if (membersV?.kind === ValueKind.Context && data.kind === ValueKind.Context) {
+        if (membersV?.kind === ValueKind.Structure && data.kind === ValueKind.Structure) {
           const membersCtx = membersV as ContextValue;
           const instanceCtx = data as ContextValue;
           const parts: string[] = [];
           // C5.2a: member keys are symbol FQNs; the instance stays
           // string-keyed (ruling R2) — project the base name for the read.
           for (const [key, binding] of membersCtx.bindings) {
-            if (binding.value?.kind === ValueKind.Context && isFieldDescriptor(binding.value as ContextValue)) {
+            if (binding.value?.kind === ValueKind.Structure && isFieldDescriptor(binding.value as ContextValue)) {
               const fieldName = fqnBaseName(key);
               const fieldVal = instanceCtx.bindings.get(fieldName)?.value;
               if (fieldVal) parts.push(`${fieldName}: ${formatValue(fieldVal)}`);
@@ -124,7 +124,7 @@ export function formatValue(v: Value): string {
       return `<function(${p.params.length})>`;
     case ValueKind.Expression:
       return `<expression>`;
-    case ValueKind.Context:
+    case ValueKind.Structure:
       return `<context(${p.bindings.size})>`;
     case ValueKind.Param:
       return `<param:${p._name ?? p.position}>`;
@@ -148,7 +148,7 @@ function asBits(v: Value, ctx: string): BitsValue {
 
 function asCtx(v: Value, ctx: string): ContextValue {
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) throw new AllegroError(`${ctx}: expected Context, got ${p.kind}`);
+  if (p.kind !== ValueKind.Structure) throw new AllegroError(`${ctx}: expected Context, got ${p.kind}`);
   return p;
 }
 
@@ -322,7 +322,7 @@ function collectUnownedParams(v: Value, out: import("./types.js").ParamValue[], 
       collectUnownedParams(v.fn, out, seen);
       for (const a of v.args) collectUnownedParams(a, out, seen);
       break;
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       // C7.1: carriers walk their primary; plain structures are inert.
       const pp = (v as { primary?: Value }).primary;
       if (pp !== undefined) collectUnownedParams(pp, out, seen);
@@ -489,7 +489,7 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // C4.3a (R2): an error-carrying condition propagates the error instead of
   // branching on its (meaningless) primary — the legacy behavior silently
   // took the else branch (differential fixture err-in-if-cond).
-  if (cond.kind === ValueKind.Context
+  if (cond.kind === ValueKind.Structure
       && channelReadRaw(cond, "error") !== undefined) {
     return cond;
   }
@@ -577,7 +577,7 @@ function matchSubPattern(
   // Nested struct destruct
   if (isPatternPrim(subPattern, "when_struct_destruct")) {
     const innerCtx = dataOf(value);
-    if (innerCtx.kind !== ValueKind.Context) return null;
+    if (innerCtx.kind !== ValueKind.Structure) return null;
     return extractFields(innerCtx as ContextValue, (subPattern as any).args, evalFn, ctx);
   }
 
@@ -586,19 +586,19 @@ function matchSubPattern(
     const typeValue = (subPattern as any).args[0];
     const fieldSpecs = (subPattern as any).args.slice(1);
     const valTypeName = getTypeName(value);
-    const patTypeName = typeValue.kind === ValueKind.Context
+    const patTypeName = typeValue.kind === ValueKind.Structure
       ? bitsToString(dataOf(
           getName(typeValue as ContextValue) ?? stringToBits("")
         ) as BitsValue)
       : null;
     if (!valTypeName || !patTypeName || valTypeName !== patTypeName) return null;
     const innerCtx = dataOf(value);
-    if (innerCtx.kind !== ValueKind.Context) return null;
+    if (innerCtx.kind !== ValueKind.Structure) return null;
     return extractFields(innerCtx as ContextValue, fieldSpecs, evalFn, ctx);
   }
 
   // Type context → instanceof check
-  if (subP.kind === ValueKind.Context &&
+  if (subP.kind === ValueKind.Structure &&
       hasName(subP as ContextValue) &&
       hasShapeSlot(subP as ContextValue)) {
     const valTypeName = getTypeName(value);
@@ -704,7 +704,7 @@ function replaceValueIdentity(v: Value, target: Value, replacement: Value, seen?
       }
       return newFn;
     }
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       // C7.1: carriers walk their primary; plain structures are inert.
       const pp = (v as { primary?: Value }).primary;
       if (pp === undefined) return v;
@@ -775,14 +775,14 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
     const subjectTypeName = getTypeName(subject);
     const typeCtx = dataOf(typeValue);
-    const patternTypeName = typeCtx.kind === ValueKind.Context
+    const patternTypeName = typeCtx.kind === ValueKind.Structure
       ? bitsToString(dataOf(
           getName(typeCtx as ContextValue) ?? stringToBits("")
         ) as BitsValue)
       : null;
 
     if (subjectTypeName && patternTypeName && subjectTypeName === patternTypeName) {
-      if (subjectP.kind === ValueKind.Context) {
+      if (subjectP.kind === ValueKind.Structure) {
         const values = extractFields(subjectP as ContextValue, fieldSpecs, evalFn!, ctx!);
         if (values) {
           matched = true;
@@ -796,7 +796,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const patternExpr = pattern as import("./types.js").ExpressionValue;
     const fieldSpecs = patternExpr.args;
 
-    if (subjectP.kind === ValueKind.Context) {
+    if (subjectP.kind === ValueKind.Structure) {
       const values = extractFields(subjectP as ContextValue, fieldSpecs, evalFn!, ctx!);
       if (values) {
         matched = true;
@@ -813,7 +813,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const patternP = dataOf(pattern);
 
     // Type context → instanceof check (for patterns like `is Int`)
-    if (patternP.kind === ValueKind.Context &&
+    if (patternP.kind === ValueKind.Structure &&
         hasName(patternP as ContextValue) &&
         hasShapeSlot(patternP as ContextValue)) {
       const subjectTypeName = getTypeName(subject);
@@ -1066,7 +1066,7 @@ function optionalIntFromCtx(ctx: ContextValue, key: string): number | undefined 
 }
 function arrayHandlesFromValue(v: Value, fnName: string): number[] {
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) {
+  if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${fnName}: expected Array of handles`);
   }
   const ctx = p as ContextValue;
@@ -1090,7 +1090,7 @@ const grammar_new_impl: PrimitiveFnImpl = (args) => {
   let opts: { whitespace?: string } = {};
   if (args.length > 0) {
     const p = dataOf(args[0]);
-    if (p.kind === ValueKind.Context) {
+    if (p.kind === ValueKind.Structure) {
       const ws = optionalStringFromCtx(p as ContextValue, "whitespace");
       if (ws !== undefined) opts.whitespace = ws;
     }
@@ -1129,7 +1129,7 @@ const grammar_repeat_impl: PrimitiveFnImpl = (args) => {
   let opts: { min?: number; max?: number; delimiter?: number } = {};
   if (args.length > 2) {
     const p = dataOf(args[2]);
-    if (p.kind === ValueKind.Context) {
+    if (p.kind === ValueKind.Structure) {
       const ctx = p as ContextValue;
       opts.min = optionalIntFromCtx(ctx, "min");
       opts.max = optionalIntFromCtx(ctx, "max");
@@ -1270,7 +1270,7 @@ function makeFragmentBuilderHandle(base: string): ContextValue {
 
 function asGrammarHandle(v: Value, fnName: string): GrammarHandleData {
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) {
+  if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${fnName}: expected grammar fragment handle, got ${p.kind}`);
   }
   const h = (p as any).__grammarHandle as GrammarHandleData | undefined;
@@ -1283,7 +1283,7 @@ function asGrammarHandle(v: Value, fnName: string): GrammarHandleData {
  *  pre-scanner (step 8) and fragment merger. */
 export function asGrammarValue(v: Value): GrammarValueData | undefined {
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) return undefined;
+  if (p.kind !== ValueKind.Structure) return undefined;
   return (p as any).__grammarValue as GrammarValueData | undefined;
 }
 
@@ -1305,7 +1305,7 @@ interface PrecSpecRead {
 
 function readPrecSpec(v: Value, fnName: string): PrecSpecRead {
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) {
+  if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${fnName}: expected prec_spec object, got ${p.kind}`);
   }
   const out: PrecSpecRead = {};
@@ -1504,7 +1504,7 @@ function resolveFreeSymbols(v: Value, ctx: ContextValue, seen: Set<Value> = new 
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
     }
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       // C7.1: carriers walk their primary; plain structures are inert.
       const pp = (v as { primary?: Value }).primary;
       if (pp === undefined) return v;
@@ -1751,7 +1751,7 @@ const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const p = dataOf(v);
   if (p.kind === ValueKind.Bits) {
     // Check if it's a string representation (non-64-bit) that needs parsing
-    if (p.length !== 64 || (v.kind === ValueKind.Context && getTypeName(v) === "String")) {
+    if (p.length !== 64 || (v.kind === ValueKind.Structure && getTypeName(v) === "String")) {
       const str = bitsToString(p);
       return withType(makeFloat(parseFloat(str)), FloatType);
     }
@@ -1809,7 +1809,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // resolved during unification when the function is called
     if (isResolved(pt)) {
       const ptPrimary = dataOf(pt);
-      if (ptPrimary.kind === ValueKind.Context && isGenericType(ptPrimary as ContextValue)) {
+      if (ptPrimary.kind === ValueKind.Structure && isGenericType(ptPrimary as ContextValue)) {
         paramTypes.push(normalizeType(ptPrimary as ContextValue));
       } else {
         paramTypes.push(ptPrimary);
@@ -1826,7 +1826,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     returnType = returnTypeRaw;
   } else {
     const rtp = dataOf(returnTypeRaw);
-    if (rtp.kind === ValueKind.Context && isGenericType(rtp as ContextValue)) {
+    if (rtp.kind === ValueKind.Structure && isGenericType(rtp as ContextValue)) {
       returnType = normalizeType(rtp as ContextValue);
     } else {
       returnType = rtp;
@@ -1862,7 +1862,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       // Concrete Effect-extending type (pure / opaque / named effect): stamp
       // the literal bound (F2: writes to Param.effectBound directly, not
       // wrapped in a PredicateSet).
-      if (pt.kind === ValueKind.Context) {
+      if (pt.kind === ValueKind.Structure) {
         const bound = (pt as any).__effectBound as _AbstractDomain | undefined;
         if (bound && bound.kind === "effects") {
           params[i].effectBound = new Set(bound.labels);
@@ -1903,7 +1903,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         if (idx < 0) continue;
         const effVal = evalFn!(pePairs[i + 1], ctx!);
         const effPrim = dataOf(effVal);
-        if (effPrim.kind !== ValueKind.Context) continue;
+        if (effPrim.kind !== ValueKind.Structure) continue;
         const bound = getEffectBound(effPrim as ContextValue) as _AbstractDomain | undefined;
         if (bound && bound.kind === "effects") {
           (cFn.params[idx] as any).effectBound = new Set(bound.labels);
@@ -1991,7 +1991,7 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // C6.1b: refined types answer meta `Refinement` (which conforms to
   // Type), so the gate is kind-conformance, not identity — chained
   // refinements (`PI & _ < 100`) stay types.
-  if (!leftType || leftType.kind !== ValueKind.Context || !isTypeMeta(leftType as ContextValue)) {
+  if (!leftType || leftType.kind !== ValueKind.Structure || !isTypeMeta(leftType as ContextValue)) {
     const ln = leftType ? getTypeName(left) : "untyped";
     throw new AllegroError(`'&' requires a type on the left (got ${ln})`);
   }
@@ -2004,7 +2004,7 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // effect variable), return a residual so the expression survives until call
   // sites bind concrete values.
   const leftPrim = dataOf(left);
-  if (leftPrim.kind === ValueKind.Context && isEffectExtending(leftPrim as ContextValue)) {
+  if (leftPrim.kind === ValueKind.Structure && isEffectExtending(leftPrim as ContextValue)) {
     const right = (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0)
       ? evalFn!(thunk.body, ctx!)
       : evalFn!(args[1], ctx!);
@@ -2012,7 +2012,7 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       return makeExpr(makePrimitive("typed_amp", typed_amp_impl, true), [left, right]);
     }
     const rightPrim = dataOf(right);
-    if (rightPrim.kind === ValueKind.Context && isEffectExtending(rightPrim as ContextValue)) {
+    if (rightPrim.kind === ValueKind.Structure && isEffectExtending(rightPrim as ContextValue)) {
       return wrapType(_effectUnion(leftPrim as ContextValue, rightPrim as ContextValue));
     }
     throw new AllegroError(`'&' on an Effect type expects another Effect on the right (got ${getTypeName(right) ?? "untyped"})`);
@@ -2099,7 +2099,7 @@ const export_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
 const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // C2.1: struct ops reject evaluation scopes (plane violation guard).
-  if (args[0]?.kind === ValueKind.Context) assertNotScope(args[0], "type_dispatch");
+  if (args[0]?.kind === ValueKind.Structure) assertNotScope(args[0], "type_dispatch");
   const obj = evalFn!(args[0], ctx!);
   const fieldArg = evalFn!(args[1], ctx!);
   if (!isResolved(obj) || !isResolved(fieldArg)) {
@@ -2107,7 +2107,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // member on an unresolved error-carrying value propagates the error
     // instead of dropping it (err-through-method). Resolved error values
     // still dispatch normally (Error's own members stay callable).
-    if (obj.kind === ValueKind.Context) {
+    if (obj.kind === ValueKind.Structure) {
       for (const chan of viralChannels()) {
         const comp = channelReadRaw(obj, chan);
         if (comp !== undefined) {
@@ -2147,7 +2147,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (bound && bound !== storedType && bound !== dataOf(ObjectType as unknown as Value)) {
       const boundMembers = getMembers(bound);
       const membersEmpty = !boundMembers ||
-        (boundMembers.kind === ValueKind.Context && (boundMembers as ContextValue).bindings.size === 0);
+        (boundMembers.kind === ValueKind.Structure && (boundMembers as ContextValue).bindings.size === 0);
       const openType = membersEmpty && getFallbackMember(bound) !== undefined;
       if (!openType) {
         const visible = typeMemberDescriptor(bound, fieldName) !== null
@@ -2196,7 +2196,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       } else if (isFieldDescriptor(desc)) {
         // Field descriptor — look up field value on the instance's primary Context
         const instanceCtx = dataOf(obj);
-        if (instanceCtx.kind === ValueKind.Context) {
+        if (instanceCtx.kind === ValueKind.Structure) {
           const b = (instanceCtx as ContextValue).bindings.get(fieldName);
           if (b?.value !== undefined) return b.value;
         }
@@ -2240,11 +2240,11 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Untyped Contexts: check meta-type dispatch first (for method binding),
   // then direct binding lookup (for data fields)
   const p = dataOf(obj);
-  if (p.kind === ValueKind.Context) {
+  if (p.kind === ValueKind.Structure) {
     // Meta-type dispatch: check __type for type-level methods (e.g., Int.extend)
     // This must come first so methods get proper self-binding
     const metaTypeV = channelReadRaw(p, "shape");
-    if (metaTypeV?.kind === ValueKind.Context) {
+    if (metaTypeV?.kind === ValueKind.Structure) {
       const metaType = metaTypeV as ContextValue;
       const metaDesc = typeMemberDescriptor(metaType, fieldName);
       if (metaDesc) {
@@ -2431,7 +2431,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const refinementPredicate = getPredicate(expectedCtx);
   if (refinementPredicate) {
     const base = getRefines(expectedCtx);
-    if (base?.kind === ValueKind.Context) {
+    if (base?.kind === ValueKind.Structure) {
       // Recurse on the base (unwraps nested refinements)
       const baseChecked = type_check_impl([v, base], ctx, evalFn);
       const actualType0 = getType(v);
@@ -2518,7 +2518,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       for (let i = 0; i < expectedArgs.length; i++) {
         const expArgCtx = dataOf(expectedArgs[i]);
         const actArgCtx = dataOf(actualArgs[i]);
-        if (expArgCtx.kind === ValueKind.Context && actArgCtx.kind === ValueKind.Context) {
+        if (expArgCtx.kind === ValueKind.Structure && actArgCtx.kind === ValueKind.Structure) {
           const expArgName = getName(expArgCtx as ContextValue);
           const actArgName = getName(actArgCtx as ContextValue);
           if (expArgName && actArgName) {
@@ -2546,7 +2546,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   const expectedCtx = dataOf(expectedType);
-  if (expectedCtx.kind !== ValueKind.Context) return withType(makeInt(0), BoolType);
+  if (expectedCtx.kind !== ValueKind.Structure) return withType(makeInt(0), BoolType);
 
   const expectedNameV = getName(expectedCtx as ContextValue);
   if (!expectedNameV) return withType(makeInt(0), BoolType);
@@ -2571,7 +2571,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (getPredicate(expectedCtx as ContextValue) !== undefined
       && typeShape(expectedCtx as ContextValue) !== expectedCtx) {
     const base = getRefines(expectedCtx as ContextValue);
-    if (base?.kind === ValueKind.Context) {
+    if (base?.kind === ValueKind.Structure) {
       const baseRes = type_instanceof_impl([v, base], ctx, evalFn);
       const brp = dataOf(baseRes);
       if (brp.kind !== ValueKind.Bits) {
@@ -2639,7 +2639,7 @@ const certificate_peek_impl: PrimitiveFnImpl = (args) => {
   if (args.length !== 2) throw new AllegroError(`certificate_peek: need 2 args, got ${args.length}`);
   const v = args[0];
   const t = dataOf(args[1]);
-  if (t.kind !== ValueKind.Context) return withType(makeInt(0), BoolType);
+  if (t.kind !== ValueKind.Structure) return withType(makeInt(0), BoolType);
   const stored = getType(v);
   if (!stored) return withType(makeInt(0), BoolType);
   const tName = typeContextName(t as ContextValue);
@@ -2649,7 +2649,7 @@ const certificate_peek_impl: PrimitiveFnImpl = (args) => {
     if (tName !== null && typeContextName(cur) === tName) return withType(makeInt(1), BoolType);
     if (getPredicate(cur) === undefined) break; // reached the shape — no more certificate layers
     const p = getRefines(cur);
-    cur = p !== undefined && dataOf(p).kind === ValueKind.Context ? (dataOf(p) as ContextValue) : null;
+    cur = p !== undefined && dataOf(p).kind === ValueKind.Structure ? (dataOf(p) as ContextValue) : null;
   }
   return withType(makeInt(0), BoolType);
 };
@@ -2665,7 +2665,7 @@ const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   const ctxA = dataOf(typeA);
   const ctxB = dataOf(typeB);
-  if (ctxA.kind !== ValueKind.Context || ctxB.kind !== ValueKind.Context) {
+  if (ctxA.kind !== ValueKind.Structure || ctxB.kind !== ValueKind.Structure) {
     return withType(makeInt(0), BoolType);
   }
 
@@ -3423,7 +3423,7 @@ function eqOperandsOf(v: Value): { lhs: Value; rhs: Value } | null {
  *  any residual-stripped view of a proof as well as the full value. */
 function proofCtx(v: Value): ContextValue | null {
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) return null;
+  if (p.kind !== ValueKind.Structure) return null;
   const c = p as ContextValue;
   return hasDischarged(c) ? c : null;
 }
@@ -3555,7 +3555,7 @@ const proof_refines_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // The refined type's OWN name (its `__name` binding), not its meta-type.
   const rtCtx = dataOf(refined) as any;
-  const nameBinding = rtCtx?.kind === ValueKind.Context ? getName(rtCtx) : undefined;
+  const nameBinding = rtCtx?.kind === ValueKind.Structure ? getName(rtCtx) : undefined;
   const typeName = (nameBinding && dataOf(nameBinding).kind === ValueKind.Bits)
     ? bitsToString(dataOf(nameBinding) as BitsValue)
     : (getTypeName(refined) ?? "<type>");
@@ -3577,7 +3577,7 @@ const proof_refines_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Expected: the refined type's abstract domain (set by buildRefinedType /
   // Type.invariant via domainFromPredicate).
   const rt = dataOf(refined) as any;
-  const rtPredicate = rt?.kind === ValueKind.Context ? getPredicate(rt) : undefined;
+  const rtPredicate = rt?.kind === ValueKind.Structure ? getPredicate(rt) : undefined;
   const expected = (rt && getAbstractDomain(rt))
     ? getAbstractDomain(rt)
     : (rtPredicate ? domainFromPredicate(rtPredicate) : null);

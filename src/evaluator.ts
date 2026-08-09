@@ -99,7 +99,7 @@ export function evaluate(
     case ValueKind.ComposedFunction:
       return value;
 
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       // C7.1: a CARRIER (primary present) re-evaluates its primary — a
       // residual under channels is still pending computation; plain
       // structures self-evaluate.
@@ -113,7 +113,7 @@ export function evaluate(
       // C4.3a (R3): union-rule channels (effects) merge by union via the
       // registry-installed merge instead of inner-shadows-outer — effects
       // observed before re-evaluation are facts, not stale guesses.
-      if (ep.kind === ValueKind.Context) {
+      if (ep.kind === ValueKind.Structure) {
         const merged = cloneComponents(mv);
         for (const [k, v] of componentsView(ep)) {
           const prev = merged.get(k);
@@ -174,7 +174,7 @@ function evaluateExpr(
 
   // Context as function — constructor call via __construct. `fn` is
   // already dataOf(fnRaw), so carriers are peeled.
-  const fnCtx = fn.kind === ValueKind.Context ? fn as ContextValue : null;
+  const fnCtx = fn.kind === ValueKind.Structure ? fn as ContextValue : null;
   if (fnCtx) {
     const ctorSlot = getConstruct(fnCtx);
     if (ctorSlot) {
@@ -231,7 +231,7 @@ function evaluateExpr(
   // being dropped at the application hop. First hit wins, matching viralScan.
   for (const cand of [fnRaw, ...evalArgs]) {
     // C4.3b: flattened Contexts carry channels too.
-    if (cand.kind !== ValueKind.Context) continue;
+    if (cand.kind !== ValueKind.Structure) continue;
     for (const chan of viralChannels()) {
       const comp = channelReadRaw(cand, chan);
       if (comp) {
@@ -332,9 +332,9 @@ function applyPrimitive(
     // Even though args aren't fully resolved, their type components
     // may be known. Use type-level dispatch to infer the result type.
     // C4.3b: flattened Contexts carry the type channel too.
-    if (evalArgs[0]?.kind === ValueKind.Context) {
+    if (evalArgs[0]?.kind === ValueKind.Structure) {
       const typeComp = channelReadRaw(evalArgs[0], "type");
-      if (typeComp && typeComp.kind === ValueKind.Context) {
+      if (typeComp && typeComp.kind === ValueKind.Structure) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
         if (methodName) {
           // Propagate left operand's type as the residual's type.
@@ -357,9 +357,9 @@ function applyPrimitive(
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
   // C4.3b: flattened Contexts (typed records/arrays) dispatch too.
-  if (evalArgs[0]?.kind === ValueKind.Context) {
+  if (evalArgs[0]?.kind === ValueKind.Structure) {
     const typeComp = channelReadRaw(evalArgs[0], "type");
-    if (typeComp && typeComp.kind === ValueKind.Context) {
+    if (typeComp && typeComp.kind === ValueKind.Structure) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
       if (methodName) {
         // C3.1 (D36): dispatch reads the SHAPE. Member-transparent
@@ -373,7 +373,7 @@ function applyPrimitive(
           // If the method already returned a typed value (MultiValue), use it as-is.
           // Methods know their return types (e.g., comparisons return Bool).
           let out: Value;
-          if (result.kind === ValueKind.Context) out = result;
+          if (result.kind === ValueKind.Structure) out = result;
           else if (result.kind === ValueKind.Bits)  out = makeMultiValue(result, new Map([["type", typeComp]]));
           else                                       out = result;
           out = attachEff(out);
@@ -399,7 +399,7 @@ function applyPrimitive(
   // propagate the type to the result.
   let out: Value;
   if (result.kind === ValueKind.Bits
-      && evalArgs[0]?.kind === ValueKind.Context) {
+      && evalArgs[0]?.kind === ValueKind.Structure) {
     const typeComp = channelReadRaw(evalArgs[0], "type");
     if (typeComp) out = makeMultiValue(result, new Map([["type", typeComp]]));
     else          out = result;
@@ -432,7 +432,7 @@ function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
   const viral = viralChannels();
   for (const arg of evalArgs) {
     // C4.3b: flattened Contexts carry channels too.
-    if (arg.kind !== ValueKind.Context) continue;
+    if (arg.kind !== ValueKind.Structure) continue;
     for (const chan of viral) {
       const comp = channelReadRaw(arg, chan);
       if (comp) {
@@ -519,7 +519,7 @@ function applyComposed(
           // (after unification, so type variables are resolved)
           for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
             const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
-            if (resolvedParamType.kind !== ValueKind.Context) continue; // unresolved type var
+            if (resolvedParamType.kind !== ValueKind.Structure) continue; // unresolved type var
             checkArgType(evalArgs[i], resolvedParamType as ContextValue, i, enrichedCtx, depth, depCollector);
             // C3.2 (D36): the annotation is a knowledge upper-bound — the
             // param crossing is an abstraction boundary. Stamp (widening)
@@ -571,7 +571,7 @@ function applyComposed(
     }
 
     // Apply inferred return type
-    if (inferredReturnType && inferredReturnType.kind === ValueKind.Context) {
+    if (inferredReturnType && inferredReturnType.kind === ValueKind.Structure) {
       const currentType = getType(result);
       if (!currentType) {
         result = withType(result, inferredReturnType as ContextValue);
@@ -596,7 +596,7 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
     case ValueKind.PrimitiveFunction:
     case ValueKind.Symbol:
       return value;
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       // C7.1: carriers walk their primary; plain structures are inert.
       if (!isCarrier(value)) return value;
       const mv = value as MultiValueType;
@@ -645,7 +645,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
   // (no circular function references in expression tree)
 
   switch (value.kind) {
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       // C7.1: carriers walk their primary; plain structures are inert.
       if (!isCarrier(value)) return value;
       const mv = value as MultiValueType;
@@ -772,7 +772,7 @@ function checkArgType(
   const refinementPredicate = getPredicate(expected);
   if (refinementPredicate) {
     const base = getRefines(expected);
-    if (base?.kind === ValueKind.Context) {
+    if (base?.kind === ValueKind.Structure) {
       // Recurse on the base type (unwraps nested refinements)
       checkArgType(arg, base as ContextValue, argIndex, ctx, depth, depCollector);
       // Base check passed — evaluate the predicate (unless same refined type)
@@ -815,7 +815,7 @@ function checkArgType(
     // Names match — also check type args for generics (Array[Int] vs Array[String])
     const expectedArgs = getGenericArgs(expected);
     const actualArgs = getGenericArgs(argType);
-    if (expectedArgs?.kind === ValueKind.Context && actualArgs?.kind === ValueKind.Context) {
+    if (expectedArgs?.kind === ValueKind.Structure && actualArgs?.kind === ValueKind.Structure) {
       const expCtx = expectedArgs as ContextValue;
       const actCtx = actualArgs as ContextValue;
       const expLenV = getSlotCount(expCtx);
@@ -825,7 +825,7 @@ function checkArgType(
       for (let j = 0; j < Math.min(expLen, actLen); j++) {
         const expArg = indexGet(expCtx, j);
         const actArg = indexGet(actCtx, j);
-        if (expArg?.kind === ValueKind.Context && actArg?.kind === ValueKind.Context) {
+        if (expArg?.kind === ValueKind.Structure && actArg?.kind === ValueKind.Structure) {
           const expArgName = typeContextName(expArg);
           const actArgName = typeContextName(actArg);
           if (expArgName && actArgName && expArgName !== "Any" && actArgName !== "Any" && expArgName !== actArgName) {
@@ -898,7 +898,7 @@ export function precompileFunction(
     const param = fn.params[i];
     const paramType = i < paramTypes.length ? paramTypes[i] : null;
 
-    if (paramType && paramType.kind === ValueKind.Context) {
+    if (paramType && paramType.kind === ValueKind.Structure) {
       // Typed param: create MultiValue(Param, type: paramType). If the type
       // is refined and carries an abstract domain (Phase B), seed the domain
       // on the placeholder so propagation rules fire during precompile.

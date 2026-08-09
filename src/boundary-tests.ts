@@ -309,13 +309,13 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     if (mv.primary && (mv.primary as Value & { primary?: Value }).primary !== undefined) {
       out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is itself a carrier", program });
     }
-    if (mv.primary && (mv.primary as Value).kind === ValueKind.Context) {
+    if (mv.primary && (mv.primary as Value).kind === ValueKind.Structure) {
       out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is a Context (records flatten — C4.3b/C7.1)", program });
     }
     const typeComp = mv.components.get("type");
     if (typeComp && (typeComp as Value).kind !== ValueKind.Expression) {
       const tp = dataOf(typeComp as Value);
-      if (!tp || tp.kind !== ValueKind.Context) {
+      if (!tp || tp.kind !== ValueKind.Structure) {
         out.push({ invariant: "W2 type-component-shape", detail: `type component primary has kind ${tp?.kind}`, program });
       }
     }
@@ -328,7 +328,7 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     for (const comp of mv.components.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
     return;
   }
-  if (v.kind === ValueKind.Context) {
+  if (v.kind === ValueKind.Structure) {
     // C4.1 (W4): every Context is an instance of the unified Structure class.
     if (!isStructure(v)) {
       out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeContext)", program });
@@ -1088,7 +1088,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     // C7.1 (D15): a carrier's data plane is EMPTY — the lazily-
     // materialized view may exist, but it holds no slots.
     eq((x as unknown as Structure).bindings.size, 0, "carrier data plane is empty (D15/D17 restated)");
-    eq(x.kind, ValueKind.Context, "the carrier answers the one structure kind (MultiValue kind retired)");
+    eq(x.kind, ValueKind.Structure, "the carrier answers the one structure kind (MultiValue kind retired)");
     const p = dataOf(evalCtx.bindings.get("p")!.value!);
     eq(isStructure(p), true, "object Context role is a Structure");
     eq((p as unknown as Structure).primary === undefined, true, "Context role has no primary (D17)");
@@ -1183,7 +1183,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const r = evalSource("p = {x: 1, y: 2}\ns = p.x + p.y",
       undefined, [createTypeSystem()], undefined, true);
     const p = r.evalCtx.bindings.get("p")!.value!;
-    eq(p.kind, ValueKind.Context, "a typed record IS a Context — no MultiValue wrapper");
+    eq(p.kind, ValueKind.Structure, "a typed record IS a Context — no MultiValue wrapper");
     eq(dataOf(p) === p, true, "dataOf is identity for flattened records");
     eq(getType(p) !== null, true, "the type channel rides the record directly");
     eq(Number((dataOf(r.evalCtx.bindings.get("s")!.value!) as BitsValue).data), 3,
@@ -1195,7 +1195,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const r = evalSource("arr = [1, 2, 3]\nm = arr.map(x => x * 2)",
       undefined, [createTypeSystem()], undefined, true);
     const arr = r.evalCtx.bindings.get("arr")!.value!;
-    eq(arr.kind, ValueKind.Context, "a typed array IS a Context");
+    eq(arr.kind, ValueKind.Structure, "a typed array IS a Context");
     eq((arr as unknown as Structure).dense !== undefined, true, "dense region rides with the channel plane");
     eq(getTypeNameOf(arr), "Array", "type channel present on the flattened array");
     eq(formatValue(arr), "[1, 2, 3]", "flattened arrays print as arrays");
@@ -1228,7 +1228,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const comps = cloneComponents(record);
     comps.set("exported", makeInt(1));
     const stamped = makeMultiValue(dataOf(record), comps);
-    eq((stamped as Value).kind, ValueKind.Context, "wrapping a Context derives a flattened Context");
+    eq((stamped as Value).kind, ValueKind.Structure, "wrapping a Context derives a flattened Context");
     eq(channelReadRaw(stamped as Value, "exported") !== undefined, true, "the new channel rides");
     eq(channelReadRaw(stamped as Value, "type") !== undefined, true, "cloned channels carry forward");
     eq(dataOf(stamped as Value) === (stamped as Value), true, "the derived value is transparent to dataOf");
@@ -1243,7 +1243,7 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     const record = r.evalCtx.bindings.get("p")!.value!;
     const withPreds = withPredicates(record, new PredicateSet([{ shape: { kind: "interval", lo: 0, hi: 10 }, source: "assert" }]));
     eq(getType(withPreds) !== null, true, "type channel preserved through withPredicates");
-    eq(withPreds.kind, ValueKind.Context, "still a flattened Context");
+    eq(withPreds.kind, ValueKind.Structure, "still a flattened Context");
   });
 
   // --- FQN symbols (C5.1) ------------------------------------------------------

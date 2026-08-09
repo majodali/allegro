@@ -61,7 +61,7 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       if ((v as any).__effectVarParams) (newFn as any).__effectVarParams = (v as any).__effectVarParams;
       return newFn;
     }
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       // C7.1: only CARRIERS recurse — and only untyped ones. A carrier
       // already holding a type component was deliberately typed (e.g. by
       // an earlier typeLiterals pass in a module); re-wrapping would
@@ -260,7 +260,7 @@ function patchNamedParams(
     if (!shadows) {
       patchNamedParams(value.body, name, binding, seen);
     }
-  } else if (value.kind === ValueKind.Context) {
+  } else if (value.kind === ValueKind.Structure) {
     const pp = (value as { primary?: Value }).primary;
     if (pp !== undefined) patchNamedParams(pp, name, binding, seen);
   }
@@ -347,7 +347,7 @@ function resolveNamedParams(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       const pp = (value as { primary?: Value }).primary;
       if (pp === undefined) return value;
       const newP = resolveNamedParams(pp, resMap, selfName, seen);
@@ -434,7 +434,7 @@ function resolveNamedParamsInner(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       const pp = (value as { primary?: Value }).primary;
       if (pp === undefined) return value;
       const newP = resolveNamedParamsInner(pp, resMap, owner, ownParamNames, selfName, seen);
@@ -645,7 +645,7 @@ function precompileFunctions(
     }
 
     if (inferredReturnType) {
-      const inferredName = inferredReturnType.kind === ValueKind.Context
+      const inferredName = inferredReturnType.kind === ValueKind.Structure
         ? getName(inferredReturnType as ContextValue)
         : null;
       const inferredStr = inferredName && inferredName.kind === ValueKind.Bits
@@ -655,7 +655,7 @@ function precompileFunctions(
 
       // Check against explicit return type if declared (typed functions only)
       const declaredReturn = fnType ? getFunctionReturnType(fnType) : null;
-      if (declaredReturn && declaredReturn.kind === ValueKind.Context) {
+      if (declaredReturn && declaredReturn.kind === ValueKind.Structure) {
         const declaredName = getName(declaredReturn as ContextValue);
         const declaredStr = declaredName && declaredName.kind === ValueKind.Bits
           ? bitsToString(declaredName as BitsValue)
@@ -1134,7 +1134,7 @@ export function evalSource(
       collectSymbolRefs(v.fn, refs, seen);
       for (const a of v.args) collectSymbolRefs(a, refs, seen);
     }
-    if (v.kind === ValueKind.Context) {
+    if (v.kind === ValueKind.Structure) {
       const pp = (v as { primary?: Value }).primary;
       if (pp !== undefined) collectSymbolRefs(pp, refs, seen);
     }
@@ -1195,7 +1195,7 @@ export function evalSource(
       }
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
-      const typeCtx = dataOf(val).kind === ValueKind.Context ? dataOf(val) as ContextValue : null;
+      const typeCtx = dataOf(val).kind === ValueKind.Structure ? dataOf(val) as ContextValue : null;
       if (typeCtx && hasShapeSlot(typeCtx)) {
         const nameV = getName(typeCtx);
         if (nameV?.kind === ValueKind.Bits) {

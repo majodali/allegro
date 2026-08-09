@@ -76,7 +76,7 @@ function intArg(v: Value, primName: string): number {
 
 function arrayArg(v: Value, primName: string): Value[] {
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) {
+  if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${primName}: expected Array, got ${p.kind}`);
   }
   const ctx = p as ContextValue;
@@ -103,7 +103,7 @@ function handleToValue(id: number): Value {
 function readAttrs(v: Value | undefined, primName: string): import("./types.js").RuleAttrs | undefined {
   if (!v) return undefined;
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) {
+  if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${primName}: attrs must be an Object`);
   }
   const ctx = p as ContextValue;
@@ -183,7 +183,7 @@ const grammar2_rep_impl: PrimitiveFnImpl = (args) => {
   const opts: { min?: number; max?: number | null; sep?: Rule } = {};
   if (args[1]) {
     const p = dataOf(args[1]);
-    if (p.kind !== ValueKind.Context) {
+    if (p.kind !== ValueKind.Structure) {
       throw new AllegroError("grammar2_rep: opts must be an Object");
     }
     const ctx = p as ContextValue;

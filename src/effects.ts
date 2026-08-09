@@ -280,7 +280,7 @@ function encodeEffects(eff: EffectSet): Value {
 }
 
 function decodeEffects(v: Value): EffectSet | null {
-  if (v.kind !== ValueKind.Context) return null;
+  if (v.kind !== ValueKind.Structure) return null;
   const set = (v as any).__effectSet as EffectSet | undefined;
   return set ?? null;
 }

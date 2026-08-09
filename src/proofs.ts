@@ -40,7 +40,7 @@ export interface ProofFinding {
 export function isFailedProof(v: Value | undefined): boolean {
   if (!v) return false;
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) return false;
+  if (p.kind !== ValueKind.Structure) return false;
   if (getTypeName(v) !== "Proof") return false;
   const d = channelReadRaw(p, "discharged");
   if (!d) return false;
@@ -52,7 +52,7 @@ export function isFailedProof(v: Value | undefined): boolean {
 export function isDischargedProof(v: Value | undefined): boolean {
   if (!v) return false;
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) return false;
+  if (p.kind !== ValueKind.Structure) return false;
   if (getTypeName(v) !== "Proof") return false;
   const d = channelReadRaw(p, "discharged");
   if (!d) return false;

@@ -626,7 +626,7 @@ function rewriteNonterm(rule: Rule, fromName: string, toName: string): Rule {
  */
 function ebnfObjectToRule(v: Value, labels: string[]): Rule {
   const p = dataOf(v);
-  if (p.kind !== ValueKind.Context) {
+  if (p.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: expected Context, got ${p.kind}`);
   }
   const ctx  = p as ContextValue;
@@ -756,7 +756,7 @@ function getIntField(ctx: ContextValue, key: string): number {
 
 function getArrayField(ctx: ContextValue, key: string): Value[] {
   const arr = dataOf(getField(ctx, key));
-  if (arr.kind !== ValueKind.Context) {
+  if (arr.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: field '${key}' not an array`);
   }
   const len  = Number(((getSlotCount(arr) as any)?.data) ?? 0n);

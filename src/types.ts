@@ -10,7 +10,10 @@ export enum ValueKind {
   PrimitiveFunction = "PrimitiveFunction",
   ComposedFunction = "ComposedFunction",
   Expression = "Expression",
-  Context = "Context",
+  // C7.1 (D25 completes): the `Context` kind-name is retired — the one
+  // composite representation is Structure. The evaluation-environment
+  // role is Scope (host plane, not a kind).
+  Structure = "Structure",
   Param = "Param",
   Symbol = "Symbol",
 }
@@ -123,8 +126,8 @@ export interface Binding {
   isComplete?: boolean;
 }
 
-export interface ContextValue {
-  kind: ValueKind.Context;
+export interface StructureValue {
+  kind: ValueKind.Structure;
   bindings: Map<string, Binding>;
   bindingList: Binding[];
   /** C2.1 scope protocol: parent-chain layer link (evaluation scopes only —
@@ -248,7 +251,7 @@ export function makeMultiValue(primary: Value, components?: Map<string, Value>):
   // non-Structure primary (Bits, functions, residuals) takes the D15
   // transparent carrier. Call sites read data through dataOf, never
   // `.primary`.
-  if (primary.kind === ValueKind.Context) {
+  if (primary.kind === ValueKind.Structure) {
     if (isCarrier(primary)) {
       return newMultiValueStructure(
         (primary as MultiValueType).primary, components ?? new Map()) as unknown as MultiValueType;
@@ -284,7 +287,7 @@ export function isResolved(v: Value): boolean {
     case ValueKind.PrimitiveFunction:
     case ValueKind.ComposedFunction:
       return true;
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       // C7.1: a carrier is as resolved as its primary (a residual under
       // channels is still a residual); plain structures self-resolve.
       const p = (v as { primary?: Value }).primary;
@@ -451,3 +454,6 @@ export class AllegroError extends Error {
     this.name = "AllegroError";
   }
 }
+/** C7.1 transitional alias — the `Context` NAME is retired (D25); existing
+ *  references migrate opportunistically. */
+export type ContextValue = StructureValue;

@@ -822,7 +822,7 @@ test("hybrid parser: import doesn't shadow extension binding", () => {
 test("grammar ext: extensionToContext wraps bindings", () => {
   const ext: Extension = { name: "math", bindings: { pi: makeInt(3), tau: makeInt(6) } };
   const ctx = extensionToContext(ext) as ContextValue;
-  eq(ctx.kind, ValueKind.Context);
+  eq(ctx.kind, ValueKind.Structure);
   eq(ctx.bindings.size, 2);
   const pi = ctx.bindings.get("pi");
   eq(pi !== undefined, true);
@@ -1054,7 +1054,7 @@ test("standalone grammar: parse JSON array", () => {
   const result = parseGrammar(g, "[1, 2, 3]");
   eq(result.errors.length, 0);
   const val = result.tree.val as ContextValue;
-  eq(val.kind, ValueKind.Context);
+  eq(val.kind, ValueKind.Structure);
   // Check length
   const len = (val.bindings.get("length")!).value as BitsValue;
   eq(Number(len.data), 3);
@@ -1078,7 +1078,7 @@ test("standalone grammar: parse JSON object", () => {
   const result = parseGrammar(g, '{"x": 10, "y": 20}');
   eq(result.errors.length, 0);
   const val = result.tree.val as ContextValue;
-  eq(val.kind, ValueKind.Context);
+  eq(val.kind, ValueKind.Structure);
   eq(Number((val.bindings.get("x")!.value as BitsValue).data), 10);
   eq(Number((val.bindings.get("y")!.value as BitsValue).data), 20);
 });
@@ -1090,7 +1090,7 @@ test("standalone grammar: parse nested JSON", () => {
   const val = result.tree.val as ContextValue;
   // Check items array
   const items = val.bindings.get("items")!.value as ContextValue;
-  eq(items.kind, ValueKind.Context);
+  eq(items.kind, ValueKind.Structure);
   eq(Number((items.bindings.get("length")!.value as BitsValue).data), 2);
   eq(Number((items.bindings.get("0")!.value as BitsValue).data), 1);
   // Check name string
@@ -1848,7 +1848,7 @@ test("generics: Array is a generic type", () => {
   // Array in the context should have __isGeneric
   const result = evalStd("Array");
   const p = dataOf(result!);
-  if (p.kind === ValueKind.Context) {
+  if (p.kind === ValueKind.Structure) {
     const isGen = (p as ContextValue).bindings.get("__isGeneric");
     eq(isGen !== undefined, true);
   }
@@ -2274,7 +2274,7 @@ test("member descriptors: record type has Field descriptors", () => {
   const result = evalStd(`Animal = Type.define({name: String, age: Int}, Int)
 Animal`);
   const typeCtx = dataOf(result!) as ContextValue;
-  eq(typeCtx.kind, ValueKind.Context);
+  eq(typeCtx.kind, ValueKind.Structure);
   const members = memberDescriptorsOf(typeCtx);
   eq(members.size > 0, true);
   const nameDesc = members.get("name");
@@ -2441,7 +2441,7 @@ test("interfaces: Type.interface creates structural type with __interface marker
   const result = evalStd(`Printable = Interface.define({toString: Function})
 Printable`);
   const iface = dataOf(result!) as ContextValue;
-  eq(iface.kind, ValueKind.Context);
+  eq(iface.kind, ValueKind.Structure);
   // __interface marker
   const marker = iface.bindings.get("__interface")?.value;
   eq(marker !== undefined, true);
@@ -2716,7 +2716,7 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
   eq(boundMethod.kind, ValueKind.PrimitiveFunction, "meta-method should return a bound primitive");
   const result = boundMethod.fn([], ctx, (v: Value, c: ContextValue) => evaluate(v, c));
   // describeFn returns its self param; primary should be the raw target Context.
-  eq(dataOf(result).kind, ValueKind.Context);
+  eq(dataOf(result).kind, ValueKind.Structure);
   eq(dataOf(result) === target, true, "bound method should pass target as self");
 });
 
@@ -2869,7 +2869,7 @@ test("of: type of typed int", () => {
   const result = evalStd("type of 42");
   eq(result !== null, true);
   // The type of 42 is the Int type context — which has __name = "Int"
-  eq(result!.kind, ValueKind.Context);
+  eq(result!.kind, ValueKind.Structure);
   const nameBinding = (result as ContextValue).bindings.get("__name");
   eq(nameBinding !== undefined, true);
   eq(bitsToString(dataOf(nameBinding!.value!) as BitsValue), "Int");
@@ -2982,7 +2982,7 @@ test("none: print", () => {
 test("error: creates error MultiValue", () => {
   const result = evalStd('error "something went wrong"');
   eq(result !== null, true);
-  eq(result!.kind, ValueKind.Context);
+  eq(result!.kind, ValueKind.Structure);
   eq(getType(result!) !== null, true);
   eq((result as any).components.has("error"), true);
 });
@@ -3034,7 +3034,7 @@ test("error: error of error returns the error value", () => {
 test("error: type of returns Error type context", () => {
   const result = evalStd('type of (error "bad")');
   eq(result !== null, true);
-  eq(result!.kind, ValueKind.Context);
+  eq(result!.kind, ValueKind.Structure);
 });
 
 test("error: when/is can inspect error", () => {
@@ -3169,7 +3169,7 @@ Point = NominalType.define({x: Int, y: Int})
 p = Point(1, 2)
 type of p
 `);
-  eq(result!.kind, ValueKind.Context);
+  eq(result!.kind, ValueKind.Structure);
   const nameB = (result as ContextValue).bindings.get("__name");
   eq(bitsToString(dataOf(nameB!.value!) as BitsValue), "Point");
 });
@@ -3745,7 +3745,7 @@ p = grammar_phrase(g, [a, b])
 grammar_set_target(g, p)
 grammar_parse(g, "ab")`);
   const pv = dataOf(result!) as any;
-  eq(pv.kind === ValueKind.Context, true);
+  eq(pv.kind === ValueKind.Structure, true);
 });
 
 test("grammar combinators: choice is transparent (unwraps matched alternative)", () => {
@@ -4235,7 +4235,7 @@ bad = Range(10, 1)
   // ok constructs successfully and exposes fields. C4.3b: typed records are
   // flattened Contexts (channels attach directly — no MultiValue wrapper).
   const okV = evalCtx.bindings.get("ok")!.value!;
-  eq(okV.kind, ValueKind.Context);
+  eq(okV.kind, ValueKind.Structure);
   eq(getType(okV) !== null, true, "record carries its type channel directly");
   // bad fails the invariant
   const badV = evalCtx.bindings.get("bad")!.value!;
@@ -5070,8 +5070,8 @@ test("Stage C3: typed_amp(pure, opaque) returns opaque (effect lattice top)", ()
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const v = evalCtx.bindings.get("result")!.value!;
   const p = dataOf(v);
-  eq(p.kind, ValueKind.Context);
-  if (p.kind === ValueKind.Context) {
+  eq(p.kind, ValueKind.Structure);
+  if (p.kind === ValueKind.Structure) {
     const name = p.bindings.get("__name")?.value;
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "opaque");
   }
@@ -5082,7 +5082,7 @@ test("Stage C3: typed_amp(pure, pure) returns pure (idempotence at value level)"
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const v = evalCtx.bindings.get("result")!.value!;
   const p = dataOf(v);
-  if (p.kind === ValueKind.Context) {
+  if (p.kind === ValueKind.Structure) {
     const name = p.bindings.get("__name")?.value;
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "pure");
   }
@@ -5382,8 +5382,8 @@ t
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const v = evalCtx.bindings.get("t")!.value!;
   const p = dataOf(v);
-  eq(p.kind, ValueKind.Context);
-  if (p.kind === ValueKind.Context) {
+  eq(p.kind, ValueKind.Structure);
+  if (p.kind === ValueKind.Structure) {
     const name = p.bindings.get("__name")?.value;
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "Function");
   }
@@ -5396,7 +5396,7 @@ t
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const v = evalCtx.bindings.get("t")!.value!;
   const p = dataOf(v);
-  if (p.kind === ValueKind.Context) {
+  if (p.kind === ValueKind.Structure) {
     const name = p.bindings.get("__name")?.value;
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "Function");
   }
@@ -8558,13 +8558,13 @@ function callAllegroFn2(fnName: string, grammar: g2.Grammar, nullable: any): any
 /** Extract an array of `{code, message, production}` error/warning records. */
 function extractErrorList(result: any): { code?: string; message?: string; production?: string }[] {
   const p = dataOf(result);
-  if (p.kind !== ValueKind.Context) return [];
+  if (p.kind !== ValueKind.Structure) return [];
   const len = Number(((p.bindings.get("__length")?.value) as any)?.data ?? 0n);
   const out: { code?: string; message?: string; production?: string }[] = [];
   for (let i = 0; i < len; i++) {
     const entry = p.bindings.get(String(i))?.value;
     const entryP = dataOf(entry!);
-    if (entryP.kind === ValueKind.Context) {
+    if (entryP.kind === ValueKind.Structure) {
       const code = entryP.bindings.get("code")?.value;
       const msg = entryP.bindings.get("message")?.value;
       const prod = entryP.bindings.get("production")?.value;
@@ -8582,7 +8582,7 @@ function extractErrorList(result: any): { code?: string; message?: string; produ
 /** Extract an array of strings from an Allegro Array result. */
 function extractStringList(result: any): string[] {
   const p = dataOf(result);
-  if (p.kind !== ValueKind.Context) return [];
+  if (p.kind !== ValueKind.Structure) return [];
   const len = Number(((p.bindings.get("__length")?.value) as any)?.data ?? 0n);
   const out: string[] = [];
   for (let i = 0; i < len; i++) {
@@ -8757,8 +8757,8 @@ test("Phase 5: Allegro analyze() top-level returns unified report", () => {
 
   const result = callAllegroFn1("analyze", g);
   const p = dataOf(result);
-  eq(p.kind, ValueKind.Context, "analyze returned an object");
-  if (p.kind !== ValueKind.Context) return;
+  eq(p.kind, ValueKind.Structure, "analyze returned an object");
+  if (p.kind !== ValueKind.Structure) return;
 
   const errors   = extractErrorList(p.bindings.get("errors")!.value);
   const warnings = extractErrorList(p.bindings.get("warnings")!.value);
@@ -9594,7 +9594,7 @@ test("grammar2/std: `of` infix accesses MultiValue component", () => {
   // with name "Int".
   const r = evalStandard2("type of 42");
   const p = dataOf(r!);
-  eq(p.kind, ValueKind.Context);
+  eq(p.kind, ValueKind.Structure);
   const nameBind = (p as any).bindings.get("__name");
   eq(bitsToString(nameBind.value), "Int");
 });

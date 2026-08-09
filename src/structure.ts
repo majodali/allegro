@@ -59,7 +59,7 @@ export class Structure {
   // configuration — primary set, empty data plane — and it answers the
   // same kind as every structure. `isCarrier` is the host-level
   // discriminant (primary presence), not the kind tag.
-  kind: ValueKind.Context;
+  kind: ValueKind.Structure;
 
   // --- Carrier configuration (transparent value: primary + channel plane) ---
   primary: Value;
@@ -88,7 +88,7 @@ export class Structure {
   immutable: boolean;
 
   constructor(immutable: boolean) {
-    this.kind = ValueKind.Context;
+    this.kind = ValueKind.Structure;
     this.primary = undefined as unknown as Value;
     this.components = undefined as unknown as Map<string, Value>;
     this._bindings = undefined as unknown as Map<string, Binding>;

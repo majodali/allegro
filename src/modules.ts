@@ -106,7 +106,7 @@ function captureModuleVars(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       const pp = (value as { primary?: Value }).primary;
       if (pp === undefined) return value;
       const newP = captureModuleVars(pp, moduleBindings, ownParams, seen);

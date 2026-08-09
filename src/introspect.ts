@@ -200,7 +200,7 @@ export function summarizeValue(v: Value): ValueSummary {
         walk(node.body, depth + 1, seen);
         return;
       }
-      case ValueKind.Context:
+      case ValueKind.Structure:
         if ((node as any).primary !== undefined) walk((node as any).primary, depth, seen);
         return;
       case ValueKind.Bits:
@@ -231,9 +231,9 @@ export function summarizeValue(v: Value): ValueSummary {
   // didn't go through __construct — synthesise a singleton set from the
   // refined type Context's stored __abstractDomain.
   let preds = predicatesOf(v);
-  if (!preds && v.kind === ValueKind.Context) {
+  if (!preds && v.kind === ValueKind.Structure) {
     const typeComp = channelReadRaw(v, "type");
-    if (typeComp?.kind === ValueKind.Context) {
+    if (typeComp?.kind === ValueKind.Structure) {
       const fromType = (typeComp as any).__abstractDomain;
       if (fromType && fromType.kind) {
         preds = new PredicateSet([{ shape: fromType, source: "refinement-type" }]);
@@ -443,7 +443,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return `Primitive <${(dataOf(v) as PrimitiveFunctionValue).name}>`;
     case ValueKind.Symbol:
       return `unresolved Symbol <${(dataOf(v) as { kind: ValueKind.Symbol; name: string }).name}>`;
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       const ctx = dataOf(v) as ContextValue;
       if ((ctx as any).__grammarValue) {
         const chain = (ctx as any).__grammarValue.baseChain?.join(" > ") ?? "?";

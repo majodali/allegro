@@ -196,7 +196,7 @@ function slotWrite(ctx: ContextValue, key: string, value: Value): void {
 export function asContext(v: Value | null | undefined): ContextValue | null {
   if (!v) return null;
   const p = (v as { primary?: Value }).primary ?? v;
-  return p && p.kind === ValueKind.Context ? (p as ContextValue) : null;
+  return p && p.kind === ValueKind.Structure ? (p as ContextValue) : null;
 }
 
 // Type fields
@@ -303,7 +303,7 @@ export function channelReadRaw(v: Value, channel: string): Value | undefined {
   }
   if (channel === "shape" || channel === "type") {
     let raw: Value | undefined;
-    if (v.kind === ValueKind.Context) {
+    if (v.kind === ValueKind.Structure) {
       // C7.1: a carrier's type rides in its components; a plain
       // structure answers through the __type binding-plane fallback.
       raw = (v as { primary?: Value }).primary !== undefined
@@ -313,7 +313,7 @@ export function channelReadRaw(v: Value, channel: string): Value | undefined {
       const ctx = asContext(v);
       raw = ctx ? slotRead(ctx, "__type") : undefined;
     }
-    if (channel === "shape" && raw?.kind === ValueKind.Context) {
+    if (channel === "shape" && raw?.kind === ValueKind.Structure) {
       return typeShape(raw as ContextValue);
     }
     return raw;
@@ -540,7 +540,7 @@ function buildWriter(spec: ChannelSpec): ChannelWriter {
     channel: spec.name,
     write(target: Value, channelValue: Value): Value {
       if (spec.bindingKey) {
-        if (target.kind !== ValueKind.Context) {
+        if (target.kind !== ValueKind.Structure) {
           throw new AllegroError(`channel '${spec.name}': binding-plane write target must be a Context`);
         }
         if (spec.name === "discharged") stampDischarged(target as ContextValue, channelValue);
@@ -711,7 +711,7 @@ export function channelList(v: Value): string[] {
   if (comps !== undefined) {
     out.push(...comps.keys());
   }
-  if (v.kind === ValueKind.Context) {
+  if (v.kind === ValueKind.Structure) {
     const ctx = v as ContextValue;
     if (!isDense(ctx)) {
       if (ctx.bindings.has("__type") && !out.includes("shape")) out.push("shape");

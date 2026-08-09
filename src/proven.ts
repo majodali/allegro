@@ -56,7 +56,7 @@ function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | nul
     if (!b?.value) return null;
     return resolveTypeContext(b.value, evalCtx);
   }
-  return cur.kind === ValueKind.Context ? (cur as ContextValue) : null;
+  return cur.kind === ValueKind.Structure ? (cur as ContextValue) : null;
 }
 
 /** Pick sample inputs for a parameter based on its resolved type. Returns
@@ -148,7 +148,7 @@ function substParams(
       const args = e.args.map(a => substParams(a, cfn, posMap, seen));
       return { ...e, fn, args };
     }
-    case ValueKind.Context: {
+    case ValueKind.Structure: {
       seen.add(v);
       const pp = (v as any).primary;
       if (pp === undefined) return v;
@@ -193,12 +193,12 @@ export function checkProvenClauses(
     // Need a ComposedFunction body to peel + sample.
     let cfn: ComposedFunctionValue | null = null;
     let paramTypes: Value[] | null = null;
-    if (val.kind === ValueKind.Context && (val as any).primary !== undefined) {
+    if (val.kind === ValueKind.Structure && (val as any).primary !== undefined) {
       const mv = val as any;
       if (mv.primary?.kind === ValueKind.ComposedFunction) {
         cfn = mv.primary as ComposedFunctionValue;
         const tComp = channelReadRaw(mv, "type");
-        if (tComp?.kind === ValueKind.Context) {
+        if (tComp?.kind === ValueKind.Structure) {
           paramTypes = getFunctionParamTypes(tComp as ContextValue);
         }
       }

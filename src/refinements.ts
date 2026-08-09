@@ -664,7 +664,7 @@ function encodePredicates(set: PredicateSet): Value {
 }
 
 function decodePredicates(v: Value): PredicateSet | null {
-  if (v.kind !== ValueKind.Context) return null;
+  if (v.kind !== ValueKind.Structure) return null;
   return (v as any).__predicateSet ?? null;
 }
 
@@ -711,7 +711,7 @@ const BOUND_COMPONENT_KEY = "bound";
 export function occurrenceBoundOf(v: Value): ContextValue | null {
   // C4.3b: componentsView is total — flattened Contexts answer directly.
   const b = componentsView(v).get(BOUND_COMPONENT_KEY);
-  return b?.kind === ValueKind.Context ? (b as ContextValue) : null;
+  return b?.kind === ValueKind.Structure ? (b as ContextValue) : null;
 }
 
 /** Stamp an occurrence bound (annotation-boundary crossing). */
@@ -733,7 +733,7 @@ export function clearOccurrenceBound(v: Value): Value {
 export function knowledgeOf(v: Value): Knowledge | null {
   const stored = channelReadRaw(v, "type");
   let bound: ContextValue | null = null;
-  if (stored?.kind === ValueKind.Context) {
+  if (stored?.kind === ValueKind.Structure) {
     const shape = typeShape(stored as ContextValue);
     if (shape !== stored) bound = stored as ContextValue;
   }
@@ -789,7 +789,7 @@ function encodeDomain(d: AbstractDomain): Value {
 }
 
 function decodeDomain(v: Value): AbstractDomain | null {
-  if (v.kind !== ValueKind.Context) return null;
+  if (v.kind !== ValueKind.Structure) return null;
   return (v as any).__abstractDomain ?? null;
 }
 

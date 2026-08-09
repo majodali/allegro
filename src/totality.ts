@@ -103,7 +103,7 @@ export function collapseBodyMetadata(v: Value | undefined, seen: Set<Value> = ne
     for (const a of e.args) collapseBodyMetadata(a, seen);
     return;
   }
-  if (v.kind === ValueKind.Context && (v as any).primary !== undefined) {
+  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
     collapseBodyMetadata((v as any).primary, seen);
   }
 }
@@ -162,13 +162,13 @@ function peelFunctionAst(v: Value): {
   paramTypeAsts: Value[];
 } | null {
   // Post-evaluation: a typed-function carrier.
-  if (v.kind === ValueKind.Context && (v as any).primary !== undefined) {
+  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
     const mv = v as any;
     const tComp = channelReadRaw(mv, "type") as Value | undefined;
     const prim = mv.primary;
     if (prim.kind === ValueKind.ComposedFunction) {
       let paramTypeAsts: Value[] = [];
-      if (tComp && tComp.kind === ValueKind.Context) {
+      if (tComp && tComp.kind === ValueKind.Structure) {
         const types = getFunctionParamTypes(tComp as ContextValue);
         if (types) paramTypeAsts = types;
       }
@@ -304,7 +304,7 @@ function walkForWhen(
     walkForWhen((v as ComposedFunctionValue).body, visit, visited);
     return;
   }
-  if (v.kind === ValueKind.Context && (v as any).primary !== undefined) {
+  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
     walkForWhen((v as any).primary, visit, visited);
     return;
   }
@@ -325,7 +325,7 @@ function resolveSubjectTypeName(
   typeLookup: TypeLookup | undefined,
 ): string | null {
   // Strip carriers; flattened structures answer through the channel plane.
-  if (subject.kind === ValueKind.Context) {
+  if (subject.kind === ValueKind.Structure) {
     const t = channelReadRaw(subject as Value, "type");
     if (t) return resolveTypeName(t, typeLookup);
     const pp = (subject as { primary?: Value }).primary;
@@ -348,7 +348,7 @@ function resolveSubjectTypeName(
 /** Resolve a type AST node to a concrete type name (e.g. "Bool", "Int"). */
 function resolveTypeName(t: Value, typeLookup: TypeLookup | undefined): string | null {
   // Direct Context type values carry __name.
-  if (t.kind === ValueKind.Context) {
+  if (t.kind === ValueKind.Structure) {
     const pp = (t as { primary?: Value }).primary;
     return pp !== undefined ? resolveTypeName(pp, typeLookup) : typeContextName(t);
   }
@@ -408,7 +408,7 @@ function analyzeChain(
 }
 
 function typeContextName(t: Value): string | null {
-  if (t.kind !== ValueKind.Context) return null;
+  if (t.kind !== ValueKind.Structure) return null;
   const n = getName(t as ContextValue);
   if (!n) return null;
   const p = dataOf(n);
@@ -693,7 +693,7 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
     for (const a of e.args) collectCalleeNames(a, out, seen);
   } else if (v.kind === ValueKind.ComposedFunction) {
     collectCalleeNames((v as ComposedFunctionValue).body, out, seen);
-  } else if (v.kind === ValueKind.Context && (v as any).primary !== undefined) {
+  } else if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
     collectCalleeNames((v as any).primary, out, seen);
   }
 }
@@ -732,7 +732,7 @@ function findCallsToCycle(
     for (const a of e.args) findCallsToCycle(a, cycle, out, seen);
   } else if (body.kind === ValueKind.ComposedFunction) {
     findCallsToCycle((body as ComposedFunctionValue).body, cycle, out, seen);
-  } else if (body.kind === ValueKind.Context && (body as any).primary !== undefined) {
+  } else if (body.kind === ValueKind.Structure && (body as any).primary !== undefined) {
     findCallsToCycle((body as any).primary, cycle, out, seen);
   }
 }
@@ -996,7 +996,7 @@ function typeHasNonNegativeLowerBound(
     if (!resolved) return false;
     return typeHasNonNegativeLowerBound(resolved, typeLookup, seen);
   }
-  if (cur.kind !== ValueKind.Context) return false;
+  if (cur.kind !== ValueKind.Structure) return false;
   const dom = (cur as any).__abstractDomain;
   if (!dom) return false;
   if (dom.kind === "interval") return dom.lo >= 0;
@@ -1019,7 +1019,7 @@ function collectBoolLiterals(cases: ChainCase[]): Set<boolean> {
         if (b.data === 0n) out.add(false);
         else if (b.data === 1n) out.add(true);
       }
-    } else if (c.pattern.kind === ValueKind.Context && (c.pattern as any).primary !== undefined) {
+    } else if (c.pattern.kind === ValueKind.Structure && (c.pattern as any).primary !== undefined) {
       const pp = dataOf(c.pattern);
       if (pp.kind === ValueKind.Bits) {
         const b = pp as BitsValue;
