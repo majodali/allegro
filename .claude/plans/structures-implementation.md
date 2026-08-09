@@ -553,6 +553,37 @@ internals; the C1.1 registry walker confirms zero unregistered slots.
 **Validation criterion met = Effect and Proof rebuilt with zero
 hand-rolled residue.**
 
+**C7.1 — MultiValue retirement (D15 execution; D46).** The closing
+chunk of the original thesis: the kind that started the journey
+retires. Scope (maintainer-ratified 2026-08, D46):
+1. *Recon*: enumerate `ValueKind.MultiValue` consumers (evaluator
+   branches, `makeMultiValue` call sites, wire/introspect/format
+   paths); decide `primary`-channel storage (I-level: register
+   `primary` in the channel registry; the existing class field may
+   remain its physical storage — the registry already maps storages).
+2. *Carrier flip*: the scalar/function/residual carrier is the D15
+   transparent structure — empty data plane + `primary` channel; it
+   answers the Structure kind. `ValueKind.MultiValue` is DELETED from
+   the enum; a C4.3b-style kind-check audit re-routes every
+   `=== ValueKind.MultiValue` site (consumers already read data via
+   `dataOf`, so most sites collapse or widen mechanically).
+3. *Kind-name retirement (D25 completes)*: `ValueKind.Context` renames
+   to `ValueKind.Structure` (`ContextValue` → `StructureValue` with a
+   transitional type alias); mechanical, tsc-guided, its own commit.
+4. *Shims*: `makeMultiValue` retires or narrows to the carrier factory;
+   W1 restates as "carriers never nest" (a carrier's primary is never a
+   carrier); W2 restates over the carrier; wire/JSON representation
+   updated.
+5. *NominalType alias retirement* (ratified with this plan): delete the
+   export + extension binding; migrate the ~15 remaining test/sandbox
+   sites to `Type`.
+6. *Docs*: CLAUDE.md's "Seven Value Kinds" reframes as
+   representations + computation forms (`kind` demoted to host
+   discriminant per D46); §2 status updated; CHANGELOG.
+Battery: carrier-duality tests (typed scalar answers Structure; dataOf
+reads primary; channels ride), non-nesting, forgery re-run over the
+carrier path, suite green.
+
 ## 5. Verification strategy (the boundary contract)
 
 Standing rules, every chunk:

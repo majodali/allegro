@@ -2,7 +2,7 @@
 
 > Tier 1 design doc — **draft, pending maintainer sign-off** (promoted from
 > the design discussion in `.claude/plans/structured-values-unification.md`,
-> which holds the full decision log D1–D45 and rationale; decision numbers
+> which holds the full decision log D1–D46 and rationale; decision numbers
 > below cite it). Status tags per `docs/design/README.md`. Everything here
 > is **[designed]** unless tagged otherwise — this document describes the
 > post-unification model, not current behavior (`CLAUDE.md` describes what
@@ -52,6 +52,45 @@ the scope + future-cell + construction-phase carve-outs) asserted by the
 battery. Still pending: physical plane separation + shape ref field
 (inside structure.ts, with C4.3's transparency cutover), symbol keys
 (C5).*
+
+*D46 (maintainer-ratified 2026-08) — the retirement design and the
+definitional ladder.* The MultiValue kind retires by EXECUTING D15
+(reaffirmed unchanged): the scalar/function/residual channel carrier is
+a TRANSPARENT STRUCTURE — empty data plane + `primary` CHANNEL — the
+same construct, not a distinct wrapper kind. The empty data plane is
+what keeps a carrier unmistakable for a record with no reserved member
+name. The competing design (a channel-plane field on every leaf
+representation) was evaluated and rejected: it saves no allocation
+(per-occurrence channels force copy-on-write clones of immutable
+leaves), smears the channel machinery from one hidden class across six
+object shapes, and re-opens function-identity hazards. The "MultiValue
+interface" intuition survives as a HOST-LEVEL protocol — a value is
+(representation, channel plane); non-Structure representations take the
+transparent carrier when channels attach — named here, never reified in
+the kind tower (the same reasoning that keeps Scope out of it).
+
+*The definitional ladder* (the C6 vocabulary, recorded): host
+REPRESENTATIONS — `Bits`, the two function representations, and
+`Structure` as the one composite (the ValueKind taxonomy, BELOW the
+type system) → VALUES (representation + channels) → TYPES
+(language-level classifiers over representations: Int over Bits,
+`Function[P,R]` over functions, record types over Structures) → KINDS
+(types whose instances are type-values). `Scope` sits on a parallel
+plane (D25): shared substrate, own protocol, barred from dispatch and
+typing — neither type nor kind. None of Bits / Function / Structure /
+Scope is a Kind, and that is correct: which representation a value has
+is a host fact; which TYPE it has is a language fact on the channel
+plane.
+
+*`v.kind` is demoted to a host discriminant.* At the language level it
+does not exist — no primitive exposes it; `type of`, when/is patterns,
+data access, and channel reads answer every observable question — and
+the language-level taxonomy is DATA vs COMPUTATION FORMS (Expression /
+Symbol / Param). At the host level the discriminant is irreducible (the
+evaluator must tell computation forms from self-evaluating data; the TS
+union narrows on it), but it is an implementation detail, not spec. The
+"seven value kinds" framing retires with chunk C7.1.
+
 
 *C4.3 rulings (2026-08, maintainer-ratified — recorded in the
 implementation plan §6): merge policies activate at C4.3a — error

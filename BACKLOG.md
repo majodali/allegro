@@ -290,6 +290,15 @@ phase).
   `__effectVarParams` (function-type generic params). MultiValue-kind
   + NominalType-alias decisions presented to maintainer — **M1 exit
   criterion**
+- [ ] **B-088** · L0 · C7.1 — MultiValue retirement (D15 execution;
+  D46, maintainer-ratified 2026-08): transparent-structure carrier
+  (empty data plane + `primary` channel) replaces the MultiValue kind;
+  `ValueKind.MultiValue` deleted with a C4.3b-style kind audit;
+  `ValueKind.Context` → `ValueKind.Structure` (D25 completes);
+  `makeMultiValue` narrows to the carrier factory; W1/W2 restated;
+  NominalType alias retired (~15 sites → `Type`); CLAUDE.md
+  seven-kinds reframe (`kind` demoted to host discriminant). The
+  closing chunk of the original MultiValue/Context-collapse thesis
 - [ ] **B-027** · L2 · Equality protocol + lawful interfaces — design
   ratification pass on structures.md §7–8, then own plan
   (`equality-and-laws.md`) per structures-implementation §3
