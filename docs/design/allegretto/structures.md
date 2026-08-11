@@ -763,8 +763,13 @@ through the recipe (C7.2a): draws Type's kind-members, declares `params`;
 generic types stamp shape = GenericType (`type of Array` answers it;
 `Array instanceof Type` holds by conformance); the applier lives in the
 generic's own `construct` (the `__constructor` alias collapsed);
-`__isGeneric` deleted — the kind IS the flag. The mint is KERNEL-PRIVATE
-(ruling R1, Proof precedent); applied concretes stay shape Type with
+`__isGeneric` deleted — the kind IS the flag. GenericType holds no
+construct authority yet — per ruling R1 as maintainer-amended, this is a
+DEFERRED PUBLIC SURFACE, not kernel-privacy-by-design: unlike Proof
+(whose privacy IS the soundness mechanism), nothing breaks if users mint
+generic types; exposure waits on surface design (per-generic gensym'd
+member scopes — the kernel mint keys them by name — plus a spec form),
+and the refactor is additive. Applied concretes stay shape Type with
 host-read `__args`/`__generic` (member surface consciously deferred).
 `distinct` re-derived as the SYMBOL-FRESH newtype mint (ruling R2):
 members re-declared under a gensym'd scope, so non-conformance falls out

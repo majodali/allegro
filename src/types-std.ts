@@ -2360,6 +2360,15 @@ setMembers(GenericType, genericTypeMembers);
 // The `params` field descriptor is declared after ArrayType exists
 // (bootstrap order — ArrayType is itself minted through buildGenericType).
 
+// Bootstrap staging for typed `params` values: generics minted before
+// ArrayType/StringType exist store a raw array and are upgraded in place
+// once the flag flips (right after FunctionType's mint).
+let _genericParamsTypedReady = false;
+const _pendingGenericParamsUpgrades: { ctx: ContextValue; names: string[] }[] = [];
+function typedGenericParams(names: string[]): Value {
+  return makeArray(names.map(n => withType(stringToBits(n), StringType)));
+}
+
 /**
  * Build a GenericType: a type constructor that takes type parameters and
  * produces concrete types. Each unique parameterization is memoized.
@@ -2435,9 +2444,17 @@ export function buildGenericType(
   writeShape(ctx, GenericType);
 
   // `params` — declared instance data (the GenericType kind holds the field
-  // descriptor; storage is a plain binding, like Effect's kind/labels).
-  // Raw array to avoid circular dep with ArrayType (minted through here).
-  addBinding(ctx, "params", makeRawArrayCtx(paramNames.map(n => stringToBits(n))));
+  // descriptor; storage is a plain binding, like Effect's kind/labels): a
+  // typed Array[String] of the param names, so `Array.params` reads like
+  // any other array value. The two bootstrap generics (Array, Function)
+  // are minted BEFORE ArrayType/StringType exist — they store a raw array
+  // and are upgraded in place right after FunctionType's mint.
+  if (_genericParamsTypedReady) {
+    addBinding(ctx, "params", typedGenericParams(paramNames));
+  } else {
+    addBinding(ctx, "params", makeRawArrayCtx(paramNames.map(n => stringToBits(n))));
+    _pendingGenericParamsUpgrades.push({ ctx, names: paramNames });
+  }
 
   // The applier IS the generic's construct authority (D45 collapse — the
   // separate __constructor slot is retired): type args in, concrete type out.
@@ -2580,10 +2597,19 @@ const functionTypeMethods: Record<string, PrimitiveFnImpl> = {
 export const FunctionType: ContextValue = buildGenericType("Function", ["ParamTypes", "ReturnType"], functionTypeMethods);
 
 // GenericType's declared instance field (C7.2a) — added here because
-// ArrayType (the descriptor's fieldType) is itself minted through
-// buildGenericType above. `Array.params` dispatches through the kind's
-// shape to this descriptor, reading the instance's `params` binding.
-addMember(genericTypeMembers, GENERIC_MEMBER_SCOPE, "params", makeFieldDescriptor("params", ArrayType));
+// Array[String] (the descriptor's fieldType) needs ArrayType, itself
+// minted through buildGenericType above. `Array.params` dispatches
+// through the kind's shape to this descriptor, reading the instance's
+// `params` binding.
+addMember(genericTypeMembers, GENERIC_MEMBER_SCOPE, "params",
+  makeFieldDescriptor("params", applyGenericType(ArrayType, [StringType])));
+// Upgrade the bootstrap generics' raw params storage to typed
+// Array[String] values, then mint typed directly from here on.
+_genericParamsTypedReady = true;
+for (const { ctx, names } of _pendingGenericParamsUpgrades.splice(0)) {
+  const b = ctx.bindings.get("params");
+  if (b) b.value = typedGenericParams(names);
+}
 
 /** Create a concrete FunctionType from param types and return type. */
 export function makeFunctionType(paramTypes: Value[], returnType: Value): ContextValue {

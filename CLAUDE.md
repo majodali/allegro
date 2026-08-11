@@ -112,7 +112,7 @@ Types are Structure values with `__name`, `__type`, `__members`, and other meta-
 - `Array[Int]` is a concrete type produced by applying `Array` to `Int`
 - Type parameters can be types or values (e.g., `Vector[3]`)
 - Concrete types are memoized — `Array[Int]` always returns the same Context
-- Generic types have `type = GenericType` (C7.2a: a kind through the Effect recipe — draws Type's kind-member symbols, declares the `params` instance field; `isGenericType` is a SHAPE check, the `__isGeneric` flag is retired). The applier IS the generic's `construct` slot (D45 one-surface; the `__constructor` alias is retired). The mint is kernel-private (Proof precedent); applied concretes stay shape Type with host-read `__args`/`__generic`
+- Generic types have `type = GenericType` (C7.2a: a kind through the Effect recipe — draws Type's kind-member symbols, declares the `params` instance field; `isGenericType` is a SHAPE check, the `__isGeneric` flag is retired). The applier IS the generic's `construct` slot (D45 one-surface; the `__constructor` alias is retired). `params` is a typed `Array[String]` instance field (`Array.params` → `[T]`). GenericType holds no construct authority YET — a deferred public surface (C7.2 ruling R1 as amended: not integrity-required kernel privacy; user-defined generics await surface design — per-generic gensym'd member scopes + a spec form). Applied concretes stay shape Type with host-read `__args`/`__generic`
 - Bare generic in annotations auto-applies `Any`: `arr: Array` → `arr: Array[Any]`
 
 ### Function Types and Unification

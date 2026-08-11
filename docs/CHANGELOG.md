@@ -11,10 +11,17 @@ Next" / completed-items section) will be migrated here verbatim during the
 ## 2026-08 — C7.2: kind-tower residue (Tranche B — D39 checklist to zero)
 
 Closes the last D39 slot-disposition rows. Three sub-parts; three
-agent-proposed rulings (R1 kernel-private GenericType mint + deferred
-member surface for applied concretes; R2 symbol-fresh distinct; R3
-reserved `construct` spec key) recorded in the structures plan §4 and
-presented for maintainer ratification at landing.
+rulings recorded in the structures plan §4, maintainer-ratified at
+landing: R2 symbol-fresh distinct and R3 reserved `construct` spec key
+ratified as proposed; R1 AMENDED — GenericType's missing construct
+authority is a DEFERRED PUBLIC SURFACE, not integrity-required kernel
+privacy (unlike Proof, nothing breaks if users mint generics; exposure
+waits on surface design — per-generic gensym'd member scopes + a spec
+form — and the refactor is additive). Follow-up polish in the same
+tranche: `params` is a typed `Array[String]` instance field
+(`Array.params` → `[T]`, `Function.params` → `[ParamTypes,
+ReturnType]`) — bootstrap generics upgraded in place once ArrayType
+exists.
 
 - **C7.2a — GenericType through the kind recipe.** The GenericType kind
   (Effect pattern): draws Type's kind-member symbols (so `Array

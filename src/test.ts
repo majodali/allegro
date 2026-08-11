@@ -1854,6 +1854,19 @@ test("generics: Array is a generic type", () => {
   eq((p as ContextValue).bindings.has("__isGeneric"), false);
 });
 
+test("generics: params is a typed Array[String] instance field", () => {
+  // C7.2a polish: `params` reads like any other array value — a typed
+  // Array[String] of the param names (the two bootstrap generics are
+  // upgraded in place once ArrayType exists), dispatching through the
+  // GenericType kind's field descriptor.
+  const first = evalStd("Array.params[0]");
+  eq(bitsToString(dataOf(first!) as BitsValue), "T");
+  const fnParams = evalStd("Function.params.length");
+  eq(Number((dataOf(fnParams!) as BitsValue).data), 2);
+  const elemTyped = evalStd(`Array.params[0] instanceof String`);
+  eq(Number((dataOf(elemTyped!) as BitsValue).data), 1);
+});
+
 // == Any Type ==
 
 test("Any: type annotation accepts any value", () => {

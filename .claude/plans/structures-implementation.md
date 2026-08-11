@@ -614,21 +614,32 @@ REMOVED; construct authority is declared at mint time via the reserved
 declared structure on function values; PE's Param-call effect
 propagation reads the declared param, not marker strings.
 
-**C7.2 rulings (proposed by agent 2026-08, presented for maintainer
-ratification at landing — each isolated and reversible):**
-- *R1 (GenericType mint authority)*: buildGenericType stays
-  KERNEL-PRIVATE (Proof's makeProof precedent). GenericType exposes no
-  construct authority to Allegro; user-defined generic types are a
-  future surface with their own design. `__args`/`__generic` on
-  applied concretes remain host-read instance data — a language-level
-  member surface for applied types is consciously deferred (avoids
-  leaking `.args` into every applied-generic value via the typeMethod
-  direct-binding fallback).
-- *R2 (distinct = symbol-fresh)*: as above — newtype identity is fresh
+**C7.2 rulings (maintainer-ratified 2026-08, R1 as amended):**
+- *R1 (GenericType construct authority — DEFERRED SURFACE, not
+  kernel-private-by-design)*: maintainer amendment — kernel-private
+  features are restricted to those REQUIRED for language integrity, and
+  GenericType does not qualify: unlike Proof (where privacy IS the
+  soundness mechanism — a forged discharged Proof breaks the system), a
+  user-minted generic type breaks nothing; conformance, dispatch, and
+  memoization all work through public mechanisms. The current absence
+  of construct authority on GenericType is a DEFERRED PUBLIC SURFACE:
+  GenericType is intended to eventually hold public construct authority
+  like Type itself. What blocks exposure today is surface design, not
+  principle — chiefly that `buildGenericType` keys concrete member
+  scopes by the generic's NAME (fine for kernel built-ins, colliding
+  for same-named user generics; the user path needs gensym'd scopes à
+  la `distinct`, plus a decided spec form). The refactor is additive
+  (`setConstruct(GenericType, …)` + a define path; no stored-state
+  migration), so revisiting the kernel/type-system boundary later is
+  cheap. `__args`/`__generic` on applied concretes remain host-read
+  instance data — the language-level member surface for applied types
+  stays consciously deferred (avoids leaking `.args` into every
+  applied-generic value via the typeMethod direct-binding fallback).
+- *R2 (distinct = symbol-fresh)*: RATIFIED — newtype identity is fresh
   member symbols, not a guard special-case.
-- *R3 (construct spec key)*: one construction surface — the reserved
-  `construct` key in define specs replaces post-hoc `.constructor()`;
-  the meta-method leaves the kind API.
+- *R3 (construct spec key)*: RATIFIED — one construction surface; the
+  reserved `construct` key in define specs replaces post-hoc
+  `.constructor()`; the meta-method leaves the kind API.
 
 ## 5. Verification strategy (the boundary contract)
 
