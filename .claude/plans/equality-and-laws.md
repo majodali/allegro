@@ -97,6 +97,22 @@ any member — symbol identity gives law inheritance for free). Drawing a
 law-bearing interface instantiates one PCP Obligation per law at
 definition time, quantifier specialized to the implementing type.
 
+*Generality note (maintainer Q&A at ratification, 2026-08): "lawful
+interfaces" names instance #1's home, not a restriction. A law is an
+ordinary member descriptor in a member SET — so any member-set-minting
+surface can carry laws: `Interface.define`, `Type.define` (concrete
+types stating laws about their own members; methods-only bundles /
+mixins whose laws are drawn along with their methods), and refinement
+specs by extension. Laws attach to SCOPES rather than to individual
+members because a law may reference several members (§8's
+distributivity example — the law lives with the declarations of all
+participating members). The referenced members need not be abstract
+(kernel-supplied `equals` carries its parametric certificate) but must
+be effect-bounded pure (E-R5, proposition stability). E3 ships the
+`Interface.define` surface as the proving ground; the same `law_` spec
+key on `Type.define` is the same code path and lands in E3 or trails
+it immediately.*
+
 **E-R4 — discharge maps onto D34's spectrum using existing machinery;
 `assume` is new and verdict-visible.** kernel-auto = PE +
 `prove_for_all_bool` (finite domains) + the parametric kernel-equals
@@ -207,5 +223,8 @@ PROCESS. Deviations recorded here in §6.
 ## 7. Status log
 
 - 2026-08: plan drafted (ratification-pass deliverable); §3 decision
-  points E-R1–E-R6 presented to maintainer. Awaiting ratification
-  before E1.
+  points E-R1–E-R6 presented to maintainer.
+- 2026-08: **E-R1–E-R6 maintainer-ratified as they stand**; §6 deltas
+  pre-approved. Generality note added to E-R3 (laws are
+  member-set-general, not interface-only) from ratification Q&A.
+  E1 unblocked.

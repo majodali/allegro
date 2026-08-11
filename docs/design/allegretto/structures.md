@@ -612,6 +612,17 @@ all participating members**), and Functor laws for `map` — discharged laws
 license PE rewrites, feeding compilation. Laws require effect-bounded
 (`pure`) members for proposition stability.
 
+*Generality (maintainer Q&A at B-027 ratification, 2026-08): "lawful
+interfaces" names the flagship home, not a restriction. A law is an
+ordinary member descriptor in a member SET, so every member-set-minting
+surface can carry laws — interfaces, concrete `Type.define` types
+(laws about their own members), methods-only bundles/mixins (laws drawn
+along with the methods they constrain), refinement specs. Laws attach
+to scopes rather than to individual members because a law may reference
+several members (distributivity above); the referenced members need not
+be abstract — kernel-supplied defaults carry their parametric
+certificates — but must be pure.*
+
 ## 9. Kinds are just types [designed]
 
 *D45 (maintainer-ratified 2026-08) extends this section — one

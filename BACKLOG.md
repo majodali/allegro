@@ -34,11 +34,11 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   R1–R3 (plan §4) maintainer-ratified 2026-08 (R1 amended: deferred
   public surface, not kernel privacy). See CHANGELOG.
 - **Tranche C — next arc (in progress):** B-027 equality + lawful
-  interfaces — design ratification pass done, plan drafted
-  (`equality-and-laws.md`); §3 decisions E-R1–E-R6 awaiting maintainer
-  sign-off before chunk E1. Then S3 visibility (D41–D43,
-  designed+ratified), then B-028 completion effects. M4 reval docs
-  (B-014, B-018, B-029) ride between chunks.
+  interfaces — plan `equality-and-laws.md`, decisions E-R1–E-R6
+  maintainer-ratified 2026-08 (with E-R3 generality note: laws are
+  member-set-general, not interface-only); chunks E1–E4 underway. Then
+  S3 visibility (D41–D43, designed+ratified), then B-028 completion
+  effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
 - **Parked consciously:** B-087 (awaiting use cases), full
   `ContextValue`→`StructureValue` reference migration (opportunistic),
   perf hard threshold (maintainer decision, any time).
@@ -330,9 +330,9 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   alias); NominalType retired; W1/W5 restated; CLAUDE.md seven-kinds
   reframe. The original MultiValue/Context-collapse thesis is
   COMPLETE
-- [ ] **B-027** · L2 · Equality protocol + lawful interfaces — design
-  ratification pass done; plan drafted (`equality-and-laws.md`, chunks
-  E1–E4). §3 decisions E-R1–E-R6 awaiting maintainer sign-off before E1
+- [ ] **B-027** · L2 · Equality protocol + lawful interfaces — plan
+  `equality-and-laws.md` (chunks E1–E4); E-R1–E-R6 maintainer-ratified
+  2026-08. In progress
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
   (`completion-effects.md`): `div`, blocking-read, triggered guard,
   discharge tiers (structures.md §10)
