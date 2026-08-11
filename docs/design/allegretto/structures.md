@@ -758,6 +758,26 @@ stay registered pending the function-type generic-param structure.
 Decisions presented to the maintainer at this landing: MultiValue-kind
 retirement and the NominalType alias.*
 
+*Status (2026-08, C7.2): the D39 residue is zero. GenericType re-derived
+through the recipe (C7.2a): draws Type's kind-members, declares `params`;
+generic types stamp shape = GenericType (`type of Array` answers it;
+`Array instanceof Type` holds by conformance); the applier lives in the
+generic's own `construct` (the `__constructor` alias collapsed);
+`__isGeneric` deleted — the kind IS the flag. The mint is KERNEL-PRIVATE
+(ruling R1, Proof precedent); applied concretes stay shape Type with
+host-read `__args`/`__generic` (member surface consciously deferred).
+`distinct` re-derived as the SYMBOL-FRESH newtype mint (ruling R2):
+members re-declared under a gensym'd scope, so non-conformance falls out
+of C5.2 symbol-identity membership by construction — the
+shared-member-set guard now carries only `structuralWrap`. The post-hoc
+`constructor` meta-method removed; construction authority is the
+reserved `construct` define-spec key (ruling R3). Effect variables
+(C7.2c): `Param.effectVar` is a declared reference into
+`__genericParams`; bare variable names ride inferred effect sets; the
+`__effectvar:` marker strings and `__effectVarParams` side table are
+deleted. Rulings R1–R3 were agent-proposed and are pending maintainer
+ratification (recorded in the structures plan §4).*
+
 **Instance-of = shape-of** (D40; sharpened by D45 to shape-CONFORMS-TO):
 a kind is a type whose instances are
 type-values. `io : Effect`, `Int : Type`, `Effect : Type`, and `Type :
@@ -973,12 +993,17 @@ disposition EXECUTED. Post-C7.1 state of the original D39 inventory:
   `__invariantsList` → swept, no writer since C6.1b; `arity` → deleted
   (D39 addendum); `__extends` → `__refines`, writers narrowed to
   refinement (C6.1a); the MultiValue component plane → the carrier's
-  channel plane (C7.1).
-- **Registered, pinned to a future owner**: `__isGeneric` (delete —
-  GenericType re-derivation, tranche C7.2), `__params`/`__args`/
-  `__generic` (GenericType members, C7.2), `__effectvar:` /
-  `__effectVarParams` (declared generic-param structure on function
-  types, C7.2), `exported` (S3 scope-binding visibility),
+  channel plane (C7.1); `__isGeneric` → DELETED, generic-ness IS the
+  kind (shape = GenericType, C7.2a); `__params` → the `params` declared
+  binding on generic types (C7.2a); `__constructor` → collapsed into
+  `construct` (D45 one-surface, C7.2a); `__effectvar:` markers +
+  `__effectVarParams` side table → `Param.effectVar` declared reference
+  into `__genericParams` (C7.2c; the side table had no functional
+  reader since the F1-F3 walker deletion).
+- **Registered, pinned to a future owner**: `__args`/`__generic`
+  (host-read instance data on applied concretes; the language-level
+  member surface for applied generic types is consciously deferred —
+  C7.2 ruling R1), `exported` (S3 scope-binding visibility),
   `__predicate`/`__abstractDomain` (Refinement members — physical
   rename pending the same treatment Proof's fields got).
 - **Channels (stay)**: `__type` (shape), `__discharged` (integrity,

@@ -58,7 +58,6 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       // Preserve generic-param / effect-var-param metadata across clones so
       // Slice 2's polymorphism resolution still works after this pass.
       if ((v as any).__genericParams) (newFn as any).__genericParams = (v as any).__genericParams;
-      if ((v as any).__effectVarParams) (newFn as any).__effectVarParams = (v as any).__effectVarParams;
       return newFn;
     }
     case ValueKind.Structure: {
@@ -336,7 +335,6 @@ function resolveNamedParams(
       };
       for (const p of newFn.params) p.owner = newFn;
       if ((fn as any).__genericParams) (newFn as any).__genericParams = (fn as any).__genericParams;
-      if ((fn as any).__effectVarParams) (newFn as any).__effectVarParams = (fn as any).__effectVarParams;
       return newFn;
     }
 
@@ -423,7 +421,6 @@ function resolveNamedParamsInner(
       };
       for (const p of newFn.params) p.owner = newFn;
       if ((fn as any).__genericParams) (newFn as any).__genericParams = (fn as any).__genericParams;
-      if ((fn as any).__effectVarParams) (newFn as any).__effectVarParams = (fn as any).__effectVarParams;
       return newFn;
     }
 

@@ -12,7 +12,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, isEffectVarLabel, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 import { isCarrier } from "./structure.js";
 
@@ -198,8 +198,14 @@ function evaluateExpr(
   // the e-effect when precompiling the body's residual `Param(g)(x)` call.
   let residualEffects: Set<string> | null = null;
   if (fn.kind === ValueKind.Param) {
+    const evar = (fn as any).effectVar as string | undefined;
     const bound = (fn as any).effectBound as Set<string> | undefined;
-    if (bound && bound.size > 0) {
+    if (evar !== undefined) {
+      // C7.2c: declared effect variable — the variable's bare name rides
+      // the inferred set (matches an `effects e` declaration directly);
+      // concrete call sites resolve it by ordinary PE substitution.
+      residualEffects = new Set([evar]);
+    } else if (bound && bound.size > 0) {
       residualEffects = new Set(bound);
     } else if (!bound) {
       // No effectBound — function-typed param could do anything. Match
@@ -533,14 +539,13 @@ function applyComposed(
             // matches Surface A's rejection of mismatched callbacks. F2
             // reads effects directly from the arg's `effects` MultiValue
             // component (PE-populated) rather than via the predicate-set
-            // view. Skip when the bound is a Stage C2 effect-variable
-            // marker (`__effectvar:NAME`) — those are placeholders the
-            // walker resolves at call sites, not concrete bounds.
+            // view. C7.2c: effect-VARIABLE params carry `effectVar` (a
+            // declared reference, no bound labels), so `effectBound` here
+            // is always concrete — the marker-sniffing skip is gone.
             const ptHasEffBound = getEffectBound(resolvedParamType) !== undefined;
             if (!ptHasEffBound && i < currentFn.params.length) {
               const surfaceCBound = (currentFn.params[i] as any).effectBound as EffectSet | undefined;
-              const isMarkerBound = surfaceCBound && [...surfaceCBound].some(l => isEffectVarLabel(l));
-              if (surfaceCBound && !isMarkerBound) {
+              if (surfaceCBound) {
                 const argEff = effectsOf(evalArgs[i]) ?? new Set<string>();
                 const boundDom: EffectsDomain = { kind: "effects", labels: surfaceCBound };
                 const actualDom: EffectsDomain = { kind: "effects", labels: argEff };
@@ -620,7 +625,6 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
       if (newBody === value.body) return value;
       const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
       if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
-      if ((value as any).__effectVarParams) (newFn as any).__effectVarParams = (value as any).__effectVarParams;
       for (const k of PRESERVED_FN_META_KEYS) {
         if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
       }
@@ -684,6 +688,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
         _name: p._name,
         predicates: p.predicates,
         effectBound: p.effectBound,
+        effectVar: p.effectVar,
       } as ParamValue));
       // Rewrite Param references in the new body that point to old params,
       // remapping them to the cloned params (matched by position).
@@ -696,10 +701,9 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
         body: remappedBody,
       };
       for (const p of newFn.params) p.owner = newFn;
-      // Preserve generic-param / effect-var-param metadata across clones so
-      // Slice 2's polymorphism resolution still works after substitution.
+      // Preserve generic-param metadata across clones so Slice 2's
+      // polymorphism resolution still works after substitution.
       if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
-      if ((value as any).__effectVarParams) (newFn as any).__effectVarParams = (value as any).__effectVarParams;
       for (const k of PRESERVED_FN_META_KEYS) {
         if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
       }
@@ -909,20 +913,23 @@ export function precompileFunction(
         (domCtx as any).__abstractDomain = dom;
         components.set("domain", domCtx);
       }
-      // F2: preserve effectBound on the placeholder so PE's Param-call
-      // residual path can attach the e-effect when the body calls this
-      // param. Without this, polymorphic functions would lose their
-      // effect-variable markers during precompile.
+      // F2: preserve effectBound/effectVar on the placeholder so PE's
+      // Param-call residual path can attach the e-effect when the body
+      // calls this param. Without this, polymorphic functions would lose
+      // their declared effect variables during precompile.
       const innerParam = makeParamHelper(param.position, param._name);
       if (param.effectBound) (innerParam as any).effectBound = param.effectBound;
+      if (param.effectVar !== undefined) (innerParam as any).effectVar = param.effectVar;
       const placeholder = makeMultiValue(innerParam, components);
       placeholders.push(placeholder);
     } else {
-      // Untyped or type variable — leave as bare Param. Same effectBound
-      // copy so polymorphic params with no concrete type annotation still
-      // propagate (e.g. Stage C2 markers stamped via __genericParams).
+      // Untyped or type variable — leave as bare Param. Same
+      // effectBound/effectVar copy so polymorphic params with no concrete
+      // type annotation still propagate (C7.2c: declared effect variables
+      // referencing __genericParams entries).
       const bare = makeParamHelper(param.position, param._name);
       if (param.effectBound) (bare as any).effectBound = param.effectBound;
+      if (param.effectVar !== undefined) (bare as any).effectVar = param.effectVar;
       placeholders.push(bare);
     }
   }

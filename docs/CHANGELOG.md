@@ -8,6 +8,65 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — C7.2: kind-tower residue (Tranche B — D39 checklist to zero)
+
+Closes the last D39 slot-disposition rows. Three sub-parts; three
+agent-proposed rulings (R1 kernel-private GenericType mint + deferred
+member surface for applied concretes; R2 symbol-fresh distinct; R3
+reserved `construct` spec key) recorded in the structures plan §4 and
+presented for maintainer ratification at landing.
+
+- **C7.2a — GenericType through the kind recipe.** The GenericType kind
+  (Effect pattern): draws Type's kind-member symbols (so `Array
+  instanceof Type` holds by conformance and `type of Array` answers
+  `GenericType`), declares the `params` instance field (`Array.params`
+  dispatches). Generic types stamp shape = GenericType; `isGenericType`
+  is a SHAPE check — the `__isGeneric` presence flag is DELETED. The
+  applier collapses into the generic's `construct` slot (D45
+  one-surface): `__constructor` slot + accessors deleted;
+  `getConstruct` drops the alias fallback (call-as-function behavior
+  unchanged — it already reached the applier through that fallback).
+  `__params` → the plain `params` declared binding. Applied concretes
+  stay shape Type; `__args`/`__generic` remain host-read instance data
+  (registry rows note the consciously deferred member surface — ruling
+  R1 avoids leaking `.args` into every applied-generic value via
+  typeMethod's direct-binding fallback).
+- **C7.2b — distinct + construct kind specs** (the C6.1b deferral).
+  `Base.distinct()` re-derives as a SYMBOL-FRESH mint: parent member
+  descriptors re-declared under a gensym'd scope (same impls, new
+  symbol identity) — newtype non-conformance now falls out of C5.2
+  symbol-identity membership BY CONSTRUCTION; the shared-member-set
+  guard in `shapeAwareSubtypeof` no longer carries distinct (it remains
+  for `structuralWrap`, which genuinely shares the member object). The
+  post-hoc `Type.constructor` meta-method is REMOVED (it mutated a
+  built type against D22); construction authority is declared at mint
+  time via the reserved `construct` spec key —
+  `Type.define({x: Int, construct: (a, b) => …})` (Refinement.define's
+  reserved-key precedent). A construct-only spec mints a record type,
+  not a bundle.
+- **C7.2c — effect vars → declared structure.** The `__effectvar:NAME`
+  marker strings inside effect-label sets and the `__effectVarParams`
+  side table (which had NO functional reader since the F1-F3 walker
+  deletion — only clone-preservation sites) dissolve into
+  `Param.effectVar: string` — a structured reference to the
+  Effect-kinded `__genericParams` entry by name. PE's Param-call branch
+  surfaces the variable's BARE name in inferred sets (an `effects e`
+  declaration matches directly; `checkEffectsDeclarations`' marker
+  normalisation loop is deleted); concrete call sites resolve by
+  ordinary PE substitution as before. Surface C call-site enforcement
+  drops its marker-sniffing skip (`effectBound` is now always
+  concrete). `EFFECT_VAR_MARKER`/`isEffectVarLabel`/`effectVarLabel`
+  deleted from slots.ts; five `__effectVarParams` clone-preservation
+  sites removed across evaluator/runtime.
+
+D39 registry: `__isGeneric` row deleted; `__params`, `__constructor`,
+`__effectvar:`, `__effectVarParams` rows executed; `__args`/`__generic`
+annotated as deferred-surface instance data. New tests: GenericType
+shape/conformance, distinct symbol-freshness + bidirectional
+non-conformance + dispatch, construct spec key (custom authority,
+type tagging, meta-method removal), effectVar declared structure.
+1057/1057 green (was 1052 pre-chunk).
+
 ## 2026-08 — Tranche A docs closeout (B-002, B-031, B-003, B-004)
 
 Post-M1 documentation debt cleared before chunk C7.2; no code-behavior

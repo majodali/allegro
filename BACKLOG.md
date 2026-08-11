@@ -25,11 +25,13 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
 - **Tranche A — M1 closeout (docs):** B-002 (appendices + archive the
   decision log), B-031 (primer verification + bench re-baseline),
   B-003, B-004.
-- **Tranche B — kind-tower residue (chunk C7.2):** GenericType through
-  the recipe (retires `__isGeneric`, settles `__params`/`__args`/
-  `__generic`); `distinct` + `constructor` kind specs; `__effectvar:`/
-  `__effectVarParams` → declared generic-param structure. D39 checklist
-  to zero.
+- **Tranche B — kind-tower residue (chunk C7.2):** LANDED 2026-08 —
+  GenericType through the recipe (`__isGeneric` retired, `params`
+  declared, applier collapsed into `construct`); symbol-fresh `distinct`
+  + reserved `construct` spec key (post-hoc `constructor` meta-method
+  removed); `Param.effectVar` declared structure (`__effectvar:` markers
+  + `__effectVarParams` side table deleted). D39 residue zero; rulings
+  R1–R3 (plan §4) pending maintainer ratification. See CHANGELOG.
 - **Tranche C — next arc:** B-027 equality + lawful interfaces (design
   ratification on structures.md §7–8 → `equality-and-laws.md`), then
   S3 visibility (D41–D43, designed+ratified), then B-028 completion

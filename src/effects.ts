@@ -24,7 +24,7 @@
 // syntax.
 // =============================================================================
 
-import { dataOf, isEffectVarLabel, EFFECT_VAR_MARKER, componentsView, cloneComponents, installChannelMerge } from "./slots.js";
+import { dataOf, componentsView, cloneComponents, installChannelMerge } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ContextValue, MultiValueType,
   makeMultiValue, makeContext,
@@ -195,20 +195,11 @@ export function checkEffectsDeclarations(
     const inferred = stashed ?? new Set<string>();
     const inferredHard = new Set(inferred);
     inferredHard.delete("opaque");
-    // Slice 2 Stage C3: polymorphic declarations like `effects e` for a
-    // function declared `[e: Effect]` carry a `__effectvar:e` marker in
-    // the PE-inferred set (stamped by typed_function_impl on Effect-kinded
-    // generic params). Normalise the marker to its bare
-    // name (`e`) so the declared set's symbolic labels match. The marker
-    // form is only meaningful at call sites where it resolves to actual
-    // effect labels — at definition time the bare name is the contract.
-    for (const lbl of [...inferredHard]) {
-      if (isEffectVarLabel(lbl)) {
-        const bare = lbl.slice(EFFECT_VAR_MARKER.length);
-        inferredHard.delete(lbl);
-        inferredHard.add(bare);
-      }
-    }
+    // C7.2c: polymorphic declarations like `effects e` for a function
+    // declared `[e: Effect]` now surface the variable's BARE name in the
+    // PE-inferred set directly (the Param carries a declared `effectVar`
+    // reference; the `__effectvar:` marker strings are retired), so the
+    // declared set's symbolic labels match without normalisation.
     const missing = effectDifference(inferredHard, wrap.declared);
     if (missing.size > 0) {
       mismatches.push({

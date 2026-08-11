@@ -17,11 +17,11 @@ import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, 
 import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
 import {
   getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
-  getGenericArgs, getGenericParamsSlot, getGenericBackLink, getGenericConstructor,
-  getSlotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, getVariants, isGenericTypeSlot, indexGet, elementsOf,
+  getGenericArgs, getGenericBackLink,
+  getSlotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, getVariants, indexGet, elementsOf,
   setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface,
-  setWraps, setVariants, setPredicate, setGenericParams, setGenericArgs,
-  setGenericBackLink, markGeneric, setGenericConstructor, setProposition,
+  setWraps, setVariants, setPredicate, setGenericArgs,
+  setGenericBackLink, setProposition,
   setEffectBound, setSlotCount, setAbstractDomain,
   writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
   removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape,
@@ -34,7 +34,7 @@ import {
  *  C6.1b: the fluent names (where/interface/preserveOps/mixin/invariant)
  *  left with the fluent API; the surviving kind API is small. */
 const META_METHOD_NAMES = new Set([
-  "instanceof", "subtypeof", "define", "distinct", "constructor",
+  "instanceof", "subtypeof", "define", "distinct",
 ]);
 
 // --- Helpers ---
@@ -114,7 +114,7 @@ export function applyBoundaryBound(v: Value, expected: ContextValue): Value {
   if (getEffectLabels(expected) !== undefined) return v;
   if (getInterfaceMarker(expected) !== undefined) return v;
   if (getVariants(expected) !== undefined) return v;
-  if (isGenericTypeSlot(expected) || getGenericArgs(expected) !== undefined) return v;
+  if (isGenericType(expected) || getGenericArgs(expected) !== undefined) return v;
   const stored = getType(v);
   if (!stored) return v;
   if (typeShape(stored) === typeShape(expected)) {
@@ -372,8 +372,10 @@ function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
   //  3. refinement satisfaction — A's `refines` chain reaching B (a
   //     knowledge layer over B's shape; identity walk);
   //  4. shared-member-set guard — the same member-set OBJECT without a
-  //     refines path is knowledge-layer plumbing (`distinct`), NOT a
-  //     declaration: distinct types conform to nothing but themselves;
+  //     refines path is projection plumbing (`structuralWrap` shares the
+  //     member object), NOT a declaration. (C7.2b: `distinct` no longer
+  //     rides this guard — it mints FRESH member symbols, so newtype
+  //     non-conformance falls out of membership by construction.);
   //  5. generic-args guard — Array[Int] vs Array[String] share member
   //     symbols (one declaring generic), so args must match;
   //  6. symbol-identity MEMBERSHIP — the D44 conformance relation, the
@@ -721,10 +723,22 @@ function buildRecordType(
   // field. Methods do not participate in the positional constructor.
   const fields: { name: string; type: Value }[] = [];
   const methods: { name: string; impl: Value }[] = [];
+  // C7.2b (ruling R3): `construct` is a RESERVED spec key — the declared
+  // construction authority (Refinement.define's reserved-key precedent:
+  // refines/where/preserve). Declared at mint time, replacing the post-hoc
+  // `.constructor()` meta-method (which MUTATED a built type against D22).
+  let customConstruct: Value | null = null;
   for (const [key, binding] of (fieldCtx as ContextValue).bindings) {
     if (isMetaSlotKey(key)) continue;
     if (binding.value) {
       const entry = dataOf(binding.value);
+      if (key === "construct") {
+        if (entry.kind !== ValueKind.ComposedFunction && entry.kind !== ValueKind.PrimitiveFunction) {
+          throw new AllegroError("define: reserved key 'construct' must be a function value");
+        }
+        customConstruct = entry;
+        continue;
+      }
       if (entry.kind === ValueKind.ComposedFunction || entry.kind === ValueKind.PrimitiveFunction) {
         methods.push({ name: key, impl: entry });
       } else {
@@ -814,25 +828,37 @@ function buildRecordType(
   // every other concrete bundle at draw time (two auto-toStrings under
   // one base name is the D44 explicit-conflict error). An empty spec
   // (`Type.define({})`) still mints a full record type.
-  const isBundle = fields.length === 0 && methods.length > 0;
+  const isBundle = fields.length === 0 && methods.length > 0 && customConstruct === null;
   if (isBundle) {
     setMembers(newType, members);
     return newType;
   }
 
-  // Auto-generate __construct: positional args in field order
-  const constructImpl: PrimitiveFnImpl = (args, ctx, evalFn) => {
-    const evalArgs = args.map(a => evalFn!(a, ctx!));
-    if (evalArgs.length !== fields.length) {
-      throw new AllegroError(`Constructor expects ${fields.length} args, got ${evalArgs.length}`);
-    }
-    const instance = makeContext();
-    for (let i = 0; i < fields.length; i++) {
-      addBinding(instance, fields[i].name, evalArgs[i]);
-    }
-    return withType(instance, newType);
-  };
-  setConstruct(newType, makePrimitive("record.__construct", constructImpl, true));
+  if (customConstruct !== null) {
+    // C7.2b (ruling R3): declared construction authority — the spec's
+    // `construct` function runs with the call's args; its result is
+    // tagged with this type (same wrap the retired `.constructor()`
+    // meta-method applied, now declared at mint time).
+    const declaredCtor = customConstruct;
+    setConstruct(newType, makePrimitive("record.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
+      const result = ctorEvalFn!(makeExpr(declaredCtor, ctorArgs), ctorCtx!);
+      return withTypeReplacing(dataOf(result), newType);
+    }, true));
+  } else {
+    // Auto-generate __construct: positional args in field order
+    const constructImpl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+      const evalArgs = args.map(a => evalFn!(a, ctx!));
+      if (evalArgs.length !== fields.length) {
+        throw new AllegroError(`Constructor expects ${fields.length} args, got ${evalArgs.length}`);
+      }
+      const instance = makeContext();
+      for (let i = 0; i < fields.length; i++) {
+        addBinding(instance, fields[i].name, evalArgs[i]);
+      }
+      return withType(instance, newType);
+    };
+    setConstruct(newType, makePrimitive("record.__construct", constructImpl, true));
+  }
 
   // Auto-generate __getMember: field access on instances
   setFallbackMember(newType, makePrimitive("record.__getMember", (args) => {
@@ -1084,7 +1110,16 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
 // swept in C6.3's slot-disposition pass.
 
 /**
- * Build a distinct type: copies parent, breaks subtypeof chain.
+ * Build a distinct type — the NEWTYPE mint (C7.2b, ruling R2).
+ *
+ * A distinct type is a SYMBOL-FRESH re-declaration: the parent's member
+ * descriptors are re-declared under the distinct type's own gensym'd
+ * scope — same implementations, NEW symbol identity. Non-conformance
+ * (`UserId subtypeof Int` false, and vice versa) then falls out of C5.2
+ * symbol-identity membership BY CONSTRUCTION: no member symbol is shared,
+ * so the membership check fails naturally. (The shared-member-set guard
+ * in shapeAwareSubtypeof no longer carries distinct — it remains for
+ * structuralWrap, which genuinely shares the member object.)
  */
 function buildDistinctType(parentType: ContextValue): ContextValue {
   const distinctType = makeContext();
@@ -1096,10 +1131,16 @@ function buildDistinctType(parentType: ContextValue): ContextValue {
       addBinding(distinctType, key, binding.value);
     }
   }
-  // Copy __members from parent (shared reference — same descriptors)
+  // Re-declare the parent's members under a fresh scope (fresh symbols).
   const parentMembers = getMembers(parentType);
   if (parentMembers?.kind === ValueKind.Structure) {
-    setMembers(distinctType, parentMembers);
+    const freshScope = newTypeMemberScope("<distinct>");
+    const freshMembers = makeContext();
+    for (const [key, b] of (parentMembers as ContextValue).bindings) {
+      if (!b.value) continue;
+      addMember(freshMembers, freshScope, fqnBaseName(key), b.value);
+    }
+    setMembers(distinctType, freshMembers);
   }
   // Override __name and __type
   removeName(distinctType);
@@ -1348,23 +1389,14 @@ addMember(typeMembers, TYPE_MEMBER_SCOPE, "define", makeMethodDescriptor("define
 // `invariant` are the refinement mint (`T & pred`, chained for multiple
 // clauses); `interface` is `Interface.define(spec, ...bundles)`; `mixin`
 // is method-valued entries in `define` specs (or drawing a bundle);
-// `preserveOps` is the Refinement spec's `preserve` option. `distinct`
-// and `constructor` remain pending their own kind-spec designs.
+// `preserveOps` is the Refinement spec's `preserve` option.
+// C7.2b: `distinct` keeps its kind-member (the newtype mint, now
+// symbol-fresh); `constructor` is REMOVED — it mutated a built type
+// (against D22); construction authority is declared at mint time via
+// the reserved `construct` spec key (ruling R3).
 addMember(typeMembers, TYPE_MEMBER_SCOPE, "distinct", makeMethodDescriptor("distinct",
   makePrimitive("Type.distinct", (args) => {
     return wrapType(buildDistinctType(args[0] as ContextValue));
-  })
-));
-addMember(typeMembers, TYPE_MEMBER_SCOPE, "constructor", makeMethodDescriptor("constructor",
-  makePrimitive("Type.constructor", (args) => {
-    const type = args[0] as ContextValue;
-    const fn = args[1];
-    removeConstruct(type);
-    setConstruct(type, makePrimitive("custom.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
-      const result = ctorEvalFn!(makeExpr(fn, ctorArgs), ctorCtx!);
-      return withTypeReplacing(dataOf(result), type);
-    }, true));
-    return wrapType(type);
   })
 ));
 setMembers(Type, typeMembers);
@@ -2289,8 +2321,44 @@ setConstruct(BoolType, makePrimitive("Bool.__construct", (args, ctx, evalFn) => 
 }, true));
 
 // =============================================================================
-// Generic Type Infrastructure
+// GenericType — the kind of generic types (C7.2a)
+//
+// A GENERIC TYPE (Array, Function, user generics) is a TYPE CONSTRUCTOR: its
+// construct authority takes type arguments and mints concrete types
+// (`Array[Int]`), memoized so equal parameterizations are the same Context.
+// C7.2a re-derives it through the kind recipe (the Effect/Proof pattern):
+// GenericType draws Type's kind-member symbols (kind-hood is conformance to
+// Type) and declares its instances' `params` field; generic types stamp
+// shape = GenericType, so `isGenericType` is a SHAPE CHECK — the __isGeneric
+// presence flag is deleted (D39: the flag IS the kind).
+//
+// The applier lives in the generic's own `construct` slot (D45: ONE
+// construction surface — the separate `__constructor` alias is collapsed;
+// call-as-function and `type_apply` both invoke it). Applied concretes stay
+// shape Type — they are ordinary types; their `__args`/`__generic` back-links
+// remain host-read instance data (a language-level member surface for them
+// is consciously deferred — see the C7.2 rulings in the plan).
+//
+// The mint (buildGenericType) is KERNEL-PRIVATE, like Proof's makeProof:
+// GenericType exposes no construct authority to Allegro — user-defined
+// generic types are a future surface with their own design.
 // =============================================================================
+
+export const GenericType: ContextValue = makeContext();
+setName(GenericType, stringToBits("GenericType"));
+writeShape(GenericType, Type);
+
+const GENERIC_MEMBER_SCOPE = typeMemberScopeFqn("GenericType");
+const genericTypeMembers = makeContext();
+// Draw Type's kind API verbatim — same member symbols, so `GenericType
+// subtypeof Type` holds by membership and generic types keep the kind API
+// (`Array instanceof Type` stays true through conformance).
+for (const [key, b] of typeMembers.bindings) {
+  if (b.value) addBinding(genericTypeMembers, key, b.value);
+}
+setMembers(GenericType, genericTypeMembers);
+// The `params` field descriptor is declared after ArrayType exists
+// (bootstrap order — ArrayType is itself minted through buildGenericType).
 
 /**
  * Build a GenericType: a type constructor that takes type parameters and
@@ -2360,14 +2428,20 @@ export function buildGenericType(
     return `unk:${idx}`;
   }
 
-  // Build the base type with methods + generic metadata
+  // Build the base type with methods, then re-stamp its shape: a generic
+  // type is an INSTANCE of the GenericType kind (C7.2a).
   const ctx = buildType(name, methods, { methodEffects: options?.methodEffects });
+  removeShapeSlot(ctx);
+  writeShape(ctx, GenericType);
 
-  // Add __params (use raw array to avoid circular dep with ArrayType)
-  setGenericParams(ctx, makeRawArrayCtx(paramNames.map(n => stringToBits(n))));
+  // `params` — declared instance data (the GenericType kind holds the field
+  // descriptor; storage is a plain binding, like Effect's kind/labels).
+  // Raw array to avoid circular dep with ArrayType (minted through here).
+  addBinding(ctx, "params", makeRawArrayCtx(paramNames.map(n => stringToBits(n))));
 
-  // Add __constructor
-  const constructorFn = makePrimitive(`${name}.__constructor`, (args: Value[]) => {
+  // The applier IS the generic's construct authority (D45 collapse — the
+  // separate __constructor slot is retired): type args in, concrete type out.
+  const constructorFn = makePrimitive(`${name}.__construct`, (args: Value[]) => {
     const key = cacheKey(args);
     const cached = cache.get(key);
     if (cached) return cached;
@@ -2381,10 +2455,7 @@ export function buildGenericType(
     cache.set(key, concrete);
     return concrete;
   });
-  setGenericConstructor(ctx, constructorFn);
-
-  // Mark as generic
-  markGeneric(ctx, makeInt(1));
+  setConstruct(ctx, constructorFn);
 
   return ctx;
 }
@@ -2412,10 +2483,11 @@ function defaultConcreteType(
 }
 
 /**
- * Check if a type is a generic type (has __isGeneric).
+ * Check if a type is a generic type — a SHAPE check (C7.2a): generic types
+ * are the instances of the GenericType kind. The __isGeneric flag is gone.
  */
 export function isGenericType(type: ContextValue): boolean {
-  return isGenericTypeSlot(type);
+  return channelReadRaw(type, "type") === GenericType;
 }
 
 /**
@@ -2443,7 +2515,7 @@ export function getGenericType(type: ContextValue): ContextValue | null {
  * Get the number of type parameters on a generic type.
  */
 function getGenericParamCount(generic: ContextValue): number {
-  const paramsV = getGenericParamsSlot(generic);
+  const paramsV = generic.bindings.get("params")?.value;
   if (!paramsV) return 0;
   const paramsCtx = dataOf(paramsV);
   if (paramsCtx.kind !== ValueKind.Structure) return 0;
@@ -2468,7 +2540,9 @@ export function normalizeType(type: ContextValue): ContextValue {
  * Apply type arguments to a generic type, returning the concrete type.
  */
 export function applyGenericType(generic: ContextValue, args: Value[]): ContextValue {
-  const ctorV = getGenericConstructor(generic);
+  // C7.2a: the applier IS the generic's construct authority (D45 — one
+  // construction surface; call-as-function reaches the same slot).
+  const ctorV = getConstruct(generic);
   if (!ctorV || ctorV.kind !== ValueKind.PrimitiveFunction) {
     throw new AllegroError(`Not a generic type: ${bitsToString(getName(generic) as BitsValue ?? stringToBits("unknown"))}`);
   }
@@ -2504,6 +2578,12 @@ const functionTypeMethods: Record<string, PrimitiveFnImpl> = {
 };
 
 export const FunctionType: ContextValue = buildGenericType("Function", ["ParamTypes", "ReturnType"], functionTypeMethods);
+
+// GenericType's declared instance field (C7.2a) — added here because
+// ArrayType (the descriptor's fieldType) is itself minted through
+// buildGenericType above. `Array.params` dispatches through the kind's
+// shape to this descriptor, reading the instance's `params` binding.
+addMember(genericTypeMembers, GENERIC_MEMBER_SCOPE, "params", makeFieldDescriptor("params", ArrayType));
 
 /** Create a concrete FunctionType from param types and return type. */
 export function makeFunctionType(paramTypes: Value[], returnType: Value): ContextValue {

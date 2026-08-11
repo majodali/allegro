@@ -112,7 +112,7 @@ Types are Structure values with `__name`, `__type`, `__members`, and other meta-
 - `Array[Int]` is a concrete type produced by applying `Array` to `Int`
 - Type parameters can be types or values (e.g., `Vector[3]`)
 - Concrete types are memoized — `Array[Int]` always returns the same Context
-- Generic types have `type = GenericType` (subtype of `Type`)
+- Generic types have `type = GenericType` (C7.2a: a kind through the Effect recipe — draws Type's kind-member symbols, declares the `params` instance field; `isGenericType` is a SHAPE check, the `__isGeneric` flag is retired). The applier IS the generic's `construct` slot (D45 one-surface; the `__constructor` alias is retired). The mint is kernel-private (Proof precedent); applied concretes stay shape Type with host-read `__args`/`__generic`
 - Bare generic in annotations auto-applies `Any`: `arr: Array` → `arr: Array[Any]`
 
 ### Function Types and Unification
@@ -128,7 +128,7 @@ Types are Structure values with `__name`, `__type`, `__members`, and other meta-
 - **Field descriptors**: `{__type: FieldType, name: String, fieldType: Type}` — typed field declarations (on record types)
 - `typeMethod(type, name)` reads from `__members` first, falls back to direct bindings — the single bridge function for all member access
 - `typeMemberDescriptor(type, name)` returns the full descriptor for dispatch-level access
-- The Type meta-type stores its kind API (instanceof, subtypeof, define, distinct, constructor) in `__members`. `instanceof` and `subtypeof` are conformance checks; `define` is the NAMED FACTORY delegating to the kind's `construct` authority. The fluent API (`extend`/`where`/`interface`/`mixin`/`preserveOps`/`invariant`) is REMOVED (D44/D45, no sugar): records/methods/bundles are `Type.define(spec, ...bundles)`, refinements and invariants are the `&` mint, interfaces are `Interface.define(spec, ...bundles)`, operator preservation is the Refinement spec's `preserve` option.
+- The Type meta-type stores its kind API (instanceof, subtypeof, define, distinct) in `__members`. `instanceof` and `subtypeof` are conformance checks; `define` is the NAMED FACTORY delegating to the kind's `construct` authority. The fluent API (`extend`/`where`/`interface`/`mixin`/`preserveOps`/`invariant`) is REMOVED (D44/D45, no sugar): records/methods/bundles are `Type.define(spec, ...bundles)`, refinements and invariants are the `&` mint, interfaces are `Interface.define(spec, ...bundles)`, operator preservation is the Refinement spec's `preserve` option. C7.2b: `distinct` is the SYMBOL-FRESH newtype mint (members re-declared under a fresh scope — non-conformance falls out of symbol-identity membership by construction); the post-hoc `constructor` meta-method is REMOVED — construction authority is declared at mint time via the reserved `construct` spec key (`Type.define({x: Int, construct: (a) => …})`).
 - Structural checking compares `__members` collections: every member in the expected type must exist in the actual type
 
 ### Type-Directed Dispatch

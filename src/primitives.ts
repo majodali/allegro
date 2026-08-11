@@ -1838,14 +1838,16 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Without this, function-typed params would always look effect-less
   // inside their declarer.
   //
-  // Stage C2: also detect effect-variable param types (paramType is a Symbol
-  // matching an Effect-kinded entry in the function's `__genericParams`) and
-  // stamp the Param with a `__effectvar:NAME` marker. The marker labels are
-  // resolved at call sites by substitution against the actual arg's effects.
+  // C7.2c (was Stage C2): effect-variable param types (paramType is a Symbol
+  // matching an Effect-kinded entry in the function's `__genericParams`) set
+  // the Param's DECLARED `effectVar` reference — the variable's bare name
+  // rides inferred effect sets; concrete call sites resolve it by ordinary
+  // PE substitution. The `__effectvar:` marker strings and the
+  // `__effectVarParams` side table are retired (D39).
   const fnPrimary = dataOf(fn);
   if (fnPrimary.kind === ValueKind.ComposedFunction) {
     const cFn = fnPrimary as any;
-    const params = cFn.params as Array<{ effectBound?: Set<string> }>;
+    const params = cFn.params as Array<{ effectBound?: Set<string>; effectVar?: string }>;
     const genericParams = (cFn as any).__genericParams as Array<{ name: string; kind?: any }> | undefined;
     const effectVarNames = new Set<string>();
     if (genericParams) {
@@ -1855,7 +1857,6 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         }
       }
     }
-    const effectVarParams: Map<string, number[]> = new Map();
     for (let i = 0; i < Math.min(params.length, paramTypes.length); i++) {
       const pt = paramTypes[i];
       if (!pt) continue;
@@ -1870,21 +1871,14 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         continue;
       }
       // Effect variable: paramType is a Symbol whose name matches an Effect-
-      // kinded generic-param declaration. Stamp the Param with a marker
-      // labelled `__effectvar:NAME` so PE's substitution resolves it at the
-      // call site against the actual arg's effects.
+      // kinded generic-param declaration. Set the declared reference; PE's
+      // Param-call branch surfaces the bare variable name in inferred sets.
       if (pt.kind === ValueKind.Symbol) {
         const symName = (pt as any).name as string;
         if (effectVarNames.has(symName)) {
-          params[i].effectBound = new Set<string>([`__effectvar:${symName}`]);
-          const arr = effectVarParams.get(symName) ?? [];
-          arr.push(i);
-          effectVarParams.set(symName, arr);
+          params[i].effectVar = symName;
         }
       }
-    }
-    if (effectVarParams.size > 0) {
-      (cFn as any).__effectVarParams = effectVarParams;
     }
     // Stage D — Surface C `param_effects f: pure` body-form. C1.5b: the
     // (paramRef, effSym) pairs are stashed on the function by

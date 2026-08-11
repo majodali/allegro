@@ -63,8 +63,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "__name", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.name" },
   { name: "__members", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.members" },
   { name: "__refines", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.refines" },
-  { name: "__construct", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.construct", notes: "per-kind minting authority (D40 R2)" },
-  { name: "__constructor", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.construct", notes: "alias of __construct; collapses into one member" },
+  { name: "__construct", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.construct", notes: "per-kind minting authority (D40 R2). C7.2a: the __constructor alias is EXECUTED — collapsed into this slot (generic types hold their applier here; one construction surface, D45)" },
   { name: "__getMember", storages: ["context-binding", "js-property"], owner: "Type", disposition: "member", target: "Type.fallbackMember" },
   { name: "__interface", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.structural" },
   // __invariantsList — SWEPT at C6.3: no writer since C6.1b folded
@@ -76,12 +75,16 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "__predicate", storages: ["context-binding"], owner: "Refinement", disposition: "member", target: "predicate" },
   { name: "__abstractDomain", storages: ["js-property"], owner: "Refinement", disposition: "member", target: "domain" },
 
-  // --- GenericType fields -----------------------------------------------------
+  // --- GenericType fields — C7.2a EXECUTED (D39 checklist) ---------------------
+  // __params → the `params` declared instance binding on generic types (the
+  // GenericType kind holds the field descriptor); __isGeneric → DELETED (the
+  // flag IS the kind: shape = GenericType); __constructor → collapsed into
+  // the generic's `construct` slot (D45 one-surface). __args/__generic stay
+  // as host-read instance data on applied concretes (member surface for
+  // applied types consciously deferred — C7.2 ruling R1).
   { name: "__genericParams", storages: ["js-property"], owner: "GenericType", disposition: "member", target: "params", notes: "on ComposedFunction; survives clones via subst/remapParams" },
-  { name: "__params", storages: ["context-binding"], owner: "GenericType", disposition: "member", target: "params" },
-  { name: "__args", storages: ["context-binding"], owner: "GenericType", disposition: "member", target: "args" },
-  { name: "__generic", storages: ["context-binding"], owner: "GenericType", disposition: "member", target: "generic (constructor back-link)" },
-  { name: "__isGeneric", storages: ["context-binding"], owner: "GenericType", disposition: "delete", target: "n/a — the flag IS the kind (shape = GenericType)" },
+  { name: "__args", storages: ["context-binding"], owner: "GenericType", disposition: "member", target: "args", notes: "C7.2a: host-read instance data on applied concretes; language surface deferred" },
+  { name: "__generic", storages: ["context-binding"], owner: "GenericType", disposition: "member", target: "generic (constructor back-link)", notes: "C7.2a: host-read instance data on applied concretes; language surface deferred" },
 
   // --- Proof fields — EXECUTED at C6.3 (D39 checklist): the five proof
   // fields are plain instance-data bindings (proposition / reason /
@@ -92,8 +95,12 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // --- Effect fields -------------------------------------------------------------
   { name: "__effectLabels", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect.labels", notes: "C6.2 (D40): the instance IS its label set — Set<string>, empty for pure, null for opaque (top); the `kind`/`labels` data bindings are the declared-member view. Replaces the retired __effect_kind slot (D39: -> Effect.kind, checked off)" },
   { name: "__effectBound", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect instance label-set representation (dissolves at C6.2; the annotation-bound reading becomes derived)", notes: "D39 addendum, maintainer-ratified 2026-07: member for now; when Effect re-derives through the kind recipe an instance IS its label set, so the stored bound collapses into it" },
-  { name: "__effectvar:", storages: ["label-marker"], owner: "Effect", disposition: "member", target: "declared generic-param structure on function types", prefix: true },
-  { name: "__effectVarParams", storages: ["js-property"], owner: "Effect", disposition: "member", target: "declared generic-param structure on function types" },
+  // __effectvar: label markers + __effectVarParams side table — C7.2c
+  // EXECUTED (D39): dissolved into the declared structure — `Param.effectVar`
+  // references the Effect-kinded `__genericParams` entry by name; the
+  // variable's bare name rides inferred effect sets; concrete call sites
+  // resolve by ordinary PE substitution. (The side table had no functional
+  // reader since the F1-F3 walker deletion.)
 
   // --- Channels (D36 / D21–D24): value-plane metadata, not fields ---------------
   { name: "__type", storages: ["context-binding"], owner: "shape channel", disposition: "channel", target: "shape (D36)" },
@@ -205,7 +212,7 @@ export function asContext(v: Value | null | undefined): ContextValue | null {
 export function getName(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__name"); }
 export function getMembers(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__members"); }
 export function getRefines(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__refines"); }
-export function getConstruct(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__construct") ?? slotRead(ctx, "__constructor"); }
+export function getConstruct(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__construct"); }
 export function getFallbackMember(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__getMember"); }
 export function isInterfaceType(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__interface"); }
 export function getInterfaceMarker(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__interface"); }
@@ -220,8 +227,6 @@ export function getAbstractDomain(ctx: ContextValue): any { return (ctx as any).
 // GenericType fields
 export function getGenericArgs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__args"); }
 export function getGenericBackLink(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__generic"); }
-export function isGenericType(ctx: ContextValue): boolean { return ctx.bindings.has("__isGeneric"); }
-export function isGenericTypeSlot(ctx: ContextValue): boolean { return slotRead(ctx, "__isGeneric") !== undefined; }
 
 // Proof fields
 export function getProposition(ctx: ContextValue): Value | undefined { return slotRead(ctx, "proposition"); }
@@ -350,12 +355,9 @@ export function renameInPlace(ctx: ContextValue, name: Value): void {
 export function setPredicate(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__predicate", v); }
 export function setAbstractDomain(ctx: ContextValue, d: unknown): void { (ctx as any).__abstractDomain = d; }
 
-// GenericType fields
-export function setGenericParams(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__params", v); }
+// GenericType fields (C7.2a: applied-concrete instance data, host-read)
 export function setGenericArgs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__args", v); }
 export function setGenericBackLink(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__generic", v); }
-export function markGeneric(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__isGeneric", v); }
-export function getGenericParamsSlot(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__params"); }
 
 // Proof fields
 export function setProposition(ctx: ContextValue, v: Value): void { slotWrite(ctx, "proposition", v); }
@@ -405,16 +407,13 @@ export const SLOT_KEYS = {
   members: "__members",
   refines: "__refines",
   construct: "__construct",
-  constructor: "__constructor",
   getMember: "__getMember",
   interface: "__interface",
   wraps: "__wraps",
   union: "__union",
   predicate: "__predicate",
-  params: "__params",
   args: "__args",
   generic: "__generic",
-  isGeneric: "__isGeneric",
   type: "__type",
   discharged: "__discharged",
   length: "__length",
@@ -446,11 +445,6 @@ export function removeConstruct(ctx: ContextValue): void {
   if (idx >= 0) ctx.bindingList.splice(idx, 1);
 }
 
-// GenericType's own constructor slot ("__constructor" — the type-constructor
-// function, semantically distinct from a concrete type's "__construct")
-export function getGenericConstructor(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__constructor"); }
-export function setGenericConstructor(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__constructor", v); }
-
 // --- Data plane -----------------------------------------------------------------------
 
 /** Data-plane read (C4.3c: `primaryOf` retired — this is THE accessor).
@@ -476,14 +470,6 @@ export function cloneComponents(v: Value): Map<string, Value> {
   const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
   return comps !== undefined ? new Map(comps) : new Map();
 }
-
-// --- Label markers -------------------------------------------------------------------------
-
-/** Effect-variable marker prefix inside effect labels (Stage C2 machinery;
- *  dissolves into declared generic-param structure per D39). */
-export const EFFECT_VAR_MARKER = "__effectvar:";
-export function isEffectVarLabel(label: string): boolean { return label.startsWith(EFFECT_VAR_MARKER); }
-export function effectVarLabel(name: string): string { return EFFECT_VAR_MARKER + name; }
 
 // --- Channel registry + writer capabilities (C1.4, per D21–D24) -----------------------
 //

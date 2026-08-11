@@ -9,7 +9,7 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw } from "./slots.js";
 import { exportedSymbols, symbolFromWire, kernelMemberFqn } from "./symbols.js";
@@ -1845,13 +1845,13 @@ f([1, 2, 3]) + g([10, 20])
 });
 
 test("generics: Array is a generic type", () => {
-  // Array in the context should have __isGeneric
+  // C7.2a: generic-ness IS the kind — Array's shape answers GenericType
+  // (the __isGeneric presence flag is retired).
   const result = evalStd("Array");
   const p = dataOf(result!);
-  if (p.kind === ValueKind.Structure) {
-    const isGen = (p as ContextValue).bindings.get("__isGeneric");
-    eq(isGen !== undefined, true);
-  }
+  eq(p.kind === ValueKind.Structure, true);
+  eq(isGenericType(p as ContextValue), true);
+  eq((p as ContextValue).bindings.has("__isGeneric"), false);
 });
 
 // == Any Type ==
@@ -3370,13 +3370,73 @@ x + 0
   eq(Number((dataOf(result!) as BitsValue).data), 42);
 });
 
-test("constructor: override", () => {
+test("distinct: symbol-fresh mint — no shared member symbols (C7.2b)", () => {
+  // Ruling R2: distinct re-declares the parent's members under a fresh
+  // scope. Non-conformance falls out of symbol-identity membership by
+  // construction — no member-symbol key overlaps with the parent's.
+  const ext = createTypeSystem();
+  const intT = dataOf(ext.bindings["Int"] as unknown as Value) as ContextValue;
+  const result = evalStd(`UserId = Int.distinct()\nUserId`);
+  const distinctT = dataOf(result!) as ContextValue;
+  const membersOf = (t: ContextValue) => t.bindings.get("__members")?.value as ContextValue | undefined;
+  const parentMembers = membersOf(intT);
+  const distinctMembers = membersOf(distinctT);
+  eq(parentMembers !== undefined && distinctMembers !== undefined, true);
+  for (const key of distinctMembers!.bindings.keys()) {
+    eq(parentMembers!.bindings.has(key), false);
+  }
+  // Same base-name surface: dispatch still finds every parent member.
+  eq(distinctMembers!.bindings.size, parentMembers!.bindings.size);
+});
+
+test("distinct: subtypeof fails in both directions (C7.2b)", () => {
   const result = evalStd(`
-Point = Type.define({x: Int, y: Int}).constructor((a, b) => {x: a * 2, y: b * 2})
+UserId = Int.distinct()
+a = UserId subtypeof Int
+b = Int subtypeof UserId
+a || b
+`);
+  eq(Number((dataOf(result!) as BitsValue).data), 0);
+});
+
+test("distinct: dispatch works through fresh symbols (C7.2b)", () => {
+  const result = evalStd(`
+UserId = Int.distinct()
+x = UserId(41)
+(x + 1).toString()
+`);
+  eq(bitsToString(dataOf(result!) as BitsValue), "42");
+});
+
+test("construct spec key: custom construction authority", () => {
+  // C7.2b (ruling R3): construction authority is DECLARED at mint time
+  // via the reserved `construct` spec key — the post-hoc `.constructor()`
+  // meta-method (which mutated a built type) is removed.
+  const result = evalStd(`
+Point = Type.define({x: Int, y: Int, construct: (a, b) => {x: a * 2, y: b * 2}})
 p = Point(5, 10)
 p.x
 `);
   eq(Number((dataOf(result!) as BitsValue).data), 10);
+});
+
+test("construct spec key: result is tagged with the defined type", () => {
+  const result = evalStd(`
+Point = Type.define({x: Int, y: Int, construct: (a, b) => {x: a, y: b}})
+p = Point(1, 2)
+p instanceof Point
+`);
+  eq(Number((dataOf(result!) as BitsValue).data), 1);
+});
+
+test("constructor meta-method is removed (C7.2b)", () => {
+  let threw = false;
+  try {
+    evalStd(`Type.define({x: Int}).constructor((a) => {x: a})`);
+  } catch {
+    threw = true;
+  }
+  eq(threw, true);
 });
 
 // == Guard Clauses (and) ==
@@ -4923,17 +4983,20 @@ test("Stage C1: export NAME[generic_decl](...) parses", () => {
 
 // --- Phase D1 Slice 2 Stage C2: effect-variable unification at call sites ---
 
-test("Stage C2: __effectVarParams metadata records var positions", () => {
+test("C7.2c: effect-variable params carry the declared effectVar reference", () => {
   // For `apply[e: Effect](g: e, x: Int): Int`, position 0 is the e-bound
-  // param. Stamping in typed_function_impl records this mapping.
+  // param. C7.2c: the declared structure is `Param.effectVar` referencing
+  // the Effect-kinded __genericParams entry by name — the __effectVarParams
+  // side table and `__effectvar:` marker labels are retired.
   const src = `apply[e: Effect](g: e, x: Int): Int => g(x)\napply`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = dataOf(evalCtx.bindings.get("apply")!.value!);
-  const map = (fn as any).__effectVarParams as Map<string, number[]> | undefined;
-  eq(map !== undefined, true);
-  if (map) {
-    eq(map.has("e"), true);
-    eq(JSON.stringify(map.get("e")), "[0]");
+  eq((fn as any).__effectVarParams === undefined, true);
+  if (fn.kind === ValueKind.ComposedFunction) {
+    eq((fn.params[0] as any).effectVar, "e");
+    eq((fn.params[1] as any).effectVar, undefined);
+    const bound = (fn.params[0] as any).effectBound as Set<string> | undefined;
+    eq(bound === undefined, true, "effect-var param carries no concrete bound");
   }
 });
 
@@ -5149,11 +5212,12 @@ auto_caller(f, x: Int): Int =>
   }
 });
 
-test("Stage C3: polymorphic function declaring `effects e` verifies (marker normalises to bare name)", () => {
-  // The walker stamps __effectvar:e in the inferred set, but the declaration
-  // check normalises the marker to its bare name `e` so the symbolic
-  // declaration matches at definition time. Concrete resolution happens at
-  // call sites where the marker resolves to actual labels.
+test("Stage C3: polymorphic function declaring `effects e` verifies (bare variable name matches)", () => {
+  // C7.2c: PE surfaces the effect variable's BARE name (`e`) in the
+  // inferred set directly (from the Param's declared `effectVar`), so the
+  // symbolic declaration matches at definition time with no marker
+  // normalisation. Concrete resolution happens at call sites by ordinary
+  // PE substitution.
   //
   // Hand-built effects_attach since the test harness doesn't load the
   // effects grammar; mirrors existing Phase D1 tests' shape.
@@ -5166,13 +5230,13 @@ test("Stage C3: polymorphic function declaring `effects e` verifies (marker norm
   } catch (e: any) {
     threw = true;
   }
-  eq(threw, false, "polymorphic effects e should verify against __effectvar:e");
+  eq(threw, false, "polymorphic effects e should verify against the declared variable");
 });
 
 test("Stage C3: polymorphic body with extra effect under-declared fires mismatch", () => {
   // bad_apply declares `effects e` but its body also runs print (io) outside
-  // the polymorphic call. inferred = {__effectvar:e, io}; normalised to
-  // {e, io}; declared = {e}; missing = {io} → halt.
+  // the polymorphic call. inferred = {e, io} (C7.2c: bare variable name);
+  // declared = {e}; missing = {io} → halt.
   const src = `bad_apply[e: Effect](g: e, x: Int): Int =>
   effects_attach(seq(print("trace"), g(x)), typed_array(e))
 `;
@@ -5538,17 +5602,18 @@ test("Stage F2: Param.effectBound carries Surface A pure annotation", () => {
   }
 });
 
-test("Stage F2: PE residual at unresolved-Param call carries effectBound", () => {
-  // F2c: when PE evaluates `Expression(Param_with_effectBound, args)`, the
-  // residual carries the bound's labels via the effects component. This is
-  // what lets polymorphic functions populate __inferredEffects for the
-  // outer function during precompile.
+test("Stage F2: PE residual at unresolved-Param call carries the effect variable", () => {
+  // F2c: when PE evaluates `Expression(Param_with_effectVar, args)`, the
+  // residual carries the declared variable's BARE name via the effects
+  // component (C7.2c: no marker prefix). This is what lets polymorphic
+  // functions populate __inferredEffects for the outer function during
+  // precompile.
   const src = `apply[e: Effect](g: e, x: Int): Int => g(x)\napply\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("apply")!.value!;
   const eff = effectsOf(fn);
-  eq(eff?.has("__effectvar:e"), true,
-     `expected effect-variable marker on apply, got: ${eff ? [...eff].join(",") : "none"}`);
+  eq(eff?.has("e"), true,
+     `expected effect variable 'e' on apply, got: ${eff ? [...eff].join(",") : "none"}`);
 });
 
 test("Stage F2: polymorphic apply propagates io callback's effects to caller", () => {

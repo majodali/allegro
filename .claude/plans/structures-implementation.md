@@ -584,6 +584,52 @@ Battery: carrier-duality tests (typed scalar answers Structure; dataOf
 reads primary; channels ride), non-nesting, forgery re-run over the
 carrier path, suite green.
 
+**C7.2 — kind-tower residue (Tranche B, maintainer-ratified sequence
+2026-08).** Drives the D39 checklist to zero. Three sub-parts:
+
+*C7.2a — GenericType through the recipe.* The GenericType kind (Effect
+pattern): draws Type's kind-member symbols, declares the `params`
+instance field; generic types (Array, Function) stamp shape =
+GenericType, so `isGenericType` is a SHAPE check and `__isGeneric` is
+DELETED. The applier collapses into the generic's `construct` slot
+(D45 one-surface; `__constructor` retired — `getConstruct`'s read
+fallback was already the alias, so call-as-function behavior is
+unchanged). `__params` → the `params` declared instance binding.
+Applied concretes (`Array[Int]`) stay shape Type.
+
+*C7.2b — distinct + constructor kind specs* (the C6.1b deferral).
+`Base.distinct()` re-derives as a SYMBOL-FRESH mint: members
+re-declared in the distinct type's own gensym'd scope (same
+descriptors, new symbol identity), so newtype non-conformance falls
+out of C5.2 symbol-identity membership BY CONSTRUCTION instead of the
+shared-member-set guard (the guard remains for structuralWrap).
+`Type.constructor` (post-hoc, MUTATED the type against D22) is
+REMOVED; construct authority is declared at mint time via the reserved
+`construct` spec key: `Type.define({x: Int, construct: (a, b) => …})`
+(Refinement.define reserved-key precedent).
+
+*C7.2c — effect vars → declared generic-param structure.* The
+`__effectvar:` string markers inside effect-label sets and the
+`__effectVarParams` side table dissolve into the C1 `__genericParams`
+declared structure on function values; PE's Param-call effect
+propagation reads the declared param, not marker strings.
+
+**C7.2 rulings (proposed by agent 2026-08, presented for maintainer
+ratification at landing — each isolated and reversible):**
+- *R1 (GenericType mint authority)*: buildGenericType stays
+  KERNEL-PRIVATE (Proof's makeProof precedent). GenericType exposes no
+  construct authority to Allegro; user-defined generic types are a
+  future surface with their own design. `__args`/`__generic` on
+  applied concretes remain host-read instance data — a language-level
+  member surface for applied types is consciously deferred (avoids
+  leaking `.args` into every applied-generic value via the typeMethod
+  direct-binding fallback).
+- *R2 (distinct = symbol-fresh)*: as above — newtype identity is fresh
+  member symbols, not a guard special-case.
+- *R3 (construct spec key)*: one construction surface — the reserved
+  `construct` key in define specs replaces post-hoc `.constructor()`;
+  the meta-method leaves the kind API.
+
 ## 5. Verification strategy (the boundary contract)
 
 Standing rules, every chunk:
