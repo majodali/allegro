@@ -487,7 +487,7 @@ PositiveInt (certificate-peeking) is a separate, **effectful**
 introspection op — knowledge-observation would otherwise break congruence
 (§7).
 
-## 7. Equality [landed — steps 1+3 (E1), step 2 (E2); laws pending (E3)]
+## 7. Equality [landed — steps 1+3 (E1), step 2 (E2), laws (E3); admitted tier pending (E4)]
 
 Equality **dispatches on shape, never knowledge** (D37) — required for a
 globally stable equivalence relation. Consequently refinements are excluded:
@@ -555,7 +555,7 @@ discharged under — a `proof_trans` chain resting on an *admitted*
 transitivity is verdict-visibly weaker than one resting on a proven one
 (extends D8).
 
-## 8. Conformance and lawful interfaces [designed]
+## 8. Conformance and lawful interfaces [partial — law members + tiers landed (E3); admitted tier + strict gates pending (E4)]
 
 **Member identity** (D30): type members are symbol-keyed. Types **draw
 member symbols from declared contexts** (interfaces, base types, mixins): a
@@ -653,6 +653,27 @@ to scopes rather than to individual members because a law may reference
 several members (distributivity above); the referenced members need not
 be abstract — kernel-supplied defaults carry their parametric
 certificates — but must be pure.*
+
+*E3 implementation notes (2026-08): the surface is `law_`-prefixed spec
+keys + `for_all(fn)` (an eager primitive, host-side marker — no new
+slot, no new statement grammar; the §8 sketch's `law refl:` statement
+form remains available as later sugar). Law descriptors are ordinary
+members (`LawType`) drawn like any other; refinement-spec laws
+instantiate against the refined type WITHOUT descriptor storage (the
+shared member set IS shape transparency — laws live at the obligation
+layer there). Discharge tiers at instantiation: kernel (parametric
+certificate + kernel-supplied equality resolution), enumerated (Bool
+domain), sampled (interval/Int domains — survival recorded as its own
+status, never "discharged"; counterexamples halt with concrete
+inputs), witnessed (`Law.witness`/`Coercion.witness` + discharged
+Proof; quantified-proposition matching deferred to E4/H), pending
+(H2 export). `Equatable` is instance #1 — its law propositions run
+through the `protocolEquals` chokepoint; kernel scalars draw it
+retroactively (eq multi-bound under Equatable's symbol, obligations
+kernel-tier). The E-R5 gate is live (empty inferred effect set incl.
+`observe`, definition-time error). Verdict carries law + coercion
+obligations scoped to the compilation unit. E4 remains: `assume law`,
+the `proof_trans` strict gate, proof tier recording.*
 
 ## 9. Kinds are just types [designed]
 

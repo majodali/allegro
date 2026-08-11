@@ -8,6 +8,83 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — E3: law members + obligation instantiation + discharge tiers (B-027, Tranche C)
+
+The law mechanism lands (structures.md §8, D38): interfaces and type
+specs can carry LAW MEMBERS — named theorem templates quantified over
+the implementing type — whose obligations flow through the existing
+PCP machinery with D34 discharge tiers. Equality is instance #1:
+`Equatable` ships in the standard env with `law_refl`/`law_sym`/
+`law_trans` running through the SAME `protocolEqualsBool` chokepoint
+`==` uses.
+
+- **Surface (E-R3)**: `law_`-prefixed spec entries with a
+  `for_all(...)` proposition — `Interface.define({eq: Function,
+  law_refl: for_all(a => a.eq(a))})`. `for_all(fn)` is an eager
+  primitive marking the body via a host-side WeakMap (no new `__*`
+  slot, no new grammar — it's an ordinary call). Works on
+  `Interface.define`, `Type.define` (laws about own members), and
+  `Refinement.define` specs. Law descriptors (`LawType`) are ordinary
+  members drawn like any other — law inheritance is symbol identity
+  for free.
+- **Instantiation (draw time)**: an interface DECLARES (schema only,
+  nothing runs); a concrete type drawing a law-bearing bundle
+  instantiates one obligation per law, quantifier specialized to the
+  implementing type. Refinement-spec laws instantiate against the
+  refined type WITHOUT minting descriptors — a refinement shares its
+  parent's member set by object identity (that sharing IS shape
+  transparency, D37), so its laws live at the obligation layer.
+- **Discharge tiers (E-R4/D34)**, attempted at instantiation:
+  `kernel` — the law carries the parametric certificate
+  (`KERNEL_EQUALS_CERTIFICATE`) AND the type's equality resolution is
+  kernel-supplied (no custom `eq`, or a built-in scalar eq);
+  `enumerated` — finite quantifier domain (Bool) fully enumerated;
+  `sampled` — F7-style bounded sampling over Int/interval domains
+  SURVIVED (recorded as its own status — survival is not proof); a
+  COUNTEREXAMPLE HALTS definition with concrete inputs (`law 'sub'
+  fails for 'T': counterexample at (0, 1)`); `witnessed` —
+  `Law.witness(T, "name", proof)` attaches a discharged Proof term
+  post-hoc (`Coercion.witness(From, To, obligation, proof)` is the
+  same path for E2's §7 edges); `pending` — exported through H2.
+- **Retroactive kernel conformance**: the built-in scalars draw
+  `Equatable` — each scalar's `eq` implementation is multi-bound under
+  Equatable's member symbol, so `42 instanceof Equatable` is true and
+  refl/sym/trans discharge at tier kernel via the parametric
+  certificate (§8 amortization: types with the kernel structural
+  default inherit the same certificate free; a custom `eq` bears
+  fresh obligations — pending until enumerable/sampled/witnessed).
+- **E-R5 purity gate**: `eq` implementations and coercion fns must
+  infer an EMPTY effect set — including `observe` (`certificate_peek`
+  inside equals is exactly the D37 violation). Mechanical: reads the
+  effects component / precompile stash, with an on-demand
+  `precompileFunction` fallback injected from primitives.ts (types-std
+  can't import the evaluator). Violation = definition-time
+  `AllegroError` naming the labels.
+- **Verdict + H2 routing**: `Verdict` gains `lawObligations` +
+  `coercionObligations` (status + tier); `extractObligations` exports
+  pending law/coercion obligations as PCP tasks
+  (`E3Ob.law_refl`-style names). Both views are SCOPED to the
+  compilation unit — the registries are process-global, so pcp.ts
+  filters to types reachable as bound values on the eval scope chain
+  (kernel scalars always in view; another module's types never leak
+  into a file's Verdict). Pending laws do NOT flip `verified` — E3
+  records tiers; E4 turns on the first strict gate.
+- **Precompile suspension**: the runtime's precompile pass evaluates
+  every binding once to detect function shapes, minting throwaway
+  type objects. Law instantiation + the purity gate suspend during
+  that pass (`setLawInstantiationSuspended`) so definition-time
+  semantics fire exactly once, at the real evaluation.
+
+Deviations recorded in plan §6b: witnessed tier verifies the term IS a
+discharged Proof but defers structural proposition-matching for
+quantified propositions (E4/H-arc); `distinct` copies law descriptors
+under fresh symbols without instantiating obligations (newtype laws
+deferred); record-domain quantifiers aren't sampleable yet → pending
+(honest — the H2 export owns them). Two invariant re-pins: Int's
+member keys now live in Int's OR Equatable's scope; `distinct`'s
+same-surface check compares base-name sets (the parent's `eq` is
+multi-bound). 19 new battery tests. 1104/1104 green.
+
 ## 2026-08 — E2: declared coercions + least common type (B-027, Tranche C)
 
 §7 step 2 lands in the E2 seam: when the two operands' equality shapes

@@ -9,10 +9,10 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, EquatableType, isLawDescriptor } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw } from "./slots.js";
-import { exportedSymbols, symbolFromWire, kernelMemberFqn } from "./symbols.js";
+import { exportedSymbols, symbolFromWire, kernelMemberFqn, fqnBaseName } from "./symbols.js";
 import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
 import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, dataOf, isResolved, stringToBits, bitsToString } from "./types.js";
@@ -3399,7 +3399,12 @@ test("distinct: symbol-fresh mint — no shared member symbols (C7.2b)", () => {
     eq(parentMembers!.bindings.has(key), false);
   }
   // Same base-name surface: dispatch still finds every parent member.
-  eq(distinctMembers!.bindings.size, parentMembers!.bindings.size);
+  // (E3: the parent's `eq` is MULTI-BOUND — Int's own key plus Equatable's
+  // drawn symbol point at ONE descriptor — while the fresh mint collapses
+  // each member to a single fresh symbol. Compare base-name surfaces, not
+  // raw key counts.)
+  const baseNames = (m: ContextValue) => new Set([...m.bindings.keys()].map(fqnBaseName));
+  eq(baseNames(distinctMembers!).size, baseNames(parentMembers!).size);
 });
 
 test("distinct: subtypeof fails in both directions (C7.2b)", () => {
@@ -3691,6 +3696,203 @@ test("E2 coercion: declare rejects vacuous and malformed declarations", () => {
     evalStd(`D2 = Int.distinct("D2")\nCoercion.declare(D2, Int, 42)`);
   } catch (e: any) { msg2 = String(e?.message ?? e); }
   eq(msg2.includes("must be a function"), true);
+});
+
+// == E3 lawful interfaces battery (B-027, structures.md §8, E-R3/E-R4/E-R5, D34/D38) ==
+
+test("E3 laws: kernel scalars conform to Equatable with kernel-tier obligations", () => {
+  // Retroactive conformance: built-in eq impls answer Equatable's symbols.
+  const r1 = evalStd("42 instanceof Equatable");
+  eq(Number((dataOf(r1!) as BitsValue).data), 1);
+  const r2 = evalStd('"hi" instanceof Equatable');
+  eq(Number((dataOf(r2!) as BitsValue).data), 1);
+  // refl/sym/trans discharge via the parametric certificate — tier kernel.
+  for (const t of ["Int", "Float", "String", "Bool"]) {
+    const recs = lawObligationRecords().filter(x => x.type === t);
+    eq(recs.length >= 3, true);
+    eq(recs.every(x => x.status === "discharged" && x.tier === "kernel"), true);
+  }
+});
+
+test("E3 laws: Equatable carries Law descriptors (ordinary members)", () => {
+  const desc = typeMemberDescriptor(EquatableType, "refl");
+  eq(desc !== null, true);
+  eq(isLawDescriptor(desc!), true);
+  // eq is an ordinary Field declaration alongside the laws.
+  const eqDesc = typeMemberDescriptor(EquatableType, "eq");
+  eq(isFieldDescriptor(eqDesc!), true);
+});
+
+test("E3 laws: record drawing Equatable with kernel equals discharges at tier kernel", () => {
+  const r = evalStd("E3Pt = Type.define({x: Int, y: Int}, Equatable)\nE3Pt(1, 2) instanceof Equatable");
+  eq(Number((dataOf(r!) as BitsValue).data), 1);
+  const recs = lawObligationRecords().filter(x => x.type === "E3Pt");
+  eq(recs.map(x => x.law).sort().join(","), "refl,sym,trans");
+  eq(recs.every(x => x.status === "discharged" && x.tier === "kernel"), true);
+});
+
+test("E3 laws: a custom eq bears fresh obligations (pending, not kernel)", () => {
+  evalStd("E3Cust = Type.define({x: Int, eq: (self, other) => true}, Equatable)\n1");
+  const recs = lawObligationRecords().filter(x => x.type === "E3Cust");
+  eq(recs.length, 3);
+  eq(recs.every(x => x.status === "pending"), true);
+});
+
+test("E3 laws: `law_` spec keys demand a for_all proposition", () => {
+  let msg = "";
+  try { evalStd("Bad = Type.define({x: Int, law_x: 42})\n1"); }
+  catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("for_all"), true);
+});
+
+test("E3 laws: refinement law over an interval domain survives sampling (tier sampled)", () => {
+  evalStd("E3Pos = Refinement.define({refines: Int & _ > 0, where: p => p > 0, law_gt: for_all(a => a > 0)})\n1");
+  const recs = lawObligationRecords().filter(x => x.type === "E3Pos" && x.law === "gt");
+  eq(recs.length, 1);
+  // Survival is NOT proof (D34): status "sampled", not "discharged".
+  eq(recs[0].status, "sampled");
+  eq(recs[0].tier, "sampled");
+});
+
+test("E3 laws: a false law HALTS with a concrete counterexample", () => {
+  let msg = "";
+  try {
+    evalStd("E3Neg = Refinement.define({refines: Int & _ > 0, where: p => p > 0, law_bad: for_all(a => a < 0)})\n1");
+  } catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("law 'bad' fails"), true);
+  eq(msg.includes("counterexample at (1)"), true);
+});
+
+test("E3 laws: a Bool-domain law discharges by full enumeration (tier enumerated)", () => {
+  evalStd("E3BoolRef = Refinement.define({refines: Bool, where: p => true, law_lem: for_all(a => a || !a)})\n1");
+  const recs = lawObligationRecords().filter(x => x.type === "E3BoolRef" && x.law === "lem");
+  eq(recs.length, 1);
+  eq(recs[0].status, "discharged");
+  eq(recs[0].tier, "enumerated");
+});
+
+test("E3 laws: multi-variable laws sample tuples (arity 2)", () => {
+  let msg = "";
+  try {
+    // a + b == b + a holds; a - b == b - a fails at (0, 1) → halt names it.
+    evalStd("E3Comm = Refinement.define({refines: Int & _ >= 0, where: p => p >= 0, law_sub: for_all((a, b) => a - b == b - a)})\n1");
+  } catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("law 'sub' fails"), true);
+  eq(msg.includes("counterexample at (0, 1)"), true);
+});
+
+test("E3 E-R5: an eq implementation with effects is rejected at definition", () => {
+  let msg = "";
+  try { evalStd("BadEq = Type.define({x: Int, eq: (self, other) => print(1)}, Equatable)\n1"); }
+  catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("must be pure"), true);
+  eq(msg.includes("io"), true);
+});
+
+test("E3 E-R5: an eq peeking at certificates is rejected (observe label)", () => {
+  let msg = "";
+  try {
+    evalStd("PosPeek = Int & _ > 0\nBadEq2 = Type.define({x: Int, eq: (self, other) => certificate_peek(self, PosPeek)}, Equatable)\n1");
+  } catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("must be pure"), true);
+  eq(msg.includes("observe"), true);
+});
+
+test("E3 E-R5: a coercion fn with effects is rejected at declaration", () => {
+  let msg = "";
+  try {
+    evalStd(`E3D = Int.distinct("E3D")\nCoercion.declare(E3D, Int, (u) => print(u))`);
+  } catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("must be pure"), true);
+});
+
+test("E3 witnessed: Law.witness flips a pending obligation to discharged/witnessed", () => {
+  evalStd(`
+E3W = Type.define({x: Bool, eq: (self, other) => self.x == other.x}, Equatable)
+Law.witness(E3W, "refl", prove_for_all_bool(b => b == b))
+1`);
+  const recs = lawObligationRecords().filter(x => x.type === "E3W");
+  const refl = recs.find(x => x.law === "refl");
+  eq(refl?.status, "discharged");
+  eq(refl?.tier, "witnessed");
+  // The others stay pending — witnessing is per-law.
+  eq(recs.find(x => x.law === "sym")?.status, "pending");
+});
+
+test("E3 witnessed: Law.witness rejects a non-proof and unknown laws", () => {
+  let msg1 = "";
+  try { evalStd(`E3W2 = Type.define({x: Int, eq: (self, other) => true}, Equatable)\nLaw.witness(E3W2, "refl", 42)`); }
+  catch (e: any) { msg1 = String(e?.message ?? e); }
+  eq(msg1.includes("not a discharged Proof"), true);
+  let msg2 = "";
+  try { evalStd(`E3W3 = Type.define({x: Int, eq: (self, other) => true}, Equatable)\nLaw.witness(E3W3, "nope", prove_for_all_bool(b => b == b))`); }
+  catch (e: any) { msg2 = String(e?.message ?? e); }
+  eq(msg2.includes("no law obligation 'nope'"), true);
+});
+
+test("E3 witnessed: Coercion.witness discharges a pending §7 obligation", () => {
+  evalStd(`
+E3CW = Int.distinct("E3CW")
+Coercion.declare(E3CW, Int, (u) => Int(u))
+Coercion.witness(E3CW, Int, "equality-preservation", prove_for_all_bool(b => b == b))
+1`);
+  const recs = coercionObligationRecords().filter(r => r.from === "E3CW" && r.to === "Int");
+  const pres = recs.find(r => r.obligation === "equality-preservation");
+  eq(pres?.status, "discharged");
+  eq(pres?.tier, "witnessed");
+  eq(recs.find(r => r.obligation === "coherence")?.status, "pending");
+});
+
+test("E3 verdict: law + coercion obligations ride the Verdict with tiers", () => {
+  const src = "E3V = Type.define({x: Int, eq: (self, other) => true}, Equatable)\n1";
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport);
+  eq((verdict.lawObligations ?? []).length >= 3, true);
+  const intRefl = verdict.lawObligations!.find(o => o.type === "Int" && o.law === "refl");
+  eq(intRefl?.status, "discharged");
+  eq(intRefl?.tier, "kernel");
+  const pend = verdict.lawObligations!.filter(o => o.type === "E3V");
+  eq(pend.length, 3);
+  eq(pend.every(o => o.status === "pending"), true);
+  const kernelEdge = (verdict.coercionObligations ?? []).filter(o => o.from === "Int" && o.to === "Float");
+  eq(kernelEdge.length, 2);
+  eq(kernelEdge.every(o => o.status === "discharged" && o.tier === "kernel"), true);
+  // Pending laws don't flip verified (E3 records; the strict gate is E4).
+  eq(verdict.verified, true);
+});
+
+test("E3 obligations export: pending laws surface through the H2 surface", () => {
+  const src = "E3Ob = Type.define({x: Int, eq: (self, other) => true}, Equatable)\n1";
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const obs = extractObligations(result.evalCtx, result.compilationReport, { pendingOnly: true });
+  const names = obs.map(o => o.theorem.name);
+  eq(names.includes("E3Ob.law_refl"), true);
+  eq(names.includes("E3Ob.law_sym"), true);
+  eq(names.includes("E3Ob.law_trans"), true);
+  // Discharged kernel obligations are excluded under pendingOnly.
+  eq(names.includes("Int.law_refl"), false);
+});
+
+test("E3 laws: interface declaration alone instantiates nothing", () => {
+  const before = lawObligationRecords().length;
+  evalStd("E3Decl = Interface.define({frob: Function, law_frob_id: for_all(a => a == a)})\n1");
+  const after = lawObligationRecords().filter(x => x.law === "frob_id");
+  // Declared, not implemented — schema only, no obligation for the
+  // interface itself.
+  eq(after.length, 0);
+  eq(lawObligationRecords().length, before);
+});
+
+test("E3 laws: drawing a user law-bearing interface instantiates at draw time", () => {
+  evalStd(`
+E3HasId = Interface.define({idem: Function, law_idem: for_all(a => a == a)})
+E3Draw = Type.define({x: Int}, E3HasId)
+1`);
+  const recs = lawObligationRecords().filter(x => x.type === "E3Draw" && x.law === "idem");
+  eq(recs.length, 1);
+  // No kernel certificate on a user law; record domain isn't sampleable →
+  // pending (the honest answer — the H2 export owns it now).
+  eq(recs[0].status, "pending");
 });
 
 // == Guard Clauses (and) ==

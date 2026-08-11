@@ -294,6 +294,49 @@ differently-parameterized generic concretes stay distinct shapes
 (`[1,2] == [1.0,2.0]` false — pinned boundary, element coercion only
 under a common container shape). 8 new battery tests + E1 pin update.
 
+**E3 — landed 2026-08.** The law mechanism (§8/D38) through existing
+machinery. Surface per E-R3: `law_`-prefixed spec keys +
+`for_all(fn)` (an eager primitive marking the body via a host WeakMap
+— no new slot, no new grammar); accepted on `Interface.define`,
+`Type.define`, AND `Refinement.define` specs (the third exceeds the
+E-R3 letter; refinement laws instantiate against the refined type
+without minting descriptors, because a refinement SHARES its parent's
+member set by identity — that sharing IS shape transparency, so
+descriptor storage there would break D37; laws attach at the
+obligation layer instead — deviation, principled). Law descriptors
+(`LawType`) are ordinary members drawn like any other. Instantiation:
+interfaces declare (schema only); concrete types instantiate per
+drawn law at definition, quantifier = the implementing type.
+Tier ladder at instantiation (E-R4/D34): kernel (certificate +
+`equalsIsKernel` — no custom `eq` member, or a built-in scalar eq
+registered in `kernelEqImpls`), enumerated (Bool domain, full
+product), sampled (interval/Int domains, ≤4 samples^arity ≤ 64
+tuples; counterexample HALTS with concrete inputs; survival recorded
+as status "sampled", never "discharged"), witnessed (`Law.witness` /
+`Coercion.witness` + a discharged Proof term), pending (H2 export as
+`T.law_name` obligations). `Equatable` = instance #1: eq Field +
+three laws whose propositions run through `protocolEqualsBool` (no
+parallel equality); kernel scalars retrofitted — eq multi-bound under
+Equatable's symbol (`42 instanceof Equatable` true), obligations
+discharged tier kernel. E-R5 gate: mechanical, effects component /
+precompile stash / on-demand precompile injected from primitives.ts
+(`setEffectsInspector` — types-std can't import the evaluator);
+rejects any non-empty inferred set incl. `observe`. Verdict gains
+`lawObligations`/`coercionObligations` (tiers recorded, pending
+non-fatal — first strict gate is E4); both views SCOPED to the
+compilation unit by filtering registry entries to types bound on the
+eval scope chain (both coercion endpoints must be in-unit — an
+or-filter leaked every `X→Int` edge into every file's worker loop).
+Law instantiation + gate SUSPEND during the runtime precompile pass
+(exploratory binding evals mint throwaway types; definition-time
+semantics fire once, at the real evaluation). Deviations: witnessed
+tier checks discharged-Proof-ness, not quantified-proposition match
+(E4/H-arc); `distinct` copies law descriptors under fresh symbols
+without obligations (newtype laws deferred); record-domain
+quantifiers not sampleable → pending. Re-pins: Int member keys live
+in Int's OR Equatable's scope; distinct same-surface check compares
+base names. 19 battery tests; 1104/1104.
+
 ## 7. Status log
 
 - 2026-08: plan drafted (ratification-pass deliverable); §3 decision

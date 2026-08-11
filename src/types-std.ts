@@ -667,6 +667,78 @@ export function makeFieldDescriptor(
   return desc;
 }
 
+/** Law descriptor — a named theorem template quantified over the
+ *  implementing type (E3 — B-027 §8, D38). An ordinary member descriptor:
+ *  laws live in member SETS and are drawn like any member, so law
+ *  inheritance is symbol identity for free. */
+export const LawType: ContextValue = makeContext();
+setName(LawType, stringToBits("Law"));
+writeShape(LawType, Type);
+
+/** Create a Law descriptor. `proposition` is the quantified BODY — a
+ *  function value of `arity` params, each ranging over the implementing
+ *  type; the law holds iff the body is true on every tuple. A
+ *  `kernelCertificate` marks a law proven ONCE, parametrically, for
+ *  KERNEL-SUPPLIED implementations of the member it references
+ *  (Equatable's refl/sym/trans over the kernel structural equals) — types
+ *  whose implementation is kernel-supplied inherit the certificate free
+ *  (§8 amortization); custom implementations bear fresh obligations. */
+export function makeLawDescriptor(
+  name: string,
+  proposition: Value,
+  arity: number,
+  kernelCertificate?: string,
+): ContextValue {
+  const desc = makeContext();
+  writeShape(desc, LawType);
+  addBinding(desc, "name", stringToBits(name));
+  addBinding(desc, "value", proposition);
+  addBinding(desc, "arity", makeInt(arity));
+  if (kernelCertificate) addBinding(desc, "kernelCertificate", stringToBits(kernelCertificate));
+  return desc;
+}
+
+/** Check if a descriptor is a Law */
+export function isLawDescriptor(desc: ContextValue): boolean {
+  return channelReadRaw(desc, "shape") === LawType;
+}
+
+function lawDescriptorParts(desc: ContextValue): {
+  name: string; proposition: Value; arity: number; kernelCertificate: string | null;
+} {
+  const nameV = desc.bindings.get("name")?.value;
+  const propV = desc.bindings.get("value")?.value;
+  const arityV = desc.bindings.get("arity")?.value;
+  const certV = desc.bindings.get("kernelCertificate")?.value;
+  return {
+    name: nameV?.kind === ValueKind.Bits ? bitsToString(nameV as BitsValue) : "<law>",
+    proposition: propV ?? makeInt(0),
+    arity: arityV?.kind === ValueKind.Bits ? Number((arityV as BitsValue).data) : 1,
+    kernelCertificate: certV?.kind === ValueKind.Bits ? bitsToString(certV as BitsValue) : null,
+  };
+}
+
+// --- `for_all` proposition form (E-R3) ---------------------------------------
+// `for_all(fn)` marks a function value as a quantified proposition schema.
+// The marker is a host-side registry (no new `__*` slot): the returned
+// Context is empty on the data plane; spec processing recognises it via
+// `forAllBody`. All params of the body quantify over the implementing type.
+
+const forAllRegistry = new WeakMap<Value, Value>();
+
+/** Wrap a proposition body as a for_all marker value. */
+export function makeForAllProp(body: Value): ContextValue {
+  const marker = makeContext();
+  forAllRegistry.set(marker, body);
+  return marker;
+}
+
+/** The quantified body of a for_all marker, or undefined when `v` is not
+ *  one. */
+export function forAllBody(v: Value): Value | undefined {
+  return forAllRegistry.get(dataOf(v));
+}
+
 /** Check if a descriptor is a Method */
 export function isMethodDescriptor(desc: ContextValue): boolean {
   return channelReadRaw(desc, "shape") === MethodType;
@@ -711,6 +783,8 @@ function buildRecordType(
   fieldSpecObj: Value,
   drawn: ContextValue[],
   metaType: ContextValue,
+  ctx?: ContextValue,
+  evalFn?: EvalFn,
 ): ContextValue {
   // Extract field specs from the Object's Context
   const fieldCtx = dataOf(fieldSpecObj);
@@ -729,9 +803,22 @@ function buildRecordType(
   // refines/where/preserve). Declared at mint time, replacing the post-hoc
   // `.constructor()` meta-method (which MUTATED a built type against D22).
   let customConstruct: Value | null = null;
+  // E3 (E-R3): `law_`-prefixed spec entries are LAW declarations — the
+  // value must be a `for_all(...)` proposition; they become Law
+  // descriptors, never fields or methods.
+  const laws: { name: string; body: Value }[] = [];
   for (const [key, binding] of (fieldCtx as ContextValue).bindings) {
     if (isMetaSlotKey(key)) continue;
     if (binding.value) {
+      if (key.startsWith("law_")) {
+        const body = forAllBody(binding.value);
+        if (body === undefined) {
+          throw new AllegroError(
+            `define: '${key}' must be a for_all(...) proposition (laws quantify over the implementing type)`);
+        }
+        laws.push({ name: key.slice(4), body });
+        continue;
+      }
       const entry = dataOf(binding.value);
       if (key === "construct") {
         if (entry.kind !== ValueKind.ComposedFunction && entry.kind !== ValueKind.PrimitiveFunction) {
@@ -741,6 +828,11 @@ function buildRecordType(
         continue;
       }
       if (entry.kind === ValueKind.ComposedFunction || entry.kind === ValueKind.PrimitiveFunction) {
+        // E-R5: an `eq` implementation is this type's equality — it must
+        // be pure and knowledge-independent, checked mechanically here.
+        if (key === "eq") {
+          assertPureForEquality(binding.value, `define: 'eq' implementation`, ctx);
+        }
         methods.push({ name: key, impl: entry });
       } else {
         fields.push({ name: key, type: binding.value });
@@ -791,6 +883,18 @@ function buildRecordType(
       desc = d;
     }
     for (const key of drawMemberKeys(drawn, m.name, recordScope)) {
+      addMemberAt(members, key, desc);
+    }
+  }
+
+  // Law entries (E3): Law descriptors drawn like any member — a law whose
+  // name matches a drawn law OVERRIDES it (binds the drawn symbol).
+  for (const l of laws) {
+    const desc = makeLawDescriptor(
+      l.name, l.body,
+      dataOf(l.body).kind === ValueKind.ComposedFunction
+        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1);
+    for (const key of drawMemberKeys(drawn, l.name, recordScope)) {
       addMemberAt(members, key, desc);
     }
   }
@@ -908,6 +1012,12 @@ function buildRecordType(
 
   setMembers(newType, members);
 
+  // E3: a CONCRETE type is an implementing type — every Law descriptor in
+  // its member set (own spec + drawn bundles) instantiates an obligation,
+  // quantifier specialized to this type, discharge attempted down the
+  // tier ladder. (Bundles returned above declare, they don't implement.)
+  instantiateLawsFromMembers(newType, members, ctx, evalFn);
+
   return newType;
 }
 
@@ -927,11 +1037,24 @@ function buildInterfaceType(
     throw new AllegroError("Interface.define: argument must be an object literal {member: Type, ...}");
   }
 
-  // Extract declared members from the spec
+  // Extract declared members from the spec. E3: `law_`-prefixed entries
+  // are LAW declarations — proposition SCHEMAS at declaration time
+  // (nothing runs, nothing discharges); they become concrete obligations
+  // at DRAW time when an implementing type binds the interface's symbols.
   const declaredMembers: { name: string; type: Value }[] = [];
+  const declaredLaws: { name: string; body: Value }[] = [];
   for (const [key, binding] of (specCtx as ContextValue).bindings) {
     if (isMetaSlotKey(key)) continue;
     if (binding.value) {
+      if (key.startsWith("law_")) {
+        const body = forAllBody(binding.value);
+        if (body === undefined) {
+          throw new AllegroError(
+            `Interface.define: '${key}' must be a for_all(...) proposition`);
+        }
+        declaredLaws.push({ name: key.slice(4), body });
+        continue;
+      }
       declaredMembers.push({ name: key, type: binding.value });
     }
   }
@@ -958,6 +1081,18 @@ function buildInterfaceType(
   for (const m of declaredMembers) {
     const desc = makeFieldDescriptor(m.name, m.type);
     for (const key of drawMemberKeys(drawn, m.name, ifaceScope)) {
+      addMemberAt(members, key, desc);
+    }
+  }
+
+  // Law descriptors (E3) — drawn like any member; no instantiation here
+  // (an interface declares, it never implements).
+  for (const l of declaredLaws) {
+    const desc = makeLawDescriptor(
+      l.name, l.body,
+      dataOf(l.body).kind === ValueKind.ComposedFunction
+        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1);
+    for (const key of drawMemberKeys(drawn, l.name, ifaceScope)) {
       addMemberAt(members, key, desc);
     }
   }
@@ -1438,6 +1573,9 @@ function buildType(
     const fxLabels = options?.methodEffects?.[key];
     const prim = makePrimitive(`${name}.${key}`, fn, false, fxLabels);
     const isGetter = getterNames.has(key);
+    // E3: built-in `eq` implementations are kernel-supplied — the
+    // parametric equality certificate covers them (equalsIsKernel).
+    if (key === "eq") kernelEqImpls.add(prim);
     addMember(members, typeScope, key, makeMethodDescriptor(key, prim, isGetter));
   }
   setMembers(ctx, members);
@@ -1537,14 +1675,18 @@ export function declareCoercion(
 }
 
 /** The §7 obligations carried by every declared edge, for tests and the
- *  E3 tier machinery. */
-export function coercionObligationRecords(): {
+ *  E3 tier machinery. Registry is process-global; `filter` (over the
+ *  edge's from/to shapes) scopes the view to one compilation unit. */
+export function coercionObligationRecords(
+  filter?: (from: ContextValue, to: ContextValue) => boolean,
+): {
   from: string; to: string; obligation: "equality-preservation" | "coherence";
   status: "pending" | "discharged"; tier?: string;
 }[] {
   const out: ReturnType<typeof coercionObligationRecords> = [];
   for (const edges of coercionRegistry.values()) {
     for (const e of edges.values()) {
+      if (filter && !filter(e.from, e.to)) continue;
       out.push({ from: typeCtxName(e.from), to: typeCtxName(e.to), obligation: "equality-preservation", ...e.preservation });
       out.push({ from: typeCtxName(e.from), to: typeCtxName(e.to), obligation: "coherence", ...e.coherence });
     }
@@ -1731,6 +1873,292 @@ export function protocolEquals(
   if (!ta || !tb) return null;
   const eq = protocolEqualsBool(left, right, ctx, evalFn);
   return withType(makeInt((negate ? !eq : eq) ? 1 : 0), BoolType);
+}
+
+// =============================================================================
+// Law obligations + discharge tiers (E3 — B-027 §8, E-R3/E-R4/E-R5, D34/D38)
+//
+// Drawing a law-bearing member set instantiates one PCP obligation per law,
+// quantifier specialized to the implementing type. Discharge walks the D34
+// spectrum at instantiation time:
+//   kernel     — the law carries a kernel certificate AND the referenced
+//                implementation is kernel-supplied (parametric proof, free);
+//   enumerated — the quantifier domain is finite (Bool) and full
+//                enumeration holds (PE-as-discharge over the whole domain);
+//   sampled    — F7-style bounded sampling SURVIVED (not proof — recorded
+//                as its own status); a COUNTEREXAMPLE HALTS with concrete
+//                inputs (build safety in);
+//   witnessed  — a discharged Proof term attached post-hoc via
+//                `Law.witness` (the `by` path);
+//   pending    — none of the above; exported through the H2 obligations
+//                surface for PCP workers.
+// E4 adds the `assume law` admitted tier + the first strict gate.
+// =============================================================================
+
+/** Kernel-supplied equality implementations (built-in scalar `eq` methods).
+ *  The parametric kernel certificate covers exactly these plus the kernel
+ *  structural default (= no `eq` member at all). */
+const kernelEqImpls = new WeakSet<object>();
+
+interface LawObligationEntry {
+  type: ContextValue;
+  law: string;
+  status: "discharged" | "sampled" | "pending";
+  tier?: string; // "kernel" | "enumerated" | "sampled" | "witnessed"
+  counterexample?: string;
+}
+
+const lawObligationsReg: LawObligationEntry[] = [];
+
+// The precompile pass (runtime.ts precompileFunctions) evaluates every
+// binding once to detect function shapes — a `Type.define`/`Refinement.
+// define` there mints a THROWAWAY type object before the real evaluation
+// mints the bound one. Obligations attach to DEFINITIONS, not exploratory
+// evaluations, so the pass suspends instantiation (and the E-R5 gate —
+// the real evaluation re-runs both).
+let lawInstantiationSuspended = false;
+
+/** Suspend/resume law-obligation instantiation + the E-R5 purity gate
+ *  (used by the runtime's precompile pass around its exploratory
+ *  binding evaluations). */
+export function setLawInstantiationSuspended(b: boolean): void {
+  lawInstantiationSuspended = b;
+}
+
+/** The law obligations instantiated so far, names resolved at read time
+ *  (types are auto-named after definition). The E3 read surface for
+ *  tests, the Verdict, and the H2 obligations export. The registry is
+ *  process-global; pass `filter` to scope the view to one compilation
+ *  unit's types (pcp.ts filters by the eval scope's bound values so a
+ *  file's Verdict never lists another module's obligations). */
+export function lawObligationRecords(filter?: (type: ContextValue) => boolean): {
+  type: string; law: string; status: "discharged" | "sampled" | "pending";
+  tier?: string; counterexample?: string;
+}[] {
+  return lawObligationsReg
+    .filter(e => !filter || filter(e.type))
+    .map(e => ({
+      type: typeCtxName(e.type),
+      law: e.law,
+      status: e.status,
+      ...(e.tier !== undefined ? { tier: e.tier } : {}),
+      ...(e.counterexample !== undefined ? { counterexample: e.counterexample } : {}),
+    }));
+}
+
+/** Is this type's equality resolution kernel-supplied? True when the
+ *  equality shape has no custom `eq` member (kernel structural equals
+ *  applies at the protocol chokepoint) or its `eq` is a kernel scalar
+ *  implementation. */
+function equalsIsKernel(t: ContextValue): boolean {
+  const impl = typeMethod(equalityShape(t), "eq");
+  return impl === null || kernelEqImpls.has(dataOf(impl));
+}
+
+/** Quantifier samples for a law over `t`. `exhaustive` marks FULL domain
+ *  enumeration (Bool) — survival there is proof (tier "enumerated"), not
+ *  sampling. Int-backed domains sample (refinement interval lo..lo+3, or
+ *  the F7 default mix). Returns null when the domain isn't sampleable
+ *  (records, strings, …) — the obligation stays pending. */
+function lawSamples(t: ContextValue): { samples: Value[]; exhaustive: boolean } | null {
+  // Walk the refines chain to the base shape (a Bool/Int refinement
+  // quantifies over the refined subdomain but dispatches at the base).
+  let base: ContextValue = t;
+  for (let guard = 0; guard < 64; guard++) {
+    const p = getRefines(base);
+    if (p?.kind !== ValueKind.Structure) break;
+    base = p as ContextValue;
+  }
+  const baseName = getTypeNameFromCtx(base);
+  if (baseName === "Bool") {
+    return {
+      samples: [withType(makeInt(1), BoolType), withType(makeInt(0), BoolType)],
+      exhaustive: true,
+    };
+  }
+  const dom = getAbstractDomain(t) ?? (t as any).__abstractDomain;
+  if (dom && dom.kind === "interval") {
+    const lo = Number.isFinite(dom.lo) ? dom.lo : 0;
+    const hi = Number.isFinite(dom.hi) ? dom.hi : Infinity;
+    const out: Value[] = [];
+    for (let i = 0; i < 4; i++) {
+      if (lo + i <= hi) out.push(withType(makeInt(lo + i), IntType));
+    }
+    if (out.length > 0) return { samples: out, exhaustive: false };
+  }
+  if (baseName === "Int") {
+    return { samples: [0, 1, 5, -3].map(n => withType(makeInt(n), IntType)), exhaustive: false };
+  }
+  return null;
+}
+
+/** Render a sample tuple for counterexample messages. */
+function renderLawArgs(args: Value[]): string {
+  return args.map(a => {
+    const d = dataOf(a);
+    if (d.kind !== ValueKind.Bits) return "?";
+    const b = d as BitsValue;
+    if (b.length !== 64) return "?";
+    const signed = b.data >= 2n ** 63n ? b.data - 2n ** 64n : b.data;
+    if (getTypeName(a) === "Bool") return signed === 0n ? "false" : "true";
+    return String(signed);
+  }).join(", ");
+}
+
+/** Evaluate a law proposition body on one argument tuple. Returns true /
+ *  false when the body folds to a Bits truth value, null when it can't be
+ *  evaluated here (missing evalFn, residual result). */
+function runLawProp(body: Value, args: Value[], ctx?: ContextValue, evalFn?: EvalFn): boolean | null {
+  const d = dataOf(body);
+  try {
+    let result: Value;
+    if (d.kind === ValueKind.PrimitiveFunction) {
+      result = (d as PrimitiveFunctionValue).fn(args, ctx as any, evalFn as any);
+    } else if (d.kind === ValueKind.ComposedFunction && evalFn && ctx) {
+      result = evalFn(makeExpr(d, args), ctx);
+    } else {
+      return null;
+    }
+    const rd = dataOf(result);
+    if (rd.kind !== ValueKind.Bits) return null;
+    return (rd as BitsValue).data !== 0n;
+  } catch {
+    return null;
+  }
+}
+
+/** Instantiate one law obligation for an implementing type and attempt
+ *  discharge down the tier ladder. A concrete counterexample HALTS
+ *  definition (AllegroError) — a false law is unsound by construction. */
+function instantiateLaw(
+  implType: ContextValue,
+  desc: ContextValue,
+  ctx?: ContextValue,
+  evalFn?: EvalFn,
+): void {
+  if (lawInstantiationSuspended) return;
+  const { name, proposition, arity, kernelCertificate } = lawDescriptorParts(desc);
+
+  // Tier 1: parametric kernel certificate — free for kernel-supplied
+  // implementations (§8 amortization).
+  if (kernelCertificate !== null && equalsIsKernel(implType)) {
+    lawObligationsReg.push({ type: implType, law: name, status: "discharged", tier: "kernel" });
+    return;
+  }
+
+  // Tiers 2-3: enumeration / sampling over the quantifier domain.
+  const domain = lawSamples(implType);
+  if (domain !== null && arity >= 1 && arity <= 3) {
+    // Cartesian product of samples^arity (≤ 4^3 = 64 tuples).
+    const tuples: Value[][] = [[]];
+    for (let i = 0; i < arity; i++) {
+      const next: Value[][] = [];
+      for (const t of tuples) for (const s of domain.samples) next.push([...t, s]);
+      tuples.length = 0; tuples.push(...next);
+    }
+    let undecided = false;
+    for (const tuple of tuples) {
+      const r = runLawProp(proposition, tuple, ctx, evalFn);
+      if (r === false) {
+        throw new AllegroError(
+          `law '${name}' fails for '${typeCtxName(implType)}': counterexample at (${renderLawArgs(tuple)})`);
+      }
+      if (r === null) { undecided = true; break; }
+    }
+    if (!undecided) {
+      if (domain.exhaustive) {
+        lawObligationsReg.push({ type: implType, law: name, status: "discharged", tier: "enumerated" });
+      } else {
+        // Survival, not proof (D34): recorded as its own status.
+        lawObligationsReg.push({ type: implType, law: name, status: "sampled", tier: "sampled" });
+      }
+      return;
+    }
+  }
+
+  // Tier 5: pending — exported via the H2 obligations surface.
+  lawObligationsReg.push({ type: implType, law: name, status: "pending" });
+}
+
+/** Instantiate obligations for every Law descriptor in a member set
+ *  (called once per CONCRETE type at definition; bundles and interfaces
+ *  declare schemas, they don't implement). Multi-bound keys dedupe by
+ *  descriptor identity. */
+function instantiateLawsFromMembers(
+  implType: ContextValue,
+  members: ContextValue,
+  ctx?: ContextValue,
+  evalFn?: EvalFn,
+): void {
+  const seen = new Set<Value>();
+  for (const [, b] of members.bindings) {
+    const desc = b.value;
+    if (!desc || desc.kind !== ValueKind.Structure) continue;
+    if (!isLawDescriptor(desc as ContextValue)) continue;
+    if (seen.has(desc)) continue;
+    seen.add(desc);
+    instantiateLaw(implType, desc as ContextValue, ctx, evalFn);
+  }
+}
+
+/** Structural discharged-Proof check (local: proofs.ts imports this
+ *  module, so the canonical `isDischargedProof` can't be imported here). */
+function isDischargedProofValue(v: Value): boolean {
+  const p = dataOf(v);
+  if (p.kind !== ValueKind.Structure) return false;
+  const d = channelReadRaw(p, "discharged");
+  if (!d) return false;
+  const dp = dataOf(d);
+  return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 1n;
+}
+
+/** The witnessed tier (`by` path): attach a discharged Proof term to a
+ *  pending/sampled law obligation. E3 minimum verifies the term IS a
+ *  discharged Proof; structural proposition-matching for quantified
+ *  propositions arrives with the E4/H-arc machinery. */
+function witnessLawObligation(implType: ContextValue, lawName: string, proof: Value): void {
+  if (!isDischargedProofValue(proof)) {
+    throw new AllegroError(
+      `Law.witness: the proof term for '${lawName}' is not a discharged Proof`);
+  }
+  const shape = equalityShape(implType);
+  for (let i = lawObligationsReg.length - 1; i >= 0; i--) {
+    const e = lawObligationsReg[i];
+    if (e.law !== lawName) continue;
+    if (e.type !== implType && equalityShape(e.type) !== shape) continue;
+    if (e.status === "discharged") return; // already proven — idempotent
+    e.status = "discharged";
+    e.tier = "witnessed";
+    delete e.counterexample;
+    return;
+  }
+  throw new AllegroError(
+    `Law.witness: no law obligation '${lawName}' is registered for '${typeCtxName(implType)}'`);
+}
+
+// --- E-R5: the purity / knowledge-independence gate --------------------------
+// `equals` implementations and coercion fns must infer an EMPTY effect set
+// — including the `observe` label (`certificate_peek` inside equals is
+// exactly the D37 violation: equality must not see knowledge). The
+// inspector is injected from primitives.ts (it needs the evaluator's
+// precompile, which this module can't import).
+
+let effectsInspector: ((fn: Value, ctx?: ContextValue) => Set<string> | null) | null = null;
+
+/** Register the effect-inference hook (called once from primitives.ts). */
+export function setEffectsInspector(f: (fn: Value, ctx?: ContextValue) => Set<string> | null): void {
+  effectsInspector = f;
+}
+
+function assertPureForEquality(fnValue: Value, what: string, ctx?: ContextValue): void {
+  if (lawInstantiationSuspended) return;
+  if (!effectsInspector) return;
+  const eff = effectsInspector(fnValue, ctx);
+  if (eff && eff.size > 0) {
+    throw new AllegroError(
+      `${what} must be pure and knowledge-independent (E-R5) — inferred effects: ` +
+      `{${[...eff].sort().join(", ")}}`);
+  }
 }
 
 // =============================================================================
@@ -2442,13 +2870,31 @@ setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx,
     // results with the OUTERMOST type, so `x + 3 instanceof PI` holds.
     const RESERVED_REFINEMENT_KEYS = new Set(["refines", "where", "preserve"]);
     const extraMethods: { name: string; impl: Value }[] = [];
+    // E3: `law_` entries on a refinement spec. A refinement SHARES its
+    // parent's member set by object identity (that sharing IS shape
+    // transparency, D37) — so refinement laws instantiate obligations
+    // directly, without minting descriptors into the shared set. The
+    // quantifier is the REFINED type (its abstract domain drives the
+    // sampled tier).
+    const refinementLaws: { name: string; body: Value }[] = [];
     for (const [k, b] of (first as ContextValue).bindings) {
       if (isMetaSlotKey(k) || RESERVED_REFINEMENT_KEYS.has(k)) continue;
       if (!b.value) continue;
+      if (k.startsWith("law_")) {
+        const body = forAllBody(b.value);
+        if (body === undefined) {
+          throw new AllegroError(`Refinement: '${k}' must be a for_all(...) proposition`);
+        }
+        refinementLaws.push({ name: k.slice(4), body });
+        continue;
+      }
       const entry = dataOf(b.value);
       if (entry.kind !== ValueKind.ComposedFunction && entry.kind !== ValueKind.PrimitiveFunction) {
         throw new AllegroError(
           `Refinement: spec entry '${k}' must be a method (function value) — fields live on record kinds`);
+      }
+      if (k === "eq") {
+        assertPureForEquality(b.value, `Refinement: 'eq' implementation`, ctx);
       }
       extraMethods.push({ name: k, impl: entry });
     }
@@ -2472,6 +2918,14 @@ setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx,
       }
       refined = buildPreserveOps(refined, opNames);
     }
+    // E3: instantiate the spec's law obligations against the finished
+    // refined type. Sampling reads the refinement's abstract domain; a
+    // concrete counterexample halts the definition.
+    for (const l of refinementLaws) {
+      const arity = dataOf(l.body).kind === ValueKind.ComposedFunction
+        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1;
+      instantiateLaw(refined, makeLawDescriptor(l.name, l.body, arity), ctx, evalFn);
+    }
     return wrapType(refined);
   }
   const predicate = evalFn!(args[1], ctx!);
@@ -2492,7 +2946,7 @@ setConstruct(Type, makePrimitive("Type.__construct", (args, ctx, evalFn) => {
     }
     drawn.push(b as ContextValue);
   }
-  return wrapType(buildRecordType(spec, drawn, Type));
+  return wrapType(buildRecordType(spec, drawn, Type, ctx, evalFn));
 }, true));
 
 // Interface = the refinement mint applied to Type with the declaration-only
@@ -2922,6 +3376,72 @@ export function getFunctionReturnType(fnType: ContextValue): Value | null {
 }
 
 // =============================================================================
+// Equatable — lawful-interface instance #1 (E3 — B-027 §8, D38)
+//
+// The interface declares the equality member plus the three equivalence
+// laws as Law descriptors. The law propositions run through the SAME
+// protocol chokepoint `==` uses (protocolEqualsBool) — there is no
+// parallel equality to keep in sync. Each law carries the parametric
+// kernel certificate: a type whose equality resolution is kernel-supplied
+// (the structural default, or a built-in scalar eq) discharges
+// refl/sym/trans at tier "kernel" for free (§8 amortization); a custom
+// `eq` bears fresh obligations.
+// =============================================================================
+
+export const EquatableType: ContextValue = makeContext();
+setName(EquatableType, stringToBits("Equatable"));
+writeShape(EquatableType, InterfaceKind);
+markInterface(EquatableType, makeInt(1));
+{
+  const EQUATABLE_SCOPE = typeMemberScopeFqn("Equatable");
+  (EquatableType as any).__localMemberScope = EQUATABLE_SCOPE;
+  const members = makeContext();
+  addMember(members, EQUATABLE_SCOPE, "eq", makeFieldDescriptor("eq", FunctionType));
+  const reflProp = makePrimitive("Equatable.law.refl", (args, ctx, evalFn) =>
+    makeInt(protocolEqualsBool(args[0], args[0], ctx, evalFn) ? 1 : 0));
+  const symProp = makePrimitive("Equatable.law.sym", (args, ctx, evalFn) =>
+    makeInt(protocolEqualsBool(args[0], args[1], ctx, evalFn) ===
+            protocolEqualsBool(args[1], args[0], ctx, evalFn) ? 1 : 0));
+  const transProp = makePrimitive("Equatable.law.trans", (args, ctx, evalFn) => {
+    const ab = protocolEqualsBool(args[0], args[1], ctx, evalFn);
+    const bc = protocolEqualsBool(args[1], args[2], ctx, evalFn);
+    const ac = protocolEqualsBool(args[0], args[2], ctx, evalFn);
+    return makeInt(!(ab && bc) || ac ? 1 : 0);
+  });
+  addMember(members, EQUATABLE_SCOPE, "refl",
+    makeLawDescriptor("refl", reflProp, 1, KERNEL_EQUALS_CERTIFICATE));
+  addMember(members, EQUATABLE_SCOPE, "sym",
+    makeLawDescriptor("sym", symProp, 2, KERNEL_EQUALS_CERTIFICATE));
+  addMember(members, EQUATABLE_SCOPE, "trans",
+    makeLawDescriptor("trans", transProp, 3, KERNEL_EQUALS_CERTIFICATE));
+  setMembers(EquatableType, members);
+}
+
+// Retroactive conformance for the kernel scalars (§8: "retroactive
+// conformance is via mixins / partial type declarations" — this is the
+// kernel's own partial declaration): each built-in eq implementation is
+// MULTI-BOUND under Equatable's member symbol (same descriptor object, so
+// base-name dispatch dedupes by identity), the law descriptors are drawn
+// verbatim, and the refl/sym/trans obligations discharge at tier "kernel"
+// via the parametric certificate. `42 instanceof Equatable` is true.
+{
+  const eqMembers = getMembers(EquatableType) as ContextValue;
+  for (const t of [IntType, FloatType, StringType, BoolType]) {
+    const tMembers = getMembers(t) as ContextValue;
+    for (const [key, b] of eqMembers.bindings) {
+      if (!b.value) continue;
+      if (fqnBaseName(key) === "eq") {
+        const ownEq = typeMemberDescriptor(t, "eq");
+        if (ownEq) addMemberAt(tMembers, key, ownEq);
+      } else {
+        addMemberAt(tMembers, key, b.value);
+      }
+    }
+    instantiateLawsFromMembers(t, tMembers);
+  }
+}
+
+// =============================================================================
 // Unification
 // Type variable bindings accumulate in a Map<string, Value> (varName → type).
 // =============================================================================
@@ -3336,7 +3856,7 @@ export function wrapType(type: ContextValue): Value {
 // typed Object: dot access rides Object's `__getMember`, no new dispatch
 // machinery. Declarations instantiate their §7 obligations PENDING (E3
 // routes them through PCP discharge).
-const coercionDeclarePrim = makePrimitive("Coercion.declare", (args) => {
+const coercionDeclarePrim = makePrimitive("Coercion.declare", (args, ctx) => {
   const from = asContext(dataOf(args[0]));
   const to = asContext(dataOf(args[1]));
   if (!from || !to) {
@@ -3347,10 +3867,68 @@ const coercionDeclarePrim = makePrimitive("Coercion.declare", (args) => {
   if (fd.kind !== ValueKind.PrimitiveFunction && fd.kind !== ValueKind.ComposedFunction) {
     throw new AllegroError("Coercion.declare: third argument must be a function");
   }
+  // E-R5: coercion fns feed the equality protocol — same purity gate as
+  // `eq` implementations.
+  assertPureForEquality(fn, "Coercion.declare: coercion fn", ctx);
   declareCoercion(from, to, fn);
   return noneSingleton;
 });
-const coercionSurface: Value = makeObject([["declare", coercionDeclarePrim]]);
+
+// E3: the witnessed tier for the §7 coercion obligations — attach a
+// discharged Proof term to a declared edge's preservation/coherence slot.
+const coercionWitnessPrim = makePrimitive("Coercion.witness", (args) => {
+  const from = asContext(dataOf(args[0]));
+  const to = asContext(dataOf(args[1]));
+  if (!from || !to) {
+    throw new AllegroError("Coercion.witness: expected (FromType, ToType, obligation, proof)");
+  }
+  const obD = dataOf(args[2]);
+  const which = obD.kind === ValueKind.Bits ? bitsToString(obD as BitsValue) : "";
+  if (which !== "equality-preservation" && which !== "coherence") {
+    throw new AllegroError(
+      `Coercion.witness: obligation must be "equality-preservation" or "coherence"`);
+  }
+  if (!isDischargedProofValue(args[3])) {
+    throw new AllegroError("Coercion.witness: the proof term is not a discharged Proof");
+  }
+  const edge = coercionRegistry.get(equalityShape(from))?.get(equalityShape(to));
+  if (!edge) {
+    throw new AllegroError(
+      `Coercion.witness: no declared coercion from '${typeCtxName(from)}' to '${typeCtxName(to)}'`);
+  }
+  const slot = which === "coherence" ? edge.coherence : edge.preservation;
+  slot.status = "discharged";
+  slot.tier = "witnessed";
+  return noneSingleton;
+});
+const coercionSurface: Value = makeObject([
+  ["declare", coercionDeclarePrim],
+  ["witness", coercionWitnessPrim],
+]);
+
+// E3: the `Law.witness(Type, "name", proof)` surface — the `by` path for
+// law obligations.
+const lawWitnessPrim = makePrimitive("Law.witness", (args) => {
+  const t = asContext(dataOf(args[0]));
+  if (!t) throw new AllegroError("Law.witness: expected (Type, lawName, proof)");
+  const nameD = dataOf(args[1]);
+  if (nameD.kind !== ValueKind.Bits) {
+    throw new AllegroError("Law.witness: law name must be a String");
+  }
+  witnessLawObligation(t, bitsToString(nameD as BitsValue), args[2]);
+  return noneSingleton;
+});
+const lawSurface: Value = makeObject([["witness", lawWitnessPrim]]);
+
+// E3: `for_all(fn)` — the quantified-proposition constructor (E-R3). All
+// params of the body range over the implementing type.
+const forAllPrim = makePrimitive("for_all", (args) => {
+  const d = dataOf(args[0]);
+  if (d.kind !== ValueKind.ComposedFunction && d.kind !== ValueKind.PrimitiveFunction) {
+    throw new AllegroError("for_all: argument must be a function (the quantified proposition body)");
+  }
+  return makeForAllProp(args[0]);
+});
 
 export function createTypeSystem(): Extension {
   return {
@@ -3379,6 +3957,10 @@ export function createTypeSystem(): Extension {
       Proof: wrapType(Proof) as any,
       // Coercion declaration surface (E2 — B-027 §7 step 2)
       Coercion: coercionSurface as any,
+      // Lawful interfaces (E3 — B-027 §8, D38)
+      Equatable: wrapType(EquatableType) as any,
+      Law: lawSurface as any,
+      for_all: forAllPrim as any,
       // Literal bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,

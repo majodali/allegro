@@ -21,7 +21,7 @@ import { collapseBodyMetadata, checkExhaustiveness, checkTermination } from "./t
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
 import { registerScopeSymbol, MAIN_SCOPE_FQN, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
-import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope } from "./types-std.js";
+import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
 export type { Extension };
@@ -548,6 +548,23 @@ function precompileFunctions(
   const report: CompilationReport = { inferred: [], unresolved: [], bindingTypes: new Map(), notifications: [] };
   if (!typed) return report;
 
+  // E3: the pass's exploratory binding evaluations mint throwaway type
+  // objects (the real evaluation mints the bound ones) — suspend law-
+  // obligation instantiation + the E-R5 gate so definition-time semantics
+  // fire exactly once, at the real evaluation.
+  setLawInstantiationSuspended(true);
+  try {
+    return precompileFunctionsInner(fileCtx, extensions, report);
+  } finally {
+    setLawInstantiationSuspended(false);
+  }
+}
+
+function precompileFunctionsInner(
+  fileCtx: any,
+  extensions: Extension[] | undefined,
+  report: CompilationReport,
+): CompilationReport {
   // Build a minimal context for pre-compilation (primitives + extensions)
   const compileCtx = makeContext();
   for (const [name, prim] of Object.entries(primitives)) {

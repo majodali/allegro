@@ -1363,8 +1363,15 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(members.bindings.has(kernelMemberFqn("add")), false, "the shared kernel scope is retired for built-ins");
     eq(typeMethod(dataOf(IntType as unknown as Value) as ContextValue, "add") !== null, true,
       "typeMethod projects by base name through the per-type scope");
+    // E3 (B-027 §8): the kernel scalars DRAW Equatable retroactively —
+    // `eq` is multi-bound under Equatable's member symbol and the
+    // refl/sym/trans Law descriptors ride in (retroactive declared
+    // conformance). Every key therefore lives in Int's own scope OR
+    // Equatable's; no other scope may appear.
+    const equatableScope = typeMemberScopeFqn("Equatable");
     for (const key of members.bindings.keys()) {
-      eq(key.startsWith(intScope), true, `member key '${key}' lives in Int's scope`);
+      eq(key.startsWith(intScope) || key.startsWith(equatableScope), true,
+        `member key '${key}' lives in Int's or Equatable's scope`);
     }
     // The consequence the move exists for: near-identical built-ins do
     // NOT conform to each other (Int and Float spell many same names).

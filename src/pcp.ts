@@ -26,7 +26,21 @@ import type { ContextValue, BitsValue } from "./types.js";
 import { dataOf, SLOT_KEYS } from "./slots.js";
 import { ValueKind, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
+import { lawObligationRecords, coercionObligationRecords } from "./types-std.js";
+import { scopeAllBindings } from "./scope.js";
 import type { CompilationReport, Notification } from "./runtime.js";
+
+/** E3: the law/coercion registries are process-global — scope their view
+ *  to THIS compilation unit by filtering to types reachable as bound
+ *  values on the eval scope chain (source bindings + extension layers, so
+ *  kernel scalars are always in view; another module's types are not). */
+function boundTypeFilter(evalCtx: ContextValue): (t: ContextValue) => boolean {
+  const bound = new Set<unknown>();
+  for (const [, b] of scopeAllBindings(evalCtx)) {
+    if (b?.value) bound.add(dataOf(b.value));
+  }
+  return (t) => bound.has(t);
+}
 
 export const PCP_VERSION = "pcp/1" as const;
 
@@ -108,9 +122,37 @@ export interface Verdict {
   totalityFindings?: TotalityFinding[];
   /** Effects-declaration mismatches (Phase D1) — fatal. */
   effectMismatches?: EffectMismatch[];
+  /** E3 (B-027 §8): law obligations instantiated by lawful-interface
+   *  draws, each with its D34 discharge tier. Pending entries do NOT
+   *  flip `verified` — E3 records; E4 turns on the first strict gate. */
+  lawObligations?: LawObligationRecord[];
+  /** E3: the §7 coercion obligations (equality-preservation +
+   *  pairwise coherence) per declared edge. */
+  coercionObligations?: CoercionObligationRecord[];
   /** H3: structured guidance for the next attempt. Generated from the
    *  failure modes in this verdict + any priorAttempts metadata. */
   iterationHints?: IterationHints;
+}
+
+export interface LawObligationRecord {
+  /** Implementing type's name (resolved after auto-naming). */
+  type: string;
+  /** Law name as declared (the `law_` prefix stripped). */
+  law: string;
+  /** "discharged" (kernel/enumerated/witnessed), "sampled" (survival —
+   *  not proof, D34), or "pending". */
+  status: "discharged" | "sampled" | "pending";
+  /** D34 tier: "kernel" | "enumerated" | "sampled" | "witnessed". */
+  tier?: string;
+  counterexample?: string;
+}
+
+export interface CoercionObligationRecord {
+  from: string;
+  to: string;
+  obligation: "equality-preservation" | "coherence";
+  status: "pending" | "discharged";
+  tier?: string;
 }
 
 // =============================================================================
@@ -450,6 +492,27 @@ export function formatVerdict(v: Verdict): string {
       lines.push(`    [${em.binding}] declared=${em.declared.join(",") || "∅"} inferred=${em.inferred.join(",") || "∅"} missing=${em.missing.join(",") || "∅"}`);
     }
   }
+  if (v.lawObligations && v.lawObligations.length > 0) {
+    const discharged = v.lawObligations.filter(o => o.status === "discharged").length;
+    const sampled    = v.lawObligations.filter(o => o.status === "sampled").length;
+    const pending    = v.lawObligations.filter(o => o.status === "pending");
+    lines.push(
+      `  laws: ${discharged}/${v.lawObligations.length} discharged` +
+      (sampled > 0 ? `, ${sampled} sampled (survival, not proof)` : "") +
+      (pending.length > 0 ? `, ${pending.length} pending` : ""));
+    for (const o of pending) {
+      lines.push(`    ? ${o.type}.${o.law}`);
+    }
+  }
+  if (v.coercionObligations && v.coercionObligations.length > 0) {
+    const pending = v.coercionObligations.filter(o => o.status === "pending");
+    lines.push(
+      `  coercions: ${v.coercionObligations.length - pending.length}/${v.coercionObligations.length} obligations discharged` +
+      (pending.length > 0 ? `, ${pending.length} pending` : ""));
+    for (const o of pending) {
+      lines.push(`    ? ${o.from}->${o.to} ${o.obligation}`);
+    }
+  }
   if (v.iterationHints) {
     if (v.iterationHints.suggestions.length > 0) {
       lines.push(`  hints:`);
@@ -596,12 +659,20 @@ export function buildVerdict(
 
   const hasFailedTheorem = theorems.some(t => t.status === "failed");
   const iterationHints = generateHints(theorems, report, obligation);
+  // E3: law + coercion obligations with their D34 discharge tiers,
+  // scoped to this compilation unit's types. Pending entries are
+  // recorded, not fatal (the first strict gate is E4).
+  const inUnit = boundTypeFilter(evalCtx);
+  const lawObligations = lawObligationRecords(inUnit);
+  const coercionObligations = coercionObligationRecords((f, t) => inUnit(f) && inUnit(t));
   return {
     version: PCP_VERSION,
     verified: !anyError && !hasFailedTheorem,
     theorems,
     ...(totalityFindings.length > 0 ? { totalityFindings } : {}),
     ...(effectMismatches.length > 0 ? { effectMismatches } : {}),
+    ...(lawObligations.length > 0 ? { lawObligations } : {}),
+    ...(coercionObligations.length > 0 ? { coercionObligations } : {}),
     ...(iterationHints.suggestions.length > 0 || iterationHints.strategiesTried
         ? { iterationHints } : {}),
   };
@@ -810,6 +881,32 @@ export function extractObligations(
         }],
       }));
     }
+  }
+
+  // E3 (B-027 §8): law + coercion obligations are exactly the well-posed
+  // PCP tasks the D34 "pending" tier promises — export them alongside
+  // theorem obligations, scoped to this compilation unit's types. The
+  // proposition text is synthesized (the law's quantified body is a
+  // value, not source text); workers discharge via `Law.witness` /
+  // `Coercion.witness` with a proof term.
+  const inUnit = boundTypeFilter(evalCtx);
+  for (const rec of lawObligationRecords(inUnit)) {
+    if (opts?.pendingOnly && rec.status !== "pending") continue;
+    obligations.push(makeObligation({
+      theoremName: `${rec.type}.law_${rec.law}`,
+      proposition: `for_all over ${rec.type}: law '${rec.law}' holds`,
+      ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
+    }));
+  }
+  for (const rec of coercionObligationRecords((f, t) => inUnit(f) && inUnit(t))) {
+    if (opts?.pendingOnly && rec.status !== "pending") continue;
+    obligations.push(makeObligation({
+      theoremName: `coercion(${rec.from}->${rec.to}).${rec.obligation}`,
+      proposition: rec.obligation === "coherence"
+        ? `coercion ${rec.from}->${rec.to}: composition triangles commute`
+        : `coercion ${rec.from}->${rec.to}: x == y implies coerce(x) == coerce(y)`,
+      ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
+    }));
   }
 
   return obligations;

@@ -1681,6 +1681,7 @@ import {
   Effect as _Effect, effectUnion as _effectUnion, isEffectInstance as _isEffectInstance,
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
   protocolEquals,
+  setEffectsInspector as _setEffectsInspector,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 import {
@@ -1694,6 +1695,36 @@ import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, r
 // re-enter precompile and loop forever. Cleared when the precompile call
 // completes or throws.
 const _precompileInProgress = new WeakSet<ComposedFunctionValue>();
+
+// E3 (E-R5): the purity/knowledge-independence inspector for `eq`
+// implementations and coercion fns. types-std can't import the evaluator
+// (import direction), so the hook is injected here: effects component
+// first, then the precompile stash, then an on-demand precompile.
+_setEffectsInspector((fnValue, ctx) => {
+  const eff = _effectsOf(fnValue);
+  if (eff) return new Set(eff);
+  const d = dataOf(fnValue);
+  if (d.kind === ValueKind.PrimitiveFunction) {
+    return new Set((d as PrimitiveFunctionValue).effects ?? []);
+  }
+  if (d.kind === ValueKind.ComposedFunction) {
+    const cfn = d as ComposedFunctionValue;
+    const stash = (cfn as any).__inferredEffects as Set<string> | undefined;
+    if (stash) return new Set(stash);
+    if (ctx && !_precompileInProgress.has(cfn)) {
+      _precompileInProgress.add(cfn);
+      try {
+        const r = _precompileFunction(cfn, [], ctx);
+        return r.inferredEffects ? new Set(r.inferredEffects) : new Set();
+      } catch {
+        return null; // can't infer here — the gate declines, not rejects
+      } finally {
+        _precompileInProgress.delete(cfn);
+      }
+    }
+  }
+  return null;
+});
 import {
   domainOf as _domainOf, impliesDomain as _impliesDomain,
   AbstractDomain as _AbstractDomain, EffectsDomain as _EffectsDomain,
