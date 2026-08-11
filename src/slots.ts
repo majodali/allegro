@@ -287,6 +287,25 @@ export function typeShape(t: ContextValue): ContextValue {
   return cur;
 }
 
+/** E1 (B-027, §7/D37): the EQUALITY shape — walk the FULL `__refines`
+ *  chain to the representation root, past preserve-lifted and method-layer
+ *  refinements too (unlike `typeShape`, which stops at layers that mint
+ *  their own member sets, because their overrides must run for dispatch).
+ *  Refinements are knowledge and never separate equal values —
+ *  `PositiveInt(5) == 5` even when PositiveInt lifts operators. `distinct`
+ *  types mint NO refines edge (buildDistinctType skips the slot), so they
+ *  stay their own equality shape: unequal to the parent until a coercion
+ *  is declared (E2). */
+export function equalityShape(t: ContextValue): ContextValue {
+  let cur = typeShape(t);
+  for (let guard = 0; guard < 64; guard++) {
+    const parent = asContext(slotRead(cur, "__refines"));
+    if (!parent) return cur;
+    cur = typeShape(parent);
+  }
+  return cur;
+}
+
 // --- Channel plane (read side) ------------------------------------------------------
 
 /** Raw channel read on a value: MultiValue component lookup, plus the two

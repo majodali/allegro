@@ -7,10 +7,10 @@
 import { isCarrier } from "./structure.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, MultiValueType, PrimitiveFnImpl, PrimitiveFunctionValue,
-  ComposedFunctionValue,
+  ComposedFunctionValue, EvalFn,
   makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue, makeDenseArrayCtx,
   makeComposedFn, makeParam,
-  stringToBits, bitsToString, AllegroError,
+  stringToBits, bitsToString, AllegroError, isResolved,
   Extension,
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
@@ -25,6 +25,7 @@ import {
   setEffectBound, setSlotCount, setAbstractDomain,
   writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
   removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape,
+  equalityShape,
 } from "./slots.js";
 
 
@@ -1457,6 +1458,136 @@ function asBitsTyped(v: Value, ctx: string): BitsValue {
 }
 
 // =============================================================================
+// Equality protocol (E1 — B-027, structures.md §7, E-R1/D37)
+//
+// `==` resolves through THREE steps (the §7 resolution):
+//   1. Same equality shape → that shape's `equals` (a custom `eq` member
+//      dispatches; its absence means the KERNEL STRUCTURAL EQUALS applies —
+//      the kernel default is supplied at this chokepoint, not per-type).
+//   2. Different shapes → declared coercion to the least common type
+//      (E2 — not yet; the seam is marked below).
+//   3. No common type → NOT EQUAL (typed Bool false, never a host error).
+//
+// The equality shape walks the FULL `__refines` chain (slots.equalityShape):
+// refinements — member-transparent AND preserve-lifted — are knowledge and
+// never separate equal values (D37). `distinct` types mint no refines edge,
+// so step 3 makes them unequal to their parent until a coercion is declared.
+//
+// The kernel structural equals recurses element-wise (dense region) and
+// field-wise (named bindings) through THIS protocol, so custom `equals` on
+// component types compose. Its lawfulness certificate is parametric —
+// refl/sym/trans hold by structural induction given lawful component
+// equalities (KERNEL_EQUALS_CERTIFICATE is the E3 tier anchor).
+// =============================================================================
+
+/** E3 reads this marker as the discharge tier for the kernel-supplied
+ *  equals: proven once, parametrically, by structural induction. */
+export const KERNEL_EQUALS_CERTIFICATE = "kernel-structural-parametric";
+
+/** Protocol equality as a host boolean. Total: any resolved value pair
+ *  answers true/false, never throws. */
+export function protocolEqualsBool(
+  a: Value, b: Value,
+  ctx?: ContextValue, evalFn?: EvalFn,
+): boolean {
+  if (a === b) return true;
+  const ta = getType(a), tb = getType(b);
+  if (ta && tb) {
+    const sa = equalityShape(ta), sb = equalityShape(tb);
+    // E2 seam: the least-common-type coercion lookup goes HERE.
+    if (sa !== sb) return false;                     // §7 step 3
+    const m = typeMethod(sa, "eq");                  // §7 step 1: custom equals
+    if (m) {
+      if (m.kind === ValueKind.PrimitiveFunction) {
+        const r = (m as PrimitiveFunctionValue).fn([dataOf(a), dataOf(b)], ctx as any, evalFn as any);
+        const rd = dataOf(r);
+        return rd.kind === ValueKind.Bits && (rd as BitsValue).data !== 0n;
+      }
+      if (m.kind === ValueKind.ComposedFunction && evalFn && ctx) {
+        // Spec-supplied `eq` method: (self, other) — full values flow in.
+        const r = evalFn(makeExpr(m, [a, b]), ctx);
+        const rd = dataOf(r);
+        return rd.kind === ValueKind.Bits && (rd as BitsValue).data !== 0n;
+      }
+    }
+  }
+  return kernelStructuralEquals(dataOf(a), dataOf(b), ctx, evalFn);
+}
+
+/** The kernel structural equals over data-plane representations. Bits
+ *  compare by length+payload; Structures compare dense elements and
+ *  non-meta named bindings, recursing through the protocol; everything
+ *  else (functions, params, symbols, expressions) is identity-only. */
+function kernelStructuralEquals(
+  da: Value, db: Value,
+  ctx?: ContextValue, evalFn?: EvalFn,
+): boolean {
+  if (da === db) return true;
+  if (da.kind !== db.kind) return false;
+  if (da.kind === ValueKind.Bits) {
+    const ba = da as BitsValue, bb = db as BitsValue;
+    return ba.length === bb.length && ba.data === bb.data;
+  }
+  if (da.kind === ValueKind.Structure) {
+    const ca = da as ContextValue, cb = db as ContextValue;
+    // TYPE VALUES (anything holding a member set or construct authority —
+    // types, kinds, interfaces, generics) are IDENTITY-only: they are
+    // minted once / memoized, so identity IS their equality. Structural
+    // comparison over their (mostly meta) bindings would false-positive
+    // distinct types as equal.
+    if (getMembers(ca) !== undefined || getConstruct(ca) !== undefined ||
+        getMembers(cb) !== undefined || getConstruct(cb) !== undefined) {
+      return false; // da === db already answered the equal case
+    }
+    const ea = elementsOf(ca), eb = elementsOf(cb);
+    if (ea.length !== eb.length) return false;
+    for (let i = 0; i < ea.length; i++) {
+      if (!protocolEqualsBool(ea[i], eb[i], ctx, evalFn)) return false;
+    }
+    const fa = namedFieldsOf(ca), fb = namedFieldsOf(cb);
+    if (fa.size !== fb.size) return false;
+    for (const [k, va] of fa) {
+      const vb = fb.get(k);
+      if (vb === undefined) return false;
+      if (!protocolEqualsBool(va, vb, ctx, evalFn)) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/** Named user-visible fields of a Structure: skip meta slots (`__*`) and
+ *  the dense region's lazily-materialized numeric-key view (elements are
+ *  compared through `elementsOf`, not twice). */
+function namedFieldsOf(c: ContextValue): Map<string, Value> {
+  const out = new Map<string, Value>();
+  for (const [k, bnd] of c.bindings) {
+    if (bnd.value === undefined) continue;
+    if (isMetaSlotKey(k)) continue;
+    if (/^\d+$/.test(k)) continue;
+    out.set(k, bnd.value);
+  }
+  return out;
+}
+
+/** The `==` / `!=` chokepoint for the evaluator's dispatch and the
+ *  `typed_eq`/`typed_neq` path. Returns a typed Bool, or null to DECLINE
+ *  (unresolved or untyped operand → caller falls through to the legacy
+ *  raw-bits path, preserving base-mode Allegretto semantics). `!=` is
+ *  DERIVED — the negation of protocol equality, so the pair stays
+ *  coherent by construction. */
+export function protocolEquals(
+  left: Value, right: Value, negate: boolean,
+  ctx?: ContextValue, evalFn?: EvalFn,
+): Value | null {
+  if (!isResolved(left) || !isResolved(right)) return null;
+  const ta = getType(left), tb = getType(right);
+  if (!ta || !tb) return null;
+  const eq = protocolEqualsBool(left, right, ctx, evalFn);
+  return withType(makeInt((negate ? !eq : eq) ? 1 : 0), BoolType);
+}
+
+// =============================================================================
 // Int Type
 // =============================================================================
 
@@ -1986,10 +2117,10 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
     const initial = args[2];
     return evalFn!(makeExpr(reduceAllegro, [arr, fn, initial, makeInt(0)]), ctx!);
   },
-  eq: (args) => {
-    // Reference equality for now (arrays are Contexts)
-    return makeInt(args[0] === args[1] ? 1 : 0);
-  },
+  // E1 (B-027): no `eq` member — the kernel structural equals applies at
+  // the protocol chokepoint (protocolEquals). The old reference-equality
+  // stub returned an UNTYPED int the dispatch fallback then mistyped as
+  // Array, crashing print/formatValue downstream.
   toString: ((args: Value[]) => {
     const ctx = args[0] as ContextValue;
     const elems = arrayElements(ctx);
@@ -2045,7 +2176,8 @@ const objectMethods: Record<string, PrimitiveFnImpl> = {
     if (!b?.value) return noneSingleton;
     return b.value;
   },
-  eq: (args) => makeInt(args[0] === args[1] ? 1 : 0),
+  // E1 (B-027): no `eq` member — kernel structural equals applies at the
+  // protocol chokepoint (see arrayMethods note).
   toString: ((args: Value[]) => {
     const ctx = args[0] as ContextValue;
     return stringToBits(`{Object(${ctx.bindings.size})}`);

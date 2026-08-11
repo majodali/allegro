@@ -219,6 +219,43 @@ PROCESS. Deviations recorded here in §6.
 6. `proof_trans` over an equality with neither proven nor admitted
    transitivity: previously silent → refusal (E4; scalar + kernel
    equalities are auto-proven, so existing programs stay green).
+7. *(discovered at E1, flagged at landing)* `true == 1`: `true`
+   (raw-bits accident — Bool data IS Int 0/1) → `false` (Bool and Int
+   are distinct shapes; §7 step 3). Opting back in would be an E2
+   declared coercion — recommend NOT declaring it (Bool is
+   semantically not a number; the old truth was representation leak).
+8. *(discovered at E1)* `[1,2] != [1,2]` and record `!=`: host-level
+   AllegroError (no neq member → raw `bits_neq` on a Structure) →
+   derived negation of protocol equality.
+
+## 6b. Chunk records
+
+**E1 — landed 2026-08.** One chokepoint: `protocolEquals`
+(`src/types-std.ts`), called from the evaluator's `bits_eq`/`bits_neq`
+dispatch and `makeTypedBinOp`'s eq/neq path; declines for
+untyped/unresolved operands (base-mode semantics keep). `equalityShape`
+(`src/slots.ts`) = full `__refines` walk (preserve-lifted layers
+included — deeper than dispatch's `typeShape`; ruling: §7's
+"refinements are excluded" governs equality even when the refinement
+mints its own member set, since it never overrides `eq`). Kernel
+structural equals = same-shape default in the ABSENCE of a custom `eq`
+member (the broken Array/Object reference-eq stubs deleted — they were
+the crash source: untyped int results mistyped by the dispatch
+fallback); spec-supplied `eq` methods (PrimitiveFunction or
+ComposedFunction) override and dispatch. Type values identity-only
+(member-set/construct holders — structural compare would
+false-positive `Int == Float` since their bindings are mostly meta).
+`!=` derived by negation. `KERNEL_EQUALS_CERTIFICATE` exported (E3
+anchor). Deviations from the E-R1 letter: kernel equals is supplied AT
+THE CHOKEPOINT rather than registered as a member on each type
+(observably identical, simpler; E3's tier machinery reads the
+certificate constant + the absence-of-custom-eq condition); None/Error
+keep their existing identity `eq` members (dispatched as custom —
+identity IS their structure, per E-R1). Known limit: untyped source
+functions (`f(x) => x`) carry no type channel → `f == f` still errors
+via base `bits_eq` (controlled, not a crash); typed functions compare
+by identity. Battery: 18 tests incl. 11×11 no-throw kind-pair sweep +
+refl/sym/trans empirical shadow. 1077/1077 green.
 
 ## 7. Status log
 

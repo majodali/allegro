@@ -9,7 +9,7 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw } from "./slots.js";
 import { exportedSymbols, symbolFromWire, kernelMemberFqn } from "./symbols.js";
@@ -3450,6 +3450,164 @@ test("constructor meta-method is removed (C7.2b)", () => {
     threw = true;
   }
   eq(threw, true);
+});
+
+// == E1 equality protocol battery (B-027, structures.md §7, E-R1/D37) ==
+
+function eqNum(src: string): number {
+  const result = evalStd(src);
+  return Number((dataOf(result!) as BitsValue).data);
+}
+
+test("E1 equality: array structural equality is true, Bool-typed", () => {
+  const result = evalStd("[1,2] == [1,2]");
+  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(getTypeName(result!), "Bool");
+});
+
+test("E1 equality: != is the derived negation", () => {
+  eq(eqNum("[1,2] != [1,2]"), 0);
+  eq(eqNum("[1,2] != [1,3]"), 1);
+});
+
+test("E1 equality: array element and length mismatches", () => {
+  eq(eqNum("[1,2] == [1,3]"), 0);
+  eq(eqNum("[1,2] == [1,2,3]"), 0);
+  eq(eqNum("[1.5, 2.5] == [1.5, 2.5]"), 1);
+});
+
+test("E1 equality: nested structures recurse through the protocol", () => {
+  eq(eqNum("[[1,2],[3]] == [[1,2],[3]]"), 1);
+  eq(eqNum("[[1,2],[3]] == [[1,2],[4]]"), 0);
+  eq(eqNum("{a: {b: [1,2]}} == {a: {b: [1,2]}}"), 1);
+  eq(eqNum("{a: {b: [1,2]}} == {a: {b: [1,3]}}"), 0);
+});
+
+test("E1 equality: object field-wise equality", () => {
+  eq(eqNum("{x: 1} == {x: 1}"), 1);
+  eq(eqNum("{x: 1} == {x: 2}"), 0);
+  eq(eqNum("{x: 1} == {y: 1}"), 0);
+  eq(eqNum("{x: 1, y: 2} == {x: 1}"), 0);
+});
+
+test("E1 equality: record instances compare structurally", () => {
+  const mk = (tail: string) => eqNum(`P = Type.define({x: Int, y: Int})\n${tail}`);
+  eq(mk("P(1,2) == P(1,2)"), 1);
+  eq(mk("P(1,2) == P(1,3)"), 0);
+  eq(mk("P(1,2) != P(1,2)"), 0);
+});
+
+test("E1 equality: custom `eq` in the define spec overrides the kernel", () => {
+  // eq compares x only — proves the spec-supplied equals dispatches.
+  eq(eqNum(`Q = Type.define({x: Int, y: Int, eq: (self, other) => self.x == other.x})
+Q(1, 2) == Q(1, 9)`), 1);
+  eq(eqNum(`Q = Type.define({x: Int, y: Int, eq: (self, other) => self.x == other.x})
+Q(1, 2) == Q(3, 2)`), 0);
+});
+
+test("E1 equality: refinement peel re-pinned (D37 — knowledge never separates)", () => {
+  eq(eqNum("PositiveInt = Int & _ > 0\nPositiveInt(5) == 5"), 1);
+});
+
+test("E1 equality: preserve-lifted refinements peel too (equalityShape)", () => {
+  const pre = `PI = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})\n`;
+  eq(eqNum(pre + "PI(5) == 5"), 1);
+  eq(eqNum(pre + "x = PI(5)\n(x + 3) == 8"), 1);
+});
+
+test("E1 equality: distinct types are unequal to their parent (§7 step 3)", () => {
+  const pre = `UserId = Int.distinct("UserId")\n`;
+  eq(eqNum(pre + "UserId(42) == 42"), 0);
+  eq(eqNum(pre + "UserId(42) != 42"), 1);
+  eq(eqNum(pre + "UserId(42) == UserId(42)"), 1);
+});
+
+test("E1 equality: cross-shape scalars are simply false", () => {
+  eq(eqNum("1 == 1.0"), 0);      // until E2's Int→Float coercion
+  eq(eqNum('"a" == 1'), 0);
+  eq(eqNum("true == 1"), 0);     // §6 delta 7: Bool and Int are distinct shapes
+  eq(eqNum("true == true"), 1);
+});
+
+test("E1 equality: none keeps identity semantics", () => {
+  eq(eqNum("none == none"), 1);
+  eq(eqNum("none == 5"), 0);
+});
+
+test("E1 equality: errors stay viral through ==", () => {
+  const result = evalStd('(error "boom") == 1');
+  eq((result as any).components?.has("error") ?? (getTypeName(result!) === "Error"), true);
+});
+
+test("E1 equality: type values compare by identity", () => {
+  eq(eqNum("Int == Int"), 1);
+  eq(eqNum("Int == Float"), 0);
+  // Memoized generic concretes: same application → same identity.
+  eq(eqNum("t1 = type of [1,2]\nt2 = type of [3,4]\nt1 == t2"), 1);
+  eq(eqNum('t1 = type of [1,2]\nt2 = type of ["a"]\nt1 == t2'), 0);
+});
+
+test("E1 equality: typed functions compare by identity", () => {
+  eq(eqNum("f(x: Int): Int => x\nf == f"), 1);
+  eq(eqNum("f(x: Int): Int => x\ng(x: Int): Int => x\nf == g"), 0);
+});
+
+test("E1 equality: print of a structural comparison no longer crashes", () => {
+  // Regression: the old reference-eq stub returned an untyped int the
+  // dispatch fallback mistyped as Array/Object, crashing formatValue.
+  const result = evalStd("v = [1,2] == [1,2]\nv.toString()");
+  eq(bitsToString(dataOf(result!) as BitsValue), "true");
+});
+
+test("E1 equality: no-throw sweep — == is total over every kind pair", () => {
+  const bindings = `P = Type.define({x: Int})
+UserId = Int.distinct("UserId")
+tf(x: Int): Int => x
+v0 = 1
+v1 = 1.5
+v2 = "a"
+v3 = true
+v4 = [1]
+v5 = {x: 1}
+v6 = P(1)
+v7 = tf
+v8 = none
+v9 = Int
+v10 = UserId(1)
+`;
+  const lines: string[] = [];
+  for (let i = 0; i <= 10; i++) {
+    for (let j = 0; j <= 10; j++) {
+      lines.push(`r${i}_${j} = v${i} == v${j}`);
+    }
+  }
+  // Every pair must produce a value (typed Bool), never a host throw.
+  const result = evalStd(bindings + lines.join("\n") + "\nv0 == v0");
+  eq(Number((dataOf(result!) as BitsValue).data), 1);
+});
+
+test("E1 equality: kernel lawfulness empirical shadow (refl/sym/trans)", () => {
+  // The parametric certificate's empirical shadow (plan §5): property-check
+  // the kernel equals over a fixed set of generated structures.
+  const srcs = [
+    "1", "2", "1.5", '"a"', '"b"', "true", "false", "none",
+    "[1,2]", "[1,2]", "[2,1]", "[[1],[2]]",
+    "{x: 1}", "{x: 1}", "{x: 2}", "{a: {b: [1,2]}}", "{a: {b: [1,2]}}",
+  ];
+  const vals = srcs.map(s => evalStd(s)!);
+  const eqv = (a: Value, b: Value) => protocolEqualsBool(a, b);
+  for (const a of vals) eq(eqv(a, a), true);                       // refl
+  for (const a of vals) for (const b of vals) {
+    eq(eqv(a, b), eqv(b, a));                                      // sym
+  }
+  for (const a of vals) for (const b of vals) for (const c of vals) {
+    if (eqv(a, b) && eqv(b, c)) eq(eqv(a, c), true);               // trans
+  }
+});
+
+test("E1 equality: E3 certificate anchor is exported", () => {
+  eq(typeof KERNEL_EQUALS_CERTIFICATE, "string");
+  eq(KERNEL_EQUALS_CERTIFICATE.length > 0, true);
 });
 
 // == Guard Clauses (and) ==

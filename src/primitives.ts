@@ -1680,6 +1680,7 @@ import {
   structuralWrap, makeUnionType, wrapType, buildRefinedType, isTypeMeta,
   Effect as _Effect, effectUnion as _effectUnion, isEffectInstance as _isEffectInstance,
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
+  protocolEquals,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 import {
@@ -3871,6 +3872,13 @@ function makeTypedBinOp(opName: string): PrimitiveFnImpl {
     const right = evalFn!(args[1], ctx!);
     if (!isResolved(left) || !isResolved(right)) {
       return makeExpr(makePrimitive(`typed_${opName}`, makeTypedBinOp(opName), true), [left, right]);
+    }
+    // E1 (B-027, §7): eq/neq resolve through the equality protocol — same
+    // chokepoint the evaluator's bits_eq/bits_neq dispatch uses. Declines
+    // (null) when an operand is untyped; the legacy path below handles it.
+    if (opName === "eq" || opName === "neq") {
+      const r = protocolEquals(left, right, opName === "neq", ctx, evalFn);
+      if (r) return r;
     }
     const leftType = getType(left);
     if (!leftType) {

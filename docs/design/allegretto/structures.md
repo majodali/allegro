@@ -487,7 +487,7 @@ PositiveInt (certificate-peeking) is a separate, **effectful**
 introspection op — knowledge-observation would otherwise break congruence
 (§7).
 
-## 7. Equality [designed]
+## 7. Equality [partial — steps 1+3 landed (E1); step 2 pending (E2)]
 
 Equality **dispatches on shape, never knowledge** (D37) — required for a
 globally stable equivalence relation. Consequently refinements are excluded:
@@ -502,6 +502,21 @@ is simply re-checked).
    construction, hence commutative.
 3. No common type → **not equal**. A `distinct` type is unequal to
    everything until it declares a coherent coercion.
+
+*E1 implementation notes (2026-08): steps 1+3 live at one chokepoint
+(`protocolEquals`, `src/types-std.ts`), shared by the evaluator's
+`bits_eq`/`bits_neq` dispatch and the `typed_eq` path; the E2 coercion
+lookup slots between them. The equality shape (`equalityShape`,
+`src/slots.ts`) walks the FULL `__refines` chain — past preserve-lifted
+layers too, unlike dispatch's `typeShape` — so operator-lifting
+refinements never separate equal values; `distinct` mints no refines
+edge and so falls to step 3. Kernel structural equals is the same-shape
+default when no custom `eq` member exists: dense elements + non-meta
+fields, recursing through the protocol. Type values (member-set or
+construct-authority holders) are identity-only — minted once/memoized,
+identity IS their equality. `!=` is the derived negation. Untyped
+source functions still fall to base `bits_eq` (no type channel) — a
+known limit, revisit with E3's `Equatable`.*
 
 **Laws** (discharged per §8):
 - Reflexivity/symmetry/transitivity of a custom `equals`: per-type

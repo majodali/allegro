@@ -8,6 +8,60 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — E1: kernel structural equals + shape resolution (B-027, Tranche C)
+
+First chunk of the equality-protocol arc (`equality-and-laws.md`,
+E-R1–E-R6 maintainer-ratified 2026-08). `==` / `!=` now resolve
+through the §7 EQUALITY PROTOCOL whenever both operands are typed —
+one chokepoint (`protocolEquals` in `src/types-std.ts`) shared by the
+evaluator's `bits_eq`/`bits_neq` dispatch and the `typed_eq`/`typed_neq`
+path; it declines (null) for untyped operands so base-mode Allegretto
+semantics keep.
+
+- **Equality shape** (`equalityShape`, `src/slots.ts`): walks the FULL
+  `__refines` chain to the representation root — past preserve-lifted
+  and method-layer refinements too, unlike dispatch's `typeShape`.
+  Refinements are knowledge and never separate equal values (D37):
+  `PositiveInt(5) == 5` holds even when PositiveInt lifts operators.
+  `distinct` types mint no refines edge, so §7 step 3 makes
+  `UserId(42) == 42` **false** (was true — the distinct leak, §6
+  delta 3).
+- **Kernel structural equals**: same shape + no custom `eq` member →
+  element-wise (dense region) + field-wise (non-meta bindings)
+  recursion through the protocol, so custom `equals` on component
+  types compose. `[1,2] == [1,2]` and `{x:1} == {x:1}` were HOST
+  CRASHES (the old reference-eq stubs returned untyped ints the
+  dispatch fallback mistyped as Array/Object, crashing formatValue) —
+  now structural, typed Bool (§6 deltas 1–2). Record instances
+  compare structurally; a spec-supplied `eq` method overrides the
+  kernel and dispatches (both PrimitiveFunction and ComposedFunction
+  descriptors).
+- **Type values compare by identity** (types/kinds/interfaces/
+  generics — anything holding a member set or construct authority):
+  they are minted once/memoized, so identity IS their equality;
+  structural comparison over their mostly-meta bindings would
+  false-positive `Int == Float`.
+- **`!=` is derived** — the negation of protocol equality; the pair
+  is coherent by construction. `[1,2] != [1,2]` threw before (no neq
+  member → raw `bits_neq` on a Structure).
+- **Discovered delta (recorded as plan §6 delta 7)**: `true == 1` was
+  `true` via raw-bits comparison; Bool and Int are distinct shapes, so
+  it is now **false** — flagged to maintainer at landing.
+- **Known limit**: UNTYPED source functions (`f(x) => x` with no
+  annotations) carry no type channel, so `f == f` still falls to base
+  `bits_eq` and errors (controlled AllegroError, not a crash). Typed
+  functions compare by identity. Revisit if E3's Equatable needs it.
+- `KERNEL_EQUALS_CERTIFICATE` exported as the E3 discharge-tier anchor
+  (the kernel equals is lawful parametrically — refl/sym/trans by
+  structural induction given lawful component equalities; pinned
+  empirically by a bounded property-check battery).
+
+E2 seam marked in `protocolEqualsBool` (least-common-type coercion
+lookup between steps 1 and 3). 18 new battery tests (structural grid,
+refinement/preserve peel, distinct non-equality, cross-shape scalars,
+error virality, identity tiers, 11×11 no-throw kind-pair sweep,
+refl/sym/trans empirical shadow); 1077/1077 green.
+
 ## 2026-08 — C7.2: kind-tower residue (Tranche B — D39 checklist to zero)
 
 Closes the last D39 slot-disposition rows. Three sub-parts; three

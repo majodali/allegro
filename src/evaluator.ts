@@ -9,6 +9,7 @@ import {
 import {
   getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
+  protocolEquals,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
@@ -358,6 +359,20 @@ function applyPrimitive(
   // (from refined types or literal values), compute the output domain so
   // downstream operations inherit the proof context.
   const propagatedSet = propagateSetForPrimitive(fn.name, evalArgs);
+
+  // E1 (B-027, §7/D37): `==` and `!=` resolve through the EQUALITY
+  // PROTOCOL when both operands are typed — shape resolution (equality
+  // shape = full refinement-peel; distinct types don't unify), custom
+  // `equals` dispatch, kernel structural equals for structures. Total:
+  // typed Bool out, never a host crash, on any kind pair. Declines
+  // (null) for untyped operands — base-mode bits_eq semantics keep.
+  if (fn.name === "bits_eq" || fn.name === "bits_neq") {
+    const r = protocolEquals(evalArgs[0], evalArgs[1], fn.name === "bits_neq", ctx, evalFn);
+    if (r) {
+      const out = attachEff(r);
+      return propagatedSet ? withPredicates(out, propagatedSet) : out;
+    }
+  }
 
   // Type-directed dispatch: if the first arg has a type with a matching method,
   // dispatch through the type instead of calling the base primitive directly.
