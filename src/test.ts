@@ -9,7 +9,7 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw } from "./slots.js";
 import { exportedSymbols, symbolFromWire, kernelMemberFqn } from "./symbols.js";
@@ -3522,11 +3522,10 @@ test("E1 equality: distinct types are unequal to their parent (§7 step 3)", () 
   eq(eqNum(pre + "UserId(42) == UserId(42)"), 1);
 });
 
-test("E1 equality: cross-shape scalars are simply false", () => {
-  eq(eqNum("1 == 1.0"), 0);      // until E2's Int→Float coercion
+test("E1 equality: cross-shape scalars with no coercion are simply false", () => {
   eq(eqNum('"a" == 1'), 0);
   eq(eqNum("true == 1"), 0);     // §6 delta 7: Bool and Int are distinct shapes
-  eq(eqNum("true == true"), 1);
+  eq(eqNum("true == true"), 1);  // and NO Bool→Int coercion is declared (recommended)
 });
 
 test("E1 equality: none keeps identity semantics", () => {
@@ -3608,6 +3607,90 @@ test("E1 equality: kernel lawfulness empirical shadow (refl/sym/trans)", () => {
 test("E1 equality: E3 certificate anchor is exported", () => {
   eq(typeof KERNEL_EQUALS_CERTIFICATE, "string");
   eq(KERNEL_EQUALS_CERTIFICATE.length > 0, true);
+});
+
+// == E2 declared coercions + least common type (B-027, §7 step 2, E-R2) ==
+
+test("E2 coercion: 1 == 1.0 flips true via the kernel Int→Float edge (§6 delta 4)", () => {
+  eq(eqNum("1 == 1.0"), 1);
+  eq(eqNum("1.0 == 1"), 1);      // commutative by construction (same LCT both orders)
+  eq(eqNum("2 == 1.0"), 0);
+  eq(eqNum("1 != 1.0"), 0);      // != stays the derived negation through coercion
+  eq(eqNum("1 != 2.0"), 1);
+});
+
+test("E2 coercion: same-shape containers coerce their components", () => {
+  // Kernel structural equals recurses through the PROTOCOL, which now
+  // includes the coercion step — mixed scalar fields meet at Float.
+  eq(eqNum("{x: 1} == {x: 1.0}"), 1);
+  eq(eqNum("{x: 2} == {x: 1.0}"), 0);
+});
+
+test("E2 coercion: differently-parameterized generic shapes do NOT coerce", () => {
+  // Array[Int] and Array[Float] are distinct memoized concretes with no
+  // declared edge — the container shapes themselves must meet, element
+  // coercion only runs under a common container shape.
+  eq(eqNum("[1, 2] == [1.0, 2.0]"), 0);
+});
+
+test("E2 coercion: distinct types opt back in via Coercion.declare (§6 delta 3)", () => {
+  const pre = `UserId = Int.distinct("UserId")\nCoercion.declare(UserId, Int, (u) => Int(u))\n`;
+  eq(eqNum(pre + "UserId(42) == 42"), 1);
+  eq(eqNum(pre + "42 == UserId(42)"), 1);    // symmetric
+  eq(eqNum(pre + "UserId(42) == 43"), 0);
+  eq(eqNum(pre + "UserId(42) != 42"), 0);
+  eq(eqNum(pre + "UserId(41) == UserId(41)"), 1); // own-shape equality unchanged
+});
+
+test("E2 coercion: coherence triangle — composed path UserId→Int→Float", () => {
+  const pre = `UserId = Int.distinct("UserId")\nCoercion.declare(UserId, Int, (u) => Int(u))\n`;
+  eq(eqNum(pre + "UserId(42) == 42.0"), 1);
+  eq(eqNum(pre + "42.0 == UserId(42)"), 1);
+  eq(eqNum(pre + "UserId(42) == 43.0"), 0);
+});
+
+test("E2 coercion: no unique least common type is an explicit error", () => {
+  // Diamond: A and B each coerce into incomparable M and N — no least.
+  const src = `A = Int.distinct("A")
+B = Int.distinct("B")
+M = Int.distinct("M")
+N = Int.distinct("N")
+Coercion.declare(A, M, (v) => M(v))
+Coercion.declare(A, N, (v) => N(v))
+Coercion.declare(B, M, (v) => M(v))
+Coercion.declare(B, N, (v) => N(v))
+A(1) == B(1)`;
+  let msg = "";
+  try { evalStd(src); } catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("ambiguous"), true);
+  eq(msg.includes("explicit coercion"), true);
+});
+
+test("E2 coercion: user declarations instantiate PENDING obligations; kernel edge is discharged", () => {
+  evalStd(`ObDemo = Int.distinct("ObDemo")\nCoercion.declare(ObDemo, Int, (u) => Int(u))\n1`);
+  const records = coercionObligationRecords();
+  const user = records.filter(r => r.from === "ObDemo" && r.to === "Int");
+  eq(user.length, 2);
+  eq(user.every(r => r.status === "pending"), true);
+  eq(user.map(r => r.obligation).sort().join(","), "coherence,equality-preservation");
+  const kernel = records.filter(r => r.from === "Int" && r.to === "Float");
+  eq(kernel.length, 2);
+  eq(kernel.every(r => r.status === "discharged" && r.tier === "kernel"), true);
+});
+
+test("E2 coercion: declare rejects vacuous and malformed declarations", () => {
+  // Same equality shape (refinements peel to Int) — a coercion is vacuous.
+  let msg1 = "";
+  try {
+    evalStd("PositiveInt = Int & _ > 0\nCoercion.declare(PositiveInt, Int, (v) => v)");
+  } catch (e: any) { msg1 = String(e?.message ?? e); }
+  eq(msg1.includes("vacuous"), true);
+  // Third argument must be a function.
+  let msg2 = "";
+  try {
+    evalStd(`D2 = Int.distinct("D2")\nCoercion.declare(D2, Int, 42)`);
+  } catch (e: any) { msg2 = String(e?.message ?? e); }
+  eq(msg2.includes("must be a function"), true);
 });
 
 // == Guard Clauses (and) ==

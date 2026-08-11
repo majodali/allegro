@@ -25,7 +25,7 @@ import {
   setEffectBound, setSlotCount, setAbstractDomain,
   writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
   removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape,
-  equalityShape,
+  equalityShape, asContext,
 } from "./slots.js";
 
 
@@ -1484,6 +1484,143 @@ function asBitsTyped(v: Value, ctx: string): BitsValue {
  *  equals: proven once, parametrically, by structural induction. */
 export const KERNEL_EQUALS_CERTIFICATE = "kernel-structural-parametric";
 
+// -----------------------------------------------------------------------------
+// Declared coercions + least common type (E2 — §7 step 2, E-R2)
+//
+// A declared coercion is an edge (from-shape → to-shape, fn) in a global
+// registry keyed by equality-shape identity. `==` across different shapes
+// finds the LEAST COMMON TYPE over the graph — the unique candidate both
+// operands reach from which every other common candidate is reachable —
+// coerces BOTH operands in (symmetric by construction, hence commutative),
+// and compares at the target. No common type → not equal (§7 step 3);
+// no unique least → error demanding an explicit declaration.
+//
+// Each declaration carries the two §7 obligations — equality preservation
+// (x ==_A y ⟹ coerce(x) ==_B coerce(y)) and pairwise coherence
+// (composition triangles commute). E2 instantiates them PENDING; the E3
+// machinery routes them through PCP discharge. The kernel Int→Float edge
+// ships with both discharged (tier "kernel": the embedding is exact —
+// every 64-bit signed Int is representable in an IEEE double's 53-bit
+// mantissa only up to 2^53, but equality preservation needs injectivity
+// on equals-related pairs, which bit-identical Int equality gives).
+// -----------------------------------------------------------------------------
+
+type ObligationStatus = { status: "pending" | "discharged"; tier?: string };
+
+interface CoercionEdge {
+  from: ContextValue;
+  to: ContextValue;
+  fn: Value; // (value at `from` shape) => value at `to` shape
+  preservation: ObligationStatus;
+  coherence: ObligationStatus;
+}
+
+const coercionRegistry = new Map<ContextValue, Map<ContextValue, CoercionEdge>>();
+
+/** Register a coercion edge. Host-side entry point — the `Coercion.declare`
+ *  surface and the kernel Int→Float edge both land here. Re-declaring a
+ *  pair replaces the edge (last declaration wins; obligations reset). */
+export function declareCoercion(
+  from: ContextValue, to: ContextValue, fn: Value,
+  discharged?: { tier: string },
+): void {
+  const fromShape = equalityShape(from), toShape = equalityShape(to);
+  if (fromShape === toShape) {
+    throw new AllegroError(
+      `Coercion.declare: '${typeCtxName(from)}' and '${typeCtxName(to)}' share an equality shape — a coercion between them is vacuous`);
+  }
+  const ob = (): ObligationStatus =>
+    discharged ? { status: "discharged", tier: discharged.tier } : { status: "pending" };
+  let edges = coercionRegistry.get(fromShape);
+  if (!edges) { edges = new Map(); coercionRegistry.set(fromShape, edges); }
+  edges.set(toShape, { from: fromShape, to: toShape, fn, preservation: ob(), coherence: ob() });
+}
+
+/** The §7 obligations carried by every declared edge, for tests and the
+ *  E3 tier machinery. */
+export function coercionObligationRecords(): {
+  from: string; to: string; obligation: "equality-preservation" | "coherence";
+  status: "pending" | "discharged"; tier?: string;
+}[] {
+  const out: ReturnType<typeof coercionObligationRecords> = [];
+  for (const edges of coercionRegistry.values()) {
+    for (const e of edges.values()) {
+      out.push({ from: typeCtxName(e.from), to: typeCtxName(e.to), obligation: "equality-preservation", ...e.preservation });
+      out.push({ from: typeCtxName(e.from), to: typeCtxName(e.to), obligation: "coherence", ...e.coherence });
+    }
+  }
+  return out;
+}
+
+function typeCtxName(t: ContextValue): string {
+  const nameV = getName(t);
+  return nameV && nameV.kind === ValueKind.Bits ? bitsToString(nameV) : "<anonymous>";
+}
+
+/** Every shape reachable from `start` over declared edges (including
+ *  `start` itself), with the composed edge path to each. First-found
+ *  (BFS-shortest) path wins — deterministic; the coherence obligation is
+ *  what makes path choice semantically irrelevant. */
+function coercionReach(start: ContextValue): Map<ContextValue, CoercionEdge[]> {
+  const reach = new Map<ContextValue, CoercionEdge[]>();
+  reach.set(start, []);
+  const queue: ContextValue[] = [start];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const edges = coercionRegistry.get(cur);
+    if (!edges) continue;
+    for (const [to, edge] of edges) {
+      if (reach.has(to)) continue;
+      reach.set(to, [...reach.get(cur)!, edge]);
+      queue.push(to);
+    }
+  }
+  return reach;
+}
+
+/** Resolve the least common type of two distinct shapes over the declared
+ *  coercion graph. Returns the coercion paths for each operand, or null
+ *  when the shapes share no common type (§7 step 3: not equal). Throws
+ *  when common types exist but none is least (E-R2: ambiguity demands an
+ *  explicit declaration). */
+function leastCommonCoercion(
+  sa: ContextValue, sb: ContextValue,
+): { pathA: CoercionEdge[]; pathB: CoercionEdge[] } | null {
+  const ra = coercionReach(sa), rb = coercionReach(sb);
+  const common = [...ra.keys()].filter(t => rb.has(t));
+  if (common.length === 0) return null;
+  // Least = the candidate from which every other candidate is reachable.
+  const least = common.filter(t => {
+    const rt = coercionReach(t);
+    return common.every(o => rt.has(o));
+  });
+  if (least.length !== 1) {
+    throw new AllegroError(
+      `equality is ambiguous between '${typeCtxName(sa)}' and '${typeCtxName(sb)}': ` +
+      `no unique least common type among {${common.map(typeCtxName).join(", ")}} — declare an explicit coercion`);
+  }
+  return { pathA: ra.get(least[0])!, pathB: rb.get(least[0])! };
+}
+
+/** Apply a coercion path to a value. Identity on the empty path. */
+function applyCoercionPath(
+  v: Value, path: CoercionEdge[],
+  ctx?: ContextValue, evalFn?: EvalFn,
+): Value | null {
+  let cur = v;
+  for (const edge of path) {
+    const fn = dataOf(edge.fn);
+    if (fn.kind === ValueKind.PrimitiveFunction) {
+      cur = (fn as PrimitiveFunctionValue).fn([cur], ctx as any, evalFn as any);
+    } else if (fn.kind === ValueKind.ComposedFunction && evalFn && ctx) {
+      cur = evalFn(makeExpr(fn, [cur]), ctx);
+    } else {
+      return null; // no way to run the fn here — decline, not-equal
+    }
+  }
+  return cur;
+}
+
 /** Protocol equality as a host boolean. Total: any resolved value pair
  *  answers true/false, never throws. */
 export function protocolEqualsBool(
@@ -1494,8 +1631,17 @@ export function protocolEqualsBool(
   const ta = getType(a), tb = getType(b);
   if (ta && tb) {
     const sa = equalityShape(ta), sb = equalityShape(tb);
-    // E2 seam: the least-common-type coercion lookup goes HERE.
-    if (sa !== sb) return false;                     // §7 step 3
+    if (sa !== sb) {
+      // §7 step 2 (E2): coerce both operands to the least common type
+      // over the declared coercion graph and compare there. Symmetric by
+      // construction — both orders resolve the same target.
+      const lct = leastCommonCoercion(sa, sb);
+      if (lct === null) return false;                // §7 step 3
+      const ca = applyCoercionPath(a, lct.pathA, ctx, evalFn);
+      const cb = applyCoercionPath(b, lct.pathB, ctx, evalFn);
+      if (ca === null || cb === null) return false;
+      return protocolEqualsBool(ca, cb, ctx, evalFn);
+    }
     const m = typeMethod(sa, "eq");                  // §7 step 1: custom equals
     if (m) {
       if (m.kind === ValueKind.PrimitiveFunction) {
@@ -2390,6 +2536,16 @@ function isKind(t: ContextValue): boolean {
 
 export const IntType: ContextValue = buildType("Int", intMethods);
 export const FloatType: ContextValue = buildType("Float", floatMethods);
+
+// E2: the kernel Int→Float coercion — the numeric tower's first declared
+// edge (§7 step 2). Ships with both §7 obligations discharged at tier
+// "kernel": the embedding preserves bit-identical Int equality by
+// construction, and with a single kernel edge every composition triangle
+// commutes trivially. Makes `1 == 1.0` true via least-common-type Float.
+declareCoercion(IntType, FloatType, makePrimitive("Int->Float", (args) => {
+  const a = toSigned(asBitsTyped(args[0], "Int->Float coercion"));
+  return withType(makeFloat(Number(a)), FloatType);
+}), { tier: "kernel" });
 export const StringType: ContextValue = buildType("String", stringMethods);
 export const BoolType: ContextValue = buildType("Bool", boolMethods);
 export const ObjectType: ContextValue = buildType("Object", objectMethods);
@@ -3175,6 +3331,27 @@ export function wrapType(type: ContextValue): Value {
   return type;
 }
 
+// E2: the `Coercion.declare(From, To, fn)` surface (E-R2's standalone
+// form — pairs stay first-class, define specs stay closed). A module-like
+// typed Object: dot access rides Object's `__getMember`, no new dispatch
+// machinery. Declarations instantiate their §7 obligations PENDING (E3
+// routes them through PCP discharge).
+const coercionDeclarePrim = makePrimitive("Coercion.declare", (args) => {
+  const from = asContext(dataOf(args[0]));
+  const to = asContext(dataOf(args[1]));
+  if (!from || !to) {
+    throw new AllegroError("Coercion.declare: expected (FromType, ToType, fn)");
+  }
+  const fn = args[2];
+  const fd = dataOf(fn);
+  if (fd.kind !== ValueKind.PrimitiveFunction && fd.kind !== ValueKind.ComposedFunction) {
+    throw new AllegroError("Coercion.declare: third argument must be a function");
+  }
+  declareCoercion(from, to, fn);
+  return noneSingleton;
+});
+const coercionSurface: Value = makeObject([["declare", coercionDeclarePrim]]);
+
 export function createTypeSystem(): Extension {
   return {
     name: "types",
@@ -3200,6 +3377,8 @@ export function createTypeSystem(): Extension {
       opaque: wrapType(opaqueEffect) as any,
       // Proof meta-type (Phase F1)
       Proof: wrapType(Proof) as any,
+      // Coercion declaration surface (E2 — B-027 §7 step 2)
+      Coercion: coercionSurface as any,
       // Literal bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,

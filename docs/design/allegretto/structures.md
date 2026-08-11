@@ -487,7 +487,7 @@ PositiveInt (certificate-peeking) is a separate, **effectful**
 introspection op — knowledge-observation would otherwise break congruence
 (§7).
 
-## 7. Equality [partial — steps 1+3 landed (E1); step 2 pending (E2)]
+## 7. Equality [landed — steps 1+3 (E1), step 2 (E2); laws pending (E3)]
 
 Equality **dispatches on shape, never knowledge** (D37) — required for a
 globally stable equivalence relation. Consequently refinements are excluded:
@@ -517,6 +517,22 @@ construct-authority holders) are identity-only — minted once/memoized,
 identity IS their equality. `!=` is the derived negation. Untyped
 source functions still fall to base `bits_eq` (no type channel) — a
 known limit, revisit with E3's `Equatable`.*
+
+*E2 implementation notes (2026-08): step 2 lands in the seam — a
+declared-coercion registry keyed by equality-shape identity, BFS
+reachability with composed edge paths (first-found shortest wins;
+coherence is what makes path choice semantically irrelevant), least =
+the common candidate from which every other is reachable; no unique
+least → error demanding an explicit declaration. Surface:
+`Coercion.declare(From, To, fn)` (the standalone form — pairs stay
+first-class, define specs stay closed). The kernel Int→Float edge
+ships with both obligations discharged at tier "kernel"
+(`1 == 1.0` true); user declarations instantiate
+preservation+coherence PENDING (`coercionObligationRecords()`; PCP
+routing arrives with E3). Same-shape containers coerce their
+components through the protocol recursion; differently-parameterized
+generic concretes are distinct shapes with no edge (element coercion
+only under a common container shape).*
 
 **Laws** (discharged per §8):
 - Reflexivity/symmetry/transitivity of a custom `equals`: per-type

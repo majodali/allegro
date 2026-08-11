@@ -113,6 +113,19 @@ be effect-bounded pure (E-R5, proposition stability). E3 ships the
 key on `Type.define` is the same code path and lands in E3 or trails
 it immediately.*
 
+*Abstract-member addendum (maintainer Q&A follow-up, 2026-08): laws
+may reference ABSTRACT members, and that is the primary case —
+`Equatable`'s laws reference `equals`, abstract at declaration. A law
+over abstract members is a proposition SCHEMA at declaration time
+(nothing runs, nothing discharges); it becomes a concrete H1
+Obligation at DRAW time, when symbol-identity binding resolves each
+referenced member to the drawing type's implementation and the
+quantifier specializes. Concrete members are the degenerate case where
+instantiation happens immediately at definition. Consequence for the
+E-R5 purity gate: for an abstract member the gate cannot run at
+declaration (no body); purity is part of the declared bound, enforced
+at draw time against the supplied implementation.*
+
 **E-R4 — discharge maps onto D34's spectrum using existing machinery;
 `assume` is new and verdict-visible.** kernel-auto = PE +
 `prove_for_all_bool` (finite domains) + the parametric kernel-equals
@@ -256,6 +269,30 @@ functions (`f(x) => x`) carry no type channel → `f == f` still errors
 via base `bits_eq` (controlled, not a crash); typed functions compare
 by identity. Battery: 18 tests incl. 11×11 no-throw kind-pair sweep +
 refl/sym/trans empirical shadow. 1077/1077 green.
+
+**E2 — landed 2026-08.** §7 step 2 in the E1 seam: different equality
+shapes → least common type over the declared-coercion graph, BOTH
+operands coerced in (symmetric ⇒ commutative by construction), compare
+at the target. Registry keyed by equality-shape identity; BFS
+reachability with composed paths (first-found shortest — deterministic;
+coherence is the obligation that makes path choice irrelevant); least
+= the common candidate from which every other is reachable; no common
+type → false, no unique least → AllegroError naming the candidate set
+and demanding an explicit declaration. Surface: `Coercion.declare(From,
+To, fn)` per the E-R2 recommendation — a module-like typed Object
+(Object `__getMember` dot access, zero new dispatch machinery);
+rejects vacuous same-shape pairs and non-function args. Kernel
+Int→Float edge registered at module init, both obligations discharged
+at tier "kernel"; user declarations instantiate preservation+coherence
+PENDING (`coercionObligationRecords()` is the E3 read surface; PCP
+routing arrives with E3). Deltas landed: `1 == 1.0` true (delta 4);
+`UserId` opt-back-in via declared coercion (delta 3 closure);
+`true == 1` stays false (delta 7 recommendation followed — no Bool
+edge). Composition: transitive UserId→Int→Float triangle works;
+same-shape containers coerce components (`{x:1} == {x:1.0}` true);
+differently-parameterized generic concretes stay distinct shapes
+(`[1,2] == [1.0,2.0]` false — pinned boundary, element coercion only
+under a common container shape). 8 new battery tests + E1 pin update.
 
 ## 7. Status log
 

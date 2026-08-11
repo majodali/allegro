@@ -8,6 +8,52 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — E2: declared coercions + least common type (B-027, Tranche C)
+
+§7 step 2 lands in the E2 seam: when the two operands' equality shapes
+differ, `protocolEqualsBool` now resolves the LEAST COMMON TYPE over a
+declared-coercion graph, coerces BOTH operands in, and compares at the
+target — symmetric by construction, hence commutative. No common type
+→ not-equal (step 3 unchanged); common types with no unique least →
+`AllegroError` demanding an explicit declaration (E-R2 ambiguity rule).
+
+- **Registry + resolution** (`src/types-std.ts`): edges keyed by
+  equality-shape identity; `coercionReach` BFS computes reachability
+  with composed edge paths (first-found shortest path wins —
+  deterministic; the coherence obligation is what makes path choice
+  semantically irrelevant); the least candidate is the one from which
+  every other common candidate is reachable. Transitive composition
+  works: with `UserId→Int` declared and the kernel `Int→Float` edge,
+  `UserId(42) == 42.0` meets at Float through the composed path.
+- **Surface**: `Coercion.declare(From, To, fn)` — E-R2's recommended
+  standalone form. `Coercion` is a module-like typed Object bound by
+  the standard extension (dot access rides Object's `__getMember`, no
+  new dispatch machinery). Rejects vacuous pairs (shared equality
+  shape — e.g. a refinement and its base) and non-function third args.
+- **Kernel Int→Float edge** ships registered at module init with both
+  §7 obligations DISCHARGED at tier `"kernel"`; `1 == 1.0` flips true
+  (§6 delta 4, was false via the raw-bits accident). `true == 1`
+  stays false — no Bool coercion is declared, per the delta-7
+  recommendation.
+- **Obligations**: every user declaration instantiates
+  equality-preservation + pairwise-coherence records PENDING
+  (`coercionObligationRecords()` exposes them for tests and E3's tier
+  machinery; PCP routing arrives with E3).
+- **Distinct opt-back-in** (§6 delta 3 closure): `UserId(42) == 42`
+  is false after E1; declaring `Coercion.declare(UserId, Int, u =>
+  Int(u))` makes it true again — the designed two-step.
+- **Composition through containers**: kernel structural equals
+  recurses through the protocol, so same-shape containers coerce
+  their components (`{x: 1} == {x: 1.0}` is true). Differently
+  parameterized generic concretes (`Array[Int]` vs `Array[Float]`)
+  remain distinct shapes with no edge — false, pinned as the boundary.
+
+8 new battery tests (flip + commutativity, container composition,
+generic-shape boundary, distinct opt-back-in both orders, coherence
+triangle, ambiguity diamond error, pending/discharged obligation
+records, vacuous+malformed declare rejection); E1's cross-shape pin
+updated for the flip. 1085/1085 green.
+
 ## 2026-08 — E1: kernel structural equals + shape resolution (B-027, Tranche C)
 
 First chunk of the equality-protocol arc (`equality-and-laws.md`,
