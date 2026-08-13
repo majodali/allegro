@@ -1643,7 +1643,7 @@ export const KERNEL_EQUALS_CERTIFICATE = "kernel-structural-parametric";
 // on equals-related pairs, which bit-identical Int equality gives).
 // -----------------------------------------------------------------------------
 
-type ObligationStatus = { status: "pending" | "discharged"; tier?: string };
+type ObligationStatus = { status: "pending" | "discharged" | "admitted"; tier?: string };
 
 interface CoercionEdge {
   from: ContextValue;
@@ -1681,7 +1681,7 @@ export function coercionObligationRecords(
   filter?: (from: ContextValue, to: ContextValue) => boolean,
 ): {
   from: string; to: string; obligation: "equality-preservation" | "coherence";
-  status: "pending" | "discharged"; tier?: string;
+  status: "pending" | "discharged" | "admitted"; tier?: string;
 }[] {
   const out: ReturnType<typeof coercionObligationRecords> = [];
   for (const edges of coercionRegistry.values()) {
@@ -1903,8 +1903,8 @@ const kernelEqImpls = new WeakSet<object>();
 interface LawObligationEntry {
   type: ContextValue;
   law: string;
-  status: "discharged" | "sampled" | "pending";
-  tier?: string; // "kernel" | "enumerated" | "sampled" | "witnessed"
+  status: "discharged" | "sampled" | "pending" | "admitted";
+  tier?: string; // "kernel" | "enumerated" | "sampled" | "witnessed" | "admitted"
   counterexample?: string;
 }
 
@@ -1932,7 +1932,7 @@ export function setLawInstantiationSuspended(b: boolean): void {
  *  unit's types (pcp.ts filters by the eval scope's bound values so a
  *  file's Verdict never lists another module's obligations). */
 export function lawObligationRecords(filter?: (type: ContextValue) => boolean): {
-  type: string; law: string; status: "discharged" | "sampled" | "pending";
+  type: string; law: string; status: "discharged" | "sampled" | "pending" | "admitted";
   tier?: string; counterexample?: string;
 }[] {
   return lawObligationsReg
@@ -2134,6 +2134,50 @@ function witnessLawObligation(implType: ContextValue, lawName: string, proof: Va
   }
   throw new AllegroError(
     `Law.witness: no law obligation '${lawName}' is registered for '${typeCtxName(implType)}'`);
+}
+
+/** The admitted tier (E4 — `assume law`, D34): mark a law as ASSUMED for
+ *  an implementing type — verdict-visible, same standing as F-arc
+ *  admitted facts. Flips a pending/sampled obligation, or REGISTERS an
+ *  admitted one when the type never instantiated the law (a custom
+ *  equality that never drew Equatable can still be admitted transitive —
+ *  that is exactly what unblocks the E4 `proof_trans` gate). A
+ *  discharged obligation is left alone (already stronger). */
+function admitLawObligation(implType: ContextValue, lawName: string): void {
+  const shape = equalityShape(implType);
+  for (let i = lawObligationsReg.length - 1; i >= 0; i--) {
+    const e = lawObligationsReg[i];
+    if (e.law !== lawName) continue;
+    if (e.type !== implType && equalityShape(e.type) !== shape) continue;
+    if (e.status === "discharged") return; // proven beats admitted — no-op
+    e.status = "admitted";
+    e.tier = "admitted";
+    delete e.counterexample;
+    return;
+  }
+  lawObligationsReg.push({ type: implType, law: lawName, status: "admitted", tier: "admitted" });
+}
+
+/** E4: the law backing for `lawName` over the equality of type `t` — the
+ *  strict-gate lookup. Kernel-supplied equality resolution (no custom
+ *  `eq`, or a built-in scalar eq) is auto-proven by the parametric
+ *  certificate; a custom equality answers with its registered
+ *  obligation's tier; absent or pending → refused. */
+export function equalityLawBacking(t: ContextValue, lawName: string):
+  { equality: string; tier: string } | { equality: string; refused: true } {
+  const shape = equalityShape(t);
+  const name = typeCtxName(shape);
+  if (equalsIsKernel(t)) return { equality: name, tier: "kernel" };
+  for (let i = lawObligationsReg.length - 1; i >= 0; i--) {
+    const e = lawObligationsReg[i];
+    if (e.law !== lawName) continue;
+    if (e.type !== t && equalityShape(e.type) !== shape) continue;
+    if (e.status === "discharged") return { equality: name, tier: e.tier ?? "witnessed" };
+    if (e.status === "sampled") return { equality: name, tier: "sampled" };
+    if (e.status === "admitted") return { equality: name, tier: "admitted" };
+    return { equality: name, refused: true }; // pending
+  }
+  return { equality: name, refused: true };
 }
 
 // --- E-R5: the purity / knowledge-independence gate --------------------------
@@ -3799,6 +3843,13 @@ writeShape(Proof, Type);
   addMember(proofMembers, PROOF_MEMBER_SCOPE, "counterexample", makeFieldDescriptor("counterexample", StringType));
   addMember(proofMembers, PROOF_MEMBER_SCOPE, "lhs", makeFieldDescriptor("lhs", AnyType));
   addMember(proofMembers, PROOF_MEMBER_SCOPE, "rhs", makeFieldDescriptor("rhs", AnyType));
+  // E4 (E-R6): equality proofs record which equality they chained and
+  // which law tier backed it (kernel / enumerated / witnessed / sampled
+  // / admitted) — a `proof_trans` resting on admitted transitivity is
+  // verdict-visibly weaker than one resting on a proven one.
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "equality", makeFieldDescriptor("equality", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "lawName", makeFieldDescriptor("lawName", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "lawTier", makeFieldDescriptor("lawTier", StringType));
   setMembers(Proof, proofMembers);
 }
 // NO setConstruct(Proof, ...) — deliberately. See the header comment.
@@ -3901,9 +3952,35 @@ const coercionWitnessPrim = makePrimitive("Coercion.witness", (args) => {
   slot.tier = "witnessed";
   return noneSingleton;
 });
+// E4: the admitted tier for coercion obligations — mark a declared
+// edge's obligation ASSUMED (verdict-visible; no-op when discharged).
+const coercionAssumePrim = makePrimitive("Coercion.assume", (args) => {
+  const from = asContext(dataOf(args[0]));
+  const to = asContext(dataOf(args[1]));
+  if (!from || !to) {
+    throw new AllegroError("Coercion.assume: expected (FromType, ToType, obligation)");
+  }
+  const obD = dataOf(args[2]);
+  const which = obD.kind === ValueKind.Bits ? bitsToString(obD as BitsValue) : "";
+  if (which !== "equality-preservation" && which !== "coherence") {
+    throw new AllegroError(
+      `Coercion.assume: obligation must be "equality-preservation" or "coherence"`);
+  }
+  const edge = coercionRegistry.get(equalityShape(from))?.get(equalityShape(to));
+  if (!edge) {
+    throw new AllegroError(
+      `Coercion.assume: no declared coercion from '${typeCtxName(from)}' to '${typeCtxName(to)}'`);
+  }
+  const slot = which === "coherence" ? edge.coherence : edge.preservation;
+  if (slot.status === "discharged") return noneSingleton; // proven beats admitted
+  slot.status = "admitted";
+  slot.tier = "admitted";
+  return noneSingleton;
+});
 const coercionSurface: Value = makeObject([
   ["declare", coercionDeclarePrim],
   ["witness", coercionWitnessPrim],
+  ["assume", coercionAssumePrim],
 ]);
 
 // E3: the `Law.witness(Type, "name", proof)` surface — the `by` path for
@@ -3918,7 +3995,21 @@ const lawWitnessPrim = makePrimitive("Law.witness", (args) => {
   witnessLawObligation(t, bitsToString(nameD as BitsValue), args[2]);
   return noneSingleton;
 });
-const lawSurface: Value = makeObject([["witness", lawWitnessPrim]]);
+// E4: `Law.assume(Type, "name")` — the admitted tier (`assume law`).
+const lawAssumePrim = makePrimitive("Law.assume", (args) => {
+  const t = asContext(dataOf(args[0]));
+  if (!t) throw new AllegroError("Law.assume: expected (Type, lawName)");
+  const nameD = dataOf(args[1]);
+  if (nameD.kind !== ValueKind.Bits) {
+    throw new AllegroError("Law.assume: law name must be a String");
+  }
+  admitLawObligation(t, bitsToString(nameD as BitsValue));
+  return noneSingleton;
+});
+const lawSurface: Value = makeObject([
+  ["witness", lawWitnessPrim],
+  ["assume", lawAssumePrim],
+]);
 
 // E3: `for_all(fn)` — the quantified-proposition constructor (E-R3). All
 // params of the body range over the implementing type.

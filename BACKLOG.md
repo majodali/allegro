@@ -330,9 +330,25 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   alias); NominalType retired; W1/W5 restated; CLAUDE.md seven-kinds
   reframe. The original MultiValue/Context-collapse thesis is
   COMPLETE
-- [ ] **B-027** · L2 · Equality protocol + lawful interfaces — plan
+- [x] **B-027** · L2 · Equality protocol + lawful interfaces — plan
   `equality-and-laws.md` (chunks E1–E4); E-R1–E-R6 maintainer-ratified
-  2026-08. In progress
+  2026-08. Landed 2026-08 (all four chunks): kernel structural equals +
+  shape resolution (E1); declared coercions + least common type (E2);
+  law members + for_all + D34 discharge tiers + Equatable + the E-R5
+  purity gate (E3); admitted tier + the proof_trans strict gate + E-R6
+  proof tier recording (E4). Follow-ons registered as B-089
+- [ ] **B-089** · L2 · Lawful-interface follow-ons (B-027 residue):
+  `Ordered` as law-mechanism instance #2
+  (antisymmetry/totality/consistency-with-equals — mechanism generality
+  already validated by Equatable + user laws + refinement laws, so this
+  is a consumer, not a validation gate); `Monoid`/`Semiring`
+  (cross-operation distributivity); witnessed-tier structural
+  proposition-matching for quantified propositions; `assume law` /
+  `law NAME:` statement sugar; sampled tier for record-domain
+  quantifiers (instance construction); `distinct` newtype law
+  obligations; proof-plane `proofValEqual` unification with protocol
+  equality; further strict gates from the §6 pre-approved queue
+  (`Ordered` totality for sorts)
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
   (`completion-effects.md`): `div`, blocking-read, triggered guard,
   discharge tiers (structures.md §10)

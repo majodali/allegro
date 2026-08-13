@@ -417,6 +417,14 @@ export function stampEqOperands(ctx: ContextValue, lhs: Value, rhs: Value): void
   slotSet(ctx, "lhs", lhs);
   slotSet(ctx, "rhs", rhs);
 }
+/** E4 (E-R6): equality proofs record which equality they chained and
+ *  which law tier backed it — plain instance-data bindings (the C6.3
+ *  pattern), no new `__*` slots. */
+export function stampLawBacking(ctx: ContextValue, equality: Value, lawName: Value, lawTier: Value): void {
+  slotSet(ctx, "equality", equality);
+  slotSet(ctx, "lawName", lawName);
+  slotSet(ctx, "lawTier", lawTier);
+}
 
 // Slot-key constants — for the residual idioms (key filters in copy loops,
 // bindingList lookups) that need the literal itself. Call sites use these

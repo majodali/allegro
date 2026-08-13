@@ -140,9 +140,11 @@ export interface LawObligationRecord {
   /** Law name as declared (the `law_` prefix stripped). */
   law: string;
   /** "discharged" (kernel/enumerated/witnessed), "sampled" (survival —
-   *  not proof, D34), or "pending". */
-  status: "discharged" | "sampled" | "pending";
-  /** D34 tier: "kernel" | "enumerated" | "sampled" | "witnessed". */
+   *  not proof, D34), "admitted" (E4 `assume law` — verdict-visible),
+   *  or "pending". */
+  status: "discharged" | "sampled" | "pending" | "admitted";
+  /** D34 tier: "kernel" | "enumerated" | "sampled" | "witnessed" |
+   *  "admitted". */
   tier?: string;
   counterexample?: string;
 }
@@ -151,7 +153,7 @@ export interface CoercionObligationRecord {
   from: string;
   to: string;
   obligation: "equality-preservation" | "coherence";
-  status: "pending" | "discharged";
+  status: "pending" | "discharged" | "admitted";
   tier?: string;
 }
 
@@ -194,6 +196,13 @@ export interface TheoremResult {
   authorship?: Authorship;
   /** Set when status === "failed" or "skipped". */
   failure?: TheoremFailure;
+  /** E4 (E-R6): set when the discharged proof is an equality proof that
+   *  recorded its law backing — which equality it chained, which law
+   *  the combinator relied on, and which D34 tier backed that law. A
+   *  chain resting on admitted/sampled backing is verdict-visibly
+   *  weaker than one resting on a proven (kernel/enumerated/witnessed)
+   *  one. */
+  lawBacking?: { equality: string; law: string; tier: string };
 }
 
 export interface TheoremFailure {
@@ -469,7 +478,14 @@ export function formatVerdict(v: Verdict): string {
     const author = t.authorship
       ? ` — by ${t.authorship.provers.map(p => p.prover).join(" + ")}`
       : "";
-    lines.push(`  ${mark} ${t.name}${author}`);
+    // E4 (E-R6): a proof resting on admitted/sampled law backing is
+    // verdict-visibly weaker; proven backing (kernel/enumerated/
+    // witnessed) renders nothing.
+    const weak = t.lawBacking &&
+      (t.lawBacking.tier === "admitted" || t.lawBacking.tier === "sampled")
+      ? ` [resting on ${t.lawBacking.tier} '${t.lawBacking.law}' of '${t.lawBacking.equality}']`
+      : "";
+    lines.push(`  ${mark} ${t.name}${author}${weak}`);
     if (t.failure) {
       lines.push(`      ${t.failure.reason}`);
       if (t.failure.counterexample) {
@@ -495,20 +511,31 @@ export function formatVerdict(v: Verdict): string {
   if (v.lawObligations && v.lawObligations.length > 0) {
     const discharged = v.lawObligations.filter(o => o.status === "discharged").length;
     const sampled    = v.lawObligations.filter(o => o.status === "sampled").length;
+    const admitted   = v.lawObligations.filter(o => o.status === "admitted");
     const pending    = v.lawObligations.filter(o => o.status === "pending");
     lines.push(
       `  laws: ${discharged}/${v.lawObligations.length} discharged` +
       (sampled > 0 ? `, ${sampled} sampled (survival, not proof)` : "") +
+      (admitted.length > 0 ? `, ${admitted.length} ADMITTED (assumed, not proof)` : "") +
       (pending.length > 0 ? `, ${pending.length} pending` : ""));
+    for (const o of admitted) {
+      lines.push(`    ! ${o.type}.${o.law} (admitted)`);
+    }
     for (const o of pending) {
       lines.push(`    ? ${o.type}.${o.law}`);
     }
   }
   if (v.coercionObligations && v.coercionObligations.length > 0) {
-    const pending = v.coercionObligations.filter(o => o.status === "pending");
+    const discharged = v.coercionObligations.filter(o => o.status === "discharged").length;
+    const admitted   = v.coercionObligations.filter(o => o.status === "admitted");
+    const pending    = v.coercionObligations.filter(o => o.status === "pending");
     lines.push(
-      `  coercions: ${v.coercionObligations.length - pending.length}/${v.coercionObligations.length} obligations discharged` +
+      `  coercions: ${discharged}/${v.coercionObligations.length} obligations discharged` +
+      (admitted.length > 0 ? `, ${admitted.length} ADMITTED` : "") +
       (pending.length > 0 ? `, ${pending.length} pending` : ""));
+    for (const o of admitted) {
+      lines.push(`    ! ${o.from}->${o.to} ${o.obligation} (admitted)`);
+    }
     for (const o of pending) {
       lines.push(`    ? ${o.from}->${o.to} ${o.obligation}`);
     }
@@ -567,11 +594,18 @@ export function buildVerdict(
     if (!v) continue;
     if (isDischargedProof(v)) {
       const ctx = dataOf(v) as ContextValue;
+      // E4 (E-R6): surface the recorded law backing when present.
+      const eqName  = _ctxString(ctx, "equality");
+      const lawName = _ctxString(ctx, "lawName");
+      const lawTier = _ctxString(ctx, "lawTier");
       theorems.push({
         name: key,
         proposition: _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>",
         status: "discharged",
         authorship: AUTO_PE_AUTHORSHIP(),
+        ...(eqName && lawName && lawTier
+          ? { lawBacking: { equality: eqName, law: lawName, tier: lawTier } }
+          : {}),
       });
     } else if (isFailedProof(v)) {
       const ctx = dataOf(v) as ContextValue;

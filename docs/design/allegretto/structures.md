@@ -487,7 +487,7 @@ PositiveInt (certificate-peeking) is a separate, **effectful**
 introspection op — knowledge-observation would otherwise break congruence
 (§7).
 
-## 7. Equality [landed — steps 1+3 (E1), step 2 (E2), laws (E3); admitted tier pending (E4)]
+## 7. Equality [landed — E1–E4 complete (B-027); follow-ons B-089]
 
 Equality **dispatches on shape, never knowledge** (D37) — required for a
 globally stable equivalence relation. Consequently refinements are excluded:
@@ -555,7 +555,7 @@ discharged under — a `proof_trans` chain resting on an *admitted*
 transitivity is verdict-visibly weaker than one resting on a proven one
 (extends D8).
 
-## 8. Conformance and lawful interfaces [partial — law members + tiers landed (E3); admitted tier + strict gates pending (E4)]
+## 8. Conformance and lawful interfaces [landed — law members + tiers (E3), admitted tier + first strict gate (E4); follow-ons B-089]
 
 **Member identity** (D30): type members are symbol-keyed. Types **draw
 member symbols from declared contexts** (interfaces, base types, mixins): a
@@ -672,8 +672,23 @@ through the `protocolEquals` chokepoint; kernel scalars draw it
 retroactively (eq multi-bound under Equatable's symbol, obligations
 kernel-tier). The E-R5 gate is live (empty inferred effect set incl.
 `observe`, definition-time error). Verdict carries law + coercion
-obligations scoped to the compilation unit. E4 remains: `assume law`,
-the `proof_trans` strict gate, proof tier recording.*
+obligations scoped to the compilation unit.*
+
+*E4 implementation notes (2026-08 — arc complete): the admitted tier
+is `Law.assume(T, "name")` / `Coercion.assume(From, To, obligation)`
+(statement sugar deferred) — flips pending/sampled to admitted, or
+registers an admitted entry for a never-instantiated law; proven beats
+admitted; rendered loudly in the Verdict, excluded from the
+pendingOnly obligations export. The first strict gate is live:
+`proof_trans` refuses a custom equality whose `trans` law is neither
+proven, sampled, nor admitted (kernel equalities auto-prove through
+the parametric certificate — existing programs stay green); the
+refusal names both escape hatches. E-R6 executed: equality proofs
+carry `equality`/`lawName`/`lawTier` as declared Proof fields;
+`proof_check`'s relabel preserves them; a theorem resting on
+admitted/sampled backing renders verdict-visibly weaker. Follow-ons
+(Ordered/Monoid/Semiring, quantified-proposition matching for the
+witnessed tier, further gates) live on BACKLOG B-089.*
 
 ## 9. Kinds are just types [designed]
 

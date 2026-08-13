@@ -337,6 +337,35 @@ quantifiers not sampleable → pending. Re-pins: Int member keys live
 in Int's OR Equatable's scope; distinct same-surface check compares
 base names. 19 battery tests; 1104/1104.
 
+**E4 — landed 2026-08; ARC COMPLETE.** Admitted tier: `Law.assume(T,
+"name")` (the `assume law` marker in the E3 `Law`-surface idiom —
+statement sugar deferred to B-089) flips pending/sampled → admitted,
+or REGISTERS an admitted entry for a never-instantiated law (custom
+equality that never drew Equatable — the case the gate needs);
+proven-beats-admitted no-op; `Coercion.assume` for §7 edge
+obligations; admitted excluded from pendingOnly H2 export, rendered
+loudly in the Verdict (`ADMITTED (assumed, not proof)`). Strict gate
+(§6 delta 6): `proof_trans` looks up the chained equality's `trans`
+backing via `equalityLawBacking` (kernel-supplied resolution →
+auto-proven tier "kernel"; else registry by equality-shape match) and
+returns a failed Proof naming both escape hatches when it is neither
+proven, sampled, nor admitted. Kernel equalities stay green (pinned —
+delta 6's compatibility condition). E-R6: `equality`/`lawName`/
+`lawTier` stamped as plain instance-data bindings (C6.3 pattern),
+declared as Proof-kind fields (`p.lawTier` dispatches); refl/sym
+record without gating; `proof_check`'s relabel carries the backing to
+the theorem binding; `TheoremResult.lawBacking` + formatVerdict
+weakness note (`[resting on admitted 'trans' of 'T']`) — proven
+backing renders nothing (D8 extension). Deviations: E-R6's two
+recorded fields became three (`lawName` added — rendering needs to
+say WHICH law without inferring from the combinator); sampled `trans`
+backing is presently unreachable (custom equalities live on records,
+not sampleable — path kept for B-089's record-instance sampling).
+`Ordered` moved to BACKLOG B-089 per the E4 condition: the mechanism
+has three consumers (Equatable, user interface laws, refinement
+laws); instance #2 is a consumer, not a validation gate. 9 battery
+tests; 1113/1113. B-027 CLOSES; residue registered as B-089.
+
 ## 7. Status log
 
 - 2026-08: plan drafted (ratification-pass deliverable); §3 decision

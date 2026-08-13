@@ -8,6 +8,53 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — E4: admitted tier + proof_trans strict gate + proof tier recording (B-027, Tranche C — arc complete)
+
+The final chunk of the equality-and-laws arc: assumption becomes a
+first-class, verdict-visible tier, and the first law-dependent context
+starts REFUSING unproven laws.
+
+- **Admitted tier (D34)**: `Law.assume(T, "name")` marks a law ASSUMED
+  — flips a pending/sampled obligation to status `admitted`, or
+  REGISTERS an admitted entry when the type never instantiated the law
+  (a custom equality that never drew Equatable can still be admitted
+  transitive — exactly what unblocks the gate). Proven beats admitted:
+  assuming a discharged obligation is a no-op. `Coercion.assume(From,
+  To, obligation)` is the same tier for the §7 edge obligations.
+  Admitted entries are excluded from the pendingOnly H2 export
+  (resolved for gating) but render loudly in the Verdict
+  (`1 ADMITTED (assumed, not proof)` + per-entry `!` lines).
+- **The first strict gate (§6 delta 6)**: `proof_trans` now demands
+  the chained equality's transitivity be proven, sampled, or admitted.
+  Kernel equalities (structural default / built-in scalar eq) are
+  auto-proven by the parametric certificate — existing programs stay
+  green (pinned). A custom equality with no discharged/sampled/
+  admitted `trans` law returns a failed Proof whose counterexample
+  names both escape hatches (`Law.witness(...)` / `Law.assume(...)`).
+  The gate list is the §6-style pre-approved queue — follow-on gates
+  (e.g. `Ordered` totality for sorts) land per-entry, not wholesale.
+- **E-R6 proof tier recording**: equality proofs record which equality
+  they used and which law tier backed the rule — `equality`,
+  `lawName`, `lawTier` as plain instance-data bindings (the C6.3
+  pattern; declared as Proof-kind fields so `p.lawTier` dispatches).
+  `proof_refl`/`proof_sym` record without gating; `proof_check`'s
+  relabel carries the backing through to the theorem binding.
+  `TheoremResult` gains `lawBacking`; `formatVerdict` renders a chain
+  resting on admitted/sampled backing as verdict-visibly weaker
+  (`✓ t — by auto-PE [resting on admitted 'trans' of 'CA']`); proven
+  backing (kernel/enumerated/witnessed) renders nothing (extends D8).
+- **Ordered → BACKLOG (B-089)**: the plan's condition for sketching
+  instance #2 was "IF the mechanism needs a second consumer to
+  validate generality" — Equatable + user interface laws + refinement
+  laws already exercise the mechanism, so `Ordered`/`Monoid`/
+  `Semiring` move to the backlog as consumers, with the rest of the
+  arc's registered residue.
+
+Note: sampled-tier `trans` backing is currently unreachable (custom
+equalities live on record types, whose domains aren't sampleable yet)
+— the code path is kept for when record-instance sampling lands
+(B-089). 9 new battery tests. 1113/1113 green. B-027 closes.
+
 ## 2026-08 — E3: law members + obligation instantiation + discharge tiers (B-027, Tranche C)
 
 The law mechanism lands (structures.md §8, D38): interfaces and type

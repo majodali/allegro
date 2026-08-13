@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -1682,6 +1682,7 @@ import {
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
   protocolEquals,
   setEffectsInspector as _setEffectsInspector,
+  equalityLawBacking as _equalityLawBacking,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
 import {
@@ -3643,6 +3644,30 @@ const proof_refines_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 // discharged equality proofs (else a failed Proof propagates, surfaced
 // by `checkProofs` like any other proof failure).
 
+// E4 (E-R6): equality proofs record which equality they used and which
+// law tier backed the equational rule (kernel / enumerated / witnessed /
+// sampled / admitted). The backing is looked up from the operand's
+// equality shape; untyped operands (base mode) record nothing.
+function lawBackingFor(operand: Value, lawName: string):
+  { equality: string; tier?: string; refused?: true } | null {
+  const t = getType(operand);
+  if (!t) return null;
+  const td = dataOf(t);
+  if (td.kind !== ValueKind.Structure) return null;
+  return _equalityLawBacking(td as ContextValue, lawName);
+}
+
+/** Stamp the E-R6 fields on a freshly built equality proof. */
+function recordLawBacking(proof: Value, backing: { equality: string; tier?: string } | null, lawName: string): Value {
+  if (backing && backing.tier) {
+    stampLawBacking(dataOf(proof) as ContextValue,
+      withType(stringToBits(backing.equality), StringType),
+      withType(stringToBits(lawName), StringType),
+      withType(stringToBits(backing.tier), StringType));
+  }
+  return proof;
+}
+
 /** `proof_refl(x)` — reflexivity: `x == x`, always discharged. */
 const proof_refl_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 1) throw new AllegroError(`proof_refl: expected 1 arg, got ${args.length}`);
@@ -3651,7 +3676,11 @@ const proof_refl_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeFailedProof(`refl`, `operand did not resolve`,
       `proof_refl needs its operand resolved`);
   }
-  return makeEqProof(x, x);
+  // E-R6: record the backing when known; refl never refuses (the gate
+  // list is a pre-approved queue — trans is the first and only E4 gate).
+  const backing = lawBackingFor(x, "refl");
+  return recordLawBacking(makeEqProof(x, x),
+    backing && !backing.refused ? backing : null, "refl");
 };
 
 /** `proof_sym(p)` — symmetry: from `a == b`, derive `b == a`. */
@@ -3667,11 +3696,20 @@ const proof_sym_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeFailedProof(`sym`, `argument is not an equality proof`,
       `proof_sym only applies to proofs of \`a == b\``);
   }
-  return makeEqProof(ops.rhs, ops.lhs);
+  const backing = lawBackingFor(ops.lhs, "sym");
+  return recordLawBacking(makeEqProof(ops.rhs, ops.lhs),
+    backing && !backing.refused ? backing : null, "sym");
 };
 
 /** `proof_trans(p1, p2)` — transitivity: from `a == b` and `b == c`,
- *  derive `a == c`. Requires p1's RHS to value-match p2's LHS. */
+ *  derive `a == c`. Requires p1's RHS to value-match p2's LHS.
+ *
+ *  E4 (§6 delta 6 — the FIRST law-dependent strict gate): the chained
+ *  equality's transitivity must be proven, sampled, or admitted. Kernel
+ *  equalities (structural default / built-in scalar eq) are auto-proven
+ *  by the parametric certificate, so existing programs stay green; a
+ *  CUSTOM equality with no discharged/sampled/admitted `trans` law is
+ *  REFUSED — witness it (`Law.witness`) or admit it (`Law.assume`). */
 const proof_trans_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) throw new AllegroError(`proof_trans: expected 2 args, got ${args.length}`);
   const p1 = args[0];
@@ -3693,7 +3731,17 @@ const proof_trans_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       `p1 proves \`… == ${_valDesc(a.rhs)}\` but p2 proves \`${_valDesc(b.lhs)} == …\` — the shared term must match`,
     );
   }
-  return makeEqProof(a.lhs, b.rhs);
+  const backing = lawBackingFor(a.lhs, "trans") ?? lawBackingFor(b.rhs, "trans");
+  if (backing && backing.refused) {
+    return makeFailedProof(
+      `${_valDesc(a.lhs)} == ${_valDesc(b.rhs)}`,
+      `transitivity of '${backing.equality}' is neither proven nor admitted`,
+      `the custom equality '${backing.equality}' has no discharged, sampled, or admitted ` +
+      `'trans' law — witness it (Law.witness(${backing.equality}, "trans", proof)) or ` +
+      `admit it (Law.assume(${backing.equality}, "trans"))`,
+    );
+  }
+  return recordLawBacking(makeEqProof(a.lhs, b.rhs), backing ?? null, "trans");
 };
 
 /** `proof_cong(f, p)` — congruence: from `a == b`, derive `f(a) == f(b)`
@@ -3770,6 +3818,18 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       // Relabel with the theorem's source and return the (already
       // discharged, eq-structured) proof.
       const relabeled = makeEqProof(ops.lhs, ops.rhs, propSrc);
+      // E4 (E-R6): the relabel must not drop the proof term's recorded
+      // law backing — the theorem stays verdict-visibly weaker when its
+      // `by` chain rests on admitted/sampled backing.
+      const pc = proofCtx(proof);
+      if (pc) {
+        const eq = pc.bindings.get("equality")?.value;
+        const ln = pc.bindings.get("lawName")?.value;
+        const lt = pc.bindings.get("lawTier")?.value;
+        if (eq && ln && lt) {
+          stampLawBacking(dataOf(relabeled) as ContextValue, eq, ln, lt);
+        }
+      }
       return relabeled;
     }
     return makeFailedProof(propSrc,

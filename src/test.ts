@@ -3895,6 +3895,133 @@ E3Draw = Type.define({x: Int}, E3HasId)
   eq(recs[0].status, "pending");
 });
 
+// == E4 admitted tier + proof_trans strict gate + E-R6 recording (B-027, D34/D8) ==
+
+test("E4 gate: kernel equalities are auto-proven — proof_trans over Int stays green", () => {
+  const src = "theorem t: 1 == 1 by proof_trans(proof_refl(1), proof_refl(1))\n1";
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  const t = v.theorems.find(x => x.name === "t");
+  eq(t?.status, "discharged");
+  // E-R6: the proof records which equality + which tier backed it.
+  eq(t?.lawBacking?.equality, "Int");
+  eq(t?.lawBacking?.law, "trans");
+  eq(t?.lawBacking?.tier, "kernel");
+});
+
+test("E4 gate: a custom equality with no trans law is REFUSED (§6 delta 6)", () => {
+  const src = `
+E4CE = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+v1 = E4CE(1)
+theorem t: v1 == v1 by proof_trans(proof_refl(v1), proof_refl(v1))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  const t = v.theorems.find(x => x.name === "t");
+  eq(t?.status, "failed");
+  eq(t?.failure?.reason.includes("neither proven nor admitted"), true);
+  // The refusal is actionable — it names both escape hatches.
+  eq(t?.failure?.counterexample?.includes("Law.witness"), true);
+  eq(t?.failure?.counterexample?.includes("Law.assume"), true);
+});
+
+test("E4 admitted: Law.assume flips a pending obligation and unblocks the gate", () => {
+  const src = `
+E4CA = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+Law.assume(E4CA, "trans")
+v1 = E4CA(1)
+theorem t: v1 == v1 by proof_trans(proof_refl(v1), proof_refl(v1))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  const t = v.theorems.find(x => x.name === "t");
+  eq(t?.status, "discharged");
+  eq(t?.lawBacking?.tier, "admitted");
+  // Verdict-visible: the obligation shows as admitted, and the theorem
+  // line renders the weakness note.
+  const ob = v.lawObligations?.find(o => o.type === "E4CA" && o.law === "trans");
+  eq(ob?.status, "admitted");
+  const rendered = formatVerdict(v);
+  eq(rendered.includes("[resting on admitted 'trans' of 'E4CA']"), true);
+  eq(rendered.includes("ADMITTED"), true);
+});
+
+test("E4 admitted: Law.assume registers an obligation for a never-instantiated law", () => {
+  // E4NX never drew Equatable — no obligations exist; assuming trans
+  // creates a verdict-visible admitted entry and unblocks the gate.
+  const src = `
+E4NX = Type.define({x: Int, eq: (self, other) => true})
+Law.assume(E4NX, "trans")
+v1 = E4NX(1)
+theorem t: v1 == v1 by proof_trans(proof_refl(v1), proof_refl(v1))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(v.theorems.find(x => x.name === "t")?.status, "discharged");
+  const recs = lawObligationRecords().filter(x => x.type === "E4NX");
+  eq(recs.length, 1);
+  eq(recs[0].status, "admitted");
+});
+
+test("E4 witnessed: a witnessed trans law passes the gate with proven backing (no weakness note)", () => {
+  const src = `
+E4CW2 = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+Law.witness(E4CW2, "trans", prove_for_all_bool(b => b == b))
+v1 = E4CW2(1)
+theorem t: v1 == v1 by proof_trans(proof_refl(v1), proof_refl(v1))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  const t = v.theorems.find(x => x.name === "t");
+  eq(t?.status, "discharged");
+  eq(t?.lawBacking?.tier, "witnessed");
+  eq(formatVerdict(v).includes("resting on"), false);
+});
+
+test("E4 E-R6: proof fields dispatch — p.equality / p.lawName / p.lawTier", () => {
+  const r = evalStd("p = proof_trans(proof_refl(7), proof_refl(7))\np.lawTier");
+  eq(bitsToString(dataOf(r!) as BitsValue), "kernel");
+  const r2 = evalStd("p = proof_trans(proof_refl(7), proof_refl(7))\np.equality");
+  eq(bitsToString(dataOf(r2!) as BitsValue), "Int");
+  const r3 = evalStd("p = proof_refl(7)\np.lawName");
+  eq(bitsToString(dataOf(r3!) as BitsValue), "refl");
+});
+
+test("E4: proven beats admitted — Law.assume on a discharged obligation is a no-op", () => {
+  evalStd(`E4Pt2 = Type.define({x: Int}, Equatable)\nLaw.assume(E4Pt2, "trans")\n1`);
+  const rec = lawObligationRecords().find(x => x.type === "E4Pt2" && x.law === "trans");
+  eq(rec?.status, "discharged");
+  eq(rec?.tier, "kernel");
+});
+
+test("E4: Coercion.assume flips a pending §7 obligation to admitted", () => {
+  evalStd(`
+E4CD = Int.distinct("E4CD")
+Coercion.declare(E4CD, Int, (u) => Int(u))
+Coercion.assume(E4CD, Int, "coherence")
+1`);
+  const recs = coercionObligationRecords().filter(r => r.from === "E4CD");
+  eq(recs.find(r => r.obligation === "coherence")?.status, "admitted");
+  eq(recs.find(r => r.obligation === "equality-preservation")?.status, "pending");
+  // Unknown edge errors.
+  let msg = "";
+  try { evalStd(`Coercion.assume(Int, Bool, "coherence")`); }
+  catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("no declared coercion"), true);
+});
+
+test("E4: admitted obligations are excluded from the pendingOnly H2 export", () => {
+  const src = `
+E4Ex = Type.define({x: Int, eq: (self, other) => true}, Equatable)
+Law.assume(E4Ex, "trans")
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const obs = extractObligations(result.evalCtx, result.compilationReport, { pendingOnly: true });
+  const names = obs.map(o => o.theorem.name);
+  eq(names.includes("E4Ex.law_refl"), true);   // still pending
+  eq(names.includes("E4Ex.law_trans"), false); // admitted — resolved for gating
+});
+
 // == Guard Clauses (and) ==
 
 test("guard: basic guard passes", () => {
