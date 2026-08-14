@@ -39,6 +39,13 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   member-set-general, not interface-only); chunks E1–E4 underway. Then
   S3 visibility (D41–D43, designed+ratified), then B-028 completion
   effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
+- **Track R — public release (started 2026-08, runs alongside
+  functional tranches):** positioning plan `release-track.md`
+  (differentiator map + claims register + demo ladder); VISION §1a/§5
+  amendment (three moves, substrate/surfaces, claims discipline —
+  Tier-0, pending ratification). Items B-090–B-093 below. The ladder's
+  higher rungs feed functional sequencing (constraint/units substrate,
+  solution finding) rather than competing with it.
 - **Parked consciously:** B-087 (awaiting use cases), full
   `ContextValue`→`StructureValue` reference migration (opportunistic),
   perf hard threshold (maintainer decision, any time).
@@ -489,6 +496,32 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
 
 - [ ] **B-078** · Module versioning + compatibility; dependency
   resolution; registry
+
+### Track R — public release
+
+- [ ] **B-090** · Release positioning: `release-track.md` plan (three-move
+  cohesion frame, differentiator map D1–D7 with claims register, demo
+  ladder rungs 1–4, derivation order) + VISION §1a/§5 amendment
+  (substrate/surfaces terminology, principle 17 claims discipline —
+  Tier 0, dedicated commit). R-R1/R-R2 ratified in session 2026-08;
+  R-R3–R-R5 awaiting maintainer sign-off
+- [ ] **B-091** · Rung 1 release package: curated demo scripts +
+  sandbox walkthroughs (theorem → break → counterexample → prove loop;
+  effects refusal; laws + admitted tier), assumption-ledger roll-up
+  view in `inspect`/Verdict (the D2 polish item), getting-started +
+  language tour for outsiders, `proving-in-allegro.md` public audit,
+  website refresh derived from the messaging skeleton, README/npm/
+  versioning mechanics. Gate: every public claim at
+  `delivered`/`demoable` in the register
+- [ ] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
+  domain chosen at R-R4 ratification (recommendation: units-of-measure
+  physics — bridges to rung 3); grammar + lib + laws + domain-term
+  counterexample rendering (minimal B-081 slice); demo script + site
+  update
+- [ ] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
+  pilot exists, derive the public story (stakeholder-readable failures,
+  solution finding over one domain model); re-grade the claims register;
+  rung 4 remains internal direction until then
 
 ### L3 — Vivace (M5)
 
