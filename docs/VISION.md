@@ -21,6 +21,17 @@ Three tiers (names locked — no further Italian musical terms):
 - **Allegro Vivace** — (future) the app-developer tier: rich domain models,
   opt-in formality, AI-collaborative workflows. See §4.
 
+**Substrate and surfaces.** Allegretto is the **substrate**; every language
+built on it is a **surface** — Allegro Standard is the standard surface, a
+DSL is a narrow surface, a team's custom language is their surface.
+General-purpose vs. domain-specific is a **breadth axis on one concept**,
+not a hierarchy and not two species of thing. The historical reason DSLs
+read as "not serious" is that they were toys cut off from their host's
+guarantees and tooling; an Allegro surface **inherits the entire kernel** —
+types, proofs, effects, laws, counterexamples, the prover protocol — so a
+narrow surface is exactly as serious as a general-purpose one. Changing
+that perception is a stated goal.
+
 Two commitments shape everything else:
 
 - **Extensions are where the language lives.** Everything beyond the value
@@ -36,6 +47,34 @@ Two commitments shape everything else:
 and AI agents negotiate domain abstractions, codify them as DSLs and type
 extensions, then both work within the shared formalisms — with the compiler
 as the trust boundary between them.
+
+### 1a. Why it is one thing — the three moves
+
+Allegro's differentiators are not a feature list; they are one
+architecture seen from different angles. Everything reduces to three
+moves:
+
+1. **Everything is a value under one engine.** Code, types, grammars,
+   models, proofs, effects — all values; partial evaluation is the only
+   engine. Type checking, proof discharge, DSL compilation, and model
+   solving are the same computation at different stages of binding.
+2. **Every claim is a predicate with a visible discharge strength.**
+   Positive claims (what code does) and negative claims (what it doesn't)
+   run through the same machinery, and the answer is never a bare
+   checkmark — it is a tier (proven / enumerated / sampled / admitted /
+   pending), always visible, carried transitively by results.
+3. **Every participant goes through the same kernel.** Humans, AI agents,
+   tools, and hybrids propose through one protocol; the kernel verifies
+   independently; authorship is recorded. Trust attaches to the kernel,
+   not the author.
+
+Then: provability is what claims *mean*; collaboration is *who*
+discharges them; configurable grammar is what *vocabulary* they are
+stated in; DSLs and models are what they are *about*; solution finding
+is *search* through the space the claims constrain. New capabilities
+must present as compositions of these moves — a differentiator that
+needs a fourth move is a thesis-level concern, the positioning analog
+of §2's falsifiable design constraint.
 
 ## 2. The thesis: provable correctness + safety
 
@@ -251,6 +290,18 @@ reference.
     representations that translate to standard proof-assistant primitives;
     avoid evaluation-only constructs that can't be reified externally.
 
+**Communication**
+
+17. **Claims are private until delivered.** Ambition should be as big as we
+    can usefully imagine — it prioritizes and motivates the work — but it
+    lives in internal plans and roadmap sequencing, never in public copy,
+    until convincingly delivered. Public claims state their evidence
+    strength (principle 9 applied to messaging), and the primary external
+    audience is assumed to be formal-methods-literate skeptics:
+    under-claiming with receipts is itself positioning. The claims register
+    (release-track plan) is the gate — public material draws only from its
+    `delivered`/`demoable` tiers.
+
 ## 6. What success looks like
 
 > Define `divide(a, b) => requires b != 0; a / b`. Call `divide(x, 5)`: no
@@ -279,4 +330,9 @@ reference.
 `design_proof_exportability`, `feedback_review_and_redo` (memory), and the
 design-principles section of the provability-arc strategic plan. Principle 9
 is new (2026-06 project review); principle 13 generalizes the earlier
-AI-centric framing to participant-neutral per maintainer direction.*
+AI-centric framing to participant-neutral per maintainer direction.
+§1a (the three moves), the substrate/surfaces terminology, and principle 17
+were added 2026-08 (release-track positioning session, maintainer-directed);
+the volatile companion material — differentiator map, claims register, demo
+ladder — lives in `.claude/plans/release-track.md`, deliberately outside
+this Tier-0 document.*
