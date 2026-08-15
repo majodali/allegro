@@ -1,0 +1,8 @@
+$ # 02-counterexamples.alg with the `theorem wrong` line uncommented:
+$ allegro demos/rung1/02-counterexamples.alg
+
+Error: proof check failed:
+  theorem `wrong`: `2 + 2 == 5` — proposition is false (counterexample: `2 + 2 == 5` evaluates to false)
+
+# The build halts. A failed proof is unsound by construction — the
+# compiler refuses to produce a program rather than emit a warning.

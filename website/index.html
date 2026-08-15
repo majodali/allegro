@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Allegro — A Programmable Language Platform</title>
+<title>Allegro — Verified Code at AI Velocity</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -43,6 +43,18 @@
   li { margin: 4px 0; color: #bac2de; }
   a { color: #89b4fa; }
   .note { background: #313244; border-left: 3px solid #cba6f7; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; font-size: 14px; color: #a6adc8; }
+  .transcript {
+    background: #11111b;
+    border: 1px solid #313244;
+    border-radius: 8px;
+    margin: 16px 0 24px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #a6adc8;
+  }
 
   /* Mini sandbox */
   .sandbox {
@@ -137,6 +149,8 @@
   <a href="/" class="logo">Allegro</a>
   <div class="links">
     <a href="#provability">Provability</a>
+    <a href="#laws">Laws</a>
+    <a href="#prover">Prover Loop</a>
     <a href="#basics">Basics</a>
     <a href="#types">Types</a>
     <a href="#patterns">Patterns</a>
@@ -154,9 +168,17 @@
 <main>
 
 <h1>Allegro</h1>
-<p class="subtitle">A programmable language platform where correctness is provable by construction.</p>
+<p class="subtitle">Verified code at AI velocity.</p>
 
-<p>Allegro is built around a thesis: <strong>code is not the artifact you should review — the semantic summary of the code is</strong>. Refinement types, lifecycle invariants, and function contracts accumulate facts the compiler can prove; the same facts surface in a single safety summary that humans (and AIs) review instead of reading line-by-line. Familiar syntax, an extensible grammar, and partial evaluation as the compilation model are the means; provability is the point.</p>
+<p>Allegro is a programmable language platform where every claim about your code resolves to a proof strength you can see — and where humans and AI agents ship through the same verifying kernel. Everything it does differently is a composition of three moves:</p>
+
+<ul>
+  <li><strong>Everything is a value under one engine.</strong> Code, types, grammars, proofs, and effects are ordinary values; partial evaluation is the only engine. Type checking, proof discharge, and optimization are not separate passes — they are the same evaluation, run as far as the available facts allow.</li>
+  <li><strong>Every claim carries a visible strength.</strong> There is no boolean "verified" anywhere in the system. A claim — a refinement, a contract, a law, an effect declaration — resolves to a tier: <em>proven, enumerated, sampled, witnessed, admitted, pending</em>. The escape hatches are legal and loud: you may assume a law you can't prove, and everything resting on the assumption says so in its verdict.</li>
+  <li><strong>Every participant goes through the same kernel.</strong> A human, an LLM, a tool — all get the same obligations, propose through the same protocol, and are verified by the same kernel, with authorship recorded per discharged proof. Trust attaches to the kernel's verdict, not to who wrote the code.</li>
+</ul>
+
+<p>A consequence worth naming: <strong>code stops being the artifact you review</strong>. Refinements, invariants, contracts, effects, and laws accumulate facts the compiler proves; the same facts surface as a semantic summary — types, predicates, contracts, effect sets, safety grade — that humans and AIs review instead of reading line-by-line.</p>
 
 <div class="note">
   Allegro is a work in progress. The examples below are live — edit them and click Run to evaluate. Click <strong>Inspect</strong> on any sandbox to see the same code as a structured summary: types, predicates, contracts, safety grade. <a href="/sandbox.html">Open the full sandbox</a> for a richer experience.
@@ -173,7 +195,7 @@
 // PositiveInt: an Int constrained to be positive. The constructor checks
 // the predicate; downstream arithmetic propagates the fact (≥ 1) so the
 // compiler can reason about every derived value.
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 // `requires` is the caller's obligation; `ensures` is the implementer's
 // guarantee. `_` in `ensures` refers to the return value.
@@ -208,18 +230,18 @@ print(acc2)   // 175
 <!-- ================================================ -->
 <h3 id="refinements">Refinement types &amp; domain propagation</h3>
 
-<p>Constrain existing types with predicates using <code>&&</code>. The <code>_</code> placeholder is the value. Construction and call-site checks fire automatically; the recognised algebraic shape (intervals, equality, inequality) propagates through arithmetic so downstream values inherit the proof.</p>
+<p>Constrain existing types with predicates using <code>&amp;</code> (compound predicate bodies compose with <code>&amp;&amp;</code>). The <code>_</code> placeholder is the value. Construction and call-site checks fire automatically; the recognised algebraic shape (intervals, equality, inequality) propagates through arithmetic so downstream values inherit the proof.</p>
 
 <div class="sandbox" id="s-refinements">
 <textarea class="sandbox-editor" rows="14">// Refinement type: Int that must be positive.
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 print(PositiveInt(5))           // 5
 
 // Construction check fails when the predicate is false.
 print(PositiveInt(0 - 3))        // error(refinement check failed)
 
 // Compound predicates compose via `&&` inside the predicate body.
-SmallPos = Int && _ > 0 && _ < 100
+SmallPos = Int & _ > 0 && _ < 100
 print(SmallPos(50))              // 50
 
 // Domain propagation: x: PositiveInt has domain ≥ 1, so x + x has ≥ 2,
@@ -239,7 +261,7 @@ print(double_pos(PositiveInt(7)))   // 14
 <div class="sandbox" id="s-asserts">
 <textarea class="sandbox-editor" rows="14">use invariants
 
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 x = PositiveInt(5)         // ≥ 1 [refinement-type]
 y = x + 10                  // ≥ 11 [propagation]
@@ -295,7 +317,7 @@ print(error of SmallPos(200))    // refinement check failed: expected ≤ 99 (go
 <div class="sandbox" id="s-contracts">
 <textarea class="sandbox-editor" rows="18">use contracts
 
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 // Both contract clauses present. The ensures is statically discharged
 // because x + x with x ≥ 1 propagates to _ ≥ 2, which entails _ ≥ 1.
@@ -360,6 +382,83 @@ print(maybe_log("hi"))</textarea>
 </div>
 
 <p>Try editing the <code>square</code> function to add a <code>print(x)</code> call without removing <code>effects pure</code> — running halts with an effects-mismatch error pointing at the undeclared <code>io</code> effect.</p>
+
+<!-- ================================================ -->
+<h2 id="laws">Laws — every claim carries its strength</h2>
+
+<p>There is no boolean "verified" in Allegro. Every law obligation — reflexivity, symmetry, transitivity of an equality; algebraic laws you declare on your own types — resolves to a <em>tier</em>: <code>kernel</code>, <code>enumerated</code>, <code>sampled</code>, <code>witnessed</code>, <code>admitted</code>, or <code>pending</code>. Proofs record which tier backed them, and the verdict renders anything weaker than proof loudly.</p>
+
+<div class="sandbox" id="s-laws">
+<textarea class="sandbox-editor" rows="24">// Kernel equalities are auto-proven: transitivity over Int is backed
+// at tier `kernel`, and the proof value says so.
+theorem t_int: 1 == 1 by proof_trans(proof_refl(1), proof_refl(1))
+p = proof_trans(proof_refl(7), proof_refl(7))
+print(p.lawTier)                 // kernel
+
+// A custom equality: Cell draws Equatable and supplies its own eq.
+// Its refl/sym/trans obligations are RECORDED as pending — never
+// silently granted.
+Cell = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+v = Cell(1)
+
+// The strict gate: proof_trans over Cell values is REFUSED while
+// Cell's transitivity is neither proven nor admitted. (Try it: move
+// the theorem below above the Law.assume line.)
+
+// The escape hatch is legal — and loud:
+Law.assume(Cell, "trans")
+
+theorem t_cell: v == v by proof_trans(proof_refl(v), proof_refl(v))
+q = proof_trans(proof_refl(v), proof_refl(v))
+print(q.lawTier)                 // admitted — nothing upgraded for free
+
+// Or do it properly — witness a real proof:
+Cell2 = Type.define({x: Bool, eq: (self, other) => self.x == other.x}, Equatable)
+Law.witness(Cell2, "refl", prove_for_all_bool(b => b == b))
+print("laws carry their strength")</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-laws')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-laws')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<p>Running <code>allegro verify</code> on this file renders the full ledger — the admitted obligation marked <code>!</code>, the pending ones <code>?</code>, and a weakness note on every proof resting on the assumption:</p>
+
+<pre class="transcript">Verdict (verified): 4/4 discharged
+  ✓ t_int — by auto-PE
+  ✓ t_cell — by auto-PE [resting on admitted 'trans' of 'Cell']
+  laws: 13/18 discharged, 1 ADMITTED (assumed, not proof), 4 pending
+    ! Cell.trans (admitted)
+    ? Cell.refl
+    ? Cell.sym</pre>
+
+<!-- ================================================ -->
+<h2 id="prover">The prover loop — one protocol, any participant</h2>
+
+<p>Verification is a loop, and it is participant-neutral: the kernel emits <strong>obligations</strong>, any prover — an LLM, a human, a tool — proposes proof terms, and the kernel returns a <strong>verdict</strong> with counterexamples and iteration hints. Nobody is trusted; everybody is verified; authorship is recorded per discharged theorem.</p>
+
+<p>Given a theorem whose proof term proves the wrong fact (the soundness gate rejects a term that establishes a different equality — proving <em>something</em> is not proving <em>your</em> claim):</p>
+
+<pre class="transcript">$ allegro obligations pending.alg --pending
+Obligation: theorem `double_four`
+  proposition: double(2) == 4
+  hash:        0728a8d1
+  prior attempts: 1
+
+$ allegro propose pending.alg          # the human worker: a TODO with hints
+**Last failure:**
+- reason: proof term establishes a different equality
+- counterexample: theorem claims `double(2) == 4` but the proof
+  proves `987654321 == 987654321`
+**Hints:**
+- the `by` proof term establishes a different fact than the theorem
+  claims — match the proposition exactly
+
+$ allegro prove pending.alg            # the LLM worker: same loop, autonomous
+✓ double_four — by proof_refl(double(2))   [attempts: 1]
+  authorship: {prover: &lt;model-id&gt;, attemptsUsed: 1, role: "primary"}</pre>
+
+<p>The model's proposal has no privileged path — it goes through the same <code>proof_check</code> as a human's edit, and a wrong term gets the same refusal. A benchmark finding we state up front: on our 10-obligation corpus, partial evaluation alone discharges every <em>closed</em> proposition — the prover's measured work is supplying proof terms that satisfy the soundness gate, which is exactly the loop above (<code>bench/README.md</code>).</p>
+
+<p>Runnable versions of everything above, each with a "break it" block and captured failure transcripts, live in <code>demos/rung1/</code>.</p>
 
 <!-- ================================================ -->
 <h2 id="basics">Basics</h2>

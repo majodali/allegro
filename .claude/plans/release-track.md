@@ -317,3 +317,21 @@ against a private mental model.
   post-E4 codebase). VISION §1a/§5 amendment drafted in a dedicated
   commit for Tier-0 ratification. BACKLOG Track R items B-090–B-093
   registered.
+- 2026-08: B-090 ratified by maintainer (R-R3/R-R4/R-R5 signed off,
+  including the units-physics rung-2 recommendation and the VISION
+  amendment). B-091 slice 1 landed: **messaging skeleton** at
+  `docs/messaging.md` (§6 step 1 — the canonical public-copy source);
+  **rung-1 demo package** at `demos/rung1/` (§6 step 3 — five scenes,
+  four runnable `.alg` files registered in the test suite via
+  `// expect:` validation, break-it blocks with captured transcripts
+  in `transcripts/`, prover-loop walkthrough with real
+  `obligations`/`propose`/`verify` output); **website landing
+  refresh** (§6 step 2 partial — hero + three moves rebuilt on the
+  skeleton, new Laws and Prover Loop sections with a live laws
+  sandbox and captured verdict/CLI transcripts, refinement examples
+  migrated `&&`→`&`; all sandbox sources verified against the
+  interpreter). Remaining for B-091: full-sandbox (`sandbox.html`)
+  walkthrough presets, D2 ledger roll-up polish, getting-started +
+  public-docs audit (§6 step 4), README/packaging mechanics (§6 step
+  5). Site deploy remains the maintainer's manual `deploy.sh` step —
+  nothing published yet.

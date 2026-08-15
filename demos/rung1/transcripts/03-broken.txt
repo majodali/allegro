@@ -1,0 +1,9 @@
+$ # 03-effects.alg with the `sneaky` function uncommented:
+$ allegro demos/rung1/03-effects.alg
+
+Error: effects declaration check failed:
+  effects mismatch in sneaky: declared `pure`, inferred `io` (undeclared: io)
+
+# Under-promising halts the build. The inference is transitive over
+# everything the function calls — you cannot ship an effect you did
+# not declare.

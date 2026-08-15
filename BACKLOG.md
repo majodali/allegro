@@ -499,12 +499,12 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
 
 ### Track R — public release
 
-- [ ] **B-090** · Release positioning: `release-track.md` plan (three-move
+- [x] **B-090** · Release positioning: `release-track.md` plan (three-move
   cohesion frame, differentiator map D1–D7 with claims register, demo
   ladder rungs 1–4, derivation order) + VISION §1a/§5 amendment
   (substrate/surfaces terminology, principle 17 claims discipline —
-  Tier 0, dedicated commit). R-R1/R-R2 ratified in session 2026-08;
-  R-R3–R-R5 awaiting maintainer sign-off
+  Tier 0, dedicated commit). R-R1–R-R5 all ratified 2026-08 (rung-2
+  domain: units-of-measure physics)
 - [ ] **B-091** · Rung 1 release package: curated demo scripts +
   sandbox walkthroughs (theorem → break → counterexample → prove loop;
   effects refusal; laws + admitted tier), assumption-ledger roll-up
@@ -512,7 +512,13 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   language tour for outsiders, `proving-in-allegro.md` public audit,
   website refresh derived from the messaging skeleton, README/npm/
   versioning mechanics. Gate: every public claim at
-  `delivered`/`demoable` in the register
+  `delivered`/`demoable` in the register. **Slice 1 landed 2026-08**:
+  messaging skeleton (`docs/messaging.md`), rung-1 demo package
+  (`demos/rung1/` — suite-validated scripts + captured transcripts +
+  prover-loop walkthrough), landing-page refresh (hero/three moves,
+  Laws + Prover Loop sections, `&` migration; deploy pending
+  maintainer). Remaining: sandbox.html presets, D2 roll-up,
+  getting-started, `proving-in-allegro.md` audit, README/npm mechanics
 - [ ] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
   domain chosen at R-R4 ratification (recommendation: units-of-measure
   physics — bridges to rung 3); grammar + lib + laws + domain-term

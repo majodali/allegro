@@ -8006,6 +8006,18 @@ test("Phase G: a downstream theorem about the lib's functions discharges", () =>
 
 fileTest(path.join(testsDir, "provable-demo.alg"), [provableExt]);
 
+// --- B-091: rung-1 demo scripts (demos/rung1/) ---
+//
+// The curated public demos are validated exactly like tests/ files so
+// they cannot silently rot. Each also documents a commented "break it"
+// block whose captured output lives in demos/rung1/transcripts/.
+
+const demosRung1Dir = path.resolve("demos", "rung1");
+fileTest(path.join(demosRung1Dir, "01-discharge.alg"));
+fileTest(path.join(demosRung1Dir, "02-counterexamples.alg"));
+fileTest(path.join(demosRung1Dir, "03-effects.alg"));
+fileTest(path.join(demosRung1Dir, "04-laws.alg"));
+
 // --- Phase H1: Proof Collaboration Protocol — JSON formats ---
 //
 // Three canonical schemas (Obligation, Verdict, Authorship). JSON is
