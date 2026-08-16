@@ -233,10 +233,108 @@ scenarios A–F (see the plan doc's B10 log).
 
 **Standard channels** (registry to be specced under S6): `shape` and
 `knowledge` (§6), `error` (public writer, **viral** — reproduces automatic
-error propagation; D28), `warnings`, `source` (public), `effects`
+error propagation; D28), `warnings`, `source` (§3.1, D47 — the earlier
+"(public)" sketch is superseded there), `effects`
 (**gated** — a publicly writable effects channel would permit effect-erasure
 forgery), `discharged` (kernel-private). Channel-removal/erasure rules
 (e.g. error handling consumes the error channel) are S6 items.
+
+### 3.1 The source channel — ASTs as channel payload [proposed — D47]
+
+*Maintainer direction 2026-08: meta-functions (proofs first) should
+receive the AST of an operand through a channel on the value, not
+through dedicated grammar productions or lazy registration.*
+
+**Motivation.** Today exactly two mechanisms give a function access to
+the expression that produced its argument: a dedicated grammar
+production that captures the AST at parse time (`theorem`/`verify`
+statement forms), and lazy primitive registration (the primitive
+receives unevaluated args and evaluates them itself — `proof_check`,
+the proof combinators). Both couple "I want the AST" to special forms:
+user-level meta-functions — tactics, domain-specific proof surfaces,
+DSL error renderers, symbolic reasoning — cannot get AST access
+without host TypeScript or a grammar extension. The source channel
+generalizes the capability: the AST rides on the value; an ordinary
+eager function reads it.
+
+**D47 (proposed) — the mechanism, six sub-decisions:**
+
+- **(a) Payload.** The channel holds the unevaluated **Expression
+  value itself** (the immutable DAG node the evaluator had in hand),
+  plus its source span. Source *text* is a rendering derived from the
+  node + span — not a second payload. Expressions already occupy value
+  positions (residuals), so no new value kind and no quoting form:
+  attachment is an O(1) reference capture.
+
+- **(b) Attachment is demand-driven, declared by the consumer.**
+  Universal attachment is rejected: it would carrier-wrap (D15) every
+  scalar on every hot path. Instead a primitive/function registers as
+  **source-aware** (the data-plane analogue of lazy registration); at
+  call sites of a source-aware function the evaluator attaches each
+  argument's originating AST to the evaluated argument value. Cost is
+  zero everywhere except meta-function call sites. A near-free
+  complement (follow-on): binding-level attachment — the RHS AST of a
+  top-level binding is already retained by the runtime and can ride
+  the binding's value for introspection/verdict use.
+
+- **(c) Propagation rule: `drop`** (D2 vocabulary). A value derived
+  from a source-carrying value (`x + 1`) is NOT produced by the
+  recorded expression; propagating source would fabricate provenance.
+  The channel means "the expression this value evaluated from, at this
+  attachment boundary" — nothing more. Drop is also the cheap rule.
+
+- **(d) Writer: kernel-private origination; reads free.** This
+  supersedes the "(public)" sketch in the §3 registry, and it is the
+  soundness-relevant call: the proof surface consumes source for
+  *what claim is being stated* (proposition rendering, equality-shape
+  detection). With a public writer, a doctored source channel could
+  make the verdict display a different proposition than the one
+  checked — a display/claim divergence, which is exactly a forgery
+  vector under the D21 integrity model (`viral`/`union`/public
+  origination on an authority-adjacent channel). User metaprogramming
+  does not need to forge provenance: constructing an Expression value
+  and passing it is already ordinary data flow. Reads stay free
+  (D23).
+
+- **(e) Observation is effectful.** Reading `source of x`
+  distinguishes `4`-computed-as-`2+2` from `4`-written-as-`4` —
+  extensionally equal values become distinguishable, the same
+  referential-transparency breach as `certificate_peek` (C3.3). Same
+  treatment, uniformly: source reads carry the `observe` effect
+  label; `effects pure` code cannot read source. Structural equality
+  ignores the channel (E1: equality reads data planes; the
+  equality-ignores-knowledge battery extends to source). Theorem/
+  verify statements sit at module top level, so no existing
+  `effects pure` function body is affected by the kernel's own reads.
+
+- **(f) Surface.** `source of x` — the existing `Y of x`
+  component-access form; no new syntax. Absent channel → `none`,
+  consistent with `error of`.
+
+**What migrates.** `proof_check` / `proof_by_eval` / the proof
+combinators become eager, source-aware primitives: the argument
+arrives evaluated (folded Bits, or a residual — which for an
+undischargeable proposition is itself the evidence) with the original
+AST on its source channel for shape detection and counterexample
+rendering. The lazy-registration workaround class shrinks to genuine
+control-flow laziness (`eval_if`, short-circuit ops, thunks) — lazy
+is for *not evaluating*; source-awareness is for *seeing what was
+evaluated*. The `theorem`/`verify` grammar productions remain for
+their statement/naming surface, but their lowering stops smuggling
+ASTs — the checking machinery becomes expressible as ordinary
+(source-aware) functions, which is what opens the capability to user
+meta-functions. Non-goals: `requires`/`ensures`/`assert`/`proven`
+keep their body-forms (they need statement *hoisting*, not just AST
+access); PE residual semantics unchanged (a residual in value
+position + original AST in the channel is the useful division:
+discharge logic reads the residual, rendering reads the original).
+
+**Open at ratification:** whether binding-level attachment (the (b)
+complement) lands in chunk 1 or follows; whether `source of` on an
+absent channel should instead attach lazily at statement level
+(rejected tentatively — post-hoc attachment is impossible once the
+evaluator has moved on, and magic-on-read violates (b)'s cost
+model).
 
 ## 4. Scope [partial]
 

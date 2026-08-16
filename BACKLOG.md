@@ -356,6 +356,16 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   obligations; proof-plane `proofValEqual` unification with protocol
   equality; further strict gates from the §6 pre-approved queue
   (`Ordered` totality for sorts)
+- [ ] **B-094** · L0 · Source channel — ASTs as channel payload
+  (structures.md §3.1, D47 proposed 2026-08 awaiting ratification):
+  source-aware primitive registration + evaluator attachment at
+  meta-function call sites; kernel-private writer, `drop` propagation,
+  observe-tagged reads, `source of x` surface; migrate
+  `proof_check`/`proof_by_eval`/combinators from lazy to eager
+  source-aware; boundary battery (forgery: doctored-source display
+  divergence; equality ignores source; pure-code read refusal).
+  Opens AST access to user-level meta-functions without grammar
+  productions
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
   (`completion-effects.md`): `div`, blocking-read, triggered guard,
   discharge tiers (structures.md §10)
