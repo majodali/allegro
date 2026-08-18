@@ -8,6 +8,63 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — B-091 slices 1–2: rung-1 release package + D2 assumption-ledger roll-up (Track R)
+
+The first release-track content derivation (plan:
+`.claude/plans/release-track.md`, B-090 ratified) plus the one
+functional item the rung-1 story needed, and a soundness fix it
+surfaced.
+
+- **Messaging skeleton** (`docs/messaging.md`): canonical source for
+  all public copy — the three moves, the rung-1 story, claims with
+  runnable receipts (delivered/demoable only), an explicit
+  what-we-do-not-claim section, voice rules.
+- **Rung-1 demo package** (`demos/rung1/`): four runnable scenes
+  (discharge, counterexamples, effects refusal, laws + admitted tier)
+  each with a commented break-it block and captured real transcripts;
+  `05-prover-loop.md` walks obligations → propose → prove → verify
+  with real CLI output. All four registered in the `fileTest` battery
+  so the public demos are suite-validated.
+- **Website refresh** (`website/index.html`): hero + three-moves intro
+  on the skeleton; new Laws section (live sandbox + verify-ledger
+  transcript) and Prover Loop section (real CLI transcripts + honest
+  bench framing); refinement examples migrated `&&`→`&`. Sandbox
+  walkthrough presets (4) added to `website/sandbox.html` +
+  `web/sandbox.html`; every sandbox source verified against the
+  interpreter. Deploy remains the maintainer's manual step.
+- **D2 assumption-ledger roll-up**: proofs now carry a TRANSITIVE
+  law-backing set (`__lawBackings`, js-property host plane — the
+  `__effectSet` pattern) unioned through `proof_refl`/`sym`/`trans`/
+  `cong` and preserved by `proof_check`'s relabel, so nested chains no
+  longer lose inner backings (a `proof_sym(proof_trans(…admitted…))`
+  theorem now renders its weakness note). The single E-R6 fields stay
+  as the OWN-rule backing (`p.lawTier` dispatch unchanged). Verdict:
+  `TheoremResult.restsOn` (additive optional; pcp/1 unchanged),
+  multi-entry weakness notes, and a new `assumption ledger` block —
+  every admitted/sampled assumption in force mapped to the proofs
+  resting on it, pending-obligation count, explicit `clean` line.
+  `allegro inspect` renders per-proof `rests on:` lines (weak loud,
+  proven quiet).
+- **Soundness fix (pre-existing)**: `buildProgram`'s stmt walk did not
+  dispatch `theorem_decl`/`verify_stmt` directly; fragment-merged
+  grammars (any `use`-header file) surface stmt alternatives without
+  the base "stmt" wrapper tag, so the walk recursed past the theorem
+  and built its proposition as a bare expression — **a false theorem
+  in a `use`-header file was silently dropped instead of halting the
+  build**, and `allegro verify` saw 0 theorems in such files. Fixed in
+  the dispatch set; 3 regression tests (kept+discharged, false-theorem
+  halt, false-verify halt).
+- **Public docs**: `docs/getting-started.md` (outsider path: install →
+  first verified program → break it → inspect/verify → prover loop →
+  honest status). `docs/proving-in-allegro.md` (the PCP LLM worker's
+  system primer) gains the missing E3/E4 section — tiers, `Law.witness`
+  / `Law.assume`, the strict-gate refusal + failure-mode row — so a
+  prover hitting the gate knows both legal outs.
+
+Tests: 1122 → 1125 (5 D2 roll-up + 3 regression, minus prior count
+overlap); suite green. Demo transcripts re-captured for the new ledger
+block.
+
 ## 2026-08 — E4: admitted tier + proof_trans strict gate + proof tier recording (B-027, Tranche C — arc complete)
 
 The final chunk of the equality-and-laws arc: assumption becomes a

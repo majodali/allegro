@@ -527,8 +527,14 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   (`demos/rung1/` — suite-validated scripts + captured transcripts +
   prover-loop walkthrough), landing-page refresh (hero/three moves,
   Laws + Prover Loop sections, `&` migration; deploy pending
-  maintainer). Remaining: sandbox.html presets, D2 roll-up,
-  getting-started, `proving-in-allegro.md` audit, README/npm mechanics
+  maintainer). **Slice 2 landed 2026-08**: D2 assumption-ledger
+  roll-up (transitive proof backing sets + Verdict ledger block +
+  inspect rests-on; D2 register row → delivered); theorem-dropped-
+  under-fragment-grammar soundness fix + regressions; sandbox
+  walkthrough presets (both copies); `docs/getting-started.md`;
+  `proving-in-allegro.md` E3/E4 laws+gate section. Remaining:
+  README/npm/versioning mechanics + web/website sandbox unification +
+  deploy pass
 - [ ] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
   domain chosen at R-R4 ratification (recommendation: units-of-measure
   physics — bridges to rung 3); grammar + lib + laws + domain-term

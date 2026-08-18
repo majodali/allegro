@@ -11,7 +11,8 @@
 // See .claude/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { dataOf, channelReadRaw } from "./slots.js";
+import { dataOf, channelReadRaw, backingsOf } from "./slots.js";
+import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, ContextValue, ComposedFunctionValue,
   BitsValue, PrimitiveFunctionValue, ParamValue,
@@ -83,6 +84,11 @@ export interface ValueSummary {
    *  clause). When non-null AND inferred ⊄ declared, the function has a
    *  declaration mismatch (separately surfaced as an error). */
   declaredEffects: EffectSet | null;
+  /** D2 roll-up (B-091): for Proof values, the TRANSITIVE law-backing
+   *  set — every {equality, law, tier} the proof rests on through its
+   *  combinator chain. Admitted/sampled entries are the assumptions the
+   *  renderer surfaces. */
+  restsOn?: LawBackingRec[];
 }
 
 export interface ContractSummary {
@@ -258,6 +264,15 @@ export function summarizeValue(v: Value): ValueSummary {
   const boundCtx = occurrenceBoundOf(v);
   const annotationBound = boundCtx ? (typeContextName(boundCtx) ?? "<anonymous>") : null;
 
+  // D2 roll-up (B-091): a Proof value's transitive law-backing set —
+  // what the proof rests on, through the whole combinator chain.
+  let restsOn: LawBackingRec[] | undefined;
+  const structPrim = dataOf(v);
+  if (structPrim.kind === ValueKind.Structure) {
+    const backings = backingsOf(structPrim as ContextValue);
+    if (backings.length > 0) restsOn = backings;
+  }
+
   return {
     kind:             kindAtPrimary,
     typeName,
@@ -275,6 +290,7 @@ export function summarizeValue(v: Value): ValueSummary {
     promotionSuggestions,
     inferredEffects,
     declaredEffects,
+    ...(restsOn ? { restsOn } : {}),
   };
 }
 
@@ -648,6 +664,18 @@ export function renderModuleSummary(summary: ModuleSummary): string {
       for (const c of b.summary.promotionSuggestions) {
         const name = c.bindings[0] ?? "<expr>";
         lines.push(`        promote 'assert ${name} ${formatDomain(c.shape)}' → 'requires …'`);
+      }
+    }
+    // D2 roll-up (B-091): a proof binding's transitive backing. Weak
+    // (admitted/sampled) entries render loudly; all-proven sets render
+    // a single quiet line.
+    if (b.summary.restsOn && b.summary.restsOn.length > 0) {
+      const weak = b.summary.restsOn.filter(
+        r => r.tier === "admitted" || r.tier === "sampled");
+      if (weak.length > 0) {
+        lines.push(`      rests on: ${weak.map(r => `${r.tier} '${r.law}' of '${r.equality}'`).join(", ")}`);
+      } else {
+        lines.push(`      rests on: proven backing only (${b.summary.restsOn.length} law(s))`);
       }
     }
     // Phase D1: surface inferred and declared effects when the binding is

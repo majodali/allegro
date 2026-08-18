@@ -4022,6 +4022,86 @@ Law.assume(E4Ex, "trans")
   eq(names.includes("E4Ex.law_trans"), false); // admitted — resolved for gating
 });
 
+// == D2 assumption-ledger roll-up (B-091) ==
+//
+// Proofs carry a TRANSITIVE backing set (`__lawBackings`, unioned
+// through combinators and preserved by proof_check's relabel), so
+// nested chains no longer lose inner backings; the Verdict aggregates
+// the sets into an assumption-ledger block.
+
+test("D2 roll-up: nested chain surfaces inner admitted backing through sym", () => {
+  // Under single-field E-R6 recording, the outer proof_sym would lose
+  // the inner proof_trans's admitted backing. The transitive set keeps it.
+  const src = `
+LgCell = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+Law.assume(LgCell, "trans")
+v = LgCell(1)
+theorem lg_outer: v == v by proof_sym(proof_trans(proof_refl(v), proof_refl(v)))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  const t = v.theorems.find(x => x.name === "lg_outer");
+  eq(t?.status, "discharged");
+  eq(t?.restsOn?.some(r => r.equality === "LgCell" && r.law === "trans" && r.tier === "admitted"), true);
+  eq(formatVerdict(v).includes("[resting on admitted 'trans' of 'LgCell']"), true);
+});
+
+test("D2 roll-up: kernel chain records the full backing set, ledger stays clean", () => {
+  const src = `
+theorem lg_k: 1 == 1 by proof_trans(proof_refl(1), proof_refl(1))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  const t = v.theorems.find(x => x.name === "lg_k");
+  // Both the trans gate's backing and the refl inputs' backing survive.
+  eq(t?.restsOn?.some(r => r.law === "trans" && r.tier === "kernel"), true);
+  eq(t?.restsOn?.some(r => r.law === "refl" && r.tier === "kernel"), true);
+  const rendered = formatVerdict(v);
+  eq(rendered.includes("assumption ledger: clean"), true);
+  eq(rendered.includes("resting on"), false);
+});
+
+test("D2 roll-up: ledger dedupes one assumption across proofs and lists both backers", () => {
+  const src = `
+LgC2 = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+Law.assume(LgC2, "trans")
+v = LgC2(1)
+theorem lg_a: v == v by proof_trans(proof_refl(v), proof_refl(v))
+theorem lg_b: v == v by proof_trans(proof_refl(v), proof_refl(v))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const rendered = formatVerdict(buildVerdict(result.evalCtx, result.compilationReport));
+  const ledgerLines = rendered.split("\n").filter(l => l.includes("admitted 'trans' of 'LgC2'") && l.includes("backs:"));
+  eq(ledgerLines.length, 1);
+  eq(ledgerLines[0].includes("lg_a"), true);
+  eq(ledgerLines[0].includes("lg_b"), true);
+  eq(rendered.includes("assumption ledger: rests on 1 admitted"), true);
+});
+
+test("D2 roll-up: an assumption backing no proofs still appears in the ledger", () => {
+  const src = `
+LgNx = Type.define({x: Int, eq: (self, other) => true}, Equatable)
+Law.assume(LgNx, "trans")
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const rendered = formatVerdict(buildVerdict(result.evalCtx, result.compilationReport));
+  eq(rendered.includes("admitted 'trans' of 'LgNx' — backs no proofs yet"), true);
+});
+
+test("D2 roll-up: inspect renders rests-on for proof bindings (weak loud, proven quiet)", () => {
+  const src = `
+LgIn = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+Law.assume(LgIn, "trans")
+v = LgIn(1)
+theorem lg_weak: v == v by proof_trans(proof_refl(v), proof_refl(v))
+theorem lg_proven: 1 == 1 by proof_refl(1)
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const rendered = renderModuleSummary(summarizeModule(result.evalCtx, result.compilationReport));
+  eq(rendered.includes("rests on: admitted 'trans' of 'LgIn'"), true);
+  eq(rendered.includes("rests on: proven backing only"), true);
+});
+
 // == Guard Clauses (and) ==
 
 test("guard: basic guard passes", () => {
@@ -7940,6 +8020,37 @@ test("Phase F7: function without `proven` is unaffected", () => {
 });
 
 fileTest(path.join(testsDir, "proofs-proven-demo.alg"), [provenExt]);
+
+// --- Regression (B-091): theorem/verify statements under a fragment-
+// merged grammar. Fragment merging surfaces stmt alternatives without
+// the base grammar's "stmt" wrapper tag; buildProgram must dispatch
+// theorem_decl / verify_stmt directly or the proof obligation is
+// silently dropped — a false theorem in a `use`-header file would
+// never halt the build.
+
+test("regression: theorem under fragment grammar is kept and discharged", () => {
+  const { evalCtx } = runtimeEval("theorem frag_t: 2 + 2 == 4\n1",
+    undefined, [typeExt, provenExt], undefined, true);
+  eq(_isDischargedProof(evalCtx.bindings.get("frag_t")?.value), true);
+});
+
+test("regression: FALSE theorem under fragment grammar halts the build", () => {
+  let msg = "";
+  try {
+    runtimeEval("theorem frag_bad: 1 == 2\n1",
+      undefined, [typeExt, provenExt], undefined, true);
+  } catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("proposition is false"), true);
+});
+
+test("regression: false `verify` under fragment grammar halts the build", () => {
+  let msg = "";
+  try {
+    runtimeEval("verify 1 == 2\n1",
+      undefined, [typeExt, provenExt], undefined, true);
+  } catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("evaluates to false"), true);
+});
 
 // --- Phase G: provable stdlib pilot (`lib/provable.alg`) ---
 //

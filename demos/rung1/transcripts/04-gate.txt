@@ -21,7 +21,12 @@ Verdict (verified): 4/4 discharged
     ? Cell2.sym
     ? Cell2.trans
   coercions: 2/2 obligations discharged
+  assumption ledger: rests on 1 admitted, 0 sampled; 4 obligation(s) pending
+    ! admitted 'trans' of 'Cell' — backs: t_cell, q
 
 # Nothing is upgraded for free: the admitted obligation is marked `!`,
-# the pending ones `?`, and every proof resting on the assumption
-# carries the weakness note. That ledger IS the product.
+# the pending ones `?`, every proof resting on the assumption carries
+# the weakness note, and the assumption ledger rolls it all up — each
+# assumption in force, mapped to the proofs resting on it. The
+# transitive set survives combinator nesting: wrap the chain in
+# proof_sym and the note stays. That ledger IS the product.

@@ -420,7 +420,7 @@ print("laws carry their strength")</textarea>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
 
-<p>Running <code>allegro verify</code> on this file renders the full ledger — the admitted obligation marked <code>!</code>, the pending ones <code>?</code>, and a weakness note on every proof resting on the assumption:</p>
+<p>Running <code>allegro verify</code> on this file renders the full picture — the admitted obligation marked <code>!</code>, the pending ones <code>?</code>, a weakness note on every proof resting on the assumption, and the <strong>assumption ledger</strong>: every assumption in force, mapped to the proofs resting on it. The backing set is transitive — wrap the chain in another combinator and the note survives:</p>
 
 <pre class="transcript">Verdict (verified): 4/4 discharged
   ✓ t_int — by auto-PE
@@ -428,7 +428,9 @@ print("laws carry their strength")</textarea>
   laws: 13/18 discharged, 1 ADMITTED (assumed, not proof), 4 pending
     ! Cell.trans (admitted)
     ? Cell.refl
-    ? Cell.sym</pre>
+    ? Cell.sym
+  assumption ledger: rests on 1 admitted, 0 sampled; 4 obligation(s) pending
+    ! admitted 'trans' of 'Cell' — backs: t_cell, q</pre>
 
 <!-- ================================================ -->
 <h2 id="prover">The prover loop — one protocol, any participant</h2>

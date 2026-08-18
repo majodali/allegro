@@ -108,6 +108,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "__effectSet", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects (F1 component made canonical)" },
   { name: "__inferredEffects", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects" },
   { name: "__predicateSet", storages: ["js-property"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
+  { name: "__lawBackings", storages: ["js-property"], owner: "proof kernel", disposition: "channel", target: "knowledge (D2 roll-up: transitive law-backing set on proofs, B-091)" },
 
   // --- MultiValue components (current channel plane) ------------------------------
   { name: "type", storages: ["mv-component"], owner: "shape channel", disposition: "channel", target: "shape (D36)" },
@@ -424,6 +425,35 @@ export function stampLawBacking(ctx: ContextValue, equality: Value, lawName: Val
   slotSet(ctx, "equality", equality);
   slotSet(ctx, "lawName", lawName);
   slotSet(ctx, "lawTier", lawTier);
+}
+
+/** D2 roll-up (B-091): the TRANSITIVE backing set a proof rests on —
+ *  its own rule application's backing plus every input proof's set,
+ *  unioned. Host-plane (js-property) storage, the `__effectSet` /
+ *  `__predicateSet` pattern. The single E-R6 fields above remain the
+ *  proof's OWN rule backing (they are dispatched instance fields —
+ *  `p.lawTier`); this set is what the Verdict's assumption ledger
+ *  aggregates, so a nested chain does not lose inner backings. */
+export interface LawBackingRec { equality: string; law: string; tier: string }
+
+export function backingsOf(ctx: ContextValue): LawBackingRec[] {
+  return ((ctx as unknown as { __lawBackings?: LawBackingRec[] }).__lawBackings) ?? [];
+}
+export function stampBackings(ctx: ContextValue, recs: LawBackingRec[]): void {
+  if (recs.length > 0) {
+    (ctx as unknown as { __lawBackings?: LawBackingRec[] }).__lawBackings = recs;
+  }
+}
+export function unionBackings(...sets: LawBackingRec[][]): LawBackingRec[] {
+  const seen = new Set<string>();
+  const out: LawBackingRec[] = [];
+  for (const set of sets) {
+    for (const r of set) {
+      const k = `${r.equality} ${r.law} ${r.tier}`;
+      if (!seen.has(k)) { seen.add(k); out.push(r); }
+    }
+  }
+  return out;
 }
 
 // Slot-key constants — for the residual idioms (key filters in copy loops,

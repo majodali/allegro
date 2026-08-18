@@ -94,11 +94,12 @@ E-R6 proof tier recording, Verdict schema, predicate-set sources.
 | Per-claim tiers on the Verdict (laws, coercions, proofs) | delivered |
 | Proofs record which law tier backed them; admitted renders weaker | delivered |
 | Predicate provenance per source (assert/branch/requires/…) | delivered |
-| Result-level roll-up ("this OUTPUT rests on …", transitive) | in-progress (mechanism exists per-value; no roll-up UX) |
+| Result-level roll-up ("this OUTPUT rests on …", transitive) | **delivered** (B-091: transitive backing sets on proofs + Verdict `assumption ledger` block + inspect `rests on:` lines) |
 | Cross-model ledger over a composed solution | hypothesis (needs rung 3-4) |
 
-To advance: a ledger view in `inspect`/Verdict that aggregates a
-binding's transitive backing — small, high-leverage (rung 1 polish).
+To advance: extend the roll-up beyond proofs (contracts/effects
+provenance in one view) — post-rung-1 polish; the proof-side ledger
+landed in B-091.
 
 ### D3 — Participant-neutral collaboration — the kernel is the trust boundary
 
@@ -335,3 +336,17 @@ against a private mental model.
   public-docs audit (§6 step 4), README/packaging mechanics (§6 step
   5). Site deploy remains the maintainer's manual `deploy.sh` step —
   nothing published yet.
+- 2026-08: B-091 slice 2 landed. **D2 ledger roll-up delivered**
+  (transitive `__lawBackings` sets through combinators + proof_check;
+  Verdict `restsOn` + `assumption ledger` block; inspect `rests on:`
+  lines) — D2 register row re-graded delivered. **Soundness fix**
+  surfaced by the release work: theorem/verify statements were
+  silently dropped under fragment-merged grammars (`use`-header
+  files); fixed in buildProgram's dispatch + 3 regression tests.
+  **Sandbox walkthrough presets** (4, both sandbox copies, all
+  verified). **getting-started.md** written;
+  **proving-in-allegro.md** gains the missing E3/E4 laws/gate section.
+  Remaining for B-091: README/npm/versioning mechanics (§6 step 5) +
+  final deploy pass. Noted: `web/sandbox.html` vs `website/
+  sandbox.html` divergence is pre-existing (dev vs deployed copy) —
+  fold into the mechanics step.

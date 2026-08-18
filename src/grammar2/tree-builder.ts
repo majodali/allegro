@@ -2241,11 +2241,18 @@ export function buildProgram(tree: ParseTree): any {
     throw new Error("buildProgram: expected branch root");
   }
 
-  // Walk to find stmt branches.
+  // Walk to find stmt branches. theorem_decl / verify_stmt MUST be in
+  // this dispatch set: fragment-merged grammars surface stmt
+  // alternatives without the base grammar's "stmt" wrapper tag, and
+  // without direct dispatch the walk would recurse past the theorem
+  // into its children — building the proposition as a bare expression
+  // and silently DROPPING the proof obligation (a false theorem in a
+  // `use`-header file then never halts the build).
   const walk = (t: ParseTree): void => {
     if (t.kind !== "branch") return;
     if (t.tag === "stmt" || t.tag === "binding" || t.tag === "fn_decl" ||
         t.tag === "import_stmt" || t.tag === "export_binding" || t.tag === "export_fn_decl" ||
+        t.tag === "theorem_decl" || t.tag === "verify_stmt" ||
         (t.tag && EXPRESSION_TAGS.has(t.tag))) {
       try {
         addStmt(buildStmt(t));

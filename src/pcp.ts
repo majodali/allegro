@@ -23,7 +23,8 @@
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
 import type { ContextValue, BitsValue } from "./types.js";
-import { dataOf, SLOT_KEYS } from "./slots.js";
+import { dataOf, SLOT_KEYS, backingsOf } from "./slots.js";
+import type { LawBackingRec } from "./slots.js";
 import { ValueKind, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
 import { lawObligationRecords, coercionObligationRecords } from "./types-std.js";
@@ -203,6 +204,12 @@ export interface TheoremResult {
    *  weaker than one resting on a proven (kernel/enumerated/witnessed)
    *  one. */
   lawBacking?: { equality: string; law: string; tier: string };
+  /** D2 roll-up (B-091): the TRANSITIVE backing set — the outermost
+   *  rule's backing plus everything inherited from input proofs through
+   *  the combinator chain. `lawBacking` above is the outermost rule
+   *  only; this is what the assumption ledger aggregates. Additive
+   *  optional field — pcp/1 unchanged. */
+  restsOn?: LawBackingRec[];
 }
 
 export interface TheoremFailure {
@@ -459,6 +466,64 @@ export function formatObligation(o: Obligation): string {
   return lines.join("\n");
 }
 
+/** D2 roll-up (B-091): a theorem's weak (admitted/sampled) backings,
+ *  drawn from the transitive `restsOn` set with the single E-R6
+ *  `lawBacking` field as fallback, deduped. */
+function weakBackingsOf(t: TheoremResult): LawBackingRec[] {
+  const source: LawBackingRec[] = t.restsOn && t.restsOn.length > 0
+    ? t.restsOn
+    : (t.lawBacking ? [t.lawBacking] : []);
+  const seen = new Set<string>();
+  const out: LawBackingRec[] = [];
+  for (const r of source) {
+    if (r.tier !== "admitted" && r.tier !== "sampled") continue;
+    const k = `${r.equality} ${r.law} ${r.tier}`;
+    if (!seen.has(k)) { seen.add(k); out.push(r); }
+  }
+  return out;
+}
+
+/** D2 roll-up (B-091): aggregate what the module's verification rests
+ *  on — every admitted/sampled assumption in force (from proofs'
+ *  transitive backing sets AND from obligations flipped by
+ *  `Law.assume`/witness-sampling even when no proof consumes them yet),
+ *  mapped to the proofs resting on each, plus the pending-obligation
+ *  count. Renders as the verdict's `assumption ledger` block. */
+function buildAssumptionLedger(v: Verdict): {
+  entries: { tier: string; label: string; backs: string[] }[];
+  pendingCount: number;
+  hasContent: boolean;
+} {
+  const entries = new Map<string, { tier: string; label: string; backs: string[] }>();
+  const add = (tier: string, label: string, backer?: string) => {
+    const k = `${tier} ${label}`;
+    let e = entries.get(k);
+    if (!e) { e = { tier, label, backs: [] }; entries.set(k, e); }
+    if (backer && !e.backs.includes(backer)) e.backs.push(backer);
+  };
+  for (const t of v.theorems) {
+    for (const r of weakBackingsOf(t)) {
+      add(r.tier, `'${r.law}' of '${r.equality}'`, t.name);
+    }
+  }
+  for (const o of v.lawObligations ?? []) {
+    if (o.status === "admitted") add("admitted", `'${o.law}' of '${o.type}'`);
+    else if (o.status === "sampled") add("sampled", `'${o.law}' of '${o.type}'`);
+  }
+  for (const o of v.coercionObligations ?? []) {
+    if (o.status === "admitted") add("admitted", `coercion ${o.from}->${o.to} ${o.obligation}`);
+  }
+  const pendingCount =
+    (v.lawObligations ?? []).filter(o => o.status === "pending").length +
+    (v.coercionObligations ?? []).filter(o => o.status === "pending").length;
+  const list = [...entries.values()].sort((a, b) =>
+    a.tier === b.tier ? a.label.localeCompare(b.label) : a.tier.localeCompare(b.tier));
+  const hasContent = v.theorems.length > 0
+    || (v.lawObligations ?? []).length > 0
+    || (v.coercionObligations ?? []).length > 0;
+  return { entries: list, pendingCount, hasContent };
+}
+
 export function formatVerdict(v: Verdict): string {
   const lines: string[] = [];
   const total      = v.theorems.length;
@@ -480,10 +545,12 @@ export function formatVerdict(v: Verdict): string {
       : "";
     // E4 (E-R6): a proof resting on admitted/sampled law backing is
     // verdict-visibly weaker; proven backing (kernel/enumerated/
-    // witnessed) renders nothing.
-    const weak = t.lawBacking &&
-      (t.lawBacking.tier === "admitted" || t.lawBacking.tier === "sampled")
-      ? ` [resting on ${t.lawBacking.tier} '${t.lawBacking.law}' of '${t.lawBacking.equality}']`
+    // witnessed) renders nothing. D2 roll-up (B-091): the TRANSITIVE
+    // set is consulted, so nested chains surface inner weak backings;
+    // the single lawBacking field is the fallback for older records.
+    const weakRecs = weakBackingsOf(t);
+    const weak = weakRecs.length > 0
+      ? ` [resting on ${weakRecs.map(r => `${r.tier} '${r.law}' of '${r.equality}'`).join(", ")}]`
       : "";
     lines.push(`  ${mark} ${t.name}${author}${weak}`);
     if (t.failure) {
@@ -538,6 +605,29 @@ export function formatVerdict(v: Verdict): string {
     }
     for (const o of pending) {
       lines.push(`    ? ${o.from}->${o.to} ${o.obligation}`);
+    }
+  }
+  // D2 roll-up (B-091): the assumption ledger — one place answering
+  // "what does this module's verification rest on?". Admitted/sampled
+  // assumptions in force, each mapped to the proofs resting on it;
+  // clean modules say so explicitly.
+  {
+    const ledger = buildAssumptionLedger(v);
+    if (ledger.hasContent) {
+      const admitted = ledger.entries.filter(e => e.tier === "admitted").length;
+      const sampled  = ledger.entries.filter(e => e.tier === "sampled").length;
+      if (ledger.entries.length === 0 && ledger.pendingCount === 0) {
+        lines.push(`  assumption ledger: clean — all proofs rest on proven backing; no pending obligations`);
+      } else {
+        lines.push(
+          `  assumption ledger: rests on ` +
+          `${admitted} admitted, ${sampled} sampled` +
+          (ledger.pendingCount > 0 ? `; ${ledger.pendingCount} obligation(s) pending` : ""));
+        for (const e of ledger.entries) {
+          lines.push(`    ! ${e.tier} ${e.label}` +
+            (e.backs.length > 0 ? ` — backs: ${e.backs.join(", ")}` : ` — backs no proofs yet`));
+        }
+      }
     }
   }
   if (v.iterationHints) {
@@ -598,6 +688,7 @@ export function buildVerdict(
       const eqName  = _ctxString(ctx, "equality");
       const lawName = _ctxString(ctx, "lawName");
       const lawTier = _ctxString(ctx, "lawTier");
+      const restsOn = backingsOf(ctx);
       theorems.push({
         name: key,
         proposition: _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>",
@@ -606,6 +697,7 @@ export function buildVerdict(
         ...(eqName && lawName && lawTier
           ? { lawBacking: { equality: eqName, law: lawName, tier: lawTier } }
           : {}),
+        ...(restsOn.length > 0 ? { restsOn } : {}),
       });
     } else if (isFailedProof(v)) {
       const ctx = dataOf(v) as ContextValue;

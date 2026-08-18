@@ -82,7 +82,7 @@ Each claim is stated at its evidence strength. Receipts are runnable.
 | Refinements, contracts, and invariants are discharged by partial evaluation; failures carry concrete counterexamples | sandbox demos; `tests/refinements.alg`, `tests/contracts-demo.alg` |
 | Effect declarations are verified against inference; under-promising halts the build | `tests/effects-demo.alg`; sandbox |
 | Totality analysis: exhaustiveness, termination, `decreases` metrics, HOF-mediated recursion — with witnesses | `tests/totality-*.alg` |
-| Type-class laws carry discharge tiers; `Law.assume` is verdict-visible; proofs record which tier backed them | E3/E4 test batteries; `allegro verify` output |
+| Type-class laws carry discharge tiers; `Law.assume` is verdict-visible; proofs carry their transitive backing, and the verdict's assumption ledger maps every assumption in force to the proofs resting on it | E3/E4 + D2 roll-up test batteries; `allegro verify demos/rung1/04-laws.alg` |
 | The prover loop is participant-neutral and closes end-to-end: obligations → proposal → kernel verdict → authorship | `allegro obligations` / `verify` / `prove` / `propose`; PCP schemas |
 | Benchmark, honestly framed: PE alone discharges all 10 closed propositions in the corpus; the soundness gate rejects wrong proof terms — the prover's measured work is satisfying the gate, not discharging closed props | `npm run bench`; `bench/README.md` |
 | A module's behavioral envelope is inspectable: safety grade, contracts, effects, predicates per binding | `allegro inspect`; sandbox Inspect button |

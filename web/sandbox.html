@@ -206,6 +206,76 @@ const snippetsSelect = document.getElementById('snippets');
 // --- Examples (built-in) ---
 
 const EXAMPLES = {
+  "Walkthrough 1 — State facts, watch them discharge": `// Claims are part of the program: a refinement, a contract, a theorem.
+// Partial evaluation folds what it can — discharged checks cost nothing.
+use contracts
+
+PositiveInt = Int & _ > 0
+print(PositiveInt(5))                 // 5
+
+double_pos(x: PositiveInt): PositiveInt =>
+  requires x > 0
+  ensures _ > 0
+  x + x
+print(double_pos(PositiveInt(7)))     // 14
+
+// Theorems discharge by evaluation at compile time; proofs compose.
+theorem four: 2 + 2 == 4
+theorem four_flipped: 4 == 2 + 2 by proof_sym(four)
+print(2 + 2)                          // 4 — theorems change nothing at runtime`,
+
+  "Walkthrough 2 — Break a claim (counterexamples)": `// Failures name concrete inputs, not type-error hieroglyphs.
+SmallPos = Int & _ > 0 & _ < 100
+print(SmallPos(50))                   // 50
+print(error of SmallPos(0 - 5))       // refinement check failed: expected ≥ 1 (got -5)
+print(error of SmallPos(200))         // refinement check failed: expected ≤ 99 (got 200)
+
+// Record invariants tie fields together.
+Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi
+print(error of Range(50, 5))          // refinement check failed
+
+// A FALSE theorem halts the build — uncomment to see the refusal:
+// theorem wrong: 2 + 2 == 5
+print("still standing")`,
+
+  "Walkthrough 3 — Effects: what code doesn't do": `// Functions declare their side-effect categories; the analyzer infers
+// the actual set and verifies declared ⊇ inferred.
+use effects
+
+square(x) => x * x                    // inferred: pure
+print(square(7))
+
+loud(msg) =>
+  effects io
+  print(msg)                          // print is tagged io
+  msg
+loud("declared and verified")
+
+// Under-promising is refused — uncomment to halt the build:
+// sneaky(x) =>
+//   effects pure
+//   print(x)
+//   x
+print("no undeclared effects")`,
+
+  "Walkthrough 4 — Laws, tiers & the escape hatch": `// No boolean "verified": every law obligation resolves to a TIER,
+// and proofs record which tier backed them.
+theorem t_int: 1 == 1 by proof_trans(proof_refl(1), proof_refl(1))
+p = proof_trans(proof_refl(7), proof_refl(7))
+print(p.lawTier)                      // kernel
+
+// A custom equality: its law obligations are recorded, never granted.
+Cell = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+v = Cell(1)
+
+// proof_trans over Cell is REFUSED until trans is proven or admitted.
+// (Try it: move the theorem below above the Law.assume line.)
+Law.assume(Cell, "trans")             // legal — and loud
+
+theorem t_cell: v == v by proof_trans(proof_refl(v), proof_refl(v))
+q = proof_trans(proof_refl(v), proof_refl(v))
+print(q.lawTier)                      // admitted — nothing upgraded for free`,
+
   "Hello World": `print("Hello, Allegro!")`,
 
   "Fibonacci": `// Tail-recursive fibonacci

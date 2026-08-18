@@ -1,6 +1,7 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels } from "./slots.js";
+import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
@@ -3657,14 +3658,26 @@ function lawBackingFor(operand: Value, lawName: string):
   return _equalityLawBacking(td as ContextValue, lawName);
 }
 
-/** Stamp the E-R6 fields on a freshly built equality proof. */
-function recordLawBacking(proof: Value, backing: { equality: string; tier?: string } | null, lawName: string): Value {
+/** Stamp the E-R6 fields on a freshly built equality proof, and union
+ *  the D2 roll-up backing set: the proof's own rule backing plus every
+ *  input proof's transitive set (B-091 — nested chains keep inner
+ *  backings; the Verdict's assumption ledger aggregates this). */
+function recordLawBacking(proof: Value, backing: { equality: string; tier?: string } | null, lawName: string, inputs: Value[] = []): Value {
+  const outCtx = dataOf(proof) as ContextValue;
   if (backing && backing.tier) {
-    stampLawBacking(dataOf(proof) as ContextValue,
+    stampLawBacking(outCtx,
       withType(stringToBits(backing.equality), StringType),
       withType(stringToBits(lawName), StringType),
       withType(stringToBits(backing.tier), StringType));
   }
+  const own: LawBackingRec[] = backing && backing.tier
+    ? [{ equality: backing.equality, law: lawName, tier: backing.tier }]
+    : [];
+  const inherited = inputs
+    .map(p => proofCtx(p))
+    .filter((c): c is ContextValue => c !== null)
+    .map(c => backingsOf(c));
+  stampBackings(outCtx, unionBackings(own, ...inherited));
   return proof;
 }
 
@@ -3698,7 +3711,7 @@ const proof_sym_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
   const backing = lawBackingFor(ops.lhs, "sym");
   return recordLawBacking(makeEqProof(ops.rhs, ops.lhs),
-    backing && !backing.refused ? backing : null, "sym");
+    backing && !backing.refused ? backing : null, "sym", [p]);
 };
 
 /** `proof_trans(p1, p2)` — transitivity: from `a == b` and `b == c`,
@@ -3741,7 +3754,7 @@ const proof_trans_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       `admit it (Law.assume(${backing.equality}, "trans"))`,
     );
   }
-  return recordLawBacking(makeEqProof(a.lhs, b.rhs), backing ?? null, "trans");
+  return recordLawBacking(makeEqProof(a.lhs, b.rhs), backing ?? null, "trans", [p1, p2]);
 };
 
 /** `proof_cong(f, p)` — congruence: from `a == b`, derive `f(a) == f(b)`
@@ -3766,7 +3779,8 @@ const proof_cong_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeFailedProof(`cong`, `f(a) / f(b) did not resolve`,
       `proof_cong needs f applied to both sides to reduce`);
   }
-  return makeEqProof(fa, fb);
+  // D2 roll-up: cong has no gate/backing of its own but inherits p's set.
+  return recordLawBacking(makeEqProof(fa, fb), null, "cong", [p]);
 };
 
 // --- Phase F3: `theorem NAME: P by <proofterm>` checker ---
@@ -3829,6 +3843,9 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         if (eq && ln && lt) {
           stampLawBacking(dataOf(relabeled) as ContextValue, eq, ln, lt);
         }
+        // D2 roll-up: the theorem inherits the by-term's TRANSITIVE
+        // backing set, not just the outermost rule's fields.
+        stampBackings(dataOf(relabeled) as ContextValue, backingsOf(pc));
       }
       return relabeled;
     }

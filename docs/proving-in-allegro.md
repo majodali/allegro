@@ -173,6 +173,44 @@ non-sampleable types emit a `proven-skipped` info.
 `proven` is F7-minimum scope: single Int / NonNeg / PositiveInt / Bool
 typed param. Symbolic-input verification is a follow-on.
 
+## Laws, discharge tiers, and the strict gate (E3/E4)
+
+There is no boolean "verified" anywhere in the system. Every law
+obligation — reflexivity / symmetry / transitivity of an equality,
+plus any `law_*` propositions a type declares — resolves to a **tier**:
+
+- `kernel` — backed by the kernel's structural equality (automatic for
+  built-in scalars and default record equality).
+- `enumerated` — discharged by exhausting a finite domain
+  (`prove_for_all_bool`).
+- `witnessed` — a real proof supplied via `Law.witness(T, "law", proof)`.
+- `sampled` — survived bounded sampling; survival, not proof.
+- `admitted` — assumed via `Law.assume(T, "law")`; legal and loud.
+- `pending` — recorded, undischarged.
+
+Equality proofs record their backing: `p.lawTier` / `p.lawName` /
+`p.equality` dispatch on any combinator-built proof, and the proof
+carries its **transitive** backing set (everything inherited through
+nested combinators), which `allegro verify` rolls up into the
+verdict's `assumption ledger` block.
+
+**The strict gate**: `proof_trans` over values of a type with a CUSTOM
+equality is **refused** while that equality's `trans` law is neither
+proven nor admitted. The refusal names both legal outs:
+
+```
+transitivity of 'Cell' is neither proven nor admitted — witness it
+(Law.witness(Cell, "trans", proof)) or admit it (Law.assume(Cell, "trans"))
+```
+
+A prover should prefer `Law.witness` with a real proof
+(`prove_for_all_bool` for finite carriers) and fall back to
+`Law.assume` only when instructed — an admitted law marks every
+downstream proof `[resting on admitted 'trans' of 'Cell']` in the
+verdict, and the assumption ledger lists it with the proofs that rest
+on it. Kernel equalities (Int, String, records with default equality)
+pass the gate automatically at tier `kernel`.
+
 ## Failure modes and how to respond
 
 The compiler emits structured failures with counterexamples and
@@ -184,6 +222,7 @@ iteration hints. Common shapes:
 | `did not reduce to a constant Bool (PE left a residual)` | F1 can't discharge; needs a richer strategy | Use `by` with a combinator (`proof_refl` / `proof_trans` / `tactics.chain`) or `prove_for_all_bool` for finite domains |
 | `transitivity middle terms differ` | In `proof_trans(p1, p2)`, p1's RHS doesn't value-match p2's LHS | Check intermediate term; consider `tactics.chain([…])` for a longer sequence |
 | `proof term establishes a different equality` | The `by` term proves a different fact than the theorem claims | Match the proposition exactly — the proof's operands must equal the theorem's |
+| `neither proven nor admitted` | The E4 strict gate: `proof_trans` over a custom equality with no discharged/sampled/admitted `trans` law | `Law.witness(T, "trans", proof)` with a real proof; `Law.assume(T, "trans")` only as a loud, verdict-visible last resort |
 | `proven check failed: at <param> = <value>` | F7 sampling found a counterexample | Revise the impl or weaken the `proven` clause |
 | `predicate(1) does not hold` (induction) | `prove_induction` step proof claims P(n+1) but PE doesn't fold it true | Check the step function; ensure it returns a discharged proof for each sample |
 
