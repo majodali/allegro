@@ -558,10 +558,13 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   GenericType `get` member) with regressions. B-091 COMPLETE except
   the maintainer's manual deploy.sh pass
 - [ ] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
-  domain chosen at R-R4 ratification (recommendation: units-of-measure
-  physics — bridges to rung 3); grammar + lib + laws + domain-term
-  counterexample rendering (minimal B-081 slice); demo script + site
-  update
+  units-of-measure physics (R-R4 ratified). **Brief composed 2026-08**
+  (`.claude/plans/units-dsl.md`): dimensions as structural data +
+  named-dimension REFINEMENTS over one Quantity record (U-R1 —
+  pre-validated by entry test on the unmodified substrate),
+  number-anchored literal sugar, laws at honest tiers with the
+  admitted-ledger as demo content, chunks U1–U4. U-R1–U-R5 awaiting
+  ratification; U1 gated on sign-off
 - [ ] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;
