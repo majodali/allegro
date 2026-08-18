@@ -119,6 +119,12 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // c[0] is the ident (component name); last expression-tagged child is the target.
       const name = textOf(c[0]);
       const target = buildExpr(lastChild(c), paramMap);
+      // D47(e)/(f): `source of x` is the observe-tagged source read — a
+      // dedicated primitive so the effect label is static; the generic
+      // component accessor answers none for this key.
+      if (name === "source") {
+        return makeExpr(prim("source_get"), [target]);
+      }
       return makeExpr(prim("component_get"), [target, stringToBits(name)]);
     }
     case "of_error": {

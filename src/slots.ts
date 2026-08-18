@@ -115,6 +115,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "error", storages: ["mv-component"], owner: "error channel", disposition: "channel", target: "error (viral propagation)" },
   { name: "effects", storages: ["mv-component"], owner: "effects channel", disposition: "channel", target: "effects" },
   { name: "predicates", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
+  { name: "source", storages: ["mv-component"], owner: "source channel", disposition: "channel", target: "source (D47: originating AST; kernel-originated, drop, observe-tagged reads)" },
   { name: "domain", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
   { name: "bound", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36) — occurrence bound (C3.2 annotation boundary)" },
   { name: "exported", storages: ["mv-component"], owner: "module system", disposition: "base-concept", target: "scope-binding visibility metadata (S3; migrates at the Phase 2 scope split / module rework)", notes: "D39 addendum, maintainer-ratified 2026-07: export-ness is a property of a binding in the module Scope, not of the value — the value-plane marker is a stopgap with a known aliasing wart (`y = x` silently exports y) and dissolves once C2.1 gives bindings a visibility attribute" },
@@ -684,22 +685,56 @@ registerChannel({ name: "knowledge", rule: "computed" });
 registerChannel({ name: "bound", rule: "drop" });
 registerChannel({ name: "discharged", rule: "drop", integrity: true, bindingKey: "__discharged" });
 registerChannel({ name: "warnings", rule: "union" });
-registerChannel({ name: "source", rule: "positional" });
+// D47 (B-094): drop — a derived value was not produced by the recorded
+// expression; propagating source would fabricate provenance. Kernel-
+// originated (evaluator attachment only); reads via `source of` are
+// observe-tagged (§3.1).
+registerChannel({ name: "source", rule: "drop" });
 registerChannel({ name: "exported", rule: "drop" });
 
 /** Binding keys that only a channel writer may originate. User-reachable
- *  construction paths (object literals, mv_set) consult this. */
+ *  construction paths (object literals, mv_set) consult this. `source` is
+ *  D47(d): forged provenance would let a doctored source channel display a
+ *  different claim than the one checked — kernel-originated only. */
 const INTEGRITY_BINDING_KEYS = new Set<string>(["__discharged"]);
-const INTEGRITY_CHANNEL_NAMES = new Set<string>(["discharged"]);
+const INTEGRITY_CHANNEL_NAMES = new Set<string>(["discharged", "source"]);
 
 /** Gate for user-reachable construction paths: throws if the key would
  *  originate an integrity channel without holding its writer. */
 export function assertNotIntegrityKey(key: string, site: string): void {
   if (INTEGRITY_BINDING_KEYS.has(key) || INTEGRITY_CHANNEL_NAMES.has(key)) {
     throw new AllegroError(
-      `${site}: cannot originate integrity channel 'discharged' — origination requires the channel writer (D21–D24)`
+      `${site}: cannot originate integrity channel '${key.replace(/^__/, "")}' — origination requires the channel writer (D21–D24)`
     );
   }
+}
+
+// --- Source channel (D47, B-094 chunk 1) --------------------------------------
+//
+// The `source` component carries the ORIGINATING Expression AST of a value —
+// attached by the evaluator only (kernel-originated, D47(d)): at call sites
+// of source-aware primitives, and on resolved top-level bindings whose data
+// is not a Structure (Structure bindings — types, records, proofs — carry
+// channels directly and are identity-sensitive; their attachment is the
+// chunk-2+ audit). Rule `drop` (D47(c)); reads go through `source of`
+// (`source_get`, observe-tagged, D47(e)) and render TEXT — the raw AST as a
+// first-class user value needs an inert quote carrier, deferred until user
+// meta-functions land.
+
+export const SOURCE_COMPONENT_KEY = "source";
+
+/** Kernel-internal: attach the originating AST to a value. Not exposed as a
+ *  primitive — origination authority stays with the evaluator. */
+export function withSource(v: Value, ast: Value): Value {
+  const comps = cloneComponents(v);
+  comps.set(SOURCE_COMPONENT_KEY, ast);
+  return makeMultiValue(dataOf(v), comps) as Value;
+}
+
+/** Kernel-internal read of the source channel (free for kernel use; the
+ *  LANGUAGE-level read is `source_get`, which carries the observe tag). */
+export function sourceOf(v: Value): Value | undefined {
+  return componentsView(v).get(SOURCE_COMPONENT_KEY);
 }
 
 /** Host-internal function-metadata properties preserved across

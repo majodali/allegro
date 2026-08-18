@@ -5,7 +5,7 @@
 
 import { isCarrier } from "./structure.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch, isBareBindingName, isFutureBindingName } from "./slots.js";
+import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource } from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
@@ -1241,13 +1241,25 @@ export function evalSource(
       // Store the evaluated value on the scope's binding and track that
       // SAME object in the reactive registry — the binding is its cell.
       const complete = isResolved(val);
+      // D47 (B-094 chunk 1): binding-level source attachment — a resolved
+      // top-level binding's value carries its RHS AST on the `source`
+      // channel (kernel origination). Chunk-1 scope: non-Structure data
+      // only — Structures (types, records, proofs) carry channels directly
+      // and are identity-sensitive (memoized generics, law registries);
+      // their attachment is the chunk-2+ audit. Residuals are skipped:
+      // forward chaining REPLACES them on completion, dropping anything
+      // attached here.
+      const storedVal = (complete && !isMetaSlotKey(b.key)
+          && dataOf(val).kind !== ValueKind.Structure)
+        ? withSource(val, b.value)
+        : val;
       let ctxBinding = evalCtx.bindings.get(b.key);
       if (!ctxBinding) {
-        ctxBinding = { key: b.key, value: val };
+        ctxBinding = { key: b.key, value: storedVal };
         evalCtx.bindings.set(b.key, ctxBinding);
         evalCtx.bindingList.push(ctxBinding);
       }
-      resolveCell(ctxBinding, val, complete, collector.incompleteRefs);
+      resolveCell(ctxBinding, storedVal, complete, collector.incompleteRefs);
       registry.bindings.set(b.key, ctxBinding);
 
       if (complete) {

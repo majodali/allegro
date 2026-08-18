@@ -357,7 +357,14 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   equality; further strict gates from the §6 pre-approved queue
   (`Ordered` totality for sorts)
 - [ ] **B-094** · L0 · Source channel — ASTs as channel payload
-  (structures.md §3.1, D47 proposed 2026-08 awaiting ratification):
+  (structures.md §3.1, D47 RATIFIED 2026-08). **Chunk 1 landed
+  2026-08**: sourceAware registration + evaluator call-site attachment
+  + binding-level attachment (non-Structure data) + drop rule +
+  integrity gating (mv_set refusal, component_get key block) +
+  observe-tagged `source of` returning rendered text
+  (renderExprSource) + 7-test battery. Chunk-1 rulings: text at the
+  read surface (quote carrier deferred), Structure bindings deferred
+  (identity audit), residuals skipped. Remaining (chunk 2+):
   source-aware primitive registration + evaluator attachment at
   meta-function call sites; kernel-private writer, `drop` propagation,
   observe-tagged reads, `source of x` surface; migrate

@@ -239,11 +239,14 @@ error propagation; D28), `warnings`, `source` (§3.1, D47 — the earlier
 forgery), `discharged` (kernel-private). Channel-removal/erasure rules
 (e.g. error handling consumes the error channel) are S6 items.
 
-### 3.1 The source channel — ASTs as channel payload [proposed — D47]
+### 3.1 The source channel — ASTs as channel payload [D47 RATIFIED 2026-08; chunk 1 landed]
 
 *Maintainer direction 2026-08: meta-functions (proofs first) should
 receive the AST of an operand through a channel on the value, not
-through dedicated grammar productions or lazy registration.*
+through dedicated grammar productions or lazy registration. Ratified
+as proposed ("exactly how I saw this feature playing out"); B-094
+chunk 1 (substrate) landed 2026-08 — see the status stamp at the end
+of this subsection.*
 
 **Motivation.** Today exactly two mechanisms give a function access to
 the expression that produced its argument: a dedicated grammar
@@ -335,6 +338,32 @@ absent channel should instead attach lazily at statement level
 (rejected tentatively — post-hoc attachment is impossible once the
 evaluator has moved on, and magic-on-read violates (b)'s cost
 model).
+
+**Chunk 1 status (landed 2026-08, B-094).** Substrate complete:
+`sourceAware` registration on PrimitiveFunction; evaluator attaches
+each arg's originating AST at source-aware call sites (eager path);
+binding-level attachment included (the (b) complement — resolved
+top-level bindings carry their RHS AST); registry rule flipped to
+`drop`; `source` added to the integrity-channel set (mv_set refusal);
+`source of x` lowers to the observe-tagged `source_get`, and the
+generic `component_get` answers none for the key so the effect cannot
+be laundered. Three chunk-1 rulings recorded:
+
+- **Reads render TEXT** (via a new canonical `renderExprSource`
+  renderer — infix-aware, lexically faithful): a raw Expression
+  returned as a user value reads as an unresolved residual to the
+  completion machinery (print defers on it, forward chaining may
+  re-evaluate it). A first-class inert AST value needs a QUOTE
+  carrier — deferred until user-level meta-functions land; kernel
+  meta-functions (chunk 2) read the AST host-side via `sourceOf`.
+- **Binding-level attachment covers non-Structure data only**:
+  Structures (types, records, proofs) carry channels directly and
+  are identity-sensitive (memoized generics, law registries keyed by
+  identity) — wrapping them at the binding boundary needs an identity
+  audit, deferred to the chunk-2+ pass.
+- **Residual bindings are skipped**: forward chaining REPLACES
+  residuals on completion, so anything attached to them would drop;
+  attachment on completion-replacement is a follow-on.
 
 ## 4. Scope [partial]
 

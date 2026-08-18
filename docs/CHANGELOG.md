@@ -8,6 +8,44 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — B-094 chunk 1: the source channel — ASTs as channel payload (D47 ratified)
+
+Maintainer-ratified D47 (structures.md §3.1): meta-functions receive an
+operand's originating AST through the `source` channel instead of via
+dedicated grammar productions or lazy registration.
+
+- **Source-aware registration**: `makePrimitive(..., sourceAware)` —
+  the data-plane analogue of `lazy`. At call sites of a source-aware
+  primitive the evaluator attaches each argument's unevaluated
+  Expression AST to the evaluated value (kernel origination, the only
+  attachment authority). Zero cost at every other call site.
+- **Binding-level attachment** (the (b) complement): resolved
+  top-level bindings whose data is not a Structure carry their RHS
+  AST — `x = 2 + 2` answers `source of x` → `"2 + 2"`, with lexical
+  fidelity (`z = x + 1` renders `x + 1`). Structures (types, records,
+  proofs) deferred pending an identity audit; residuals skipped
+  (forward chaining replaces them).
+- **Read surface**: `source of x` lowers to `source_get` — eager,
+  OBSERVE-tagged (the certificate_peek precedent: source reads
+  distinguish extensionally equal values), returning rendered TEXT via
+  a new canonical `renderExprSource` (infix-aware). A raw Expression
+  as a user value would read as a residual to the completion machinery
+  — the inert quote carrier is deferred until user meta-functions
+  land. `component_get` answers none for the key (no effect
+  laundering); absent channel → none.
+- **Integrity**: `source` joins the integrity-channel set — `mv_set`
+  origination is refused (forged provenance would let a doctored
+  channel display a different claim than the one checked). Registry
+  rule flipped from the pre-D47 `positional` sketch to `drop`
+  (derived values must not inherit fabricated provenance). Equality
+  ignores the channel (E1).
+
+7-test battery (binding render, lexical fidelity, none-on-absent,
+drop, source-aware call site, observe inference, forgery refusal +
+laundering block). Boundary lint clean (isMetaSlotKey, no new dunder
+literals). 1133/1133 green. Chunk 2 (proof primitives migrate
+lazy→eager source-aware) next.
+
 ## 2026-08 — B-091 slices 1–2: rung-1 release package + D2 assumption-ledger roll-up (Track R)
 
 The first release-track content derivation (plan:

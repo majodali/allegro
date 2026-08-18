@@ -1,10 +1,10 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels, sourceOf, SOURCE_COMPONENT_KEY } from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
-  PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue,
+  PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue, ParamValue,
   AllegroError, makeBits, makeInt, makeFloat, bitsToFloat, makePrimitive, makeExpr,
   makeParam, makeComposedFn, makeContext, makeMultiValue, makeSymbol,
   stringToBits, bitsToString,
@@ -22,6 +22,68 @@ import { grammar2Primitives } from "./grammar2/builder.js";
 import { BASE_OPERATORS_TO_LEVEL } from "./grammar2/base-grammar.js";
 
 // --- Value formatting ---
+
+// --- Source rendering (D47, B-094 chunk 1) -----------------------------------
+//
+// Canonical text for an Expression AST — the derivation D47(a) names ("text
+// is a rendering of the node"). Used by `source_get` (`source of x`) and
+// available to counterexample rendering. Infix-aware for the operator
+// primitives; call form for everything else; bounded depth.
+
+const INFIX_OF_PRIM = new Map<string, string>([
+  ["bits_add", "+"], ["bits_sub", "-"], ["bits_mul", "*"], ["bits_div", "/"],
+  ["bits_mod", "%"], ["bits_eq", "=="], ["bits_ne", "!="], ["bits_lt", "<"],
+  ["bits_gt", ">"], ["bits_le", "<="], ["bits_ge", ">="],
+  ["typed_eq", "=="], ["typed_ne", "!="],
+  ["typed_and", "&&"], ["typed_or", "||"], ["typed_amp", "&"],
+]);
+
+export function renderExprSource(v: Value, depth: number = 0): string {
+  if (depth > 24) return "…";
+  const d = dataOf(v);
+  switch (d.kind) {
+    case ValueKind.Symbol:
+      return d.name;
+    case ValueKind.Param:
+      return (d as ParamValue)._name ?? `_p${(d as ParamValue).position}`;
+    case ValueKind.Bits:
+      return formatValue(v);
+    case ValueKind.Expression: {
+      const e = d as ExpressionValue;
+      const fnD = dataOf(e.fn);
+      const sub = (a: Value): string => {
+        const t = renderExprSource(a, depth + 1);
+        // Parenthesize compound operands of infix renderings for fidelity.
+        return dataOf(a).kind === ValueKind.Expression && / /.test(t) && !t.startsWith("(")
+          ? `(${t})` : t;
+      };
+      if (fnD.kind === ValueKind.PrimitiveFunction) {
+        const name = (fnD as PrimitiveFunctionValue).name;
+        const op = INFIX_OF_PRIM.get(name);
+        if (op && e.args.length === 2) {
+          return `${sub(e.args[0])} ${op} ${sub(e.args[1])}`;
+        }
+        // `obj.member(...)` — a call whose fn is type_dispatch(obj, "member").
+        if (name === "type_dispatch" && e.args.length === 2
+            && dataOf(e.args[1]).kind === ValueKind.Bits) {
+          return `${sub(e.args[0])}.${bitsToString(dataOf(e.args[1]) as BitsValue)}`;
+        }
+        return `${name}(${e.args.map(a => renderExprSource(a, depth + 1)).join(", ")})`;
+      }
+      if (fnD.kind === ValueKind.Expression) {
+        // Applied dispatch: (type_dispatch(obj, "m"))(args) → obj.m(args).
+        const inner = renderExprSource(e.fn, depth + 1);
+        return `${inner}(${e.args.map(a => renderExprSource(a, depth + 1)).join(", ")})`;
+      }
+      if (fnD.kind === ValueKind.Symbol) {
+        return `${fnD.name}(${e.args.map(a => renderExprSource(a, depth + 1)).join(", ")})`;
+      }
+      return `<fn>(${e.args.map(a => renderExprSource(a, depth + 1)).join(", ")})`;
+    }
+    default:
+      return formatValue(v);
+  }
+}
 
 export function formatValue(v: Value): string {
   // Typed-value display. C4.3b: flattened Contexts (typed records/arrays)
@@ -888,6 +950,10 @@ const component_get_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) throw new AllegroError(`component_get: need 2 args, got ${args.length}`);
   const value = evalFn!(args[0], ctx!);
   const key = bitsToString(dataOf(args[1]) as BitsValue);
+  // D47(e): source reads are OBSERVE-effectful and go through `source of`
+  // (`source_get`); the generic accessor answers none so the effect tag
+  // cannot be laundered around.
+  if (key === SOURCE_COMPONENT_KEY) return noneSingleton;
   // C4.3b: channelReadRaw is total — flattened Contexts answer their channel
   // plane, and bare type Contexts answer `type of Int` through the `__type`
   // binding-plane fallback. componentsView covers ad-hoc mv_set keys.
@@ -895,6 +961,23 @@ const component_get_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (c !== undefined) return c;
   // Component not found — return none instead of throwing
   return noneSingleton;
+};
+
+// --- source_get (D47(e)/(f), B-094): the language-level source read ---
+//
+// `source of x` lowers here. Reading source distinguishes extensionally
+// equal values (`4`-written-as-`4` vs `4`-computed-as-`2+2`) — the same
+// referential-transparency breach as `certificate_peek`, so the read
+// carries the `observe` effect label. Returns the RENDERED source text
+// (String) — the raw AST as a first-class user value needs an inert quote
+// carrier, deferred until user meta-functions land (chunk 2 consumes the
+// AST kernel-side). Absent channel → none, consistent with `error of`.
+const source_get_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) throw new AllegroError(`source_get: need 1 arg, got ${args.length}`);
+  const v = args[0];
+  const ast = sourceOf(v);
+  if (ast === undefined) return noneSingleton;
+  return withType(stringToBits(renderExprSource(ast)), StringType);
 };
 
 // ============ MAKE_ERROR (lazy — for "error expr" syntax) ============
@@ -4077,6 +4160,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   mv_components: makePrimitive("mv_components", mv_components),
   eval_if: eval_if_value,
   component_get: makePrimitive("component_get", component_get_impl, true),
+  // D47: eager (receives the full value, channels intact — C4.3c) and
+  // observe-tagged; `source of x` lowers here.
+  source_get: makePrimitive("source_get", source_get_impl, false, ["observe"]),
   make_error: makePrimitive("make_error", make_error_impl, true),
   eval_when: eval_when_value,
   when_wildcard: makePrimitive("when_wildcard", when_wildcard_impl),

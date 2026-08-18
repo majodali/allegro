@@ -4122,6 +4122,75 @@ theorem lg_proven: 1 == 1 by proof_refl(1)
   eq(rendered.includes("rests on: proven backing only"), true);
 });
 
+// == D47 source channel — B-094 chunk 1 (substrate + battery) ==
+//
+// The `source` channel carries a value's originating Expression AST:
+// kernel-originated (evaluator only), `drop` propagation, observe-tagged
+// reads via `source of x` (source_get), rendered as text at the read
+// surface. Design: structures.md §3.1.
+
+import { sourceOf as _sourceOf, withSource as _withSource, componentsView as _componentsViewD47 } from "./slots.js";
+import { renderExprSource } from "./primitives.js";
+
+test("D47: binding-level source — `source of x` renders the RHS AST", () => {
+  const r = evalStd("x = 2 + 2\nsource of x");
+  eq(bitsToString(dataOf(r!) as BitsValue), "2 + 2");
+  const r2 = evalStd("y = 5\nsource of y");
+  eq(bitsToString(dataOf(r2!) as BitsValue), "5");
+  // Lexical fidelity: symbols render by name.
+  const r3 = evalStd("x = 2 + 2\nz = x + 1\nsource of z");
+  eq(bitsToString(dataOf(r3!) as BitsValue), "x + 1");
+});
+
+test("D47: absent source answers none, and equality ignores the channel", () => {
+  const r = evalStd("source of 7");
+  eq(getTypeName(r!), "None");
+  const r2 = evalStd("x = 2 + 2\nx == 4");
+  eq(Number((dataOf(r2!) as BitsValue).data), 1);
+});
+
+test("D47: drop propagation — derived values carry no source", () => {
+  const { evalCtx } = runtimeEval("x = 2 + 2\nd = x + 1\n1", undefined, [typeExt], undefined, true);
+  const d = evalCtx.bindings.get("d")!.value!;
+  // d has its OWN binding-level source ("x + 1") but the underlying
+  // arithmetic result did not inherit x's — check a non-binding result:
+  const { value } = runtimeEval("x = 2 + 2\nx * 3", undefined, [typeExt], undefined, true);
+  eq(_componentsViewD47(value!).get("source"), undefined);
+  eq(_sourceOf(d) !== undefined, true);
+});
+
+test("D47: source-aware primitive receives each arg's originating AST", () => {
+  // The data-plane analogue of lazy: the arg arrives EVALUATED, with the
+  // unevaluated AST riding the source channel.
+  let seen: string | null = null;
+  const probe = makePrimitive("probe", (args) => {
+    const ast = _sourceOf(args[0]);
+    seen = ast ? renderExprSource(ast) : null;
+    return args[0];
+  }, false, undefined, true);
+  const { value } = runtimeEval("probe(1 + 2)", undefined,
+    [typeExt, { name: "d47", bindings: { probe } }], undefined, true);
+  eq(seen, "1 + 2");
+  eq(Number((dataOf(value!) as BitsValue).data), 3);
+});
+
+test("D47: source reads carry the observe effect (certificate_peek precedent)", () => {
+  const { evalCtx } = runtimeEval("f(v) => source_get(v)\n1", undefined, [typeExt], undefined, true);
+  const eff = effectsOf(evalCtx.bindings.get("f")!.value!);
+  eq(eff?.has("observe"), true);
+});
+
+test("D47: forged source origination is refused (mv_set integrity gate)", () => {
+  let msg = "";
+  try { evalStd('mv_set(5, "source", 42)'); }
+  catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("cannot originate integrity channel 'source'"), true);
+  // And the generic accessor cannot read it either — the observe tag
+  // cannot be laundered through component_get.
+  const r = evalStd('x = 2 + 2\ncomponent_get(x, "source")');
+  eq(getTypeName(r!), "None");
+});
+
 // == Guard Clauses (and) ==
 
 test("guard: basic guard passes", () => {

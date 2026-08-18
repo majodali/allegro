@@ -49,6 +49,15 @@ export interface PrimitiveFunctionValue {
    * function transitively calls.
    */
   effects?: string[];
+  /**
+   * D47 (B-094): source-aware registration — the data-plane analogue of
+   * `lazy`. At call sites of a source-aware primitive the evaluator
+   * attaches each argument's ORIGINATING Expression AST to the evaluated
+   * argument value on the `source` channel (kernel-originated; `drop`
+   * propagation). Lazy is for *not evaluating*; source-aware is for
+   * *seeing what was evaluated*. Cost is zero at all other call sites.
+   */
+  sourceAware?: boolean;
 }
 
 // --- Param: positional placeholder within function expressions ---
@@ -212,8 +221,9 @@ export function makePrimitive(
   fn: PrimitiveFnImpl,
   lazy?: boolean,
   effects?: string[],
+  sourceAware?: boolean,
 ): PrimitiveFunctionValue {
-  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects };
+  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects, sourceAware };
 }
 
 export function makeParam(position: number, name?: string): ParamValue {

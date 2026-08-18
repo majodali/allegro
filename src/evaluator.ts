@@ -13,7 +13,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS } from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource } from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 import { isCarrier } from "./structure.js";
 
@@ -306,8 +306,14 @@ function applyPrimitive(
     return trackedEffects.size > 0 ? withEffects(result, trackedEffects) : result;
   }
 
-  // Eager: evaluate all args
-  const evalArgs = args.map(a => evaluate(a, ctx, depth + 1, depCollector));
+  // Eager: evaluate all args. D47 (B-094): at call sites of a source-aware
+  // primitive, each evaluated argument carries its ORIGINATING AST on the
+  // `source` channel (kernel origination — the only attachment authority).
+  // Discharge logic reads the evaluated value; rendering / shape detection
+  // reads the original. Zero cost at every other call site.
+  const evalArgs = fn.sourceAware
+    ? args.map(a => withSource(evaluate(a, ctx, depth + 1, depCollector), a))
+    : args.map(a => evaluate(a, ctx, depth + 1, depCollector));
   // Stage F1: pre-compute the unioned effect set from the primitive's static
   // tags + each evaluated arg's `effects` component. Used by every return
   // path below so deferred computations carry their effects forward.
