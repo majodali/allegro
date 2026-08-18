@@ -314,23 +314,29 @@ eager function reads it.
   component-access form; no new syntax. Absent channel → `none`,
   consistent with `error of`.
 
-**What migrates.** `proof_check` / `proof_by_eval` / the proof
-combinators become eager, source-aware primitives: the argument
-arrives evaluated (folded Bits, or a residual — which for an
-undischargeable proposition is itself the evidence) with the original
-AST on its source channel for shape detection and counterexample
-rendering. The lazy-registration workaround class shrinks to genuine
-control-flow laziness (`eval_if`, short-circuit ops, thunks) — lazy
-is for *not evaluating*; source-awareness is for *seeing what was
-evaluated*. The `theorem`/`verify` grammar productions remain for
-their statement/naming surface, but their lowering stops smuggling
-ASTs — the checking machinery becomes expressible as ordinary
-(source-aware) functions, which is what opens the capability to user
-meta-functions. Non-goals: `requires`/`ensures`/`assert`/`proven`
-keep their body-forms (they need statement *hoisting*, not just AST
-access); PE residual semantics unchanged (a residual in value
-position + original AST in the channel is the useful division:
-discharge logic reads the residual, rendering reads the original).
+**What migrates — AMENDED at chunk 2 (2026-08).** The prediction that
+`proof_check`/`proof_by_eval` would go eager+source-aware was wrong,
+for a reason worth recording. The proof combinators had ALREADY
+migrated to plain eager at C4.3c (the lazy-for-components workaround
+died with the eager-boundary flip). The two remaining lazy proof
+primitives are lazy for a DIFFERENT, load-bearing property: they are
+**non-value interpreters** — a proposition that evaluates to a
+residual or an error must become a FAILED PROOF ("could not be
+discharged by evaluation"), and the eager path's Rule-1 residual
+guard and error-virality would intercept before the impl runs,
+silently weakening failure into an unresolved binding or a viral
+error ("build safety in" broken). Lazy registration is today the only
+guard-opt-out surface, and for these two that IS genuine control-flow
+laziness: they give meaning to non-values. So the workaround class
+D47 targets — lazy-for-AST-access — is empty in the kernel, and
+D47's payoff is prospective: NEW meta-functions (domain-DSL error
+surfaces, tactics, renderers) get AST access as ordinary eager
+source-aware registrations. The reference consumer is `explain`
+(chunk 2): `explain(x * 3)` → `"x * 3 = 12"` — one registration
+line, no grammar production, no laziness, observe-tagged. Non-goals
+unchanged: `requires`/`ensures`/`assert`/`proven` keep their
+body-forms (hoisting, not AST access); PE residual semantics
+unchanged.
 
 **Open at ratification:** whether binding-level attachment (the (b)
 complement) lands in chunk 1 or follows; whether `source of` on an

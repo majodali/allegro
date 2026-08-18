@@ -980,6 +980,26 @@ const source_get_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return withType(stringToBits(renderExprSource(ast)), StringType);
 };
 
+// --- explain (D47, B-094 chunk 2): the reference source-aware consumer ---
+//
+// `explain(x * 3)` → "x * 3 = 12". An ordinary EAGER primitive that sees
+// both the evaluated value and (via source-aware registration) the
+// originating AST — the meta-function pattern that previously required a
+// grammar production or lazy host code, now a one-line registration.
+// This is the pattern domain surfaces use for errors in domain terms.
+// Observe-tagged: revealing how a value was written distinguishes
+// extensionally equal values, same as any source read.
+const explain_impl: PrimitiveFnImpl = (args) => {
+  if (args.length !== 1) throw new AllegroError(`explain: need 1 arg, got ${args.length}`);
+  const v = args[0];
+  const ast = sourceOf(v);
+  const valueText = formatValue(v);
+  const text = ast !== undefined && renderExprSource(ast) !== valueText
+    ? `${renderExprSource(ast)} = ${valueText}`
+    : valueText;
+  return withType(stringToBits(text), StringType);
+};
+
 // ============ MAKE_ERROR (lazy — for "error expr" syntax) ============
 
 const make_error_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
@@ -4163,6 +4183,9 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   // D47: eager (receives the full value, channels intact — C4.3c) and
   // observe-tagged; `source of x` lowers here.
   source_get: makePrimitive("source_get", source_get_impl, false, ["observe"]),
+  // D47 chunk 2: eager + SOURCE-AWARE — the evaluator hands the impl the
+  // evaluated arg with its originating AST on the source channel.
+  explain: makePrimitive("explain", explain_impl, false, ["observe"], true),
   make_error: makePrimitive("make_error", make_error_impl, true),
   eval_when: eval_when_value,
   when_wildcard: makePrimitive("when_wildcard", when_wildcard_impl),

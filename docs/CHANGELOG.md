@@ -8,6 +8,32 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — B-094 chunk 2: migration reality + `explain` (source channel complete)
+
+The planned lazy→eager migration of the proof entry points was
+re-scoped on a finding worth the record (structures.md §3.1 amended):
+the combinators had ALREADY gone eager at C4.3c, and
+`proof_by_eval`/`proof_check` are lazy for a load-bearing property —
+they are NON-VALUE INTERPRETERS. A proposition that evaluates to a
+residual or error must become a failed proof; the eager path's Rule-1
+residual guard and error-virality would intercept before the impl and
+silently weaken failure semantics. That is genuine control-flow
+laziness, so the lazy-for-AST-access workaround class D47 targets is
+empty in the kernel — D47's payoff is prospective, for NEW
+meta-functions. A regression test pins the halt-not-residualize
+behavior.
+
+The reference consumer lands: **`explain(expr)`** → `"x * 3 = 12"` —
+an ordinary eager primitive with `sourceAware` registration (one
+line), no grammar production, no laziness, observe-tagged, with
+infix-faithful rendering (compound operands parenthesize). This is
+the exact pattern the rung-2 DSL uses for errors in domain terms.
+3 new tests; 1136/1136 green. B-094 closes; residue (inert quote
+carrier for user-level AST values, Structure-binding attachment
+identity audit, attachment on completion-replacement) recorded on the
+backlog entry and folded into rung-2 planning where the DSL's needs
+decide priority.
+
 ## 2026-08 — B-094 chunk 1: the source channel — ASTs as channel payload (D47 ratified)
 
 Maintainer-ratified D47 (structures.md §3.1): meta-functions receive an

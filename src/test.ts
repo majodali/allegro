@@ -4180,6 +4180,33 @@ test("D47: source reads carry the observe effect (certificate_peek precedent)", 
   eq(eff?.has("observe"), true);
 });
 
+test("D47 chunk 2: explain — the reference source-aware consumer", () => {
+  const r = evalStd("x = 4\nexplain(x * 3)");
+  eq(bitsToString(dataOf(r!) as BitsValue), "x * 3 = 12");
+  // No redundant echo when the source IS the value.
+  const r2 = evalStd("explain(7)");
+  eq(bitsToString(dataOf(r2!) as BitsValue), "7");
+  // Compound operands parenthesize for fidelity.
+  const r3 = evalStd("y = 5\nexplain(y * y - 2)");
+  eq(bitsToString(dataOf(r3!) as BitsValue), "(y * y) - 2 = 23");
+});
+
+test("D47 chunk 2: explain carries observe (it reveals how a value was written)", () => {
+  const { evalCtx } = runtimeEval("f(v) => explain(v + 1)\n1", undefined, [typeExt], undefined, true);
+  const eff = effectsOf(evalCtx.bindings.get("f")!.value!);
+  eq(eff?.has("observe"), true);
+});
+
+test("D47 chunk 2: proof entry points remain lazy non-value interpreters", () => {
+  // A theorem whose proposition cannot resolve must FAIL (halt), not
+  // residualize — the guard-opt-out property that keeps proof_by_eval
+  // lazy (§3.1 chunk-2 amendment).
+  let msg = "";
+  try { evalStd("theorem t: unresolved_name == 4\n1"); }
+  catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("could not be discharged"), true);
+});
+
 test("D47: forged source origination is refused (mv_set integrity gate)", () => {
   let msg = "";
   try { evalStd('mv_set(5, "source", 42)'); }

@@ -356,7 +356,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   obligations; proof-plane `proofValEqual` unification with protocol
   equality; further strict gates from the §6 pre-approved queue
   (`Ordered` totality for sorts)
-- [ ] **B-094** · L0 · Source channel — ASTs as channel payload
+- [x] **B-094** · L0 · Source channel — ASTs as channel payload
   (structures.md §3.1, D47 RATIFIED 2026-08). **Chunk 1 landed
   2026-08**: sourceAware registration + evaluator call-site attachment
   + binding-level attachment (non-Structure data) + drop rule +
@@ -364,7 +364,15 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   observe-tagged `source of` returning rendered text
   (renderExprSource) + 7-test battery. Chunk-1 rulings: text at the
   read surface (quote carrier deferred), Structure bindings deferred
-  (identity audit), residuals skipped. Remaining (chunk 2+):
+  (identity audit), residuals skipped. **Chunk 2 landed 2026-08** (B-094 CLOSED):
+  migration reality recorded (§3.1 amendment — proof entry points are
+  lazy NON-VALUE INTERPRETERS; the lazy-for-AST class was already
+  empty post-C4.3c) + `explain` reference consumer (eager sourceAware
+  registration, observe-tagged) + halt-not-residualize regression.
+  Residue for rung-2 planning: inert quote carrier (user-level AST
+  values), Structure-binding attachment (identity audit), attachment
+  on completion-replacement. Superseded scope note (original chunk-2
+  sketch):
   source-aware primitive registration + evaluator attachment at
   meta-function call sites; kernel-private writer, `drop` propagation,
   observe-tagged reads, `source of x` surface; migrate
