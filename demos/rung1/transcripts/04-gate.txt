@@ -1,0 +1,32 @@
+$ # 04-laws.alg with the `theorem t_bad` line uncommented (and no
+$ # Law.assume): the proof_trans strict gate refuses the chain.
+$ allegro demos/rung1/04-laws.alg
+
+Error: proof check failed:
+  theorem `t_bad`: `v == v` — `by` proof failed: transitivity of 'Cell' is neither proven nor admitted (counterexample: the custom equality 'Cell' has no discharged, sampled, or admitted 'trans' law — witness it (Law.witness(Cell, "trans", proof)) or admit it (Law.assume(Cell, "trans")))
+
+$ # After Law.assume(Cell, "trans") — the file as shipped — the gate
+$ # opens, but the verdict renders the assumption loudly:
+$ allegro verify demos/rung1/04-laws.alg
+
+Verdict (verified): 4/4 discharged
+  ✓ t_int — by auto-PE
+  ✓ p — by auto-PE
+  ✓ t_cell — by auto-PE [resting on admitted 'trans' of 'Cell']
+  ✓ q — by auto-PE [resting on admitted 'trans' of 'Cell']
+  laws: 13/18 discharged, 1 ADMITTED (assumed, not proof), 4 pending
+    ! Cell.trans (admitted)
+    ? Cell.refl
+    ? Cell.sym
+    ? Cell2.sym
+    ? Cell2.trans
+  coercions: 2/2 obligations discharged
+  assumption ledger: rests on 1 admitted, 0 sampled; 4 obligation(s) pending
+    ! admitted 'trans' of 'Cell' — backs: t_cell, q
+
+# Nothing is upgraded for free: the admitted obligation is marked `!`,
+# the pending ones `?`, every proof resting on the assumption carries
+# the weakness note, and the assumption ledger rolls it all up — each
+# assumption in force, mapped to the proofs resting on it. The
+# transitive set survives combinator nesting: wrap the chain in
+# proof_sym and the note stays. That ledger IS the product.

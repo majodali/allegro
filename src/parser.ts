@@ -1156,7 +1156,7 @@ return nfn;
 return v;
 }
 function bind(ctx, name, value) {
-const b = { key: name, value, isUse: false };
+const b = { key: name, value };
 ctx.bindings.set(name, b);
 ctx.bindingList.push(b);
 }
@@ -1186,7 +1186,7 @@ const s = child.children[0];
 if (s.binding) {
 bind(ctx, s.binding.name, s.binding.value);
 } else if (s.val !== undefined) {
-ctx.bindingList.push({ key: null, value: s.val, isUse: false });
+ctx.bindingList.push({ key: null, value: s.val });
 }
 }
 return ctx;

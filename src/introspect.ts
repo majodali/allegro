@@ -11,18 +11,21 @@
 // See .claude/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
+import { dataOf, channelReadRaw, backingsOf } from "./slots.js";
+import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, ContextValue, ComposedFunctionValue,
   BitsValue, PrimitiveFunctionValue, ParamValue,
-  primaryOf, bitsToString, bitsToFloat, isResolved,
+  bitsToString, bitsToFloat, isResolved,
 } from "./types.js";
 import type { CompilationReport, Notification } from "./runtime.js";
 import { reportErrors, reportHasErrors } from "./runtime.js";
-import { getTypeName } from "./types-std.js";
+import { getTypeName, typeContextName } from "./types-std.js";
 import {
   domainOf, formatDomain, AbstractDomain,
   predicatesOf, PredicateSet, Predicate,
   deriveBranchPredicates, domainFromPredicate,
+  occurrenceBoundOf,
 } from "./refinements.js";
 import {
   EffectSet, formatEffects, effectsOf, unwrapEffectsAttach,
@@ -39,6 +42,10 @@ export interface ValueSummary {
   kind:          ValueKind;
   /** Type name if the value is typed (e.g., "Int", "Function", "Array"). */
   typeName:      string | null;
+  /** C3.2 (D36): the occurrence bound's type name, when this value crossed
+   *  an annotation boundary wider than its shape (e.g. "Animal" on a value
+   *  whose typeName is "Dog"). Member availability follows the bound. */
+  annotationBound: string | null;
   /** Whether the value is fully resolved (no residual Expression / Symbol). */
   resolved:      boolean;
   /** Total node count in the Value tree. */
@@ -77,6 +84,11 @@ export interface ValueSummary {
    *  clause). When non-null AND inferred ⊄ declared, the function has a
    *  declaration mismatch (separately surfaced as an error). */
   declaredEffects: EffectSet | null;
+  /** D2 roll-up (B-091): for Proof values, the TRANSITIVE law-backing
+   *  set — every {equality, law, tier} the proof rests on through its
+   *  combinator chain. Admitted/sampled entries are the assumptions the
+   *  renderer surfaces. */
+  restsOn?: LawBackingRec[];
 }
 
 export interface ContractSummary {
@@ -156,7 +168,7 @@ export function summarizeValue(v: Value): ValueSummary {
         // shape, when the primitive was invoked directly by name). In
         // Standard mode, resolveSymbols wraps primitives as UntypedFunction
         // MultiValues — peel that wrapper before matching.
-        const fnPrim = primaryOf(node.fn);
+        const fnPrim = dataOf(node.fn);
         const fnName = (fnPrim.kind === ValueKind.PrimitiveFunction || fnPrim.kind === ValueKind.Symbol)
           ? fnPrim.name : null;
         if (fnName) {
@@ -194,10 +206,9 @@ export function summarizeValue(v: Value): ValueSummary {
         walk(node.body, depth + 1, seen);
         return;
       }
-      case ValueKind.MultiValue:
-        walk(node.primary, depth, seen);
+      case ValueKind.Structure:
+        if ((node as any).primary !== undefined) walk((node as any).primary, depth, seen);
         return;
-      case ValueKind.Context:
       case ValueKind.Bits:
       case ValueKind.Param:
         return;
@@ -220,15 +231,15 @@ export function summarizeValue(v: Value): ValueSummary {
     }
   }
 
-  const kindAtPrimary = primaryOf(v).kind;
+  const kindAtPrimary = dataOf(v).kind;
   const typeName = getTypeName(v);
   // Pull predicate set from the value itself, or — for refined values that
   // didn't go through __construct — synthesise a singleton set from the
   // refined type Context's stored __abstractDomain.
   let preds = predicatesOf(v);
-  if (!preds && v.kind === ValueKind.MultiValue) {
-    const typeComp = v.components.get("type");
-    if (typeComp?.kind === ValueKind.Context) {
+  if (!preds && v.kind === ValueKind.Structure) {
+    const typeComp = channelReadRaw(v, "type");
+    if (typeComp?.kind === ValueKind.Structure) {
       const fromType = (typeComp as any).__abstractDomain;
       if (fromType && fromType.kind) {
         preds = new PredicateSet([{ shape: fromType, source: "refinement-type" }]);
@@ -243,16 +254,29 @@ export function summarizeValue(v: Value): ValueSummary {
   // come from the body's `effects_attach` wrapper.
   let inferredEffects: EffectSet | null = null;
   let declaredEffects: EffectSet | null = null;
-  const fnPrim = primaryOf(v);
+  const fnPrim = dataOf(v);
   if (fnPrim.kind === ValueKind.ComposedFunction) {
     inferredEffects = effectsOf(v);
-    const wrap = unwrapEffectsAttach(fnPrim.body);
+    const wrap = unwrapEffectsAttach(fnPrim as import("./types.js").ComposedFunctionValue);
     if (wrap) declaredEffects = wrap.declared;
+  }
+
+  const boundCtx = occurrenceBoundOf(v);
+  const annotationBound = boundCtx ? (typeContextName(boundCtx) ?? "<anonymous>") : null;
+
+  // D2 roll-up (B-091): a Proof value's transitive law-backing set —
+  // what the proof rests on, through the whole combinator chain.
+  let restsOn: LawBackingRec[] | undefined;
+  const structPrim = dataOf(v);
+  if (structPrim.kind === ValueKind.Structure) {
+    const backings = backingsOf(structPrim as ContextValue);
+    if (backings.length > 0) restsOn = backings;
   }
 
   return {
     kind:             kindAtPrimary,
     typeName,
+    annotationBound,
     resolved:         isResolved(v),
     nodeCount,
     depth:            maxDepth,
@@ -266,6 +290,7 @@ export function summarizeValue(v: Value): ValueSummary {
     promotionSuggestions,
     inferredEffects,
     declaredEffects,
+    ...(restsOn ? { restsOn } : {}),
   };
 }
 
@@ -295,9 +320,9 @@ function recogniseBoolExpr(expr: Value): ContractSummary | null {
  *  Returns the first single-Param constraint found. Multi-param predicates
  *  return null until Phase D introduces relational tracking. */
 function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
-  const e = primaryOf(expr);
+  const e = dataOf(expr);
   if (e.kind !== ValueKind.Expression) return null;
-  const fn = primaryOf(e.fn);
+  const fn = dataOf(e.fn);
   // Accept Symbol too — when the boolean expr survives without resolveSymbols
   // running (rare; the runtime fast-path normally resolves first).
   if (fn.kind !== ValueKind.PrimitiveFunction && fn.kind !== ValueKind.Symbol) return null;
@@ -307,7 +332,7 @@ function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
   if (fn.name === "typed_and" && e.args.length === 2) {
     const left = recogniseParamBoolExpr(e.args[0]);
     if (left) return left;
-    const rightArg = primaryOf(e.args[1]);
+    const rightArg = dataOf(e.args[1]);
     if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
       return recogniseParamBoolExpr(rightArg.body);
     }
@@ -315,8 +340,8 @@ function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
   }
 
   if (e.args.length !== 2) return null;
-  const a = primaryOf(e.args[0]);
-  const b = primaryOf(e.args[1]);
+  const a = dataOf(e.args[0]);
+  const b = dataOf(e.args[1]);
   let paramName: string | null = null;
   let lit: number | null = null;
   let leftIsParam = false;
@@ -363,7 +388,7 @@ function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
  *  Mirrors refinements.ts asIntLiteral but lives here to avoid widening
  *  that module's export surface for a single use. */
 function asIntLiteral(v: Value): number | null {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) return null;
   if (p.length !== 64) return null;
   const data = p.data;
@@ -378,7 +403,7 @@ function asIntLiteral(v: Value): number | null {
  *  filter). Returns empty set if the value is not a function. */
 function collectParamNames(v: Value): Set<string> {
   const out = new Set<string>();
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind === ValueKind.ComposedFunction) {
     for (const param of p.params) {
       if (param._name) out.add(param._name);
@@ -390,7 +415,7 @@ function collectParamNames(v: Value): Set<string> {
 function describeValue(v: Value, kind: ValueKind, typeName: string | null): string {
   switch (kind) {
     case ValueKind.Bits: {
-      const bits = primaryOf(v) as BitsValue;
+      const bits = dataOf(v) as BitsValue;
       if (typeName === "String") {
         const s = bitsToString(bits);
         return s.length <= 40 ? `String "${s}"` : `String "${s.slice(0, 37)}..."`;
@@ -411,7 +436,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return `Bits(len=${bits.length})`;
     }
     case ValueKind.Expression: {
-      const ev = v.kind === ValueKind.Expression ? v : (v.kind === ValueKind.MultiValue ? primaryOf(v) as Value : v);
+      const ev = dataOf(v) as Value;
       if (ev.kind === ValueKind.Expression) {
         const fn = ev.fn;
         const fnName = fn.kind === ValueKind.PrimitiveFunction ? fn.name :
@@ -422,7 +447,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return "Expression";
     }
     case ValueKind.ComposedFunction: {
-      const cf = v.kind === ValueKind.ComposedFunction ? v : (v.kind === ValueKind.MultiValue ? primaryOf(v) as ComposedFunctionValue : null);
+      const cf = dataOf(v).kind === ValueKind.ComposedFunction ? dataOf(v) as ComposedFunctionValue : null;
       if (cf && cf.kind === ValueKind.ComposedFunction) {
         const paramNames = cf.params.map(p => p._name ?? `_${p.position}`).join(", ");
         if (typeName === "Function") return `Function(${paramNames})`;
@@ -431,28 +456,24 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return "ComposedFunction";
     }
     case ValueKind.PrimitiveFunction:
-      return `Primitive <${(primaryOf(v) as PrimitiveFunctionValue).name}>`;
+      return `Primitive <${(dataOf(v) as PrimitiveFunctionValue).name}>`;
     case ValueKind.Symbol:
-      return `unresolved Symbol <${(primaryOf(v) as { kind: ValueKind.Symbol; name: string }).name}>`;
-    case ValueKind.Context: {
-      const ctx = primaryOf(v) as ContextValue;
+      return `unresolved Symbol <${(dataOf(v) as { kind: ValueKind.Symbol; name: string }).name}>`;
+    case ValueKind.Structure: {
+      const ctx = dataOf(v) as ContextValue;
       if ((ctx as any).__grammarValue) {
         const chain = (ctx as any).__grammarValue.baseChain?.join(" > ") ?? "?";
         return `Grammar (extends ${chain})`;
       }
-      // Phase C Chunk 4: a type that carries lifecycle invariants.
-      const invs = (ctx as any).__invariantsList as Value[] | undefined;
-      if (invs && invs.length > 0 && typeName) {
-        const noun = invs.length === 1 ? "invariant" : "invariants";
-        return `${typeName} object [${invs.length} ${noun}]`;
-      }
+      // C6.1b: lifecycle invariants are ordinary refinements now — the
+      // Phase C Chunk 4 `__invariantsList` rendering left with
+      // buildInvariantedType (refined types render their predicate/domain
+      // through the standard refinement summary instead).
       if (typeName) return `${typeName} object`;
       return "Context";
     }
-    case ValueKind.MultiValue:
-      return `${typeName ?? "typed"} value`;
     case ValueKind.Param:
-      return `Param <${(primaryOf(v) as ParamValue)._name ?? "?"}>`;
+      return `Param <${(dataOf(v) as ParamValue)._name ?? "?"}>`;
   }
 }
 
@@ -605,6 +626,10 @@ export function renderModuleSummary(summary: ModuleSummary): string {
       // Fallback: legacy single-domain path.
       lines.push(`      refinement: ${formatDomain(b.summary.domain)}`);
     }
+    // C3.2 (delta 5, additive): surface the occurrence bound when present.
+    if (b.summary.annotationBound) {
+      lines.push(`      bound: ${b.summary.annotationBound} (annotation)`);
+    }
     if (b.summary.nodeCount > 1) {
       lines.push(`      nodes: ${b.summary.nodeCount}, depth: ${b.summary.depth}`);
     }
@@ -639,6 +664,18 @@ export function renderModuleSummary(summary: ModuleSummary): string {
       for (const c of b.summary.promotionSuggestions) {
         const name = c.bindings[0] ?? "<expr>";
         lines.push(`        promote 'assert ${name} ${formatDomain(c.shape)}' → 'requires …'`);
+      }
+    }
+    // D2 roll-up (B-091): a proof binding's transitive backing. Weak
+    // (admitted/sampled) entries render loudly; all-proven sets render
+    // a single quiet line.
+    if (b.summary.restsOn && b.summary.restsOn.length > 0) {
+      const weak = b.summary.restsOn.filter(
+        r => r.tier === "admitted" || r.tier === "sampled");
+      if (weak.length > 0) {
+        lines.push(`      rests on: ${weak.map(r => `${r.tier} '${r.law}' of '${r.equality}'`).join(", ")}`);
+      } else {
+        lines.push(`      rests on: proven backing only (${b.summary.restsOn.length} law(s))`);
       }
     }
     // Phase D1: surface inferred and declared effects when the binding is

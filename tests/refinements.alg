@@ -25,7 +25,7 @@ z = PositiveInt(3)
 print(double(z)) // expect: 6
 
 // preserveOps: lift operators
-PI = (Int & _ > 0).preserveOps()
+PI = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})
 a = PI(5)
 b = a + 3
 print(b + 0) // expect: 8
@@ -35,6 +35,6 @@ print(b instanceof PI) // expect: true
 c = a - 10
 print(c) // expect: error(refinement check failed: expected ≥ 1 (got -5))
 
-// .where() fluent API still works
-PosInt2 = Int.where(n => n > 0)
+// The & mint replaces the old .where() fluent surface
+PosInt2 = Int & _ > 0
 print(PosInt2(10) + 0) // expect: 10

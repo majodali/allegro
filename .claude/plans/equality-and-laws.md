@@ -1,0 +1,376 @@
+# Equality protocol + lawful interfaces — implementation plan (B-027)
+
+> Tranche C, chunk family E. Design source: `docs/design/allegretto/
+> structures.md` §7 (Equality, [designed]) + §8 (Conformance and lawful
+> interfaces, [designed]); D8/D30/D34/D37/D38/D44 from the archived
+> decision log. This plan is the RATIFICATION PASS deliverable: it
+> verifies the §7–8 design against the post-C7.2 codebase, sharpens it
+> into decisions (§3), and sequences the chunks (§4). Maintainer
+> ratifies §3's decision points before E1 starts, per PROCESS §6.
+
+## 1. Goal and scope
+
+Make `==` a lawful, globally stable equivalence relation dispatched on
+shape (D37), and ship the mechanism that makes "lawful" checkable: LAW
+MEMBERS on interfaces (D38) whose obligations flow through the existing
+PCP/discharge machinery. Equality is instance #1 of the law mechanism —
+the point is the mechanism, with equality as its proving ground.
+
+In scope: kernel structural equals; the three-step resolution
+(shape → declared coercion to least common type → not-equal); declared
+coercions with equality-preservation/coherence obligations; `law`
+members + obligation instantiation + the D34 discharge spectrum;
+purity/knowledge-independence gate on `equals`; `Equatable` and the
+kernel-parametric certificate; proof-plane tier recording.
+
+Out of scope (stay on BACKLOG): `Ordered`/`Monoid`/`Semiring` beyond a
+demo (follow-on once the mechanism lands); full unification of the
+proof plane's `proofValEqual` with protocol equality (E4 records tiers;
+routing proof matching through user `equals` waits for a use case);
+hash-consing/memoized equality performance work.
+
+## 2. Current state (recon 2026-08, post-C7.2)
+
+| Surface | Today | §7–8 target |
+|---|---|---|
+| `Int/Float/String/Bool ==` | per-type `eq` on raw bits data, typed Bool result | unchanged (shape-dispatched `equals`) |
+| `[1,2] == [1,2]` | **host crash** (`Cannot read properties of undefined`) | true (kernel structural equals, element-wise) |
+| `{x:1} == {x:1}` | **host crash** (`ctx.bindings is not iterable`) | true (kernel structural equals, field-wise) |
+| record-type instances `==` | untested/reference at best | kernel structural equals by default |
+| `1 == 1.0` | **silently false** (Int.eq compares raw bit patterns across types) | true via declared Int→Float coercion (least common type) |
+| `UserId(42) == 42` (distinct) | **true** (distinct's fresh symbols share the parent's eq impl; dispatch runs it on both) | **not equal** until UserId declares a coercion (§7 step 3) |
+| `PositiveInt(5) == 5` | true (shape walk peels refinement layers) | true — already matches D37 |
+| coercions | none | declared registry + LCT resolution + preservation/coherence obligations |
+| laws | none | `law` interface members → PCP Obligations → D34 discharge tiers |
+| purity gate | effects machinery exists (`pure` bounds, `observe` label on `certificate_peek`) | mechanical: `equals` must infer effect-free (incl. `observe`) |
+| obligations/discharge | H1 Obligation schema, H2 verify/obligations CLI, PE-discharge, `by` terms, `prove_for_all_bool`, F7 sampling | reused wholesale; new: `assume law` (admitted tier), law-obligation instantiation at draw time |
+
+Substrate C5–C7 delivered that §7–8 depends on: symbol-identity
+conformance (laws attach to drawn interface symbols), shape/knowledge
+split (equality dispatches shape, ignores knowledge), kinds through the
+recipe (interfaces are declaration-only), effects-as-component
+(mechanical purity check), typed `params`/construct authority surfaces.
+
+## 3. Decisions for ratification
+
+**E-R1 — kernel structural equals is the default for every
+structure-backed type.** Records (define-minted), arrays, and objects
+get a kernel-supplied `equals`: same SHAPE (D37 — typeShape identity
+after refinement peel), then field-wise/element-wise recursion through
+each component's own protocol equality (so custom `equals` on a field
+type composes). Dense arrays compare length + elements; records compare
+the declared field set. The kernel impl is proven lawful ONCE,
+parametrically (its laws hold by structural induction given lawful
+component equalities) — record types drawing it inherit the certificate
+free (§8 amortization). A user `equals` in the define spec overrides it
+and BEARS the three obligations. Conscious deltas: array/record `==`
+goes crash→structural; `None`/`Error` keep identity semantics
+explicitly (singleton identity IS their structure).
+
+**E-R2 — coercion declarations are type-level members with obligations;
+the numeric tower is instance #1.** A declared coercion is
+`(from: A, to: B, fn)` registered on the PAIR (proposal: a reserved
+`coerce` spec key on the TARGET type or a standalone
+`Coercion.declare(A, B, fn)` — maintainer picks the surface; the
+standalone form avoids reopening define specs and keeps pairs
+first-class, so it is the recommendation). `==` resolution: same shape
+→ equals; else find the least common type over the declared coercion
+graph (both operands coerce in; ties/ambiguity = compile-or-runtime
+error demanding an explicit declaration); none → not-equal (never an
+error — §7 step 3 makes `distinct`-vs-parent simply false). Each
+declaration instantiates equality-preservation + pairwise-coherence
+obligations (pending until discharged; the Int→Float kernel coercion
+ships with its `by`/kernel-auto discharge). `1 == 1.0` becomes true;
+`UserId(42) == 42` becomes false — both conscious deltas, both the
+designed semantics.
+
+**E-R3 — `law` members ride the existing spec surface; `for_all` is a
+proposition form.** Surface proposal (minimal grammar): inside
+`Interface.define` specs, a reserved-shape entry
+`law_refl: for_all((a: T) => equals(a, a))` — reserved PREFIX `law_` on
+the key, `for_all` as a base-grammar proposition constructor (mirrors
+`theorem`/`verify` residence: provability is core, not an opt-in lib).
+The §8 sketch's `law refl:` statement form can arrive later as sugar;
+the prefix form needs zero new statement grammar. Law entries become
+Law descriptors in `__members` under the interface's scope (drawn like
+any member — symbol identity gives law inheritance for free). Drawing a
+law-bearing interface instantiates one PCP Obligation per law at
+definition time, quantifier specialized to the implementing type.
+
+*Generality note (maintainer Q&A at ratification, 2026-08): "lawful
+interfaces" names instance #1's home, not a restriction. A law is an
+ordinary member descriptor in a member SET — so any member-set-minting
+surface can carry laws: `Interface.define`, `Type.define` (concrete
+types stating laws about their own members; methods-only bundles /
+mixins whose laws are drawn along with their methods), and refinement
+specs by extension. Laws attach to SCOPES rather than to individual
+members because a law may reference several members (§8's
+distributivity example — the law lives with the declarations of all
+participating members). The referenced members need not be abstract
+(kernel-supplied `equals` carries its parametric certificate) but must
+be effect-bounded pure (E-R5, proposition stability). E3 ships the
+`Interface.define` surface as the proving ground; the same `law_` spec
+key on `Type.define` is the same code path and lands in E3 or trails
+it immediately.*
+
+*Abstract-member addendum (maintainer Q&A follow-up, 2026-08): laws
+may reference ABSTRACT members, and that is the primary case —
+`Equatable`'s laws reference `equals`, abstract at declaration. A law
+over abstract members is a proposition SCHEMA at declaration time
+(nothing runs, nothing discharges); it becomes a concrete H1
+Obligation at DRAW time, when symbol-identity binding resolves each
+referenced member to the drawing type's implementation and the
+quantifier specializes. Concrete members are the degenerate case where
+instantiation happens immediately at definition. Consequence for the
+E-R5 purity gate: for an abstract member the gate cannot run at
+declaration (no body); purity is part of the declared bound, enforced
+at draw time against the supplied implementation.*
+
+**E-R4 — discharge maps onto D34's spectrum using existing machinery;
+`assume` is new and verdict-visible.** kernel-auto = PE +
+`prove_for_all_bool` (finite domains) + the parametric kernel-equals
+certificate; witnessed = `by` proof term attached to the law
+obligation; sampled-falsification = F7's sampler run over the law's
+quantified variable (counterexample halts; clean pass = survival, tier
+recorded as `sampled`); admitted = `assume law NAME` (new marker,
+verdict-visible, same standing as F-arc admitted facts); pending =
+`allegro obligations` export (H2 — law obligations are exactly the
+well-posed PCP tasks). STRICTNESS ships incrementally: E3 records tiers
+on the Verdict; E4 turns on the first strict gate — `proof_trans`
+refuses an equality whose transitivity is neither proven nor admitted.
+(Gating everything at once would halt existing programs; the gate list
+is a §6-style pre-approved queue.)
+
+**E-R5 — the purity/knowledge-independence gate is mechanical.** At
+definition time, an `equals` implementation (and any coercion fn) must
+infer an EMPTY effect set — including the `observe` label
+(`certificate_peek` inside equals is exactly the D37 violation:
+equality must not see knowledge). Uses `__inferredEffects` from
+precompile; violation = compile error naming the offending label. No
+new machinery — this is a consumer of the effects component.
+
+**E-R6 — proofs record equality identity + tier.** Equality proofs
+(`proof_refl`/`proof_trans`/…) gain two recorded fields: which equality
+(the shape's name) and which law tier backed it (proven / admitted /
+sampled / kernel). `proof_trans` chains resting on admitted
+transitivity render verdict-visibly weaker (extends D8). Storage: plain
+instance-data bindings on the Proof value (the C6.3 pattern — no new
+`__*` slots).
+
+## 4. Chunks
+
+**E1 — kernel structural equals + shape resolution (steps 1 and 3).**
+Replace Array/Object/record eq impls with the kernel structural
+`equals` (recursive through protocol equality); different shapes with
+no coercion path → typed Bool false (kills both crashes and the
+distinct leak — `UserId(42) == 42` flips false HERE, before coercions
+exist). None/Error identity semantics pinned by test. The parametric
+lawfulness certificate is recorded on the kernel impl (a marker the E3
+tier machinery reads). Battery: structural eq over nesting/length/field
+mismatches; refinement-peel equality (D37) re-pinned; distinct
+non-equality; no-throw sweep (eq never host-crashes on any kind pair —
+the incompleteness grid extended to `==`).
+
+**E2 — declared coercions + least common type (step 2).** The
+declaration surface (per E-R2 ruling), the pair registry, LCT
+resolution inside `typed_eq`'s different-shape branch, symmetric
+coercion of both operands, ambiguity errors. Int→Float ships
+kernel-discharged; a demo user coercion (UserId→Int) shows the
+opt-back-in path for distinct types. Preservation/coherence obligations
+instantiate as PENDING (discharge arrives with E3's machinery; the
+kernel pair carries its certificate immediately). `1 == 1.0` flips
+true. Battery: commutativity by construction (both orders agree),
+coherence triangle demo, distinct-with-declared-coercion equality.
+
+**E3 — law members + obligation instantiation + discharge tiers.**
+`law_`-prefixed spec entries + `for_all` proposition form; Law
+descriptors in member sets; draw-time Obligation instantiation
+(H1 schema, quantifier specialized); discharge: kernel-auto, witnessed
+`by`, sampled (F7 generalization), pending (H2 export); tier recording
+on the Verdict; the E-R5 purity gate on `equals`/coercion fns.
+`Equatable` ships as instance #1; kernel equals + scalar eqs discharge
+refl/sym/trans via the parametric certificate + finite-domain/PE paths.
+Battery: obligation round-trip (define → pending → `by` → discharged),
+sampled counterexample halts with concrete inputs, purity-gate
+rejection (an `equals` calling `print` or `certificate_peek`).
+
+**E4 — admitted tier + first strict gate + proof tier recording.**
+`assume law` marker (verdict-visible); `proof_trans` demands
+proven-or-admitted transitivity for the equality it chains (the first
+law-dependent refusal — gate list is the pre-approved queue for
+follow-ons); E-R6 proof fields + verdict rendering ("resting on
+admitted transitivity"). `Ordered` sketched as instance #2 IF the
+mechanism needs a second consumer to validate generality — else it
+moves to BACKLOG as a follow-on.
+
+Each chunk: recon → implement → battery → docs (CHANGELOG, CLAUDE.md,
+structures.md §7–8 status stamps) → full suite → commit/push, per
+PROCESS. Deviations recorded here in §6.
+
+## 5. Verification strategy
+
+- The no-throw-on-any-kind-pair equality sweep joins the boundary
+  battery (equality is total: Bool or false, never a host crash).
+- Lawfulness battery: kernel equals refl/sym/trans property-checked
+  over generated structures (bounded depth) — the parametric
+  certificate's empirical shadow.
+- Obligation-machinery tests run through the REAL PCP path (H1/H2
+  schemas), not a parallel test-only route.
+- Every behavior delta in §6 lands with a test pinning the NEW
+  behavior in the same commit.
+
+## 6. Conscious behavior deltas (pre-approved on ratification)
+
+1. `[1,2] == [1,2]`: host crash → `true` (E1).
+2. `{x:1} == {x:1}` / record instances: host crash → structural (E1).
+3. `UserId(42) == 42` (distinct): `true` → `false` (E1); opt back in
+   via declared coercion (E2).
+4. `1 == 1.0`: `false` (raw-bits accident) → `true` via Int→Float
+   least-common-type coercion (E2).
+5. `equals`/coercion fns with effects (incl. `observe`): previously
+   unchecked → definition-time compile error (E3).
+6. `proof_trans` over an equality with neither proven nor admitted
+   transitivity: previously silent → refusal (E4; scalar + kernel
+   equalities are auto-proven, so existing programs stay green).
+7. *(discovered at E1, flagged at landing)* `true == 1`: `true`
+   (raw-bits accident — Bool data IS Int 0/1) → `false` (Bool and Int
+   are distinct shapes; §7 step 3). Opting back in would be an E2
+   declared coercion — recommend NOT declaring it (Bool is
+   semantically not a number; the old truth was representation leak).
+8. *(discovered at E1)* `[1,2] != [1,2]` and record `!=`: host-level
+   AllegroError (no neq member → raw `bits_neq` on a Structure) →
+   derived negation of protocol equality.
+
+## 6b. Chunk records
+
+**E1 — landed 2026-08.** One chokepoint: `protocolEquals`
+(`src/types-std.ts`), called from the evaluator's `bits_eq`/`bits_neq`
+dispatch and `makeTypedBinOp`'s eq/neq path; declines for
+untyped/unresolved operands (base-mode semantics keep). `equalityShape`
+(`src/slots.ts`) = full `__refines` walk (preserve-lifted layers
+included — deeper than dispatch's `typeShape`; ruling: §7's
+"refinements are excluded" governs equality even when the refinement
+mints its own member set, since it never overrides `eq`). Kernel
+structural equals = same-shape default in the ABSENCE of a custom `eq`
+member (the broken Array/Object reference-eq stubs deleted — they were
+the crash source: untyped int results mistyped by the dispatch
+fallback); spec-supplied `eq` methods (PrimitiveFunction or
+ComposedFunction) override and dispatch. Type values identity-only
+(member-set/construct holders — structural compare would
+false-positive `Int == Float` since their bindings are mostly meta).
+`!=` derived by negation. `KERNEL_EQUALS_CERTIFICATE` exported (E3
+anchor). Deviations from the E-R1 letter: kernel equals is supplied AT
+THE CHOKEPOINT rather than registered as a member on each type
+(observably identical, simpler; E3's tier machinery reads the
+certificate constant + the absence-of-custom-eq condition); None/Error
+keep their existing identity `eq` members (dispatched as custom —
+identity IS their structure, per E-R1). Known limit: untyped source
+functions (`f(x) => x`) carry no type channel → `f == f` still errors
+via base `bits_eq` (controlled, not a crash); typed functions compare
+by identity. Battery: 18 tests incl. 11×11 no-throw kind-pair sweep +
+refl/sym/trans empirical shadow. 1077/1077 green.
+
+**E2 — landed 2026-08.** §7 step 2 in the E1 seam: different equality
+shapes → least common type over the declared-coercion graph, BOTH
+operands coerced in (symmetric ⇒ commutative by construction), compare
+at the target. Registry keyed by equality-shape identity; BFS
+reachability with composed paths (first-found shortest — deterministic;
+coherence is the obligation that makes path choice irrelevant); least
+= the common candidate from which every other is reachable; no common
+type → false, no unique least → AllegroError naming the candidate set
+and demanding an explicit declaration. Surface: `Coercion.declare(From,
+To, fn)` per the E-R2 recommendation — a module-like typed Object
+(Object `__getMember` dot access, zero new dispatch machinery);
+rejects vacuous same-shape pairs and non-function args. Kernel
+Int→Float edge registered at module init, both obligations discharged
+at tier "kernel"; user declarations instantiate preservation+coherence
+PENDING (`coercionObligationRecords()` is the E3 read surface; PCP
+routing arrives with E3). Deltas landed: `1 == 1.0` true (delta 4);
+`UserId` opt-back-in via declared coercion (delta 3 closure);
+`true == 1` stays false (delta 7 recommendation followed — no Bool
+edge). Composition: transitive UserId→Int→Float triangle works;
+same-shape containers coerce components (`{x:1} == {x:1.0}` true);
+differently-parameterized generic concretes stay distinct shapes
+(`[1,2] == [1.0,2.0]` false — pinned boundary, element coercion only
+under a common container shape). 8 new battery tests + E1 pin update.
+
+**E3 — landed 2026-08.** The law mechanism (§8/D38) through existing
+machinery. Surface per E-R3: `law_`-prefixed spec keys +
+`for_all(fn)` (an eager primitive marking the body via a host WeakMap
+— no new slot, no new grammar); accepted on `Interface.define`,
+`Type.define`, AND `Refinement.define` specs (the third exceeds the
+E-R3 letter; refinement laws instantiate against the refined type
+without minting descriptors, because a refinement SHARES its parent's
+member set by identity — that sharing IS shape transparency, so
+descriptor storage there would break D37; laws attach at the
+obligation layer instead — deviation, principled). Law descriptors
+(`LawType`) are ordinary members drawn like any other. Instantiation:
+interfaces declare (schema only); concrete types instantiate per
+drawn law at definition, quantifier = the implementing type.
+Tier ladder at instantiation (E-R4/D34): kernel (certificate +
+`equalsIsKernel` — no custom `eq` member, or a built-in scalar eq
+registered in `kernelEqImpls`), enumerated (Bool domain, full
+product), sampled (interval/Int domains, ≤4 samples^arity ≤ 64
+tuples; counterexample HALTS with concrete inputs; survival recorded
+as status "sampled", never "discharged"), witnessed (`Law.witness` /
+`Coercion.witness` + a discharged Proof term), pending (H2 export as
+`T.law_name` obligations). `Equatable` = instance #1: eq Field +
+three laws whose propositions run through `protocolEqualsBool` (no
+parallel equality); kernel scalars retrofitted — eq multi-bound under
+Equatable's symbol (`42 instanceof Equatable` true), obligations
+discharged tier kernel. E-R5 gate: mechanical, effects component /
+precompile stash / on-demand precompile injected from primitives.ts
+(`setEffectsInspector` — types-std can't import the evaluator);
+rejects any non-empty inferred set incl. `observe`. Verdict gains
+`lawObligations`/`coercionObligations` (tiers recorded, pending
+non-fatal — first strict gate is E4); both views SCOPED to the
+compilation unit by filtering registry entries to types bound on the
+eval scope chain (both coercion endpoints must be in-unit — an
+or-filter leaked every `X→Int` edge into every file's worker loop).
+Law instantiation + gate SUSPEND during the runtime precompile pass
+(exploratory binding evals mint throwaway types; definition-time
+semantics fire once, at the real evaluation). Deviations: witnessed
+tier checks discharged-Proof-ness, not quantified-proposition match
+(E4/H-arc); `distinct` copies law descriptors under fresh symbols
+without obligations (newtype laws deferred); record-domain
+quantifiers not sampleable → pending. Re-pins: Int member keys live
+in Int's OR Equatable's scope; distinct same-surface check compares
+base names. 19 battery tests; 1104/1104.
+
+**E4 — landed 2026-08; ARC COMPLETE.** Admitted tier: `Law.assume(T,
+"name")` (the `assume law` marker in the E3 `Law`-surface idiom —
+statement sugar deferred to B-089) flips pending/sampled → admitted,
+or REGISTERS an admitted entry for a never-instantiated law (custom
+equality that never drew Equatable — the case the gate needs);
+proven-beats-admitted no-op; `Coercion.assume` for §7 edge
+obligations; admitted excluded from pendingOnly H2 export, rendered
+loudly in the Verdict (`ADMITTED (assumed, not proof)`). Strict gate
+(§6 delta 6): `proof_trans` looks up the chained equality's `trans`
+backing via `equalityLawBacking` (kernel-supplied resolution →
+auto-proven tier "kernel"; else registry by equality-shape match) and
+returns a failed Proof naming both escape hatches when it is neither
+proven, sampled, nor admitted. Kernel equalities stay green (pinned —
+delta 6's compatibility condition). E-R6: `equality`/`lawName`/
+`lawTier` stamped as plain instance-data bindings (C6.3 pattern),
+declared as Proof-kind fields (`p.lawTier` dispatches); refl/sym
+record without gating; `proof_check`'s relabel carries the backing to
+the theorem binding; `TheoremResult.lawBacking` + formatVerdict
+weakness note (`[resting on admitted 'trans' of 'T']`) — proven
+backing renders nothing (D8 extension). Deviations: E-R6's two
+recorded fields became three (`lawName` added — rendering needs to
+say WHICH law without inferring from the combinator); sampled `trans`
+backing is presently unreachable (custom equalities live on records,
+not sampleable — path kept for B-089's record-instance sampling).
+`Ordered` moved to BACKLOG B-089 per the E4 condition: the mechanism
+has three consumers (Equatable, user interface laws, refinement
+laws); instance #2 is a consumer, not a validation gate. 9 battery
+tests; 1113/1113. B-027 CLOSES; residue registered as B-089.
+
+## 7. Status log
+
+- 2026-08: plan drafted (ratification-pass deliverable); §3 decision
+  points E-R1–E-R6 presented to maintainer.
+- 2026-08: **E-R1–E-R6 maintainer-ratified as they stand**; §6 deltas
+  pre-approved. Generality note added to E-R3 (laws are
+  member-set-general, not interface-only) from ratification Q&A.
+  E1 unblocked.

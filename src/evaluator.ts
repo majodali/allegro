@@ -3,15 +3,19 @@
 import {
   Value, ValueKind, ExpressionValue, ContextValue,
   ComposedFunctionValue, ParamValue, MultiValueType,
-  AllegroError, primaryOf, isResolved, makeExpr, makeMultiValue, makeContext,
+  AllegroError, isResolved, makeExpr, makeMultiValue, makeContext,
   DepCollector,
 } from "./types.js";
 import {
-  getType, getTypeName, withType, typeMethod, getFunctionParamTypes, getFunctionReturnType,
+  getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
+  protocolEquals,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource } from "./slots.js";
+import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
+import { isCarrier } from "./structure.js";
 
 const MAX_DEPTH = 10000;
 
@@ -93,44 +97,55 @@ export function evaluate(
   switch (value.kind) {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
-    case ValueKind.Context:
     case ValueKind.ComposedFunction:
       return value;
+
+    case ValueKind.Structure: {
+      // C7.1: a CARRIER (primary present) re-evaluates its primary — a
+      // residual under channels is still pending computation; plain
+      // structures self-evaluate.
+      if (!isCarrier(value)) return value;
+      const mv = value as MultiValueType;
+      const ep = evaluate(mv.primary, ctx, depth + 1, depCollector);
+      if (ep === mv.primary) return value;
+      // If re-evaluation produced another structure, FLATTEN rather than NEST.
+      // Inner (freshly-evaluated) components shadow outer (stale) components —
+      // fresh resolved type info should replace pre-computed partial-eval types.
+      // C4.3a (R3): union-rule channels (effects) merge by union via the
+      // registry-installed merge instead of inner-shadows-outer — effects
+      // observed before re-evaluation are facts, not stale guesses.
+      if (ep.kind === ValueKind.Structure) {
+        const merged = cloneComponents(mv);
+        for (const [k, v] of componentsView(ep)) {
+          const prev = merged.get(k);
+          const mergeFn = prev !== undefined && channelSpec(k)?.rule === "union"
+            ? channelMerge(k) : undefined;
+          merged.set(k, mergeFn ? mergeFn(prev!, v) : v);
+        }
+        return makeMultiValue(dataOf(ep), merged);
+      }
+      return makeMultiValue(ep, cloneComponents(mv));
+    }
 
     case ValueKind.Param:
       return value;
 
     case ValueKind.Symbol: {
-      const resolved = ctx.bindings.get(value.name);
+      const resolved = scopeLookup(ctx, value.name);
       if (resolved?.value !== undefined) {
         let result = evaluate(resolved.value, ctx, depth + 1, depCollector);
         // Phase C Chunk 2: augment with any scope-local predicates for this
         // name (from branch conditions or in-scope `assert` statements).
-        if (ctx.scopePredicates) {
-          const scopePred = ctx.scopePredicates.get(value.name);
-          if (scopePred) {
-            result = withPredicates(result, scopePred as PredicateSet);
-          }
+        // C2.1: chain-aware — nearest layer wins.
+        const scopePred = scopeFactsFor(ctx, value.name);
+        if (scopePred) {
+          result = withPredicates(result, scopePred as PredicateSet);
         }
         return result;
       }
       // Symbol unresolved — record as incomplete dependency
       if (depCollector) depCollector.incompleteRefs.add(value.name);
       return value;
-    }
-
-    case ValueKind.MultiValue: {
-      const ep = evaluate(value.primary, ctx, depth + 1, depCollector);
-      if (ep === value.primary) return value;
-      // If re-evaluation produced another MultiValue, FLATTEN rather than NEST.
-      // Inner (freshly-evaluated) components shadow outer (stale) components —
-      // fresh resolved type info should replace pre-computed partial-eval types.
-      if (ep.kind === ValueKind.MultiValue) {
-        const merged = new Map(value.components);
-        for (const [k, v] of (ep as MultiValueType).components) merged.set(k, v);
-        return makeMultiValue((ep as MultiValueType).primary, merged);
-      }
-      return makeMultiValue(ep, new Map(value.components));
     }
 
     case ValueKind.Expression: {
@@ -144,7 +159,7 @@ function evaluateExpr(
   expr: ExpressionValue, ctx: ContextValue, depth: number, depCollector?: DepCollector,
 ): Value | TailCall {
   const fnRaw = evaluate(expr.fn, ctx, depth + 1, depCollector);
-  const fn = primaryOf(fnRaw);
+  const fn = dataOf(fnRaw);
 
   if (fn.kind === ValueKind.PrimitiveFunction) {
     return applyPrimitive(fn, expr.args, ctx, depth, depCollector);
@@ -158,15 +173,13 @@ function evaluateExpr(
     return applyComposed(fn, expr.args, ctx, depth, fnRaw, depCollector);
   }
 
-  // Context as function — constructor call via __construct
-  // Types may be wrapped as MultiValues (e.g., Int is MultiValue(IntType, {type: Type}))
-  const fnCtx = fn.kind === ValueKind.Context ? fn as ContextValue
-    : (fn.kind === ValueKind.MultiValue && (fn as MultiValueType).primary.kind === ValueKind.Context)
-      ? (fn as MultiValueType).primary as ContextValue : null;
+  // Context as function — constructor call via __construct. `fn` is
+  // already dataOf(fnRaw), so carriers are peeled.
+  const fnCtx = fn.kind === ValueKind.Structure ? fn as ContextValue : null;
   if (fnCtx) {
-    const constructBinding = fnCtx.bindings.get("__construct");
-    if (constructBinding?.value) {
-      const ctor = constructBinding.value;
+    const ctorSlot = getConstruct(fnCtx);
+    if (ctorSlot) {
+      const ctor = ctorSlot;
       if (ctor.kind === ValueKind.PrimitiveFunction) {
         return applyPrimitive(ctor, expr.args, ctx, depth, depCollector);
       }
@@ -186,8 +199,14 @@ function evaluateExpr(
   // the e-effect when precompiling the body's residual `Param(g)(x)` call.
   let residualEffects: Set<string> | null = null;
   if (fn.kind === ValueKind.Param) {
+    const evar = (fn as any).effectVar as string | undefined;
     const bound = (fn as any).effectBound as Set<string> | undefined;
-    if (bound && bound.size > 0) {
+    if (evar !== undefined) {
+      // C7.2c: declared effect variable — the variable's bare name rides
+      // the inferred set (matches an `effects e` declaration directly);
+      // concrete call sites resolve it by ordinary PE substitution.
+      residualEffects = new Set([evar]);
+    } else if (bound && bound.size > 0) {
       residualEffects = new Set(bound);
     } else if (!bound) {
       // No effectBound — function-typed param could do anything. Match
@@ -212,6 +231,24 @@ function evaluateExpr(
     residual = expr;
   } else {
     residual = makeExpr(fn, evalArgs);
+  }
+  // C4.3a (R1): viral channels ride the unresolved-application residual too.
+  // An error-carrying callee (e.g. the result of dispatching a method on an
+  // error value — err-through-method) or argument propagates instead of
+  // being dropped at the application hop. First hit wins, matching viralScan.
+  for (const cand of [fnRaw, ...evalArgs]) {
+    // C4.3b: flattened Contexts carry channels too.
+    if (cand.kind !== ValueKind.Structure) continue;
+    for (const chan of viralChannels()) {
+      const comp = channelReadRaw(cand, chan);
+      if (comp) {
+        const components = new Map<string, Value>([[chan, comp]]);
+        const typeComp = channelReadRaw(cand, "type");
+        if (typeComp) components.set("type", typeComp);
+        const out = makeMultiValue(residual, components);
+        return residualEffects ? withEffects(out, residualEffects) : out;
+      }
+    }
   }
   return residualEffects ? withEffects(residual, residualEffects) : residual;
 }
@@ -249,7 +286,7 @@ function applyPrimitive(
     // propagate into the residual), then return `makeExpr(fn, evalArgs)`
     // instead of running the impl. The impl runs at runtime when the
     // residual evaluates outside compile-mode.
-    if ((ctx as any).__compileMode && fn.effects && fn.effects.length > 0) {
+    if (scopeCompileMode(ctx) && fn.effects && fn.effects.length > 0) {
       const evalArgs = args.map(a => evalFn(a, ctx));
       // Add fn's effects + tracked subcall effects + arg effects.
       if (fn.effects) for (const e of fn.effects) trackedEffects.add(e);
@@ -269,8 +306,14 @@ function applyPrimitive(
     return trackedEffects.size > 0 ? withEffects(result, trackedEffects) : result;
   }
 
-  // Eager: evaluate all args
-  const evalArgs = args.map(a => evaluate(a, ctx, depth + 1, depCollector));
+  // Eager: evaluate all args. D47 (B-094): at call sites of a source-aware
+  // primitive, each evaluated argument carries its ORIGINATING AST on the
+  // `source` channel (kernel origination — the only attachment authority).
+  // Discharge logic reads the evaluated value; rendering / shape detection
+  // reads the original. Zero cost at every other call site.
+  const evalArgs = fn.sourceAware
+    ? args.map(a => withSource(evaluate(a, ctx, depth + 1, depCollector), a))
+    : args.map(a => evaluate(a, ctx, depth + 1, depCollector));
   // Stage F1: pre-compute the unioned effect set from the primitive's static
   // tags + each evaluated arg's `effects` component. Used by every return
   // path below so deferred computations carry their effects forward.
@@ -287,16 +330,24 @@ function applyPrimitive(
   // set; the actual side effect fires when the function is invoked at
   // runtime (the call site's ctx isn't compile-mode). Pure primitives
   // still fold eagerly — only effectful ones defer.
-  if ((ctx as any).__compileMode && fn.effects && fn.effects.length > 0) {
+  if (scopeCompileMode(ctx) && fn.effects && fn.effects.length > 0) {
     return attachEff(makeExpr(fn, evalArgs));
   }
+  // Viral channels (propagation table): today just `error` — see viralScan.
+  // C4.3a (R1): runs BEFORE the unresolved-residual early return, so the
+  // channel rides every hop of a residual chain instead of being lost after
+  // the first (the legacy first-hop-only behavior was a bug, not a policy —
+  // see differential fixtures err-viral-chain / err-through-method).
+  const viralHit = viralScan(evalArgs, fn);
+  if (viralHit) return attachEff(viralHit);
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
     // Even though args aren't fully resolved, their type components
     // may be known. Use type-level dispatch to infer the result type.
-    if (evalArgs[0]?.kind === ValueKind.MultiValue) {
-      const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
-      if (typeComp && typeComp.kind === ValueKind.Context) {
+    // C4.3b: flattened Contexts carry the type channel too.
+    if (evalArgs[0]?.kind === ValueKind.Structure) {
+      const typeComp = channelReadRaw(evalArgs[0], "type");
+      if (typeComp && typeComp.kind === ValueKind.Structure) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
         if (methodName) {
           // Propagate left operand's type as the residual's type.
@@ -309,42 +360,47 @@ function applyPrimitive(
     return attachEff(residual);
   }
 
-  // Error propagation: if any evaluated arg has an error component, propagate
-  // the error without executing this primitive.
-  for (const arg of evalArgs) {
-    if (arg.kind === ValueKind.MultiValue) {
-      const errComp = (arg as MultiValueType).components.get("error");
-      if (errComp) {
-        const components = new Map<string, Value>([["error", errComp]]);
-        const typeComp = (arg as MultiValueType).components.get("type");
-        if (typeComp) components.set("type", typeComp);
-        return attachEff(makeMultiValue(makeExpr(fn, evalArgs), components));
-      }
-    }
-  }
-
   // Phase B: refinement-domain propagation. If the primitive is one of
   // bits_add / bits_sub / bits_mul and the operands carry abstract domains
   // (from refined types or literal values), compute the output domain so
   // downstream operations inherit the proof context.
   const propagatedSet = propagateSetForPrimitive(fn.name, evalArgs);
 
+  // E1 (B-027, §7/D37): `==` and `!=` resolve through the EQUALITY
+  // PROTOCOL when both operands are typed — shape resolution (equality
+  // shape = full refinement-peel; distinct types don't unify), custom
+  // `equals` dispatch, kernel structural equals for structures. Total:
+  // typed Bool out, never a host crash, on any kind pair. Declines
+  // (null) for untyped operands — base-mode bits_eq semantics keep.
+  if (fn.name === "bits_eq" || fn.name === "bits_neq") {
+    const r = protocolEquals(evalArgs[0], evalArgs[1], fn.name === "bits_neq", ctx, evalFn);
+    if (r) {
+      const out = attachEff(r);
+      return propagatedSet ? withPredicates(out, propagatedSet) : out;
+    }
+  }
+
   // Type-directed dispatch: if the first arg has a type with a matching method,
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
-  if (evalArgs[0]?.kind === ValueKind.MultiValue) {
-    const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
-    if (typeComp && typeComp.kind === ValueKind.Context) {
+  // C4.3b: flattened Contexts (typed records/arrays) dispatch too.
+  if (evalArgs[0]?.kind === ValueKind.Structure) {
+    const typeComp = channelReadRaw(evalArgs[0], "type");
+    if (typeComp && typeComp.kind === ValueKind.Structure) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
       if (methodName) {
-        const method = typeMethod(typeComp as ContextValue, methodName);
+        // C3.1 (D36): dispatch reads the SHAPE. Member-transparent
+        // refinement layers share the parent's member set, so walking them
+        // off never changes which method runs; preserveOps/mixin layers
+        // mint their own members and ARE shapes (their overrides run).
+        const method = typeMethod(typeShape(typeComp as ContextValue), methodName);
         if (method?.kind === ValueKind.PrimitiveFunction) {
-          const primaryArgs = evalArgs.map(primaryOf);
+          const primaryArgs = evalArgs.map(dataOf);
           const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
           // If the method already returned a typed value (MultiValue), use it as-is.
           // Methods know their return types (e.g., comparisons return Bool).
           let out: Value;
-          if (result.kind === ValueKind.MultiValue) out = result;
+          if (result.kind === ValueKind.Structure) out = result;
           else if (result.kind === ValueKind.Bits)  out = makeMultiValue(result, new Map([["type", typeComp]]));
           else                                       out = result;
           out = attachEff(out);
@@ -354,18 +410,24 @@ function applyPrimitive(
     }
   }
 
-  // Unwrap multi-values for primitives
-  const primaryArgs = evalArgs.map(primaryOf);
+  // C4.3c (R4): TRANSPARENCY — eager impls receive the full values,
+  // channels intact, and read data through the accessors (dataOf/asBits
+  // are identity-or-unwrap). The boundary no longer strips; the
+  // propagation table alone governs channels. This also retires the
+  // C1.5 `channelAware` registration mode (it is now everyone's default)
+  // and the "register lazy to dodge stripping" idiom — lazy is purely an
+  // evaluation-control choice again.
   if (typeof fn.fn !== "function") {
     throw new AllegroError(`applyPrimitive: ${fn.name} has unresolved stub (fn=null). Check resolvePrimitives.`);
   }
-  const result = fn.fn(primaryArgs, ctx, evalFn);
+  const result = fn.fn(evalArgs, ctx, evalFn);
 
   // Type propagation: if the first arg had a type and the result is Bits,
   // propagate the type to the result.
   let out: Value;
-  if (result.kind === ValueKind.Bits && evalArgs[0]?.kind === ValueKind.MultiValue) {
-    const typeComp = (evalArgs[0] as MultiValueType).components.get("type");
+  if (result.kind === ValueKind.Bits
+      && evalArgs[0]?.kind === ValueKind.Structure) {
+    const typeComp = channelReadRaw(evalArgs[0], "type");
     if (typeComp) out = makeMultiValue(result, new Map([["type", typeComp]]));
     else          out = result;
   } else {
@@ -381,6 +443,53 @@ function applyPrimitive(
   out = attachEff(out);
   return propagatedSet ? withPredicates(out, propagatedSet) : out;
 }
+
+
+// --- C1.5 propagation table: generic viral scan ---
+//
+// Consults the channel registry: any component-plane channel registered
+// `viral` short-circuits the primitive when present on an arg — first arg
+// wins, the channel (plus the arg's shape) is carried onto the residual.
+// Today `error` is the only viral channel, so behavior is byte-identical
+// to the former hand-rolled loop (differential fixtures pin it); a newly
+// registered viral channel gets this path with zero evaluator changes.
+// Table linkage for the grandfathered/bespoke rules lives in
+// assertPropagationTableLinkage below.
+function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
+  const viral = viralChannels();
+  for (const arg of evalArgs) {
+    // C4.3b: flattened Contexts carry channels too.
+    if (arg.kind !== ValueKind.Structure) continue;
+    for (const chan of viral) {
+      const comp = channelReadRaw(arg, chan);
+      if (comp) {
+        const components = new Map<string, Value>([[chan, comp]]);
+        const typeComp = channelReadRaw(arg, "type");
+        if (typeComp) components.set("type", typeComp);
+        return makeMultiValue(makeExpr(residualFn, evalArgs), components);
+      }
+    }
+  }
+  return null;
+}
+
+// The rules the evaluator still implements bespoke (shape/knowledge:
+// `computed` — domain logic IS the rule; effects: `union`, grandfathered on
+// its dedicated path until C4.3; discharged: `drop` — never propagates,
+// verified by forgery test C). If the registry drifts from what this file
+// implements, fail loudly at startup.
+(function assertPropagationTableLinkage() {
+  const expect: [string, string][] = [
+    ["error", "viral"], ["effects", "union"], ["shape", "computed"],
+    ["predicates", "computed"], ["domain", "computed"], ["discharged", "drop"],
+  ];
+  for (const [chan, rule] of expect) {
+    const spec = channelSpec(chan);
+    if (!spec || spec.rule !== rule) {
+      throw new Error(`propagation-table linkage: evaluator implements '${chan}' as ${rule}, registry says ${spec?.rule ?? "unregistered"}`);
+    }
+  }
+})();
 
 // --- Apply composed function ---
 
@@ -400,23 +509,14 @@ function applyComposed(
   tco_loop: while (true) {
     const evalArgs = currentArgs.map(a => evaluate(a, ctx, depth + 1, depCollector));
 
-    // Error propagation: if any arg has an error component, propagate without executing
-    for (const arg of evalArgs) {
-      if (arg.kind === ValueKind.MultiValue) {
-        const errComp = (arg as MultiValueType).components.get("error");
-        if (errComp) {
-          const components = new Map<string, Value>([["error", errComp]]);
-          const typeComp = (arg as MultiValueType).components.get("type");
-          if (typeComp) components.set("type", typeComp);
-          return makeMultiValue(makeExpr(currentFn, evalArgs), components);
-        }
-      }
-    }
+    // Viral channels (propagation table): today just `error` — see viralScan.
+    const viralHit = viralScan(evalArgs, currentFn as unknown as Value);
+    if (viralHit) return viralHit;
 
     // Type variable unification
     let enrichedCtx = ctx;
     let inferredReturnType: Value | null = null;
-    if (currentFnRaw && currentFnRaw.kind === ValueKind.MultiValue) {
+    if (currentFnRaw && isCarrier(currentFnRaw)) {
       const fnType = getType(currentFnRaw);
       const _fnTypeName = fnType ? getTypeName(currentFnRaw) : null;
       if (fnType && _fnTypeName === "Function") {
@@ -429,20 +529,15 @@ function applyComposed(
             unifyTypes(argType, paramTypes[i], bindings);
           }
           if (bindings.size > 0) {
-            enrichedCtx = makeContext();
-            // F3a: propagate compile-mode through enrichedCtx so deferral
-            // continues to apply inside transitively-called function bodies
-            // during precompile.
-            if ((ctx as any).__compileMode) (enrichedCtx as any).__compileMode = true;
-            for (const [key, binding] of ctx.bindings) {
-              enrichedCtx.bindings.set(key, binding);
-              enrichedCtx.bindingList.push(binding);
-            }
-            for (const [varName, typeVal] of bindings) {
-              const binding = { key: varName, value: typeVal, isUse: false };
-              enrichedCtx.bindings.set(varName, binding);
-              enrichedCtx.bindingList.push(binding);
-            }
+            // C2.1: O(1) child layer over the call ctx — replaces the
+            // former flatten-copy of every inherited binding. Compile-mode
+            // reads are chain-aware (scopeCompileMode), so no flag copying.
+            enrichedCtx = scopeExtend(
+              ctx,
+              [...bindings].map(([varName, typeVal]) =>
+                [varName, { key: varName, value: typeVal }] as [string, import("./types.js").Binding]
+              ),
+            );
             if (returnTypeExpr && (returnTypeExpr.kind === ValueKind.Param || returnTypeExpr.kind === ValueKind.Symbol)) {
               inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
             }
@@ -451,8 +546,13 @@ function applyComposed(
           // (after unification, so type variables are resolved)
           for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
             const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
-            if (resolvedParamType.kind !== ValueKind.Context) continue; // unresolved type var
+            if (resolvedParamType.kind !== ValueKind.Structure) continue; // unresolved type var
             checkArgType(evalArgs[i], resolvedParamType as ContextValue, i, enrichedCtx, depth, depCollector);
+            // C3.2 (D36): the annotation is a knowledge upper-bound — the
+            // param crossing is an abstraction boundary. Stamp (widening)
+            // or reset (own-shape) the occurrence bound on the value that
+            // gets substituted into the body.
+            evalArgs[i] = applyBoundaryBound(evalArgs[i], resolvedParamType as ContextValue);
             // Stage D — Surface C call-site enforcement (F2): when the
             // param-type slot has no `__effectBound` but `param_effects
             // f: pure` stamped an effect bound onto the Param.effectBound
@@ -460,14 +560,13 @@ function applyComposed(
             // matches Surface A's rejection of mismatched callbacks. F2
             // reads effects directly from the arg's `effects` MultiValue
             // component (PE-populated) rather than via the predicate-set
-            // view. Skip when the bound is a Stage C2 effect-variable
-            // marker (`__effectvar:NAME`) — those are placeholders the
-            // walker resolves at call sites, not concrete bounds.
-            const ptHasEffBound = (resolvedParamType as any).__effectBound !== undefined;
+            // view. C7.2c: effect-VARIABLE params carry `effectVar` (a
+            // declared reference, no bound labels), so `effectBound` here
+            // is always concrete — the marker-sniffing skip is gone.
+            const ptHasEffBound = getEffectBound(resolvedParamType) !== undefined;
             if (!ptHasEffBound && i < currentFn.params.length) {
               const surfaceCBound = (currentFn.params[i] as any).effectBound as EffectSet | undefined;
-              const isMarkerBound = surfaceCBound && [...surfaceCBound].some(l => l.startsWith("__effectvar:"));
-              if (surfaceCBound && !isMarkerBound) {
+              if (surfaceCBound) {
                 const argEff = effectsOf(evalArgs[i]) ?? new Set<string>();
                 const boundDom: EffectsDomain = { kind: "effects", labels: surfaceCBound };
                 const actualDom: EffectsDomain = { kind: "effects", labels: argEff };
@@ -498,7 +597,7 @@ function applyComposed(
     }
 
     // Apply inferred return type
-    if (inferredReturnType && inferredReturnType.kind === ValueKind.Context) {
+    if (inferredReturnType && inferredReturnType.kind === ValueKind.Structure) {
       const currentType = getType(result);
       if (!currentType) {
         result = withType(result, inferredReturnType as ContextValue);
@@ -521,9 +620,15 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
   switch (value.kind) {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
-    case ValueKind.Context:
     case ValueKind.Symbol:
       return value;
+    case ValueKind.Structure: {
+      // C7.1: carriers walk their primary; plain structures are inert.
+      if (!isCarrier(value)) return value;
+      const mv = value as MultiValueType;
+      const newP = remapParams(mv.primary, paramMap);
+      return newP === mv.primary ? value : makeMultiValue(newP, cloneComponents(mv));
+    }
     case ValueKind.Param: {
       const replacement = paramMap.get(value);
       return replacement ?? value;
@@ -541,12 +646,10 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
       if (newBody === value.body) return value;
       const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
       if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
-      if ((value as any).__effectVarParams) (newFn as any).__effectVarParams = (value as any).__effectVarParams;
+      for (const k of PRESERVED_FN_META_KEYS) {
+        if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
+      }
       return newFn;
-    }
-    case ValueKind.MultiValue: {
-      const newP = remapParams(value.primary, paramMap);
-      return newP === value.primary ? value : makeMultiValue(newP, new Map(value.components));
     }
   }
 }
@@ -567,9 +670,15 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
   // (no circular function references in expression tree)
 
   switch (value.kind) {
+    case ValueKind.Structure: {
+      // C7.1: carriers walk their primary; plain structures are inert.
+      if (!isCarrier(value)) return value;
+      const mv = value as MultiValueType;
+      const newP = subst(mv.primary, owner, posMap, seen);
+      return newP === mv.primary ? value : makeMultiValue(newP, cloneComponents(mv));
+    }
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
-    case ValueKind.Context:
       return value;
 
     case ValueKind.Param: {
@@ -600,6 +709,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
         _name: p._name,
         predicates: p.predicates,
         effectBound: p.effectBound,
+        effectVar: p.effectVar,
       } as ParamValue));
       // Rewrite Param references in the new body that point to old params,
       // remapping them to the cloned params (matched by position).
@@ -612,10 +722,12 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
         body: remappedBody,
       };
       for (const p of newFn.params) p.owner = newFn;
-      // Preserve generic-param / effect-var-param metadata across clones so
-      // Slice 2's polymorphism resolution still works after substitution.
+      // Preserve generic-param metadata across clones so Slice 2's
+      // polymorphism resolution still works after substitution.
       if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
-      if ((value as any).__effectVarParams) (newFn as any).__effectVarParams = (value as any).__effectVarParams;
+      for (const k of PRESERVED_FN_META_KEYS) {
+        if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
+      }
       return newFn;
     }
 
@@ -629,18 +741,13 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       return newExpr;
     }
 
-    case ValueKind.MultiValue: {
-      const newP = subst(value.primary, owner, posMap, seen);
-      return newP === value.primary ? value : makeMultiValue(newP, new Map(value.components));
-    }
   }
 }
 
 // --- Context helpers ---
 
 export function resolveInContext(ctx: ContextValue, name: string): Value | undefined {
-  const b = ctx.bindings.get(name);
-  return b?.value;
+  return scopeLookup(ctx, name)?.value;
 }
 
 // --- Call-site type checking ---
@@ -670,7 +777,7 @@ function checkArgType(
   // bound via the same `impliesDomain` path used for numeric refinements.
   // `opaque` has no bound — anything passes; we skip the check entirely.
   // Args without an effects component behave as pure.
-  const effBound = (expected as any).__effectBound as AbstractDomain | undefined;
+  const effBound = getEffectBound(expected) as AbstractDomain | undefined;
   if (effBound && effBound.kind === "effects") {
     const argEff = effectsOf(arg) ?? new Set<string>();
     const actualDom: EffectsDomain = { kind: "effects", labels: argEff };
@@ -685,19 +792,19 @@ function checkArgType(
   }
 
   // Refinement type handling: if expected is a refined type, check the value
-  // against the refinement's BASE (via __extends chain), then evaluate the predicate.
+  // against the refinement's BASE (via __refines chain), then evaluate the predicate.
   // This allows a plain Int to satisfy PositiveInt if the predicate passes.
-  const refinementPredicate = expected.bindings.get("__predicate")?.value;
+  const refinementPredicate = getPredicate(expected);
   if (refinementPredicate) {
-    const base = expected.bindings.get("__extends")?.value;
-    if (base?.kind === ValueKind.Context) {
+    const base = getRefines(expected);
+    if (base?.kind === ValueKind.Structure) {
       // Recurse on the base type (unwraps nested refinements)
       checkArgType(arg, base as ContextValue, argIndex, ctx, depth, depCollector);
       // Base check passed — evaluate the predicate (unless same refined type)
       const argType0 = getType(arg);
       if (argType0 !== expected && ctx && depth !== undefined) {
         const result = evaluate(makeExpr(refinementPredicate, [arg]), ctx, depth + 1, depCollector);
-        const p = primaryOf(result);
+        const p = dataOf(result);
         if (p.kind === ValueKind.Bits && p.data === 0n) {
           const name = typeContextName(expected) ?? "<refined>";
           throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}`);
@@ -716,12 +823,12 @@ function checkArgType(
   // Helper: evaluate refinement predicate on arg if expected type has one.
   // Short-circuits when argType is reference-equal to expected (same refined type).
   const checkRefinement = (): void => {
-    const predicate = expected.bindings.get("__predicate")?.value;
+    const predicate = getPredicate(expected);
     if (!predicate) return;
     if (argType === expected) return; // same refined type — predicate already holds
     if (!ctx || depth === undefined) return; // no eval context — best-effort skip
     const result = evaluate(makeExpr(predicate, [arg]), ctx, depth + 1, depCollector);
-    const p = primaryOf(result);
+    const p = dataOf(result);
     if (p.kind === ValueKind.Bits && p.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`);
     }
@@ -731,17 +838,19 @@ function checkArgType(
   const actualName = typeContextName(argType);
   if (actualName === expectedName) {
     // Names match — also check type args for generics (Array[Int] vs Array[String])
-    const expectedArgs = expected.bindings.get("__args")?.value;
-    const actualArgs = argType.bindings.get("__args")?.value;
-    if (expectedArgs?.kind === ValueKind.Context && actualArgs?.kind === ValueKind.Context) {
+    const expectedArgs = getGenericArgs(expected);
+    const actualArgs = getGenericArgs(argType);
+    if (expectedArgs?.kind === ValueKind.Structure && actualArgs?.kind === ValueKind.Structure) {
       const expCtx = expectedArgs as ContextValue;
       const actCtx = actualArgs as ContextValue;
-      const expLen = Number(expCtx.bindings.get("__length")?.value?.kind === ValueKind.Bits ? (expCtx.bindings.get("__length")!.value! as any).data : 0n);
-      const actLen = Number(actCtx.bindings.get("__length")?.value?.kind === ValueKind.Bits ? (actCtx.bindings.get("__length")!.value! as any).data : 0n);
+      const expLenV = getSlotCount(expCtx);
+      const actLenV = getSlotCount(actCtx);
+      const expLen = Number(expLenV?.kind === ValueKind.Bits ? (expLenV as any).data : 0n);
+      const actLen = Number(actLenV?.kind === ValueKind.Bits ? (actLenV as any).data : 0n);
       for (let j = 0; j < Math.min(expLen, actLen); j++) {
-        const expArg = expCtx.bindings.get(String(j))?.value;
-        const actArg = actCtx.bindings.get(String(j))?.value;
-        if (expArg?.kind === ValueKind.Context && actArg?.kind === ValueKind.Context) {
+        const expArg = indexGet(expCtx, j);
+        const actArg = indexGet(actCtx, j);
+        if (expArg?.kind === ValueKind.Structure && actArg?.kind === ValueKind.Structure) {
           const expArgName = typeContextName(expArg);
           const actArgName = typeContextName(actArg);
           if (expArgName && actArgName && expArgName !== "Any" && actArgName !== "Any" && expArgName !== actArgName) {
@@ -758,7 +867,7 @@ function checkArgType(
   const directInstanceof = expected.bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const checkResult = directInstanceof.fn([arg], undefined as any, undefined as any);
-    const checkP = primaryOf(checkResult);
+    const checkP = dataOf(checkResult);
     if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
     }
@@ -767,12 +876,12 @@ function checkArgType(
   }
 
   // Use meta-type instanceof (Type's shape-aware check: nominal if both named, structural otherwise)
-  const typeType = expected.bindings.get("__type")?.value as ContextValue | undefined;
+  const typeType = channelReadRaw(expected, "shape") as ContextValue | undefined;
   if (typeType) {
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const checkResult = instanceofMethod.fn([expected, arg], undefined as any, undefined as any);
-      const checkP = primaryOf(checkResult);
+      const checkP = dataOf(checkResult);
       if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
         throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
       }
@@ -814,31 +923,34 @@ export function precompileFunction(
     const param = fn.params[i];
     const paramType = i < paramTypes.length ? paramTypes[i] : null;
 
-    if (paramType && paramType.kind === ValueKind.Context) {
+    if (paramType && paramType.kind === ValueKind.Structure) {
       // Typed param: create MultiValue(Param, type: paramType). If the type
       // is refined and carries an abstract domain (Phase B), seed the domain
       // on the placeholder so propagation rules fire during precompile.
       const components = new Map<string, Value>([["type", paramType]]);
       const dom = (paramType as any).__abstractDomain;
       if (dom && dom.kind !== "opaque") {
-        const domCtx: ContextValue = { kind: ValueKind.Context, bindings: new Map(), bindingList: [] };
+        const domCtx: ContextValue = makeContext();
         (domCtx as any).__abstractDomain = dom;
         components.set("domain", domCtx);
       }
-      // F2: preserve effectBound on the placeholder so PE's Param-call
-      // residual path can attach the e-effect when the body calls this
-      // param. Without this, polymorphic functions would lose their
-      // effect-variable markers during precompile.
+      // F2: preserve effectBound/effectVar on the placeholder so PE's
+      // Param-call residual path can attach the e-effect when the body
+      // calls this param. Without this, polymorphic functions would lose
+      // their declared effect variables during precompile.
       const innerParam = makeParamHelper(param.position, param._name);
       if (param.effectBound) (innerParam as any).effectBound = param.effectBound;
+      if (param.effectVar !== undefined) (innerParam as any).effectVar = param.effectVar;
       const placeholder = makeMultiValue(innerParam, components);
       placeholders.push(placeholder);
     } else {
-      // Untyped or type variable — leave as bare Param. Same effectBound
-      // copy so polymorphic params with no concrete type annotation still
-      // propagate (e.g. Stage C2 markers stamped via __genericParams).
+      // Untyped or type variable — leave as bare Param. Same
+      // effectBound/effectVar copy so polymorphic params with no concrete
+      // type annotation still propagate (C7.2c: declared effect variables
+      // referencing __genericParams entries).
       const bare = makeParamHelper(param.position, param._name);
       if (param.effectBound) (bare as any).effectBound = param.effectBound;
+      if (param.effectVar !== undefined) (bare as any).effectVar = param.effectVar;
       placeholders.push(bare);
     }
   }

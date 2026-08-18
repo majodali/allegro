@@ -1,32 +1,32 @@
-// Phase C Chunk 4: Type.invariant — type-internal lifecycle invariants.
+// Lifecycle invariants (C6.1b: invariants ARE refinements — one
+// conjunction story via the `&` mint; chained `&` gives per-clause
+// layers, and record predicates reference fields through `_`).
 //
-// Two complementary ways to declare typed constraints:
-//   - `&` refinement for single-value types (PositiveInt = Int & _ > 0)
-//   - `.invariant(self => …)` for records / multi-predicate cases
-// Mechanically the same: constructor checks; predicate's domain attaches
-// to the value's predicate set; downstream propagation inherits the fact.
+// Mechanically unchanged from the Phase C Chunk 4 semantics: the
+// constructor checks each clause; a recognised predicate's domain
+// attaches to the value's predicate set; downstream propagation
+// inherits the fact.
 
-// Single-value invariant — equivalent to `Int & _ > 0` but composes via
-// the fluent API so multiple constraints can chain.
-PositiveInt = Int.invariant(self => self > 0)
+// Single-value clause.
+PositiveInt = Int & _ > 0
 ten = PositiveInt(10)
 print(ten)              // expect: 10
 
-// Multi-field record type with a relational invariant: `lo <= hi`.
-// `invariant` is the natural shape here — refinement-via-`&&` doesn't
-// extend cleanly to predicates that reference fields.
-Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+// Multi-field record type with a relational constraint: `lo <= hi`.
+// The refinement predicate reaches fields through `_` — the same mint
+// covers scalars and records.
+Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi
 ok = Range(1, 100)
 print(ok.lo)            // expect: 1
 print(ok.hi)            // expect: 100
 
-// Invariant violation produces a counterexample-bearing error.
+// Violation produces a counterexample-bearing error.
 bad = Range(50, 5)
-print(error of bad)     // expect: invariant 1 failed
+print(error of bad)     // expect: refinement check failed
 
-// Chaining: one type with multiple invariants. Each invariant is its own
-// clause — failure points at which one tripped.
-SmallPos = Int.invariant(self => self > 0).invariant(self => self < 100)
+// Chaining: `&` is left-associative, so each clause is its own layer —
+// failure points at the clause that tripped via its rendered domain.
+SmallPos = Int & _ > 0 & _ < 100
 print(SmallPos(50))     // expect: 50
-print(error of SmallPos(0))     // expect: invariant 1 failed
-print(error of SmallPos(200))   // expect: invariant 2 failed
+print(error of SmallPos(0))     // expect: refinement check failed: expected ≥ 1 (got 0)
+print(error of SmallPos(200))   // expect: refinement check failed: expected ≤ 99 (got 200)

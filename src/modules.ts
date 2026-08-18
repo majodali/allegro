@@ -4,10 +4,12 @@
 // =============================================================================
 
 import { evalSource, Extension } from "./runtime.js";
+import { dataOf, cloneComponents, setName, setFallbackMember, isBareBindingName, isFutureBindingName, componentsView } from "./slots.js";
 import { remapParams } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, primaryOf, AllegroError } from "./types.js";
+import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, AllegroError } from "./types.js";
 import { withType } from "./types-std.js";
 import { primitives } from "./primitives.js";
+import { markExported } from "./symbols.js";
 import { scanUses } from "./use-scanner.js";
 
 // --- Types ---
@@ -52,7 +54,6 @@ function captureModuleVars(
   switch (value.kind) {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
-    case ValueKind.Context:
       return value;
 
     case ValueKind.Param:
@@ -105,10 +106,12 @@ function captureModuleVars(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.MultiValue: {
-      const newP = captureModuleVars(value.primary, moduleBindings, ownParams, seen);
-      if (newP === value.primary) return value;
-      return makeMultiValue(newP, new Map(value.components));
+    case ValueKind.Structure: {
+      const pp = (value as { primary?: Value }).primary;
+      if (pp === undefined) return value;
+      const newP = captureModuleVars(pp, moduleBindings, ownParams, seen);
+      if (newP === pp) return value;
+      return makeMultiValue(newP, cloneComponents(value));
     }
 
     default:
@@ -132,7 +135,7 @@ export function buildModuleObject(
   // Skip self-referential bindings (recursive functions).
   const capturedBindings: Record<string, Value> = {};
   for (const [key, value] of Object.entries(allBindings)) {
-    const p = primaryOf(value);
+    const p = dataOf(value);
     if (p.kind === ValueKind.ComposedFunction) {
       // Exclude this binding's own name to prevent infinite recursion
       const selfExclude = new Set([key]);
@@ -145,8 +148,8 @@ export function buildModuleObject(
   // Build the underlying Context with ALL bindings (public + private)
   const ctx = makeContext();
   for (const [key, value] of Object.entries(capturedBindings)) {
-    ctx.bindings.set(key, { key, value, isUse: false });
-    ctx.bindingList.push({ key, value, isUse: false });
+    ctx.bindings.set(key, { key, value });
+    ctx.bindingList.push({ key, value });
   }
 
   // Build a module-specific type with __getMember for exported fields only.
@@ -154,11 +157,7 @@ export function buildModuleObject(
   // enforcing encapsulation — private module bindings are inaccessible.
   const moduleType = makeContext();
 
-  // __name
-  const nameKey = "__name";
-  const nameVal = stringToBits(name);
-  moduleType.bindings.set(nameKey, { key: nameKey, value: nameVal, isUse: false });
-  moduleType.bindingList.push({ key: nameKey, value: nameVal, isUse: false });
+  setName(moduleType, stringToBits(name));
 
   // __getMember: only allows access to exported fields
   const getMember: PrimitiveFnImpl = (args) => {
@@ -172,8 +171,7 @@ export function buildModuleObject(
     return b.value;
   };
   const getMemberPrim = makePrimitive(`${name}.__getMember`, getMember);
-  moduleType.bindings.set("__getMember", { key: "__getMember", value: getMemberPrim, isUse: false });
-  moduleType.bindingList.push({ key: "__getMember", value: getMemberPrim, isUse: false });
+  setFallbackMember(moduleType, getMemberPrim);
 
   return withType(ctx, moduleType);
 }
@@ -305,6 +303,9 @@ export class ModuleLoader {
         allExtensions,
         /* grammarExtension */ undefined,
         /* typed */ true,
+        /* futureManager */ undefined,
+        /* softFail */ undefined,
+        /* C5.1: the module file path IS the defining-scope FQN (§5) */ resolvedPath,
       );
       evalCtx = result.evalCtx;
     } catch (e: any) {
@@ -330,16 +331,16 @@ export class ModuleLoader {
 
     for (const [key, binding] of evalCtx.bindings) {
       if (nonSourceNames.has(key)) continue;
-      if (key.startsWith("__bare_") || key.startsWith("__future_")) continue;
+      if (isBareBindingName(key) || isFutureBindingName(key)) continue;
       if (binding.value === undefined) continue;
       const evaluated = binding.value;
       allBindings[key] = evaluated;
-      if (evaluated.kind === ValueKind.MultiValue) {
-        const exp = evaluated.components.get("exported");
-        if (exp) {
-          hasExports = true;
-          exportedBindings[key] = evaluated;
-        }
+      // C4.3b: componentsView is total — a flattened Context (exported
+      // record/module value) reports its `exported` marker directly.
+      const exp = componentsView(evaluated).get("exported");
+      if (exp) {
+        hasExports = true;
+        exportedBindings[key] = evaluated;
       }
     }
 
@@ -347,6 +348,14 @@ export class ModuleLoader {
       ? new Set(Object.keys(exportedBindings))
       : new Set(Object.keys(allBindings));
     const bindings = hasExports ? exportedBindings : allBindings;
+
+    // C5.1 (D42): populate the EXPORT PARTITION — only these symbols are
+    // reachable to foreign FQNs arriving over the wire (symbolFromWire).
+    // Registration of ALL module bindings already happened inside
+    // evalSource; exporting is the separate, narrower act.
+    for (const name of exportNames) {
+      markExported(resolvedPath, name);
+    }
 
     // Build typed module object for use with `import name` + dot access
     const moduleObj = buildModuleObject(id, allBindings, exportNames);

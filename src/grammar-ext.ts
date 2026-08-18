@@ -31,7 +31,7 @@ import {
 } from "./parser.js";
 import {
   Value, ValueKind, ContextValue, BitsValue,
-  makeContext, makeInt, makeMultiValue, stringToBits, primaryOf,
+  makeContext, makeInt, makeMultiValue, stringToBits, dataOf,
 } from "./types.js";
 import { withType, StringType, ErrorType, IntType, makeArray, noneSingleton } from "./types-std.js";
 

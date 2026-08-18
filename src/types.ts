@@ -1,13 +1,19 @@
 // Allegretto - Core Types
 // Five value kinds + Param placeholder
 
+// C4.1: the unified Structure class behind MultiValue/Context. structure.ts
+// imports only TYPES from this module, so there is no runtime cycle.
+import { newMultiValueStructure, newContextStructure, newDenseStructure, deriveWithChannels, isCarrier } from "./structure.js";
+
 export enum ValueKind {
   Bits = "Bits",
   PrimitiveFunction = "PrimitiveFunction",
   ComposedFunction = "ComposedFunction",
   Expression = "Expression",
-  Context = "Context",
-  MultiValue = "MultiValue",
+  // C7.1 (D25 completes): the `Context` kind-name is retired — the one
+  // composite representation is Structure. The evaluation-environment
+  // role is Scope (host plane, not a kind).
+  Structure = "Structure",
   Param = "Param",
   Symbol = "Symbol",
 }
@@ -43,6 +49,15 @@ export interface PrimitiveFunctionValue {
    * function transitively calls.
    */
   effects?: string[];
+  /**
+   * D47 (B-094): source-aware registration — the data-plane analogue of
+   * `lazy`. At call sites of a source-aware primitive the evaluator
+   * attaches each argument's ORIGINATING Expression AST to the evaluated
+   * argument value on the `source` channel (kernel-originated; `drop`
+   * propagation). Lazy is for *not evaluating*; source-aware is for
+   * *seeing what was evaluated*. Cost is zero at all other call sites.
+   */
+  sourceAware?: boolean;
 }
 
 // --- Param: positional placeholder within function expressions ---
@@ -59,14 +74,21 @@ export interface ParamValue {
    *  reserved so refinement-bound annotations (`x: PositiveInt`) can later
    *  flow through here without another schema change. */
   predicates?: import("./refinements.js").PredicateSet;
-  /** Effect bound for function-typed params. Set by `typed_function_impl`
-   *  from a param-type annotation's `__effectBound` (Surface A: `f: pure`),
-   *  by Stage C2 marker stamping (`__effectvar:NAME` for polymorphic effect
-   *  variables), and by the Surface C `param_effects` body-form peel-and-
-   *  stamp pass. PE's Param-call branch reads this slot directly to
-   *  propagate effects from param body to caller; call-site enforcement
+  /** Effect bound for function-typed params — CONCRETE labels only. Set by
+   *  `typed_function_impl` from a param-type annotation's `__effectBound`
+   *  (Surface A: `f: pure`) and by the Surface C `param_effects` body-form
+   *  peel-and-stamp pass. PE's Param-call branch reads this slot directly
+   *  to propagate effects from param body to caller; call-site enforcement
    *  runs `impliesDomain` against it. */
   effectBound?: import("./effects.js").EffectSet;
+  /** C7.2c: DECLARED effect variable — the name of the Effect-kinded entry
+   *  in the owner function's `__genericParams` this param's effects are
+   *  bound to (`apply[e: Effect](g: e, …)` → g.effectVar = "e"). Replaces
+   *  the retired `__effectvar:NAME` marker-string labels inside
+   *  `effectBound`: the reference is structural, the variable's bare name
+   *  rides inferred effect sets, and call sites resolve it by ordinary PE
+   *  substitution. Mutually exclusive with `effectBound`. */
+  effectVar?: string;
 }
 
 // --- Symbol: named reference resolved during compilation ---
@@ -75,7 +97,13 @@ export interface ParamValue {
 
 export interface SymbolValue {
   kind: ValueKind.Symbol;
+  /** Base-name projection — printing, lexical resolution, loose matching. */
   name: string;
+  /** C5.1: fully-qualified name for REGISTERED symbols (identity = FQN;
+   *  interned in src/symbols.ts — same FQN is the same object). Absent on
+   *  transient parser-minted reference symbols, which have no identity
+   *  beyond their occurrence and resolve by base name against scope. */
+  fqn?: string;
 }
 
 // --- Composed Function: expression body with declared params ---
@@ -99,14 +127,31 @@ export interface ExpressionValue {
 
 export interface Binding {
   key: string | null;
+  /** The bound value. `undefined` while the binding is a PENDING FUTURE
+   *  CELL (declared-but-unresolved import, async future) — the evaluator
+   *  residualises references to it. C2.3b: this is the ONE unresolved
+   *  representation; there is no separate reactive-binding record. */
   value: Value | undefined;
-  isUse: boolean;
+  /** C2.3b future-cell state (host-plane, maintained by the reactive
+   *  registry): names of incomplete dependencies while this binding's
+   *  value is a residual. Absent on untracked bindings. */
+  incompleteDeps?: Set<string>;
+  /** C2.3b: completion flag. `false` while pending or residual; `true`
+   *  once the value is fully resolved. Absent on untracked bindings
+   *  (data-plane contexts, compile ctxs) — treat as complete. */
+  isComplete?: boolean;
 }
 
-export interface ContextValue {
-  kind: ValueKind.Context;
+export interface StructureValue {
+  kind: ValueKind.Structure;
   bindings: Map<string, Binding>;
   bindingList: Binding[];
+  /** C2.1 scope protocol: parent-chain layer link (evaluation scopes only —
+   *  host-plane field, never a value slot). Lookup walks the chain. */
+  parent?: ContextValue;
+  /** C2.1: marks evaluation scopes vs data Contexts. Set by scopeNew/
+   *  scopeExtend and the root eval-context builders. */
+  isScope?: boolean;
   /**
    * Phase C scope-local predicate narrowing. When a binding is referenced
    * within a scope that has additional predicates known about it (e.g. from
@@ -122,13 +167,18 @@ export interface ContextValue {
   scopePredicates?: Map<string, unknown>;
 }
 
-// --- Multi-Value: primary + named components ---
+// --- The carrier (C7.1, D15/D46): the former MultiValue KIND is now a
+// CONFIGURATION of Structure — a transparent structure with an empty
+// data plane whose data rides in `primary` and whose channels ride in
+// `components`. It answers the same kind as every structure; the
+// host-level discriminant is primary presence (`isCarrier`). The legacy
+// type name survives as the carrier's static shape so existing casts
+// keep compiling.
 
-export interface MultiValueType {
-  kind: ValueKind.MultiValue;
+export type MultiValueType = ContextValue & {
   primary: Value;
   components: Map<string, Value>;
-}
+};
 
 // --- Union type ---
 
@@ -138,7 +188,6 @@ export type Value =
   | ComposedFunctionValue
   | ExpressionValue
   | ContextValue
-  | MultiValueType
   | ParamValue
   | SymbolValue;
 
@@ -172,19 +221,22 @@ export function makePrimitive(
   fn: PrimitiveFnImpl,
   lazy?: boolean,
   effects?: string[],
+  sourceAware?: boolean,
 ): PrimitiveFunctionValue {
-  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects };
+  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects, sourceAware };
 }
 
 export function makeParam(position: number, name?: string): ParamValue {
   // Always declare optional fields so V8/JSC see a stable hidden class shape
   // across all Params, whether or not bounds end up being attached later.
   return { kind: ValueKind.Param, position, owner: null, _name: name,
-           predicates: undefined, effectBound: undefined };
+           predicates: undefined, effectBound: undefined, effectVar: undefined };
 }
 
 export function makeSymbol(name: string): SymbolValue {
-  return { kind: ValueKind.Symbol, name };
+  // Transient reference symbol (no FQN). Declare the optional field for a
+  // stable hidden class shared with registered symbols (src/symbols.ts).
+  return { kind: ValueKind.Symbol, name, fqn: undefined };
 }
 
 export function makeExpr(fn: Value, args: Value[]): ExpressionValue {
@@ -199,18 +251,51 @@ export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunct
   return fn;
 }
 
+// C4.1 (structures Phase 4): both factories are now SHIMS over the
+// unified Structure class (src/structure.ts) — one host representation,
+// one hidden class, constructed only here. The returned objects satisfy
+// the legacy interfaces field-for-field; the physical layout migrates
+// inside structure.ts from now on.
 export function makeContext(): ContextValue {
-  return { kind: ValueKind.Context, bindings: new Map(), bindingList: [] };
+  return newContextStructure() as unknown as ContextValue;
 }
 
 export function makeMultiValue(primary: Value, components?: Map<string, Value>): MultiValueType {
-  return { kind: ValueKind.MultiValue, primary, components: components ?? new Map() };
+  // C4.3b/C7.1: the ONE channel-attachment chokepoint. A record/array/type
+  // primary flattens into a copy-on-write derive (channels ride directly);
+  // a CARRIER primary re-wraps its inner data (W1: carriers never nest —
+  // the given channel map is authoritative, mirroring the derive); a
+  // non-Structure primary (Bits, functions, residuals) takes the D15
+  // transparent carrier. Call sites read data through dataOf, never
+  // `.primary`.
+  if (primary.kind === ValueKind.Structure) {
+    if (isCarrier(primary)) {
+      return newMultiValueStructure(
+        (primary as MultiValueType).primary, components ?? new Map()) as unknown as MultiValueType;
+    }
+    return deriveWithChannels(primary as ContextValue, components ?? new Map()) as unknown as MultiValueType;
+  }
+  return newMultiValueStructure(primary, components ?? new Map()) as unknown as MultiValueType;
+}
+
+/** C4.2: construct a dense numeric-keyed structure (array context) — the
+ *  element array is adopted. Element reads go through slots.ts `indexGet`;
+ *  the legacy bindings view materializes lazily for stragglers. */
+export function makeDenseArrayCtx(elements: Value[]): ContextValue {
+  return newDenseStructure(elements) as unknown as ContextValue;
 }
 
 // --- Utilities ---
 
-export function primaryOf(v: Value): Value {
-  return v.kind === ValueKind.MultiValue ? v.primary : v;
+/** Data-plane read: identity for everything except a transparent scalar
+ *  structure (MultiValue role), whose data lives in `primary`. C4.3c: the
+ *  former `primaryOf` name is retired — this IS the accessor (re-exported
+ *  through slots.ts; both import paths resolve to this one function). */
+export function dataOf(v: Value): Value {
+  // Carrier check by primary presence — one property read; non-Structure
+  // values lack the field entirely.
+  const p = (v as { primary?: Value }).primary;
+  return p !== undefined ? p : v;
 }
 
 export function isResolved(v: Value): boolean {
@@ -218,13 +303,16 @@ export function isResolved(v: Value): boolean {
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
     case ValueKind.ComposedFunction:
-    case ValueKind.Context:
       return true;
+    case ValueKind.Structure: {
+      // C7.1: a carrier is as resolved as its primary (a residual under
+      // channels is still a residual); plain structures self-resolve.
+      const p = (v as { primary?: Value }).primary;
+      return p === undefined ? true : isResolved(p);
+    }
     case ValueKind.Param:
     case ValueKind.Symbol:
       return false;
-    case ValueKind.MultiValue:
-      return isResolved(v.primary);
     case ValueKind.Expression:
       return false;
   }
@@ -383,3 +471,6 @@ export class AllegroError extends Error {
     this.name = "AllegroError";
   }
 }
+/** C7.1 transitional alias — the `Context` NAME is retired (D25); existing
+ *  references migrate opportunistically. */
+export type ContextValue = StructureValue;

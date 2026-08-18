@@ -4,32 +4,50 @@
 // Types are attached to values as MultiValue "type" components.
 // =============================================================================
 
+import { isCarrier } from "./structure.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, MultiValueType, PrimitiveFnImpl, PrimitiveFunctionValue,
-  ComposedFunctionValue,
-  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue,
+  ComposedFunctionValue, EvalFn,
+  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeContext, makeMultiValue, makeDenseArrayCtx,
   makeComposedFn, makeParam,
-  primaryOf, stringToBits, bitsToString, AllegroError,
+  stringToBits, bitsToString, AllegroError, isResolved,
   Extension,
 } from "./types.js";
-import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate } from "./refinements.js";
+import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
+import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
+import {
+  getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
+  getGenericArgs, getGenericBackLink,
+  getSlotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, getVariants, indexGet, elementsOf,
+  setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface,
+  setWraps, setVariants, setPredicate, setGenericArgs,
+  setGenericBackLink, setProposition,
+  setEffectBound, setSlotCount, setAbstractDomain,
+  writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
+  removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape,
+  equalityShape, asContext,
+} from "./slots.js";
+
 
 // --- Constants ---
 
-/** Meta-method names that should NOT be inherited by child types during extend/interface */
+/** Meta-method names that should NOT be copied into new types during define/interface.
+ *  C6.1b: the fluent names (where/interface/preserveOps/mixin/invariant)
+ *  left with the fluent API; the surviving kind API is small. */
 const META_METHOD_NAMES = new Set([
-  "instanceof", "subtypeof", "extend", "where", "distinct",
-  "constructor", "interface", "preserveOps", "mixin", "invariant",
+  "instanceof", "subtypeof", "define", "distinct",
 ]);
 
 // --- Helpers ---
 
-/** Get the type component from a value (if it's a MultiValue with "type") */
+/** Get the type channel from a value. C4.3b: total — flattened Contexts
+ *  (typed records/arrays) answer through their component plane, and bare
+ *  type Contexts answer their meta-type through the `__type` binding-plane
+ *  fallback (so `getType(IntType)` is `Type`, where it was null before the
+ *  flatten — type values and typed values read uniformly). */
 export function getType(v: Value): ContextValue | null {
-  if (v.kind === ValueKind.MultiValue) {
-    const t = v.components.get("type");
-    if (t && t.kind === ValueKind.Context) return t;
-  }
+  const t = channelReadRaw(v, "type");
+  if (t && t.kind === ValueKind.Structure) return t;
   return null;
 }
 
@@ -37,27 +55,97 @@ export function getType(v: Value): ContextValue | null {
 export function getTypeName(v: Value): string | null {
   const t = getType(v);
   if (!t) return null;
-  const nameBinding = t.bindings.get("__name");
-  if (!nameBinding?.value || nameBinding.value.kind !== ValueKind.Bits) return null;
-  return bitsToString(nameBinding.value);
+  const nameV = getName(t);
+  if (!nameV || nameV.kind !== ValueKind.Bits) return null;
+  return bitsToString(nameV);
 }
 
-/** Wrap a raw value with a type component */
+/** Wrap a raw value with a type component.
+ *
+ *  C3.1 (D36): SHAPE IS FIXED AT CONSTRUCTION — this writer (the type
+ *  channel's origination chokepoint, per the C1.4 scoping note) refuses to
+ *  re-stamp a value with a type of a DIFFERENT shape. Same-shape re-stamps
+ *  are knowledge re-bounds (refinement certificate tagging at
+ *  construction, preserveOps result re-tagging) and remain legal. */
 export function withType(v: Value, type: ContextValue): Value {
-  const primary = primaryOf(v);
-  const components = v.kind === ValueKind.MultiValue
-    ? new Map(v.components)
-    : new Map<string, Value>();
+  const primary = dataOf(v);
+  // C4.3b: cloneComponents is total — a flattened Context's channels carry
+  // forward (and its prior type makes the shape guard live for Contexts;
+  // construction-point re-tags use withTypeReplacing).
+  const components = cloneComponents(v);
+  const prior = components.get("type");
+  if (prior !== undefined && prior !== (type as Value)
+      && prior.kind === ValueKind.Structure && type?.kind === ValueKind.Structure) {
+    const priorShape = typeShape(prior as ContextValue);
+    const newShape = typeShape(type);
+    if (priorShape !== newShape) {
+      throw new AllegroError(
+        `withType: shape is fixed at construction — cannot re-stamp a value of shape ` +
+        `'${typeContextName(priorShape) ?? "<anonymous>"}' with '${typeContextName(newShape) ?? "<anonymous>"}'`,
+      );
+    }
+  }
+  components.set("type", type);
+  return makeMultiValue(primary, components);
+}
+
+/** C3.2 (D36): annotation-boundary crossing. Called AFTER the type check
+ *  passes, with the declared (annotation) type. Sets the new occurrence's
+ *  starting knowledge:
+ *   - declared type WIDER than the value's shape (a Dog crossing
+ *     `x: Animal`) → stamp the occurrence bound; member AVAILABILITY
+ *     follows it until narrowed, dispatch stays on the shape.
+ *   - declared type of the value's OWN shape → reset (clear any inherited
+ *     bound; the new occurrence has full knowledge of the declared type).
+ *  Bounds are member-availability constructs, so only named nominal
+ *  concrete types participate: Any, function types, Effect annotations,
+ *  interfaces (structural), unions, and generics are pass-throughs.
+ *  Intrinsic knowledge (certificates, predicates) is never touched —
+ *  effective knowledge is the meet, so a looser annotation cannot erase
+ *  what construction certified. */
+export function applyBoundaryBound(v: Value, expected: ContextValue): Value {
+  // C4.3b: flattened records answer Context — the C3.2 availability gate
+  // applies to them too (they're exactly the values annotation bounds
+  // matter most for). Other kinds (Bits, functions, residuals) pass their
+  // typed MultiValue form through as before.
+  if (v.kind !== ValueKind.Structure) return v;
+  const name = typeContextName(expected);
+  if (!name || name === "Any" || name === "Function" || name === "UntypedFunction") return v;
+  if (getEffectBound(expected) !== undefined) return v;
+  if (getEffectLabels(expected) !== undefined) return v;
+  if (getInterfaceMarker(expected) !== undefined) return v;
+  if (getVariants(expected) !== undefined) return v;
+  if (isGenericType(expected) || getGenericArgs(expected) !== undefined) return v;
+  const stored = getType(v);
+  if (!stored) return v;
+  if (typeShape(stored) === typeShape(expected)) {
+    return occurrenceBoundOf(v) ? clearOccurrenceBound(v) : v;
+  }
+  return withOccurrenceBound(v, expected);
+}
+
+/** Construction-time type replacement — the literal-typing / coercion
+ *  path. `typeLiterals` provisionally guesses every 64-bit literal as Int;
+ *  the `typed_*` wrappers are the literal's REAL construction point and
+ *  replace the guess outright (e.g. an 8-character string literal arrives
+ *  Int-guessed and leaves String). Non-type components (error, effects,
+ *  predicates) are preserved. Post-construction code uses `withType`,
+ *  which refuses cross-shape re-stamps (C3.1, D36). */
+export function withTypeReplacing(v: Value, type: ContextValue): Value {
+  const primary = dataOf(v);
+  const components = cloneComponents(v);
   components.set("type", type);
   return makeMultiValue(primary, components);
 }
 
 /** Get the __name from a type Context directly (not from a typed value) */
 export function typeContextName(v: Value): string | null {
-  const ctx = v.kind === ValueKind.Context ? v : (v.kind === ValueKind.MultiValue ? primaryOf(v) : null);
-  if (!ctx || ctx.kind !== ValueKind.Context) return null;
-  const nb = (ctx as ContextValue).bindings.get("__name");
-  if (nb?.value?.kind === ValueKind.Bits) return bitsToString(nb.value);
+  // dataOf peels a carrier (whose primary is never a Context — W1) and is
+  // identity for the bare type Contexts this reads.
+  const ctx = dataOf(v);
+  if (ctx.kind !== ValueKind.Structure) return null;
+  const nv = getName(ctx as ContextValue);
+  if (nv?.kind === ValueKind.Bits) return bitsToString(nv);
   return null;
 }
 
@@ -65,13 +153,17 @@ export function typeContextName(v: Value): string | null {
  *  Returns the PrimitiveFunctionValue (or other callable) for Method descriptors,
  *  or the raw value for direct bindings (backward compat during transition). */
 export function typeMethod(type: ContextValue, name: string): Value | null {
-  // First: check __members for a Method descriptor
-  const membersBinding = type.bindings.get("__members");
-  if (membersBinding?.value?.kind === ValueKind.Context) {
-    const members = membersBinding.value as ContextValue;
-    const memberBinding = members.bindings.get(name);
-    if (memberBinding?.value?.kind === ValueKind.Context) {
-      const desc = memberBinding.value as ContextValue;
+  // First: check __members for a Method descriptor. C5.2a: member sets are
+  // SYMBOL-KEYED (stored under the member symbol's FQN string; interning
+  // makes string-key identity symbol identity). The base name projects
+  // through the kernel scope — every member registers there during C5.2a,
+  // so the projection is deterministic (ruling R5); C5.2b generalizes to
+  // drawn/type-local scopes via projectBaseName.
+  const membersV = getMembers(type);
+  if (membersV?.kind === ValueKind.Structure) {
+    const descV = memberBindingByName(membersV as ContextValue, name);
+    if (descV?.kind === ValueKind.Structure) {
+      const desc = descV as ContextValue;
       // For Method descriptors, return the implementation
       const valueBinding = desc.bindings.get("value");
       if (valueBinding?.value) return valueBinding.value;
@@ -85,21 +177,156 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
   return binding.value;
 }
 
+/** C6.1a: the member-set write chokepoint — stores the descriptor under
+ *  the member symbol's FQN key in the DECLARING TYPE's OWN scope (per-type
+ *  name-stable scopes; the shared kernel scope made cross-built-in
+ *  conformance accidental under symbol membership). `addBinding` remains
+ *  for descriptor internals and non-member contexts. */
+function addMember(members: ContextValue, scopeFqn: string, baseName: string, desc: Value): void {
+  addBinding(members, memberFqnIn(scopeFqn, baseName), desc);
+  (members as any).__memberNameIndex = undefined;
+}
+
+/** Lazy base-name index on a member set (JS-side cache field, like
+ *  `__predicateSet`'s precedent). Sound because member sets are
+ *  populated fully during construction before the first lookup and are
+ *  never mutated after (derived types clone into fresh sets). */
+function memberNameIndex(members: ContextValue): Map<string, Value[]> {
+  const cached = (members as any).__memberNameIndex as Map<string, Value[]> | undefined | null;
+  if (cached) return cached;
+  const idx = new Map<string, Value[]>();
+  for (const [key, b] of members.bindings) {
+    if (b.value === undefined) continue;
+    const base = fqnBaseName(key);
+    const arr = idx.get(base);
+    if (arr) arr.push(b.value);
+    else idx.set(base, [b.value]);
+  }
+  (members as any).__memberNameIndex = idx;
+  return idx;
+}
+
+/** C5.2b (D30): DRAW-FROM resolution at member declaration time. A member
+ *  declared on a type under construction binds its symbol by projecting
+ *  the base name against the DRAWN contexts (parent type / base / drawn
+ *  interfaces):
+ *    - exactly one distinct target  → bind THAT symbol (override /
+ *      implement keeps the drawn member's identity);
+ *    - zero targets                 → a TYPE-LOCAL symbol in the type's
+ *      own member scope;
+ *    - several distinct targets     → error (the §5 rule: explicit
+ *      resolution required; a member multi-bound to one descriptor
+ *      dedupes to one target and stays legal).
+ *  Returns the storage KEYS (bound symbols' FQNs). C6.1b order ruling:
+ *  bundle order in a define call is NOT significant — when one target is
+ *  multi-bound under several drawn symbols, the declaration binds ALL of
+ *  them (instead of an order-dependent pick); distinct targets error. */
+function drawMemberKeys(drawnContexts: ContextValue[], baseName: string, localScope: string): string[] {
+  const matches = new Map<string, Value | undefined>(); // key → descriptor (target)
+  for (const drawn of drawnContexts) {
+    const membersV = getMembers(drawn);
+    if (membersV?.kind !== ValueKind.Structure) continue;
+    for (const [key, b] of (membersV as ContextValue).bindings) {
+      if (fqnBaseName(key) === baseName) matches.set(key, b.value);
+    }
+  }
+  if (matches.size === 0) return [memberFqnIn(localScope, baseName)];
+  if (matches.size === 1) return [...matches.keys()];
+  // Distinct KEYS may still be one TARGET (multi-bound descriptor).
+  const targets = new Set(matches.values());
+  if (targets.size === 1) return [...matches.keys()];
+  throw new AllegroError(
+    `member '${baseName}' matches multiple distinct drawn members (${[...matches.keys()].join(", ")}) — explicit resolution required`,
+  );
+}
+
+/** C5.2b: store a descriptor under an explicit (draw-resolved) key.
+ *  Invalidates the lazy name index — construction-time lookups (mixin's
+ *  conflict check) may have built it on a partial set. */
+function addMemberAt(members: ContextValue, key: string, desc: Value): void {
+  addBinding(members, key, desc);
+  (members as any).__memberNameIndex = undefined;
+}
+
+/** C5.2b: base-name member lookup over a member set — kernel fast path
+ *  (built-in members, the hot dispatch case), then a projection scan for
+ *  drawn/type-local symbols. Multi-bound keys dedupe by descriptor
+ *  identity; several DISTINCT targets under one base name is the §5
+ *  ambiguity error at the access surface. */
+function memberBindingByName(members: ContextValue, name: string): Value | undefined {
+  // C6.1a: the kernel fast path retired with the shared kernel scope; the
+  // lazy name index keeps dispatch O(1) per lookup.
+  const hits = memberNameIndex(members).get(name);
+  if (!hits || hits.length === 0) return undefined;
+  if (hits.length === 1) return hits[0];
+  let found: Value | undefined;
+  for (const v of hits) {
+    if (found === undefined) found = v;
+    else if (found !== v) {
+      throw new AllegroError(
+        `member '${name}' is ambiguous — multiple distinct targets; explicit qualification required`,
+      );
+    }
+  }
+  return found;
+}
+
+/** C6.1a: re-key a type's TYPE-LOCAL member symbols onto a name-stable
+ *  scope at auto-naming time. Counter scopes give per-construction
+ *  identity, but evalSource's fixpoint may re-evaluate a type
+ *  declaration — the same declaration must yield the SAME member symbols
+ *  or conformance between captures of different passes fails (the old
+ *  name-string walk masked this; symbol identity exposes it). Runs at
+ *  the binding step, before anything external draws the keys; drawn
+ *  (non-local) keys are untouched. */
+export function stabilizeTypeMemberScope(typeCtx: ContextValue, stableScope: string): void {
+  const local = (typeCtx as any).__localMemberScope as string | undefined;
+  if (!local || local === stableScope) return;
+  const membersV = getMembers(typeCtx);
+  if (membersV?.kind !== ValueKind.Structure) return;
+  const members = membersV as ContextValue;
+  const renames: [string, string][] = [];
+  for (const key of members.bindings.keys()) {
+    if (key.startsWith(local + FQN_SEP)) {
+      renames.push([key, memberFqnIn(stableScope, fqnBaseName(key))]);
+    }
+  }
+  for (const [oldK, newK] of renames) {
+    const bnd = members.bindings.get(oldK)!;
+    members.bindings.delete(oldK);
+    members.bindings.set(newK, { key: newK, value: bnd.value });
+    for (const e of members.bindingList) {
+      if (e.key === oldK) (e as { key: string }).key = newK;
+    }
+  }
+  (members as any).__memberNameIndex = undefined;
+  (typeCtx as any).__localMemberScope = stableScope;
+}
+
+/** Read-side projection view for consumers that iterate members by base
+ *  name (tests, tooling): baseName → descriptor. */
+export function memberDescriptorsOf(type: ContextValue): Map<string, ContextValue> {
+  const out = new Map<string, ContextValue>();
+  const membersV = getMembers(type);
+  if (membersV?.kind === ValueKind.Structure) {
+    for (const [key, b] of (membersV as ContextValue).bindings) {
+      if (b.value?.kind === ValueKind.Structure) out.set(fqnBaseName(key), b.value as ContextValue);
+    }
+  }
+  return out;
+}
+
 // =============================================================================
 // Meta-type: Type
 //
 // All type values have __type = Type. Comparison methods (instanceof / subtypeof)
 // are SHAPE-AWARE: when both operands have a __name, the comparison is nominal
-// (by name + __extends chain); when either operand has no __name, it's structural
-// (by __members compatibility). This collapses the older Type / NominalType split
-// into a single meta-type — the named-vs-anonymous distinction is now a property
-// of the type value, not of its meta-type.
+// (by name + __refines chain); when either operand has no __name, it's structural
+// (by __members compatibility) — one meta-type; the named-vs-anonymous
+// distinction is a property of the type value, not of its meta-type.
 //
 // `~T` (structural wrap) erases __name to project a named type into anonymous form.
 //
-// `NominalType` is retained as a back-compat alias (= Type) so existing user code
-// reading `Int instanceof NominalType` continues to work. Multiple inheritance and
-// NominalType-as-mixin are deferred — see memory/design_type_system_meta_types.md.
 //
 // ConcreteType — interface (not a position in hierarchy). Concrete types have __construct.
 //
@@ -108,14 +335,19 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
 // =============================================================================
 
 /** Helper to add a binding to a Context */
+// Held write capability for the discharged integrity channel (C1.4, D21-D24).
+// Module-scope, never exported — makeProof is this module's only
+// origination site.
+const dischargedWriterStd = kernelChannelWriter("discharged");
+
 function addBinding(ctx: ContextValue, key: string, value: Value): void {
-  ctx.bindings.set(key, { key, value, isUse: false });
-  ctx.bindingList.push({ key, value, isUse: false });
+  ctx.bindings.set(key, { key, value });
+  ctx.bindingList.push({ key, value });
 }
 
 /**
  * Shape-aware instanceof: dispatch based on __name presence.
- *   - Both operand types named → nominal (by name + __extends chain)
+ *   - Both operand types named → nominal (by name + __refines chain)
  *   - Either operand anonymous (no __name) → structural (by __members compat)
  */
 function shapeAwareInstanceof(value: Value, expectedType: ContextValue): boolean {
@@ -133,23 +365,65 @@ function shapeAwareInstanceof(value: Value, expectedType: ContextValue): boolean
  *     typeA to be named, since an anonymous typeA can't match a name.
  */
 function shapeAwareSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
-  if (isInterfaceType(typeB)) {
+  // C6.1a (D44/D45): ONE declared check — the nominal name-string chain
+  // walk is gone (its name-collision false positive with it). Order:
+  //  1. identity;
+  //  2. loose path — an UNNAMED, non-interface expected type (~T wraps,
+  //     anonymous inline types) matches by base-name projection;
+  //  3. refinement satisfaction — A's `refines` chain reaching B (a
+  //     knowledge layer over B's shape; identity walk);
+  //  4. shared-member-set guard — the same member-set OBJECT without a
+  //     refines path is projection plumbing (`structuralWrap` shares the
+  //     member object), NOT a declaration. (C7.2b: `distinct` no longer
+  //     rides this guard — it mints FRESH member symbols, so newtype
+  //     non-conformance falls out of membership by construction.);
+  //  5. generic-args guard — Array[Int] vs Array[String] share member
+  //     symbols (one declaring generic), so args must match;
+  //  6. symbol-identity MEMBERSHIP — the D44 conformance relation, the
+  //     same check for interfaces and named concrete types alike.
+  if (typeA === typeB) return true;
+  if (!isInterfaceType(typeB) && getTypeNameFromCtx(typeB) === null) {
     return structuralSubtypeof(typeA, typeB);
   }
-  const nameB = getTypeNameFromCtx(typeB);
-  if (nameB === null) {
-    return structuralSubtypeof(typeA, typeB);
+  let cur: ContextValue | null = typeA;
+  for (let guard = 0; guard < 64 && cur; guard++) {
+    const parentV = getRefines(cur);
+    if (parentV?.kind !== ValueKind.Structure) break;
+    cur = parentV as ContextValue;
+    if (cur === typeB) return typeArgsMatch(typeA, typeB);
   }
-  const nameA = getTypeNameFromCtx(typeA);
-  if (nameA === null) {
-    return structuralSubtypeof(typeA, typeB);
-  }
-  return nominalSubtypeof(typeA, typeB, nameB);
+  // C6.2 (D40): the expected type is an EFFECT INSTANCE — instances of an
+  // order-carrying kind relate by the KIND'S ORDER (label-set inclusion,
+  // surfaced as `implies`/`subset_of`), not by conformance. Identity was
+  // checked above; membership over memberless instances would be vacuous.
+  if (getEffectLabels(typeB) !== undefined) return false;
+  // C3.3 preserved, generalized in C6.1b: a predicate-carrying expected
+  // type — transparent refinement, preserveOps shape, or the Interface
+  // kind — demands construction through its chain. Membership cannot
+  // discharge a predicate (its member symbols were drawn from the base,
+  // so membership cannot distinguish base values from certified ones);
+  // value-level discharge (domain implication, predicate re-check) lives
+  // in type_check / instanceof, not in the type-to-type relation.
+  // Chain/identity (checked above) is the only declared route.
+  if (getPredicate(typeB) !== undefined) return false;
+  const aMembers = getMembers(typeA);
+  const bMembers = getMembers(typeB);
+  if (aMembers !== undefined && aMembers === bMembers) return false;
+  if (!typeArgsMatch(typeA, typeB)) return false;
+  return structuralSubtypeof(typeA, typeB);
 }
 
 function isInterfaceType(t: ContextValue): boolean {
-  const m = t.bindings.get("__interface");
-  return m?.value?.kind === ValueKind.Bits && (m.value as BitsValue).data !== 0n;
+  const m = getInterfaceMarker(t);
+  return m?.kind === ValueKind.Bits && (m as BitsValue).data !== 0n;
+}
+
+/** C6.1b (D45): is this meta Context a kind in the Type tower — Type
+ *  itself or a meta CONFORMING to it (Refinement, Interface)? Surfaces
+ *  that used to identity-check `=== Type` (e.g. `&`'s left-operand gate)
+ *  use this so refined types (meta Refinement) keep their type-hood. */
+export function isTypeMeta(meta: ContextValue): boolean {
+  return meta === Type || shapeAwareSubtypeof(meta, Type);
 }
 
 /**
@@ -157,14 +431,35 @@ function isInterfaceType(t: ContextValue): boolean {
  * Compares __members collections by name.
  */
 function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean {
-  const aMembersVal = typeA.bindings.get("__members")?.value;
-  const bMembersVal = typeB.bindings.get("__members")?.value;
+  const aMembersVal = getMembers(typeA);
+  const bMembersVal = getMembers(typeB);
 
-  if (bMembersVal?.kind === ValueKind.Context) {
+  if (bMembersVal?.kind === ValueKind.Structure) {
     const bMembers = bMembersVal as ContextValue;
-    const aMembers = aMembersVal?.kind === ValueKind.Context ? aMembersVal as ContextValue : null;
-    for (const [key] of bMembers.bindings) {
-      if (!aMembers || !aMembers.bindings.has(key)) return false;
+    const aMembers = aMembersVal?.kind === ValueKind.Structure ? aMembersVal as ContextValue : null;
+    if (!aMembers) return bMembers.bindings.size === 0;
+    // C5.2c/C6.1a (D30/D44): the conformance split.
+    //  - A DECLARED check (expected is an interface OR a named type — one
+    //    mechanism since D44 dissolved the nominal chain) is
+    //    SYMBOL-IDENTITY membership: every member symbol the expected
+    //    type declares must BE a member symbol of the actual type (same
+    //    FQN key; interning makes key identity symbol identity).
+    //    Conformance is declared, never accidental — a type conforms by
+    //    DRAWING the expected type's symbols, not by spelling the same
+    //    names.
+    //  - The LOOSE path (~T structural wraps, anonymous inline types —
+    //    expected is UNNAMED and unmarked) matches by base-name
+    //    projection — the duck-typing surface, aimed at data values.
+    if (isInterfaceType(typeB) || getTypeNameFromCtx(typeB) !== null) {
+      for (const key of bMembers.bindings.keys()) {
+        if (!aMembers.bindings.has(key)) return false;
+      }
+      return true;
+    }
+    const aNames = new Set<string>();
+    for (const key of aMembers.bindings.keys()) aNames.add(fqnBaseName(key));
+    for (const key of bMembers.bindings.keys()) {
+      if (!aNames.has(fqnBaseName(key))) return false;
     }
     return true;
   }
@@ -175,44 +470,32 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
 
 /**
  * Nominal subtypeof: typeA is the same as typeB by name (and type args), or
- * typeA's __extends chain reaches a type with that name. Caller has already
+ * typeA's __refines chain reaches a type with that name. Caller has already
  * confirmed both types carry a __name.
  */
-function nominalSubtypeof(typeA: ContextValue, typeB: ContextValue, nameB: string): boolean {
-  let current: ContextValue | null = typeA;
-  while (current) {
-    const nameA = getTypeNameFromCtx(current);
-    if (nameA === nameB) {
-      return typeArgsMatch(current, typeB);
-    }
-    const extendsBinding = current.bindings.get("__extends");
-    if (extendsBinding?.value?.kind === ValueKind.Context) {
-      current = extendsBinding.value as ContextValue;
-    } else {
-      current = null;
-    }
-  }
-  return false;
-}
+// C6.1a (D44): `nominalSubtypeof` — the name-string chain walk — is
+// DELETED. The declared relation is symbol-identity conformance
+// (shapeAwareSubtypeof); refinement satisfaction walks the `refines`
+// chain by object identity, never by name.
 
 /** Check that type arguments match (if the expected type has them) */
 function typeArgsMatch(actual: ContextValue, expected: ContextValue): boolean {
-  const expectedArgsB = expected.bindings.get("__args");
-  if (!expectedArgsB?.value || expectedArgsB.value.kind !== ValueKind.Context) return true; // no args to check
-  const actualArgsB = actual.bindings.get("__args");
-  if (!actualArgsB?.value || actualArgsB.value.kind !== ValueKind.Context) return true; // actual has no args — accept (bare generic)
+  const expectedArgsV = getGenericArgs(expected);
+  if (!expectedArgsV || expectedArgsV.kind !== ValueKind.Structure) return true; // no args to check
+  const actualArgsV = getGenericArgs(actual);
+  if (!actualArgsV || actualArgsV.kind !== ValueKind.Structure) return true; // actual has no args — accept (bare generic)
 
-  const expectedArgsCtx = expectedArgsB.value as ContextValue;
-  const actualArgsCtx = actualArgsB.value as ContextValue;
+  const expectedArgsCtx = expectedArgsV as ContextValue;
+  const actualArgsCtx = actualArgsV as ContextValue;
   const expElems = arrayElements(expectedArgsCtx);
   const actElems = arrayElements(actualArgsCtx);
 
   if (expElems.length !== actElems.length) return false;
 
   for (let i = 0; i < expElems.length; i++) {
-    const expArg = primaryOf(expElems[i]);
-    const actArg = primaryOf(actElems[i]);
-    if (expArg.kind !== ValueKind.Context || actArg.kind !== ValueKind.Context) continue;
+    const expArg = dataOf(expElems[i]);
+    const actArg = dataOf(actElems[i]);
+    if (expArg.kind !== ValueKind.Structure || actArg.kind !== ValueKind.Structure) continue;
     const expName = getTypeNameFromCtx(expArg as ContextValue);
     const actName = getTypeNameFromCtx(actArg as ContextValue);
     if (expName && actName && expName !== "Any" && expName !== actName) return false;
@@ -222,31 +505,26 @@ function typeArgsMatch(actual: ContextValue, expected: ContextValue): boolean {
 
 /** Get __name from a type Context */
 function getTypeNameFromCtx(type: ContextValue): string | null {
-  const nb = type.bindings.get("__name");
-  if (nb?.value?.kind === ValueKind.Bits) return bitsToString(nb.value);
+  const nv = getName(type);
+  if (nv?.kind === ValueKind.Bits) return bitsToString(nv);
   return null;
 }
 
 // --- Build Type (the single meta-type) ---
 
 export const Type: ContextValue = makeContext();
-addBinding(Type, "__name", stringToBits("Type"));
+setName(Type, stringToBits("Type"));
 // __members added after all meta-types are bootstrapped (see below)
 
-/**
- * Back-compat alias. NominalType used to be a distinct meta-type; its semantics
- * (nominal comparison) now live inside Type's shape-aware methods, dispatching
- * on __name presence. Keeping the export means existing user code (and tests)
- * referring to `NominalType` continue to work.
- */
-export const NominalType: ContextValue = Type;
+// C7.1: the `NominalType` alias is RETIRED — after D44 there is no
+// nominal checking left for the name to name. `Type` is the one root kind.
 
 // --- Structural wrap (~): erase __name to make the type compare structurally ---
 
 /**
  * Create an anonymous projection of a named type. With shape-aware dispatch,
  * absence of __name flips comparisons from nominal to structural — so erasing
- * the name is exactly the `~T` semantics. All other bindings (__extends,
+ * the name is exactly the `~T` semantics. All other bindings (__refines,
  * __members, __construct, __predicate, __invariantsList, ...) are preserved,
  * so `~Int` still constructs Int values, has Int's methods, etc.; only its
  * type comparisons go structural.
@@ -254,11 +532,21 @@ export const NominalType: ContextValue = Type;
 export function structuralWrap(type: ContextValue): ContextValue {
   const wrapper = makeContext();
   for (const [key, binding] of type.bindings) {
-    if (key === "__name") continue; // erase name → anonymous → structural
+    if (key === SLOT_KEYS.name) continue; // erase name → anonymous → structural
+    if (key === SLOT_KEYS.members) continue; // shared explicitly below
+    // C5.2c: erase the interface marker too — `~T` projects the type into
+    // the LOOSE (base-name) world; a wrapped interface duck-types by name
+    // instead of demanding declared symbol identity.
+    if (key === SLOT_KEYS.interface) continue;
     wrapper.bindings.set(key, { ...binding });
     wrapper.bindingList.push({ ...binding });
   }
-  addBinding(wrapper, "__wraps", type);
+  // C5.2a (ruling R1): member-set sharing is EXPLICIT — the wrap is
+  // member-transparent (same member-set object as the wrapped type), which
+  // is what keeps typeShape's identity test sound across the re-keying.
+  const wrappedMembers = getMembers(type);
+  if (wrappedMembers) setMembers(wrapper, wrappedMembers);
+  setWraps(wrapper, type);
   return wrapper;
 }
 
@@ -271,9 +559,9 @@ export function structuralWrap(type: ContextValue): ContextValue {
  */
 export function makeUnionType(alternatives: ContextValue[]): ContextValue {
   const union = makeContext();
-  addBinding(union, "__name", stringToBits(
+  setName(union, stringToBits(
     alternatives.map(a => {
-      const n = a.bindings.get("__name")?.value;
+      const n = getName(a);
       return n && n.kind === ValueKind.Bits ? bitsToString(n) : "?";
     }).join(" | ")
   ));
@@ -281,8 +569,8 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
   for (let i = 0; i < alternatives.length; i++) {
     addBinding(union, String(i), alternatives[i]);
   }
-  addBinding(union, "__length", makeInt(alternatives.length));
-  addBinding(union, "__union", makeInt(1)); // marker
+  setSlotCount(union, makeInt(alternatives.length));
+  setVariants(union, makeInt(1)); // marker
 
   // instanceof: value matches if it matches ANY alternative
   addBinding(union, "instanceof", makePrimitive("UnionType.instanceof", (args) => {
@@ -292,16 +580,16 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
     const valueName = getTypeName(value);
     for (let i = 0; i < alternatives.length; i++) {
       const alt = alternatives[i];
-      const altName = alt.bindings.get("__name")?.value;
+      const altName = getName(alt);
       const altNameStr = altName && altName.kind === ValueKind.Bits ? bitsToString(altName) : null;
       if (altNameStr && altNameStr === valueName) return makeInt(1);
       // Also check via the alternative's meta-type instanceof
-      const altMetaType = alt.bindings.get("__type")?.value as ContextValue | undefined;
+      const altMetaType = channelReadRaw(alt, "shape") as ContextValue | undefined;
       if (altMetaType) {
         const altInstanceof = typeMethod(altMetaType, "instanceof");
         if (altInstanceof?.kind === ValueKind.PrimitiveFunction) {
           const result = altInstanceof.fn([alt, value], undefined as any, undefined as any);
-          const rp = primaryOf(result);
+          const rp = dataOf(result);
           if (rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n) return makeInt(1);
         }
       }
@@ -313,47 +601,45 @@ export function makeUnionType(alternatives: ContextValue[]): ContextValue {
   addBinding(union, "subtypeof", makePrimitive("UnionType.subtypeof", (args) => {
     const target = args[0] as ContextValue;
     for (const alt of alternatives) {
-      const altMetaType = alt.bindings.get("__type")?.value as ContextValue | undefined;
+      const altMetaType = channelReadRaw(alt, "shape") as ContextValue | undefined;
       if (!altMetaType) return makeInt(0);
       const altSubtype = typeMethod(altMetaType, "subtypeof");
       if (!altSubtype || altSubtype.kind !== ValueKind.PrimitiveFunction) return makeInt(0);
       const result = altSubtype.fn([alt, target], undefined as any, undefined as any);
-      const rp = primaryOf(result);
+      const rp = dataOf(result);
       if (rp.kind === ValueKind.Bits && (rp as BitsValue).data === 0n) return makeInt(0);
     }
     return makeInt(1);
   }));
 
   // Set __type to Type (unions are structural)
-  addBinding(union, "__type", Type);
+  writeShape(union, Type);
 
   return union;
 }
 
 // Bootstrap: Type self-types
-addBinding(Type, "__type", Type);
+writeShape(Type, Type);
 
 // =============================================================================
 // Member Descriptor Types (bootstrap)
 // Member/Method/Field are named types created before buildType is available.
 // =============================================================================
 
-/** Abstract base type for member descriptors */
-export const MemberType: ContextValue = makeContext();
-addBinding(MemberType, "__name", stringToBits("Member"));
-addBinding(MemberType, "__type", Type);
+// C6.3 (D44 audit): the descriptor taxonomy's refines edges are gone —
+// MemberType (the abstract base) is deleted; Method and Field are the
+// two descriptor shapes, recognised by shape identity, related by
+// nothing (no chain, no shared members).
 
 /** Method descriptor — a member with an implementation function */
 export const MethodType: ContextValue = makeContext();
-addBinding(MethodType, "__name", stringToBits("Method"));
-addBinding(MethodType, "__type", Type);
-addBinding(MethodType, "__extends", MemberType);
+setName(MethodType, stringToBits("Method"));
+writeShape(MethodType, Type);
 
 /** Field descriptor — a member representing instance data */
 export const FieldType: ContextValue = makeContext();
-addBinding(FieldType, "__name", stringToBits("Field"));
-addBinding(FieldType, "__type", Type);
-addBinding(FieldType, "__extends", MemberType);
+setName(FieldType, stringToBits("Field"));
+writeShape(FieldType, Type);
 
 /** Create a Method descriptor */
 export function makeMethodDescriptor(
@@ -362,7 +648,7 @@ export function makeMethodDescriptor(
   isGetter: boolean = false,
 ): ContextValue {
   const desc = makeContext();
-  addBinding(desc, "__type", MethodType);
+  writeShape(desc, MethodType);
   addBinding(desc, "name", stringToBits(name));
   addBinding(desc, "value", impl);
   if (isGetter) addBinding(desc, "getter", makeInt(1));
@@ -375,20 +661,92 @@ export function makeFieldDescriptor(
   fieldType: Value,
 ): ContextValue {
   const desc = makeContext();
-  addBinding(desc, "__type", FieldType);
+  writeShape(desc, FieldType);
   addBinding(desc, "name", stringToBits(name));
   addBinding(desc, "fieldType", fieldType);
   return desc;
 }
 
+/** Law descriptor — a named theorem template quantified over the
+ *  implementing type (E3 — B-027 §8, D38). An ordinary member descriptor:
+ *  laws live in member SETS and are drawn like any member, so law
+ *  inheritance is symbol identity for free. */
+export const LawType: ContextValue = makeContext();
+setName(LawType, stringToBits("Law"));
+writeShape(LawType, Type);
+
+/** Create a Law descriptor. `proposition` is the quantified BODY — a
+ *  function value of `arity` params, each ranging over the implementing
+ *  type; the law holds iff the body is true on every tuple. A
+ *  `kernelCertificate` marks a law proven ONCE, parametrically, for
+ *  KERNEL-SUPPLIED implementations of the member it references
+ *  (Equatable's refl/sym/trans over the kernel structural equals) — types
+ *  whose implementation is kernel-supplied inherit the certificate free
+ *  (§8 amortization); custom implementations bear fresh obligations. */
+export function makeLawDescriptor(
+  name: string,
+  proposition: Value,
+  arity: number,
+  kernelCertificate?: string,
+): ContextValue {
+  const desc = makeContext();
+  writeShape(desc, LawType);
+  addBinding(desc, "name", stringToBits(name));
+  addBinding(desc, "value", proposition);
+  addBinding(desc, "arity", makeInt(arity));
+  if (kernelCertificate) addBinding(desc, "kernelCertificate", stringToBits(kernelCertificate));
+  return desc;
+}
+
+/** Check if a descriptor is a Law */
+export function isLawDescriptor(desc: ContextValue): boolean {
+  return channelReadRaw(desc, "shape") === LawType;
+}
+
+function lawDescriptorParts(desc: ContextValue): {
+  name: string; proposition: Value; arity: number; kernelCertificate: string | null;
+} {
+  const nameV = desc.bindings.get("name")?.value;
+  const propV = desc.bindings.get("value")?.value;
+  const arityV = desc.bindings.get("arity")?.value;
+  const certV = desc.bindings.get("kernelCertificate")?.value;
+  return {
+    name: nameV?.kind === ValueKind.Bits ? bitsToString(nameV as BitsValue) : "<law>",
+    proposition: propV ?? makeInt(0),
+    arity: arityV?.kind === ValueKind.Bits ? Number((arityV as BitsValue).data) : 1,
+    kernelCertificate: certV?.kind === ValueKind.Bits ? bitsToString(certV as BitsValue) : null,
+  };
+}
+
+// --- `for_all` proposition form (E-R3) ---------------------------------------
+// `for_all(fn)` marks a function value as a quantified proposition schema.
+// The marker is a host-side registry (no new `__*` slot): the returned
+// Context is empty on the data plane; spec processing recognises it via
+// `forAllBody`. All params of the body quantify over the implementing type.
+
+const forAllRegistry = new WeakMap<Value, Value>();
+
+/** Wrap a proposition body as a for_all marker value. */
+export function makeForAllProp(body: Value): ContextValue {
+  const marker = makeContext();
+  forAllRegistry.set(marker, body);
+  return marker;
+}
+
+/** The quantified body of a for_all marker, or undefined when `v` is not
+ *  one. */
+export function forAllBody(v: Value): Value | undefined {
+  return forAllRegistry.get(dataOf(v));
+}
+
 /** Check if a descriptor is a Method */
 export function isMethodDescriptor(desc: ContextValue): boolean {
-  return desc.bindings.get("__type")?.value === MethodType;
+  return channelReadRaw(desc, "shape") === MethodType;
 }
 
 /** Check if a descriptor is a Field */
 export function isFieldDescriptor(desc: ContextValue): boolean {
-  return desc.bindings.get("__type")?.value === FieldType;
+  return channelReadRaw(desc, "shape") === FieldType;
 }
 
 /** Check if a Method descriptor is a getter (auto-call with self) */
@@ -397,84 +755,218 @@ export function isGetterDescriptor(desc: ContextValue): boolean {
   return g !== undefined && g.kind === ValueKind.Bits && (g as BitsValue).data !== 0n;
 }
 
-/** Look up the full member descriptor from a type's __members */
+/** Look up the full member descriptor from a type's __members.
+ *  C5.2b: base name resolves via the projection scan (kernel fast path;
+ *  drawn/type-local symbols by base-name projection; distinct-target
+ *  ambiguity errors per §5). */
 export function typeMemberDescriptor(type: ContextValue, name: string): ContextValue | null {
-  const membersBinding = type.bindings.get("__members");
-  if (!membersBinding?.value || membersBinding.value.kind !== ValueKind.Context) return null;
-  const members = membersBinding.value as ContextValue;
-  const memberBinding = members.bindings.get(name);
-  if (!memberBinding?.value || memberBinding.value.kind !== ValueKind.Context) return null;
-  return memberBinding.value as ContextValue;
+  const membersV = getMembers(type);
+  if (!membersV || membersV.kind !== ValueKind.Structure) return null;
+  const descV = memberBindingByName(membersV as ContextValue, name);
+  if (!descV || descV.kind !== ValueKind.Structure) return null;
+  return descV as ContextValue;
 }
 
 // =============================================================================
-// Fluent Type API: extend, where, distinct, constructor
+// Type construction API: define, where, distinct, constructor
 // =============================================================================
 
 /**
- * Build a record type from a parent type and field specification.
+ * Build a record type from a field specification plus zero or more drawn
+ * member bundles (D45: `Type.define(spec, ...bundles)`). A field whose base
+ * name matches a drawn bundle's member binds THAT symbol (declared
+ * conformance); bundle methods not overridden are copied verbatim (same
+ * symbol, same key). No is-a edge is minted (D44).
  * Auto-generates __construct (positional args), __getMember (field access), toString.
  */
 function buildRecordType(
-  parentType: ContextValue,
   fieldSpecObj: Value,
+  drawn: ContextValue[],
   metaType: ContextValue,
+  ctx?: ContextValue,
+  evalFn?: EvalFn,
 ): ContextValue {
   // Extract field specs from the Object's Context
-  const fieldCtx = primaryOf(fieldSpecObj);
-  if (fieldCtx.kind !== ValueKind.Context) {
-    throw new AllegroError("extend: argument must be an object literal {field: Type, ...}");
+  const fieldCtx = dataOf(fieldSpecObj);
+  if (fieldCtx.kind !== ValueKind.Structure) {
+    throw new AllegroError("define: argument must be an object literal {field: Type, ...}");
   }
+  // C6.1b (D45): the spec unifies fields and methods — an entry whose
+  // value is a FUNCTION VALUE (ComposedFunction / PrimitiveFunction) is a
+  // method implementation (the old `.mixin()` surface); anything else —
+  // including function TYPES like `toString: Function` — declares a typed
+  // field. Methods do not participate in the positional constructor.
   const fields: { name: string; type: Value }[] = [];
+  const methods: { name: string; impl: Value }[] = [];
+  // C7.2b (ruling R3): `construct` is a RESERVED spec key — the declared
+  // construction authority (Refinement.define's reserved-key precedent:
+  // refines/where/preserve). Declared at mint time, replacing the post-hoc
+  // `.constructor()` meta-method (which MUTATED a built type against D22).
+  let customConstruct: Value | null = null;
+  // E3 (E-R3): `law_`-prefixed spec entries are LAW declarations — the
+  // value must be a `for_all(...)` proposition; they become Law
+  // descriptors, never fields or methods.
+  const laws: { name: string; body: Value }[] = [];
   for (const [key, binding] of (fieldCtx as ContextValue).bindings) {
-    if (key.startsWith("__")) continue;
+    if (isMetaSlotKey(key)) continue;
     if (binding.value) {
-      fields.push({ name: key, type: binding.value });
+      if (key.startsWith("law_")) {
+        const body = forAllBody(binding.value);
+        if (body === undefined) {
+          throw new AllegroError(
+            `define: '${key}' must be a for_all(...) proposition (laws quantify over the implementing type)`);
+        }
+        laws.push({ name: key.slice(4), body });
+        continue;
+      }
+      const entry = dataOf(binding.value);
+      if (key === "construct") {
+        if (entry.kind !== ValueKind.ComposedFunction && entry.kind !== ValueKind.PrimitiveFunction) {
+          throw new AllegroError("define: reserved key 'construct' must be a function value");
+        }
+        customConstruct = entry;
+        continue;
+      }
+      if (entry.kind === ValueKind.ComposedFunction || entry.kind === ValueKind.PrimitiveFunction) {
+        // E-R5: an `eq` implementation is this type's equality — it must
+        // be pure and knowledge-independent, checked mechanically here.
+        if (key === "eq") {
+          assertPureForEquality(binding.value, `define: 'eq' implementation`, ctx);
+        }
+        methods.push({ name: key, impl: entry });
+      } else {
+        fields.push({ name: key, type: binding.value });
+      }
     }
   }
 
   // Build the new type Context
   const newType = makeContext();
-  addBinding(newType, "__name", stringToBits("<anonymous>"));
-  addBinding(newType, "__type", metaType);
-  addBinding(newType, "__extends", parentType);
+  setName(newType, stringToBits("<anonymous>"));
+  writeShape(newType, metaType);
+  // C6.1a (D44): composition mints NO is-a edge — Dog relates to Animal
+  // by holding its drawn member symbols (conformance), not by a chain
+  // link. `refines` is written only by refinement layers now.
 
   // Build __members: Field descriptors for declared fields + Method descriptors for methods
   const members = makeContext();
 
-  // Add Field descriptors for each declared field
+  // Add Field descriptors for each declared field. C5.2b (D30 draw-from):
+  // a field whose base name matches a drawn bundle's member binds THAT
+  // symbol (override/implement keeps identity); otherwise it gets a
+  // type-local symbol in this type's member scope. Multi-bundle diamonds
+  // resolve inside drawMemberKey (shared symbol → one key; distinct
+  // same-named symbols → explicit ambiguity error).
+  const recordScope = newTypeMemberScope();
+  (newType as any).__localMemberScope = recordScope;
   for (const f of fields) {
-    addBinding(members, f.name, makeFieldDescriptor(f.name, f.type));
+    for (const key of drawMemberKeys(drawn, f.name, recordScope)) {
+      addMemberAt(members, key, makeFieldDescriptor(f.name, f.type));
+    }
   }
 
-  // Copy non-meta Method descriptors from parent's __members
+  // Method entries (the unified mixin surface). A method whose base name
+  // matches a drawn member DRAWS that symbol — an override that keeps
+  // member identity (C5.2b); new names get type-local symbols. Methods
+  // receive `self` (the typed instance) as their first argument;
+  // type_dispatch handles both PrimitiveFunction and ComposedFunction
+  // descriptors with self-binding.
+  for (const m of methods) {
+    let desc: Value;
+    if (m.impl.kind === ValueKind.PrimitiveFunction) {
+      desc = makeMethodDescriptor(m.name, m.impl as PrimitiveFunctionValue);
+    } else {
+      const d = makeContext();
+      writeShape(d, MethodType);
+      addBinding(d, "name", stringToBits(m.name));
+      addBinding(d, "value", m.impl);
+      desc = d;
+    }
+    for (const key of drawMemberKeys(drawn, m.name, recordScope)) {
+      addMemberAt(members, key, desc);
+    }
+  }
+
+  // Law entries (E3): Law descriptors drawn like any member — a law whose
+  // name matches a drawn law OVERRIDES it (binds the drawn symbol).
+  for (const l of laws) {
+    const desc = makeLawDescriptor(
+      l.name, l.body,
+      dataOf(l.body).kind === ValueKind.ComposedFunction
+        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1);
+    for (const key of drawMemberKeys(drawn, l.name, recordScope)) {
+      addMemberAt(members, key, desc);
+    }
+  }
+
+  // Copy non-meta Method descriptors from each drawn bundle's __members.
+  // C5.2a: keys are member-symbol FQNs — copied verbatim (same symbol,
+  // same key); the meta filter compares the base-name projection.
+  // C6.1b order ruling: bundle order is NOT significant. A spec
+  // declaration owns its keys (the explicit resolution); two bundles
+  // providing DIFFERENT descriptors for the same symbol is an explicit-
+  // conflict error, never a first-bundle-wins.
   const metaMethodNames = META_METHOD_NAMES;
-  const parentMembers = parentType.bindings.get("__members")?.value;
-  if (parentMembers?.kind === ValueKind.Context) {
-    for (const [key, binding] of (parentMembers as ContextValue).bindings) {
-      if (metaMethodNames.has(key)) continue;
-      if (!members.bindings.has(key) && binding.value) {
+  const specKeys = new Set(members.bindings.keys());
+  for (const bundle of drawn) {
+    const bundleMembers = getMembers(bundle);
+    if (bundleMembers?.kind !== ValueKind.Structure) continue;
+    for (const [key, binding] of (bundleMembers as ContextValue).bindings) {
+      if (metaMethodNames.has(fqnBaseName(key))) continue;
+      if (!binding.value) continue;
+      if (specKeys.has(key)) continue;
+      const existing = members.bindings.get(key)?.value;
+      if (existing === undefined) {
         addBinding(members, key, binding.value);
+      } else if (existing !== binding.value) {
+        throw new AllegroError(
+          `member '${fqnBaseName(key)}' is provided differently by two drawn bundles — ` +
+          `bundle order is not significant; resolve by declaring '${fqnBaseName(key)}' in the spec`);
       }
     }
   }
 
-  // Auto-generate __construct: positional args in field order
-  const constructImpl: PrimitiveFnImpl = (args, ctx, evalFn) => {
-    const evalArgs = args.map(a => evalFn!(a, ctx!));
-    if (evalArgs.length !== fields.length) {
-      throw new AllegroError(`Constructor expects ${fields.length} args, got ${evalArgs.length}`);
-    }
-    const instance = makeContext();
-    for (let i = 0; i < fields.length; i++) {
-      addBinding(instance, fields[i].name, evalArgs[i]);
-    }
-    return withType(instance, newType);
-  };
-  addBinding(newType, "__construct", makePrimitive("record.__construct", constructImpl, true));
+  // A METHODS-ONLY spec mints a BUNDLE — a pure member set meant to be
+  // drawn into other types (`Type.define(spec, ..., MagMixin)`), not
+  // instantiated. Bundles get no auto-generated construct / getMember /
+  // toString: the generated infrastructure would clash symbol-wise with
+  // every other concrete bundle at draw time (two auto-toStrings under
+  // one base name is the D44 explicit-conflict error). An empty spec
+  // (`Type.define({})`) still mints a full record type.
+  const isBundle = fields.length === 0 && methods.length > 0 && customConstruct === null;
+  if (isBundle) {
+    setMembers(newType, members);
+    return newType;
+  }
+
+  if (customConstruct !== null) {
+    // C7.2b (ruling R3): declared construction authority — the spec's
+    // `construct` function runs with the call's args; its result is
+    // tagged with this type (same wrap the retired `.constructor()`
+    // meta-method applied, now declared at mint time).
+    const declaredCtor = customConstruct;
+    setConstruct(newType, makePrimitive("record.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
+      const result = ctorEvalFn!(makeExpr(declaredCtor, ctorArgs), ctorCtx!);
+      return withTypeReplacing(dataOf(result), newType);
+    }, true));
+  } else {
+    // Auto-generate __construct: positional args in field order
+    const constructImpl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+      const evalArgs = args.map(a => evalFn!(a, ctx!));
+      if (evalArgs.length !== fields.length) {
+        throw new AllegroError(`Constructor expects ${fields.length} args, got ${evalArgs.length}`);
+      }
+      const instance = makeContext();
+      for (let i = 0; i < fields.length; i++) {
+        addBinding(instance, fields[i].name, evalArgs[i]);
+      }
+      return withType(instance, newType);
+    };
+    setConstruct(newType, makePrimitive("record.__construct", constructImpl, true));
+  }
 
   // Auto-generate __getMember: field access on instances
-  addBinding(newType, "__getMember", makePrimitive("record.__getMember", (args) => {
+  setFallbackMember(newType, makePrimitive("record.__getMember", (args) => {
     const instanceCtx = args[0] as ContextValue;
     const fieldName = bitsToString(args[1] as BitsValue);
     const b = instanceCtx.bindings.get(fieldName);
@@ -495,8 +987,8 @@ function buildRecordType(
         if (valType) {
           const tsMethod = typeMethod(valType, "toString");
           if (tsMethod?.kind === ValueKind.PrimitiveFunction) {
-            const str = (tsMethod as PrimitiveFunctionValue).fn([primaryOf(val)], undefined as any, undefined as any);
-            const sp = primaryOf(str);
+            const str = (tsMethod as PrimitiveFunctionValue).fn([dataOf(val)], undefined as any, undefined as any);
+            const sp = dataOf(str);
             if (sp.kind === ValueKind.Bits) {
               parts.push(`${f.name}: ${bitsToString(sp as BitsValue)}`);
               continue;
@@ -508,9 +1000,23 @@ function buildRecordType(
     }
     return withType(stringToBits(`${typeName}(${parts.join(", ")})`), StringType);
   }) as PrimitiveFnImpl);
-  addBinding(members, "toString", makeMethodDescriptor("toString", toStringImpl));
+  // toString draws a bundle's symbol if one exists (an override, same
+  // member identity); otherwise it gets a type-local symbol. A toString
+  // METHOD supplied in the spec wins over the auto-generated one.
+  if (!methods.some((m) => m.name === "toString")) {
+    const tsDesc = makeMethodDescriptor("toString", toStringImpl);
+    for (const key of drawMemberKeys(drawn, "toString", recordScope)) {
+      addMemberAt(members, key, tsDesc);
+    }
+  }
 
-  addBinding(newType, "__members", members);
+  setMembers(newType, members);
+
+  // E3: a CONCRETE type is an implementing type — every Law descriptor in
+  // its member set (own spec + drawn bundles) instantiates an obligation,
+  // quantifier specialized to this type, discharge attempted down the
+  // tier ladder. (Bundles returned above declare, they don't implement.)
+  instantiateLawsFromMembers(newType, members, ctx, evalFn);
 
   return newType;
 }
@@ -523,51 +1029,101 @@ function buildRecordType(
  * No __construct, __getMember, or auto-generated methods.
  */
 function buildInterfaceType(
-  parentType: ContextValue,
   memberSpecObj: Value,
+  drawn: ContextValue[],
 ): ContextValue {
-  const specCtx = primaryOf(memberSpecObj);
-  if (specCtx.kind !== ValueKind.Context) {
-    throw new AllegroError("interface: argument must be an object literal {member: Type, ...}");
+  const specCtx = dataOf(memberSpecObj);
+  if (specCtx.kind !== ValueKind.Structure) {
+    throw new AllegroError("Interface.define: argument must be an object literal {member: Type, ...}");
   }
 
-  // Extract declared members from the spec
+  // Extract declared members from the spec. E3: `law_`-prefixed entries
+  // are LAW declarations — proposition SCHEMAS at declaration time
+  // (nothing runs, nothing discharges); they become concrete obligations
+  // at DRAW time when an implementing type binds the interface's symbols.
   const declaredMembers: { name: string; type: Value }[] = [];
+  const declaredLaws: { name: string; body: Value }[] = [];
   for (const [key, binding] of (specCtx as ContextValue).bindings) {
-    if (key.startsWith("__")) continue;
+    if (isMetaSlotKey(key)) continue;
     if (binding.value) {
+      if (key.startsWith("law_")) {
+        const body = forAllBody(binding.value);
+        if (body === undefined) {
+          throw new AllegroError(
+            `Interface.define: '${key}' must be a for_all(...) proposition`);
+        }
+        declaredLaws.push({ name: key.slice(4), body });
+        continue;
+      }
       declaredMembers.push({ name: key, type: binding.value });
     }
   }
 
   // Build the interface type Context
   const ifaceType = makeContext();
-  addBinding(ifaceType, "__name", stringToBits("<anonymous>"));
-  addBinding(ifaceType, "__type", Type); // structural — no ~ needed
-  addBinding(ifaceType, "__extends", parentType);
-  addBinding(ifaceType, "__interface", makeInt(1)); // marker
+  setName(ifaceType, stringToBits("<anonymous>"));
+  // C6.1b (D45): an interface is an INSTANCE OF the Interface kind
+  // (declaration-only types). Interface conforms to Type through its
+  // refines edge, so `Printable instanceof Type` stays true.
+  writeShape(ifaceType, InterfaceKind);
+  // C6.1a (D44): no edge — interface conformance is symbol membership
+  // over the copied member set.
+  markInterface(ifaceType, makeInt(1)); // marker
 
   // Build __members: declared members as Field descriptors
   const members = makeContext();
 
-  // Copy non-meta Method descriptors from parent's __members
+  // Add Field descriptors for each declared member first. C5.2b:
+  // declarations draw from the bundles (a matching base name binds the
+  // drawn member symbol); new names get interface-local symbols.
+  const ifaceScope = newTypeMemberScope();
+  (ifaceType as any).__localMemberScope = ifaceScope;
+  for (const m of declaredMembers) {
+    const desc = makeFieldDescriptor(m.name, m.type);
+    for (const key of drawMemberKeys(drawn, m.name, ifaceScope)) {
+      addMemberAt(members, key, desc);
+    }
+  }
+
+  // Law descriptors (E3) — drawn like any member; no instantiation here
+  // (an interface declares, it never implements).
+  for (const l of declaredLaws) {
+    const desc = makeLawDescriptor(
+      l.name, l.body,
+      dataOf(l.body).kind === ValueKind.ComposedFunction
+        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1);
+    for (const key of drawMemberKeys(drawn, l.name, ifaceScope)) {
+      addMemberAt(members, key, desc);
+    }
+  }
+
+  // Copy non-meta members from each drawn bundle (C5.2a: FQN keys copied
+  // verbatim; meta filter on the base-name projection) — the old
+  // parent-inheritance form `Int.interface(spec)` is now
+  // `Interface.define(spec, Int)`. C6.1b order ruling: bundle order is
+  // NOT significant — spec declarations own their keys; conflicting
+  // bundle-provided descriptors for one symbol error explicitly.
   const metaMethodNames = META_METHOD_NAMES;
-  const parentMembers = parentType.bindings.get("__members")?.value;
-  if (parentMembers?.kind === ValueKind.Context) {
-    for (const [key, binding] of (parentMembers as ContextValue).bindings) {
-      if (metaMethodNames.has(key)) continue;
-      if (binding.value) {
+  const specKeys = new Set(members.bindings.keys());
+  for (const bundle of drawn) {
+    const bundleMembers = getMembers(bundle);
+    if (bundleMembers?.kind !== ValueKind.Structure) continue;
+    for (const [key, binding] of (bundleMembers as ContextValue).bindings) {
+      if (metaMethodNames.has(fqnBaseName(key))) continue;
+      if (!binding.value) continue;
+      if (specKeys.has(key)) continue;
+      const existing = members.bindings.get(key)?.value;
+      if (existing === undefined) {
         addBinding(members, key, binding.value);
+      } else if (existing !== binding.value) {
+        throw new AllegroError(
+          `member '${fqnBaseName(key)}' is provided differently by two drawn bundles — ` +
+          `bundle order is not significant; resolve by declaring '${fqnBaseName(key)}' in the spec`);
       }
     }
   }
 
-  // Add Field descriptors for each declared member
-  for (const m of declaredMembers) {
-    addBinding(members, m.name, makeFieldDescriptor(m.name, m.type));
-  }
-
-  addBinding(ifaceType, "__members", members);
+  setMembers(ifaceType, members);
 
   return ifaceType;
 }
@@ -579,39 +1135,42 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   const refinedType = makeContext();
   // Copy all bindings from parent (except __members, handled separately)
   for (const [key, binding] of parentType.bindings) {
-    if (key === "__members") continue;
+    if (key === SLOT_KEYS.members) continue;
     if (binding.value) {
       addBinding(refinedType, key, binding.value);
     }
   }
   // Copy __members from parent (shared reference is fine — same descriptors)
-  const parentMembers = parentType.bindings.get("__members")?.value;
-  if (parentMembers?.kind === ValueKind.Context) {
-    addBinding(refinedType, "__members", parentMembers);
+  const parentMembers = getMembers(parentType);
+  if (parentMembers?.kind === ValueKind.Structure) {
+    setMembers(refinedType, parentMembers);
   }
   // Override __name
-  refinedType.bindings.delete("__name");
-  addBinding(refinedType, "__name", stringToBits("<refined>"));
-  // Set __extends to parent
-  refinedType.bindings.delete("__extends");
-  addBinding(refinedType, "__extends", parentType);
+  removeName(refinedType);
+  setName(refinedType, stringToBits("<refined>"));
+  // Set __refines to parent
+  removeRefines(refinedType);
+  setRefines(refinedType, parentType);
+  // C6.1b (D45): a refined type is an INSTANCE OF the Refinement kind —
+  // its meta answers Refinement (which conforms to Type by drawn
+  // membership, so `P instanceof Type` stays true through conformance).
+  removeShapeSlot(refinedType);
+  writeShape(refinedType, RefinementKind);
   // Store predicate
-  addBinding(refinedType, "__predicate", predicate);
+  setPredicate(refinedType, predicate);
   // Phase B: recognise the predicate's algebraic shape (if any) and stash
   // an abstract domain. The domain lets downstream arithmetic propagate
   // refinement facts without re-evaluating the predicate. Opaque
   // predicates just get an opaque-tagged domain; runtime checks still
   // fire via __construct / type_check.
-  (refinedType as any).__abstractDomain = domainFromPredicate(predicate);
+  setAbstractDomain(refinedType, domainFromPredicate(predicate));
 
   // Wrap __construct with predicate check
-  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  const parentConstruct = getConstruct(parentType);
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    refinedType.bindings.delete("__construct");
-    const idx = refinedType.bindingList.findIndex(b => b.key === "__construct");
-    if (idx >= 0) refinedType.bindingList.splice(idx, 1);
+    removeConstruct(refinedType);
 
-    addBinding(refinedType, "__construct", makePrimitive("refined.__construct", (args, ctx, evalFn) => {
+    setConstruct(refinedType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
       // Call parent constructor
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
 
@@ -619,20 +1178,17 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       // own refinement check failed further up the chain), propagate it
       // without re-tagging or running this predicate. Without this, a deeper
       // refinement's error would get silently retagged with the outer type.
-      if (value.kind === ValueKind.MultiValue) {
-        const comps = (value as MultiValueType).components;
-        if (comps.has("error")) return value;
-      }
+      if (channelReadRaw(value, "error") !== undefined) return value;
 
       // Apply predicate
       const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
-      const checkP = primaryOf(checkResult);
+      const checkP = dataOf(checkResult);
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
         // Predicate failed — return a targeted error. If the refined type has
         // a recognised abstract domain, render it in the message so the user
         // sees what constraint the value violated.
-        const dom = (refinedType as any).__abstractDomain;
-        const primary = primaryOf(value);
+        const dom = getAbstractDomain(refinedType);
+        const primary = dataOf(value);
         let cexDesc = "";
         if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
           const signed = (primary as BitsValue).data >= 0x8000000000000000n
@@ -668,8 +1224,8 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
       // Re-tag with refined type, and attach the abstract domain so downstream
       // arithmetic can propagate the refinement without re-parsing the
       // predicate.
-      const typed = withType(primaryOf(value), refinedType);
-      const dom = (refinedType as any).__abstractDomain;
+      const typed = withTypeReplacing(dataOf(value), refinedType);
+      const dom = getAbstractDomain(refinedType);
       if (dom) {
         // Phase C: attach a single-predicate set rather than a single
         // domain. The set is the canonical predicate-storage form;
@@ -684,141 +1240,58 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   return refinedType;
 }
 
-/**
- * Build an invarianted type (Phase C Chunk 4): a type that carries one or
- * more lifecycle invariants — predicates that must hold for every instance
- * throughout its lifetime. Multiple invariants chain via repeated
- * `.invariant()` calls; each is stored separately so introspection and
- * proof-search can address them by source.
- *
- * `invariant` is the multi-predicate, multi-field counterpart to `where`:
- *   - `where` is for value-level refinement on a primitive type
- *     (`Int && _ > 0`).
- *   - `invariant` is for record/struct types where the predicate references
- *     fields (`self.balance >= 0`) and where readability benefits from
- *     each rule being a separate clause.
- *
- * Mechanically the runtime story is the same as a refinement: the
- * constructor runs the predicate; failure produces a counterexample-bearing
- * error; success re-tags the value with the invarianted type and attaches
- * the predicate's recognised abstract domain to the value's predicate set.
- *
- * Inheritance: a derived type via `.extend` automatically inherits the
- * parent's invariants because the hidden `__invariantsList` field is
- * carried forward in the standard binding-copy loop. (Parent's invariants
- * stay separate from the child's via list concatenation.)
- */
-export function buildInvariantedType(parentType: ContextValue, predicate: Value): ContextValue {
-  const newType = makeContext();
-
-  // Copy parent's bindings (everything except __construct, which we wrap
-  // below; everything else inherited).
-  for (const [key, binding] of parentType.bindings) {
-    if (key === "__construct") continue;
-    if (binding.value) addBinding(newType, key, binding.value);
-  }
-
-  // Inherit any existing invariants list from the parent and append the new
-  // predicate. Stored as a hidden JS array so the constructor wrapper can
-  // iterate without going through the bindings table.
-  const parentInvariants = (parentType as any).__invariantsList ?? [];
-  const newInvariants: Value[] = [...parentInvariants, predicate];
-  (newType as any).__invariantsList = newInvariants;
-
-  // Wrap parent's constructor so each invariant is checked after parent
-  // construction.
-  const parentConstruct = parentType.bindings.get("__construct")?.value;
-  if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    addBinding(newType, "__construct", makePrimitive("invariant.__construct", (args, ctx, evalFn) => {
-      // Call parent constructor first.
-      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-
-      // Error propagation: parent's own invariant / refinement check might
-      // have failed already; pass the error through unchanged rather than
-      // re-tagging with this layer.
-      if (value.kind === ValueKind.MultiValue) {
-        const comps = (value as MultiValueType).components;
-        if (comps.has("error")) return value;
-      }
-
-      // Apply each invariant in declaration order. First failure → error.
-      for (let i = 0; i < newInvariants.length; i++) {
-        const inv = newInvariants[i];
-        const checkResult = evalFn!(makeExpr(inv, [value]), ctx!);
-        const checkP = primaryOf(checkResult);
-        if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
-          // Build a counterexample-style error message. For invariants on
-          // record types, render the field name(s) the predicate touched if
-          // we can recognise them; otherwise just say "invariant N failed."
-          const idx = i;
-          const msg = `invariant ${idx + 1} failed`;
-          const components = new Map<string, Value>();
-          components.set("error", withType(stringToBits(msg), StringType));
-          components.set("type", ErrorType);
-          return makeMultiValue(makeInt(0), components);
-        }
-      }
-
-      // Re-tag with the invarianted type. Also attach the recognised
-      // abstract domain (if any) of each invariant to the value's
-      // predicate set — same machinery as buildRefinedType so consumers
-      // see the inferred refinement on the result.
-      const typed = withType(primaryOf(value), newType);
-      try {
-        const preds: Predicate[] = [];
-        for (const inv of newInvariants) {
-          const dom = domainFromPredicate(inv);
-          if (dom.kind !== "opaque") {
-            preds.push({ shape: dom, source: "type-invariant" });
-          }
-        }
-        if (preds.length > 0) {
-          return rfWithPredicates(typed, new PredicateSet(preds));
-        }
-      } catch {
-        /* fall through if the helper isn't available */
-      }
-      return typed;
-    }, true));
-  }
-
-  return newType;
-}
+// C6.1b (D45): buildInvariantedType is DELETED — lifecycle invariants are
+// ordinary refinements now (`T & pred`, chained per clause). The
+// `__invariantsList` slot has no remaining writer; its registry entry is
+// swept in C6.3's slot-disposition pass.
 
 /**
- * Build a distinct type: copies parent, breaks subtypeof chain.
+ * Build a distinct type — the NEWTYPE mint (C7.2b, ruling R2).
+ *
+ * A distinct type is a SYMBOL-FRESH re-declaration: the parent's member
+ * descriptors are re-declared under the distinct type's own gensym'd
+ * scope — same implementations, NEW symbol identity. Non-conformance
+ * (`UserId subtypeof Int` false, and vice versa) then falls out of C5.2
+ * symbol-identity membership BY CONSTRUCTION: no member symbol is shared,
+ * so the membership check fails naturally. (The shared-member-set guard
+ * in shapeAwareSubtypeof no longer carries distinct — it remains for
+ * structuralWrap, which genuinely shares the member object.)
  */
 function buildDistinctType(parentType: ContextValue): ContextValue {
   const distinctType = makeContext();
-  // Copy all bindings except __extends and __members (handled separately)
+  // Copy all bindings except __refines and __members (handled separately)
   for (const [key, binding] of parentType.bindings) {
-    if (key === "__extends") continue;
-    if (key === "__members") continue;
+    if (key === SLOT_KEYS.refines) continue;
+    if (key === SLOT_KEYS.members) continue;
     if (binding.value) {
       addBinding(distinctType, key, binding.value);
     }
   }
-  // Copy __members from parent (shared reference — same descriptors)
-  const parentMembers = parentType.bindings.get("__members")?.value;
-  if (parentMembers?.kind === ValueKind.Context) {
-    addBinding(distinctType, "__members", parentMembers);
+  // Re-declare the parent's members under a fresh scope (fresh symbols).
+  const parentMembers = getMembers(parentType);
+  if (parentMembers?.kind === ValueKind.Structure) {
+    const freshScope = newTypeMemberScope("<distinct>");
+    const freshMembers = makeContext();
+    for (const [key, b] of (parentMembers as ContextValue).bindings) {
+      if (!b.value) continue;
+      addMember(freshMembers, freshScope, fqnBaseName(key), b.value);
+    }
+    setMembers(distinctType, freshMembers);
   }
   // Override __name and __type
-  distinctType.bindings.delete("__name");
-  addBinding(distinctType, "__name", stringToBits("<distinct>"));
-  distinctType.bindings.delete("__type");
-  addBinding(distinctType, "__type", Type); // named → nominal comparison via shape dispatch
+  removeName(distinctType);
+  setName(distinctType, stringToBits("<distinct>"));
+  removeShapeSlot(distinctType);
+  writeShape(distinctType, Type); // named → nominal comparison via shape dispatch
 
   // Wrap __construct to re-tag with distinct type
-  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  const parentConstruct = getConstruct(parentType);
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    distinctType.bindings.delete("__construct");
-    const idx = distinctType.bindingList.findIndex(b => b.key === "__construct");
-    if (idx >= 0) distinctType.bindingList.splice(idx, 1);
+    removeConstruct(distinctType);
 
-    addBinding(distinctType, "__construct", makePrimitive("distinct.__construct", (args, ctx, evalFn) => {
+    setConstruct(distinctType, makePrimitive("distinct.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-      return withType(primaryOf(value), distinctType);
+      return withTypeReplacing(dataOf(value), distinctType);
     }, true));
   }
 
@@ -837,30 +1310,30 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
   const defaultOps = ["add", "sub", "mul", "div", "mod", "neg"];
   const ops = opNames.length > 0 ? opNames : defaultOps;
 
-  const predicate = refinedType.bindings.get("__predicate")?.value;
-  const parentType = refinedType.bindings.get("__extends")?.value as ContextValue;
-  if (!predicate || !parentType || parentType.kind !== ValueKind.Context) {
+  const predicate = getPredicate(refinedType);
+  const parentType = getRefines(refinedType) as ContextValue;
+  if (!predicate || !parentType || parentType.kind !== ValueKind.Structure) {
     return refinedType; // not a refined type — nothing to do
   }
-  const parentConstruct = parentType.bindings.get("__construct")?.value;
+  const parentConstruct = getConstruct(parentType);
 
   // Build new type (clone bindings except __members and __construct)
   const newType = makeContext();
   for (const [key, binding] of refinedType.bindings) {
-    if (key === "__members" || key === "__construct") continue;
+    if (key === SLOT_KEYS.members || key === SLOT_KEYS.construct) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
 
   // Rebuild __construct so it tags results with the NEW type
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    addBinding(newType, "__construct", makePrimitive("refined.__construct", (args, ctx, evalFn) => {
+    setConstruct(newType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
       const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
-      const checkP = primaryOf(checkResult);
+      const checkP = dataOf(checkResult);
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
         // Same constraint-rendering logic as buildRefinedType's __construct.
-        const dom = (refinedType as any).__abstractDomain;
-        const primary = primaryOf(value);
+        const dom = getAbstractDomain(refinedType);
+        const primary = dataOf(value);
         let cexDesc = "";
         if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
           const signed = (primary as BitsValue).data >= 0x8000000000000000n
@@ -888,26 +1361,32 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
         components.set("type", ErrorType);
         return makeMultiValue(makeInt(0), components);
       }
-      return withType(primaryOf(value), newType);
+      return withTypeReplacing(dataOf(value), newType);
     }, true));
   }
 
-  // Clone __members and add lifted operator descriptors
-  const parentMembers = refinedType.bindings.get("__members")?.value;
+  // Clone __members and add lifted operator descriptors. C5.2b: the
+  // long-latent unfiltered copy is fixed — meta-method names no longer
+  // ride into instance member sets (the wart the symbol re-keying made
+  // visible; recon 2026-08).
+  const parentMembers = getMembers(refinedType);
   const newMembers = makeContext();
-  if (parentMembers?.kind === ValueKind.Context) {
+  if (parentMembers?.kind === ValueKind.Structure) {
     for (const [key, binding] of (parentMembers as ContextValue).bindings) {
+      if (META_METHOD_NAMES.has(fqnBaseName(key))) continue;
       if (binding.value) addBinding(newMembers, key, binding.value);
     }
   }
 
-  const newConstruct = newType.bindings.get("__construct")?.value as PrimitiveFunctionValue | undefined;
+  const newConstruct = getConstruct(newType) as PrimitiveFunctionValue | undefined;
+  const liftScope = newTypeMemberScope();
+  (newType as any).__localMemberScope = liftScope;
 
   for (const opName of ops) {
-    const parentDesc = parentMembers?.kind === ValueKind.Context
-      ? (parentMembers as ContextValue).bindings.get(opName)?.value
+    const parentDesc = parentMembers?.kind === ValueKind.Structure
+      ? memberBindingByName(parentMembers as ContextValue, opName)
       : null;
-    if (!parentDesc || parentDesc.kind !== ValueKind.Context) continue;
+    if (!parentDesc || parentDesc.kind !== ValueKind.Structure) continue;
     const parentOp = (parentDesc as ContextValue).bindings.get("value")?.value;
     if (!parentOp || parentOp.kind !== ValueKind.PrimitiveFunction) continue;
     if (!newConstruct) continue;
@@ -917,96 +1396,82 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
       const parentResult = (parentOp as PrimitiveFunctionValue).fn(args, ctx as any, evalFn as any);
       // __construct is lazy — wrap the result in an identity expression so it evaluates to itself
       const identityPrim = makePrimitive("identity", (a) => a[0]);
-      const wrapped = makeExpr(identityPrim, [primaryOf(parentResult)]);
+      const wrapped = makeExpr(identityPrim, [dataOf(parentResult)]);
       return newConstruct.fn([wrapped], ctx as any, evalFn as any);
     }) as PrimitiveFnImpl);
 
-    addBinding(newMembers, opName, makeMethodDescriptor(opName, liftedOp));
+    // The lift is an OVERRIDE — it draws (binds) the parent op's symbol.
+    const liftDesc = makeMethodDescriptor(opName, liftedOp);
+    for (const key of drawMemberKeys([refinedType], opName, liftScope)) {
+      addMemberAt(newMembers, key, liftDesc);
+    }
   }
 
-  addBinding(newType, "__members", newMembers);
+  setMembers(newType, newMembers);
   return newType;
 }
 
-/**
- * Add mixin methods to a type. Takes a method spec object (key → function)
- * and returns a new type with the methods added to __members as Method descriptors.
- * Errors on name conflict (method already exists in __members).
- */
-function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
-  const specCtx = primaryOf(specObj);
-  if (specCtx.kind !== ValueKind.Context) {
-    throw new AllegroError("mixin: argument must be an object literal {method: fn, ...}");
-  }
+// C6.1b (D45): buildMixinType is DELETED — method implementations are
+// method-valued entries in `define` specs (drawing resolves overrides),
+// and reusable mixins are ordinary bundle types drawn via
+// `Type.define(spec, ..., MixinBundle)`. What remains of its machinery
+// is buildMethodLayer below, reached through kind specs.
 
-  // Extract method specs
-  const methods: { name: string; impl: Value }[] = [];
-  for (const [key, binding] of (specCtx as ContextValue).bindings) {
-    if (key.startsWith("__")) continue;
-    if (binding.value) {
-      methods.push({ name: key, impl: binding.value });
-    }
-  }
-
-  // Build new type (clone baseType except __members and __construct)
+/** Mint a member layer over a base type carrying additional method
+ *  implementations — the surviving core of the mixin machinery, reached
+ *  through kind specs (`Refinement.define({refines, where, double: self
+ *  => …})`). Clones the base's bindings, mints an OWN member set (a
+ *  shape layer — overrides run, C3.1), adds the methods as type-local
+ *  symbols, and retags construction through the base's construct chain.
+ *  Same-name additions are refused (no drawn bundles here, so a match
+ *  is a genuine clash with the base, not an override declaration). */
+function buildMethodLayer(baseType: ContextValue, methods: { name: string; impl: Value }[]): ContextValue {
   const newType = makeContext();
   for (const [key, binding] of baseType.bindings) {
-    if (key === "__members" || key === "__construct") continue;
+    if (key === SLOT_KEYS.members || key === SLOT_KEYS.construct) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
-
-  // Clone __members and add mixin methods
-  const parentMembers = baseType.bindings.get("__members")?.value;
+  // The abstract domain rides as a JS-side property (not a binding) —
+  // carry it so downstream layers (preserve) keep constraint rendering.
+  const dom = getAbstractDomain(baseType);
+  if (dom !== undefined) setAbstractDomain(newType, dom);
   const newMembers = makeContext();
-  if (parentMembers?.kind === ValueKind.Context) {
-    for (const [key, binding] of (parentMembers as ContextValue).bindings) {
+  const baseMembers = getMembers(baseType);
+  if (baseMembers?.kind === ValueKind.Structure) {
+    for (const [key, binding] of (baseMembers as ContextValue).bindings) {
+      if (META_METHOD_NAMES.has(fqnBaseName(key))) continue;
       if (binding.value) addBinding(newMembers, key, binding.value);
     }
   }
-
+  const layerScope = newTypeMemberScope();
+  (newType as any).__localMemberScope = layerScope;
   for (const m of methods) {
-    // Check for conflict
-    if (newMembers.bindings.has(m.name)) {
-      throw new AllegroError(`mixin: method '${m.name}' conflicts with existing member`);
+    if (memberBindingByName(newMembers, m.name) !== undefined) {
+      throw new AllegroError(`method '${m.name}' conflicts with an existing member`);
     }
-    // Wrap ComposedFunctions in a PrimitiveFn that the descriptor expects,
-    // or use PrimitiveFunctions directly
-    const impl = primaryOf(m.impl);
+    const key = memberFqnIn(layerScope, m.name);
+    const impl = dataOf(m.impl);
     if (impl.kind === ValueKind.PrimitiveFunction) {
-      addBinding(newMembers, m.name, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
+      addMemberAt(newMembers, key, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
     } else if (impl.kind === ValueKind.ComposedFunction) {
-      // Store the ComposedFunction directly — type_dispatch handles it
       const desc = makeContext();
-      addBinding(desc, "__type", MethodType);
+      writeShape(desc, MethodType);
       addBinding(desc, "name", stringToBits(m.name));
       addBinding(desc, "value", impl);
-      addBinding(newMembers, m.name, desc);
+      addMemberAt(newMembers, key, desc);
     } else {
-      throw new AllegroError(`mixin: '${m.name}' must be a function`);
+      throw new AllegroError(`'${m.name}' must be a function`);
     }
   }
-
-  addBinding(newType, "__members", newMembers);
-
-  // Rebuild __construct: delegate to parentConstruct (which already chains all
-  // predicate checks through nested refinements), then retag with newType. This
-  // handles arbitrary refinement depth naturally — a previous implementation
-  // tried to skip one level and re-apply the immediate predicate, which was
-  // correct for a single level but fragile if the shape ever changed. If the
-  // parent's construct produces an error MultiValue (refinement failure), we
-  // propagate it without retagging.
-  const parentConstruct = baseType.bindings.get("__construct")?.value;
+  setMembers(newType, newMembers);
+  const parentConstruct = getConstruct(baseType);
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    addBinding(newType, "__construct", makePrimitive("mixin.__construct", (args, ctx, evalFn) => {
+    setConstruct(newType, makePrimitive("methods.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-      if (value.kind === ValueKind.MultiValue) {
-        const components = (value as MultiValueType).components;
-        if (components.has("error")) return value;
-      }
-      return withType(primaryOf(value), newType);
+      if (channelReadRaw(value, "error") !== undefined) return value;
+      return withTypeReplacing(dataOf(value), newType);
     }, true));
   }
-
   return newType;
 }
 
@@ -1014,79 +1479,63 @@ function buildMixinType(baseType: ContextValue, specObj: Value): ContextValue {
 // Single block — instanceof/subtypeof are shape-aware (nominal when both
 // operands are named, structural otherwise).
 
+const TYPE_MEMBER_SCOPE = typeMemberScopeFqn("Type");
 const typeMembers = makeContext();
-addBinding(typeMembers, "instanceof", makeMethodDescriptor("instanceof",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "instanceof", makeMethodDescriptor("instanceof",
   makePrimitive("Type.instanceof", (args) => {
     const type = args[0] as ContextValue;
     const value = args[1];
     return withType(makeInt(shapeAwareInstanceof(value, type) ? 1 : 0), BoolType);
   })
 ));
-addBinding(typeMembers, "subtypeof", makeMethodDescriptor("subtypeof",
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "subtypeof", makeMethodDescriptor("subtypeof",
   makePrimitive("Type.subtypeof", (args) => {
     const typeA = args[0] as ContextValue;
     const typeB = args[1] as ContextValue;
     return withType(makeInt(shapeAwareSubtypeof(typeA, typeB) ? 1 : 0), BoolType);
   })
 ));
-addBinding(typeMembers, "extend", makeMethodDescriptor("extend",
-  makePrimitive("Type.extend", (args, _ctx, _evalFn) => {
-    return wrapType(buildRecordType(args[0] as ContextValue, args[1], Type));
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "define", makeMethodDescriptor("define",
+  makePrimitive("Type.define", (args, ctx, evalFn) => {
+    // D45: `define` is THE construction surface, dispatched on a KIND —
+    // self is the kind whose instance is being minted; the remaining args
+    // are the kind-specific spec. `define` is a NAMED FACTORY with no
+    // independent minting power: it validates the dispatch target is a
+    // kind, then delegates to the kind's `construct` authority (C6.1b
+    // kinds: Type — (spec, ...bundles) record mint; Refinement —
+    // (base, predicate) refinement mint; Interface — (spec) declaration
+    // mint).
+    const kind = dataOf(args[0]);
+    if (kind.kind !== ValueKind.Structure || !isKind(kind as ContextValue)) {
+      const name = kind.kind === ValueKind.Structure
+        ? (getTypeNameFromCtx(kind as ContextValue) ?? "<anonymous>") : "<value>";
+      throw new AllegroError(
+        `define must be dispatched on a kind — '${name}' is a type, not a kind. ` +
+        `To draw ${name}'s members into a new type, pass it as a bundle: Type.define(spec, ${name})`);
+    }
+    const construct = getConstruct(kind as ContextValue);
+    if (construct?.kind !== ValueKind.PrimitiveFunction) {
+      throw new AllegroError(
+        `define: kind '${getTypeNameFromCtx(kind as ContextValue)}' holds no constructor authority`);
+    }
+    return (construct as PrimitiveFunctionValue).fn(args.slice(1), ctx, evalFn);
   })
 ));
-addBinding(typeMembers, "where", makeMethodDescriptor("where",
-  makePrimitive("Type.where", (args) => {
-    return wrapType(buildRefinedType(args[0] as ContextValue, args[1]));
-  })
-));
-addBinding(typeMembers, "invariant", makeMethodDescriptor("invariant",
-  makePrimitive("Type.invariant", (args) => {
-    return wrapType(buildInvariantedType(args[0] as ContextValue, args[1]));
-  })
-));
-addBinding(typeMembers, "distinct", makeMethodDescriptor("distinct",
+// C6.1b (D45): the fluent API is REMOVED decisively — `where` and
+// `invariant` are the refinement mint (`T & pred`, chained for multiple
+// clauses); `interface` is `Interface.define(spec, ...bundles)`; `mixin`
+// is method-valued entries in `define` specs (or drawing a bundle);
+// `preserveOps` is the Refinement spec's `preserve` option.
+// C7.2b: `distinct` keeps its kind-member (the newtype mint, now
+// symbol-fresh); `constructor` is REMOVED — it mutated a built type
+// (against D22); construction authority is declared at mint time via
+// the reserved `construct` spec key (ruling R3).
+addMember(typeMembers, TYPE_MEMBER_SCOPE, "distinct", makeMethodDescriptor("distinct",
   makePrimitive("Type.distinct", (args) => {
     return wrapType(buildDistinctType(args[0] as ContextValue));
   })
 ));
-addBinding(typeMembers, "constructor", makeMethodDescriptor("constructor",
-  makePrimitive("Type.constructor", (args) => {
-    const type = args[0] as ContextValue;
-    const fn = args[1];
-    type.bindings.delete("__construct");
-    const idx = type.bindingList.findIndex(b => b.key === "__construct");
-    if (idx >= 0) type.bindingList.splice(idx, 1);
-    addBinding(type, "__construct", makePrimitive("custom.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
-      const result = ctorEvalFn!(makeExpr(fn, ctorArgs), ctorCtx!);
-      return withType(primaryOf(result), type);
-    }, true));
-    return wrapType(type);
-  })
-));
-addBinding(typeMembers, "interface", makeMethodDescriptor("interface",
-  makePrimitive("Type.interface", (args) => {
-    return wrapType(buildInterfaceType(args[0] as ContextValue, args[1]));
-  })
-));
-addBinding(typeMembers, "preserveOps", makeMethodDescriptor("preserveOps",
-  makePrimitive("Type.preserveOps", (args) => {
-    const type = args[0] as ContextValue;
-    const opNames: string[] = [];
-    for (let i = 1; i < args.length; i++) {
-      const p = primaryOf(args[i]);
-      if (p.kind === ValueKind.Bits) {
-        opNames.push(bitsToString(p as BitsValue));
-      }
-    }
-    return wrapType(buildPreserveOps(type, opNames));
-  })
-));
-addBinding(typeMembers, "mixin", makeMethodDescriptor("mixin",
-  makePrimitive("Type.mixin", (args) => {
-    return wrapType(buildMixinType(args[0] as ContextValue, args[1]));
-  })
-));
-addBinding(Type, "__members", typeMembers);
+setMembers(Type, typeMembers);
 
 // --- Type builder helper ---
 
@@ -1100,7 +1549,6 @@ const getterNames = new Set(["length"]);
  * @param name     Type name (e.g., "Int", "String")
  * @param methods  Instance methods (dispatched via type_dispatch on values of this type)
  * @param options  Optional:
- *   - extends: parent type
  *   - methodEffects: per-method effect label list. Used to tag stdlib HOFs
  *     (`Array.map`, etc.) as `opaque` so callers' inferred effect sets reflect
  *     "may do anything the callback does" until Slice 2's effect polymorphism
@@ -1109,23 +1557,28 @@ const getterNames = new Set(["length"]);
 function buildType(
   name: string,
   methods: Record<string, PrimitiveFnImpl>,
-  options?: { extends?: ContextValue; methodEffects?: Record<string, string[]> },
+  options?: { methodEffects?: Record<string, string[]> },
 ): ContextValue {
   const ctx = makeContext();
-  addBinding(ctx, "__name", stringToBits(name));
-  addBinding(ctx, "__type", Type);
-  if (options?.extends) {
-    addBinding(ctx, "__extends", options.extends);
-  }
-  // Build __members with Method descriptors
+  setName(ctx, stringToBits(name));
+  writeShape(ctx, Type);
+  // Build __members with Method descriptors. C6.1a: each named type
+  // declares its members in its OWN name-stable scope — Int.add and
+  // Float.add are DISTINCT symbols (neither drew from the other), so
+  // symbol-membership conformance between built-ins is declared, never
+  // accidental.
+  const typeScope = typeMemberScopeFqn(name);
   const members = makeContext();
   for (const [key, fn] of Object.entries(methods)) {
     const fxLabels = options?.methodEffects?.[key];
     const prim = makePrimitive(`${name}.${key}`, fn, false, fxLabels);
     const isGetter = getterNames.has(key);
-    addBinding(members, key, makeMethodDescriptor(key, prim, isGetter));
+    // E3: built-in `eq` implementations are kernel-supplied — the
+    // parametric equality certificate covers them (equalsIsKernel).
+    if (key === "eq") kernelEqImpls.add(prim);
+    addMember(members, typeScope, key, makeMethodDescriptor(key, prim, isGetter));
   }
-  addBinding(ctx, "__members", members);
+  setMembers(ctx, members);
   return ctx;
 }
 
@@ -1137,9 +1590,619 @@ function toSigned(b: BitsValue): bigint {
 }
 
 function asBitsTyped(v: Value, ctx: string): BitsValue {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) throw new AllegroError(`${ctx}: expected Bits, got ${p.kind}`);
   return p;
+}
+
+// =============================================================================
+// Equality protocol (E1 — B-027, structures.md §7, E-R1/D37)
+//
+// `==` resolves through THREE steps (the §7 resolution):
+//   1. Same equality shape → that shape's `equals` (a custom `eq` member
+//      dispatches; its absence means the KERNEL STRUCTURAL EQUALS applies —
+//      the kernel default is supplied at this chokepoint, not per-type).
+//   2. Different shapes → declared coercion to the least common type
+//      (E2 — not yet; the seam is marked below).
+//   3. No common type → NOT EQUAL (typed Bool false, never a host error).
+//
+// The equality shape walks the FULL `__refines` chain (slots.equalityShape):
+// refinements — member-transparent AND preserve-lifted — are knowledge and
+// never separate equal values (D37). `distinct` types mint no refines edge,
+// so step 3 makes them unequal to their parent until a coercion is declared.
+//
+// The kernel structural equals recurses element-wise (dense region) and
+// field-wise (named bindings) through THIS protocol, so custom `equals` on
+// component types compose. Its lawfulness certificate is parametric —
+// refl/sym/trans hold by structural induction given lawful component
+// equalities (KERNEL_EQUALS_CERTIFICATE is the E3 tier anchor).
+// =============================================================================
+
+/** E3 reads this marker as the discharge tier for the kernel-supplied
+ *  equals: proven once, parametrically, by structural induction. */
+export const KERNEL_EQUALS_CERTIFICATE = "kernel-structural-parametric";
+
+// -----------------------------------------------------------------------------
+// Declared coercions + least common type (E2 — §7 step 2, E-R2)
+//
+// A declared coercion is an edge (from-shape → to-shape, fn) in a global
+// registry keyed by equality-shape identity. `==` across different shapes
+// finds the LEAST COMMON TYPE over the graph — the unique candidate both
+// operands reach from which every other common candidate is reachable —
+// coerces BOTH operands in (symmetric by construction, hence commutative),
+// and compares at the target. No common type → not equal (§7 step 3);
+// no unique least → error demanding an explicit declaration.
+//
+// Each declaration carries the two §7 obligations — equality preservation
+// (x ==_A y ⟹ coerce(x) ==_B coerce(y)) and pairwise coherence
+// (composition triangles commute). E2 instantiates them PENDING; the E3
+// machinery routes them through PCP discharge. The kernel Int→Float edge
+// ships with both discharged (tier "kernel": the embedding is exact —
+// every 64-bit signed Int is representable in an IEEE double's 53-bit
+// mantissa only up to 2^53, but equality preservation needs injectivity
+// on equals-related pairs, which bit-identical Int equality gives).
+// -----------------------------------------------------------------------------
+
+type ObligationStatus = { status: "pending" | "discharged" | "admitted"; tier?: string };
+
+interface CoercionEdge {
+  from: ContextValue;
+  to: ContextValue;
+  fn: Value; // (value at `from` shape) => value at `to` shape
+  preservation: ObligationStatus;
+  coherence: ObligationStatus;
+}
+
+const coercionRegistry = new Map<ContextValue, Map<ContextValue, CoercionEdge>>();
+
+/** Register a coercion edge. Host-side entry point — the `Coercion.declare`
+ *  surface and the kernel Int→Float edge both land here. Re-declaring a
+ *  pair replaces the edge (last declaration wins; obligations reset). */
+export function declareCoercion(
+  from: ContextValue, to: ContextValue, fn: Value,
+  discharged?: { tier: string },
+): void {
+  const fromShape = equalityShape(from), toShape = equalityShape(to);
+  if (fromShape === toShape) {
+    throw new AllegroError(
+      `Coercion.declare: '${typeCtxName(from)}' and '${typeCtxName(to)}' share an equality shape — a coercion between them is vacuous`);
+  }
+  const ob = (): ObligationStatus =>
+    discharged ? { status: "discharged", tier: discharged.tier } : { status: "pending" };
+  let edges = coercionRegistry.get(fromShape);
+  if (!edges) { edges = new Map(); coercionRegistry.set(fromShape, edges); }
+  edges.set(toShape, { from: fromShape, to: toShape, fn, preservation: ob(), coherence: ob() });
+}
+
+/** The §7 obligations carried by every declared edge, for tests and the
+ *  E3 tier machinery. Registry is process-global; `filter` (over the
+ *  edge's from/to shapes) scopes the view to one compilation unit. */
+export function coercionObligationRecords(
+  filter?: (from: ContextValue, to: ContextValue) => boolean,
+): {
+  from: string; to: string; obligation: "equality-preservation" | "coherence";
+  status: "pending" | "discharged" | "admitted"; tier?: string;
+}[] {
+  const out: ReturnType<typeof coercionObligationRecords> = [];
+  for (const edges of coercionRegistry.values()) {
+    for (const e of edges.values()) {
+      if (filter && !filter(e.from, e.to)) continue;
+      out.push({ from: typeCtxName(e.from), to: typeCtxName(e.to), obligation: "equality-preservation", ...e.preservation });
+      out.push({ from: typeCtxName(e.from), to: typeCtxName(e.to), obligation: "coherence", ...e.coherence });
+    }
+  }
+  return out;
+}
+
+function typeCtxName(t: ContextValue): string {
+  const nameV = getName(t);
+  return nameV && nameV.kind === ValueKind.Bits ? bitsToString(nameV) : "<anonymous>";
+}
+
+/** Every shape reachable from `start` over declared edges (including
+ *  `start` itself), with the composed edge path to each. First-found
+ *  (BFS-shortest) path wins — deterministic; the coherence obligation is
+ *  what makes path choice semantically irrelevant. */
+function coercionReach(start: ContextValue): Map<ContextValue, CoercionEdge[]> {
+  const reach = new Map<ContextValue, CoercionEdge[]>();
+  reach.set(start, []);
+  const queue: ContextValue[] = [start];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const edges = coercionRegistry.get(cur);
+    if (!edges) continue;
+    for (const [to, edge] of edges) {
+      if (reach.has(to)) continue;
+      reach.set(to, [...reach.get(cur)!, edge]);
+      queue.push(to);
+    }
+  }
+  return reach;
+}
+
+/** Resolve the least common type of two distinct shapes over the declared
+ *  coercion graph. Returns the coercion paths for each operand, or null
+ *  when the shapes share no common type (§7 step 3: not equal). Throws
+ *  when common types exist but none is least (E-R2: ambiguity demands an
+ *  explicit declaration). */
+function leastCommonCoercion(
+  sa: ContextValue, sb: ContextValue,
+): { pathA: CoercionEdge[]; pathB: CoercionEdge[] } | null {
+  const ra = coercionReach(sa), rb = coercionReach(sb);
+  const common = [...ra.keys()].filter(t => rb.has(t));
+  if (common.length === 0) return null;
+  // Least = the candidate from which every other candidate is reachable.
+  const least = common.filter(t => {
+    const rt = coercionReach(t);
+    return common.every(o => rt.has(o));
+  });
+  if (least.length !== 1) {
+    throw new AllegroError(
+      `equality is ambiguous between '${typeCtxName(sa)}' and '${typeCtxName(sb)}': ` +
+      `no unique least common type among {${common.map(typeCtxName).join(", ")}} — declare an explicit coercion`);
+  }
+  return { pathA: ra.get(least[0])!, pathB: rb.get(least[0])! };
+}
+
+/** Apply a coercion path to a value. Identity on the empty path. */
+function applyCoercionPath(
+  v: Value, path: CoercionEdge[],
+  ctx?: ContextValue, evalFn?: EvalFn,
+): Value | null {
+  let cur = v;
+  for (const edge of path) {
+    const fn = dataOf(edge.fn);
+    if (fn.kind === ValueKind.PrimitiveFunction) {
+      cur = (fn as PrimitiveFunctionValue).fn([cur], ctx as any, evalFn as any);
+    } else if (fn.kind === ValueKind.ComposedFunction && evalFn && ctx) {
+      cur = evalFn(makeExpr(fn, [cur]), ctx);
+    } else {
+      return null; // no way to run the fn here — decline, not-equal
+    }
+  }
+  return cur;
+}
+
+/** Protocol equality as a host boolean. Total: any resolved value pair
+ *  answers true/false, never throws. */
+export function protocolEqualsBool(
+  a: Value, b: Value,
+  ctx?: ContextValue, evalFn?: EvalFn,
+): boolean {
+  if (a === b) return true;
+  const ta = getType(a), tb = getType(b);
+  if (ta && tb) {
+    const sa = equalityShape(ta), sb = equalityShape(tb);
+    if (sa !== sb) {
+      // §7 step 2 (E2): coerce both operands to the least common type
+      // over the declared coercion graph and compare there. Symmetric by
+      // construction — both orders resolve the same target.
+      const lct = leastCommonCoercion(sa, sb);
+      if (lct === null) return false;                // §7 step 3
+      const ca = applyCoercionPath(a, lct.pathA, ctx, evalFn);
+      const cb = applyCoercionPath(b, lct.pathB, ctx, evalFn);
+      if (ca === null || cb === null) return false;
+      return protocolEqualsBool(ca, cb, ctx, evalFn);
+    }
+    const m = typeMethod(sa, "eq");                  // §7 step 1: custom equals
+    if (m) {
+      if (m.kind === ValueKind.PrimitiveFunction) {
+        const r = (m as PrimitiveFunctionValue).fn([dataOf(a), dataOf(b)], ctx as any, evalFn as any);
+        const rd = dataOf(r);
+        return rd.kind === ValueKind.Bits && (rd as BitsValue).data !== 0n;
+      }
+      if (m.kind === ValueKind.ComposedFunction && evalFn && ctx) {
+        // Spec-supplied `eq` method: (self, other) — full values flow in.
+        const r = evalFn(makeExpr(m, [a, b]), ctx);
+        const rd = dataOf(r);
+        return rd.kind === ValueKind.Bits && (rd as BitsValue).data !== 0n;
+      }
+    }
+  }
+  return kernelStructuralEquals(dataOf(a), dataOf(b), ctx, evalFn);
+}
+
+/** The kernel structural equals over data-plane representations. Bits
+ *  compare by length+payload; Structures compare dense elements and
+ *  non-meta named bindings, recursing through the protocol; everything
+ *  else (functions, params, symbols, expressions) is identity-only. */
+function kernelStructuralEquals(
+  da: Value, db: Value,
+  ctx?: ContextValue, evalFn?: EvalFn,
+): boolean {
+  if (da === db) return true;
+  if (da.kind !== db.kind) return false;
+  if (da.kind === ValueKind.Bits) {
+    const ba = da as BitsValue, bb = db as BitsValue;
+    return ba.length === bb.length && ba.data === bb.data;
+  }
+  if (da.kind === ValueKind.Structure) {
+    const ca = da as ContextValue, cb = db as ContextValue;
+    // TYPE VALUES (anything holding a member set or construct authority —
+    // types, kinds, interfaces, generics) are IDENTITY-only: they are
+    // minted once / memoized, so identity IS their equality. Structural
+    // comparison over their (mostly meta) bindings would false-positive
+    // distinct types as equal.
+    if (getMembers(ca) !== undefined || getConstruct(ca) !== undefined ||
+        getMembers(cb) !== undefined || getConstruct(cb) !== undefined) {
+      return false; // da === db already answered the equal case
+    }
+    const ea = elementsOf(ca), eb = elementsOf(cb);
+    if (ea.length !== eb.length) return false;
+    for (let i = 0; i < ea.length; i++) {
+      if (!protocolEqualsBool(ea[i], eb[i], ctx, evalFn)) return false;
+    }
+    const fa = namedFieldsOf(ca), fb = namedFieldsOf(cb);
+    if (fa.size !== fb.size) return false;
+    for (const [k, va] of fa) {
+      const vb = fb.get(k);
+      if (vb === undefined) return false;
+      if (!protocolEqualsBool(va, vb, ctx, evalFn)) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/** Named user-visible fields of a Structure: skip meta slots (`__*`) and
+ *  the dense region's lazily-materialized numeric-key view (elements are
+ *  compared through `elementsOf`, not twice). */
+function namedFieldsOf(c: ContextValue): Map<string, Value> {
+  const out = new Map<string, Value>();
+  for (const [k, bnd] of c.bindings) {
+    if (bnd.value === undefined) continue;
+    if (isMetaSlotKey(k)) continue;
+    if (/^\d+$/.test(k)) continue;
+    out.set(k, bnd.value);
+  }
+  return out;
+}
+
+/** The `==` / `!=` chokepoint for the evaluator's dispatch and the
+ *  `typed_eq`/`typed_neq` path. Returns a typed Bool, or null to DECLINE
+ *  (unresolved or untyped operand → caller falls through to the legacy
+ *  raw-bits path, preserving base-mode Allegretto semantics). `!=` is
+ *  DERIVED — the negation of protocol equality, so the pair stays
+ *  coherent by construction. */
+export function protocolEquals(
+  left: Value, right: Value, negate: boolean,
+  ctx?: ContextValue, evalFn?: EvalFn,
+): Value | null {
+  if (!isResolved(left) || !isResolved(right)) return null;
+  const ta = getType(left), tb = getType(right);
+  if (!ta || !tb) return null;
+  const eq = protocolEqualsBool(left, right, ctx, evalFn);
+  return withType(makeInt((negate ? !eq : eq) ? 1 : 0), BoolType);
+}
+
+// =============================================================================
+// Law obligations + discharge tiers (E3 — B-027 §8, E-R3/E-R4/E-R5, D34/D38)
+//
+// Drawing a law-bearing member set instantiates one PCP obligation per law,
+// quantifier specialized to the implementing type. Discharge walks the D34
+// spectrum at instantiation time:
+//   kernel     — the law carries a kernel certificate AND the referenced
+//                implementation is kernel-supplied (parametric proof, free);
+//   enumerated — the quantifier domain is finite (Bool) and full
+//                enumeration holds (PE-as-discharge over the whole domain);
+//   sampled    — F7-style bounded sampling SURVIVED (not proof — recorded
+//                as its own status); a COUNTEREXAMPLE HALTS with concrete
+//                inputs (build safety in);
+//   witnessed  — a discharged Proof term attached post-hoc via
+//                `Law.witness` (the `by` path);
+//   pending    — none of the above; exported through the H2 obligations
+//                surface for PCP workers.
+// E4 adds the `assume law` admitted tier + the first strict gate.
+// =============================================================================
+
+/** Kernel-supplied equality implementations (built-in scalar `eq` methods).
+ *  The parametric kernel certificate covers exactly these plus the kernel
+ *  structural default (= no `eq` member at all). */
+const kernelEqImpls = new WeakSet<object>();
+
+interface LawObligationEntry {
+  type: ContextValue;
+  law: string;
+  status: "discharged" | "sampled" | "pending" | "admitted";
+  tier?: string; // "kernel" | "enumerated" | "sampled" | "witnessed" | "admitted"
+  counterexample?: string;
+}
+
+const lawObligationsReg: LawObligationEntry[] = [];
+
+// The precompile pass (runtime.ts precompileFunctions) evaluates every
+// binding once to detect function shapes — a `Type.define`/`Refinement.
+// define` there mints a THROWAWAY type object before the real evaluation
+// mints the bound one. Obligations attach to DEFINITIONS, not exploratory
+// evaluations, so the pass suspends instantiation (and the E-R5 gate —
+// the real evaluation re-runs both).
+let lawInstantiationSuspended = false;
+
+/** Suspend/resume law-obligation instantiation + the E-R5 purity gate
+ *  (used by the runtime's precompile pass around its exploratory
+ *  binding evaluations). */
+export function setLawInstantiationSuspended(b: boolean): void {
+  lawInstantiationSuspended = b;
+}
+
+/** The law obligations instantiated so far, names resolved at read time
+ *  (types are auto-named after definition). The E3 read surface for
+ *  tests, the Verdict, and the H2 obligations export. The registry is
+ *  process-global; pass `filter` to scope the view to one compilation
+ *  unit's types (pcp.ts filters by the eval scope's bound values so a
+ *  file's Verdict never lists another module's obligations). */
+export function lawObligationRecords(filter?: (type: ContextValue) => boolean): {
+  type: string; law: string; status: "discharged" | "sampled" | "pending" | "admitted";
+  tier?: string; counterexample?: string;
+}[] {
+  return lawObligationsReg
+    .filter(e => !filter || filter(e.type))
+    .map(e => ({
+      type: typeCtxName(e.type),
+      law: e.law,
+      status: e.status,
+      ...(e.tier !== undefined ? { tier: e.tier } : {}),
+      ...(e.counterexample !== undefined ? { counterexample: e.counterexample } : {}),
+    }));
+}
+
+/** Is this type's equality resolution kernel-supplied? True when the
+ *  equality shape has no custom `eq` member (kernel structural equals
+ *  applies at the protocol chokepoint) or its `eq` is a kernel scalar
+ *  implementation. */
+function equalsIsKernel(t: ContextValue): boolean {
+  const impl = typeMethod(equalityShape(t), "eq");
+  return impl === null || kernelEqImpls.has(dataOf(impl));
+}
+
+/** Quantifier samples for a law over `t`. `exhaustive` marks FULL domain
+ *  enumeration (Bool) — survival there is proof (tier "enumerated"), not
+ *  sampling. Int-backed domains sample (refinement interval lo..lo+3, or
+ *  the F7 default mix). Returns null when the domain isn't sampleable
+ *  (records, strings, …) — the obligation stays pending. */
+function lawSamples(t: ContextValue): { samples: Value[]; exhaustive: boolean } | null {
+  // Walk the refines chain to the base shape (a Bool/Int refinement
+  // quantifies over the refined subdomain but dispatches at the base).
+  let base: ContextValue = t;
+  for (let guard = 0; guard < 64; guard++) {
+    const p = getRefines(base);
+    if (p?.kind !== ValueKind.Structure) break;
+    base = p as ContextValue;
+  }
+  const baseName = getTypeNameFromCtx(base);
+  if (baseName === "Bool") {
+    return {
+      samples: [withType(makeInt(1), BoolType), withType(makeInt(0), BoolType)],
+      exhaustive: true,
+    };
+  }
+  const dom = getAbstractDomain(t) ?? (t as any).__abstractDomain;
+  if (dom && dom.kind === "interval") {
+    const lo = Number.isFinite(dom.lo) ? dom.lo : 0;
+    const hi = Number.isFinite(dom.hi) ? dom.hi : Infinity;
+    const out: Value[] = [];
+    for (let i = 0; i < 4; i++) {
+      if (lo + i <= hi) out.push(withType(makeInt(lo + i), IntType));
+    }
+    if (out.length > 0) return { samples: out, exhaustive: false };
+  }
+  if (baseName === "Int") {
+    return { samples: [0, 1, 5, -3].map(n => withType(makeInt(n), IntType)), exhaustive: false };
+  }
+  return null;
+}
+
+/** Render a sample tuple for counterexample messages. */
+function renderLawArgs(args: Value[]): string {
+  return args.map(a => {
+    const d = dataOf(a);
+    if (d.kind !== ValueKind.Bits) return "?";
+    const b = d as BitsValue;
+    if (b.length !== 64) return "?";
+    const signed = b.data >= 2n ** 63n ? b.data - 2n ** 64n : b.data;
+    if (getTypeName(a) === "Bool") return signed === 0n ? "false" : "true";
+    return String(signed);
+  }).join(", ");
+}
+
+/** Evaluate a law proposition body on one argument tuple. Returns true /
+ *  false when the body folds to a Bits truth value, null when it can't be
+ *  evaluated here (missing evalFn, residual result). */
+function runLawProp(body: Value, args: Value[], ctx?: ContextValue, evalFn?: EvalFn): boolean | null {
+  const d = dataOf(body);
+  try {
+    let result: Value;
+    if (d.kind === ValueKind.PrimitiveFunction) {
+      result = (d as PrimitiveFunctionValue).fn(args, ctx as any, evalFn as any);
+    } else if (d.kind === ValueKind.ComposedFunction && evalFn && ctx) {
+      result = evalFn(makeExpr(d, args), ctx);
+    } else {
+      return null;
+    }
+    const rd = dataOf(result);
+    if (rd.kind !== ValueKind.Bits) return null;
+    return (rd as BitsValue).data !== 0n;
+  } catch {
+    return null;
+  }
+}
+
+/** Instantiate one law obligation for an implementing type and attempt
+ *  discharge down the tier ladder. A concrete counterexample HALTS
+ *  definition (AllegroError) — a false law is unsound by construction. */
+function instantiateLaw(
+  implType: ContextValue,
+  desc: ContextValue,
+  ctx?: ContextValue,
+  evalFn?: EvalFn,
+): void {
+  if (lawInstantiationSuspended) return;
+  const { name, proposition, arity, kernelCertificate } = lawDescriptorParts(desc);
+
+  // Tier 1: parametric kernel certificate — free for kernel-supplied
+  // implementations (§8 amortization).
+  if (kernelCertificate !== null && equalsIsKernel(implType)) {
+    lawObligationsReg.push({ type: implType, law: name, status: "discharged", tier: "kernel" });
+    return;
+  }
+
+  // Tiers 2-3: enumeration / sampling over the quantifier domain.
+  const domain = lawSamples(implType);
+  if (domain !== null && arity >= 1 && arity <= 3) {
+    // Cartesian product of samples^arity (≤ 4^3 = 64 tuples).
+    const tuples: Value[][] = [[]];
+    for (let i = 0; i < arity; i++) {
+      const next: Value[][] = [];
+      for (const t of tuples) for (const s of domain.samples) next.push([...t, s]);
+      tuples.length = 0; tuples.push(...next);
+    }
+    let undecided = false;
+    for (const tuple of tuples) {
+      const r = runLawProp(proposition, tuple, ctx, evalFn);
+      if (r === false) {
+        throw new AllegroError(
+          `law '${name}' fails for '${typeCtxName(implType)}': counterexample at (${renderLawArgs(tuple)})`);
+      }
+      if (r === null) { undecided = true; break; }
+    }
+    if (!undecided) {
+      if (domain.exhaustive) {
+        lawObligationsReg.push({ type: implType, law: name, status: "discharged", tier: "enumerated" });
+      } else {
+        // Survival, not proof (D34): recorded as its own status.
+        lawObligationsReg.push({ type: implType, law: name, status: "sampled", tier: "sampled" });
+      }
+      return;
+    }
+  }
+
+  // Tier 5: pending — exported via the H2 obligations surface.
+  lawObligationsReg.push({ type: implType, law: name, status: "pending" });
+}
+
+/** Instantiate obligations for every Law descriptor in a member set
+ *  (called once per CONCRETE type at definition; bundles and interfaces
+ *  declare schemas, they don't implement). Multi-bound keys dedupe by
+ *  descriptor identity. */
+function instantiateLawsFromMembers(
+  implType: ContextValue,
+  members: ContextValue,
+  ctx?: ContextValue,
+  evalFn?: EvalFn,
+): void {
+  const seen = new Set<Value>();
+  for (const [, b] of members.bindings) {
+    const desc = b.value;
+    if (!desc || desc.kind !== ValueKind.Structure) continue;
+    if (!isLawDescriptor(desc as ContextValue)) continue;
+    if (seen.has(desc)) continue;
+    seen.add(desc);
+    instantiateLaw(implType, desc as ContextValue, ctx, evalFn);
+  }
+}
+
+/** Structural discharged-Proof check (local: proofs.ts imports this
+ *  module, so the canonical `isDischargedProof` can't be imported here). */
+function isDischargedProofValue(v: Value): boolean {
+  const p = dataOf(v);
+  if (p.kind !== ValueKind.Structure) return false;
+  const d = channelReadRaw(p, "discharged");
+  if (!d) return false;
+  const dp = dataOf(d);
+  return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 1n;
+}
+
+/** The witnessed tier (`by` path): attach a discharged Proof term to a
+ *  pending/sampled law obligation. E3 minimum verifies the term IS a
+ *  discharged Proof; structural proposition-matching for quantified
+ *  propositions arrives with the E4/H-arc machinery. */
+function witnessLawObligation(implType: ContextValue, lawName: string, proof: Value): void {
+  if (!isDischargedProofValue(proof)) {
+    throw new AllegroError(
+      `Law.witness: the proof term for '${lawName}' is not a discharged Proof`);
+  }
+  const shape = equalityShape(implType);
+  for (let i = lawObligationsReg.length - 1; i >= 0; i--) {
+    const e = lawObligationsReg[i];
+    if (e.law !== lawName) continue;
+    if (e.type !== implType && equalityShape(e.type) !== shape) continue;
+    if (e.status === "discharged") return; // already proven — idempotent
+    e.status = "discharged";
+    e.tier = "witnessed";
+    delete e.counterexample;
+    return;
+  }
+  throw new AllegroError(
+    `Law.witness: no law obligation '${lawName}' is registered for '${typeCtxName(implType)}'`);
+}
+
+/** The admitted tier (E4 — `assume law`, D34): mark a law as ASSUMED for
+ *  an implementing type — verdict-visible, same standing as F-arc
+ *  admitted facts. Flips a pending/sampled obligation, or REGISTERS an
+ *  admitted one when the type never instantiated the law (a custom
+ *  equality that never drew Equatable can still be admitted transitive —
+ *  that is exactly what unblocks the E4 `proof_trans` gate). A
+ *  discharged obligation is left alone (already stronger). */
+function admitLawObligation(implType: ContextValue, lawName: string): void {
+  const shape = equalityShape(implType);
+  for (let i = lawObligationsReg.length - 1; i >= 0; i--) {
+    const e = lawObligationsReg[i];
+    if (e.law !== lawName) continue;
+    if (e.type !== implType && equalityShape(e.type) !== shape) continue;
+    if (e.status === "discharged") return; // proven beats admitted — no-op
+    e.status = "admitted";
+    e.tier = "admitted";
+    delete e.counterexample;
+    return;
+  }
+  lawObligationsReg.push({ type: implType, law: lawName, status: "admitted", tier: "admitted" });
+}
+
+/** E4: the law backing for `lawName` over the equality of type `t` — the
+ *  strict-gate lookup. Kernel-supplied equality resolution (no custom
+ *  `eq`, or a built-in scalar eq) is auto-proven by the parametric
+ *  certificate; a custom equality answers with its registered
+ *  obligation's tier; absent or pending → refused. */
+export function equalityLawBacking(t: ContextValue, lawName: string):
+  { equality: string; tier: string } | { equality: string; refused: true } {
+  const shape = equalityShape(t);
+  const name = typeCtxName(shape);
+  if (equalsIsKernel(t)) return { equality: name, tier: "kernel" };
+  for (let i = lawObligationsReg.length - 1; i >= 0; i--) {
+    const e = lawObligationsReg[i];
+    if (e.law !== lawName) continue;
+    if (e.type !== t && equalityShape(e.type) !== shape) continue;
+    if (e.status === "discharged") return { equality: name, tier: e.tier ?? "witnessed" };
+    if (e.status === "sampled") return { equality: name, tier: "sampled" };
+    if (e.status === "admitted") return { equality: name, tier: "admitted" };
+    return { equality: name, refused: true }; // pending
+  }
+  return { equality: name, refused: true };
+}
+
+// --- E-R5: the purity / knowledge-independence gate --------------------------
+// `equals` implementations and coercion fns must infer an EMPTY effect set
+// — including the `observe` label (`certificate_peek` inside equals is
+// exactly the D37 violation: equality must not see knowledge). The
+// inspector is injected from primitives.ts (it needs the evaluator's
+// precompile, which this module can't import).
+
+let effectsInspector: ((fn: Value, ctx?: ContextValue) => Set<string> | null) | null = null;
+
+/** Register the effect-inference hook (called once from primitives.ts). */
+export function setEffectsInspector(f: (fn: Value, ctx?: ContextValue) => Set<string> | null): void {
+  effectsInspector = f;
+}
+
+function assertPureForEquality(fnValue: Value, what: string, ctx?: ContextValue): void {
+  if (lawInstantiationSuspended) return;
+  if (!effectsInspector) return;
+  const eff = effectsInspector(fnValue, ctx);
+  if (eff && eff.size > 0) {
+    throw new AllegroError(
+      `${what} must be pure and knowledge-independent (E-R5) — inferred effects: ` +
+      `{${[...eff].sort().join(", ")}}`);
+  }
 }
 
 // =============================================================================
@@ -1415,22 +2478,15 @@ const boolMethods: Record<string, PrimitiveFnImpl> = {
 
 // =============================================================================
 // Array Type
-// Arrays are Contexts with numeric string keys ("0", "1", ...) and "__length".
+// Arrays are Contexts with numeric string keys ("0", "1", ...) plus the length slot.
 // =============================================================================
 
 /** Build a raw array Context (without type wrapping). Used internally. */
+// C4.2: numeric-keyed structures store elements in the dense region —
+// no per-element Binding objects, no string keys, no __length binding.
+// The legacy bindings view materializes lazily for stragglers.
 function makeRawArrayCtx(elements: Value[]): ContextValue {
-  const ctx = makeContext();
-  for (let i = 0; i < elements.length; i++) {
-    const key = String(i);
-    ctx.bindings.set(key, { key, value: elements[i], isUse: false });
-    ctx.bindingList.push({ key, value: elements[i], isUse: false });
-  }
-  const lenKey = "__length";
-  const lenVal = makeInt(elements.length);
-  ctx.bindings.set(lenKey, { key: lenKey, value: lenVal, isUse: false });
-  ctx.bindingList.push({ key: lenKey, value: lenVal, isUse: false });
-  return ctx;
+  return makeDenseArrayCtx(elements);
 }
 
 /** Create a typed Array value from a list of Allegro values.
@@ -1457,15 +2513,7 @@ export function makeArray(elements: Value[]): Value {
 }
 
 function arrayElements(ctx: ContextValue): Value[] {
-  const lenBinding = ctx.bindings.get("__length");
-  if (!lenBinding?.value) return [];
-  const len = Number((lenBinding.value as BitsValue).data);
-  const result: Value[] = [];
-  for (let i = 0; i < len; i++) {
-    const b = ctx.bindings.get(String(i));
-    if (b?.value) result.push(b.value);
-  }
-  return result;
+  return elementsOf(ctx);
 }
 
 // =============================================================================
@@ -1476,30 +2524,30 @@ function arrayElements(ctx: ContextValue): Value[] {
 
 // Inline primitives for use inside ComposedFunctions (no circular import)
 const arrLengthPrim = makePrimitive("arr_length", (args) => {
-  const ctx = primaryOf(args[0]) as ContextValue;
-  return withType(ctx.bindings.get("__length")?.value ?? makeInt(0), IntType);
+  const ctx = dataOf(args[0]) as ContextValue;
+  return withType(getSlotCount(ctx) ?? makeInt(0), IntType);
 });
 const arrGetPrim = makePrimitive("arr_get", (args) => {
-  const ctx = primaryOf(args[0]) as ContextValue;
-  const idx = Number(toSigned(asBitsTyped(primaryOf(args[1]), "arr_get")));
-  const b = ctx.bindings.get(String(idx));
-  if (!b?.value) throw new AllegroError(`Array index ${idx} out of bounds`);
-  return b.value;
+  const ctx = dataOf(args[0]) as ContextValue;
+  const idx = Number(toSigned(asBitsTyped(dataOf(args[1]), "arr_get")));
+  const v = indexGet(ctx, idx);
+  if (v === undefined) throw new AllegroError(`Array index ${idx} out of bounds`);
+  return v;
 });
 const intGtePrim = makePrimitive("int_gte", (args) => {
   return withType(
-    makeInt(toSigned(asBitsTyped(primaryOf(args[0]), "int_gte")) >= toSigned(asBitsTyped(primaryOf(args[1]), "int_gte")) ? 1 : 0),
+    makeInt(toSigned(asBitsTyped(dataOf(args[0]), "int_gte")) >= toSigned(asBitsTyped(dataOf(args[1]), "int_gte")) ? 1 : 0),
     BoolType,
   );
 });
 const intAddPrim = makePrimitive("int_add", (args) => {
-  const a = toSigned(asBitsTyped(primaryOf(args[0]), "int_add"));
-  const b = toSigned(asBitsTyped(primaryOf(args[1]), "int_add"));
+  const a = toSigned(asBitsTyped(dataOf(args[0]), "int_add"));
+  const b = toSigned(asBitsTyped(dataOf(args[1]), "int_add"));
   return withType(makeInt(Number(a + b)), IntType);
 });
 const evalIfPrim = makePrimitive("eval_if", (args, ctx, evalFn) => {
   const cond = evalFn!(args[0], ctx!);
-  const condP = primaryOf(cond);
+  const condP = dataOf(cond);
   if (condP.kind === ValueKind.Bits) {
     const branch = (condP as BitsValue).data !== 0n ? args[1] : args[2];
     const evalBranch = evalFn!(branch, ctx!);
@@ -1517,8 +2565,8 @@ const makeArrayPrim = makePrimitive("make_array", (args, ctx, evalFn) => {
 const arrConcatPrim = makePrimitive("arr_concat", (args, ctx, evalFn) => {
   const a = evalFn!(args[0], ctx!);
   const b = evalFn!(args[1], ctx!);
-  const aCtx = primaryOf(a) as ContextValue;
-  const bCtx = primaryOf(b) as ContextValue;
+  const aCtx = dataOf(a) as ContextValue;
+  const bCtx = dataOf(b) as ContextValue;
   return makeArray([...arrayElements(aCtx), ...arrayElements(bCtx)]);
 }, true);
 
@@ -1647,19 +2695,18 @@ const reduceAllegro = buildReduceFn();
 const arrayMethods: Record<string, PrimitiveFnImpl> = {
   length: (args) => {
     const ctx = args[0] as ContextValue;
-    const lenBinding = ctx.bindings.get("__length");
-    return lenBinding?.value ?? makeInt(0);
+    return getSlotCount(ctx) ?? makeInt(0);
   },
   get: (args) => {
     const ctx = args[0] as ContextValue;
     const idx = Number(toSigned(asBitsTyped(args[1], "Array.get")));
-    const b = ctx.bindings.get(String(idx));
-    if (!b?.value) throw new AllegroError(`Array.get: index ${idx} out of bounds`);
-    return b.value;
+    const v = indexGet(ctx, idx);
+    if (v === undefined) throw new AllegroError(`Array.get: index ${idx} out of bounds`);
+    return v;
   },
   concat: (args) => {
     const aCtx = args[0] as ContextValue;
-    const bCtx = primaryOf(args[1]) as ContextValue;
+    const bCtx = dataOf(args[1]) as ContextValue;
     return makeArray([...arrayElements(aCtx), ...arrayElements(bCtx)]);
   },
   slice: (args) => {
@@ -1688,10 +2735,10 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
     const initial = args[2];
     return evalFn!(makeExpr(reduceAllegro, [arr, fn, initial, makeInt(0)]), ctx!);
   },
-  eq: (args) => {
-    // Reference equality for now (arrays are Contexts)
-    return makeInt(args[0] === args[1] ? 1 : 0);
-  },
+  // E1 (B-027): no `eq` member — the kernel structural equals applies at
+  // the protocol chokepoint (protocolEquals). The old reference-equality
+  // stub returned an UNTYPED int the dispatch fallback then mistyped as
+  // Array, crashing print/formatValue downstream.
   toString: ((args: Value[]) => {
     const ctx = args[0] as ContextValue;
     const elems = arrayElements(ctx);
@@ -1708,8 +2755,9 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
 export function makeObject(entries: [string, Value][]): Value {
   const ctx = makeContext();
   for (const [key, value] of entries) {
-    ctx.bindings.set(key, { key, value, isUse: false });
-    ctx.bindingList.push({ key, value, isUse: false });
+    assertNotIntegrityKey(key, "object literal");
+    ctx.bindings.set(key, { key, value });
+    ctx.bindingList.push({ key, value });
   }
   return withType(ctx, ObjectType);
 }
@@ -1746,7 +2794,8 @@ const objectMethods: Record<string, PrimitiveFnImpl> = {
     if (!b?.value) return noneSingleton;
     return b.value;
   },
-  eq: (args) => makeInt(args[0] === args[1] ? 1 : 0),
+  // E1 (B-027): no `eq` member — kernel structural equals applies at the
+  // protocol chokepoint (see arrayMethods note).
   toString: ((args: Value[]) => {
     const ctx = args[0] as ContextValue;
     return stringToBits(`{Object(${ctx.bindings.size})}`);
@@ -1783,8 +2832,218 @@ const anyMethods: Record<string, PrimitiveFnImpl> = {
 // =============================================================================
 
 export const AnyType: ContextValue = buildType("Any", anyMethods);
+
+// =============================================================================
+// The kind tower (C6.1b, D45): Refinement and Interface
+//
+// A KIND is a type whose instances are type-values. C6.1b mints the two
+// kinds D45 derives from D44's own relations:
+//
+//   Refinement — a SUB-KIND of Type: built by DRAWING Type's kind-members
+//   (composition; conformance by symbol membership) plus its own instance-
+//   data declarations (`refines`, `constraints`). Its instances are refined
+//   types: buildRefinedType stamps `__type = Refinement`. Holds constructor
+//   authority: `Refinement(base, predicate)` is the mint `&` sugars.
+//
+//   Interface — a REFINEMENT of Type: member-transparent over Type's kind
+//   API (shared member-set object, `__refines = Type`), restricted by the
+//   declaration-only predicate — an instance of Interface is a type that
+//   holds NO value-constructor authority. Its instances are interfaces:
+//   buildInterfaceType stamps `__type = Interface`.
+//
+// The ratified half-lotus matrix falls out of the existing machinery:
+//   Type : Type            ✓ (fixed point, D7)
+//   Refinement : Type      ✓ (meta Type; identity)
+//   Interface : Refinement ✓ (built BY the refinement mint; meta Refinement)
+//   Interface : Type       ✓ (Refinement conforms to Type by membership)
+//   Refinement : Interface ✗ (predicate re-check: Refinement holds
+//                             constructor authority — C3.3's instanceof
+//                             branch evaluates the declaration-only
+//                             predicate and rejects)
+// =============================================================================
+
+export const RefinementKind: ContextValue = makeContext();
+setName(RefinementKind, stringToBits("Refinement"));
+writeShape(RefinementKind, Type);
+{
+  const REFINEMENT_SCOPE = typeMemberScopeFqn("Refinement");
+  const refMembers = makeContext();
+  // Draw Type's kind API verbatim — same keys, same member symbols; the
+  // D44 conformance relation (`Refinement subtypeof Type`) holds by
+  // membership, and meta-dispatch on refined types finds the same
+  // implementations Type's instances use.
+  for (const [key, b] of typeMembers.bindings) {
+    if (b.value) addBinding(refMembers, key, b.value);
+  }
+  // Instance-data declarations: every refined type carries a base and its
+  // constraints. (AnyType is deliberately loose for `constraints` — the
+  // exact constraint-list type sharpens with `distinct`'s spec, C6.1b+.)
+  addMember(refMembers, REFINEMENT_SCOPE, "refines", makeFieldDescriptor("refines", Type));
+  addMember(refMembers, REFINEMENT_SCOPE, "constraints", makeFieldDescriptor("constraints", AnyType));
+  setMembers(RefinementKind, refMembers);
+}
+// Constructor authority (D45 R2): `Refinement(base, predicate)` IS the
+// refinement mint — the `&` operator (`Int & _ > 0`) is its operator form.
+// The kind-specific SPEC form (the surface `define` exposes) is
+//   Refinement.define({refines: T, where: pred, preserve: [ops] | "all"})
+// — `preserve` lifts the named operators (or the default numeric set) so
+// results re-check the predicate and keep the refined tag (the old
+// `.preserveOps()` fluent surface, folded into the spec per D45).
+setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx, evalFn) => {
+  const first = dataOf(evalFn!(args[0], ctx!));
+  if (first.kind !== ValueKind.Structure) {
+    throw new AllegroError("Refinement: base must be a type");
+  }
+  const specRefines = args.length === 1
+    ? (first as ContextValue).bindings.get("refines")?.value : undefined;
+  if (specRefines !== undefined) {
+    const base = dataOf(specRefines);
+    if (base.kind !== ValueKind.Structure) {
+      throw new AllegroError("Refinement: `refines` must be a type");
+    }
+    const wherePred = (first as ContextValue).bindings.get("where")?.value;
+    if (wherePred === undefined) {
+      throw new AllegroError("Refinement: spec requires a `where` predicate");
+    }
+    let refined = buildRefinedType(base as ContextValue, dataOf(wherePred));
+    // Non-reserved spec entries are METHOD implementations layered onto
+    // the refined type (the old `.mixin()` on refinements): every entry
+    // beyond refines/where/preserve must be a function value. The method
+    // layer goes on BEFORE preserve — the preserve layer clones its
+    // input's member set (methods survive) and its lifted ops retag
+    // results with the OUTERMOST type, so `x + 3 instanceof PI` holds.
+    const RESERVED_REFINEMENT_KEYS = new Set(["refines", "where", "preserve"]);
+    const extraMethods: { name: string; impl: Value }[] = [];
+    // E3: `law_` entries on a refinement spec. A refinement SHARES its
+    // parent's member set by object identity (that sharing IS shape
+    // transparency, D37) — so refinement laws instantiate obligations
+    // directly, without minting descriptors into the shared set. The
+    // quantifier is the REFINED type (its abstract domain drives the
+    // sampled tier).
+    const refinementLaws: { name: string; body: Value }[] = [];
+    for (const [k, b] of (first as ContextValue).bindings) {
+      if (isMetaSlotKey(k) || RESERVED_REFINEMENT_KEYS.has(k)) continue;
+      if (!b.value) continue;
+      if (k.startsWith("law_")) {
+        const body = forAllBody(b.value);
+        if (body === undefined) {
+          throw new AllegroError(`Refinement: '${k}' must be a for_all(...) proposition`);
+        }
+        refinementLaws.push({ name: k.slice(4), body });
+        continue;
+      }
+      const entry = dataOf(b.value);
+      if (entry.kind !== ValueKind.ComposedFunction && entry.kind !== ValueKind.PrimitiveFunction) {
+        throw new AllegroError(
+          `Refinement: spec entry '${k}' must be a method (function value) — fields live on record kinds`);
+      }
+      if (k === "eq") {
+        assertPureForEquality(b.value, `Refinement: 'eq' implementation`, ctx);
+      }
+      extraMethods.push({ name: k, impl: entry });
+    }
+    if (extraMethods.length > 0) {
+      refined = buildMethodLayer(refined, extraMethods);
+    }
+    const preserve = (first as ContextValue).bindings.get("preserve")?.value;
+    if (preserve !== undefined) {
+      const p = dataOf(preserve);
+      const opNames: string[] = [];
+      if (p.kind === ValueKind.Bits) {
+        const s = bitsToString(p as BitsValue);
+        if (s !== "all") throw new AllegroError(`Refinement: preserve must be "all" or a list of operator names (got "${s}")`);
+      } else if (p.kind === ValueKind.Structure) {
+        for (const el of arrayElements(p as ContextValue)) {
+          const e = dataOf(el);
+          if (e.kind === ValueKind.Bits) opNames.push(bitsToString(e as BitsValue));
+        }
+      } else {
+        throw new AllegroError("Refinement: preserve must be \"all\" or a list of operator names");
+      }
+      refined = buildPreserveOps(refined, opNames);
+    }
+    // E3: instantiate the spec's law obligations against the finished
+    // refined type. Sampling reads the refinement's abstract domain; a
+    // concrete counterexample halts the definition.
+    for (const l of refinementLaws) {
+      const arity = dataOf(l.body).kind === ValueKind.ComposedFunction
+        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1;
+      instantiateLaw(refined, makeLawDescriptor(l.name, l.body, arity), ctx, evalFn);
+    }
+    return wrapType(refined);
+  }
+  const predicate = evalFn!(args[1], ctx!);
+  return wrapType(buildRefinedType(first as ContextValue, predicate));
+}, true));
+
+// Type's own constructor authority: `Type(spec, ...bundles)` mints a
+// record type — `Type.define` is the canonical named factory delegating
+// here. (Every construct bottoms out in the structure factories plus the
+// gated shape stamp — makeContext + writeShape inside buildRecordType.)
+setConstruct(Type, makePrimitive("Type.__construct", (args, ctx, evalFn) => {
+  const spec = evalFn!(args[0], ctx!);
+  const drawn: ContextValue[] = [];
+  for (let i = 1; i < args.length; i++) {
+    const b = dataOf(evalFn!(args[i], ctx!));
+    if (b.kind !== ValueKind.Structure) {
+      throw new AllegroError("Type: drawn bundles must be types");
+    }
+    drawn.push(b as ContextValue);
+  }
+  return wrapType(buildRecordType(spec, drawn, Type, ctx, evalFn));
+}, true));
+
+// Interface = the refinement mint applied to Type with the declaration-only
+// predicate. Its own construct is REPLACED (the wrapped Type-construct a
+// refinement would inherit mints records — an Interface instance is a
+// declaration, so the kind's authority is the interface mint instead).
+const declarationOnlyPredicate = makePrimitive("Interface.__declarationOnly", (args) => {
+  const t = dataOf(args[0]);
+  return makeInt(
+    t.kind === ValueKind.Structure && getConstruct(t as ContextValue) === undefined ? 1 : 0);
+});
+export const InterfaceKind: ContextValue = buildRefinedType(Type, declarationOnlyPredicate);
+removeName(InterfaceKind);
+setName(InterfaceKind, stringToBits("Interface"));
+removeConstruct(InterfaceKind);
+setConstruct(InterfaceKind, makePrimitive("Interface.__construct", (args, ctx, evalFn) => {
+  const spec = evalFn!(args[0], ctx!);
+  const drawn: ContextValue[] = [];
+  for (let i = 1; i < args.length; i++) {
+    const b = dataOf(evalFn!(args[i], ctx!));
+    if (b.kind !== ValueKind.Structure) {
+      throw new AllegroError("Interface: drawn bundles must be types");
+    }
+    drawn.push(b as ContextValue);
+  }
+  return wrapType(buildInterfaceType(spec, drawn));
+}, true));
+
+/** C6.1b (maintainer ruling): there is no reified `Kind` — D7 forbids a
+ *  universe above Type. Kind-hood is a CHECKABLE PROPERTY, not a
+ *  convention: a kind is exactly a type that holds Type's kind-member
+ *  symbols — Type itself (identity), Refinement (drawn), Interface
+ *  (transparent). Ordinary types can never acquire them accidentally:
+ *  the meta filter excludes the kind API from every draw, so kind-hood
+ *  requires a deliberate kind derivation. From Allegro, `K subtypeof
+ *  Type` IS the kind test. Effect and Proof join the tower when they
+ *  are re-derived through the recipe (C6.2 / C6.3). */
+function isKind(t: ContextValue): boolean {
+  return isTypeMeta(t);
+}
+
 export const IntType: ContextValue = buildType("Int", intMethods);
 export const FloatType: ContextValue = buildType("Float", floatMethods);
+
+// E2: the kernel Int→Float coercion — the numeric tower's first declared
+// edge (§7 step 2). Ships with both §7 obligations discharged at tier
+// "kernel": the embedding preserves bit-identical Int equality by
+// construction, and with a single kernel edge every composition triangle
+// commutes trivially. Makes `1 == 1.0` true via least-common-type Float.
+declareCoercion(IntType, FloatType, makePrimitive("Int->Float", (args) => {
+  const a = toSigned(asBitsTyped(args[0], "Int->Float coercion"));
+  return withType(makeFloat(Number(a)), FloatType);
+}), { tier: "kernel" });
 export const StringType: ContextValue = buildType("String", stringMethods);
 export const BoolType: ContextValue = buildType("Bool", boolMethods);
 export const ObjectType: ContextValue = buildType("Object", objectMethods);
@@ -1797,7 +3056,7 @@ const objectGetMember = makePrimitive("Object.__getMember", (args) => {
   if (!b?.value) throw new AllegroError(`Object: field '${fieldName}' not found`);
   return b.value;
 });
-addBinding(ObjectType, "__getMember", objectGetMember);
+setFallbackMember(ObjectType, objectGetMember);
 export const UntypedFunctionType: ContextValue = buildType("UntypedFunction", untypedFnMethods);
 
 // None type — represents the absence of a value
@@ -1824,32 +3083,90 @@ export const ErrorType: ContextValue = buildType("Error", errorMethods);
 // =============================================================================
 
 // Int(x) — wrap a value with Int type
-addBinding(IntType, "__construct", makePrimitive("Int.__construct", (args, ctx, evalFn) => {
+setConstruct(IntType, makePrimitive("Int.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(primaryOf(v), IntType);
+  return withType(dataOf(v), IntType);
 }, true));
 
 // Float(x) — wrap a value with Float type
-addBinding(FloatType, "__construct", makePrimitive("Float.__construct", (args, ctx, evalFn) => {
+setConstruct(FloatType, makePrimitive("Float.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(primaryOf(v), FloatType);
+  return withType(dataOf(v), FloatType);
 }, true));
 
 // String(x) — wrap a value with String type
-addBinding(StringType, "__construct", makePrimitive("String.__construct", (args, ctx, evalFn) => {
+setConstruct(StringType, makePrimitive("String.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(primaryOf(v), StringType);
+  return withType(dataOf(v), StringType);
 }, true));
 
 // Bool(x) — wrap a value with Bool type
-addBinding(BoolType, "__construct", makePrimitive("Bool.__construct", (args, ctx, evalFn) => {
+setConstruct(BoolType, makePrimitive("Bool.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(primaryOf(v), BoolType);
+  return withType(dataOf(v), BoolType);
 }, true));
 
 // =============================================================================
-// Generic Type Infrastructure
+// GenericType — the kind of generic types (C7.2a)
+//
+// A GENERIC TYPE (Array, Function, user generics) is a TYPE CONSTRUCTOR: its
+// construct authority takes type arguments and mints concrete types
+// (`Array[Int]`), memoized so equal parameterizations are the same Context.
+// C7.2a re-derives it through the kind recipe (the Effect/Proof pattern):
+// GenericType draws Type's kind-member symbols (kind-hood is conformance to
+// Type) and declares its instances' `params` field; generic types stamp
+// shape = GenericType, so `isGenericType` is a SHAPE CHECK — the __isGeneric
+// presence flag is deleted (D39: the flag IS the kind).
+//
+// The applier lives in the generic's own `construct` slot (D45: ONE
+// construction surface — the separate `__constructor` alias is collapsed;
+// call-as-function and `type_apply` both invoke it). Applied concretes stay
+// shape Type — they are ordinary types; their `__args`/`__generic` back-links
+// remain host-read instance data (a language-level member surface for them
+// is consciously deferred — see the C7.2 rulings in the plan).
+//
+// The mint (buildGenericType) is KERNEL-PRIVATE, like Proof's makeProof:
+// GenericType exposes no construct authority to Allegro — user-defined
+// generic types are a future surface with their own design.
 // =============================================================================
+
+export const GenericType: ContextValue = makeContext();
+setName(GenericType, stringToBits("GenericType"));
+writeShape(GenericType, Type);
+
+const GENERIC_MEMBER_SCOPE = typeMemberScopeFqn("GenericType");
+const genericTypeMembers = makeContext();
+// Draw Type's kind API verbatim — same member symbols, so `GenericType
+// subtypeof Type` holds by membership and generic types keep the kind API
+// (`Array instanceof Type` stays true through conformance).
+for (const [key, b] of typeMembers.bindings) {
+  if (b.value) addBinding(genericTypeMembers, key, b.value);
+}
+setMembers(GenericType, genericTypeMembers);
+// `get` — bracket application in EXPRESSION position (`Array[Int]` as an
+// expression lowers to type_dispatch(Array, "get")(Int), the same shape
+// as array indexing). Routes to the generic's construct authority, so
+// expression-position application and annotation-position `type_apply`
+// mint the identical memoized concrete (B-091 sweep finding — without
+// this member, `print(x instanceof Array[Int])` died with
+// "'get' not found on GenericType").
+addMemberAt(genericTypeMembers, "get",
+  makeMethodDescriptor("get", makePrimitive("GenericType.get", (args, ctx, evalFn) => {
+    const self = args[0];
+    const typeArgs = args.slice(1).map(a => evalFn ? evalFn(a, ctx!) : a);
+    return applyGenericType(dataOf(self) as ContextValue, typeArgs);
+  })));
+// The `params` field descriptor is declared after ArrayType exists
+// (bootstrap order — ArrayType is itself minted through buildGenericType).
+
+// Bootstrap staging for typed `params` values: generics minted before
+// ArrayType/StringType exist store a raw array and are upgraded in place
+// once the flag flips (right after FunctionType's mint).
+let _genericParamsTypedReady = false;
+const _pendingGenericParamsUpgrades: { ctx: ContextValue; names: string[] }[] = [];
+function typedGenericParams(names: string[]): Value {
+  return makeArray(names.map(n => withType(stringToBits(n), StringType)));
+}
 
 /**
  * Build a GenericType: a type constructor that takes type parameters and
@@ -1875,29 +3192,37 @@ export function buildGenericType(
   }
 
   function cacheKeyOne(a: Value, idx: number): string {
-    if (a.kind === ValueKind.Context) {
+    // C7.1: carriers key by their DATA (a typed 3 and a typed 5 must not
+    // collide on the empty-bindings context key) — peel before the
+    // structure branch.
+    if (a.kind === ValueKind.Structure && (a as { primary?: Value }).primary !== undefined) {
+      const p = dataOf(a);
+      if (p.kind === ValueKind.Bits) return `v:${(p as BitsValue).data}`;
+      return cacheKeyOne(p, idx);
+    }
+    if (a.kind === ValueKind.Structure) {
       const ctx = a as ContextValue;
       // Named type (Int, String, Array, etc.)
-      const nb = ctx.bindings.get("__name");
-      if (nb?.value?.kind === ValueKind.Bits) {
-        const typeName = bitsToString(nb.value);
+      const nv = getName(ctx);
+      if (nv?.kind === ValueKind.Bits) {
+        const typeName = bitsToString(nv);
         // Check for type args (concrete generic like Array[Int])
-        const argsB = ctx.bindings.get("__args");
-        if (argsB?.value?.kind === ValueKind.Context) {
-          const argsCtx = argsB.value as ContextValue;
+        const argsV = getGenericArgs(ctx);
+        if (argsV?.kind === ValueKind.Structure) {
+          const argsCtx = argsV as ContextValue;
           const argElems = arrayElements(argsCtx);
           return `${typeName}[${argElems.map((e, i) => cacheKeyOne(e, i)).join(";")}]`;
         }
         return typeName;
       }
       // Array-like Context (used as param types list)
-      const lenB = ctx.bindings.get("__length");
-      if (lenB?.value?.kind === ValueKind.Bits) {
-        const len = Number((lenB.value as BitsValue).data);
+      const lenV = getSlotCount(ctx);
+      if (lenV?.kind === ValueKind.Bits) {
+        const len = Number((lenV as BitsValue).data);
         const elems: string[] = [];
         for (let i = 0; i < len; i++) {
-          const eb = ctx.bindings.get(String(i));
-          if (eb?.value) elems.push(cacheKeyOne(eb.value, i));
+          const ev = indexGet(ctx, i);
+          if (ev !== undefined) elems.push(cacheKeyOne(ev, i));
         }
         return `arr(${elems.join(";")})`;
       }
@@ -1905,28 +3230,34 @@ export function buildGenericType(
       return `ctx:${ctx.bindings.size}:${idx}`;
     }
     if (a.kind === ValueKind.Bits) return `v:${(a as BitsValue).data}`;
-    if (a.kind === ValueKind.MultiValue) {
-      const p = primaryOf(a);
-      if (p.kind === ValueKind.Bits) return `v:${(p as BitsValue).data}`;
-      return cacheKeyOne(p, idx);
-    }
     // Params and Symbols (type variables) — unique per name
     if (a.kind === ValueKind.Param) return `param:${(a as any)._name ?? idx}`;
     if (a.kind === ValueKind.Symbol) return `sym:${(a as any).name}`;
     return `unk:${idx}`;
   }
 
-  // Build the base type with methods + generic metadata
+  // Build the base type with methods, then re-stamp its shape: a generic
+  // type is an INSTANCE of the GenericType kind (C7.2a).
   const ctx = buildType(name, methods, { methodEffects: options?.methodEffects });
+  removeShapeSlot(ctx);
+  writeShape(ctx, GenericType);
 
-  // Add __params (use raw array to avoid circular dep with ArrayType)
-  const paramsKey = "__params";
-  const paramsVal = makeRawArrayCtx(paramNames.map(n => stringToBits(n)));
-  ctx.bindings.set(paramsKey, { key: paramsKey, value: paramsVal, isUse: false });
-  ctx.bindingList.push({ key: paramsKey, value: paramsVal, isUse: false });
+  // `params` — declared instance data (the GenericType kind holds the field
+  // descriptor; storage is a plain binding, like Effect's kind/labels): a
+  // typed Array[String] of the param names, so `Array.params` reads like
+  // any other array value. The two bootstrap generics (Array, Function)
+  // are minted BEFORE ArrayType/StringType exist — they store a raw array
+  // and are upgraded in place right after FunctionType's mint.
+  if (_genericParamsTypedReady) {
+    addBinding(ctx, "params", typedGenericParams(paramNames));
+  } else {
+    addBinding(ctx, "params", makeRawArrayCtx(paramNames.map(n => stringToBits(n))));
+    _pendingGenericParamsUpgrades.push({ ctx, names: paramNames });
+  }
 
-  // Add __constructor
-  const constructorFn = makePrimitive(`${name}.__constructor`, (args: Value[]) => {
+  // The applier IS the generic's construct authority (D45 collapse — the
+  // separate __constructor slot is retired): type args in, concrete type out.
+  const constructorFn = makePrimitive(`${name}.__construct`, (args: Value[]) => {
     const key = cacheKey(args);
     const cached = cache.get(key);
     if (cached) return cached;
@@ -1940,15 +3271,7 @@ export function buildGenericType(
     cache.set(key, concrete);
     return concrete;
   });
-  const ctorKey = "__constructor";
-  ctx.bindings.set(ctorKey, { key: ctorKey, value: constructorFn, isUse: false });
-  ctx.bindingList.push({ key: ctorKey, value: constructorFn, isUse: false });
-
-  // Mark as generic
-  const genericKey = "__isGeneric";
-  const genericVal = makeInt(1);
-  ctx.bindings.set(genericKey, { key: genericKey, value: genericVal, isUse: false });
-  ctx.bindingList.push({ key: genericKey, value: genericVal, isUse: false });
+  setConstruct(ctx, constructorFn);
 
   return ctx;
 }
@@ -1967,25 +3290,20 @@ function defaultConcreteType(
   const concrete = buildType(name, methods, { methodEffects });
 
   // __generic: reference to the generic type
-  const genKey = "__generic";
-  concrete.bindings.set(genKey, { key: genKey, value: generic, isUse: false });
-  concrete.bindingList.push({ key: genKey, value: generic, isUse: false });
+  setGenericBackLink(concrete, generic);
 
   // __args: the applied type arguments (raw array to avoid circular deps)
-  const argsKey = "__args";
-  const argsVal = makeRawArrayCtx(args);
-  concrete.bindings.set(argsKey, { key: argsKey, value: argsVal, isUse: false });
-  concrete.bindingList.push({ key: argsKey, value: argsVal, isUse: false });
+  setGenericArgs(concrete, makeRawArrayCtx(args));
 
   return concrete;
 }
 
 /**
- * Check if a type is a generic type (has __isGeneric).
+ * Check if a type is a generic type — a SHAPE check (C7.2a): generic types
+ * are the instances of the GenericType kind. The __isGeneric flag is gone.
  */
 export function isGenericType(type: ContextValue): boolean {
-  const b = type.bindings.get("__isGeneric");
-  return b?.value !== undefined;
+  return channelReadRaw(type, "type") === GenericType;
 }
 
 /**
@@ -1993,10 +3311,10 @@ export function isGenericType(type: ContextValue): boolean {
  * Returns null if the type has no __args.
  */
 export function getTypeArgs(type: ContextValue): Value[] | null {
-  const b = type.bindings.get("__args");
-  if (!b?.value) return null;
-  const ctx = primaryOf(b.value);
-  if (ctx.kind !== ValueKind.Context) return null;
+  const argsV = getGenericArgs(type);
+  if (!argsV) return null;
+  const ctx = dataOf(argsV);
+  if (ctx.kind !== ValueKind.Structure) return null;
   return arrayElements(ctx as ContextValue);
 }
 
@@ -2004,21 +3322,21 @@ export function getTypeArgs(type: ContextValue): Value[] | null {
  * Get the generic type from a concrete parameterized type.
  */
 export function getGenericType(type: ContextValue): ContextValue | null {
-  const b = type.bindings.get("__generic");
-  if (!b?.value || b.value.kind !== ValueKind.Context) return null;
-  return b.value;
+  const g = getGenericBackLink(type);
+  if (!g || g.kind !== ValueKind.Structure) return null;
+  return g;
 }
 
 /**
  * Get the number of type parameters on a generic type.
  */
 function getGenericParamCount(generic: ContextValue): number {
-  const paramsBinding = generic.bindings.get("__params");
-  if (!paramsBinding?.value) return 0;
-  const paramsCtx = primaryOf(paramsBinding.value);
-  if (paramsCtx.kind !== ValueKind.Context) return 0;
-  const lenBinding = (paramsCtx as ContextValue).bindings.get("__length");
-  return lenBinding?.value ? Number((lenBinding.value as BitsValue).data) : 0;
+  const paramsV = generic.bindings.get("params")?.value;
+  if (!paramsV) return 0;
+  const paramsCtx = dataOf(paramsV);
+  if (paramsCtx.kind !== ValueKind.Structure) return 0;
+  const lenV = getSlotCount(paramsCtx as ContextValue);
+  return lenV ? Number((lenV as BitsValue).data) : 0;
 }
 
 /**
@@ -2038,11 +3356,13 @@ export function normalizeType(type: ContextValue): ContextValue {
  * Apply type arguments to a generic type, returning the concrete type.
  */
 export function applyGenericType(generic: ContextValue, args: Value[]): ContextValue {
-  const ctor = generic.bindings.get("__constructor");
-  if (!ctor?.value || ctor.value.kind !== ValueKind.PrimitiveFunction) {
-    throw new AllegroError(`Not a generic type: ${bitsToString(generic.bindings.get("__name")?.value as BitsValue ?? stringToBits("unknown"))}`);
+  // C7.2a: the applier IS the generic's construct authority (D45 — one
+  // construction surface; call-as-function reaches the same slot).
+  const ctorV = getConstruct(generic);
+  if (!ctorV || ctorV.kind !== ValueKind.PrimitiveFunction) {
+    throw new AllegroError(`Not a generic type: ${bitsToString(getName(generic) as BitsValue ?? stringToBits("unknown"))}`);
   }
-  return ctor.value.fn(args, undefined as any, undefined as any) as ContextValue;
+  return ctorV.fn(args, undefined as any, undefined as any) as ContextValue;
 }
 
 // =============================================================================
@@ -2075,6 +3395,21 @@ const functionTypeMethods: Record<string, PrimitiveFnImpl> = {
 
 export const FunctionType: ContextValue = buildGenericType("Function", ["ParamTypes", "ReturnType"], functionTypeMethods);
 
+// GenericType's declared instance field (C7.2a) — added here because
+// Array[String] (the descriptor's fieldType) needs ArrayType, itself
+// minted through buildGenericType above. `Array.params` dispatches
+// through the kind's shape to this descriptor, reading the instance's
+// `params` binding.
+addMember(genericTypeMembers, GENERIC_MEMBER_SCOPE, "params",
+  makeFieldDescriptor("params", applyGenericType(ArrayType, [StringType])));
+// Upgrade the bootstrap generics' raw params storage to typed
+// Array[String] values, then mint typed directly from here on.
+_genericParamsTypedReady = true;
+for (const { ctx, names } of _pendingGenericParamsUpgrades.splice(0)) {
+  const b = ctx.bindings.get("params");
+  if (b) b.value = typedGenericParams(names);
+}
+
 /** Create a concrete FunctionType from param types and return type. */
 export function makeFunctionType(paramTypes: Value[], returnType: Value): ContextValue {
   const paramTypesArr = makeRawArrayCtx(paramTypes);
@@ -2085,8 +3420,8 @@ export function makeFunctionType(paramTypes: Value[], returnType: Value): Contex
 export function getFunctionParamTypes(fnType: ContextValue): Value[] | null {
   const args = getTypeArgs(fnType);
   if (!args || args.length < 2) return null;
-  const paramTypesCtx = primaryOf(args[0]);
-  if (paramTypesCtx.kind !== ValueKind.Context) return null;
+  const paramTypesCtx = dataOf(args[0]);
+  if (paramTypesCtx.kind !== ValueKind.Structure) return null;
   return arrayElements(paramTypesCtx as ContextValue);
 }
 
@@ -2095,6 +3430,72 @@ export function getFunctionReturnType(fnType: ContextValue): Value | null {
   const args = getTypeArgs(fnType);
   if (!args || args.length < 2) return null;
   return args[1];
+}
+
+// =============================================================================
+// Equatable — lawful-interface instance #1 (E3 — B-027 §8, D38)
+//
+// The interface declares the equality member plus the three equivalence
+// laws as Law descriptors. The law propositions run through the SAME
+// protocol chokepoint `==` uses (protocolEqualsBool) — there is no
+// parallel equality to keep in sync. Each law carries the parametric
+// kernel certificate: a type whose equality resolution is kernel-supplied
+// (the structural default, or a built-in scalar eq) discharges
+// refl/sym/trans at tier "kernel" for free (§8 amortization); a custom
+// `eq` bears fresh obligations.
+// =============================================================================
+
+export const EquatableType: ContextValue = makeContext();
+setName(EquatableType, stringToBits("Equatable"));
+writeShape(EquatableType, InterfaceKind);
+markInterface(EquatableType, makeInt(1));
+{
+  const EQUATABLE_SCOPE = typeMemberScopeFqn("Equatable");
+  (EquatableType as any).__localMemberScope = EQUATABLE_SCOPE;
+  const members = makeContext();
+  addMember(members, EQUATABLE_SCOPE, "eq", makeFieldDescriptor("eq", FunctionType));
+  const reflProp = makePrimitive("Equatable.law.refl", (args, ctx, evalFn) =>
+    makeInt(protocolEqualsBool(args[0], args[0], ctx, evalFn) ? 1 : 0));
+  const symProp = makePrimitive("Equatable.law.sym", (args, ctx, evalFn) =>
+    makeInt(protocolEqualsBool(args[0], args[1], ctx, evalFn) ===
+            protocolEqualsBool(args[1], args[0], ctx, evalFn) ? 1 : 0));
+  const transProp = makePrimitive("Equatable.law.trans", (args, ctx, evalFn) => {
+    const ab = protocolEqualsBool(args[0], args[1], ctx, evalFn);
+    const bc = protocolEqualsBool(args[1], args[2], ctx, evalFn);
+    const ac = protocolEqualsBool(args[0], args[2], ctx, evalFn);
+    return makeInt(!(ab && bc) || ac ? 1 : 0);
+  });
+  addMember(members, EQUATABLE_SCOPE, "refl",
+    makeLawDescriptor("refl", reflProp, 1, KERNEL_EQUALS_CERTIFICATE));
+  addMember(members, EQUATABLE_SCOPE, "sym",
+    makeLawDescriptor("sym", symProp, 2, KERNEL_EQUALS_CERTIFICATE));
+  addMember(members, EQUATABLE_SCOPE, "trans",
+    makeLawDescriptor("trans", transProp, 3, KERNEL_EQUALS_CERTIFICATE));
+  setMembers(EquatableType, members);
+}
+
+// Retroactive conformance for the kernel scalars (§8: "retroactive
+// conformance is via mixins / partial type declarations" — this is the
+// kernel's own partial declaration): each built-in eq implementation is
+// MULTI-BOUND under Equatable's member symbol (same descriptor object, so
+// base-name dispatch dedupes by identity), the law descriptors are drawn
+// verbatim, and the refl/sym/trans obligations discharge at tier "kernel"
+// via the parametric certificate. `42 instanceof Equatable` is true.
+{
+  const eqMembers = getMembers(EquatableType) as ContextValue;
+  for (const t of [IntType, FloatType, StringType, BoolType]) {
+    const tMembers = getMembers(t) as ContextValue;
+    for (const [key, b] of eqMembers.bindings) {
+      if (!b.value) continue;
+      if (fqnBaseName(key) === "eq") {
+        const ownEq = typeMemberDescriptor(t, "eq");
+        if (ownEq) addMemberAt(tMembers, key, ownEq);
+      } else {
+        addMemberAt(tMembers, key, b.value);
+      }
+    }
+    instantiateLawsFromMembers(t, tMembers);
+  }
 }
 
 // =============================================================================
@@ -2153,25 +3554,29 @@ export function unifyTypes(
   }
 
   // If expected is Any, always matches
-  if (expectedType.kind === ValueKind.Context) {
+  if (expectedType.kind === ValueKind.Structure) {
     const expectedName = bitsToString(
-      ((expectedType as ContextValue).bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+      (getName(expectedType as ContextValue) as BitsValue) ?? stringToBits(""),
     );
     if (expectedName === "Any") return bindings;
   }
 
   // If expected is a concrete type
-  if (expectedType.kind === ValueKind.Context && actualType) {
+  if (expectedType.kind === ValueKind.Structure && actualType) {
     const expectedCtx = expectedType as ContextValue;
-    const actualCtx = getType(actualType);
+    // Legacy-exact (C4.3b): only an MV-wrapped actual participates in name
+    // unification here — a bare type Context skips (getType on it would now
+    // report its META-type, which is not what this comparison wants; the
+    // call-site checkArgType does the real concrete-type check).
+    const actualCtx = isCarrier(actualType) ? getType(actualType) : null;
     if (!actualCtx) return bindings; // no type on actual, can't unify
 
     // Check base name
     const expectedName = bitsToString(
-      (expectedCtx.bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+      (getName(expectedCtx) as BitsValue) ?? stringToBits(""),
     );
     const actualName = bitsToString(
-      (actualCtx.bindings.get("__name")?.value as BitsValue) ?? stringToBits(""),
+      (getName(actualCtx) as BitsValue) ?? stringToBits(""),
     );
     if (expectedName !== actualName) {
       throw new AllegroError(`Type mismatch: expected ${expectedName}, got ${actualName}`);
@@ -2209,12 +3614,12 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
     return typeExpr;
   }
 
-  if (typeExpr.kind === ValueKind.Context) {
+  if (typeExpr.kind === ValueKind.Structure) {
     const ctx = typeExpr as ContextValue;
-    const argsBinding = ctx.bindings.get("__args");
-    if (argsBinding?.value) {
-      const argsCtx = primaryOf(argsBinding.value);
-      if (argsCtx.kind === ValueKind.Context) {
+    const argsV2 = getGenericArgs(ctx);
+    if (argsV2) {
+      const argsCtx = dataOf(argsV2);
+      if (argsCtx.kind === ValueKind.Structure) {
         const args = arrayElements(argsCtx as ContextValue);
         const resolvedArgs = args.map(a => resolveTypeWithBindings(a, bindings));
         if (resolvedArgs.some((a, i) => a !== args[i])) {
@@ -2232,59 +3637,68 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
 }
 
 // =============================================================================
-// Effect meta-type (Phase D1 sub-chunk 1.1 substrate)
+// Effect — the kind of effects (C6.2, D40)
 //
-// Effect is a type whose subtypes represent categories of side effects. Specific
-// effects (`pure`, `opaque`, `io`, `time`, ...) are types that extend Effect and
-// participate in the lattice via the `subset_of` / `implies` / `intersect` /
-// `union` operations. Subtype relationships (`pure subtypeof Effect == true`)
-// fall out of the standard `__extends` machinery — Effect is a regular named
-// type for the purposes of nominal subtype checks.
+// Effect is a KIND: it draws Type's kind-member symbols (so `Effect
+// subtypeof Type` holds — kind-hood is conformance to Type — and
+// define / call-as-function work uniformly) and declares its instances'
+// members: the `kind` / `labels` fields plus the lattice ops. D40 R1 —
+// Effect's declared instance ORDER is label-set inclusion, with join
+// (`union`) / meet (`intersect`) and `pure` / `opaque` as bottom / top.
 //
-// Lattice:
-//   `pure` (bottom)  ⊆  any specific effect  ⊆  `opaque` (top)
+// Members live ONCE, on the kind (D40; §6 delta 7): `io.union(time)`
+// dispatches through io's shape (Effect) exactly as `42.toString()`
+// dispatches through Int — buildEffect's per-instance member copying is
+// deleted, and so is the `__refines = Effect` chain hack (D44: effects
+// stop using the link; `pure instanceof Effect` is the check now, and
+// `pure subtypeof Effect` is FALSE — §6 delta 6).
 //
-// Anonymous conjunction creation (`io & time`) is deferred to Slice 2; for now,
-// `union` of two non-equal non-trivial effects falls back to `opaque` as a
-// sound over-approximation. `intersect` similarly returns `pure` when there's
-// no detectable overlap.
-//
-// Marker bindings:
-//   `__effect_kind` — "pure" or "opaque" on the two core absolutes; absent on
-//                     ordinary named effects. Used for fast-path dispatch in
-//                     the lattice ops without depending on identity comparison
-//                     to module-local Contexts.
+// An instance IS its label set (D39 __effectBound note): `pure` = {},
+// a named effect = {name}, an operator-minted conjunction (`io & time`,
+// D40 R3) = the union set, `opaque` = top (null — unbounded). Instances
+// are MEMOIZED by label set, so equal-set conjunctions are the SAME
+// Context and D37 equality falls out of identity.
 // =============================================================================
 
-function isPureEffect(e: ContextValue): boolean {
-  const m = e.bindings.get("__effect_kind")?.value;
-  return m?.kind === ValueKind.Bits && bitsToString(m as BitsValue) === "pure";
+export const Effect: ContextValue = makeContext();
+setName(Effect, stringToBits("Effect"));
+writeShape(Effect, Type);
+
+const EFFECT_MEMBER_SCOPE = typeMemberScopeFqn("Effect");
+const effectMembers = makeContext();
+// Draw Type's kind API verbatim — same member symbols, so `Effect
+// subtypeof Type` holds by membership and isKind(Effect) is true.
+for (const [key, b] of typeMembers.bindings) {
+  if (b.value) addBinding(effectMembers, key, b.value);
+}
+// Instance-data declarations (D39 checklist: __effect_kind → Effect.kind;
+// the label set is the Effect.labels declared view).
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "kind", makeFieldDescriptor("kind", StringType));
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "labels", makeFieldDescriptor("labels", ArrayType));
+
+/** The label set an effect instance carries: Set (empty for pure),
+ *  null for opaque (top), undefined for non-instances. */
+function labelsOf(e: ContextValue): Set<string> | null | undefined {
+  return getEffectLabels(e);
 }
 
-function isOpaqueEffect(e: ContextValue): boolean {
-  const m = e.bindings.get("__effect_kind")?.value;
-  return m?.kind === ValueKind.Bits && bitsToString(m as BitsValue) === "opaque";
+/** C6.2: is this Context an Effect INSTANCE (pure, opaque, a named
+ *  effect, or an operator-minted conjunction)? */
+export function isEffectInstance(t: ContextValue): boolean {
+  return getEffectLabels(t) !== undefined;
 }
 
-/** e1 ⊆ e2 in the effect lattice. */
+/** e1 ⊆ e2 in the effect lattice — label-set inclusion (D40 R1: the
+ *  kind's declared instance order). Top absorbs; the kind itself (no
+ *  label set) is treated as top on the right, identity-only on the left. */
 export function effectSubsetOf(e1: ContextValue, e2: ContextValue): boolean {
-  if (isOpaqueEffect(e2)) return true;       // anything ⊆ top
-  if (isPureEffect(e1)) return true;         // bottom ⊆ anything
-  if (isOpaqueEffect(e1)) return false;
-  if (isPureEffect(e2)) return false;
-  if (e1 === e2) return true;
-  // Walk e1's __extends chain looking for e2 by identity.
-  let current: ContextValue | null = e1;
-  while (current) {
-    const ext = current.bindings.get("__extends")?.value;
-    if (ext?.kind === ValueKind.Context) {
-      if (ext === e2) return true;
-      current = ext as ContextValue;
-    } else {
-      current = null;
-    }
-  }
-  return false;
+  const l1 = labelsOf(e1);
+  const l2 = labelsOf(e2);
+  if (l2 === null || l2 === undefined) return true;  // top (or the kind) absorbs
+  if (l1 === null) return false;                      // top ⊄ anything bounded
+  if (l1 === undefined) return e1 === e2;
+  for (const l of l1) if (!l2.has(l)) return false;
+  return true;
 }
 
 /** e1 implies e2: knowing e1's effects discharges a check for e2. Equivalent
@@ -2293,132 +3707,172 @@ export function effectImplies(e1: ContextValue, e2: ContextValue): boolean {
   return effectSubsetOf(e2, e1);
 }
 
-/** Lattice meet (greatest lower bound). */
+// --- The mint (D40 R2/R3) ----------------------------------------------------
+// One writer; memoized by label set so label-set identity IS physical
+// identity (`Effect("io") === Effect("io")`; two `io & time` mints are
+// the same Context).
+
+const effectInstanceCache = new Map<string, ContextValue>();
+
+function mintEffect(labels: Set<string> | null, displayName?: string): ContextValue {
+  const key = labels === null ? "\u22a4" : [...labels].sort().join("\u0000");
+  const hit = effectInstanceCache.get(key);
+  if (hit) return hit;
+  const name = displayName ?? (labels === null ? "opaque"
+    : labels.size === 0 ? "pure"
+    : [...labels].sort().join(" & "));
+  const eff = makeContext();
+  setName(eff, stringToBits(name));
+  writeShape(eff, Effect); // instance-of the kind (D40)
+  setEffectLabels(eff, labels === null ? null : new Set(labels));
+  // Declared instance fields as ordinary data bindings (D39: members on
+  // the kind; storage is instance data, like record fields).
+  addBinding(eff, "kind", withType(stringToBits(
+    labels === null ? "opaque" : labels.size === 0 ? "pure" : "labeled"), StringType));
+  if (labels !== null) {
+    addBinding(eff, "labels",
+      makeArray([...labels].sort().map((l) => withType(stringToBits(l), StringType))));
+  }
+  // The annotation bound is DERIVED from the label set at mint (the D39
+  // addendum's collapse): callers through `f: <effect>` may produce at
+  // most these labels. `opaque` carries no bound — universal pass.
+  if (labels !== null) {
+    setEffectBound(eff, { kind: "effects", labels: new Set(labels) });
+  }
+  effectInstanceCache.set(key, eff);
+  return eff;
+}
+
+/** Lattice meet (greatest lower bound) — label-set intersection. */
 export function effectIntersect(e1: ContextValue, e2: ContextValue): ContextValue {
-  if (isPureEffect(e1) || isPureEffect(e2)) return pureEffect;
-  if (isOpaqueEffect(e1)) return e2;
-  if (isOpaqueEffect(e2)) return e1;
-  if (e1 === e2) return e1;
-  // Conservative: no statically detectable overlap → bottom. Slice 2 will
-  // handle conjunctions and refined overlap detection.
-  return pureEffect;
+  const l1 = labelsOf(e1);
+  const l2 = labelsOf(e2);
+  if (l1 === null) return e2;
+  if (l2 === null) return e1;
+  if (l1 === undefined || l2 === undefined) return pureEffect;
+  return mintEffect(new Set([...l1].filter((x) => l2.has(x))));
 }
 
-/** Lattice join (least upper bound). */
+/** Lattice join (least upper bound) — label-set union. Anonymous
+ *  conjunctions (`io & time`) mint here (D40 R3 — the deferred debt
+ *  closed): the result carries the union set, memoized. */
 export function effectUnion(e1: ContextValue, e2: ContextValue): ContextValue {
-  if (isOpaqueEffect(e1) || isOpaqueEffect(e2)) return opaqueEffect;
-  if (isPureEffect(e1)) return e2;
-  if (isPureEffect(e2)) return e1;
-  if (e1 === e2) return e1;
-  // Sound over-approximation pending Slice 2's anonymous conjunctions.
-  return opaqueEffect;
+  const l1 = labelsOf(e1);
+  const l2 = labelsOf(e2);
+  if (l1 === null || l2 === null) return opaqueEffect;
+  if (l1 === undefined || l2 === undefined) return opaqueEffect;
+  return mintEffect(new Set([...l1, ...l2]));
 }
 
-// --- Effect meta-type Context ---
-
-export const Effect: ContextValue = makeContext();
-addBinding(Effect, "__name", stringToBits("Effect"));
-addBinding(Effect, "__type", Type);
-
-const effectMembers = makeContext();
-addBinding(effectMembers, "subset_of", makeMethodDescriptor("subset_of",
+// The order ops are members ON THE KIND — instances dispatch through
+// their shape (io.union(time) finds Effect's member with self = io).
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "subset_of", makeMethodDescriptor("subset_of",
   makePrimitive("Effect.subset_of", (args) => {
-    const e1 = primaryOf(args[0]) as ContextValue;
-    const e2 = primaryOf(args[1]) as ContextValue;
+    const e1 = dataOf(args[0]) as ContextValue;
+    const e2 = dataOf(args[1]) as ContextValue;
     return withType(makeInt(effectSubsetOf(e1, e2) ? 1 : 0), BoolType);
   })
 ));
-addBinding(effectMembers, "implies", makeMethodDescriptor("implies",
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "implies", makeMethodDescriptor("implies",
   makePrimitive("Effect.implies", (args) => {
-    const e1 = primaryOf(args[0]) as ContextValue;
-    const e2 = primaryOf(args[1]) as ContextValue;
+    const e1 = dataOf(args[0]) as ContextValue;
+    const e2 = dataOf(args[1]) as ContextValue;
     return withType(makeInt(effectImplies(e1, e2) ? 1 : 0), BoolType);
   })
 ));
-addBinding(effectMembers, "intersect", makeMethodDescriptor("intersect",
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "intersect", makeMethodDescriptor("intersect",
   makePrimitive("Effect.intersect", (args) => {
-    const e1 = primaryOf(args[0]) as ContextValue;
-    const e2 = primaryOf(args[1]) as ContextValue;
+    const e1 = dataOf(args[0]) as ContextValue;
+    const e2 = dataOf(args[1]) as ContextValue;
     return wrapType(effectIntersect(e1, e2));
   })
 ));
-addBinding(effectMembers, "union", makeMethodDescriptor("union",
+addMember(effectMembers, EFFECT_MEMBER_SCOPE, "union", makeMethodDescriptor("union",
   makePrimitive("Effect.union", (args) => {
-    const e1 = primaryOf(args[0]) as ContextValue;
-    const e2 = primaryOf(args[1]) as ContextValue;
+    const e1 = dataOf(args[0]) as ContextValue;
+    const e2 = dataOf(args[1]) as ContextValue;
     return wrapType(effectUnion(e1, e2));
   })
 ));
-addBinding(Effect, "__members", effectMembers);
+setMembers(Effect, effectMembers);
 
-/**
- * Build an effect type that extends Effect. Used for `pure` and `opaque` here;
- * extension libraries will use the same builder for their own effects (`io`,
- * `time`, ...) once the public surface lands in Slice 2.
- *
- * The lattice methods are copied into the new type's `__members` so that
- * eventual dot-dispatch (`pure.subset_of(opaque)`) can find them on the value
- * side. Today's dispatch flow finds them via `__type` (Type), which doesn't
- * carry effect methods — so the copy is the bridge until Slice 2 either walks
- * `__extends` for member lookup or formalises Effect-as-meta-type.
- */
+// Constructor authority (D40 R2 / D45): `Effect("net")` mints a named
+// effect; `Effect.define("net")` is the named-factory route.
+setConstruct(Effect, makePrimitive("Effect.__construct", (args, ctx, evalFn) => {
+  const nameV = dataOf(evalFn!(args[0], ctx!));
+  if (nameV.kind !== ValueKind.Bits) {
+    throw new AllegroError("Effect: the label must be a string");
+  }
+  return wrapType(buildEffect(bitsToString(nameV as BitsValue)));
+}, true));
+
+/** Mint an effect instance. `kind` selects the two absolutes; named
+ *  effects carry the singleton label set. Memoized — same labels, same
+ *  Context. */
 export function buildEffect(name: string, kind?: "pure" | "opaque"): ContextValue {
-  const eff = makeContext();
-  addBinding(eff, "__name", stringToBits(name));
-  addBinding(eff, "__type", Type);
-  addBinding(eff, "__extends", Effect);
-  if (kind) addBinding(eff, "__effect_kind", stringToBits(kind));
-  const members = makeContext();
-  for (const [key, binding] of effectMembers.bindings) {
-    if (binding.value) addBinding(members, key, binding.value);
-  }
-  addBinding(eff, "__members", members);
-  // Attach an effect bound — the value-side check this type imposes when it
-  // appears as a parameter annotation (`f: pure`). The bound is the set of
-  // effect labels callers may legally produce; the discharge runs through
-  // `impliesDomain` on the predicate-set machinery, identical path to numeric
-  // refinements. `opaque` carries no bound — universal, anything passes.
-  if (kind === "pure") {
-    (eff as any).__effectBound = { kind: "effects", labels: new Set<string>() };
-  } else if (kind === "opaque") {
-    // No bound — universal. type_check skips the effect discharge entirely.
-  } else {
-    // Named effects (io, time, …): bound is the singleton {name}. Extension
-    // libraries will pass `kind` undefined when they call `buildEffect("io")`.
-    (eff as any).__effectBound = { kind: "effects", labels: new Set<string>([name]) };
-  }
-  return eff;
+  if (kind === "pure") return mintEffect(new Set(), "pure");
+  if (kind === "opaque") return mintEffect(null, "opaque");
+  return mintEffect(new Set([name]), name);
 }
 
 export const pureEffect: ContextValue = buildEffect("pure", "pure");
 export const opaqueEffect: ContextValue = buildEffect("opaque", "opaque");
 
 // =============================================================================
-// Proof meta-type (Phase F1 substrate)
+// Proof — the kind of proofs (C6.3, D40/D45; Phase F1 substrate)
 // =============================================================================
 //
-// A Proof is a Value that witnesses a proposition. Phase F1's only proof
-// constructor is `proof_by_eval` (discharge by partial evaluation): if the
-// proposition folds to `true`, the witness is valid. Later chunks add
-// refinement-domain proofs (F2) and proof combinators (F3).
+// A Proof is a Value that witnesses a proposition. Proof is a KIND: it
+// draws Type's kind-member symbols and declares its instances' fields
+// (proposition / reason / counterexample / lhs / rhs — the D39 table,
+// executed). Instances are Contexts stamped `__type = Proof` carrying
+// those fields as plain data bindings plus the `__discharged` INTEGRITY
+// CHANNEL.
 //
-// Internally a proof is a Context with `__type = Proof`, a `__proposition`
-// binding holding a source-rendered string of what was proved, and a
-// `__discharged` flag. Failed proofs are Error-typed values carrying the
-// counterexample (reusing Phase E Stage 6 machinery) — `checkProofs` in
-// `src/proofs.ts` surfaces them as error-severity notifications.
+// Constructor authority is KERNEL-PRIVATE (D40 R2 / D45): Proof holds
+// NO `construct` — `Proof(...)` and `Proof.define(...)` fail, and the
+// only mint is `makeProof`, which holds the module-private discharged
+// channel writer (the attenuated-capability pattern). Holding a kind's
+// construct IS holding its mint; not exporting it IS unforgeability —
+// an ordinary capability instance, not a special arrangement.
+//
+// Failed proofs are the same shape with `__discharged = 0` plus
+// reason/counterexample; `checkProofs` in `src/proofs.ts` surfaces them
+// as error-severity notifications.
 
 export const Proof: ContextValue = makeContext();
-addBinding(Proof, "__name", stringToBits("Proof"));
-addBinding(Proof, "__type", Type);
-addBinding(Proof, "__members", makeContext());
+setName(Proof, stringToBits("Proof"));
+writeShape(Proof, Type);
+{
+  const PROOF_MEMBER_SCOPE = typeMemberScopeFqn("Proof");
+  const proofMembers = makeContext();
+  // Draw Type's kind API — Proof joins the tower by construction.
+  for (const [key, b] of typeMembers.bindings) {
+    if (b.value) addBinding(proofMembers, key, b.value);
+  }
+  // Instance-data declarations (D39 Proof rows, executed at C6.3).
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "proposition", makeFieldDescriptor("proposition", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "reason", makeFieldDescriptor("reason", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "counterexample", makeFieldDescriptor("counterexample", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "lhs", makeFieldDescriptor("lhs", AnyType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "rhs", makeFieldDescriptor("rhs", AnyType));
+  // E4 (E-R6): equality proofs record which equality they chained and
+  // which law tier backed it (kernel / enumerated / witnessed / sampled
+  // / admitted) — a `proof_trans` resting on admitted transitivity is
+  // verdict-visibly weaker than one resting on a proven one.
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "equality", makeFieldDescriptor("equality", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "lawName", makeFieldDescriptor("lawName", StringType));
+  addMember(proofMembers, PROOF_MEMBER_SCOPE, "lawTier", makeFieldDescriptor("lawTier", StringType));
+  setMembers(Proof, proofMembers);
+}
+// NO setConstruct(Proof, ...) — deliberately. See the header comment.
 
 /** Construct a discharged proof witness for a proposition. `proposition`
  *  is the source-rendered text of what was proved (for display / export). */
 export function makeProof(proposition: string): Value {
   const p = makeContext();
-  addBinding(p, "__proposition", stringToBits(proposition));
-  addBinding(p, "__discharged", makeInt(1));
+  setProposition(p, withType(stringToBits(proposition), StringType));
+  dischargedWriterStd.write(p, makeInt(1));
   return withType(p, Proof);
 }
 
@@ -2434,29 +3888,151 @@ export function isProof(v: Value): boolean {
 
 /**
  * Wrap a function value (PrimitiveFunction or ComposedFunction) as UntypedFunction.
- * Attaches arity as a component when known.
+ * (An `arity` component was formerly attached here when known; it was
+ * write-only — never read anywhere — and was removed per the D39-addendum
+ * slot review, 2026-07. Arity is derivable from Function[ParamTypes, R]
+ * wherever it's actually needed.)
  */
-export function wrapAsUntypedFunction(fn: Value, arity?: number): Value {
-  const primary = primaryOf(fn);
-  const components = fn.kind === ValueKind.MultiValue
-    ? new Map(fn.components)
-    : new Map<string, Value>();
+export function wrapAsUntypedFunction(fn: Value): Value {
+  const primary = dataOf(fn);
+  const components = cloneComponents(fn);
   components.set("type", UntypedFunctionType);
-  if (arity !== undefined) {
-    components.set("arity", makeInt(arity));
-  }
   return makeMultiValue(primary, components);
 }
 
 /**
  * Check if a value is a function (PrimitiveFunction or ComposedFunction).
  */
-/** Wrap a type Context as a typed MultiValue using its __type as meta-type */
+/** C4.3b: user-visible type bindings ARE the type Context — the former
+ *  MultiValue wrap is gone. A bare type Context already answers its
+ *  meta-type through `channelReadRaw(t, "type"/"shape")` (the `__type`
+ *  binding-plane fallback), and `getType` is total, so `type of Int`,
+ *  `Int instanceof Type`, and meta-method dispatch all read the same
+ *  storage the internal singletons use. Identity is the point: annotation
+ *  symbols and internal construction sites resolve to the SAME object, so
+ *  `actualType === expectedType` short-circuits keep working. */
 export function wrapType(type: ContextValue): Value {
-  const metaType = type.bindings.get("__type")?.value as ContextValue | undefined;
-  if (metaType) return withType(type, metaType);
   return type;
 }
+
+// E2: the `Coercion.declare(From, To, fn)` surface (E-R2's standalone
+// form — pairs stay first-class, define specs stay closed). A module-like
+// typed Object: dot access rides Object's `__getMember`, no new dispatch
+// machinery. Declarations instantiate their §7 obligations PENDING (E3
+// routes them through PCP discharge).
+const coercionDeclarePrim = makePrimitive("Coercion.declare", (args, ctx) => {
+  const from = asContext(dataOf(args[0]));
+  const to = asContext(dataOf(args[1]));
+  if (!from || !to) {
+    throw new AllegroError("Coercion.declare: expected (FromType, ToType, fn)");
+  }
+  const fn = args[2];
+  const fd = dataOf(fn);
+  if (fd.kind !== ValueKind.PrimitiveFunction && fd.kind !== ValueKind.ComposedFunction) {
+    throw new AllegroError("Coercion.declare: third argument must be a function");
+  }
+  // E-R5: coercion fns feed the equality protocol — same purity gate as
+  // `eq` implementations.
+  assertPureForEquality(fn, "Coercion.declare: coercion fn", ctx);
+  declareCoercion(from, to, fn);
+  return noneSingleton;
+});
+
+// E3: the witnessed tier for the §7 coercion obligations — attach a
+// discharged Proof term to a declared edge's preservation/coherence slot.
+const coercionWitnessPrim = makePrimitive("Coercion.witness", (args) => {
+  const from = asContext(dataOf(args[0]));
+  const to = asContext(dataOf(args[1]));
+  if (!from || !to) {
+    throw new AllegroError("Coercion.witness: expected (FromType, ToType, obligation, proof)");
+  }
+  const obD = dataOf(args[2]);
+  const which = obD.kind === ValueKind.Bits ? bitsToString(obD as BitsValue) : "";
+  if (which !== "equality-preservation" && which !== "coherence") {
+    throw new AllegroError(
+      `Coercion.witness: obligation must be "equality-preservation" or "coherence"`);
+  }
+  if (!isDischargedProofValue(args[3])) {
+    throw new AllegroError("Coercion.witness: the proof term is not a discharged Proof");
+  }
+  const edge = coercionRegistry.get(equalityShape(from))?.get(equalityShape(to));
+  if (!edge) {
+    throw new AllegroError(
+      `Coercion.witness: no declared coercion from '${typeCtxName(from)}' to '${typeCtxName(to)}'`);
+  }
+  const slot = which === "coherence" ? edge.coherence : edge.preservation;
+  slot.status = "discharged";
+  slot.tier = "witnessed";
+  return noneSingleton;
+});
+// E4: the admitted tier for coercion obligations — mark a declared
+// edge's obligation ASSUMED (verdict-visible; no-op when discharged).
+const coercionAssumePrim = makePrimitive("Coercion.assume", (args) => {
+  const from = asContext(dataOf(args[0]));
+  const to = asContext(dataOf(args[1]));
+  if (!from || !to) {
+    throw new AllegroError("Coercion.assume: expected (FromType, ToType, obligation)");
+  }
+  const obD = dataOf(args[2]);
+  const which = obD.kind === ValueKind.Bits ? bitsToString(obD as BitsValue) : "";
+  if (which !== "equality-preservation" && which !== "coherence") {
+    throw new AllegroError(
+      `Coercion.assume: obligation must be "equality-preservation" or "coherence"`);
+  }
+  const edge = coercionRegistry.get(equalityShape(from))?.get(equalityShape(to));
+  if (!edge) {
+    throw new AllegroError(
+      `Coercion.assume: no declared coercion from '${typeCtxName(from)}' to '${typeCtxName(to)}'`);
+  }
+  const slot = which === "coherence" ? edge.coherence : edge.preservation;
+  if (slot.status === "discharged") return noneSingleton; // proven beats admitted
+  slot.status = "admitted";
+  slot.tier = "admitted";
+  return noneSingleton;
+});
+const coercionSurface: Value = makeObject([
+  ["declare", coercionDeclarePrim],
+  ["witness", coercionWitnessPrim],
+  ["assume", coercionAssumePrim],
+]);
+
+// E3: the `Law.witness(Type, "name", proof)` surface — the `by` path for
+// law obligations.
+const lawWitnessPrim = makePrimitive("Law.witness", (args) => {
+  const t = asContext(dataOf(args[0]));
+  if (!t) throw new AllegroError("Law.witness: expected (Type, lawName, proof)");
+  const nameD = dataOf(args[1]);
+  if (nameD.kind !== ValueKind.Bits) {
+    throw new AllegroError("Law.witness: law name must be a String");
+  }
+  witnessLawObligation(t, bitsToString(nameD as BitsValue), args[2]);
+  return noneSingleton;
+});
+// E4: `Law.assume(Type, "name")` — the admitted tier (`assume law`).
+const lawAssumePrim = makePrimitive("Law.assume", (args) => {
+  const t = asContext(dataOf(args[0]));
+  if (!t) throw new AllegroError("Law.assume: expected (Type, lawName)");
+  const nameD = dataOf(args[1]);
+  if (nameD.kind !== ValueKind.Bits) {
+    throw new AllegroError("Law.assume: law name must be a String");
+  }
+  admitLawObligation(t, bitsToString(nameD as BitsValue));
+  return noneSingleton;
+});
+const lawSurface: Value = makeObject([
+  ["witness", lawWitnessPrim],
+  ["assume", lawAssumePrim],
+]);
+
+// E3: `for_all(fn)` — the quantified-proposition constructor (E-R3). All
+// params of the body range over the implementing type.
+const forAllPrim = makePrimitive("for_all", (args) => {
+  const d = dataOf(args[0]);
+  if (d.kind !== ValueKind.ComposedFunction && d.kind !== ValueKind.PrimitiveFunction) {
+    throw new AllegroError("for_all: argument must be a function (the quantified proposition body)");
+  }
+  return makeForAllProp(args[0]);
+});
 
 export function createTypeSystem(): Extension {
   return {
@@ -2471,9 +4047,10 @@ export function createTypeSystem(): Extension {
       Object: wrapType(ObjectType) as any,
       Function: wrapType(FunctionType) as any,
       UntypedFunction: wrapType(UntypedFunctionType) as any,
-      // Meta-types
+      // Meta-types — the kind tower (C6.1b, D45)
       Type: wrapType(Type) as any,
-      NominalType: wrapType(NominalType) as any,
+      Refinement: wrapType(RefinementKind) as any,
+      Interface: wrapType(InterfaceKind) as any,
       None: wrapType(NoneType) as any,
       Error: wrapType(ErrorType) as any,
       // Effect meta-type + core absolutes
@@ -2482,6 +4059,12 @@ export function createTypeSystem(): Extension {
       opaque: wrapType(opaqueEffect) as any,
       // Proof meta-type (Phase F1)
       Proof: wrapType(Proof) as any,
+      // Coercion declaration surface (E2 — B-027 §7 step 2)
+      Coercion: coercionSurface as any,
+      // Lawful interfaces (E3 — B-027 §8, D38)
+      Equatable: wrapType(EquatableType) as any,
+      Law: lawSurface as any,
+      for_all: forAllPrim as any,
       // Literal bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,

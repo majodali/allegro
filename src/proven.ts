@@ -21,12 +21,14 @@
 // type) is F7+ and likely requires either richer abstract-domain
 // machinery or an external SMT discharge.
 
+import { dataOf, getName, channelReadRaw, componentsView } from "./slots.js";
+import { scopeLookup } from "./scope.js";
 import {
   Value, ValueKind, ContextValue, ComposedFunctionValue, ExpressionValue,
   ParamValue, BitsValue,
-  primaryOf, bitsToString, makeInt, makeMultiValue,
+  bitsToString, makeInt, makeMultiValue,
 } from "./types.js";
-import { unwrapProvenAttach } from "./totality.js";
+
 import { evaluate } from "./evaluator.js";
 import { getType, getTypeName, getFunctionParamTypes, BoolType, IntType } from "./types-std.js";
 
@@ -45,24 +47,25 @@ export interface ProvenFinding {
  *  evalCtx Symbol lookup if needed). Returns the Context that may carry
  *  `__name`, `__abstractDomain`, etc. */
 function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | null {
-  let cur: Value = t;
-  if (cur.kind === ValueKind.MultiValue) cur = (cur as any).primary;
+  let cur: Value = dataOf(t);
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
-    const b = evalCtx.bindings.get(name);
+    // C2.3b: chain-aware — type names (Int, Bool, user refinements) may
+    // live on any layer of the root scope chain, not the source layer.
+    const b = scopeLookup(evalCtx, name);
     if (!b?.value) return null;
     return resolveTypeContext(b.value, evalCtx);
   }
-  return cur.kind === ValueKind.Context ? (cur as ContextValue) : null;
+  return cur.kind === ValueKind.Structure ? (cur as ContextValue) : null;
 }
 
 /** Pick sample inputs for a parameter based on its resolved type. Returns
  *  `null` when the type isn't one of the F7-minimum shapes; the caller
  *  records this as a "type not sampleable" info notification. */
 function pickSamples(typeCtx: ContextValue): Value[] | null {
-  const nameBinding = typeCtx.bindings.get("__name")?.value;
-  const name = nameBinding && primaryOf(nameBinding).kind === ValueKind.Bits
-    ? bitsToString(primaryOf(nameBinding) as BitsValue) : null;
+  const nameBinding = getName(typeCtx);
+  const name = nameBinding && dataOf(nameBinding).kind === ValueKind.Bits
+    ? bitsToString(dataOf(nameBinding) as BitsValue) : null;
 
   // Bool — enumerate the domain.
   if (name === "Bool") {
@@ -102,7 +105,7 @@ function pickSamples(typeCtx: ContextValue): Value[] | null {
 
 /** Render a sample value as a short string for counterexamples. */
 function describeSample(v: Value): string {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind !== ValueKind.Bits) return "?";
   const b = p as BitsValue;
   if (b.length !== 64) return "?";
@@ -129,7 +132,6 @@ function substParams(
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
     case ValueKind.Symbol:
-    case ValueKind.Context:
       return v;
     case ValueKind.Param: {
       const p = v as ParamValue;
@@ -146,10 +148,11 @@ function substParams(
       const args = e.args.map(a => substParams(a, cfn, posMap, seen));
       return { ...e, fn, args };
     }
-    case ValueKind.MultiValue: {
+    case ValueKind.Structure: {
       seen.add(v);
-      const mv = v as any;
-      return { ...mv, primary: substParams(mv.primary, cfn, posMap, seen) };
+      const pp = (v as any).primary;
+      if (pp === undefined) return v;
+      return makeMultiValue(substParams(pp, cfn, posMap, seen), componentsView(v) as Map<string, import("./types.js").Value>);
     }
     case ValueKind.ComposedFunction: {
       seen.add(v);
@@ -190,12 +193,12 @@ export function checkProvenClauses(
     // Need a ComposedFunction body to peel + sample.
     let cfn: ComposedFunctionValue | null = null;
     let paramTypes: Value[] | null = null;
-    if (val.kind === ValueKind.MultiValue) {
+    if (val.kind === ValueKind.Structure && (val as any).primary !== undefined) {
       const mv = val as any;
       if (mv.primary?.kind === ValueKind.ComposedFunction) {
         cfn = mv.primary as ComposedFunctionValue;
-        const tComp = mv.components.get("type");
-        if (tComp?.kind === ValueKind.Context) {
+        const tComp = channelReadRaw(mv, "type");
+        if (tComp?.kind === ValueKind.Structure) {
           paramTypes = getFunctionParamTypes(tComp as ContextValue);
         }
       }
@@ -204,8 +207,8 @@ export function checkProvenClauses(
     }
     if (!cfn) continue;
 
-    const peeled = unwrapProvenAttach(cfn.body);
-    if (!peeled) continue;
+    const provenClauses = (cfn as any).__provenClauses as Value[] | undefined;
+    if (!provenClauses || provenClauses.length === 0) continue;
 
     // F7 minimum: single typed param. Multi-param + untyped emit info.
     if (cfn.params.length !== 1) {
@@ -236,9 +239,9 @@ export function checkProvenClauses(
     }
     const samples = pickSamples(typeCtx);
     if (!samples) {
-      const tn = typeCtx.bindings.get("__name")?.value;
-      const tname = tn && primaryOf(tn).kind === ValueKind.Bits
-        ? bitsToString(primaryOf(tn) as BitsValue) : "<type>";
+      const tn = getName(typeCtx);
+      const tname = tn && dataOf(tn).kind === ValueKind.Bits
+        ? bitsToString(dataOf(tn) as BitsValue) : "<type>";
       infos.push({
         binding: name,
         proposition: renderPredicateShape(cfn),
@@ -249,8 +252,8 @@ export function checkProvenClauses(
 
     // For each predicate, sample.
     const param = cfn.params[0];
-    for (let pi = 0; pi < peeled.predicates.length; pi++) {
-      const predAst = peeled.predicates[pi];
+    for (let pi = 0; pi < provenClauses.length; pi++) {
+      const predAst = provenClauses[pi];
       let failed: { sample: Value; reason: string } | null = null;
       for (const sample of samples) {
         const posMap = new Map<number, Value>([[param.position, sample]]);
@@ -262,7 +265,7 @@ export function checkProvenClauses(
           failed = { sample, reason: `evaluation threw: ${e.message}` };
           break;
         }
-        const rp = primaryOf(result);
+        const rp = dataOf(result);
         if (rp.kind !== ValueKind.Bits || (rp as BitsValue).data !== 1n) {
           const rendered = rp.kind === ValueKind.Bits
             ? `${rp.data}` : `<${rp.kind}>`;

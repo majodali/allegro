@@ -23,9 +23,25 @@
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
 import type { ContextValue, BitsValue } from "./types.js";
-import { ValueKind, primaryOf, bitsToString } from "./types.js";
+import { dataOf, SLOT_KEYS, backingsOf } from "./slots.js";
+import type { LawBackingRec } from "./slots.js";
+import { ValueKind, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
+import { lawObligationRecords, coercionObligationRecords } from "./types-std.js";
+import { scopeAllBindings } from "./scope.js";
 import type { CompilationReport, Notification } from "./runtime.js";
+
+/** E3: the law/coercion registries are process-global — scope their view
+ *  to THIS compilation unit by filtering to types reachable as bound
+ *  values on the eval scope chain (source bindings + extension layers, so
+ *  kernel scalars are always in view; another module's types are not). */
+function boundTypeFilter(evalCtx: ContextValue): (t: ContextValue) => boolean {
+  const bound = new Set<unknown>();
+  for (const [, b] of scopeAllBindings(evalCtx)) {
+    if (b?.value) bound.add(dataOf(b.value));
+  }
+  return (t) => bound.has(t);
+}
 
 export const PCP_VERSION = "pcp/1" as const;
 
@@ -107,9 +123,39 @@ export interface Verdict {
   totalityFindings?: TotalityFinding[];
   /** Effects-declaration mismatches (Phase D1) — fatal. */
   effectMismatches?: EffectMismatch[];
+  /** E3 (B-027 §8): law obligations instantiated by lawful-interface
+   *  draws, each with its D34 discharge tier. Pending entries do NOT
+   *  flip `verified` — E3 records; E4 turns on the first strict gate. */
+  lawObligations?: LawObligationRecord[];
+  /** E3: the §7 coercion obligations (equality-preservation +
+   *  pairwise coherence) per declared edge. */
+  coercionObligations?: CoercionObligationRecord[];
   /** H3: structured guidance for the next attempt. Generated from the
    *  failure modes in this verdict + any priorAttempts metadata. */
   iterationHints?: IterationHints;
+}
+
+export interface LawObligationRecord {
+  /** Implementing type's name (resolved after auto-naming). */
+  type: string;
+  /** Law name as declared (the `law_` prefix stripped). */
+  law: string;
+  /** "discharged" (kernel/enumerated/witnessed), "sampled" (survival —
+   *  not proof, D34), "admitted" (E4 `assume law` — verdict-visible),
+   *  or "pending". */
+  status: "discharged" | "sampled" | "pending" | "admitted";
+  /** D34 tier: "kernel" | "enumerated" | "sampled" | "witnessed" |
+   *  "admitted". */
+  tier?: string;
+  counterexample?: string;
+}
+
+export interface CoercionObligationRecord {
+  from: string;
+  to: string;
+  obligation: "equality-preservation" | "coherence";
+  status: "pending" | "discharged" | "admitted";
+  tier?: string;
 }
 
 // =============================================================================
@@ -151,6 +197,19 @@ export interface TheoremResult {
   authorship?: Authorship;
   /** Set when status === "failed" or "skipped". */
   failure?: TheoremFailure;
+  /** E4 (E-R6): set when the discharged proof is an equality proof that
+   *  recorded its law backing — which equality it chained, which law
+   *  the combinator relied on, and which D34 tier backed that law. A
+   *  chain resting on admitted/sampled backing is verdict-visibly
+   *  weaker than one resting on a proven (kernel/enumerated/witnessed)
+   *  one. */
+  lawBacking?: { equality: string; law: string; tier: string };
+  /** D2 roll-up (B-091): the TRANSITIVE backing set — the outermost
+   *  rule's backing plus everything inherited from input proofs through
+   *  the combinator chain. `lawBacking` above is the outermost rule
+   *  only; this is what the assumption ledger aggregates. Additive
+   *  optional field — pcp/1 unchanged. */
+  restsOn?: LawBackingRec[];
 }
 
 export interface TheoremFailure {
@@ -407,6 +466,64 @@ export function formatObligation(o: Obligation): string {
   return lines.join("\n");
 }
 
+/** D2 roll-up (B-091): a theorem's weak (admitted/sampled) backings,
+ *  drawn from the transitive `restsOn` set with the single E-R6
+ *  `lawBacking` field as fallback, deduped. */
+function weakBackingsOf(t: TheoremResult): LawBackingRec[] {
+  const source: LawBackingRec[] = t.restsOn && t.restsOn.length > 0
+    ? t.restsOn
+    : (t.lawBacking ? [t.lawBacking] : []);
+  const seen = new Set<string>();
+  const out: LawBackingRec[] = [];
+  for (const r of source) {
+    if (r.tier !== "admitted" && r.tier !== "sampled") continue;
+    const k = `${r.equality} ${r.law} ${r.tier}`;
+    if (!seen.has(k)) { seen.add(k); out.push(r); }
+  }
+  return out;
+}
+
+/** D2 roll-up (B-091): aggregate what the module's verification rests
+ *  on — every admitted/sampled assumption in force (from proofs'
+ *  transitive backing sets AND from obligations flipped by
+ *  `Law.assume`/witness-sampling even when no proof consumes them yet),
+ *  mapped to the proofs resting on each, plus the pending-obligation
+ *  count. Renders as the verdict's `assumption ledger` block. */
+function buildAssumptionLedger(v: Verdict): {
+  entries: { tier: string; label: string; backs: string[] }[];
+  pendingCount: number;
+  hasContent: boolean;
+} {
+  const entries = new Map<string, { tier: string; label: string; backs: string[] }>();
+  const add = (tier: string, label: string, backer?: string) => {
+    const k = `${tier} ${label}`;
+    let e = entries.get(k);
+    if (!e) { e = { tier, label, backs: [] }; entries.set(k, e); }
+    if (backer && !e.backs.includes(backer)) e.backs.push(backer);
+  };
+  for (const t of v.theorems) {
+    for (const r of weakBackingsOf(t)) {
+      add(r.tier, `'${r.law}' of '${r.equality}'`, t.name);
+    }
+  }
+  for (const o of v.lawObligations ?? []) {
+    if (o.status === "admitted") add("admitted", `'${o.law}' of '${o.type}'`);
+    else if (o.status === "sampled") add("sampled", `'${o.law}' of '${o.type}'`);
+  }
+  for (const o of v.coercionObligations ?? []) {
+    if (o.status === "admitted") add("admitted", `coercion ${o.from}->${o.to} ${o.obligation}`);
+  }
+  const pendingCount =
+    (v.lawObligations ?? []).filter(o => o.status === "pending").length +
+    (v.coercionObligations ?? []).filter(o => o.status === "pending").length;
+  const list = [...entries.values()].sort((a, b) =>
+    a.tier === b.tier ? a.label.localeCompare(b.label) : a.tier.localeCompare(b.tier));
+  const hasContent = v.theorems.length > 0
+    || (v.lawObligations ?? []).length > 0
+    || (v.coercionObligations ?? []).length > 0;
+  return { entries: list, pendingCount, hasContent };
+}
+
 export function formatVerdict(v: Verdict): string {
   const lines: string[] = [];
   const total      = v.theorems.length;
@@ -426,7 +543,16 @@ export function formatVerdict(v: Verdict): string {
     const author = t.authorship
       ? ` — by ${t.authorship.provers.map(p => p.prover).join(" + ")}`
       : "";
-    lines.push(`  ${mark} ${t.name}${author}`);
+    // E4 (E-R6): a proof resting on admitted/sampled law backing is
+    // verdict-visibly weaker; proven backing (kernel/enumerated/
+    // witnessed) renders nothing. D2 roll-up (B-091): the TRANSITIVE
+    // set is consulted, so nested chains surface inner weak backings;
+    // the single lawBacking field is the fallback for older records.
+    const weakRecs = weakBackingsOf(t);
+    const weak = weakRecs.length > 0
+      ? ` [resting on ${weakRecs.map(r => `${r.tier} '${r.law}' of '${r.equality}'`).join(", ")}]`
+      : "";
+    lines.push(`  ${mark} ${t.name}${author}${weak}`);
     if (t.failure) {
       lines.push(`      ${t.failure.reason}`);
       if (t.failure.counterexample) {
@@ -447,6 +573,61 @@ export function formatVerdict(v: Verdict): string {
     lines.push(`  effects mismatches:`);
     for (const em of v.effectMismatches) {
       lines.push(`    [${em.binding}] declared=${em.declared.join(",") || "∅"} inferred=${em.inferred.join(",") || "∅"} missing=${em.missing.join(",") || "∅"}`);
+    }
+  }
+  if (v.lawObligations && v.lawObligations.length > 0) {
+    const discharged = v.lawObligations.filter(o => o.status === "discharged").length;
+    const sampled    = v.lawObligations.filter(o => o.status === "sampled").length;
+    const admitted   = v.lawObligations.filter(o => o.status === "admitted");
+    const pending    = v.lawObligations.filter(o => o.status === "pending");
+    lines.push(
+      `  laws: ${discharged}/${v.lawObligations.length} discharged` +
+      (sampled > 0 ? `, ${sampled} sampled (survival, not proof)` : "") +
+      (admitted.length > 0 ? `, ${admitted.length} ADMITTED (assumed, not proof)` : "") +
+      (pending.length > 0 ? `, ${pending.length} pending` : ""));
+    for (const o of admitted) {
+      lines.push(`    ! ${o.type}.${o.law} (admitted)`);
+    }
+    for (const o of pending) {
+      lines.push(`    ? ${o.type}.${o.law}`);
+    }
+  }
+  if (v.coercionObligations && v.coercionObligations.length > 0) {
+    const discharged = v.coercionObligations.filter(o => o.status === "discharged").length;
+    const admitted   = v.coercionObligations.filter(o => o.status === "admitted");
+    const pending    = v.coercionObligations.filter(o => o.status === "pending");
+    lines.push(
+      `  coercions: ${discharged}/${v.coercionObligations.length} obligations discharged` +
+      (admitted.length > 0 ? `, ${admitted.length} ADMITTED` : "") +
+      (pending.length > 0 ? `, ${pending.length} pending` : ""));
+    for (const o of admitted) {
+      lines.push(`    ! ${o.from}->${o.to} ${o.obligation} (admitted)`);
+    }
+    for (const o of pending) {
+      lines.push(`    ? ${o.from}->${o.to} ${o.obligation}`);
+    }
+  }
+  // D2 roll-up (B-091): the assumption ledger — one place answering
+  // "what does this module's verification rest on?". Admitted/sampled
+  // assumptions in force, each mapped to the proofs resting on it;
+  // clean modules say so explicitly.
+  {
+    const ledger = buildAssumptionLedger(v);
+    if (ledger.hasContent) {
+      const admitted = ledger.entries.filter(e => e.tier === "admitted").length;
+      const sampled  = ledger.entries.filter(e => e.tier === "sampled").length;
+      if (ledger.entries.length === 0 && ledger.pendingCount === 0) {
+        lines.push(`  assumption ledger: clean — all proofs rest on proven backing; no pending obligations`);
+      } else {
+        lines.push(
+          `  assumption ledger: rests on ` +
+          `${admitted} admitted, ${sampled} sampled` +
+          (ledger.pendingCount > 0 ? `; ${ledger.pendingCount} obligation(s) pending` : ""));
+        for (const e of ledger.entries) {
+          lines.push(`    ! ${e.tier} ${e.label}` +
+            (e.backs.length > 0 ? ` — backs: ${e.backs.join(", ")}` : ` — backs no proofs yet`));
+        }
+      }
     }
   }
   if (v.iterationHints) {
@@ -478,7 +659,7 @@ export function formatVerdict(v: Verdict): string {
 function _ctxString(ctx: ContextValue, key: string): string | undefined {
   const b = ctx.bindings.get(key)?.value;
   if (!b) return undefined;
-  const p = primaryOf(b);
+  const p = dataOf(b);
   return p.kind === ValueKind.Bits ? bitsToString(p as BitsValue) : undefined;
 }
 
@@ -502,23 +683,32 @@ export function buildVerdict(
     const v = binding.value;
     if (!v) continue;
     if (isDischargedProof(v)) {
-      const ctx = primaryOf(v) as ContextValue;
+      const ctx = dataOf(v) as ContextValue;
+      // E4 (E-R6): surface the recorded law backing when present.
+      const eqName  = _ctxString(ctx, "equality");
+      const lawName = _ctxString(ctx, "lawName");
+      const lawTier = _ctxString(ctx, "lawTier");
+      const restsOn = backingsOf(ctx);
       theorems.push({
         name: key,
-        proposition: _ctxString(ctx, "__proposition") ?? "<unknown>",
+        proposition: _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>",
         status: "discharged",
         authorship: AUTO_PE_AUTHORSHIP(),
+        ...(eqName && lawName && lawTier
+          ? { lawBacking: { equality: eqName, law: lawName, tier: lawTier } }
+          : {}),
+        ...(restsOn.length > 0 ? { restsOn } : {}),
       });
     } else if (isFailedProof(v)) {
-      const ctx = primaryOf(v) as ContextValue;
+      const ctx = dataOf(v) as ContextValue;
       theorems.push({
         name: key,
-        proposition: _ctxString(ctx, "__proposition") ?? "<unknown>",
+        proposition: _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>",
         status: "failed",
         failure: {
           kind: "proof-failure",
-          reason: _ctxString(ctx, "__reason") ?? "proof did not discharge",
-          counterexample: _ctxString(ctx, "__counterexample"),
+          reason: _ctxString(ctx, SLOT_KEYS.reason) ?? "proof did not discharge",
+          counterexample: _ctxString(ctx, SLOT_KEYS.counterexample),
         },
       });
     }
@@ -595,12 +785,20 @@ export function buildVerdict(
 
   const hasFailedTheorem = theorems.some(t => t.status === "failed");
   const iterationHints = generateHints(theorems, report, obligation);
+  // E3: law + coercion obligations with their D34 discharge tiers,
+  // scoped to this compilation unit's types. Pending entries are
+  // recorded, not fatal (the first strict gate is E4).
+  const inUnit = boundTypeFilter(evalCtx);
+  const lawObligations = lawObligationRecords(inUnit);
+  const coercionObligations = coercionObligationRecords((f, t) => inUnit(f) && inUnit(t));
   return {
     version: PCP_VERSION,
     verified: !anyError && !hasFailedTheorem,
     theorems,
     ...(totalityFindings.length > 0 ? { totalityFindings } : {}),
     ...(effectMismatches.length > 0 ? { effectMismatches } : {}),
+    ...(lawObligations.length > 0 ? { lawObligations } : {}),
+    ...(coercionObligations.length > 0 ? { coercionObligations } : {}),
     ...(iterationHints.suggestions.length > 0 || iterationHints.strategiesTried
         ? { iterationHints } : {}),
   };
@@ -743,8 +941,8 @@ export function extractObligations(
     if (!discharged && !failed) continue;
     if (opts?.pendingOnly && discharged) continue;
 
-    const ctx = primaryOf(v) as ContextValue;
-    const proposition = _ctxString(ctx, "__proposition") ?? "<unknown>";
+    const ctx = dataOf(v) as ContextValue;
+    const proposition = _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>";
 
     // Prior attempt context: if failed, package the failure as a single
     // PriorAttempt with the candidate slot empty (we don't know what
@@ -761,8 +959,8 @@ export function extractObligations(
               name: key, proposition, status: "failed",
               failure: {
                 kind: "proof-failure",
-                reason: _ctxString(ctx, "__reason") ?? "did not discharge",
-                counterexample: _ctxString(ctx, "__counterexample"),
+                reason: _ctxString(ctx, SLOT_KEYS.reason) ?? "did not discharge",
+                counterexample: _ctxString(ctx, SLOT_KEYS.counterexample),
               },
             }],
           },
@@ -809,6 +1007,32 @@ export function extractObligations(
         }],
       }));
     }
+  }
+
+  // E3 (B-027 §8): law + coercion obligations are exactly the well-posed
+  // PCP tasks the D34 "pending" tier promises — export them alongside
+  // theorem obligations, scoped to this compilation unit's types. The
+  // proposition text is synthesized (the law's quantified body is a
+  // value, not source text); workers discharge via `Law.witness` /
+  // `Coercion.witness` with a proof term.
+  const inUnit = boundTypeFilter(evalCtx);
+  for (const rec of lawObligationRecords(inUnit)) {
+    if (opts?.pendingOnly && rec.status !== "pending") continue;
+    obligations.push(makeObligation({
+      theoremName: `${rec.type}.law_${rec.law}`,
+      proposition: `for_all over ${rec.type}: law '${rec.law}' holds`,
+      ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
+    }));
+  }
+  for (const rec of coercionObligationRecords((f, t) => inUnit(f) && inUnit(t))) {
+    if (opts?.pendingOnly && rec.status !== "pending") continue;
+    obligations.push(makeObligation({
+      theoremName: `coercion(${rec.from}->${rec.to}).${rec.obligation}`,
+      proposition: rec.obligation === "coherence"
+        ? `coercion ${rec.from}->${rec.to}: composition triangles commute`
+        : `coercion ${rec.from}->${rec.to}: x == y implies coerce(x) == coerce(y)`,
+      ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
+    }));
   }
 
   return obligations;

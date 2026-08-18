@@ -488,13 +488,25 @@ PrecedenceInsert = { name: String, before: Opt(String), after: Opt(String) }
   and the analyzer runs on `effective`, so conflicts are reported whatever
   the composition order. `Wrap` operations are applied in composition order.
 
-### 6.2 `use_grammar` semantics
+**Base-chain compatibility (shipped, Phase 7).** Every grammar value carries
+its base chain: `["allegro"]` for a plain `grammar { … }` block, `["empty"]`
+for `new grammar { … }`, and the parent's chain plus the parent for
+`grammar extends X { … }`. Two grammars may merge at `use` time iff one
+base chain is a prefix of the other; otherwise the merge is rejected with
+`E_INCOMPATIBLE_GRAMMARS`. Modules do not transitively re-export grammars —
+each consumer activates its own via `use`.
 
-A module that `use_grammar NAME`-includes grammar `NAME` effectively runs:
+### 6.2 `use` activation semantics
+
+The shipped activation surface (Phase 6/7; `use_grammar` was the Phase 1
+spelling) is a top-of-file header accepting `use NAME`, `use import NAME`,
+`use NAME.MEMBER` (selects one Grammar binding from a multi-grammar
+module), and `use grammar { … }` (hosting-file literal grammar). A file
+that activates grammar `NAME` effectively runs:
 
 ```
 new_grammar = extend(active_grammar, NAME.grammar_delta)
-verify(new_grammar)   // runs analyzer
+verify(new_grammar)   // runs analyzer + cross-fragment validation
 ```
 
 before parsing the rest of the file. If `verify` returns conflicts, parsing
@@ -621,6 +633,47 @@ error: alternatives overlap and cannot be resolved by precedence [E_AMBIG_ALT]
   non-associative, or group under @longest if they never overlap.
 ```
 
+### 7.5 Shipped diagnostic codes (Phase 3 analyzer + Phase 6/7 extension)
+
+The implemented analyzer (`src/grammar2/analyzer.ts`) and the `use`-time
+cross-fragment validator (`src/grammar2/fragments.ts`) emit these codes:
+
+**Analyzer — structural checks (per unique Grammar identity, cached):**
+
+- `E_UNDEFINED_NAME` — a `NonTerm` references a production that doesn't exist.
+- `E_UNDEFINED_START` — the grammar's start production is undefined.
+- `E_UNDEFINED_RESERVED_SET` — a `@reserved(name)` guard references an
+  undeclared reserved set.
+- `E_INFINITE_REP` — a `Rep` whose body (and separator) are nullable with
+  `min: 0` (infinite parse).
+- `W_UNREACHABLE` — production not reachable from start (warning; may be an
+  intentional extension hook).
+- `W_ALT_OVERLAP` — alternative-disjointness finding; **opt-in** via
+  `analyzeWithDisjointnessCheck` (the stratified base grammar intentionally
+  uses ordered-alt semantics in places that would false-positive — see
+  `docs/design/extension/grammar.md` §2 on alt-order significance).
+- Left-recursion classification is reported in the warnings list (allowed —
+  the engine handles it; hidden left recursion flagged for readability).
+
+**`use`-time cross-fragment validation (before merging):**
+
+- `E_OPERATOR_CONFLICT` — two fragments (or a fragment and the base) both
+  register the same infix/prefix/postfix token.
+- `E_KEYWORD_CONFLICT` — ditto for `expr_prefix` keywords / user-rule
+  keywords.
+- `E_PRECEDENCE_CYCLE` — user level constraints (`above`/`below`/`prec`)
+  plus the base stratified stack form a cycle.
+- `E_INCOMPATIBLE_GRAMMARS` — fragment base chains are not prefix-compatible
+  (§6.2 base-chain compatibility).
+- `W_PRODUCTION_REPLACED` — `rule NAME = …` shadows an existing base
+  production (warn, not error — replacement is a legitimate extension
+  technique, but silent shadowing has bitten before; use `+=` to append).
+
+Errors are aggregated per `use` header and abort the parse; warnings are
+reported and parsing proceeds. Spec-only codes from §7.1–§7.4 (e.g.
+`E_AMBIG_ALT` under full disjointness enforcement) land when their checks
+are enabled by default.
+
 ## 8. Parse semantics
 
 ### 8.1 Success
@@ -702,13 +755,13 @@ This formalism is expressible in Allegro's current type system:
 Rule = Terminal | NonTerm | Seq | Alt | Rep | Opt | Guarded
 
 // Each variant is a nominal type with specific fields
-Terminal = Type.extend({ match: TerminalMatch })
-Seq      = Type.extend({ items: Array[Rule] })
-Alt      = Type.extend({ options: Array[Rule], attrs: Object })
+Terminal = Type.define({ match: TerminalMatch })
+Seq      = Type.define({ items: Array[Rule] })
+Alt      = Type.define({ options: Array[Rule], attrs: Object })
 // ...
 
 // Grammar is a record type
-Grammar = Type.extend({
+Grammar = Type.define({
   productions: Object[String, Production],
   start:       String,
   reserved:    Object[String, Array[String]],

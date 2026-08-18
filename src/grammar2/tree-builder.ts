@@ -119,6 +119,12 @@ export function buildExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // c[0] is the ident (component name); last expression-tagged child is the target.
       const name = textOf(c[0]);
       const target = buildExpr(lastChild(c), paramMap);
+      // D47(e)/(f): `source of x` is the observe-tagged source read — a
+      // dedicated primitive so the effect label is static; the generic
+      // component accessor answers none for this key.
+      if (name === "source") {
+        return makeExpr(prim("source_get"), [target]);
+      }
       return makeExpr(prim("component_get"), [target, stringToBits(name)]);
     }
     case "of_error": {
@@ -686,7 +692,7 @@ function isPrimitiveCall(value: any, primName: string): boolean {
   // The fn may be a MultiValue-wrapped function (e.g. when a stmt_form's
   // template was evaluated in a lib module's typed env). Peel to primary.
   let fn = value.fn;
-  if (fn && fn.kind === "MultiValue") fn = fn.primary;
+  if (fn && (fn as { primary?: unknown }).primary !== undefined) fn = (fn as { primary?: any }).primary;
   if (!fn) return false;
   if (fn.kind === "PrimitiveFunction" && fn.name === primName) return true;
   if (fn.kind === "Symbol" && fn.name === primName) return true;
@@ -2230,7 +2236,7 @@ export function buildProgram(tree: ParseTree): any {
   const ctx = makeContext();
 
   function addStmt(stmt: BuiltBinding): void {
-    const b = { key: stmt.key, value: stmt.value, isUse: false };
+    const b = { key: stmt.key, value: stmt.value };
     (ctx as any).bindingList.push(b);
     if (stmt.key !== null) (ctx as any).bindings.set(stmt.key, b);
   }
@@ -2241,11 +2247,18 @@ export function buildProgram(tree: ParseTree): any {
     throw new Error("buildProgram: expected branch root");
   }
 
-  // Walk to find stmt branches.
+  // Walk to find stmt branches. theorem_decl / verify_stmt MUST be in
+  // this dispatch set: fragment-merged grammars surface stmt
+  // alternatives without the base grammar's "stmt" wrapper tag, and
+  // without direct dispatch the walk would recurse past the theorem
+  // into its children — building the proposition as a bare expression
+  // and silently DROPPING the proof obligation (a false theorem in a
+  // `use`-header file then never halts the build).
   const walk = (t: ParseTree): void => {
     if (t.kind !== "branch") return;
     if (t.tag === "stmt" || t.tag === "binding" || t.tag === "fn_decl" ||
         t.tag === "import_stmt" || t.tag === "export_binding" || t.tag === "export_fn_decl" ||
+        t.tag === "theorem_decl" || t.tag === "verify_stmt" ||
         (t.tag && EXPRESSION_TAGS.has(t.tag))) {
       try {
         addStmt(buildStmt(t));

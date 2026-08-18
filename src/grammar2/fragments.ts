@@ -13,13 +13,14 @@
 // substitution templates.
 // =============================================================================
 
+import { dataOf, getSlotCount, indexGet } from "../slots.js";
 import {
   Grammar, Rule, makeGrammar, addProduction,
   lit, nonterm, seq, alt, rep, opt, regex as ruleRegex,
 } from "./types.js";
 import { buildBaseGrammar, BASE_LEVEL_NAMES, BASE_OPERATORS_TO_LEVEL } from "./base-grammar.js";
 import type { GrammarFragment, Value, ContextValue, BitsValue } from "../types.js";
-import { ValueKind, primaryOf, bitsToString } from "../types.js";
+import { ValueKind, bitsToString } from "../types.js";
 
 // --- User operation registry ---
 //
@@ -624,8 +625,8 @@ function rewriteNonterm(rule: Rule, fromName: string, toName: string): Rule {
  * parse tree carries the label as a tag, enabling dispatch-time extraction.
  */
 function ebnfObjectToRule(v: Value, labels: string[]): Rule {
-  const p = primaryOf(v);
-  if (p.kind !== ValueKind.Context) {
+  const p = dataOf(v);
+  if (p.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: expected Context, got ${p.kind}`);
   }
   const ctx  = p as ContextValue;
@@ -740,7 +741,7 @@ function getField(ctx: ContextValue, key: string): Value {
 }
 
 function getStringField(ctx: ContextValue, key: string): string {
-  const p = primaryOf(getField(ctx, key));
+  const p = dataOf(getField(ctx, key));
   if (p.kind !== ValueKind.Bits) throw new Error(`EBNF object: field '${key}' not a string`);
   return bitsToString(p as BitsValue);
 }
@@ -748,21 +749,21 @@ function getStringField(ctx: ContextValue, key: string): string {
 function getIntField(ctx: ContextValue, key: string): number {
   const b = ctx.bindings.get(key);
   if (!b?.value) return 0;
-  const p = primaryOf(b.value);
+  const p = dataOf(b.value);
   if (p.kind !== ValueKind.Bits) return 0;
   return Number((p as BitsValue).data);
 }
 
 function getArrayField(ctx: ContextValue, key: string): Value[] {
-  const arr = primaryOf(getField(ctx, key));
-  if (arr.kind !== ValueKind.Context) {
+  const arr = dataOf(getField(ctx, key));
+  if (arr.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: field '${key}' not an array`);
   }
-  const len  = Number(((arr.bindings.get("__length")?.value as any)?.data) ?? 0n);
+  const len  = Number(((getSlotCount(arr) as any)?.data) ?? 0n);
   const out: Value[] = [];
   for (let i = 0; i < len; i++) {
-    const v = arr.bindings.get(String(i))?.value;
-    if (v) out.push(v);
+    const v = indexGet(arr, i);
+    if (v !== undefined) out.push(v);
   }
   return out;
 }

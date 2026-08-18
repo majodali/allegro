@@ -24,9 +24,10 @@
 // syntax.
 // =============================================================================
 
+import { dataOf, componentsView, cloneComponents, installChannelMerge } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ContextValue, MultiValueType,
-  primaryOf, makeMultiValue,
+  makeMultiValue, makeContext,
 } from "./types.js";
 
 // =============================================================================
@@ -81,21 +82,14 @@ export function formatEffects(e: EffectSet): string {
  *  `type_check` so the declaration check fires on typed functions just like
  *  untyped ones — needed for Stage C3 polymorphic functions whose return
  *  type annotations always trigger the type_check wrap. */
-export function unwrapEffectsAttach(v: Value): { body: Value; declared: EffectSet } | null {
-  if (v.kind !== ValueKind.Expression) return null;
-  let target = v;
-  let fn = primaryOf(target.fn);
-  if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "type_check"
-      && target.args.length >= 1
-      && target.args[0].kind === ValueKind.Expression) {
-    target = target.args[0] as any;
-    fn = primaryOf(target.fn);
-  }
-  if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "effects_attach") return null;
-  if (target.args.length !== 2) return null;
-  const declared = extractLabelArray(target.args[1]);
-  return { body: target.args[0], declared };
+export function unwrapEffectsAttach(fn: import("./types.js").ComposedFunctionValue): { declared: EffectSet } | null {
+  // C1.5b: the declared-effects clause is stashed on the function by
+  // collapseBodyMetadata (totality.ts) — no AST peeling.
+  const ast = (fn as any).__declaredEffectsAst as Value | undefined;
+  if (ast === undefined) return null;
+  return { declared: extractLabelArray(ast) };
 }
+
 
 /** Extract a set of label strings from a `typed_array(Symbol(L1), Symbol(L2), …)`
  *  Expression. Used to pull declared labels out of an effects_attach call's
@@ -103,12 +97,12 @@ export function unwrapEffectsAttach(v: Value): { body: Value; declared: EffectSe
  *  the analyzer treats that as "no declaration". */
 function extractLabelArray(v: Value): EffectSet {
   const out: EffectSet = new Set();
-  const e = primaryOf(v);
+  const e = dataOf(v);
   if (e.kind !== ValueKind.Expression) return out;
-  const fn = primaryOf(e.fn);
+  const fn = dataOf(e.fn);
   if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "typed_array") return out;
   for (const a of e.args) {
-    const p = primaryOf(a);
+    const p = dataOf(a);
     if (p.kind === ValueKind.Symbol) out.add(p.name);
     // Bits-encoded string literals would be `String "label"` — also accept.
     // (Not currently emitted by the grammar, but cheap to support.)
@@ -162,10 +156,10 @@ export function effectDifference(inferred: EffectSet, declared: EffectSet): Effe
  *  after. Slice 2 Stage C3: covers polymorphic functions whose declared
  *  effect sets need to be checked at compile time, not deferred to a callsite. */
 function asFunction(v: Value): ComposedFunctionValue | null {
-  const p = primaryOf(v);
+  const p = dataOf(v);
   if (p.kind === ValueKind.ComposedFunction) return p;
   if (p.kind === ValueKind.Expression) {
-    const target = primaryOf(p.fn);
+    const target = dataOf(p.fn);
     if (target.kind === ValueKind.PrimitiveFunction
         && (target as any).name === "typed_function"
         && p.args.length >= 1) {
@@ -191,7 +185,7 @@ export function checkEffectsDeclarations(
     if (!b.key || !b.value) continue;
     const fn = asFunction(b.value);
     if (!fn) continue;
-    const wrap = unwrapEffectsAttach(fn.body);
+    const wrap = unwrapEffectsAttach(fn);
     if (!wrap) continue;
     // Inferred set comes from `precompileFunction`'s stash on the
     // ComposedFunction. `precompileFunctions` precompiles every function
@@ -201,20 +195,11 @@ export function checkEffectsDeclarations(
     const inferred = stashed ?? new Set<string>();
     const inferredHard = new Set(inferred);
     inferredHard.delete("opaque");
-    // Slice 2 Stage C3: polymorphic declarations like `effects e` for a
-    // function declared `[e: Effect]` carry a `__effectvar:e` marker in
-    // the PE-inferred set (stamped by typed_function_impl on Effect-kinded
-    // generic params). Normalise the marker to its bare
-    // name (`e`) so the declared set's symbolic labels match. The marker
-    // form is only meaningful at call sites where it resolves to actual
-    // effect labels — at definition time the bare name is the contract.
-    for (const lbl of [...inferredHard]) {
-      if (lbl.startsWith("__effectvar:")) {
-        const bare = lbl.slice("__effectvar:".length);
-        inferredHard.delete(lbl);
-        inferredHard.add(bare);
-      }
-    }
+    // C7.2c: polymorphic declarations like `effects e` for a function
+    // declared `[e: Effect]` now surface the variable's BARE name in the
+    // PE-inferred set directly (the Param carries a declared `effectVar`
+    // reference; the `__effectvar:` marker strings are retired), so the
+    // declared set's symbolic labels match without normalisation.
     const missing = effectDifference(inferredHard, wrap.declared);
     if (missing.size > 0) {
       mismatches.push({
@@ -271,18 +256,22 @@ export function opaqueEffectNotices(
 
 export const EFFECTS_COMPONENT_KEY = "effects";
 
+// C1.5: the effects channel's union-merge, installed into the propagation
+// table so generic executors can merge encoded effect sets without this
+// module's encoding leaking into slots.ts.
+installChannelMerge("effects", (a: Value, b: Value) => {
+  const merged = effectUnion(decodeEffects(a) ?? new Set(), decodeEffects(b) ?? new Set());
+  return encodeEffects(merged);
+});
+
 function encodeEffects(eff: EffectSet): Value {
-  const ctx: ContextValue = {
-    kind: ValueKind.Context,
-    bindings: new Map(),
-    bindingList: [],
-  };
+  const ctx: ContextValue = makeContext();
   (ctx as any).__effectSet = eff;
   return ctx;
 }
 
 function decodeEffects(v: Value): EffectSet | null {
-  if (v.kind !== ValueKind.Context) return null;
+  if (v.kind !== ValueKind.Structure) return null;
   const set = (v as any).__effectSet as EffectSet | undefined;
   return set ?? null;
 }
@@ -296,11 +285,10 @@ function decodeEffects(v: Value): EffectSet | null {
  *       functions in standard mode).
  *  Returns null when neither source has effects (consumer treats as pure). */
 export function effectsOf(v: Value): EffectSet | null {
-  if (v.kind === ValueKind.MultiValue) {
-    const c = (v as MultiValueType).components.get(EFFECTS_COMPONENT_KEY);
-    if (c) return decodeEffects(c);
-  }
-  const p = primaryOf(v);
+  // C4.3b: componentsView is total — flattened Contexts answer directly.
+  const c = componentsView(v).get(EFFECTS_COMPONENT_KEY);
+  if (c) return decodeEffects(c);
+  const p = dataOf(v);
   if (p.kind === ValueKind.ComposedFunction) {
     const stash = (p as any).__inferredEffects as EffectSet | undefined;
     if (stash) return stash;
@@ -316,10 +304,9 @@ export function withEffects(v: Value, eff: EffectSet): Value {
   if (eff.size === 0 && prior === null) return v;
   const merged = prior ? effectUnion(prior, eff) : eff;
   if (merged.size === 0) return v;
-  const existing = v.kind === ValueKind.MultiValue ? v.components : new Map<string, Value>();
-  const comps = new Map(existing);
+  const comps = cloneComponents(v);
   comps.set(EFFECTS_COMPONENT_KEY, encodeEffects(merged));
-  return makeMultiValue(primaryOf(v), comps);
+  return makeMultiValue(dataOf(v), comps);
 }
 
 /** Compute the union of multiple effect sets. Null and undefined entries are

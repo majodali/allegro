@@ -3,7 +3,10 @@
 // Bridges the parser's output to the evaluator.
 // =============================================================================
 
+import { isCarrier } from "./structure.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
+import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource } from "./slots.js";
+import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
@@ -12,12 +15,13 @@ import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, primaryOf, GrammarFragment } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
-import { checkExhaustiveness, checkTermination } from "./totality.js";
+import { collapseBodyMetadata, checkExhaustiveness, checkTermination } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
-import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType } from "./types-std.js";
+import { registerScopeSymbol, MAIN_SCOPE_FQN, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
+import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
 export type { Extension };
@@ -54,19 +58,19 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       // Preserve generic-param / effect-var-param metadata across clones so
       // Slice 2's polymorphism resolution still works after this pass.
       if ((v as any).__genericParams) (newFn as any).__genericParams = (v as any).__genericParams;
-      if ((v as any).__effectVarParams) (newFn as any).__effectVarParams = (v as any).__effectVarParams;
       return newFn;
     }
-    case ValueKind.MultiValue: {
-      // If the MultiValue already carries a type component, don't recurse
-      // into its primary — the value was deliberately typed (e.g. by an
-      // earlier typeLiterals pass in a module) and wrapping again would
-      // produce a nested MultiValue(MultiValue(Bits, T), T) that later
-      // breaks `primaryOf(v) as BitsValue` extractions.
-      if (v.components.has("type")) return v;
-      const newPrimary = typeLiterals(v.primary, seen);
-      if (newPrimary === v.primary) return v;
-      return makeMultiValue(newPrimary, new Map(v.components));
+    case ValueKind.Structure: {
+      // C7.1: only CARRIERS recurse — and only untyped ones. A carrier
+      // already holding a type component was deliberately typed (e.g. by
+      // an earlier typeLiterals pass in a module); re-wrapping would
+      // corrupt it. Plain structures are inert.
+      const pp = (v as { primary?: Value }).primary;
+      if (pp === undefined) return v;
+      if (channelReadRaw(v, "type") !== undefined) return v;
+      const newPrimary = typeLiterals(pp, seen);
+      if (newPrimary === pp) return v;
+      return makeMultiValue(newPrimary, cloneComponents(v));
     }
     default:
       return v;
@@ -100,7 +104,7 @@ export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
     return v;
   }
 
-  if (v.kind === "MultiValue") {
+  if ((v as { primary?: unknown }).primary !== undefined) {
     v.primary = resolvePrimitives(v.primary, seen);
     return v;
   }
@@ -159,9 +163,11 @@ export function resolveSymbols(
     }
   }
 
-  // Layer 3: Base context (REPL persistence)
+  // Layer 3: Base context (REPL persistence). The base may be a layered
+  // scope chain (C2.3b root layering) — flatten it so every persisted
+  // binding participates in resolution.
   if (base) {
-    for (const [key, binding] of base.bindings) {
+    for (const [key, binding] of scopeAllBindings(base)) {
       if (binding.value !== undefined) {
         resolutionMap.set(key, binding.value);
       }
@@ -253,8 +259,9 @@ function patchNamedParams(
     if (!shadows) {
       patchNamedParams(value.body, name, binding, seen);
     }
-  } else if (value.kind === ValueKind.MultiValue) {
-    patchNamedParams(value.primary, name, binding, seen);
+  } else if (value.kind === ValueKind.Structure) {
+    const pp = (value as { primary?: Value }).primary;
+    if (pp !== undefined) patchNamedParams(pp, name, binding, seen);
   }
 }
 
@@ -282,7 +289,6 @@ function resolveNamedParams(
 
   switch (value.kind) {
     case ValueKind.Bits:
-    case ValueKind.Context:
       return value;
 
     case ValueKind.PrimitiveFunction: {
@@ -329,7 +335,6 @@ function resolveNamedParams(
       };
       for (const p of newFn.params) p.owner = newFn;
       if ((fn as any).__genericParams) (newFn as any).__genericParams = (fn as any).__genericParams;
-      if ((fn as any).__effectVarParams) (newFn as any).__effectVarParams = (fn as any).__effectVarParams;
       return newFn;
     }
 
@@ -340,10 +345,12 @@ function resolveNamedParams(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.MultiValue: {
-      const newP = resolveNamedParams(value.primary, resMap, selfName, seen);
-      if (newP === value.primary) return value;
-      return makeMultiValue(newP, new Map(value.components));
+    case ValueKind.Structure: {
+      const pp = (value as { primary?: Value }).primary;
+      if (pp === undefined) return value;
+      const newP = resolveNamedParams(pp, resMap, selfName, seen);
+      if (newP === pp) return value;
+      return makeMultiValue(newP, cloneComponents(value));
     }
   }
   return value;
@@ -368,7 +375,6 @@ function resolveNamedParamsInner(
 
   switch (value.kind) {
     case ValueKind.Bits:
-    case ValueKind.Context:
       return value;
 
     case ValueKind.PrimitiveFunction: {
@@ -415,7 +421,6 @@ function resolveNamedParamsInner(
       };
       for (const p of newFn.params) p.owner = newFn;
       if ((fn as any).__genericParams) (newFn as any).__genericParams = (fn as any).__genericParams;
-      if ((fn as any).__effectVarParams) (newFn as any).__effectVarParams = (fn as any).__effectVarParams;
       return newFn;
     }
 
@@ -426,10 +431,12 @@ function resolveNamedParamsInner(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.MultiValue: {
-      const newP = resolveNamedParamsInner(value.primary, resMap, owner, ownParamNames, selfName, seen);
-      if (newP === value.primary) return value;
-      return makeMultiValue(newP, new Map(value.components));
+    case ValueKind.Structure: {
+      const pp = (value as { primary?: Value }).primary;
+      if (pp === undefined) return value;
+      const newP = resolveNamedParamsInner(pp, resMap, owner, ownParamNames, selfName, seen);
+      if (newP === pp) return value;
+      return makeMultiValue(newP, cloneComponents(value));
     }
   }
   return value;
@@ -439,6 +446,13 @@ function resolveNamedParamsInner(
  * Walk all bindings and mark tail-position calls in ComposedFunction bodies.
  */
 function markTailCallsInContext(fileCtx: any): void {
+  // C1.5b: collapse body-form metadata wrappers onto function properties
+  // BEFORE tail-call marking, so tail positions are computed on the real
+  // body (previously the passthrough wrappers had to forward TailCalls).
+  const collapseSeen = new Set<any>();
+  for (const b of fileCtx.bindingList) {
+    if (b.value !== undefined) collapseBodyMetadata(b.value, collapseSeen);
+  }
   const seen = new Set<any>();
   for (const b of fileCtx.bindingList) {
     if (b.value !== undefined) {
@@ -458,8 +472,8 @@ function markTailCallsInValue(v: any, seen: Set<any>): void {
   } else if (v.kind === "Expression") {
     markTailCallsInValue(v.fn, seen);
     for (const a of v.args) markTailCallsInValue(a, seen);
-  } else if (v.kind === "MultiValue") {
-    markTailCallsInValue(v.primary, seen);
+  } else if ((v as { primary?: unknown }).primary !== undefined) {
+    markTailCallsInValue((v as any).primary, seen);
   }
 }
 
@@ -534,22 +548,39 @@ function precompileFunctions(
   const report: CompilationReport = { inferred: [], unresolved: [], bindingTypes: new Map(), notifications: [] };
   if (!typed) return report;
 
+  // E3: the pass's exploratory binding evaluations mint throwaway type
+  // objects (the real evaluation mints the bound ones) — suspend law-
+  // obligation instantiation + the E-R5 gate so definition-time semantics
+  // fire exactly once, at the real evaluation.
+  setLawInstantiationSuspended(true);
+  try {
+    return precompileFunctionsInner(fileCtx, extensions, report);
+  } finally {
+    setLawInstantiationSuspended(false);
+  }
+}
+
+function precompileFunctionsInner(
+  fileCtx: any,
+  extensions: Extension[] | undefined,
+  report: CompilationReport,
+): CompilationReport {
   // Build a minimal context for pre-compilation (primitives + extensions)
   const compileCtx = makeContext();
   for (const [name, prim] of Object.entries(primitives)) {
-    const binding = { key: name, value: prim as Value, isUse: false };
+    const binding = { key: name, value: prim as Value };
     compileCtx.bindings.set(name, binding);
     compileCtx.bindingList.push(binding);
   }
   if (extensions) {
     for (const ext of extensions) {
       for (const [name, value] of Object.entries(ext.bindings)) {
-        const binding = { key: name, value, isUse: false };
+        const binding = { key: name, value };
         compileCtx.bindings.set(name, binding);
         compileCtx.bindingList.push(binding);
       }
       if (ext.moduleObject) {
-        const binding = { key: ext.name, value: ext.moduleObject, isUse: false };
+        const binding = { key: ext.name, value: ext.moduleObject };
         compileCtx.bindings.set(ext.name, binding);
         compileCtx.bindingList.push(binding);
       }
@@ -558,8 +589,8 @@ function precompileFunctions(
   // Add source bindings to compile context
   for (const b of fileCtx.bindingList) {
     if (b.key !== null && b.value !== undefined) {
-      compileCtx.bindings.set(b.key, { key: b.key, value: b.value, isUse: false });
-      compileCtx.bindingList.push({ key: b.key, value: b.value, isUse: false });
+      compileCtx.bindings.set(b.key, { key: b.key, value: b.value });
+      compileCtx.bindingList.push({ key: b.key, value: b.value });
     }
   }
 
@@ -591,15 +622,16 @@ function precompileFunctions(
     let fn: Value;
     let fnType: Value | null = null;
     let paramTypes: Value[] | null = null;
-    if (val.kind === ValueKind.MultiValue) {
+    if (isCarrier(val)) {
       fnType = getType(val);
       if (!fnType) continue;
       const typeName = getTypeName(val);
       const isTyped = typeName === "Function";
       const isUntyped = typeName === "UntypedFunction";
       if (!isTyped && !isUntyped) continue;
-      if (val.primary.kind !== ValueKind.ComposedFunction) continue;
-      fn = val.primary;
+      const valP = (val as { primary?: Value }).primary!;
+      if (valP.kind !== ValueKind.ComposedFunction) continue;
+      fn = valP;
       paramTypes = isTyped ? getFunctionParamTypes(fnType) : null;
       if (isTyped && !paramTypes) continue;
     } else if (val.kind === ValueKind.ComposedFunction) {
@@ -627,8 +659,8 @@ function precompileFunctions(
     }
 
     if (inferredReturnType) {
-      const inferredName = inferredReturnType.kind === ValueKind.Context
-        ? (inferredReturnType as ContextValue).bindings.get("__name")?.value
+      const inferredName = inferredReturnType.kind === ValueKind.Structure
+        ? getName(inferredReturnType as ContextValue)
         : null;
       const inferredStr = inferredName && inferredName.kind === ValueKind.Bits
         ? bitsToString(inferredName as BitsValue)
@@ -637,8 +669,8 @@ function precompileFunctions(
 
       // Check against explicit return type if declared (typed functions only)
       const declaredReturn = fnType ? getFunctionReturnType(fnType) : null;
-      if (declaredReturn && declaredReturn.kind === ValueKind.Context) {
-        const declaredName = (declaredReturn as ContextValue).bindings.get("__name")?.value;
+      if (declaredReturn && declaredReturn.kind === ValueKind.Structure) {
+        const declaredName = getName(declaredReturn as ContextValue);
         const declaredStr = declaredName && declaredName.kind === ValueKind.Bits
           ? bitsToString(declaredName as BitsValue)
           : null;
@@ -667,11 +699,19 @@ function precompileFunctions(
 /**
  * Build an evaluation context from a parser file context.
  *
- * Context layers (bottom to top, later layers shadow earlier ones):
+ * C2.3b: the root context is a real SCOPE CHAIN (rootmost first):
  *   1. Primitives — base language built-ins
  *   2. Extensions — anonymous extensions from the execution context
- *   3. Base context — REPL persistence / pre-existing bindings
- *   4. Source bindings — parsed from the current source file
+ *   3. Base context — REPL persistence / pre-existing bindings (flattened
+ *      copies of the previous pass's chain, so completions in this pass
+ *      never mutate the previous pass's ctx)
+ *   4. Source bindings — parsed from the current source file (the layer
+ *      returned; its OWN map holds exactly the source-level bindings)
+ *
+ * Lookup walks the chain (scopeLookup) — nearer layers shadow. Source
+ * bindings that are declared but unresolved (e.g. `import foo` with no
+ * provider anywhere below) become PENDING FUTURE CELLS in the source
+ * layer, distinguishing them from genuinely absent names.
  */
 export function buildEvalCtx(
   fileCtx: any,
@@ -679,56 +719,83 @@ export function buildEvalCtx(
   extensions?: Extension[],
   typed?: boolean,
 ): ContextValue {
-  const evalCtx = makeContext();
-
-  function addBinding(key: string, value: Value, isUse: boolean = false): void {
-    const binding = { key, value, isUse };
-    const existingIdx = evalCtx.bindingList.findIndex(x => x.key === key);
+  // Per-layer add with replace-or-push semantics (same-name re-adds within
+  // one layer replace the earlier entry rather than duplicating).
+  function addTo(layer: ContextValue, key: string, value: Value): void {
+    const binding: Binding = { key, value };
+    const existingIdx = layer.bindingList.findIndex(x => x.key === key);
     if (existingIdx >= 0) {
-      evalCtx.bindingList[existingIdx] = binding;
+      layer.bindingList[existingIdx] = binding;
     } else {
-      evalCtx.bindingList.push(binding);
+      layer.bindingList.push(binding);
     }
-    evalCtx.bindings.set(key, binding);
+    layer.bindings.set(key, binding);
   }
 
   // Layer 1: Primitives
   // In typed/standard mode, wrap function primitives as UntypedFunction
+  const primLayer = scopeNew();
   for (const [name, prim] of Object.entries(primitives)) {
     if (typed && (prim as any).kind === ValueKind.PrimitiveFunction) {
-      addBinding(name, wrapAsUntypedFunction(prim as Value));
+      addTo(primLayer, name, wrapAsUntypedFunction(prim as Value));
     } else {
-      addBinding(name, prim as Value);
+      addTo(primLayer, name, prim as Value);
     }
   }
 
   // Layer 2: Extensions (applied in order, later extensions shadow earlier ones)
-  if (extensions) {
+  let below: ContextValue = primLayer;
+  if (extensions && extensions.length > 0) {
+    const extLayer = scopeNew(below);
     for (const ext of extensions) {
       for (const [name, value] of Object.entries(ext.bindings)) {
-        addBinding(name, value);
+        addTo(extLayer, name, value);
       }
       // If extension has a typed module object, bind the module name to it.
       // This is what `import <name>` resolves to — the encapsulated module.
       if (ext.moduleObject) {
-        addBinding(ext.name, ext.moduleObject);
+        addTo(extLayer, ext.name, ext.moduleObject);
       }
     }
+    below = extLayer;
   }
 
-  // Layer 3: Base context (REPL persistence)
+  // Layer 3: Base context (REPL persistence). Flatten the base's own chain
+  // and copy each binding into a fresh object — in-place cell resolution in
+  // THIS pass must not reach back into the previous pass's ctx.
   if (base) {
-    for (const [key, binding] of base.bindings) {
-      // Skip primitives and extension bindings that were already added
-      // Only bring forward user-defined bindings from previous REPL inputs
-      addBinding(key, binding.value!, binding.isUse);
+    const baseLayer = scopeNew(below);
+    for (const [key, binding] of scopeAllBindings(base)) {
+      if (binding.value !== undefined) {
+        addTo(baseLayer, key, binding.value);
+      } else {
+        // Carry unresolved bindings forward as fresh pending cells — a
+        // REPL `import foo` awaiting a later phase stays unresolved (and
+        // residualising) across passes, exactly as the flat copy did.
+        const cell = makeCell(key);
+        baseLayer.bindings.set(key, cell);
+        baseLayer.bindingList.push(cell);
+      }
     }
+    below = baseLayer;
   }
 
-  // Layer 4: Source bindings (already resolved by resolveSymbols)
+  // Layer 4: Source bindings (already resolved by resolveSymbols). This is
+  // the returned scope; dynamically-added bindings (futures, bare residuals,
+  // applyPhase completions) land here too.
+  const evalCtx = scopeNew(below);
   for (const b of fileCtx.bindingList) {
-    if (b.key !== null && b.value !== undefined) {
-      addBinding(b.key, b.value);
+    if (b.key === null) continue;
+    if (b.value !== undefined) {
+      addTo(evalCtx, b.key, b.value);
+    } else if (scopeLookup(below, b.key) === undefined && !evalCtx.bindings.has(b.key)) {
+      // Declared but unresolved with no provider below — a pending future
+      // cell awaiting a later phase (applyPhase resolves it in place).
+      // Names provided by a lower layer (e.g. `import math` satisfied by a
+      // module extension) resolve through the chain and get no cell.
+      const cell = makeCell(b.key);
+      evalCtx.bindings.set(b.key, cell);
+      evalCtx.bindingList.push(cell);
     }
   }
 
@@ -744,7 +811,7 @@ export function extensionToContext(ext: Extension): Value {
   if (ext.moduleObject) return ext.moduleObject;
   const ctx = makeContext();
   for (const [name, value] of Object.entries(ext.bindings)) {
-    const binding: Binding = { key: name, value, isUse: false };
+    const binding: Binding = { key: name, value };
     ctx.bindings.set(name, binding);
     ctx.bindingList.push(binding);
   }
@@ -755,23 +822,17 @@ export function extensionToContext(ext: Extension): Value {
 // Forward-Chaining Reactive Partial Evaluation
 // =============================================================================
 
-/** A binding tracked by the reactive evaluation system. */
-export interface ReactiveBinding {
-  key: string;
-  /** Current value — may be a residual Expression or final value */
-  currentValue: Value;
-  /** Names of incomplete dependencies (only meaningful when !isComplete) */
-  incompleteDeps: Set<string>;
-  /** True when currentValue is fully resolved */
-  isComplete: boolean;
-}
-
-/** Registry of reactive bindings and their dependency relationships. */
+/** Registry of reactive bindings and their dependency relationships.
+ *  C2.3b: the registry tracks the SAME `Binding` objects the evaluation
+ *  scope's source layer holds — a binding IS its future cell (value +
+ *  `incompleteDeps` + `isComplete` on one record). The former
+ *  `ReactiveBinding.currentValue` mirror and its dual-write dance are
+ *  gone: resolving a cell is one in-place write visible to both. */
 export interface DependencyRegistry {
   /** Maps incomplete binding name → set of binding keys that depend on it */
   dependents: Map<string, Set<string>>;
-  /** All reactive bindings by key */
-  bindings: Map<string, ReactiveBinding>;
+  /** All reactive bindings by key — shared with the eval scope's own layer */
+  bindings: Map<string, Binding>;
 }
 
 /** Create an empty dependency registry. */
@@ -812,21 +873,16 @@ function propagateCompletions(
 
   for (const key of worklist) {
     const rb = registry.bindings.get(key);
-    if (!rb || rb.isComplete) continue;
+    // Skip completed cells and cells still pending with no residual to
+    // re-evaluate (their completion comes directly through applyPhase).
+    if (!rb || rb.isComplete || rb.value === undefined) continue;
 
-    // Re-evaluate the residual in the updated context
+    // Re-evaluate the residual in the updated context. The residual is
+    // replaced (not mutated); the write goes to the ONE shared binding.
     const collector: DepCollector = { incompleteRefs: new Set() };
-    const newVal = evaluate(rb.currentValue, evalCtx, 0, collector);
-
-    // Replace the binding's value (not mutate)
-    rb.currentValue = newVal;
-    rb.incompleteDeps = collector.incompleteRefs;
-
-    const ctxBinding = evalCtx.bindings.get(key);
-    if (ctxBinding) ctxBinding.value = newVal;
-
+    const newVal = evaluate(rb.value, evalCtx, 0, collector);
     const nowComplete = isResolved(newVal);
-    rb.isComplete = nowComplete;
+    resolveCell(rb, newVal, nowComplete, collector.incompleteRefs);
 
     if (nowComplete) {
       newlyCompleted.add(key);
@@ -854,12 +910,21 @@ export function applyPhase(
   const completed = new Set<string>();
 
   for (const [name, value] of newBindings) {
-    const binding: Binding = { key: name, value, isUse: false };
-    evalCtx.bindings.set(name, binding);
-    // Also add to bindingList if not already present
-    if (!evalCtx.bindingList.some(b => b.key === name)) {
+    // Resolve an existing cell in place (pending import, async future) —
+    // the registry shares the object, so one write completes both views.
+    // Only genuinely new names get fresh bindings.
+    const existing = evalCtx.bindings.get(name);
+    const tracked = registry.bindings.get(name);
+    if (existing) {
+      resolveCell(existing, value, true);
+    } else {
+      const binding: Binding = { key: name, value, isComplete: true };
+      evalCtx.bindings.set(name, binding);
       evalCtx.bindingList.push(binding);
     }
+    // Defensive: a registry entry that predates the unification (or was
+    // installed by an external caller) may not alias the ctx binding.
+    if (tracked && tracked !== existing) resolveCell(tracked, value, true);
     completed.add(name);
   }
 
@@ -895,7 +960,16 @@ export function evalSource(
    *  (e.g. the `allegro verify` CLI emits them as a Verdict). Default
    *  false (compilation halts on failure — "build safety in"). */
   softFail?: boolean,
+  /** C5.1: the defining-scope FQN for this source's top-level bindings
+   *  (default `<main>`; ModuleLoader passes the resolved module file path).
+   *  Every top-level binding name is REGISTERED as an FQN symbol —
+   *  identity = FQN, interned in src/symbols.ts. Exporting is a separate
+   *  act (the D42 partition), performed by the module loader. */
+  moduleFqn?: string,
 ): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
+  // New pass: Allegro-minted channel registrations from prior passes are
+  // sealed (see ChannelEntry.epoch in slots.ts).
+  bumpChannelEpoch();
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
@@ -1002,14 +1076,14 @@ export function evalSource(
     // extension-provided types (Int, Bool, …).
     const totalityCompileCtx = makeContext();
     for (const [name, prim] of Object.entries(primitives)) {
-      const binding = { key: name, value: prim as Value, isUse: false };
+      const binding = { key: name, value: prim as Value };
       totalityCompileCtx.bindings.set(name, binding);
       totalityCompileCtx.bindingList.push(binding);
     }
     if (extensions) {
       for (const ext of extensions) {
         for (const [name, value] of Object.entries(ext.bindings)) {
-          const binding = { key: name, value, isUse: false };
+          const binding = { key: name, value };
           totalityCompileCtx.bindings.set(name, binding);
           totalityCompileCtx.bindingList.push(binding);
         }
@@ -1017,7 +1091,7 @@ export function evalSource(
     }
     for (const b of fileCtx.bindingList) {
       if (b.key !== null && b.value !== undefined) {
-        totalityCompileCtx.bindings.set(b.key, { key: b.key, value: b.value, isUse: false });
+        totalityCompileCtx.bindings.set(b.key, { key: b.key, value: b.value });
       }
     }
     const exhTypeLookup = (name: string): Value | undefined => {
@@ -1074,7 +1148,10 @@ export function evalSource(
       collectSymbolRefs(v.fn, refs, seen);
       for (const a of v.args) collectSymbolRefs(a, refs, seen);
     }
-    if (v.kind === ValueKind.MultiValue) collectSymbolRefs(v.primary, refs, seen);
+    if (v.kind === ValueKind.Structure) {
+      const pp = (v as { primary?: Value }).primary;
+      if (pp !== undefined) collectSymbolRefs(pp, refs, seen);
+    }
     if (v.kind === ValueKind.ComposedFunction) collectSymbolRefs(v.body, refs, seen);
   }
 
@@ -1087,7 +1164,17 @@ export function evalSource(
   const proofFindings: ProofFinding[] = [];
 
   for (const b of fileCtx.bindingList) {
-    if (b.value === undefined) continue;
+    if (b.value === undefined) {
+      // Declared-but-unresolved source binding. If buildEvalCtx installed a
+      // pending cell for it (no provider on the chain), track the cell in
+      // the registry so it lives on the ONE unresolved representation
+      // applyPhase completes.
+      if (b.key !== null) {
+        const cell = evalCtx.bindings.get(b.key);
+        if (cell && cell.value === undefined) registry.bindings.set(b.key, cell);
+      }
+      continue;
+    }
 
     const collector: DepCollector = { incompleteRefs: new Set() };
     const val = evaluate(b.value, evalCtx, 0, collector);
@@ -1105,37 +1192,40 @@ export function evalSource(
       // that weren't seen by DepCollector because they were returned by primitives)
       if (!isResolved(val)) collectSymbolRefs(val, collector.incompleteRefs);
       // Track bare expressions with pending futures so forward-chaining
-      // can re-evaluate them (e.g., deferred print calls)
+      // can re-evaluate them (e.g., deferred print calls). One cell,
+      // shared by the eval scope and the registry.
       if (!isResolved(val) && collector.incompleteRefs.size > 0) {
         const bareKey = `__bare_${bareCounter++}`;
-        registry.bindings.set(bareKey, {
+        const cell: Binding = {
           key: bareKey,
-          currentValue: val,
+          value: val,
           incompleteDeps: collector.incompleteRefs,
           isComplete: false,
-        });
+        };
+        registry.bindings.set(bareKey, cell);
         registerDeps(registry, bareKey, collector.incompleteRefs);
-        evalCtx.bindings.set(bareKey, { key: bareKey, value: val, isUse: false });
-        evalCtx.bindingList.push({ key: bareKey, value: val, isUse: false });
+        evalCtx.bindings.set(bareKey, cell);
+        evalCtx.bindingList.push(cell);
       }
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
-      const typeCtx = val.kind === ValueKind.Context ? val as ContextValue
-        : (val.kind === ValueKind.MultiValue && primaryOf(val).kind === ValueKind.Context)
-          ? primaryOf(val) as ContextValue : null;
-      if (typeCtx && typeCtx.bindings.has("__type")) {
-        const nameBinding = typeCtx.bindings.get("__name");
-        if (nameBinding?.value?.kind === ValueKind.Bits) {
-          const currentName = bitsToString(nameBinding.value as BitsValue);
+      const typeCtx = dataOf(val).kind === ValueKind.Structure ? dataOf(val) as ContextValue : null;
+      if (typeCtx && hasShapeSlot(typeCtx)) {
+        const nameV = getName(typeCtx);
+        if (nameV?.kind === ValueKind.Bits) {
+          const currentName = bitsToString(nameV as BitsValue);
           if (currentName.startsWith("<")) {
-            nameBinding.value = stringToBits(b.key);
+            renameInPlace(typeCtx, stringToBits(b.key));
           }
+          // C6.1a: stabilize the type's LOCAL member symbols onto the
+          // declaration-site scope (module FQN + binding name) — the
+          // fixpoint may re-evaluate this declaration, and both
+          // constructions must yield the SAME member symbols for
+          // conformance to hold across passes.
+          stabilizeTypeMemberScope(typeCtx,
+            typeMemberScopeFqn(`${moduleFqn ?? MAIN_SCOPE_FQN}${FQN_SEP}${b.key}`));
         }
       }
-
-      // Store evaluated value in eval context
-      const ctxBinding = evalCtx.bindings.get(b.key);
-      if (ctxBinding) ctxBinding.value = val;
 
       // Record inferred type in compilation report
       if (compilationReport) {
@@ -1148,14 +1238,29 @@ export function evalSource(
       // Track Symbol dependencies from async futures in the result tree
       if (!isResolved(val)) collectSymbolRefs(val, collector.incompleteRefs);
 
-      // Register in reactive registry
+      // Store the evaluated value on the scope's binding and track that
+      // SAME object in the reactive registry — the binding is its cell.
       const complete = isResolved(val);
-      registry.bindings.set(b.key, {
-        key: b.key,
-        currentValue: val,
-        incompleteDeps: complete ? new Set() : collector.incompleteRefs,
-        isComplete: complete,
-      });
+      // D47 (B-094 chunk 1): binding-level source attachment — a resolved
+      // top-level binding's value carries its RHS AST on the `source`
+      // channel (kernel origination). Chunk-1 scope: non-Structure data
+      // only — Structures (types, records, proofs) carry channels directly
+      // and are identity-sensitive (memoized generics, law registries);
+      // their attachment is the chunk-2+ audit. Residuals are skipped:
+      // forward chaining REPLACES them on completion, dropping anything
+      // attached here.
+      const storedVal = (complete && !isMetaSlotKey(b.key)
+          && dataOf(val).kind !== ValueKind.Structure)
+        ? withSource(val, b.value)
+        : val;
+      let ctxBinding = evalCtx.bindings.get(b.key);
+      if (!ctxBinding) {
+        ctxBinding = { key: b.key, value: storedVal };
+        evalCtx.bindings.set(b.key, ctxBinding);
+        evalCtx.bindingList.push(ctxBinding);
+      }
+      resolveCell(ctxBinding, storedVal, complete, collector.incompleteRefs);
+      registry.bindings.set(b.key, ctxBinding);
 
       if (complete) {
         completedInThisPass.add(b.key);
@@ -1223,6 +1328,18 @@ export function evalSource(
         ).join("\n"),
         );
       }
+    }
+  }
+
+  // C5.1: register this source's top-level binding names as FQN symbols
+  // under the defining scope (module file path, or `<main>`). Registration
+  // is idempotent (interned — same FQN is the same object across re-eval
+  // and reload); synthetic bare/future markers are not names.
+  {
+    const scopeFqn = moduleFqn ?? MAIN_SCOPE_FQN;
+    for (const key of evalCtx.bindings.keys()) {
+      if (isBareBindingName(key) || isFutureBindingName(key)) continue;
+      registerScopeSymbol(scopeFqn, key);
     }
   }
 

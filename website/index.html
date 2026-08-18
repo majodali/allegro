@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Allegro — A Programmable Language Platform</title>
+<title>Allegro — Verified Code at AI Velocity</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -43,6 +43,18 @@
   li { margin: 4px 0; color: #bac2de; }
   a { color: #89b4fa; }
   .note { background: #313244; border-left: 3px solid #cba6f7; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; font-size: 14px; color: #a6adc8; }
+  .transcript {
+    background: #11111b;
+    border: 1px solid #313244;
+    border-radius: 8px;
+    margin: 16px 0 24px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #a6adc8;
+  }
 
   /* Mini sandbox */
   .sandbox {
@@ -137,6 +149,8 @@
   <a href="/" class="logo">Allegro</a>
   <div class="links">
     <a href="#provability">Provability</a>
+    <a href="#laws">Laws</a>
+    <a href="#prover">Prover Loop</a>
     <a href="#basics">Basics</a>
     <a href="#types">Types</a>
     <a href="#patterns">Patterns</a>
@@ -154,9 +168,17 @@
 <main>
 
 <h1>Allegro</h1>
-<p class="subtitle">A programmable language platform where correctness is provable by construction.</p>
+<p class="subtitle">Verified code at AI velocity.</p>
 
-<p>Allegro is built around a thesis: <strong>code is not the artifact you should review — the semantic summary of the code is</strong>. Refinement types, lifecycle invariants, and function contracts accumulate facts the compiler can prove; the same facts surface in a single safety summary that humans (and AIs) review instead of reading line-by-line. Familiar syntax, an extensible grammar, and partial evaluation as the compilation model are the means; provability is the point.</p>
+<p>Allegro is a programmable language platform where every claim about your code resolves to a proof strength you can see — and where humans and AI agents ship through the same verifying kernel. Everything it does differently is a composition of three moves:</p>
+
+<ul>
+  <li><strong>Everything is a value under one engine.</strong> Code, types, grammars, proofs, and effects are ordinary values; partial evaluation is the only engine. Type checking, proof discharge, and optimization are not separate passes — they are the same evaluation, run as far as the available facts allow.</li>
+  <li><strong>Every claim carries a visible strength.</strong> There is no boolean "verified" anywhere in the system. A claim — a refinement, a contract, a law, an effect declaration — resolves to a tier: <em>proven, enumerated, sampled, witnessed, admitted, pending</em>. The escape hatches are legal and loud: you may assume a law you can't prove, and everything resting on the assumption says so in its verdict.</li>
+  <li><strong>Every participant goes through the same kernel.</strong> A human, an LLM, a tool — all get the same obligations, propose through the same protocol, and are verified by the same kernel, with authorship recorded per discharged proof. Trust attaches to the kernel's verdict, not to who wrote the code.</li>
+</ul>
+
+<p>A consequence worth naming: <strong>code stops being the artifact you review</strong>. Refinements, invariants, contracts, effects, and laws accumulate facts the compiler proves; the same facts surface as a semantic summary — types, predicates, contracts, effect sets, safety grade — that humans and AIs review instead of reading line-by-line.</p>
 
 <div class="note">
   Allegro is a work in progress. The examples below are live — edit them and click Run to evaluate. Click <strong>Inspect</strong> on any sandbox to see the same code as a structured summary: types, predicates, contracts, safety grade. <a href="/sandbox.html">Open the full sandbox</a> for a richer experience.
@@ -173,7 +195,7 @@
 // PositiveInt: an Int constrained to be positive. The constructor checks
 // the predicate; downstream arithmetic propagates the fact (≥ 1) so the
 // compiler can reason about every derived value.
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 // `requires` is the caller's obligation; `ensures` is the implementer's
 // guarantee. `_` in `ensures` refers to the return value.
@@ -208,18 +230,18 @@ print(acc2)   // 175
 <!-- ================================================ -->
 <h3 id="refinements">Refinement types &amp; domain propagation</h3>
 
-<p>Constrain existing types with predicates using <code>&&</code>. The <code>_</code> placeholder is the value. Construction and call-site checks fire automatically; the recognised algebraic shape (intervals, equality, inequality) propagates through arithmetic so downstream values inherit the proof.</p>
+<p>Constrain existing types with predicates using <code>&amp;</code> (compound predicate bodies compose with <code>&amp;&amp;</code>). The <code>_</code> placeholder is the value. Construction and call-site checks fire automatically; the recognised algebraic shape (intervals, equality, inequality) propagates through arithmetic so downstream values inherit the proof.</p>
 
 <div class="sandbox" id="s-refinements">
 <textarea class="sandbox-editor" rows="14">// Refinement type: Int that must be positive.
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 print(PositiveInt(5))           // 5
 
 // Construction check fails when the predicate is false.
 print(PositiveInt(0 - 3))        // error(refinement check failed)
 
 // Compound predicates compose via `&&` inside the predicate body.
-SmallPos = Int && _ > 0 && _ < 100
+SmallPos = Int & _ > 0 && _ < 100
 print(SmallPos(50))              // 50
 
 // Domain propagation: x: PositiveInt has domain ≥ 1, so x + x has ≥ 2,
@@ -239,7 +261,7 @@ print(double_pos(PositiveInt(7)))   // 14
 <div class="sandbox" id="s-asserts">
 <textarea class="sandbox-editor" rows="14">use invariants
 
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 x = PositiveInt(5)         // ≥ 1 [refinement-type]
 y = x + 10                  // ≥ 11 [propagation]
@@ -263,28 +285,26 @@ print(z)                    // 10</textarea>
 <!-- ================================================ -->
 <h3 id="invariants">Lifecycle invariants</h3>
 
-<p><code>Type.invariant(self => P)</code> declares a predicate that holds for every value of the type. The constructor checks every clause; multi-clause chaining reports per-clause failure messages. Multi-field invariants reference fields via <code>self.field</code>.</p>
+<p>Lifecycle invariants are ordinary refinements — the <code>&amp;</code> mint covers scalars and records alike. Chained <code>&amp;</code> clauses each form their own layer, so a failure reports the violated clause's constraint with a counterexample. Record predicates reference fields through <code>_</code>.</p>
 
 <div class="sandbox" id="s-invariants">
-<textarea class="sandbox-editor" rows="14">// Single-value invariant — equivalent to `Int && _ > 0` but composes
-// fluently when multiple constraints chain.
-PositiveInt = Int.invariant(self => self > 0)
+<textarea class="sandbox-editor" rows="14">// Single-value clause.
+PositiveInt = Int & _ > 0
 print(PositiveInt(10))           // 10
 
-// Multi-field record invariant: `lo <= hi` ties two fields together —
-// the natural shape for `invariant` rather than refinement-via-`&&`.
-Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+// Multi-field record predicate: `lo <= hi` ties two fields together.
+Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi
 ok = Range(1, 100)
 print(ok.lo)                      // 1
 
 bad = Range(50, 5)
-print(error of bad)              // invariant 1 failed
+print(error of bad)              // refinement check failed
 
-// Chained: per-clause failure messages.
-SmallPos = Int.invariant(self => self > 0).invariant(self => self < 100)
+// Chained clauses — failures name the violated constraint.
+SmallPos = Int & _ > 0 & _ < 100
 print(SmallPos(50))              // 50
-print(error of SmallPos(0))      // invariant 1 failed
-print(error of SmallPos(200))    // invariant 2 failed</textarea>
+print(error of SmallPos(0))      // refinement check failed: expected ≥ 1 (got 0)
+print(error of SmallPos(200))    // refinement check failed: expected ≤ 99 (got 200)</textarea>
 <div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-invariants')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-invariants')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
 </div>
@@ -297,7 +317,7 @@ print(error of SmallPos(200))    // invariant 2 failed</textarea>
 <div class="sandbox" id="s-contracts">
 <textarea class="sandbox-editor" rows="18">use contracts
 
-PositiveInt = Int && _ > 0
+PositiveInt = Int & _ > 0
 
 // Both contract clauses present. The ensures is statically discharged
 // because x + x with x ≥ 1 propagates to _ ≥ 2, which entails _ ≥ 1.
@@ -362,6 +382,85 @@ print(maybe_log("hi"))</textarea>
 </div>
 
 <p>Try editing the <code>square</code> function to add a <code>print(x)</code> call without removing <code>effects pure</code> — running halts with an effects-mismatch error pointing at the undeclared <code>io</code> effect.</p>
+
+<!-- ================================================ -->
+<h2 id="laws">Laws — every claim carries its strength</h2>
+
+<p>There is no boolean "verified" in Allegro. Every law obligation — reflexivity, symmetry, transitivity of an equality; algebraic laws you declare on your own types — resolves to a <em>tier</em>: <code>kernel</code>, <code>enumerated</code>, <code>sampled</code>, <code>witnessed</code>, <code>admitted</code>, or <code>pending</code>. Proofs record which tier backed them, and the verdict renders anything weaker than proof loudly.</p>
+
+<div class="sandbox" id="s-laws">
+<textarea class="sandbox-editor" rows="24">// Kernel equalities are auto-proven: transitivity over Int is backed
+// at tier `kernel`, and the proof value says so.
+theorem t_int: 1 == 1 by proof_trans(proof_refl(1), proof_refl(1))
+p = proof_trans(proof_refl(7), proof_refl(7))
+print(p.lawTier)                 // kernel
+
+// A custom equality: Cell draws Equatable and supplies its own eq.
+// Its refl/sym/trans obligations are RECORDED as pending — never
+// silently granted.
+Cell = Type.define({x: Int, eq: (self, other) => self.x == other.x}, Equatable)
+v = Cell(1)
+
+// The strict gate: proof_trans over Cell values is REFUSED while
+// Cell's transitivity is neither proven nor admitted. (Try it: move
+// the theorem below above the Law.assume line.)
+
+// The escape hatch is legal — and loud:
+Law.assume(Cell, "trans")
+
+theorem t_cell: v == v by proof_trans(proof_refl(v), proof_refl(v))
+q = proof_trans(proof_refl(v), proof_refl(v))
+print(q.lawTier)                 // admitted — nothing upgraded for free
+
+// Or do it properly — witness a real proof:
+Cell2 = Type.define({x: Bool, eq: (self, other) => self.x == other.x}, Equatable)
+Law.witness(Cell2, "refl", prove_for_all_bool(b => b == b))
+print("laws carry their strength")</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-laws')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-laws')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<p>Running <code>allegro verify</code> on this file renders the full picture — the admitted obligation marked <code>!</code>, the pending ones <code>?</code>, a weakness note on every proof resting on the assumption, and the <strong>assumption ledger</strong>: every assumption in force, mapped to the proofs resting on it. The backing set is transitive — wrap the chain in another combinator and the note survives:</p>
+
+<pre class="transcript">Verdict (verified): 4/4 discharged
+  ✓ t_int — by auto-PE
+  ✓ t_cell — by auto-PE [resting on admitted 'trans' of 'Cell']
+  laws: 13/18 discharged, 1 ADMITTED (assumed, not proof), 4 pending
+    ! Cell.trans (admitted)
+    ? Cell.refl
+    ? Cell.sym
+  assumption ledger: rests on 1 admitted, 0 sampled; 4 obligation(s) pending
+    ! admitted 'trans' of 'Cell' — backs: t_cell, q</pre>
+
+<!-- ================================================ -->
+<h2 id="prover">The prover loop — one protocol, any participant</h2>
+
+<p>Verification is a loop, and it is participant-neutral: the kernel emits <strong>obligations</strong>, any prover — an LLM, a human, a tool — proposes proof terms, and the kernel returns a <strong>verdict</strong> with counterexamples and iteration hints. Nobody is trusted; everybody is verified; authorship is recorded per discharged theorem.</p>
+
+<p>Given a theorem whose proof term proves the wrong fact (the soundness gate rejects a term that establishes a different equality — proving <em>something</em> is not proving <em>your</em> claim):</p>
+
+<pre class="transcript">$ allegro obligations pending.alg --pending
+Obligation: theorem `double_four`
+  proposition: double(2) == 4
+  hash:        0728a8d1
+  prior attempts: 1
+
+$ allegro propose pending.alg          # the human worker: a TODO with hints
+**Last failure:**
+- reason: proof term establishes a different equality
+- counterexample: theorem claims `double(2) == 4` but the proof
+  proves `987654321 == 987654321`
+**Hints:**
+- the `by` proof term establishes a different fact than the theorem
+  claims — match the proposition exactly
+
+$ allegro prove pending.alg            # the LLM worker: same loop, autonomous
+✓ double_four — by proof_refl(double(2))   [attempts: 1]
+  authorship: {prover: &lt;model-id&gt;, attemptsUsed: 1, role: "primary"}</pre>
+
+<p>The model's proposal has no privileged path — it goes through the same <code>proof_check</code> as a human's edit, and a wrong term gets the same refusal. A benchmark finding we state up front: on our 10-obligation corpus, partial evaluation alone discharges every <em>closed</em> proposition — the prover's measured work is supplying proof terms that satisfy the soundness gate, which is exactly the loop above (<code>bench/README.md</code>).</p>
+
+<p>Runnable versions of everything above, each with a "break it" block and captured failure transcripts, live in <code>demos/rung1/</code>.</p>
 
 <!-- ================================================ -->
 <h2 id="basics">Basics</h2>
@@ -470,19 +569,19 @@ print(result)</textarea>
 <!-- ================================================ -->
 <h2 id="custom-types">Custom Types</h2>
 
-<p>Create types using the fluent API. <code>extend</code> creates record types, <code>distinct</code> creates newtypes. Types themselves are typed values — <code>Int instanceof NominalType</code> is true.</p>
+<p>Create types using the fluent API. <code>extend</code> creates record types, <code>distinct</code> creates newtypes. Types themselves are typed values — <code>Int instanceof Type</code> is true.</p>
 
 <div class="sandbox" id="s-custom-types">
 <textarea class="sandbox-editor" rows="14">// Record type with fields and constructor
-Point = Int.extend({x: Int, y: Int})
+Point = Type.define({x: Int, y: Int}, Int)
 p = Point(10, 20)
 print(p)
 print(p.x + p.y)
 print(p instanceof Point)
 
 // Types are typed values
-print(Int instanceof NominalType)
-print(type of Point instanceof NominalType)
+print(Int instanceof Type)
+print(type of Point instanceof Type)
 
 // Distinct type (breaks subtypeof)
 UserId = Int.distinct()
@@ -499,14 +598,14 @@ print(UserId(42) instanceof UserId)</textarea>
 
 <div class="sandbox" id="s-interfaces">
 <textarea class="sandbox-editor" rows="12">// Declare an interface
-Printable = Type.interface({toString: Function})
+Printable = Interface.define({toString: Function})
 
 // Any type with toString satisfies it
 print(42 instanceof Printable)
 print("hello" instanceof Printable)
 
 // Interface with specific member
-Sized = Type.interface({length: Int})
+Sized = Interface.define({length: Int})
 print("hello" instanceof Sized)
 print(42 instanceof Sized)
 
@@ -519,11 +618,11 @@ print(Printable instanceof Type)</textarea>
 <!-- ================================================ -->
 <h2 id="mixins">Mixins</h2>
 
-<p>Add method implementations to types with <code>.mixin()</code>. Mixin methods receive <code>self</code> as their first argument and can access fields and call other methods.</p>
+<p>Method implementations are ordinary <code>define</code> spec entries — an entry whose value is a function becomes a method receiving <code>self</code> as its first argument. Reusable mixins are methods-only types (bundles) drawn alongside other bundles.</p>
 
 <div class="sandbox" id="s-mixins">
-<textarea class="sandbox-editor" rows="12">// Add methods to a record type
-Point = Int.extend({x: Int, y: Int}).mixin({magnitude: (self) => self.x * self.x + self.y * self.y, translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)})
+<textarea class="sandbox-editor" rows="12">// Methods live in the define spec, next to the fields they use
+Point = Type.define({x: Int, y: Int, magnitude: (self) => self.x * self.x + self.y * self.y, translate: (self, dx, dy) => Point(self.x + dx, self.y + dy)}, Int)
 
 p = Point(3, 4)
 print(p.magnitude())
@@ -532,9 +631,9 @@ q = p.translate(10, 20)
 print(q.x)
 print(q.y)
 
-// Reusable mixin spec
-magSpec = {mag: (self) => self.x * self.x + self.y * self.y}
-Vec = Int.extend({x: Int, y: Int}).mixin(magSpec)
+// Reusable mixin: a methods-only define mints a BUNDLE, drawn like any other
+MagMixin = Type.define({mag: (self) => self.x * self.x + self.y * self.y})
+Vec = Type.define({x: Int, y: Int}, Int, MagMixin)
 print(Vec(5, 12).mag())</textarea>
 <div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-mixins')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-mixins')">Inspect</button></div><span class="timing"></span></div>
 <div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>

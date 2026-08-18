@@ -5,13 +5,9 @@
 // domain propagation alone suffices to discharge the return-type check
 // (without flow-sensitive narrowing — that's a future phase).
 //
-// Phase C Chunk 4 demonstrates two equivalent ways to express a typed
-// constraint:
-//   - `Int & _ > 0`               (refinement type, value-level)
-//   - `Int.invariant(self > 0)`   (lifecycle invariant, multi-clause)
-// Mechanically equivalent for single-value types; `invariant` is the
-// natural form for record/struct types where the predicate references
-// fields.
+// C6.1b: constraints have ONE surface — the `&` refinement mint. Chained
+// `&` gives multi-clause layers; record predicates reference fields
+// through `_` (`Type.define({lo, hi}) & _.lo <= _.hi`).
 //
 // Phase C Chunk 3: function-body contracts (`requires` / `ensures`) attach
 // caller obligations and implementer guarantees to function definitions.
@@ -23,15 +19,12 @@ export PI = 3.141592653589793
 export E = 2.718281828459045
 export TAU = 6.283185307179586
 
-// Single-value refinements via `&`. Equivalent to:
-//   Int.invariant(self => self > 0)
-//   Int.invariant(self => self >= 0)
+// Single-value refinements via `&`.
 export PositiveInt = Int & _ > 0
 export NonNeg      = Int & _ >= 0
 
-// A multi-field range. The invariant ties two fields together — the
-// natural shape for `invariant` rather than refinement-via-`&&`.
-export Range = Type.extend({lo: Int, hi: Int}).invariant(self => self.lo <= self.hi)
+// A multi-field range. The refinement predicate ties two fields together.
+export Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi
 
 // Phase D1 pilot: pure math functions declare `effects pure` so the
 // declaration is reviewable in the safety summary alongside contracts.

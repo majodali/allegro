@@ -11,10 +11,11 @@
 // to `info` severity so adoption is non-breaking. Per-project config promotes
 // them to `error` once a project's source is clean.
 
+import { dataOf, channelReadRaw, getName } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ExpressionValue,
   ContextValue, BitsValue,
-  primaryOf, bitsToString,
+  bitsToString,
 } from "./types.js";
 import { getFunctionParamTypes } from "./types-std.js";
 
@@ -38,57 +39,79 @@ export const NOTIF_TOTALITY_NEEDS_ANNOTATION = "totality-needs-annotation";
 // generic `findAttachWrapper` walks the head expression peeling unrelated
 // decorators until it finds the named target.
 
-const _WRAPPER_NAMES = new Set([
-  "type_check", "partial_attach", "decreases_attach",
-  "effects_attach", "param_effects_attach", "proven_attach",
+// --- C1.5b: body-form metadata collapse -------------------------------------
+//
+// The five metadata wrappers (partial/decreases/effects/param_effects/
+// proven `*_attach`) are a PARSE-TIME encoding only. `collapseBodyMetadata`
+// runs once per evalSource pass (after symbol resolution, before tail-call
+// marking): it peels the wrapper chain off every ComposedFunction body —
+// descending through `type_check` layers — and stashes the metadata as
+// host-internal properties on the function (registered in SLOT_REGISTRY):
+//   __partial, __decreasesMetric, __declaredEffectsAst,
+//   __paramEffectPairs, __provenClauses
+// Analyzers read the properties; the wrapper primitives remain registered
+// as inert passthroughs for any uncollapsed path (defense in depth).
+// `subst`/`remapParams` preserve the properties across clones.
+
+const ATTACH_NAMES = new Set([
+  "partial_attach", "decreases_attach", "effects_attach",
+  "param_effects_attach", "proven_attach",
 ]);
 
-export function findAttachWrapper(body: Value, wantName: string): ExpressionValue | null {
-  let cur = body;
-  for (let i = 0; i < 16; i++) {
-    if (cur.kind !== ValueKind.Expression) return null;
-    const fn = primaryOf((cur as ExpressionValue).fn);
-    if (fn.kind !== ValueKind.PrimitiveFunction) return null;
+function collapseOneFunction(cfn: ComposedFunctionValue): void {
+  let getCur: () => Value = () => cfn.body;
+  let setCur: (v: Value) => void = (v) => { (cfn as any).body = v; };
+  for (let guard = 0; guard < 24; guard++) {
+    const cur = getCur();
+    if (cur.kind !== ValueKind.Expression) return;
+    const e = cur as ExpressionValue;
+    const fn = dataOf(e.fn);
+    if (fn.kind !== ValueKind.PrimitiveFunction) return;
     const name = (fn as any).name as string;
-    if (name === wantName) return cur as ExpressionValue;
-    if (!_WRAPPER_NAMES.has(name)) return null;
-    if ((cur as ExpressionValue).args.length < 1) return null;
-    cur = (cur as ExpressionValue).args[0];
+    if (name === "type_check") {
+      if (e.args.length < 1 || e.args[0].kind !== ValueKind.Expression) return;
+      getCur = () => e.args[0];
+      setCur = (v) => { e.args[0] = v; };
+      continue;
+    }
+    if (!ATTACH_NAMES.has(name)) return;
+    switch (name) {
+      case "partial_attach":       (cfn as any).__partial = true; break;
+      case "decreases_attach":     (cfn as any).__decreasesMetric = e.args[1]; break;
+      case "effects_attach":       (cfn as any).__declaredEffectsAst = e.args[1]; break;
+      case "param_effects_attach": (cfn as any).__paramEffectPairs = e.args.slice(1); break;
+      case "proven_attach":        (cfn as any).__provenClauses = e.args.slice(1); break;
+    }
+    setCur(e.args[0]);
   }
-  return null;
 }
 
-/** Recognise `partial_attach(body)` anywhere in the head wrapper stack.
- *  Returns the inner body when found, null otherwise. */
-export function unwrapPartialAttach(body: Value): Value | null {
-  const w = findAttachWrapper(body, "partial_attach");
-  if (!w) return null;
-  return w.args[0];
+/** Recursively collapse body-form metadata on every ComposedFunction
+ *  reachable from a binding value (top-level functions, typed_function
+ *  envelopes, nested lambdas). Idempotent. */
+export function collapseBodyMetadata(v: Value | undefined, seen: Set<Value> = new Set()): void {
+  if (!v || typeof v !== "object" || seen.has(v)) return;
+  seen.add(v);
+  if (v.kind === ValueKind.ComposedFunction) {
+    collapseOneFunction(v as ComposedFunctionValue);
+    collapseBodyMetadata((v as ComposedFunctionValue).body, seen);
+    return;
+  }
+  if (v.kind === ValueKind.Expression) {
+    const e = v as ExpressionValue;
+    collapseBodyMetadata(e.fn, seen);
+    for (const a of e.args) collapseBodyMetadata(a, seen);
+    return;
+  }
+  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
+    collapseBodyMetadata((v as any).primary, seen);
+  }
 }
 
-/** Is the function's body wrapped with `partial_attach`? Analyzers consult
- *  this to skip the totality check on opted-out functions. */
 export function isFunctionPartial(fn: ComposedFunctionValue): boolean {
-  return unwrapPartialAttach(fn.body) !== null;
+  return (fn as any).__partial === true;
 }
 
-/** Recognise `decreases_attach(body, metric)` in the head wrapper stack.
- *  Returns `{ body, metric }` when found, null otherwise. Stage 3+. */
-export function unwrapDecreasesAttach(body: Value): { body: Value; metric: Value } | null {
-  const w = findAttachWrapper(body, "decreases_attach");
-  if (!w) return null;
-  if (w.args.length < 2) return null;
-  return { body: w.args[0], metric: w.args[1] };
-}
-
-/** Recognise `proven_attach(body, pred1, …, predN)` in the head wrapper
- *  stack. Returns `{ body, predicates }` when found, null otherwise. F7. */
-export function unwrapProvenAttach(body: Value): { body: Value; predicates: Value[] } | null {
-  const w = findAttachWrapper(body, "proven_attach");
-  if (!w) return null;
-  if (w.args.length < 1) return null;
-  return { body: w.args[0], predicates: w.args.slice(1) };
-}
 
 // =============================================================================
 // Stage 1 — Exhaustiveness check for `when/is/then`
@@ -138,14 +161,14 @@ function peelFunctionAst(v: Value): {
   cfn: ComposedFunctionValue;
   paramTypeAsts: Value[];
 } | null {
-  // Post-evaluation: MultiValue + FunctionType.
-  if (v.kind === ValueKind.MultiValue) {
+  // Post-evaluation: a typed-function carrier.
+  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
     const mv = v as any;
-    const tComp = mv.components.get("type") as Value | undefined;
+    const tComp = channelReadRaw(mv, "type") as Value | undefined;
     const prim = mv.primary;
     if (prim.kind === ValueKind.ComposedFunction) {
       let paramTypeAsts: Value[] = [];
-      if (tComp && tComp.kind === ValueKind.Context) {
+      if (tComp && tComp.kind === ValueKind.Structure) {
         const types = getFunctionParamTypes(tComp as ContextValue);
         if (types) paramTypeAsts = types;
       }
@@ -156,7 +179,7 @@ function peelFunctionAst(v: Value): {
     return { cfn: v as ComposedFunctionValue, paramTypeAsts: [] };
   }
   if (v.kind !== ValueKind.Expression) return null;
-  const target = primaryOf((v as ExpressionValue).fn);
+  const target = dataOf((v as ExpressionValue).fn);
   if (target.kind !== ValueKind.PrimitiveFunction) return null;
   if ((target as any).name !== "typed_function") return null;
   const args = (v as ExpressionValue).args;
@@ -165,7 +188,7 @@ function peelFunctionAst(v: Value): {
   // args[2..2+paramCount-1] = paramTypes, last = returnType.
   const inner = peelFunctionAst(args[0]);
   if (!inner) return null;
-  const paramCountP = primaryOf(args[1]);
+  const paramCountP = dataOf(args[1]);
   let paramCount = 0;
   if (paramCountP.kind === ValueKind.Bits) {
     paramCount = Number((paramCountP as BitsValue).data);
@@ -230,20 +253,20 @@ function walkForWhen(
   visited.add(v);
 
   if (v.kind === ValueKind.Expression) {
-    const fn = primaryOf((v as ExpressionValue).fn);
+    const fn = dataOf((v as ExpressionValue).fn);
     if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "eval_when") {
       // Top of a chain. Flatten by walking else-branch thunks.
       const subject = (v as ExpressionValue).args[0];
       const cases: ChainCase[] = [];
       let cur: Value = v;
       while (cur.kind === ValueKind.Expression) {
-        const cfn = primaryOf((cur as ExpressionValue).fn);
+        const cfn = dataOf((cur as ExpressionValue).fn);
         if (cfn.kind !== ValueKind.PrimitiveFunction || (cfn as any).name !== "eval_when") break;
         const args = (cur as ExpressionValue).args;
         if (args.length < 5) break;
         cases.push({ pattern: args[1] });
         // elseFn is a zero-arg ComposedFunction whose body is the rest of the chain.
-        const elseFn = primaryOf(args[4]);
+        const elseFn = dataOf(args[4]);
         if (elseFn.kind === ValueKind.ComposedFunction) {
           cur = (elseFn as ComposedFunctionValue).body;
         } else {
@@ -258,14 +281,14 @@ function walkForWhen(
       // when chains. The then branches live inside arg 3 (thenFn body).
       cur = v;
       while (cur.kind === ValueKind.Expression) {
-        const cfn = primaryOf((cur as ExpressionValue).fn);
+        const cfn = dataOf((cur as ExpressionValue).fn);
         if (cfn.kind !== ValueKind.PrimitiveFunction || (cfn as any).name !== "eval_when") break;
         const args = (cur as ExpressionValue).args;
-        const thenFn = primaryOf(args[3]);
+        const thenFn = dataOf(args[3]);
         if (thenFn.kind === ValueKind.ComposedFunction) {
           walkForWhen((thenFn as ComposedFunctionValue).body, visit, visited);
         }
-        const elseFn = primaryOf(args[4]);
+        const elseFn = dataOf(args[4]);
         if (elseFn.kind === ValueKind.ComposedFunction) {
           cur = (elseFn as ComposedFunctionValue).body;
         } else break;
@@ -281,7 +304,7 @@ function walkForWhen(
     walkForWhen((v as ComposedFunctionValue).body, visit, visited);
     return;
   }
-  if (v.kind === ValueKind.MultiValue) {
+  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
     walkForWhen((v as any).primary, visit, visited);
     return;
   }
@@ -289,7 +312,7 @@ function walkForWhen(
 
 function isWhenNoMatch(v: Value): boolean {
   if (v.kind !== ValueKind.Expression) return false;
-  const fn = primaryOf((v as ExpressionValue).fn);
+  const fn = dataOf((v as ExpressionValue).fn);
   return fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "when_no_match";
 }
 
@@ -301,11 +324,15 @@ function resolveSubjectTypeName(
   paramTypeAsts: Value[],
   typeLookup: TypeLookup | undefined,
 ): string | null {
-  // Strip MultiValue wrappers.
-  if (subject.kind === ValueKind.MultiValue) {
-    const t = (subject as any).components.get("type");
+  // Strip carriers; flattened structures answer through the channel plane.
+  if (subject.kind === ValueKind.Structure) {
+    const t = channelReadRaw(subject as Value, "type");
     if (t) return resolveTypeName(t, typeLookup);
-    return resolveSubjectTypeName((subject as any).primary, paramTypeAsts, typeLookup);
+    const pp = (subject as { primary?: Value }).primary;
+    if (pp !== undefined) {
+      return resolveSubjectTypeName(pp, paramTypeAsts, typeLookup);
+    }
+    return null;
   }
   if (subject.kind === ValueKind.Param) {
     const pos = (subject as any).position as number;
@@ -321,8 +348,10 @@ function resolveSubjectTypeName(
 /** Resolve a type AST node to a concrete type name (e.g. "Bool", "Int"). */
 function resolveTypeName(t: Value, typeLookup: TypeLookup | undefined): string | null {
   // Direct Context type values carry __name.
-  if (t.kind === ValueKind.Context) return typeContextName(t);
-  if (t.kind === ValueKind.MultiValue) return resolveTypeName((t as any).primary, typeLookup);
+  if (t.kind === ValueKind.Structure) {
+    const pp = (t as { primary?: Value }).primary;
+    return pp !== undefined ? resolveTypeName(pp, typeLookup) : typeContextName(t);
+  }
   // Symbol — look up against extensions (`Bool` etc.).
   if (t.kind === ValueKind.Symbol) {
     if (!typeLookup) return null;
@@ -379,20 +408,20 @@ function analyzeChain(
 }
 
 function typeContextName(t: Value): string | null {
-  if (t.kind !== ValueKind.Context) return null;
-  const n = (t as ContextValue).bindings.get("__name");
-  if (!n || !n.value) return null;
-  const p = primaryOf(n.value);
+  if (t.kind !== ValueKind.Structure) return null;
+  const n = getName(t as ContextValue);
+  if (!n) return null;
+  const p = dataOf(n);
   if (p.kind !== ValueKind.Bits) return null;
   return bitsToString(p as BitsValue);
 }
 
 function hasWildcardOrBinding(cases: ChainCase[]): boolean {
   for (const c of cases) {
-    const p = primaryOf(c.pattern);
+    const p = dataOf(c.pattern);
     // Wildcard marker: `when_wildcard()` expression.
     if (p.kind === ValueKind.Expression) {
-      const fn = primaryOf((p as ExpressionValue).fn);
+      const fn = dataOf((p as ExpressionValue).fn);
       if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "when_wildcard") return true;
     }
     // Bind-to-name: pattern is a bare Symbol like `is n`. Matches anything.
@@ -485,18 +514,18 @@ export function checkTermination(
     // against the caller's param-type info. Stage 5 HOF edges are accepted
     // without metric verification (the `decreases` clause is the contract;
     // we trust it).
-    const decAttach = unwrapDecreasesAttach(cfn.body);
-    if (decAttach) {
+    const decMetric = (cfn as any).__decreasesMetric as Value | undefined;
+    if (decMetric) {
       const directCalls = cycleCalls
         .filter((s): s is CallSite & { kind: "direct" } => s.kind === "direct")
         .map(s => s.call);
-      const reasons = checkUserMetric(decAttach.metric, directCalls, peeled.paramTypeAsts, typeLookup);
+      const reasons = checkUserMetric(decMetric, directCalls, peeled.paramTypeAsts, typeLookup);
       if (reasons.length > 0) {
         const unique = [...new Set(reasons)];
         findings.push({
           binding: b.key,
           message: `\`decreases\` metric does not provably decrease: ${unique.join("; ")}`,
-          counterexample: renderMetricCounterexample(b.key, decAttach.metric, cycleCalls),
+          counterexample: renderMetricCounterexample(b.key, decMetric, cycleCalls),
         });
       }
       continue;
@@ -569,7 +598,7 @@ function renderTerminationCounterexample(
     return `${bindingName}(${sampleArgs}) → ${bindingName}(${sampleArgs}) [same input passes back]`;
   }
   // HOF edge.
-  const recv = primaryOf(first.receiver);
+  const recv = dataOf(first.receiver);
   const recvDesc = recv.kind === ValueKind.Param
     ? ((recv as any)._name ?? "arr")
     : "<receiver>";
@@ -587,15 +616,15 @@ function renderMetricCounterexample(
   const first = cycleCalls.find((s): s is CallSite & { kind: "direct" } => s.kind === "direct");
   if (!first) return undefined;
   let metricDesc = "<metric>";
-  const mp = primaryOf(metric);
+  const mp = dataOf(metric);
   if (mp.kind === ValueKind.Param) {
     metricDesc = (mp as any)._name ?? `param${(mp as any).position}`;
   } else if (mp.kind === ValueKind.Expression) {
-    const fn = primaryOf((mp as ExpressionValue).fn);
+    const fn = dataOf((mp as ExpressionValue).fn);
     if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
       metricDesc = `[${(mp as ExpressionValue).args
         .map(a => {
-          const p = primaryOf(a);
+          const p = dataOf(a);
           if (p.kind === ValueKind.Param) return (p as any)._name ?? `param${(p as any).position}`;
           return "_";
         })
@@ -621,14 +650,14 @@ const _HOF_METHODS = new Set(["map", "filter", "reduce"]);
 function matchStdlibHof(
   e: ExpressionValue,
 ): { method: "map" | "filter" | "reduce"; receiver: Value; args: Value[] } | null {
-  const outerFn = primaryOf(e.fn);
+  const outerFn = dataOf(e.fn);
   if (outerFn.kind !== ValueKind.Expression) return null;
-  const dispFn = primaryOf((outerFn as ExpressionValue).fn);
+  const dispFn = dataOf((outerFn as ExpressionValue).fn);
   if (dispFn.kind !== ValueKind.PrimitiveFunction) return null;
   if ((dispFn as any).name !== "type_dispatch") return null;
   const dispArgs = (outerFn as ExpressionValue).args;
   if (dispArgs.length !== 2) return null;
-  const methodVal = primaryOf(dispArgs[1]);
+  const methodVal = dataOf(dispArgs[1]);
   if (methodVal.kind !== ValueKind.Bits) return null;
   const method = bitsToString(methodVal as BitsValue);
   if (!_HOF_METHODS.has(method)) return null;
@@ -650,13 +679,13 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
   seen.add(v);
   if (v.kind === ValueKind.Expression) {
     const e = v as ExpressionValue;
-    const fn = primaryOf(e.fn);
+    const fn = dataOf(e.fn);
     if (fn.kind === ValueKind.Symbol) out.add((fn as any).name);
     // Stage 5: HOF callback positions.
     const hof = matchStdlibHof(e);
     if (hof) {
       for (const a of hof.args) {
-        const ap = primaryOf(a);
+        const ap = dataOf(a);
         if (ap.kind === ValueKind.Symbol) out.add((ap as any).name);
       }
     }
@@ -664,7 +693,7 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
     for (const a of e.args) collectCalleeNames(a, out, seen);
   } else if (v.kind === ValueKind.ComposedFunction) {
     collectCalleeNames((v as ComposedFunctionValue).body, out, seen);
-  } else if (v.kind === ValueKind.MultiValue) {
+  } else if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
     collectCalleeNames((v as any).primary, out, seen);
   }
 }
@@ -681,7 +710,7 @@ function findCallsToCycle(
   seen.add(body);
   if (body.kind === ValueKind.Expression) {
     const e = body as ExpressionValue;
-    const fn = primaryOf(e.fn);
+    const fn = dataOf(e.fn);
     if (fn.kind === ValueKind.Symbol) {
       const name = (fn as any).name as string;
       if (cycle.has(name)) out.push({ kind: "direct", callee: name, call: e });
@@ -690,7 +719,7 @@ function findCallsToCycle(
     const hof = matchStdlibHof(e);
     if (hof) {
       for (const a of hof.args) {
-        const ap = primaryOf(a);
+        const ap = dataOf(a);
         if (ap.kind === ValueKind.Symbol) {
           const name = (ap as any).name as string;
           if (cycle.has(name)) {
@@ -703,7 +732,7 @@ function findCallsToCycle(
     for (const a of e.args) findCallsToCycle(a, cycle, out, seen);
   } else if (body.kind === ValueKind.ComposedFunction) {
     findCallsToCycle((body as ComposedFunctionValue).body, cycle, out, seen);
-  } else if (body.kind === ValueKind.MultiValue) {
+  } else if (body.kind === ValueKind.Structure && (body as any).primary !== undefined) {
     findCallsToCycle((body as any).primary, cycle, out, seen);
   }
 }
@@ -715,14 +744,14 @@ function findCallsToCycle(
  *  structural induction). Bare-Param receivers (e.g. `arr.map(self)` on
  *  the function's own array param) are NOT decreasing and fire. */
 function isHofReceiverStructurallySmaller(receiver: Value): boolean {
-  const p = primaryOf(receiver);
+  const p = dataOf(receiver);
   if (p.kind !== ValueKind.Expression) return false;
-  const inner = primaryOf((p as ExpressionValue).fn);
+  const inner = dataOf((p as ExpressionValue).fn);
   if (inner.kind !== ValueKind.PrimitiveFunction) return false;
   if ((inner as any).name !== "type_dispatch") return false;
   const args = (p as ExpressionValue).args;
   if (args.length !== 2) return false;
-  const recvArg = primaryOf(args[0]);
+  const recvArg = dataOf(args[0]);
   // `param.field` shape: dispatch's first arg is a bare Param. The field
   // value is a sub-component by record-structural induction.
   return recvArg.kind === ValueKind.Param;
@@ -731,7 +760,7 @@ function isHofReceiverStructurallySmaller(receiver: Value): boolean {
 /** Explain why an HOF cycle edge doesn't terminate, or null when it does. */
 function whyHofCallNotDecreasing(site: CallSite & { kind: "hof" }): string | null {
   if (isHofReceiverStructurallySmaller(site.receiver)) return null;
-  const recv = primaryOf(site.receiver);
+  const recv = dataOf(site.receiver);
   const recvDesc = recv.kind === ValueKind.Param
     ? `param \`${(recv as any)._name ?? `param${(recv as any).position}`}\``
     : "the receiver";
@@ -828,7 +857,7 @@ function checkUserMetric(
 
   // Shape 2: typed_array of params → lexicographic.
   if (metric.kind === ValueKind.Expression) {
-    const fn = primaryOf((metric as ExpressionValue).fn);
+    const fn = dataOf((metric as ExpressionValue).fn);
     if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
       const components = (metric as ExpressionValue).args;
       // For each call, walk through components left-to-right. The metric
@@ -863,7 +892,7 @@ function findLexDecreasePosition(components: Value[], call: ExpressionValue): nu
       if (c.kind !== ValueKind.Param) { earlierStable = false; break; }
       const pos = (c as any).position as number;
       if (pos >= call.args.length) { earlierStable = false; break; }
-      const argP = primaryOf(call.args[pos]);
+      const argP = dataOf(call.args[pos]);
       if (argP.kind !== ValueKind.Param || (argP as any).position !== pos) {
         earlierStable = false; break;
       }
@@ -929,15 +958,15 @@ function whyNotDecreasing(
  *  literals. */
 function recognizeParamMinusK(v: Value): { pos: number; name: string } | null {
   if (v.kind !== ValueKind.Expression) return null;
-  const fn = primaryOf((v as ExpressionValue).fn);
+  const fn = dataOf((v as ExpressionValue).fn);
   if (fn.kind !== ValueKind.PrimitiveFunction) return null;
   const fnName = (fn as any).name as string;
   if (fnName !== "bits_sub" && fnName !== "typed_sub") return null;
   const args = (v as ExpressionValue).args;
   if (args.length !== 2) return null;
-  const left = primaryOf(args[0]);
+  const left = dataOf(args[0]);
   if (left.kind !== ValueKind.Param) return null;
-  const right = primaryOf(args[1]);
+  const right = dataOf(args[1]);
   if (right.kind !== ValueKind.Bits) return null;
   const k = (right as BitsValue).data;
   if (k <= 0n) return null;
@@ -960,14 +989,14 @@ function typeHasNonNegativeLowerBound(
   if (seen.has(t)) return false;
   seen.add(t);
   let cur = t;
-  if (cur.kind === ValueKind.MultiValue) cur = (cur as any).primary;
+  cur = dataOf(cur);
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
     const resolved = typeLookup?.(name);
     if (!resolved) return false;
     return typeHasNonNegativeLowerBound(resolved, typeLookup, seen);
   }
-  if (cur.kind !== ValueKind.Context) return false;
+  if (cur.kind !== ValueKind.Structure) return false;
   const dom = (cur as any).__abstractDomain;
   if (!dom) return false;
   if (dom.kind === "interval") return dom.lo >= 0;
@@ -978,7 +1007,7 @@ function typeHasNonNegativeLowerBound(
 function collectBoolLiterals(cases: ChainCase[]): Set<boolean> {
   const out = new Set<boolean>();
   for (const c of cases) {
-    const p = primaryOf(c.pattern);
+    const p = dataOf(c.pattern);
     // Bool literals come through typed_function calls / `true`/`false` resolve
     // to MultiValue(Int, {type: Bool}); after PE the raw form is Bits(1)/Bits(0)
     // possibly wrapped in MultiValue with Bool type.
@@ -990,8 +1019,8 @@ function collectBoolLiterals(cases: ChainCase[]): Set<boolean> {
         if (b.data === 0n) out.add(false);
         else if (b.data === 1n) out.add(true);
       }
-    } else if (c.pattern.kind === ValueKind.MultiValue) {
-      const pp = primaryOf(c.pattern);
+    } else if (c.pattern.kind === ValueKind.Structure && (c.pattern as any).primary !== undefined) {
+      const pp = dataOf(c.pattern);
       if (pp.kind === ValueKind.Bits) {
         const b = pp as BitsValue;
         if (b.data === 0n) out.add(false);
