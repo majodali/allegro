@@ -3143,6 +3143,19 @@ for (const [key, b] of typeMembers.bindings) {
   if (b.value) addBinding(genericTypeMembers, key, b.value);
 }
 setMembers(GenericType, genericTypeMembers);
+// `get` — bracket application in EXPRESSION position (`Array[Int]` as an
+// expression lowers to type_dispatch(Array, "get")(Int), the same shape
+// as array indexing). Routes to the generic's construct authority, so
+// expression-position application and annotation-position `type_apply`
+// mint the identical memoized concrete (B-091 sweep finding — without
+// this member, `print(x instanceof Array[Int])` died with
+// "'get' not found on GenericType").
+addMemberAt(genericTypeMembers, "get",
+  makeMethodDescriptor("get", makePrimitive("GenericType.get", (args, ctx, evalFn) => {
+    const self = args[0];
+    const typeArgs = args.slice(1).map(a => evalFn ? evalFn(a, ctx!) : a);
+    return applyGenericType(dataOf(self) as ContextValue, typeArgs);
+  })));
 // The `params` field descriptor is declared after ArrayType exists
 // (bootstrap order — ArrayType is itself minted through buildGenericType).
 

@@ -512,40 +512,34 @@ refreshSnippetsList();
 
 // --- Run ---
 
-function runCode() {
+async function runCode() {
   const source = editor.value;
   if (!source.trim()) {
     output.innerHTML = '<span class="out-info">Nothing to evaluate.</span>';
     return;
   }
 
+  output.innerHTML = '';
+  status.textContent = 'Running...';
   const start = performance.now();
-  const result = Allegro.eval(source);
-  const elapsed = (performance.now() - start).toFixed(1);
 
-  let html = '';
+  try {
+    const result = await Allegro.evalAsync(source, (text) => {
+      output.innerHTML += `<span class="out-line">${escapeHtml(text)}</span>\n`;
+    });
 
-  // Print output lines
-  for (const line of result.output) {
-    html += `<span class="out-line">${escapeHtml(line)}</span>\n`;
+    if (result.result !== null && result.result !== undefined) {
+      output.innerHTML += `<span class="out-result">${escapeHtml(result.result)}</span>\n`;
+    }
+    if (result.error) {
+      output.innerHTML += `<span class="out-error">Error: ${escapeHtml(result.error)}</span>\n`;
+    }
+    if (!output.innerHTML) output.innerHTML = '<span class="out-info">No output.</span>';
+  } catch (e) {
+    output.innerHTML += `<span class="out-error">Error: ${escapeHtml(String(e))}</span>\n`;
   }
 
-  // Final result value
-  if (result.result !== null && result.result !== undefined) {
-    html += `<span class="out-result">${escapeHtml(result.result)}</span>\n`;
-  }
-
-  // Error
-  if (result.error) {
-    html += `<span class="out-error">Error: ${escapeHtml(result.error)}</span>\n`;
-  }
-
-  if (!html) {
-    html = '<span class="out-info">No output.</span>';
-  }
-
-  output.innerHTML = html;
-  status.textContent = `Evaluated in ${elapsed}ms`;
+  status.textContent = `Evaluated in ${(performance.now() - start).toFixed(0)}ms`;
 }
 
 function resetSession() {

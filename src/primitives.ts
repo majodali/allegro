@@ -2576,6 +2576,15 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const expectedCtx = dataOf(expectedType);
   if (expectedCtx.kind !== ValueKind.Structure) return withType(makeInt(0), BoolType);
 
+  // Bare generic in expression position (`arr instanceof Array`) auto-
+  // applies Any — the same rule annotations use (`arr: Array` →
+  // `Array[Any]`, B-091 sweep finding). Delegate to the normalized
+  // concrete type.
+  if (isGenericType(expectedCtx as ContextValue)) {
+    const norm = normalizeType(expectedCtx as ContextValue);
+    if (norm !== expectedCtx) return type_instanceof_impl([v, norm], ctx, evalFn);
+  }
+
   const expectedNameV = getName(expectedCtx as ContextValue);
   if (!expectedNameV) return withType(makeInt(0), BoolType);
   const expectedName = bitsToString(asBits(expectedNameV, "type_instanceof"));

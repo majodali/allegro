@@ -1789,6 +1789,26 @@ test("module export: typed module object exposes exports via dot", () => {
 
 // == Generics ==
 
+test("generics: bare generic in expression position auto-applies Any (B-091 sweep)", () => {
+  // `arr instanceof Array` mirrors the annotation rule (`arr: Array` →
+  // Array[Any]) instead of dying with "'get' not found on GenericType".
+  const r = evalStd("[1, 2, 3] instanceof Array");
+  eq(Number((dataOf(r!) as BitsValue).data), 1);
+  const r2 = evalStd("42 instanceof Array");
+  eq(Number((dataOf(r2!) as BitsValue).data), 0);
+});
+
+test("generics: expression-position Array[Int] applies via GenericType.get (B-091 sweep)", () => {
+  // Bracket application in expression position lowers to
+  // type_dispatch(Array, "get")(Int); the GenericType kind's `get`
+  // member routes to the construct authority — same memoized concrete
+  // as annotation-position type_apply.
+  const r = evalStd("[1, 2, 3] instanceof Array[Int]");
+  eq(Number((dataOf(r!) as BitsValue).data), 1);
+  const r2 = evalStd('["a"] instanceof Array[Int]');
+  eq(Number((dataOf(r2!) as BitsValue).data), 0);
+});
+
 test("generics: array literal infers Array[Int]", () => {
   const result = evalStd("[1, 2, 3]");
   eq(getTypeName(result!), "Array");

@@ -515,7 +515,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   (substrate/surfaces terminology, principle 17 claims discipline —
   Tier 0, dedicated commit). R-R1–R-R5 all ratified 2026-08 (rung-2
   domain: units-of-measure physics)
-- [ ] **B-091** · Rung 1 release package: curated demo scripts +
+- [x] **B-091** · Rung 1 release package: curated demo scripts +
   sandbox walkthroughs (theorem → break → counterexample → prove loop;
   effects refusal; laws + admitted tier), assumption-ledger roll-up
   view in `inspect`/Verdict (the D2 polish item), getting-started +
@@ -532,9 +532,16 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   inspect rests-on; D2 register row → delivered); theorem-dropped-
   under-fragment-grammar soundness fix + regressions; sandbox
   walkthrough presets (both copies); `docs/getting-started.md`;
-  `proving-in-allegro.md` E3/E4 laws+gate section. Remaining:
-  README/npm/versioning mechanics + web/website sandbox unification +
-  deploy pass
+  `proving-in-allegro.md` E3/E4 laws+gate section. **Slice 3 (close-
+  out) landed 2026-08**: README.md (repo front page from the
+  skeleton), package.json metadata (0.1.0, CC0-1.0, private,
+  description), web/website sandbox unified (deployed copy gets the
+  async streaming runtime; only intended deltas = script path + docs
+  nav link), full 36-example public sweep run — surfaced and fixed
+  two expression-position generic gaps (bare `x instanceof Array`
+  auto-applies Any; `Array[Int]` as an expression applies via a
+  GenericType `get` member) with regressions. B-091 COMPLETE except
+  the maintainer's manual deploy.sh pass
 - [ ] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
   domain chosen at R-R4 ratification (recommendation: units-of-measure
   physics — bridges to rung 3); grammar + lib + laws + domain-term

@@ -350,3 +350,15 @@ against a private mental model.
   final deploy pass. Noted: `web/sandbox.html` vs `website/
   sandbox.html` divergence is pre-existing (dev vs deployed copy) —
   fold into the mechanics step.
+- 2026-08: B-091 slice 3 (close-out) — README from the skeleton,
+  package.json metadata, sandbox copies unified (deployed page gains
+  the async streaming runtime), web bundle build verified, and a full
+  36-example public sweep (every landing-page textarea + sandbox
+  preset run against the interpreter). The sweep surfaced two
+  expression-position generic gaps, both fixed with regressions:
+  bare `x instanceof Array` now auto-applies Any (the annotation
+  rule, mirrored), and expression-position `Array[Int]` applies via
+  a new GenericType `get` member routing to the construct authority.
+  **B-091 complete** pending the maintainer's manual deploy.sh pass.
+  Next per ratified sequence: B-094 (source channel) → B-092
+  (units-physics DSL).
