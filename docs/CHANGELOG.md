@@ -8,6 +8,32 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — B-092 U4: rung-2 release packaging (B-092 closes — rung 2 landed)
+
+The seriousness proof ships: demos/rung2 (3 suite-validated scenes
+with break-it blocks + captured transcripts — the refinement halt, the
+gate refusal, the full domain-vocabulary verify ledger), a landing-page
+"A provable DSL — units of measure" section with a live sandbox and
+the ledger transcript, and a Walkthrough 5 sandbox preset (both
+copies).
+
+Release-infrastructure fix: the web pages resolve `use NAME` through
+inline Allegro.registerLibrary sources — index.html carried FIVE
+hand-pasted drifting copies and the sandbox pages carried NONE (the
+B-091 walkthrough presets using `use contracts`/`use effects` would
+have failed on the deployed sandbox). New `scripts/sync-web-libs.ts`
+generates the registry region in all three pages from the DISK libs
+(pow, match_expr, invariants, contracts, effects, units) at marked
+anchors, with byte-identical decode verification and a `--check` mode.
+37-example site sweep clean against the same sources the pages now
+serve.
+
+Claims re-grade: release-track D4 flagship-DSL row → delivered;
+messaging.md gains the units claim with receipts; plans manifest
+units-dsl.md → landed. Residue routed: B-081 (refinement-failure
+domain detail), B-089 (record-domain law sampling — flips the DSL's
+pending laws to sampled with zero DSL changes). 1149/1149 green.
+
 ## 2026-08 — B-092 U3: laws + physics theorems in domain terms
 
 Rung-2 chunk U3: Quantity draws Equatable — its refl/sym/trans law

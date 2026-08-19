@@ -218,3 +218,12 @@ U1 does not start until §5 is ratified.
   caught the missing `h` as a false theorem — the demo debugging
   experience working as designed). tests/units-laws.alg registered +
   4 TS tests. U4 (rung-2 release packaging) next.
+- 2026-08: **U4 LANDED — B-092 CLOSED.** demos/rung2 (3 scenes +
+  transcripts, suite-registered), landing-page section + nav + sandbox
+  preset (both copies), web lib registry generated from disk libs by
+  scripts/sync-web-libs.ts (drift ended; also fixed the sandbox pages'
+  MISSING registrations that would have broken the rung-1 presets on
+  deploy), release-track D4 row → delivered, messaging claims row
+  added, 37-example site sweep clean. Residue: B-081 refinement-
+  failure domain detail; B-089 record-domain sampling (flips the
+  pending laws automatically).

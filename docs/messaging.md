@@ -87,6 +87,7 @@ Each claim is stated at its evidence strength. Receipts are runnable.
 | Benchmark, honestly framed: PE alone discharges all 10 closed propositions in the corpus; the soundness gate rejects wrong proof terms — the prover's measured work is satisfying the gate, not discharging closed props | `npm run bench`; `bench/README.md` |
 | A module's behavioral envelope is inspectable: safety grade, contracts, effects, predicates per binding | `allegro inspect`; sandbox Inspect button |
 | The grammar is extensible at runtime — operators, rules, multi-token forms — with conflict detection at `use` time; extensions in `.alg` libraries get the entire kernel (proofs, effects, totality) | `lib/pow.alg`, `lib/match_expr.alg`, `lib/provable.alg` |
+| A flagship provable DSL exists: units-of-measure physics as a pure Allegro library — dimensional soundness is refinement discharge, failures speak physics, theorems PE-discharge in literal syntax (`theorem: 1 km == 1000 m`), and the gate/ledger work over quantities | `lib/units.alg`; `demos/rung2/`; `allegro verify demos/rung2/03-laws.alg` |
 
 ## What we do not claim (and say so)
 

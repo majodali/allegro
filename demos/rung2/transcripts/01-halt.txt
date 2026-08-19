@@ -1,0 +1,9 @@
+$ # 01-dimensions.alg with the wrong-dimension call uncommented:
+$ allegro demos/rung2/01-dimensions.alg
+
+Error: Type error: argument 0 failed refinement predicate for Acceleration
+
+# The build halts. Dimensional soundness is a refinement check — the
+# same call-site machinery that refuses a non-positive PositiveInt
+# refuses a length where acceleration is expected. Nothing was built
+# for physics specifically; the signature IS the check.

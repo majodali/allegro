@@ -8255,6 +8255,12 @@ fileTest(path.join(testsDir, "units-core.alg"));
 fileTest(path.join(testsDir, "units-sugar.alg"));
 fileTest(path.join(testsDir, "units-laws.alg"));
 
+// B-092 U4: the public rung-2 demo scenes are suite-validated too.
+const demosRung2Dir = path.resolve("demos", "rung2");
+fileTest(path.join(demosRung2Dir, "01-dimensions.alg"));
+fileTest(path.join(demosRung2Dir, "02-literals.alg"));
+fileTest(path.join(demosRung2Dir, "03-laws.alg"));
+
 const unitsSource = fs.readFileSync(path.join("lib", "units.alg"), "utf-8");
 const unitsResult = runtimeEval(unitsSource, undefined, [typeExt], undefined, true);
 const unitsBindings: Record<string, Value> = {};

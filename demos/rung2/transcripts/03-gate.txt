@@ -1,0 +1,30 @@
+$ # 03-laws.alg with the Law.assume removed and `theorem bad` uncommented:
+$ allegro demos/rung2/03-laws.alg
+
+Error: proof check failed:
+  theorem `bad`: `qx == qx` — `by` proof failed: transitivity of 'Quantity' is neither proven nor admitted (counterexample: the custom equality 'Quantity' has no discharged, sampled, or admitted 'trans' law — witness it (Law.witness(Quantity, "trans", proof)) or admit it (Law.assume(Quantity, "trans")))
+
+$ # With Law.assume(Quantity, "trans") — the file as shipped:
+$ allegro verify demos/rung2/03-laws.alg
+
+Verdict (verified): 6/6 discharged
+  ✓ km_scale — by auto-PE
+  ✓ min_scale — by auto-PE
+  ✓ newton_ident — by auto-PE
+  ✓ f_ma — by auto-PE
+  ✓ q_chain — by auto-PE [resting on admitted 'trans' of 'Quantity']
+  ✓ p — by auto-PE [resting on admitted 'trans' of 'Quantity']
+  laws: 12/17 discharged, 1 ADMITTED (assumed, not proof), 4 pending
+    ! Quantity.trans (admitted)
+    ? Quantity.mul_comm
+    ? Quantity.conv_roundtrip
+    ? Quantity.refl
+    ? Quantity.sym
+  coercions: 2/2 obligations discharged
+  assumption ledger: rests on 1 admitted, 0 sampled; 4 obligation(s) pending
+    ! admitted 'trans' of 'Quantity' — backs: q_chain, p
+
+# Everything in domain vocabulary: PE-discharged physics theorems, the
+# admitted transitivity mapped to the proofs resting on it, and the
+# algebraic laws honestly PENDING (record-domain quantifiers await
+# sample construction — the verdict says so instead of rounding up).

@@ -557,7 +557,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   auto-applies Any; `Array[Int]` as an expression applies via a
   GenericType `get` member) with regressions. B-091 COMPLETE except
   the maintainer's manual deploy.sh pass
-- [ ] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
+- [x] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
   units-of-measure physics (R-R4 ratified). **Brief composed 2026-08**
   (`.claude/plans/units-dsl.md`): dimensions as structural data +
   named-dimension REFINEMENTS over one Quantity record (U-R1 —
@@ -571,7 +571,15 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   refinements (explicit-ws interleave override; expr_form front
   splice). **U3 landed 2026-08**: Equatable draw + honest-pending
   laws + PE-tier physics theorems + the E4 gate/ledger over quantities
-  in domain vocabulary; U4 release packaging next
+  in domain vocabulary. **U4 landed 2026-08 — B-092 CLOSED**:
+  demos/rung2 (3 suite-validated scenes + transcripts), landing-page
+  Units DSL section + sandbox preset (both copies), web lib registry
+  synced from disk via scripts/sync-web-libs.ts (fixed: sandbox pages
+  had NO lib registrations — B-091 presets using `use` would have
+  failed on the deployed site), D4 register row → delivered,
+  37-example site sweep clean. Residue routed: B-081 (refinement-
+  failure domain detail), B-089 (record-domain law sampling flips the
+  DSL's pending laws with zero DSL changes)
 - [ ] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;
