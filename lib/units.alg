@@ -198,3 +198,26 @@ N  = named(kg.mul(m).div(s.pow(2)), "N")
 J  = named(N.mul(m), "J")
 W  = named(J.div(s), "W")
 Pa = named(N.div(m.pow(2)), "Pa")
+
+// --- Quantity literal sugar (U2) ---------------------------------------
+//
+// `3 m`, `9.8 m/s^2`, `1.5 km` — number-anchored (U-R2): only a NUMERIC
+// LITERAL followed by a unit expression on the SAME LINE reads as a
+// quantity (the explicit `hws` keeps the sugar horizontal-only, so
+// `x = 3` on one line never glues onto an identifier on the next).
+// Computed magnitudes use the ordinary algebra: `qty(v, u)`, `q.mul(u)`.
+// Unit expressions: idents, `·` or `*` products, ONE `/`, `^` integer
+// exponents. The matched unit idents resolve in the CONSUMER's scope —
+// `use units` provides them; a local rebinding of a unit name shadows it.
+units_grammar = grammar {
+  rule unit_pow = u:ident "^" e:number   => (u, e) => u.pow(e)
+  rule unit_pow += u:ident               => u => u
+  rule unit_prod = a:unit_pow "·" b:unit_prod  => (a, b) => a.mul(b)
+  rule unit_prod += a:unit_pow "*" b:unit_prod => (a, b) => a.mul(b)
+  rule unit_prod += a:unit_pow           => a => a
+  rule unit_quot = p:unit_prod "/" q:unit_prod => (p, q) => p.div(q)
+  rule unit_quot += p:unit_prod          => p => p
+
+  expr_form f:float hws u:unit_quot  => (f, u) => qty(f, u)
+  expr_form n:number hws u:unit_quot => (n, u) => qty(n, u)
+}

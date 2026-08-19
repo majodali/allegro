@@ -191,3 +191,17 @@ U1 does not start until §5 is ratified.
   tests/units-core.alg suite-registered (F = m·a worked end-to-end;
   refinement refusal halts at call site pinned in TS tests).
   U2 (grammar sugar) next.
+- 2026-08: **U2 LANDED**. Quantity literals (`3 m`, `9.8 m/s^2`,
+  `1.5 km`, `2 kg·m/s^2`) via a `grammar { }` block: unit_pow/prod/quot
+  rules + two number-anchored expr_forms with explicit `hws` (same-line
+  only, U-R2). TWO KERNEL REFINEMENTS surfaced: (1) user-EBNF
+  auto-interleave now respects an explicit ws production between items
+  (hws = horizontal-only — without this, ws_any's raw newlines glued
+  `x = 3` onto the next line's identifier); (2) expr_form alternatives
+  splice at the FRONT of expr_atom (PEG-committed choice made
+  number-led forms dead code at the old before-ident position). Both
+  recorded in docs/design/extension/grammar.md §4. Hazard battery
+  green: cross-line non-glue, keywords after numbers, calls/arrays/
+  parens untouched, sugar composes with algebra + refinements + the
+  domain error. Fallback never needed. U3 (laws + physics theorems)
+  next.

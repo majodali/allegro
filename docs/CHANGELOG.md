@@ -8,6 +8,32 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — B-092 U2: quantity literal grammar + two grammar-kernel refinements
+
+Rung-2 chunk U2: `3 m`, `9.8 m/s^2`, `1.5 km`, `2 kg·m/s^2` parse as
+quantity literals via a `grammar { }` block in lib/units.alg —
+number-anchored (U-R2: only a numeric literal followed by a same-line
+unit expression; computed values use the ordinary algebra), with unit
+products (`·`/`*`), one `/`, and integer `^` exponents. Matched unit
+idents resolve in the consumer's scope (`use units` provides them).
+
+Two kernel refinements the chunk forced, both general (recorded in
+docs/design/extension/grammar.md §4):
+- **Explicit-ws override in user EBNF**: auto-interleaved `ws_any`
+  matches raw newlines, which would glue `x = 3` onto the next line's
+  identifier. An explicit ws production between two items (`hws`/`ws`/
+  `ws_req`/`ws_any`) now suppresses the auto-wrap — adjacency-sensitive
+  rules get horizontal-only whitespace.
+- **expr_form splices at the FRONT of expr_atom**: the engine's alt is
+  PEG-committed ordered choice, so number-led forms were dead code at
+  the old before-ident splice position (the shorter `number` match
+  committed first). Keyword-led forms (match) unaffected.
+
+tests/units-sugar.alg suite-registered: literals, composition with the
+algebra/refinements, the marquee domain error in literal syntax, and a
+non-interference battery (cross-line non-glue, keywords after numbers,
+calls/arrays/parens). 1141/1141 green. U3 (laws + theorems) next.
+
 ## 2026-08 — B-092 U1: units DSL core algebra + user-type operator dispatch
 
 Rung-2 chunk U1 (plan `.claude/plans/units-dsl.md`, U-R1–U-R5

@@ -566,7 +566,10 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   admitted-ledger as demo content, chunks U1–U4. U-R1–U-R5 awaiting
   ratification 2026-08 (as recommended). **U1 landed 2026-08**:
   lib/units.alg + user-type operator-dispatch kernel fix +
-  suite-registered demo; U2 grammar sugar next
+  suite-registered demo. **U2 landed 2026-08**: quantity literal
+  grammar (number-anchored, hws same-line) + two grammar-kernel
+  refinements (explicit-ws interleave override; expr_form front
+  splice); U3 laws + physics theorems next
 - [ ] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;

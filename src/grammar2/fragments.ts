@@ -723,12 +723,27 @@ function applyReplaceAlt(g: Grammar, name: string, selector: string, replacement
 }
 
 /** Interleave `ws_any` between items of a user EBNF sequence so whitespace
- *  between rule parts works transparently. */
+ *  between rule parts works transparently.
+ *
+ *  B-092 U2: an EXPLICIT ws production written by the rule author
+ *  (`hws` / `ws` / `ws_req` / `ws_any`) suppresses the automatic
+ *  `ws_any` on both sides — adjacency-sensitive rules (e.g. a quantity
+ *  literal whose number and unit must sit on ONE line) write `hws`
+ *  between items and get horizontal-only whitespace instead of the
+ *  default, which matches raw newlines and would glue across lines. */
+const WS_PRODUCTION_NAMES = new Set(["hws", "ws", "ws_req", "ws_any"]);
+
+function isExplicitWs(r: Rule): boolean {
+  return r.kind === "nonterm" && WS_PRODUCTION_NAMES.has(r.name);
+}
+
 function interleaveWs(items: Rule[]): Rule[] {
   if (items.length < 2) return items;
   const out: Rule[] = [items[0]];
   for (let i = 1; i < items.length; i++) {
-    out.push(nonterm("ws_any"));
+    if (!isExplicitWs(items[i]) && !isExplicitWs(items[i - 1])) {
+      out.push(nonterm("ws_any"));
+    }
     out.push(items[i]);
   }
   return out;
@@ -820,16 +835,20 @@ function applyUserRulesAndForms(g: Grammar, fragments: GrammarFragment[]): void 
       const tag     = registerUserOp({ kind: "exprForm", token: "", fn: f.fn, labels });
       const tagged  = seq([rule], { name: tag });
 
-      // The tree-builder's expression walker must recognise this tag. We
-      // splice the form alt into expr_atom BEFORE `ident` (the last alt)
-      // so it's tried ahead of bare identifiers.
+      // The tree-builder's expression walker must recognise this tag.
+      // B-092 U2: splice the form alt at the FRONT of expr_atom. The
+      // engine's alt is PEG-committed ordered choice, so a form whose
+      // anchor OVERLAPS a base atom (e.g. a quantity literal `3 m`
+      // starting with a number) is unreachable if spliced after the
+      // base alternative — the shorter base match commits first. Forms
+      // fail fast on their leading anchor, so trying them first costs
+      // one cheap probe per atom position. (Previous position — before
+      // the `ident` fallthrough — made number-led forms dead code.)
       const atomProd = g.productions.get("expr_atom");
       if (!atomProd || atomProd.rule.kind !== "alt") {
         throw new Error("expr_atom is not an alt production");
       }
-      const opts = [...atomProd.rule.options];
-      // Insert right before the last alt (expr_atom's `ident` fallthrough).
-      opts.splice(opts.length - 1, 0, tagged);
+      const opts = [tagged, ...atomProd.rule.options];
       g.productions.set("expr_atom", { name: "expr_atom", rule: alt(opts) });
     }
 

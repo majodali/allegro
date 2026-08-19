@@ -8252,6 +8252,7 @@ fileTest(path.join(demosRung1Dir, "04-laws.alg"));
 // (plan: .claude/plans/units-dsl.md, U-R1 ratified).
 
 fileTest(path.join(testsDir, "units-core.alg"));
+fileTest(path.join(testsDir, "units-sugar.alg"));
 
 const unitsSource = fs.readFileSync(path.join("lib", "units.alg"), "utf-8");
 const unitsResult = runtimeEval(unitsSource, undefined, [typeExt], undefined, true);
