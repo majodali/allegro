@@ -564,7 +564,9 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   pre-validated by entry test on the unmodified substrate),
   number-anchored literal sugar, laws at honest tiers with the
   admitted-ledger as demo content, chunks U1–U4. U-R1–U-R5 awaiting
-  ratification; U1 gated on sign-off
+  ratification 2026-08 (as recommended). **U1 landed 2026-08**:
+  lib/units.alg + user-type operator-dispatch kernel fix +
+  suite-registered demo; U2 grammar sugar next
 - [ ] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;

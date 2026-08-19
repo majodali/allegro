@@ -4,7 +4,8 @@
 > ratified at R-R4: units-of-measure physics, chosen for the rung-3
 > bridge (Vivace domain models need dimensional quantities) and the
 > mixed-model trajectory. This plan is the design brief + chunk
-> sequence; maintainer ratifies §5's decision points before chunk U1.
+> sequence. §5's decision points U-R1–U-R5 RATIFIED 2026-08
+> (maintainer, as recommended); U1 underway.
 
 ## 1. What this proves (and what it must not become)
 
@@ -177,3 +178,16 @@ U1 does not start until §5 is ratified.
   via structural `==` over the array field. The representation
   recommendation is validated, not speculative. Awaiting U-R1–U-R5
   ratification.
+- 2026-08: U-R1–U-R5 ratified as recommended; **U1 LANDED**.
+  `lib/units.alg` (~180 LOC pure Allegro): dim vectors + group ops,
+  Unit/Quantity records with operator methods, conversions, normalized
+  comparison, domain-vocabulary mismatch errors, 7 named-dimension
+  refinements, mechanics SI set (m..mm, s/min/h, kg/g, N/J/W/Pa).
+  KERNEL FIX surfaced by the entry work: the PRIM_TO_METHOD operator
+  dispatch path handled only host-primitive methods — user-defined
+  record types' ComposedFunction methods (Type.define specs) fell
+  through to raw bits ops. Extended to dispatch ComposedFunction
+  members, giving every user type operator overloading (`q1 + q2`).
+  tests/units-core.alg suite-registered (F = m·a worked end-to-end;
+  refinement refusal halts at call site pinned in TS tests).
+  U2 (grammar sugar) next.

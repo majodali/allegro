@@ -8245,6 +8245,62 @@ fileTest(path.join(demosRung1Dir, "02-counterexamples.alg"));
 fileTest(path.join(demosRung1Dir, "03-effects.alg"));
 fileTest(path.join(demosRung1Dir, "04-laws.alg"));
 
+// --- B-092 U1: units-of-measure DSL core algebra (lib/units.alg) ---
+//
+// Dimensions as structural data; named dimensions as refinements over
+// one Quantity record — dimensional soundness IS refinement discharge
+// (plan: .claude/plans/units-dsl.md, U-R1 ratified).
+
+fileTest(path.join(testsDir, "units-core.alg"));
+
+const unitsSource = fs.readFileSync(path.join("lib", "units.alg"), "utf-8");
+const unitsResult = runtimeEval(unitsSource, undefined, [typeExt], undefined, true);
+const unitsBindings: Record<string, Value> = {};
+for (const [key, binding] of unitsResult.evalCtx.bindings) {
+  if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+    unitsBindings[key] = binding.value;
+  }
+}
+const unitsExt: Extension = { name: "units", bindings: unitsBindings };
+
+test("B-092 U1: wrong-dimension argument HALTS at the call site (refinement path)", () => {
+  // The anti-goal check: dimensional soundness must flow through the
+  // standard refinement machinery — a wrong-dimension argument fails
+  // checkArgType exactly like a failed PositiveInt.
+  let msg = "";
+  try {
+    runtimeEval(
+      "spd(a: Acceleration, t: Duration): Velocity => a.mul(t)\nspd(qty(3, m), qty(2, s))\n1",
+      undefined, [typeExt, unitsExt], undefined, true);
+  } catch (e: any) { msg = String(e?.message ?? e); }
+  eq(msg.includes("refinement predicate"), true);
+  eq(msg.includes("Acceleration"), true);
+});
+
+test("B-092 U1: dimension mismatch is a domain-vocabulary error value", () => {
+  const { evalCtx } = runtimeEval(
+    "bad = qty(3, m) + qty(2, s)\n1",
+    undefined, [typeExt, unitsExt], undefined, true);
+  const bad = evalCtx.bindings.get("bad")!.value!;
+  const err = channelReadRaw(bad, "error");
+  eq(err !== undefined, true);
+  eq(bitsToString(dataOf(err!) as BitsValue).includes("cannot add m and s"), true);
+  eq(bitsToString(dataOf(err!) as BitsValue).includes("length vs time"), true);
+});
+
+test("B-092 U1: dimension algebra is exact structural data (group laws on vectors)", () => {
+  const r = evalStd2(
+    "dim_mul(velocity_dim, time_dim) == length_dim", unitsExt);
+  eq(Number((dataOf(r!) as BitsValue).data), 1);
+  const r2 = evalStd2(
+    "dim_div(force_dim, mass_dim) == acceleration_dim", unitsExt);
+  eq(Number((dataOf(r2!) as BitsValue).data), 1);
+});
+
+function evalStd2(src: string, ext: Extension): Value | undefined {
+  return runtimeEval(src, undefined, [typeExt, ext], undefined, true).value;
+}
+
 // --- Phase H1: Proof Collaboration Protocol — JSON formats ---
 //
 // Three canonical schemas (Obligation, Verdict, Authorship). JSON is

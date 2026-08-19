@@ -8,6 +8,33 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — B-092 U1: units DSL core algebra + user-type operator dispatch
+
+Rung-2 chunk U1 (plan `.claude/plans/units-dsl.md`, U-R1–U-R5
+maintainer-ratified): `lib/units.alg` — pure Allegro, zero host code.
+Dimensions are structural 7-vectors (abelian group by exponent
+arithmetic, E1 structural equality); one Quantity record; named
+dimensions (Length, Velocity, Force, …) are REFINEMENTS over it, so
+dimensional soundness is refinement discharge — the same machinery as
+PositiveInt. Wrong-dimension arguments HALT at the call site through
+checkArgType; same-expression mismatches are domain-vocabulary error
+values ("cannot add m and s: length vs time"). Conversions, normalized
+comparison, derived units (N/J/W/Pa composed via unit algebra),
+mechanics SI set.
+
+Kernel fix surfaced by the chunk: the evaluator's PRIM_TO_METHOD
+operator-dispatch path handled only HOST-PRIMITIVE methods, so
+user-defined record types' method impls (ComposedFunctions from
+Type.define specs) fell through to raw bits ops — `q1 + q2` crashed
+with `bits_add: expected Bits`. The path now dispatches
+ComposedFunction members too (self-first, full values), giving every
+user-defined type operator overloading — a substrate win the rung
+exists to force.
+
+tests/units-core.alg (suite-registered, F = m·a end-to-end) + 3 TS
+tests (call-site halt, domain-error message, dimension group facts).
+1140/1140 green. U2 (literal grammar sugar) next.
+
 ## 2026-08 — B-094 chunk 2: migration reality + `explain` (source channel complete)
 
 The planned lazy→eager migration of the proof entry points was
