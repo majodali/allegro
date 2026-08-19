@@ -530,7 +530,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   (substrate/surfaces terminology, principle 17 claims discipline —
   Tier 0, dedicated commit). R-R1–R-R5 all ratified 2026-08 (rung-2
   domain: units-of-measure physics)
-- [x] **B-091** · Rung 1 release package: curated demo scripts +
+- [x] **B-091** · `[stage: live]` Rung 1 release package: curated demo scripts +
   sandbox walkthroughs (theorem → break → counterexample → prove loop;
   effects refusal; laws + admitted tier), assumption-ledger roll-up
   view in `inspect`/Verdict (the D2 polish item), getting-started +
@@ -557,7 +557,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   auto-applies Any; `Array[Int]` as an expression applies via a
   GenericType `get` member) with regressions. B-091 COMPLETE except
   the maintainer's manual deploy.sh pass
-- [x] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
+- [x] **B-092** · `[stage: merged]` Rung 2 flagship provable DSL (the seriousness proof):
   units-of-measure physics (R-R4 ratified). **Brief composed 2026-08**
   (`.claude/plans/units-dsl.md`): dimensions as structural data +
   named-dimension REFINEMENTS over one Quantity record (U-R1 —
@@ -584,6 +584,21 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;
   rung 4 remains internal direction until then
+
+### Track M — methodology (2026-08)
+
+- [ ] **B-095** · Methodology adoption (majodali/methodology v1.0.0) —
+  plan `docs/plans/methodology-adoption.md` (the first resident of the
+  new K-007 plan home). **Chunk 1 drafted 2026-08**:
+  `docs/classification.md` (C2 / S0 / language-tool-platform /
+  static-site, pinned 1.0.0, Workflow `in-dev → merged → live` +
+  stage-reference convention, DEV-1 branch-naming deviation, Article-7
+  transition designations on CLAUDE.md, .claude/plans, .claude/memory,
+  BACKLOG location, missing decision register) + Binding block in
+  CLAUDE.md. Awaiting owner gate. Chunks: 2 decision register
+  (K-004), 3 authority relocation (K-001/K-002/K-007 — plans/memory/
+  CLAUDE.md slim/backlog move), 4 close-out + coordination (portfolio
+  register row, practices §5 stale-data amendment)
 
 ### L3 — Vivace (M5)
 

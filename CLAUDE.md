@@ -1,5 +1,22 @@
 # Allegro — Project Summary & Instructions
 
+## Methodology — binding
+
+This project follows majodali/methodology v1.0.0 as declared in
+`docs/classification.md`. That file strictly defines this project's
+document lifecycles and workflows. Read it before any work; nothing
+in this file or under `.claude/` overrides it.
+
+Classification: C2 / S0 / language-tool-platform / static-site
+Deviations: DEV-1 (W-006 branch naming — harness-designated persistent
+branch; recorded in `docs/classification.md`)
+
+Note: this file is designated `in-progress` under the adoption
+transition (`docs/classification.md` §Adoption transition) — it still
+exceeds the K-002 bootstrap size and carries content that will move to
+`docs/` in the methodology-adoption arc
+(`docs/plans/methodology-adoption.md`).
+
 ## Documentation map (read first)
 
 - **Vision, thesis, design principles:** `docs/VISION.md` (Tier 0 — never edit without maintainer sign-off)
