@@ -205,3 +205,16 @@ U1 does not start until §5 is ratified.
   parens untouched, sugar composes with algebra + refinements + the
   domain error. Fallback never needed. U3 (laws + physics theorems)
   next.
+- 2026-08: **U3 LANDED**. Quantity draws Equatable — refl/sym/trans +
+  the algebraic laws (mul_comm, conv_roundtrip) recorded, ALL honestly
+  pending (record-domain quantifiers have no sample construction —
+  B-089 residue; the `?` rows are the product per U-R3). Physics
+  theorems discharge at PE tier in literal syntax (`theorem km_scale:
+  1 km == 1000 m`, `1 N == 1 kg·m/s^2`, F = ma through refinement-
+  typed force_of). The E4 gate REFUSES proof_trans over quantities
+  naming 'Quantity' + both escape hatches; Law.assume opens it and the
+  verdict renders `[resting on admitted 'trans' of 'Quantity']` + the
+  ledger line with backers. `min`/`h` unit aliases added (the kernel
+  caught the missing `h` as a false theorem — the demo debugging
+  experience working as designed). tests/units-laws.alg registered +
+  4 TS tests. U4 (rung-2 release packaging) next.

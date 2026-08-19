@@ -150,6 +150,12 @@ q_gt(self, other) =>
 
 q_toString(self) => "{self.mag} {self.unit.name}"
 
+// U3: Quantity DRAWS Equatable — its refl/sym/trans law obligations are
+// recorded against the custom normalized eq (never silently granted),
+// and the E4 proof_trans gate arms over quantities. The algebraic laws
+// land at their honest tier: record-domain quantifiers have no sample
+// construction yet (B-089 residue), so they are PENDING in the verdict
+// — the ledger showing `?` is the product, not a blemish (U-R3).
 Quantity = Type.define({
   mag: Float,
   dim: Array,
@@ -162,8 +168,10 @@ Quantity = Type.define({
   eq: q_eq,
   lt: q_lt,
   gt: q_gt,
-  toString: q_toString
-})
+  toString: q_toString,
+  law_mul_comm: for_all((a, b) => a.mul(b).eq(b.mul(a))),
+  law_conv_roundtrip: for_all(a => a.to(a.unit).eq(a))
+}, Equatable)
 
 // The blessed constructor: qty(3, m), qty(9.8, m.div(s.pow(2))).
 qty(v, u) =>
@@ -190,7 +198,9 @@ cm = Unit("cm", length_dim, 0.01)
 mm = Unit("mm", length_dim, 0.001)
 s  = Unit("s",  time_dim, 1.0)
 minute = Unit("min", time_dim, 60.0)
+min    = minute
 hour   = Unit("h",   time_dim, 3600.0)
+h      = hour
 kg = Unit("kg", mass_dim, 1.0)
 g  = Unit("g",  mass_dim, 0.001)
 

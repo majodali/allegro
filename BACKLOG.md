@@ -569,7 +569,9 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   suite-registered demo. **U2 landed 2026-08**: quantity literal
   grammar (number-anchored, hws same-line) + two grammar-kernel
   refinements (explicit-ws interleave override; expr_form front
-  splice); U3 laws + physics theorems next
+  splice). **U3 landed 2026-08**: Equatable draw + honest-pending
+  laws + PE-tier physics theorems + the E4 gate/ledger over quantities
+  in domain vocabulary; U4 release packaging next
 - [ ] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;

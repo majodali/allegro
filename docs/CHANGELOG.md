@@ -8,6 +8,33 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — B-092 U3: laws + physics theorems in domain terms
+
+Rung-2 chunk U3: Quantity draws Equatable — its refl/sym/trans law
+obligations plus two declared algebraic laws (`law_mul_comm`,
+`law_conv_roundtrip`) are RECORDED, all at their honest tier: pending
+(record-domain quantifiers have no sample construction yet — B-089
+residue — and the verdict's `?` rows are the point, per U-R3).
+
+Physics facts discharge at the PE tier in literal syntax:
+`theorem km_scale: 1 km == 1000 m`, `theorem newton_ident: 1 N ==
+1 kg·m/s^2`, `verify (9.8 m/s^2).mul(2 s) == 19.6 m/s`, and F = ma
+end-to-end through the refinement-typed signature. The E4 strict gate
+arms over quantities: proof_trans is refused naming 'Quantity' and
+both escape hatches; `Law.assume(Quantity, "trans")` opens it and the
+verdict renders the weakness note + the assumption-ledger line mapping
+the admitted law to the proofs resting on it — the entire ledger in
+domain vocabulary.
+
+`min`/`h` unit aliases added — found when the kernel refused
+`theorem min_scale: 90 minute == 1.5 h` (unbound `h` → residual → eq
+false → "proposition is false"): the build-halting theorem caught a
+lib bug during demo authoring, which is the loop working as designed.
+
+tests/units-laws.alg suite-registered + 4 TS tests (obligations
+recorded, gate refusal, admitted ledger with backers, PE-tier scale
+fact). 1146/1146 green. U4 (rung-2 release packaging) next.
+
 ## 2026-08 — B-092 U2: quantity literal grammar + two grammar-kernel refinements
 
 Rung-2 chunk U2: `3 m`, `9.8 m/s^2`, `1.5 km`, `2 kg·m/s^2` parse as

@@ -8253,6 +8253,7 @@ fileTest(path.join(demosRung1Dir, "04-laws.alg"));
 
 fileTest(path.join(testsDir, "units-core.alg"));
 fileTest(path.join(testsDir, "units-sugar.alg"));
+fileTest(path.join(testsDir, "units-laws.alg"));
 
 const unitsSource = fs.readFileSync(path.join("lib", "units.alg"), "utf-8");
 const unitsResult = runtimeEval(unitsSource, undefined, [typeExt], undefined, true);
@@ -8287,6 +8288,56 @@ test("B-092 U1: dimension mismatch is a domain-vocabulary error value", () => {
   eq(err !== undefined, true);
   eq(bitsToString(dataOf(err!) as BitsValue).includes("cannot add m and s"), true);
   eq(bitsToString(dataOf(err!) as BitsValue).includes("length vs time"), true);
+});
+
+test("B-092 U3: Quantity draws Equatable — obligations recorded at honest tiers", () => {
+  // The lib was loaded above (unitsExt); its Quantity draw registered
+  // refl/sym/trans plus the record-domain algebraic laws — all PENDING
+  // (no sample construction for record quantifiers, B-089 residue).
+  const recs = lawObligationRecords().filter(r => r.type === "Quantity");
+  const byLaw = new Map(recs.map(r => [r.law, r.status]));
+  eq(byLaw.get("refl"), "pending");
+  eq(byLaw.get("trans"), "pending");
+  eq(byLaw.get("mul_comm"), "pending");
+  eq(byLaw.get("conv_roundtrip"), "pending");
+});
+
+test("B-092 U3: the E4 gate REFUSES proof_trans over quantities until admitted", () => {
+  const src = `
+q = qty(5, m)
+theorem bad: q == q by proof_trans(proof_refl(q), proof_refl(q))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt, unitsExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  const t = v.theorems.find(x => x.name === "bad");
+  eq(t?.status, "failed");
+  eq(t?.failure?.reason.includes("neither proven nor admitted"), true);
+  eq(t?.failure?.counterexample?.includes("Quantity"), true);
+});
+
+test("B-092 U3: Law.assume opens the gate; the ledger names the assumption in domain terms", () => {
+  const src = `
+Law.assume(Quantity, "trans")
+q = qty(5, m)
+theorem chain: q == q by proof_trans(proof_refl(q), proof_refl(q))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt, unitsExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  const t = v.theorems.find(x => x.name === "chain");
+  eq(t?.status, "discharged");
+  eq(t?.restsOn?.some(r => r.equality === "Quantity" && r.tier === "admitted"), true);
+  const rendered = formatVerdict(v);
+  eq(rendered.includes("[resting on admitted 'trans' of 'Quantity']"), true);
+  eq(rendered.includes("admitted 'trans' of 'Quantity' — backs: chain"), true);
+});
+
+test("B-092 U3: physics scale facts discharge at the PE tier", () => {
+  const src = `
+theorem ks: qty(1, km) == qty(1000, m)
+1`;
+  const result = runtimeEval(src, undefined, [typeExt, unitsExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(v.theorems.find(x => x.name === "ks")?.status, "discharged");
 });
 
 test("B-092 U1: dimension algebra is exact structural data (group laws on vectors)", () => {
