@@ -15,7 +15,7 @@
 > `docs/CHANGELOG.md` per PROCESS.
 
 Layer/track tags per `docs/design/layers.md`. Chunk refs per
-`.claude/plans/structures-implementation.md`; register refs per
+`docs/plans/structures-implementation.md`; register refs per
 `BACKLOG.md` §revalidation register.
 
 ## L0 — evaluator & core

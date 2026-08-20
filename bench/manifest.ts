@@ -21,7 +21,7 @@
 // gate and are skipped by the prover baselines.
 
 /** Coarse difficulty/skill categories, mirroring the Phase H plan's
- *  corpus shape (`.claude/plans/phase-h-plan.md`). */
+ *  corpus shape (`docs/plans/phase-h-plan.md`). */
 export type BenchCategory =
   | "refl-trivial"   // PE folds; the only proof is reflexivity
   | "combinator"     // needs sym / trans / cong composition over lemmas

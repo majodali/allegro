@@ -107,5 +107,5 @@ is tracked in the BACKLOG revalidation register.
 *Sources: `design_brace_offside_modes` (memory, promoted 2026-06);
 alt-order and tree-builder corrections from the 2026-06 review with
 maintainer ruling; §4 recovered from
-`.claude/plans/archive/dappled-cascading-cantor.md` (2026-07 triage).
+`docs/plans/archive/dappled-cascading-cantor.md` (2026-07 triage).
 Parser experiment context: `.claude/memory/user_parser_experiments.md`.*

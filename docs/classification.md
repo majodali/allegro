@@ -45,9 +45,9 @@ designated 2026-08 — audits treat age as a finding:
 - `CLAUDE.md` — monolithic (~600 lines) and holds authoritative
   architecture/invariant content, contra K-001/K-002; slims to a
   pointer bootstrap in chunk 3. Its Binding block is compliant now.
-- `.claude/plans/` — active plan documents live here, contra K-007's
-  `docs/plans/` home; relocation in chunk 3. New plans start in
-  `docs/plans/` immediately.
+- ~~`.claude/plans/`~~ — resolved 2026-08 (chunk 3 move 1): the whole
+  plans tree relocated to `docs/plans/`, statuses normalized to the
+  K-007 grammar.
 - `.claude/memory/` — several design memos hold authoritative design
   content, contra K-001; audit-and-promote to `docs/design/` in
   chunk 3, after which the directory is strictly non-authoritative

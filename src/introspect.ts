@@ -8,7 +8,7 @@
 // / precompileFunctions / evaluation. The point is to make the silent
 // knowledge visible.
 //
-// See .claude/plans/crystal-proving-curry.md for the broader plan.
+// See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
 import { dataOf, channelReadRaw, backingsOf } from "./slots.js";

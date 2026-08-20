@@ -1,5 +1,8 @@
 # Release track — positioning, differentiators, demo ladder (B-090)
 
+> Status: **active** (rungs 1–2 delivered; the ladder continues —
+> B-093 rung 3 next).
+>
 > Track R. This is the working plan for the public-release arc: the
 > differentiator map with its claims register, the demo ladder, and the
 > derivation order for website / demos / public docs. The DURABLE parts

@@ -19,14 +19,14 @@ never duplicate content — duplication is how documentation rots.
 | 1 | `docs/proving-in-allegro.md` | Participant-neutral proving primer (consumed by humans and the PCP LLM worker) | Same as design docs |
 | 2 | `BACKLOG.md` | What's next, debt register, research questions | Freely, before every commit that affects it |
 | 2 | `docs/CHANGELOG.md` | What landed, when, with what design notes | Append per landed chunk |
-| 2 | `.claude/plans/*.md` | Implementation plans (transient; see §4) | Freely; lifecycle below |
+| 2 | `docs/plans/*.md` | Implementation plans (transient; see §4) | Freely; lifecycle below |
 | 3 | `CLAUDE.md` | Agent session contract: build/run, architecture map, invariants & gotchas, pointers | When commands, invariants, or architecture change — not for history |
 | — | `.claude/memory/*` | Session/user context only (see §8) | Freely, with the promotion rule |
 
 Three content types, three homes:
 
 - **Design rationale & decisions** (durable) → `docs/design/`
-- **Implementation plans** (transient) → `.claude/plans/`
+- **Implementation plans** (transient) → `docs/plans/`
 - **Status & history** (append-only) → `docs/CHANGELOG.md` + `BACKLOG.md`
 
 A plan file must not become the only record of a design decision; a status
@@ -64,14 +64,14 @@ in a memory file.
 updated *in the same commit*. Divergence recorded nowhere is the
 fragmentation mechanism this process exists to kill.
 
-## 4. Plan documents (`.claude/plans/`)
+## 4. Plan documents (`docs/plans/`)
 
 - **Naming: descriptive**, matching the terminology of the design docs and
   backlog, with plan/sequence identifiers where meaningful. Examples:
   `effects-slice2-stage-f.md`, `planning-dsl-1-model.md`,
   `phase-i-js-codegen.md`. (Supersedes the earlier evocative-codename
   convention — codenames are unguessable for the next reader.)
-- **Manifest.** `.claude/plans/README.md` lists every plan: name, topic,
+- **Manifest.** `docs/plans/README.md` lists every plan: name, topic,
   status, related backlog items. Agents read the manifest first.
 - **Header** on every plan: `Status: draft | active | landed | superseded`,
   related backlog items, design docs it touches.
@@ -79,7 +79,7 @@ fragmentation mechanism this process exists to kill.
   Chunks → Verification → Doc-update checklist (which design docs /
   CHANGELOG / BACKLOG entries this work must touch on landing).
 - **Lifecycle.** Draft → active (maintainer approved) → landed/superseded.
-  Landed and superseded plans move to `.claude/plans/archive/` once their
+  Landed and superseded plans move to `docs/plans/archive/` once their
   durable content has been promoted to design docs and their pending items
   extracted to the backlog. The archive is history — never an input to new
   work.
@@ -201,7 +201,7 @@ and invalidates) is the maintainer's primary sandbox, not just marketing.
 ## 10. Enforcement & tooling
 
 - **CI** (to be added — tracked as debt): `tsc --noEmit`, the full test
-  suite, and a doc-reference lint (every `docs/…`, `.claude/plans/…`,
+  suite, and a doc-reference lint (every `docs/…`, `docs/plans/…`,
   `.claude/memory/…` path mentioned in tracked docs must resolve — dangling
   references are how this project lost its thesis document for months).
 - Git identity in remote sessions: `Claude <noreply@anthropic.com>` for

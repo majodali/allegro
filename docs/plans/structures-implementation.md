@@ -1,7 +1,9 @@
 # Structures unification — implementation plan
 
-> Status: **active** (maintainer approved Phase 0 start, 2026-07; per
-> PROCESS §3 each subsequent phase needs its own go-ahead).
+> Status: **closed** → Backlog entries B-001…B-031 + tranche B
+> (Phases 0–7 + chunk C7.2 landed; M1 exited 2026-08 — see
+> `docs/CHANGELOG.md`). Kept as the chunk record (§4) and
+> conscious-delta log (§6) until content promotion.
 > Design: `docs/design/allegretto/structures.md` (decision log D1–D46,
 > archived: `archive/structured-values-unification.md`).
 > Related backlog: items B-001…B-031 (sequenced head) mirror this plan's

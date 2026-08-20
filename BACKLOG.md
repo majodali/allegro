@@ -11,14 +11,14 @@
 > awaiting disposition through the rewrite lives in `V1-INVENTORY.md`.
 >
 > **Revalidation-register items** (tagged `[reval]`) carry v1 design whose
-> only record is an archived plan (`.claude/plans/archive/README.md` has
+> only record is an archived plan (`docs/plans/archive/README.md` has
 > the triage record). Working one means: read the archived source,
 > revalidate against `docs/design/allegretto/structures.md` and the code,
 > then incorporate into the named target doc or discard with a note here.
 
 ## Sequenced head
 
-Implementation chunks reference `.claude/plans/structures-implementation.md`
+Implementation chunks reference `docs/plans/structures-implementation.md`
 (status: **complete** — Phases 0–7 landed; M1 exited 2026-08).
 
 **Current tranche sequence (maintainer-ratified 2026-08):**
@@ -59,12 +59,12 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   audit, and B10 forgery tables into `docs/design/allegretto/structures.md`
   as appendices; then archive `structured-values-unification.md`. Landed
   2026-08 — Appendices A–C added; decision log moved to
-  `.claude/plans/archive/structured-values-unification.md` (triage row in
+  `docs/plans/archive/structured-values-unification.md` (triage row in
   `archive/README.md`)
 - [x] **B-003** · L1 · `[reval]` docs: sync shipped extension error codes +
   base-chain semantics into `docs/grammar-formalism.md` §6–7 (decisions:
   `docs/design/extension/grammar.md` §4; source:
-  `.claude/plans/archive/dappled-cascading-cantor.md`). Landed 2026-08:
+  `docs/plans/archive/dappled-cascading-cantor.md`). Landed 2026-08:
   §6.2 base-chain compatibility, §6.2 `use` activation surface, new §7.5
   shipped-diagnostic-codes inventory
 - [x] **B-004** · L2 · `[reval]` docs: effects nits — silent-capture
@@ -160,8 +160,8 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   refinement, assert/requires/ensures lowering, sink-based checks,
   invariant inheritance, `assume` rejection + constructor pattern,
   refinement-vs-contract guidance (sources:
-  `.claude/plans/archive/lucid-discharging-lambek.md`,
-  `.claude/plans/archive/crystal-proving-curry.md` §Phase C; substrate:
+  `docs/plans/archive/lucid-discharging-lambek.md`,
+  `docs/plans/archive/crystal-proving-curry.md` §Phase C; substrate:
   structures.md §4/§6) — natural slot: with Phases 2–3
 - [x] **B-015** · L0 · Shape/knowledge channel split; dispatch on shape
   (C3.1). Landed 2026-07: `typeShape` walk (member-transparent refinement
@@ -220,7 +220,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   explicit migration decision**), exhaustiveness taxonomy, mutual-recursion
   lexicographic design, totality polymorphism, decreases obligations,
   counterexample shapes (source:
-  `.claude/plans/archive/phase-e-totality-plan.md`)
+  `docs/plans/archive/phase-e-totality-plan.md`)
 - [x] **B-019** · L0 · Structure kind — representation swap behind
   accessors (C4.1). Landed 2026-07: one host class (`src/structure.ts`)
   behind makeMultiValue/makeContext (factory shims; 6 bypass sites
@@ -388,7 +388,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   `pcp.md` in `docs/design/standard/`: schemas, multi-prover authorship,
   trivial-pass prevention, hints, catalog (H5), budgets/escalation (H7),
   benchmark methodology (source:
-  `.claude/plans/archive/phase-h-plan.md`; shipping shape `src/pcp.ts`)
+  `docs/plans/archive/phase-h-plan.md`; shipping shape `src/pcp.ts`)
 - [ ] **B-030** · L2 · M3 sweep: disposition every remaining `TBD` in
   `V1-INVENTORY.md`; re-verify canaries (provable.alg theorems, bench
   corpus, stdlib effects tags)
@@ -445,12 +445,12 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
 
 - [ ] **B-051** · `[reval]` Roadmap remainder revalidation: D2 parametric
   capabilities, D3 information flow, D4 behavioral budgets, D5 declared
-  intent (source: `.claude/plans/archive/crystal-proving-curry.md`) —
+  intent (source: `docs/plans/archive/crystal-proving-curry.md`) —
   revalidate against v2 before scheduling
 - [ ] **B-052** · F6 Lean export: proof terms → Lean, refinements →
   subtypes, verified-substrate `Allegro.lean` → `proofs.md` in
   `docs/design/standard/` (source:
-  `.claude/plans/archive/phase-f-plan.md` §F6)
+  `docs/plans/archive/phase-f-plan.md` §F6)
 - [ ] **B-053** · Phase G expansion: provable stdlib rewrite (sort/search
   + algebraic theorems on map/filter/reduce)
 - [ ] **B-054** · PCP H5 proof catalog (`proofs.json` per project).
@@ -563,7 +563,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   the maintainer's manual deploy.sh pass
 - [x] **B-092** · `[stage: merged]` Rung 2 flagship provable DSL (the seriousness proof):
   units-of-measure physics (R-R4 ratified). **Brief composed 2026-08**
-  (`.claude/plans/units-dsl.md`): dimensions as structural data +
+  (`docs/plans/units-dsl.md`): dimensions as structural data +
   named-dimension REFINEMENTS over one Quantity record (U-R1 —
   pre-validated by entry test on the unmodified substrate),
   number-anchored literal sugar, laws at honest tiers with the
@@ -597,7 +597,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   `docs/classification.md` (C2 / S0 / language-tool-platform /
   static-site, pinned 1.0.0, Workflow `in-dev → merged → live` +
   stage-reference convention, Article-7 transition designations on
-  CLAUDE.md, .claude/plans, .claude/memory, BACKLOG location, missing
+  CLAUDE.md, docs/plans, .claude/memory, BACKLOG location, missing
   decision register) + Binding block in CLAUDE.md. **Gate passed
   2026-08**: C2 + convention + B-091 live confirmed; drafted DEV-1
   removed — W-006 adopted in full (single-use outcome-named branches
@@ -626,7 +626,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   in `docs/design/vivace/`: outcome-DAG model, 12 conventions, rejections,
   `SoftwareRelease` example; Shape 1/2 + pilot roster proposed into
   VISION §4 (Tier 0 — propose, don't land). Source:
-  `.claude/plans/archive/project-1-planning-dsl-design.md`.
+  `docs/plans/archive/project-1-planning-dsl-design.md`.
   `lib/planning.alg` stays paused until then
 - [ ] **B-080** · Vivace DSL candidates (post-pilot roster): logic
   programming, constraint programming, data modeling, numerical methods,

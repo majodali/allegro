@@ -1,5 +1,8 @@
 # Equality protocol + lawful interfaces — implementation plan (B-027)
 
+> Status: **closed** → Backlog entry B-027 (chunks E1–E4 all landed
+> 2026-08; residue → B-089). Kept for the §6b chunk records.
+>
 > Tranche C, chunk family E. Design source: `docs/design/allegretto/
 > structures.md` §7 (Equality, [designed]) + §8 (Conformance and lawful
 > interfaces, [designed]); D8/D30/D34/D37/D38/D44 from the archived

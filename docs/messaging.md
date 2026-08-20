@@ -2,7 +2,7 @@
 
 > **This is the canonical source for all public copy** (website, demos,
 > README, public docs). It derives from `docs/VISION.md` (§1a, §5
-> principle 17) and `.claude/plans/release-track.md` (claims register).
+> principle 17) and `docs/plans/release-track.md` (claims register).
 > Nothing appears in public material that is not in this document, and
 > nothing appears here that is not `delivered` or `demoable` in the
 > claims register. Audience: formal-methods-literate skeptics first —

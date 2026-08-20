@@ -334,5 +334,5 @@ AI-centric framing to participant-neutral per maintainer direction.
 §1a (the three moves), the substrate/surfaces terminology, and principle 17
 were added 2026-08 (release-track positioning session, maintainer-directed);
 the volatile companion material — differentiator map, claims register, demo
-ladder — lives in `.claude/plans/release-track.md`, deliberately outside
+ladder — lives in `docs/plans/release-track.md`, deliberately outside
 this Tier-0 document.*
