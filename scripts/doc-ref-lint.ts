@@ -22,7 +22,10 @@ export interface DocRefFinding {
 }
 
 const REF_PATTERNS = [
-  /\bdocs\/[A-Za-z0-9_\-./]+\.md\b/g,
+  // lookbehind excludes `docs/…` embedded in a longer path or URL
+  // (e.g. `…methodology/blob/main/docs/vocabulary.md`) — only
+  // root-anchored local references are tracked
+  /(?<!\/)\bdocs\/[A-Za-z0-9_\-./]+\.md\b/g,
   /\.claude\/(?:plans|memory)\/[A-Za-z0-9_\-./]+\.md\b/g,
   // bare `memory/…` (a recurring stale form; canonical form is
   // `.claude/memory/…`) — lookbehind excludes the `.claude/memory` hits

@@ -8,6 +8,112 @@
 Next" / completed-items section) will be migrated here verbatim during the
 2026-06 documentation refactor; new entries are appended here from now on.*
 
+## 2026-08 — B-092 U4: rung-2 release packaging (B-092 closes — rung 2 landed)
+
+The seriousness proof ships: demos/rung2 (3 suite-validated scenes
+with break-it blocks + captured transcripts — the refinement halt, the
+gate refusal, the full domain-vocabulary verify ledger), a landing-page
+"A provable DSL — units of measure" section with a live sandbox and
+the ledger transcript, and a Walkthrough 5 sandbox preset (both
+copies).
+
+Release-infrastructure fix: the web pages resolve `use NAME` through
+inline Allegro.registerLibrary sources — index.html carried FIVE
+hand-pasted drifting copies and the sandbox pages carried NONE (the
+B-091 walkthrough presets using `use contracts`/`use effects` would
+have failed on the deployed sandbox). New `scripts/sync-web-libs.ts`
+generates the registry region in all three pages from the DISK libs
+(pow, match_expr, invariants, contracts, effects, units) at marked
+anchors, with byte-identical decode verification and a `--check` mode.
+37-example site sweep clean against the same sources the pages now
+serve.
+
+Claims re-grade: release-track D4 flagship-DSL row → delivered;
+messaging.md gains the units claim with receipts; plans manifest
+units-dsl.md → landed. Residue routed: B-081 (refinement-failure
+domain detail), B-089 (record-domain law sampling — flips the DSL's
+pending laws to sampled with zero DSL changes). 1149/1149 green.
+
+## 2026-08 — B-092 U3: laws + physics theorems in domain terms
+
+Rung-2 chunk U3: Quantity draws Equatable — its refl/sym/trans law
+obligations plus two declared algebraic laws (`law_mul_comm`,
+`law_conv_roundtrip`) are RECORDED, all at their honest tier: pending
+(record-domain quantifiers have no sample construction yet — B-089
+residue — and the verdict's `?` rows are the point, per U-R3).
+
+Physics facts discharge at the PE tier in literal syntax:
+`theorem km_scale: 1 km == 1000 m`, `theorem newton_ident: 1 N ==
+1 kg·m/s^2`, `verify (9.8 m/s^2).mul(2 s) == 19.6 m/s`, and F = ma
+end-to-end through the refinement-typed signature. The E4 strict gate
+arms over quantities: proof_trans is refused naming 'Quantity' and
+both escape hatches; `Law.assume(Quantity, "trans")` opens it and the
+verdict renders the weakness note + the assumption-ledger line mapping
+the admitted law to the proofs resting on it — the entire ledger in
+domain vocabulary.
+
+`min`/`h` unit aliases added — found when the kernel refused
+`theorem min_scale: 90 minute == 1.5 h` (unbound `h` → residual → eq
+false → "proposition is false"): the build-halting theorem caught a
+lib bug during demo authoring, which is the loop working as designed.
+
+tests/units-laws.alg suite-registered + 4 TS tests (obligations
+recorded, gate refusal, admitted ledger with backers, PE-tier scale
+fact). 1146/1146 green. U4 (rung-2 release packaging) next.
+
+## 2026-08 — B-092 U2: quantity literal grammar + two grammar-kernel refinements
+
+Rung-2 chunk U2: `3 m`, `9.8 m/s^2`, `1.5 km`, `2 kg·m/s^2` parse as
+quantity literals via a `grammar { }` block in lib/units.alg —
+number-anchored (U-R2: only a numeric literal followed by a same-line
+unit expression; computed values use the ordinary algebra), with unit
+products (`·`/`*`), one `/`, and integer `^` exponents. Matched unit
+idents resolve in the consumer's scope (`use units` provides them).
+
+Two kernel refinements the chunk forced, both general (recorded in
+docs/design/extension/grammar.md §4):
+- **Explicit-ws override in user EBNF**: auto-interleaved `ws_any`
+  matches raw newlines, which would glue `x = 3` onto the next line's
+  identifier. An explicit ws production between two items (`hws`/`ws`/
+  `ws_req`/`ws_any`) now suppresses the auto-wrap — adjacency-sensitive
+  rules get horizontal-only whitespace.
+- **expr_form splices at the FRONT of expr_atom**: the engine's alt is
+  PEG-committed ordered choice, so number-led forms were dead code at
+  the old before-ident splice position (the shorter `number` match
+  committed first). Keyword-led forms (match) unaffected.
+
+tests/units-sugar.alg suite-registered: literals, composition with the
+algebra/refinements, the marquee domain error in literal syntax, and a
+non-interference battery (cross-line non-glue, keywords after numbers,
+calls/arrays/parens). 1141/1141 green. U3 (laws + theorems) next.
+
+## 2026-08 — B-092 U1: units DSL core algebra + user-type operator dispatch
+
+Rung-2 chunk U1 (plan `.claude/plans/units-dsl.md`, U-R1–U-R5
+maintainer-ratified): `lib/units.alg` — pure Allegro, zero host code.
+Dimensions are structural 7-vectors (abelian group by exponent
+arithmetic, E1 structural equality); one Quantity record; named
+dimensions (Length, Velocity, Force, …) are REFINEMENTS over it, so
+dimensional soundness is refinement discharge — the same machinery as
+PositiveInt. Wrong-dimension arguments HALT at the call site through
+checkArgType; same-expression mismatches are domain-vocabulary error
+values ("cannot add m and s: length vs time"). Conversions, normalized
+comparison, derived units (N/J/W/Pa composed via unit algebra),
+mechanics SI set.
+
+Kernel fix surfaced by the chunk: the evaluator's PRIM_TO_METHOD
+operator-dispatch path handled only HOST-PRIMITIVE methods, so
+user-defined record types' method impls (ComposedFunctions from
+Type.define specs) fell through to raw bits ops — `q1 + q2` crashed
+with `bits_add: expected Bits`. The path now dispatches
+ComposedFunction members too (self-first, full values), giving every
+user-defined type operator overloading — a substrate win the rung
+exists to force.
+
+tests/units-core.alg (suite-registered, F = m·a end-to-end) + 3 TS
+tests (call-site halt, domain-error message, dimension group facts).
+1140/1140 green. U2 (literal grammar sugar) next.
+
 ## 2026-08 — B-094 chunk 2: migration reality + `explain` (source channel complete)
 
 The planned lazy→eager migration of the proof entry points was

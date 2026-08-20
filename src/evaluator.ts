@@ -406,6 +406,17 @@ function applyPrimitive(
           out = attachEff(out);
           return propagatedSet ? withPredicates(out, propagatedSet) : out;
         }
+        // B-092 U1: USER-DEFINED types get operator overloading too — a
+        // `Type.define` spec's method impls are ComposedFunctions, and
+        // this path previously handled only host-primitive methods, so
+        // `q1 + q2` on a record type fell through to raw bits_add.
+        // Dispatch the same way type_dispatch does for method members:
+        // self is the first parameter, full values (channels intact).
+        const mData = method != null ? dataOf(method) : undefined;
+        if (mData?.kind === ValueKind.ComposedFunction) {
+          const out = attachEff(evalFn(makeExpr(mData, evalArgs), ctx));
+          return propagatedSet ? withPredicates(out, propagatedSet) : out;
+        }
       }
     }
   }

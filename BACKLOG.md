@@ -530,7 +530,7 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   (substrate/surfaces terminology, principle 17 claims discipline —
   Tier 0, dedicated commit). R-R1–R-R5 all ratified 2026-08 (rung-2
   domain: units-of-measure physics)
-- [x] **B-091** · Rung 1 release package: curated demo scripts +
+- [x] **B-091** · `[stage: live]` Rung 1 release package: curated demo scripts +
   sandbox walkthroughs (theorem → break → counterexample → prove loop;
   effects refusal; laws + admitted tier), assumption-ledger roll-up
   view in `inspect`/Verdict (the D2 polish item), getting-started +
@@ -557,15 +557,57 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   auto-applies Any; `Array[Int]` as an expression applies via a
   GenericType `get` member) with regressions. B-091 COMPLETE except
   the maintainer's manual deploy.sh pass
-- [ ] **B-092** · Rung 2 flagship provable DSL (the seriousness proof):
-  domain chosen at R-R4 ratification (recommendation: units-of-measure
-  physics — bridges to rung 3); grammar + lib + laws + domain-term
-  counterexample rendering (minimal B-081 slice); demo script + site
-  update
+- [x] **B-092** · `[stage: merged]` Rung 2 flagship provable DSL (the seriousness proof):
+  units-of-measure physics (R-R4 ratified). **Brief composed 2026-08**
+  (`.claude/plans/units-dsl.md`): dimensions as structural data +
+  named-dimension REFINEMENTS over one Quantity record (U-R1 —
+  pre-validated by entry test on the unmodified substrate),
+  number-anchored literal sugar, laws at honest tiers with the
+  admitted-ledger as demo content, chunks U1–U4. U-R1–U-R5 awaiting
+  ratification 2026-08 (as recommended). **U1 landed 2026-08**:
+  lib/units.alg + user-type operator-dispatch kernel fix +
+  suite-registered demo. **U2 landed 2026-08**: quantity literal
+  grammar (number-anchored, hws same-line) + two grammar-kernel
+  refinements (explicit-ws interleave override; expr_form front
+  splice). **U3 landed 2026-08**: Equatable draw + honest-pending
+  laws + PE-tier physics theorems + the E4 gate/ledger over quantities
+  in domain vocabulary. **U4 landed 2026-08 — B-092 CLOSED**:
+  demos/rung2 (3 suite-validated scenes + transcripts), landing-page
+  Units DSL section + sandbox preset (both copies), web lib registry
+  synced from disk via scripts/sync-web-libs.ts (fixed: sandbox pages
+  had NO lib registrations — B-091 presets using `use` would have
+  failed on the deployed site), D4 register row → delivered,
+  37-example site sweep clean. Residue routed: B-081 (refinement-
+  failure domain detail), B-089 (record-domain law sampling flips the
+  DSL's pending laws with zero DSL changes)
 - [ ] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;
   rung 4 remains internal direction until then
+
+### Track M — methodology (2026-08)
+
+- [ ] **B-095** · Methodology adoption (majodali/methodology v1.0.0) —
+  plan `docs/plans/methodology-adoption.md` (the first resident of the
+  new K-007 plan home). **Chunk 1 drafted 2026-08**:
+  `docs/classification.md` (C2 / S0 / language-tool-platform /
+  static-site, pinned 1.0.0, Workflow `in-dev → merged → live` +
+  stage-reference convention, Article-7 transition designations on
+  CLAUDE.md, .claude/plans, .claude/memory, BACKLOG location, missing
+  decision register) + Binding block in CLAUDE.md. **Gate passed
+  2026-08**: C2 + convention + B-091 live confirmed; drafted DEV-1
+  removed — W-006 adopted in full (single-use outcome-named branches
+  from the next deliverable). Chunks: 2 decision register
+  (K-004), 3 authority relocation (K-001/K-002/K-007 — plans/memory/
+  CLAUDE.md slim/backlog move), 4 close-out + coordination (portfolio
+  register row, practices §5 stale-data amendment)
+- [ ] **B-096** · T-tooling · Deployed-version verification (owner,
+  chunk-1 gate): make "what is live at allegrolang.org" checkable —
+  e.g. deploy.sh stamps the git commit/version into the published site
+  (a `/version.json` or footer stamp) and a verify step compares it to
+  main, so `[stage: live]` designations are auditable instead of
+  attested. Feeds the methodology's form-audit tooling picture
+  (Constitution Article 11)
 
 ### L3 — Vivace (M5)
 

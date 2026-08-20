@@ -151,11 +151,11 @@ forms work in libs).
 | Conflict detection at `use` time; hygienic templates | delivered |
 | DSL demos (regex, match-expr, pow) | delivered (toy scale) |
 | Libs get the full kernel (proofs/effects/totality in .alg libs) | delivered |
-| A FLAGSHIP serious DSL (laws + counterexamples in domain terms) | in-progress → rung 2 |
+| A FLAGSHIP serious DSL (laws + counterexamples in domain terms) | **delivered** (B-092: units-of-measure — dimensional soundness as refinement discharge, domain-vocabulary errors, PE-tier physics theorems, gate + ledger over quantities, literal grammar from the lib; suite-validated demos/rung2 + live site section) |
 | Paradigm stacks beyond functional (logic, constraints, events) | hypothesis (B-048/B-080 band) |
 | Custom general-purpose surfaces | hypothesis |
 
-To advance: rung 2 — pick and build the flagship DSL.
+To advance (post-rung-2): domain-term rendering of refinement-failure detail (B-081 residue); record-domain law sampling (B-089) flips the DSL's pending laws to sampled with zero DSL changes.
 
 ### D5 — Compilation is evaluation you can trust and extend
 
@@ -362,3 +362,18 @@ against a private mental model.
   **B-091 complete** pending the maintainer's manual deploy.sh pass.
   Next per ratified sequence: B-094 (source channel) → B-092
   (units-physics DSL).
+- 2026-08: **RUNG 2 LANDED** (B-092 U1–U4, plan `units-dsl.md`). The
+  seriousness proof is delivered: units-of-measure DSL as a pure
+  Allegro lib (~200 LOC + ~10-line grammar block), dimensional
+  soundness through refinement discharge, domain-vocabulary failures,
+  PE-tier physics theorems, the gate + assumption ledger over
+  quantities, honest-pending algebraic laws. D4 register row
+  re-graded delivered. Along the way the rung forced three substrate
+  wins (user-type operator dispatch; explicit-ws EBNF override;
+  expr_form front splice) and one release-infrastructure fix (web lib
+  registry synced from disk via scripts/sync-web-libs.ts — the
+  sandbox pages had NO lib registrations, so the B-091 walkthrough
+  presets using `use` would have failed on the deployed site).
+  demos/rung2 + landing section + sandbox preset shipped;
+  37-example site sweep clean. Next: rung 3 (B-093/B-079/B-080
+  reval) per the ladder; deploy pass is the maintainer's.

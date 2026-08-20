@@ -85,6 +85,23 @@ of the formalism spec (recovered from the archived Phase 6 plan in the
 Syncing the shipped error/warning codes into `grammar-formalism.md` §6–7
 is tracked in the BACKLOG revalidation register.
 
+- **User-EBNF whitespace: auto-interleave with an explicit-ws override
+  (B-092 U2, 2026-08).** Sequence items in `rule`/`expr_form`/
+  `stmt_form` bodies get `ws_any` interleaved automatically — which
+  matches raw newlines. An EXPLICIT ws production written between two
+  items (`hws` / `ws` / `ws_req` / `ws_any`) suppresses the automatic
+  wrap on both sides, so adjacency-sensitive rules can demand
+  horizontal-only whitespace (the units DSL's quantity literal:
+  `n:number hws u:unit_quot` — `3 m` never glues across a line break).
+- **expr_form alternatives splice at the FRONT of expr_atom (B-092 U2,
+  2026-08).** The engine's alt is PEG-committed ordered choice; a form
+  whose anchor overlaps a base atom (a number-led quantity literal) is
+  unreachable if tried after the base alternative commits. Forms fail
+  fast on their leading anchor, so front position costs one cheap probe
+  per atom. (The previous position — before the `ident` fallthrough —
+  made number-led forms dead code; keyword-led forms like `match` are
+  unaffected either way.)
+
 ---
 
 *Sources: `design_brace_offside_modes` (memory, promoted 2026-06);
