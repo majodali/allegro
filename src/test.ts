@@ -8249,7 +8249,7 @@ fileTest(path.join(demosRung1Dir, "04-laws.alg"));
 //
 // Dimensions as structural data; named dimensions as refinements over
 // one Quantity record — dimensional soundness IS refinement discharge
-// (plan: .claude/plans/units-dsl.md, U-R1 ratified).
+// (plan: docs/plans/units-dsl.md, U-R1 ratified).
 
 fileTest(path.join(testsDir, "units-core.alg"));
 fileTest(path.join(testsDir, "units-sugar.alg"));

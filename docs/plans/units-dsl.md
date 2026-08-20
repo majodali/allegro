@@ -1,5 +1,8 @@
 # Units-of-measure DSL — the rung-2 seriousness proof (B-092)
 
+> Status: **closed** → Backlog entry B-092 (chunks U1–U4 all landed
+> 2026-08). Kept for the chunk records.
+>
 > Track R, rung 2 of the demo ladder (`release-track.md` §5). Domain
 > ratified at R-R4: units-of-measure physics, chosen for the rung-3
 > bridge (Vivace domain models need dimensional quantities) and the

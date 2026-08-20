@@ -21,7 +21,7 @@ pattern) may still be minted inside plans; they are indexed here when
 their plan's gate passes.
 
 **Namespace warnings** (colliding labels that are NOT decision IDs):
-the differentiator map in `.claude/plans/release-track.md` numbers its
+the differentiator map in `docs/plans/release-track.md` numbers its
 seven public-positioning claims D1–D7 — those are claims, not
 decisions; and "Phase D1/D2" in `docs/design/standard/effects.md` and
 the provability plans are roadmap phases. Neither series is indexed
@@ -30,7 +30,7 @@ here.
 ## D-series — core design decisions (D1–D47)
 
 Origin: the structured-values-unification decision log
-(`.claude/plans/archive/structured-values-unification.md`, frozen —
+(`docs/plans/archive/structured-values-unification.md`, frozen —
 the rationale record for D1–D46, 2026-06 → 2026-08). Current design
 home: `docs/design/allegretto/structures.md` (D47 was minted there and
 the series continues there). Pointers below name the design-doc
@@ -41,7 +41,7 @@ record.
 - **D2** — Annotation channels are extensible: extensions register channels with declared propagation rules (viral / union / computed / positional / drop) — accepted (executed, C1.2) — reasoning: `docs/design/allegretto/structures.md` §3
 - **D3** — The lazy/eager `primaryOf` stripping asymmetry is replaced by per-channel propagation semantics — accepted (executed; `primaryOf` deleted as default) — reasoning: `docs/design/allegretto/structures.md` §3 + §12
 - **D4** — The type system (typing, visibility, variance, equality policy) stays outside Allegretto: mechanism in base, policy in extensions — accepted (in force; physical relocation rides M2/M3) — reasoning: `docs/design/allegretto/structures.md` Appendix B; `docs/design/layers.md`
-- **D5** — Strict typing of all structures is a Standard-layer guarantee; Allegretto structures may be untyped (duck-typed over defined slot keys) — accepted — reasoning: `.claude/plans/archive/structured-values-unification.md` decision log (sole definition site; no design-doc restatement yet)
+- **D5** — Strict typing of all structures is a Standard-layer guarantee; Allegretto structures may be untyped (duck-typed over defined slot keys) — accepted — reasoning: `docs/plans/archive/structured-values-unification.md` decision log (sole definition site; no design-doc restatement yet)
 - **D6** — `__*` prefixes are retired; meta-slots become declared slots with visibility/access attributes in a registry — accepted (executed; completed by D39, registry is `src/slots.ts`) — reasoning: `docs/design/allegretto/structures.md` §9 + Appendix A
 - **D7** — Internal `Type : Type` self-reference is kept; universe stratification is handled by translation at the proof-export boundary — accepted (in force; no reified Kind, no tower) — reasoning: `docs/design/allegretto/structures.md` §9
 - **D8** — Equality is type-customizable with declared laws; proofs record which equality they discharged under — accepted (executed; extended by D37/D38; `proofValEqual` unification residue → B-089) — reasoning: `docs/design/allegretto/structures.md` §7–§8
@@ -49,7 +49,7 @@ record.
 - **D10** — Functions keep returning annotated values: the return is a structure whose channels populate per propagation rules, no wrapper nesting — accepted (executed) — reasoning: `docs/design/allegretto/structures.md` §2
 - **D11** — No operation errors on an incomplete value: operations on unresolved values produce residuals; incompleteness detection is separate and effectful — accepted (executed, C2) — reasoning: `docs/design/allegretto/structures.md` §10 + §4
 - **D12** — Structures are always structurally complete: incompleteness is a value (an unresolved future in a slot), never a structure state — accepted (executed) — reasoning: `docs/design/allegretto/structures.md` §10
-- **D13** — A `seal` op for structures — superseded by D21 + D22, because the op was only ever conceptual: constructor trust decomposed into channel-write authority (D21) and the freeze-a-transient need folded into finalization (D22) — reasoning: `.claude/plans/archive/structured-values-unification.md` decision log; `docs/design/allegretto/structures.md` §2
+- **D13** — A `seal` op for structures — superseded by D21 + D22, because the op was only ever conceptual: constructor trust decomposed into channel-write authority (D21) and the freeze-a-transient need folded into finalization (D22) — reasoning: `docs/plans/archive/structured-values-unification.md` decision log; `docs/design/allegretto/structures.md` §2
 - **D14** — Slot keys are symbol | string | number; channel keys are always namespaced symbols: one slot space partitioned by key sort — accepted (executed; symbol keys at C5) — reasoning: `docs/design/allegretto/structures.md` §2 + §5
 - **D15** — The MultiValue wrapper is flattened for structures; scalar primaries ride a transparent structure (empty data plane + `primary` channel) — accepted (executed at C7.1/B-088; reaffirmed by D46) — reasoning: `docs/design/allegretto/structures.md` §2
 - **D16** — Reading a potentially-unresolvable value is an effect, dischargeable by a resolvability/completion proof — accepted (execution pending, B-028) — reasoning: `docs/design/allegretto/structures.md` §10
@@ -87,38 +87,38 @@ record.
 
 ## E-R series — equality and laws (plan rulings, ratified 2026-08)
 
-Plan: `.claude/plans/equality-and-laws.md` §3 (landed — chunks E1–E4
+Plan: `docs/plans/equality-and-laws.md` §3 (landed — chunks E1–E4
 complete, B-027 closed; residue → B-089). All maintainer-ratified as
 they stand, 2026-08.
 
-- **E-R1** — Kernel structural equals is the default for every structure-backed type: same shape (D37), then field-wise recursion through each component's protocol equality; proven lawful once, parametrically; a user override bears the three obligations — accepted (executed, E1) — reasoning: `.claude/plans/equality-and-laws.md` §3
-- **E-R2** — Coercion declarations are type-level members with obligations, registered on the PAIR; `==` resolves same-shape → equals, else least common type over the declared coercion graph, else not-equal (never an error); numeric tower is instance #1 — accepted (executed, E2) — reasoning: `.claude/plans/equality-and-laws.md` §3
-- **E-R3** — `law` members ride the existing spec surface (`law_` prefix in define/Interface specs); `for_all` is a proposition form; drawing a law-bearing interface instantiates one Obligation per law — accepted (executed, E3; two ratification addenda: laws are member-set-general, and laws over abstract members are schemas instantiated at draw time; `law` statement sugar → B-089) — reasoning: `.claude/plans/equality-and-laws.md` §3
-- **E-R4** — Law discharge maps onto D34's spectrum with existing machinery; `assume` is new and verdict-visible; strictness ships incrementally (E3 records tiers, E4 turns on the first strict gate, `proof_trans`) — accepted (executed, E3+E4) — reasoning: `.claude/plans/equality-and-laws.md` §3
-- **E-R5** — The purity/knowledge-independence gate is mechanical: an `equals` implementation (and any coercion fn) must infer an EMPTY effect set including `observe`; violation is a compile error naming the label — accepted (executed) — reasoning: `.claude/plans/equality-and-laws.md` §3
-- **E-R6** — Proofs record equality identity + tier as plain instance-data bindings on the Proof value; chains resting on admitted transitivity render verdict-visibly weaker (extends D8) — accepted (executed, E4, with a recorded deviation: the two fields became three, `lawName` added) — reasoning: `.claude/plans/equality-and-laws.md` §3
+- **E-R1** — Kernel structural equals is the default for every structure-backed type: same shape (D37), then field-wise recursion through each component's protocol equality; proven lawful once, parametrically; a user override bears the three obligations — accepted (executed, E1) — reasoning: `docs/plans/equality-and-laws.md` §3
+- **E-R2** — Coercion declarations are type-level members with obligations, registered on the PAIR; `==` resolves same-shape → equals, else least common type over the declared coercion graph, else not-equal (never an error); numeric tower is instance #1 — accepted (executed, E2) — reasoning: `docs/plans/equality-and-laws.md` §3
+- **E-R3** — `law` members ride the existing spec surface (`law_` prefix in define/Interface specs); `for_all` is a proposition form; drawing a law-bearing interface instantiates one Obligation per law — accepted (executed, E3; two ratification addenda: laws are member-set-general, and laws over abstract members are schemas instantiated at draw time; `law` statement sugar → B-089) — reasoning: `docs/plans/equality-and-laws.md` §3
+- **E-R4** — Law discharge maps onto D34's spectrum with existing machinery; `assume` is new and verdict-visible; strictness ships incrementally (E3 records tiers, E4 turns on the first strict gate, `proof_trans`) — accepted (executed, E3+E4) — reasoning: `docs/plans/equality-and-laws.md` §3
+- **E-R5** — The purity/knowledge-independence gate is mechanical: an `equals` implementation (and any coercion fn) must infer an EMPTY effect set including `observe`; violation is a compile error naming the label — accepted (executed) — reasoning: `docs/plans/equality-and-laws.md` §3
+- **E-R6** — Proofs record equality identity + tier as plain instance-data bindings on the Proof value; chains resting on admitted transitivity render verdict-visibly weaker (extends D8) — accepted (executed, E4, with a recorded deviation: the two fields became three, `lawName` added) — reasoning: `docs/plans/equality-and-laws.md` §3
 
 ## U-R series — units DSL (plan rulings, ratified 2026-08)
 
-Plan: `.claude/plans/units-dsl.md` §5 (landed — chunks U1–U4 complete,
+Plan: `docs/plans/units-dsl.md` §5 (landed — chunks U1–U4 complete,
 B-092 closed). All ratified as recommended, 2026-08.
 
-- **U-R1** — Dimensions are structural DATA + named dimensions are REFINEMENTS over one Quantity record (not dynamically minted nominal types): dimensional soundness IS refinement discharge — accepted (executed, U1; accepted cost: `type of q` answers Quantity; nominal dimensions revisitable at the deferred user-generics surface, C7.2-R1) — reasoning: `.claude/plans/units-dsl.md` §5
-- **U-R2** — Literal syntax scope: number-anchored `3 m/s^2` only; all computed values go through the ordinary operator algebra — accepted (executed, U2) — reasoning: `.claude/plans/units-dsl.md` §5
-- **U-R3** — Law honesty: accept sampled/admitted tiers for the quantity laws, displayed loudly in the demo, rather than restricting to kernel-dischargeable laws — accepted (executed, U3: the pending `?` rows are the product) — reasoning: `.claude/plans/units-dsl.md` §5
-- **U-R4** — `in` conversion sugar is deferred to a later slice (`.to(m)` reads fine; `in` interacts with the syntax track) — accepted (deferred) — reasoning: `.claude/plans/units-dsl.md` §5
-- **U-R5** — Full 7-vector base dimension set from day one, with the shipped unit set mechanics-focused (m, km, cm, s, min, h, kg, g, N, J, W, Pa and derived velocities/accelerations) — accepted (executed, U1/U3) — reasoning: `.claude/plans/units-dsl.md` §5
+- **U-R1** — Dimensions are structural DATA + named dimensions are REFINEMENTS over one Quantity record (not dynamically minted nominal types): dimensional soundness IS refinement discharge — accepted (executed, U1; accepted cost: `type of q` answers Quantity; nominal dimensions revisitable at the deferred user-generics surface, C7.2-R1) — reasoning: `docs/plans/units-dsl.md` §5
+- **U-R2** — Literal syntax scope: number-anchored `3 m/s^2` only; all computed values go through the ordinary operator algebra — accepted (executed, U2) — reasoning: `docs/plans/units-dsl.md` §5
+- **U-R3** — Law honesty: accept sampled/admitted tiers for the quantity laws, displayed loudly in the demo, rather than restricting to kernel-dischargeable laws — accepted (executed, U3: the pending `?` rows are the product) — reasoning: `docs/plans/units-dsl.md` §5
+- **U-R4** — `in` conversion sugar is deferred to a later slice (`.to(m)` reads fine; `in` interacts with the syntax track) — accepted (deferred) — reasoning: `docs/plans/units-dsl.md` §5
+- **U-R5** — Full 7-vector base dimension set from day one, with the shipped unit set mechanics-focused (m, km, cm, s, min, h, kg, g, N, J, W, Pa and derived velocities/accelerations) — accepted (executed, U1/U3) — reasoning: `docs/plans/units-dsl.md` §5
 
 ## R-R series — release track (plan rulings, ratified 2026-08)
 
-Plan: `.claude/plans/release-track.md` §7 (active; internal). R-R1/R-R2
+Plan: `docs/plans/release-track.md` §7 (active; internal). R-R1/R-R2
 ratified in-session; R-R3–R-R5 signed off at B-090 (§8 status log).
 
-- **R-R1** — Terminology: "substrate / surfaces", with general-purpose vs. domain as breadth (VISION §1a amendment), including the seriousness claim — accepted — reasoning: `.claude/plans/release-track.md` §7
-- **R-R2** — Claims discipline: claims as big as we can usefully imagine, private until convincingly delivered; skeptics-first audience — accepted — reasoning: `.claude/plans/release-track.md` §7 + §4
-- **R-R3** — Differentiator map: the six + capstone, as merged — accepted (B-090 sign-off) — reasoning: `.claude/plans/release-track.md` §3 + §7
-- **R-R4** — Ladder order and the rung-2 domain choice: units-physics over state machines, for the rung-3 bridge and the mixed-model trajectory — accepted (B-090 sign-off; executed as B-092) — reasoning: `.claude/plans/release-track.md` §5 + §7
-- **R-R5** — Doc placement: durable → VISION §1a/§5; volatile → the release plan; items → Backlog Track R; no competing primary docs — accepted (B-090 sign-off, including the VISION amendment) — reasoning: `.claude/plans/release-track.md` §7
+- **R-R1** — Terminology: "substrate / surfaces", with general-purpose vs. domain as breadth (VISION §1a amendment), including the seriousness claim — accepted — reasoning: `docs/plans/release-track.md` §7
+- **R-R2** — Claims discipline: claims as big as we can usefully imagine, private until convincingly delivered; skeptics-first audience — accepted — reasoning: `docs/plans/release-track.md` §7 + §4
+- **R-R3** — Differentiator map: the six + capstone, as merged — accepted (B-090 sign-off) — reasoning: `docs/plans/release-track.md` §3 + §7
+- **R-R4** — Ladder order and the rung-2 domain choice: units-physics over state machines, for the rung-3 bridge and the mixed-model trajectory — accepted (B-090 sign-off; executed as B-092) — reasoning: `docs/plans/release-track.md` §5 + §7
+- **R-R5** — Doc placement: durable → VISION §1a/§5; volatile → the release plan; items → Backlog Track R; no competing primary docs — accepted (B-090 sign-off, including the VISION amendment) — reasoning: `docs/plans/release-track.md` §7
 
 ## Chunk rulings — structures implementation arc
 
@@ -126,7 +126,7 @@ Ruling IDs below are qualified by their chunk (the bare R-numbers are
 chunk-scoped in the sources); the qualified form is already how the
 docs cite them (e.g. "C7.2 ruling R1").
 
-- **C4.3-R1/R2/R3** — Merge policies activate at C4.3a: error virality survives residual chains; an error-carrying `if` condition propagates the error; union-rule channels merge by union on re-evaluation — accepted (executed, C4.3a) — reasoning: `docs/design/allegretto/structures.md` §2 rulings block; `.claude/plans/structures-implementation.md` §6
+- **C4.3-R1/R2/R3** — Merge policies activate at C4.3a: error virality survives residual chains; an error-carrying `if` condition propagates the error; union-rule channels merge by union on re-evaluation — accepted (executed, C4.3a) — reasoning: `docs/design/allegretto/structures.md` §2 rulings block; `docs/plans/structures-implementation.md` §6
 - **C4.3-R4/R5** — `primaryOf`-strip retirement + the non-nesting reframe land at C4.3c — accepted (executed, C4.3c) — reasoning: `docs/design/allegretto/structures.md` §2 rulings block
 - **C4.3-R6** — The host `ValueKind.MultiValue` tag stays through C4.3 but is not expected to survive C6 — accepted (outcome realized at C7.1: tag retired) — reasoning: `docs/design/allegretto/structures.md` §2 rulings block
 - **C5.2-R1** — typeShape member-transparency stays member-set OBJECT identity — accepted (executed) — reasoning: `docs/design/allegretto/structures.md` §5 rulings block
@@ -135,13 +135,13 @@ docs cite them (e.g. "C7.2 ruling R1").
 - **C5.2-R4** — `x[ns.name]` qualification syntax DEFERRED; ambiguity is a detected error — accepted (deferred) — reasoning: `docs/design/allegretto/structures.md` §5 rulings block
 - **C5.2-R5** — Kernel member names register under one kernel-scope FQN — accepted (executed) — reasoning: `docs/design/allegretto/structures.md` §5 rulings block
 - **C5.2-R6** — Unions stay outside member storage — accepted (executed) — reasoning: `docs/design/allegretto/structures.md` §5 rulings block
-- **C6.1-P1** — Resolved as `Type.define` (the unified-recipe reading); P2–P4 stand as briefed — accepted (executed, C6.1) — reasoning: `.claude/plans/structures-implementation.md` §4 Phase 6
-- **C7.2-R1** — GenericType's lack of construct authority is a DEFERRED PUBLIC SURFACE, not kernel-private-by-design (maintainer-amended): kernel privacy is reserved for what integrity requires; exposure waits on surface design — accepted, as amended — reasoning: `.claude/plans/structures-implementation.md` §4 Phase 6
-- **C7.2-R2** — `distinct` is the symbol-fresh newtype mint: members re-declared under a fresh scope, non-conformance falls out of symbol-identity membership by construction — accepted (executed, C7.2b) — reasoning: `.claude/plans/structures-implementation.md` §4 Phase 6
-- **C7.2-R3** — One construction surface: the reserved `construct` define-spec key replaces post-hoc `.constructor()`; the meta-method leaves the kind API — accepted (executed, C7.2b) — reasoning: `.claude/plans/structures-implementation.md` §4 Phase 6
+- **C6.1-P1** — Resolved as `Type.define` (the unified-recipe reading); P2–P4 stand as briefed — accepted (executed, C6.1) — reasoning: `docs/plans/structures-implementation.md` §4 Phase 6
+- **C7.2-R1** — GenericType's lack of construct authority is a DEFERRED PUBLIC SURFACE, not kernel-private-by-design (maintainer-amended): kernel privacy is reserved for what integrity requires; exposure waits on surface design — accepted, as amended — reasoning: `docs/plans/structures-implementation.md` §4 Phase 6
+- **C7.2-R2** — `distinct` is the symbol-fresh newtype mint: members re-declared under a fresh scope, non-conformance falls out of symbol-identity membership by construction — accepted (executed, C7.2b) — reasoning: `docs/plans/structures-implementation.md` §4 Phase 6
+- **C7.2-R3** — One construction surface: the reserved `construct` define-spec key replaces post-hoc `.constructor()`; the meta-method leaves the kind API — accepted (executed, C7.2b) — reasoning: `docs/plans/structures-implementation.md` §4 Phase 6
 - **B-094-1/2/3** — Source-channel chunk-1 rulings: reads render TEXT (a first-class inert AST needs a QUOTE carrier, deferred); binding-level attachment covers non-Structure data only (Structure identity audit deferred); residual bindings are skipped (attachment on completion-replacement is a follow-on) — accepted — reasoning: `docs/design/allegretto/structures.md` §3.1 chunk-1 status
-- **Perf ruling (C1.1, 2026-07)** — Warn-only perf floor now, refined progressively — accepted — reasoning: `.claude/plans/structures-implementation.md` header status log
-- **§6 item-3 ruling** — Test-condition changes must be pre-discussed / collapse-equivalents (the conscious-delta queue) — accepted (standing practice) — reasoning: `.claude/plans/structures-implementation.md` §6
+- **Perf ruling (C1.1, 2026-07)** — Warn-only perf floor now, refined progressively — accepted — reasoning: `docs/plans/structures-implementation.md` header status log
+- **§6 item-3 ruling** — Test-condition changes must be pre-discussed / collapse-equivalents (the conscious-delta queue) — accepted (standing practice) — reasoning: `docs/plans/structures-implementation.md` §6
 
 ## Standing rulings — layers, grammar, methodology
 

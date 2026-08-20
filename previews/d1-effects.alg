@@ -10,7 +10,7 @@
 // D2 will add parametric capabilities (`net[api.example.com:443]`) on top
 // of D1's substrate.
 //
-// Reference: .claude/plans/crystal-proving-curry.md §"Phase D arc"
+// Reference: docs/plans/crystal-proving-curry.md §"Phase D arc"
 // =============================================================================
 
 

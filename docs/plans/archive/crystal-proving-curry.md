@@ -116,7 +116,7 @@ substrate the compiler reasons about.
 
 ### Phase C — Invariants as first-class pervasive syntax [LANDED]
 
-Phase C ships in four chunks (see `.claude/plans/lucid-discharging-lambek.md`
+Phase C ships in four chunks (see `docs/plans/lucid-discharging-lambek.md`
 for the tactical plan).
 
 - **Chunk 1 — predicate sets per binding.** `PredicateSet` carries multiple

@@ -29,5 +29,5 @@ appears.
 ## Documents
 
 - `planning-dsl.md` (planned, revalidation-gated — BACKLOG register;
-  source: `.claude/plans/archive/project-1-planning-dsl-design.md`)
+  source: `docs/plans/archive/project-1-planning-dsl-design.md`)
 - Vision-level framing: `docs/VISION.md` §4 (Tier 0)

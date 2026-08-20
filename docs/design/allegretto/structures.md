@@ -1,7 +1,7 @@
 # Structures, Scopes & Channels — design decisions
 
 > Tier 1 design doc. The full decision log D1–D46 with rationale is
-> ARCHIVED at `.claude/plans/archive/structured-values-unification.md`
+> ARCHIVED at `docs/plans/archive/structured-values-unification.md`
 > (complete; every decision executed or pinned to a named owner —
 > B-002); decision numbers below cite it, and Appendices A–C carry the
 > three load-bearing tables. Status tags per `docs/design/README.md`.

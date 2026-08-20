@@ -1,7 +1,7 @@
 # Rung 2 — a provable DSL: units of measure
 
 The seriousness proof (see `docs/messaging.md` and
-`.claude/plans/units-dsl.md`): a domain language built entirely as an
+`docs/plans/units-dsl.md`): a domain language built entirely as an
 Allegro library — `lib/units.alg`, ~200 lines, **zero host code** —
 that inherits the whole kernel. Dimensional soundness is refinement
 discharge (the same machinery as `PositiveInt`), failures speak

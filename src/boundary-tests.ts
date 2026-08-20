@@ -1,7 +1,7 @@
 // =============================================================================
 // Boundary-test harness — structures-implementation Phase 0 (C0.1 / B-001)
 //
-// Four instruments, per `.claude/plans/structures-implementation.md` §Phase 0
+// Four instruments, per `docs/plans/structures-implementation.md` §Phase 0
 // and the boundary contracts in `docs/design/*/README.md`:
 //
 //   1. Boundary lint — counts forbidden direct-access patterns in production

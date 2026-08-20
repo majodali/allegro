@@ -6,9 +6,8 @@ Outcome under development: Allegro classified and compliant under
 majodali/methodology v1.0.0, with the K-001/K-002 authority relocation
 completed and all transition designations cleared.
 
-This is the first plan in `docs/plans/` — the K-007 home; the legacy
-plans under `.claude/plans/` relocate here in chunk 3 and are
-designated `in-progress` until then
+This was the first plan in `docs/plans/` — the K-007 home; the legacy
+plans relocated here from `.claude/` in chunk 3 move 1
 ([classification §Adoption transition](../classification.md#adoption-transition-article-7-sandbox-designations)).
 
 ## Context
@@ -62,15 +61,43 @@ fidelity; register merged via PR #4).
 
 ### Chunk 3 — Authority relocation (K-001/K-002/K-007)
 
-The substantive arc, planned in detail at its own start: plans
-`.claude/plans/` → `docs/plans/` (statuses normalized to the K-007
-grammar; archive preserved); `.claude/memory/` design memos audited,
-authoritative content promoted to `docs/design/`, remainder marked
-session cache; `CLAUDE.md` slimmed to a ≤200-line pointer bootstrap
-(history → `docs/CHANGELOG.md`, architecture detail → design notes);
-`BACKLOG.md` relocates to a `backlog.md` under `docs/` with link
-updates and a root tombstone note. Clears the transition designations.
-Gate: per-move review; the CLAUDE.md slim-down is its own sub-gate.
+Four sequential moves, each on its own W-006 single-use branch with
+its own PR — the owner's merge is the per-move review. Order chosen
+so mechanical relocations land before judgment-heavy edits, and every
+intermediate state keeps the doc-ref lint green.
+
+**Move 1 — plans relocation (K-007)  [this PR]**: the whole
+`.claude/plans/` tree (4 active plans + manifest + 12-file archive)
+moves to `docs/plans/`, joining this plan. Status lines normalized to
+the K-007 grammar (`draft → active → superseded | closed → Backlog
+entry`): structures-implementation and release-track `active`;
+equality-and-laws `closed → B-027`; units-dsl `closed → B-092`;
+archived plans keep the archive README as their explicit closure
+record. All ~85 repo references rewritten (docs, code comments, web
+pages). The doc-ref lint's scan exclusion follows the archive to
+`docs/plans/archive/`; its `.claude/plans/…` pattern is retained so
+any reintroduced stale path dangles loudly. Transition designation
+for `.claude/plans/` cleared.
+
+**Move 2 — memory audit (K-001)**: each `.claude/memory/` file
+classified — authoritative design content promoted to `docs/design/`
+(candidates: the provability thesis, meta-type/multiple-inheritance
+design, vivace vision; audit decides), remainder marked
+non-authoritative session cache per practice A6. Gate: owner reviews
+the promote/cache table in the PR.
+
+**Move 3 — CLAUDE.md slim (K-002, own sub-gate)**: 676 lines → ≤200
+pointer bootstrap (Binding block, what-it-is, build/run/test,
+architecture at a glance, conventions, doc map). Every removed fact
+must already live in `docs/` (CHANGELOG, design notes) or is promoted
+there first in the same PR — a reader ignoring CLAUDE.md misses
+nothing authoritative.
+
+**Move 4 — backlog relocation (K-003 home)**: `BACKLOG.md` moves to
+a `backlog.md` under `docs/`, root tombstone pointer, all references
+updated;
+remaining transition designations cleared (the section itself empties
+in chunk 4).
 
 ### Chunk 4 — Close-out
 

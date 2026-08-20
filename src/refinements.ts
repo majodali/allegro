@@ -17,7 +17,7 @@
 // value receives a propagated domain as a `"domain"` component on its
 // MultiValue. The introspection surface (Phase A) reads this directly.
 //
-// See .claude/plans/crystal-proving-curry.md for the broader plan.
+// See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
 import { dataOf, cloneComponents, componentsView, channelReadRaw, typeShape, getAbstractDomain } from "./slots.js";

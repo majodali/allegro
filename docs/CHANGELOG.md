@@ -89,7 +89,7 @@ calls/arrays/parens). 1141/1141 green. U3 (laws + theorems) next.
 
 ## 2026-08 — B-092 U1: units DSL core algebra + user-type operator dispatch
 
-Rung-2 chunk U1 (plan `.claude/plans/units-dsl.md`, U-R1–U-R5
+Rung-2 chunk U1 (plan `docs/plans/units-dsl.md`, U-R1–U-R5
 maintainer-ratified): `lib/units.alg` — pure Allegro, zero host code.
 Dimensions are structural 7-vectors (abelian group by exponent
 arithmetic, E1 structural equality); one Quantity record; named
@@ -181,7 +181,7 @@ lazy→eager source-aware) next.
 ## 2026-08 — B-091 slices 1–2: rung-1 release package + D2 assumption-ledger roll-up (Track R)
 
 The first release-track content derivation (plan:
-`.claude/plans/release-track.md`, B-090 ratified) plus the one
+`docs/plans/release-track.md`, B-090 ratified) plus the one
 functional item the rung-1 story needed, and a soundness fix it
 surfaced.
 
@@ -535,7 +535,7 @@ changes (one comment updated in `src/slots.ts`).
   Appendices A–C of `docs/design/allegretto/structures.md`;
   `structured-values-unification.md` (decision log D1–D46, complete —
   every decision executed or pinned to a named backlog owner) moved to
-  `.claude/plans/archive/` with a triage-record row. Decision numbers
+  `docs/plans/archive/` with a triage-record row. Decision numbers
   remain citable. Path references updated (plans manifest,
   structures-implementation plan, BACKLOG, slots.ts header comment).
   BACKLOG head re-sequenced to the maintainer-ratified tranche plan
@@ -1828,7 +1828,7 @@ harness tests).
   rework / drop / TBD per feature). Full v1 landing narratives remain in
   git history (pre-rebuild `BACKLOG.md`).
 - Earlier in 2026-07 (same arc): v1-era plans archived with triage record
-  (`.claude/plans/archive/README.md`); revalidation register established
+  (`docs/plans/archive/README.md`); revalidation register established
   (now folded into the backlog as `[reval]` items); shipped
   grammar-extension decisions recovered into
   `docs/design/extension/grammar.md` §4; `structures.md` drafted from the
@@ -1840,7 +1840,7 @@ harness tests).
 - Created `docs/VISION.md` and `docs/PROCESS.md` (Tier 0); `docs/design/`
   (type-system, effects, pattern-matching, grammar) promoted from
   `.claude/memory/` files and plan docs; promoted memory files shrunk to
-  pointers; `.claude/plans/README.md` manifest added.
+  pointers; `docs/plans/README.md` manifest added.
 - Maintainer rulings recorded: descriptive plan-doc names supersede
   evocative codenames; `__` meta-property prefixes are accreted artifacts
   (redesign pending — `docs/design/standard/type-system.md` §4); parser alt-order

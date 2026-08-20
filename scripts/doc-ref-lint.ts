@@ -1,9 +1,9 @@
 // Doc-reference lint (PROCESS §10): every root-anchored `docs/…`,
-// `.claude/plans/…`, `.claude/memory/…` (or bare `memory/…`) *.md path
+// `docs/plans/…`, `.claude/memory/…` (or bare `memory/…`) *.md path
 // mentioned in a tracked markdown file must resolve. Dangling references
 // are how this project lost its thesis document for months.
 //
-// Scope: tracked *.md files, excluding `.claude/plans/archive/` (history —
+// Scope: tracked *.md files, excluding `docs/plans/archive/` (history —
 // its references are frozen) and node_modules. Glob-ish mentions
 // (`docs/design/*.md`), ellipses (`docs/…`), and placeholders
 // (`<layer>`) never match the path pattern, so prose stays lintable.
@@ -41,7 +41,7 @@ export function lintDocRefs(repoRoot: string): DocRefFinding[] {
     .filter(Boolean)
     .filter(
       (f) =>
-        !f.startsWith(".claude/plans/archive/") && !f.includes("node_modules")
+        !f.startsWith("docs/plans/archive/") && !f.includes("node_modules")
     );
 
   const findings: DocRefFinding[] = [];
