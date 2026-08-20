@@ -23,16 +23,11 @@ field definitions and omission defaults per the methodology
 
 ## Deviation register
 
-- **DEV-1** — deviates-from
-  [W-006](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-006--names-follow-outcomes-branches-are-single-use)
-  (branches single-use, outcome-named), branch-naming half only.
-  Remote agent sessions work on a harness-designated persistent branch
-  (currently `claude/c2-3b-continuation-kdfq85`) that is restarted
-  from `main` per deliverable arc rather than created fresh per
-  deliverable. Plan and document naming follows W-006 in full.
-  Rationale: the branch name is assigned by the session harness, not
-  chosen by the agent; work lands on `main` by owner-merged PR either
-  way. Revisit at the next review round — recorded 2026-08.
+No deviations recorded. (W-006 is adopted in full — owner ruling at
+the chunk-1 gate, 2026-08: agent work uses single-use, outcome-named
+branches, deleted after merge, from the next deliverable onward. The
+harness-designated branch that carried the pre-adoption arcs merges at
+that gate and retires the old practice.)
 
 ## Custom definitions
 

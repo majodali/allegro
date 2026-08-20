@@ -592,13 +592,22 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   new K-007 plan home). **Chunk 1 drafted 2026-08**:
   `docs/classification.md` (C2 / S0 / language-tool-platform /
   static-site, pinned 1.0.0, Workflow `in-dev → merged → live` +
-  stage-reference convention, DEV-1 branch-naming deviation, Article-7
-  transition designations on CLAUDE.md, .claude/plans, .claude/memory,
-  BACKLOG location, missing decision register) + Binding block in
-  CLAUDE.md. Awaiting owner gate. Chunks: 2 decision register
+  stage-reference convention, Article-7 transition designations on
+  CLAUDE.md, .claude/plans, .claude/memory, BACKLOG location, missing
+  decision register) + Binding block in CLAUDE.md. **Gate passed
+  2026-08**: C2 + convention + B-091 live confirmed; drafted DEV-1
+  removed — W-006 adopted in full (single-use outcome-named branches
+  from the next deliverable). Chunks: 2 decision register
   (K-004), 3 authority relocation (K-001/K-002/K-007 — plans/memory/
   CLAUDE.md slim/backlog move), 4 close-out + coordination (portfolio
   register row, practices §5 stale-data amendment)
+- [ ] **B-096** · T-tooling · Deployed-version verification (owner,
+  chunk-1 gate): make "what is live at allegrolang.org" checkable —
+  e.g. deploy.sh stamps the git commit/version into the published site
+  (a `/version.json` or footer stamp) and a verify step compares it to
+  main, so `[stage: live]` designations are auditable instead of
+  attested. Feeds the methodology's form-audit tooling picture
+  (Constitution Article 11)
 
 ### L3 — Vivace (M5)
 

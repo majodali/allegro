@@ -18,8 +18,8 @@ Gap analysis performed 2026-08 against the seeded rule corpus
 S-001/S-002) are already Allegro practice — several were extracted from
 it. The gaps are structural: authority location (K-001/K-002), the
 decision register (K-004), plan home and status grammar (K-007), and
-the branch-naming half of W-006 (recorded as deviation DEV-1 rather
-than adopted, pending review-round revisit). The methodology repo's
+the branch-naming half of W-006 (adopted in full at the chunk-1
+gate — the drafted deviation was removed by owner ruling). The methodology repo's
 own data on Allegro (practices §5, portfolio register) is stale on two
 points — "no CI" and "no README" — both fixed pre-adoption; census
 refresh is coordination item C below.
@@ -29,16 +29,19 @@ refresh is coordination item C below.
 Chunk boundaries approved by the owner 2026-08. Each chunk ends at a
 gate: summarize, wait for explicit go-ahead (W-001).
 
-### Chunk 1 — Classification + Binding  ✅ this chunk
+### Chunk 1 — Classification + Binding  ✅ landed (gate passed 2026-08)
 
 `docs/classification.md` (C2 / S0 / language-tool-platform /
 static-site, pinned 1.0.0, Workflow `in-dev → merged → live` with the
-stage-reference convention, DEV-1, transition designations), the
-Binding block in `CLAUDE.md`, this plan, and the Backlog entry.
-Gate: owner reviews the declaration — especially the C-tier, the
-Workflow stage convention, the `[stage: live]` placement on B-091
-(drafted on the assumption the rung-1 deploy ran; correct if not), and
-whether DEV-1 stands or branch practice changes instead.
+stage-reference convention, transition designations), the Binding
+block in `CLAUDE.md`, this plan, and the Backlog entry.
+Gate outcomes (owner, 2026-08): C2 confirmed; the stage-reference
+convention confirmed; B-091 `[stage: live]` confirmed (rung-1 deploy
+ran); the drafted DEV-1 was REMOVED in favor of adopting W-006 in
+full — single-use outcome-named branches from the next deliverable.
+Owner also flagged a tooling need: verifying WHICH version is deployed
+(registered as B-096; feeds the Article 11 transitional-tooling
+picture).
 
 ### Chunk 2 — Decision register (K-004)
 

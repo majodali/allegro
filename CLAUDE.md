@@ -8,8 +8,7 @@ document lifecycles and workflows. Read it before any work; nothing
 in this file or under `.claude/` overrides it.
 
 Classification: C2 / S0 / language-tool-platform / static-site
-Deviations: DEV-1 (W-006 branch naming — harness-designated persistent
-branch; recorded in `docs/classification.md`)
+Deviations: none
 
 Note: this file is designated `in-progress` under the adoption
 transition (`docs/classification.md` §Adoption transition) — it still
