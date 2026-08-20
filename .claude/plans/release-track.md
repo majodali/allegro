@@ -301,15 +301,14 @@ against a private mental model.
   "claims as big as we can usefully imagine … until convincingly
   delivered, they remain private").
 - **R-R3 — differentiator map** (§3): the six + capstone, as merged.
-  Proposed; awaiting sign-off.
+  RATIFIED 2026-08 (B-090 sign-off, §8 log).
 - **R-R4 — ladder order** (§5) and the rung-2 domain choice
   (units-physics vs. state machines — recommendation: units-physics,
-  for the rung-3 bridge and the mixed-model trajectory). Awaiting
-  sign-off.
+  for the rung-3 bridge and the mixed-model trajectory). RATIFIED
+  2026-08 (B-090 sign-off, §8 log — units-physics as recommended).
 - **R-R5 — doc placement**: durable → VISION §1a/§5; volatile → this
-  plan; items → BACKLOG Track R. Proposed per maintainer direction
-  ("no competing primary docs"); awaiting sign-off on the VISION
-  amendment text itself (Tier 0).
+  plan; items → BACKLOG Track R. RATIFIED 2026-08 (B-090 sign-off,
+  §8 log, including the VISION amendment text).
 
 ## 8. Status log
 

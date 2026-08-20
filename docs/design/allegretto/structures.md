@@ -991,8 +991,8 @@ reserved `construct` define-spec key (ruling R3). Effect variables
 (C7.2c): `Param.effectVar` is a declared reference into
 `__genericParams`; bare variable names ride inferred effect sets; the
 `__effectvar:` marker strings and `__effectVarParams` side table are
-deleted. Rulings R1–R3 were agent-proposed and are pending maintainer
-ratification (recorded in the structures plan §4).*
+deleted. Rulings R1–R3 maintainer-ratified 2026-08, R1 as amended
+(recorded in the structures plan §4).*
 
 **Instance-of = shape-of** (D40; sharpened by D45 to shape-CONFORMS-TO):
 a kind is a type whose instances are
