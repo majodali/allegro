@@ -45,7 +45,9 @@ picture).
 
 ### Chunk 2 — Decision register (K-004)
 
-`docs/decisions.md`: numbered one-line entries with status and a
+A `decisions.md` register under `docs/` (path named in exact form once
+the file exists — the doc-ref lint tracks only resolvable paths):
+numbered one-line entries with status and a
 pointer to the design note holding the reasoning, indexing the
 existing decision corpus (D1–D47, E-R1–E-R6, U-R1–U-R5, R-R1–R-R5,
 per-chunk rulings) without renumbering. Existing IDs remain citable.
@@ -59,8 +61,8 @@ grammar; archive preserved); `.claude/memory/` design memos audited,
 authoritative content promoted to `docs/design/`, remainder marked
 session cache; `CLAUDE.md` slimmed to a ≤200-line pointer bootstrap
 (history → `docs/CHANGELOG.md`, architecture detail → design notes);
-`BACKLOG.md` → `docs/backlog.md` with link updates and a root
-tombstone note. Clears the transition designations.
+`BACKLOG.md` relocates to a `backlog.md` under `docs/` with link
+updates and a root tombstone note. Clears the transition designations.
 Gate: per-move review; the CLAUDE.md slim-down is its own sub-gate.
 
 ### Chunk 4 — Close-out

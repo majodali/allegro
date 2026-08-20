@@ -412,7 +412,7 @@ function applyPrimitive(
         // `q1 + q2` on a record type fell through to raw bits_add.
         // Dispatch the same way type_dispatch does for method members:
         // self is the first parameter, full values (channels intact).
-        const mData = method !== undefined ? dataOf(method) : undefined;
+        const mData = method != null ? dataOf(method) : undefined;
         if (mData?.kind === ValueKind.ComposedFunction) {
           const out = attachEff(evalFn(makeExpr(mData, evalArgs), ctx));
           return propagatedSet ? withPredicates(out, propagatedSet) : out;

@@ -55,5 +55,5 @@ designated 2026-08 — audits treat age as a finding:
 - `BACKLOG.md` — at repo root; Registers live under `docs/`;
   relocation in chunk 3 (it is otherwise K-003-compliant).
 - Decision register — absent (decisions D1–D47, E-R, U-R, R-R live
-  inside design docs and plan logs), contra K-004; `docs/decisions.md`
-  is chunk 2.
+  inside design docs and plan logs), contra K-004; a `decisions.md`
+  register under `docs/` is chunk 2.

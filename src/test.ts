@@ -8356,7 +8356,7 @@ test("B-092 U1: dimension algebra is exact structural data (group laws on vector
 });
 
 function evalStd2(src: string, ext: Extension): Value | undefined {
-  return runtimeEval(src, undefined, [typeExt, ext], undefined, true).value;
+  return runtimeEval(src, undefined, [typeExt, ext], undefined, true).value ?? undefined;
 }
 
 // --- Phase H1: Proof Collaboration Protocol — JSON formats ---
