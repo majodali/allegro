@@ -597,10 +597,17 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   decision register) + Binding block in CLAUDE.md. **Gate passed
   2026-08**: C2 + convention + B-091 live confirmed; drafted DEV-1
   removed — W-006 adopted in full (single-use outcome-named branches
-  from the next deliverable). Chunks: 2 decision register
-  (K-004), 3 authority relocation (K-001/K-002/K-007 — plans/memory/
-  CLAUDE.md slim/backlog move), 4 close-out + coordination (portfolio
-  register row, practices §5 stale-data amendment)
+  from the next deliverable). **Chunk 2 drafted 2026-08** (branch
+  `decision-register`, the first W-006 single-use branch):
+  `docs/decisions.md` — K-004 register indexing D1–D47, E-R1–E-R6,
+  U-R1–U-R5, R-R1–R-R5 + chunk/standing rulings under original IDs
+  (no renumbering; K-004 status vocabulary; D48+ continues here);
+  two stale ruling-status passages refreshed in sources during the
+  sweep (structures.md C7.2, release-track §7 R-R3–5). Gate: owner
+  samples entries for fidelity. Remaining chunks: 3 authority
+  relocation (K-001/K-002/K-007 — plans/memory/CLAUDE.md slim/backlog
+  move), 4 close-out + coordination (portfolio register row,
+  practices §5 stale-data amendment)
 - [ ] **B-096** · T-tooling · Deployed-version verification (owner,
   chunk-1 gate): make "what is live at allegrolang.org" checkable —
   e.g. deploy.sh stamps the git commit/version into the published site

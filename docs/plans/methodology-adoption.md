@@ -43,15 +43,21 @@ Owner also flagged a tooling need: verifying WHICH version is deployed
 (registered as B-096; feeds the Article 11 transitional-tooling
 picture).
 
-### Chunk 2 — Decision register (K-004)
+### Chunk 2 — Decision register (K-004)  — drafted, at gate
 
-A `decisions.md` register under `docs/` (path named in exact form once
-the file exists — the doc-ref lint tracks only resolvable paths):
-numbered one-line entries with status and a
-pointer to the design note holding the reasoning, indexing the
-existing decision corpus (D1–D47, E-R1–E-R6, U-R1–U-R5, R-R1–R-R5,
-per-chunk rulings) without renumbering. Existing IDs remain citable.
-Gate: owner samples entries for fidelity.
+[docs/decisions.md](../decisions.md): numbered one-line entries with
+status and a pointer to the design note holding the reasoning,
+indexing the existing decision corpus (D1–D47, E-R1–E-R6, U-R1–U-R5,
+R-R1–R-R5, per-chunk rulings) without renumbering. Existing IDs
+remain citable; new decisions continue the D-series (next: D48) in
+the register. Statuses use K-004's vocabulary (accepted / superseded
+/ deprecated) with execution state + backlog owner in parentheses.
+Drafted 2026-08 on branch `decision-register` (the first W-006
+single-use branch). Sweep side-finding, fixed at draft time: two
+sources carried stale ruling statuses contradicting their own
+ratification logs (structures.md said C7.2 R1–R3 pending; release
+track §7 said R-R3–R-R5 awaiting sign-off) — both refreshed to match
+the logs. Gate: owner samples entries for fidelity.
 
 ### Chunk 3 — Authority relocation (K-001/K-002/K-007)
 
