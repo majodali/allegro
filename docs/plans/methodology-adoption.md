@@ -43,7 +43,7 @@ Owner also flagged a tooling need: verifying WHICH version is deployed
 (registered as B-096; feeds the Article 11 transitional-tooling
 picture).
 
-### Chunk 2 — Decision register (K-004)  — drafted, at gate
+### Chunk 2 — Decision register (K-004)  ✅ gate passed 2026-08
 
 [docs/decisions.md](../decisions.md): numbered one-line entries with
 status and a pointer to the design note holding the reasoning,
@@ -57,7 +57,8 @@ single-use branch). Sweep side-finding, fixed at draft time: two
 sources carried stale ruling statuses contradicting their own
 ratification logs (structures.md said C7.2 R1–R3 pending; release
 track §7 said R-R3–R-R5 awaiting sign-off) — both refreshed to match
-the logs. Gate: owner samples entries for fidelity.
+the logs. Gate passed 2026-08 (owner sampled entries for
+fidelity; register merged via PR #4).
 
 ### Chunk 3 — Authority relocation (K-001/K-002/K-007)
 

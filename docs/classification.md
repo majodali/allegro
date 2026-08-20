@@ -54,7 +54,7 @@ designated 2026-08 — audits treat age as a finding:
   session cache (practice A6).
 - `BACKLOG.md` — at repo root; Registers live under `docs/`;
   relocation in chunk 3 (it is otherwise K-003-compliant).
-- Decision register — landed 2026-08 as
-  [docs/decisions.md](decisions.md) (chunk 2): the existing corpus
-  (D1–D47, E-R, U-R, R-R, chunk rulings) indexed under original IDs;
-  this bullet clears when the chunk-2 gate passes.
+
+Resolved: the missing decision register (contra K-004) cleared at the
+chunk-2 gate, 2026-08 — [docs/decisions.md](decisions.md) indexes the
+existing corpus under original IDs.
