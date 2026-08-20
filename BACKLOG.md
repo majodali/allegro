@@ -453,7 +453,9 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   `.claude/plans/archive/phase-f-plan.md` §F6)
 - [ ] **B-053** · Phase G expansion: provable stdlib rewrite (sort/search
   + algebraic theorems on map/filter/reduce)
-- [ ] **B-054** · PCP H5 proof catalog (`proofs.json` per project)
+- [ ] **B-054** · PCP H5 proof catalog (`proofs.json` per project).
+  v1 implementation preserved at branch `archive/v1-references`
+  (parent 0546daa, `allegro catalog`) — pre-rework, reference only
 - [ ] **B-055** · PCP H6 multi-strategy parallel prover orchestration
 - [ ] **B-056** · PCP H7 effort budgets, escalation, reproducibility
 - [ ] **B-057** · Phase C polish (scope decided during B-014): sink-based
@@ -501,7 +503,9 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
 
 - [ ] **B-072** · Code generation: expression graph → JS first;
   continuations decision feeds B-048/B-073 (v1 "Phase I" — revalidate
-  against v2 graph shapes; Grammar 2 "Phase 9" emitter folds in here)
+  against v2 graph shapes; Grammar 2 "Phase 9" emitter folds in here).
+  v1 Phase-I substrate + plan preserved at branch
+  `archive/v1-references` (parent c553710) — pre-rework, reference only
 
 ### T-perf
 
@@ -631,7 +635,9 @@ Implementation chunks reference `.claude/plans/structures-implementation.md`
   imperative/mixed) as extensions
 - [ ] **B-081** · Counterexample legibility — domain-specific failure
   rendering layer (foundational; coupled to the AI iteration loop; see
-  `docs/VISION.md` §4)
+  `docs/VISION.md` §4). v1 rendering-hook sketch (`T.onFailure`)
+  preserved at branch `archive/v1-references` (parent b838a89) —
+  pre-rework, reference only
 - [ ] **B-082** · Model composition patterns (cross-domain predicates,
   arbitration, multi-domain [impl, proof] explosion risk)
 - [ ] **B-083** · AI iteration loop — usable failure modes (residuals the
