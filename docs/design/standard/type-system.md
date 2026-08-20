@@ -22,30 +22,36 @@ compile-time entailment.
 state: name present or not), not a type-of-types distinction.
 
 - `instanceof` / `subtypeof` are shape-aware: nominal comparison when both
-  operands carry a name (walks the `__extends` chain), structural when the
-  expected type is anonymous or carries the interface marker.
+  operands carry a name, structural when the expected type is anonymous or
+  carries the interface marker. *(Superseded detail, D44/C6.1a 2026-08:
+  the `__extends` name-walk is DELETED — conformance is now identity →
+  loose base-name path → `__refines` chain → symbol-identity membership
+  over `__members`. There is no declared is-a edge outside refinement.
+  See `docs/decisions.md` D44 and
+  `docs/design/allegretto/structures.md` §8.)*
 - `~T` (structural wrap) projects to anonymous by erasing the name,
-  preserving members/extends/construct; a back-link records the original.
-- `NominalType` survives as a back-compat alias (`NominalType === Type`).
+  preserving members/construct; a back-link records the original.
+- `NominalType` is RETIRED (C7.1) — after D44 there is no nominal
+  checking left for the name to name; `Type` is the one root kind.
 
 **Why it came up:** `Effect` needed a meta-type handling both named effects
 (`io`, `time`) and anonymous conjunctions (`io & time`). The same shape-aware
 framing settled for Effect lifts one level to Type itself. The pattern is
 expected to recur for `Predicate`, `Function`, `Symbol`.
 
-### Deferred: multiple inheritance [designed]
+### Multiple inheritance [dissolved — D44, 2026-08]
 
-With explicit-error-on-conflict semantics (no MRO), MI is much cleaner than
-typical OO models: `__extends: Type[]`; `instanceof` becomes
-graph-reachability over the parent DAG; member conflicts are errors the user
-resolves explicitly (mirroring Mixin's policy). Deferred because the
-meta-type collapse solved the immediate need, no second concrete use case
-has surfaced, and MI's own design surface (constructor/getter inheritance,
-member-access composition) deserves focused work. **Trigger to revisit:** a
-second concrete use case, or domain-library work pulling on it.
+The deferred MI design (explicit-error-on-conflict, `__extends: Type[]`,
+graph-reachability `instanceof`) was DISSOLVED by D44: declared
+inheritance itself decomposed into conformance (drawing member symbols)
++ refinement (`__refines`) + composition (bundles), so multi-conformance
+needs no MI — a type draws symbols from any number of bundles today.
+The old trigger conditions no longer apply. Rationale record:
+`docs/plans/archive/structured-values-unification.md` D44;
+register entry `docs/decisions.md` D44.
 
-Also parked: modeling nominal-vs-structural as a *mixin* (the comparison
-methods as an additive behavior set) — reconsider alongside MI.
+Also parked (still live): modeling nominal-vs-structural as a *mixin*
+(the comparison methods as an additive behavior set).
 
 ## 3. Type definition mechanisms [implemented (API); syntax deferred]
 

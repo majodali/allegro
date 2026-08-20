@@ -48,10 +48,12 @@ designated 2026-08 — audits treat age as a finding:
 - ~~`.claude/plans/`~~ — resolved 2026-08 (chunk 3 move 1): the whole
   plans tree relocated to `docs/plans/`, statuses normalized to the
   K-007 grammar.
-- `.claude/memory/` — several design memos hold authoritative design
-  content, contra K-001; audit-and-promote to `docs/design/` in
-  chunk 3, after which the directory is strictly non-authoritative
-  session cache (practice A6).
+- `.claude/memory/` — resolved 2026-08 (chunk 3 move 2): audit found
+  the 2026-06 promotion pass already moved all authoritative content
+  to `docs/` — the residual exposure was five live citations pointing
+  INTO `.claude/`, all retargeted; 13 zero-reference pointer stubs
+  deleted; the directory now carries the A6 non-authoritative banner
+  and holds only session/user/external context.
 - `BACKLOG.md` — at repo root; Registers live under `docs/`;
   relocation in chunk 3 (it is otherwise K-003-compliant).
 
