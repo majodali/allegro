@@ -37,30 +37,8 @@ named; deferred until needed per Article 6.)
 
 ## Adoption transition (Article 7 sandbox designations)
 
-**All designations resolved 2026-08** — no material remains
-`in-progress` under the methodology-adoption arc
-([docs/plans/methodology-adoption.md](plans/methodology-adoption.md)).
-The resolution record below stands until the chunk-4 close-out
-empties this section:
-
-- `CLAUDE.md` — resolved 2026-08 (chunk 3 moves 3a+3b): every
-  bootstrap-only fact promoted into `docs/` (v1-era history →
-  CHANGELOG; core types, unification, modules, grammar surface,
-  implementation map, language reference → new/extended docs), then
-  slimmed to a ~135-line K-002 pointer bootstrap.
-- ~~`.claude/plans/`~~ — resolved 2026-08 (chunk 3 move 1): the whole
-  plans tree relocated to `docs/plans/`, statuses normalized to the
-  K-007 grammar.
-- `.claude/memory/` — resolved 2026-08 (chunk 3 move 2): audit found
-  the 2026-06 promotion pass already moved all authoritative content
-  to `docs/` — the residual exposure was five live citations pointing
-  INTO `.claude/`, all retargeted; 13 zero-reference pointer stubs
-  deleted; the directory now carries the A6 non-authoritative banner
-  and holds only session/user/external context.
-- Backlog — resolved 2026-08 (chunk 3 move 4): relocated from repo
-  root to [docs/backlog.md](backlog.md) with all references updated
-  and a root tombstone pointer; K-003-compliant throughout.
-
-Resolved: the missing decision register (contra K-004) cleared at the
-chunk-2 gate, 2026-08 — [docs/decisions.md](decisions.md) indexes the
-existing corpus under original IDs.
+No active designations. The four designations opened at adoption
+(CLAUDE.md, plans home, memory, Backlog location) were all resolved
+2026-08 by the authority-relocation arc; the resolution record lives
+in [docs/plans/methodology-adoption.md](plans/methodology-adoption.md)
+and `docs/CHANGELOG.md` (B-095).

@@ -1,6 +1,7 @@
 # Methodology adoption
 
-Status: active
+Status: closed → Backlog entry B-095 (chunk-4 gate, 2026-08 — owner
+sign-off is the merge of the close-out PR)
 
 Outcome under development: Allegro classified and compliant under
 majodali/methodology v1.0.0, with the K-001/K-002 authority relocation
@@ -133,13 +134,69 @@ manifest, memory index — archive left frozen). The last transition
 designation cleared; classification's transition section now records
 all four resolutions and empties at the chunk-4 close-out.
 
-### Chunk 4 — Close-out
+### Chunk 4 — Close-out  [this PR]
 
-PR template from the methodology skeleton; Risk register seeded from
-real pressure only (perf hard threshold, sandbox age) if the owner
-wants it; transition section emptied; coordination items delivered.
-Gate: form-audit-style self-check against the rule corpus; owner
-sign-off closes the plan to a Backlog entry.
+Delivered: PR template (practice D2) adapted to Allegro's test ladder
+at `.github/pull_request_template.md`; classification's transition
+section emptied (all designations resolved; record here + CHANGELOG);
+consolidated B-095 CHANGELOG entry; the form audit and coordination
+drafts below. Risk register NOT seeded — K-005 forbids registers
+before pressure; the two known pressure points (perf hard threshold:
+warn-only at 2×, maintainer decision pending since B-001; sandbox-age
+audit finding) are recorded here as the seed material if the owner
+wants the register.
+
+**Form audit (2026-08, against the v1.0.0 rule corpus):**
+
+- K-001 sole authority — PASS (chunk 3; memory carries the A6 banner).
+- K-002 pointer bootstrap — PASS (135 lines; Binding block present;
+  every removed fact verified in `docs/`).
+- K-003 Backlog — PASS (`docs/backlog.md`; dependency-ordered; checked
+  entries rewritten to what shipped; stage convention declared).
+- K-004 decision register — PASS (`docs/decisions.md`, original IDs,
+  K-004 statuses, supersession-not-silent-edit stated).
+- K-005 companion registers — PASS (none seeded; pressure documented
+  here first).
+- K-006 design note per area — PASS (structures, type system, core
+  types, effects, pattern matching, grammar, modules, layers,
+  implementation map; planned notes tracked in `design/README.md`).
+- K-007 plans — PASS (home `docs/plans/`, outcome names, K-007
+  statuses, manifest; archive preserved with triage record).
+- K-008 non-developer docs — PASS at current stage (getting-started,
+  language-reference, proving primer, website + sandbox).
+- K-009 hosted registers — N/A (C3 rule; project is C2).
+- W-001 gated delivery — PASS (chunk gates; per-move PRs).
+- W-002 tests are signals — PASS (append-only-in-spirit rule in
+  bootstrap + PROCESS §6; suite green at every landing).
+- W-003 docs move with the work — PASS (every move PR carried its doc
+  updates; landing checklist enforces).
+- W-004 provisional until reviewed — PASS (review-and-redo principle,
+  VISION §5 p15; owner review on every PR).
+- W-005 no unowned known issues — PASS (residues carry backlog owners:
+  B-089, B-081, B-028, B-018…).
+- W-006 outcome-named single-use branches — PASS (practice since the
+  chunk-1 gate; five moves = five branches, deleted after merge).
+- W-007 README — PASS (B-091).
+- S-001/S-002 — PASS (no secrets in repo; S0 declared).
+- M-001..M-003 — N/A (methodology-corpus rules).
+
+**Coordination drafts (for majodali/methodology — C1/C2):**
+
+- C1, portfolio register row (replaces allegro's `implicit C0` row):
+  `| allegro | github.com/majodali/allegro | C2 / S0 /
+  language-tool-platform / static-site — pinned 1.0.0 |
+  [Classification](https://github.com/majodali/allegro/blob/main/docs/classification.md);
+  adoption arc B-095 complete 2026-08 |`
+- C2, practices §5 census corrections (propose per Article 8): A1 →
+  ✅ (135-line pointer bootstrap); A3 → ✅ (docs/decisions.md); A6 →
+  ✅ (audited, non-authoritative banner); A7 → ✅ (docs/plans/, K-007
+  statuses); D1–D3 → 🟡→✅ (CI runs typecheck + full suite on
+  push/PR since B-005; PR template added at B-095 chunk 4); "no
+  README" note obsolete (W-007 met at B-091). Test-count reference
+  "970+" → 1149 at 2026-08.
+
+Gate: owner sign-off (merge) closes the plan; the plan's Status line
+above flips with this PR.
 
 ## Coordination items (outside this repo)
 
