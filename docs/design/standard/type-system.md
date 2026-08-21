@@ -119,7 +119,61 @@ registered host-side internals. Until then: **no new meta-property without
 recording it here**, and follow the existing conventions for consistency
 rather than inventing variants.
 
-## 5. Known consistency notes
+## 5. Generics [implemented]
+
+Promoted from the session bootstrap at the K-002 slim (B-095 chunk 3);
+kind-tower truth (GenericType as a kind, `params` field, applier =
+`construct`, deferred user-generics surface — C7.2 ruling R1 as
+amended) is `docs/design/allegretto/structures.md` §9. The facts that
+live here:
+
+- Generic types are type constructors: `Array` is a function from type
+  params to concrete types; `Array[Int]` is the applied concrete.
+- **Concretes are memoized** — `Array[Int]` always returns the same
+  Context, so applied-generic identity is physical identity.
+- Type parameters can be types or **values** (e.g. `Vector[3]`).
+- Bare generic in annotation position auto-applies `Any`:
+  `arr: Array` → `arr: Array[Any]`.
+- Applied concretes answer shape Type and carry host-read
+  `__args`/`__generic` back-links.
+
+## 6. Function types and unification [implemented]
+
+`Function[ParamTypes, ReturnType]` is the parameterized type attached
+to typed function definitions. Type variables (unresolved Params in
+type expressions) bind progressively at call sites:
+
+- Unification matches arg types against param types, accumulating
+  type-variable bindings.
+- Flow is **bidirectional**: `T` determined from one argument
+  propagates to constrain the others in the same call.
+- Contradictory bindings (`T = Int` and `T = String` in one call)
+  produce type errors at the call site.
+
+Checks run in `applyComposed` before substitution — no `type_check`
+wrappers inside function bodies. Effect-variable unification rides the
+same generic-param surface (`docs/design/standard/effects.md` §2).
+
+## 7. Member descriptor shapes [implemented]
+
+The literal descriptor forms stored in every type's `__members`
+Context (the symbol-keyed member registry — identity and conformance
+semantics in `structures.md` §8):
+
+- Method: `{__type: MethodType, name: String, value: fn, getter?: 1}`
+  — executable member; the getter flag makes dispatch call it
+  immediately with self.
+- Field: `{__type: FieldType, name: String, fieldType: Type}` — typed
+  field declaration on record types.
+
+`typeMethod(type, name)` reads `__members` first and falls back to
+direct bindings — the single bridge for member access;
+`typeMemberDescriptor(type, name)` returns the full descriptor for
+dispatch-level use. The kind API itself (instanceof, subtypeof,
+define, distinct, construct authority) lives in `__members` the same
+way — `structures.md` §9 holds that design.
+
+## 8. Known consistency notes
 
 - The value-kind list in `CLAUDE.md` says "seven value kinds" but enumerates
   eight (Symbol was added later). To reconcile when `architecture.md` is

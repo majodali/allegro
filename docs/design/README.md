@@ -22,13 +22,15 @@ Every section is tagged with its implementation status:
 | Location | Layer / scope | Documents |
 |---|---|---|
 | `layers.md` | The spine | Layer model, capability tracks, milestone register |
+| `implementation-map.md` | File-level spine | Per-file map of src/ + trees, the evalSource pipeline, async runtime surface |
 | `allegretto/` | **L0** base language | `structures.md` (v2 design — draft pending sign-off); planned: `architecture.md` |
-| `extension/` | **L1** extension substrate | `grammar.md`; planned: `modules.md` (loading contract). Formalism spec stays at `../grammar-formalism.md` (referenced by Tier-0 PROCESS and by source code) |
-| `standard/` | **L2** Allegro Standard | `type-system.md`, `effects.md`, `pattern-matching.md`; planned, revalidation-gated (BACKLOG register): `contracts.md`, `totality.md`, `proofs.md`, `pcp.md` |
+| `extension/` | **L1** extension substrate | `grammar.md`, `modules.md` (loading + module objects). Formalism spec stays at `../grammar-formalism.md` (referenced by Tier-0 PROCESS and by source code) |
+| `standard/` | **L2** Allegro Standard | `type-system.md`, `core-types.md`, `effects.md`, `pattern-matching.md`; planned, revalidation-gated (BACKLOG register): `contracts.md`, `totality.md`, `proofs.md`, `pcp.md` |
 | `vivace/` | **L3** Vivace | planned, revalidation-gated: `planning-dsl.md` |
 | `platform/` | Capability tracks | planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
 
 Top-level consumables (not design truth, kept at `docs/`):
 `../grammar-formalism.md` (Grammar 2 spec), `../proving-in-allegro.md`
 (participant-neutral proving primer; loaded at runtime by the PCP LLM
-worker).
+worker), `../language-reference.md` (syntax by example),
+`../getting-started.md`.

@@ -520,6 +520,30 @@ into each other, into modules they import, or into the REPL session.
 
 Future (deferred): per-block or per-production activation via annotations.
 
+### 6.4 Shipped extension surface (the `grammar { … }` block)
+
+Promoted from the session bootstrap at the K-002 slim (B-095 chunk 3)
+— the concrete clause syntax modules use to declare syntax additions,
+as shipped in runtime-extension Phases 6/6b/7 (decision record:
+`docs/design/extension/grammar.md` §4; demos: `lib/pow.alg`,
+`lib/match_expr.alg`, `lib/units.alg`).
+
+- **Grammar 2 formalism (new, Phase 1 in progress)** — scannerless formalism described in `docs/grammar-formalism.md`. Will replace Pratt + Earley in Phase 2. Rule union (Terminal/NonTerm/Seq/Alt/Rep/Opt/Guarded), named productions, symbolic precedence, stateful indent terminals, grammar-value extension via `Operation` deltas, user-defined `@error` productions with `@sync` panic recovery. Phase 1 status: types + engine + Allegro primitives (`grammar2_*`) + tests covering the §10.3 regex DSL. Not yet: analyzer, indent engine, left recursion via full GLL, migration of existing Allegro grammar.
+- **Runtime grammar extension** (Phase 6 + 6b): modules declare syntax additions in a `grammar { … }` block:
+  - **Operators** (Phase 6): `infix S prec(X) left/right/none => (l,r) => ast`, `prefix S at(X) => …`, `postfix S at(X) => …`, `expr_prefix KW => …`. Precedence clauses accept named levels (`prec(pow)`), positional constraints (`above(mul) below(unary)`, single or combined), and operator-symbol lookup (`at("*")`). Anonymous levels get gensym'd names. Level insertion in `src/grammar2/fragments.ts` splices new productions into the stratified stack via surgery on the base grammar (LEVELS array in `base-grammar.ts`).
+  - **User rules + multi-token forms** (Phase 6b): `rule NAME = ebnf_body => template` adds/replaces a production; `rule NAME += …` appends an alternative. `expr_form parts => template` adds a new multi-token expression alternative (e.g. `match x with p => e | …`); `stmt_form parts => template` adds a new statement alternative. EBNF inside rule bodies supports `"lit"`, `/regex/`, ident refs, `s:rule` labels, `a*`/`a+`/`a?` postfix, `a ** sep` sep-rep, `(a | b)` grouping. Labels bind positionally to the template's params; `substituteParams` injects matched sub-ASTs at parse time. Whitespace between seq items and around rep separators is auto-interleaved.
+  - **Activation**: top-of-file `use NAME` / `use import NAME` header. The pre-scanner loads the named module and harvests any `grammar { … }` Grammar values from its bindings.
+  - **Validation**: cross-fragment validator runs before merging and reports `E_OPERATOR_CONFLICT` / `E_KEYWORD_CONFLICT` / `E_PRECEDENCE_CYCLE` at `use` time with aggregated messages.
+
+Phase 7 additions: `new grammar { … }` for fresh grammars
+(baseChain=[empty]) and `grammar extends X { … }` for composition;
+`use grammar { … }` hosting-file literal grammars; `use NAME.MEMBER`
+selects one Grammar binding from a multi-grammar module. Selector
+surgery: `rule foo -= alt_name` removes a named alternative,
+`rule foo[alt_name] = body => template` replaces one. Hygiene: free
+Symbols in grammar templates resolve against the module's evalCtx at
+definition time, so consumer rebindings can't hijack an extension.
+
 ## 7. Static analysis
 
 The analyzer is a pure function:

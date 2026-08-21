@@ -15,3 +15,9 @@
 | T-perf | — (continuous) | — | Known items banded in BACKLOG |
 | T-bootstrap (self-hosting) | M9 | — | Aspirational |
 | T-ecosystem (packages) | M10 | — | Aspirational |
+
+T-build design fragments held here until `build-pipeline.md` exists:
+phase-gate postconditions scan the expression graph for unresolved
+elements before a phase may close; extension modules may consume
+bindings internally (e.g. the module system consumes a filesystem);
+the phase chain itself is `layers.md` §2.
