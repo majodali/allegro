@@ -217,7 +217,7 @@ design hypothesis (work-in-progress, not settled):
 Seven known-unsolved gaps (counterexample legibility, model composition, the
 AI iteration loop, proof portability, organizational constraint-completeness
 process, bootstrap economics, escape-hatch discoverability) are tracked in
-`BACKLOG.md` (the L3 — Vivace band, B-081…B-086). *"We're not close enough to the
+`docs/backlog.md` (the L3 — Vivace band, B-081…B-086). *"We're not close enough to the
 bridge to decide whether we cross it or bungee off it"* — v1 domain pilots
 test the hypothesis; don't over-design ahead of evidence.
 

@@ -91,7 +91,7 @@ missing despite being the vision's endpoint).
 
 ## 4. How the backlog uses this
 
-Every `BACKLOG.md` item carries a stable ID (`B-###`) and a layer/track
+Every `docs/backlog.md` item carries a stable ID (`B-###`) and a layer/track
 tag from this doc. The list head is sequenced (implementation order); the
 tail is banded by layer/track in spine order, marked "not yet sequenced."
 Layer boundary questions that arise during implementation are settled as

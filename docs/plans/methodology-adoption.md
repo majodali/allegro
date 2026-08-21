@@ -125,11 +125,13 @@ basics.alg test comment made self-owning; the CLAUDE.md transition
 designation cleared. A reader ignoring CLAUDE.md misses nothing
 authoritative.
 
-**Move 4 — backlog relocation (K-003 home)**: `BACKLOG.md` moves to
-a `backlog.md` under `docs/`, root tombstone pointer, all references
-updated;
-remaining transition designations cleared (the section itself empties
-in chunk 4).
+**Move 4 — backlog relocation (K-003 home)  [this PR]**: `BACKLOG.md`
+moved to `docs/backlog.md` (git rename, history follows); root
+tombstone pointer left in place; every repo reference rewritten
+(bootstrap, Tier-0 docs' mechanical path mentions, design docs, plan
+manifest, memory index — archive left frozen). The last transition
+designation cleared; classification's transition section now records
+all four resolutions and empties at the chunk-4 close-out.
 
 ### Chunk 4 — Close-out
 

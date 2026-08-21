@@ -10,7 +10,7 @@ place and moves to `docs/` (practice A6; audited 2026-08,
 
 **Before writing memory** (docs/PROCESS.md §8): consider a permanent
 home first — design decisions → docs/design/ + `docs/decisions.md`,
-process/feedback → docs/PROCESS.md, status → BACKLOG.md /
+process/feedback → docs/PROCESS.md, status → docs/backlog.md /
 docs/CHANGELOG.md. Only session/user/external context belongs here.
 
 ## Session/user context (the legitimate residents)
@@ -18,7 +18,7 @@ docs/CHANGELOG.md. Only session/user/external context belongs here.
 - [user_role.md](user_role.md) — User is the language designer; formal semantics focus; discuss design before implementation
 - [feedback_tool_rejections.md](feedback_tool_rejections.md) — Tool rejections may be erroneous (interface bug); confirm verbally before treating one as deliberate
 - [user_parser_experiments.md](user_parser_experiments.md) — External LL(k)+Pratt parser experiment deferred; codegen is scheduled (B-072), not on hold
-- [project_state.md](project_state.md) — Narrative arc snapshot; defer to BACKLOG.md / docs/CHANGELOG.md for specifics
+- [project_state.md](project_state.md) — Narrative arc snapshot; defer to docs/backlog.md / docs/CHANGELOG.md for specifics
 
 ## Retained pointer stubs (canonical text lives in docs/)
 

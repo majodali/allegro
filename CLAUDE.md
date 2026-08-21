@@ -23,7 +23,7 @@ ignores it entirely misses nothing authoritative.
 - **File-level map + evalSource pipeline:** `docs/design/implementation-map.md`
 - **Durable design truth per area:** `docs/design/` (structures, type system, core types, effects, pattern matching, grammar, modules)
 - **Plans:** `docs/plans/` — read `README.md` (manifest) first
-- **What's next:** `BACKLOG.md` · **What landed:** `docs/CHANGELOG.md` (incl. the migrated v1-era record) · **v1 dispositions:** `V1-INVENTORY.md`
+- **What's next:** `docs/backlog.md` · **What landed:** `docs/CHANGELOG.md` (incl. the migrated v1-era record) · **v1 dispositions:** `V1-INVENTORY.md`
 - **Consumables:** `docs/getting-started.md`, `docs/language-reference.md` (syntax by example), `docs/grammar-formalism.md`, `docs/proving-in-allegro.md`
 
 ## Build, run, test
@@ -128,7 +128,7 @@ evaluator/runtime set; this is the complete session list):
 
 ## Status pointers
 
-- What's next → `BACKLOG.md` (one dependency-ordered list; stage tags
+- What's next → `docs/backlog.md` (one dependency-ordered list; stage tags
   per `docs/classification.md`)
 - What landed → `docs/CHANGELOG.md` · v1 feature dispositions →
   `V1-INVENTORY.md`
