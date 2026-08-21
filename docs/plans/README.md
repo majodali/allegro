@@ -20,7 +20,7 @@ closed → Backlog entry)`. "Closed" plans kept below retain record value
 All v1-era plans (the pre-review push through provability Phase H) were
 moved to `archive/` in the 2026-07 triage — see `archive/README.md` for
 the per-plan triage record. Their unpromoted design content is indexed in
-`BACKLOG.md` §"V1 revalidation register"; **do not** treat archived plans
+`docs/backlog.md` §"V1 revalidation register"; **do not** treat archived plans
 as current design.
 
 Lifecycle (K-007): draft → active → (superseded by X, because Y |

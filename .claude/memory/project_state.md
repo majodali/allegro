@@ -1,6 +1,6 @@
 ---
 name: allegro-project-state
-description: Narrative arc pointer — current status lives in BACKLOG.md and docs/CHANGELOG.md; file map in docs/design/implementation-map.md
+description: Narrative arc pointer — current status lives in docs/backlog.md and docs/CHANGELOG.md; file map in docs/design/implementation-map.md
 type: project
 ---
 Allegro is a programmable language platform: Allegretto (base) + Allegro
@@ -15,4 +15,4 @@ PCP + benchmark); next: Vivace pilots working backwards from use cases
 (planning DSL first), then D2–D5, I codegen, J review UX.
 
 Don't cite test counts or file lists from memory — read docs/design/implementation-map.md /
-BACKLOG.md. When asked "where are we?", answer in arc terms.
+docs/backlog.md. When asked "where are we?", answer in arc terms.

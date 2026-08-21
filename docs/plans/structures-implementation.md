@@ -781,7 +781,7 @@ carry over as-is. The rebuilt BACKLOG mirrors this plan's phases as its
   after Phase 3; kind recipe after Phase 6.
 - `docs/design/standard/effects.md`: effect-channel + Effect-re-derivation deltas
   (C1.5, C6.2).
-- `docs/CHANGELOG.md`: entry per chunk. `BACKLOG.md`: rebuilt on plan
+- `docs/CHANGELOG.md`: entry per chunk. `docs/backlog.md`: rebuilt on plan
   approval, then ticked per chunk.
 - `CLAUDE.md`: architecture map updates at phase boundaries (esp. Phases 2
   and 4); invariants section gains the boundary-lint rule at C1.3.

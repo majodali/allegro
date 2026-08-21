@@ -1821,12 +1821,12 @@ harness tests).
 - Doc-reference lint (`scripts/doc-ref-lint.ts`) added and wired into the
   test suite — PROCESS §10 debt; caught and fixed 20+ dangling references
   (stale `memory/…` paths, archived-plan paths in CLAUDE.md/bench/primer).
-- `BACKLOG.md` rebuilt: single list, stable IDs (B-001…B-086), sequenced
+- `docs/backlog.md` rebuilt: single list, stable IDs (B-001…B-086), sequenced
   head mirroring the structures implementation plan with revalidation
   items interleaved, banded tail by layer/track. V1 completed-items ledger
   converted to `V1-INVENTORY.md` (migration matrix: keep / revalidate /
   rework / drop / TBD per feature). Full v1 landing narratives remain in
-  git history (pre-rebuild `BACKLOG.md`).
+  git history (pre-rebuild `docs/backlog.md`).
 - Earlier in 2026-07 (same arc): v1-era plans archived with triage record
   (`docs/plans/archive/README.md`); revalidation register established
   (now folded into the backlog as `[reval]` items); shipped

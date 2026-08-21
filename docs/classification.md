@@ -37,10 +37,11 @@ named; deferred until needed per Article 6.)
 
 ## Adoption transition (Article 7 sandbox designations)
 
-The following materials are designated **`in-progress`** pending the
-methodology-adoption arc
-([docs/plans/methodology-adoption.md](plans/methodology-adoption.md));
-designated 2026-08 — audits treat age as a finding:
+**All designations resolved 2026-08** — no material remains
+`in-progress` under the methodology-adoption arc
+([docs/plans/methodology-adoption.md](plans/methodology-adoption.md)).
+The resolution record below stands until the chunk-4 close-out
+empties this section:
 
 - `CLAUDE.md` — resolved 2026-08 (chunk 3 moves 3a+3b): every
   bootstrap-only fact promoted into `docs/` (v1-era history →
@@ -56,8 +57,9 @@ designated 2026-08 — audits treat age as a finding:
   INTO `.claude/`, all retargeted; 13 zero-reference pointer stubs
   deleted; the directory now carries the A6 non-authoritative banner
   and holds only session/user/external context.
-- `BACKLOG.md` — at repo root; Registers live under `docs/`;
-  relocation in chunk 3 (it is otherwise K-003-compliant).
+- Backlog — resolved 2026-08 (chunk 3 move 4): relocated from repo
+  root to [docs/backlog.md](backlog.md) with all references updated
+  and a root tombstone pointer; K-003-compliant throughout.
 
 Resolved: the missing decision register (contra K-004) cleared at the
 chunk-2 gate, 2026-08 — [docs/decisions.md](decisions.md) indexes the

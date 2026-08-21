@@ -17,7 +17,7 @@ never duplicate content — duplication is how documentation rots.
 | 1 | `docs/design/*.md` | Durable design truth per area (type system, effects, grammar, proofs, …) | With the implementing/deciding change, same PR |
 | 1 | `docs/grammar-formalism.md` | Grammar 2 formalism spec | Same as design docs |
 | 1 | `docs/proving-in-allegro.md` | Participant-neutral proving primer (consumed by humans and the PCP LLM worker) | Same as design docs |
-| 2 | `BACKLOG.md` | What's next, debt register, research questions | Freely, before every commit that affects it |
+| 2 | `docs/backlog.md` | What's next, debt register, research questions | Freely, before every commit that affects it |
 | 2 | `docs/CHANGELOG.md` | What landed, when, with what design notes | Append per landed chunk |
 | 2 | `docs/plans/*.md` | Implementation plans (transient; see §4) | Freely; lifecycle below |
 | 3 | `CLAUDE.md` | Agent session contract: build/run, architecture map, invariants & gotchas, pointers | When commands, invariants, or architecture change — not for history |
@@ -27,7 +27,7 @@ Three content types, three homes:
 
 - **Design rationale & decisions** (durable) → `docs/design/`
 - **Implementation plans** (transient) → `docs/plans/`
-- **Status & history** (append-only) → `docs/CHANGELOG.md` + `BACKLOG.md`
+- **Status & history** (append-only) → `docs/CHANGELOG.md` + `docs/backlog.md`
 
 A plan file must not become the only record of a design decision; a status
 narrative must not live in CLAUDE.md; a design decision must not exist only
@@ -93,7 +93,7 @@ Before every commit that lands functionality:
 - [ ] New behavior covered by tests; user-visible features get a demo
       `tests/*.alg` with `// expect:` comments
 - [ ] `docs/CHANGELOG.md` entry (what landed, key decisions, deviations)
-- [ ] `BACKLOG.md` updated (items ticked/moved; new debt or follow-ons filed)
+- [ ] `docs/backlog.md` updated (items ticked/moved; new debt or follow-ons filed)
 - [ ] `docs/design/*` updated if the design or its implemented/designed
       status changed
 - [ ] `CLAUDE.md` updated **only** if commands, invariants, or the
@@ -180,7 +180,7 @@ content has a more permanent home.**
 - Design decisions → `docs/design/` (or propose for `docs/VISION.md`)
 - Process rules and feedback about how to work → propose for
   `docs/PROCESS.md`
-- Status and history → `docs/CHANGELOG.md` / `BACKLOG.md`
+- Status and history → `docs/CHANGELOG.md` / `docs/backlog.md`
 
 If content is promoted, the memory file shrinks to a 2–3 line pointer to the
 canonical location. Memory is never the canonical source for design or

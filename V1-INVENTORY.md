@@ -1,6 +1,6 @@
 # V1 feature inventory — migration matrix
 
-> Tier 2 (companion to `BACKLOG.md`). The v1 implementation ran through
+> Tier 2 (companion to `docs/backlog.md`). The v1 implementation ran through
 > provability Phase H before the 2026-06 review; the shipped feature set
 > below (converted from the old BACKLOG's completed-items ledger,
 > 2026-07) is the inventory the structures rewrite must disposition.
@@ -11,12 +11,12 @@
 > implementation-plan phase runs). Verdicts are filled progressively;
 > closing all TBDs is itself a backlog item (M3 sweep).
 > Detailed v1 landing narratives: this repo's git history (pre-rebuild
-> `BACKLOG.md` and `CLAUDE.md` "What's Next"), migrating to
+> `docs/backlog.md` and `CLAUDE.md` "What's Next"), migrating to
 > `docs/CHANGELOG.md` per PROCESS.
 
 Layer/track tags per `docs/design/layers.md`. Chunk refs per
 `docs/plans/structures-implementation.md`; register refs per
-`BACKLOG.md` §revalidation register.
+`docs/backlog.md` §revalidation register.
 
 ## L0 — evaluator & core
 
