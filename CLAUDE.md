@@ -37,6 +37,7 @@ npx tsx src/index.ts file.alg       # run a file  (--base for Allegretto)
 npx tsx src/index.ts inspect|verify|obligations|propose|prove <file>  # → docs/getting-started.md
 npm run bench                       # H-arc benchmark corpus
 npm run build:web                   # web bundle; deploy.sh is OWNER-RUN only
+npm run check-deployed              # audit live site vs origin/main (needs site egress)
 ```
 
 `basics.alg` output and every `tests/*.alg` demo are suite-pinned via

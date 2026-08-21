@@ -14,6 +14,7 @@
   "scripts": {
     "test": "tsx src/test.ts",
     "bench": "tsx bench/run.ts",
+    "check-deployed": "tsx scripts/check-deployed.ts",
     "generate-parser": "tsx grammar/generate-parser.ts",
     "build:web": "esbuild web/allegro-web.ts --bundle --outfile=web/dist/allegro.js --format=iife --global-name=AllegroBundle --platform=browser",
     "start": "tsx src/index.ts"

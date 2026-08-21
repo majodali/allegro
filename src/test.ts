@@ -11461,6 +11461,67 @@ function runDocLintTests(): void {
   });
 }
 
+// --- B-096: deployed-version verification — pure verdict logic (no network) ---
+
+import { assessDeployment, parseStamp } from "../scripts/check-deployed.js";
+
+function runCheckDeployedTests(): void {
+  const stamp = (commit: string, opts: { branch?: string; dirty?: boolean } = {}) => ({
+    commit,
+    branch: opts.branch ?? "main",
+    deployedAt: "2026-08-21T00:00:00Z",
+    dirty: opts.dirty ?? false,
+  });
+  const MAIN = "a".repeat(40);
+  const OLD = "b".repeat(40);
+
+  test("B-096: live matching origin/main is current (exit 0)", () => {
+    const v = assessDeployment({ stamp: stamp(MAIN), mainHead: MAIN, liveKnownLocally: true, behindMain: 0 });
+    eq(v.status, "current");
+    eq(v.exitCode, 0);
+  });
+
+  test("B-096: live behind main reports the commit count (exit 1)", () => {
+    const v = assessDeployment({ stamp: stamp(OLD), mainHead: MAIN, liveKnownLocally: true, behindMain: 3 });
+    eq(v.status, "stale");
+    eq(v.exitCode, 1);
+    eq(v.lines.some((l) => l.includes("3 commit(s) behind")), true, "behind count rendered");
+  });
+
+  test("B-096: missing stamp is unverifiable with redeploy guidance (exit 2)", () => {
+    const v = assessDeployment({ stamp: null, mainHead: MAIN, liveKnownLocally: false, behindMain: null });
+    eq(v.status, "unverifiable");
+    eq(v.exitCode, 2);
+    eq(v.lines.some((l) => l.includes("Redeploy")), true, "guidance rendered");
+  });
+
+  test("B-096: live commit unknown to the clone is a mismatch, not a crash", () => {
+    const v = assessDeployment({ stamp: stamp("c".repeat(40)), mainHead: MAIN, liveKnownLocally: false, behindMain: null });
+    eq(v.status, "stale");
+    eq(v.lines.some((l) => l.includes("unknown to this clone")), true);
+  });
+
+  test("B-096: dirty deploy of main's commit is a mismatch with a warning", () => {
+    const v = assessDeployment({ stamp: stamp(MAIN, { dirty: true }), mainHead: MAIN, liveKnownLocally: true, behindMain: 0 });
+    eq(v.status, "stale");
+    eq(v.lines.some((l) => l.includes("DIRTY working tree")), true, "dirty warning rendered");
+  });
+
+  test("B-096: non-main deploy branch warns even when current", () => {
+    const v = assessDeployment({ stamp: stamp(MAIN, { branch: "hotfix" }), mainHead: MAIN, liveKnownLocally: true, behindMain: 0 });
+    eq(v.status, "current");
+    eq(v.lines.some((l) => l.includes("branch 'hotfix'")), true, "branch warning rendered");
+  });
+
+  test("B-096: parseStamp accepts the deploy.sh shape and rejects junk", () => {
+    const ok = parseStamp('{"commit": "abc", "branch": "main", "deployedAt": "2026-08-21T00:00:00Z", "dirty": false}');
+    eq(ok?.commit, "abc");
+    eq(ok?.dirty, false);
+    eq(parseStamp("<html>404</html>"), null);
+    eq(parseStamp('{"unrelated": 1}'), null);
+  });
+}
+
 // --- Boundary-test harness (structures-implementation Phase 0 / B-001) ---
 
 import { runBoundaryTests, getSuiteFloor } from "./boundary-tests.js";
@@ -11473,6 +11534,7 @@ timedSection("modules", runModuleTests)
   .then(() => timedSection("h4a-llm-worker", runH4aAsyncTests))
   .then(() => timedSection("benchmark", runBenchmarkTests))
   .then(() => timedSection("doc-lint", async () => runDocLintTests()))
+  .then(() => timedSection("check-deployed", async () => runCheckDeployedTests()))
   .then(() => timedSection("boundary", async () => runBoundaryTests({ test, eq, corpus: { files: corpusWalkFiles, violations: corpusWalkViolations } })))
   .then(() => {
   // Suite-count floor (boundary baseline): a mass-disablement tripwire.
