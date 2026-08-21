@@ -10988,8 +10988,9 @@ test("grammar2/std: dot-access.alg runs end-to-end through grammar2", () => {
 
 test("grammar2/base: basics.alg runs end-to-end, matches expected output", () => {
   // Phase 2b acceptance: parse, build, and evaluate the full basics.alg through
-  // the new grammar2 path. The expected output from CLAUDE.md is the seven
-  // lines below — all produced by print() calls in the source.
+  // the new grammar2 path. The expected output is pinned as the seven
+  // lines below — all produced by print() calls in the source; this
+  // test is the oracle (formerly duplicated in CLAUDE.md).
   const source = fs.readFileSync("basics.alg", "utf-8");
   const printed: string[] = [];
   const origLog = console.log;

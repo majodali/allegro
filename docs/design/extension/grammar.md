@@ -1,8 +1,8 @@
 # Grammar & parser — design decisions and goals
 
 > Tier 1 design doc. Status tags per `docs/design/README.md`.
-> The formalism specification lives in `docs/grammar-formalism.md`; runtime
-> grammar-extension behavior is summarized in `CLAUDE.md`. This doc records
+> The formalism specification lives in `docs/grammar-formalism.md`; the
+> shipped extension surface is its §6.4. This doc records
 > decisions, goals, and known corrections that aren't part of the formalism
 > spec itself.
 

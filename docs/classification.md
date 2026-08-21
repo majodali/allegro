@@ -42,9 +42,11 @@ methodology-adoption arc
 ([docs/plans/methodology-adoption.md](plans/methodology-adoption.md));
 designated 2026-08 — audits treat age as a finding:
 
-- `CLAUDE.md` — monolithic (~600 lines) and holds authoritative
-  architecture/invariant content, contra K-001/K-002; slims to a
-  pointer bootstrap in chunk 3. Its Binding block is compliant now.
+- `CLAUDE.md` — resolved 2026-08 (chunk 3 moves 3a+3b): every
+  bootstrap-only fact promoted into `docs/` (v1-era history →
+  CHANGELOG; core types, unification, modules, grammar surface,
+  implementation map, language reference → new/extended docs), then
+  slimmed to a ~135-line K-002 pointer bootstrap.
 - ~~`.claude/plans/`~~ — resolved 2026-08 (chunk 3 move 1): the whole
   plans tree relocated to `docs/plans/`, statuses normalized to the
   K-007 grammar.

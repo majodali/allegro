@@ -7,8 +7,8 @@ that needs to produce candidate proof terms the kernel will accept.
 
 The primer is intentionally compact. For deeper background see
 `docs/VISION.md` §2 (the bet behind the arc) and the
-F1–F7 entries in `CLAUDE.md` (each feature's full implementation
-contract).
+Phase F1–F7 entries in `docs/CHANGELOG.md` §v1 era (each feature's
+full implementation contract).
 
 ## The proof model in one sentence
 

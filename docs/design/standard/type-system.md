@@ -1,7 +1,8 @@
 # Type system — design decisions
 
 > Tier 1 design doc. Status tags per `docs/design/README.md`.
-> Reference for current behavior: `CLAUDE.md` §Type System; implementation
+> Reference for current behavior: `core-types.md` (the roster) +
+> `docs/design/allegretto/structures.md` §6/§8/§9; implementation
 > in `src/types-std.ts`, `src/primitives.ts` (dispatch), `src/evaluator.ts`.
 
 ## 1. Types are predicates [implemented]
@@ -175,9 +176,9 @@ way — `structures.md` §9 holds that design.
 
 ## 8. Known consistency notes
 
-- The value-kind list in `CLAUDE.md` says "seven value kinds" but enumerates
-  eight (Symbol was added later). To reconcile when `architecture.md` is
-  written.
+- (Resolved 2026-08, K-002 slim: the bootstrap's "seven value kinds"
+  list is deleted; the representation taxonomy is
+  `structures.md` §2 — host discriminants, D46.)
 - `Param.predicates` is reserved for future refinement bounds on parameters;
   effect bounds moved to the dedicated `Param.effectBound` slot (effects
   describe computations, refinements describe data — keep the lattices

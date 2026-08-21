@@ -1,7 +1,7 @@
 # Pattern matching — design decisions
 
 > Tier 1 design doc. Status tags per `docs/design/README.md`.
-> Syntax reference: `CLAUDE.md` §Base Parser Syntax; implementation in
+> Syntax reference: `docs/language-reference.md`; implementation in
 > `src/grammar2/base-grammar.ts` (when/is/then), `src/primitives.ts`
 > (`eval_when`).
 
