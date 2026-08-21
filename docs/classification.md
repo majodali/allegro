@@ -6,7 +6,7 @@ field definitions and omission defaults per the methodology
 [vocabulary](https://github.com/majodali/methodology/blob/main/docs/vocabulary.md).
 
 - **C-tier**: C2 — serious project, pre-users
-- **Pinned methodology version**: 1.0.0 (compliance target)
+- **Pinned methodology version**: 1.1.0 (compliance target; migrated from 1.0.0 2026-08 — both v1.1.0 amendments ship migration-note: none)
 - **S-level**: S0 — public code only
 - **Type**: `language/tool platform`
 - **Target**: `static site` (allegrolang.org — landing page, sandbox,
