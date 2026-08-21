@@ -57,7 +57,7 @@
 |---|---|
 | `bench/` | H-arc benchmark corpus + harness (`npm run bench`) |
 | `pcp/llm-worker.ts` | `allegro prove` LLM worker (Anthropic SDK; pure helpers tested SDK-free) |
-| `scripts/` | `typecheck.sh` (sanctioned typecheck), `doc-ref-lint.ts`, `sync-web-libs.ts` |
+| `scripts/` | `typecheck.sh` (sanctioned typecheck), `doc-ref-lint.ts`, `sync-web-libs.ts`, `check-deployed.ts` (B-096 live-site audit) |
 
 ## Everything else
 

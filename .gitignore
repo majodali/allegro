@@ -22,3 +22,6 @@ Thumbs.db
 
 # Claude Code harness local settings (user-specific permissions)
 .claude/settings.local.json
+
+# B-096: generated per deploy by deploy.sh, never committed
+website/version.json

@@ -8,6 +8,23 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-096: deployed-version verification (T-tooling)
+
+`[stage: live]` becomes auditable instead of attested. `deploy.sh` now
+stamps `website/version.json` at deploy time (commit / branch /
+deployedAt / dirty; gitignored — generated per deploy, uploaded by the
+existing S3 sync) and warns on non-main or dirty deploys. New
+`npm run check-deployed` (`scripts/check-deployed.ts`, out-of-rootDir)
+fetches the stamp from the live site and compares to origin/main:
+current / stale-by-N-commits / mismatch (unknown commit, dirty deploy)
+/ unverifiable, with matching exit codes (0/1/2). Only a clean 404
+reads as "predates the stamp" — proxy 403s and 5xx report as
+unverifiable, not unstamped. Pure verdict logic (`assessDeployment`,
+`parseStamp`) exported and unit-tested (7 tests, new `check-deployed`
+suite section, no network in the suite); the CLI needs egress to the
+site, so it runs on the owner's machine. First stamp publishes with
+the owner's next deploy. Closes the chunk-1 gate flag; feeds the
+Article 11 tooling picture.
 ## 2026-08 — Methodology pin bumped to v1.1.0
 
 Compliance target migrated 1.0.0 → 1.1.0 (Binding block + Classification).

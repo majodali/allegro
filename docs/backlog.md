@@ -625,13 +625,16 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   practices §5 census corrections — delivery is an owner action or a
   methodology-repo PR on request), risk register consciously NOT
   seeded (K-005). Plan closed → this entry
-- [ ] **B-096** · T-tooling · Deployed-version verification (owner,
-  chunk-1 gate): make "what is live at allegrolang.org" checkable —
-  e.g. deploy.sh stamps the git commit/version into the published site
-  (a `/version.json` or footer stamp) and a verify step compares it to
-  main, so `[stage: live]` designations are auditable instead of
-  attested. Feeds the methodology's form-audit tooling picture
-  (Constitution Article 11)
+- [x] **B-096** · T-tooling · Deployed-version verification (owner,
+  chunk-1 gate). Landed 2026-08: `deploy.sh` stamps
+  `website/version.json` (commit / branch / deployedAt / dirty;
+  gitignored, generated per deploy) and `npm run check-deployed`
+  (`scripts/check-deployed.ts`) fetches it from the live site and
+  compares to origin/main — current / stale-by-N / mismatch /
+  unverifiable verdicts, only a clean 404 read as "predates the
+  stamp"; pure verdict logic unit-tested (7 tests, no network in the
+  suite). `[stage: live]` designations are auditable once the owner's
+  NEXT deploy publishes the first stamp. Feeds Article 11 tooling
 
 ### L3 — Vivace (M5)
 
