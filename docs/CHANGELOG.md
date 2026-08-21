@@ -8,6 +8,16 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — Methodology pin bumped to v1.1.0
+
+Compliance target migrated 1.0.0 → 1.1.0 (Binding block + Classification).
+The release's two amendments (amendment & release process; Audit-log
+register) both ship migration-note: none — the delta is
+methodology-repo process machinery; no project-facing duty is minted.
+Taken up the one optional hook: `docs/audits.md` seeded with the B-095
+chunk-4 form-audit entry, making the Article 9 delta-ratio trigger
+recordable here.
+
 ## 2026-08 — B-095: methodology adoption (majodali/methodology v1.0.0) — arc complete
 
 Allegro is classified and structurally compliant under the pinned
