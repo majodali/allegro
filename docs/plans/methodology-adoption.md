@@ -102,7 +102,7 @@ codegen-after-safety-machinery rationale. Transition designation for
 pointer bootstrap. Split into two PRs after the coverage audit found
 seven fact-clusters existing ONLY in CLAUDE.md (and that the
 CHANGELOG's own stub promise — v1-era history migration — was never
-executed). **3a (promotions, additive)  [this PR]**: the ✅ v1-era
+executed). **3a (promotions, additive)  ✅ merged (PR #8)**: the ✅ v1-era
 per-phase record migrated verbatim into `docs/CHANGELOG.md`; new docs
 `docs/design/standard/core-types.md`,
 `docs/design/extension/modules.md`,
@@ -113,12 +113,16 @@ evalSource pipeline + async runtime surface),
 types and unification, §Member descriptor shapes;
 `docs/grammar-formalism.md` gains §6.4 (shipped `grammar { … }`
 surface); platform README holds the T-build fragments. **3b (the slim
-itself, the sub-gate)**: rewrite CLAUDE.md to the ~186-line skeleton
+itself, the sub-gate)  [this PR]**: CLAUDE.md rewritten to a 135-line
+pointer bootstrap
 (Binding verbatim, doc map, build/run/test, architecture at a glance,
 conventions/gotchas — kept because PROCESS §6 promises them there —
-session contract, status pointers); retarget the six doc citations
-that point at deleted sections; clear the CLAUDE.md transition
-designation. A reader ignoring CLAUDE.md misses nothing
+session contract, status pointers); the six doc citations that
+pointed at deleted sections retargeted (type-system.md header + its
+seven-kinds consistency note, pattern-matching.md, grammar.md,
+structures.md, proving-in-allegro.md, project_state.md) and the
+basics.alg test comment made self-owning; the CLAUDE.md transition
+designation cleared. A reader ignoring CLAUDE.md misses nothing
 authoritative.
 
 **Move 4 — backlog relocation (K-003 home)**: `BACKLOG.md` moves to

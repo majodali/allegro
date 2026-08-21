@@ -5,9 +5,9 @@
 > (complete; every decision executed or pinned to a named owner —
 > B-002); decision numbers below cite it, and Appendices A–C carry the
 > three load-bearing tables. Status tags per `docs/design/README.md`.
-> This document describes the post-unification model; `CLAUDE.md`
-> describes what ships today — as of C7.1 the two have converged for
-> the substrate.
+> This document describes the post-unification model; shipped state is
+> recorded in `docs/CHANGELOG.md` — as of C7.1 the model and the
+> shipped substrate have converged.
 
 ## 1. Overview [designed]
 
