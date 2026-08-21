@@ -594,7 +594,7 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
 
 ### Track M — methodology (2026-08)
 
-- [ ] **B-095** · Methodology adoption (majodali/methodology v1.0.0) —
+- [x] **B-095** · Methodology adoption (majodali/methodology v1.0.0) —
   plan `docs/plans/methodology-adoption.md` (the first resident of the
   new K-007 plan home). **Chunk 1 drafted 2026-08**:
   `docs/classification.md` (C2 / S0 / language-tool-platform /
@@ -618,9 +618,13 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   history → CHANGELOG; core-types/modules/implementation-map/
   language-reference docs); CLAUDE.md → 135-line K-002 bootstrap;
   Backlog → `docs/backlog.md` (this move). All four Article-7
-  transition designations resolved. Remaining: chunk 4 close-out +
-  coordination (portfolio register row, practices §5 stale-data
-  amendment)
+  transition designations resolved. **Chunk 4 landed 2026-08 (arc
+  CLOSED)**: PR template (practice D2), transition section emptied,
+  form audit PASS across the applicable rule corpus (recorded in the
+  plan), coordination drafts for the methodology repo (portfolio row,
+  practices §5 census corrections — delivery is an owner action or a
+  methodology-repo PR on request), risk register consciously NOT
+  seeded (K-005). Plan closed → this entry
 - [ ] **B-096** · T-tooling · Deployed-version verification (owner,
   chunk-1 gate): make "what is live at allegrolang.org" checkable —
   e.g. deploy.sh stamps the git commit/version into the published site

@@ -8,6 +8,41 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-095: methodology adoption (majodali/methodology v1.0.0) — arc complete
+
+Allegro is classified and structurally compliant under the pinned
+methodology. Four chunks, each owner-gated; chunk 3 ran as five
+per-move-reviewed PRs (#6–#10) on W-006 single-use branches.
+
+- **Chunk 1 — Classification + Binding**: `docs/classification.md`
+  (C2 / S0 / language-tool-platform / static-site, pinned 1.0.0,
+  Workflow `in-dev → merged → live` + stage-reference convention) and
+  the CLAUDE.md Binding block. Gate rulings: C2 confirmed; B-091
+  `[stage: live]`; the drafted DEV-1 deviation withdrawn — W-006
+  adopted in full; B-096 (deployed-version verification) registered.
+- **Chunk 2 — Decision register (K-004)**: `docs/decisions.md` indexes
+  the corpus (D1–D47, E-R, U-R, R-R, chunk + standing rulings) under
+  original IDs; D48+ continues there. Side-finding: two stale
+  ruling-status passages refreshed to match their ratification logs.
+- **Chunk 3 — Authority relocation (K-001/K-002/K-007)**: plans tree →
+  `docs/plans/` with K-007 statuses; memory audited (five inbound
+  citations retargeted, 13 dead stubs deleted, A6 banner); every
+  bootstrap-only fact promoted (v1-era history → this file; new
+  `core-types.md`, `extension/modules.md`, `implementation-map.md`,
+  `language-reference.md`; type-system + grammar-formalism sections);
+  CLAUDE.md 676 → 135-line pointer bootstrap; Backlog →
+  `docs/backlog.md` with root tombstone. All four Article-7 transition
+  designations resolved.
+- **Chunk 4 — Close-out**: PR template (practice D2) at
+  `.github/pull_request_template.md`; transition section emptied;
+  form-audit self-check against the rule corpus recorded in the plan;
+  coordination drafts (portfolio register row, practices §5 census
+  corrections) prepared for the methodology repo; risk register NOT
+  seeded (K-005: no register before pressure — proposed, owner's
+  call). Plan closed → this entry.
+
+Suite green throughout (1149/1149 at every landing).
+
 ## 2026-08 — B-092 U4: rung-2 release packaging (B-092 closes — rung 2 landed)
 
 The seriousness proof ships: demos/rung2 (3 suite-validated scenes
