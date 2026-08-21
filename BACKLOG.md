@@ -505,7 +505,10 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   continuations decision feeds B-048/B-073 (v1 "Phase I" — revalidate
   against v2 graph shapes; Grammar 2 "Phase 9" emitter folds in here).
   v1 Phase-I substrate + plan preserved at branch
-  `archive/v1-references` (parent c553710) — pre-rework, reference only
+  `archive/v1-references` (parent c553710) — pre-rework, reference only.
+  Sequencing rationale (maintainer, recorded 2026-06): codegen sits
+  after the safety machinery deliberately, so emission can be
+  aggressive without forfeiting invariant/effect information
 
 ### T-perf
 

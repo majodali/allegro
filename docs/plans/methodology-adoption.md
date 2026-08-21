@@ -79,12 +79,24 @@ pages). The doc-ref lint's scan exclusion follows the archive to
 any reintroduced stale path dangles loudly. Transition designation
 for `.claude/plans/` cleared.
 
-**Move 2 — memory audit (K-001)**: each `.claude/memory/` file
-classified — authoritative design content promoted to `docs/design/`
-(candidates: the provability thesis, meta-type/multiple-inheritance
-design, vivace vision; audit decides), remainder marked
-non-authoritative session cache per practice A6. Gate: owner reviews
-the promote/cache table in the PR.
+**Move 2 — memory audit (K-001)  [this PR]**: all 21 files audited.
+Finding that reframed the move: the 2026-06 promotion pass had already
+moved every authoritative design memo into `docs/` (verified per file
+against VISION §2/§4/§5, PROCESS §3–§9, design/standard/*,
+design/extension/grammar.md) — zero promotions needed. The real K-001
+exposure was five live citations pointing INTO `.claude/`
+(CLAUDE.md ×3, proving-in-allegro.md, bench/README.md) — all
+retargeted to `docs/VISION.md` §2 or deleted. Outcome: 13
+zero-reference pointer stubs deleted; 8 files remain (4 session/user/
+external context, 3 marked pointer stubs, index) under a new A6
+non-authoritative banner in MEMORY.md. Two staleness bugs fixed en
+route: CLAUDE.md's deferred-MI bullet contradicted the D44 line above
+it (deleted), and `docs/design/standard/type-system.md` §2 still
+described the pre-D44 `__extends` name-walk and dissolved MI design
+(D44 supersession notes added). Side-fixes: VISION.md's dangling
+"§Vivace Usability Research" anchor; B-072 gains the recorded
+codegen-after-safety-machinery rationale. Transition designation for
+`.claude/memory/` cleared.
 
 **Move 3 — CLAUDE.md slim (K-002, own sub-gate)**: 676 lines → ≤200
 pointer bootstrap (Binding block, what-it-is, build/run/test,

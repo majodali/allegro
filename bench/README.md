@@ -1,7 +1,7 @@
 # PCP Benchmark Suite
 
 A small graded-difficulty corpus of proof obligations that measures the
-provability arc (`.claude/memory/design_provability_thesis.md`) across baselines.
+provability arc (`docs/VISION.md` §2) across baselines.
 It pairs with Phase H (the Proof Collaboration Protocol — see
 `docs/plans/archive/phase-h-plan.md`): *"Without this we don't know the thesis
 is validated for any prover."*

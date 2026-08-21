@@ -4,5 +4,8 @@ description: PROMOTED — canonical text in docs/design/standard/type-system.md 
 type: project
 ---
 **Promoted to `docs/design/standard/type-system.md` §2 (2026-06).** NominalType
-collapsed into Type with optional name; shape-aware comparison; multiple
-inheritance deferred with explicit-conflict design and revisit triggers.
+collapsed into Type with optional name; shape-aware comparison.
+**Superseded (2026-08): the deferred-MI design and its revisit triggers
+were DISSOLVED by D44** (declared inheritance decomposed into
+conformance + refinement + composition; multi-conformance needs no MI) —
+see `docs/decisions.md` D44. NominalType itself retired at C7.1.
