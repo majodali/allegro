@@ -39,5 +39,5 @@ merely *transports* as extensions.
 ## Documents
 
 - `grammar.md` — parser & grammar-extension design decisions
-- `modules.md` (planned) — loading contract (the L1 half of the split)
+- `modules.md` — loading contract + module objects (the L1/L2 split doc)
 - Formalism spec: `../../grammar-formalism.md` (top level, see above)

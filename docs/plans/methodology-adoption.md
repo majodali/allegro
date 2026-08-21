@@ -99,11 +99,27 @@ codegen-after-safety-machinery rationale. Transition designation for
 `.claude/memory/` cleared.
 
 **Move 3 — CLAUDE.md slim (K-002, own sub-gate)**: 676 lines → ≤200
-pointer bootstrap (Binding block, what-it-is, build/run/test,
-architecture at a glance, conventions, doc map). Every removed fact
-must already live in `docs/` (CHANGELOG, design notes) or is promoted
-there first in the same PR — a reader ignoring CLAUDE.md misses
-nothing authoritative.
+pointer bootstrap. Split into two PRs after the coverage audit found
+seven fact-clusters existing ONLY in CLAUDE.md (and that the
+CHANGELOG's own stub promise — v1-era history migration — was never
+executed). **3a (promotions, additive)  [this PR]**: the ✅ v1-era
+per-phase record migrated verbatim into `docs/CHANGELOG.md`; new docs
+`docs/design/standard/core-types.md`,
+`docs/design/extension/modules.md`,
+`docs/design/implementation-map.md` (corrected per-file map +
+evalSource pipeline + async runtime surface),
+`docs/language-reference.md` (syntax by example);
+`docs/design/standard/type-system.md` gains §Generics, §Function
+types and unification, §Member descriptor shapes;
+`docs/grammar-formalism.md` gains §6.4 (shipped `grammar { … }`
+surface); platform README holds the T-build fragments. **3b (the slim
+itself, the sub-gate)**: rewrite CLAUDE.md to the ~186-line skeleton
+(Binding verbatim, doc map, build/run/test, architecture at a glance,
+conventions/gotchas — kept because PROCESS §6 promises them there —
+session contract, status pointers); retarget the six doc citations
+that point at deleted sections; clear the CLAUDE.md transition
+designation. A reader ignoring CLAUDE.md misses nothing
+authoritative.
 
 **Move 4 — backlog relocation (K-003 home)**: `BACKLOG.md` moves to
 a `backlog.md` under `docs/`, root tombstone pointer, all references
