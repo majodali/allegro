@@ -37,8 +37,8 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   interfaces — plan `equality-and-laws.md`, decisions E-R1–E-R6
   maintainer-ratified 2026-08 (with E-R3 generality note: laws are
   member-set-general, not interface-only); chunks E1–E4 underway. Then
-  S3 visibility (D41–D43, designed+ratified), then B-028 completion
-  effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
+  S3 visibility (D41–D43 — B-097, plan `visibility.md` at
+  ratification gate), then B-028 completion effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
 - **Track R — public release (started 2026-08, runs alongside
   functional tranches):** positioning plan `release-track.md`
   (differentiator map + claims register + demo ladder); VISION §1a/§5
@@ -381,6 +381,15 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   divergence; equality ignores source; pure-code read refusal).
   Opens AST access to user-level meta-functions without grammar
   productions
+- [ ] **B-097** · L0/L2 · S3 visibility arc (D41–D43) — own plan
+  `docs/plans/visibility.md` `[stage: in-dev]`: mediated member
+  pipeline (kernel default mediator; fallbackMember 3-ary with the
+  evidence capsule), scope-binding visibility attribute (the
+  `exported` stopgap + `y = x` wart die), private members via
+  `private(...)` descriptor attributes, bespoke-reader closure
+  (destructuring/print/conformance/reflection per V-R6/V-R7),
+  forgery E live. Decision points V-R1–V-R8 drafted 2026-08,
+  awaiting ratification; chunks V1–V4
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
   (`completion-effects.md`): `div`, blocking-read, triggered guard,
   discharge tiers (structures.md §10)
