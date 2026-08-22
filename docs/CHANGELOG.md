@@ -8,6 +8,34 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-097 V1: visibility substrate (S3 arc opens; plan ratified)
+
+The S3 mediated-member arc opened: `docs/plans/visibility.md` ratified
+(V-R1–V-R8 + the forgery-E criterion, all as recommended — one kernel
+pipeline with `fallbackMember` as the sole user hook, opaque evidence
+capsule, private/public tiers, open-module policy, `private(...)`
+combinator surface, bespoke-reader closure, names-free/accessors-gated
+reflection, per-mediator effect tags). V1 lands the substrate:
+
+- **Export-ness is a Binding property** (V-R4, D42, D39 addendum
+  executed): `Binding.visibility` on the scope binding; `export NAME =
+  …` / `export NAME(…) => …` mark the binding at build time
+  (tree-builder → buildProgram → eval scope). The value-plane
+  `exported` component is RETIRED — the `export` primitive is an inert
+  passthrough (the `*_attach` defense precedent), nothing in the
+  language writes the component, and the `y = x` aliasing wart is dead
+  (conscious delta 1, ratified: the component-mechanism test reworked
+  to its binding-attribute collapse-equivalent; conditions preserved).
+- **Module loader** derives ONE export set from binding visibility;
+  the open-module policy is explicit in code: no exports declared =
+  open module (all public — the nine no-export libs unchanged), any
+  export closes the module. Flat `use`-injection and the D42 wire
+  partition already consume that same set.
+- Slot registry row updated (D39 addendum executed; channel
+  registration retained solely as the boundary battery's writer-idiom
+  example). New tests: binding-level marking, alias non-export, typed
+  export-fn marking.
+
 ## 2026-08 — B-096: deployed-version verification (T-tooling)
 
 `[stage: live]` becomes auditable instead of attested. `deploy.sh` now

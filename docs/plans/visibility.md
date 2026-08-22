@@ -1,7 +1,8 @@
 # Visibility — the S3 mediated-member arc (B-097)
 
-Status: draft (→ active when the maintainer ratifies §3's decision
-points; per PROCESS §6 no chunk starts before that)
+Status: active (V-R1–V-R8 + the forgery-E criterion maintainer-ratified
+2026-08 at the plan gate, PR #14 — all eight as recommended;
+`fallbackMember` name confirmed at ratification)
 
 > Tranche C successor per the sequenced head: after B-027
 > (equality, closed), before B-028 (completion effects). This plan is
@@ -208,7 +209,8 @@ House sizing: one landable unit per chunk, suite green, landing
 checklist per PROCESS §5; the behavior FLIP lands last (C5.2-R3
 precedent). Each chunk on its own W-006 branch + PR.
 
-**V1 — Visibility substrate (scope bindings + export migration).**
+**V1 — Visibility substrate (scope bindings + export migration)
+[this PR].**
 `Binding` gains the visibility attribute; `export` writes it;
 `buildModuleObject` + flat `use`-injection + the wire's `markExported`
 all read ONE export set derived from bindings; the `exported`

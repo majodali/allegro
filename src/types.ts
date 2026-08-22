@@ -132,6 +132,13 @@ export interface Binding {
    *  residualises references to it. C2.3b: this is the ONE unresolved
    *  representation; there is no separate reactive-binding record. */
   value: Value | undefined;
+  /** B-097 V1 (D42/V-R4): visibility is a property of the BINDING in its
+   *  scope, never of the value — `export x = …` marks the binding;
+   *  `y = x` copies the value and NO visibility (the old value-plane
+   *  marker's aliasing wart is dead). Absent = default (module-private
+   *  once a module declares any export; open-module policy otherwise —
+   *  see modules.ts). */
+  visibility?: "exported";
   /** C2.3b future-cell state (host-plane, maintained by the reactive
    *  registry): names of incomplete dependencies while this binding's
    *  value is a residual. Absent on untracked bindings. */

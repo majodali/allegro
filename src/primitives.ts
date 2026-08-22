@@ -2212,18 +2212,13 @@ const typed_not_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 // --- export: mark a value as exported from a module ---
 
 const export_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
-  // export(value) — marks a value with an "exported" component
-  // Used as: x = export(42), the binding x gets an exported marker
-  const v = evalFn!(args[0], ctx!);
-  if (!isResolved(v)) {
-    return makeExpr(makePrimitive("export", export_impl, true), [v]);
-  }
-  // Wrap with exported marker. C4.3b: cloneComponents is total, so an
-  // exported record/module value keeps its channels (type included).
-  const primary = dataOf(v);
-  const components = cloneComponents(v);
-  components.set("exported", makeInt(1));
-  return makeMultiValue(primary, components);
+  // B-097 V1 (V-R4): export-ness is a property of the BINDING in the
+  // module scope, not of the value — `export NAME = …` marks the
+  // binding at build time (tree-builder → Binding.visibility). This
+  // primitive no longer stamps a value-plane marker (whose `y = x`
+  // aliasing wart is thereby dead); it is retained as an inert
+  // passthrough (defense precedent: the `*_attach` family).
+  return evalFn!(args[0], ctx!);
 };
 
 // --- type_dispatch: type-directed dot access ---

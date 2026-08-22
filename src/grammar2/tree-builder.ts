@@ -1415,6 +1415,10 @@ function collectIdents(tree: ParseTree, out: string[]): void {
 export interface BuiltBinding {
   key: string | null;      // null for bare expressions
   value: any;
+  /** B-097 V1: `export NAME = …` / `export NAME(…) => …` mark the
+   *  BINDING (Binding.visibility), not the value — no export wrapper
+   *  rides the RHS any more. */
+  exported?: true;
 }
 
 export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new Map()): BuiltBinding {
@@ -1525,8 +1529,7 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
     if (typeExpr !== undefined) {
       value = makeExpr(prim("type_check_binding"), [value, typeExpr]);
     }
-    value = makeExpr(prim("export"), [value]);
-    return { key: name, value };
+    return { key: name, value, exported: true };
   }
 
   if (tag === "export_fn_decl") {
@@ -1567,8 +1570,7 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
       (fn as any).__genericParams = genericParams;
     }
     const typed = maybeTyped(fn, typedParams, returnTypeExpr);
-    const exported = makeExpr(prim("export"), [typed]);
-    return { key: fnName, value: exported };
+    return { key: fnName, value: typed, exported: true };
   }
 
   if (tag === "binding") {
@@ -2236,7 +2238,8 @@ export function buildProgram(tree: ParseTree): any {
   const ctx = makeContext();
 
   function addStmt(stmt: BuiltBinding): void {
-    const b = { key: stmt.key, value: stmt.value };
+    const b: any = { key: stmt.key, value: stmt.value };
+    if (stmt.exported) b.visibility = "exported";
     (ctx as any).bindingList.push(b);
     if (stmt.key !== null) (ctx as any).bindings.set(stmt.key, b);
   }

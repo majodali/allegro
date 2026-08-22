@@ -335,15 +335,19 @@ export class ModuleLoader {
       if (binding.value === undefined) continue;
       const evaluated = binding.value;
       allBindings[key] = evaluated;
-      // C4.3b: componentsView is total — a flattened Context (exported
-      // record/module value) reports its `exported` marker directly.
-      const exp = componentsView(evaluated).get("exported");
-      if (exp) {
+      // B-097 V1 (V-R4): export-ness is a property of the BINDING in the
+      // module scope (Binding.visibility), never of the value — the old
+      // value-plane marker (and its `y = x` aliasing wart) is retired.
+      if (binding.visibility === "exported") {
         hasExports = true;
         exportedBindings[key] = evaluated;
       }
     }
 
+    // Open-module policy (V-R4, explicit): a module that declares NO
+    // exports is an OPEN module — every binding is public (the nine
+    // no-export stdlib grammar/body-form libs rely on this). Declaring
+    // any `export` closes the module to its export set.
     const exportNames = hasExports
       ? new Set(Object.keys(exportedBindings))
       : new Set(Object.keys(allBindings));
