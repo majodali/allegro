@@ -10787,10 +10787,13 @@ test("grammar2/std: union type annotation", () => {
 });
 
 test("grammar2/std: export binding wraps value", () => {
-  // Build a module-like source, check that exported bindings carry the
-  // "exported" component.
-  const r = evalStandard2("export x = 42\nx");
-  eq((r as any).components?.has("exported"), true);
+  // B-097 V1 collapse-equivalent (conscious delta 1): export-ness is
+  // recorded on the BINDING (Binding.visibility), never as a value
+  // component — same contract (exported binding usable, export-ness
+  // recorded), new carrier.
+  const r2 = runtimeEval("export x = 42\nx", undefined, [typeExt], undefined, true);
+  eq(Number((dataOf(r2.value!) as BitsValue).data), 42);
+  eq(r2.evalCtx.bindings.get("x")?.visibility, "exported");
 });
 
 test("grammar2/std: export function declaration", () => {
