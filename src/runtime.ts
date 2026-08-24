@@ -788,6 +788,9 @@ export function buildEvalCtx(
     if (b.key === null) continue;
     if (b.value !== undefined) {
       addTo(evalCtx, b.key, b.value);
+      // B-097 V1: visibility rides the BINDING into the eval scope —
+      // the module loader reads it off evalCtx (never off values).
+      if (b.visibility) evalCtx.bindings.get(b.key)!.visibility = b.visibility;
     } else if (scopeLookup(below, b.key) === undefined && !evalCtx.bindings.has(b.key)) {
       // Declared but unresolved with no provider below — a pending future
       // cell awaiting a later phase (applyPhase resolves it in place).

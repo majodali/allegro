@@ -1728,12 +1728,17 @@ fileTest(path.join(testsDir, "generics.alg"));
 // == Module Export Tests ==
 
 test("module export: export keyword marks value with exported component", () => {
-  const result = evalStd("export x = 42\nx\n");
+  // B-097 V1 collapse-equivalent (conscious delta 1, ratified at the
+  // plan gate): the export keyword now marks the BINDING
+  // (Binding.visibility), never the value — same observable contract
+  // (export-ness recorded, value fully usable), new carrier.
+  const r = runtimeEval("export x = 42\nx\n", undefined, [typeExt], undefined, true);
+  const result = r.value;
   eq(result !== null, true);
   // Should still be usable as a number
   eq(Number((dataOf(result!) as BitsValue).data), 42);
-  // Should have "exported" component
-  eq(channelReadRaw(result!, "exported") !== undefined, true);
+  // Export-ness is recorded — on the binding
+  eq(r.evalCtx.bindings.get("x")?.visibility, "exported");
   {
   }
 });
@@ -1746,6 +1751,24 @@ test("module export: non-exported values don't have exported component", () => {
   }
 });
 
+test("B-097 V1: export marks the BINDING, not the value (no component)", () => {
+  const r = runtimeEval("export x = 42\ny = x\n", undefined, [typeExt], undefined, true);
+  eq(r.evalCtx.bindings.get("x")?.visibility, "exported");
+  // The value itself carries NO exported marker any more.
+  eq(channelReadRaw(r.evalCtx.bindings.get("x")!.value!, "exported") === undefined, true);
+});
+
+test("B-097 V1: y = x does NOT export y (the aliasing wart is dead)", () => {
+  const r = runtimeEval("export x = 42\ny = x\n", undefined, [typeExt], undefined, true);
+  eq(r.evalCtx.bindings.get("y")?.visibility === undefined, true, "alias binding is not exported");
+});
+
+test("B-097 V1: exported typed function declaration marks its binding", () => {
+  const r = runtimeEval("export double(n: Int): Int => n * 2\ndouble(21)\n", undefined, [typeExt], undefined, true);
+  eq(r.evalCtx.bindings.get("double")?.visibility, "exported");
+  eq(Number((dataOf(r.value!) as BitsValue).data), 42);
+});
+
 test("module export: exported functions work normally", () => {
   const result = evalStd("export f = x => x * 2\nf(21)\n");
   eq(Number((dataOf(result!) as BitsValue).data), 42);
@@ -1756,14 +1779,16 @@ test("module export: typed module object exposes exports via dot", () => {
   const modSource = "private_val = 99\nexport pub_val = 42\nexport pub_fn = x => x * 2\n";
   const modResult = runtimeEval(modSource, undefined, [typeExt], undefined, true);
 
-  // Extract and evaluate bindings, then build typed module
+  // Extract and evaluate bindings, then build typed module.
+  // B-097 V1: export-ness is read off the BINDING (visibility), never
+  // the value — same derivation the module loader uses.
   const allBindings: Record<string, Value> = {};
   const exportedNames = new Set<string>();
   for (const [key, binding] of modResult.evalCtx.bindings) {
     if (binding.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
       const evaluated = evaluate(binding.value, modResult.evalCtx);
       allBindings[key] = evaluated;
-      if (channelReadRaw(evaluated, "exported") !== undefined) {
+      if (binding.visibility === "exported") {
         exportedNames.add(key);
       }
     }
@@ -10762,10 +10787,13 @@ test("grammar2/std: union type annotation", () => {
 });
 
 test("grammar2/std: export binding wraps value", () => {
-  // Build a module-like source, check that exported bindings carry the
-  // "exported" component.
-  const r = evalStandard2("export x = 42\nx");
-  eq((r as any).components?.has("exported"), true);
+  // B-097 V1 collapse-equivalent (conscious delta 1): export-ness is
+  // recorded on the BINDING (Binding.visibility), never as a value
+  // component — same contract (exported binding usable, export-ness
+  // recorded), new carrier.
+  const r2 = runtimeEval("export x = 42\nx", undefined, [typeExt], undefined, true);
+  eq(Number((dataOf(r2.value!) as BitsValue).data), 42);
+  eq(r2.evalCtx.bindings.get("x")?.visibility, "exported");
 });
 
 test("grammar2/std: export function declaration", () => {

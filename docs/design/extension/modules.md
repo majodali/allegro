@@ -39,9 +39,11 @@
 
 ## Module objects and encapsulation (L2)
 
-- **Export**: the `export("name", value)` primitive marks bindings for
-  export; `buildModuleObject` wraps the exported set as a typed
-  Object.
+- **Export** (B-097 V1): `export NAME = …` marks the BINDING in the
+  module scope (`Binding.visibility` — never the value, so `y = x`
+  copies no export-ness); `buildModuleObject` wraps the exported set
+  as a typed Object. Open-module policy: a module declaring no
+  exports is fully open; any `export` closes it to its export set.
 - **Module objects**: imported modules are typed Objects — dot access
   dispatches through the module's type, exposing only exported
   fields.

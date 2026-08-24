@@ -388,8 +388,11 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   `exported` stopgap + `y = x` wart die), private members via
   `private(...)` descriptor attributes, bespoke-reader closure
   (destructuring/print/conformance/reflection per V-R6/V-R7),
-  forgery E live. Decision points V-R1–V-R8 drafted 2026-08,
-  awaiting ratification; chunks V1–V4
+  forgery E live. V-R1–V-R8 + forgery-E criterion RATIFIED 2026-08
+  (PR #14, as recommended). **V1 (visibility substrate) landed
+  2026-08**: Binding.visibility, export migration off the value plane
+  (aliasing wart dead), explicit open-module policy. Next: V2
+  pipeline unification, V3 private members (the flip), V4 forgery E
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
   (`completion-effects.md`): `div`, blocking-read, triggered guard,
   discharge tiers (structures.md §10)
