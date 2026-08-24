@@ -21,3 +21,8 @@ findings pointer (or —)`.
   [Audit delivery](https://github.com/majodali/methodology/blob/main/docs/audit-process.md)
   (`mtool audit form`; transition from the adoption-close-out pass —
   the lag warning appeared with the v1.2.0 release)
+- 2026-08-24 — form — full tree — post-migration audit at the 1.2.0
+  pin bump (PR #19, `migrate-1.2.0`) — 0 violations / 0 warnings —
+  record in the migration commit (f021d83); clears the 2026-08-21
+  Article 8 lag warning (register backfill: the migration PR recorded
+  the audit in its commit message only)
