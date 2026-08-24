@@ -232,7 +232,7 @@ narrowed to registered protocol slots. Totality's and the renderer's
 lowering change (or the shape kept — decided in-chunk). No `private`
 exists yet; the pipeline is in place and everything still public.
 
-**V3 — Private members (the flip).** Descriptor attributes +
+**V3 — Private members (the flip) [this PR].** Descriptor attributes +
 `private(...)` combinator in define/Interface specs; type-local
 member scopes become name-stable and hold private member symbols;
 kernel default mediator consults attributes + capsule; bespoke

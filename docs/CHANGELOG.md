@@ -8,6 +8,55 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-097 V3: private members (the flip)
+
+The S3 arc's policy chunk: D43 declared modifiers exist and the kernel
+mediator enforces them. Everything below is inert for types that
+declare no private members (one host-flag read on the hot path):
+
+- **`private(...)` combinator** in `Type.define`/`Interface.define`
+  specs (V-R5): `{secret: private(Int), helper: private(fn)}` marks
+  the declaration; the attribute rides the member DESCRIPTOR (the
+  `getter` precedent). `readonly(...)` is registered as RESERVED
+  vocabulary — recorded on the descriptor, inert until B-046. Keyword
+  syntax stays parked on B-043 and will lower to these attributes.
+- **Kernel mediation** (`assertMemberReachable`, D41 stage 3): a
+  private member resolves only for contexts holding the type's member
+  privilege. Evidence is possession realized on the C2 chain: dispatch
+  PLANTS a kernel privilege layer over the call-site scope when it
+  evaluates the type's own member bodies (methods, getters, operators,
+  the declared `construct`), so the type's own code reaches its
+  privates and nothing else does — denial says `'x' is private to 'T'`
+  (names-public, per V-R5). Pure; folds at PE time (V-R8). The gate
+  covers dot/bracket/interpolation, BOTH operator bridges
+  (PRIM_TO_METHOD and `typed_*`), and the meta path.
+- **Private symbols are type-local** (V-R3): a `private(...)`
+  declaration never draws — it cannot override a drawn member (a
+  base-name collision with a drawn member is a define-time error),
+  drawing a foreign private is a denial, and bundle privates never
+  propagate into drawing types.
+- **Bespoke readers close per policy** (V-R6): destructuring a private
+  field outside its scope is an ERROR naming privacy (inside a member
+  body it works — privilege held); `formatValue` and the auto
+  `toString` omit private fields with an honest `…` marker;
+  structural/declared conformance counts only externally-reachable
+  members (an actual-side private satisfies nothing; an expected-side
+  private requires nothing).
+- **Reflection per V-R7**: enumeration surfaces and flags stay free
+  and caller-independent (`memberDescriptorsOf` counts unchanged;
+  descriptor `name`/`private` pairs list for everyone); the ACCESSOR
+  is gated — `ctx_bindings` withholds private (name, value) pairs on
+  instances and the `value` (implementation) pair on private members'
+  descriptors without possession evidence.
+
+Conscious deltas 4–7 landed as pre-declared (all latent — no existing
+test or demo used privates; delta 4's module-refusal substring set did
+not need extending since module denials are unchanged). Lowering shape
+untouched. New tests: field/method/operator denials + internal access,
+destructuring error + privileged destructure, printer honesty,
+conformance filtering, draw denial, shadow error, reflection gates,
+readonly inertness.
+
 ## 2026-08 — B-097 V2: pipeline unification (mediation seam in place)
 
 The D41 pipeline's plumbing lands with no policy change — everything

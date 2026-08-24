@@ -135,6 +135,38 @@ export function scopeOwnFacts(scope: ContextValue): Map<string, unknown> {
   return scope.scopePredicates;
 }
 
+// --- Member privilege (B-097 V3, D42) ------------------------------------------
+//
+// A type's private members are reachable only from evaluation contexts
+// extended from the type's own member scope. Bodies are evaluated in the
+// CALL-SITE chain (substitution model), so the kernel mediator PLANTS a
+// privilege layer over the call ctx when it dispatches a member of a
+// type that declares private members; the privacy check then walks the
+// chain for that exact layer. This realizes "context = reachability
+// capsule": the layer is kernel-minted (user code cannot fabricate it),
+// and calling a function hands it your context — possession is lent
+// down the dynamic extent, exactly as the C2 chain lends every other
+// capability the context holds.
+
+/** Plant a member-privilege layer for `owner` (a type shape) over the
+ *  call-site scope. Kernel-only mint — never exposed as a primitive. */
+export function scopePrivilegeExtend(parent: ContextValue, owner: ContextValue): ContextValue {
+  const s = scopeNew(parent);
+  (s as any).__memberPrivilege = owner;
+  return s;
+}
+
+/** Does this chain hold `owner`'s member privilege? (The D42 possession
+ *  test for type-private members.) */
+export function scopeHoldsPrivilege(scope: ContextValue | undefined, owner: ContextValue): boolean {
+  let cur: ContextValue | undefined = scope;
+  while (cur) {
+    if ((cur as any).__memberPrivilege === owner) return true;
+    cur = cur.parent;
+  }
+  return false;
+}
+
 /** Guard for the data plane: struct operations must never run on scopes. */
 export function assertNotScope(v: Value, op: string): void {
   if (v.kind === ValueKind.Structure && isScopeCtx(v as ContextValue)) {

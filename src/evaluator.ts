@@ -11,6 +11,7 @@ import {
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
   protocolEquals,
   assertMemberAvailable,
+  assertMemberReachable, typePrivilegedCtx,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
@@ -399,7 +400,12 @@ function applyPrimitive(
         // refinement layers share the parent's member set, so walking them
         // off never changes which method runs; preserveOps/mixin layers
         // mint their own members and ARE shapes (their overrides run).
-        const method = typeMethod(typeShape(typeComp as ContextValue), methodName);
+        const opShape = typeShape(typeComp as ContextValue);
+        // B-097 V3 (D41 stage 3): kernel mediation covers operators too —
+        // `a + b` on a type whose `add` is private denies outside the
+        // defining scope, exactly as `a.add` would.
+        assertMemberReachable(opShape, methodName, ctx);
+        const method = typeMethod(opShape, methodName);
         if (method?.kind === ValueKind.PrimitiveFunction) {
           const primaryArgs = evalArgs.map(dataOf);
           const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
@@ -420,7 +426,9 @@ function applyPrimitive(
         // self is the first parameter, full values (channels intact).
         const mData = method != null ? dataOf(method) : undefined;
         if (mData?.kind === ValueKind.ComposedFunction) {
-          const out = attachEff(evalFn(makeExpr(mData, evalArgs), ctx));
+          // B-097 V3: a composed operator member is the type's own code —
+          // its body runs with the type's member privilege planted.
+          const out = attachEff(evalFn(makeExpr(mData, evalArgs), typePrivilegedCtx(opShape, ctx)));
           return propagatedSet ? withPredicates(out, propagatedSet) : out;
         }
       }

@@ -395,8 +395,14 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   unification) landed 2026-08**: one dispatch ladder (shadow copy
   deleted, meta path gated), operator dispatch through the shared
   availability gate, 3-ary fallbackMember with the evidence capsule,
-  hook effects propagate, typeMethod fallthrough narrowed. Next: V3
-  private members (the flip), V4 forgery E
+  hook effects propagate, typeMethod fallthrough narrowed. **V3
+  (private members — the flip) landed 2026-08**: `private(...)` /
+  reserved `readonly(...)` combinators → descriptor attributes;
+  kernel mediation with dispatch-planted privilege layers (the D42
+  possession test on the C2 chain); private symbols type-local (draw
+  denial, no propagation); destructuring/printer/conformance closed
+  per V-R6; reflection names-free/accessor-gated per V-R7. Next: V4
+  evidence hardening + forgery E live + docs sync + release
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
   (`completion-effects.md`): `div`, blocking-read, triggered guard,
   discharge tiers (structures.md §10)
