@@ -71,15 +71,45 @@ fluent API (`Type.extend / .where / .distinct / .interface / .mixin /
 syntax obvious. User-defined type declaration *syntax* is deliberately
 deferred (backlog).
 
-### Access control [implemented]
+### Access control [implemented — B-097, D41–D43]
 
-No `public`/`private` keywords. Access is controlled by the type's member
-lookup: a type exposes exactly what its member-access protocol returns
-(fields listed in member descriptors; optionally a `__getMember` fallback
-for computed access). Type methods operate on the raw Context and can reach
+Access is controlled by the type's member lookup: a type exposes exactly
+what its member-access protocol returns (fields listed in member
+descriptors; optionally a `__getMember`/`fallbackMember` hook for
+computed access — 3-ary since B-097 V2: `(instance, name, evidence
+capsule)`). Type methods operate on the raw Context and can reach
 everything; consumers go through dispatch. This makes dynamic, computed,
 context-sensitive access possible — module encapsulation (only exported
 fields visible) is implemented this way.
+
+Since B-097 V3, members can be declared **private** in the define spec
+via the combinator surface (no keywords yet — keyword syntax is B-043
+and lowers to the same attributes):
+
+```
+Vault = Type.define({
+  owner:  String,
+  secret: private(Int),                     // private field
+  code:   private((self) => self.secret),   // private method
+  reveal: (self) => self.secret,            // public, reads the private
+})
+```
+
+The attribute rides the member DESCRIPTOR (the `getter` precedent);
+`readonly(...)` is reserved vocabulary — recorded but inert until B-046.
+The kernel mediator (D41 stage 3) enforces it: a private member resolves
+only for evaluation contexts holding the type's member privilege, which
+dispatch plants when it runs the type's own member bodies. Denial names
+privacy (`'secret' is private to 'Vault'` — member names are public by
+design). Enforcement covers every reader: dot/bracket/interpolation,
+operator dispatch, destructuring (an error, not a silent no-match),
+printing (`…` marks omitted private fields), conformance (only
+externally-reachable members count, both sides), and value-bearing
+reflection (`ctx_bindings` withholds private pairs; enumeration and
+flags stay free). Private symbols are type-local: they never draw, a
+foreign private cannot be drawn, and bundle privates do not propagate.
+Full design truth: `docs/design/allegretto/structures.md` §6/§13; the
+ratified decisions are V-R1–V-R8 in `docs/plans/visibility.md`.
 
 ## 4. The meta-property protocol [under revision]
 

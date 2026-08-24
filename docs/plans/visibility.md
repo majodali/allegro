@@ -1,8 +1,13 @@
 # Visibility — the S3 mediated-member arc (B-097)
 
-Status: active (V-R1–V-R8 + the forgery-E criterion maintainer-ratified
+Status: closed (2026-08 — all four chunks landed: V1 substrate, V2
+pipeline unification, V3 private members, V4 evidence hardening +
+forgery E live. V-R1–V-R8 + the forgery-E criterion maintainer-ratified
 2026-08 at the plan gate, PR #14 — all eight as recommended;
-`fallbackMember` name confirmed at ratification)
+`fallbackMember` name confirmed at ratification. Outcome recorded in
+`docs/backlog.md` B-097 and `docs/CHANGELOG.md`; riders live with their
+named owners in §6. The V4 website-loop rider — a sandbox visibility
+example — is an owner decision at the arc gate.)
 
 > Tranche C successor per the sequenced head: after B-027
 > (equality, closed), before B-028 (completion effects). This plan is
@@ -242,7 +247,7 @@ enumerated in §5, pre-discussed at this plan's gate, each item
 verified in the chunk. Module-private bindings become unreachable
 through every remaining route.
 
-**V4 — Evidence hardening + forgery E + release.** Wire-route attack;
+**V4 — Evidence hardening + forgery E + release [this PR].** Wire-route attack;
 forgery E LIVE (skeleton → real battery, the last skeleton retires);
 capsule print-redaction and non-fabrication asserted in the boundary
 battery; confluence tests for stages 3–4 (late-arriving knowledge and
@@ -299,3 +304,14 @@ the V1 export set when it lands; S5 variance → B-050.
   V-R1–V-R8 proposed with recommendations; forgery-E criterion
   proposed. Awaiting maintainer ratification — no chunk starts before
   the gate (PROCESS §6).
+- 2026-08: ratified at the plan gate (PR #14) — all eight as
+  recommended; `fallbackMember` confirmed.
+- 2026-08: V1 landed (PR #15), V2 landed (PR #16), V3 landed (PR #18),
+  V4 landed — arc complete, plan closed. Execution notes live in the
+  CHANGELOG entries and the design-doc stamps (structures.md §6/§13,
+  type-system.md §3, modules.md). One realization detail worth the
+  record: possession for TYPE members is dispatch-planted privilege on
+  the C2 chain (dynamic extent — bodies evaluate in the call-site
+  ctx), and reflection's accessor gate landed on `ctx_bindings`
+  (descriptors are typed values, so dot access on them was already
+  opaque).
