@@ -1775,7 +1775,7 @@ const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("w
 // ============ TYPE SYSTEM ============
 
 import {
-  getType, getTypeName, withType, withTypeReplacing, applyBoundaryBound, typeContextName, typeMethod, typeMemberDescriptor,
+  getType, getTypeName, withType, withTypeReplacing, applyBoundaryBound, typeContextName, typeMethod, typeMemberDescriptor, assertMemberAvailable,
   isMethodDescriptor, isFieldDescriptor, isGetterDescriptor,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
@@ -2223,6 +2223,98 @@ const export_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
 // --- type_dispatch: type-directed dot access ---
 
+/** B-097 V2 (V-R2): mint the evaluator-supplied EVIDENCE CAPSULE — an
+ *  opaque kernel value answering only the possession test
+ *  holds(name) -> Bool against the access-site scope chain. Realized
+ *  as a PrimitiveFunction closure (the D24 capability shape):
+ *  print-redacted (functions render opaquely), non-enumerable (no
+ *  bindings), cannot be mined for the lexical environment. Handed to
+ *  fallbackMember hooks as their third argument; the kernel default
+ *  mediator reads reachability directly (V3). */
+function mintEvidenceCapsule(ctx: ContextValue): PrimitiveFunctionValue {
+  const impl: PrimitiveFnImpl = (capArgs, _capCtx, capEvalFn) => {
+    const nameV = capEvalFn ? capEvalFn(capArgs[0], _capCtx!) : capArgs[0];
+    const name = bitsToString(asBits(nameV, "evidence"));
+    const held = scopeLookup(ctx, name) !== undefined;
+    return withType(makeInt(held ? 1 : 0), BoolType);
+  };
+  return makePrimitive("evidence", impl, false) as PrimitiveFunctionValue;
+}
+
+/** B-097 V2 (V-R1): the ONE descriptor + typeMethod dispatch ladder —
+ *  shared by the typed path and the meta-type path (formerly a drifting
+ *  shadow copy with no availability gate). `self` is what
+ *  PrimitiveFunction impls receive as their first argument; `selfExpr`
+ *  is what ComposedFunction members bind (the full typed value on the
+ *  typed path; the Context itself on the meta path). Returns null when
+ *  neither the member set nor a protocol slot has the member —
+ *  fall-through order preserved exactly from the pre-V2 ladders. */
+function dispatchThroughType(
+  type: ContextValue,
+  fieldName: string,
+  self: Value,
+  selfExpr: Value,
+  ctx: ContextValue | undefined,
+  evalFn: EvalFn | undefined,
+): Value | null {
+  const desc = typeMemberDescriptor(type, fieldName);
+  if (desc) {
+    if (isMethodDescriptor(desc)) {
+      const impl = desc.bindings.get("value")?.value;
+      if (impl?.kind === ValueKind.PrimitiveFunction) {
+        if (isGetterDescriptor(desc)) {
+          // V2 ctx repair: getters now receive the real ctx/evalFn
+          // (previously dropped as `undefined as any`).
+          return (impl as PrimitiveFunctionValue).fn([self], ctx as any, evalFn as any);
+        }
+        const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+          const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+          return (impl as PrimitiveFunctionValue).fn([self, ...evalArgs], callCtx, callEvalFn);
+        };
+        // Propagate the underlying primitive's effects so dot-dispatch
+        // doesn't strip them (stdlib HOFs tagged opaque in sub-chunk 1.3).
+        return makePrimitive(`bound:${fieldName}`, boundFn, true, (impl as PrimitiveFunctionValue).effects);
+      }
+      if (impl?.kind === ValueKind.ComposedFunction) {
+        if (isGetterDescriptor(desc)) {
+          return evalFn!(makeExpr(impl, [selfExpr]), ctx!);
+        }
+        const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+          const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+          return callEvalFn!(makeExpr(impl, [selfExpr, ...evalArgs]), callCtx!);
+        };
+        return makePrimitive(`bound:${fieldName}`, boundFn, true);
+      }
+      if (impl) return impl;
+    } else if (isFieldDescriptor(desc)) {
+      const instanceCtx = dataOf(selfExpr);
+      if (instanceCtx.kind === ValueKind.Structure) {
+        const b = (instanceCtx as ContextValue).bindings.get(fieldName);
+        if (b?.value !== undefined) return b.value;
+      }
+    }
+  }
+  const method = typeMethod(type, fieldName);
+  if (method) {
+    if (method.kind === ValueKind.PrimitiveFunction) {
+      const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+        const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+        return (method as PrimitiveFunctionValue).fn([self, ...evalArgs], callCtx, callEvalFn);
+      };
+      return makePrimitive(`bound:${fieldName}`, boundFn, true, (method as PrimitiveFunctionValue).effects);
+    }
+    if (method.kind === ValueKind.ComposedFunction) {
+      const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
+        const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
+        return callEvalFn!(makeExpr(method, [selfExpr, ...evalArgs]), callCtx!);
+      };
+      return makePrimitive(`bound:${fieldName}`, boundFn, true);
+    }
+    return method;
+  }
+  return null;
+}
+
 const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // C2.1: struct ops reject evaluation scopes (plane violation guard).
   if (args[0]?.kind === ValueKind.Structure) assertNotScope(args[0], "type_dispatch");
@@ -2258,169 +2350,41 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const type = storedType ? typeShape(storedType) : null;
 
   if (type) {
-    // C3.2 (D36): member AVAILABILITY follows KNOWLEDGE — an epistemic
-    // gate, not access control (that's S3). An occurrence bound (stamped
-    // at an annotation boundary — `x: Animal` receiving a Dog) determines
-    // which members this occurrence may refer to; a member that resolves
-    // still dispatches through the SHAPE, so overrides run (Liskov).
-    // This gate is the current-representation form of the single PE
-    // resolver (design §6): availability resolves text → symbol by
-    // knowledge; dispatch resolves symbol → implementation by shape.
-    // Open types are exempt: the base Object type (dynamic fields by
-    // design) and fallback-only types with no declared member set
-    // (module objects — their __getMember IS their own policy).
-    const bound = occurrenceBoundOf(obj);
-    if (bound && bound !== storedType && bound !== dataOf(ObjectType as unknown as Value)) {
-      const boundMembers = getMembers(bound);
-      const membersEmpty = !boundMembers ||
-        (boundMembers.kind === ValueKind.Structure && (boundMembers as ContextValue).bindings.size === 0);
-      const openType = membersEmpty && getFallbackMember(bound) !== undefined;
-      if (!openType) {
-        const visible = typeMemberDescriptor(bound, fieldName) !== null
-          || typeMethod(bound, fieldName) !== null;
-        if (!visible) {
-          const boundName = typeContextName(bound) ?? "<anonymous>";
-          const shapeName = getTypeName(obj) ?? "<unknown>";
-          throw new AllegroError(
-            `type_dispatch: '${fieldName}' is not available through annotation '${boundName}' ` +
-            `(the value's type is '${shapeName}') — narrow with \`when … is ${shapeName}\``,
-          );
-        }
-      }
-    }
-    // Look up member descriptor from __members
-    const desc = typeMemberDescriptor(type, fieldName);
-    if (desc) {
-      if (isMethodDescriptor(desc)) {
-        const impl = desc.bindings.get("value")?.value;
-        if (impl?.kind === ValueKind.PrimitiveFunction) {
-          const selfVal = dataOf(obj);
-          if (isGetterDescriptor(desc)) {
-            return (impl as PrimitiveFunctionValue).fn([selfVal], undefined as any, undefined as any);
-          }
-          const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-            const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-            return (impl as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
-          };
-          // Propagate the underlying primitive's effects so dot-dispatch
-          // doesn't strip them. Critical for stdlib HOFs (Array.map, etc.)
-          // tagged opaque in sub-chunk 1.3.
-          return makePrimitive(`bound:${fieldName}`, boundFn, true, (impl as PrimitiveFunctionValue).effects);
-        }
-        if (impl?.kind === ValueKind.ComposedFunction) {
-          // Mixin/user-defined method — pass full typed obj as self for field/method access
-          if (isGetterDescriptor(desc)) {
-            return evalFn!(makeExpr(impl, [obj]), ctx!);
-          }
-          const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-            const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-            return callEvalFn!(makeExpr(impl, [obj, ...evalArgs]), callCtx!);
-          };
-          return makePrimitive(`bound:${fieldName}`, boundFn, true);
-        }
-        if (impl) return impl;
-      } else if (isFieldDescriptor(desc)) {
-        // Field descriptor — look up field value on the instance's primary Context
-        const instanceCtx = dataOf(obj);
-        if (instanceCtx.kind === ValueKind.Structure) {
-          const b = (instanceCtx as ContextValue).bindings.get(fieldName);
-          if (b?.value !== undefined) return b.value;
-        }
-      }
-    }
+    // C3.2 (D36) availability gate — extracted to types-std at B-097 V2
+    // so operator dispatch and the meta path share the ONE gate (V-R1).
+    assertMemberAvailable(obj, fieldName, storedType);
+    // B-097 V2 (V-R1): the ONE dispatch ladder (descriptors + protocol
+    // slots), shared with the meta path below.
+    const hit = dispatchThroughType(type, fieldName, dataOf(obj), obj, ctx, evalFn);
+    if (hit !== null) return hit;
 
-    // Fallback: typeMethod for backward compat (direct bindings like __getMember)
-    const method = typeMethod(type, fieldName);
-    if (method) {
-      if (method.kind === ValueKind.PrimitiveFunction) {
-        const selfVal = dataOf(obj);
-        const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-          const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-          return method.fn([selfVal, ...evalArgs], callCtx, callEvalFn);
-        };
-        return makePrimitive(`bound:${fieldName}`, boundFn, true, method.effects);
-      }
-      // C4.3b: bind ComposedFunction methods with self too — mirrors both
-      // this path's descriptor branch and the untyped meta-dispatch fallback
-      // (which custom-meta-typed Contexts used to reach before getType went
-      // total; the two paths must agree on the returned shape).
-      if (method.kind === ValueKind.ComposedFunction) {
-        const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-          const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-          return callEvalFn!(makeExpr(method, [obj, ...evalArgs]), callCtx!);
-        };
-        return makePrimitive(`bound:${fieldName}`, boundFn, true);
-      }
-      return method;
-    }
-
-    // __getMember fallback for Object/module types
+    // fallbackMember hook (the user policy hook — open-type string-key
+    // policy). B-097 V2: 3-ary — (instance, name, evidence capsule) —
+    // and invoked THROUGH the evaluator so the hook's effect tags
+    // propagate into inference (previously called raw, effects dropped).
     const getMember = getFallbackMember(type);
     if (getMember?.kind === ValueKind.PrimitiveFunction) {
-      return (getMember as PrimitiveFunctionValue).fn([dataOf(obj), stringToBits(fieldName)], undefined as any, undefined as any);
+      return evalFn!(
+        makeExpr(getMember, [dataOf(obj), stringToBits(fieldName), mintEvidenceCapsule(ctx!)]),
+        ctx!,
+      );
     }
     const typeName = getTypeName(obj) ?? "unknown";
     throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
   }
 
-  // Untyped Contexts: check meta-type dispatch first (for method binding),
-  // then direct binding lookup (for data fields)
+  // Untyped Contexts / type values: meta-type dispatch through the SAME
+  // ladder as the typed path (B-097 V2 — the pre-V2 shadow copy, which
+  // had NO availability gate and drifted, is deleted; conscious delta 2:
+  // this path now refuses unavailable members exactly like the typed
+  // one), then direct binding lookup for data fields.
   const p = dataOf(obj);
   if (p.kind === ValueKind.Structure) {
-    // Meta-type dispatch: check __type for type-level methods (e.g., Int.extend)
-    // This must come first so methods get proper self-binding
     const metaTypeV = channelReadRaw(p, "shape");
     if (metaTypeV?.kind === ValueKind.Structure) {
-      const metaType = metaTypeV as ContextValue;
-      const metaDesc = typeMemberDescriptor(metaType, fieldName);
-      if (metaDesc) {
-        if (isMethodDescriptor(metaDesc)) {
-          const metaImpl = metaDesc.bindings.get("value")?.value;
-          const selfVal = p;
-          if (metaImpl?.kind === ValueKind.PrimitiveFunction) {
-            if (isGetterDescriptor(metaDesc)) {
-              return (metaImpl as PrimitiveFunctionValue).fn([selfVal], undefined as any, undefined as any);
-            }
-            const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-              const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-              return (metaImpl as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
-            };
-            return makePrimitive(`bound:${fieldName}`, boundFn, true, (metaImpl as PrimitiveFunctionValue).effects);
-          }
-          if (metaImpl?.kind === ValueKind.ComposedFunction) {
-            // User-defined meta-method (e.g., a type-level method added via
-            // Type-mixin). Pass the type Context as self; mirrors the typed-
-            // value path above which handles ComposedFunction descriptors.
-            if (isGetterDescriptor(metaDesc)) {
-              return evalFn!(makeExpr(metaImpl, [selfVal]), ctx!);
-            }
-            const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-              const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-              return callEvalFn!(makeExpr(metaImpl, [selfVal, ...evalArgs]), callCtx!);
-            };
-            return makePrimitive(`bound:${fieldName}`, boundFn, true);
-          }
-        }
-      }
-      // Fallback: direct binding on meta-type (for non-__members methods)
-      const metaMethod = typeMethod(metaType, fieldName);
-      if (metaMethod) {
-        const selfVal = p;
-        if (metaMethod.kind === ValueKind.PrimitiveFunction) {
-          const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-            const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-            return (metaMethod as PrimitiveFunctionValue).fn([selfVal, ...evalArgs], callCtx, callEvalFn);
-          };
-          return makePrimitive(`bound:${fieldName}`, boundFn, true, (metaMethod as PrimitiveFunctionValue).effects);
-        }
-        if (metaMethod.kind === ValueKind.ComposedFunction) {
-          const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
-            const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-            return callEvalFn!(makeExpr(metaMethod, [selfVal, ...evalArgs]), callCtx!);
-          };
-          return makePrimitive(`bound:${fieldName}`, boundFn, true);
-        }
-      }
+      assertMemberAvailable(obj, fieldName, null);
+      const metaHit = dispatchThroughType(metaTypeV as ContextValue, fieldName, p, p, ctx, evalFn);
+      if (metaHit !== null) return metaHit;
     }
 
     // Direct binding lookup (for data fields like __name, non-method bindings)

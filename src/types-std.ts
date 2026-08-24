@@ -24,7 +24,7 @@ import {
   setGenericBackLink, setProposition,
   setEffectBound, setSlotCount, setAbstractDomain,
   writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
-  removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape,
+  removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape, getFallbackMember,
   equalityShape, asContext,
 } from "./slots.js";
 
@@ -171,10 +171,48 @@ export function typeMethod(type: ContextValue, name: string): Value | null {
       return null;
     }
   }
-  // Fallback: direct binding lookup (for __getMember and other special bindings)
+  // Fallback: direct binding lookup — B-097 V2 (V-R1): NARROWED to
+  // registered meta-protocol slots (__getMember and friends). A raw
+  // non-slot binding on a type Context is no longer name-reachable
+  // through dispatch; members come from __members, policy hooks from
+  // registered slots. (Pre-V2 any stray binding leaked through.)
+  if (!isMetaSlotKey(name)) return null;
   const binding = type.bindings.get(name);
   if (!binding || binding.value === undefined) return null;
   return binding.value;
+}
+
+/** B-097 V2 (D36/C3.2, extracted for V-R1): the availability gate —
+ *  an occurrence bound (annotation knowledge) determines which members
+ *  this occurrence may refer to; a member that resolves still
+ *  dispatches through the SHAPE (Liskov). Shared by type_dispatch
+ *  (dot/bracket/interpolation), the meta-type dispatch path, and
+ *  operator dispatch (the formerly deferred C3.2 item). Open types are
+ *  exempt: base Object, and fallback-only types whose hook IS their
+ *  policy (module objects). Throws on an unavailable member. */
+export function assertMemberAvailable(
+  obj: Value,
+  fieldName: string,
+  storedType: ContextValue | null,
+): void {
+  const bound = occurrenceBoundOf(obj);
+  if (!bound || bound === storedType) return;
+  if (bound === (dataOf(ObjectType as unknown as Value) as ContextValue)) return;
+  const boundMembers = getMembers(bound);
+  const membersEmpty = !boundMembers ||
+    (boundMembers.kind === ValueKind.Structure && (boundMembers as ContextValue).bindings.size === 0);
+  const openType = membersEmpty && getFallbackMember(bound) !== undefined;
+  if (openType) return;
+  const visible = typeMemberDescriptor(bound, fieldName) !== null
+    || typeMethod(bound, fieldName) !== null;
+  if (!visible) {
+    const boundName = typeContextName(bound) ?? "<anonymous>";
+    const shapeName = getTypeName(obj) ?? "<unknown>";
+    throw new AllegroError(
+      `type_dispatch: '${fieldName}' is not available through annotation '${boundName}' ` +
+      `(the value's type is '${shapeName}') — narrow with \`when … is ${shapeName}\``,
+    );
+  }
 }
 
 /** C6.1a: the member-set write chokepoint — stores the descriptor under
