@@ -220,7 +220,7 @@ injection filtered (leak route 2 closed). Conscious deltas: the
 exported-channel tests; behavior of `y = x` re-export (was silent
 export, becomes none — the fix). Forgery E partial (injection route).
 
-**V2 — Pipeline unification (no policy change).** The three ctx drops
+**V2 — Pipeline unification (no policy change)  [this PR].** The three ctx drops
 repaired; `fallbackMember` 3-ary with the V-R2 capsule; its
 invocation moved inside `applyPrimitive` (effects propagate); the
 untyped meta-dispatch shadow ladder unified into the typed path (the

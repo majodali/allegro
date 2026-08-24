@@ -11,7 +11,7 @@ import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, EquatableType, isLawDescriptor } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
-import { channelReadRaw } from "./slots.js";
+import { channelReadRaw, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "./slots.js";
 import { exportedSymbols, symbolFromWire, kernelMemberFqn, fqnBaseName } from "./symbols.js";
 import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
@@ -1767,6 +1767,60 @@ test("B-097 V1: exported typed function declaration marks its binding", () => {
   const r = runtimeEval("export double(n: Int): Int => n * 2\ndouble(21)\n", undefined, [typeExt], undefined, true);
   eq(r.evalCtx.bindings.get("double")?.visibility, "exported");
   eq(Number((dataOf(r.value!) as BitsValue).data), 42);
+});
+
+// == B-097 V2: pipeline unification ==
+
+import { withType as tsWithType } from "./types-std.js";
+import { effectsOf as tsEffectsOf } from "./effects.js";
+
+test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possession", () => {
+  const r = runtimeEval("secret = 41\nsecret", undefined, [typeExt], undefined, true);
+  const accessCtx = r.evalCtx;
+  const t = makeContext();
+  slotSetName(t, stringToBits("Probe"));
+  let arity = 0;
+  const hook = makePrimitive("probe.__getMember", (hargs) => {
+    arity = hargs.length;
+    const capsule = dataOf(hargs[2]) as import("./types.js").PrimitiveFunctionValue;
+    const holdsSecret = capsule.fn([stringToBits("secret")], undefined as any, undefined as any);
+    const holdsNope = capsule.fn([stringToBits("no_such_name")], undefined as any, undefined as any);
+    const score = (Number((dataOf(holdsSecret) as BitsValue).data) === 1 ? 10 : 0)
+    + (Number((dataOf(holdsNope) as BitsValue).data) === 1 ? 1 : 0);
+    return makeInt(score);
+  });
+  slotSetFallbackMember(t, hook);
+  const inst = tsWithType(makeContext(), t);
+  const td = primRegistry.type_dispatch;
+  const out = evaluate(makeExpr(td, [inst, stringToBits("anything")]), accessCtx);
+  eq(arity, 3, "hook received (instance, name, capsule)");
+  eq(Number((dataOf(out) as BitsValue).data), 10, "capsule: holds in-scope name, denies unknown");
+});
+
+test("B-097 V2: an effectful fallbackMember's tag survives dispatch (applyPrimitive path)", () => {
+  const r = runtimeEval("x = 1", undefined, [typeExt], undefined, true);
+  const t = makeContext();
+  slotSetName(t, stringToBits("FxProbe"));
+  const hook = makePrimitive("fx.__getMember", () => makeInt(5), false, ["io"]);
+  slotSetFallbackMember(t, hook);
+  const inst = tsWithType(makeContext(), t);
+  const out = evaluate(makeExpr(primRegistry.type_dispatch, [inst, stringToBits("f")]), r.evalCtx);
+  const eff = tsEffectsOf(out);
+  eq(eff != null && eff.has("io"), true, "hook effect tag harvested (was silently dropped pre-V2)");
+});
+
+test("B-097 V2: typeMethod raw-binding fallthrough is narrowed to protocol slots", () => {
+  const t = makeContext();
+  slotSetName(t, stringToBits("Leaky"));
+  // a stray non-slot binding on the type Context — pre-V2 this was
+  // name-reachable through dispatch; post-V2 it is not a member.
+  t.bindings.set("stray", { key: "stray", value: makeInt(9) });
+  const r = runtimeEval("x = 1", undefined, [typeExt], undefined, true);
+  const inst = tsWithType(makeContext(), t);
+  let threw = false;
+  try { evaluate(makeExpr(primRegistry.type_dispatch, [inst, stringToBits("stray")]), r.evalCtx); }
+  catch (e: any) { threw = e.message.includes("not found"); }
+  eq(threw, true, "stray type-Context binding no longer leaks through dispatch");
 });
 
 test("module export: exported functions work normally", () => {

@@ -37,8 +37,8 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   interfaces — plan `equality-and-laws.md`, decisions E-R1–E-R6
   maintainer-ratified 2026-08 (with E-R3 generality note: laws are
   member-set-general, not interface-only); chunks E1–E4 underway. Then
-  S3 visibility (D41–D43 — B-097, plan `visibility.md` at
-  ratification gate), then B-028 completion effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
+  S3 visibility (D41–D43 — B-097, plan `visibility.md` ratified;
+  chunks V1–V2 landed, V3 next), then B-028 completion effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
 - **Track R — public release (started 2026-08, runs alongside
   functional tranches):** positioning plan `release-track.md`
   (differentiator map + claims register + demo ladder); VISION §1a/§5
@@ -391,8 +391,12 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   forgery E live. V-R1–V-R8 + forgery-E criterion RATIFIED 2026-08
   (PR #14, as recommended). **V1 (visibility substrate) landed
   2026-08**: Binding.visibility, export migration off the value plane
-  (aliasing wart dead), explicit open-module policy. Next: V2
-  pipeline unification, V3 private members (the flip), V4 forgery E
+  (aliasing wart dead), explicit open-module policy. **V2 (pipeline
+  unification) landed 2026-08**: one dispatch ladder (shadow copy
+  deleted, meta path gated), operator dispatch through the shared
+  availability gate, 3-ary fallbackMember with the evidence capsule,
+  hook effects propagate, typeMethod fallthrough narrowed. Next: V3
+  private members (the flip), V4 forgery E
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
   (`completion-effects.md`): `div`, blocking-read, triggered guard,
   discharge tiers (structures.md §10)

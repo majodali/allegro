@@ -10,6 +10,7 @@ import {
   getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
   protocolEquals,
+  assertMemberAvailable,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
@@ -389,6 +390,11 @@ function applyPrimitive(
     if (typeComp && typeComp.kind === ValueKind.Structure) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
       if (methodName) {
+        // B-097 V2 (V-R1): operator dispatch goes through the SAME
+        // availability gate as dot access — the formerly deferred C3.2
+        // item. An occurrence bound that lacks the operator member
+        // denies, exactly as `x.add` would (conscious delta 3).
+        assertMemberAvailable(evalArgs[0], methodName, typeComp as ContextValue);
         // C3.1 (D36): dispatch reads the SHAPE. Member-transparent
         // refinement layers share the parent's member set, so walking them
         // off never changes which method runs; preserveOps/mixin layers

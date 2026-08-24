@@ -8,6 +8,38 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-097 V2: pipeline unification (mediation seam in place)
+
+The D41 pipeline's plumbing lands with no policy change — everything
+still public; V3 flips the switch:
+
+- **One dispatch ladder** (`dispatchThroughType`): the typed
+  descriptor+protocol path and the untyped/meta-type path (previously
+  a drifting shadow copy with NO availability gate) now share one
+  implementation. Conscious delta 2 (ratified): the meta path gains
+  the same C3.2 availability refusals as the typed path.
+- **The availability gate is extracted** to `assertMemberAvailable`
+  (types-std) and now also guards **operator dispatch** — the formerly
+  deferred C3.2 item: `a + b` through PRIM_TO_METHOD checks the
+  occurrence bound exactly as `a.add` would (conscious delta 3).
+- **`fallbackMember` is 3-ary**: hooks receive the V-R2 EVIDENCE
+  CAPSULE — a kernel-minted opaque closure (D24 capability shape,
+  print-redacted, non-enumerable) answering only `holds(name)` against
+  the access-site scope chain. Kernel hooks ignore it today; V3's
+  possession tests consume it.
+- **The hook runs through the evaluator** (`applyPrimitive`), so an
+  effectful fallbackMember's tags propagate into inference —
+  previously silently discarded (called raw with dropped ctx). The
+  three `undefined as any` ctx drops (getter call, hook invocation,
+  meta getter) are repaired.
+- **`typeMethod`'s raw-binding fallthrough is narrowed** to registered
+  meta-protocol slots: a stray non-slot binding on a type Context is
+  no longer name-reachable through dispatch.
+
+Lowering shape unchanged — totality's HOF matcher and the source
+renderer are unaffected by construction. New tests: capsule
+possession answers, effect-tag survival, stray-binding refusal.
+
 ## 2026-08 — B-097 V1: visibility substrate (S3 arc opens; plan ratified)
 
 The S3 mediated-member arc opened: `docs/plans/visibility.md` ratified
