@@ -11,7 +11,7 @@ import {
 } from "./types.js";
 import { buildFn } from "./parser-helpers.js";
 import { fqnBaseName } from "./symbols.js";
-import { assertNotScope, scopeAssume, scopeExtend, scopeFactsFor, scopeOwnFacts, scopeLookup, scopeHostRead, isPendingCell } from "./scope.js";
+import { assertNotScope, scopeAssume, scopeExtend, scopeFactsFor, scopeOwnFacts, scopeLookup, scopeHostRead, scopeHoldsPrivilege, isPendingCell } from "./scope.js";
 
 // Held write capability for the discharged integrity channel (C1.4, D21-D24).
 // Module-scope, never exported, never bound into any Allegro extension —
@@ -161,13 +161,18 @@ export function formatValue(v: Value): string {
           const parts: string[] = [];
           // C5.2a: member keys are symbol FQNs; the instance stays
           // string-keyed (ruling R2) — project the base name for the read.
+          // B-097 V3 (V-R6): private fields are omitted; a trailing `…`
+          // marks the omission so the rendering stays honest.
+          let omittedPrivate = false;
           for (const [key, binding] of membersCtx.bindings) {
             if (binding.value?.kind === ValueKind.Structure && isFieldDescriptor(binding.value as ContextValue)) {
+              if (isPrivateDescriptor(binding.value as ContextValue)) { omittedPrivate = true; continue; }
               const fieldName = fqnBaseName(key);
               const fieldVal = instanceCtx.bindings.get(fieldName)?.value;
               if (fieldVal) parts.push(`${fieldName}: ${formatValue(fieldVal)}`);
             }
           }
+          if (omittedPrivate) parts.push("…");
           if (parts.length > 0) return `${typeName}(${parts.join(", ")})`;
         }
         // Int — display the primary normally
@@ -443,11 +448,28 @@ const ctx_resolve: PrimitiveFnImpl = (args) => {
   return b.value!;
 };
 
-const ctx_bindings: PrimitiveFnImpl = (args) => {
+const ctx_bindings: PrimitiveFnImpl = (args, pctx) => {
   const ctx = asCtx(args[0], "ctx_bindings");
+  // B-097 V3 (V-R7): names stay free, VALUE-BEARING reads are gated.
+  // On a typed record instance, private fields' (name, value) pairs are
+  // withheld without the owner's member privilege; on a private member
+  // DESCRIPTOR, the `value` (implementation) pair is withheld the same
+  // way. Everything else — including all names and flags — lists freely.
+  const t = getType(args[0]);
+  const shape = t ? typeShape(t) : null;
+  const guardInstance = shape !== null && (shape as any).__hasPrivateMembers
+    && !(pctx && scopeHoldsPrivilege(pctx, shape));
+  const descOwner = (ctx as any).__ownerShape as ContextValue | undefined;
+  const guardDescriptor = descOwner !== undefined && isPrivateDescriptor(ctx)
+    && !(pctx && scopeHoldsPrivilege(pctx, descOwner));
   const pairs: Value[] = [];
   for (const b of ctx.bindingList) {
     if (b.key !== null && b.value !== undefined) {
+      if (guardInstance && shape) {
+        const d = typeMemberDescriptor(shape, b.key);
+        if (d && isPrivateDescriptor(d)) continue;
+      }
+      if (guardDescriptor && b.key === "value") continue;
       pairs.push(makeExpr(id_prim, [stringToBits(b.key), b.value]));
     }
   }
@@ -641,7 +663,7 @@ function matchSubPattern(
   if (isPatternPrim(subPattern, "when_struct_destruct")) {
     const innerCtx = dataOf(value);
     if (innerCtx.kind !== ValueKind.Structure) return null;
-    return extractFields(innerCtx as ContextValue, (subPattern as any).args, evalFn, ctx);
+    return extractFields(innerCtx as ContextValue, (subPattern as any).args, evalFn, ctx, value);
   }
 
   // Nested type destruct
@@ -657,7 +679,7 @@ function matchSubPattern(
     if (!valTypeName || !patTypeName || valTypeName !== patTypeName) return null;
     const innerCtx = dataOf(value);
     if (innerCtx.kind !== ValueKind.Structure) return null;
-    return extractFields(innerCtx as ContextValue, fieldSpecs, evalFn, ctx);
+    return extractFields(innerCtx as ContextValue, fieldSpecs, evalFn, ctx, value);
   }
 
   // Type context → instanceof check
@@ -696,10 +718,19 @@ function matchSubPattern(
  */
 function extractFields(
   ctx: ContextValue, specArgs: Value[], evalFn: EvalFn, evalCtx: ContextValue,
+  subject?: Value,
 ): Value[] | null {
+  // B-097 V3 (V-R6): destructuring is a member READ — a private field
+  // outside its defining scope is an ERROR naming privacy, not a silent
+  // no-match (names are public; a quiet no-match would be a semantic
+  // trap). Inside the defining scope (privilege held) it works
+  // unchanged. No-op for types without private members.
+  const subjType = subject !== undefined ? getType(subject) : null;
+  const subjShape = subjType ? typeShape(subjType) : null;
   const values: Value[] = [];
   for (let i = 0; i < specArgs.length; i += 2) {
     const fieldName = bitsToString(dataOf(specArgs[i]) as BitsValue);
+    if (subjShape) assertMemberReachable(subjShape, fieldName, evalCtx);
     const b = ctx.bindings.get(fieldName);
     if (!b?.value) return null; // field not found → no match
 
@@ -846,7 +877,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
     if (subjectTypeName && patternTypeName && subjectTypeName === patternTypeName) {
       if (subjectP.kind === ValueKind.Structure) {
-        const values = extractFields(subjectP as ContextValue, fieldSpecs, evalFn!, ctx!);
+        const values = extractFields(subjectP as ContextValue, fieldSpecs, evalFn!, ctx!, subject);
         if (values) {
           matched = true;
           extractedValues = values;
@@ -860,7 +891,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const fieldSpecs = patternExpr.args;
 
     if (subjectP.kind === ValueKind.Structure) {
-      const values = extractFields(subjectP as ContextValue, fieldSpecs, evalFn!, ctx!);
+      const values = extractFields(subjectP as ContextValue, fieldSpecs, evalFn!, ctx!, subject);
       if (values) {
         matched = true;
         extractedValues = values;
@@ -1776,6 +1807,7 @@ const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("w
 
 import {
   getType, getTypeName, withType, withTypeReplacing, applyBoundaryBound, typeContextName, typeMethod, typeMemberDescriptor, assertMemberAvailable,
+  assertMemberReachable, typePrivilegedCtx, isPrivateDescriptor,
   isMethodDescriptor, isFieldDescriptor, isGetterDescriptor,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
@@ -2259,6 +2291,12 @@ function dispatchThroughType(
 ): Value | null {
   const desc = typeMemberDescriptor(type, fieldName);
   if (desc) {
+    // B-097 V3 (D41 stage 3): KERNEL MEDIATION — a private member
+    // resolves only for contexts holding the type's member privilege
+    // (planted below when the type's own member bodies are evaluated).
+    // Pure, folds when scope + knowledge are static (V-R8); no-op for
+    // types without private members.
+    assertMemberReachable(type, fieldName, ctx, desc);
     if (isMethodDescriptor(desc)) {
       const impl = desc.bindings.get("value")?.value;
       if (impl?.kind === ValueKind.PrimitiveFunction) {
@@ -2276,12 +2314,15 @@ function dispatchThroughType(
         return makePrimitive(`bound:${fieldName}`, boundFn, true, (impl as PrimitiveFunctionValue).effects);
       }
       if (impl?.kind === ValueKind.ComposedFunction) {
+        // B-097 V3: composed member bodies run with the type's member
+        // privilege planted over the call-site chain — the D42 evidence
+        // a type's own code holds for its private members.
         if (isGetterDescriptor(desc)) {
-          return evalFn!(makeExpr(impl, [selfExpr]), ctx!);
+          return evalFn!(makeExpr(impl, [selfExpr]), typePrivilegedCtx(type, ctx!));
         }
         const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
           const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-          return callEvalFn!(makeExpr(impl, [selfExpr, ...evalArgs]), callCtx!);
+          return callEvalFn!(makeExpr(impl, [selfExpr, ...evalArgs]), typePrivilegedCtx(type, callCtx!));
         };
         return makePrimitive(`bound:${fieldName}`, boundFn, true);
       }
@@ -2306,7 +2347,7 @@ function dispatchThroughType(
     if (method.kind === ValueKind.ComposedFunction) {
       const boundFn: PrimitiveFnImpl = (callArgs, callCtx, callEvalFn) => {
         const evalArgs = callArgs.map(a => callEvalFn!(a, callCtx!));
-        return callEvalFn!(makeExpr(method, [selfExpr, ...evalArgs]), callCtx!);
+        return callEvalFn!(makeExpr(method, [selfExpr, ...evalArgs]), typePrivilegedCtx(type, callCtx!));
       };
       return makePrimitive(`bound:${fieldName}`, boundFn, true);
     }
@@ -2389,7 +2430,23 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
     // Direct binding lookup (for data fields like __name, non-method bindings)
     const b = p.bindings.get(fieldName);
-    if (b && b.value !== undefined) return b.value;
+    if (b && b.value !== undefined) {
+      // B-097 V3 (V-R7) defense-in-depth: descriptors are typed values,
+      // so dot access on them is already opaque (the typed path finds no
+      // Method members) — but if a private member's descriptor ever
+      // surfaces UNTYPED, its implementation stays gated behind the same
+      // possession evidence as dot access. The live reflective gate is
+      // ctx_bindings (names + flags free, value pairs withheld).
+      if (fieldName === "value" && isPrivateDescriptor(p as ContextValue)) {
+        const owner = (p as any).__ownerShape as ContextValue | undefined;
+        if (owner && !(ctx && scopeHoldsPrivilege(ctx, owner))) {
+          const nameV = (p as ContextValue).bindings.get("name")?.value;
+          const memberName = nameV?.kind === ValueKind.Bits ? bitsToString(nameV as BitsValue) : "<member>";
+          throw new AllegroError(`'${memberName}' is private to '${typeContextName(owner) ?? "<anonymous>"}'`);
+        }
+      }
+      return b.value;
+    }
 
     throw new AllegroError(`type_dispatch: '${fieldName}' not found`);
   }
@@ -4066,6 +4123,9 @@ function makeTypedBinOp(opName: string): PrimitiveFnImpl {
     // C5.2a pre-fix: dispatch reads the SHAPE, matching the evaluator's
     // PRIM_TO_METHOD path — the two agreed before only because refinement
     // layers share the member-set object (C3.1).
+    // B-097 V3: the same kernel mediation as dot/operator dispatch — a
+    // private operator member denies outside its defining scope.
+    assertMemberReachable(typeShape(leftType), opName, ctx);
     const method = typeMethod(typeShape(leftType), opName);
     if (!method) {
       const typeName = getTypeName(left) ?? "unknown";

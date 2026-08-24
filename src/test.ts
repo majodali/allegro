@@ -1823,6 +1823,178 @@ test("B-097 V2: typeMethod raw-binding fallthrough is narrowed to protocol slots
   eq(threw, true, "stray type-Context binding no longer leaks through dispatch");
 });
 
+// == B-097 V3: private members (the flip) ==
+
+/** Evaluate Standard source expecting an AllegroError; returns its message. */
+function stdErrorMessage(source: string): string {
+  try {
+    evalStd(source);
+  } catch (e: any) {
+    return e.message ?? String(e);
+  }
+  return "<no error>";
+}
+
+test("B-097 V3: private field — the type's own method reads it; external dot access denies", () => {
+  const out = evalStd(
+    "Vault = Type.define({owner: String, secret: private(Int), reveal: (self) => self.secret})\n" +
+    "v = Vault(\"alice\", 42)\nv.reveal()\n");
+  eq(Number((dataOf(out!) as BitsValue).data), 42, "own method holds the member privilege");
+  const msg = stdErrorMessage(
+    "Vault = Type.define({owner: String, secret: private(Int)})\n" +
+    "v = Vault(\"alice\", 42)\nv.secret\n");
+  eq(msg.includes("'secret' is private to 'Vault'"), true, "denial names privacy and the type (names-public)");
+});
+
+test("B-097 V3: private method — internal call works, external call denies", () => {
+  const out = evalStd(
+    "Counter = Type.define({n: Int, bump: private((self) => self.n + 1), next: (self) => self.bump()})\n" +
+    "c = Counter(41)\nc.next()\n");
+  eq(Number((dataOf(out!) as BitsValue).data), 42);
+  const msg = stdErrorMessage(
+    "Counter = Type.define({n: Int, bump: private((self) => self.n + 1)})\n" +
+    "c = Counter(41)\nc.bump()\n");
+  eq(msg.includes("'bump' is private to 'Counter'"), true);
+});
+
+test("B-097 V3: private operator member — a + b denies outside, works from the type's own code", () => {
+  const out = evalStd(
+    "Money = Type.define({amt: Int, add: private((self, other) => Money(self.amt + other.amt)), plus: (self, other) => self + other})\n" +
+    "Money(2).plus(Money(3)).amt\n");
+  eq(Number((dataOf(out!) as BitsValue).data), 5, "operator dispatch inside a member body holds privilege");
+  const msg = stdErrorMessage(
+    "Money = Type.define({amt: Int, add: private((self, other) => Money(self.amt + other.amt))})\n" +
+    "Money(2) + Money(3)\n");
+  eq(msg.includes("'add' is private to 'Money'"), true, "PRIM_TO_METHOD dispatch shares the mediation gate");
+});
+
+test("B-097 V3: destructuring a private field outside its scope is an ERROR naming privacy (V-R6)", () => {
+  const msg = stdErrorMessage(
+    "Vault = Type.define({owner: String, secret: private(Int)})\n" +
+    "v = Vault(\"alice\", 42)\n" +
+    "when v is Vault(owner, secret) then owner else \"no\"\n");
+  eq(msg.includes("'secret' is private to 'Vault'"), true, "not a silent no-match");
+  // Public-only patterns keep working; inside a member body the private
+  // field destructures normally (privilege held).
+  const pub = evalStd(
+    "Vault = Type.define({owner: String, secret: private(Int)})\n" +
+    "v = Vault(\"alice\", 42)\n" +
+    "when v is Vault(owner) then owner else \"no\"\n");
+  eq(bitsToString(dataOf(pub!) as BitsValue), "alice");
+  const inner = evalStd(
+    "Vault = Type.define({owner: String, secret: private(Int), peek: (self) => when self is Vault(secret) then secret else 0 - 1})\n" +
+    "Vault(\"alice\", 42).peek()\n");
+  eq(Number((dataOf(inner!) as BitsValue).data), 42);
+});
+
+test("B-097 V3: printer omits private fields with an honest `…` marker (V-R6)", () => {
+  const r = runtimeEval(
+    "Vault = Type.define({owner: String, secret: private(Int)})\n" +
+    "v = Vault(\"alice\", 42)\nv\n", undefined, [typeExt], undefined, true);
+  const rendered = formatValue(r.value!);
+  eq(rendered.includes("owner: alice"), true);
+  eq(rendered.includes("42"), false, "private value never rendered");
+  eq(rendered.includes("…"), true, "omission is marked");
+  const ts = evalStd(
+    "Vault = Type.define({owner: String, secret: private(Int)})\n" +
+    "Vault(\"alice\", 42).toString()\n");
+  const tsStr = bitsToString(dataOf(ts!) as BitsValue);
+  eq(tsStr.includes("42"), false, "auto-toString omits private fields too");
+  eq(tsStr.includes("…"), true);
+});
+
+test("B-097 V3: conformance counts only externally-reachable members (V-R6)", () => {
+  // Actual side: a private `x` satisfies nothing through the loose
+  // (structural-wrap) surface.
+  const r = runtimeEval(
+    "HasX = Interface.define({x: Int})\n" +
+    "PrivX = Type.define({x2: Int, x: private(Int)})\n" +
+    "PubX = Type.define({x: Int})\n" +
+    "a = PrivX(1, 2)\nb = PubX(5)\nb\n", undefined, [typeExt], undefined, true);
+  const iface = dataOf(r.evalCtx.bindings.get("HasX")!.value!) as ContextValue;
+  const privInst = r.evalCtx.bindings.get("a")!.value!;
+  const pubInst = r.evalCtx.bindings.get("b")!.value!;
+  const looseIface = structuralWrap(iface);
+  const instOf = typeMethod(Type, "instanceof")! as import("./types.js").PrimitiveFunctionValue;
+  const privCheck = instOf.fn([looseIface, privInst], undefined as any, undefined as any);
+  eq(Number((dataOf(privCheck) as BitsValue).data), 0, "private x does not satisfy ~{x}");
+  const pubCheck = instOf.fn([looseIface, pubInst], undefined as any, undefined as any);
+  eq(Number((dataOf(pubCheck) as BitsValue).data), 1, "public x does");
+  // Expected side: an interface's own private declaration imposes no
+  // requirement on conformers (its symbol is interface-local).
+  const r2 = runtimeEval(
+    "Wants = Interface.define({x: Int, hidden: private(Int)})\n" +
+    "Impl = Type.define({x: Int}, Wants)\n" +
+    "i = Impl(7)\ni\n", undefined, [typeExt], undefined, true);
+  const wants = dataOf(r2.evalCtx.bindings.get("Wants")!.value!) as ContextValue;
+  const impl = r2.evalCtx.bindings.get("i")!.value!;
+  const declCheck = instOf.fn([wants, impl], undefined as any, undefined as any);
+  eq(Number((dataOf(declCheck) as BitsValue).data), 1, "expected-side private is not required");
+});
+
+test("B-097 V3: a foreign type cannot draw a bundle's private member; privates never propagate", () => {
+  const msg = stdErrorMessage(
+    "Helpers = Type.define({calc: private((self) => 1), pub: (self) => 2})\n" +
+    "User = Type.define({x: Int, calc: (self) => 3}, Helpers)\n");
+  eq(msg.includes("private to 'Helpers'"), true, "draw-from of a foreign private is a denial");
+  // The bundle's private member is not copied into a drawing type.
+  const r = runtimeEval(
+    "Helpers = Type.define({calc: private((self) => 1), pub: (self) => 2})\n" +
+    "User = Type.define({x: Int}, Helpers)\n" +
+    "u = User(9)\nu\n", undefined, [typeExt], undefined, true);
+  const userType = dataOf(r.evalCtx.bindings.get("User")!.value!) as ContextValue;
+  eq(typeMemberDescriptor(userType, "calc"), null, "private member stayed with the bundle");
+  eq(typeMemberDescriptor(userType, "pub") !== null, true, "public bundle member copied as before");
+});
+
+test("B-097 V3: declaring a private member that shadows a drawn member is a define-time error", () => {
+  const msg = stdErrorMessage(
+    "Base = Type.define({tag: (self) => 1})\n" +
+    "Shadow = Type.define({x: Int, tag: private(Int)}, Base)\n");
+  eq(msg.includes("cannot declare 'tag' private"), true);
+});
+
+test("B-097 V3: reflection — names and flags free, accessors gated (V-R7)", () => {
+  const r = runtimeEval(
+    "Vault = Type.define({owner: String, secret: private(Int), code: private((self) => 7)})\n" +
+    "v = Vault(\"alice\", 42)\nv\n", undefined, [typeExt], undefined, true);
+  const vaultType = dataOf(r.evalCtx.bindings.get("Vault")!.value!) as ContextValue;
+  // Enumeration lists private members (names-public), flags recorded —
+  // introspection/PCP tooling keeps unrestricted name-level reads.
+  const descs = memberDescriptorsOf(vaultType);
+  eq(descs.has("secret") && descs.has("code"), true, "enumeration counts are unchanged by privacy");
+  const codeDesc = descs.get("code")!;
+  const listKeys = (v: Value): string[] => {
+    const listing = primRegistry.ctx_bindings.fn([v], r.evalCtx, evaluate) as import("./types.js").ExpressionValue;
+    return listing.args.map((pair) =>
+      bitsToString(dataOf((pair as import("./types.js").ExpressionValue).args[0]) as BitsValue));
+  };
+  // The descriptor's reflective listing keeps name + flag pairs free but
+  // withholds the ACCESSOR (the implementation) without possession
+  // evidence — the one value-bearing reflective route.
+  const descKeys = listKeys(codeDesc as unknown as Value);
+  eq(descKeys.includes("name") && descKeys.includes("private"), true, "names and flags are free reads");
+  eq(descKeys.includes("value"), false, "the private member's impl is withheld without evidence");
+  // Same gate on instances: private (name, value) pairs are withheld.
+  const inst = r.evalCtx.bindings.get("v")!.value!;
+  const instKeys = listKeys(inst);
+  eq(instKeys.includes("owner"), true);
+  eq(instKeys.includes("secret"), false, "value-bearing reflection withholds the private pair");
+  // A PUBLIC member's descriptor lists its impl freely, unchanged.
+  const ownerDesc = descs.get("owner")!;
+  eq(listKeys(ownerDesc as unknown as Value).includes("fieldType"), true, "public descriptors list everything");
+});
+
+test("B-097 V3: readonly(...) is reserved vocabulary — recorded on the descriptor, inert until B-046", () => {
+  const r = runtimeEval(
+    "Point = Type.define({x: readonly(Int), y: Int})\n" +
+    "p = Point(3, 4)\np.x\n", undefined, [typeExt], undefined, true);
+  eq(Number((dataOf(r.value!) as BitsValue).data), 3, "reads work unchanged");
+  const pointType = dataOf(r.evalCtx.bindings.get("Point")!.value!) as ContextValue;
+  const xDesc = typeMemberDescriptor(pointType, "x")!;
+  eq(xDesc.bindings.get("readonly")?.value !== undefined, true, "attribute recorded for B-046");
+});
+
 test("module export: exported functions work normally", () => {
   const result = evalStd("export f = x => x * 2\nf(21)\n");
   eq(Number((dataOf(result!) as BitsValue).data), 42);

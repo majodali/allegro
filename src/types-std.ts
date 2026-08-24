@@ -15,6 +15,7 @@ import {
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
 import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
+import { scopePrivilegeExtend, scopeHoldsPrivilege } from "./scope.js";
 import {
   getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericBackLink,
@@ -215,6 +216,39 @@ export function assertMemberAvailable(
   }
 }
 
+/** B-097 V3 (D41 stage 3, D42/D43): the KERNEL MEDIATION check — a
+ *  member declared `private` resolves only for contexts holding the
+ *  declaring type's member privilege (planted by dispatch when it
+ *  evaluates the type's own member bodies — the D42 possession test:
+ *  the member symbol stays in the type-local member scope, so only
+ *  evaluation extended from that scope reaches it). Pure, folds at PE
+ *  time — denial is static when scope + knowledge are static (V-R8).
+ *  Shared by dot/bracket/interpolation dispatch, operator dispatch, and
+ *  destructuring. No-op for types without private members (hot path:
+ *  one property read). */
+export function assertMemberReachable(
+  type: ContextValue,
+  fieldName: string,
+  ctx: ContextValue | undefined,
+  desc?: ContextValue | null,
+): void {
+  if (!(type as any).__hasPrivateMembers) return;
+  const d = desc !== undefined ? desc : typeMemberDescriptor(type, fieldName);
+  if (!d || !isPrivateDescriptor(d)) return;
+  if (ctx && scopeHoldsPrivilege(ctx, type)) return;
+  const typeName = getTypeNameFromCtx(type) ?? "<anonymous>";
+  throw new AllegroError(`'${fieldName}' is private to '${typeName}'`);
+}
+
+/** B-097 V3: the evaluation context a type's OWN member bodies run in —
+ *  the call-site chain plus the type's privilege layer, minted only for
+ *  types that declare private members (everyone else: the ctx as-is,
+ *  zero allocation). */
+export function typePrivilegedCtx(type: ContextValue, ctx: ContextValue): ContextValue {
+  if (!(type as any).__hasPrivateMembers) return ctx;
+  return scopePrivilegeExtend(ctx, type);
+}
+
 /** C6.1a: the member-set write chokepoint — stores the descriptor under
  *  the member symbol's FQN key in the DECLARING TYPE's OWN scope (per-type
  *  name-stable scopes; the shared kernel scope made cross-built-in
@@ -261,12 +295,27 @@ function memberNameIndex(members: ContextValue): Map<string, Value[]> {
  *  them (instead of an order-dependent pick); distinct targets error. */
 function drawMemberKeys(drawnContexts: ContextValue[], baseName: string, localScope: string): string[] {
   const matches = new Map<string, Value | undefined>(); // key → descriptor (target)
+  // B-097 V3 (V-R6): a foreign PRIVATE member is not drawable — its
+  // symbol stays with the defining type. A base-name match on one is an
+  // explicit denial (names are public; a silent fresh-symbol mint would
+  // read as an override and be a semantic trap).
+  let privateOwner: string | null = null;
   for (const drawn of drawnContexts) {
     const membersV = getMembers(drawn);
     if (membersV?.kind !== ValueKind.Structure) continue;
     for (const [key, b] of (membersV as ContextValue).bindings) {
-      if (fqnBaseName(key) === baseName) matches.set(key, b.value);
+      if (fqnBaseName(key) !== baseName) continue;
+      if (b.value?.kind === ValueKind.Structure && isPrivateDescriptor(b.value as ContextValue)) {
+        privateOwner = getTypeNameFromCtx(drawn) ?? "<anonymous>";
+        continue;
+      }
+      matches.set(key, b.value);
     }
+  }
+  if (matches.size === 0 && privateOwner !== null) {
+    throw new AllegroError(
+      `member '${baseName}' is private to '${privateOwner}' — a foreign type cannot draw it`,
+    );
   }
   if (matches.size === 0) return [memberFqnIn(localScope, baseName)];
   if (matches.size === 1) return [...matches.keys()];
@@ -488,15 +537,25 @@ function structuralSubtypeof(typeA: ContextValue, typeB: ContextValue): boolean 
     //  - The LOOSE path (~T structural wraps, anonymous inline types —
     //    expected is UNNAMED and unmarked) matches by base-name
     //    projection — the duck-typing surface, aimed at data values.
+    // B-097 V3 (V-R6): conformance counts only EXTERNALLY-REACHABLE
+    // members. The expected side's private members impose no requirement
+    // (their symbols are type-local — nothing else can hold them), and
+    // the actual side's private members satisfy nothing (they are not
+    // reachable through the conforming surface).
     if (isInterfaceType(typeB) || getTypeNameFromCtx(typeB) !== null) {
-      for (const key of bMembers.bindings.keys()) {
+      for (const [key, bBinding] of bMembers.bindings) {
+        if (bBinding.value?.kind === ValueKind.Structure && isPrivateDescriptor(bBinding.value as ContextValue)) continue;
         if (!aMembers.bindings.has(key)) return false;
       }
       return true;
     }
     const aNames = new Set<string>();
-    for (const key of aMembers.bindings.keys()) aNames.add(fqnBaseName(key));
-    for (const key of bMembers.bindings.keys()) {
+    for (const [key, aBinding] of aMembers.bindings) {
+      if (aBinding.value?.kind === ValueKind.Structure && isPrivateDescriptor(aBinding.value as ContextValue)) continue;
+      aNames.add(fqnBaseName(key));
+    }
+    for (const [key, bBinding] of bMembers.bindings) {
+      if (bBinding.value?.kind === ValueKind.Structure && isPrivateDescriptor(bBinding.value as ContextValue)) continue;
       if (!aNames.has(fqnBaseName(key))) return false;
     }
     return true;
@@ -679,17 +738,34 @@ export const FieldType: ContextValue = makeContext();
 setName(FieldType, stringToBits("Field"));
 writeShape(FieldType, Type);
 
+/** B-097 V3 (D43): declared member attributes — optional bindings on the
+ *  descriptor, following the shipped `getter` precedent. `private` is
+ *  live (kernel mediation consults it); `readonly` is RESERVED vocabulary
+ *  recorded on the descriptor but inert until B-046 gives it write
+ *  semantics. */
+export interface MemberAttrs {
+  private?: boolean;
+  readonly?: boolean;
+}
+
+function addAttrBindings(desc: ContextValue, attrs?: MemberAttrs): void {
+  if (attrs?.private) addBinding(desc, "private", makeInt(1));
+  if (attrs?.readonly) addBinding(desc, "readonly", makeInt(1));
+}
+
 /** Create a Method descriptor */
 export function makeMethodDescriptor(
   name: string,
   impl: PrimitiveFunctionValue,
   isGetter: boolean = false,
+  attrs?: MemberAttrs,
 ): ContextValue {
   const desc = makeContext();
   writeShape(desc, MethodType);
   addBinding(desc, "name", stringToBits(name));
   addBinding(desc, "value", impl);
   if (isGetter) addBinding(desc, "getter", makeInt(1));
+  addAttrBindings(desc, attrs);
   return desc;
 }
 
@@ -697,11 +773,13 @@ export function makeMethodDescriptor(
 export function makeFieldDescriptor(
   name: string,
   fieldType: Value,
+  attrs?: MemberAttrs,
 ): ContextValue {
   const desc = makeContext();
   writeShape(desc, FieldType);
   addBinding(desc, "name", stringToBits(name));
   addBinding(desc, "fieldType", fieldType);
+  addAttrBindings(desc, attrs);
   return desc;
 }
 
@@ -782,6 +860,39 @@ export function isMethodDescriptor(desc: ContextValue): boolean {
   return channelReadRaw(desc, "shape") === MethodType;
 }
 
+/** B-097 V3 (D43): is this member declared `private`? */
+export function isPrivateDescriptor(desc: ContextValue): boolean {
+  const p = desc.bindings.get("private")?.value;
+  return p !== undefined && p.kind === ValueKind.Bits && (p as BitsValue).data !== 0n;
+}
+
+// --- Modifier combinators (V-R5) ---------------------------------------------
+// With keyword syntax parked on B-043, the define-spec surface is wrapper
+// combinators: `Type.define({secret: private(Int), helper: private(fn)})`.
+// The marker is a host-side registry (the `for_all` precedent — no new
+// `__*` slot): the returned Context is empty on the data plane; spec
+// processing unwraps it via `specModifiers`.
+
+const modifierRegistry = new WeakMap<Value, { inner: Value; attrs: MemberAttrs }>();
+
+function makeModifiedSpec(inner: Value, attr: keyof MemberAttrs): ContextValue {
+  const marker = makeContext();
+  const existing = modifierRegistry.get(dataOf(inner));
+  if (existing) {
+    // Compose wrappers: readonly(private(T)) accumulates both attrs.
+    modifierRegistry.set(marker, { inner: existing.inner, attrs: { ...existing.attrs, [attr]: true } });
+  } else {
+    modifierRegistry.set(marker, { inner, attrs: { [attr]: true } });
+  }
+  return marker;
+}
+
+/** The wrapped declaration + attrs of a modifier marker, or undefined
+ *  when `v` is not one. */
+export function specModifiers(v: Value): { inner: Value; attrs: MemberAttrs } | undefined {
+  return modifierRegistry.get(dataOf(v));
+}
+
 /** Check if a descriptor is a Field */
 export function isFieldDescriptor(desc: ContextValue): boolean {
   return channelReadRaw(desc, "shape") === FieldType;
@@ -834,8 +945,8 @@ function buildRecordType(
   // method implementation (the old `.mixin()` surface); anything else —
   // including function TYPES like `toString: Function` — declares a typed
   // field. Methods do not participate in the positional constructor.
-  const fields: { name: string; type: Value }[] = [];
-  const methods: { name: string; impl: Value }[] = [];
+  const fields: { name: string; type: Value; attrs?: MemberAttrs }[] = [];
+  const methods: { name: string; impl: Value; attrs?: MemberAttrs }[] = [];
   // C7.2b (ruling R3): `construct` is a RESERVED spec key — the declared
   // construction authority (Refinement.define's reserved-key precedent:
   // refines/where/preserve). Declared at mint time, replacing the post-hoc
@@ -848,8 +959,15 @@ function buildRecordType(
   for (const [key, binding] of (fieldCtx as ContextValue).bindings) {
     if (isMetaSlotKey(key)) continue;
     if (binding.value) {
+      // B-097 V3 (D43/V-R5): unwrap modifier combinators — the attrs
+      // ride the declaration into the descriptor.
+      const mods = specModifiers(binding.value);
+      const declValue = mods ? mods.inner : binding.value;
       if (key.startsWith("law_")) {
-        const body = forAllBody(binding.value);
+        if (mods) {
+          throw new AllegroError(`define: modifiers do not apply to law declarations ('${key}')`);
+        }
+        const body = forAllBody(declValue);
         if (body === undefined) {
           throw new AllegroError(
             `define: '${key}' must be a for_all(...) proposition (laws quantify over the implementing type)`);
@@ -857,8 +975,11 @@ function buildRecordType(
         laws.push({ name: key.slice(4), body });
         continue;
       }
-      const entry = dataOf(binding.value);
+      const entry = dataOf(declValue);
       if (key === "construct") {
+        if (mods) {
+          throw new AllegroError("define: modifiers do not apply to the reserved key 'construct'");
+        }
         if (entry.kind !== ValueKind.ComposedFunction && entry.kind !== ValueKind.PrimitiveFunction) {
           throw new AllegroError("define: reserved key 'construct' must be a function value");
         }
@@ -869,11 +990,11 @@ function buildRecordType(
         // E-R5: an `eq` implementation is this type's equality — it must
         // be pure and knowledge-independent, checked mechanically here.
         if (key === "eq") {
-          assertPureForEquality(binding.value, `define: 'eq' implementation`, ctx);
+          assertPureForEquality(declValue, `define: 'eq' implementation`, ctx);
         }
-        methods.push({ name: key, impl: entry });
+        methods.push({ name: key, impl: entry, attrs: mods?.attrs });
       } else {
-        fields.push({ name: key, type: binding.value });
+        fields.push({ name: key, type: declValue, attrs: mods?.attrs });
       }
     }
   }
@@ -897,9 +1018,36 @@ function buildRecordType(
   // same-named symbols → explicit ambiguity error).
   const recordScope = newTypeMemberScope();
   (newType as any).__localMemberScope = recordScope;
+  // B-097 V3 (V-R3/V-R5): a `private(...)` declaration NEVER draws — its
+  // symbol is minted type-local (the member stays in the defining scope,
+  // D42), so it can neither override a drawn member nor satisfy foreign
+  // conformance. A base-name collision with a drawn member is an explicit
+  // error (the local private would shadow the drawn symbol at the access
+  // surface — the §5 ambiguity — so refuse at declaration).
+  const privateKeyFor = (name: string): string => {
+    for (const bundle of drawn) {
+      const bm = getMembers(bundle);
+      if (bm?.kind !== ValueKind.Structure) continue;
+      for (const key of (bm as ContextValue).bindings.keys()) {
+        if (fqnBaseName(key) === name) {
+          throw new AllegroError(
+            `define: cannot declare '${name}' private — it would shadow a drawn member of '${getTypeNameFromCtx(bundle) ?? "<anonymous>"}'`);
+        }
+      }
+    }
+    return memberFqnIn(recordScope, name);
+  };
+  let hasPrivateMembers = false;
   for (const f of fields) {
+    if (f.attrs?.private) {
+      hasPrivateMembers = true;
+      const desc = makeFieldDescriptor(f.name, f.type, f.attrs);
+      (desc as any).__ownerShape = newType;
+      addMemberAt(members, privateKeyFor(f.name), desc);
+      continue;
+    }
     for (const key of drawMemberKeys(drawn, f.name, recordScope)) {
-      addMemberAt(members, key, makeFieldDescriptor(f.name, f.type));
+      addMemberAt(members, key, makeFieldDescriptor(f.name, f.type, f.attrs));
     }
   }
 
@@ -912,13 +1060,20 @@ function buildRecordType(
   for (const m of methods) {
     let desc: Value;
     if (m.impl.kind === ValueKind.PrimitiveFunction) {
-      desc = makeMethodDescriptor(m.name, m.impl as PrimitiveFunctionValue);
+      desc = makeMethodDescriptor(m.name, m.impl as PrimitiveFunctionValue, false, m.attrs);
     } else {
       const d = makeContext();
       writeShape(d, MethodType);
       addBinding(d, "name", stringToBits(m.name));
       addBinding(d, "value", m.impl);
+      addAttrBindings(d, m.attrs);
       desc = d;
+    }
+    if (m.attrs?.private) {
+      hasPrivateMembers = true;
+      (desc as any).__ownerShape = newType;
+      addMemberAt(members, privateKeyFor(m.name), desc);
+      continue;
     }
     for (const key of drawMemberKeys(drawn, m.name, recordScope)) {
       addMemberAt(members, key, desc);
@@ -952,6 +1107,9 @@ function buildRecordType(
     for (const [key, binding] of (bundleMembers as ContextValue).bindings) {
       if (metaMethodNames.has(fqnBaseName(key))) continue;
       if (!binding.value) continue;
+      // B-097 V3 (V-R6): a bundle's private members stay with the bundle —
+      // they are never copied into drawing types.
+      if (binding.value.kind === ValueKind.Structure && isPrivateDescriptor(binding.value as ContextValue)) continue;
       if (specKeys.has(key)) continue;
       const existing = members.bindings.get(key)?.value;
       if (existing === undefined) {
@@ -971,6 +1129,11 @@ function buildRecordType(
   // every other concrete bundle at draw time (two auto-toStrings under
   // one base name is the D44 explicit-conflict error). An empty spec
   // (`Type.define({})`) still mints a full record type.
+  // B-097 V3: host-plane flag — the kernel mediation check and privilege
+  // planting are gated on it, so types without private members pay
+  // nothing on the dispatch hot path.
+  if (hasPrivateMembers) (newType as any).__hasPrivateMembers = true;
+
   const isBundle = fields.length === 0 && methods.length > 0 && customConstruct === null;
   if (isBundle) {
     setMembers(newType, members);
@@ -984,7 +1147,10 @@ function buildRecordType(
     // meta-method applied, now declared at mint time).
     const declaredCtor = customConstruct;
     setConstruct(newType, makePrimitive("record.__construct", (ctorArgs, ctorCtx, ctorEvalFn) => {
-      const result = ctorEvalFn!(makeExpr(declaredCtor, ctorArgs), ctorCtx!);
+      // B-097 V3: the declared constructor is the type's own code — its
+      // body runs with the type's member privilege (it may read private
+      // members of instances it works with).
+      const result = ctorEvalFn!(makeExpr(declaredCtor, ctorArgs), typePrivilegedCtx(newType, ctorCtx!));
       return withTypeReplacing(dataOf(result), newType);
     }, true));
   } else {
@@ -1017,7 +1183,11 @@ function buildRecordType(
     const instanceCtx = args[0] as ContextValue;
     const typeName = getTypeNameFromCtx(newType) ?? "<anonymous>";
     const parts: string[] = [];
+    // B-097 V3 (V-R6): private fields are OMITTED from the rendered
+    // record; a trailing `…` marks the omission so output stays honest.
+    let omittedPrivate = false;
     for (const f of fields) {
+      if (f.attrs?.private) { omittedPrivate = true; continue; }
       const val = instanceCtx.bindings.get(f.name)?.value;
       if (val) {
         // Try to get a string representation via type's toString
@@ -1036,6 +1206,7 @@ function buildRecordType(
         parts.push(`${f.name}: ...`);
       }
     }
+    if (omittedPrivate) parts.push("…");
     return withType(stringToBits(`${typeName}(${parts.join(", ")})`), StringType);
   }) as PrimitiveFnImpl);
   // toString draws a bundle's symbol if one exists (an override, same
@@ -1079,13 +1250,18 @@ function buildInterfaceType(
   // are LAW declarations — proposition SCHEMAS at declaration time
   // (nothing runs, nothing discharges); they become concrete obligations
   // at DRAW time when an implementing type binds the interface's symbols.
-  const declaredMembers: { name: string; type: Value }[] = [];
+  const declaredMembers: { name: string; type: Value; attrs?: MemberAttrs }[] = [];
   const declaredLaws: { name: string; body: Value }[] = [];
   for (const [key, binding] of (specCtx as ContextValue).bindings) {
     if (isMetaSlotKey(key)) continue;
     if (binding.value) {
+      const mods = specModifiers(binding.value);
+      const declValue = mods ? mods.inner : binding.value;
       if (key.startsWith("law_")) {
-        const body = forAllBody(binding.value);
+        if (mods) {
+          throw new AllegroError(`Interface.define: modifiers do not apply to law declarations ('${key}')`);
+        }
+        const body = forAllBody(declValue);
         if (body === undefined) {
           throw new AllegroError(
             `Interface.define: '${key}' must be a for_all(...) proposition`);
@@ -1093,7 +1269,7 @@ function buildInterfaceType(
         declaredLaws.push({ name: key.slice(4), body });
         continue;
       }
-      declaredMembers.push({ name: key, type: binding.value });
+      declaredMembers.push({ name: key, type: declValue, attrs: mods?.attrs });
     }
   }
 
@@ -1117,7 +1293,15 @@ function buildInterfaceType(
   const ifaceScope = newTypeMemberScope();
   (ifaceType as any).__localMemberScope = ifaceScope;
   for (const m of declaredMembers) {
-    const desc = makeFieldDescriptor(m.name, m.type);
+    const desc = makeFieldDescriptor(m.name, m.type, m.attrs);
+    // B-097 V3: a private interface declaration stays interface-local —
+    // it is never drawn and imposes no conformance requirement (V-R6).
+    if (m.attrs?.private) {
+      (desc as any).__ownerShape = ifaceType;
+      (ifaceType as any).__hasPrivateMembers = true;
+      addMemberAt(members, memberFqnIn(ifaceScope, m.name), desc);
+      continue;
+    }
     for (const key of drawMemberKeys(drawn, m.name, ifaceScope)) {
       addMemberAt(members, key, desc);
     }
@@ -1149,6 +1333,9 @@ function buildInterfaceType(
     for (const [key, binding] of (bundleMembers as ContextValue).bindings) {
       if (metaMethodNames.has(fqnBaseName(key))) continue;
       if (!binding.value) continue;
+      // B-097 V3 (V-R6): a bundle's private members stay with the bundle —
+      // they are never copied into drawing types.
+      if (binding.value.kind === ValueKind.Structure && isPrivateDescriptor(binding.value as ContextValue)) continue;
       if (specKeys.has(key)) continue;
       const existing = members.bindings.get(key)?.value;
       if (existing === undefined) {
@@ -4072,6 +4259,14 @@ const forAllPrim = makePrimitive("for_all", (args) => {
   return makeForAllProp(args[0]);
 });
 
+// B-097 V3 (D43/V-R5): the modifier combinator surface. `private(decl)`
+// marks a define/Interface spec entry as a private member (kernel
+// mediation enforces it); `readonly(decl)` records the RESERVED
+// attribute — inert until B-046 lands write semantics. Keyword syntax
+// (`private x: Int`) is B-043 and lowers to these same attributes.
+const privatePrim = makePrimitive("private", (args) => makeModifiedSpec(args[0], "private"));
+const readonlyPrim = makePrimitive("readonly", (args) => makeModifiedSpec(args[0], "readonly"));
+
 export function createTypeSystem(): Extension {
   return {
     name: "types",
@@ -4103,6 +4298,9 @@ export function createTypeSystem(): Extension {
       Equatable: wrapType(EquatableType) as any,
       Law: lawSurface as any,
       for_all: forAllPrim as any,
+      // Modifier combinators (B-097 V3, D43)
+      private: privatePrim as any,
+      readonly: readonlyPrim as any,
       // Literal bindings (parsed as identifiers, resolved here)
       true: withType(makeInt(1), BoolType) as any,
       false: withType(makeInt(0), BoolType) as any,
