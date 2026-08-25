@@ -189,9 +189,12 @@ export function assertNotScope(v: Value, op: string): void {
 // binding present with `value: undefined` is UNRESOLVED (residualises,
 // never throws — D11).
 
-/** Create a pending future-cell binding. */
+/** Create a pending future-cell binding. B-028 F4: the `cell` marker is
+ *  permanent (it survives resolution) — completion replacement uses it to
+ *  distinguish a slot awaiting a future/import cell from quoted-AST data
+ *  that merely LOOKS unresolved and must never be re-executed. */
 export function makeCell(key: string): Binding {
-  return { key, value: undefined, incompleteDeps: new Set(), isComplete: false };
+  return { key, value: undefined, incompleteDeps: new Set(), isComplete: false, cell: true };
 }
 
 /** Is this binding a pending (unresolved) future cell? */

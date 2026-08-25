@@ -15,7 +15,8 @@ import {
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
 import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
-import { scopePrivilegeExtend, scopeHoldsPrivilege } from "./scope.js";
+import { scopePrivilegeExtend, scopeHoldsPrivilege, scopeLookup } from "./scope.js";
+import { effectsOf as fnEffectsOf } from "./effects.js";
 import {
   getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericBackLink,
@@ -1363,10 +1364,11 @@ function buildInterfaceType(
  *  value in a slot). Shallow by design: it serves the construction-time
  *  invariant check, whose predicate reads this instance's own fields;
  *  nested-structure substitution is F2's completion-replacement item. */
-function resolveDataSlots(
+export function resolveDataSlots(
   v: Value,
   ctx: ContextValue | undefined,
   evalFn: EvalFn | undefined,
+  cellRefsOnly = false,
 ): Value {
   if (!ctx || !evalFn) return v;
   const inst = dataOf(v);
@@ -1377,6 +1379,12 @@ function resolveDataSlots(
   for (const [key, b] of instCtx.bindings) {
     if (b.value === undefined || isResolved(b.value)) continue;
     if (isMetaSlotKey(key)) continue;
+    // B-028 F4 (`cellRefsOnly`, set by the completion cascade and io):
+    // outside the construction path, only slots that actually reference
+    // a future/import CELL are evaluated — quoted-AST data (a grammar
+    // rule's expression, a stored symbol) also reads as "unresolved"
+    // and must never be re-executed by a background substitution pass.
+    if (cellRefsOnly && !referencesCell(b.value, ctx)) continue;
     // The slot may hold the bare Symbol, or a channel CARRIER over it
     // (an effectful source like `delay` wraps its future with the
     // effects channel) — `evaluate` handles both: carriers re-evaluate
@@ -1398,10 +1406,29 @@ function resolveDataSlots(
   return storedType ? withTypeReplacing(fresh, storedType) : fresh;
 }
 
+/** Does this slot value's symbol graph reference a future/import CELL
+ *  (a binding minted by `makeCell` — the marker is permanent, so a
+ *  resolved future still answers)? Guards background substitution. */
+function referencesCell(v: Value, ctx: ContextValue, depth = 0): boolean {
+  if (depth > 32) return false;
+  const d = dataOf(v);
+  if (d.kind === ValueKind.Symbol) {
+    const b = scopeLookup(ctx, d.name);
+    return b !== undefined && b.cell === true;
+  }
+  if (d.kind === ValueKind.Expression) {
+    if (referencesCell(d.fn, ctx, depth + 1)) return true;
+    for (const a of d.args) {
+      if (referencesCell(a, ctx, depth + 1)) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Build a refined type: inherits parent, wraps constructor with predicate check.
  */
-export function buildRefinedType(parentType: ContextValue, predicate: Value): ContextValue {
+export function buildRefinedType(parentType: ContextValue, predicate: Value, ctx?: ContextValue): ContextValue {
   const refinedType = makeContext();
   // Copy all bindings from parent (except __members, handled separately)
   for (const [key, binding] of parentType.bindings) {
@@ -1433,7 +1460,15 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   // refinement facts without re-evaluating the predicate. Opaque
   // predicates just get an opaque-tagged domain; runtime checks still
   // fire via __construct / type_check.
-  setAbstractDomain(refinedType, domainFromPredicate(predicate));
+  const predDomain = domainFromPredicate(predicate);
+  setAbstractDomain(refinedType, predDomain);
+  // B-028 F4 (D32/CE-R7): a VALUE-INSPECTING invariant predicate must be
+  // div-free — construction over pending fields is held until the
+  // predicate answers, so an undischarged-divergent predicate could hang
+  // the guard. Recognised scalar domains are discharged without running
+  // the predicate (the shipped opaque-domain test IS the discriminator),
+  // so only opaque predicates pay the gate.
+  if (predDomain.kind === "opaque") assertInvariantTotal(predicate, ctx);
 
   // Wrap __construct with predicate check
   const parentConstruct = getConstruct(parentType);
@@ -2530,6 +2565,67 @@ function assertPureForEquality(fnValue: Value, what: string, ctx?: ContextValue)
       `${what} must be total (E-R5/CE-R7) — the implementation may diverge; ` +
       `discharge with \`decreases\` or \`assume terminates\``);
   }
+}
+
+// B-028 F4 (D32/CE-R7): the invariant-predicate totality gate. Unlike the
+// eq/coercion gate above, only DIV matters here — other effects on an
+// invariant are covered by the ordinary effect calculus; divergence alone
+// can hang the construction guard. Two probes: predicate identity against
+// the analyzed corpus, then a callee sweep — an inline predicate lambda
+// is never a top-level binding the div analysis walked (and, anonymous,
+// cannot recurse on its own), so divergence only enters through named
+// callees, which answer through THEIR stamps (the analysis closure made
+// those transitive) and, for module imports, their effect channels (the
+// F3 leaf seam). Deliberately NO on-demand precompile here: refinement
+// creation is a hot path and predicate precompile re-opened the F3
+// branch-exploration hazard — the sweep covers the same ground.
+function assertInvariantTotal(predicate: Value, ctx?: ContextValue): void {
+  if (lawInstantiationSuspended) return;
+  const refuse = (via?: string): never => {
+    throw new AllegroError(
+      `invariant predicate must be total (D32/CE-R7) — ` +
+      (via ? `it calls \`${via}\`, which may diverge` : `the predicate may diverge`) +
+      `, so the construction guard could hang; discharge with ` +
+      `\`decreases\` or \`assume terminates\``);
+  };
+  if (divergenceProbe && divergenceProbe(predicate)) refuse();
+  const via = divCarrierCalledBy(predicate, ctx);
+  if (via !== null) refuse(via);
+}
+
+/** Callee sweep for the gate above: collect the free symbol names in the
+ *  predicate's body, resolve each in scope, and answer with the first
+ *  whose function value carries div (identity probe, effect channel, or
+ *  inferred-set stash). Null = no diverging callee found. */
+function divCarrierCalledBy(predicate: Value, ctx?: ContextValue): string | null {
+  if (!ctx) return null;
+  const p = dataOf(predicate);
+  if (p.kind !== ValueKind.ComposedFunction) return null;
+  const names = new Set<string>();
+  const seen = new Set<Value>();
+  const walk = (v: Value): void => {
+    if (!v || typeof v !== "object" || seen.has(v)) return;
+    seen.add(v);
+    if (v.kind === ValueKind.Symbol) { names.add(v.name); return; }
+    if (v.kind === ValueKind.Expression) {
+      walk(v.fn);
+      for (const a of v.args) walk(a);
+      return;
+    }
+    if (v.kind === ValueKind.ComposedFunction) walk((v as ComposedFunctionValue).body);
+  };
+  walk((p as ComposedFunctionValue).body);
+  for (const name of names) {
+    const b = scopeLookup(ctx, name);
+    const v = b?.value;
+    if (!v) continue;
+    const d = dataOf(v);
+    if (d.kind !== ValueKind.ComposedFunction && d.kind !== ValueKind.PrimitiveFunction) continue;
+    if (divergenceProbe && divergenceProbe(v)) return name;
+    const eff = fnEffectsOf(v);
+    if (eff?.has("div")) return name;
+  }
+  return null;
 }
 
 // =============================================================================
