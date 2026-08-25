@@ -8,6 +8,54 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-028 F3: `div` — the flip (D31/D34 live)
+
+The completion arc's policy chunk: divergence is a first-class
+computed effect and D34's discharge spectrum is real.
+
+- **`div` rides the effect calculus** (CE-R1): the termination
+  analysis runs BEFORE effect-declaration checking and writes `div`
+  into each undischarged binding's inferred set — the existing
+  inferred-⊆-declared check and its existing halt carry it with no
+  new enforcement machinery. `effects pure` on a possibly-diverging
+  function HALTS ("undeclared: div"); an undeclared function carries
+  `div` visibly without halting. The closure propagates div up the
+  call graph (admitted axioms block it; witnessed metrics transmit
+  it — they prove only the function's own recursion); cross-module
+  leaves answer through their effect sets. The long-reserved
+  needs-annotation notification finally fires for inherited div.
+- **D34 tiers recorded per binding** (CE-R2): auto (non-recursive, or
+  provable recursion) / witnessed (kernel-checked `decreases`) /
+  admitted (`assume terminates`, or an unrecognized `decreases` shape
+  — the formerly SILENT trust is now a recorded admission) /
+  undischarged (`partial`, or unproven recursion). `checkTermination`
+  is now a thin wrapper over the unified `analyzeDivergence` — same
+  findings, one pass.
+- **Surface forms** (CE-R3): `total` (per-function strict opt-in —
+  undischarged div on a `total` function is a compile error) and
+  `assume terminates` (the admitted liveness axiom) land in
+  `lib/totality.alg` through the sanctioned lowering chain.
+- **The purity gates see div** (CE-R7): a possibly-diverging `eq` or
+  coercion fails the E-R5 gate mechanically.
+- **Verdict/CLI wiring** (CE-R2/CE-R4): the verdict gains a
+  "completion (div discharge, D34)" block; admitted terminations and
+  admitted liveness of USED async sources join the assumption ledger;
+  undischarged div counts as a pending obligation and exports through
+  `obligations` for PCP workers; inspect's totality filter carries
+  the new kinds. All additive — pcp/1 unchanged, clean modules'
+  verdicts byte-stable.
+- **The corpus sweep (deltas 3–4) found exactly one customer**:
+  `lib/units.alg`'s `dim_render_from` — unprovable count-up recursion
+  whose inferred div cascaded through `dim_name` into the arithmetic
+  surface and tripped the units `eq` on the E-R5 gate. Discharged by
+  unrolling over the fixed 7-dimension domain (output byte-identical;
+  web lib registry re-synced). Deltas 5–6 landed as pre-declared
+  (finding messages unchanged; trusted `decreases` now recorded).
+
+Six new tests: tier assignment, the declared contract halting on own
+and inherited div, propagation notices, `total`/`assume terminates`,
+the verified/trusted `decreases` split, and the eq gate.
+
 ## 2026-08 — B-028 F2: typed futures + detection (D33/D16 complete)
 
 The completion arc's second chunk — futures become honest typed

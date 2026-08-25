@@ -11800,6 +11800,109 @@ async function runAsyncTests(): Promise<void> {
     eq(fetchD?.tier, "admitted", "fetch rests on an external assumption");
     eq((fetchD?.axiom ?? "").includes("responds"), true, "the admitted axiom is named, ledger-ready for F3");
   });
+
+  // == B-028 F3: the div flip ==
+
+  const loadLibExts = async (names: string[]): Promise<Extension[]> => {
+    const libDir = path.resolve("lib");
+    const loader = new ModuleLoader({
+      modules: names.map((id) => ({ id })),
+      resolve: (id) => {
+        const p = path.join(libDir, `${id}.alg`);
+        return fs.existsSync(p) ? p : null;
+      },
+      readFile: async (p) => fs.readFileSync(p, "utf-8"),
+      extensions: [typeExt],
+    });
+    return loader.loadAll();
+  };
+  const totalityExts = await loadLibExts(["totality"]);
+  const effectsExts = await loadLibExts(["effects"]);
+
+  await asyncTest("B-028 F3 (CE-R1/CE-R2): the termination analysis assigns D34 tiers and infers div", async () => {
+    const r = runtimeEval(
+      "NonNeg = Int & _ >= 0\n" +
+      "count(n: NonNeg): Int => if n == 0 then 0 else count(n - 1)\n" +
+      "loop(n: Int): Int => loop(n + 1)\n" +
+      "plain(x: Int): Int => x + 1\n", undefined, [typeExt], undefined, true, undefined, true);
+    const obl = r.compilationReport!.divObligations!;
+    const by = (name: string) => obl.find((o) => o.binding === name);
+    eq(by("count")?.tier, "auto", "provable recursion is auto-discharged");
+    eq(by("plain")?.tier, "auto", "non-recursive is total by construction");
+    eq(by("loop")?.tier, "undischarged", "unproven recursion is undischarged");
+    // No declaration = no halt; div is carried, inspectable, info-only.
+    const notes = r.compilationReport!.notifications.filter((n) => n.kind === "totality-nontermination");
+    eq(notes.some((n) => n.binding === "loop"), true, "the Stage-2 finding still fires (info)");
+  });
+
+  await asyncTest("B-028 F3 (CE-R1): a declaration is a contract — `effects pure` on a diverging function halts", async () => {
+    let msg = "";
+    try {
+      runtimeEval(
+        "looper(n: Int): Int =>\n  effects pure\n  looper(n + 1)\n",
+        undefined, [typeExt, ...effectsExts], undefined, true);
+    } catch (e: any) { msg = e.message; }
+    eq(msg.includes("undeclared: div"), true, `div rides the effect calculus: ${msg}`);
+  });
+
+  await asyncTest("B-028 F3 (CE-R1): div propagates up the call graph; the needs-annotation notice finally fires", async () => {
+    const r = runtimeEval(
+      "spin(n: Int): Int =>\n  partial\n  spin(n)\n" +
+      "wrapper(x: Int): Int => spin(x) + 1\n",
+      undefined, [typeExt, ...totalityExts], undefined, true, undefined, true);
+    const notice = r.compilationReport!.notifications.find(
+      (n) => n.kind === "totality-needs-annotation" && n.binding === "wrapper");
+    eq(notice !== undefined, true, "wrapper inherits div through the call");
+    eq((notice?.message ?? "").includes("spin"), true, "the notice names the diverging callee");
+    // And the contract halts on the same inherited div:
+    let msg = "";
+    try {
+      runtimeEval(
+        "spin(n: Int): Int =>\n  partial\n  spin(n)\n" +
+        "wrapper(x: Int): Int =>\n  effects pure\n  spin(x) + 1\n",
+        undefined, [typeExt, ...totalityExts, ...effectsExts], undefined, true);
+    } catch (e: any) { msg = e.message; }
+    eq(msg.includes("undeclared: div"), true, `inherited div meets the declared contract: ${msg}`);
+  });
+
+  await asyncTest("B-028 F3 (CE-R3): `total` is the strict opt-in; `assume terminates` is the admitted axiom", async () => {
+    let msg = "";
+    try {
+      runtimeEval(
+        "loop(n: Int): Int =>\n  total\n  loop(n + 1)\n",
+        undefined, [typeExt, ...totalityExts], undefined, true);
+    } catch (e: any) { msg = e.message; }
+    eq(msg.includes("declared `total` but div is undischarged"), true, `total halts: ${msg}`);
+    const ok = runtimeEval(
+      "loop(n: Int): Int =>\n  assume terminates\n  loop(n - 1)\n",
+      undefined, [typeExt, ...totalityExts], undefined, true, undefined, true);
+    const o = ok.compilationReport!.divObligations!.find((x) => x.binding === "loop");
+    eq(o?.tier, "admitted", "assume terminates = the D34 admitted tier");
+    eq((o?.detail ?? "").includes("liveness axiom"), true, "recorded as a declared axiom");
+  });
+
+  await asyncTest("B-028 F3 (CE-R2): `decreases` splits verified (witnessed) from trusted (admitted)", async () => {
+    const r = runtimeEval(
+      "down(n: Int): Int =>\n  decreases n\n  if n == 0 then 0 else down(n - 1)\n" +
+      "trusty(n: Int): Int =>\n  decreases n * 2\n  if n == 0 then 0 else trusty(n - 1)\n",
+      undefined, [typeExt, ...totalityExts], undefined, true, undefined, true);
+    const obl = r.compilationReport!.divObligations!;
+    eq(obl.find((o) => o.binding === "down")?.tier, "witnessed", "kernel-checked metric = witnessed");
+    const t = obl.find((o) => o.binding === "trusty");
+    eq(t?.tier, "admitted", "unrecognised metric shape = RECORDED admission (was silent trust)");
+    eq((t?.detail ?? "").includes("unverified"), true, "the admission says why");
+  });
+
+  await asyncTest("B-028 F3 (CE-R7): the E-R5 purity gate refuses a possibly-diverging eq", async () => {
+    let msg = "";
+    try {
+      runtimeEval(
+        "bad_eq(a: Int, b: Int): Bool => bad_eq(b, a)\n" +
+        "T = Type.define({x: Int, eq: bad_eq})\n",
+        undefined, [typeExt], undefined, true);
+    } catch (e: any) { msg = e.message; }
+    eq(msg.includes("div"), true, `the gate names div: ${msg}`);
+  });
 }
 
 // --- PCP benchmark suite (bench/) ---
