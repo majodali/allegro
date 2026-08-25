@@ -47,7 +47,9 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   Tier-0, pending ratification). Items B-090–B-093 below. The ladder's
   higher rungs feed functional sequencing (constraint/units substrate,
   solution finding) rather than competing with it.
-- **Parked consciously:** B-087 (awaiting use cases), full
+- **Parked consciously:** B-098 (predicate propagation onto residuals,
+  awaiting use cases; renumbered from a duplicate B-087 at the 2026-08
+  groom), full
   `ContextValue`→`StructureValue` reference migration (opportunistic),
   perf hard threshold (maintainer decision, any time).
 
@@ -425,9 +427,15 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
 - [ ] **B-030** · L2 · M3 sweep: disposition every remaining `TBD` in
   `V1-INVENTORY.md`; re-verify canaries (provable.alg theorems, bench
   corpus, stdlib effects tags)
-- [ ] **B-031** · L2 · docs: revise `docs/proving-in-allegro.md` to the
+- [x] **B-031** · L2 · docs: revise `docs/proving-in-allegro.md` to the
   v2 surface (it is the PCP LLM worker's system primer — must track the
-  shipping kernel); re-baseline `bench/`
+  shipping kernel); re-baseline `bench/`. Landed 2026-08 at the
+  Tranche A closeout (primer verified current against the v2 kernel
+  with an end-to-end smoke of its own examples; `bench/` re-baselined
+  — see CHANGELOG "Tranche A docs closeout"); the primer was further
+  audited publicly and gained the E3/E4 laws+gate section at B-091
+  slice 2. This entry sat unchecked by oversight — closed at the
+  2026-08 backlog groom
 
 ## Banded tail (not yet sequenced)
 
@@ -516,8 +524,11 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
 - [ ] **B-067** · LSP / IDE integration
 - [ ] **B-068** · Review UX (v1 "Phase J"): semantic summary as the primary
   reviewable artifact, drill-down to code
-- [ ] **B-069** · CLAUDE.md slimming completion (history → CHANGELOG;
-  session contract only)
+- [x] **B-069** · CLAUDE.md slimming completion (history → CHANGELOG;
+  session contract only). Landed 2026-08 at B-095 chunk 3: v1-era
+  history migrated to CHANGELOG, CLAUDE.md reduced to the K-002
+  bootstrap (commands, invariants, pointers). This entry sat
+  unchecked by oversight — closed at the 2026-08 backlog groom
 - [ ] **B-087** · Totality-analyzer performance: the Stage 2/3 termination
   tests cost ~200s of the suite (one 84s .alg file; a single factorial
   check 42s — profile from the 2026-07 suite-cost pass). Looks
@@ -698,7 +709,12 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   maturity (roadmap question)
 - [ ] **B-086** · Escape-hatch awareness tooling ("you're cycling on this
   rule — options"); posture per `docs/VISION.md` §5 principle 4
-- [ ] **B-087** · Predicate/domain propagation onto residuals —
+- [ ] **B-098** · Predicate/domain propagation onto residuals —
+  (renumbered from a duplicate "B-087" at the 2026-08 backlog groom:
+  the ID was minted twice — 2026-07 for the totality-analyzer
+  performance item above, 2026-08 for this one; IDs never change
+  meaning, so the earlier mint keeps B-087 and this item takes the
+  next free ID) —
   `propagateSetForPrimitive` runs only on the fully-resolved path, so a
   residual's own `predicates` channel isn't pre-computed from operand
   domains (deferred precision, not unsoundness: operand values inside
