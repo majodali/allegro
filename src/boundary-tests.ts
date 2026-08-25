@@ -30,7 +30,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
-import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr } from "./types.js";
+import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr, makeContext } from "./types.js";
+import { ModuleLoader } from "./modules.js";
 import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, SLOT_KEYS, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { makeMultiValue } from "./types.js";
@@ -49,7 +50,7 @@ import { evaluate } from "./evaluator.js";
 import { makeSymbol } from "./types.js";
 import { Structure, isStructure } from "./structure.js";
 import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN, KERNEL_SCOPE_FQN, kernelMemberFqn, typeMemberScopeFqn } from "./symbols.js";
-import { dataOf, indexGet, getSlotCount } from "./slots.js";
+import { dataOf, indexGet, getSlotCount, setName, setFallbackMember } from "./slots.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const BASELINE_PATH = path.join(REPO_ROOT, "src", "boundary-baseline.json");
@@ -494,13 +495,14 @@ export interface ForgeryScenario {
 }
 
 /** D21's verification log (design log B10). A/B/D/F went live at C1.4;
- *  C unlocks with the propagation table (C1.5), E with S3 enforcement. */
+ *  C at C1.5 (propagation table), E at B-097 V4 (S3 enforcement) — the
+ *  last skeleton retired: the roster is fully live. */
 export const FORGERY_SCENARIOS: ForgeryScenario[] = [
   { id: "A", name: "forge `discharged` from nothing", blockedBy: "origination requires the kernel-held writer", unlocksAt: "C1.4", status: "live" },
   { id: "B", name: "swap a real proof's proposition, keep `discharged`", blockedBy: "data-immutability (D22)", unlocksAt: "C1.4", status: "live" },
   { id: "C", name: "combine a real proof with a fake operand hoping `discharged` propagates", blockedBy: "non-fabricating propagation rules on authority channels", unlocksAt: "C1.5", status: "live" },
   { id: "D", name: "read a real `discharged`, write it onto a fake value", blockedBy: "reads are free; the write still needs the capability", unlocksAt: "C1.4", status: "live" },
-  { id: "E", name: "capability leak through an export surface", blockedBy: "holder keeps the writer module-private (ocap discipline)", unlocksAt: "S3 visibility enforcement", status: "skeleton" },
+  { id: "E", name: "capability leak through an export surface", blockedBy: "holder keeps the writer module-private (ocap discipline — language-enforced since B-097)", unlocksAt: "S3 visibility enforcement (B-097 V4)", status: "live" },
   { id: "F", name: "forge the writer capability itself", blockedBy: "writer is a PrimitiveFunction closure, unconstructible from Allegretto", unlocksAt: "C1.4", status: "live" },
 ];
 
@@ -580,8 +582,30 @@ interface Hooks {
   corpus?: { files: number; violations: InvariantViolation[] };
 }
 
-export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
+export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<void> {
   const baseline = loadBaseline();
+
+  // B-097 V4: the forgery-E holder fixture — a module following the ocap
+  // discipline (writer module-private, only the usage surface exported),
+  // loaded once through the PRODUCTION loader so the attacks below hit
+  // the real export machinery. Async load happens up front; the tests
+  // themselves stay synchronous suite members.
+  const holderExts = await new ModuleLoader({
+    modules: [{ id: "forgery_e_holder" }],
+    resolve: (id) => id === "forgery_e_holder" ? "/mock/forgery_e_holder.alg" : null,
+    readFile: async () =>
+      'audit_writer = channel_register("forgery_e_audit", "union")\n' +
+      "export stamp(v) => audit_writer(v, \"audited\")\n",
+    extensions: [createTypeSystem()],
+  }).loadAll();
+  const attackWithHolder = (src: string): { threw: string | null; evalCtx: ContextValue | null } => {
+    try {
+      const { evalCtx } = evalSource(src, undefined, [createTypeSystem(), ...holderExts], undefined, true);
+      return { threw: null, evalCtx };
+    } catch (e: any) {
+      return { threw: String(e?.message ?? e), evalCtx: null };
+    }
+  };
 
   test("boundary lint: no forbidden-access pattern exceeds the committed baseline", () => {
     const report = runBoundaryLint(baseline);
@@ -645,11 +669,103 @@ export function runBoundaryTests({ test, eq, corpus }: Hooks): void {
     eq(result.walked >= 15, true, `corpus coverage: ${result.walked} .alg files walked`);
   });
 
-  test("forgery suite: D21 scenarios A–F all present; C/E skeletons tracked", () => {
+  test("forgery suite: D21 scenarios A–F all present — and ALL LIVE (last skeleton retired at B-097 V4)", () => {
     eq(FORGERY_SCENARIOS.map((s) => s.id).join(""), "ABCDEF");
-    for (const s of FORGERY_SCENARIOS.filter((x) => x.status === "skeleton")) {
-      console.log(`    ⊘ forgery ${s.id} — SKELETON (${s.name}; unlocks at ${s.unlocksAt})`);
-    }
+    // Strengthened at B-097 V4: E went live, so the roster carries no
+    // skeletons — and may never grow one again (a regression to skeleton
+    // status is a lost guarantee, not a pending one).
+    eq(FORGERY_SCENARIOS.filter((x) => x.status !== "live").length, 0, "no skeletons remain");
+  });
+
+  test("forgery E (live): a module-private writer is unreachable through every export surface", () => {
+    // The holder follows the ocap discipline: the writer capability is a
+    // module-private binding; only `stamp` (the usage surface) is
+    // exported. The archive called safety here "an assumption, not a
+    // base flaw" — these refusals convert it into a language-enforced
+    // guarantee for module-shaped holders (the ratified forgery-E
+    // criterion: dot access, flat-injection name, and wire rebind all
+    // refused).
+    // Route 1 — export surface (dot access on the module object):
+    const dot = attackWithHolder("w = forgery_e_holder.audit_writer");
+    eq(dot.threw?.includes("'audit_writer' is not exported") ?? false, true, `dot access: ${dot.threw}`);
+    // Route 2 — flat `use`-injection: only the export set is injected
+    // (B-097 V1), so the writer's NAME does not exist in consumer scope
+    // while the exported surface does.
+    const flat = attackWithHolder("x = 1");
+    eq(scopeLookup(flat.evalCtx!, "stamp") !== undefined, true, "exported surface is injected");
+    eq(scopeLookup(flat.evalCtx!, "audit_writer") === undefined, true, "private writer name is not injected");
+    // Route 3 — the wire: the private binding's FQN rebinds against the
+    // EXPORTED registry only (D42) — it resolves to nothing, mints nothing.
+    const before = internCount();
+    eq(symbolFromWire("/mock/forgery_e_holder.alg::audit_writer"), null, "private FQN resolves to nothing");
+    eq(symbolFromWire("/mock/forgery_e_holder.alg::stamp") !== null, true, "exported FQN still rebinds");
+    eq(internCount(), before, "failed rebind minted no symbols");
+    // The discipline costs the holder nothing: the exported surface
+    // (the typed module object, whose builder closure-captures private
+    // deps) exercises the private capability normally.
+    const use = attackWithHolder('v = forgery_e_holder.stamp(42)\nr = channel_read(v, "forgery_e_audit")');
+    eq(use.threw, null, `usage surface works: ${use.threw}`);
+    const stamped = use.evalCtx!.bindings.get("r")!.value as Value;
+    eq(bitsToString(dataOf(stamped) as BitsValue), "audited", "writer fired through the exported surface");
+  });
+
+  test("evidence capsule (V-R2): print-redacted, non-enumerable, answers only possession", () => {
+    // Capture the capsule the kernel hands a fallbackMember hook.
+    const r = evalSource("held_name = 7\n", undefined, [createTypeSystem()], undefined, true);
+    let capsule: Value | null = null;
+    const t = makeContext();
+    setName(t, stringToBits("CapsuleProbe"));
+    setFallbackMember(t, makePrimitive("probe.__getMember", (hargs) => {
+      capsule = hargs[2];
+      return hargs[2];
+    }));
+    const inst = withType(makeContext(), t);
+    evaluate(makeExpr(primitives.type_dispatch, [inst, stringToBits("anything")]), r.evalCtx);
+    eq(capsule !== null, true, "hook received the capsule");
+    const cap = dataOf(capsule!) as import("./types.js").PrimitiveFunctionValue;
+    // D24 capability shape: a PrimitiveFunction closure — no data plane
+    // to enumerate, unconstructible from Allegretto.
+    eq(cap.kind, ValueKind.PrimitiveFunction, "capability shape (not a structure)");
+    // Print-redaction: renders opaquely; the scope chain never leaks
+    // through the printer.
+    eq(formatValue(capsule!), "<primitive:evidence>", "print-redacted");
+    // It answers ONLY the possession test.
+    const held = cap.fn([stringToBits("held_name")], undefined as any, undefined as any);
+    eq(formatValue(held), "true", "holds(name) for a name on the access-site chain");
+    const notHeld = cap.fn([stringToBits("no_such_binding_anywhere")], undefined as any, undefined as any);
+    eq(formatValue(notHeld), "false", "denies an unheld name");
+  });
+
+  test("evidence non-fabrication: user closures grant nothing — kernel mediation reads the context, not a capsule", () => {
+    // A fabricated always-true "capsule" has no seam to enter kernel
+    // mediation: the privacy check walks the evaluator-supplied scope
+    // chain directly (V-R2), so holding or passing look-alike closures
+    // changes nothing.
+    const r = attack(
+      "Vault = Type.define({secret: private(Int)})\n" +
+      "fake_capsule = name => true\n" +
+      "v = Vault(42)\nv.secret");
+    eq(r.threw?.includes("'secret' is private to 'Vault'") ?? false, true, `fabrication is inert: ${r.threw}`);
+  });
+
+  test("mediation confluence (D41 stages 3–4): folded and late resolution agree, on denial and on access", () => {
+    const defs =
+      "Vault = Type.define({secret: private(Int), reveal: (self) => self.secret})\n" +
+      "v = Vault(42)\n";
+    // Denial: folded (static receiver at the access site) vs late (the
+    // access sits in a function body compiled before any instance
+    // exists — the residual completes at call time). Same refusal.
+    const folded = attack(defs + "v.secret");
+    const late = attack(defs + "snoop(x) => x.secret\nsnoop(v)");
+    eq(folded.threw?.includes("'secret' is private to 'Vault'") ?? false, true, `folded denial: ${folded.threw}`);
+    eq(late.threw?.includes("'secret' is private to 'Vault'") ?? false, true, `late denial: ${late.threw}`);
+    // Access: the mediated path resolves to the same value early and late.
+    const okFolded = attack(defs + "a = v.reveal()");
+    const okLate = attack(defs + "peek(x) => x.reveal()\nb = peek(v)");
+    eq(okFolded.threw, null, `folded access: ${okFolded.threw}`);
+    eq(okLate.threw, null, `late access: ${okLate.threw}`);
+    eq(formatValue(okFolded.evalCtx!.bindings.get("a")!.value!), "42");
+    eq(formatValue(okLate.evalCtx!.bindings.get("b")!.value!), "42", "early and late mediation agree (D41 confluence)");
   });
 
   test("forgery A (live): originating `discharged` without the writer is refused", () => {

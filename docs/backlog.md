@@ -36,9 +36,10 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
 - **Tranche C — next arc (in progress):** B-027 equality + lawful
   interfaces — plan `equality-and-laws.md`, decisions E-R1–E-R6
   maintainer-ratified 2026-08 (with E-R3 generality note: laws are
-  member-set-general, not interface-only); chunks E1–E4 underway. Then
-  S3 visibility (D41–D43 — B-097, plan `visibility.md` ratified;
-  chunks V1–V2 landed, V3 next), then B-028 completion effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
+  member-set-general, not interface-only); chunks E1–E4 underway.
+  S3 visibility (D41–D43 — B-097) COMPLETE 2026-08 (plan
+  `visibility.md` closed; all four chunks landed, forgery E live).
+  Next: B-028 completion effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
 - **Track R — public release (started 2026-08, runs alongside
   functional tranches):** positioning plan `release-track.md`
   (differentiator map + claims register + demo ladder); VISION §1a/§5
@@ -381,8 +382,8 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   divergence; equality ignores source; pure-code read refusal).
   Opens AST access to user-level meta-functions without grammar
   productions
-- [ ] **B-097** · L0/L2 · S3 visibility arc (D41–D43) — own plan
-  `docs/plans/visibility.md` `[stage: in-dev]`: mediated member
+- [x] **B-097** · L0/L2 · S3 visibility arc (D41–D43) — own plan
+  `docs/plans/visibility.md` (closed): mediated member
   pipeline (kernel default mediator; fallbackMember 3-ary with the
   evidence capsule), scope-binding visibility attribute (the
   `exported` stopgap + `y = x` wart die), private members via
@@ -401,8 +402,18 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   kernel mediation with dispatch-planted privilege layers (the D42
   possession test on the C2 chain); private symbols type-local (draw
   denial, no propagation); destructuring/printer/conformance closed
-  per V-R6; reflection names-free/accessor-gated per V-R7. Next: V4
-  evidence hardening + forgery E live + docs sync + release
+  per V-R6; reflection names-free/accessor-gated per V-R7. **V4
+  (evidence hardening + release) landed 2026-08 — ARC COMPLETE, plan
+  closed**: forgery E live (last D21 skeleton retired — unexported
+  writer refused through dot access, flat injection, and the wire;
+  the ocap discipline is language-enforced), capsule
+  redaction/non-fabrication in the boundary battery, D41 stages-3–4
+  confluence harness, design docs synced (structures.md,
+  type-system.md §3, modules.md, language-reference), D41–D43 marked
+  EXECUTED in the register. Riders with named owners: keyword syntax
+  B-043, readonly B-046, sync/async B-047, internal/protected
+  reserved (V-R3), downcast refusal (C3.2 deferred list). Website
+  visibility example: owner decision at the arc gate
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
   (`completion-effects.md`): `div`, blocking-read, triggered guard,
   discharge tiers (structures.md §10)

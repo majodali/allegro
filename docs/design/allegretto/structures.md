@@ -545,11 +545,12 @@ chain; congruent over shape-and-data-equal values; preserveOps shapes
 stay nominal), and `certificate_peek(v, T)` is the separate provenance
 op, channel-aware and tagged with the "observe" effect label so the
 effect calculus prices knowledge observation. **Phase 3 is complete over
-the current representation.** Deferred: operator-dispatch availability
-gating (interacts with PRIM_TO_METHOD fallback semantics),
-knowledge-gated downcast refusal at call sites (runtime-sound today),
-record undeclared-field openness through `__getMember`, generated-corpus
-congruence property testing (grows with the D37 equality plan). Still
+the current representation.** Deferred: ~~operator-dispatch availability
+gating~~ (EXECUTED at B-097 V2 — PRIM_TO_METHOD and `typed_*` share the
+one gate), knowledge-gated downcast refusal at call sites
+(runtime-sound today), record undeclared-field openness through
+`__getMember`, generated-corpus congruence property testing (grows with
+the D37 equality plan). Still
 pending: physical storage under the knowledge channel (C4).*
 
 The old `type` channel conflated two things; they split (D36):
@@ -1178,6 +1179,27 @@ PROCESS §6 before modification, I3):
   only reachable symbols; names public by default (proposed).
   Implementation rides C5 (symbols) + C6 (default mediator from
   type_dispatch; modifier vocabulary in the kind recipe).
+  *Status (2026-08, B-097 — EXECUTED; V-R1–V-R8 ratified in
+  `docs/plans/visibility.md`): the four-stage pipeline is live.
+  Mediation is a KERNEL stage inside `type_dispatch`'s one ladder
+  (`fallbackMember` stays the only user hook, now 3-ary with an opaque
+  evidence CAPSULE answering only `holds(name)` — not the raw scope);
+  export-ness is a scope-binding attribute (the `exported` value-plane
+  stopgap and its `y = x` wart are dead); modifiers ride descriptors
+  via `private(...)` / reserved `readonly(...)` combinators (keyword
+  surface → B-043); two tiers this arc (V-R3 — `internal`/`protected`
+  reserved; `protected` needs restating over draw-from post-D44).
+  Possession is realized on the C2 chain: dispatch PLANTS a kernel
+  privilege layer when evaluating a type's own member bodies, so
+  privilege follows the lent evaluation context (dynamic extent) — a
+  type member's defining scope is the type-local member scope, not the
+  enclosing module. Names-public is the shipped default (denial says
+  "private to T"). Reflection resolves the D23 tension per V-R7:
+  enumeration and flags stay FREE and caller-independent; only
+  value/impl-bearing reads demand possession evidence. Forgery E is a
+  live battery (an unexported writer is refused through dot access,
+  flat injection, and the wire). Operator dispatch shares the gate
+  (the C3.2 deferred item closed at V2).*
 - **S4 collections** (representation choices, persistent structures),
   **S5 variance/constraints** (`where T: Comparable` — note: constraints
   are knowledge on type-values, per §6/§9), **S6 channel registry**
@@ -1274,7 +1296,7 @@ The verification D21 cites, maintained live in `src/boundary-tests.ts`
 | B | Swap a real proof's proposition, keep `discharged` | BLOCKED (live) | data-immutability (D22) — write-authority alone is insufficient; immutability is the second leg |
 | C | Combine a real proof with a fake operand hoping `discharged` propagates | BLOCKED (live) | integrity channels use non-fabricating propagation (`drop`/recheck) — a `viral`/`union` rule here WOULD forge, hence D23's registration-time constraint |
 | D | Read a real `discharged`, write it onto a fake | BLOCKED (live) | reads are free; the WRITE needs the capability — read-freedom is safe |
-| E | Capability leak through an export surface | SKELETON | standard ocap risk; the base is safe GIVEN holders keep writers private — unlocks as a live test at S3 visibility enforcement |
+| E | Capability leak through an export surface | BLOCKED (live, B-097 V4) | the ocap discipline is language-enforced for module-shaped holders: an unexported writer is refused through dot access (module mediator), flat `use`-injection (export-set filter, B-097 V1), and the wire (D42 export partition) — the archive's "assumption, not a base flaw" is now an enforced guarantee |
 | F | Forge the capability itself | BLOCKED (live) | the writer is a PrimitiveFunction closure (D24), unconstructible from Allegretto |
 
 C6.3 additions: forge-through-every-kind-surface (`Proof.define`

@@ -8,6 +8,41 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-097 V4: evidence hardening + forgery E live (S3 arc complete)
+
+The visibility arc's release chunk — verification and record, no new
+policy:
+
+- **Forgery E is LIVE — the last skeleton retires; the D21 roster
+  (A–F) is fully live.** The battery loads a holder module through the
+  production loader (writer capability module-private, only the usage
+  surface exported) and proves the ocap discipline is
+  language-enforced: the unexported writer is refused through dot
+  access (module mediator), flat `use`-injection (export-set filter),
+  and the wire (D42 partition — resolves to nothing, mints nothing),
+  while the exported surface exercises the capability normally. The
+  roster test is STRENGTHENED: no skeletons may remain.
+- **Evidence capsule hardening (V-R2)** asserted in the boundary
+  battery: D24 capability shape (PrimitiveFunction closure, no data
+  plane), print-redacted (`<primitive:evidence>`), answers only
+  `holds(name)`; and non-fabrication — user-built look-alike closures
+  grant nothing because kernel mediation reads the evaluator-supplied
+  context, never a passed capsule.
+- **D41 confluence (stages 3–4) gets its harness**: folded (static
+  receiver) and late (residual completed at call time) mediation agree
+  — on denial (same "private to" refusal) and on access (same value).
+- **Docs sync**: structures.md §6/§13 execution stamps + Appendix C
+  row E flipped; type-system.md §3 rewritten (the "no private
+  keywords" era is over — combinator surface documented); modules.md
+  encapsulation half updated; language-reference gains the private
+  example; decisions register D41/D42/D43 marked EXECUTED.
+
+`docs/plans/visibility.md` closes: all four chunks landed (V1
+substrate, V2 pipeline, V3 flip, V4 hardening). Riders live with their
+owners (keyword syntax B-043, readonly semantics B-046, sync/async
+B-047, internal/protected reserved per V-R3, downcast refusal on the
+C3.2 deferred list). Perf floor untouched (warn-only, no drift).
+
 ## 2026-08 — Methodology pin bumped to v1.2.0 (+ register cleanup)
 
 Compliance target migrated 1.1.0 → 1.2.0 (Binding block +

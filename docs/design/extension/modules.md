@@ -48,9 +48,19 @@
   dispatches through the module's type, exposing only exported
   fields.
 - **Encapsulation**: `type_dispatch` enforces it — only fields listed
-  on the type are accessible; module types implement `__getMember`
-  restricted to exported fields. (The general mediated-member design
-  this grows into is D41–D43, S3 tranche.)
+  on the type are accessible; module types implement the
+  `fallbackMember` hook (3-ary since B-097 V2) restricted to exported
+  fields. The general mediated-member design (D41–D43) EXECUTED at
+  B-097: flat `use`-injection is filtered to the same export set the
+  module object exposes (V1 — the second leak route closed), and the
+  wire resolves foreign FQNs against the exported registry only (D42,
+  C5.1). The three routes together are the live forgery-E guarantee:
+  a module-private binding — the ocap writer discipline — is
+  unreachable through dot access, injection, and the wire alike.
+- **Type-member privacy** (B-097 V3) is a separate, finer tier: see
+  `docs/design/standard/type-system.md` §3 — `private(...)` members
+  are scoped to the TYPE's own member bodies, not to the module
+  around the type.
 
 ## Standard library roster (`lib/`)
 

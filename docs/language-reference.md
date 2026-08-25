@@ -164,6 +164,23 @@ Point(1, 2) instanceof HasXY      // true — declared conformance
 is_printable(v: ~Printable) => true      // ~T is the loose duck-typing path
 is_printable(42)                  // true — matches by base name
 
+// Private members (B-097, D41–D43) — the combinator surface
+Vault = Type.define({
+  owner:  String,
+  secret: private(Int),                   // private field
+  reveal: (self) => self.secret,          // public method — the type's
+})                                        //   own code reads its privates
+v = Vault("alice", 42)
+v.reveal()                // → 42
+v.owner                   // → "alice"
+v.secret                  // → error: 'secret' is private to 'Vault'
+print(v)                  // → Vault(owner: alice, …) — private omitted
+when v is Vault(secret) then secret else 0
+                          // → error naming privacy (not a silent no-match)
+// readonly(...) is reserved vocabulary — recorded, inert for now
+// keyword syntax (`private x: Int`) arrives with the type-declaration
+// syntax track and lowers to the same declaration attributes
+
 // Refinement types (Int & predicate, _ is the value)
 PositiveInt = Int & _ > 0
 PositiveInt(5)                    // → 5
