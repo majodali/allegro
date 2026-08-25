@@ -43,6 +43,17 @@ owners (keyword syntax B-043, readonly semantics B-046, sync/async
 B-047, internal/protected reserved per V-R3, downcast refusal on the
 C3.2 deferred list). Perf floor untouched (warn-only, no drift).
 
+## 2026-08 — Methodology pin bumped to v1.2.0 (+ register cleanup)
+
+Compliance target migrated 1.1.0 → 1.2.0 (Binding block +
+Classification — landed via PR #19's migration pass; both v1.2.0
+amendments ship migration-note: none, so the pin bump was the whole
+migration). This entry is the follow-up cleanup: the CHANGELOG record
+(the v1.1.0 bump's precedent) and the Audit-log backfill — the
+post-bump form audit (0 violations / 0 warnings, clearing the
+2026-08-21 Article 8 lag warning) was recorded only in the migration
+commit's message; `docs/audits.md` now carries its register entry.
+
 ## 2026-08 — B-097 V3: private members (the flip)
 
 The S3 arc's policy chunk: D43 declared modifiers exist and the kernel
