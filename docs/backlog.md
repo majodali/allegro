@@ -417,8 +417,13 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   reserved (V-R3), downcast refusal (C3.2 deferred list). Website
   visibility example: owner decision at the arc gate
 - [ ] **B-028** · L0 · Completion effects & futures — own plan
-  (`completion-effects.md`): `div`, blocking-read, triggered guard,
-  discharge tiers (structures.md §10)
+  `docs/plans/completion-effects.md` `[stage: in-dev]`: `div` as a
+  computed effect riding the effect calculus (D34 tiers,
+  verdict-visible), typed `Future[T]` + `is_resolved` as an effect,
+  D32 triggered construction guard, substrate hardening
+  (structures.md §10; D16/D31–D34). Plan drafted 2026-08 —
+  CE-R1–CE-R8 proposed with recommendations, awaiting maintainer
+  ratification; chunks F1–F4 sequenced (flip at F3, release at F4)
 - [ ] **B-029** · L2 · `[reval]` PCP protocol design revalidation →
   `pcp.md` in `docs/design/standard/`: schemas, multi-prover authorship,
   trivial-pass prevention, hints, catalog (H5), budgets/escalation (H7),
