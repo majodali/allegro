@@ -40,6 +40,7 @@ async function loadImportedModules(
   fileCtx: any,
   sourceDir: string,
   existingExtensions: Extension[],
+  futureManager?: import("./futures.js").FutureManager,
 ): Promise<Extension[]> {
   const libDir = path.join(sourceDir, "lib");
 
@@ -75,6 +76,7 @@ async function loadImportedModules(
     },
     readFile: async (p) => fs.readFileSync(p, "utf-8"),
     extensions: existingExtensions,
+    futureManager,
   });
 
   return loader.loadAll();
@@ -108,6 +110,7 @@ async function loadGrammarModules(
   names: string[],
   sourceDir: string,
   existingExtensions: Extension[],
+  futureManager?: import("./futures.js").FutureManager,
 ): Promise<Extension[]> {
   if (names.length === 0) return [];
   const libDir = path.join(sourceDir, "lib");
@@ -127,6 +130,7 @@ async function loadGrammarModules(
     },
     readFile: async (p) => fs.readFileSync(p, "utf-8"),
     extensions: existingExtensions,
+    futureManager,
   });
   return loader.loadAll();
 }
@@ -142,6 +146,10 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
 
     const sourceDir = path.dirname(path.resolve(filename));
     let extensions = [...getStdExtensions()];
+    // B-028 F2 (CE-R6): one FutureManager for the whole run, created
+    // BEFORE module loading so async works inside modules and their
+    // futures drain with the session.
+    const fm = createFutureManager();
 
     // 1. Pre-scan for `use …` directives and load those modules FIRST so
     //    their grammar extensions are available when we parse the main file.
@@ -156,7 +164,7 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
       .map(d => ({ module: d.moduleName!, member: d.memberName! }));
     const allModuleNames = [...new Set([...moduleNames, ...memberRefs.map(m => m.module)])];
     if (allModuleNames.length > 0) {
-      const grammarExts = await loadGrammarModules(allModuleNames, sourceDir, extensions);
+      const grammarExts = await loadGrammarModules(allModuleNames, sourceDir, extensions, fm);
       // For whole-module `use`s, include the extension as-is.
       // For member `use`s, include only a filtered extension exposing just
       // the named binding — prevents sibling Grammar values from joining.
@@ -247,11 +255,10 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
     const fileCtx: any = buildProgram(result.tree);
 
     if (fileCtx) {
-      const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);
+      const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions, fm);
       extensions = [...extensions, ...moduleExts];
     }
 
-    const fm = createFutureManager();
     evalSource(cleanSource, undefined, extensions, undefined, true, fm);
     if (fm.hasPending()) {
       await fm.waitForAll();

@@ -231,14 +231,30 @@ tagged instance) must substitute completed slots; shallow by design,
 nested substitution rides F2. And the B-087 memo measured at ~2% on
 the 65s demo — suspect refuted, item stays open with the finding.*
 
-**F2 — Typed futures + detection (D33/D16 complete).** `Future[T]`
-via `buildGenericType` (flattening, memoization); async primitives
-stamp their futures; `checkArgType` + siblings residualize on
-unresolved/future-typed args (the #1 seam); `is_resolved` lands
+**F2 — Typed futures + detection (D33/D16 complete) [this PR].**
+`Future[T]` via `buildGenericType` (flattening, memoization); async
+primitives stamp their futures; `checkArgType` + siblings residualize
+on unresolved/future-typed args (the #1 seam); `is_resolved` lands
 lazy + `sched`-labeled; modules get the FutureManager (CE-R6);
 liveness dispositions recorded for the two async sources. Conscious
 delta 2 (typed futures change introspection output for pending
 bindings).
+*In-chunk refinements (recorded at landing): the boundary seam is
+TWO sites, not one — `checkArgType` (call path: element-type check,
+defer-by-skip since the arg flows into the body per PE Rule 1) and
+`type_check_impl` (annotation/return path: element-type check,
+defer-by-RESIDUAL — the check re-fires on resolution, so refinement
+predicates run against the real value; without this branch the
+"type known — check at compile time" path compared the nominal name
+`Future` against the annotation and threw, a seam the survey's
+line-number pointer missed because pre-F2 futures carried no type at
+all). The Future annotation vanishes on resolution for free: carrier
+re-evaluation lets the fresh value's own type shadow it — no
+unwrapping machinery. The arg-path refinement predicate defers to the
+annotation/construction machinery by design (recorded as an F2
+limitation: a future passed to a refined param is shape-checked at
+the call, predicate-checked wherever the value next crosses an
+annotation or construction).*
 
 **F3 — `div` (the flip).** The inference seam: termination analysis
 runs before effect-declaration checking, writes `div` into

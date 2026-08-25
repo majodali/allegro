@@ -8,6 +8,51 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-028 F2: typed futures + detection (D33/D16 complete)
+
+The completion arc's second chunk — futures become honest typed
+values and incompleteness detection becomes an effect:
+
+- **`Future[T]` exists** (CE-R5): minted through `buildGenericType`
+  (memoized — identity equality free) with D33's flattening
+  (`Future[Future[T]]` IS `Future[T]`) in the constructor; bound as
+  `Future` in the standard extension. `delay` stamps `Future[Int]`,
+  `fetch` stamps `Future[String]`. The annotation vanishes on
+  resolution for free — carrier re-evaluation lets the resolved
+  value's own type shadow it.
+- **The call boundary checks landed knowledge, defers the rest**
+  (CE-R5/D11) at BOTH sites: `checkArgType` (call path — a
+  `Future[String]` where `Int` is expected is a real type error NOW;
+  a matching element type flows into the body as a residual per PE
+  Rule 1) and `type_check_impl` (annotation/return path — same
+  element check, but deferral is a RESIDUAL that re-fires on
+  resolution, so refinement predicates run against the real value:
+  `w: NonNeg = delay(5)` completes to a checked 0).
+- **`is_resolved` ships** (CE-R4/D33): lazy (an eager registration
+  would residualize and never answer false), `sched`-labeled — the
+  `certificate_peek`/`observe` precedent: scheduling-dependent
+  answers break congruence, so pure code cannot ask. The label rides
+  the existing calculus end-to-end: `effects pure` + `is_resolved`
+  halts compilation naming `sched`; `effects sched` passes; F3a
+  compile-mode deferral comes free (the answer never folds at
+  compile time).
+- **Modules evaluate with the session's FutureManager** (CE-R6): the
+  loader threads it (option → evalSource), the CLI file runner
+  creates one manager before module loading, and F1's mint-capture
+  makes module-minted futures settle correctly after the manager
+  re-points. Top-level async inside a module works and drains with
+  the session; absent a manager the explicit host-capability error
+  stands (a configuration error, not value incompleteness).
+- **Liveness dispositions declared** (CE-R4/D34): `delay` = live by
+  construction (a timer fires); `fetch` = admitted, resting on the
+  named axiom "the fetched endpoint eventually responds" —
+  registered at source-registration time, ledger wiring lands with
+  F3's tiers.
+
+Six new async tests. Conscious delta 2 (pending bindings now render
+with `Future` typing) surfaced no snapshot changes — no pinned output
+contains a pending value.
+
 ## 2026-08 — B-028 F1: substrate hardening (completion arc opens; CE-R1–CE-R8 ratified)
 
 The completion-effects arc opened (plan `completion-effects.md`,

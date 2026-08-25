@@ -1106,7 +1106,10 @@ const delay_wrapper: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const promise = new Promise<Value>((resolve) => {
     setTimeout(() => resolve(withType(makeInt(0), IntType)), ms);
   });
-  return fm.createFuture(promise);
+  // B-028 F2 (CE-R5): the pending value is TYPED — Future[Int]. The
+  // annotation vanishes on resolution (carrier re-evaluation lets the
+  // resolved value's own type shadow it).
+  return withType(fm.createFuture(promise), futureOf(IntType));
 };
 
 // ============ FETCH (async HTTP) ============
@@ -1134,7 +1137,25 @@ const fetch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       components.set("type", ErrorType);
       return makeMultiValue(makeInt(0), components);
     });
-  return fm.createFuture(promise);
+  // B-028 F2 (CE-R5): typed pending value — Future[String].
+  return withType(fm.createFuture(promise), futureOf(StringType));
+};
+
+// ============ INCOMPLETENESS DETECTION (B-028 F2 — D33/D16, CE-R4) ============
+
+// `is_resolved(x)` — the possession-of-completion question. Detection is
+// scheduling-dependent (two runs of the same program may answer
+// differently for the same eventual value), so it is an EFFECT — label
+// `sched` — quarantining nondeterminism from the confluent core (D33;
+// the certificate_peek/`observe` precedent: the pure question is the
+// value itself, this op answers the SCHEDULING question and pays for it
+// in the effect calculus). Lazy by necessity: an eager registration
+// would residualize on the pending arg and never answer false. The
+// effect tag also buys F3a compile-mode deferral for free — the answer
+// never folds at compile time.
+const is_resolved_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  const v = evalFn ? evalFn(args[0], ctx!) : args[0];
+  return withType(makeInt(isResolved(v) ? 1 : 0), BoolType);
 };
 
 // ============ IDENTITY (data structures) ============
@@ -1807,7 +1828,7 @@ const grammar_without_impl:            PrimitiveFnImpl = () => { throw notYet("w
 
 import {
   getType, getTypeName, withType, withTypeReplacing, applyBoundaryBound, typeContextName, typeMethod, typeMemberDescriptor, assertMemberAvailable,
-  assertMemberReachable, typePrivilegedCtx, isPrivateDescriptor,
+  assertMemberReachable, typePrivilegedCtx, isPrivateDescriptor, futureOf, futureElementType, typeNameOnRefinesChain,
   isMethodDescriptor, isFieldDescriptor, isGetterDescriptor,
   IntType, FloatType, StringType, BoolType, ArrayType, ObjectType,
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
@@ -1824,7 +1845,15 @@ import { isResolved } from "./types.js";
 import {
   withEffects as _withEffects,
   effectsOf as _effectsOf,
+  declareLiveness,
 } from "./effects.js";
+
+// B-028 F2 (CE-R4): the two async sources declare their liveness
+// dispositions at registration time — `delay` resolves by construction
+// (a timer fires); `fetch` rests on the named external assumption,
+// admitted and verdict-visible (ledger wiring lands with F3's tiers).
+declareLiveness("delay", "live");
+declareLiveness("fetch", "admitted", "the fetched endpoint eventually responds");
 import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams } from "./evaluator.js";
 
 // F3b: tracks ComposedFunctions whose body is currently being precompiled,
@@ -2547,6 +2576,29 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Any matches everything
   if (expectedName === "Any") return v;
+
+  // B-028 F2 (CE-R5, D11): a Future[T]-typed PENDING value checks the
+  // knowledge that HAS landed — the element type T — and defers the
+  // rest. T's shape on the expected type's refines chain → residual
+  // type_check, which re-fires on resolution with the real value (so
+  // refinement predicates run then); a mismatched T is a real type
+  // error now. Without this branch, the "type known — check at compile
+  // time" path below would compare the nominal name `Future` against
+  // the annotation and throw prematurely (the pre-F2 behavior only
+  // avoided it because futures carried no type at all).
+  if (!isResolved(v)) {
+    const vType = getType(v);
+    const futEl = vType ? futureElementType(vType) : null;
+    if (futEl) {
+      const elName = typeContextName(futEl);
+      if (!elName || elName === "Any" || typeNameOnRefinesChain(expectedCtx, elName)) {
+        return makeExpr(makePrimitive("type_check", type_check_impl, true), [v, expectedType]);
+      }
+      throw new AllegroError(
+        `Type error: expected ${expectedName}, got Future[${elName}] — ` +
+        `the pending value's type cannot satisfy ${expectedName}`);
+    }
+  }
 
   // Phase D1 Slice 2 Stage A: effect-bound discharge. Same shape as the
   // checkArgType path in evaluator.ts — `__effectBound` on the expected type
@@ -4337,4 +4389,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   // Async
   delay: makePrimitive("delay", delay_wrapper, true, ["time"]),
   fetch: makePrimitive("fetch", fetch_impl, true, ["net"]),
+  // B-028 F2 (CE-R4): detection is an effect — lazy (must see the
+  // pending value), `sched`-labeled (scheduling nondeterminism priced).
+  is_resolved: makePrimitive("is_resolved", is_resolved_impl, true, ["sched"]),
 };

@@ -12,6 +12,7 @@ import {
   protocolEquals,
   assertMemberAvailable,
   assertMemberReachable, typePrivilegedCtx,
+  futureElementType, typeNameOnRefinesChain,
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
@@ -844,6 +845,24 @@ function checkArgType(
 
   const argType = getType(arg);
   if (!argType) return; // untyped arg — skip
+
+  // B-028 F2 (CE-R5, D11): a Future[T]-typed argument checks the
+  // knowledge that HAS landed — its element type T — and defers the
+  // rest with the value. Future[String] where Int is expected is a real
+  // type error NOW; Future[Int] where Int (or a refinement of Int) is
+  // expected flows into the body as a residual per PE Rule 1 — never a
+  // premature throw at the boundary. The refinement predicate, which
+  // needs the value, defers with it (checked at construction/annotation
+  // sites when the value lands).
+  const futEl = futureElementType(argType);
+  if (futEl) {
+    const elName = typeContextName(futEl);
+    if (!elName || elName === "Any") return; // untyped future — defer entirely
+    if (typeNameOnRefinesChain(expected, elName)) return; // shape fits — defer
+    throw new AllegroError(
+      `Type error: argument ${argIndex} expected ${expectedName}, got Future[${elName}] — ` +
+      `the pending value's type cannot satisfy ${expectedName}`);
+  }
 
   // Helper: evaluate refinement predicate on arg if expected type has one.
   // Short-circuits when argType is reference-equal to expected (same refined type).

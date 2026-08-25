@@ -320,3 +320,35 @@ export function unionEffectSets(...sets: (EffectSet | null | undefined)[]): Effe
   }
   return out;
 }
+
+// --- Liveness dispositions (B-028 F2 — CE-R4/D16/D34) --------------------------
+//
+// Under PE semantics, reads of pending values residualize — never block —
+// so what remains of D31's "blocking-read" is the LIVENESS question: may
+// this source's futures never resolve? That is discharged by DECLARED
+// AXIOM, not inference (D34's admitted tier for the irreducibly
+// external): each async source registers its disposition here. `live` =
+// resolution is guaranteed by construction (a timer fires); `admitted` =
+// resolution rests on a named external assumption, verdict-visible. F3
+// wires this registry into the assumption ledger.
+
+export type LivenessTier = "live" | "admitted";
+
+export interface LivenessDisposition {
+  source: string;
+  tier: LivenessTier;
+  /** The external assumption an `admitted` disposition rests on. */
+  axiom?: string;
+}
+
+const livenessRegistry = new Map<string, LivenessDisposition>();
+
+/** Declare an async source's liveness disposition (registration-time). */
+export function declareLiveness(source: string, tier: LivenessTier, axiom?: string): void {
+  livenessRegistry.set(source, { source, tier, axiom });
+}
+
+/** All declared liveness dispositions (for the ledger and tests). */
+export function livenessDispositions(): LivenessDisposition[] {
+  return [...livenessRegistry.values()];
+}

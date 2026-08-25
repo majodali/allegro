@@ -33,6 +33,11 @@ export interface ModuleLoaderOptions {
   readFile: FileReader;
   /** Standard extensions (type system, etc.) to make available in modules */
   extensions?: Extension[];
+  /** B-028 F2 (CE-R6): the session's FutureManager, threaded into module
+   *  evaluation so async primitives work inside modules and module-minted
+   *  futures drain with the session. Absent = the pre-F2 behavior (an
+   *  async primitive inside a module errors: host capability missing). */
+  futureManager?: import("./futures.js").FutureManager;
 }
 
 // --- Module Type Builder ---
@@ -184,12 +189,14 @@ export class ModuleLoader {
   private resolve: ModuleResolver;
   private readFile: FileReader;
   private extensions: Extension[];
+  private futureManager?: import("./futures.js").FutureManager;
 
   constructor(options: ModuleLoaderOptions) {
     this.configs = new Map(options.modules.map(m => [m.id, m]));
     this.resolve = options.resolve;
     this.readFile = options.readFile;
     this.extensions = options.extensions ?? [];
+    this.futureManager = options.futureManager;
   }
 
   /**
@@ -303,7 +310,11 @@ export class ModuleLoader {
         allExtensions,
         /* grammarExtension */ undefined,
         /* typed */ true,
-        /* futureManager */ undefined,
+        // B-028 F2 (CE-R6): modules evaluate with the session's manager —
+        // async works inside modules; F1's mint-capture makes their
+        // futures settle into THIS pass's registry even after the manager
+        // is re-pointed at the main program's pass.
+        this.futureManager,
         /* softFail */ undefined,
         /* C5.1: the module file path IS the defining-scope FQN (§5) */ resolvedPath,
       );
