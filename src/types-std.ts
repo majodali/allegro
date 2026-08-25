@@ -1353,6 +1353,51 @@ function buildInterfaceType(
   return ifaceType;
 }
 
+/** B-028 F1 (D12/D33): substitute a data structure's RESOLVED future
+ *  slots. A pending future occupies a slot as a Symbol; once its cell
+ *  completes, only AST-node symbols re-resolve through evaluation — a
+ *  symbol sitting in a data binding is read back verbatim forever. This
+ *  helper produces a copy-on-write instance with each now-resolvable
+ *  Symbol slot replaced by its value (never mutating the original —
+ *  D22); still-pending slots are left in place (incompleteness stays a
+ *  value in a slot). Shallow by design: it serves the construction-time
+ *  invariant check, whose predicate reads this instance's own fields;
+ *  nested-structure substitution is F2's completion-replacement item. */
+function resolveDataSlots(
+  v: Value,
+  ctx: ContextValue | undefined,
+  evalFn: EvalFn | undefined,
+): Value {
+  if (!ctx || !evalFn) return v;
+  const inst = dataOf(v);
+  if (inst.kind !== ValueKind.Structure) return v;
+  const instCtx = inst as ContextValue;
+  if (instCtx.isScope) return v;
+  let updates: Map<string, Value> | null = null;
+  for (const [key, b] of instCtx.bindings) {
+    if (b.value === undefined || isResolved(b.value)) continue;
+    if (isMetaSlotKey(key)) continue;
+    // The slot may hold the bare Symbol, or a channel CARRIER over it
+    // (an effectful source like `delay` wraps its future with the
+    // effects channel) — `evaluate` handles both: carriers re-evaluate
+    // their primary, symbols resolve against the scope chain.
+    const rv = evalFn(b.value, ctx);
+    if (rv !== b.value && isResolved(rv)) {
+      (updates ??= new Map()).set(key, rv);
+    }
+  }
+  if (!updates) return v;
+  const fresh = makeContext();
+  for (const [key, b] of instCtx.bindings) {
+    if (b.value === undefined) continue;
+    const nv = updates.get(key) ?? b.value;
+    fresh.bindings.set(key, { key, value: nv });
+    fresh.bindingList.push({ key, value: nv });
+  }
+  const storedType = getType(v);
+  return storedType ? withTypeReplacing(fresh, storedType) : fresh;
+}
+
 /**
  * Build a refined type: inherits parent, wraps constructor with predicate check.
  */
@@ -1395,18 +1440,41 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
     removeConstruct(refinedType);
 
-    setConstruct(refinedType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
-      // Call parent constructor
-      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
+    // B-028 F1 (CE-R8 move 1, D32): the predicate-check half, shared by
+    // first construction and residual re-fire. It takes the BUILT value —
+    // a re-fire must never re-run the parent constructor (a lazy
+    // argument like `delay(...)` would mint a fresh future on every
+    // cascade pass and the program would never drain).
+    const refinedCheckImpl: PrimitiveFnImpl = (cargs, cctx, cevalFn) => {
+      let value = cevalFn!(cargs[0], cctx!);
+      // Substitute future slots that have since resolved (copy-on-write —
+      // D22): a pending future in a DATA slot is a Symbol the evaluator
+      // never re-visits (only AST-node symbols re-resolve), so without
+      // this the re-fired predicate reads the stale symbol forever — and
+      // a passing invariant would tag an instance still carrying it.
+      // Slots that remain pending stay as they are: the predicate runs,
+      // and only if it actually READS one does the check residualize
+      // (D32: projections untouched by the invariant stay admissible).
+      value = resolveDataSlots(value, cctx, cevalFn);
 
-      // Error propagation: if parent constructor produced an error (e.g., its
-      // own refinement check failed further up the chain), propagate it
-      // without re-tagging or running this predicate. Without this, a deeper
-      // refinement's error would get silently retagged with the outer type.
+      // Error propagation: if construction produced an error (e.g., a
+      // deeper refinement check failed further up the chain), propagate
+      // it without re-tagging or running this predicate. Without this, a
+      // deeper refinement's error would get silently retagged.
       if (channelReadRaw(value, "error") !== undefined) return value;
 
       // Apply predicate
-      const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
+      const checkResult = cevalFn!(makeExpr(predicate, [value]), cctx!);
+      // An UNRESOLVED check — the invariant read a field whose value is
+      // still a pending future — residualizes CONSTRUCTION: the value
+      // must not exist as a tagged instance (pre-F1 it was silently
+      // mis-tagged as if the invariant held) until the invariant has
+      // actually been checked. The residual re-fires when the inspected
+      // fields resolve — the D32 guard, emergent from D11 + PE Rule 1
+      // exactly as structures.md §10 predicted.
+      if (!isResolved(checkResult)) {
+        return makeExpr(makePrimitive("refined.__check", refinedCheckImpl, true), [value]);
+      }
       const checkP = dataOf(checkResult);
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
         // Predicate failed — return a targeted error. If the refined type has
@@ -1459,6 +1527,11 @@ export function buildRefinedType(parentType: ContextValue, predicate: Value): Co
         return rfWithPredicates(typed, set);
       }
       return typed;
+    };
+    setConstruct(refinedType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
+      // Call parent constructor, then delegate to the shared check half.
+      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
+      return refinedCheckImpl([value], ctx, evalFn);
     }, true));
   }
 
@@ -1551,9 +1624,16 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
 
   // Rebuild __construct so it tags results with the NEW type
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
-    setConstruct(newType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
-      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-      const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
+    // B-028 F1 (CE-R8 move 1, D32): check half over the BUILT value —
+    // same tri-state and re-fire discipline as buildRefinedType's.
+    const preserveCheckImpl: PrimitiveFnImpl = (cargs, cctx, cevalFn) => {
+      let value = cevalFn!(cargs[0], cctx!);
+      value = resolveDataSlots(value, cctx, cevalFn);
+      if (channelReadRaw(value, "error") !== undefined) return value;
+      const checkResult = cevalFn!(makeExpr(predicate, [value]), cctx!);
+      if (!isResolved(checkResult)) {
+        return makeExpr(makePrimitive("refined.__check", preserveCheckImpl, true), [value]);
+      }
       const checkP = dataOf(checkResult);
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
         // Same constraint-rendering logic as buildRefinedType's __construct.
@@ -1587,6 +1667,10 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
         return makeMultiValue(makeInt(0), components);
       }
       return withTypeReplacing(dataOf(value), newType);
+    };
+    setConstruct(newType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
+      const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
+      return preserveCheckImpl([value], ctx, evalFn);
     }, true));
   }
 

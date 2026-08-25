@@ -11619,6 +11619,79 @@ async function runAsyncTests(): Promise<void> {
     eq(output.length, 1, "print fired");
     eq(output[0], "1", "y should be 1");
   });
+
+  // == B-028 F1: substrate hardening ==
+
+  await asyncTest("B-028 F1: a future resolving in a LATER pass still completes its dependents (cross-pass fix)", async () => {
+    const fm = createFutureManager();
+    // Pass 1 mints the future; pass 2 (REPL-style: base = pass 1's ctx,
+    // SAME manager) re-points fm.registry/fm.evalCtx. Pre-F1 the
+    // resolving closure read the manager's pointers at resolution time,
+    // so the phase applied into pass 2's registry — which never tracked
+    // the cell — and pass 1's dependent chain silently never fired.
+    const r1 = runtimeEval("x = delay(10)\ny = x + 1\n", undefined, [typeExt], undefined, true, fm);
+    const r2 = runtimeEval("z = 5\n", r1.evalCtx, [typeExt], undefined, true, fm);
+    eq(r2.evalCtx !== r1.evalCtx, true, "second pass has its own ctx (re-pointed manager)");
+    await fm.waitForAll();
+    const y = r1.registry.bindings.get("y");
+    eq(y?.isComplete, true, "pass-1 dependent completed after the cross-pass resolution");
+    eq(Number((dataOf(y!.value!) as BitsValue).data), 1, "y = 0 + 1 through the minting pass's registry");
+  });
+
+  await asyncTest("B-028 F1: a rejected promise settles as an ERROR VALUE — never a throw (D11)", async () => {
+    const fm = createFutureManager();
+    const r = runtimeEval("x = 1\n", undefined, [typeExt], undefined, true, fm);
+    void r;
+    const sym = fm.createFuture(Promise.reject(new Error("boom")));
+    await fm.waitForAll();
+    const cell = fm.registry.bindings.get(sym.name);
+    eq(cell?.isComplete, true, "rejection completed the cell");
+    const err = channelReadRaw(cell!.value!, "error");
+    eq(err !== undefined, true, "cell holds an error-channel value");
+    eq(bitsToString(dataOf(err!) as BitsValue).includes("boom"), true, "rejection reason preserved");
+  });
+
+  await asyncTest("B-028 F1 (D33): future cells are WRITE-ONCE — a second phase resolution throws", async () => {
+    const fm = createFutureManager();
+    const { registry, evalCtx } = runtimeEval("import cfg\nw = cfg\n", undefined, [typeExt], undefined, true, fm);
+    applyPhase(registry, evalCtx, new Map([["cfg", makeInt(7)]]));
+    let threw = "";
+    try { applyPhase(registry, evalCtx, new Map([["cfg", makeInt(8)]])); }
+    catch (e: any) { threw = e.message; }
+    eq(threw.includes("write-once"), true, `second resolution refused: ${threw}`);
+    eq(Number((dataOf(evalCtx.bindings.get("cfg")!.value!) as BitsValue).data), 7, "first resolution stands");
+  });
+
+  await asyncTest("B-028 F1 (CE-R8/D32): a FAILING invariant over a pending field errors — never a mis-tagged value", async () => {
+    const fm = createFutureManager();
+    const r = runtimeEval(
+      "Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi\n" +
+      "r = Range(1, delay(10))\n", undefined, [typeExt], undefined, true, fm);
+    const rb = r.registry.bindings.get("r");
+    eq(rb?.isComplete, false, "construction is HELD while the inspected field is pending (D32 guard)");
+    await fm.waitForAll();
+    eq(rb?.isComplete, true, "construction completed after the field resolved");
+    const err = channelReadRaw(rb!.value!, "error");
+    eq(err !== undefined, true, "invariant checked BEFORE the value exists — 1 <= 0 fails as an error value");
+  });
+
+  await asyncTest("B-028 F1 (CE-R8/D32): a PASSING invariant over a pending field constructs with resolved slots", async () => {
+    const fm = createFutureManager();
+    const r = runtimeEval(
+      "Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi\n" +
+      "g = Range(0 - 5, delay(10))\n", undefined, [typeExt], undefined, true, fm);
+    await fm.waitForAll();
+    const gb = r.registry.bindings.get("g");
+    eq(gb?.isComplete, true, "guarded construction completed");
+    eq(formatValue(gb!.value!).includes("hi: 0"), true, "the resolved slot value (not a stale symbol) is in the instance");
+    // Scalar refinements guard the same way.
+    const fm2 = createFutureManager();
+    const r2 = runtimeEval("NonNeg = Int & _ >= 0\nv = NonNeg(delay(10))\n", undefined, [typeExt], undefined, true, fm2);
+    await fm2.waitForAll();
+    const vb = r2.registry.bindings.get("v");
+    eq(vb?.isComplete, true, "scalar refined construction completed");
+    eq(Number((dataOf(vb!.value!) as BitsValue).data), 0, "delay resolved to 0, predicate 0 >= 0 held");
+  });
 }
 
 // --- PCP benchmark suite (bench/) ---

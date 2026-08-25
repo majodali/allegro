@@ -15,7 +15,7 @@ import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment } from "./types.js";
+import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
 import { collapseBodyMetadata, checkExhaustiveness, checkTermination } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
@@ -861,43 +861,52 @@ function propagateCompletions(
   evalCtx: ContextValue,
   completedNames: Set<string>,
 ): void {
-  const worklist = new Set<string>();
+  // B-028 F1: ITERATIVE cascade. The former recursion's depth was
+  // bounded by dependency-chain length — a deep enough chain of
+  // completions could blow the JS stack. The loop preserves the exact
+  // semantics: each pass re-evaluates the dependents of the names
+  // completed by the previous pass, until a pass completes nothing new.
+  // Termination is structural (a binding completes at most once and
+  // completed bindings are skipped, so every pass either completes a
+  // new binding or is the last); a binding MAY re-evaluate once per
+  // pass — that is legitimate convergence as its deps land, not a cycle.
+  let frontier = completedNames;
+  while (frontier.size > 0) {
+    const worklist = new Set<string>();
 
-  // Collect all bindings that depend on the newly completed names
-  for (const name of completedNames) {
-    const deps = registry.dependents.get(name);
-    if (deps) {
-      for (const depKey of deps) worklist.add(depKey);
-      registry.dependents.delete(name);
+    // Collect all bindings that depend on the newly completed names
+    for (const name of frontier) {
+      const deps = registry.dependents.get(name);
+      if (deps) {
+        for (const depKey of deps) worklist.add(depKey);
+        registry.dependents.delete(name);
+      }
     }
-  }
 
-  const newlyCompleted = new Set<string>();
+    const newlyCompleted = new Set<string>();
 
-  for (const key of worklist) {
-    const rb = registry.bindings.get(key);
-    // Skip completed cells and cells still pending with no residual to
-    // re-evaluate (their completion comes directly through applyPhase).
-    if (!rb || rb.isComplete || rb.value === undefined) continue;
+    for (const key of worklist) {
+      const rb = registry.bindings.get(key);
+      // Skip completed cells and cells still pending with no residual to
+      // re-evaluate (their completion comes directly through applyPhase).
+      if (!rb || rb.isComplete || rb.value === undefined) continue;
 
-    // Re-evaluate the residual in the updated context. The residual is
-    // replaced (not mutated); the write goes to the ONE shared binding.
-    const collector: DepCollector = { incompleteRefs: new Set() };
-    const newVal = evaluate(rb.value, evalCtx, 0, collector);
-    const nowComplete = isResolved(newVal);
-    resolveCell(rb, newVal, nowComplete, collector.incompleteRefs);
+      // Re-evaluate the residual in the updated context. The residual is
+      // replaced (not mutated); the write goes to the ONE shared binding.
+      const collector: DepCollector = { incompleteRefs: new Set() };
+      const newVal = evaluate(rb.value, evalCtx, 0, collector);
+      const nowComplete = isResolved(newVal);
+      resolveCell(rb, newVal, nowComplete, collector.incompleteRefs);
 
-    if (nowComplete) {
-      newlyCompleted.add(key);
-    } else {
-      // Re-register remaining dependencies
-      registerDeps(registry, key, collector.incompleteRefs);
+      if (nowComplete) {
+        newlyCompleted.add(key);
+      } else {
+        // Re-register remaining dependencies
+        registerDeps(registry, key, collector.incompleteRefs);
+      }
     }
-  }
 
-  // Cascade: if re-evaluation completed more bindings, propagate again
-  if (newlyCompleted.size > 0) {
-    propagateCompletions(registry, evalCtx, newlyCompleted);
+    frontier = newlyCompleted;
   }
 }
 
@@ -918,6 +927,16 @@ export function applyPhase(
     // Only genuinely new names get fresh bindings.
     const existing = evalCtx.bindings.get(name);
     const tracked = registry.bindings.get(name);
+    // B-028 F1 (D33): cells resolved through the phase interface are
+    // WRITE-ONCE — a second resolution of a completed cell is an
+    // invariant violation, not a quiet overwrite. (Ordinary source
+    // rebinding never goes through applyPhase; monotonic residual
+    // refinement goes through propagateCompletions' resolveCell, which
+    // only touches incomplete cells.)
+    if (existing?.isComplete) {
+      throw new AllegroError(
+        `applyPhase: '${name}' is already resolved — future/import cells are write-once (D33)`);
+    }
     if (existing) {
       resolveCell(existing, value, true);
     } else {
@@ -927,7 +946,7 @@ export function applyPhase(
     }
     // Defensive: a registry entry that predates the unification (or was
     // installed by an external caller) may not alias the ctx binding.
-    if (tracked && tracked !== existing) resolveCell(tracked, value, true);
+    if (tracked && tracked !== existing && !tracked.isComplete) resolveCell(tracked, value, true);
     completed.add(name);
   }
 
@@ -1097,14 +1116,29 @@ export function evalSource(
         totalityCompileCtx.bindings.set(b.key, { key: b.key, value: b.value });
       }
     }
+    // B-028 F1 (delivers B-087): memoize the type lookup. The analyzers
+    // call this per case-pattern and per decrease-position per call
+    // site, and each un-memoized hit re-EVALUATED the type expression
+    // (a refinement like `Int & _ >= 0` re-minted a fresh refined type
+    // every time) — the profiled ~200s suite hotspot. Sound to cache:
+    // totalityCompileCtx is fully populated before the first lookup and
+    // never mutated during analysis.
+    const exhTypeCache = new Map<string, Value | undefined>();
     const exhTypeLookup = (name: string): Value | undefined => {
+      if (exhTypeCache.has(name)) return exhTypeCache.get(name);
       const binding = totalityCompileCtx.bindings.get(name);
-      if (!binding?.value) return undefined;
-      try {
-        return evaluate(binding.value, totalityCompileCtx, 0);
-      } catch {
-        return binding.value;
+      let out: Value | undefined;
+      if (!binding?.value) {
+        out = undefined;
+      } else {
+        try {
+          out = evaluate(binding.value, totalityCompileCtx, 0);
+        } catch {
+          out = binding.value;
+        }
       }
+      exhTypeCache.set(name, out);
+      return out;
     };
     for (const f of checkExhaustiveness(fileCtx.bindingList, exhTypeLookup)) {
       compilationReport.notifications.push({
@@ -1154,6 +1188,17 @@ export function evalSource(
     if (v.kind === ValueKind.Structure) {
       const pp = (v as { primary?: Value }).primary;
       if (pp !== undefined) collectSymbolRefs(pp, refs, seen);
+      // B-028 F1: a pending future inside a DATA structure's field is a
+      // dependency of the binding holding it (a residualized guarded
+      // construction carries the instance with the pending slot inside —
+      // D12: incompleteness is a value in a slot). Scopes are not data;
+      // never walk their bindings.
+      const ctx = v as ContextValue;
+      if (!ctx.isScope) {
+        for (const b of ctx.bindings.values()) {
+          if (b.value !== undefined) collectSymbolRefs(b.value, refs, seen);
+        }
+      }
     }
     if (v.kind === ValueKind.ComposedFunction) collectSymbolRefs(v.body, refs, seen);
   }
