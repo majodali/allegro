@@ -536,11 +536,15 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   unchecked by oversight — closed at the 2026-08 backlog groom
 - [ ] **B-087** · Totality-analyzer performance: the Stage 2/3 termination
   tests cost ~200s of the suite (one 84s .alg file; a single factorial
-  check 42s — profile from the 2026-07 suite-cost pass). Looks
-  pathological (suspect: per-call-site refinement-type re-evaluation in
-  `totalityCompileCtx` without caching). Production-code change — needs
-  its own verified chunk; also the natural moment for the B-018 severity
-  reconciliation if the analyzer is being reworked anyway
+  check 42s — profile from the 2026-07 suite-cost pass). Production-code
+  change — needs its own verified chunk; also the natural moment for the
+  B-018 severity reconciliation if the analyzer is being reworked anyway.
+  **2026-08 (B-028 F1) — suspect REFUTED by measurement**: the
+  `exhTypeLookup` memo landed (correct, and a prerequisite for div
+  inference) but A/B shows ~2% on the 65s decreases demo — the
+  per-call-site refinement re-evaluation was NOT the hotspot. The
+  remaining cost needs a real profile (likely the demos' own deep
+  recursive evaluation, or analyzer work off this lookup path)
 
 ### T-host
 

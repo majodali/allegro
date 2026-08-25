@@ -8,6 +8,48 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-028 F1: substrate hardening (completion arc opens; CE-R1–CE-R8 ratified)
+
+The completion-effects arc opened (plan `completion-effects.md`,
+CE-R1–CE-R8 ratified as recommended, PR #23) and its first chunk
+landed — no policy change; every fix makes shipped design words true:
+
+- **Write-once is an invariant, not a convention** (D33): a second
+  phase resolution of a completed cell now throws
+  (`applyPhase` — the interface future/import cells actually resolve
+  through; `resolveCell` keeps serving legitimate same-pass
+  rebinding). Boundary-tested.
+- **Cross-pass future resolution fixed** (REPL/web): the resolving
+  closure captured the manager's registry/ctx at RESOLUTION time, so
+  a future minted in pass N that resolved during pass N+1 applied its
+  phase into a registry that never tracked the cell — dependents
+  silently never re-evaluated. `createFuture` now captures the
+  minting pass's pair and settles there first, then into the current
+  pass when re-pointed. Value and rejection share one settle path
+  (rejection stays an error VALUE, D11 — now tested).
+- **The forward-chaining cascade is iterative**: recursion depth was
+  bounded by dependency-chain length (stack risk on long chains);
+  the loop preserves semantics exactly — termination is structural.
+- **CE-R8 move 1 — the D32 soundness hole closed**: `refined.__construct`
+  adopts the tri-state. Constructing through a value-inspecting
+  invariant whose predicate reads a still-pending field RESIDUALIZES
+  construction (pre-F1 it silently tagged the value as if the
+  invariant held); re-fire happens through a check-only residual over
+  the BUILT value (re-running the parent constructor would re-mint
+  futures per cascade pass), with copy-on-write RESOLVED-SLOT
+  SUBSTITUTION so the re-fired predicate — and the finally tagged
+  instance — see real values, not stale symbols. A failing invariant
+  over a future errors before the value exists; a passing one
+  constructs with resolved slots. `collectSymbolRefs` walks data-
+  structure bindings (a pending future in a field IS a dependency).
+- **B-087 memo landed, suspect refuted**: `exhTypeLookup` is memoized
+  (correct, and a div-inference prerequisite) but A/B measures ~2% on
+  the 65s demo — the backlog's hotspot hypothesis was wrong; B-087
+  stays open with the finding recorded.
+
+Five new async tests (cross-pass, rejection-as-value, write-once,
+failing/passing guarded construction).
+
 ## 2026-08 — B-097 V4: evidence hardening + forgery E live (S3 arc complete)
 
 The visibility arc's release chunk — verification and record, no new

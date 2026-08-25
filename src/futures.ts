@@ -52,7 +52,15 @@ export function createFutureManager(): FutureManager {
       fm.evalCtx.bindingList.push(cell);
       fm.registry.bindings.set(name, cell);
 
-      fm.pendingCount++;
+      // B-028 F1: capture the MINTING pass's registry/ctx. evalSource
+      // re-points fm.registry/fm.evalCtx on every pass (REPL/web), so a
+      // future resolving during a LATER pass must first settle into the
+      // pair that actually tracks this cell and its dependents — the
+      // late-bound read resolved into the new pass's registry, which
+      // never registered the cell, and dependents silently never
+      // re-evaluated.
+      const mintRegistry = fm.registry;
+      const mintCtx = fm.evalCtx;
 
       const onComplete = () => {
         fm.pendingCount--;
@@ -65,21 +73,30 @@ export function createFutureManager(): FutureManager {
         }
       };
 
-      promise.then((resolvedValue) => {
-        applyPhase(fm.registry, fm.evalCtx, new Map([[name, resolvedValue]]));
+      // One settle path for value and error alike (rejection resolves to
+      // an error VALUE — never a throw, D11). Settle into the minting
+      // pass first; if the manager has since been re-pointed at a newer
+      // pass whose carried-forward layer minted its own pending cell for
+      // this name, settle that pass too so the live scope sees the value.
+      const settle = (resolvedValue: Value) => {
+        applyPhase(mintRegistry, mintCtx, new Map([[name, resolvedValue]]));
+        if (fm.registry !== mintRegistry || fm.evalCtx !== mintCtx) {
+          applyPhase(fm.registry, fm.evalCtx, new Map([[name, resolvedValue]]));
+        }
         onComplete();
-      }).catch((err) => {
-        // Resolve with an error value
-        const errorVal = makeMultiValue(
+      };
+
+      fm.pendingCount++;
+      promise.then(
+        (resolvedValue) => settle(resolvedValue),
+        (err) => settle(makeMultiValue(
           stringToBits(""),
           new Map<string, Value>([
             ["error", withType(stringToBits(String(err)), StringType)],
             ["type", ErrorType],
           ]),
-        );
-        applyPhase(fm.registry, fm.evalCtx, new Map([[name, errorVal]]));
-        onComplete();
-      });
+        )),
+      );
 
       return sym;
     },

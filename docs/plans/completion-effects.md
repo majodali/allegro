@@ -207,15 +207,29 @@ House sizing: one landable unit per chunk, suite green, landing
 checklist per PROCESS §5; the behavior FLIP lands last-but-one with
 release after (S3 precedent). Each chunk on its own W-006 branch + PR.
 
-**F1 — Substrate hardening (no policy change).** `resolveCell`
-enforces write-once (second resolution of a complete cell throws;
-boundary test); cross-pass future resolution fixed (the resolving
-closure targets the registry/ctx that tracked the cell — REPL + web);
-`propagateCompletions` cycle guard; `fetch` error-path + chained
-future tests; the CE-R8 move-1 construction tri-state (soundness
-fix); the B-087 `exhTypeLookup` memo (one-line, pre-req: div
-inference multiplies this lookup's call count). Conscious delta:
+**F1 — Substrate hardening (no policy change) [this PR].**
+`resolveCell` enforces write-once (second resolution of a complete
+cell throws; boundary test); cross-pass future resolution fixed (the
+resolving closure targets the registry/ctx that tracked the cell —
+REPL + web); `propagateCompletions` cycle guard; `fetch` error-path +
+chained future tests; the CE-R8 move-1 construction tri-state
+(soundness fix); the B-087 `exhTypeLookup` memo (one-line, pre-req:
+div inference multiplies this lookup's call count). Conscious delta:
 none — every change makes shipped words true.
+*In-chunk refinements (recorded at landing): write-once enforcement
+lives at the PHASE interface (`applyPhase`) — `resolveCell` itself
+must keep serving legitimate same-pass rebinding, so the cell
+invariant is enforced where cells are actually resolved. The
+"cycle guard" became an ITERATIVE cascade: termination was already
+structural (a binding completes at most once), so the real hazard was
+recursion depth on long chains, and a seen-set would have wrongly
+blocked legitimate multi-pass convergence. The construction guard
+required a companion piece §2 didn't predict: RESOLVED-SLOT
+SUBSTITUTION (copy-on-write) — a future in a data slot is a Symbol
+the evaluator never revisits, so the re-fired check (and the finally
+tagged instance) must substitute completed slots; shallow by design,
+nested substitution rides F2. And the B-087 memo measured at ~2% on
+the 65s demo — suspect refuted, item stays open with the finding.*
 
 **F2 — Typed futures + detection (D33/D16 complete).** `Future[T]`
 via `buildGenericType` (flattening, memoization); async primitives
