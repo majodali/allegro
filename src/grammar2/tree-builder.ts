@@ -753,6 +753,8 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   const paramEffects: Array<{ paramRef: any; effSym: any }> = [];
   let partialMarked = false;
   let decreasesMetric: any | null = null;
+  let totalMarked = false;                // B-028 F3 — `total`
+  let assumeTerminatesMarked = false;     // B-028 F3 — `assume terminates`
   const provenPredicates: any[] = []; // F7 — accumulated across multiple `proven` clauses
   const filteredStmts: BuiltBinding[] = [];
   for (const s of stmts) {
@@ -799,6 +801,16 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // metric expression. Last writer wins if multiple clauses appear.
       const margs = (s.value as any).args as any[];
       if (margs.length >= 1) decreasesMetric = margs[0];
+      continue;
+    }
+    if (s.key === null && isPrimitiveCall(s.value, "total_decl_marker")) {
+      // B-028 F3 — per-function strict opt-in. Presence is the signal.
+      totalMarked = true;
+      continue;
+    }
+    if (s.key === null && isPrimitiveCall(s.value, "assume_terminates_decl_marker")) {
+      // B-028 F3 — the admitted liveness axiom. Presence is the signal.
+      assumeTerminatesMarked = true;
       continue;
     }
     if (s.key === null && isPrimitiveCall(s.value, "proven_decl_marker")) {
@@ -934,6 +946,16 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   // peels it via `unwrapDecreasesAttach` to verify (or trust) the metric.
   if (decreasesMetric !== null) {
     result = makeExpr(prim("decreases_attach"), [result, decreasesMetric]);
+  }
+
+  // B-028 F3 — the completion-discharge wrappers. Runtime passthroughs;
+  // `collapseBodyMetadata` stashes `__total` / `__assumeTerminates` for
+  // the divergence analysis.
+  if (totalMarked) {
+    result = makeExpr(prim("total_attach"), [result]);
+  }
+  if (assumeTerminatesMarked) {
+    result = makeExpr(prim("assume_terminates_attach"), [result]);
   }
 
   // Phase F7 — wrap with `proven_attach(result, pred1, ...)` when one or

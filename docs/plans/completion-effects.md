@@ -256,8 +256,8 @@ limitation: a future passed to a refined param is shape-checked at
 the call, predicate-checked wherever the value next crosses an
 annotation or construction).*
 
-**F3 — `div` (the flip).** The inference seam: termination analysis
-runs before effect-declaration checking, writes `div` into
+**F3 — `div` (the flip) [this PR].** The inference seam: termination
+analysis runs before effect-declaration checking, writes `div` into
 `__inferredEffects` per CE-R1 with call-graph closure
 (`NOTIF_TOTALITY_NEEDS_ANNOTATION` finally earns its keep for the
 propagation notice); the div-obligation register with D34 tiers
@@ -266,6 +266,21 @@ propagation notice); the div-obligation register with D34 tiers
 Verdict/inspect/obligations wiring (inspect's hard-coded totality
 kind filter extended; ledger div block; additive pcp fields).
 Deltas 3–6 land here — the largest queue in the arc.
+*In-chunk refinements (recorded at landing): `checkTermination` became
+a thin wrapper over the unified `analyzeDivergence` (one pass computes
+findings, tiers, and the closure — no drift, no double analysis);
+`admitted` blocks inherited div (an axiom about the whole function)
+while `witnessed` transmits it (a metric proves only the function's
+own recursion); cross-module propagation reads leaf callees' effect
+sets through the compile ctx. The corpus sweep found exactly ONE
+customer: `dim_render_from` in lib/units.alg (unprovable count-up
+recursion whose div cascaded through `dim_name` into the arithmetic
+surface and tripped the E-R5 gate on the units `eq`) — discharged by
+UNROLLING over the fixed 7-dimension domain (a typed-refinement
+count-down was tried first and abandoned: the refined param sent
+precompile's branch exploration exponential). Liveness ledger entries
+list only sources the compilation actually uses, keeping clean
+modules' verdicts byte-stable.*
 
 **F4 — D32 guarded projection + release.** Guarded projection under
 a pending invariant; invariant-predicate div gate; stages-of-arrival

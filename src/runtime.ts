@@ -16,12 +16,12 @@ import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError } from "./types.js";
-import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices } from "./effects.js";
-import { collapseBodyMetadata, checkExhaustiveness, checkTermination } from "./totality.js";
+import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf } from "./effects.js";
+import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOTALITY_NEEDS_ANNOTATION, DivObligation } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
 import { registerScopeSymbol, MAIN_SCOPE_FQN, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
-import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended } from "./types-std.js";
+import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended, setDivergenceProbe } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
 export type { Extension };
@@ -516,6 +516,9 @@ export interface CompilationReport {
   /** All diagnostics — errors, warnings, and informational notices. Filter
    *  via `notificationsBySeverity` / `reportErrors` / `reportHasErrors`. */
   notifications: Notification[];
+  /** B-028 F3 (CE-R2): per-binding div discharge record (D34 tiers) —
+   *  consumed by the Verdict ledger and the obligations surface. */
+  divObligations?: DivObligation[];
 }
 
 /** Filter notifications by one severity. */
@@ -1065,29 +1068,6 @@ export function evalSource(
   // 1.3) so callers using `effects pure` over Array.map don't fail
   // spuriously while soundness is being completed in Slice 2.
   if (typed) {
-    const fxMismatches = checkEffectsDeclarations(fileCtx.bindingList);
-    if (fxMismatches.length > 0) {
-      for (const m of fxMismatches) {
-        compilationReport.notifications.push({
-          kind:     "effects-mismatch",
-          severity: "error",
-          binding:  m.binding,
-          message:  formatMismatch(m),
-        });
-      }
-      const lines = fxMismatches.map(m => "  " + formatMismatch(m));
-      if (!softFail) {
-        throw new Error("effects declaration check failed:\n" + lines.join("\n"));
-      }
-    }
-    for (const n of opaqueEffectNotices(fileCtx.bindingList)) {
-      compilationReport.notifications.push({
-        kind:     "effects-opaque-from-stdlib-hof",
-        severity: "info",
-        binding:  n.binding,
-        message:  n.message,
-      });
-    }
     // Phase E Stages 1-2 — totality analyzers. The exhaustiveness check
     // (Stage 1) and structural-termination check (Stage 2) both need to
     // resolve Symbol-typed param annotations (`b: Bool`, `n: NonNeg`) to
@@ -1149,17 +1129,104 @@ export function evalSource(
         counterexample:  f.counterexample,
       });
     }
-    // Phase E Stage 2 — structural termination check. Notifications fire
-    // for recursive functions whose calls aren't shown to decrease on a
-    // bounded parameter. Confidence policy: only fire when at least one
-    // call is suspect — non-recursive functions are silent.
-    for (const f of checkTermination(fileCtx.bindingList, exhTypeLookup)) {
+    // Phase E Stage 2 + B-028 F3 — the termination analysis IS the div
+    // inference (CE-R1). One pass computes the Stage-2 findings, the D34
+    // discharge tier per binding, and the div closure over the call
+    // graph; leaf callees (module imports, extension bindings) answer
+    // through their own effect sets — the cross-module seam.
+    const leafDivResolver = (name: string): boolean => {
+      const v = totalityCompileCtx.bindings.get(name)?.value;
+      if (!v) return false;
+      const eff = effectsOf(v);
+      return eff !== null && eff.has("div");
+    };
+    const divR = analyzeDivergence(fileCtx.bindingList, exhTypeLookup, leafDivResolver);
+    for (const f of divR.findings) {
       compilationReport.notifications.push({
         kind:            "totality-nontermination",
         severity:        "info",
         binding:         f.binding,
         message:         f.message,
         counterexample:  f.counterexample,
+      });
+    }
+    // The long-reserved needs-annotation kind, finally emitted: a clean
+    // function that INHERITS div through its calls.
+    for (const n of divR.propagationNotices) {
+      compilationReport.notifications.push({
+        kind:     NOTIF_TOTALITY_NEEDS_ANNOTATION,
+        severity: "info",
+        binding:  n.binding,
+        message:  n.message,
+      });
+    }
+    // Stamp: div joins each carrier's INFERRED effect set — before the
+    // declaration check below, so the existing inferred-⊆-declared
+    // machinery (and its halt) carries div with no new enforcement path.
+    for (const [name] of divR.divBindings) {
+      const cfn = divR.stampTargets.get(name);
+      if (!cfn) continue;
+      const prior = (cfn as any).__inferredEffects as Set<string> | undefined;
+      const next = new Set(prior ?? []);
+      next.add("div");
+      (cfn as any).__inferredEffects = next;
+    }
+    // CE-R3: `total` is the per-function STRICT opt-in — an undischarged
+    // (own or inherited) div on a `total`-declared function is an error.
+    const totalViolations: string[] = [];
+    for (const [name, cfn] of divR.stampTargets) {
+      if ((cfn as any).__total !== true) continue;
+      const why = divR.divBindings.get(name);
+      if (!why) continue;
+      const reason = why.own
+        ? (divR.obligations.find((o) => o.binding === name)?.detail ?? "termination unproven")
+        : `calls \`${why.via}\`, which may not terminate`;
+      const message = `\`${name}\` is declared \`total\` but div is undischarged: ${reason}`;
+      compilationReport.notifications.push({
+        kind: "totality-total-violation", severity: "error", binding: name, message,
+      });
+      totalViolations.push("  " + message);
+    }
+    if (totalViolations.length > 0 && !softFail) {
+      throw new Error("totality check failed:\n" + totalViolations.join("\n"));
+    }
+    // CE-R2: the per-binding discharge record rides the report — the
+    // Verdict ledger and the obligations surface consume it.
+    compilationReport.divObligations = divR.obligations;
+    // CE-R7: the mechanical purity gates (eq / coercion — E-R5) consult
+    // divergence by function identity during the evaluation below.
+    const divCfns = new Set<Value>();
+    for (const [name] of divR.divBindings) {
+      const cfn = divR.stampTargets.get(name);
+      if (cfn) divCfns.add(cfn as unknown as Value);
+    }
+    setDivergenceProbe((fnValue: Value) => divCfns.has(dataOf(fnValue)));
+
+    // Phase D1: check effect declarations against inferred sets — now
+    // INCLUDING div (CE-R1: a declaration is a contract; `effects pure`
+    // on a possibly-diverging function halts). Mismatches (declared ⊉
+    // inferred, ignoring "opaque") are errors and halt compilation.
+    const fxMismatches = checkEffectsDeclarations(fileCtx.bindingList);
+    if (fxMismatches.length > 0) {
+      for (const m of fxMismatches) {
+        compilationReport.notifications.push({
+          kind:     "effects-mismatch",
+          severity: "error",
+          binding:  m.binding,
+          message:  formatMismatch(m),
+        });
+      }
+      const lines = fxMismatches.map(m => "  " + formatMismatch(m));
+      if (!softFail) {
+        throw new Error("effects declaration check failed:\n" + lines.join("\n"));
+      }
+    }
+    for (const n of opaqueEffectNotices(fileCtx.bindingList)) {
+      compilationReport.notifications.push({
+        kind:     "effects-opaque-from-stdlib-hof",
+        severity: "info",
+        binding:  n.binding,
+        message:  n.message,
       });
     }
   }

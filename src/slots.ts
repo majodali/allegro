@@ -743,6 +743,8 @@ export function sourceOf(v: Value): Value | undefined {
 export const PRESERVED_FN_META_KEYS = [
   "__partial", "__decreasesMetric", "__declaredEffectsAst",
   "__paramEffectPairs", "__provenClauses", "__inferredEffects",
+  // B-028 F3: the completion-discharge clauses (CE-R3).
+  "__total", "__assumeTerminates",
 ] as const;
 
 /** Brand for Allegro-level channel-writer PrimitiveFunctions (host-internal

@@ -3537,6 +3537,34 @@ const decreases_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return evalFn!(args[0], ctx!);
 };
 
+// B-028 F3 (CE-R3) — the completion-discharge clauses. `total` and
+// `assume terminates` lower to their markers at parse time; the block
+// preprocessor wraps the body with the matching `*_attach`, and
+// `collapseBodyMetadata` stashes `__total` / `__assumeTerminates` for
+// the divergence analysis. Runtime behaviour: transparent passthroughs.
+
+const total_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  return noneSingleton;
+};
+
+const total_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) {
+    throw new AllegroError(`total_attach: expected 1 arg, got ${args.length}`);
+  }
+  return evalFn!(args[0], ctx!);
+};
+
+const assume_terminates_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  return noneSingleton;
+};
+
+const assume_terminates_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
+  if (args.length !== 1) {
+    throw new AllegroError(`assume_terminates_attach: expected 1 arg, got ${args.length}`);
+  }
+  return evalFn!(args[0], ctx!);
+};
+
 // Phase F7 — `proven <prop>` body-form clauses lower to
 // `proven_decl_marker(predicate)` at parse time. The block preprocessor
 // extracts these markers and wraps the function body with
@@ -4355,6 +4383,10 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   partial_attach: makePrimitive("partial_attach", partial_attach_impl, true),
   decreases_decl_marker: makePrimitive("decreases_decl_marker", decreases_decl_marker_impl, true),
   decreases_attach: makePrimitive("decreases_attach", decreases_attach_impl, true),
+  total_decl_marker: makePrimitive("total_decl_marker", total_decl_marker_impl, true),
+  total_attach: makePrimitive("total_attach", total_attach_impl, true),
+  assume_terminates_decl_marker: makePrimitive("assume_terminates_decl_marker", assume_terminates_decl_marker_impl, true),
+  assume_terminates_attach: makePrimitive("assume_terminates_attach", assume_terminates_attach_impl, true),
   // Phase F7: `proven` clause marker + passthrough wrapper.
   proven_decl_marker: makePrimitive("proven_decl_marker", proven_decl_marker_impl, true),
   proven_attach: makePrimitive("proven_attach", proven_attach_impl, true),

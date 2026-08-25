@@ -56,6 +56,8 @@ export const NOTIF_TOTALITY_NEEDS_ANNOTATION = "totality-needs-annotation";
 const ATTACH_NAMES = new Set([
   "partial_attach", "decreases_attach", "effects_attach",
   "param_effects_attach", "proven_attach",
+  // B-028 F3 (CE-R3): the completion-discharge clauses.
+  "total_attach", "assume_terminates_attach",
 ]);
 
 function collapseOneFunction(cfn: ComposedFunctionValue): void {
@@ -81,6 +83,12 @@ function collapseOneFunction(cfn: ComposedFunctionValue): void {
       case "effects_attach":       (cfn as any).__declaredEffectsAst = e.args[1]; break;
       case "param_effects_attach": (cfn as any).__paramEffectPairs = e.args.slice(1); break;
       case "proven_attach":        (cfn as any).__provenClauses = e.args.slice(1); break;
+      // B-028 F3 (CE-R3): `total` = per-function strict opt-in (an
+      // undischarged div on this function is an ERROR); `assume
+      // terminates` = the D34 admitted tier (a declared liveness axiom
+      // for the whole function — lifts div, verdict-visible).
+      case "total_attach":             (cfn as any).__total = true; break;
+      case "assume_terminates_attach": (cfn as any).__assumeTerminates = true; break;
     }
     setCur(e.args[0]);
   }
@@ -470,6 +478,58 @@ export function checkTermination(
   bindings: Iterable<{ key: string | null; value: Value | undefined }>,
   typeLookup?: TypeLookup,
 ): TerminationFinding[] {
+  return analyzeDivergence(bindings, typeLookup).findings;
+}
+
+// =============================================================================
+// B-028 F3 — divergence analysis: `div` as a computed effect (CE-R1/CE-R2)
+// =============================================================================
+//
+// D31/D34 executed: the termination analysis IS the `div` inference. Each
+// function binding gets a DISCHARGE TIER (the D34 spectrum), and `div`
+// enters a binding's inferred effect set when its own discharge is
+// `undischarged` — or transitively, when it calls a div-carrying function
+// (PE gives `io` this propagation for free during evaluation; `div` is
+// computed post-hoc, so the closure walks the call graph the analysis
+// already builds). An `admitted` discharge (`assume terminates`, or an
+// unverified-but-declared `decreases`) is an axiom about the WHOLE
+// function and therefore blocks inherited div too; `witnessed` proves
+// only the function's own recursion, so callee div still propagates
+// through it.
+
+export type DivTier = "auto" | "witnessed" | "admitted" | "undischarged";
+
+export interface DivObligation {
+  binding: string;
+  tier: DivTier;
+  /** What discharged (or failed to discharge) this binding. */
+  detail?: string;
+  counterexample?: string;
+}
+
+export interface DivergenceResult {
+  /** The Stage-2 findings, exactly as `checkTermination` always
+   *  reported them (message-compatible; `partial` bindings suppressed). */
+  findings: TerminationFinding[];
+  /** One entry per analyzed function binding, tier per D34. */
+  obligations: DivObligation[];
+  /** binding → why `div` is in its inferred set (own vs inherited). */
+  divBindings: Map<string, { own: boolean; via?: string }>;
+  /** binding → the collapsed function object carrying the metadata
+   *  (the stamp target for `__inferredEffects`). */
+  stampTargets: Map<string, ComposedFunctionValue>;
+  /** Info notices for bindings that INHERIT div through calls (the
+   *  long-reserved needs-annotation kind finally earns its keep). */
+  propagationNotices: { binding: string; message: string }[];
+}
+
+export function analyzeDivergence(
+  bindings: Iterable<{ key: string | null; value: Value | undefined }>,
+  typeLookup?: TypeLookup,
+  /** Answers whether a callee OUTSIDE this binding list (a module import,
+   *  an extension binding) carries `div` — the cross-module seam. */
+  resolveLeafDiv?: (name: string) => boolean,
+): DivergenceResult {
   // Materialise bindings once — needed twice (call-graph build + per-binding
   // analysis) and the input may be a one-shot iterator.
   const bindingList: Array<{ key: string; value: Value }> = [];
@@ -495,11 +555,30 @@ export function checkTermination(
   const sccs = tarjanSCCs(callGraph);
 
   const findings: TerminationFinding[] = [];
+  const obligations: DivObligation[] = [];
+  const stampTargets = new Map<string, ComposedFunctionValue>();
+  const ownDiv = new Map<string, string>();   // binding → undischarged detail
+  const admitted = new Set<string>();         // axiom lifts inherited div too
   for (const b of bindingList) {
     const peeled = peeledByName.get(b.key);
     if (!peeled) continue;
     const { cfn } = peeled;
-    if (isFunctionPartial(cfn)) continue;
+    stampTargets.set(b.key, cfn);
+    if ((cfn as any).__assumeTerminates === true) {
+      obligations.push({ binding: b.key, tier: "admitted",
+        detail: "assume terminates — declared liveness axiom" });
+      admitted.add(b.key);
+      continue;
+    }
+    if (isFunctionPartial(cfn)) {
+      // No Stage-2 finding (the declared opt-out, unchanged) — but the
+      // tier is honest: `partial` always means undischarged (D34), and
+      // `div` enters the inferred set.
+      obligations.push({ binding: b.key, tier: "undischarged",
+        detail: "declared `partial` — div undischarged by declaration" });
+      ownDiv.set(b.key, "declared `partial`");
+      continue;
+    }
 
     const scc = sccs.get(b.key) ?? new Set([b.key]);
     // All calls in this function's body that target an SCC member —
@@ -507,7 +586,13 @@ export function checkTermination(
     // plus Stage 5 HOF-mediated edges (callback passed to map/filter/reduce).
     const cycleCalls: CallSite[] = [];
     findCallsToCycle(cfn.body, scc, cycleCalls);
-    if (cycleCalls.length === 0) continue; // not part of any recursion cycle
+    if (cycleCalls.length === 0) {
+      // Not part of any recursion cycle: total by construction, callees
+      // permitting (the closure below handles callees).
+      obligations.push({ binding: b.key, tier: "auto",
+        detail: "non-recursive — total by construction" });
+      continue;
+    }
 
     // Stage 3: user-supplied `decreases` clause. The metric refers to the
     // caller's params; verify each cycle call's caller-side decrease shape
@@ -519,14 +604,28 @@ export function checkTermination(
       const directCalls = cycleCalls
         .filter((s): s is CallSite & { kind: "direct" } => s.kind === "direct")
         .map(s => s.call);
-      const reasons = checkUserMetric(decMetric, directCalls, peeled.paramTypeAsts, typeLookup);
+      const { reasons, recognized } = checkUserMetric(decMetric, directCalls, peeled.paramTypeAsts, typeLookup);
       if (reasons.length > 0) {
         const unique = [...new Set(reasons)];
+        const cex = renderMetricCounterexample(b.key, decMetric, cycleCalls);
         findings.push({
           binding: b.key,
           message: `\`decreases\` metric does not provably decrease: ${unique.join("; ")}`,
-          counterexample: renderMetricCounterexample(b.key, decMetric, cycleCalls),
+          counterexample: cex,
         });
+        obligations.push({ binding: b.key, tier: "undischarged",
+          detail: `\`decreases\` metric does not provably decrease: ${unique.join("; ")}`,
+          counterexample: cex });
+        ownDiv.set(b.key, "failed `decreases` metric");
+      } else if (recognized) {
+        obligations.push({ binding: b.key, tier: "witnessed",
+          detail: "`decreases` metric verified (kernel-checked decrease on every recursive call)" });
+      } else {
+        // CE-R2: the formerly SILENT trust of an unrecognised metric
+        // shape becomes a RECORDED admission — verdict-visible, no div.
+        obligations.push({ binding: b.key, tier: "admitted",
+          detail: "unverified `decreases` metric — admitted as declared (shape not kernel-checkable)" });
+        admitted.add(b.key);
       }
       continue;
     }
@@ -562,9 +661,54 @@ export function checkTermination(
         : `recursive calls may not terminate${cycleNote}: ${reasons.join("; ")}`;
       const counterexample = renderTerminationCounterexample(b.key, cycleCalls, peeled.cfn, scc);
       findings.push({ binding: b.key, message: msg, counterexample });
+      obligations.push({ binding: b.key, tier: "undischarged", detail: msg, counterexample });
+      ownDiv.set(b.key, "unproven recursion");
+    } else {
+      obligations.push({ binding: b.key, tier: "auto",
+        detail: "recursion provably decreases (auto-detected)" });
     }
   }
-  return findings;
+
+  // --- The div closure (CE-R1): propagate up the call graph ------------------
+  // A caller inherits div from any div-carrying callee (in-list, or a leaf
+  // the resolver identifies — the cross-module seam), unless the caller's
+  // own discharge is an ADMITTED axiom about the whole function.
+  const divBindings = new Map<string, { own: boolean; via?: string }>();
+  for (const k of ownDiv.keys()) divBindings.set(k, { own: true });
+  const leafDiv = new Set<string>();
+  if (resolveLeafDiv) {
+    for (const callees of callGraph.values()) {
+      for (const c of callees) {
+        if (!peeledByName.has(c) && !leafDiv.has(c) && resolveLeafDiv(c)) leafDiv.add(c);
+      }
+    }
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [caller, callees] of callGraph) {
+      if (divBindings.has(caller) || admitted.has(caller)) continue;
+      for (const c of callees) {
+        if ((c !== caller && divBindings.has(c)) || leafDiv.has(c)) {
+          divBindings.set(caller, { own: false, via: c });
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+  const propagationNotices: { binding: string; message: string }[] = [];
+  for (const [k, w] of divBindings) {
+    if (w.own) continue;
+    propagationNotices.push({
+      binding: k,
+      message: `\`${k}\` calls \`${w.via}\`, which may not terminate — ` +
+        `\`${k}\`'s inferred effects include \`div\` ` +
+        `(discharge the callee, or declare \`assume terminates\` / \`partial\` here)`,
+    });
+  }
+
+  return { findings, obligations, divBindings, stampTargets, propagationNotices };
 }
 
 /** Stage 6: render a concrete trace illustrating the non-terminating cycle.
@@ -834,7 +978,7 @@ function checkUserMetric(
   calls: ExpressionValue[],
   paramTypeAsts: Value[],
   typeLookup?: TypeLookup,
-): string[] {
+): { reasons: string[]; recognized: boolean } {
   const reasons: string[] = [];
 
   // Shape 1: bare Param.
@@ -852,7 +996,7 @@ function checkUserMetric(
       // we trust the user about the bound (the explicit clause is the
       // commitment). Skip the type-domain check that Stage 2 enforces.
     }
-    return reasons;
+    return { reasons, recognized: true };
   }
 
   // Shape 2: typed_array of params → lexicographic.
@@ -870,12 +1014,13 @@ function checkUserMetric(
           reasons.push(`lexicographic metric does not decrease on at least one recursive call`);
         }
       }
-      return reasons;
+      return { reasons, recognized: true };
     }
   }
 
-  // Anything else: trust the user. No verification, no notification.
-  return reasons;
+  // Anything else: trust the user — B-028 F3 (CE-R2): the trust is no
+  // longer silent; the caller records it as an ADMITTED discharge.
+  return { reasons, recognized: false };
 }
 
 /** Walk lex-tuple components: return the index of the first strictly-

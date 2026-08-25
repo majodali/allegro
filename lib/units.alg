@@ -30,20 +30,28 @@ pressure_dim     = dim_div(force_dim, dim_mul(length_dim, length_dim))
 
 dim_sym(i) => ["m", "kg", "s", "A", "K", "mol", "cd"][i]
 
-dim_render_from(d, i) =>
-  if i == 7
+// B-028 F3: the renderer is UNROLLED over the fixed 7-dimension domain —
+// the former count-up recursion was unprovable to the divergence
+// analysis, and its inferred `div` cascaded through dim_name into the
+// arithmetic surface (the pre-declared corpus sweep's one finding).
+// Non-recursive = total by construction; output is byte-identical.
+dim_piece(d, i) =>
+  e = d[i]
+  if e == 0
     then ""
-    else
-      rest = dim_render_from(d, i + 1)
-      e = d[i]
-      if e == 0
-        then rest
-        else
-          piece = if e == 1 then dim_sym(i) else dim_sym(i) + "^" + e.toString()
-          if rest == "" then piece else piece + "·" + rest
+    else if e == 1 then dim_sym(i) else dim_sym(i) + "^" + e.toString()
+
+dim_join(a, b) =>
+  if a == "" then b else if b == "" then a else a + "·" + b
 
 dim_render(d) =>
-  r = dim_render_from(d, 0)
+  r = dim_join(dim_piece(d, 0),
+      dim_join(dim_piece(d, 1),
+      dim_join(dim_piece(d, 2),
+      dim_join(dim_piece(d, 3),
+      dim_join(dim_piece(d, 4),
+      dim_join(dim_piece(d, 5),
+               dim_piece(d, 6)))))))
   if r == "" then "dimensionless" else r
 
 dim_name(d) =>

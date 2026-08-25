@@ -29,6 +29,7 @@ import { ValueKind, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
 import { lawObligationRecords, coercionObligationRecords } from "./types-std.js";
 import { scopeAllBindings } from "./scope.js";
+import { livenessDispositions, effectsOf as verdictEffectsOf } from "./effects.js";
 import type { CompilationReport, Notification } from "./runtime.js";
 
 /** E3: the law/coercion registries are process-global — scope their view
@@ -121,6 +122,13 @@ export interface Verdict {
   /** Totality (Phase E) findings — non-fatal by default, surfaced for
    *  the prover to optionally address. */
   totalityFindings?: TotalityFinding[];
+  /** B-028 F3 (CE-R2): per-binding div discharge record (D34 tiers) —
+   *  non-auto tiers only. Additive optional field; pcp/1 unchanged. */
+  divObligations?: { binding: string; tier: string; detail?: string; counterexample?: string }[];
+  /** B-028 F3 (CE-R4): declared liveness dispositions of async sources
+   *  the compilation actually uses (admitted tier only — `live` sources
+   *  rest on nothing). Additive; pcp/1 unchanged. */
+  liveness?: { source: string; tier: string; axiom?: string }[];
   /** Effects-declaration mismatches (Phase D1) — fatal. */
   effectMismatches?: EffectMismatch[];
   /** E3 (B-027 §8): law obligations instantiated by lawful-interface
@@ -513,14 +521,27 @@ function buildAssumptionLedger(v: Verdict): {
   for (const o of v.coercionObligations ?? []) {
     if (o.status === "admitted") add("admitted", `coercion ${o.from}->${o.to} ${o.obligation}`);
   }
+  // B-028 F3 (CE-R2/CE-R4): the D34 completion tiers join the ledger —
+  // admitted termination axioms, admitted (trusted) decreases metrics,
+  // and admitted liveness of async sources; undischarged div counts as
+  // a pending obligation.
+  for (const o of v.divObligations ?? []) {
+    if (o.tier === "admitted") add("admitted", `termination of '${o.binding}'`);
+  }
+  for (const l of v.liveness ?? []) {
+    if (l.tier === "admitted") add("admitted", `liveness of '${l.source}'` + (l.axiom ? ` (${l.axiom})` : ""));
+  }
   const pendingCount =
     (v.lawObligations ?? []).filter(o => o.status === "pending").length +
-    (v.coercionObligations ?? []).filter(o => o.status === "pending").length;
+    (v.coercionObligations ?? []).filter(o => o.status === "pending").length +
+    (v.divObligations ?? []).filter(o => o.tier === "undischarged").length;
   const list = [...entries.values()].sort((a, b) =>
     a.tier === b.tier ? a.label.localeCompare(b.label) : a.tier.localeCompare(b.tier));
   const hasContent = v.theorems.length > 0
     || (v.lawObligations ?? []).length > 0
-    || (v.coercionObligations ?? []).length > 0;
+    || (v.coercionObligations ?? []).length > 0
+    || (v.divObligations ?? []).length > 0
+    || (v.liveness ?? []).length > 0;
   return { entries: list, pendingCount, hasContent };
 }
 
@@ -558,6 +579,13 @@ export function formatVerdict(v: Verdict): string {
       if (t.failure.counterexample) {
         lines.push(`      counterexample: ${t.failure.counterexample}`);
       }
+    }
+  }
+  if (v.divObligations && v.divObligations.length > 0) {
+    lines.push(`  completion (div discharge, D34):`);
+    for (const o of v.divObligations) {
+      const mark = o.tier === "undischarged" ? "?" : "!";
+      lines.push(`    ${mark} ${o.binding}: ${o.tier}` + (o.detail ? ` — ${o.detail}` : ""));
     }
   }
   if (v.totalityFindings && v.totalityFindings.length > 0) {
@@ -791,6 +819,20 @@ export function buildVerdict(
   const inUnit = boundTypeFilter(evalCtx);
   const lawObligations = lawObligationRecords(inUnit);
   const coercionObligations = coercionObligationRecords((f, t) => inUnit(f) && inUnit(t));
+  // B-028 F3 (CE-R2): the div discharge record — non-auto tiers only, so
+  // clean modules' verdicts are unchanged.
+  const divObligations = (report?.divObligations ?? []).filter(o => o.tier !== "auto");
+  // CE-R4: admitted liveness of async sources the compilation actually
+  // uses (detected by effect label on any binding's inferred set).
+  const usedSources = new Set<string>();
+  for (const [, b] of evalCtx.bindings) {
+    const eff = b.value !== undefined ? verdictEffectsOf(b.value) : null;
+    if (!eff) continue;
+    if (eff.has("net")) usedSources.add("fetch");
+    if (eff.has("time")) usedSources.add("delay");
+  }
+  const liveness = livenessDispositions()
+    .filter(d => d.tier === "admitted" && usedSources.has(d.source));
   return {
     version: PCP_VERSION,
     verified: !anyError && !hasFailedTheorem,
@@ -799,6 +841,8 @@ export function buildVerdict(
     ...(effectMismatches.length > 0 ? { effectMismatches } : {}),
     ...(lawObligations.length > 0 ? { lawObligations } : {}),
     ...(coercionObligations.length > 0 ? { coercionObligations } : {}),
+    ...(divObligations.length > 0 ? { divObligations } : {}),
+    ...(liveness.length > 0 ? { liveness } : {}),
     ...(iterationHints.suggestions.length > 0 || iterationHints.strategiesTried
         ? { iterationHints } : {}),
   };
@@ -1005,6 +1049,19 @@ export function extractObligations(
             }],
           },
         }],
+      }));
+    }
+  }
+
+  // B-028 F3 (CE-R2): undischarged div entries export as PCP obligations
+  // — a worker can attempt a `decreases` metric or recommend a tier.
+  if (report?.divObligations) {
+    for (const o of report.divObligations) {
+      if (o.tier !== "undischarged") continue;
+      obligations.push(makeObligation({
+        theoremName: o.binding,
+        proposition: `\`${o.binding}\` terminates` + (o.detail ? ` — ${o.detail}` : ""),
+        ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
       }));
     }
   }

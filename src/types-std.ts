@@ -2503,6 +2503,16 @@ export function setEffectsInspector(f: (fn: Value, ctx?: ContextValue) => Set<st
   effectsInspector = f;
 }
 
+// B-028 F3 (CE-R7): the divergence probe — injected per compilation from
+// runtime.ts once div analysis has run; answers by function identity
+// whether an implementation's inferred set includes `div`.
+let divergenceProbe: ((fn: Value) => boolean) | null = null;
+
+/** Register the divergence hook (called per typed compilation). */
+export function setDivergenceProbe(f: (fn: Value) => boolean): void {
+  divergenceProbe = f;
+}
+
 function assertPureForEquality(fnValue: Value, what: string, ctx?: ContextValue): void {
   if (lawInstantiationSuspended) return;
   if (!effectsInspector) return;
@@ -2511,6 +2521,14 @@ function assertPureForEquality(fnValue: Value, what: string, ctx?: ContextValue)
     throw new AllegroError(
       `${what} must be pure and knowledge-independent (E-R5) — inferred effects: ` +
       `{${[...eff].sort().join(", ")}}`);
+  }
+  // B-028 F3 (CE-R7): the purity gates see div — an implementation whose
+  // termination is undischarged cannot serve as an equality or coercion
+  // (mechanical, the same E-R5 pattern; D34's spectrum discharges it).
+  if (divergenceProbe && divergenceProbe(fnValue)) {
+    throw new AllegroError(
+      `${what} must be total (E-R5/CE-R7) — the implementation may diverge; ` +
+      `discharge with \`decreases\` or \`assume terminates\``);
   }
 }
 
