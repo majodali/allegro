@@ -29,7 +29,7 @@ ignores it entirely misses nothing authoritative.
 ## Build, run, test
 
 ```bash
-npm test                            # full suite (src/test.ts; 1149 at 2026-08)
+npm test                            # full suite (src/test.ts; 1197 at 2026-08)
 ALLEGRO_TEST_FILTER=pat npm test    # dev tier — targeted ~8s runs
 bash scripts/typecheck.sh           # sanctioned typecheck (TS6059 rootDir convention ignored)
 npx tsx src/index.ts                # REPL (Allegro Standard — default)
@@ -97,9 +97,13 @@ evaluator/runtime set; this is the complete session list):
   slots ever (D39; registry is `src/slots.ts`).
 - No implicit fallback in typed operators — a missing type method is
   an error. Every Standard-mode value has a type.
-- Failed proof, undeclared effect, failing invariant, or non-exhaustive
-  match over a finite type HALTS compilation — inside `lib/` modules
-  exactly as in user code (one `evalSource` pipeline).
+- Failed proof, undeclared effect (`div` included — a declaration is a
+  contract, CE-R1), or a failed refinement/type ANNOTATION check HALTS
+  compilation — inside `lib/` modules exactly as in user code (one
+  `evalSource` pipeline). Two paths are consciously weaker (CE-R8):
+  construction-path invariant failure yields an error VALUE, and
+  non-exhaustive match over a finite type is an info notification —
+  promoting either to a halt is a maintainer decision, not assumed.
 - Boundary lint ratchet: no `"__"`-prefixed string literals outside
   the accessor layer; use `src/slots.ts` accessors / `isMetaSlotKey`.
 - Commit messages with backticks: write to a file, `git commit -F` —

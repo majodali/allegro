@@ -232,4 +232,40 @@ describe(n) =>
     1 => "one"
   | 2 => "two"
   | 3 => "three"
+
+// Async & completion (B-028, D31–D34) — futures are typed, reads never block
+x = delay(100)            // Future[Int] while pending; resolves to 0 after 100ms
+y = x + 1                 // flows as a residual — completes when x lands
+print(y)                  // io DEFERS until the value (and its slots) resolve
+is_resolved(x)            // scheduling snapshot — carries the `sched` effect;
+                          //   `effects pure` + is_resolved HALTS
+
+// Divergence is an effect: `div` is INFERRED (the termination analysis),
+// and a declaration is a contract — this halts compilation:
+//   looper(n: Int): Int =>
+//     effects pure
+//     looper(n + 1)      // error: effects mismatch, undeclared: div
+
+// Discharge spectrum (D34) — every non-auto tier is verdict-visible:
+use totality
+count(n: NonNeg): Int =>            // auto — the analyzer proves it
+  if n == 0 then 0 else count(n - 1)
+down(n: Int): Int =>
+  decreases n                       // witnessed — kernel-checked metric
+  if n == 0 then 0 else down(n - 1)
+poll(n: Int): Int =>
+  assume terminates                 // admitted — a recorded axiom
+  if ready(n) then n else poll(n)
+strict(n: Int): Int =>
+  total                             // strict opt-in: undischarged div is an ERROR
+  n + 1
+
+// Guarded construction (D32): a value-inspecting invariant holds
+// construction until the fields it reads resolve — then checks BEFORE
+// the value exists. Untouched fields project through the guard.
+Acct = Type.define({id: Int, bal: Int}) & _.bal >= 0
+a = Acct(7, delay(10))    // held while bal is pending
+print(a.id)               // → 7, once construction succeeds
+// if the invariant fails when the field lands, every projection
+// completes as the construction error — never a partial value
 ```

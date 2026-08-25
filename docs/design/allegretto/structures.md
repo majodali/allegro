@@ -1061,7 +1061,7 @@ anywhere, and arity is derivable from `Function[ParamTypes, ReturnType]`.
 re-derived through it with zero hand-rolled residue** (D39's field tables
 are the checklist); GenericType and module-types are stretch targets.
 
-## 10. Incompleteness, async, and completion [designed]
+## 10. Incompleteness, async, and completion [executed 2026-08, B-028 — D35 deferred by its own terms]
 
 **Ground rules** (D11, D12): structures are always structurally complete —
 incompleteness is a *value* (an unresolved future occupying a slot), never
@@ -1109,6 +1109,32 @@ a deferred proof-genre extension over a cost measure; **resource budgets**
 `ResourceExhausted` outcome. Fuel is a `decreases` witness — budgeted code
 is total by construction, converting unbounded `div` into bounded,
 catchable failure.
+
+*Status (2026-08, B-028 F1–F4 — EXECUTED; CE-R1–CE-R8 ratified in
+`docs/plans/completion-effects.md`): write-once is ENFORCED at the phase
+interface (`applyPhase` refuses a second resolution; same-pass rebinding
+stays legal); cross-pass resolution settles into the minting pass's
+registry; the cascade is iterative. `Future[T]` is a flattening, memoized
+generic; the call boundary defers by skip (`checkArgType`) and the
+annotation path by re-firing residual (`type_check_impl`). `is_resolved`
+ships lazy under the one new label `sched`; liveness is a per-source
+declared axiom (delay: live; fetch: admitted), ledger-visible for used
+sources. `div` rides the effect calculus — the termination analysis IS
+the inference, D34 tiers recorded per binding (`admitted` blocks
+inherited div, `witnessed` transmits it), `total` / `assume terminates` /
+`decreases` / `partial` span the spectrum, and the purity gates (eq,
+coercion, value-inspecting invariant predicates) refuse undischarged div.
+The D32 guard is live end-to-end: construction over a pending inspected
+field residualizes (tri-state, F1), projections and methods ride the
+guard and its FAILURE completes dependents as the construction error
+(viral discipline — never a throw out of the cascade), and arrival order
+is confluent: completed slots substitute into complete holders
+(completion replacement, cell-marked slots only) and `print` defers past
+pending slots so io is scheduling-independent. Recorded residues: slot
+substitution is per-binding/shallow-recursive via the dependency registry
+— a pending slot inside a structure never registered as a dependent stays
+symbolic until read; `select`/cancellation/timers and the sync/async
+modifiers are riders (B-047); D35 stays deferred.*
 
 ## 11. The minimal base surface [designed]
 

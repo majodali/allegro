@@ -39,7 +39,10 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   member-set-general, not interface-only); chunks E1–E4 underway.
   S3 visibility (D41–D43 — B-097) COMPLETE 2026-08 (plan
   `visibility.md` closed; all four chunks landed, forgery E live).
-  Next: B-028 completion effects. M4 reval docs (B-014, B-018, B-029) ride between chunks.
+  B-028 completion effects COMPLETE 2026-08 (plan
+  `completion-effects.md` closed; F1–F4 landed, D16/D31–D34 executed).
+  M4 reval docs (B-014, B-018, B-029) ride between chunks — B-018 is
+  next in the reval line, now fed by both E4's and F3's tier machinery.
 - **Track R — public release (started 2026-08, runs alongside
   functional tranches):** positioning plan `release-track.md`
   (differentiator map + claims register + demo ladder); VISION §1a/§5
@@ -223,7 +226,14 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   explicit migration decision**), exhaustiveness taxonomy, mutual-recursion
   lexicographic design, totality polymorphism, decreases obligations,
   counterexample shapes (source:
-  `docs/plans/archive/phase-e-totality-plan.md`)
+  `docs/plans/archive/phase-e-totality-plan.md`). B-028 built the tier
+  machinery this will configure: per-binding D34 tiers, `total` (the
+  per-function strict opt-in), `assume terminates`, ledger/obligations
+  wiring — the PROJECT-level default flip, blanket axiom patterns, and
+  per-project severity config are the decisions left here. Also holds
+  the F4-measured precompile rider: PE inlining of divergent
+  non-same-arg recursion (`loop(n+1)`) costs ~43s/compile — a
+  divergence-aware inlining cutoff belongs in the same analyzer rework
 - [x] **B-019** · L0 · Structure kind — representation swap behind
   accessors (C4.1). Landed 2026-07: one host class (`src/structure.ts`)
   behind makeMultiValue/makeContext (factory shims; 6 bypass sites
@@ -416,14 +426,24 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   B-043, readonly B-046, sync/async B-047, internal/protected
   reserved (V-R3), downcast refusal (C3.2 deferred list). Website
   visibility example: owner decision at the arc gate
-- [ ] **B-028** · L0 · Completion effects & futures — own plan
-  `docs/plans/completion-effects.md` `[stage: in-dev]`: `div` as a
-  computed effect riding the effect calculus (D34 tiers,
-  verdict-visible), typed `Future[T]` + `is_resolved` as an effect,
-  D32 triggered construction guard, substrate hardening
-  (structures.md §10; D16/D31–D34). Plan drafted 2026-08 —
-  CE-R1–CE-R8 proposed with recommendations, awaiting maintainer
-  ratification; chunks F1–F4 sequenced (flip at F3, release at F4)
+- [x] **B-028** · L0 · Completion effects & futures — COMPLETE 2026-08
+  (plan `completion-effects.md` closed; CE-R1–CE-R8 ratified; F1
+  substrate PR #24, F2 typed futures PR #25, F3 div flip PR #26, F4
+  guarded projection + release). `div` rides the effect calculus with
+  D34 tiers verdict-visible; `Future[T]` typed with both boundary
+  seams; `is_resolved` under `sched` with per-source liveness axioms;
+  D32 guard live end-to-end (tri-state construction, guarded
+  projection with error-propagating failure arm, invariant div gate,
+  arrival-order confluence via completion replacement + deferring io).
+  D16/D31–D34 EXECUTED in the register; structures.md §10 stamped.
+  Riders with named owners: sync/async modifiers B-047; algebraic
+  effects B-048; resource budgets/`ResourceExhausted` D35 (deferred by
+  its own terms); severity config + `total`-by-default flip B-018;
+  `select`/cancellation/timers — mint at need; `Future` in interface
+  conformance S5/B-050; precompile PE-inlining cutoff for divergent
+  non-same-arg recursion (`loop(n+1)` ≈ 43s/compile measured at F4) —
+  B-018's analyzer-rework bundle or mint at next totality-perf pass;
+  nested-slot completion replacement (recorded §10 residue)
 - [ ] **B-029** · L2 · `[reval]` PCP protocol design revalidation →
   `pcp.md` in `docs/design/standard/`: schemas, multi-prover authorship,
   trivial-pass prevention, hints, catalog (H5), budgets/escalation (H7),

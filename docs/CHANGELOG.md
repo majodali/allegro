@@ -8,6 +8,62 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-028 F4: D32 guarded projection + arc release
+
+The completion arc's final chunk: the D32 guard is real end-to-end,
+arrival order is confluent, and the arc's decisions are stamped
+EXECUTED. B-028 closes.
+
+- **Guarded projection** (D32): the success arm was already emergent
+  (projections, touched-field reads, and method calls on a guarded
+  construction re-fire through the cascade and resolve — now pinned by
+  tests). The FAILURE arm was the new machinery: a failed construction
+  completes as an error value, and its dependents' member accesses
+  THREW out of the completion cascade (an uncaught throw in the async
+  drain — host crash). The dispatch not-found exits now propagate
+  viral channels: a projection over a failed guarded construction
+  completes as the CONSTRUCTION's error, never a fresh dispatch error
+  and never a throw. Error's own members still dispatch normally.
+- **Stages-of-arrival confluence** (D33): when the invariant's field
+  landed FIRST, construction completed with the untouched slot still a
+  pending symbol — the stored instance and `print` output were
+  arrival-order dependent. Two coordinated fixes: COMPLETION
+  REPLACEMENT (a resolving future substitutes into complete
+  dependents' data slots — copy-on-write, monotone, write-once
+  untouched; gated to slots referencing marked future/import cells so
+  quoted-AST data held in slots is never re-executed by the cascade)
+  and `print` DEFERRING past pending slots (io must not observe
+  scheduling order without a `sched` label). Folded and both arrival
+  orders now agree byte-for-byte — instance and output alike.
+- **Invariant-predicate div gate** (D32/CE-R7): a value-inspecting
+  invariant predicate must be div-free or the guard could hang.
+  Identity probe + callee sweep (analysis stamps for same-compilation
+  callees, effect channels for module leaves) — deliberately NOT an
+  on-demand predicate precompile, which re-opened the F3
+  branch-exploration hazard on a hot path. Recognized scalar domains
+  discharge without running the predicate (the shipped opaque-domain
+  discriminator); the D34 spectrum lifts the gate (`assume
+  terminates` / `decreases`), and the refusal names the diverging
+  callee.
+- **Docs release**: structures.md §10 stamped EXECUTED (with recorded
+  residues); D16/D31–D34 → EXECUTED in the register; effects.md
+  roster gains `sched` and `div`; language-reference gains the
+  async/completion section; CLAUDE.md's halt invariant corrected to
+  shipped reality per CE-R8 (construction-path invariant failure =
+  error value; non-exhaustive match = info — promoting either is a
+  maintainer decision, deliberately not smuggled). Plan closed;
+  backlog B-028 checked with riders routed (B-047, B-048, D35, B-018
+  severity + the F4-measured precompile-inlining rider, select/
+  cancellation/timers, S5 conformance, nested-slot replacement).
+- **Chunk-time finding** (for the rider): the pre-existing precompile
+  PE-inlining of divergent non-same-arg recursion (`loop(n + 1)`)
+  measured ~43s for a single compile on the session container — first
+  hard number behind the divergence-aware inlining cutoff.
+
+4 new tests (guard success arm; failure arm; stages-of-arrival
+confluence; invariant div gate + discharge). 1197/1197 green.
+B-028 closes — the completion arc is released.
+
 ## 2026-08 — B-028 F3: `div` — the flip (D31/D34 live)
 
 The completion arc's policy chunk: divergence is a first-class

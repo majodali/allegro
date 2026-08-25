@@ -21,7 +21,7 @@ import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOT
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
 import { registerScopeSymbol, MAIN_SCOPE_FQN, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
-import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended, setDivergenceProbe } from "./types-std.js";
+import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended, setDivergenceProbe, resolveDataSlots } from "./types-std.js";
 
 // Re-export Extension for backward compatibility
 export type { Extension };
@@ -890,9 +890,22 @@ function propagateCompletions(
 
     for (const key of worklist) {
       const rb = registry.bindings.get(key);
-      // Skip completed cells and cells still pending with no residual to
-      // re-evaluate (their completion comes directly through applyPhase).
-      if (!rb || rb.isComplete || rb.value === undefined) continue;
+      // Skip cells still pending with no residual to re-evaluate (their
+      // completion comes directly through applyPhase).
+      if (!rb || rb.value === undefined) continue;
+      // B-028 F4 (D33 completion replacement): a binding that completed
+      // while an UNTOUCHED slot was still pending (guarded construction —
+      // the invariant's fields landed first, D32 pipelining) holds that
+      // slot as a stale symbol. When the slot's future lands, refine the
+      // stored instance in place: copy-on-write value, one monotone cell
+      // write — the same value, more resolved. Never a re-resolution, so
+      // write-once (D33) is untouched.
+      if (rb.isComplete) {
+        const refined = resolveDataSlots(rb.value, evalCtx,
+          (vv, cc) => evaluate(vv, cc, 0) as Value, /* cellRefsOnly */ true);
+        if (refined !== rb.value) rb.value = refined;
+        continue;
+      }
 
       // Re-evaluate the residual in the updated context. The residual is
       // replaced (not mutated); the write goes to the ONE shared binding.

@@ -147,6 +147,11 @@ export interface Binding {
    *  once the value is fully resolved. Absent on untracked bindings
    *  (data-plane contexts, compile ctxs) — treat as complete. */
   isComplete?: boolean;
+  /** B-028 F4: minted by `makeCell` (future/import cells) and PERMANENT —
+   *  still true after resolution. Completion replacement only evaluates
+   *  slot values whose symbols reference a marked cell, so quoted-AST
+   *  data held in slots is never re-executed by the cascade. */
+  cell?: boolean;
 }
 
 export interface StructureValue {

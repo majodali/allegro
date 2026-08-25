@@ -38,6 +38,8 @@ Effect : Type                       // meta-type            [implemented]
 pure : Effect                       // lattice bottom        [implemented]
 opaque : Effect                     // lattice top           [implemented]
 io, net, time : Effect              // library-defined labels [implemented as flat labels]
+sched : Effect                      // scheduling detection (`is_resolved`) [implemented, B-028 F2/D33]
+div : Effect                        // divergence — COMPUTED, discharge-only [implemented, B-028 F3/D31/D34]
 files.read : Effect                 // member access          [designed]
 files.read_from : Effect            // parameterized          [designed]
 files.read_from "./config.json"     // specialized            [designed]
@@ -109,7 +111,14 @@ non-trivial unions coerce to `opaque` (sound over-approximation)
 
 ## 3. Where effects live [partial]
 
-- **Core:** `pure`, `opaque`.
+- **Core:** `pure`, `opaque`; plus the two completion labels (B-028):
+  `sched` (scheduling detection — `is_resolved` and future non-blocking
+  selects; quarantines nondeterminism from the confluent core, D33) and
+  `div` (divergence, D31/D34 — a COMPUTED effect: the termination
+  analysis writes it into inferred sets, no primitive carries it and no
+  runtime handler exists; discharge is the D34 tier spectrum, and
+  declarations are contracts — `effects pure` on a possibly-diverging
+  function halts).
 - **Standard library** [designed — currently flat labels `io`/`net`/`time`
   tagged on print/fetch/delay]: `lib/io.alg`, `lib/files.alg`,
   `lib/net.alg`, `lib/time.alg`, `lib/rand.alg`, `lib/process.alg`,

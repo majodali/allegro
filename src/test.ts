@@ -64,6 +64,7 @@ let filteredOut = 0;
 
 function test(name: string, fn: () => void): void {
   if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
+  if (process.env.ALLEGRO_TEST_TRACE) console.error("TEST:", name);
   const t0 = performance.now();
   try {
     fn();
@@ -74,6 +75,7 @@ function test(name: string, fn: () => void): void {
     failures.push(msg);
     console.log(msg);
   }
+  if (process.env.ALLEGRO_TEST_TRACE) console.error("DONE:", name);
   testTimes.push({ name, ms: performance.now() - t0 });
 }
 
@@ -445,6 +447,7 @@ test("extension: not available without being provided", () => {
 // == Module Loader ==
 
 async function asyncTest(name: string, fn: () => Promise<void>): Promise<void> {
+  if (process.env.ALLEGRO_TEST_TRACE) console.error("ATEST:", name);
   try {
     await fn();
     passed++;
@@ -11902,6 +11905,94 @@ async function runAsyncTests(): Promise<void> {
         undefined, [typeExt], undefined, true);
     } catch (e: any) { msg = e.message; }
     eq(msg.includes("div"), true, `the gate names div: ${msg}`);
+  });
+
+  // == B-028 F4: D32 guarded projection + release ==
+
+  await asyncTest("B-028 F4 (D32): projections ride the guard — untouched field, touched field, method", async () => {
+    const fm = createFutureManager();
+    const out: string[] = [];
+    fm.onOutput = (t: string) => out.push(t);
+    runtimeEval(
+      "Acct = Type.define({id: Int, bal: Int, tag: (self) => self.id * 2}) & _.bal >= 0\n" +
+      "a = Acct(7, delay(10))\n" +
+      "print(a.id)\nprint(a.bal)\nprint(a.tag())\n",
+      undefined, [typeExt], undefined, true, fm);
+    eq(out.length, 0, "all three projections held while construction is guarded");
+    await fm.waitForAll();
+    eq(out.join("|"), "7|0|14", "untouched field, touched field, and method all resolved through the guard");
+  });
+
+  await asyncTest("B-028 F4 (D32): the failure arm — projections complete as the construction ERROR, never a cascade throw", async () => {
+    const fm = createFutureManager();
+    const r = runtimeEval(
+      "Acct = Type.define({id: Int, bal: Int}) & _.bal > 0\n" +
+      "a = Acct(7, delay(10))\n" +
+      "x = a.id\n",
+      undefined, [typeExt], undefined, true, fm);
+    await fm.waitForAll(); // delay resolves to 0; 0 > 0 fails the invariant
+    const xb = r.registry.bindings.get("x");
+    eq(xb?.isComplete, true, "the dependent completed (the pre-F4 cascade THREW here and killed the host)");
+    const err = channelReadRaw(xb!.value!, "error");
+    eq(err !== undefined, true, "the projection completed as the construction error (viral discipline)");
+    eq(bitsToString(dataOf(err!) as BitsValue).includes("refinement check failed"), true,
+      "the error is the CONSTRUCTION's, propagated — not a fresh dispatch error");
+  });
+
+  await asyncTest("B-028 F4 (D33): stages of arrival are CONFLUENT — folded and both arrival orders agree", async () => {
+    const run = async (src: string): Promise<{ printed: string[]; instance: string }> => {
+      const fm = createFutureManager();
+      const printed: string[] = [];
+      fm.onOutput = (t: string) => printed.push(t);
+      const r = runtimeEval(src, undefined, [typeExt], undefined, true, fm);
+      await fm.waitForAll();
+      return { printed, instance: formatValue(r.registry.bindings.get("a")!.value!) };
+    };
+    const prog = (ctorArgs: string) =>
+      "Acct = Type.define({id: Int, bal: Int}) & _.bal >= 0\n" +
+      `a = Acct(${ctorArgs})\n` +
+      "x = a.id + 1\nprint(a)\nprint(x)\n";
+    const folded = await run(prog("0, 0"));
+    // The invariant reads only `bal`; delay(N) resolves to 0 after N ms,
+    // so the two orders differ in whether the INSPECTED field lands
+    // first (construction completes with `id` still pending) or last.
+    const invariantFieldFirst = await run(prog("delay(30), delay(10)"));
+    const invariantFieldLast = await run(prog("delay(10), delay(30)"));
+    eq(folded.printed.join("|"), "Acct(id: 0, bal: 0)|1", "the folded reference");
+    eq(invariantFieldFirst.printed.join("|"), folded.printed.join("|"),
+      "io is arrival-order independent (print deferred past the pending untouched slot)");
+    eq(invariantFieldLast.printed.join("|"), folded.printed.join("|"), "…in both orders");
+    eq(invariantFieldFirst.instance, folded.instance,
+      "the stored instance converged too (completion replacement — no stale symbol survives)");
+    eq(invariantFieldLast.instance, folded.instance, "…in both orders");
+  });
+
+  await asyncTest("B-028 F4 (D32/CE-R7): a value-inspecting invariant predicate must be div-free", async () => {
+    // Undischarged-divergent callee inside the predicate: refused at
+    // refinement creation (the guard could hang at every construction).
+    let msg = "";
+    try {
+      runtimeEval(
+        "spin(n: Int): Int => spin(n)\n" +
+        "T = Type.define({x: Int}) & spin(_.x) == 0\n",
+        undefined, [typeExt], undefined, true);
+    } catch (e: any) { msg = e.message; }
+    eq(msg.includes("invariant predicate must be total"), true, `the gate refuses: ${msg}`);
+    eq(msg.includes("spin"), true, "…and names the diverging callee");
+    // Recognised scalar domains discharge WITHOUT running the predicate
+    // (the opaque-domain discriminator), and total predicates pass.
+    const ok = runtimeEval(
+      "NonNeg = Int & _ >= 0\n" +
+      "Range = Type.define({lo: Int, hi: Int}) & _.lo <= _.hi\n" +
+      "v = NonNeg(5)\nr = Range(1, 2)\n",
+      undefined, [typeExt], undefined, true);
+    eq(formatValue(ok.registry.bindings.get("v")!.value!), "5", "recognised domain untouched by the gate");
+    // The D34 spectrum discharges the gate: `assume terminates` lifts it.
+    const lifted = runtimeEval(
+      "spin(n: Int): Int =>\n  assume terminates\n  spin(n)\n" +
+      "T = Type.define({x: Int}) & spin(_.x) == 0\n",
+      undefined, [typeExt, ...totalityExts], undefined, true);
+    eq(lifted.registry.bindings.get("T") !== undefined, true, "admitted tier lifts the invariant gate");
   });
 }
 

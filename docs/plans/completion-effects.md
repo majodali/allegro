@@ -1,8 +1,7 @@
 # Completion effects & futures — the B-028 arc
 
-Status: draft (decision points CE-R1–CE-R8 proposed with
-recommendations; awaiting maintainer ratification — no chunk starts
-before the gate, PROCESS §6)
+Status: closed (CE-R1–CE-R8 ratified 2026-08; chunks F1–F4 landed —
+PRs #24, #25, #26, and the F4 release PR; riders routed per §6)
 
 > Tranche C successor per the sequenced head: after B-097 (S3
 > visibility, closed). This plan is the RATIFICATION PASS for executing
@@ -282,14 +281,37 @@ precompile's branch exploration exponential). Liveness ledger entries
 list only sources the compilation actually uses, keeping clean
 modules' verdicts byte-stable.*
 
-**F4 — D32 guarded projection + release.** Guarded projection under
-a pending invariant; invariant-predicate div gate; stages-of-arrival
-confluence tests (folded vs late construction agree — the D41
-harness pattern reused); docs sync (structures.md §10 status stamps,
-effects.md label roster, totality doc pointer for B-018,
+**F4 — D32 guarded projection + release [this PR].** Guarded projection
+under a pending invariant; invariant-predicate div gate;
+stages-of-arrival confluence tests (folded vs late construction agree —
+the D41 harness pattern reused); docs sync (structures.md §10 status
+stamps, effects.md label roster, totality doc pointer for B-018,
 decisions.md D16/D31–D34 execution states, language-reference async
 examples, CLAUDE.md halt-invariant correction per CE-R8);
 CHANGELOG; backlog close-out with riders routed.
+*In-chunk refinements (recorded at landing): guarded projection's
+SUCCESS arm was already emergent (D11 + the F1 tri-state — projections,
+touched-field reads, and method dispatch all re-fire through the
+cascade); the new machinery was the FAILURE arm — a failed construction
+completes as an error value and its dependents' member accesses THREW
+out of the completion cascade (host crash), so the dispatch not-found
+exits now propagate viral channels (the construction error IS the
+projection's value). The confluence sweep surfaced a second gap §4
+didn't predict: when the invariant's field lands FIRST, construction
+completes with the untouched slot still a pending symbol — the stored
+instance and any io over it were arrival-order DEPENDENT. Fixed by
+COMPLETION REPLACEMENT (a resolving future substitutes into complete
+dependents' data slots — copy-on-write, monotone, gated to slots that
+reference marked future/import cells so quoted-AST data is never
+re-executed) plus print deferring past pending slots (io must not
+observe scheduling without `sched`). The invariant div gate is
+identity-probe + CALLEE SWEEP (stamps + effect channels), deliberately
+NOT an on-demand precompile of the predicate — that re-opened the F3
+branch-exploration hazard on a hot path. Chunk-time finding, recorded
+for the rider: the pre-existing precompile PE-inlining of divergent
+non-same-arg recursion (`loop(n + 1)`) measured ~43s for ONE compile on
+the session container — the `partial`/divergence-aware inlining cutoff
+rider is now backed by a number.*
 
 Gate per chunk: land, summarize, stop (PROCESS §3).
 
@@ -340,3 +362,8 @@ maintainer decision, deliberately not smuggled (CE-R8).
   Decision points CE-R1–CE-R8 proposed with recommendations.
   Awaiting maintainer ratification — no chunk starts before the gate
   (PROCESS §6).
+- 2026-08: CE-R1–CE-R8 ratified as recommended (maintainer, PR #23).
+- 2026-08: F1 landed (PR #24), F2 landed (PR #25), F3 landed (PR #26),
+  F4 landed (release PR) — chunk refinements recorded inline in §4.
+  D16/D31–D34 stamped EXECUTED in the register; §10 stamped in
+  structures.md; riders routed per §6. **Plan closed.**

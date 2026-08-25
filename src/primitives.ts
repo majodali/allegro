@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels, sourceOf, SOURCE_COMPONENT_KEY } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels, sourceOf, SOURCE_COMPONENT_KEY, isMetaSlotKey } from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, ContextValue, ComposedFunctionValue,
@@ -1064,6 +1064,43 @@ const when_no_match_impl: PrimitiveFnImpl = (args, _ctx, _evalFn) => {
 
 // ============ PRINT ============
 
+/** B-028 F4 (D33): does this unresolved slot value reference a PENDING
+ *  cell in scope? A Symbol counts only when it names an incomplete
+ *  binding — quoted-AST symbols held as data bind to nothing (or to
+ *  complete bindings) and never defer io. Follows carrier and residual-
+ *  expression shapes within the slot, mirroring what resolveDataSlots
+ *  can substitute once the cell lands. */
+function refsPendingCell(v: Value, ctx: ContextValue, depth = 0): boolean {
+  if (depth > 32) return false;
+  const d = dataOf(v);
+  if (d.kind === ValueKind.Symbol) {
+    const cell = scopeLookup(ctx, d.name);
+    return cell !== undefined && cell.isComplete === false;
+  }
+  if (d.kind === ValueKind.Expression) {
+    if (refsPendingCell(d.fn, ctx, depth + 1)) return true;
+    for (const a of d.args) if (refsPendingCell(a, ctx, depth + 1)) return true;
+  }
+  return false;
+}
+
+/** B-028 F4 (D33): a RESOLVED instance can still hold pending future
+ *  slots — a guarded construction completes when the INVARIANT's fields
+ *  land, and untouched slots complete later (D32 pipelining). Shallow at
+ *  the structure level, matching resolveDataSlots. */
+function hasPendingFutureSlot(v: Value, ctx: ContextValue): boolean {
+  const inst = dataOf(v);
+  if (inst.kind !== ValueKind.Structure) return false;
+  const instCtx = inst as ContextValue;
+  if (instCtx.isScope) return false;
+  for (const [key, b] of instCtx.bindings) {
+    if (b.value === undefined || isResolved(b.value)) continue;
+    if (isMetaSlotKey(key)) continue;
+    if (refsPendingCell(b.value, ctx)) return true;
+  }
+  return false;
+}
+
 const print_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Lazy for evaluation control: print defers on unresolved args (futures)
   const v = evalFn ? evalFn(args[0], ctx!) : args[0];
@@ -1071,16 +1108,28 @@ const print_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // Value is pending (async future or other residual) — defer print
     return makeExpr(makePrimitive("print", print_impl, true), [v]);
   }
+  // B-028 F4 (D33): io must not be scheduling-dependent. Substitute the
+  // slots whose futures have landed; if any slot is still pending, DEFER
+  // — otherwise the printed rendering would depend on arrival order
+  // (non-confluent io from an unlabeled primitive; only `sched`-labeled
+  // ops may observe scheduling).
+  let out = v;
+  if (ctx && evalFn) {
+    out = resolveDataSlots(out, ctx, evalFn, /* cellRefsOnly */ true);
+    if (hasPendingFutureSlot(out, ctx)) {
+      return makeExpr(makePrimitive("print", print_impl, true), [out]);
+    }
+  }
   // Use FutureManager's onOutput if available (for async/web streaming).
   // C2.3b: chain-aware — the manager lives on the root evaluation scope,
   // but print may run under a child layer (e.g. a unification-enriched ctx).
   const fm = ctx ? scopeHostRead(ctx, HOST_KEYS.futureManager) as any : undefined;
   if (fm?.onOutput) {
-    fm.onOutput(formatValue(v));
+    fm.onOutput(formatValue(out));
   } else {
-    console.log(formatValue(v));
+    console.log(formatValue(out));
   }
-  return v;
+  return out;
 };
 
 // ============ ASYNC PRIMITIVES ============
@@ -1835,6 +1884,7 @@ import {
   AnyType, Type, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
   structuralWrap, makeUnionType, wrapType, buildRefinedType, isTypeMeta,
+  resolveDataSlots,
   Effect as _Effect, effectUnion as _effectUnion, isEffectInstance as _isEffectInstance,
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
   protocolEquals,
@@ -2213,7 +2263,9 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // Refinement: extract the raw body and wrap as `_ => body`.
     const predicate = buildFn(["_"], thunk.body) as Value;
     const parentType = dataOf(left) as ContextValue;
-    return wrapType(buildRefinedType(parentType, predicate));
+    // B-028 F4: ctx rides along so the D32 invariant-totality gate can
+    // infer the predicate's effects at refinement creation.
+    return wrapType(buildRefinedType(parentType, predicate, ctx));
   }
   // Right operand is a resolved type or other value — type-intersection /
   // effect-conjunction. Deferred to later Slice 2 stages.
@@ -2385,6 +2437,17 @@ function dispatchThroughType(
   return null;
 }
 
+/** B-028 F4: does this value carry a viral channel (error, …)? Used by the
+ *  dispatch not-found exits to propagate a failed guarded construction's
+ *  error value instead of throwing out of the completion cascade. */
+function carriesViralChannel(v: Value): boolean {
+  if (v.kind !== ValueKind.Structure) return false;
+  for (const chan of viralChannels()) {
+    if (channelReadRaw(v, chan) !== undefined) return true;
+  }
+  return false;
+}
+
 const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // C2.1: struct ops reject evaluation scopes (plane violation guard).
   if (args[0]?.kind === ValueKind.Structure) assertNotScope(args[0], "type_dispatch");
@@ -2440,6 +2503,13 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       );
     }
     const typeName = getTypeName(obj) ?? "unknown";
+    // B-028 F4 (D32): the guard's failure arm. A FAILED guarded
+    // construction completes as an error VALUE, and its dependents
+    // re-fire over it inside the completion cascade — a member miss on
+    // an error-carrying value propagates the error (viral discipline)
+    // instead of throwing out of the cascade. Error's OWN members
+    // (message, …) still dispatch through the ladder above.
+    if (carriesViralChannel(obj)) return obj;
     throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
   }
 
@@ -2477,9 +2547,11 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       return b.value;
     }
 
+    if (carriesViralChannel(obj)) return obj; // B-028 F4: see the typed exit above
     throw new AllegroError(`type_dispatch: '${fieldName}' not found`);
   }
 
+  if (carriesViralChannel(obj)) return obj; // B-028 F4: see the typed exit above
   throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${p.kind}`);
 };
 
@@ -2986,7 +3058,7 @@ const type_refine_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("type_refine", type_refine_impl, true), [typeVal, predicate]);
   }
   const parentType = asCtx(dataOf(typeVal), "type_refine");
-  return wrapType(buildRefinedType(parentType, predicate));
+  return wrapType(buildRefinedType(parentType, predicate, ctx));
 };
 
 // --- type_check_binding: check value type for binding annotations ---
