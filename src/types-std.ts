@@ -3719,6 +3719,62 @@ for (const { ctx, names } of _pendingGenericParamsUpgrades.splice(0)) {
   if (b) b.value = typedGenericParams(names);
 }
 
+// =============================================================================
+// Future as GenericType (B-028 F2 — D33/CE-R5)
+//
+// `Future[T]` is the TYPE of a pending async result: the value itself
+// stays the pending Symbol/residual under the type channel, and the
+// evaluator's carrier re-evaluation makes the Future annotation vanish
+// on resolution (the fresh value's own type shadows it). Memoization by
+// arg identity gives type equality for free; the constructor callback
+// implements D33's flattening.
+// =============================================================================
+
+export const FutureType: ContextValue = buildGenericType(
+  "Future",
+  ["T"],
+  {},
+  (generic, args) => {
+    // D33: Future[Future[T]] IS Future[T] — a future of a future flattens.
+    const el = args[0] !== undefined ? dataOf(args[0]) : undefined;
+    if (el?.kind === ValueKind.Structure && getGenericType(el as ContextValue) === FutureType) {
+      return el as ContextValue;
+    }
+    return defaultConcreteType(generic, "Future", args, {});
+  },
+);
+
+/** Apply Future to an element type: `futureOf(Int)` = `Future[Int]`. */
+export function futureOf(elementType: ContextValue): ContextValue {
+  return applyGenericType(FutureType, [elementType]);
+}
+
+/** The element type T of a `Future[T]` type Context; `Any` for the bare
+ *  generic; null when the type is not a Future at all. */
+export function futureElementType(type: ContextValue): ContextValue | null {
+  if (type === FutureType) return AnyType;
+  if (getGenericType(type) !== FutureType) return null;
+  const args = getTypeArgs(type);
+  const el = args && args[0] !== undefined ? dataOf(args[0]) : undefined;
+  return el?.kind === ValueKind.Structure ? (el as ContextValue) : AnyType;
+}
+
+/** B-028 F2: does `name` appear on `t`'s refines chain (t itself
+ *  included)? The shape-level test the call-boundary check uses for
+ *  future-typed args — Future[Int] passes a NonNeg param's shape (Int
+ *  is on NonNeg's chain... inverted: NonNeg refines Int, so the check
+ *  walks the EXPECTED type's chain down to the element's name); the
+ *  predicate half defers with the value. */
+export function typeNameOnRefinesChain(t: ContextValue, name: string): boolean {
+  let cur: ContextValue | null = t;
+  for (let guard = 0; guard < 64 && cur; guard++) {
+    if (typeContextName(cur) === name) return true;
+    const parentV = getRefines(cur);
+    cur = parentV?.kind === ValueKind.Structure ? (parentV as ContextValue) : null;
+  }
+  return false;
+}
+
 /** Create a concrete FunctionType from param types and return type. */
 export function makeFunctionType(paramTypes: Value[], returnType: Value): ContextValue {
   const paramTypesArr = makeRawArrayCtx(paramTypes);
@@ -4361,6 +4417,7 @@ export function createTypeSystem(): Extension {
       String: wrapType(StringType) as any,
       Bool: wrapType(BoolType) as any,
       Array: wrapType(ArrayType) as any,
+      Future: wrapType(FutureType) as any,
       Object: wrapType(ObjectType) as any,
       Function: wrapType(FunctionType) as any,
       UntypedFunction: wrapType(UntypedFunctionType) as any,

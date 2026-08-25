@@ -9,7 +9,7 @@ import { createFutureManager, FutureManager } from "./futures.js";
 import { ModuleLoader, buildModuleObject } from "./modules.js";
 import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, EquatableType, isLawDescriptor } from "./types-std.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, EquatableType, isLawDescriptor, futureOf, futureElementType, typeContextName as tsTypeContextName } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
 import { channelReadRaw, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "./slots.js";
 import { exportedSymbols, symbolFromWire, kernelMemberFqn, fqnBaseName } from "./symbols.js";
@@ -1772,7 +1772,7 @@ test("B-097 V1: exported typed function declaration marks its binding", () => {
 // == B-097 V2: pipeline unification ==
 
 import { withType as tsWithType } from "./types-std.js";
-import { effectsOf as tsEffectsOf } from "./effects.js";
+import { effectsOf as tsEffectsOf, livenessDispositions } from "./effects.js";
 
 test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possession", () => {
   const r = runtimeEval("secret = 41\nsecret", undefined, [typeExt], undefined, true);
@@ -11691,6 +11691,114 @@ async function runAsyncTests(): Promise<void> {
     const vb = r2.registry.bindings.get("v");
     eq(vb?.isComplete, true, "scalar refined construction completed");
     eq(Number((dataOf(vb!.value!) as BitsValue).data), 0, "delay resolved to 0, predicate 0 >= 0 held");
+  });
+
+  // == B-028 F2: typed futures + detection ==
+
+  await asyncTest("B-028 F2 (CE-R5): async results are Future[T]-typed while pending; the annotation vanishes on resolution", async () => {
+    const fm = createFutureManager();
+    const r = runtimeEval("x = delay(10)\n", undefined, [typeExt], undefined, true, fm);
+    const pending = r.registry.bindings.get("x")!.value!;
+    eq(getTypeName(pending), "Future", "pending value carries Future");
+    const elT = futureElementType(getType(pending)! as ContextValue);
+    eq(elT !== null && tsTypeContextName(elT!) === "Int", true, "element type is Int");
+    await fm.waitForAll();
+    eq(getTypeName(r.registry.bindings.get("x")!.value!), "Int", "resolved value's own type shadows Future");
+  });
+
+  await asyncTest("B-028 F2 (D33): Future[Future[T]] flattens; parameterizations are identity-stable", async () => {
+    const fi = futureOf(IntType);
+    eq(futureOf(fi) === fi, true, "Future[Future[Int]] IS Future[Int]");
+    eq(futureOf(IntType) === fi, true, "memoized — same parameterization, same object");
+  });
+
+  await asyncTest("B-028 F2 (CE-R5/D11): the call boundary checks landed knowledge, defers the rest", async () => {
+    // Future[Int] into an Int param: defers, flows as a residual, completes.
+    const fm = createFutureManager();
+    const output: string[] = [];
+    fm.onOutput = (t: string) => output.push(t);
+    runtimeEval("f(n: Int): Int => n * 2\nprint(f(delay(10)))\n", undefined, [typeExt], undefined, true, fm);
+    await fm.waitForAll();
+    eq(output[0], "0", "matching element type deferred and resolved through the body");
+    // Future[Int] into a String param: a REAL type error, now.
+    let msg = "";
+    try {
+      runtimeEval("g(s: String): String => s\nx = g(delay(10))\n", undefined, [typeExt], undefined, true, createFutureManager());
+    } catch (e: any) { msg = e.message; }
+    eq(msg.includes("expected String, got Future[Int]"), true, `element mismatch is static: ${msg}`);
+    // Annotation path: a refinement annotation over a pending value
+    // residual-defers and re-fires with the real value (predicate runs then).
+    const fm3 = createFutureManager();
+    const r3 = runtimeEval("NonNeg = Int & _ >= 0\nw: NonNeg = delay(5)\n", undefined, [typeExt], undefined, true, fm3);
+    await fm3.waitForAll();
+    eq(Number((dataOf(r3.registry.bindings.get("w")!.value!) as BitsValue).data), 0, "type_check re-fired on resolution");
+  });
+
+  await asyncTest("B-028 F2 (CE-R4): is_resolved answers the scheduling question and pays for it (`sched`)", async () => {
+    const fm = createFutureManager();
+    const output: string[] = [];
+    fm.onOutput = (t: string) => output.push(t);
+    runtimeEval("x = delay(10)\nprint(is_resolved(x))\nprint(is_resolved(5))\n", undefined, [typeExt], undefined, true, fm);
+    eq(output[0], "false", "pending future answers false — a snapshot, not a wait");
+    eq(output[1], "true", "resolved value answers true");
+    await fm.waitForAll();
+    // The effect contract, through the real `use effects` body form
+    // (the nested-use loader precedent): declared `pure` + is_resolved
+    // HALTS naming the label; declared `sched` passes.
+    const libDir = path.resolve("lib");
+    const mkLoader = (body: string, id: string) => new ModuleLoader({
+      modules: [{ id }],
+      resolve: (mid) => {
+        if (mid === id) return `/mock/${id}.alg`;
+        const p = path.join(libDir, `${mid}.alg`);
+        return fs.existsSync(p) ? p : null;
+      },
+      readFile: async (p) => p === `/mock/${id}.alg` ? body : fs.readFileSync(p, "utf-8"),
+      extensions: [typeExt],
+    });
+    let msg = "";
+    try {
+      await mkLoader("use effects\ncheck(x) =>\n  effects pure\n  is_resolved(x)\nexport probe = check(5)\n", "schedbad").loadAll();
+    } catch (e: any) { msg = e.message; }
+    eq(msg.includes("undeclared: sched"), true, `pure contract refuses sched: ${msg}`);
+    const exts = await mkLoader("use effects\ncheck(x) =>\n  effects sched\n  is_resolved(x)\nexport probe = check(5)\n", "schedok").loadAll();
+    const probe = exts.find((e) => e.name === "schedok")!.bindings["probe"];
+    eq(formatValue(probe), "true", "declared sched passes the contract");
+  });
+
+  await asyncTest("B-028 F2 (CE-R6): modules evaluate with the session's FutureManager", async () => {
+    const fm = createFutureManager();
+    const loader = new ModuleLoader({
+      modules: [{ id: "asyncmod" }],
+      resolve: (id) => id === "asyncmod" ? "/mock/asyncmod.alg" : null,
+      readFile: async () => "probe = delay(1)\nexport answer = 42\n",
+      extensions: [typeExt],
+      futureManager: fm,
+    });
+    const exts = await loader.loadAll();
+    eq(exts.length, 1, "module with top-level async loads");
+    eq(fm.hasPending(), true, "the module's future is tracked by the session manager");
+    await fm.waitForAll();
+    // Without a manager, the pre-F2 behavior stands: host capability absent.
+    let msg = "";
+    try {
+      await new ModuleLoader({
+        modules: [{ id: "asyncmod2" }],
+        resolve: (id) => id === "asyncmod2" ? "/mock/asyncmod2.alg" : null,
+        readFile: async () => "probe = delay(1)\n",
+        extensions: [typeExt],
+      }).loadAll();
+    } catch (e: any) { msg = e.message; }
+    eq(msg.includes("requires async runtime"), true, "no manager = explicit host-capability error (CE-R6)");
+  });
+
+  await asyncTest("B-028 F2 (CE-R4/D34): the async sources carry declared liveness dispositions", async () => {
+    const dispositions = livenessDispositions();
+    const delayD = dispositions.find((d) => d.source === "delay");
+    const fetchD = dispositions.find((d) => d.source === "fetch");
+    eq(delayD?.tier, "live", "delay resolves by construction (a timer fires)");
+    eq(fetchD?.tier, "admitted", "fetch rests on an external assumption");
+    eq((fetchD?.axiom ?? "").includes("responds"), true, "the admitted axiom is named, ledger-ready for F3");
   });
 }
 
