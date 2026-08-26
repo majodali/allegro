@@ -2192,13 +2192,13 @@ f([1, 2, 3]) + g([10, 20])
 });
 
 test("generics: Array is a generic type", () => {
-  // C7.2a: generic-ness IS the kind — Array's shape answers GenericType
-  // (the __isGeneric presence flag is retired).
+  // C7.2a: generic-ness IS the kind — Array's shape answers GenericType.
+  // The presence flag it replaced is retired; the suite no longer pins its
+  // absence, since retired slots are retired as a class (C0, 2026-08).
   const result = evalStd("Array");
   const p = dataOf(result!);
   eq(p.kind === ValueKind.Structure, true);
   eq(isGenericType(p as ContextValue), true);
-  eq((p as ContextValue).bindings.has("__isGeneric"), false);
 });
 
 test("generics: params is a typed Array[String] instance field", () => {
@@ -3883,7 +3883,7 @@ test("E1 equality: none keeps identity semantics", () => {
 
 test("E1 equality: errors stay viral through ==", () => {
   const result = evalStd('(error "boom") == 1');
-  eq((result as any).components?.has("error") ?? (getTypeName(result!) === "Error"), true);
+  eq(channelReadRaw(result!, "error") !== undefined, true);
 });
 
 test("E1 equality: type values compare by identity", () => {
@@ -10196,7 +10196,12 @@ test("Phase 6: anonymous above(mul) below(unary) gensyms a level name", () => {
   eq(data !== undefined, true);
   if (!data) return;
   const anonLevel = data.fragment.infix[0].level!;
-  eq(anonLevel.startsWith("__anon_"), true, `level is anonymous (got ${anonLevel})`);
+  // Anonymity is checked by exclusion, not by the gensym's slot prefix:
+  // internal `__*` names are not the suite's to assert (C0, 2026-08). A
+  // minted level is a NEW one — neither of the two it was positioned
+  // between — and the fragment declares it (asserted just below).
+  eq(anonLevel !== "mul" && anonLevel !== "unary", true,
+     `level is anonymous (got ${anonLevel})`);
   const prec = data.fragment.precedence ?? [];
   eq(prec.length, 1, "one precedence decl");
   eq(prec[0].name, anonLevel);
