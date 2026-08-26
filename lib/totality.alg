@@ -1,24 +1,15 @@
-// Allegro Standard Library — Totality (Phase E)
+// Allegro Standard Library — Totality (Phase E substrate; D34 discharge
+// forms live since B-028 F3)
 //
-// Function-body totality annotations. Phase E will prove every function call
-// terminates and produces a defined output for every input. Until then, the
-// `partial` clause opts a function out of the totality check — explicit
-// acknowledgement that the function may not terminate or may not handle every
-// input.
+// Function-body completion-discharge annotations. The termination
+// analysis runs on every typed compilation and IS the `div` effect's
+// inference (D31/CE-R1); these clauses are the D34 discharge spectrum's
+// surface (design: docs/design/standard/totality.md).
 //
-// Surface form (added to the host grammar):
-//
-//     partial
-//
-// Lowers to a parse-time marker that the block-expression preprocessor
-// extracts and uses to wrap the function body with `partial_attach(body)`.
-// At runtime the wrapper is a passthrough; at compile time the analyzer
-// (Stage 1+) peels it to skip totality checks for the annotated function.
-//
-// `total` is reserved for the inverse opt-in once the project-wide default
-// policy is settled (today's default is notify-on-failure with `info`
-// severity, so an explicit `total` would only ever upgrade to `error` per
-// project config).
+// Each form lowers to a parse-time marker that the block-expression
+// preprocessor extracts and uses to wrap the function body with the
+// matching `*_attach(body)`; `collapseBodyMetadata` then collapses the
+// wrapper to a host function property the analyzer reads.
 //
 // Example:
 //
@@ -26,20 +17,20 @@
 //
 //     loop(n) =>
 //       partial
-//       loop(n)        // intentionally non-terminating; no analyzer complaint
+//       loop(n)        // declared undischarged: div inferred, findings
+//                      // suppressed, tier recorded in the ledger
 //
-//     branch(b) =>
-//       partial
-//       when b is true then 1   // intentionally non-exhaustive (no `else`);
-//                               // returns `none` on `false` without analyzer
-//                               // notification
+//     down(n: Int) =>
+//       decreases n
+//       if n == 0 then 0 else down(n - 1)   // witnessed (kernel-checked)
 //
-// Phase E stages build on this substrate:
-//   - Stage 1: exhaustiveness check for `when/is/then`
-//   - Stage 2: structural recursion termination check
-//   - Stage 3: `decreases <expr>` body-form for hand-rolled metrics
-//   - Stages 4-6: mutual recursion, higher-order propagation, counterexample
-//                  rendering
+//     poll(n) =>
+//       assume terminates                    // admitted liveness axiom
+//       if ready(n) then n else poll(n)
+//
+//     safe(n: Int) =>
+//       total                                // strict: undischarged div
+//       n + 1                                // (own or inherited) is an ERROR
 
 totality_grammar = grammar {
   // Opt-out: skip the totality analyzer for this function.

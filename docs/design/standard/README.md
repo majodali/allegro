@@ -29,8 +29,12 @@ Proof with zero hand-rolled residue is the exit criterion
 - Proof/`discharged` authority is kernel-private via ordinary channel
   capabilities — unforgeable from anywhere in or above this layer.
 - Dispatch follows shape; knowledge gates visibility (structures.md §6).
-- A failed proof, undeclared effect, or failing invariant halts
-  compilation ("build safety in") — in libs exactly as in user code.
+- A failed proof, undeclared effect (`div` included — CE-R1), or a
+  failed refinement/type annotation halts compilation ("build safety
+  in") — in libs exactly as in user code. Two paths are consciously
+  weaker (CE-R8): construction-path invariant failure yields an error
+  VALUE, and non-exhaustive match is an info notification — promotion
+  is a maintainer decision (`totality.md` §5).
 
 ## Documents
 
@@ -38,6 +42,8 @@ Proof with zero hand-rolled residue is the exit criterion
   registry
 - `effects.md` — effect system schema, lattice, inference, subversion
 - `pattern-matching.md` — `when/is/then`, destructuring, guards
+- `totality.md` — discharge spectrum (D34), the divergence analyzer,
+  exhaustiveness taxonomy, severity reconciliation (B-018 reval)
 - Planned, **revalidation-gated** (BACKLOG register): `contracts.md`,
-  `totality.md`, `proofs.md`, `pcp.md`
+  `proofs.md`, `pcp.md`
 - Proving primer (consumable, top level): `../../proving-in-allegro.md`

@@ -8,6 +8,42 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-018: totality design revalidation (`totality.md`)
+
+The M4 reval line resumes: the v1 Phase-E totality design is
+revalidated against the post-B-028 system and lands as the durable
+Tier-1 design doc `docs/design/standard/totality.md`.
+
+- **The severity reconciliation** (the item's reason for existing):
+  v1's notify-by-default and D34's strict-by-default bind at different
+  levels and compose — strictness is unconditional at discharge
+  ACCOUNTING (every tier recorded, nothing silent) and at the CONTRACT
+  (declarations, `total`, annotations halt since F3); info remains the
+  migration-era default for UNDECLARED code; the flip to strict is a
+  per-project config decision (designed shape recorded), never a
+  global break. Proposed as T-R1–T-R3.
+- **Archive disposition** (§6): per-stage map of
+  `phase-e-totality-plan.md` — Stages 0/2/3/6 shipped (some
+  strengthened: `total` real, unrecognized `decreases` a recorded
+  admission), Stage 1 shipped narrower with the closed-sum/record/
+  dead-case taxonomy kept [designed], Stage 4 reshaped
+  (all-edges-decrease over Tarjan SCCs replaces the common-lex-measure
+  requirement — T-R4), Stage 5's `[t: Totality]` marker system
+  DISCARDED (totality polymorphism is subsumed by div riding the
+  effect calculus — T-R5).
+- **Riders recorded**: T-R2 project severity config (owns
+  `total`-by-default, per-kind promotion, blanket axioms, the CE-R8
+  severity knobs); T-R6 divergence-aware inlining cutoff for the
+  measured ~43s precompile pathology (with B-087).
+- Hygiene: `lib/totality.alg` header refreshed (comments only — it
+  still described `total` as "reserved"); the standard-layer README's
+  halt claim corrected per CE-R8 (same correction CLAUDE.md got at
+  F4); design indexes updated.
+
+Docs-only (one lib comment block). T-R1–T-R6 proposed —
+awaiting maintainer ratification; B-018 closes on the gate decision.
+1197/1197 green.
+
 ## 2026-08 — B-028 F4: D32 guarded projection + arc release
 
 The completion arc's final chunk: the D32 guard is real end-to-end,

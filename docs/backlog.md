@@ -221,19 +221,23 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   congruence + equality-ignores-knowledge boundary tests (D37
   groundwork); demo + sandbox example
 - [ ] **B-018** · L2 · `[reval]` Totality design revalidation →
-  `totality.md` in `docs/design/standard/`: severity policy (**reconcile
-  v1 info-by-default with structures.md D34 strict-by-default as an
-  explicit migration decision**), exhaustiveness taxonomy, mutual-recursion
-  lexicographic design, totality polymorphism, decreases obligations,
-  counterexample shapes (source:
-  `docs/plans/archive/phase-e-totality-plan.md`). B-028 built the tier
-  machinery this will configure: per-binding D34 tiers, `total` (the
-  per-function strict opt-in), `assume terminates`, ledger/obligations
-  wiring — the PROJECT-level default flip, blanket axiom patterns, and
-  per-project severity config are the decisions left here. Also holds
-  the F4-measured precompile rider: PE inlining of divergent
-  non-same-arg recursion (`loop(n+1)`) costs ~43s/compile — a
-  divergence-aware inlining cutoff belongs in the same analyzer rework
+  `totality.md` in `docs/design/standard/`. **Doc delivered 2026-08**:
+  the reval of `phase-e-totality-plan.md` against the post-B-028 system
+  — severity reconciliation ruled (strict binds at discharge accounting
+  + contracts; info stays the migration default for UNDECLARED code;
+  the flip is per-project config), exhaustiveness taxonomy (shipped
+  tier + designed closed-sum/record/dead-case targets), mutual
+  recursion (all-edges-decrease ratified over the archived common-lex
+  requirement), totality polymorphism (subsumed by div-as-effect —
+  `[t: Totality]` markers discarded), decreases obligations and
+  counterexample shapes recorded as shipped. Decision points T-R1–T-R6
+  proposed with recommendations — **awaiting maintainer ratification**;
+  item closes when ratified (status flip + D34 register note).
+  Follow-on implementation work named there: T-R2 project severity
+  config (owns the `total`-by-default flip, per-kind promotion,
+  blanket axioms, CE-R8 knobs) and T-R6 divergence-aware inlining
+  cutoff (~43s/compile measured; rides the next analyzer/perf pass
+  with B-087)
 - [x] **B-019** · L0 · Structure kind — representation swap behind
   accessors (C4.1). Landed 2026-07: one host class (`src/structure.ts`)
   behind makeMultiValue/makeContext (factory shims; 6 bypass sites
