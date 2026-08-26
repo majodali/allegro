@@ -41,8 +41,10 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   `visibility.md` closed; all four chunks landed, forgery E live).
   B-028 completion effects COMPLETE 2026-08 (plan
   `completion-effects.md` closed; F1–F4 landed, D16/D31–D34 executed).
-  M4 reval docs (B-014, B-018, B-029) ride between chunks — B-018 is
-  next in the reval line, now fed by both E4's and F3's tier machinery.
+  B-018 totality reval COMPLETE 2026-08 (`totality.md` landed; T-R1–T-R6
+  ratified; follow-ons routed to B-099 and B-087). M4 reval docs ride
+  between chunks — **B-014 (contracts) and B-029 (PCP) remain** in the
+  reval line.
 - **Track R — public release (started 2026-08, runs alongside
   functional tranches):** positioning plan `release-track.md`
   (differentiator map + claims register + demo ladder); VISION §1a/§5
@@ -220,8 +222,10 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   values, priced by the effect calculus; `effects pure` + peek fails);
   congruence + equality-ignores-knowledge boundary tests (D37
   groundwork); demo + sandbox example
-- [ ] **B-018** · L2 · `[reval]` Totality design revalidation →
-  `totality.md` in `docs/design/standard/`. **Doc delivered 2026-08**:
+- [x] **B-018** · L2 · `[reval]` Totality design revalidation —
+  COMPLETE 2026-08 (`docs/design/standard/totality.md`; T-R1–T-R6
+  maintainer-ratified as recommended, indexed in the decision
+  register). **Doc delivered 2026-08**:
   the reval of `phase-e-totality-plan.md` against the post-B-028 system
   — severity reconciliation ruled (strict binds at discharge accounting
   + contracts; info stays the migration default for UNDECLARED code;
@@ -230,14 +234,12 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   recursion (all-edges-decrease ratified over the archived common-lex
   requirement), totality polymorphism (subsumed by div-as-effect —
   `[t: Totality]` markers discarded), decreases obligations and
-  counterexample shapes recorded as shipped. Decision points T-R1–T-R6
-  proposed with recommendations — **awaiting maintainer ratification**;
-  item closes when ratified (status flip + D34 register note).
-  Follow-on implementation work named there: T-R2 project severity
-  config (owns the `total`-by-default flip, per-kind promotion,
-  blanket axioms, CE-R8 knobs) and T-R6 divergence-aware inlining
-  cutoff (~43s/compile measured; rides the next analyzer/perf pass
-  with B-087)
+  counterexample shapes recorded as shipped. T-R1–T-R6 ratified as
+  recommended; the D34 register row now points at the reconciliation,
+  and the V-R / CE-R / T-R ruling families are indexed in
+  `docs/decisions.md` per its own gate-pass rule. Follow-on
+  implementation routed: T-R2 → **B-099** (project severity config);
+  T-R6 → **B-087** (divergence-aware inlining cutoff)
 - [x] **B-019** · L0 · Structure kind — representation swap behind
   accessors (C4.1). Landed 2026-07: one host class (`src/structure.ts`)
   behind makeMultiValue/makeContext (factory shims; 6 bypass sites
@@ -568,7 +570,15 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   inference) but A/B shows ~2% on the 65s decreases demo — the
   per-call-site refinement re-evaluation was NOT the hotspot. The
   remaining cost needs a real profile (likely the demos' own deep
-  recursive evaluation, or analyzer work off this lookup path)
+  recursive evaluation, or analyzer work off this lookup path).
+  **2026-08 (B-018 T-R6) — carries the ratified inlining cutoff**: a
+  binding whose D34 tier is `undischarged`/`partial` must never be
+  PE-INLINED by precompile (residualize the call instead). Measured
+  pathology: inlining divergent non-same-arg recursion (`loop(n + 1)`)
+  costs ~43s for ONE compile. The analyzer already knows the tier;
+  precompile simply doesn't consult it. Design ratified in
+  `docs/design/standard/totality.md` §7/§8 — implementation is this
+  item's
 
 ### T-host
 
@@ -758,3 +768,20 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   domains on unresolved arithmetic — then look deeply (likely a one-line
   reorder in `applyPrimitive`, but validate interaction with Rule 2
   branch predicates and precompile placeholders first)
+- [ ] **B-099** · Project severity configuration — the T-R2 surface
+  (ratified 2026-08, `docs/design/standard/totality.md` §5/§8). ONE
+  per-project config declaration (shape open — likely a manifest read
+  at session start, not a body form) providing: per-notification-kind
+  severity promotion (`totality-nontermination: error`,
+  `totality-exhaustiveness: error` — v1 Phase-E's promotion path);
+  **`total`-by-default** (every binding treated as `total` unless
+  marked `partial` — D34's strict enforcement, opt-in per project, and
+  the reason this item exists); blanket axiom patterns (D34's text:
+  trust `lib/legacy/` as total, `fetch <url-pattern>` liveness —
+  recorded admissions en masse, still ledger-visible per binding); and
+  the two CE-R8 severity knobs (construction-path invariant failure,
+  non-exhaustive match over a finite type — promotion is exercised
+  HERE, never by code drift, per T-R3). Blocked on nothing but a
+  project-config substrate: Allegro has no manifest-level configuration
+  surface yet, so this item owns designing one or deciding it rides
+  an existing file. Never a global default change (T-R2)

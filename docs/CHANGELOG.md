@@ -8,6 +8,33 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-018 close-out: T-R1–T-R6 ratified; ruling families indexed
+
+The gate decision on the totality reval, plus the register hygiene it
+surfaced. B-018 closes.
+
+- **T-R1–T-R6 ratified as recommended** (maintainer). `totality.md`'s
+  header and §8 flip from "awaiting ratification" to binding design
+  truth; the D34 register row now points at the severity
+  reconciliation instead of forward-referencing B-018.
+- **Ruling families indexed** (`docs/decisions.md`): the register's own
+  rule — plan-scoped `X-R` families are indexed here when their plan's
+  gate passes — had three outstanding debts, all from arcs closed this
+  session. **V-R1–V-R8** (S3 visibility, B-097), **CE-R1–CE-R8**
+  (completion effects, B-028) and the new **T-R1–T-R6** are now one-line
+  rows with status and reasoning pointers, matching the E-R/U-R/R-R
+  sections' shape.
+- **Follow-ons routed to real owners** rather than left in the closed
+  item's prose: **B-099** (new) — project severity configuration, the
+  T-R2 surface: per-kind promotion, `total`-by-default, blanket axiom
+  patterns, and the two CE-R8 severity knobs, blocked only on Allegro
+  having no project-config substrate yet; **B-087** — now carries the
+  T-R6 divergence-aware inlining cutoff (`undischarged`/`partial`
+  bindings are never PE-inlined) with the measured ~43s/compile
+  pathology.
+
+Docs-only. 1197/1197 green.
+
 ## 2026-08 — B-018: totality design revalidation (`totality.md`)
 
 The M4 reval line resumes: the v1 Phase-E totality design is

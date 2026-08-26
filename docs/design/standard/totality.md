@@ -10,9 +10,11 @@
 >
 > This document is the B-018 revalidation of the v1 totality design
 > (`docs/plans/archive/phase-e-totality-plan.md`) against the shipped
-> post-B-028 system. §8 carries the decision points (T-R1–T-R6),
-> proposed with recommendations — **awaiting maintainer ratification**;
-> the severity reconciliation (T-R1) is the item's reason for existing.
+> post-B-028 system. §8's decision points **T-R1–T-R6 are
+> maintainer-ratified as recommended (2026-08)**; the severity
+> reconciliation (T-R1) was the item's reason for existing. B-018 is
+> closed — the follow-on implementation work T-R2 and T-R6 name is
+> carried in `docs/backlog.md`, not here.
 
 ## 1. Settled architectural commitments
 
@@ -248,7 +250,11 @@ Per-stage disposition of `docs/plans/archive/phase-e-totality-plan.md`
   per-function `decreases` proves too weak in practice, the archived
   common-lexicographic design is the fallback; no evidence of need yet.
 
-## 8. Decisions for ratification (T-R1 … T-R6)
+## 8. Decisions (T-R1 … T-R6 — ratified 2026-08)
+
+All six were maintainer-ratified as recommended. "Recommended" below is
+kept as the record of what was put to the gate; each is now binding
+design truth for this layer.
 
 - **T-R1 — Severity reconciliation ruling.** D34's strict-by-default
   binds at discharge ACCOUNTING (always on, nothing silent) and at the
