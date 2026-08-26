@@ -27,5 +27,5 @@ npx tsx src/index.ts inspect demos/rung1/01-discharge.alg   # module summary + s
 npx tsx src/index.ts verify demos/rung1/04-laws.alg         # verdict with law obligations + tiers
 ```
 
-These files are validated by the test suite (`npx tsx src/test.ts`)
+These files are validated by the test suite (`npm test`)
 via their `// expect:` comments — the demos cannot silently rot.

@@ -19,7 +19,8 @@ npm install
 ```bash
 npx tsx src/index.ts                  # REPL (Allegro Standard)
 npx tsx src/index.ts basics.alg       # run a file
-npx tsx src/test.ts                   # run the full test suite
+npm test                              # run the full test suite (sequential)
+npm run test:shards                   # same gate, sharded across processes
 ```
 
 Hello world, in a file or at the REPL:

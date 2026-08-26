@@ -8,6 +8,45 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — Lane merge tidy-up; the parallel-lane experiment ends
+
+Lanes A and B are merged (PRs #32/#33/#34) and the working model reverts to
+**serial** at the maintainer's call — the coordination overhead of watching
+three sessions outweighed the throughput. The merged state was verified
+before closing the experiment: **1197/1197, `GATE: PASSED`** (114.2s wall,
+3 shards), typecheck clean, doc-ref lint clean. Both lanes' work composes;
+nothing needed reverting. What the merge left behind:
+
+- **A duplicate backlog id — the collision the lane model was supposed to
+  prevent, in the one file both lanes had to touch.** Lane A filed
+  **B-101** (predicate-carrier residue cleanup, from CT-R5/CT-R3) and lane
+  B independently filed **B-101** (a CI registration-count check). Neither
+  session could see the other's uncommitted work, and the merge was clean
+  because the two entries landed in different sections of `backlog.md` —
+  a textual non-conflict over a semantic one. Lane A keeps the number: it
+  is cited by ratified CT-R3/CT-R5 rulings in `docs/decisions.md`, so it
+  is the one that cannot move. Lane B's is renumbered **B-103**. The
+  general lesson for the proposed methodology amendment: *lane
+  disjointness over source files does not extend to shared registers with
+  a monotonic id space* — `backlog.md` and `decisions.md` mint ids, and
+  two lanes minting concurrently collide silently.
+- **Four stale `npx tsx src/test.ts` invocations** outside lane B's file
+  set, so it could not fix them: `docs/getting-started.md` (a consumable —
+  the command a new reader would run first), `demos/rung1/README.md`,
+  `bench/README.md`, and the header comment in `scripts/doc-ref-lint.ts`.
+  The getting-started entry now names both `npm test` and
+  `npm run test:shards`; the two READMEs point at `src/test/tooling.ts`,
+  where those tests actually live. `doc-ref-lint` never caught these:
+  it resolves markdown *references*, and these are shell commands in
+  fenced blocks.
+- **`docs/PROCESS.md` §5 still lists `npx tsx src/test.ts`** in the
+  landing checklist. Tier 0 — surfaced, not edited (PROCESS §7).
+- **B-104 filed**: retire the `__*` identifier convention (maintainer
+  directive). The survey behind it is in the item: the host-plane half is
+  a mechanical rename, the binding-plane half is a partition-test
+  replacement and needs a ruling, and the lint ratchet cannot presently
+  see template literals or property access.
+
 ## 2026-08 — The suite splits: `src/test.ts` becomes `src/test/` (lane B)
 
 The file two work streams could not avoid meeting in is gone. `src/test.ts`

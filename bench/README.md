@@ -72,6 +72,6 @@ system — no module resolver.
 - `run.ts` — CLI runner: renders the table or emits JSON.
 - `corpus/*.alg` — the obligations, in solved form.
 
-The deterministic baselines are pinned by tests in `src/test.ts`
+The deterministic baselines are pinned by tests in `src/test/tooling.ts`
 (`runBenchmarkTests`), so a regression in the proof kernel surfaces in the
 normal `npm test` run.
