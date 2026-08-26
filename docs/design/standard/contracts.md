@@ -16,9 +16,10 @@
 > design (`docs/plans/archive/lucid-discharging-lambek.md` and
 > `docs/plans/archive/crystal-proving-curry.md` §Phase C) against the
 > shipped post-B-028 system. §10's decision points **CT-R1–CT-R6 are
-> PROPOSED with recommendations and await maintainer ratification**;
-> until that gate passes they are this document's open questions, not
-> design truth. B-014 closes on the gate decision.
+> maintainer-ratified as recommended (2026-08)** and are binding design
+> truth for the contracts area. B-014 is closed — the follow-on
+> implementation work the rulings name is carried in `docs/backlog.md`
+> (B-057, B-099, B-101), not here.
 
 ## 1. Settled architectural commitments
 
@@ -63,7 +64,7 @@
    function's `requires`/`ensures` distinctly, and suggests promoting an
    in-body `assert` over parameters to a `requires`. The verdict and the
    assumption ledger, however, do not see contracts at all — the gap
-   CT-R6 puts to the gate (§7).
+   CT-R6 records, with the work routed to B-057 (§7).
 
 ## 2. Surface forms and lowering
 
@@ -355,11 +356,11 @@ strategy), against the shipped system:
 | Open decision: when to suggest promotion | **resolved conservatively**, as the plan recommended |
 | Counterexample content (call-site origin, known facts) | **partial**: constraint + actual value ship; origin and fact-set do not, and follow relocation (B-057) |
 
-## 10. Decisions (CT-R1 … CT-R6 — PROPOSED, awaiting ratification)
+## 10. Decisions (CT-R1 … CT-R6 — ratified 2026-08)
 
-Each carries a recommendation. None is binding until the maintainer
-rules; a reader arriving before that gate should treat this section as
-the open questions of the contracts area.
+All six were maintainer-ratified as recommended. "Recommended" below is
+kept as the record of what was put to the gate; each is now binding
+design truth for the contracts area.
 
 - **CT-R1 — "Sink-based" splits into discharge and relocation; only
   relocation remains open.** Ratify function-entry/return checking as
@@ -388,9 +389,9 @@ the open questions of the contracts area.
   outlier is `assume_invariant`: registered and therefore callable by
   name, but given no grammar sugar and called from nowhere in `src/`,
   `lib/`, `tests/` or the web bundle — and it attaches a fact *without
-  recording anything*. That
-  is the one path in the system that trusts silently, which is precisely
-  what D34 forbids. **Recommended**: retire the primitive (a `src/`
+  recording anything*. That is the one path in the system that trusts
+  silently, which is precisely what D34 forbids.
+  **Recommended**: retire the primitive (a `src/`
   change — lane D, not this lane), and mint B-057's `assumes`
   trust-boundary form later against the admitted tier with mandatory
   ledger visibility.
@@ -422,7 +423,7 @@ the open questions of the contracts area.
 
 - **Sink-based relocation, relational predicates, `assumes`, and
   ledger visibility** — all four are B-057, whose scope this document
-  proposes to settle (CT-R1, CT-R3, CT-R6, §4).
+  settled at the ratification (CT-R1, CT-R3, CT-R6, §4).
 - **Contract knobs in the project severity config** — T-R2 / B-099
   (CT-R2).
 - **Legacy `domain` retirement and the writerless `type-invariant`
