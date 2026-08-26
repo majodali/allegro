@@ -11,7 +11,7 @@ import { evaluate } from "./evaluator.js";
 import { GrammarExtension, registryGet } from "./grammar-ext.js";
 import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, EquatableType, isLawDescriptor, futureOf, futureElementType, typeContextName as tsTypeContextName } from "./types-std.js";
 import { Grammar, parseGrammar } from "./parser.js";
-import { channelReadRaw, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "./slots.js";
+import { channelReadRaw, componentsView, getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getWraps, getGenericArgs, getSlotCount, writeShape, setMembers, SLOT_KEYS, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "./slots.js";
 import { exportedSymbols, symbolFromWire, kernelMemberFqn, fqnBaseName } from "./symbols.js";
 import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
 import { emptyGrammarFragment, GrammarFragment } from "./types.js";
@@ -2142,16 +2142,16 @@ test("generics: array literal infers Array[Int]", () => {
   // Check it has type args
   const type = getType(result!);
   eq(type !== null, true);
-  const args = (type as any).bindings.get("__args");
-  eq(args !== undefined && args.value !== undefined, true);
+  const args = getGenericArgs(type as ContextValue);
+  eq(args !== undefined, true);
 });
 
 test("generics: array literal infers Array[String]", () => {
   const result = evalStd('["a", "b", "c"]');
   eq(getTypeName(result!), "Array");
   const type = getType(result!);
-  const args = (type as any).bindings.get("__args");
-  eq(args !== undefined && args.value !== undefined, true);
+  const args = getGenericArgs(type as ContextValue);
+  eq(args !== undefined, true);
 });
 
 test("generics: mixed element array gets bare Array", () => {
@@ -2161,7 +2161,7 @@ test("generics: mixed element array gets bare Array", () => {
   eq(getTypeName(result!), "Array");
   const type = getType(result!);
   // Bare Array (generic) should not have __args
-  const args = (type as any).bindings.get("__args");
+  const args = getGenericArgs(type as ContextValue);
   eq(args, undefined);
 });
 
@@ -2504,14 +2504,14 @@ test("compile: non-typed functions not in inferred list", () => {
 
 test("type hierarchy: all types have __type = Type", () => {
   // Int, String, Bool, Float, Object should all have __type = Type
-  const intType = IntType.bindings.get("__type")?.value;
+  const intType = channelReadRaw(IntType, "type");
   eq(intType === Type, true);
-  const strType = StringType.bindings.get("__type")?.value;
+  const strType = channelReadRaw(StringType, "type");
   eq(strType === Type, true);
 });
 
 test("type hierarchy: Type has __type = Type (self-referential)", () => {
-  const ttType = Type.bindings.get("__type")?.value;
+  const ttType = channelReadRaw(Type, "type");
   eq(ttType === Type, true);
 });
 
@@ -2569,13 +2569,13 @@ test("type hierarchy: nominal subtypeof - different types", () => {
 test("type hierarchy: structural_wrap makes type compare structurally by erasing __name", () => {
   const wrappedInt = structuralWrap(IntType);
   // __type stays Type (no longer flips meta-types — there's only one)
-  const wrapType = wrappedInt.bindings.get("__type")?.value;
+  const wrapType = channelReadRaw(wrappedInt, "type");
   eq(wrapType === Type, true);
   // __name erased — absence of name is what triggers structural dispatch
-  const name = wrappedInt.bindings.get("__name")?.value;
+  const name = getName(wrappedInt);
   eq(name === undefined, true);
   // __wraps preserves the link back to the original named type
-  const wraps = wrappedInt.bindings.get("__wraps")?.value;
+  const wraps = getWraps(wrappedInt);
   eq(wraps === IntType, true);
 });
 
@@ -2684,7 +2684,7 @@ test("typed types: type of Int returns Type", () => {
 // == Effect meta-type (Phase D1 sub-chunk 1.1) ==
 
 test("effect: Effect meta-type has __type = Type", () => {
-  const tt = Effect.bindings.get("__type")?.value;
+  const tt = channelReadRaw(Effect, "type");
   eq(tt === Type, true);
 });
 
@@ -2697,8 +2697,8 @@ test("effect: Effect carries lattice methods in __members", () => {
 });
 
 test("effect (C6.2): instances stamp shape = Effect — no refines chain hack", () => {
-  eq(pureEffect.bindings.get("__refines")?.value, undefined);
-  eq(opaqueEffect.bindings.get("__refines")?.value, undefined);
+  eq(getRefines(pureEffect), undefined);
+  eq(getRefines(opaqueEffect), undefined);
   eq(getType(pureEffect) === Effect, true);
   eq(getType(opaqueEffect) === Effect, true);
 });
@@ -2711,8 +2711,8 @@ test("effect (C6.2): instances carry `kind` as a declared data field", () => {
 });
 
 test("effect (C6.2): instances hold NO member copies — members live on the kind", () => {
-  eq(pureEffect.bindings.get("__members")?.value, undefined);
-  eq(opaqueEffect.bindings.get("__members")?.value, undefined);
+  eq(getMembers(pureEffect), undefined);
+  eq(getMembers(opaqueEffect), undefined);
   // Dispatch still works — through the shape.
   const result = evalStd("pure.subset_of(opaque)");
   eq(Number((dataOf(result!) as BitsValue).data), 1);
@@ -2803,11 +2803,11 @@ Printable`);
   const iface = dataOf(result!) as ContextValue;
   eq(iface.kind, ValueKind.Structure);
   // __interface marker
-  const marker = iface.bindings.get("__interface")?.value;
+  const marker = getInterfaceMarker(iface);
   eq(marker !== undefined, true);
   eq((marker as BitsValue).data, 1n);
   // C6.1b (D45): an interface is an instance of the Interface kind.
-  eq(iface.bindings.get("__type")?.value === InterfaceKind, true);
+  eq(channelReadRaw(iface, "type") === InterfaceKind, true);
 });
 
 test("interfaces: interface has Field descriptors in __members", () => {
@@ -2824,7 +2824,7 @@ test("interfaces: interface has Field descriptors in __members", () => {
 
 test("interfaces: interface has no __construct", () => {
   const result = dataOf(evalStd(`Interface.define({x: Int})`)!) as ContextValue;
-  eq(result.bindings.has("__construct"), false);
+  eq(getConstruct(result) !== undefined, false);
 });
 
 test("interfaces: instanceof passes for DECLARED conformance (C5.2c)", () => {
@@ -2866,14 +2866,14 @@ test("interfaces: Type.interface also creates structural type", () => {
   const result = evalStd(`Sized = Interface.define({length: Int}, Int)
 Sized`);
   const iface = dataOf(result!) as ContextValue;
-  eq(iface.bindings.get("__type")?.value === InterfaceKind, true);
+  eq(channelReadRaw(iface, "type") === InterfaceKind, true);
 });
 
 test("interfaces: auto-named when bound to symbol", () => {
   const result = evalStd(`Printable = Interface.define({toString: Function})
 Printable`);
   const iface = dataOf(result!) as ContextValue;
-  const name = iface.bindings.get("__name")?.value;
+  const name = getName(iface);
   eq(name !== undefined, true);
   eq(bitsToString(name as BitsValue), "Printable");
 });
@@ -2978,7 +2978,7 @@ PI(5)`);
 test("Refinement spec methods: predicate failure produces error", () => {
   const result = evalStd(`PI = Refinement.define({refines: Int, where: p => p > 0, double: self => self + self})
 PI(0 - 5)`);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("Refinement spec methods: method call works", () => {
@@ -2996,13 +2996,13 @@ T(50).triple()`);
 test("Refinement spec methods: upper-bound failure produces error", () => {
   const result = evalStd(`T = Refinement.define({refines: Int, where: w => w > 0 && w < 100, triple: self => self * 3})
 T(500)`);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("Refinement spec methods: lower-bound failure produces error", () => {
   const result = evalStd(`T = Refinement.define({refines: Int, where: w => w > 0 && w < 100, triple: self => self * 3})
 T(0 - 10)`);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("Refinement spec methods: refined base as `refines` chains predicates", () => {
@@ -3033,7 +3033,7 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
   const describeFn = makeComposedFn([param], selfExpr);
   const desc = makeContext();
   const descBindings = [
-    ["__type", Type],
+    [SLOT_KEYS.type, Type],
     ["name", stringToBits("describe")],
     ["value", describeFn],
   ] as const;
@@ -3045,17 +3045,13 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
   const describeKey = kernelMemberFqn("describe");
   metaMembers.bindings.set(describeKey, { key: describeKey, value: desc });
   metaMembers.bindingList.push({ key: describeKey, value: desc });
-  metaType.bindings.set("__members", { key: "__members", value: metaMembers });
-  metaType.bindingList.push({ key: "__members", value: metaMembers });
-  metaType.bindings.set("__name", { key: "__name", value: stringToBits("MetaType") });
-  metaType.bindingList.push({ key: "__name", value: stringToBits("MetaType") });
+  setMembers(metaType, metaMembers);
+  slotSetName(metaType, stringToBits("MetaType"));
 
   // Raw Context with __type = metaType.
   const target = makeContext();
-  target.bindings.set("__type", { key: "__type", value: metaType });
-  target.bindingList.push({ key: "__type", value: metaType });
-  target.bindings.set("__name", { key: "__name", value: stringToBits("Instance") });
-  target.bindingList.push({ key: "__name", value: stringToBits("Instance") });
+  writeShape(target, metaType);
+  slotSetName(target, stringToBits("Instance"));
 
   // Call type_dispatch(target, "describe") via the primitive.
   const typeDispatch = primRegistry["type_dispatch"] as any;
@@ -3230,9 +3226,9 @@ test("of: type of typed int", () => {
   eq(result !== null, true);
   // The type of 42 is the Int type context — which has __name = "Int"
   eq(result!.kind, ValueKind.Structure);
-  const nameBinding = (result as ContextValue).bindings.get("__name");
+  const nameBinding = getName(result as ContextValue);
   eq(nameBinding !== undefined, true);
-  eq(bitsToString(dataOf(nameBinding!.value!) as BitsValue), "Int");
+  eq(bitsToString(dataOf(nameBinding!) as BitsValue), "Int");
 });
 
 test("of: type of typed string", () => {
@@ -3344,7 +3340,7 @@ test("error: creates error MultiValue", () => {
   eq(result !== null, true);
   eq(result!.kind, ValueKind.Structure);
   eq(getType(result!) !== null, true);
-  eq((result as any).components.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("error: has Error type", () => {
@@ -3360,17 +3356,17 @@ test("error: formatValue shows error", () => {
 test("error: propagates through arithmetic", () => {
   const result = evalStd('error "bad" + 5');
   eq(result !== null, true);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("error: propagates through multiplication", () => {
   const result = evalStd('3 * error "oops"');
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("error: propagates through function calls", () => {
   const result = evalStd('f(x) => x + 1\nf(error "bad")');
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("error: does not propagate through if condition", () => {
@@ -3530,8 +3526,8 @@ p = Point(1, 2)
 type of p
 `);
   eq(result!.kind, ValueKind.Structure);
-  const nameB = (result as ContextValue).bindings.get("__name");
-  eq(bitsToString(dataOf(nameB!.value!) as BitsValue), "Point");
+  const nameB = getName(result as ContextValue);
+  eq(bitsToString(dataOf(nameB!) as BitsValue), "Point");
 });
 
 test("define: wrong arg count throws", () => {
@@ -3597,7 +3593,7 @@ test("where: refinement fails → error", () => {
 PositiveInt = Int & _ > 0
 PositiveInt(0 - 1)
 `);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("where: refined type instanceof parent", () => {
@@ -3619,7 +3615,7 @@ PositiveInt(5)`);
 test("refinement: && syntax fails on invalid value", () => {
   const result = evalStd(`PositiveInt = Int & _ > 0
 PositiveInt(0 - 5)`);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("refinement: compound predicate with && and &&", () => {
@@ -3631,7 +3627,7 @@ SmallPos(50)`);
 test("refinement: compound predicate rejects out-of-range", () => {
   const result = evalStd(`SmallPos = Int & _ > 0 && _ < 100
 SmallPos(150)`);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("refinement: bare Int satisfies refined type at call site if predicate passes", () => {
@@ -3685,7 +3681,7 @@ test("preserveOps: lifted op produces error on predicate failure", () => {
   const result = evalStd(`PositiveInt = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})
 x = PositiveInt(5)
 x - 10`);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 test("preserveOps: lifted op value is still correct", () => {
@@ -3738,7 +3734,7 @@ test("distinct: symbol-fresh mint — no shared member symbols (C7.2b)", () => {
   const intT = dataOf(ext.bindings["Int"] as unknown as Value) as ContextValue;
   const result = evalStd(`UserId = Int.distinct()\nUserId`);
   const distinctT = dataOf(result!) as ContextValue;
-  const membersOf = (t: ContextValue) => t.bindings.get("__members")?.value as ContextValue | undefined;
+  const membersOf = (t: ContextValue) => getMembers(t) as ContextValue | undefined;
   const parentMembers = membersOf(intT);
   const distinctMembers = membersOf(distinctT);
   eq(parentMembers !== undefined && distinctMembers !== undefined, true);
@@ -4962,7 +4958,7 @@ test("grammar combinators: parse failure returns error value", () => {
 a = grammar_terminal(g, "a")
 grammar_set_target(g, a)
 grammar_parse(g, "b")`);
-  eq((result as any).components?.has("error"), true);
+  eq(componentsView(result!).has("error"), true);
 });
 
 // == Runtime Grammar Extension (Phase 1) ==
@@ -6241,7 +6237,7 @@ test("Stage C3: typed_amp(pure, opaque) returns opaque (effect lattice top)", ()
   const p = dataOf(v);
   eq(p.kind, ValueKind.Structure);
   if (p.kind === ValueKind.Structure) {
-    const name = p.bindings.get("__name")?.value;
+    const name = getName(p);
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "opaque");
   }
 });
@@ -6252,7 +6248,7 @@ test("Stage C3: typed_amp(pure, pure) returns pure (idempotence at value level)"
   const v = evalCtx.bindings.get("result")!.value!;
   const p = dataOf(v);
   if (p.kind === ValueKind.Structure) {
-    const name = p.bindings.get("__name")?.value;
+    const name = getName(p);
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "pure");
   }
 });
@@ -6554,7 +6550,7 @@ t
   const p = dataOf(v);
   eq(p.kind, ValueKind.Structure);
   if (p.kind === ValueKind.Structure) {
-    const name = p.bindings.get("__name")?.value;
+    const name = getName(p);
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "Function");
   }
 });
@@ -6567,7 +6563,7 @@ t
   const v = evalCtx.bindings.get("t")!.value!;
   const p = dataOf(v);
   if (p.kind === ValueKind.Structure) {
-    const name = p.bindings.get("__name")?.value;
+    const name = getName(p);
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "Function");
   }
 });
@@ -9887,7 +9883,7 @@ function callAllegroFn2(fnName: string, grammar: g2.Grammar, nullable: any): any
 function extractErrorList(result: any): { code?: string; message?: string; production?: string }[] {
   const p = dataOf(result);
   if (p.kind !== ValueKind.Structure) return [];
-  const len = Number(((p.bindings.get("__length")?.value) as any)?.data ?? 0n);
+  const len = Number((getSlotCount(p) as any)?.data ?? 0n);
   const out: { code?: string; message?: string; production?: string }[] = [];
   for (let i = 0; i < len; i++) {
     const entry = p.bindings.get(String(i))?.value;
@@ -9911,7 +9907,7 @@ function extractErrorList(result: any): { code?: string; message?: string; produ
 function extractStringList(result: any): string[] {
   const p = dataOf(result);
   if (p.kind !== ValueKind.Structure) return [];
-  const len = Number(((p.bindings.get("__length")?.value) as any)?.data ?? 0n);
+  const len = Number((getSlotCount(p) as any)?.data ?? 0n);
   const out: string[] = [];
   for (let i = 0; i < len; i++) {
     const entry = p.bindings.get(String(i))?.value;
@@ -10923,13 +10919,13 @@ test("grammar2/std: `of` infix accesses MultiValue component", () => {
   const r = evalStandard2("type of 42");
   const p = dataOf(r!);
   eq(p.kind, ValueKind.Structure);
-  const nameBind = (p as any).bindings.get("__name");
-  eq(bitsToString(nameBind.value), "Int");
+  const nameBind = getName(p as ContextValue);
+  eq(bitsToString(nameBind as BitsValue), "Int");
 });
 
 test("grammar2/std: `error expr` creates an error value", () => {
   const r = evalStandard2('error "something broke"');
-  eq((r as any).components?.has("error"), true);
+  eq(componentsView(r!).has("error"), true);
 });
 
 test("grammar2/std: `error of x` extracts error component", () => {
@@ -11069,7 +11065,7 @@ test("grammar2/std: refinement type creation", () => {
 
 test("grammar2/std: refinement check failure produces error", () => {
   const r = evalStandard2("PI = Int & _ > 0\nPI(0 - 5)");
-  eq((r as any).components?.has("error"), true);
+  eq(componentsView(r!).has("error"), true);
 });
 
 test("grammar2/std: compound refinement predicates", () => {
@@ -11498,7 +11494,7 @@ grammar2_parse(g, "hello")
   // Parse tree for the "s" production wrapping a single literal leaf.
   // Shape: Object { tag: "s", children: ["hello"] } OR just a String if the
   // engine collapsed the single-child branch. Either way, primary is not an error.
-  eq((r as any).components?.has("error") ?? false, false);
+  eq(componentsView(r!).has("error"), false);
 });
 
 test("grammar2 primitives: sequence via Allegro", () => {
@@ -11508,7 +11504,7 @@ grammar2_add_production(g, "s", grammar2_seq([grammar2_lit("ab"), grammar2_lit("
 grammar2_set_start(g, "s")
 grammar2_parse(g, "abcd")
 `);
-  eq((r as any).components?.has("error") ?? false, false);
+  eq(componentsView(r!).has("error"), false);
 });
 
 test("grammar2 primitives: parse failure produces error value", () => {
@@ -11518,7 +11514,7 @@ grammar2_add_production(g, "s", grammar2_lit("hello"))
 grammar2_set_start(g, "s")
 grammar2_parse(g, "world")
 `);
-  eq((r as any).components?.has("error") ?? false, true);
+  eq(componentsView(r!).has("error"), true);
 });
 
 test("grammar2 primitives: left recursion works from Allegro", () => {
@@ -11601,7 +11597,7 @@ grammar2_set_start(g, "pattern")
   // Expected: 5 "ok", then 3 "err".
   const p = dataOf(r!) as any;
   // p is the Array Context with __length and numeric bindings.
-  const len = Number(p.bindings.get("__length").value.data);
+  const len = Number((getSlotCount(p) as any).data);
   eq(len, 8);
   const results: string[] = [];
   for (let i = 0; i < len; i++) {
