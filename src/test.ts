@@ -63,11 +63,17 @@ const TEST_FILTER = process.env.ALLEGRO_TEST_FILTER
 let filteredOut = 0;
 
 // Sharding (suite-performance pass): ALLEGRO_TEST_SHARD="i/n" runs only
-// the tests whose registration index is congruent to i mod n, so N
-// processes cover the suite between them. Registration order is
-// deterministic (tests register top-to-bottom at import time), and
-// round-robin — rather than contiguous blocks — spreads the clustered
-// slow tests across shards instead of piling them into one.
+// the tests this shard owns, so N processes cover the suite between them.
+//
+// Assignment is by a hash of the test NAME, deliberately not by
+// registration index. An index-based scheme requires every shard to
+// register exactly the same tests in the same order, which a single
+// conditional registration silently breaks: the counters drift, the
+// shards disagree about who owns what, and tests vanish from the union
+// with nothing failing. (That is not hypothetical — it is what the first
+// version of this did, losing 93 tests.) A name hash is order-free, so
+// conditional registration cannot desynchronize anything, and it
+// scatters the clustered slow tests across shards.
 //
 // A shard is NOT a landing gate on its own; `scripts/test-shards.mjs`
 // aggregates the shards and applies the gate to the total.
@@ -82,16 +88,41 @@ const SHARD = (() => {
   }
   return { index, count };
 })();
-let shardIndex = 0;
+let registeredCount = 0;
 let shardedOut = 0;
 
-/** Does this test belong to the running shard? Advances the registration
- *  counter, so it must be called exactly once per registered test —
- *  including tests the name filter already excluded, or the two
- *  mechanisms would disagree about indices. */
-function inShard(): boolean {
-  const mine = SHARD === null || (shardIndex % SHARD.count) === SHARD.index;
-  shardIndex++;
+/** FNV-1a over the test name — a stable, order-free shard assignment. */
+function hashName(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** Does this test belong to the running shard? `pin` forces ownership to
+ *  one shard regardless of the hash (used for tests that share
+ *  cross-test state — see CORPUS_SHARD). Every shard calls this for
+ *  every registered test, so `registeredCount` is suite-wide and the
+ *  aggregator can verify the shards saw the same suite. */
+function inShard(name: string, pin?: number): boolean {
+  registeredCount++;
+  if (SHARD === null) return true;
+  let mine: boolean;
+  if (pin !== undefined) {
+    mine = SHARD.index === pin;
+  } else if (SHARD.count > 1) {
+    // Unpinned tests deal themselves among the NON-corpus shards. The
+    // corpus shard already carries every `.alg` file test plus the
+    // boundary section — the critical path — so giving it a hash share
+    // too just makes it longer while the others idle. (Measured: with a
+    // share it ran 237.6s against 61-83s elsewhere.)
+    const pool = SHARD.count - 1;
+    mine = SHARD.index === 1 + (hashName(name) % pool);
+  } else {
+    mine = true;
+  }
   if (!mine) shardedOut++;
   return mine;
 }
@@ -99,16 +130,16 @@ function inShard(): boolean {
 /** The `.alg` corpus walk feeds the boundary suite's coverage assertion
  *  (`walked >= 15`), so the file tests and the boundary section must land
  *  in the SAME shard or that assertion would see a fraction of the corpus
- *  and fail. Both are pinned to shard 0 rather than weakening the
- *  assertion; other shards take the existing "no file tests ran" skip
- *  path the dev-filter already used. */
+ *  and fail. Both are pinned here rather than weakening the assertion;
+ *  other shards take the existing "no file tests ran" skip path the
+ *  dev-filter already used. */
 const CORPUS_SHARD = 0;
 function ownsCorpus(): boolean {
   return SHARD === null || SHARD.index === CORPUS_SHARD;
 }
 
-function test(name: string, fn: () => void): void {
-  const mine = inShard();
+function test(name: string, fn: () => void, pinShard?: number): void {
+  const mine = inShard(name, pinShard);
   if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
   if (!mine) return;
   if (process.env.ALLEGRO_TEST_TRACE) console.error("TEST:", name);
@@ -498,7 +529,7 @@ async function asyncTest(name: string, fn: () => Promise<void>): Promise<void> {
   // ones. Before the suite-performance pass they honored NEITHER, so a
   // "filtered" dev run still paid for the whole async block — which is
   // what made short timeouts look like hangs.
-  const mine = inShard();
+  const mine = inShard(name);
   if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
   if (!mine) return;
   if (process.env.ALLEGRO_TEST_TRACE) console.error("ATEST:", name);
@@ -1751,11 +1782,12 @@ function fileTest(filePath: string, extensions?: Extension[]): void {
   const basename = path.basename(filePath);
   // Pinned to the corpus shard so the boundary suite's coverage
   // assertion still sees the whole `.alg` corpus (see CORPUS_SHARD).
-  if (!ownsCorpus()) return;
+  // Registered in EVERY shard — skipping registration outright is what
+  // desynchronized the first, index-based version.
   test(`file: ${basename}`, () => {
     runAlgFile(filePath, extensions);
     eq(true, true); // if we get here, all expectations matched
-  });
+  }, CORPUS_SHARD);
 }
 
 // Run all .alg test files
@@ -12221,9 +12253,13 @@ timedSection("modules", runModuleTests)
   .then(() => timedSection("benchmark", runBenchmarkTests))
   .then(() => timedSection("doc-lint", async () => runDocLintTests()))
   .then(() => timedSection("check-deployed", async () => runCheckDeployedTests()))
-  .then(() => ownsCorpus()
-    ? timedSection("boundary", async () => runBoundaryTests({ test, eq, corpus: { files: corpusWalkFiles, violations: corpusWalkViolations } }))
-    : undefined)
+  .then(() => timedSection("boundary", async () => runBoundaryTests({
+    // Pinned like the file tests: the boundary suite reads the corpus
+    // walk those tests accumulate, so it must run where they ran.
+    test: (name: string, fn: () => void) => test(name, fn, CORPUS_SHARD),
+    eq,
+    corpus: { files: corpusWalkFiles, violations: corpusWalkViolations },
+  })))
   .then(() => {
   // Suite-count floor (boundary baseline): a mass-disablement tripwire.
   // Suspended under ALLEGRO_TEST_FILTER — filtered runs are dev runs —
@@ -12245,7 +12281,7 @@ timedSection("modules", runModuleTests)
     // Machine-readable line for the shard aggregator. `registered` is the
     // suite-wide registration count every shard sees, so the aggregator
     // can confirm the shards agree on what the suite contains.
-    console.log(`SHARD-RESULT ${SHARD.index}/${SHARD.count} ran=${passed + failed} passed=${passed} failed=${failed} registered=${shardIndex} skipped=${shardedOut}`);
+    console.log(`SHARD-RESULT ${SHARD.index}/${SHARD.count} ran=${passed + failed} passed=${passed} failed=${failed} registered=${registeredCount} skipped=${shardedOut}`);
   }
   console.log(`Wall clock: ${((performance.now() - suiteT0) / 1000).toFixed(1)}s`);
   console.log(`Sections: ${sectionTimes.map((s) => `${s.name} ${(s.ms / 1000).toFixed(1)}s`).join(" | ")}`);

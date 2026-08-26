@@ -8,6 +8,57 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — Suite & compile performance: T-R6 executed and broadened, sharded gate
+
+The landing gate took ~17 minutes and ran twice per PR. It now takes
+~5.5 minutes sequentially, ~3 minutes sharded, once per PR — and the
+biggest win is a compile-time fix that helps every user, not just CI.
+
+- **T-R6 executed, then BROADENED (maintainer-ratified).** PE inlines a
+  call by substituting arguments into the body and re-evaluating. With
+  an unresolved argument a RECURSIVE call cannot converge — the base
+  case is undecidable without a concrete argument — so PE unfolded to
+  MAX_DEPTH, blew the JS stack, and discarded the result as a
+  `precompile-type-error`. As ratified, T-R6 cut only `undischarged`
+  bindings, which left the pathology in place for exactly the functions
+  that were PROVEN total: `factorial(n: NonNeg)` (tier `auto`) cost
+  **71.1s** to compile and emitted a spurious "Maximum call stack size
+  exceeded" on correct code, while the same function over bare `Int`
+  (undischarged, hence cut) took **0.1s**. Proving termination was
+  punished ~700×. Termination discharge was the wrong predicate; the
+  cutoff now keys on **cycle membership** (SCCs the analyzer already
+  computes). After: **0.2s**, no notification.
+- **The cutoff has to precede precompile.** The first implementation
+  changed nothing (78.8s → 76.1s) because 124k inline expansions
+  completed before the analysis block that computes the tiers was even
+  reached. The divergence analysis — pure static AST work that does not
+  consume precompile's output — now runs ahead of precompile; the
+  STAMPING half stays after it, since it writes into the
+  `__inferredEffects` precompile populates.
+- **String conversion**: `stringToBits`/`bitsToString` constructed a
+  fresh `TextEncoder`/`TextDecoder` per call on the hottest path in the
+  system. Hoisted to module singletons (~5.5% on an interleaved A/B of
+  the round-trip; browser-compat invariant unchanged).
+- **Sharded gate**: `ALLEGRO_TEST_SHARD="i/n"` plus
+  `scripts/test-shards.mjs`, which aggregates the shards and applies the
+  gate to the total. Assignment is by NAME HASH, not registration index
+  — an index scheme desynchronizes the moment one shard registers
+  conditionally, and the first version did exactly that, silently losing
+  93 tests until the aggregator's registered-count cross-check caught
+  it. Guarantees were relocated, not relaxed: the `.alg` corpus tests and
+  boundary section are pinned to one shard so its `walked >= 15`
+  coverage assertion still sees the whole corpus, and the suite-count
+  floor is applied by the aggregator to the total.
+- **CI**: `push:` and `pull_request:` both fired for same-repo PR
+  branches, so every PR ran the full gate TWICE on one commit. push is
+  now restricted to main; superseded runs are cancelled (never on main).
+- **`asyncTest` honored neither the name filter nor sharding** — a
+  "filtered" dev run still paid for the entire async block, which is
+  what made short timeouts look like hangs during this work.
+
+Measured end to end: 1015s → 324s sequential (3.1×), 185s sharded
+(5.5× overall). 1197/1197 green throughout; no test conditions weakened.
+
 ## 2026-08 — B-018 close-out: T-R1–T-R6 ratified; ruling families indexed
 
 The gate decision on the totality reval, plus the register hygiene it

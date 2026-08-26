@@ -32,5 +32,8 @@ jobs:
       - run: npm ci
       - name: Typecheck (sanctioned invocation)
         run: bash scripts/typecheck.sh
-      - name: Test suite (full landing gate)
-        run: npx tsx src/test.ts
+      - name: Test suite (full landing gate, sharded)
+        # Same 1197 tests, run as N processes with the gate applied to the
+        # aggregate (scripts/test-shards.mjs). `npm test` remains the
+        # sequential entry point for local work.
+        run: npm run test:shards

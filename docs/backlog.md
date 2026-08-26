@@ -571,14 +571,22 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   per-call-site refinement re-evaluation was NOT the hotspot. The
   remaining cost needs a real profile (likely the demos' own deep
   recursive evaluation, or analyzer work off this lookup path).
-  **2026-08 (B-018 T-R6) — carries the ratified inlining cutoff**: a
-  binding whose D34 tier is `undischarged`/`partial` must never be
-  PE-INLINED by precompile (residualize the call instead). Measured
-  pathology: inlining divergent non-same-arg recursion (`loop(n + 1)`)
-  costs ~43s for ONE compile. The analyzer already knows the tier;
-  precompile simply doesn't consult it. Design ratified in
-  `docs/design/standard/totality.md` §7/§8 — implementation is this
-  item's
+  **2026-08 — T-R6 EXECUTED and broadened** (suite-performance pass):
+  the cutoff shipped, and the ratified `undischarged`-only scope proved
+  too narrow — it exempted precisely the functions PROVEN total, so
+  `factorial(n: NonNeg)` cost 71.1s to compile (plus a spurious
+  `precompile-type-error`) while the same function over bare `Int` took
+  0.1s. Termination discharge was the wrong predicate: a recursive call
+  with unresolved args cannot converge regardless. Broadened to CYCLE
+  MEMBERSHIP with maintainer ratification; `analyzeDivergence` now
+  reports `recursiveBindings`, and the cutoff is installed BEFORE
+  precompile (which is where the speculation happens — a cutoff
+  installed after it changed nothing). Suite 1015s → 324s.
+  **Still open here**: the remaining profile. The top costs are now the
+  boundary generated-program walk (27s) and the `.alg` units/dimensions
+  files (12–14s each) — no longer totality analysis, so the item's
+  original premise is spent and it needs re-scoping against the new
+  profile rather than more guessing
 
 ### T-host
 

@@ -29,8 +29,10 @@ ignores it entirely misses nothing authoritative.
 ## Build, run, test
 
 ```bash
-npm test                            # full suite (src/test.ts; 1197 at 2026-08)
-ALLEGRO_TEST_FILTER=pat npm test    # dev tier — targeted ~8s runs
+npm test                            # full suite, sequential (src/test.ts; 1197 at 2026-08, ~5.5min)
+npm run test:shards                 # same gate, sharded across processes (~3min) — CI uses this
+ALLEGRO_TEST_FILTER=pat npm test    # dev tier — targeted runs (now filters async tests too)
+ALLEGRO_TEST_TRACE=1 npm test       # per-test progress to stderr (hang/slowness triage)
 bash scripts/typecheck.sh           # sanctioned typecheck (TS6059 rootDir convention ignored)
 npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file  (--base for Allegretto)
