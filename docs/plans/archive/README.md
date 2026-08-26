@@ -1,8 +1,9 @@
 # Plan archive
 
 **History only — never an input to new work** (PROCESS §4), with one
-exception: entries in the BACKLOG's **v1 revalidation register** point into
-these files as *source material to mine when that register item is worked*.
+exception: the Backlog's **`[reval]`-tagged entries** (`docs/backlog.md`)
+point into these files as *source material to mine when that item is
+worked*.
 Reaching into the archive for any other purpose is the confusion this
 folder exists to prevent.
 
@@ -22,8 +23,8 @@ or **discarded**.
 
 | Plan | V1 role | Triage outcome |
 |---|---|---|
-| `crystal-proving-curry.md` | Provability arc strategy A–J | Thesis/principles already in `docs/VISION.md` §2/§5. Phase C contract machinery → **register: contracts**. Remaining roadmap (D2–D5, I, J) → **register: roadmap revalidation**. |
-| `lucid-discharging-lambek.md` | Phase C contracts/invariants | Entire contract-system design (predicate sets, branch refinement, assert/requires/ensures lowering, sink-based checks, invariant inheritance) → **register: contracts**. Sequencing discarded. |
+| `crystal-proving-curry.md` | Provability arc strategy A–J | Thesis/principles already in `docs/VISION.md` §2/§5. Phase C contract machinery → **register: contracts** — **CONSUMED 2026-08 (B-014)**: §Phase C revalidated into `docs/design/standard/contracts.md` (see its §9 disposition table). Remaining roadmap (D2–D5, I, J) → **register: roadmap revalidation** (B-051), still open. |
+| `lucid-discharging-lambek.md` | Phase C contracts/invariants | Entire contract-system design (predicate sets, branch refinement, assert/requires/ensures lowering, sink-based checks, invariant inheritance) → **register: contracts** — **CONSUMED 2026-08 (B-014)**: durable content promoted to `docs/design/standard/contracts.md`, per-chunk disposition recorded in its §9. Sequencing discarded. |
 | `phase-h-plan.md` | PCP protocol H1–H7 | Protocol design (schemas, trivial-pass prevention, hints, catalog, budgets) → **register: PCP**. Implemented shape lives in `src/pcp.ts` + `docs/proving-in-allegro.md`. Sequencing discarded. |
 | `phase-f-plan.md` | Proof terms F1–F7 | Surface fully promoted to `docs/proving-in-allegro.md` earlier. F6 Lean-export mapping → **register: roadmap revalidation**. Rest discarded. |
 | `phase-e-totality-plan.md` | Totality Stages 0–6 | Current-arc analyzer decisions (severity policy, exhaustiveness taxonomy, mutual-recursion design, totality polymorphism) → **register: totality** (incl. the severity-policy tension with `structures.md` D34). Sequencing discarded. |
@@ -34,4 +35,8 @@ or **discarded**.
 | `project-1-planning-dsl-design.md` | Vivace pilot 1: planning DSL | Settled v1 design (outcome-DAG model, 12 conventions, rejections, `SoftwareRelease` example, Shape 1/2 + pilot roster) → **register: planning DSL** — likely mostly substrate-orthogonal, revalidate before creating `docs/design/planning-dsl.md`. |
 | `structured-values-unification.md` | v2 structures design discussion — decision log D1–D46 | **COMPLETE** (not v1 material — archived 2026-08, B-002): every decision executed or pinned to a named backlog owner. Load-bearing tables inlined as `docs/design/allegretto/structures.md` Appendices A–C. Decision numbers (D1–D46) remain citable; this file is the rationale record. |
 
-Register items now live in `BACKLOG.md` as `[reval]`-tagged backlog entries (IDs stable).
+Register items live in `docs/backlog.md` as `[reval]`-tagged entries
+(IDs stable). *(Pointer corrected 2026-08 at B-014: the Backlog moved
+to `docs/` at B-095 chunk 3, and the standalone register section was
+dissolved into the one implementation-ordered list at the 2026-08
+groom.)*

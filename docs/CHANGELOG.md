@@ -8,6 +8,72 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-014: contracts design revalidation (`contracts.md`)
+
+The M4 reval line continues in **lane A**: the v1 Phase-C contract design
+(`lucid-discharging-lambek.md` + `crystal-proving-curry.md` §Phase C) is
+revalidated against the shipped post-B-028 system and lands as the
+durable Tier-1 doc `docs/design/standard/contracts.md`. Docs-only, no
+`src/` touched — lane B holds `src/test.ts` concurrently.
+
+- **The model was absorbed, not just shipped**: v1's standalone
+  `predicates` component became one arm of the D36 knowledge lattice.
+  The doc restates contracts over that lattice — two carriers
+  (intrinsic on the value, occurrence in the §4 facts plane) meeting at
+  each check — which is why an earlier `assert` and a construction
+  certificate discharge a later `requires` through one path.
+- **Lowering recorded as it shipped**, not as planned: marker primitives
+  consumed by the tree-builder's contract preprocessor (`requires`
+  sequenced ahead of the body through `seq`; `ensures` wrapping the
+  result via a parse-built one-param lambda over `_`), rather than the
+  planned assert-at-entry plus let-binding wrapper. `ensures_check`
+  forwards TailCall sentinels, so the post-condition fires against the
+  eventual base-case value.
+- **Sink-based checking splits in two** (CT-R1). The v1 principle —
+  check where the property is demanded — already ships as *discharge*:
+  PE evaluates a `requires` with the caller's knowledge, so
+  `abs_pos(PositiveInt(7))` emits nothing. What never shipped is
+  *relocating the residual* to the call site, which is codegen and
+  diagnostics (it is also what would supply the call-site origin missing
+  from counterexamples). `--strict` was never built at all.
+- **Invariants are refinements** (CT-R4): the `Type.invariant` fluent
+  API is deleted (D45/C6.1b), `__invariantsList` is writerless, and
+  "inheritance" is refinement layering over the `Type.refines` chain
+  after D44 retired the declared is-a edge. The v1 chunk-4 design is
+  discarded rather than carried forward; the D32 construction guard
+  shipped considerably stronger than the plan asked for.
+- **`assume` was never actually rejected** (CT-R3). `Law.assume` (E-R4)
+  and `assume terminates` (CE-R3) both ship as ledger-visible admitted
+  tiers. The outlier is `assume_invariant`: registered and callable by
+  name, but given no grammar sugar and called from nowhere in the tree,
+  and it attaches a fact *without recording it* — the one path in the
+  system that trusts silently. Recommended for retirement rather than
+  surfacing.
+- **The gap worth naming** (CT-R6): contracts reach `inspect` and
+  nothing else. Theorems, law obligations, coercion obligations, div
+  obligations and liveness axioms all reach the verdict and the
+  assumption ledger; an undischarged `requires` — a pending obligation
+  by D34's own definition — does not. A project can read a clean verdict
+  while carrying unproven preconditions.
+- **Guidance the sources never wrote down**: when to reach for a
+  refinement vs. a contract vs. `assert` vs. `proven`/laws, with the
+  preference ordering and its reasoning (§8).
+- Follow-ons proposed rather than assumed: **B-057**'s scope settled per
+  the item's own "scope decided during B-014" (relocation, relational
+  predicates, `assumes`, ledger visibility, `ensures` over params);
+  **B-101** filed for the predicate-carrier residue (legacy `domain`
+  dual-read — v1's own unlanded cleanup task — plus the writerless
+  `type-invariant` source and `assume_invariant`); contract knobs
+  ridered onto **B-099**.
+
+**CT-R1–CT-R6 are PROPOSED with recommendations — awaiting maintainer
+ratification. B-014 closes on the gate decision**, at which point the
+family is indexed in `docs/decisions.md` per that register's gate-pass
+rule.
+
+Docs-only. Typecheck clean; 1197/1197 green (sharded gate, 89.3s);
+doc-ref lint clean.
+
 ## 2026-08 — Parallel lanes: the working model, plus register cleanup
 
 A development-structure review, prompted by the question of what can be

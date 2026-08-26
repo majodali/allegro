@@ -42,8 +42,9 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   `completion-effects.md` closed; F1–F4 landed, D16/D31–D34 executed).
   B-018 totality reval COMPLETE 2026-08 (`totality.md` landed; T-R1–T-R6
   ratified; follow-ons routed to B-099 and B-087). M4 reval docs ride
-  between chunks — **B-014 (contracts) and B-029 (PCP) remain** in the
-  reval line.
+  between chunks — **B-014 (contracts): doc landed 2026-08
+  (`contracts.md`), CT-R1–CT-R6 awaiting ratification; B-029 (PCP)
+  remains** in the reval line.
 - **Track R — public release (started 2026-08, runs alongside
   functional tranches):** positioning plan `release-track.md`
   (differentiator map + claims register + demo ladder); VISION §1a/§5
@@ -202,7 +203,19 @@ that prevents it.
   refinement-vs-contract guidance (sources:
   `docs/plans/archive/lucid-discharging-lambek.md`,
   `docs/plans/archive/crystal-proving-curry.md` §Phase C; substrate:
-  structures.md §4/§6) — natural slot: with Phases 2–3
+  structures.md §4/§6) — natural slot: with Phases 2–3.
+  **Doc delivered 2026-08** (`docs/design/standard/contracts.md`, lane
+  A): the predicate model restated as the D36 knowledge lattice (two
+  carriers, meet at the check), the lowering chain recorded as it
+  shipped (marker prims → tree-builder contract preprocessor, not the
+  planned let-wrapper), invariants-as-refinements replacing the deleted
+  `Type.invariant` fluent API (D45) with inheritance restated over D44,
+  and the mechanism-choice guidance the sources never wrote down.
+  Sink-based checking split into discharge (shipped via PE) and
+  relocation (not shipped). **CT-R1–CT-R6 PROPOSED with
+  recommendations — awaiting ratification; B-014 closes on the gate
+  decision.** Follow-ons proposed: B-057 scope (CT-R1/CT-R3/CT-R6),
+  B-101 (CT-R5), contract knobs on B-099 (CT-R2)
 - [x] **B-015** · L0 · Shape/knowledge channel split; dispatch on shape
   (C3.1). Landed 2026-07: `typeShape` walk (member-transparent refinement
   layers = knowledge, identified by parent-member-set object identity;
@@ -562,9 +575,29 @@ that prevents it.
   (parent 0546daa, `allegro catalog`) — pre-rework, reference only
 - [ ] **B-055** · PCP H6 multi-strategy parallel prover orchestration
 - [ ] **B-056** · PCP H7 effort budgets, escalation, reproducibility
-- [ ] **B-057** · Phase C polish (scope decided during B-014): sink-based
-  check generation at call sites, relational predicates (`a < b`),
-  `assumes` trust-boundary form, ensures referencing params
+- [ ] **B-057** · Phase C polish. **Scope proposed at B-014 (2026-08),
+  pending the CT-R gate** — `docs/design/standard/contracts.md` §10:
+  (a) relocate an UNDISCHARGED `requires` check to the call site, which
+  also supplies the call-site origin missing from counterexamples
+  (CT-R1 — discharge itself is already call-site-sensitive via PE, so
+  this is codegen + diagnostics, not semantics); (b) relational
+  predicates (`a < b`) so a two-binding condition narrows rather than
+  merely checking; (c) an `assumes` trust-boundary form minted against
+  D34's admitted tier with mandatory ledger visibility (CT-R3);
+  (d) contracts in the verdict / `obligations` / assumption ledger — an
+  undischarged `requires` is a pending obligation and today reaches
+  `inspect` only (CT-R6); (e) `ensures` referencing params, not just `_`
+- [ ] **B-101** · Predicate-carrier residue cleanup (filed at B-014,
+  CT-R5 — **lane D**, touches `src/refinements.ts`): retire the legacy
+  single-`domain` component now that predicate sets are the carrier
+  (`domainOf`/`predicatesOf` still dual-read it — this was the v1 Phase-C
+  Chunk-1 task 6 that never landed); drop or give a producer to the
+  `type-invariant` predicate source, reserved and writerless since
+  invariants became refinements (D45/C6.1b); retire the `assume_invariant`
+  primitive, which has no grammar sugar, no caller anywhere in the tree,
+  and attaches a fact without recording it (CT-R3). Blocked on the CT-R
+  gate. Rides any pass already in `refinements.ts`; the physical move of
+  predicate storage under the `knowledge` channel remains C4's
 - [x] **B-058** · Per-project notification-severity config (kind →
   severity remap; substrate shipped in v1) — **SUPERSEDED by B-099**
   (2026-08). Same surface, described twice: B-099 was minted during the
@@ -860,4 +893,9 @@ that prevents it.
   HERE, never by code drift, per T-R3). Blocked on nothing but a
   project-config substrate: Allegro has no manifest-level configuration
   surface yet, so this item owns designing one or deciding it rides
-  an existing file. Never a global default change (T-R2)
+  an existing file. Never a global default change (T-R2).
+  **Rider added at B-014 (CT-R2, pending the CT-R gate)**: the contract
+  knobs belong to this same surface — the construction-path knob above
+  is a contracts knob, and v1's global `--strict` flag (never built, and
+  not to be) is superseded here rather than revived
+  (`docs/design/standard/contracts.md` §6/§7)

@@ -25,7 +25,7 @@ Every section is tagged with its implementation status:
 | `implementation-map.md` | File-level spine | Per-file map of src/ + trees, the evalSource pipeline, async runtime surface |
 | `allegretto/` | **L0** base language | `structures.md` (v2 design — draft pending sign-off); planned: `architecture.md` |
 | `extension/` | **L1** extension substrate | `grammar.md`, `modules.md` (loading + module objects). Formalism spec stays at `../grammar-formalism.md` (referenced by Tier-0 PROCESS and by source code) |
-| `standard/` | **L2** Allegro Standard | `type-system.md`, `core-types.md`, `effects.md`, `pattern-matching.md`, `totality.md`; planned, revalidation-gated (BACKLOG register): `contracts.md`, `proofs.md`, `pcp.md` |
+| `standard/` | **L2** Allegro Standard | `type-system.md`, `core-types.md`, `effects.md`, `pattern-matching.md`, `totality.md`, `contracts.md`; planned, revalidation-gated (BACKLOG register): `proofs.md`, `pcp.md` |
 | `vivace/` | **L3** Vivace | planned, revalidation-gated: `planning-dsl.md` |
 | `platform/` | Capability tracks | planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
 
