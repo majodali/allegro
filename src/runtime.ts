@@ -1148,16 +1148,20 @@ export function evalSource(
       return eff !== null && eff.has("div");
     };
     divR = analyzeDivergence(fileCtx.bindingList, exhTypeLookup, leafDivResolver);
-    // B-018 T-R6: the cutoff sees only the UNDISCHARGED tier — `partial`
-    // and unproven recursion. The discharged tiers (auto, witnessed,
-    // admitted) stay inlinable: they terminate, or the user declared an
-    // axiom saying so, and PE's folding is the payoff for discharging.
-    // Narrower than the divergence PROBE, which also carries INHERITED
-    // div: cutting at the div source already stops the explosion.
+    // B-018 T-R6 (broadened 2026-08, maintainer-ratified): the cutoff
+    // covers EVERY recursive binding, not only the undischarged ones.
+    // Termination discharge turned out to be the wrong predicate: a
+    // recursive call with unresolved arguments cannot converge no matter
+    // how well it is proven to terminate, because the base case is
+    // undecidable without a concrete argument. PE unfolded such calls to
+    // MAX_DEPTH, blew the JS stack, and DISCARDED the result as a
+    // `precompile-type-error` — so a provably-total `factorial(n:
+    // NonNeg)` cost 71.1s to compile and produced a spurious error,
+    // while the same function over bare `Int` (undischarged, hence cut)
+    // took 0.1s. Proving termination must not be punished.
     const cutoffCfns = new Set<Value>();
-    for (const o of divR.obligations) {
-      if (o.tier !== "undischarged") continue;
-      const cfn = divR.stampTargets.get(o.binding);
+    for (const name of divR.recursiveBindings) {
+      const cfn = divR.stampTargets.get(name);
       if (cfn) cutoffCfns.add(cfn as unknown as Value);
     }
     if (cutoffCfns.size > 0) {

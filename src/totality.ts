@@ -521,6 +521,14 @@ export interface DivergenceResult {
   /** Info notices for bindings that INHERIT div through calls (the
    *  long-reserved needs-annotation kind finally earns its keep). */
   propagationNotices: { binding: string; message: string }[];
+  /** B-018 T-R6 (broadened): bindings that participate in a recursion
+   *  cycle — self-recursive or in a mutual SCC — REGARDLESS of discharge
+   *  tier. Consumers use this for the PE inlining cutoff: a recursive
+   *  call with unresolved arguments cannot converge (the base case is
+   *  undecidable without a concrete argument), so unfolding it
+   *  speculatively is pure waste however well its termination is
+   *  proven. Separate from `divBindings`, which is about termination. */
+  recursiveBindings: Set<string>;
 }
 
 export function analyzeDivergence(
@@ -556,6 +564,7 @@ export function analyzeDivergence(
 
   const findings: TerminationFinding[] = [];
   const obligations: DivObligation[] = [];
+  const recursiveBindings = new Set<string>();
   const stampTargets = new Map<string, ComposedFunctionValue>();
   const ownDiv = new Map<string, string>();   // binding → undischarged detail
   const admitted = new Set<string>();         // axiom lifts inherited div too
@@ -564,6 +573,13 @@ export function analyzeDivergence(
     if (!peeled) continue;
     const { cfn } = peeled;
     stampTargets.set(b.key, cfn);
+    // Cycle membership is a structural fact, independent of how (or
+    // whether) termination is discharged — compute it before the
+    // tier-specific early exits so every recursive binding is recorded.
+    const sccEarly = sccs.get(b.key) ?? new Set([b.key]);
+    const cycleCallsEarly: CallSite[] = [];
+    findCallsToCycle(cfn.body, sccEarly, cycleCallsEarly);
+    if (cycleCallsEarly.length > 0) recursiveBindings.add(b.key);
     if ((cfn as any).__assumeTerminates === true) {
       obligations.push({ binding: b.key, tier: "admitted",
         detail: "assume terminates — declared liveness axiom" });
@@ -580,12 +596,11 @@ export function analyzeDivergence(
       continue;
     }
 
-    const scc = sccs.get(b.key) ?? new Set([b.key]);
-    // All calls in this function's body that target an SCC member —
-    // self-edges (self-recursion) and inter-edges (mutual recursion) alike,
-    // plus Stage 5 HOF-mediated edges (callback passed to map/filter/reduce).
-    const cycleCalls: CallSite[] = [];
-    findCallsToCycle(cfn.body, scc, cycleCalls);
+    // Self-edges (self-recursion) and inter-edges (mutual recursion)
+    // alike, plus Stage 5 HOF-mediated edges (callback passed to
+    // map/filter/reduce) — computed above, reused here.
+    const scc = sccEarly;
+    const cycleCalls = cycleCallsEarly;
     if (cycleCalls.length === 0) {
       // Not part of any recursion cycle: total by construction, callees
       // permitting (the closure below handles callees).
@@ -708,7 +723,7 @@ export function analyzeDivergence(
     });
   }
 
-  return { findings, obligations, divBindings, stampTargets, propagationNotices };
+  return { findings, obligations, divBindings, stampTargets, propagationNotices, recursiveBindings };
 }
 
 /** Stage 6: render a concrete trace illustrating the non-terminating cycle.
