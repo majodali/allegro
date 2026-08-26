@@ -1,5 +1,5 @@
 {
-  "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet \u2014 regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3.",
+  "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet \u2014 regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3. `suiteFloor` is the mass-disablement tripwire and is kept AT the suite size, not below it \u2014 a slack floor cannot catch a silent drop (raise it when the suite grows).",
   "hardFail": true,
   "allowedFiles": [
     "src/slots.ts",
@@ -13,7 +13,7 @@
       "kernel-writer-acquisition": 1
     }
   },
-  "suiteFloor": 979,
+  "suiteFloor": 1197,
   "basicsOutput": [
     "11",
     "42",
