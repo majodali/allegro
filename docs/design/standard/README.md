@@ -47,7 +47,7 @@ Proof with zero hand-rolled residue is the exit criterion
 - `contracts.md` — predicate/knowledge model, `assert`/`requires`/
   `ensures` lowering, invariants as refinements, discharge and failure
   semantics, mechanism-choice guidance (B-014 reval; CT-R1–CT-R6
-  proposed, awaiting ratification)
+  ratified)
 - Planned, **revalidation-gated** (BACKLOG register): `proofs.md`,
   `pcp.md`
 - Proving primer (consumable, top level): `../../proving-in-allegro.md`
