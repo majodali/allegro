@@ -33,11 +33,10 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   + `__effectVarParams` side table deleted). D39 residue zero; rulings
   R1–R3 (plan §4) maintainer-ratified 2026-08 (R1 amended: deferred
   public surface, not kernel privacy). See CHANGELOG.
-- **Tranche C — next arc (in progress):** B-027 equality + lawful
-  interfaces — plan `equality-and-laws.md`, decisions E-R1–E-R6
-  maintainer-ratified 2026-08 (with E-R3 generality note: laws are
-  member-set-general, not interface-only); chunks E1–E4 underway.
-  S3 visibility (D41–D43 — B-097) COMPLETE 2026-08 (plan
+- **Tranche C — COMPLETE 2026-08.** B-027 equality + lawful interfaces
+  closed (plan `equality-and-laws.md` closed; E-R1–E-R6 ratified and
+  indexed in the decision register; chunks E1–E4 landed; residue →
+  B-089). S3 visibility (D41–D43 — B-097) COMPLETE 2026-08 (plan
   `visibility.md` closed; all four chunks landed, forgery E live).
   B-028 completion effects COMPLETE 2026-08 (plan
   `completion-effects.md` closed; F1–F4 landed, D16/D31–D34 executed).
@@ -57,6 +56,39 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   groom), full
   `ContextValue`→`StructureValue` reference migration (opportunistic),
   perf hard threshold (maintainer decision, any time).
+
+### Parallel lanes (maintainer-ratified 2026-08)
+
+Work proceeds in **lanes** that may run in separate sessions
+concurrently. Lane membership is decided by the files an item edits, not by
+its layer tag: two items share a lane when they edit the same files.
+The grouping below comes from co-change measurement over the last 40
+`src/`+`lib/` commits (CHANGELOG 2026-08), not from the layer spine.
+
+| Lane | Contents | Concurrency |
+|---|---|---|
+| **A — reval docs** | B-014 contracts, then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/design/standard/*.md`; touches no `src/` |
+| **B — suite split** | Break up `src/test.ts` (12,281 lines, in 88% of source commits) | Runs anytime. **Prerequisite for C** |
+| **C — capability tracks** | T-tooling (B-064/065/067), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
+| **D — L2 semantics** | B-089, B-100, B-099, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
+
+**What lane B unlocks:** C and D may then run *as lanes in parallel
+with each other* (C touches new/track files, D the L2 monoliths — a
+disjoint set once the suite is no longer shared). It does NOT make D
+internally parallel; that coupling is architectural, and no tooling
+change removes it.
+
+**Gate policy per lane** — A, B and C run on **pre-ratified chunk
+sequences**: the maintainer approves the chunk list once at the start of
+an arc, and the lane lands them in order without stopping between each.
+**Lane D keeps the per-chunk gate** (PROCESS §3): land, summarize, stop.
+Everything else in the landing checklist is unchanged for every lane.
+
+**Before starting in any lane** (PROCESS §7): check open PRs for
+overlapping work. Sessions run in separate containers with separate
+clones and cannot see each other's uncommitted work, so a collision
+surfaces only at merge — the lane boundaries above are the mechanism
+that prevents it.
 
 - [x] **B-001** · L0 · Boundary-test harness + baseline (chunk C0.1):
   accessor lint w/ ratchet, invariant property checks, forgery-suite
@@ -533,8 +565,13 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
 - [ ] **B-057** · Phase C polish (scope decided during B-014): sink-based
   check generation at call sites, relational predicates (`a < b`),
   `assumes` trust-boundary form, ensures referencing params
-- [ ] **B-058** · Per-project notification-severity config (kind →
-  severity remap; substrate shipped in v1)
+- [x] **B-058** · Per-project notification-severity config (kind →
+  severity remap; substrate shipped in v1) — **SUPERSEDED by B-099**
+  (2026-08). Same surface, described twice: B-099 was minted during the
+  B-018 close-out without checking whether the item already existed.
+  B-099 keeps the work because the ratified design docs point at it
+  (`totality.md` §5/§8, decision register T-R2); this row stays as the
+  pointer rather than being deleted, since IDs never change meaning
 
 ### T-build (M6)
 
@@ -807,7 +844,8 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   `src/evaluator.ts` (`setInlineCutoff`, MAX_DEPTH), `src/runtime.ts`
   (analysis-before-precompile ordering), CHANGELOG 2026-08 perf entry
 - [ ] **B-099** · Project severity configuration — the T-R2 surface
-  (ratified 2026-08, `docs/design/standard/totality.md` §5/§8). ONE
+  (ratified 2026-08, `docs/design/standard/totality.md` §5/§8;
+  subsumes **B-058**, the v1-era statement of the same surface). ONE
   per-project config declaration (shape open — likely a manifest read
   at session start, not a body form) providing: per-notification-kind
   severity promotion (`totality-nontermination: error`,

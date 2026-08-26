@@ -31,7 +31,7 @@
 | `src/use-scanner.ts` | L1 | `use` header pre-scan shared by file runner + lib loader |
 | `src/futures.ts` | L0 | FutureManager: Promise → pending future cell → `applyPhase` cascade |
 | `src/index.ts` | T-build | CLI entry: file runner, REPL, `inspect`/`verify`/`obligations`/`propose`/`prove` subcommands |
-| `src/test.ts` | T-tooling | The suite (1149 tests at 2026-08): unit + `.alg` file tests + doc-ref lint + boundary battery |
+| `src/test.ts` | T-tooling | The suite (1197 tests at 2026-08): unit + `.alg` file tests + doc-ref lint + boundary battery. Sharded via `ALLEGRO_TEST_SHARD="i/n"` (name-hash assignment); `scripts/test-shards.mjs` aggregates and owns the whole-suite gate conditions |
 | `src/boundary-tests.ts` | T-tooling | Boundary instruments: accessor lint ratchet, invariant walks, forgery suite A–F, perf floor |
 | `src/parser.ts` | L1 (legacy) | Generated Earley parser — retained for standalone `grammar_*` DSLs only; `@ts-nocheck` stays |
 | `src/parser-helpers.ts` | L1 | Shared value-construction helpers for tree builders |
