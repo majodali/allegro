@@ -69,7 +69,7 @@ The grouping below comes from co-change measurement over the last 40
 | Lane | Contents | Concurrency |
 |---|---|---|
 | **A — reval docs** | B-014 contracts, then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/design/standard/*.md`; touches no `src/` |
-| **B — suite split** | Break up `src/test.ts` (12,281 lines, in 88% of source commits) | Runs anytime. **Prerequisite for C** |
+| **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
 
@@ -78,6 +78,13 @@ with each other* (C touches new/track files, D the L2 monoliths — a
 disjoint set once the suite is no longer shared). It does NOT make D
 internally parallel; that coupling is architectural, and no tooling
 change removes it.
+
+**Lane B landed 2026-08** (CHANGELOG "The suite splits"). The suite is
+`src/test/`: one module per area behind an index that registers nothing.
+A lane-D session working `effects.ts` and a lane-C session adding a
+tooling test now edit different files. Two follow-ons were filed rather
+than absorbed: **B-101** (a registration-count check in CI) and **B-102**
+(retire the dead `src/test.ts` entry in `SCAN_EXCLUDE`).
 
 **Gate policy per lane** — A, B and C run on **pre-ratified chunk
 sequences**: the maintainer approves the chunk list once at the start of
@@ -899,3 +906,23 @@ that prevents it.
   is a contracts knob, and v1's global `--strict` flag (never built, and
   not to be) is superseded here rather than revived
   (`docs/design/standard/contracts.md` §6/§7)
+
+- [ ] **B-101** · T-tooling · CI: assert the suite's REGISTRATION COUNT,
+  not just that it passes. The lane-B split lost nine tests to a bad cut
+  and every gate stayed green — typecheck clean, suite 1188/1188, `GATE:
+  PASSED` — because a uniformly smaller suite is self-consistent. Two
+  things caught it, both manual: diffing `registered=` against the
+  previous commit, and (once raised) the suite floor. Raising `suiteFloor`
+  to the suite size closed the hole for DROPS, but the floor has to be
+  bumped by hand whenever the suite grows, and a floor that drifts below
+  the suite is exactly the state that made it useless. Options: have the
+  aggregator fail when the total differs from `suiteFloor` in EITHER
+  direction (turning it into a pin with an explicit-bump workflow), or
+  have CI compare `registered=` against the base commit's value. The
+  second catches drops on branches without a manual bump ritual
+- [ ] **B-102** · T-tooling · `SCAN_EXCLUDE` in `src/boundary-tests.ts`
+  still lists `src/test.ts`, a file that no longer exists. It is inert —
+  the suite modules under `src/test/` are scanned like production code and
+  carry zero violations since C0 — but a stale exemption invites someone
+  to reintroduce the hole it used to hold open. Delete the entry (lane B
+  could not: `boundary-tests.ts` is outside its file set)

@@ -31,11 +31,50 @@
 | `src/use-scanner.ts` | L1 | `use` header pre-scan shared by file runner + lib loader |
 | `src/futures.ts` | L0 | FutureManager: Promise → pending future cell → `applyPhase` cascade |
 | `src/index.ts` | T-build | CLI entry: file runner, REPL, `inspect`/`verify`/`obligations`/`propose`/`prove` subcommands |
-| `src/test.ts` | T-tooling | The suite (1197 tests at 2026-08): unit + `.alg` file tests + doc-ref lint + boundary battery. Sharded via `ALLEGRO_TEST_SHARD="i/n"` (name-hash assignment); `scripts/test-shards.mjs` aggregates and owns the whole-suite gate conditions |
+| `src/test/` | T-tooling | The suite (1197 tests at 2026-08) — per-area modules behind a thin index; roster below |
 | `src/boundary-tests.ts` | T-tooling | Boundary instruments: accessor lint ratchet, invariant walks, forgery suite A–F, perf floor |
 | `src/parser.ts` | L1 (legacy) | Generated Earley parser — retained for standalone `grammar_*` DSLs only; `@ts-nocheck` stays |
 | `src/parser-helpers.ts` | L1 | Shared value-construction helpers for tree builders |
 | `src/grammar-ext.ts` | L1 (legacy) | GrammarBuilder + handle registry for the Earley combinator primitives |
+
+## src/test/ — the suite (one module per area, thin index)
+
+Split out of a single 12,281-line `src/test.ts` (2026-08) that 88% of
+source commits touched — the file two work streams could not avoid
+meeting in. `index.ts` registers nothing: each area module registers at
+import, and the index drives the async sections and the summary.
+
+| File | Role |
+|---|---|
+| `index.ts` | The index: area imports in suite order, async section chain, summary |
+| `harness.ts` | `test`/`asyncTest`/`eq`/`throws`, name-hash sharding (`ALLEGRO_TEST_SHARD`), `ALLEGRO_TEST_FILTER`, `ALLEGRO_TEST_TRACE`, timing, the summary + `SHARD-RESULT` line |
+| `fixtures.ts` | `evalSource`/`evalStr`/`evalNum`/`evalNumExt`/`evalStd`, `typeExt`, `mathExtension`, `makeCtxWith` |
+| `alg-files.ts` | `runAlgFile`/`fileTest`, the corpus walk accumulators feeding the boundary battery, `testsDir`/`primNames`/`typeNames` |
+| `base.ts` | Allegretto: arithmetic, bindings, functions, closures, blocks, extensions |
+| `modules.ts` | Module loader: resolution, caching, cycles, export encapsulation |
+| `grammar-legacy.ts` | Earley combinator layer + standalone JSON parser |
+| `types-core.ts` | Standard core types, the `.alg` corpus registrations, export visibility |
+| `types-battery.ts` | Generics, annotations, inference, the kind tower, interfaces |
+| `types-construction.ts` | Unions, destructuring, matching, `define`/`where`/`distinct`, `preserveOps` |
+| `equality-laws.ts` | E1–E4 equality/coercions/laws, D2 ledger, D47 source channel |
+| `language.ts` | Guards, offside rule, reactive forward chaining, pipes, combinators |
+| `refinements.ts` | Abstract domains, predicate sets, lifecycle invariants, contracts |
+| `effects.ts` | The D1 slices: bounds, HOF inference, effect variables, components |
+| `totality.ts` | Exhaustiveness, termination, `decreases`, SCC, counterexamples |
+| `proofs.ts` | F1–F7, tactic library, provable stdlib, rung demos, units DSL |
+| `pcp.ts` | Proof Collaboration Protocol H1–H4 + introspection |
+| `grammar2-engine.ts` | Grammar 2 formalism, scannerless engine, analyzer |
+| `grammar2-language.ts` | Grammar blocks, rule surgery, Allegro through grammar2 |
+| `async-futures.ts` | B-028 F1–F4: the forward-chaining async surface |
+| `tooling.ts` | PCP benchmark, doc-ref lint, `check-deployed` verdict logic |
+
+Two conditions can only be judged where the whole-suite total is known,
+so `scripts/test-shards.mjs` owns them at the same thresholds: the
+suite-count floor (`src/boundary-baseline.json` `suiteFloor`, held AT the
+suite size) and the `>= 15` corpus-coverage tripwire. It also cross-checks
+that every shard registered the same suite (`registered=`) — the check
+that catches a silently shrinking suite, since a uniformly smaller one
+passes every other gate.
 
 ## src/grammar2/ — the Allegro parser (scannerless, per `grammar-formalism.md`)
 
