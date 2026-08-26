@@ -62,8 +62,55 @@ const TEST_FILTER = process.env.ALLEGRO_TEST_FILTER
   : null;
 let filteredOut = 0;
 
+// Sharding (suite-performance pass): ALLEGRO_TEST_SHARD="i/n" runs only
+// the tests whose registration index is congruent to i mod n, so N
+// processes cover the suite between them. Registration order is
+// deterministic (tests register top-to-bottom at import time), and
+// round-robin — rather than contiguous blocks — spreads the clustered
+// slow tests across shards instead of piling them into one.
+//
+// A shard is NOT a landing gate on its own; `scripts/test-shards.mjs`
+// aggregates the shards and applies the gate to the total.
+const SHARD = (() => {
+  const raw = process.env.ALLEGRO_TEST_SHARD;
+  if (!raw) return null;
+  const m = /^(\d+)\/(\d+)$/.exec(raw.trim());
+  if (!m) throw new Error(`ALLEGRO_TEST_SHARD must look like "0/4", got "${raw}"`);
+  const index = Number(m[1]), count = Number(m[2]);
+  if (count < 1 || index < 0 || index >= count) {
+    throw new Error(`ALLEGRO_TEST_SHARD out of range: "${raw}"`);
+  }
+  return { index, count };
+})();
+let shardIndex = 0;
+let shardedOut = 0;
+
+/** Does this test belong to the running shard? Advances the registration
+ *  counter, so it must be called exactly once per registered test —
+ *  including tests the name filter already excluded, or the two
+ *  mechanisms would disagree about indices. */
+function inShard(): boolean {
+  const mine = SHARD === null || (shardIndex % SHARD.count) === SHARD.index;
+  shardIndex++;
+  if (!mine) shardedOut++;
+  return mine;
+}
+
+/** The `.alg` corpus walk feeds the boundary suite's coverage assertion
+ *  (`walked >= 15`), so the file tests and the boundary section must land
+ *  in the SAME shard or that assertion would see a fraction of the corpus
+ *  and fail. Both are pinned to shard 0 rather than weakening the
+ *  assertion; other shards take the existing "no file tests ran" skip
+ *  path the dev-filter already used. */
+const CORPUS_SHARD = 0;
+function ownsCorpus(): boolean {
+  return SHARD === null || SHARD.index === CORPUS_SHARD;
+}
+
 function test(name: string, fn: () => void): void {
+  const mine = inShard();
   if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
+  if (!mine) return;
   if (process.env.ALLEGRO_TEST_TRACE) console.error("TEST:", name);
   const t0 = performance.now();
   try {
@@ -447,6 +494,13 @@ test("extension: not available without being provided", () => {
 // == Module Loader ==
 
 async function asyncTest(name: string, fn: () => Promise<void>): Promise<void> {
+  // Async tests honor the name filter and the shard exactly like sync
+  // ones. Before the suite-performance pass they honored NEITHER, so a
+  // "filtered" dev run still paid for the whole async block — which is
+  // what made short timeouts look like hangs.
+  const mine = inShard();
+  if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
+  if (!mine) return;
   if (process.env.ALLEGRO_TEST_TRACE) console.error("ATEST:", name);
   try {
     await fn();
@@ -1695,6 +1749,9 @@ let corpusWalkFiles = 0;
 
 function fileTest(filePath: string, extensions?: Extension[]): void {
   const basename = path.basename(filePath);
+  // Pinned to the corpus shard so the boundary suite's coverage
+  // assertion still sees the whole `.alg` corpus (see CORPUS_SHARD).
+  if (!ownsCorpus()) return;
   test(`file: ${basename}`, () => {
     runAlgFile(filePath, extensions);
     eq(true, true); // if we get here, all expectations matched
@@ -12164,11 +12221,15 @@ timedSection("modules", runModuleTests)
   .then(() => timedSection("benchmark", runBenchmarkTests))
   .then(() => timedSection("doc-lint", async () => runDocLintTests()))
   .then(() => timedSection("check-deployed", async () => runCheckDeployedTests()))
-  .then(() => timedSection("boundary", async () => runBoundaryTests({ test, eq, corpus: { files: corpusWalkFiles, violations: corpusWalkViolations } })))
+  .then(() => ownsCorpus()
+    ? timedSection("boundary", async () => runBoundaryTests({ test, eq, corpus: { files: corpusWalkFiles, violations: corpusWalkViolations } }))
+    : undefined)
   .then(() => {
   // Suite-count floor (boundary baseline): a mass-disablement tripwire.
-  // Suspended under ALLEGRO_TEST_FILTER — filtered runs are dev runs.
-  if (!TEST_FILTER) {
+  // Suspended under ALLEGRO_TEST_FILTER — filtered runs are dev runs —
+  // and under sharding, where no single shard sees the whole suite;
+  // `scripts/test-shards.mjs` applies the floor to the aggregate.
+  if (!TEST_FILTER && SHARD === null) {
     const floor = getSuiteFloor();
     if (passed + failed < floor) {
       failed++;
@@ -12180,6 +12241,12 @@ timedSection("modules", runModuleTests)
     console.log(`DEV RUN (ALLEGRO_TEST_FILTER=${process.env.ALLEGRO_TEST_FILTER}) — ${filteredOut} tests filtered out; NOT a landing gate`);
   }
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
+  if (SHARD) {
+    // Machine-readable line for the shard aggregator. `registered` is the
+    // suite-wide registration count every shard sees, so the aggregator
+    // can confirm the shards agree on what the suite contains.
+    console.log(`SHARD-RESULT ${SHARD.index}/${SHARD.count} ran=${passed + failed} passed=${passed} failed=${failed} registered=${shardIndex} skipped=${shardedOut}`);
+  }
   console.log(`Wall clock: ${((performance.now() - suiteT0) / 1000).toFixed(1)}s`);
   console.log(`Sections: ${sectionTimes.map((s) => `${s.name} ${(s.ms / 1000).toFixed(1)}s`).join(" | ")}`);
   const slowest = [...testTimes].sort((a, b) => b.ms - a.ms).slice(0, 15);
