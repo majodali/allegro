@@ -235,12 +235,12 @@ export function summarizeValue(v: Value): ValueSummary {
   const typeName = getTypeName(v);
   // Pull predicate set from the value itself, or — for refined values that
   // didn't go through __construct — synthesise a singleton set from the
-  // refined type Context's stored __abstractDomain.
+  // refined type Context's stored abstractDomain.
   let preds = predicatesOf(v);
   if (!preds && v.kind === ValueKind.Structure) {
     const typeComp = channelReadRaw(v, "type");
     if (typeComp?.kind === ValueKind.Structure) {
-      const fromType = (typeComp as any).__abstractDomain;
+      const fromType = (typeComp as any).abstractDomain;
       if (fromType && fromType.kind) {
         preds = new PredicateSet([{ shape: fromType, source: "refinement-type" }]);
       }
@@ -250,7 +250,7 @@ export function summarizeValue(v: Value): ValueSummary {
 
   // If the value is a function, read inferred effects via `effectsOf`,
   // which checks the `effects` MultiValue component first and falls back
-  // to the ComposedFunction's `__inferredEffects` stash. Declared effects
+  // to the ComposedFunction's `inferredEffects` stash. Declared effects
   // come from the body's `effects_attach` wrapper.
   let inferredEffects: EffectSet | null = null;
   let declaredEffects: EffectSet | null = null;
@@ -461,8 +461,8 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return `unresolved Symbol <${(dataOf(v) as { kind: ValueKind.Symbol; name: string }).name}>`;
     case ValueKind.Structure: {
       const ctx = dataOf(v) as ContextValue;
-      if ((ctx as any).__grammarValue) {
-        const chain = (ctx as any).__grammarValue.baseChain?.join(" > ") ?? "?";
+      if ((ctx as any).grammarValue) {
+        const chain = (ctx as any).grammarValue.baseChain?.join(" > ") ?? "?";
         return `Grammar (extends ${chain})`;
       }
       // C6.1b: lifecycle invariants are ordinary refinements now — the

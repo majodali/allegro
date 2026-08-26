@@ -47,8 +47,8 @@ export const NOTIF_TOTALITY_NEEDS_ANNOTATION = "totality-needs-annotation";
 // marking): it peels the wrapper chain off every ComposedFunction body —
 // descending through `type_check` layers — and stashes the metadata as
 // host-internal properties on the function (registered in SLOT_REGISTRY):
-//   __partial, __decreasesMetric, __declaredEffectsAst,
-//   __paramEffectPairs, __provenClauses
+//   partial, decreasesMetric, declaredEffectsAst,
+//   paramEffectPairs, provenClauses
 // Analyzers read the properties; the wrapper primitives remain registered
 // as inert passthroughs for any uncollapsed path (defense in depth).
 // `subst`/`remapParams` preserve the properties across clones.
@@ -78,17 +78,17 @@ function collapseOneFunction(cfn: ComposedFunctionValue): void {
     }
     if (!ATTACH_NAMES.has(name)) return;
     switch (name) {
-      case "partial_attach":       (cfn as any).__partial = true; break;
-      case "decreases_attach":     (cfn as any).__decreasesMetric = e.args[1]; break;
-      case "effects_attach":       (cfn as any).__declaredEffectsAst = e.args[1]; break;
-      case "param_effects_attach": (cfn as any).__paramEffectPairs = e.args.slice(1); break;
-      case "proven_attach":        (cfn as any).__provenClauses = e.args.slice(1); break;
+      case "partial_attach":       (cfn as any).partial = true; break;
+      case "decreases_attach":     (cfn as any).decreasesMetric = e.args[1]; break;
+      case "effects_attach":       (cfn as any).declaredEffectsAst = e.args[1]; break;
+      case "param_effects_attach": (cfn as any).paramEffectPairs = e.args.slice(1); break;
+      case "proven_attach":        (cfn as any).provenClauses = e.args.slice(1); break;
       // B-028 F3 (CE-R3): `total` = per-function strict opt-in (an
       // undischarged div on this function is an ERROR); `assume
       // terminates` = the D34 admitted tier (a declared liveness axiom
       // for the whole function — lifts div, verdict-visible).
-      case "total_attach":             (cfn as any).__total = true; break;
-      case "assume_terminates_attach": (cfn as any).__assumeTerminates = true; break;
+      case "total_attach":             (cfn as any).total = true; break;
+      case "assume_terminates_attach": (cfn as any).assumeTerminates = true; break;
     }
     setCur(e.args[0]);
   }
@@ -117,7 +117,7 @@ export function collapseBodyMetadata(v: Value | undefined, seen: Set<Value> = ne
 }
 
 export function isFunctionPartial(fn: ComposedFunctionValue): boolean {
-  return (fn as any).__partial === true;
+  return (fn as any).partial === true;
 }
 
 
@@ -472,7 +472,7 @@ export interface TerminationFinding {
  *  whose termination can't be shown. `typeLookup` resolves Symbol-typed
  *  param annotations (`n: NonNeg`) to their concrete type Context — the
  *  runtime's lookup evaluates user-defined type bindings via a compile-mode
- *  context, so the returned value carries `__abstractDomain` for refined
+ *  context, so the returned value carries `abstractDomain` for refined
  *  types. */
 export function checkTermination(
   bindings: Iterable<{ key: string | null; value: Value | undefined }>,
@@ -516,7 +516,7 @@ export interface DivergenceResult {
   /** binding → why `div` is in its inferred set (own vs inherited). */
   divBindings: Map<string, { own: boolean; via?: string }>;
   /** binding → the collapsed function object carrying the metadata
-   *  (the stamp target for `__inferredEffects`). */
+   *  (the stamp target for `inferredEffects`). */
   stampTargets: Map<string, ComposedFunctionValue>;
   /** Info notices for bindings that INHERIT div through calls (the
    *  long-reserved needs-annotation kind finally earns its keep). */
@@ -580,7 +580,7 @@ export function analyzeDivergence(
     const cycleCallsEarly: CallSite[] = [];
     findCallsToCycle(cfn.body, sccEarly, cycleCallsEarly);
     if (cycleCallsEarly.length > 0) recursiveBindings.add(b.key);
-    if ((cfn as any).__assumeTerminates === true) {
+    if ((cfn as any).assumeTerminates === true) {
       obligations.push({ binding: b.key, tier: "admitted",
         detail: "assume terminates — declared liveness axiom" });
       admitted.add(b.key);
@@ -614,7 +614,7 @@ export function analyzeDivergence(
     // against the caller's param-type info. Stage 5 HOF edges are accepted
     // without metric verification (the `decreases` clause is the contract;
     // we trust it).
-    const decMetric = (cfn as any).__decreasesMetric as Value | undefined;
+    const decMetric = (cfn as any).decreasesMetric as Value | undefined;
     if (decMetric) {
       const directCalls = cycleCalls
         .filter((s): s is CallSite & { kind: "direct" } => s.kind === "direct")
@@ -1157,7 +1157,7 @@ function typeHasNonNegativeLowerBound(
     return typeHasNonNegativeLowerBound(resolved, typeLookup, seen);
   }
   if (cur.kind !== ValueKind.Structure) return false;
-  const dom = (cur as any).__abstractDomain;
+  const dom = (cur as any).abstractDomain;
   if (!dom) return false;
   if (dom.kind === "interval") return dom.lo >= 0;
   if (dom.kind === "eq")       return dom.value >= 0;

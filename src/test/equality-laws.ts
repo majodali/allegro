@@ -584,7 +584,7 @@ Law.assume(E4Ex, "trans")
 
 // == D2 assumption-ledger roll-up (B-091) ==
 //
-// Proofs carry a TRANSITIVE backing set (`__lawBackings`, unioned
+// Proofs carry a TRANSITIVE backing set (`lawBackings`, unioned
 // through combinators and preserved by proof_check's relabel), so
 // nested chains no longer lose inner backings; the Verdict aggregates
 // the sets into an assumption-ledger block.

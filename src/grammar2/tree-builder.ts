@@ -949,7 +949,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
   }
 
   // B-028 F3 — the completion-discharge wrappers. Runtime passthroughs;
-  // `collapseBodyMetadata` stashes `__total` / `__assumeTerminates` for
+  // `collapseBodyMetadata` stashes `total` / `assumeTerminates` for
   // the divergence analysis.
   if (totalMarked) {
     result = makeExpr(prim("total_attach"), [result]);
@@ -1589,7 +1589,7 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
     const body = buildExpr(bodyTree, innerMap);
     const fn = makeComposedFn(params, body);
     if (genericParams.length > 0) {
-      (fn as any).__genericParams = genericParams;
+      (fn as any).genericParams = genericParams;
     }
     const typed = maybeTyped(fn, typedParams, returnTypeExpr);
     return { key: fnName, value: typed, exported: true };
@@ -1668,7 +1668,7 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
     // survives `typed_function` wrapping at runtime). Stage C2 will consume
     // this for effect-variable unification; inert in Stage C1.
     if (genericParams.length > 0) {
-      (fn as any).__genericParams = genericParams;
+      (fn as any).genericParams = genericParams;
     }
     const value = maybeTyped(fn, typedParams, returnTypeExpr);
     return { key: fnName, value };

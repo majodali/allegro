@@ -1,16 +1,48 @@
 {
-  "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet \u2014 regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3. `suiteFloor` is the mass-disablement tripwire and is kept AT the suite size, not below it \u2014 a slack floor cannot catch a silent drop (raise it when the suite grows).",
+  "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet — regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3.",
   "hardFail": true,
   "allowedFiles": [
     "src/slots.ts",
     "src/structure.ts"
   ],
   "lint": {
+    "src/futures.ts": {
+      "dunder-template-key": 1
+    },
+    "src/index.ts": {
+      "dunder-template-key": 1
+    },
+    "src/primitives.ts": {
+      "dunder-template-key": 1
+    },
+    "src/runtime.ts": {
+      "dunder-template-key": 1
+    },
     "src/slots.ts": {
-      "components-direct": 5,
-      "dunder-string-literal": 160,
-      "bindings-get-dunder": 1,
+      "components-direct": 4,
+      "dunder-string-literal": 90,
+      "bindings-get-dunder": 11,
       "kernel-writer-acquisition": 1
+    },
+    "src/structure.ts": {
+      "components-direct": 3,
+      "dunder-string-literal": 1,
+      "scope-facts-direct": 1
+    },
+    "src/test/alg-files.ts": {
+      "dunder-template-key": 1
+    },
+    "src/test/effects.ts": {
+      "dunder-property-access": 1
+    },
+    "src/test/types-battery.ts": {
+      "dunder-property-access": 1
+    },
+    "src/test/types-core.ts": {
+      "dunder-primitive-name": 2
+    },
+    "src/types-std.ts": {
+      "dunder-primitive-name": 19
     }
   },
   "suiteFloor": 1197,
@@ -24,12 +56,12 @@
     "7"
   ],
   "perf": {
-    "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan \u00a75).",
+    "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 1144,
-      "recursion-tco": 809,
-      "collections": 549
+      "basics": 547,
+      "recursion-tco": 686,
+      "collections": 505
     }
   }
 }

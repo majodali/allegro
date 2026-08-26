@@ -46,18 +46,18 @@ export function setInlineCutoff(f: ((fn: Value) => boolean) | null): void {
  * it and loops instead of recursing.
  */
 interface TailCall {
-  __tailCall: true;
+  tailCall: true;
   fn: ComposedFunctionValue;
   args: Value[];
   fnRaw?: Value;
 }
 
 export function isTailCall(v: any): v is TailCall {
-  return v && v.__tailCall === true;
+  return v && v.tailCall === true;
 }
 
 function makeTailCall(fn: ComposedFunctionValue, args: Value[], fnRaw?: Value): TailCall {
-  return { __tailCall: true, fn, args, fnRaw };
+  return { tailCall: true, fn, args, fnRaw };
 }
 
 /**
@@ -343,7 +343,7 @@ function applyPrimitive(
   const attachEff = (v: Value): Value =>
     eagerEffSet.size > 0 ? withEffects(v, eagerEffSet) : v;
   // Stage F3: compile-time deferral. When PE is operating inside a function
-  // body being precompiled (`ctx.__compileMode = true`) and the primitive
+  // body being precompiled (`ctx.compileMode = true`) and the primitive
   // has its own effect tags, return a residual instead of executing. The
   // residual carries the effects component so callers see the inferred
   // set; the actual side effect fires when the function is invoked at
@@ -596,7 +596,7 @@ function applyComposed(
             // gets substituted into the body.
             evalArgs[i] = applyBoundaryBound(evalArgs[i], resolvedParamType as ContextValue);
             // Stage D — Surface C call-site enforcement (F2): when the
-            // param-type slot has no `__effectBound` but `param_effects
+            // param-type slot has no `effectBound` but `param_effects
             // f: pure` stamped an effect bound onto the Param.effectBound
             // slot, run the same actual ⊆ bound discharge so Surface C
             // matches Surface A's rejection of mismatched callbacks. F2
@@ -713,7 +713,7 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
       const newBody = remapParams(value.body, paramMap);
       if (newBody === value.body) return value;
       const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
-      if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
+      if ((value as any).genericParams) (newFn as any).genericParams = (value as any).genericParams;
       for (const k of PRESERVED_FN_META_KEYS) {
         if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
       }
@@ -792,7 +792,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       for (const p of newFn.params) p.owner = newFn;
       // Preserve generic-param metadata across clones so Slice 2's
       // polymorphism resolution still works after substitution.
-      if ((value as any).__genericParams) (newFn as any).__genericParams = (value as any).__genericParams;
+      if ((value as any).genericParams) (newFn as any).genericParams = (value as any).genericParams;
       for (const k of PRESERVED_FN_META_KEYS) {
         if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
       }
@@ -839,7 +839,7 @@ function checkArgType(
   let expected = normalizeType(expectedType);
 
   // Phase D1 Slice 2 Stage A (F2): effect-bound discharge. If the expected
-  // type carries an `__effectBound` (an EffectsDomain attached at
+  // type carries an `effectBound` (an EffectsDomain attached at
   // construction by `buildEffect`), pull the arg's effects from its
   // `effects` MultiValue component (PE-populated in F1) and check actual ⊆
   // bound via the same `impliesDomain` path used for numeric refinements.
@@ -1014,10 +1014,10 @@ export function precompileFunction(
       // is refined and carries an abstract domain (Phase B), seed the domain
       // on the placeholder so propagation rules fire during precompile.
       const components = new Map<string, Value>([["type", paramType]]);
-      const dom = (paramType as any).__abstractDomain;
+      const dom = (paramType as any).abstractDomain;
       if (dom && dom.kind !== "opaque") {
         const domCtx: ContextValue = makeContext();
-        (domCtx as any).__abstractDomain = dom;
+        (domCtx as any).abstractDomain = dom;
         components.set("domain", domCtx);
       }
       // F2: preserve effectBound/effectVar on the placeholder so PE's
@@ -1033,7 +1033,7 @@ export function precompileFunction(
       // Untyped or type variable — leave as bare Param. Same
       // effectBound/effectVar copy so polymorphic params with no concrete
       // type annotation still propagate (C7.2c: declared effect variables
-      // referencing __genericParams entries).
+      // referencing genericParams entries).
       const bare = makeParamHelper(param.position, param._name);
       if (param.effectBound) (bare as any).effectBound = param.effectBound;
       if (param.effectVar !== undefined) (bare as any).effectVar = param.effectVar;
@@ -1052,8 +1052,8 @@ export function precompileFunction(
   // function is invoked at runtime (where ctx isn't compile-mode).
   // Restore on exit so the same compileCtx can be reused for other
   // bindings without leaking state.
-  const wasCompileMode = (ctx as any).__compileMode;
-  (ctx as any).__compileMode = true;
+  const wasCompileMode = (ctx as any).compileMode;
+  (ctx as any).compileMode = true;
   try {
     let result: Value | TailCall = evaluate(substituted, ctx, 0);
     // Untyped functions like `forwarder(g, y) => apply(g, y)` produce a
@@ -1082,7 +1082,7 @@ export function precompileFunction(
     // of the typed_function expression picks up the stashed set.
     const inferredEffects = effectsOf(finalValue);
     if (inferredEffects && inferredEffects.size > 0) {
-      (fn as any).__inferredEffects = inferredEffects;
+      (fn as any).inferredEffects = inferredEffects;
     }
     return { inferredReturnType: inferredType, inferredEffects, errors };
   } catch (e: any) {
@@ -1090,6 +1090,6 @@ export function precompileFunction(
     errors.push(e.message);
     return { inferredReturnType: null, inferredEffects: null, errors };
   } finally {
-    (ctx as any).__compileMode = wasCompileMode;
+    (ctx as any).compileMode = wasCompileMode;
   }
 }

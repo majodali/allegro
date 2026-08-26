@@ -942,8 +942,10 @@ that prevents it.
   from the source entirely** — maintainer directive 2026-08. The prefix
   was a temporary collision-avoidance measure and is no longer needed;
   it is also load-bearing in a way that a naming convention should not
-  be. Two halves, and they are not the same problem:
-  - **(a) Host-plane names — free.** ~21 registered `js-property` slots
+  be. Two halves, and they are not the same problem. **Chunk 1 landed
+  2026-08 — (a), (c) and (d) are DONE; (b) is what remains and needs a
+  ruling.**
+  - **(a) Host-plane names — free. ✅ DONE (chunk 1).** ~21 registered `js-property` slots
     (`__abstractDomain`, `__effectLabels`, `__effectBound`,
     `__inferredEffects`, `__genericParams`, `__partial`,
     `__decreasesMetric`, `__declaredEffectsAst`, `__paramEffectPairs`,
@@ -955,8 +957,15 @@ that prevents it.
     `__hasPrivateMembers`, `__memberPrivilege`, `__declarationOnly`).
     These are JS properties on host objects — they never share a
     namespace with Allegro user names, so the prefix buys nothing.
-    Mechanical rename; no semantics
-  - **(b) Binding-plane meta slots — a design decision.** `__name`,
+    Mechanical rename; no semantics. **Landed**: 27 names, ~180 sites,
+    zero behaviour change. `__compileMode` joined them — it was
+    registered as `context-binding` but every reader and writer is a JS
+    expando, so its storage class was corrected with the rename. The
+    dead `__grammar` / `__parse` PREFIX registry rows were retired at
+    the same time: a prefix row matching nothing is not inert, it
+    pre-approves every future `__grammar*` binding and hides it from
+    the W3 completeness walk
+  - **(b) Binding-plane meta slots — a design decision. ← THE REMAINING WORK.** `__name`,
     `__members`, `__refines`, `__construct`, `__getMember`, `__interface`,
     `__wraps`, `__union`, `__predicate`, `__args`, `__generic`, `__type`,
     `__discharged`, `__length`, `__compileMode`, plus the synthetic
@@ -969,17 +978,49 @@ that prevents it.
     future scan) and the registry-completeness walk in
     `boundary-tests.ts`. Dropping the prefix requires REPLACING that
     partition, not renaming past it — separate storage plane, registry
-    membership, or interned keys. Needs a ruling before any code moves
-  - **(c) Enforcement gaps found while surveying.** The
-    `dunder-string-literal` lint pattern (`["']__[A-Za-z0-9_]*["']`)
-    matches quote-delimited literals only: template literals and JS
-    property access (`(ctx as any).__effectLabels`) are invisible to it,
-    and `bindings-get-dunder` covers `.get(` but not `.has(`/`.set(`/
-    `.delete(`. Whatever (b) settles on, the ratchet has to see the
-    thing it is ratcheting
-  - **(d) Two raw NUL bytes in `src/slots.ts`.** `unionBackings` builds
-    its dedup key as `` `${r.equality}\x00${r.law}\x00${r.tier}` `` with
-    the NULs written as literal bytes rather than escapes, which makes
-    git and `grep` treat the file as binary (it is excluded from plain
-    text searches — including, ironically, dunder searches). Use `\x00`
-    escapes or a non-NUL separator
+    membership, or interned keys. Needs a ruling before any code moves.
+    Three candidate answers, with the recommendation first:
+    1. **A fourth plane on `Structure`** — a `meta` map beside
+       `components` / `bindings` / `dense`. `isMetaSlotKey` stops being a
+       name test and becomes a STORAGE question, which is the property
+       that should have carried the partition all along; the names then
+       drop the prefix because nothing depends on it. Compatible with
+       D39: a slot dispositioned `member` later graduates out of the meta
+       plane into a declared member, one dispositioned `host-internal`
+       stays. Cost: every read/write path through the 15 slots, and the
+       W3 walk changes subject
+    2. **Registry membership** — keep one map, make the test
+       `slotRegistration(key) !== undefined`. Cheapest, but it makes
+       `name` / `members` / `length` unusable as ordinary user field
+       names, which is a language-visible regression
+    3. **Interned or symbol keys** — unforgeable by construction, but the
+       bindings map is string-keyed throughout (serialization, the
+       bindingList, module objects), so this is the largest change
+    Note the synthetic binding-name families are a SEPARATE sub-problem:
+    they are real names in the user namespace, not meta slots, so the
+    answer there is likely a `Binding` attribute (alongside `cell`,
+    `visibility`, `isComplete`) rather than a plane
+  - **(c) Enforcement gaps found while surveying. ✅ DONE (chunk 1).**
+    The `dunder-string-literal` pattern (`["']__[A-Za-z0-9_]*["']`)
+    matched quote-delimited literals only. Three spellings were invisible
+    to it and now have patterns: synthesized template keys
+    (`` `__future_${n}` `` — five sites, none previously counted),
+    property access, and primitive diagnostic names
+    (`"record.__construct"`). `bindings-get-dunder` now covers
+    `.has`/`.set`/`.delete` as well as `.get`. All three new patterns are
+    `ratchetOnly` — they count PRE-EXISTING violations for the first
+    time, so hard-failing them would fail the suite on the commit that
+    made them visible; they ratchet until (b) drives them to zero, then
+    the flag comes off. The property-access pattern matches against
+    source with string literals blanked, so a diagnostic name is not
+    miscounted as a host-plane read. *(Backticks were deliberately NOT
+    folded into `dunder-string-literal`: in this codebase a backticked
+    `__name` is nearly always a markdown code span in a doc comment —
+    prose about a slot, not a use of one. Folding them in would have
+    added ~30 false positives to a hard-fail pattern.)*
+  - **(d) Two raw NUL bytes in `src/slots.ts`. ✅ DONE (chunk 1).**
+    `unionBackings` built its dedup key with literal NUL bytes rather
+    than `\x00` escapes, which made git and `grep` treat the whole file
+    as binary — so `src/slots.ts`, the one file where every slot name
+    lives, was silently absent from plain-text searches, dunder searches
+    included. Now escaped; the file reads as text

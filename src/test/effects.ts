@@ -29,7 +29,7 @@ import { getName } from "../slots.js";
 // Helper: read the precompile-stashed effects from a function value,
 // returning an empty set when no effects are recorded. After walker removal,
 // tests verify the same property by reading the `effects` MultiValue
-// component (or the `__inferredEffects` stash on bare ComposedFunctions)
+// component (or the `inferredEffects` stash on bare ComposedFunctions)
 // instead of invoking the walker directly.
 function inferredEffectsOf(v: Value): EffectSet {
   return effectsOf(v) ?? new Set<string>();
@@ -282,7 +282,7 @@ test("Phase D1.2: entailsPredicate works for effects targets", () => {
 
 // Post-walker-removal: the predicate-set bridge is gone. The inferred set
 // lives directly on the function value (effects MultiValue component, or
-// __inferredEffects stash on bare ComposedFunctions). These three tests now
+// inferredEffects stash on bare ComposedFunctions). These three tests now
 // verify the same effect-inference property via `effectsOf`.
 test("Phase D1.2: pure body yields empty inferred effects", () => {
   const src = `
@@ -334,14 +334,14 @@ test("Phase D1.2: declared and inferred coexist on function value", () => {
 
 test("Stage A: pureEffect carries an empty-labels effect bound", () => {
   // The bound is what type_check pulls when discharging `f: pure`.
-  const bound = (pureEffect as any).__effectBound;
+  const bound = (pureEffect as any).effectBound;
   eq(bound !== undefined, true);
   eq(bound.kind, "effects");
   eq(bound.labels.size, 0);
 });
 
 test("Stage A: opaqueEffect carries no effect bound (universal)", () => {
-  const bound = (opaqueEffect as any).__effectBound;
+  const bound = (opaqueEffect as any).effectBound;
   eq(bound, undefined);
 });
 
@@ -455,7 +455,7 @@ pure_caller
   }
 });
 
-test("Stage B (F2): typed_function stamps Param.effectBound from __effectBound", () => {
+test("Stage B (F2): typed_function stamps Param.effectBound from effectBound", () => {
   // F2 storage migration: effect bounds now live on Param.effectBound (a
   // plain Set<string>) instead of Param.predicates (a PredicateSet).
   // Refinement bounds stay reserved on Param.predicates for future use.
@@ -542,7 +542,7 @@ test("Stage C1: auto-promoted type variable still works (no decl)", () => {
   eq(Number((dataOf(result!) as BitsValue).data), 99);
 });
 
-test("Stage C1: __genericParams metadata stamped on the underlying ComposedFunction", () => {
+test("Stage C1: genericParams metadata stamped on the underlying ComposedFunction", () => {
   // The metadata lives on the ComposedFunction identity — it survives the
   // typed_function envelope at runtime since the envelope just wraps the
   // same ComposedFunction with type info. Stage C2 reads this to drive
@@ -551,7 +551,7 @@ test("Stage C1: __genericParams metadata stamped on the underlying ComposedFunct
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("id")!.value!;
   const cFn = dataOf(fn);
-  const meta = (cFn as any).__genericParams;
+  const meta = (cFn as any).genericParams;
   eq(Array.isArray(meta), true);
   if (Array.isArray(meta)) {
     eq(meta.length, 2);
@@ -574,7 +574,7 @@ test("Stage C1: export NAME[generic_decl](...) parses", () => {
 test("C7.2c: effect-variable params carry the declared effectVar reference", () => {
   // For `apply[e: Effect](g: e, x: Int): Int`, position 0 is the e-bound
   // param. C7.2c: the declared structure is `Param.effectVar` referencing
-  // the Effect-kinded __genericParams entry by name — the __effectVarParams
+  // the Effect-kinded genericParams entry by name — the __effectVarParams
   // side table and `__effectvar:` marker labels are retired.
   const src = `apply[e: Effect](g: e, x: Int): Int => g(x)\napply`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
@@ -902,7 +902,7 @@ apply_pure((y: Int): Int => print(y), 5)
 });
 
 test("Stage D: opaque-bound param leaves predicates unset (universal)", () => {
-  // Mirrors Surface A's behaviour: `f: opaque` has no `__effectBound`, so
+  // Mirrors Surface A's behaviour: `f: opaque` has no `effectBound`, so
   // predicates stay undefined — any effects allowed.
   const src = `forwarder(g, x: Int): Int =>
   param_effects_attach(g(x), g, opaque)
@@ -1194,7 +1194,7 @@ test("Stage F2: PE residual at unresolved-Param call carries the effect variable
   // F2c: when PE evaluates `Expression(Param_with_effectVar, args)`, the
   // residual carries the declared variable's BARE name via the effects
   // component (C7.2c: no marker prefix). This is what lets polymorphic
-  // functions populate __inferredEffects for the outer function during
+  // functions populate inferredEffects for the outer function during
   // precompile.
   const src = `apply[e: Effect](g: e, x: Int): Int => g(x)\napply\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
@@ -1230,7 +1230,7 @@ test("Stage F2: unannotated function-typed Param stays opaque", () => {
      `expected opaque from unannotated param call, got: ${eff ? [...eff].join(",") : "none"}`);
 });
 
-test("Stage F2: checkEffectsDeclarations reads __inferredEffects (no walker call)", () => {
+test("Stage F2: checkEffectsDeclarations reads inferredEffects (no walker call)", () => {
   // Hand-built effects_attach to declare a mismatching pure bound. If
   // checkEffectsDeclarations reads the PE-stashed set correctly, the
   // mismatch should still fire (inferred io ⊄ declared pure).
@@ -1244,7 +1244,7 @@ test("Stage F2: checkEffectsDeclarations reads __inferredEffects (no walker call
 });
 
 test("Stage F2: introspection reads inferred effects from component (when populated)", () => {
-  // After precompile, the function value's __inferredEffects is set; the
+  // After precompile, the function value's inferredEffects is set; the
   // inspector reads it directly.
   const src = `greet(x: Int): Int => print(x)\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
@@ -1256,7 +1256,7 @@ test("Stage F2: introspection reads inferred effects from component (when popula
 // --- Phase D1 Slice 2 Stage F3a: compile-time deferral of effectful primitives ---
 //
 // When PE evaluates a primitive's args inside a function body being
-// precompiled (`ctx.__compileMode = true`) and the primitive carries a
+// precompiled (`ctx.compileMode = true`) and the primitive carries a
 // non-empty `.effects` tag, applyPrimitive returns a residual `makeExpr(fn,
 // evalArgs)` instead of executing the impl. The residual still carries the
 // effects component so callers see the inferred set; the side effect itself
@@ -1322,7 +1322,7 @@ test("Stage F3a: pure primitives still fold at compile time", () => {
 test("Stage F3a: deferred residual carries effects component", () => {
   // The residual `print("trace")` inside a function body still surfaces
   // its io effect upward via the effects MultiValue component, so the
-  // function value's __inferredEffects picks it up.
+  // function value's inferredEffects picks it up.
   const src = `f(x: Int): Int =>
   effects_attach(seq(print(x), x), typed_array(io))
 f
@@ -1353,7 +1353,7 @@ test("Stage F3a: declaration check still fires under deferral (mismatch detected
 // deferral all in place, the Slice-1.3 `opaque` placeholders on Array.map /
 // filter / reduce + the walker's HOF heuristic become unnecessary. F3b
 // removes both. Inline typed lambdas (`arr.map((x: Int): Int => print(x))`)
-// get their own __inferredEffects via a precompile-on-evaluate hook in
+// get their own inferredEffects via a precompile-on-evaluate hook in
 // `typed_function_impl`, so callers see the precise propagation.
 
 test("Stage F3b: arr.map(pure_cb) yields no effects", () => {
@@ -1405,7 +1405,7 @@ dump
 
 test("Stage F3b: typed_function_impl precompiles inline lambdas (effects component populated)", () => {
   // Direct test of the precompile-on-evaluate hook: an inline typed lambda
-  // gets its __inferredEffects set when the typed_function expression is
+  // gets its inferredEffects set when the typed_function expression is
   // evaluated, even though it isn't a top-level binding for
   // precompileFunctions to see.
   const src = `f(): (Int) => Int =>
@@ -1419,7 +1419,7 @@ f
   const fnPrim = dataOf(f);
   if (fnPrim.kind === ValueKind.ComposedFunction) {
     // f is pure (returns a function value, doesn't fire io itself).
-    // But the lambda it returns carries io. f's __inferredEffects is none;
+    // But the lambda it returns carries io. f's inferredEffects is none;
     // the returned lambda's effects (eventually surfaced through the call)
     // come from PE walking the body. Direct test below.
     const eff = effectsOf(f);

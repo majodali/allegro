@@ -57,7 +57,7 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       for (const p of newFn.params) p.owner = newFn;
       // Preserve generic-param / effect-var-param metadata across clones so
       // Slice 2's polymorphism resolution still works after this pass.
-      if ((v as any).__genericParams) (newFn as any).__genericParams = (v as any).__genericParams;
+      if ((v as any).genericParams) (newFn as any).genericParams = (v as any).genericParams;
       return newFn;
     }
     case ValueKind.Structure: {
@@ -334,7 +334,7 @@ function resolveNamedParams(
         body: remappedBody,
       };
       for (const p of newFn.params) p.owner = newFn;
-      if ((fn as any).__genericParams) (newFn as any).__genericParams = (fn as any).__genericParams;
+      if ((fn as any).genericParams) (newFn as any).genericParams = (fn as any).genericParams;
       return newFn;
     }
 
@@ -420,7 +420,7 @@ function resolveNamedParamsInner(
         body: remappedBody,
       };
       for (const p of newFn.params) p.owner = newFn;
-      if ((fn as any).__genericParams) (newFn as any).__genericParams = (fn as any).__genericParams;
+      if ((fn as any).genericParams) (newFn as any).genericParams = (fn as any).genericParams;
       return newFn;
     }
 
@@ -1085,7 +1085,7 @@ export function evalSource(
     // Phase E Stages 1-2 — totality analyzers. The exhaustiveness check
     // (Stage 1) and structural-termination check (Stage 2) both need to
     // resolve Symbol-typed param annotations (`b: Bool`, `n: NonNeg`) to
-    // their underlying type Context (the one carrying `__abstractDomain`
+    // their underlying type Context (the one carrying `abstractDomain`
     // for refinement domains). We build a small compile-mode ctx mirroring
     // `precompileFunctions` so we can `evaluate` user-defined type bindings
     // (`NonNeg = Int & _ >= 0`) on demand, in addition to looking up
@@ -1212,16 +1212,16 @@ export function evalSource(
     for (const [name] of divR!.divBindings) {
       const cfn = divR!.stampTargets.get(name);
       if (!cfn) continue;
-      const prior = (cfn as any).__inferredEffects as Set<string> | undefined;
+      const prior = (cfn as any).inferredEffects as Set<string> | undefined;
       const next = new Set(prior ?? []);
       next.add("div");
-      (cfn as any).__inferredEffects = next;
+      (cfn as any).inferredEffects = next;
     }
     // CE-R3: `total` is the per-function STRICT opt-in — an undischarged
     // (own or inherited) div on a `total`-declared function is an error.
     const totalViolations: string[] = [];
     for (const [name, cfn] of divR!.stampTargets) {
-      if ((cfn as any).__total !== true) continue;
+      if ((cfn as any).total !== true) continue;
       const why = divR!.divBindings.get(name);
       if (!why) continue;
       const reason = why.own
@@ -1284,7 +1284,7 @@ export function evalSource(
   if (futureManager) {
     futureManager.registry = registry;
     futureManager.evalCtx = evalCtx;
-    (evalCtx as any).__futureManager = futureManager;
+    (evalCtx as any).futureManager = futureManager;
   }
 
   // Helper: collect Symbol names from a value tree (for dependency tracking

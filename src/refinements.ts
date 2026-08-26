@@ -659,13 +659,13 @@ export function predicatesOf(v: Value): PredicateSet | null {
 
 function encodePredicates(set: PredicateSet): Value {
   const ctx: ContextValue = makeContext();
-  (ctx as any).__predicateSet = set;
+  (ctx as any).predicateSet = set;
   return ctx;
 }
 
 function decodePredicates(v: Value): PredicateSet | null {
   if (v.kind !== ValueKind.Structure) return null;
-  return (v as any).__predicateSet ?? null;
+  return (v as any).predicateSet ?? null;
 }
 
 // =============================================================================
@@ -780,17 +780,17 @@ export function meetKnowledge(a: Knowledge, b: Knowledge): Knowledge {
 }
 
 /** Encode a domain into a Value so it can live as a component. We stash it
- *  on a Context with a hidden `__abstractDomain` field — cheap, opaque to the
+ *  on a Context with a hidden `abstractDomain` field — cheap, opaque to the
  *  evaluator, decoded by the refinement helpers. */
 function encodeDomain(d: AbstractDomain): Value {
   const ctx: ContextValue = makeContext();
-  (ctx as any).__abstractDomain = d;
+  (ctx as any).abstractDomain = d;
   return ctx;
 }
 
 function decodeDomain(v: Value): AbstractDomain | null {
   if (v.kind !== ValueKind.Structure) return null;
-  return (v as any).__abstractDomain ?? null;
+  return (v as any).abstractDomain ?? null;
 }
 
 // =============================================================================

@@ -376,7 +376,7 @@ export class ModuleLoader {
     const moduleObj = buildModuleObject(id, allBindings, exportNames);
 
     // Extract grammar fragment if module registered any parselets
-    const grammarFragment = (evalCtx as any).__grammar_fragment;
+    const grammarFragment = (evalCtx as any).grammarFragment;
 
     const ext: Extension = {
       name: id,

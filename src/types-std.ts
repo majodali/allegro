@@ -233,7 +233,7 @@ export function assertMemberReachable(
   ctx: ContextValue | undefined,
   desc?: ContextValue | null,
 ): void {
-  if (!(type as any).__hasPrivateMembers) return;
+  if (!(type as any).hasPrivateMembers) return;
   const d = desc !== undefined ? desc : typeMemberDescriptor(type, fieldName);
   if (!d || !isPrivateDescriptor(d)) return;
   if (ctx && scopeHoldsPrivilege(ctx, type)) return;
@@ -246,7 +246,7 @@ export function assertMemberReachable(
  *  types that declare private members (everyone else: the ctx as-is,
  *  zero allocation). */
 export function typePrivilegedCtx(type: ContextValue, ctx: ContextValue): ContextValue {
-  if (!(type as any).__hasPrivateMembers) return ctx;
+  if (!(type as any).hasPrivateMembers) return ctx;
   return scopePrivilegeExtend(ctx, type);
 }
 
@@ -257,15 +257,15 @@ export function typePrivilegedCtx(type: ContextValue, ctx: ContextValue): Contex
  *  for descriptor internals and non-member contexts. */
 function addMember(members: ContextValue, scopeFqn: string, baseName: string, desc: Value): void {
   addBinding(members, memberFqnIn(scopeFqn, baseName), desc);
-  (members as any).__memberNameIndex = undefined;
+  (members as any).memberNameIndex = undefined;
 }
 
 /** Lazy base-name index on a member set (JS-side cache field, like
- *  `__predicateSet`'s precedent). Sound because member sets are
+ *  `predicateSet`'s precedent). Sound because member sets are
  *  populated fully during construction before the first lookup and are
  *  never mutated after (derived types clone into fresh sets). */
 function memberNameIndex(members: ContextValue): Map<string, Value[]> {
-  const cached = (members as any).__memberNameIndex as Map<string, Value[]> | undefined | null;
+  const cached = (members as any).memberNameIndex as Map<string, Value[]> | undefined | null;
   if (cached) return cached;
   const idx = new Map<string, Value[]>();
   for (const [key, b] of members.bindings) {
@@ -275,7 +275,7 @@ function memberNameIndex(members: ContextValue): Map<string, Value[]> {
     if (arr) arr.push(b.value);
     else idx.set(base, [b.value]);
   }
-  (members as any).__memberNameIndex = idx;
+  (members as any).memberNameIndex = idx;
   return idx;
 }
 
@@ -333,7 +333,7 @@ function drawMemberKeys(drawnContexts: ContextValue[], baseName: string, localSc
  *  conflict check) may have built it on a partial set. */
 function addMemberAt(members: ContextValue, key: string, desc: Value): void {
   addBinding(members, key, desc);
-  (members as any).__memberNameIndex = undefined;
+  (members as any).memberNameIndex = undefined;
 }
 
 /** C5.2b: base-name member lookup over a member set — kernel fast path
@@ -368,7 +368,7 @@ function memberBindingByName(members: ContextValue, name: string): Value | undef
  *  the binding step, before anything external draws the keys; drawn
  *  (non-local) keys are untouched. */
 export function stabilizeTypeMemberScope(typeCtx: ContextValue, stableScope: string): void {
-  const local = (typeCtx as any).__localMemberScope as string | undefined;
+  const local = (typeCtx as any).localMemberScope as string | undefined;
   if (!local || local === stableScope) return;
   const membersV = getMembers(typeCtx);
   if (membersV?.kind !== ValueKind.Structure) return;
@@ -387,8 +387,8 @@ export function stabilizeTypeMemberScope(typeCtx: ContextValue, stableScope: str
       if (e.key === oldK) (e as { key: string }).key = newK;
     }
   }
-  (members as any).__memberNameIndex = undefined;
-  (typeCtx as any).__localMemberScope = stableScope;
+  (members as any).memberNameIndex = undefined;
+  (typeCtx as any).localMemberScope = stableScope;
 }
 
 /** Read-side projection view for consumers that iterate members by base
@@ -1018,7 +1018,7 @@ function buildRecordType(
   // resolve inside drawMemberKey (shared symbol → one key; distinct
   // same-named symbols → explicit ambiguity error).
   const recordScope = newTypeMemberScope();
-  (newType as any).__localMemberScope = recordScope;
+  (newType as any).localMemberScope = recordScope;
   // B-097 V3 (V-R3/V-R5): a `private(...)` declaration NEVER draws — its
   // symbol is minted type-local (the member stays in the defining scope,
   // D42), so it can neither override a drawn member nor satisfy foreign
@@ -1043,7 +1043,7 @@ function buildRecordType(
     if (f.attrs?.private) {
       hasPrivateMembers = true;
       const desc = makeFieldDescriptor(f.name, f.type, f.attrs);
-      (desc as any).__ownerShape = newType;
+      (desc as any).ownerShape = newType;
       addMemberAt(members, privateKeyFor(f.name), desc);
       continue;
     }
@@ -1072,7 +1072,7 @@ function buildRecordType(
     }
     if (m.attrs?.private) {
       hasPrivateMembers = true;
-      (desc as any).__ownerShape = newType;
+      (desc as any).ownerShape = newType;
       addMemberAt(members, privateKeyFor(m.name), desc);
       continue;
     }
@@ -1133,7 +1133,7 @@ function buildRecordType(
   // B-097 V3: host-plane flag — the kernel mediation check and privilege
   // planting are gated on it, so types without private members pay
   // nothing on the dispatch hot path.
-  if (hasPrivateMembers) (newType as any).__hasPrivateMembers = true;
+  if (hasPrivateMembers) (newType as any).hasPrivateMembers = true;
 
   const isBundle = fields.length === 0 && methods.length > 0 && customConstruct === null;
   if (isBundle) {
@@ -1292,14 +1292,14 @@ function buildInterfaceType(
   // declarations draw from the bundles (a matching base name binds the
   // drawn member symbol); new names get interface-local symbols.
   const ifaceScope = newTypeMemberScope();
-  (ifaceType as any).__localMemberScope = ifaceScope;
+  (ifaceType as any).localMemberScope = ifaceScope;
   for (const m of declaredMembers) {
     const desc = makeFieldDescriptor(m.name, m.type, m.attrs);
     // B-097 V3: a private interface declaration stays interface-local —
     // it is never drawn and imposes no conformance requirement (V-R6).
     if (m.attrs?.private) {
-      (desc as any).__ownerShape = ifaceType;
-      (ifaceType as any).__hasPrivateMembers = true;
+      (desc as any).ownerShape = ifaceType;
+      (ifaceType as any).hasPrivateMembers = true;
       addMemberAt(members, memberFqnIn(ifaceScope, m.name), desc);
       continue;
     }
@@ -1724,7 +1724,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
 
   const newConstruct = getConstruct(newType) as PrimitiveFunctionValue | undefined;
   const liftScope = newTypeMemberScope();
-  (newType as any).__localMemberScope = liftScope;
+  (newType as any).localMemberScope = liftScope;
 
   for (const opName of ops) {
     const parentDesc = parentMembers?.kind === ValueKind.Structure
@@ -1788,7 +1788,7 @@ function buildMethodLayer(baseType: ContextValue, methods: { name: string; impl:
     }
   }
   const layerScope = newTypeMemberScope();
-  (newType as any).__localMemberScope = layerScope;
+  (newType as any).localMemberScope = layerScope;
   for (const m of methods) {
     if (memberBindingByName(newMembers, m.name) !== undefined) {
       throw new AllegroError(`method '${m.name}' conflicts with an existing member`);
@@ -2320,7 +2320,7 @@ function lawSamples(t: ContextValue): { samples: Value[]; exhaustive: boolean } 
       exhaustive: true,
     };
   }
-  const dom = getAbstractDomain(t) ?? (t as any).__abstractDomain;
+  const dom = getAbstractDomain(t) ?? (t as any).abstractDomain;
   if (dom && dom.kind === "interval") {
     const lo = Number.isFinite(dom.lo) ? dom.lo : 0;
     const hi = Number.isFinite(dom.hi) ? dom.hi : Infinity;
@@ -3930,7 +3930,7 @@ writeShape(EquatableType, InterfaceKind);
 markInterface(EquatableType, makeInt(1));
 {
   const EQUATABLE_SCOPE = typeMemberScopeFqn("Equatable");
-  (EquatableType as any).__localMemberScope = EQUATABLE_SCOPE;
+  (EquatableType as any).localMemberScope = EQUATABLE_SCOPE;
   const members = makeContext();
   addMember(members, EQUATABLE_SCOPE, "eq", makeFieldDescriptor("eq", FunctionType));
   const reflProp = makePrimitive("Equatable.law.refl", (args, ctx, evalFn) =>
@@ -4132,7 +4132,7 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
 // stop using the link; `pure instanceof Effect` is the check now, and
 // `pure subtypeof Effect` is FALSE — §6 delta 6).
 //
-// An instance IS its label set (D39 __effectBound note): `pure` = {},
+// An instance IS its label set (D39 effectBound note): `pure` = {},
 // a named effect = {name}, an operator-minted conjunction (`io & time`,
 // D40 R3) = the union set, `opaque` = top (null — unbounded). Instances
 // are MEMOIZED by label set, so equal-set conjunctions are the SAME

@@ -92,13 +92,41 @@ interface LintPattern {
   regex: RegExp;
   /** Files where the pattern is inherently legitimate (e.g. definition site). */
   excludeFiles?: string[];
+  /** Match against source with string/template literals blanked out, so a
+   *  property-access pattern does not fire on `"record.__construct"`. */
+  stripLiterals?: boolean;
+  /** Ratchet against the committed baseline instead of hard-failing on any
+   *  occurrence. For patterns whose violations are PRE-EXISTING and being
+   *  counted for the first time: hard-fail is the end state (a pattern
+   *  already driven to zero), the ratchet is how it gets there. Flip to
+   *  hard-fail — i.e. delete this flag — when the count reaches zero. */
+  ratchetOnly?: boolean;
 }
 
 // The forbidden-access patterns the accessor layer (C1.1–C1.3) will absorb.
 const LINT_PATTERNS: LintPattern[] = [
   { name: "components-direct", regex: /\.components\b/g },
+  // B-104(c): the ratchet has to see every way a `__*` name can REACH a
+  // key, or it ratchets one spelling while the others go uncounted. This
+  // one — a quote-delimited literal — is the original, and stays hard-fail;
+  // the three below it are the spellings it never saw. (Backticks are NOT
+  // folded in here: in this codebase a backticked `__name` is almost always
+  // a markdown code span inside a doc comment, i.e. prose about a slot, not
+  // a use of one. Interpolated template KEYS are the real evasion route and
+  // get their own pattern.)
   { name: "dunder-string-literal", regex: /["']__[A-Za-z0-9_]*["']/g },
-  { name: "bindings-get-dunder", regex: /bindings\.get\(\s*["']__/g },
+  // A synthesized dunder key: `__future_${n}`, `__anon_${n}`, `__bare_${n}`.
+  // Five such sites existed, none of them counted before B-104.
+  { name: "dunder-template-key", regex: /`[^`\n]*__[A-Za-z0-9_]*\$\{/g, ratchetOnly: true },
+  // Property access on a dunder — literals stripped first, so the primitive
+  // DIAGNOSTIC names (`makePrimitive("record.__construct", …)`) fall to the
+  // pattern below rather than being miscounted as host-plane reads.
+  { name: "dunder-property-access", regex: /\.__[A-Za-z0-9_]+/g, stripLiterals: true, ratchetOnly: true },
+  // Dunder inside a primitive's diagnostic name — user-visible in error
+  // messages, so in scope for B-104 even though it is not a slot access.
+  { name: "dunder-primitive-name", regex: /["'`][A-Za-z0-9_$]+\.__[A-Za-z0-9_]+["'`]/g, ratchetOnly: true },
+  // Binding-map access by dunder key — every mutator, not just the reader.
+  { name: "bindings-get-dunder", regex: /bindings\.(?:get|has|set|delete)\(\s*["'`]__/g },
   // dataOf's strip-vs-preserve asymmetry is retired by C1.5/C4.3; its
   // definition site is exempt.
   { name: "dataOf-call", regex: /\bprimaryOf\s*\(/g, excludeFiles: ["src/types.ts"] },
@@ -111,11 +139,13 @@ const LINT_PATTERNS: LintPattern[] = [
   { name: "scope-facts-direct", regex: /\.scopePredicates\b/g, excludeFiles: ["src/scope.ts"] },
 ];
 
-// Production sources only. test.ts pokes internals as test setup by design;
-// parser.ts is generated; this file contains the patterns as regexes.
+// Production sources only. parser.ts is generated; this file contains the
+// patterns as regexes. B-102: the `src/test.ts` exemption is retired — that
+// file no longer exists (the suite is `src/test/`, scanned like production
+// code since lane B's C0 migration), and a stale exemption invites someone
+// to reintroduce the hole it used to hold open.
 const SCAN_EXCLUDE = new Set([
   "src/parser.ts",
-  "src/test.ts",
   "src/boundary-tests.ts",
 ]);
 
@@ -131,12 +161,23 @@ function productionSources(): string[] {
     .filter((f) => !SCAN_EXCLUDE.has(f));
 }
 
+/** Blank the CONTENTS of string and template literals, preserving length and
+ *  line structure so counts stay comparable. Deliberately simple: quotes are
+ *  matched pairwise on a line, which is enough for this codebase (no
+ *  multi-line string literals in `src/`) and cannot under-blank in a way that
+ *  hides a violation — an unmatched quote leaves the text intact. */
+function blankLiterals(text: string): string {
+  return text.replace(/(["'`])(?:\\.|(?!\1)[^\\\n])*\1/g, (m) => m[0] + " ".repeat(m.length - 2) + m[0]);
+}
+
 export function countLintViolations(): Record<string, Record<string, number>> {
   const result: Record<string, Record<string, number>> = {};
   for (const file of productionSources()) {
-    const text = fs.readFileSync(path.join(REPO_ROOT, file), "utf-8");
+    const raw = fs.readFileSync(path.join(REPO_ROOT, file), "utf-8");
+    const stripped = blankLiterals(raw);
     for (const p of LINT_PATTERNS) {
       if (p.excludeFiles?.includes(file)) continue;
+      const text = p.stripLiterals ? stripped : raw;
       const count = [...text.matchAll(p.regex)].length;
       if (count > 0) {
         (result[file] ??= {})[p.name] = count;
@@ -167,7 +208,12 @@ export function runBoundaryLint(baseline: BoundaryBaseline): LintReport {
       // from the ratchet in both modes.
       if (baseline.allowedFiles.includes(file)) continue;
       const base = baseline.lint[file]?.[pattern] ?? 0;
-      if (baseline.hardFail && count > 0) {
+      // A `ratchetOnly` pattern counts pre-existing violations that no one
+      // had measured before; hard-failing them would fail the suite on the
+      // commit that made them visible. It ratchets until B-104 drives it to
+      // zero, then the flag comes off and it hard-fails like the rest.
+      const ratchetOnly = LINT_PATTERNS.find((p) => p.name === pattern)?.ratchetOnly === true;
+      if (baseline.hardFail && !ratchetOnly && count > 0) {
         breaches.push(`${file} [${pattern}]: ${count} (hard-fail mode)`);
       } else if (count > base) {
         breaches.push(`${file} [${pattern}]: ${count} > baseline ${base}`);

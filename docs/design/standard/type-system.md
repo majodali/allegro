@@ -114,14 +114,32 @@ ratified decisions are V-R1–V-R8 in `docs/plans/visibility.md`.
 ## 4. The meta-property protocol [under revision]
 
 Types and rich values communicate through string-keyed Context bindings —
-currently `__`-prefixed: `__name`, `__type`, `__members`, `__extends`,
-`__construct`, `__getMember`, `__interface`, `__predicate`,
-`__abstractDomain`, `__invariantsList`, `__effectBound`, `__wraps`,
-`__discharged`, `__eq_lhs`/`__eq_rhs`, `__genericParams`,
-`__effectVarParams`, `__inferredEffects`, and others.
+still `__`-prefixed on the BINDING plane: `__name`, `__type`, `__members`,
+`__construct`, `__getMember`, `__interface`, `__predicate`, `__refines`,
+`__wraps`, `__union`, `__args`, `__generic`, `__discharged`, `__length`.
 
 **Maintainer direction (2026-06):** the `__` prefix is an accreted artifact
 — it gestures at privacy and clash-avoidance but provides neither.
+
+**Retirement in progress (B-104, 2026-08).** The direction above is now a
+directive, and the survey behind it separated two populations that the one
+prefix had been hiding:
+
+- **Host plane — retired 2026-08 (chunk 1).** `abstractDomain`,
+  `effectBound`, `effectLabels`, `effectSet`, `inferredEffects`,
+  `predicateSet`, `lawBackings`, `genericParams`, `partial`,
+  `decreasesMetric`, `declaredEffectsAst`, `paramEffectPairs`,
+  `provenClauses`, `total`, `assumeTerminates`, `futureManager`,
+  `tailCall`, `compileMode`, the three `grammar*` properties and the
+  member-dispatch expandos are JS properties on host objects. They share a
+  namespace with nothing, so the prefix bought nothing; 27 names were
+  renamed with no behaviour change.
+- **Binding plane — open.** The names listed above sit in the SAME
+  `bindings` map as user fields, and `isMetaSlotKey(key) =
+  key.startsWith("__")` is the partition test between the two. Here the
+  prefix IS load-bearing, so retiring it means replacing the partition —
+  a storage plane, registry membership, or interned keys — not renaming
+  past it. B-104(b) carries the options and awaits a ruling.
 
 **The redesign discussion has since concluded (2026-07)** — outcome in
 `docs/design/allegretto/structures.md`; the questions this section

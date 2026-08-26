@@ -930,7 +930,7 @@ conjunction are one Context). Members live once on the kind (§6 delta
 per-instance member copying and the `__refines = Effect` chain hack are
 deleted, and the D39 checklist advances — the `__effect_kind` slot is
 retired (→ the `kind` data field declared on Effect) and
-`__effectBound` becomes derived-at-mint from the label set. The R3
+`effectBound` becomes derived-at-mint from the label set. The R3
 operator mint closes the anonymous-conjunction debt: `io & time` mints
 an anonymous instance carrying the union set (typed_amp's opaque
 coercion gone). §6 deltas ruled and landed: `pure subtypeof Effect` is
@@ -990,7 +990,7 @@ shared-member-set guard now carries only `structuralWrap`. The post-hoc
 `constructor` meta-method removed; construction authority is the
 reserved `construct` define-spec key (ruling R3). Effect variables
 (C7.2c): `Param.effectVar` is a declared reference into
-`__genericParams`; bare variable names ride inferred effect sets; the
+`genericParams`; bare variable names ride inferred effect sets; the
 `__effectvar:` marker strings and `__effectVarParams` side table are
 deleted. Rulings R1–R3 maintainer-ratified 2026-08, R1 as amended
 (recorded in the structures plan §4).*
@@ -1047,7 +1047,7 @@ in the plan doc (D39); as of C1.1 it is also **code** —
 `src/slots.ts` — and mechanically enforced by the boundary harness.
 
 *D39 addendum (maintainer-ratified 2026-07)* — three slots present in code
-but absent from D39's original table: **`__effectBound`** → member on the
+but absent from D39's original table: **`effectBound`** → member on the
 Effect instance for now; dissolves into the instance's canonical label-set
 representation when Effect re-derives through the kind recipe (C6.2), the
 annotation-bound reading becoming derived. **`exported`** → scope-binding
@@ -1262,7 +1262,7 @@ disposition EXECUTED. Post-C7.1 state of the original D39 inventory:
   binding on generic types (C7.2a); `__constructor` → collapsed into
   `construct` (D45 one-surface, C7.2a); `__effectvar:` markers +
   `__effectVarParams` side table → `Param.effectVar` declared reference
-  into `__genericParams` (C7.2c; the side table had no functional
+  into `genericParams` (C7.2c; the side table had no functional
   reader since the F1-F3 walker deletion).
 - **Registered, pinned to a future owner**: `__args`/`__generic`
   (host-read instance data on applied concretes; the language-level

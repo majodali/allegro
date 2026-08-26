@@ -8,6 +8,89 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-104 chunk 1: the host plane loses its dunders
+
+The `__*` prefix was added long ago to keep engine metadata from colliding
+with user names. Maintainer directive: retire it everywhere. The survey
+found that "everywhere" is two unrelated problems wearing the same prefix,
+and this chunk lands the one that is genuinely free.
+
+**What the prefix is actually for.** On the BINDING plane it is
+load-bearing: engine slots (`__name`, `__members`, `__type`, …) live in the
+same `bindings` map as user fields, and `isMetaSlotKey(key) =
+key.startsWith("__")` is the partition test between them — read by
+`types-std.ts` (member-dispatch narrowing, spec walks, refinement key
+filters), `runtime.ts` (source attachment), `primitives.ts` (pending-future
+scan) and the W3 completeness walk. On the HOST plane it is decoration:
+`(cfn as any).__partial` is a JS expando on a host object that shares a
+namespace with nothing. **27 host-plane names, ~180 sites, renamed; zero
+behaviour change**, typecheck clean, **1197/1197**.
+
+*Three test NAMES changed, because they quote the property under test
+("…stamps Param.effectBound from `__effectBound`" → "…from `effectBound`").
+No test condition was touched. Shard assignment is by test-name hash, so
+this moved exactly one test between shards — 407/418/374 became
+407/417/375, with the total and the corpus walk unchanged. Recording it
+because a shifting per-shard count is otherwise the signature of a lost
+test, and that signature should never go unexplained.*
+
+- **`__compileMode` was mis-registered.** `SLOT_REGISTRY` gave it
+  `storages: ["context-binding"]`, but every reader and writer is a JS
+  expando (`evaluator.ts` precompile flag, `scope.ts` chain probe) — there
+  has never been a binding by that name. It renamed with the host plane and
+  its storage class was corrected.
+- **Two dead PREFIX rows retired.** With `__grammarValue` /
+  `__grammarHandle` / `__grammar_fragment` renamed, the `__grammar` and
+  `__parse` prefix registrations matched nothing. A prefix row that matches
+  nothing is not inert: it pre-approves every future `__grammar*` binding,
+  which is exactly what would hide one from the W3 walk. Removed, and the
+  walk still passes — confirming nothing was riding them.
+  `__inline_grammar` IS a live binding prefix and stays.
+
+**The lint could not see most of what it was ratcheting.** The
+`dunder-string-literal` pattern matched quote-delimited literals only, so
+three spellings never entered the count — synthesized template keys
+(`` `__future_${n}` ``, `` `__anon_${n}` ``, `` `__bare_${n}` ``: five
+sites, zero counted), property access, and primitive diagnostic names
+(`"record.__construct"`). Each now has a pattern, and `bindings-get-dunder`
+covers `.has`/`.set`/`.delete` alongside `.get`.
+
+- **New patterns ratchet rather than hard-fail.** `hardFail: true` treats
+  any nonzero count outside `allowedFiles` as a breach, so a pattern that
+  counts PRE-EXISTING violations for the first time would fail the suite on
+  the very commit that made them visible. `LintPattern.ratchetOnly` marks
+  those: they hold at the committed baseline and hard-fail once B-104's
+  remaining half drives them to zero. Hard-fail is the end state, the
+  ratchet is how a pattern gets there.
+- **Property access is matched against literal-blanked source**, so
+  `makePrimitive("record.__construct", …)` is counted as a diagnostic name
+  rather than miscounted as a host-plane read.
+- **Backticks were deliberately NOT folded into the existing hard-fail
+  pattern.** In this codebase a backticked `__name` is nearly always a
+  markdown code span in a doc comment — prose *about* a slot, not a use of
+  one. Folding them in would have added ~30 false positives to a
+  hard-failing pattern and taught the next reader to route around it.
+- **B-102 closed** in passing: the `src/test.ts` entry in `SCAN_EXCLUDE`
+  is gone (the file has not existed since lane B; the suite modules under
+  `src/test/` are scanned like production code).
+
+**`src/slots.ts` was invisible to grep.** `unionBackings` built its dedup
+key with two literal NUL bytes instead of `\x00` escapes, so git and
+ripgrep classified the file as binary. The one file where every slot name
+is defined was silently absent from plain-text searches — dunder searches
+included, which is part of why the host-plane population went uncounted
+for so long. Escaped; the file reads as text.
+
+**What remains (B-104(b))** is the binding-plane partition, and it needs a
+ruling rather than a rename: a fourth `meta` plane on `Structure` (the
+recommendation — it makes the partition a storage question instead of a
+name question, and stays compatible with D39's per-slot dispositions),
+registry membership (cheapest, but it makes `name`/`members`/`length`
+unusable as ordinary user field names), or interned keys (soundest,
+largest). The synthetic binding-name families are a separate sub-problem:
+they are real names in the user namespace, so their answer is likely a
+`Binding` attribute beside `cell`/`visibility`/`isComplete`.
+
 ## 2026-08 — Lane merge tidy-up; the parallel-lane experiment ends
 
 Lanes A and B are merged (PRs #32/#33/#34) and the working model reverts to
