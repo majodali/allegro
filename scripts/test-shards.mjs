@@ -5,10 +5,10 @@
 // Why processes rather than workers: the suite leans on module-level
 // state (channel registry, the divergence probe/cutoff, type-system
 // singletons), so isolation per shard is the property we want, and it is
-// free — each shard is an ordinary `tsx src/test.ts` run.
+// free — each shard is an ordinary `tsx src/test/index.ts` run.
 //
 // Shard assignment is by test-name hash (see ALLEGRO_TEST_SHARD in
-// src/test.ts). Everything distributes, including the `.alg` corpus
+// src/test/harness.ts). Everything distributes, including the `.alg` corpus
 // files; whole-shard self-checks whose subject is that shard's own work
 // run in every shard instead (`everyShard`), so the union of the shards
 // covers what the single-process run covers.
@@ -32,7 +32,7 @@ const SHARDS = requested > 0 ? requested : Math.max(2, Math.min(4, cpus().length
 function runShard(index) {
   return new Promise((resolve) => {
     const started = Date.now();
-    const child = spawn("npx", ["tsx", "src/test.ts"], {
+    const child = spawn("npx", ["tsx", "src/test/index.ts"], {
       env: { ...process.env, ALLEGRO_TEST_SHARD: `${index}/${SHARDS}` },
       stdio: ["ignore", "pipe", "pipe"],
     });

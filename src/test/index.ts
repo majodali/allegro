@@ -1,169 +1,36 @@
 // =============================================================================
 // Allegretto - Test Suite
-// Run: npx tsx src/test.ts
+// Run: npx tsx src/test/index.ts
 // =============================================================================
 
-import { formatValue } from "./primitives.js";
-import { evalSource as runtimeEval, Extension, extensionToContext, applyPhase, DependencyRegistry } from "./runtime.js";
-import { createFutureManager, FutureManager } from "./futures.js";
-import { ModuleLoader, buildModuleObject } from "./modules.js";
-import { evaluate } from "./evaluator.js";
-import { GrammarExtension, registryGet } from "./grammar-ext.js";
-import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, EquatableType, isLawDescriptor, futureOf, futureElementType, typeContextName as tsTypeContextName } from "./types-std.js";
-import { Grammar, parseGrammar } from "./parser.js";
-import { channelReadRaw, componentsView, getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getWraps, getGenericArgs, getSlotCount, writeShape, setMembers, SLOT_KEYS, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "./slots.js";
-import { exportedSymbols, symbolFromWire, kernelMemberFqn, fqnBaseName } from "./symbols.js";
-import { extractGrammarFragment, asGrammarValue } from "./primitives.js";
-import { emptyGrammarFragment, GrammarFragment } from "./types.js";
-import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, dataOf, isResolved, stringToBits, bitsToString } from "./types.js";
+import { formatValue } from "../primitives.js";
+import { evalSource as runtimeEval, Extension, extensionToContext, applyPhase, DependencyRegistry } from "../runtime.js";
+import { createFutureManager, FutureManager } from "../futures.js";
+import { ModuleLoader, buildModuleObject } from "../modules.js";
+import { evaluate } from "../evaluator.js";
+import { GrammarExtension, registryGet } from "../grammar-ext.js";
+import { createTypeSystem, getTypeName, getType, typeMethod, typeMemberDescriptor, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, isGetterDescriptor, MethodType, FieldType, Type, IntType, StringType, NoneType, ErrorType, noneSingleton, structuralWrap, InterfaceKind, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, BoolType, isGenericType, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, EquatableType, isLawDescriptor, futureOf, futureElementType, typeContextName as tsTypeContextName } from "../types-std.js";
+import { Grammar, parseGrammar } from "../parser.js";
+import { channelReadRaw, componentsView, getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getWraps, getGenericArgs, getSlotCount, writeShape, setMembers, SLOT_KEYS, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "../slots.js";
+import { exportedSymbols, symbolFromWire, kernelMemberFqn, fqnBaseName } from "../symbols.js";
+import { extractGrammarFragment, asGrammarValue } from "../primitives.js";
+import { emptyGrammarFragment, GrammarFragment } from "../types.js";
+import { Value, ValueKind, BitsValue, ContextValue, AllegroError, makePrimitive, makeInt, makeFloat, bitsToFloat, makeContext, makeExpr, makeParam, makeComposedFn, makeMultiValue, dataOf, isResolved, stringToBits, bitsToString } from "../types.js";
 
 // --- Test infrastructure ---
-
-let passed = 0;
-let failed = 0;
-const failures: string[] = [];
-
-function evalSource(source: string): Value | null {
-  return runtimeEval(source + "\n").value;
-}
-
-/** Evaluate and return the formatted string result. */
-function evalStr(source: string): string {
-  const val = evalSource(source);
-  if (val === null) throw new Error("No value produced");
-  return formatValue(val);
-}
-
-/** Evaluate and return the numeric result (for Bits values). */
-function evalNum(source: string): number {
-  const val = evalSource(source);
-  if (val === null) throw new Error("No value produced");
-  const p = dataOf(val);
-  if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
-  // Handle signed 64-bit
-  if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
-  return Number(p.data);
-}
-
-// Per-test timing — the summary prints the slowest tests so suite-cost
-// optimization stays evidence-based (see the "suite verification cost"
-// discussion, 2026-07).
-const testTimes: { name: string; ms: number }[] = [];
-const sectionTimes: { name: string; ms: number }[] = [];
-const suiteT0 = performance.now();
-
-// Dev-tier filter (two-tier verification discipline, 2026-07): set
-// ALLEGRO_TEST_FILTER to a regex to run only matching tests during
-// iteration. Filtered runs are DEV runs — the suite floor and full-gate
-// semantics are suspended, and the summary says so. Landings always use
-// the full unfiltered suite.
-const TEST_FILTER = process.env.ALLEGRO_TEST_FILTER
-  ? new RegExp(process.env.ALLEGRO_TEST_FILTER)
-  : null;
-let filteredOut = 0;
-
-// Sharding (suite-performance pass): ALLEGRO_TEST_SHARD="i/n" runs only
-// the tests this shard owns, so N processes cover the suite between them.
 //
-// Assignment is by a hash of the test NAME, deliberately not by
-// registration index. An index-based scheme requires every shard to
-// register exactly the same tests in the same order, which a single
-// conditional registration silently breaks: the counters drift, the
-// shards disagree about who owns what, and tests vanish from the union
-// with nothing failing. (That is not hypothetical — it is what the first
-// version of this did, losing 93 tests.) A name hash is order-free, so
-// conditional registration cannot desynchronize anything, and it
-// scatters the clustered slow tests across shards.
-//
-// A shard is NOT a landing gate on its own; `scripts/test-shards.mjs`
-// aggregates the shards and applies the gate to the total.
-const SHARD = (() => {
-  const raw = process.env.ALLEGRO_TEST_SHARD;
-  if (!raw) return null;
-  const m = /^(\d+)\/(\d+)$/.exec(raw.trim());
-  if (!m) throw new Error(`ALLEGRO_TEST_SHARD must look like "0/4", got "${raw}"`);
-  const index = Number(m[1]), count = Number(m[2]);
-  if (count < 1 || index < 0 || index >= count) {
-    throw new Error(`ALLEGRO_TEST_SHARD out of range: "${raw}"`);
-  }
-  return { index, count };
-})();
-let registeredCount = 0;
-let shardedOut = 0;
-let everyShardCount = 0;
+// The harness (registration, sharding, the dev filter, timing, the summary)
+// and the shared evaluation fixtures now live beside this file; every area
+// module imports the same instances, so the counters and the suite-wide
+// registration count stay single-sourced.
 
-/** FNV-1a over the test name — a stable, order-free shard assignment. */
-function hashName(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-/** Per-test shard options.
- *  - default: the name hash picks one owning shard.
- *  - `everyShard`: run in ALL shards. For whole-shard self-checks whose
- *    subject is that shard's own work (the corpus walk), where running in
- *    a single shard would leave the other shards' work unchecked. */
-export interface ShardOpts { everyShard?: boolean }
-
-/** Does this test belong to the running shard? Every shard calls this for
- *  every registered test, so `registeredCount` is suite-wide and the
- *  aggregator can verify the shards saw the same suite. */
-function inShard(name: string, opts?: ShardOpts): boolean {
-  registeredCount++;
-  if (opts?.everyShard) { everyShardCount++; return true; }
-  if (SHARD === null) return true;
-  const mine = (hashName(name) % SHARD.count) === SHARD.index;
-  if (!mine) shardedOut++;
-  return mine;
-}
-
-function test(name: string, fn: () => void, opts?: ShardOpts): void {
-  const mine = inShard(name, opts);
-  if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
-  if (!mine) return;
-  if (process.env.ALLEGRO_TEST_TRACE) console.error("TEST:", name);
-  const t0 = performance.now();
-  try {
-    fn();
-    passed++;
-  } catch (e: any) {
-    failed++;
-    const msg = `FAIL: ${name} — ${e.message}`;
-    failures.push(msg);
-    console.log(msg);
-  }
-  if (process.env.ALLEGRO_TEST_TRACE) console.error("DONE:", name);
-  testTimes.push({ name, ms: performance.now() - t0 });
-}
-
-async function timedSection<T>(name: string, fn: () => Promise<T>): Promise<T> {
-  const t0 = performance.now();
-  const r = await fn();
-  sectionTimes.push({ name, ms: performance.now() - t0 });
-  return r;
-}
-
-function eq(actual: any, expected: any, label?: string): void {
-  if (actual !== expected) {
-    throw new Error(`${label ? label + ": " : ""}expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
-  }
-}
-
-function throws(fn: () => void, pattern?: string): void {
-  try {
-    fn();
-    throw new Error("Expected an error but none was thrown");
-  } catch (e: any) {
-    if (e.message === "Expected an error but none was thrown") throw e;
-    if (pattern && !e.message.includes(pattern)) {
-      throw new Error(`Expected error containing "${pattern}", got: ${e.message}`);
-    }
-  }
-}
+import {
+  test, asyncTest, asyncThrows, eq, throws, timedSection,
+  noteSyncBodyDone, reportSummary, SHARD, ShardOpts,
+} from "./harness.js";
+import {
+  evalSource, evalStr, evalNum, evalNumExt, evalStd, typeExt, mathExtension,
+} from "./fixtures.js";
 
 // --- Tests ---
 
@@ -421,44 +288,6 @@ test("persistent context: redefine binding", () => {
 
 // == Anonymous Extensions ==
 
-// Build a math extension with abs, max, min
-const mathExtension: Extension = {
-  name: "math",
-  bindings: {
-    abs: makePrimitive("abs", (args) => {
-      const p = dataOf(args[0]);
-      if (p.kind !== ValueKind.Bits) throw new AllegroError("abs: expected Bits");
-      const v = p.length === 64 && p.data >= 2n ** 63n ? p.data - 2n ** 64n : p.data;
-      return makeInt(Number(v < 0n ? -v : v));
-    }),
-    max: makePrimitive("max", (args) => {
-      const a = dataOf(args[0]) as BitsValue;
-      const b = dataOf(args[1]) as BitsValue;
-      const av = a.length === 64 && a.data >= 2n ** 63n ? a.data - 2n ** 64n : a.data;
-      const bv = b.length === 64 && b.data >= 2n ** 63n ? b.data - 2n ** 64n : b.data;
-      return av >= bv ? a : b;
-    }),
-    min: makePrimitive("min", (args) => {
-      const a = dataOf(args[0]) as BitsValue;
-      const b = dataOf(args[1]) as BitsValue;
-      const av = a.length === 64 && a.data >= 2n ** 63n ? a.data - 2n ** 64n : a.data;
-      const bv = b.length === 64 && b.data >= 2n ** 63n ? b.data - 2n ** 64n : b.data;
-      return av <= bv ? a : b;
-    }),
-  },
-};
-
-/** Evaluate with extensions and return numeric result. */
-function evalNumExt(source: string, extensions?: Extension[]): number {
-  const result = runtimeEval(source + "\n", undefined, extensions);
-  const val = result.value;
-  if (val === null) throw new Error("No value produced");
-  const p = dataOf(val);
-  if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
-  if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
-  return Number(p.data);
-}
-
 test("extension: abs positive", () => {
   eq(evalNumExt("abs(42)", [mathExtension]), 42);
 });
@@ -506,38 +335,6 @@ test("extension: not available without being provided", () => {
 });
 
 // == Module Loader ==
-
-async function asyncTest(name: string, fn: () => Promise<void>): Promise<void> {
-  // Async tests honor the name filter and the shard exactly like sync
-  // ones. Before the suite-performance pass they honored NEITHER, so a
-  // "filtered" dev run still paid for the whole async block — which is
-  // what made short timeouts look like hangs.
-  const mine = inShard(name);
-  if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
-  if (!mine) return;
-  if (process.env.ALLEGRO_TEST_TRACE) console.error("ATEST:", name);
-  try {
-    await fn();
-    passed++;
-  } catch (e: any) {
-    failed++;
-    const msg = `FAIL: ${name} — ${e.message}`;
-    failures.push(msg);
-    console.log(msg);
-  }
-}
-
-async function asyncThrows(fn: () => Promise<any>, pattern?: string): Promise<void> {
-  try {
-    await fn();
-    throw new Error("Expected an error but none was thrown");
-  } catch (e: any) {
-    if (e.message === "Expected an error but none was thrown") throw e;
-    if (pattern && !e.message.includes(pattern)) {
-      throw new Error(`Expected error containing "${pattern}", got: ${e.message}`);
-    }
-  }
-}
 
 async function runModuleTests(): Promise<void> {
   await asyncTest("module: load simple module", async () => {
@@ -1171,15 +968,6 @@ test("standalone grammar: parse nested JSON", () => {
 
 // == Allegro Standard — Type System ==
 
-const typeExt = createTypeSystem();
-
-/** Evaluate source in Allegro Standard mode (uses hybrid parser) */
-function evalStd(source: string, extraExtensions?: Extension[]): Value | null {
-  const exts = [typeExt, ...(extraExtensions ?? [])];
-  const { value } = runtimeEval(source, undefined, exts, undefined, true);
-  return value;
-}
-
 test("type system: int literal has Int type", () => {
   const result = evalStd("42");
   eq(result !== null, true);
@@ -1579,200 +1367,10 @@ test("array: chained map and filter", () => {
 
 import * as fs from "fs";
 import * as path from "path";
-
-/**
- * Run an .alg file in Allegro Standard mode.
- * Captures print output and validates against "// expect: ..." comments.
- * Handles `use NAME` (and the back-compat-free pre-scanner) by loading
- * lib/NAME.alg and merging its grammar fragment, mirroring the file runner.
- */
-function runAlgFile(filePath: string, extensions?: Extension[]): void {
-  const source = fs.readFileSync(filePath, "utf-8");
-  const lines = source.split(/\r?\n/);
-
-  // Extract expected outputs from "// expect: ..." comments
-  const expectations: { lineNum: number; expected: string }[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/\/\/\s*expect:\s*(.*)/);
-    if (match) {
-      expectations.push({ lineNum: i + 1, expected: match[1].trim() });
-    }
-  }
-
-  // Pre-scan the header for `use NAME`, `use import NAME`, and `use grammar
-  // { … }` directives. Module names are collected for lib/ loading; literal
-  // grammar blocks are evaluated in a bootstrap context now.
-  const grammarNames: string[] = [];
-  const memberRefs: Array<{ module: string; member: string }> = [];
-  const literalGrammarSources: string[] = [];
-  let headerEnd = 0;
-  {
-    let i = 0;
-    const n = source.length;
-    const skipWs = (p: number): number => {
-      while (p < n) {
-        const c = source[p];
-        if (c === " " || c === "\t" || c === "\n" || c === "\r") { p++; continue; }
-        if (source.slice(p, p + 2) === "//") {
-          while (p < n && source[p] !== "\n") p++; continue;
-        }
-        break;
-      }
-      return p;
-    };
-    const findCloseBrace = (p: number): number => {
-      let depth = 0;
-      while (p < n) {
-        const ch = source[p];
-        if (ch === '"' || ch === "'") {
-          const q = ch; p++;
-          while (p < n && source[p] !== q) { if (source[p] === "\\") p++; p++; }
-          p++; continue;
-        }
-        if (source.slice(p, p + 2) === "//") { while (p < n && source[p] !== "\n") p++; continue; }
-        if (ch === "{") depth++;
-        else if (ch === "}") { depth--; if (depth === 0) return p; }
-        p++;
-      }
-      return -1;
-    };
-
-    while (i < n) {
-      i = skipWs(i);
-      if (i >= n) break;
-      if (source.slice(i, i + 4) === "use " || source.slice(i, i + 4) === "use\t") {
-        let j = i + 4;
-        while (j < n && (source[j] === " " || source[j] === "\t")) j++;
-        // `use grammar {`
-        if (source.slice(j, j + 7) === "grammar" && (source[j + 7] === " " || source[j + 7] === "\t" || source[j + 7] === "{")) {
-          const brace = source.indexOf("{", j);
-          const end = findCloseBrace(brace);
-          if (end < 0) break;
-          literalGrammarSources.push(source.slice(j, end + 1));
-          i = end + 1;
-          while (i < n && (source[i] === " " || source[i] === "\t")) i++;
-          if (i < n && source[i] === "\n") i++;
-          continue;
-        }
-        // `use NAME.MEMBER` — Phase 7d dotted form; narrow to that Grammar.
-        const dotMatch = /^(?:import\s+)?(\w+)\.(\w+)\s*(\r?\n|$)/.exec(source.slice(j));
-        if (dotMatch) {
-          grammarNames.push(dotMatch[1]);
-          memberRefs.push({ module: dotMatch[1], member: dotMatch[2] });
-          i = j + dotMatch[0].length; continue;
-        }
-        // `use NAME` or `use import NAME`
-        const m = /^(?:import\s+)?(\w+)\s*(\r?\n|$)/.exec(source.slice(j));
-        if (m) { grammarNames.push(m[1]); i = j + m[0].length; continue; }
-      }
-      break;
-    }
-    headerEnd = i;
-  }
-
-  let grammarExts: Extension[] = [];
-  const uniqModuleNames = [...new Set(grammarNames)];
-  if (uniqModuleNames.length > 0) {
-    const libDir = path.resolve("lib");
-    for (const id of uniqModuleNames) {
-      const modPath = path.join(libDir, `${id}.alg`);
-      const modSource = fs.readFileSync(modPath, "utf-8");
-      const modResult = runtimeEval(modSource, undefined, [typeExt], undefined, true);
-      const frag = extractGrammarFragment(modResult.evalCtx);
-      const bindings: Record<string, Value> = {};
-      for (const [key, b] of modResult.evalCtx.bindings) {
-        if (b.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
-          bindings[key] = b.value;
-        }
-      }
-      // `use NAME.MEMBER` — narrow to the named Grammar binding(s).
-      const mems = memberRefs.filter(m => m.module === id);
-      if (mems.length > 0) {
-        const allowed = new Set(mems.map(m => m.member));
-        for (const key of Object.keys(bindings)) {
-          const v = bindings[key];
-          if (asGrammarValue(v) && !allowed.has(key)) {
-            delete bindings[key];
-          }
-        }
-      }
-      grammarExts.push({ name: id, bindings, grammarFragment: frag });
-    }
-  }
-  // Evaluate inline literal `grammar { … }` blocks in a bootstrap context.
-  for (let idx = 0; idx < literalGrammarSources.length; idx++) {
-    const bootstrapResult = runtimeEval(literalGrammarSources[idx], undefined, [typeExt], undefined, true);
-    const gv = bootstrapResult.value;
-    if (!gv) throw new Error("use grammar { … }: no grammar value produced");
-    grammarExts.push({
-      name: `__inline_grammar_${idx}`,
-      bindings: { __inline_grammar: gv },
-    });
-  }
-  // Strip the header from the source before evaluation.
-  const cleanSource = source.slice(headerEnd);
-
-  // Capture print output
-  const printed: string[] = [];
-  const origLog = console.log;
-  console.log = (msg: any) => printed.push(String(msg));
-
-  try {
-    const exts = [typeExt, ...grammarExts, ...(extensions ?? [])];
-    const { value: fileValue, evalCtx: fileCtx } = runtimeEval(cleanSource, undefined, exts, undefined, true);
-    // Registry-completeness piggyback: walk this file's values for the
-    // boundary harness HERE (memory traversal, ~ms) instead of re-evaluating
-    // the whole corpus in the boundary section (which cost 156s of the
-    // suite before the 2026-07 suite-cost pass).
-    corpusWalkFiles++;
-    const seen = new WeakSet<object>();
-    checkValueInvariants(fileValue, path.basename(filePath), corpusWalkViolations, seen);
-    for (const b of fileCtx.bindings.values()) {
-      checkValueInvariants(b.value as any, path.basename(filePath), corpusWalkViolations, seen);
-    }
-  } catch (e: any) {
-    console.log = origLog;
-    throw e;
-  } finally {
-    console.log = origLog;
-  }
-
-  // Validate
-  const basename = path.basename(filePath);
-  if (expectations.length !== printed.length) {
-    throw new Error(
-      `${basename}: expected ${expectations.length} outputs but got ${printed.length}` +
-      `\n  Expected: ${expectations.map(e => e.expected).join(", ")}` +
-      `\n  Got: ${printed.join(", ")}`
-    );
-  }
-  for (let i = 0; i < expectations.length; i++) {
-    if (printed[i] !== expectations[i].expected) {
-      throw new Error(
-        `${basename} line ${expectations[i].lineNum}: expected "${expectations[i].expected}" but got "${printed[i]}"`
-      );
-    }
-  }
-}
-
-// Collected by runAlgFile's registry-completeness piggyback; consumed by the
-// boundary section at the end of the suite.
-import { checkValueInvariants, InvariantViolation } from "./boundary-tests.js";
-const corpusWalkViolations: InvariantViolation[] = [];
-let corpusWalkFiles = 0;
-
-function fileTest(filePath: string, extensions?: Extension[]): void {
-  const basename = path.basename(filePath);
-  // Distributed by hash like every other test. Each shard walks the
-  // corpus files it owns and checks THOSE files for registry violations
-  // (see the every-shard registry-completeness test); the union across
-  // shards covers the whole corpus, and the aggregator asserts the total
-  // coverage the single-process run asserts locally.
-  test(`file: ${basename}`, () => {
-    runAlgFile(filePath, extensions);
-    eq(true, true); // if we get here, all expectations matched
-  });
-}
+import {
+  runAlgFile, fileTest, corpusWalk, primNames, typeNames,
+} from "./alg-files.js";
+import { primitives as primRegistry } from "../primitives.js";
 
 // Run all .alg test files
 const testsDir = path.resolve("tests");
@@ -1784,10 +1382,6 @@ fileTest(path.join(testsDir, "logical.alg"));
 fileTest(path.join(testsDir, "functions.alg"));
 
 // Module test needs a math extension
-import { primitives as primRegistry } from "./primitives.js";
-const primNames = new Set(Object.keys(primRegistry));
-const typeNames = new Set(["Int", "Float", "String", "Bool", "Array", "Object", "true", "false"]);
-
 const mathSource = fs.readFileSync(path.join(testsDir, "lib", "mymath.alg"), "utf-8");
 const mathResult = runtimeEval(mathSource, undefined, [typeExt], undefined, true);
 const mathBindings: Record<string, Value> = {};
@@ -1847,8 +1441,8 @@ test("B-097 V1: exported typed function declaration marks its binding", () => {
 
 // == B-097 V2: pipeline unification ==
 
-import { withType as tsWithType } from "./types-std.js";
-import { effectsOf as tsEffectsOf, livenessDispositions } from "./effects.js";
+import { withType as tsWithType } from "../types-std.js";
+import { effectsOf as tsEffectsOf, livenessDispositions } from "../effects.js";
 
 test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possession", () => {
   const r = runtimeEval("secret = 41\nsecret", undefined, [typeExt], undefined, true);
@@ -1858,7 +1452,7 @@ test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possess
   let arity = 0;
   const hook = makePrimitive("probe.__getMember", (hargs) => {
     arity = hargs.length;
-    const capsule = dataOf(hargs[2]) as import("./types.js").PrimitiveFunctionValue;
+    const capsule = dataOf(hargs[2]) as import("../types.js").PrimitiveFunctionValue;
     const holdsSecret = capsule.fn([stringToBits("secret")], undefined as any, undefined as any);
     const holdsNope = capsule.fn([stringToBits("no_such_name")], undefined as any, undefined as any);
     const score = (Number((dataOf(holdsSecret) as BitsValue).data) === 1 ? 10 : 0)
@@ -1991,7 +1585,7 @@ test("B-097 V3: conformance counts only externally-reachable members (V-R6)", ()
   const privInst = r.evalCtx.bindings.get("a")!.value!;
   const pubInst = r.evalCtx.bindings.get("b")!.value!;
   const looseIface = structuralWrap(iface);
-  const instOf = typeMethod(Type, "instanceof")! as import("./types.js").PrimitiveFunctionValue;
+  const instOf = typeMethod(Type, "instanceof")! as import("../types.js").PrimitiveFunctionValue;
   const privCheck = instOf.fn([looseIface, privInst], undefined as any, undefined as any);
   eq(Number((dataOf(privCheck) as BitsValue).data), 0, "private x does not satisfy ~{x}");
   const pubCheck = instOf.fn([looseIface, pubInst], undefined as any, undefined as any);
@@ -2041,9 +1635,9 @@ test("B-097 V3: reflection — names and flags free, accessors gated (V-R7)", ()
   eq(descs.has("secret") && descs.has("code"), true, "enumeration counts are unchanged by privacy");
   const codeDesc = descs.get("code")!;
   const listKeys = (v: Value): string[] => {
-    const listing = primRegistry.ctx_bindings.fn([v], r.evalCtx, evaluate) as import("./types.js").ExpressionValue;
+    const listing = primRegistry.ctx_bindings.fn([v], r.evalCtx, evaluate) as import("../types.js").ExpressionValue;
     return listing.args.map((pair) =>
-      bitsToString(dataOf((pair as import("./types.js").ExpressionValue).args[0]) as BitsValue));
+      bitsToString(dataOf((pair as import("../types.js").ExpressionValue).args[0]) as BitsValue));
   };
   // The descriptor's reflective listing keeps name + flag pairs free but
   // withholds the ACCESSOR (the implementation) without possession
@@ -4452,8 +4046,8 @@ theorem lg_proven: 1 == 1 by proof_refl(1)
 // reads via `source of x` (source_get), rendered as text at the read
 // surface. Design: structures.md §3.1.
 
-import { sourceOf as _sourceOf, withSource as _withSource, componentsView as _componentsViewD47 } from "./slots.js";
-import { renderExprSource } from "./primitives.js";
+import { sourceOf as _sourceOf, withSource as _withSource, componentsView as _componentsViewD47 } from "../slots.js";
+import { renderExprSource } from "../primitives.js";
 
 test("D47: binding-level source — `source of x` renders the RHS AST", () => {
   const r = evalStd("x = 2 + 2\nsource of x");
@@ -5109,7 +4703,7 @@ import {
   domainFromPredicate, propagateAdd, propagateSub, propagateMul,
   intersectDomains, joinDomains, impliesDomain, counterexampleFor,
   formatDomain,
-} from "./refinements.js";
+} from "../refinements.js";
 
 test("Phase B: propagateAdd of two intervals", () => {
   const d = propagateAdd(
@@ -5187,7 +4781,7 @@ test("Phase B: formatDomain renders human-readable strings", () => {
 import {
   PredicateSet, addPredicate, mergePredicateSets, simplifyPredicateSet,
   entailsPredicate, predicatesOf,
-} from "./refinements.js";
+} from "../refinements.js";
 
 test("Phase C: PredicateSet starts empty", () => {
   const s = new PredicateSet();
@@ -5415,7 +5009,7 @@ bad = Range(10, 1)
 // surface-syntax path end-to-end.
 
 // Pull in the introspection helper used by the contract-summary tests below.
-import { summarizeValue as _summarizeValueChunk3 } from "./introspect.js";
+import { summarizeValue as _summarizeValueChunk3 } from "../introspect.js";
 
 test("Phase C Chunk 3: requires runtime check passes when condition holds", () => {
   const src = `
@@ -5536,8 +5130,8 @@ import {
   unwrapEffectsAttach,
   effectsOf, withEffects,
   EffectSet,
-} from "./effects.js";
-import { ComposedFunctionValue } from "./types.js";
+} from "../effects.js";
+import { ComposedFunctionValue } from "../types.js";
 
 // Helper: read the precompile-stashed effects from a function value,
 // returning an empty set when no effects are recorded. After walker removal,
@@ -5661,7 +5255,7 @@ test("Phase D1: unwrapEffectsAttach extracts declared label set", () => {
 
 // --- Phase D1 sub-chunk 1.2: effects in PredicateSet ---
 
-import { effectsDomain, makePredicate } from "./refinements.js";
+import { effectsDomain, makePredicate } from "../refinements.js";
 
 test("Phase D1.2: effectsDomain constructor builds EffectsDomain", () => {
   const d = effectsDomain(["io", "time"]);
@@ -7074,7 +6668,7 @@ import {
   isFunctionPartial, collapseBodyMetadata,
   NOTIF_TOTALITY_EXHAUSTIVENESS, NOTIF_TOTALITY_NONTERMINATION,
   NOTIF_TOTALITY_NEEDS_ANNOTATION,
-} from "./totality.js";
+} from "../totality.js";
 
 test("Phase E Stage 0: notification kind constants exist", () => {
   eq(NOTIF_TOTALITY_EXHAUSTIVENESS, "totality-exhaustiveness");
@@ -7828,7 +7422,7 @@ countdown(100000)
 // discharge mechanism — if `P` folds to `true` the proof is established;
 // false or unresolved is a failure that halts compilation.
 
-import { isDischargedProof as _isDischargedProof, formatProofFinding } from "./proofs.js";
+import { isDischargedProof as _isDischargedProof, formatProofFinding } from "../proofs.js";
 
 test("Phase F1: verify with a true proposition discharges cleanly", () => {
   const { compilationReport } = runtimeEval("verify 3 + 5 == 8\n", undefined, [typeExt], undefined, true);
@@ -8696,7 +8290,7 @@ import {
   serializeVerdict,    parseVerdict,
   serializeAuthorship, parseAuthorship,
   formatObligation, formatVerdict, formatAuthorship,
-} from "./pcp.js";
+} from "../pcp.js";
 
 test("Phase H1: hashProposition is whitespace-insensitive and deterministic", () => {
   const a = hashProposition("abs(0) == 0");
@@ -8881,7 +8475,7 @@ test("Phase H1: formatAuthorship lists ordered contributors with effort", () => 
 
 import {
   buildVerdict, extractObligations, checkObligationSatisfied,
-} from "./pcp.js";
+} from "../pcp.js";
 import { spawnSync } from "child_process";
 
 test("Phase H2: buildVerdict captures discharged + failed theorems from soft-fail eval", () => {
@@ -9055,7 +8649,7 @@ test("Phase H2: CLI `obligations --json` emits one JSON per theorem", () => {
 // common pitfalls. The Verdict carries them in `iterationHints`.
 // generateHints also folds in `strategiesUsed` from prior attempts.
 
-import { generateHints, IterationHints } from "./pcp.js";
+import { generateHints, IterationHints } from "../pcp.js";
 
 test("Phase H3: false-proposition failure gets a 'revise theorem' hint", () => {
   const src = `theorem bad: 5 == 6\n`;
@@ -9193,7 +8787,7 @@ test("Phase H3: formatVerdict renders hints section", () => {
 // obligations + hints. `allegro propose` CLI uses it; tests cover both
 // the formatter and the CLI smoke path.
 
-import { formatTodo, TodoSection } from "./pcp.js";
+import { formatTodo, TodoSection } from "../pcp.js";
 
 test("Phase H4b: formatTodo on a clean file says 'nothing pending'", () => {
   const md = formatTodo({ filename: "x.alg", totalObligations: 3, sections: [] });
@@ -9295,7 +8889,7 @@ test("Phase H4b: CLI `propose --output` writes to file", () => {
 import {
   extractCodeBlocks, spliceProof, buildIterationMessage,
   classifyStrategy, loadPrimer, runLlmWorker, LlmClient,
-} from "../pcp/llm-worker.js";
+} from "../../pcp/llm-worker.js";
 
 test("Phase H4a: extractCodeBlocks finds ```allegro blocks", () => {
   const text = "Here is the proof.\n\n```allegro\nproof_trans(ab, bc)\n```\n\nDone.";
@@ -9479,7 +9073,7 @@ test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
 
 import {
   summarizeValue, summarizeModule, safetyGradeFor, renderModuleSummary,
-} from "./introspect.js";
+} from "../introspect.js";
 
 test("Phase A: summarizeValue describes an Int literal", () => {
   const src = "x = 42\n";
@@ -9551,9 +9145,9 @@ test("Phase A: renderModuleSummary produces readable text", () => {
 // directly-constructed grammar values. Allegro-level integration comes
 // via builder.ts and registered primitives (tested separately below).
 
-import * as g2 from "./grammar2/types.js";
-import { parse as g2parse, ParseResult as G2ParseResult } from "./grammar2/engine.js";
-import { getGrammarWithFragments as g2getGrammarWithFragments } from "./grammar2/fragments.js";
+import * as g2 from "../grammar2/types.js";
+import { parse as g2parse, ParseResult as G2ParseResult } from "../grammar2/engine.js";
+import { getGrammarWithFragments as g2getGrammarWithFragments } from "../grammar2/fragments.js";
 
 function g2ok(r: G2ParseResult): asserts r is Extract<G2ParseResult, { ok: true }> {
   if (!r.ok) throw new Error(`expected parse success, got: ${r.error.message}`);
@@ -9739,8 +9333,8 @@ test("grammar2/engine: @longest alt picks the longest match", () => {
 
 // --- Phase 3: grammar analyzer ---
 
-import { analyze as g2analyze, formatReport as g2format, analyzeWithDisjointnessCheck } from "./grammar2/analyzer.js";
-import { buildBaseGrammar as buildBaseG2 } from "./grammar2/base-grammar.js";
+import { analyze as g2analyze, formatReport as g2format, analyzeWithDisjointnessCheck } from "../grammar2/analyzer.js";
+import { buildBaseGrammar as buildBaseG2 } from "../grammar2/base-grammar.js";
 
 test("grammar2/analyzer: base grammar is clean", () => {
   const g = buildBaseG2();
@@ -9831,8 +9425,8 @@ test("grammar2/analyzer: opt-in disjointness catches real ambiguity", () => {
   eq(report.warnings.some(w => w.code === "W_ALT_OVERLAP"), true);
 });
 
-import { assertClean as g2assertClean } from "./grammar2/analyzer.js";
-import { grammarToAllegro } from "./grammar2/to-allegro.js";
+import { assertClean as g2assertClean } from "../grammar2/analyzer.js";
+import { grammarToAllegro } from "../grammar2/to-allegro.js";
 
 test("grammar2/analyzer: assertClean throws on grammar errors", () => {
   const g = g2.makeGrammar({ start: "s" });
@@ -10620,10 +10214,10 @@ test("Phase 6: tree-builder lowers grammar block to finalize(add(new))", () => {
 
 // --- Phase 2b: base (Allegretto) grammar in grammar2 formalism ---
 
-import { buildBaseGrammar } from "./grammar2/base-grammar.js";
-import { buildProgram } from "./grammar2/tree-builder.js";
-import { evaluate as evalVal } from "./evaluator.js";
-import { resolveSymbols, buildEvalCtx, resolvePrimitives, typeLiterals } from "./runtime.js";
+import { buildBaseGrammar } from "../grammar2/base-grammar.js";
+import { buildProgram } from "../grammar2/tree-builder.js";
+import { evaluate as evalVal } from "../evaluator.js";
+import { resolveSymbols, buildEvalCtx, resolvePrimitives, typeLiterals } from "../runtime.js";
 
 function parseBase2(source: string): any {
   const g = buildBaseGrammar();
@@ -12078,9 +11672,9 @@ async function runAsyncTests(): Promise<void> {
 // kernel surfaces here, and exercise the LLM-baseline path with a mock
 // client (no API key needed).
 
-import { CORPUS, WRONG_SENTINEL_TERM } from "../bench/manifest.js";
-import { runBenchmark, stripProof } from "../bench/harness.js";
-import type { LlmClient as BenchLlmClient } from "../pcp/llm-worker.js";
+import { CORPUS, WRONG_SENTINEL_TERM } from "../../bench/manifest.js";
+import { runBenchmark, stripProof } from "../../bench/harness.js";
+import type { LlmClient as BenchLlmClient } from "../../pcp/llm-worker.js";
 
 async function runBenchmarkTests(): Promise<void> {
   test("PCP benchmark: corpus has 10 graded entries spanning all categories", () => {
@@ -12153,12 +11747,12 @@ async function runBenchmarkTests(): Promise<void> {
 
 // --- Doc-reference lint (PROCESS §10) ---
 
-import { lintDocRefs } from "../scripts/doc-ref-lint.js";
+import { lintDocRefs } from "../../scripts/doc-ref-lint.js";
 import * as nodePath from "path";
 
 function runDocLintTests(): void {
   test("doc-ref lint: all tracked markdown doc references resolve", () => {
-    const findings = lintDocRefs(nodePath.resolve(import.meta.dirname, ".."));
+    const findings = lintDocRefs(nodePath.resolve(import.meta.dirname, "../.."));
     const rendered = findings.map((f) => `${f.file}:${f.line} → ${f.ref}`).join("; ");
     eq(rendered, "", "dangling doc references");
   });
@@ -12166,7 +11760,7 @@ function runDocLintTests(): void {
 
 // --- B-096: deployed-version verification — pure verdict logic (no network) ---
 
-import { assessDeployment, parseStamp } from "../scripts/check-deployed.js";
+import { assessDeployment, parseStamp } from "../../scripts/check-deployed.js";
 
 function runCheckDeployedTests(): void {
   const stamp = (commit: string, opts: { branch?: string; dirty?: boolean } = {}) => ({
@@ -12227,11 +11821,11 @@ function runCheckDeployedTests(): void {
 
 // --- Boundary-test harness (structures-implementation Phase 0 / B-001) ---
 
-import { runBoundaryTests, getSuiteFloor } from "./boundary-tests.js";
+import { runBoundaryTests } from "../boundary-tests.js";
 
 // --- Run all tests (sync + async) and report ---
 
-sectionTimes.push({ name: "sync body (evaluator/types/grammar/.alg files)", ms: performance.now() - suiteT0 });
+noteSyncBodyDone("sync body (evaluator/types/grammar/.alg files)");
 timedSection("modules", runModuleTests)
   .then(() => timedSection("async/futures", runAsyncTests))
   .then(() => timedSection("h4a-llm-worker", runH4aAsyncTests))
@@ -12244,39 +11838,6 @@ timedSection("modules", runModuleTests)
     // Each shard reports the corpus IT walked; the registry-completeness
     // check runs in every shard over its own files, and the aggregate
     // coverage tripwire is applied by scripts/test-shards.mjs.
-    corpus: { files: corpusWalkFiles, violations: corpusWalkViolations, sharded: SHARD !== null },
+    corpus: { ...corpusWalk(), sharded: SHARD !== null },
   })))
-  .then(() => {
-  // Suite-count floor (boundary baseline): a mass-disablement tripwire.
-  // Suspended under ALLEGRO_TEST_FILTER — filtered runs are dev runs —
-  // and under sharding, where no single shard sees the whole suite;
-  // `scripts/test-shards.mjs` applies the floor to the aggregate.
-  if (!TEST_FILTER && SHARD === null) {
-    const floor = getSuiteFloor();
-    if (passed + failed < floor) {
-      failed++;
-      failures.push(`suite shrank: ${passed + failed - 1} tests < committed floor ${floor} (src/boundary-baseline.json)`);
-    }
-  }
-  console.log(`\n${"=".repeat(50)}`);
-  if (TEST_FILTER) {
-    console.log(`DEV RUN (ALLEGRO_TEST_FILTER=${process.env.ALLEGRO_TEST_FILTER}) — ${filteredOut} tests filtered out; NOT a landing gate`);
-  }
-  console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
-  if (SHARD) {
-    // Machine-readable line for the shard aggregator. `registered` is the
-    // suite-wide registration count every shard sees, so the aggregator
-    // can confirm the shards agree on what the suite contains.
-    console.log(`SHARD-RESULT ${SHARD.index}/${SHARD.count} ran=${passed + failed} passed=${passed} failed=${failed} registered=${registeredCount} skipped=${shardedOut} everyShard=${everyShardCount}`);
-  }
-  console.log(`Wall clock: ${((performance.now() - suiteT0) / 1000).toFixed(1)}s`);
-  console.log(`Sections: ${sectionTimes.map((s) => `${s.name} ${(s.ms / 1000).toFixed(1)}s`).join(" | ")}`);
-  const slowest = [...testTimes].sort((a, b) => b.ms - a.ms).slice(0, 15);
-  console.log(`Slowest tests:`);
-  for (const t of slowest) console.log(`  ${(t.ms / 1000).toFixed(2).padStart(7)}s  ${t.name}`);
-  if (failures.length > 0) {
-    console.log("\nFailures:");
-    for (const f of failures) console.log(`  ${f}`);
-    process.exit(1);
-  }
-});
+  .then(() => reportSummary());
