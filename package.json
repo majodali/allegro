@@ -1,7 +1,7 @@
 {
   "name": "allegro",
   "version": "0.1.0",
-  "description": "A programmable language platform where every claim about your code resolves to a visible proof strength \u2014 humans and AI agents verify through the same kernel.",
+  "description": "A programmable language platform where every claim about your code resolves to a visible proof strength — humans and AI agents verify through the same kernel.",
   "private": true,
   "license": "CC0-1.0",
   "author": "",
@@ -12,7 +12,7 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "test": "tsx src/test.ts",
+    "test": "tsx src/test/index.ts",
     "test:shards": "node scripts/test-shards.mjs",
     "bench": "tsx bench/run.ts",
     "check-deployed": "tsx scripts/check-deployed.ts",
@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.0",
+    "tsx": "^4.23.12"
   }
 }

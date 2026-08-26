@@ -8,6 +8,92 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — The suite splits: `src/test.ts` becomes `src/test/` (lane B)
+
+The file two work streams could not avoid meeting in is gone. `src/test.ts`
+was 12,281 lines and appeared in **88% of source commits** (35 of 40) — not
+a hot file but a universal one, which is why lane B was a prerequisite
+rather than an optimization (CHANGELOG "Parallel lanes"). It is now
+`src/test/`: **21 modules behind an index that registers nothing**, largest
+1,556 lines. A lane-D session working `effects.ts` and a lane-C session
+adding a tooling test no longer touch the same file. **Lane C opens.**
+
+- **The index is an index.** `src/test/index.ts` is 66 lines: the area
+  imports in suite order, the async section chain, the summary call. Each
+  area registers its own tests when its module is imported. Roster and
+  per-module roles: `docs/design/implementation-map.md` §`src/test/`.
+- **Everything the sharding model needs stayed single-sourced.** The
+  counters, the name-hash shard assignment, the registration count and the
+  corpus-walk accumulators live in `harness.ts`/`alg-files.ts`, so N
+  modules registering into them is indistinguishable from one file doing
+  it. The proof is arithmetic: per-shard counts were **407/418/374 at every
+  one of the six commits**, identical to the pre-split suite. Shard
+  assignment is by test NAME, so which module a test lives in — and when
+  that module loads — cannot move it between shards. That property is what
+  made the split tractable, and it is why the split did not disturb it.
+- **1197 throughout**, sequential and sharded, with the `everyShard`
+  registry-completeness check, the 49-file corpus walk, the `>= 15`
+  tripwire on both paths, `ALLEGRO_TEST_FILTER` (async included) and
+  `ALLEGRO_TEST_TRACE` verified at each chunk. No test condition was
+  weakened; three were changed, each with maintainer sign-off, recorded
+  below.
+
+**C0, the prerequisite nobody had noticed.** `src/boundary-tests.ts`
+excluded `src/test.ts` from the accessor lint ratchet by exact path, and
+**92 violations** had accumulated behind that exemption — 45 `__*` string
+literals, 29 `bindings.get("__…")`, 18 direct `.components` reads. Moving
+any of them into a new module would have hard-failed the ratchet
+(`hardFail: true`, scan glob `src/*.ts` + `src/**/*.ts`). CLAUDE.md already
+stated the rule without carve-out, so the exemption was a hole in
+enforcement rather than a sanctioned exception, and it was closed at the
+source: 89 sites migrated mechanically onto accessors `src/slots.ts`
+already exported (`getName`, `getMembers`, `channelReadRaw(x, "type")`,
+`componentsView`, `SLOT_KEYS`, …). Three had no accessor and were decided:
+the `__isGeneric` retirement guard was dropped (retired slots are retired
+as a class now), the `__anon_` prefix match became a check by exclusion,
+and one dead `??` fallback arm — probed, never reached — was removed in
+favour of a strictly stricter `channelReadRaw`. Zero violations remain, and
+the suite modules are ratcheted like production code.
+
+**The near miss, recorded because every gate missed it.** C1's first cut
+took everything between the math extension and the module-loader header,
+which swallowed nine `extension: *` tests living in that span. Typecheck
+was clean, a filtered smoke run was green, and the suite would have
+reported **1188/1188 with `GATE: PASSED`** — a uniformly smaller suite is
+perfectly self-consistent. What caught it was diffing `registered=` against
+the previous commit: 1197 vs 1188. Same cross-check that caught the
+original 93-test loss (CHANGELOG "Suite & compile performance"), applied
+across time instead of across shards.
+
+Two things followed, both landed as **C1b**:
+
+- **The floor was slack.** `suiteFloor` was 979 against a 1197-test suite —
+  a fifth of the suite could vanish before the mass-disablement tripwire
+  fired. Now 1197, negative-tested: with nine registrations disabled the
+  run reports `suite shrank: 1188 tests < committed floor 1197` and exits
+  1, on both the sequential path and the aggregate. The baseline note
+  carries the rule that keeps it honest — hold the floor AT the suite size;
+  a floor kept comfortably below it is not a tripwire. Follow-on **B-101**:
+  make this a CI check rather than a number someone remembers to raise.
+- **`npm test` had never run.** `tsx` was undeclared, so the sequential
+  entry point documented in CLAUDE.md and PROCESS §5's checklist failed
+  from a clean install with `tsx: not found`. CI never noticed: it runs
+  `test:shards`, which spawns `npx tsx`. Declared; `npm test` completes.
+
+**Method.** After C1, extraction ran through a tool that MOVES a
+marker-delimited range verbatim and refuses to write when the total
+registration count changes — a range cannot be deleted while only part of
+it is copied. It caught nothing further, which is the point. Its own faults
+(hoisting only single-line imports; inserting an import into the middle of
+a multi-line one) were found by typecheck and fixed in the tool, with C3
+redone from a clean backup rather than patched.
+
+Sequence: C0 accessors · C1 harness + rename · C1b floor/tsx · C2 leaves
+(grammar2, PCP, async, tooling) · C3 semantics (refinements, effects,
+totality, proofs) · C4 type system · C5 the rest, index rewritten.
+Follow-on **B-102**: `SCAN_EXCLUDE` still names the now-deleted
+`src/test.ts` — inert, but a stale exemption invites reopening the hole.
+
 ## 2026-08 — B-014 close-out: CT-R1–CT-R6 ratified and indexed
 
 The gate decision on the contracts reval. B-014 closes.
@@ -32,7 +118,7 @@ The gate decision on the contracts reval. B-014 closes.
   `assume_invariant` retirement CT-R3 calls for. **B-099** — carries the
   contract severity knobs alongside the totality ones.
 
-Docs-only. 1197/1197 green.
+Docs-only. 1197/1197 green
 
 ## 2026-08 — B-014: contracts design revalidation (`contracts.md`)
 
