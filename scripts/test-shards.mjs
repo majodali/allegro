@@ -7,10 +7,16 @@
 // singletons), so isolation per shard is the property we want, and it is
 // free — each shard is an ordinary `tsx src/test.ts` run.
 //
-// Shard assignment is round-robin over registration index (see
-// ALLEGRO_TEST_SHARD in src/test.ts). The `.alg` corpus file tests and
-// the boundary section are pinned to shard 0, which keeps the boundary
-// suite's corpus-coverage assertion intact rather than weakening it.
+// Shard assignment is by test-name hash (see ALLEGRO_TEST_SHARD in
+// src/test.ts). Everything distributes, including the `.alg` corpus
+// files; whole-shard self-checks whose subject is that shard's own work
+// run in every shard instead (`everyShard`), so the union of the shards
+// covers what the single-process run covers.
+//
+// Two gate conditions can only be evaluated where the TOTAL is known,
+// so this script owns them: the suite-count floor, and the `.alg`
+// corpus-coverage tripwire (>= 15 files walked). Both are asserted here
+// over the aggregate, not softened per shard.
 //
 // Usage:  node scripts/test-shards.mjs [shardCount]
 //         ALLEGRO_TEST_SHARDS=6 node scripts/test-shards.mjs
@@ -43,13 +49,14 @@ const results = await Promise.all(
   Array.from({ length: SHARDS }, (_, i) => runShard(i)),
 );
 
-let ran = 0, passed = 0, failed = 0;
+let ran = 0, passed = 0, failed = 0, everyShardRuns = 0, corpusWalked = 0;
 const registeredSeen = new Set();
 const failureLines = [];
 let missingResult = false;
+let corpusReports = 0;
 
 for (const r of results) {
-  const m = /^SHARD-RESULT (\d+)\/(\d+) ran=(\d+) passed=(\d+) failed=(\d+) registered=(\d+) skipped=(\d+)$/m.exec(r.out);
+  const m = /^SHARD-RESULT (\d+)\/(\d+) ran=(\d+) passed=(\d+) failed=(\d+) registered=(\d+) skipped=(\d+) everyShard=(\d+)$/m.exec(r.out);
   if (!m) {
     missingResult = true;
     console.error(`\n=== shard ${r.index} produced no SHARD-RESULT line (exit ${r.code}) ===`);
@@ -58,6 +65,11 @@ for (const r of results) {
   }
   ran += Number(m[3]); passed += Number(m[4]); failed += Number(m[5]);
   registeredSeen.add(Number(m[6]));
+  everyShardRuns += Number(m[8]);
+  for (const line of r.out.split("\n")) {
+    const c = /^SHARD-CORPUS walked=(\d+)$/.exec(line);
+    if (c) { corpusWalked += Number(c[1]); corpusReports++; }
+  }
   for (const line of r.out.split("\n")) {
     if (line.startsWith("FAIL:")) failureLines.push(`  [shard ${r.index}] ${line}`);
   }
@@ -66,8 +78,12 @@ for (const r of results) {
 
 const wall = Math.max(...results.map((r) => r.seconds));
 const serial = results.reduce((a, r) => a + r.seconds, 0);
+// every-shard tests run once PER shard by design; the suite's own test
+// count is the aggregate minus those repeats.
+const uniqueRan = ran - Math.max(0, everyShardRuns - everyShardRuns / SHARDS);
 console.log(`\n${"=".repeat(50)}`);
-console.log(`Aggregate: ${ran} tests, ${passed} passed, ${failed} failed`);
+console.log(`Aggregate: ${ran} test runs, ${passed} passed, ${failed} failed`);
+console.log(`Suite coverage: ${Math.round(uniqueRan)} distinct tests (${everyShardRuns} runs of whole-shard checks repeated across ${SHARDS} shards)`);
 console.log(`Wall clock: ${wall.toFixed(1)}s across ${SHARDS} shards (${serial.toFixed(1)}s of work)`);
 if (failureLines.length) console.log(failureLines.join("\n"));
 
@@ -87,9 +103,23 @@ if (registeredSeen.size > 1) {
 const floor = JSON.parse(
   readFileSync(new URL("../src/boundary-baseline.json", import.meta.url), "utf-8"),
 ).suiteFloor ?? 0;
-if (floor && ran < floor) {
-  console.error(`suite shrank: ${ran} tests < committed floor ${floor} (src/boundary-baseline.json)`);
+if (floor && uniqueRan < floor) {
+  console.error(`suite shrank: ${Math.round(uniqueRan)} tests < committed floor ${floor} (src/boundary-baseline.json)`);
   gateFailed = true;
+}
+
+// The `.alg` corpus-coverage tripwire. In a single-process run the
+// boundary suite asserts this itself; sharded, no one process sees the
+// total, so it is asserted here over the union. Same threshold.
+const CORPUS_MIN = 15;
+if (corpusReports === 0) {
+  console.error(`no shard reported a corpus walk — the .alg file tests did not run`);
+  gateFailed = true;
+} else if (corpusWalked < CORPUS_MIN) {
+  console.error(`corpus coverage: ${corpusWalked} .alg files walked across ${corpusReports} shards, need >= ${CORPUS_MIN}`);
+  gateFailed = true;
+} else {
+  console.log(`Corpus coverage: ${corpusWalked} .alg files walked across ${corpusReports} shards (>= ${CORPUS_MIN})`);
 }
 
 console.log(gateFailed ? "GATE: FAILED" : "GATE: PASSED");

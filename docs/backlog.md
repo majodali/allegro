@@ -776,6 +776,36 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   domains on unresolved arithmetic — then look deeply (likely a one-line
   reorder in `applyPrimitive`, but validate interaction with Rule 2
   branch predicates and precompile placeholders first)
+- [ ] **B-100** · `[reval]` T-R6 soundness review + the checking
+  algorithm itself. The broadened cutoff (cycle membership rather than
+  D34 tier) shipped 2026-08 on measured evidence and maintainer
+  ratification, but the reasoning deserves a deeper look than a perf
+  pass gave it. **Two threads:**
+  (a) **Cutoff soundness.** The claim is "a recursive call with
+  unresolved arguments cannot converge, so residualizing loses
+  nothing." Interrogate it: is it true for PARTIALLY-applied calls
+  (some args concrete, some symbolic) where unfolding a few levels
+  might reach a decidable base case? For mutual cycles where the SCC is
+  entered at different points? For HOF-mediated edges? Does the cutoff
+  change any FOLDING result the suite does not currently pin (it kept
+  1197/1197 green, which is evidence, not proof)? Also review the
+  `unresolved argument` predicate itself — `isResolved` on a carrier vs
+  a residual vs a pending future — and whether the cutoff should
+  reside in `precompileFunction` rather than `applyComposed`.
+  (b) **The checking algorithm hitting STACK OVERFLOW is a bad sign.**
+  Before the cutoff, precompiling a provably-total `factorial(n:
+  NonNeg)` unfolded until the JS stack died, and the error surfaced as
+  a `precompile-type-error` on correct code. The cutoff removes the
+  trigger but not the underlying fragility: PE has a `MAX_DEPTH` of
+  10000 that recursion depth can outrun, and a host-stack failure is
+  reported as a user-facing type error. Wanted: a real termination
+  discipline for the analyzer/PE itself (explicit work list or depth
+  budget with a HONEST diagnostic), so that no input can turn an
+  engine limit into a wrong answer about the user's program. Related:
+  D35's fuel/budget framing may be the right shape.
+  Sources: `docs/design/standard/totality.md` §3/§7/§8,
+  `src/evaluator.ts` (`setInlineCutoff`, MAX_DEPTH), `src/runtime.ts`
+  (analysis-before-precompile ordering), CHANGELOG 2026-08 perf entry
 - [ ] **B-099** · Project severity configuration — the T-R2 surface
   (ratified 2026-08, `docs/design/standard/totality.md` §5/§8). ONE
   per-project config declaration (shape open — likely a manifest read

@@ -233,13 +233,15 @@ Per-stage disposition of `docs/plans/archive/phase-e-totality-plan.md`
 - **Project severity config + blanket axioms** — T-R2 [designed];
   owns the `total`-by-default flip and the CE-R8 severity knobs.
 - **Closed-sum / record / dead-case exhaustiveness** — §4 [designed].
-- **Precompile divergence-aware inlining cutoff** — the analyzer knows
-  a binding diverges, but precompile's PE inlining does not consult
-  it: inlining divergent non-same-arg recursion (`loop(n + 1)`) costs
-  ~43s for ONE compile (measured 2026-08, B-028 F4). Candidate rule:
-  a binding whose tier is `undischarged`/`partial` is never
-  PE-inlined (residualize the call). Rides the next analyzer/perf
-  pass with B-087 (T-R6).
+- **Recursion inlining cutoff** — EXECUTED 2026-08 (T-R6, broadened:
+  cycle membership rather than discharge tier; see §8). Suite 1015s →
+  324s sequential. **Soundness review pending — B-100**, covering the
+  cutoff's reasoning and, separately, the fact that the checking
+  algorithm could reach host stack overflow at all: PE's `MAX_DEPTH`
+  can be outrun by recursion depth, and the failure surfaced as a
+  user-facing `precompile-type-error` on correct code. The cutoff
+  removes today's trigger; it does not give the analyzer a real
+  termination discipline.
 - **B-087 totality-analysis performance** — open, hypothesis refuted
   by measurement (memo ≈ 2%); needs a real profile.
 - **Productive corecursion** — `div` is *unproductive* nontermination;
@@ -279,7 +281,29 @@ design truth for this layer.
   effect propagation and effect variables. The stdlib-HOF structural
   check stays as an analyzer precision aid, not a polymorphism
   mechanism. Recommended.
-- **T-R6 — Divergence-aware inlining cutoff is the accepted design**
-  for the measured precompile pathology (undischarged/`partial`
-  bindings are not PE-inlined), implementation deferred to the next
-  analyzer/perf pass alongside B-087. Recommended.
+- **T-R6 — Inlining cutoff.** *Ratified as the divergence-aware form
+  (undischarged/`partial` bindings are not PE-inlined); **amended and
+  BROADENED 2026-08** on measured evidence — see below. EXECUTED.*
+  The pathology is real but the original predicate was wrong.
+  Termination discharge does not decide whether PE can usefully unfold
+  a call: a recursive call with UNRESOLVED arguments cannot converge
+  whatever its tier, because the base case is undecidable without a
+  concrete argument. Unfolding it builds ever-larger expressions until
+  `MAX_DEPTH` or the JS stack gives out, and the result is discarded.
+  Restricting the cutoff to `undischarged` therefore exempted exactly
+  the functions that had been PROVEN total: `factorial(n: NonNeg)`
+  (tier `auto`) cost **71.1s** to compile and emitted a spurious
+  `precompile-type-error: Maximum call stack size exceeded` on correct
+  code, while the same function over bare `Int` (undischarged, hence
+  cut) took **0.1s** — a ~700× penalty for discharging. The shipped
+  cutoff keys on **cycle membership** (the SCCs the analyzer already
+  computes, surfaced as `analyzeDivergence`'s `recursiveBindings`), and
+  fires only when an argument is unresolved: a fully-applied call to a
+  `partial` function still executes and may legitimately diverge.
+  It is installed BEFORE precompile, which is where the speculation
+  happens — a cutoff installed after it demonstrably changed nothing.
+  **Caveat (maintainer, at ratification of the amendment): a deeper
+  soundness review is PENDING — B-100.** It covers both the cutoff's
+  reasoning (partially-applied calls, mutual cycles, HOF edges) and the
+  fact that the checking algorithm could hit host stack overflow at
+  all, which is a symptom the cutoff hides rather than cures.

@@ -45,10 +45,14 @@ biggest win is a compile-time fix that helps every user, not just CI.
   — an index scheme desynchronizes the moment one shard registers
   conditionally, and the first version did exactly that, silently losing
   93 tests until the aggregator's registered-count cross-check caught
-  it. Guarantees were relocated, not relaxed: the `.alg` corpus tests and
-  boundary section are pinned to one shard so its `walked >= 15`
-  coverage assertion still sees the whole corpus, and the suite-count
-  floor is applied by the aggregator to the total.
+  it. **Everything distributes, including the `.alg` corpus**: tests
+  whose subject is the shard's OWN work (the registry-completeness walk)
+  run in every shard over that shard's files, so the union covers what
+  the single-process run covers. Two conditions can only be evaluated
+  where the total is known, so the aggregator owns them at the SAME
+  thresholds — the suite-count floor and the `>= 15` corpus-coverage
+  tripwire — and it cross-checks that every shard registered the same
+  suite. Nothing was softened per shard.
 - **CI**: `push:` and `pull_request:` both fired for same-repo PR
   branches, so every PR ran the full gate TWICE on one commit. push is
   now restricted to main; superseded runs are cancelled (never on main).
@@ -56,8 +60,16 @@ biggest win is a compile-time fix that helps every user, not just CI.
   "filtered" dev run still paid for the entire async block, which is
   what made short timeouts look like hangs during this work.
 
-Measured end to end: 1015s → 324s sequential (3.1×), 185s sharded
-(5.5× overall). 1197/1197 green throughout; no test conditions weakened.
+Measured end to end: **1015s → 333.7s sequential (3.0×) and 129.5s
+sharded (7.8× overall)**; on GitHub's runners the single check went from
+~10m54s (twice per PR) to **2m43s** (once). 1197/1197 green throughout;
+no test conditions weakened.
+
+Follow-ups registered rather than assumed: **B-100** — a soundness
+review of the broadened T-R6, and of the checking algorithm itself,
+since PE reaching host stack overflow (surfacing as a
+`precompile-type-error` on correct code) is a symptom the cutoff hides
+rather than cures.
 
 ## 2026-08 — B-018 close-out: T-R1–T-R6 ratified; ruling families indexed
 

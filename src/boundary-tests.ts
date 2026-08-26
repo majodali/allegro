@@ -573,13 +573,18 @@ export function runPerfWorkloads(): Record<string, number> {
 // --- Harness entry (wired from src/test.ts) -----------------------------------
 
 interface Hooks {
-  test: (name: string, fn: () => void) => void;
+  test: (name: string, fn: () => void, opts?: { everyShard?: boolean }) => void;
   eq: (actual: unknown, expected: unknown, label?: string) => void;
   /** Registry-walk results piggybacked on the suite's own .alg file tests
    *  (walked at evaluation time in runAlgFile — no re-evaluation). When
    *  absent (standalone invocation), the harness evaluates the corpus
-   *  itself via runRegistryCompletenessCorpus. */
-  corpus?: { files: number; violations: InvariantViolation[] };
+   *  itself via runRegistryCompletenessCorpus.
+   *  `sharded`: this process ran a SHARD of the suite, so `files` is the
+   *  subset this shard walked. The violation check is still exhaustive
+   *  over the union (the check runs in every shard, over that shard's
+   *  own files); only the aggregate COVERAGE tripwire is applied by the
+   *  shard aggregator, which is the only place the total is known. */
+  corpus?: { files: number; violations: InvariantViolation[]; sharded?: boolean };
 }
 
 export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<void> {
@@ -653,6 +658,9 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(SLOT_REGISTRY.every((r) => r.owner.length > 0 && r.target.length > 0), true, "registry entries complete");
   });
 
+  // Runs in EVERY shard: its subject is the corpus THIS process walked,
+  // so confining it to one shard would leave the other shards' files
+  // unchecked. The union of the shards' subsets is the whole corpus.
   test("registry completeness (C1.1): no unregistered __* slot or component key in the corpus", () => {
     if (corpus && corpus.files === 0) {
       // Dev-filtered run: the file tests (whose evaluation the walk
@@ -666,8 +674,14 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       : (() => { const r = runRegistryCompletenessCorpus(); return { walked: r.walked, violations: r.violations }; })();
     const unique = [...new Set(result.violations.map((v) => v.detail))];
     eq(unique.slice(0, 5).join("; "), "", `unregistered keys (${unique.length} unique, across ${result.walked} corpus files)`);
-    eq(result.walked >= 15, true, `corpus coverage: ${result.walked} .alg files walked`);
-  });
+    if (corpus?.sharded) {
+      // This shard walked a subset by construction. Emit the count for
+      // the aggregator, which owns the `>= 15` tripwire over the total.
+      console.log(`SHARD-CORPUS walked=${result.walked}`);
+    } else {
+      eq(result.walked >= 15, true, `corpus coverage: ${result.walked} .alg files walked`);
+    }
+  }, { everyShard: true });
 
   test("forgery suite: D21 scenarios A–F all present — and ALL LIVE (last skeleton retired at B-097 V4)", () => {
     eq(FORGERY_SCENARIOS.map((s) => s.id).join(""), "ABCDEF");

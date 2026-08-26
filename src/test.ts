@@ -90,6 +90,7 @@ const SHARD = (() => {
 })();
 let registeredCount = 0;
 let shardedOut = 0;
+let everyShardCount = 0;
 
 /** FNV-1a over the test name — a stable, order-free shard assignment. */
 function hashName(s: string): number {
@@ -101,45 +102,27 @@ function hashName(s: string): number {
   return h >>> 0;
 }
 
-/** Does this test belong to the running shard? `pin` forces ownership to
- *  one shard regardless of the hash (used for tests that share
- *  cross-test state — see CORPUS_SHARD). Every shard calls this for
+/** Per-test shard options.
+ *  - default: the name hash picks one owning shard.
+ *  - `everyShard`: run in ALL shards. For whole-shard self-checks whose
+ *    subject is that shard's own work (the corpus walk), where running in
+ *    a single shard would leave the other shards' work unchecked. */
+export interface ShardOpts { everyShard?: boolean }
+
+/** Does this test belong to the running shard? Every shard calls this for
  *  every registered test, so `registeredCount` is suite-wide and the
  *  aggregator can verify the shards saw the same suite. */
-function inShard(name: string, pin?: number): boolean {
+function inShard(name: string, opts?: ShardOpts): boolean {
   registeredCount++;
+  if (opts?.everyShard) { everyShardCount++; return true; }
   if (SHARD === null) return true;
-  let mine: boolean;
-  if (pin !== undefined) {
-    mine = SHARD.index === pin;
-  } else if (SHARD.count > 1) {
-    // Unpinned tests deal themselves among the NON-corpus shards. The
-    // corpus shard already carries every `.alg` file test plus the
-    // boundary section — the critical path — so giving it a hash share
-    // too just makes it longer while the others idle. (Measured: with a
-    // share it ran 237.6s against 61-83s elsewhere.)
-    const pool = SHARD.count - 1;
-    mine = SHARD.index === 1 + (hashName(name) % pool);
-  } else {
-    mine = true;
-  }
+  const mine = (hashName(name) % SHARD.count) === SHARD.index;
   if (!mine) shardedOut++;
   return mine;
 }
 
-/** The `.alg` corpus walk feeds the boundary suite's coverage assertion
- *  (`walked >= 15`), so the file tests and the boundary section must land
- *  in the SAME shard or that assertion would see a fraction of the corpus
- *  and fail. Both are pinned here rather than weakening the assertion;
- *  other shards take the existing "no file tests ran" skip path the
- *  dev-filter already used. */
-const CORPUS_SHARD = 0;
-function ownsCorpus(): boolean {
-  return SHARD === null || SHARD.index === CORPUS_SHARD;
-}
-
-function test(name: string, fn: () => void, pinShard?: number): void {
-  const mine = inShard(name, pinShard);
+function test(name: string, fn: () => void, opts?: ShardOpts): void {
+  const mine = inShard(name, opts);
   if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
   if (!mine) return;
   if (process.env.ALLEGRO_TEST_TRACE) console.error("TEST:", name);
@@ -1780,14 +1763,15 @@ let corpusWalkFiles = 0;
 
 function fileTest(filePath: string, extensions?: Extension[]): void {
   const basename = path.basename(filePath);
-  // Pinned to the corpus shard so the boundary suite's coverage
-  // assertion still sees the whole `.alg` corpus (see CORPUS_SHARD).
-  // Registered in EVERY shard — skipping registration outright is what
-  // desynchronized the first, index-based version.
+  // Distributed by hash like every other test. Each shard walks the
+  // corpus files it owns and checks THOSE files for registry violations
+  // (see the every-shard registry-completeness test); the union across
+  // shards covers the whole corpus, and the aggregator asserts the total
+  // coverage the single-process run asserts locally.
   test(`file: ${basename}`, () => {
     runAlgFile(filePath, extensions);
     eq(true, true); // if we get here, all expectations matched
-  }, CORPUS_SHARD);
+  });
 }
 
 // Run all .alg test files
@@ -12254,11 +12238,12 @@ timedSection("modules", runModuleTests)
   .then(() => timedSection("doc-lint", async () => runDocLintTests()))
   .then(() => timedSection("check-deployed", async () => runCheckDeployedTests()))
   .then(() => timedSection("boundary", async () => runBoundaryTests({
-    // Pinned like the file tests: the boundary suite reads the corpus
-    // walk those tests accumulate, so it must run where they ran.
-    test: (name: string, fn: () => void) => test(name, fn, CORPUS_SHARD),
+    test,
     eq,
-    corpus: { files: corpusWalkFiles, violations: corpusWalkViolations },
+    // Each shard reports the corpus IT walked; the registry-completeness
+    // check runs in every shard over its own files, and the aggregate
+    // coverage tripwire is applied by scripts/test-shards.mjs.
+    corpus: { files: corpusWalkFiles, violations: corpusWalkViolations, sharded: SHARD !== null },
   })))
   .then(() => {
   // Suite-count floor (boundary baseline): a mass-disablement tripwire.
@@ -12281,7 +12266,7 @@ timedSection("modules", runModuleTests)
     // Machine-readable line for the shard aggregator. `registered` is the
     // suite-wide registration count every shard sees, so the aggregator
     // can confirm the shards agree on what the suite contains.
-    console.log(`SHARD-RESULT ${SHARD.index}/${SHARD.count} ran=${passed + failed} passed=${passed} failed=${failed} registered=${registeredCount} skipped=${shardedOut}`);
+    console.log(`SHARD-RESULT ${SHARD.index}/${SHARD.count} ran=${passed + failed} passed=${passed} failed=${failed} registered=${registeredCount} skipped=${shardedOut} everyShard=${everyShardCount}`);
   }
   console.log(`Wall clock: ${((performance.now() - suiteT0) / 1000).toFixed(1)}s`);
   console.log(`Sections: ${sectionTimes.map((s) => `${s.name} ${(s.ms / 1000).toFixed(1)}s`).join(" | ")}`);
