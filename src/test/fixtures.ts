@@ -18,7 +18,7 @@
 import { formatValue } from "../primitives.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
 import { createTypeSystem } from "../types-std.js";
-import { Value, ValueKind, BitsValue, AllegroError, makePrimitive, makeInt, dataOf } from "../types.js";
+import { Value, ValueKind, BitsValue, AllegroError, makePrimitive, makeInt, makeContext, dataOf } from "../types.js";
 
 export function evalSource(source: string): Value | null {
   return runtimeEval(source + "\n").value;
@@ -87,4 +87,15 @@ export function evalStd(source: string, extraExtensions?: Extension[]): Value | 
   const exts = [typeExt, ...(extraExtensions ?? [])];
   const { value } = runtimeEval(source, undefined, exts, undefined, true);
   return value;
+}
+
+/** A Context carrying the given bindings — the "module object" shape the
+ *  extension and type-system tests build by hand. */
+export function makeCtxWith(bindings: Record<string, Value>): Value {
+  const ctx = makeContext();
+  for (const [name, value] of Object.entries(bindings)) {
+    ctx.bindings.set(name, { key: name, value });
+    ctx.bindingList.push({ key: name, value });
+  }
+  return ctx;
 }
