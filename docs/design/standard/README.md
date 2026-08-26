@@ -33,8 +33,8 @@ Proof with zero hand-rolled residue is the exit criterion
   failed refinement/type annotation halts compilation ("build safety
   in") — in libs exactly as in user code. Two paths are consciously
   weaker (CE-R8): construction-path invariant failure yields an error
-  VALUE, and non-exhaustive match is an info notification — promotion
-  is a maintainer decision (`totality.md` §5).
+  VALUE (`contracts.md` §7), and non-exhaustive match is an info
+  notification — promotion is a maintainer decision (`totality.md` §5).
 
 ## Documents
 
@@ -44,6 +44,10 @@ Proof with zero hand-rolled residue is the exit criterion
 - `pattern-matching.md` — `when/is/then`, destructuring, guards
 - `totality.md` — discharge spectrum (D34), the divergence analyzer,
   exhaustiveness taxonomy, severity reconciliation (B-018 reval)
-- Planned, **revalidation-gated** (BACKLOG register): `contracts.md`,
-  `proofs.md`, `pcp.md`
+- `contracts.md` — predicate/knowledge model, `assert`/`requires`/
+  `ensures` lowering, invariants as refinements, discharge and failure
+  semantics, mechanism-choice guidance (B-014 reval; CT-R1–CT-R6
+  proposed, awaiting ratification)
+- Planned, **revalidation-gated** (BACKLOG register): `proofs.md`,
+  `pcp.md`
 - Proving primer (consumable, top level): `../../proving-in-allegro.md`
