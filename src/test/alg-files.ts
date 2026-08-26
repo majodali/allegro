@@ -25,6 +25,7 @@ import * as path from "path";
 /** Names that come from the interpreter itself, not from a module source —
  *  the filter every "collect this module's own bindings" loop applies. */
 export const primNames = new Set(Object.keys(primRegistry));
+export const testsDir = path.resolve("tests");
 export const typeNames = new Set(["Int", "Float", "String", "Bool", "Array", "Object", "true", "false"]);
 
 /**
