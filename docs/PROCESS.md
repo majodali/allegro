@@ -57,6 +57,15 @@ in a memory file.
    chunk, summarize what changed, stop. Don't chain multiple chunks without
    confirmation. "Great work" without "next" means discuss before
    continuing.
+   **Per-lane exception (2026-08).** Lanes declared "pre-ratified" in
+   `docs/backlog.md` §"Parallel lanes" run a maintainer-approved chunk
+   SEQUENCE: the chunk list is agreed once at the start of the arc, and
+   the lane lands the chunks in order without stopping between each.
+   Stop-and-summarize still applies at the end of the sequence, and
+   immediately at any point where the work diverges from the agreed list
+   — a chunk that turns out to need a decision is a stop, not a judgment
+   call. Lanes not declared pre-ratified keep the per-chunk gate above.
+   The landing checklist (§5) is unchanged for every lane.
 4. **Land with the checklist** (§5) — every chunk, same PR/commit.
 
 **Deviation rule.** If implementation diverges from the plan or a design doc
@@ -165,8 +174,15 @@ gotcha list lives in `CLAUDE.md`):
   before commit" rule means updating the *right* doc: CHANGELOG for history,
   design docs for design deltas, BACKLOG for status, CLAUDE.md only for
   invariants.
-- Parallel sessions: before starting, check open branches/PRs for
-  overlapping work; if found, flag it rather than duplicating.
+- Parallel sessions: work is organized into LANES (`docs/backlog.md`
+  §"Parallel lanes") — a lane is a set of items that edit the same files,
+  so two lanes can run concurrently without colliding. Before starting:
+  confirm which lane you are in, and check open PRs for overlapping work;
+  if found, flag it rather than duplicating. Sessions cannot see each
+  other's uncommitted work, so a collision surfaces only at merge —
+  staying inside the lane's files is the mechanism, not a courtesy. An
+  item that turns out to need files outside its lane is a stop: re-scope
+  it with the maintainer rather than reaching across.
 
 ## 8. Memory files (`.claude/memory/`)
 

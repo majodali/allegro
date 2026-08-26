@@ -8,6 +8,51 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — Parallel lanes: the working model, plus register cleanup
+
+A development-structure review, prompted by the question of what can be
+worked concurrently. The grouping is empirical: co-change frequency over
+the last 40 `src/`+`lib/` commits, not the layer spine.
+
+- **The lane model** (`docs/backlog.md` §"Parallel lanes",
+  maintainer-ratified): items share a lane when they edit the same
+  files. **A** reval docs (no `src/` at all) · **B** the suite split ·
+  **C** capability tracks · **D** L2 semantics. A and B run now; C opens
+  once B lands; **D is internally serial permanently** — B-089, B-100,
+  B-099 and the rest of the Standard band converge on `types-std.ts` /
+  `primitives.ts` / `evaluator.ts`, which is architectural coupling no
+  tooling change removes. Landing B lets C and D run as lanes in
+  parallel with *each other*; it does not make D internally parallel.
+- **The measurement behind it**: `src/test.ts` is touched by **88% of
+  source commits** (35 of 40) at 12,281 lines — not a hot file but a
+  universal one, so any two code streams meet there. Second tier:
+  `types-std.ts` and `primitives.ts` at 45% each. This is why lane B is
+  a prerequisite rather than an optimization.
+- **Gate policy per lane** (ratified): A/B/C run pre-ratified chunk
+  SEQUENCES — the chunk list is approved once per arc and lands in
+  order; D keeps the per-chunk stop-and-summarize gate. This needed two
+  Tier-0 PROCESS sentences (§3's per-lane exception to stop-after-every-
+  chunk, and §7's lane rule); they were proposed rather than landed, per
+  the rule that agents never land Tier-0 changes, then **approved by the
+  maintainer in-session and applied**. Record of the proposal:
+  `docs/plans/parallel-lanes-process-delta.md` (now closed). The
+  maintainer additionally recorded intent to evaluate the lane model as
+  a candidate majodali/methodology amendment — this run is its evidence,
+  so observations against it should be gathered as the lanes proceed.
+- **Register cleanup**: **B-058 superseded by B-099** — the same
+  per-project severity surface described twice, B-099 having been minted
+  during the B-018 close-out without checking; B-099 keeps the work
+  because the ratified design docs point at it. The Tranche C head
+  claimed B-027's chunks were "underway" when the arc closed three arcs
+  ago. `implementation-map.md` still described a 1149-test suite (1197,
+  now with the sharding surface recorded).
+- **Withdrawn finding**: the review also reported 13 merged branches left
+  undeleted. That was wrong — they are auto-deleted on merge; the local
+  remote-tracking refs were simply stale, and `git fetch --prune` shows
+  zero. No hygiene issue exists.
+
+Docs-only.
+
 ## 2026-08 — Suite & compile performance: T-R6 executed and broadened, sharded gate
 
 The landing gate took ~17 minutes and ran twice per PR. It now takes
