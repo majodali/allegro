@@ -5,8 +5,19 @@
 name: CI
 
 on:
+  # `push:` alone fired for BOTH events on a same-repo PR branch, so every
+  # PR ran the full gate twice on the same commit. Restricting push to the
+  # default branch keeps main covered while PR branches are covered once,
+  # by `pull_request`.
   push:
+    branches: [main]
   pull_request:
+
+# A new push supersedes the run in flight for the same ref; the older one
+# is answering a question nobody is asking any more. Never cancels main.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   test:

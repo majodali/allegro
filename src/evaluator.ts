@@ -22,6 +22,22 @@ import { isCarrier } from "./structure.js";
 
 const MAX_DEPTH = 10000;
 
+// B-018 T-R6: the divergence-aware inlining cutoff hook. Injected per
+// typed compilation from runtime.ts once the D34 tiers are known;
+// answers, by function identity, whether a callee's termination is
+// UNDISCHARGED (the `partial` declaration and the analyzer's unproven
+// verdict — not the discharged tiers, which are safe to inline). Mirrors
+// the `setDivergenceProbe` pattern: no new value slot, no new `__*`
+// property, and absent (null) it is simply the pre-T-R6 behavior.
+let inlineCutoff: ((fn: Value) => boolean) | null = null;
+
+/** Register the inlining cutoff (called per typed compilation). Pass
+ *  null to clear it — an untyped compilation has no tier information and
+ *  must not inherit the previous one's. */
+export function setInlineCutoff(f: ((fn: Value) => boolean) | null): void {
+  inlineCutoff = f;
+}
+
 // --- Tail Call Optimization ---
 
 /**
@@ -608,6 +624,31 @@ function applyComposed(
           }
         }
       }
+    }
+
+    // B-018 T-R6: the divergence-aware inlining cutoff. PE inlines a call
+    // by substituting args into the body and re-evaluating — for a
+    // function whose termination is UNDISCHARGED that recurses without
+    // bound, and when the recursive argument grows (`loop(n + 1)` →
+    // `loop((n + 1) + 1)` → …) each level allocates a larger expression,
+    // so the cost is quadratic in MAX_DEPTH (profiled: 78.8s for one such
+    // compile, 33% of it GC). The analyzer already knows the D34 tier, so
+    // consult it: speculating on an undischarged-divergent callee buys
+    // nothing PE can use.
+    //
+    // Only SPECULATIVE calls are cut. With every argument resolved this
+    // is a real application — a `partial` function the program actually
+    // calls must still run (and may legitimately diverge; that is what
+    // the declaration opted into). Residualizing there would change
+    // semantics, not just cost.
+    if (
+      inlineCutoff !== null &&
+      evalArgs.some(a => !isResolved(a)) &&
+      inlineCutoff(currentFn as unknown as Value)
+    ) {
+      const residual = makeExpr(currentFnRaw ?? currentFn, evalArgs);
+      const calleeEffects = effectsOf(currentFn as unknown as Value);
+      return calleeEffects ? withEffects(residual, calleeEffects) : residual;
     }
 
     const substituted = substituteParams(currentFn, evalArgs);

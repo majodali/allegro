@@ -7,7 +7,7 @@ import { isCarrier } from "./structure.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource } from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
-import { markTailCalls, precompileFunction, remapParams } from "./evaluator.js";
+import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
 import { buildProgram } from "./grammar2/tree-builder.js";
@@ -17,7 +17,7 @@ import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf } from "./effects.js";
-import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOTALITY_NEEDS_ANNOTATION, DivObligation } from "./totality.js";
+import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOTALITY_NEEDS_ANNOTATION, DivObligation, DivergenceResult } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
 import { registerScopeSymbol, MAIN_SCOPE_FQN, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
@@ -1071,15 +1071,16 @@ export function evalSource(
   // Mark tail-position calls in function bodies for TCO
   markTailCallsInContext(fileCtx);
 
-  // Pre-compile typed functions: infer return types and detect type errors
-  const compilationReport = precompileFunctions(fileCtx, extensions, typed);
-
-  // Phase D1: check effect declarations against inferred sets. Mismatches
-  // (declared ⊉ inferred, ignoring "opaque" which is a Slice-1 placeholder
-  // from stdlib HOF calls) are recorded as errors and halt compilation.
-  // Opaque-only inferences become informational notifications (sub-chunk
-  // 1.3) so callers using `effects pure` over Array.map don't fail
-  // spuriously while soundness is being completed in Slice 2.
+  // B-018 T-R6: the divergence analysis runs BEFORE precompile.
+  // Precompile is where speculative inlining happens, so the cutoff has
+  // to be installed first — measured: 124k inline expansions of a single
+  // undischarged binding completed before the analysis block was even
+  // reached. The analysis itself is pure static AST work (it does not
+  // consume precompile's output), and the STAMPING half stays below,
+  // after precompile has written its inferred sets.
+  let divR: DivergenceResult | undefined;
+  let exhTypeLookup: ((name: string) => Value | undefined) | undefined;
+  setInlineCutoff(null);
   if (typed) {
     // Phase E Stages 1-2 — totality analyzers. The exhaustiveness check
     // (Stage 1) and structural-termination check (Stage 2) both need to
@@ -1117,7 +1118,7 @@ export function evalSource(
     // totalityCompileCtx is fully populated before the first lookup and
     // never mutated during analysis.
     const exhTypeCache = new Map<string, Value | undefined>();
-    const exhTypeLookup = (name: string): Value | undefined => {
+    exhTypeLookup = (name: string): Value | undefined => {
       if (exhTypeCache.has(name)) return exhTypeCache.get(name);
       const binding = totalityCompileCtx.bindings.get(name);
       let out: Value | undefined;
@@ -1133,7 +1134,47 @@ export function evalSource(
       exhTypeCache.set(name, out);
       return out;
     };
-    for (const f of checkExhaustiveness(fileCtx.bindingList, exhTypeLookup)) {
+    // Phase E Stage 2 + B-028 F3 — the termination analysis IS the div
+    // inference (CE-R1). One pass computes the Stage-2 findings, the D34
+    // discharge tier per binding, and the div closure over the call
+    // graph; leaf callees (module imports, extension bindings) answer
+    // through their own effect sets — the cross-module seam. Runs here,
+    // ahead of precompile, so the T-R6 cutoff below is in force while
+    // precompile speculates; the reporting/stamping half is below.
+    const leafDivResolver = (name: string): boolean => {
+      const v = totalityCompileCtx.bindings.get(name)?.value;
+      if (!v) return false;
+      const eff = effectsOf(v);
+      return eff !== null && eff.has("div");
+    };
+    divR = analyzeDivergence(fileCtx.bindingList, exhTypeLookup, leafDivResolver);
+    // B-018 T-R6: the cutoff sees only the UNDISCHARGED tier — `partial`
+    // and unproven recursion. The discharged tiers (auto, witnessed,
+    // admitted) stay inlinable: they terminate, or the user declared an
+    // axiom saying so, and PE's folding is the payoff for discharging.
+    // Narrower than the divergence PROBE, which also carries INHERITED
+    // div: cutting at the div source already stops the explosion.
+    const cutoffCfns = new Set<Value>();
+    for (const o of divR.obligations) {
+      if (o.tier !== "undischarged") continue;
+      const cfn = divR.stampTargets.get(o.binding);
+      if (cfn) cutoffCfns.add(cfn as unknown as Value);
+    }
+    if (cutoffCfns.size > 0) {
+      setInlineCutoff((fnValue: Value) => cutoffCfns.has(dataOf(fnValue)));
+    }
+  }
+  // Pre-compile typed functions: infer return types and detect type errors
+  const compilationReport = precompileFunctions(fileCtx, extensions, typed);
+
+  // Phase D1: check effect declarations against inferred sets. Mismatches
+  // (declared ⊉ inferred, ignoring "opaque" which is a Slice-1 placeholder
+  // from stdlib HOF calls) are recorded as errors and halt compilation.
+  // Opaque-only inferences become informational notifications (sub-chunk
+  // 1.3) so callers using `effects pure` over Array.map don't fail
+  // spuriously while soundness is being completed in Slice 2.
+  if (typed) {
+    for (const f of checkExhaustiveness(fileCtx.bindingList, exhTypeLookup!)) {
       compilationReport.notifications.push({
         kind:            "totality-exhaustiveness",
         severity:        "info",
@@ -1142,19 +1183,7 @@ export function evalSource(
         counterexample:  f.counterexample,
       });
     }
-    // Phase E Stage 2 + B-028 F3 — the termination analysis IS the div
-    // inference (CE-R1). One pass computes the Stage-2 findings, the D34
-    // discharge tier per binding, and the div closure over the call
-    // graph; leaf callees (module imports, extension bindings) answer
-    // through their own effect sets — the cross-module seam.
-    const leafDivResolver = (name: string): boolean => {
-      const v = totalityCompileCtx.bindings.get(name)?.value;
-      if (!v) return false;
-      const eff = effectsOf(v);
-      return eff !== null && eff.has("div");
-    };
-    const divR = analyzeDivergence(fileCtx.bindingList, exhTypeLookup, leafDivResolver);
-    for (const f of divR.findings) {
+    for (const f of divR!.findings) {
       compilationReport.notifications.push({
         kind:            "totality-nontermination",
         severity:        "info",
@@ -1165,7 +1194,7 @@ export function evalSource(
     }
     // The long-reserved needs-annotation kind, finally emitted: a clean
     // function that INHERITS div through its calls.
-    for (const n of divR.propagationNotices) {
+    for (const n of divR!.propagationNotices) {
       compilationReport.notifications.push({
         kind:     NOTIF_TOTALITY_NEEDS_ANNOTATION,
         severity: "info",
@@ -1176,8 +1205,8 @@ export function evalSource(
     // Stamp: div joins each carrier's INFERRED effect set — before the
     // declaration check below, so the existing inferred-⊆-declared
     // machinery (and its halt) carries div with no new enforcement path.
-    for (const [name] of divR.divBindings) {
-      const cfn = divR.stampTargets.get(name);
+    for (const [name] of divR!.divBindings) {
+      const cfn = divR!.stampTargets.get(name);
       if (!cfn) continue;
       const prior = (cfn as any).__inferredEffects as Set<string> | undefined;
       const next = new Set(prior ?? []);
@@ -1187,12 +1216,12 @@ export function evalSource(
     // CE-R3: `total` is the per-function STRICT opt-in — an undischarged
     // (own or inherited) div on a `total`-declared function is an error.
     const totalViolations: string[] = [];
-    for (const [name, cfn] of divR.stampTargets) {
+    for (const [name, cfn] of divR!.stampTargets) {
       if ((cfn as any).__total !== true) continue;
-      const why = divR.divBindings.get(name);
+      const why = divR!.divBindings.get(name);
       if (!why) continue;
       const reason = why.own
-        ? (divR.obligations.find((o) => o.binding === name)?.detail ?? "termination unproven")
+        ? (divR!.obligations.find((o: DivObligation) => o.binding === name)?.detail ?? "termination unproven")
         : `calls \`${why.via}\`, which may not terminate`;
       const message = `\`${name}\` is declared \`total\` but div is undischarged: ${reason}`;
       compilationReport.notifications.push({
@@ -1205,12 +1234,12 @@ export function evalSource(
     }
     // CE-R2: the per-binding discharge record rides the report — the
     // Verdict ledger and the obligations surface consume it.
-    compilationReport.divObligations = divR.obligations;
+    compilationReport.divObligations = divR!.obligations;
     // CE-R7: the mechanical purity gates (eq / coercion — E-R5) consult
     // divergence by function identity during the evaluation below.
     const divCfns = new Set<Value>();
-    for (const [name] of divR.divBindings) {
-      const cfn = divR.stampTargets.get(name);
+    for (const [name] of divR!.divBindings) {
+      const cfn = divR!.stampTargets.get(name);
       if (cfn) divCfns.add(cfn as unknown as Value);
     }
     setDivergenceProbe((fnValue: Value) => divCfns.has(dataOf(fnValue)));

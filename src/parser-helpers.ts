@@ -14,9 +14,10 @@ export function makeBits(length: number, data: bigint | number) {
   return { kind: 'Bits' as const, length, data: typeof data === 'number' ? BigInt(data) : data };
 }
 
+const UTF8_ENCODER = new TextEncoder();
+
 export function stringToBits(s: string) {
-  const enc = new TextEncoder();
-  const bytes = enc.encode(s);
+  const bytes = UTF8_ENCODER.encode(s);
   let data = 0n;
   for (let i = bytes.length - 1; i >= 0; i--) {
     data = (data << 8n) | BigInt(bytes[i]);
