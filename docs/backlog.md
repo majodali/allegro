@@ -571,14 +571,22 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   per-call-site refinement re-evaluation was NOT the hotspot. The
   remaining cost needs a real profile (likely the demos' own deep
   recursive evaluation, or analyzer work off this lookup path).
-  **2026-08 (B-018 T-R6) — carries the ratified inlining cutoff**: a
-  binding whose D34 tier is `undischarged`/`partial` must never be
-  PE-INLINED by precompile (residualize the call instead). Measured
-  pathology: inlining divergent non-same-arg recursion (`loop(n + 1)`)
-  costs ~43s for ONE compile. The analyzer already knows the tier;
-  precompile simply doesn't consult it. Design ratified in
-  `docs/design/standard/totality.md` §7/§8 — implementation is this
-  item's
+  **2026-08 — T-R6 EXECUTED and broadened** (suite-performance pass):
+  the cutoff shipped, and the ratified `undischarged`-only scope proved
+  too narrow — it exempted precisely the functions PROVEN total, so
+  `factorial(n: NonNeg)` cost 71.1s to compile (plus a spurious
+  `precompile-type-error`) while the same function over bare `Int` took
+  0.1s. Termination discharge was the wrong predicate: a recursive call
+  with unresolved args cannot converge regardless. Broadened to CYCLE
+  MEMBERSHIP with maintainer ratification; `analyzeDivergence` now
+  reports `recursiveBindings`, and the cutoff is installed BEFORE
+  precompile (which is where the speculation happens — a cutoff
+  installed after it changed nothing). Suite 1015s → 324s.
+  **Still open here**: the remaining profile. The top costs are now the
+  boundary generated-program walk (27s) and the `.alg` units/dimensions
+  files (12–14s each) — no longer totality analysis, so the item's
+  original premise is spent and it needs re-scoping against the new
+  profile rather than more guessing
 
 ### T-host
 
@@ -768,6 +776,36 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   domains on unresolved arithmetic — then look deeply (likely a one-line
   reorder in `applyPrimitive`, but validate interaction with Rule 2
   branch predicates and precompile placeholders first)
+- [ ] **B-100** · `[reval]` T-R6 soundness review + the checking
+  algorithm itself. The broadened cutoff (cycle membership rather than
+  D34 tier) shipped 2026-08 on measured evidence and maintainer
+  ratification, but the reasoning deserves a deeper look than a perf
+  pass gave it. **Two threads:**
+  (a) **Cutoff soundness.** The claim is "a recursive call with
+  unresolved arguments cannot converge, so residualizing loses
+  nothing." Interrogate it: is it true for PARTIALLY-applied calls
+  (some args concrete, some symbolic) where unfolding a few levels
+  might reach a decidable base case? For mutual cycles where the SCC is
+  entered at different points? For HOF-mediated edges? Does the cutoff
+  change any FOLDING result the suite does not currently pin (it kept
+  1197/1197 green, which is evidence, not proof)? Also review the
+  `unresolved argument` predicate itself — `isResolved` on a carrier vs
+  a residual vs a pending future — and whether the cutoff should
+  reside in `precompileFunction` rather than `applyComposed`.
+  (b) **The checking algorithm hitting STACK OVERFLOW is a bad sign.**
+  Before the cutoff, precompiling a provably-total `factorial(n:
+  NonNeg)` unfolded until the JS stack died, and the error surfaced as
+  a `precompile-type-error` on correct code. The cutoff removes the
+  trigger but not the underlying fragility: PE has a `MAX_DEPTH` of
+  10000 that recursion depth can outrun, and a host-stack failure is
+  reported as a user-facing type error. Wanted: a real termination
+  discipline for the analyzer/PE itself (explicit work list or depth
+  budget with a HONEST diagnostic), so that no input can turn an
+  engine limit into a wrong answer about the user's program. Related:
+  D35's fuel/budget framing may be the right shape.
+  Sources: `docs/design/standard/totality.md` §3/§7/§8,
+  `src/evaluator.ts` (`setInlineCutoff`, MAX_DEPTH), `src/runtime.ts`
+  (analysis-before-precompile ordering), CHANGELOG 2026-08 perf entry
 - [ ] **B-099** · Project severity configuration — the T-R2 surface
   (ratified 2026-08, `docs/design/standard/totality.md` §5/§8). ONE
   per-project config declaration (shape open — likely a manifest read

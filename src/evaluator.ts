@@ -22,6 +22,22 @@ import { isCarrier } from "./structure.js";
 
 const MAX_DEPTH = 10000;
 
+// B-018 T-R6 (broadened): the recursion inlining cutoff hook. Injected
+// per typed compilation from runtime.ts once the call-graph SCCs are
+// known; answers, by function identity, whether a callee participates in
+// a recursion cycle — self-recursive or mutual — regardless of its D34
+// discharge tier. Mirrors the `setDivergenceProbe` pattern: no new value
+// slot, no new `__*` property, and absent (null) it is simply the
+// pre-T-R6 behavior.
+let inlineCutoff: ((fn: Value) => boolean) | null = null;
+
+/** Register the inlining cutoff (called per typed compilation). Pass
+ *  null to clear it — an untyped compilation has no tier information and
+ *  must not inherit the previous one's. */
+export function setInlineCutoff(f: ((fn: Value) => boolean) | null): void {
+  inlineCutoff = f;
+}
+
 // --- Tail Call Optimization ---
 
 /**
@@ -608,6 +624,32 @@ function applyComposed(
           }
         }
       }
+    }
+
+    // B-018 T-R6: the recursion inlining cutoff. PE inlines a call by
+    // substituting args into the body and re-evaluating. With an
+    // unresolved argument a RECURSIVE call cannot converge — the base
+    // case is undecidable without a concrete argument — so unfolding it
+    // only builds ever-larger expressions until MAX_DEPTH or the JS
+    // stack gives out, and the result is discarded. Measured: 78.8s for
+    // one divergent compile (33% of it GC) and 71.1s for a provably
+    // TOTAL `factorial(n: NonNeg)`, the latter also emitting a spurious
+    // `precompile-type-error`. Termination discharge is the wrong
+    // predicate here; cycle membership is the right one.
+    //
+    // Only SPECULATIVE calls are cut. With every argument resolved this
+    // is a real application — a `partial` function the program actually
+    // calls must still run (and may legitimately diverge; that is what
+    // the declaration opted into). Residualizing there would change
+    // semantics, not just cost.
+    if (
+      inlineCutoff !== null &&
+      evalArgs.some(a => !isResolved(a)) &&
+      inlineCutoff(currentFn as unknown as Value)
+    ) {
+      const residual = makeExpr(currentFnRaw ?? currentFn, evalArgs);
+      const calleeEffects = effectsOf(currentFn as unknown as Value);
+      return calleeEffects ? withEffects(residual, calleeEffects) : residual;
     }
 
     const substituted = substituteParams(currentFn, evalArgs);

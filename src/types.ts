@@ -332,8 +332,16 @@ export function isResolved(v: Value): boolean {
 
 // --- String/Bits conversion (UTF-8) ---
 
+// One encoder/decoder for the process. Both are stateless for our use
+// (default UTF-8, no streaming), and these two functions sit on the
+// hottest path in the system — every type-name read, every dispatch,
+// every string literal. Constructing them per call profiled at ~9% of a
+// heavy compile. Browser-compatible either way (never `Buffer`).
+const UTF8_ENCODER = new TextEncoder();
+const UTF8_DECODER = new TextDecoder();
+
 export function stringToBits(s: string): BitsValue {
-  const bytes = new TextEncoder().encode(s);
+  const bytes = UTF8_ENCODER.encode(s);
   let data = 0n;
   for (let i = bytes.length - 1; i >= 0; i--) {
     data = (data << 8n) | BigInt(bytes[i]);
@@ -349,7 +357,7 @@ export function bitsToString(b: BitsValue): string {
     bytes[i] = Number(data & 0xFFn);
     data >>= 8n;
   }
-  return new TextDecoder().decode(bytes);
+  return UTF8_DECODER.decode(bytes);
 }
 
 // --- Extension interface (here to avoid circular deps) ---

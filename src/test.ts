@@ -62,8 +62,69 @@ const TEST_FILTER = process.env.ALLEGRO_TEST_FILTER
   : null;
 let filteredOut = 0;
 
-function test(name: string, fn: () => void): void {
+// Sharding (suite-performance pass): ALLEGRO_TEST_SHARD="i/n" runs only
+// the tests this shard owns, so N processes cover the suite between them.
+//
+// Assignment is by a hash of the test NAME, deliberately not by
+// registration index. An index-based scheme requires every shard to
+// register exactly the same tests in the same order, which a single
+// conditional registration silently breaks: the counters drift, the
+// shards disagree about who owns what, and tests vanish from the union
+// with nothing failing. (That is not hypothetical — it is what the first
+// version of this did, losing 93 tests.) A name hash is order-free, so
+// conditional registration cannot desynchronize anything, and it
+// scatters the clustered slow tests across shards.
+//
+// A shard is NOT a landing gate on its own; `scripts/test-shards.mjs`
+// aggregates the shards and applies the gate to the total.
+const SHARD = (() => {
+  const raw = process.env.ALLEGRO_TEST_SHARD;
+  if (!raw) return null;
+  const m = /^(\d+)\/(\d+)$/.exec(raw.trim());
+  if (!m) throw new Error(`ALLEGRO_TEST_SHARD must look like "0/4", got "${raw}"`);
+  const index = Number(m[1]), count = Number(m[2]);
+  if (count < 1 || index < 0 || index >= count) {
+    throw new Error(`ALLEGRO_TEST_SHARD out of range: "${raw}"`);
+  }
+  return { index, count };
+})();
+let registeredCount = 0;
+let shardedOut = 0;
+let everyShardCount = 0;
+
+/** FNV-1a over the test name — a stable, order-free shard assignment. */
+function hashName(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** Per-test shard options.
+ *  - default: the name hash picks one owning shard.
+ *  - `everyShard`: run in ALL shards. For whole-shard self-checks whose
+ *    subject is that shard's own work (the corpus walk), where running in
+ *    a single shard would leave the other shards' work unchecked. */
+export interface ShardOpts { everyShard?: boolean }
+
+/** Does this test belong to the running shard? Every shard calls this for
+ *  every registered test, so `registeredCount` is suite-wide and the
+ *  aggregator can verify the shards saw the same suite. */
+function inShard(name: string, opts?: ShardOpts): boolean {
+  registeredCount++;
+  if (opts?.everyShard) { everyShardCount++; return true; }
+  if (SHARD === null) return true;
+  const mine = (hashName(name) % SHARD.count) === SHARD.index;
+  if (!mine) shardedOut++;
+  return mine;
+}
+
+function test(name: string, fn: () => void, opts?: ShardOpts): void {
+  const mine = inShard(name, opts);
   if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
+  if (!mine) return;
   if (process.env.ALLEGRO_TEST_TRACE) console.error("TEST:", name);
   const t0 = performance.now();
   try {
@@ -447,6 +508,13 @@ test("extension: not available without being provided", () => {
 // == Module Loader ==
 
 async function asyncTest(name: string, fn: () => Promise<void>): Promise<void> {
+  // Async tests honor the name filter and the shard exactly like sync
+  // ones. Before the suite-performance pass they honored NEITHER, so a
+  // "filtered" dev run still paid for the whole async block — which is
+  // what made short timeouts look like hangs.
+  const mine = inShard(name);
+  if (TEST_FILTER && !TEST_FILTER.test(name)) { filteredOut++; return; }
+  if (!mine) return;
   if (process.env.ALLEGRO_TEST_TRACE) console.error("ATEST:", name);
   try {
     await fn();
@@ -1695,6 +1763,11 @@ let corpusWalkFiles = 0;
 
 function fileTest(filePath: string, extensions?: Extension[]): void {
   const basename = path.basename(filePath);
+  // Distributed by hash like every other test. Each shard walks the
+  // corpus files it owns and checks THOSE files for registry violations
+  // (see the every-shard registry-completeness test); the union across
+  // shards covers the whole corpus, and the aggregator asserts the total
+  // coverage the single-process run asserts locally.
   test(`file: ${basename}`, () => {
     runAlgFile(filePath, extensions);
     eq(true, true); // if we get here, all expectations matched
@@ -12164,11 +12237,20 @@ timedSection("modules", runModuleTests)
   .then(() => timedSection("benchmark", runBenchmarkTests))
   .then(() => timedSection("doc-lint", async () => runDocLintTests()))
   .then(() => timedSection("check-deployed", async () => runCheckDeployedTests()))
-  .then(() => timedSection("boundary", async () => runBoundaryTests({ test, eq, corpus: { files: corpusWalkFiles, violations: corpusWalkViolations } })))
+  .then(() => timedSection("boundary", async () => runBoundaryTests({
+    test,
+    eq,
+    // Each shard reports the corpus IT walked; the registry-completeness
+    // check runs in every shard over its own files, and the aggregate
+    // coverage tripwire is applied by scripts/test-shards.mjs.
+    corpus: { files: corpusWalkFiles, violations: corpusWalkViolations, sharded: SHARD !== null },
+  })))
   .then(() => {
   // Suite-count floor (boundary baseline): a mass-disablement tripwire.
-  // Suspended under ALLEGRO_TEST_FILTER — filtered runs are dev runs.
-  if (!TEST_FILTER) {
+  // Suspended under ALLEGRO_TEST_FILTER — filtered runs are dev runs —
+  // and under sharding, where no single shard sees the whole suite;
+  // `scripts/test-shards.mjs` applies the floor to the aggregate.
+  if (!TEST_FILTER && SHARD === null) {
     const floor = getSuiteFloor();
     if (passed + failed < floor) {
       failed++;
@@ -12180,6 +12262,12 @@ timedSection("modules", runModuleTests)
     console.log(`DEV RUN (ALLEGRO_TEST_FILTER=${process.env.ALLEGRO_TEST_FILTER}) — ${filteredOut} tests filtered out; NOT a landing gate`);
   }
   console.log(`Tests: ${passed + failed} total, ${passed} passed, ${failed} failed`);
+  if (SHARD) {
+    // Machine-readable line for the shard aggregator. `registered` is the
+    // suite-wide registration count every shard sees, so the aggregator
+    // can confirm the shards agree on what the suite contains.
+    console.log(`SHARD-RESULT ${SHARD.index}/${SHARD.count} ran=${passed + failed} passed=${passed} failed=${failed} registered=${registeredCount} skipped=${shardedOut} everyShard=${everyShardCount}`);
+  }
   console.log(`Wall clock: ${((performance.now() - suiteT0) / 1000).toFixed(1)}s`);
   console.log(`Sections: ${sectionTimes.map((s) => `${s.name} ${(s.ms / 1000).toFixed(1)}s`).join(" | ")}`);
   const slowest = [...testTimes].sort((a, b) => b.ms - a.ms).slice(0, 15);
