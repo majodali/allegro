@@ -1,12 +1,17 @@
 # Proposed PROCESS delta — parallel lanes & the per-lane gate
 
-Status: **proposal, awaiting maintainer sign-off.** PROCESS.md is Tier 0
-and agents never land Tier-0 changes (PROCESS §7) — so the lane model
-itself landed in `docs/backlog.md` §"Parallel lanes" (Tier 2, sequencing),
-and the two Tier-0 sentences it depends on are proposed here instead.
+Status: **approved and applied 2026-08** (maintainer sign-off in
+session). Both edits below are now live in `docs/PROCESS.md`; this doc
+is kept as the record of what was proposed and why, and closes here.
 
-Approve and this becomes a one-commit edit; reject or amend and the
-backlog section is adjusted to match.
+The maintainer also recorded intent to evaluate this as a candidate
+amendment to majodali/methodology — the lane experiment is the evidence
+for that decision, so the observations that accumulate against it should
+be gathered before the amendment is proposed.
+
+PROCESS.md is Tier 0 and agents never land Tier-0 changes (PROCESS §7),
+so the lane model itself landed in `docs/backlog.md` §"Parallel lanes"
+(Tier 2, sequencing) and only these two sentences needed sign-off.
 
 ## Why a Tier-0 delta is needed at all
 
@@ -25,7 +30,7 @@ without stopping between each. That is a direct exception to §3.3, and
 recording it anywhere other than PROCESS would be the fragmentation
 PROCESS §3's deviation rule exists to prevent.
 
-## Proposed edit 1 — PROCESS §3, item 3
+## Edit 1 (applied) — PROCESS §3, item 3
 
 Append to the existing item (no text removed):
 
@@ -39,7 +44,7 @@ Append to the existing item (no text removed):
 > declared pre-ratified keep the per-chunk gate above. The landing
 > checklist (§5) is unchanged for every lane.
 
-## Proposed edit 2 — PROCESS §7, the parallel-sessions bullet
+## Edit 2 (applied) — PROCESS §7, the parallel-sessions bullet
 
 Replace:
 

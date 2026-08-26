@@ -30,10 +30,15 @@ the last 40 `src/`+`lib/` commits, not the layer spine.
   a prerequisite rather than an optimization.
 - **Gate policy per lane** (ratified): A/B/C run pre-ratified chunk
   SEQUENCES — the chunk list is approved once per arc and lands in
-  order; D keeps the per-chunk stop-and-summarize gate. The two Tier-0
-  PROCESS sentences this needs are NOT landed here: they are proposed in
-  `docs/plans/parallel-lanes-process-delta.md`, per the rule that agents
-  never land Tier-0 changes.
+  order; D keeps the per-chunk stop-and-summarize gate. This needed two
+  Tier-0 PROCESS sentences (§3's per-lane exception to stop-after-every-
+  chunk, and §7's lane rule); they were proposed rather than landed, per
+  the rule that agents never land Tier-0 changes, then **approved by the
+  maintainer in-session and applied**. Record of the proposal:
+  `docs/plans/parallel-lanes-process-delta.md` (now closed). The
+  maintainer additionally recorded intent to evaluate the lane model as
+  a candidate majodali/methodology amendment — this run is its evidence,
+  so observations against it should be gathered as the lanes proceed.
 - **Register cleanup**: **B-058 superseded by B-099** — the same
   per-project severity surface described twice, B-099 having been minted
   during the B-018 close-out without checking; B-099 keeps the work
