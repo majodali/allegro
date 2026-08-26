@@ -8,6 +8,32 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-014 close-out: CT-R1–CT-R6 ratified and indexed
+
+The gate decision on the contracts reval. B-014 closes.
+
+- **CT-R1–CT-R6 ratified as recommended** (maintainer). `contracts.md`'s
+  header and §10 flip from "proposed, awaiting ratification" to binding
+  design truth for the contracts area.
+- **Indexed** (`docs/decisions.md`): the **CT-R** family joins the D-,
+  E-R, U-R, R-R, V-R, CE-R and T-R sections as one-line rows with status
+  and reasoning pointers, per the register's rule that plan- and
+  design-scoped ruling families are indexed when their gate passes.
+- **Follow-ons routed to real owners** rather than left in the closed
+  item's prose: **B-057** — its scope was settled by this item, as its
+  own entry always said it would be (relocate the undischarged
+  `requires` check to the call site, which also supplies the missing
+  counterexample origin; relational predicates; the `assumes`
+  trust-boundary form against D34's admitted tier; contracts in the
+  verdict / `obligations` / assumption ledger; `ensures` over params).
+  **B-101** (new, lane D) — the predicate-carrier residue: the legacy
+  `domain` dual-read that v1's own Chunk-1 cleanup task never landed,
+  the writerless `type-invariant` predicate source, and the
+  `assume_invariant` retirement CT-R3 calls for. **B-099** — carries the
+  contract severity knobs alongside the totality ones.
+
+Docs-only. 1197/1197 green.
+
 ## 2026-08 — B-014: contracts design revalidation (`contracts.md`)
 
 The M4 reval line continues in **lane A**: the v1 Phase-C contract design

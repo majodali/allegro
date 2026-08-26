@@ -42,9 +42,9 @@ Implementation chunks reference `docs/plans/structures-implementation.md`
   `completion-effects.md` closed; F1–F4 landed, D16/D31–D34 executed).
   B-018 totality reval COMPLETE 2026-08 (`totality.md` landed; T-R1–T-R6
   ratified; follow-ons routed to B-099 and B-087). M4 reval docs ride
-  between chunks — **B-014 (contracts): doc landed 2026-08
-  (`contracts.md`), CT-R1–CT-R6 awaiting ratification; B-029 (PCP)
-  remains** in the reval line.
+  between chunks — B-014 contracts reval COMPLETE 2026-08
+  (`contracts.md` landed; CT-R1–CT-R6 ratified; follow-ons routed to
+  B-057, B-099 and B-101). **B-029 (PCP) remains** in the reval line.
 - **Track R — public release (started 2026-08, runs alongside
   functional tranches):** positioning plan `release-track.md`
   (differentiator map + claims register + demo ladder); VISION §1a/§5
@@ -68,10 +68,10 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** | B-014 contracts, then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/design/standard/*.md`; touches no `src/` |
+| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08), then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/design/standard/*.md`; touches no `src/` |
 | **B — suite split** | Break up `src/test.ts` (12,281 lines, in 88% of source commits) | Runs anytime. **Prerequisite for C** |
 | **C — capability tracks** | T-tooling (B-064/065/067), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
-| **D — L2 semantics** | B-089, B-100, B-099, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
+| **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
 
 **What lane B unlocks:** C and D may then run *as lanes in parallel
 with each other* (C touches new/track files, D the L2 monoliths — a
@@ -196,8 +196,10 @@ that prevents it.
   residualising semantics (absent → error value, pending → residual —
   never a throw); `Binding.isUse` deleted with all literal sites;
   chain-aware `__futureManager`/proven-type lookups; 6 boundary tests
-- [ ] **B-014** · L2 · `[reval]` Contracts design revalidation →
-  `contracts.md` in `docs/design/standard/`: predicate-set model, branch
+- [x] **B-014** · L2 · `[reval]` Contracts design revalidation —
+  COMPLETE 2026-08 (`docs/design/standard/contracts.md`; CT-R1–CT-R6
+  maintainer-ratified as recommended, indexed in the decision
+  register). Original scope: predicate-set model, branch
   refinement, assert/requires/ensures lowering, sink-based checks,
   invariant inheritance, `assume` rejection + constructor pattern,
   refinement-vs-contract guidance (sources:
@@ -212,10 +214,13 @@ that prevents it.
   `Type.invariant` fluent API (D45) with inheritance restated over D44,
   and the mechanism-choice guidance the sources never wrote down.
   Sink-based checking split into discharge (shipped via PE) and
-  relocation (not shipped). **CT-R1–CT-R6 PROPOSED with
-  recommendations — awaiting ratification; B-014 closes on the gate
-  decision.** Follow-ons proposed: B-057 scope (CT-R1/CT-R3/CT-R6),
-  B-101 (CT-R5), contract knobs on B-099 (CT-R2)
+  relocation (not shipped); `assume` found never actually rejected —
+  it is D34's admitted tier, with `assume_invariant` the one path that
+  trusts silently. **CT-R1–CT-R6 ratified as recommended 2026-08** and
+  indexed in `docs/decisions.md`. Follow-on implementation routed:
+  CT-R1/CT-R3/CT-R6 → **B-057** (scope settled per this item);
+  CT-R5 + the `assume_invariant` retirement → **B-101** (new);
+  CT-R2's contract knobs → **B-099**
 - [x] **B-015** · L0 · Shape/knowledge channel split; dispatch on shape
   (C3.1). Landed 2026-07: `typeShape` walk (member-transparent refinement
   layers = knowledge, identified by parent-member-set object identity;
@@ -575,8 +580,8 @@ that prevents it.
   (parent 0546daa, `allegro catalog`) — pre-rework, reference only
 - [ ] **B-055** · PCP H6 multi-strategy parallel prover orchestration
 - [ ] **B-056** · PCP H7 effort budgets, escalation, reproducibility
-- [ ] **B-057** · Phase C polish. **Scope proposed at B-014 (2026-08),
-  pending the CT-R gate** — `docs/design/standard/contracts.md` §10:
+- [ ] **B-057** · Phase C polish. **Scope SETTLED at B-014 (2026-08,
+  CT-R gate passed)** — `docs/design/standard/contracts.md` §10:
   (a) relocate an UNDISCHARGED `requires` check to the call site, which
   also supplies the call-site origin missing from counterexamples
   (CT-R1 — discharge itself is already call-site-sensitive via PE, so
@@ -595,9 +600,12 @@ that prevents it.
   `type-invariant` predicate source, reserved and writerless since
   invariants became refinements (D45/C6.1b); retire the `assume_invariant`
   primitive, which has no grammar sugar, no caller anywhere in the tree,
-  and attaches a fact without recording it (CT-R3). Blocked on the CT-R
-  gate. Rides any pass already in `refinements.ts`; the physical move of
-  predicate storage under the `knowledge` channel remains C4's
+  and attaches a fact without recording it (CT-R3). Unblocked — CT-R3
+  and CT-R5 ratified 2026-08. Rides any pass already in
+  `refinements.ts`/`primitives.ts`; the physical move of predicate
+  storage under the `knowledge` channel remains C4's. Note for the lane
+  table: this is **lane D** work, so it queues behind the Standard
+  band's serial ordering rather than riding lane A
 - [x] **B-058** · Per-project notification-severity config (kind →
   severity remap; substrate shipped in v1) — **SUPERSEDED by B-099**
   (2026-08). Same surface, described twice: B-099 was minted during the
@@ -894,7 +902,7 @@ that prevents it.
   project-config substrate: Allegro has no manifest-level configuration
   surface yet, so this item owns designing one or deciding it rides
   an existing file. Never a global default change (T-R2).
-  **Rider added at B-014 (CT-R2, pending the CT-R gate)**: the contract
+  **Rider added at B-014 (CT-R2, ratified 2026-08)**: the contract
   knobs belong to this same surface — the construction-path knob above
   is a contracts knob, and v1's global `--strict` flag (never built, and
   not to be) is superseded here rather than revived

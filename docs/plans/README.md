@@ -28,9 +28,9 @@ dissolved into the one implementation-ordered list at the 2026-08 groom;
 the backlog header states what working a `[reval]` item means); **do
 not** treat archived plans as current design. Consumed so far: effects
 nits (B-004), grammar formalism (B-003), totality (B-018,
-`standard/totality.md`), contracts (B-014, `standard/contracts.md` —
-gate pending). Still open: PCP (B-029), roadmap remainder (B-051),
-planning DSL (B-079).
+`standard/totality.md`), contracts (B-014, `standard/contracts.md`).
+Still open: PCP (B-029), roadmap remainder (B-051), planning DSL
+(B-079).
 
 Lifecycle (K-007): draft → active → (superseded by X, because Y |
 closed → Backlog entry); closed plans move to `archive/` after durable
