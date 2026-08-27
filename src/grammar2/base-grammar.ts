@@ -608,18 +608,21 @@ export function buildBaseGrammar(): Grammar {
 
   // --- Type expressions (Phase 2c-4 — simple + generics) ---
   //
-  // type_expr = type_expr_union
-  // type_expr_union = type_expr_atom ("|" type_expr_atom)*
+  // type_expr = type_expr_atom
   // type_expr_atom = ident ("[" type_expr_args "]")? | "{" type_fields "}"
   //
-  // For now, just ident-based types with generics. Union and structural are
-  // supported. Refinements (`&&`) deferred.
+  // For now, just ident-based types with generics. Structural is supported.
+  // Refinements (`&&`) deferred.
+  //
+  // B-104 chunk 2: the `A | B` UNION alternative is removed. It parsed, but
+  // the type it built was a Context that was also an array (numeric keys +
+  // an explicit `__length`) carrying a marker slot that stored the integer
+  // 1 — never the variants the registry claimed it held. Nothing outside
+  // four test assertions used it. Redesign is B-105; until then `|` in a
+  // type position is a parse error rather than a half-built type.
 
   addProduction(g, { name: "type_expr",
-    rule: alt([
-      seq([nonterm("type_expr_atom"), nonterm("ws"), lit("|"), nonterm("ws"), nonterm("type_expr")], { name: "type_union" }),
-      nonterm("type_expr_atom"),
-    ]),
+    rule: nonterm("type_expr_atom"),
   });
 
   addProduction(g, { name: "type_expr_atom",

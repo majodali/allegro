@@ -20,7 +20,7 @@
     },
     "src/slots.ts": {
       "components-direct": 4,
-      "dunder-string-literal": 90,
+      "dunder-string-literal": 82,
       "bindings-get-dunder": 11,
       "kernel-writer-acquisition": 1
     },
@@ -59,9 +59,9 @@
     "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 547,
-      "recursion-tco": 686,
-      "collections": 505
+      "basics": 472,
+      "recursion-tco": 580,
+      "collections": 429
     }
   }
 }

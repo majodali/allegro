@@ -134,12 +134,36 @@ prefix had been hiding:
   member-dispatch expandos are JS properties on host objects. They share a
   namespace with nothing, so the prefix bought nothing; 27 names were
   renamed with no behaviour change.
-- **Binding plane — open.** The names listed above sit in the SAME
-  `bindings` map as user fields, and `isMetaSlotKey(key) =
-  key.startsWith("__")` is the partition test between the two. Here the
-  prefix IS load-bearing, so retiring it means replacing the partition —
-  a storage plane, registry membership, or interned keys — not renaming
-  past it. B-104(b) carries the options and awaits a ruling.
+- **Binding plane — the partition turned out to be almost entirely
+  imaginary.** Instrumenting `isMetaSlotKey` across the full 1197-test
+  suite recorded exactly ONE key it ever returned true for: `__length`,
+  296 times. None of the type slots above ever reached it. The reason is
+  structural rather than lucky — a type Context's namespace is closed
+  (a user field named `name` is routed into `__members` under an FQN
+  key), an instance carries no metadata at all (shape moved to the
+  component plane at C4.3b), and `__members` is itself FQN-keyed. Two
+  populations that never meet do not need a partition, and the proposal
+  to give them a dedicated `meta` plane was **withdrawn** on this
+  evidence: these slots become ordinary bindings on a kernel-only
+  Context.
+- **What `isMetaSlotKey` is actually for.** `__length`, and nothing else.
+  `materializeView` emits it into the legacy map view of a dense
+  structure (the C4.2 compatibility contract, held by the W6
+  dense-view-coherence invariant), where it sits beside numeric element
+  keys — the one genuinely mixed Context left, now that unions are
+  retired. Whatever replaces the predicate needs to cover that case and
+  no other.
+- **Deleted rather than renamed (B-104 chunk 2).** `__union` — it stored
+  the integer 1 as an is-a-union marker, never the variants D39 named as
+  its target, and went with the union type itself (B-105).
+  `__invariantsList` — no writer since C6.1b folded invariants into
+  refinement layers; its accessors were dead code.
+- **`__interface` is not in that group**, despite looking like it.
+  `structuralWrap` erases the marker while copying `__type`, so
+  `~SomeInterface` keeps meta `Interface` while leaving declared
+  conformance for the loose base-name world (C5.2c). The marker encodes
+  something the meta-type does not, and removing it is a semantic change
+  to what `~Interface` is — not a redundancy removal. Open, B-104(g).
 
 **The redesign discussion has since concluded (2026-07)** — outcome in
 `docs/design/allegretto/structures.md`; the questions this section

@@ -1009,9 +1009,14 @@ test("grammar2/std: structural wrap type annotation", () => {
   eq(Number((dataOf(r) as BitsValue).data), 42);
 });
 
-test("grammar2/std: union type annotation", () => {
-  const r = evalStandard2('f(x: Int | String) => x\nf(42)');
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+// B-104 chunk 2: union types are removed (maintainer ruling; redesign B-105).
+// The annotation test is replaced by its inverse — the grammar no longer
+// admits `|` in a type position, and must say so rather than mis-parse.
+test("grammar2/std: union type annotation is rejected (B-104 c2)", () => {
+  let threw = false;
+  try { evalStandard2('f(x: Int | String) => x\nf(42)'); }
+  catch { threw = true; }
+  eq(threw, true, "`Int | String` no longer parses as a type expression");
 });
 
 test("grammar2/std: export binding wraps value", () => {

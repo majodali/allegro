@@ -1883,7 +1883,7 @@ import {
   FunctionType, makeFunctionType, getFunctionParamTypes, getFunctionReturnType,
   AnyType, Type, makeArray, makeObject, NoneType, ErrorType, noneSingleton,
   isGenericType, getTypeArgs, getGenericType, applyGenericType, normalizeType,
-  structuralWrap, makeUnionType, wrapType, buildRefinedType, isTypeMeta,
+  structuralWrap, wrapType, buildRefinedType, isTypeMeta,
   resolveDataSlots,
   Effect as _Effect, effectUnion as _effectUnion, isEffectInstance as _isEffectInstance,
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
@@ -3023,20 +3023,8 @@ const type_apply_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   return wrapType(applyGenericType(genericCtx, typeArgs));
 };
 
-// --- type_union: create a union type from alternatives ---
-
-const type_union_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
-  // Evaluate all alternative type args
-  const alternatives: Value[] = [];
-  for (const arg of args) {
-    const v = evalFn!(arg, ctx!);
-    if (!isResolved(v)) {
-      return makeExpr(makePrimitive("type_union", type_union_impl, true), args);
-    }
-    alternatives.push(dataOf(v));
-  }
-  return wrapType(makeUnionType(alternatives as ContextValue[]));
-};
+// B-104 chunk 2: `type_union` is removed along with the `A | B` surface
+// syntax it backed. See base-grammar.ts; redesign is B-105.
 
 // --- structural_wrap: ~ operator on types ---
 
@@ -4434,7 +4422,6 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   certificate_peek: makePrimitive("certificate_peek", certificate_peek_impl, false, ["observe"]),
   type_apply: makePrimitive("type_apply", type_apply_impl, true),
   type_function: makePrimitive("type_function", type_function_impl, true),
-  type_union: makePrimitive("type_union", type_union_impl, true),
   structural_wrap: makePrimitive("structural_wrap", structural_wrap_impl, true),
   type_refine: makePrimitive("type_refine", type_refine_impl, true),
   type_check_binding: makePrimitive("type_check_binding", type_check_binding_impl, true),

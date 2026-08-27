@@ -13,23 +13,43 @@ import { getTypeName, getType, createTypeSystem } from "../types-std.js";
 import { getName, componentsView, getMembers } from "../slots.js";
 import { formatValue } from "../primitives.js";
 import { fqnBaseName } from "../symbols.js";
+import { primNames } from "./alg-files.js";
 
-// == Union Types ==
+// == Union Types: REMOVED at B-104 chunk 2 (maintainer ruling) ==
+//
+// `A | B` built a type Context that was also an array — numeric keys, an
+// explicit `__length`, two method bindings and a `__union` marker holding
+// the integer 1 rather than the variants D39 named as its target. It was the
+// only Context mixing engine slots with plain names. Nothing outside these
+// tests used it, so it was removed rather than migrated (redesign: B-105).
+//
+// The three assertions that lived here covered a feature that no longer
+// exists; they are replaced — not dropped — by the assertion that the syntax
+// now fails LOUDLY rather than silently building a half-formed type. That is
+// the condition worth holding: a removed feature must not degrade into a
+// confusing partial one.
 
-test("union type: Int | String accepted", () => {
-  // A function accepting Int | String should accept both
-  const result1 = evalStd('f(x: Int | String) => x\nf(42)');
-  eq(Number((dataOf(result1!) as BitsValue).data), 42);
-
-  const result2 = evalStd('f(x: Int | String) => x\nf("hello")');
-  eq(bitsToString(dataOf(result2!) as BitsValue), "hello");
+test("union type: `A | B` is rejected, not silently half-built (B-104 c2)", () => {
+  let threw = false;
+  let message = "";
+  try { evalStd('f(x: Int | String) => x\nf(42)'); }
+  catch (e: any) { threw = true; message = e.message; }
+  eq(threw, true, "`|` in a type position no longer parses");
+  eq(/parse error/i.test(message), true, `expected a parse error, got: ${message}`);
 });
 
-test("union type: rejects non-matching type", () => {
-  let threw = false;
-  try { evalStd('f(x: Int | String) => x\nf(true)'); }
-  catch (e: any) { threw = e.message.includes("Type error") || e.message.includes("type"); }
-  eq(threw, true, "Bool should not match Int | String");
+test("union type: the removal is complete on the primitive side too (B-104 c2)", () => {
+  // The grammar test above only proves the SURFACE is gone. A half-removed
+  // feature — syntax dropped but `type_union` still registered — would leave
+  // the primitive reachable by name and able to mint the one Context in the
+  // system that mixes engine slots with plain bindings. Both halves must go.
+  eq(primNames.has("type_union"), false, "type_union is no longer a registered primitive");
+  // Calling it by name does NOT throw — an unresolved symbol residualizes
+  // (PE Rule 1), which is correct base-language behaviour. The condition
+  // that matters is that nothing MINTS a union: the call stays a residual
+  // Expression instead of producing a type Context.
+  const r = evalStd('type_union(Int, String)');
+  eq(dataOf(r!).kind, ValueKind.Expression, "the call residualizes rather than minting a union type");
 });
 
 // == Structural Type (~) ==

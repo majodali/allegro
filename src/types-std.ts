@@ -20,11 +20,11 @@ import { effectsOf as fnEffectsOf } from "./effects.js";
 import {
   getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericBackLink,
-  getSlotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, getVariants, indexGet, elementsOf,
+  getSlotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf,
   setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface,
-  setWraps, setVariants, setPredicate, setGenericArgs,
+  setWraps, setPredicate, setGenericArgs,
   setGenericBackLink, setProposition,
-  setEffectBound, setSlotCount, setAbstractDomain,
+  setEffectBound, setAbstractDomain,
   writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
   removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape, getFallbackMember,
   equalityShape, asContext,
@@ -116,7 +116,6 @@ export function applyBoundaryBound(v: Value, expected: ContextValue): Value {
   if (getEffectBound(expected) !== undefined) return v;
   if (getEffectLabels(expected) !== undefined) return v;
   if (getInterfaceMarker(expected) !== undefined) return v;
-  if (getVariants(expected) !== undefined) return v;
   if (isGenericType(expected) || getGenericArgs(expected) !== undefined) return v;
   const stored = getType(v);
   if (!stored) return v;
@@ -648,73 +647,20 @@ export function structuralWrap(type: ContextValue): ContextValue {
   return wrapper;
 }
 
-// --- Union Type ---
-
-/**
- * Create a union type from alternatives: `A | B | C`
- * A union type's instanceof checks if the value satisfies ANY alternative.
- * A union type's subtypeof checks if ALL alternatives are subtypes of the target.
- */
-export function makeUnionType(alternatives: ContextValue[]): ContextValue {
-  const union = makeContext();
-  setName(union, stringToBits(
-    alternatives.map(a => {
-      const n = getName(a);
-      return n && n.kind === ValueKind.Bits ? bitsToString(n) : "?";
-    }).join(" | ")
-  ));
-  // Store alternatives as an array-like Context
-  for (let i = 0; i < alternatives.length; i++) {
-    addBinding(union, String(i), alternatives[i]);
-  }
-  setSlotCount(union, makeInt(alternatives.length));
-  setVariants(union, makeInt(1)); // marker
-
-  // instanceof: value matches if it matches ANY alternative
-  addBinding(union, "instanceof", makePrimitive("UnionType.instanceof", (args) => {
-    const value = args[0];
-    const valueType = getType(value);
-    if (!valueType) return makeInt(0);
-    const valueName = getTypeName(value);
-    for (let i = 0; i < alternatives.length; i++) {
-      const alt = alternatives[i];
-      const altName = getName(alt);
-      const altNameStr = altName && altName.kind === ValueKind.Bits ? bitsToString(altName) : null;
-      if (altNameStr && altNameStr === valueName) return makeInt(1);
-      // Also check via the alternative's meta-type instanceof
-      const altMetaType = channelReadRaw(alt, "shape") as ContextValue | undefined;
-      if (altMetaType) {
-        const altInstanceof = typeMethod(altMetaType, "instanceof");
-        if (altInstanceof?.kind === ValueKind.PrimitiveFunction) {
-          const result = altInstanceof.fn([alt, value], undefined as any, undefined as any);
-          const rp = dataOf(result);
-          if (rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n) return makeInt(1);
-        }
-      }
-    }
-    return makeInt(0);
-  }));
-
-  // subtypeof: this union is a subtype of target if ALL alternatives are subtypes
-  addBinding(union, "subtypeof", makePrimitive("UnionType.subtypeof", (args) => {
-    const target = args[0] as ContextValue;
-    for (const alt of alternatives) {
-      const altMetaType = channelReadRaw(alt, "shape") as ContextValue | undefined;
-      if (!altMetaType) return makeInt(0);
-      const altSubtype = typeMethod(altMetaType, "subtypeof");
-      if (!altSubtype || altSubtype.kind !== ValueKind.PrimitiveFunction) return makeInt(0);
-      const result = altSubtype.fn([alt, target], undefined as any, undefined as any);
-      const rp = dataOf(result);
-      if (rp.kind === ValueKind.Bits && (rp as BitsValue).data === 0n) return makeInt(0);
-    }
-    return makeInt(1);
-  }));
-
-  // Set __type to Type (unions are structural)
-  writeShape(union, Type);
-
-  return union;
-}
+// --- Union Type: REMOVED at B-104 chunk 2 -----------------------------------
+//
+// `makeUnionType` built a type Context that was also an array: alternatives
+// under numeric string keys, an explicit `__length`, two method bindings
+// (`instanceof`/`subtypeof`) and a `__union` marker slot that stored the
+// integer 1 — never the variants the D39 registry named as its target. It
+// was the only Context in the system that genuinely mixed engine slots with
+// plain names, and the sole reason `__length` survived outside dense
+// structures. C6's member-storage rework carved it out explicitly (structures
+// plan, ruling R6) and it was never re-derived.
+//
+// Nothing outside four test assertions used it. Removed rather than migrated;
+// the redesign — including whether the alternatives should live in the dense
+// region and whether a UnionType KIND replaces the marker — is B-105.
 
 // Bootstrap: Type self-types
 writeShape(Type, Type);

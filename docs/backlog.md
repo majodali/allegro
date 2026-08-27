@@ -1024,3 +1024,78 @@ that prevents it.
     as binary — so `src/slots.ts`, the one file where every slot name
     lives, was silently absent from plain-text searches, dunder searches
     included. Now escaped; the file reads as text
+  - **(e) Chunk 2 — the deletions, maintainer-ratified 2026-08. ✅ DONE.**
+    The audit (artifact "The Meta Slot Audit") instrumented
+    `isMetaSlotKey` over the whole suite: across 1197 tests it returned
+    true for exactly ONE key, `__length`, 296 times. Every other slot —
+    `__name`, `__members`, `__type`, `__construct`, `__refines`,
+    `__predicate`, `__getMember`, `__interface`, `__wraps`, `__union`,
+    `__args`, `__generic`, `__discharged` — never once. The reason is
+    structural: type Contexts hold ONLY meta (a user field named `name`
+    lands in `__members` under an FQN key), instances hold ONLY user
+    fields (shape moved to the component plane at C4.3b), and
+    `__members` is FQN-keyed. **The `meta`-plane recommendation was
+    WITHDRAWN on this evidence** — a plane would be a new pile for old
+    debris. Landed in chunk 2: union types removed entirely (below,
+    B-105); `__union` deleted with them; `__invariantsList` accessors
+    deleted (zero readers, zero writers since C6.1b); four registry rows
+    reclassified from `context-binding` to `js-property` (`__el_`,
+    `__start__`, `__error__` are JS locals and element `.name`
+    properties in the generated Earley parser, `__anon_` is a grammar
+    precedence-LEVEL name — none has ever been a binding, and the
+    `__el_`/`__anon_` PREFIX rows carried the same pre-approval hazard
+    removed for `__grammar`/`__parse` in chunk 1)
+  - **(f) `__length` — the audit's own recommendation, RETRACTED.** The
+    audit called it deletable. It is not. Its one arbitrary writer
+    (`makeUnionType`) is gone, but `materializeView` emits it as part of
+    the C4.2 legacy-view compatibility contract, pinned by the W6
+    dense-view-coherence invariant and by boundary tests asserting the
+    view carries it and that `bindingList` has 3 elements + `__length`.
+    Deleting it would have weakened existing test conditions. It stays —
+    and it is therefore the ENTIRE remaining job of `isMetaSlotKey`:
+    hiding one derived slot from field walks. Whatever replaces the
+    partition needs to handle exactly this case and nothing else
+  - **(g) `__interface` — NOT the same shape as `__union`.** The audit
+    grouped them as pure presence-markers and the ratification covered
+    both. On implementation the two diverge: `__union` was redundant with
+    a kind, but `__interface` carries a distinction the meta-type does
+    NOT. `structuralWrap` deliberately ERASES the marker while COPYING
+    `__type`, so `~SomeInterface` keeps meta `Interface` while leaving the
+    declared-conformance world for the loose base-name world (C5.2c,
+    pinned by a boundary test). Deleting the marker therefore requires
+    `structuralWrap` to re-stamp the wrapper's meta-type from
+    `InterfaceKind` to `Type` — a semantic change to what `~Interface`
+    IS, not a redundancy removal. Deferred to its own chunk with a
+    maintainer gate rather than folded into the deletions
+
+- [ ] **B-105** · L2 · **Union types — redesign or leave retired.**
+  Removed wholesale at B-104 chunk 2 (maintainer ruling: "if not used
+  outside tests, remove it"). Usage at removal: **four test assertions,
+  nothing else** — no `lib/`, no `tests/*.alg`, no demo, no bench, no
+  entry in `language-reference.md` or `getting-started.md`. What was
+  removed: the `A | B` production in `grammar2/base-grammar.ts` and its
+  `grammar-ext.ts` Earley twin, the `type_union` tree-builder case and
+  primitive, and `makeUnionType`. What was wrong with it, and what any
+  redesign has to answer:
+  - **It was array-shaped but not DENSE.** `makeUnionType` stored
+    alternatives with `addBinding(union, String(i), …)` — the
+    string-keyed path — and so needed an explicit `__length`. It predates
+    the C4.2 dense region and was never migrated. A redesign should use
+    the dense region, at which point the length member is derived and
+    disappears (maintainer's question at ratification: *"if a union type
+    is implemented as an array, why isn't it dense?"*)
+  - **Its marker held the wrong thing.** `__union` stored `makeInt(1)`
+    while the D39 registry named `Type.variants` as its target. The
+    is-a-union test should be answered by a UnionType KIND (the
+    `__isGeneric` ruling: the flag IS the kind), not a marker slot
+  - **It was the only genuinely mixed Context in the system** — engine
+    slots (`__name`, `__type`, `__length`, `__union`) beside plain names
+    (`instanceof`, `subtypeof`) beside numeric element keys
+  - **C6 carved it out and never came back.** The structures plan's
+    ruling R6 kept `makeUnionType` outside member storage with dispatch
+    via direct bindings, deferring `__union` → `Type.variants` to a
+    re-derivation that never happened
+  - `docs/grammar-formalism.md` already noted the feature's real problem
+    in passing: "`Int | String` style unions, but pattern-matching
+    ergonomics are awkward". Whether unions come back at all is open —
+    variant types reached through `define` may be the better surface

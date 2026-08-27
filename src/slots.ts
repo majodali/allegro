@@ -69,7 +69,10 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // __invariantsList — SWEPT at C6.3: no writer since C6.1b folded
   // invariants into refinement layers (`&` chains).
   { name: "__wraps", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.wraps" },
-  { name: "__union", storages: ["context-binding"], owner: "Type", disposition: "member", target: "Type.variants" },
+  // __union — DELETED at B-104 chunk 2 with the union type itself. It never
+  // held variants (it stored the integer 1 as an is-a-union marker), which is
+  // the `__isGeneric` shape D39 already ruled: the flag IS the kind. Redesign
+  // is B-105.
 
   // --- Refinement-type fields (on the type instance) -------------------------
   { name: "__predicate", storages: ["context-binding"], owner: "Refinement", disposition: "member", target: "predicate" },
@@ -124,7 +127,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "source", storages: ["mv-component"], owner: "source channel", disposition: "channel", target: "source", notes: "documented in CLAUDE.md; currently unused in code" },
 
   // --- Base concepts, not slots -----------------------------------------------------
-  { name: "__length", storages: ["context-binding"], owner: "Array", disposition: "base-concept", target: "numeric-structure slot count (D18)" },
+  { name: "__length", storages: ["context-binding"], owner: "Array", disposition: "base-concept", target: "numeric-structure slot count (D18)", notes: "B-104 chunk 2 audit — RETAINED, correcting the audit's own recommendation. Its one arbitrary writer (makeUnionType) is gone with unions, but the slot is NOT debris: `materializeView` emits it as part of the C4.2 legacy-view compatibility contract, pinned by the W6 dense-view-coherence invariant and by boundary tests asserting the view carries it. `denseSlotCount` is authoritative for dense structures and falls back to this binding for non-dense numeric ones. It is also the ONLY key isMetaSlotKey ever returns true for (1197 tests, 296 hits, nothing else) — so the partition test's entire remaining job is hiding this one derived slot from field walks" },
   { name: "__future_", storages: ["binding-name-prefix"], owner: "futures", disposition: "base-concept", target: "future cells (D33)", prefix: true },
   { name: "__bare_", storages: ["binding-name-prefix"], owner: "futures", disposition: "base-concept", target: "future cells (D33)", prefix: true },
 
@@ -150,10 +153,21 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // completeness walk. `__inline_grammar` (below) IS still a live binding
   // prefix and stays.
   { name: "__inline_grammar", storages: ["context-binding"], owner: "grammar2", disposition: "host-internal", target: "n/a", prefix: true },
-  { name: "__el_", storages: ["context-binding"], owner: "Earley", disposition: "host-internal", target: "n/a", prefix: true },
-  { name: "__start__", storages: ["context-binding"], owner: "Earley", disposition: "host-internal", target: "n/a" },
-  { name: "__error__", storages: ["context-binding"], owner: "Earley", disposition: "host-internal", target: "n/a" },
-  { name: "__anon_", storages: ["context-binding"], owner: "grammar2 gensym", disposition: "host-internal", target: "n/a", prefix: true },
+  // B-104 chunk 2 — RECLASSIFIED. These four were registered as
+  // `context-binding`; none of them is one, and no binding by any of these
+  // names has ever existed. `__el_*` are local JS variables in the generated
+  // Earley parser; `__start__`/`__error__` are `.name` properties on Earley
+  // grammar-element objects there; `__anon_*` is a gensym'd precedence-LEVEL
+  // name living in a grammar fragment's level table. Storage corrected to
+  // `js-property`, which keeps the audit record while taking them out of the
+  // W3 binding walk's pre-approved set — the `__el_`/`__anon_` PREFIX rows
+  // were the same hazard removed for `__grammar`/`__parse` in chunk 1.
+  // Renaming the first three means regenerating src/parser.ts; deferred with
+  // the legacy Earley parser's retirement (maintainer ruling, B-104 Q3).
+  { name: "__el_", storages: ["js-property"], owner: "Earley (generated parser)", disposition: "host-internal", target: "n/a — local variables in src/parser.ts", prefix: true },
+  { name: "__start__", storages: ["js-property"], owner: "Earley (generated parser)", disposition: "host-internal", target: "n/a — element .name in src/parser.ts" },
+  { name: "__error__", storages: ["js-property"], owner: "Earley (generated parser)", disposition: "host-internal", target: "n/a — element .name in src/parser.ts" },
+  { name: "__anon_", storages: ["js-property"], owner: "grammar2 gensym", disposition: "host-internal", target: "n/a — precedence-level name in a grammar fragment", prefix: true },
 ];
 
 const EXACT = new Map<string, SlotRegistration>();
@@ -224,9 +238,7 @@ export function getConstruct(ctx: ContextValue): Value | undefined { return slot
 export function getFallbackMember(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__getMember"); }
 export function isInterfaceType(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__interface"); }
 export function getInterfaceMarker(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__interface"); }
-export function getInvariants(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__invariantsList"); }
 export function getWraps(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__wraps"); }
-export function getVariants(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__union"); }
 
 // Refinement fields
 export function getPredicate(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__predicate"); }
@@ -366,9 +378,7 @@ export function setRefines(ctx: ContextValue, v: Value): void { slotWrite(ctx, "
 export function setConstruct(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__construct", v); }
 export function setFallbackMember(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__getMember", v); }
 export function markInterface(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__interface", v); }
-export function setInvariants(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__invariantsList", v); }
 export function setWraps(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__wraps", v); }
-export function setVariants(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__union", v); }
 export function removeName(ctx: ContextValue): void { ctx.bindings.delete("__name"); }
 /** In-place rename used by the auto-naming pass. Mutates the bindings-map
  *  entry ONLY — bindingList entries are separate objects and are
@@ -398,7 +408,6 @@ export function setEffectLabels(ctx: ContextValue, labels: Set<string> | null): 
 export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as any).effectBound = d; }
 
 // Base concepts
-export function setSlotCount(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__length", v); }
 
 // Channel-plane writes. `writeShape` remains a plain shim (shape-dispatch
 // integrity is C3.1's concern); the discharged channel is capability-gated
@@ -474,13 +483,11 @@ export const SLOT_KEYS = {
   getMember: "__getMember",
   interface: "__interface",
   wraps: "__wraps",
-  union: "__union",
   predicate: "__predicate",
   args: "__args",
   generic: "__generic",
   type: "__type",
   discharged: "__discharged",
-  length: "__length",
   proposition: "proposition",
   reason: "reason",
   counterexample: "counterexample",
