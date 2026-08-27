@@ -8,6 +8,7 @@ closed → Backlog entry)`. "Closed" plans kept below retain record value
 
 | Plan | Topic | Status | Notes |
 |---|---|---|---|
+| `concept-spine.md` | Define every salient Allegro concept in dependency order (definition / rationale / as-implemented / delta), then bring the code to the definitions | **draft** | Awaiting ratification. Motivated by measured documentation debt: 93 of 136 exported concepts undefined anywhere in `docs/design/`, and decisions recorded "executed" whose naming was done by alias only (`ContextValue` 701 uses vs `StructureValue` 2). The delta rows become the code campaign's work-list |
 | `archive/structured-values-unification.md` | Structures design discussion — decision log D1–D46 | **archived (complete)** | Every decision executed or pinned to a named backlog owner; D39/B8/B10 tables inlined as `docs/design/allegretto/structures.md` Appendices A–C (B-002, 2026-08). Decision numbers remain citable. |
 | `structures-implementation.md` | Structures unification implementation — phases 0–7, boundary-test-first | **closed → B-001…B-031** | Phases 0–7 + chunk C7.2 landed; M1 exited 2026-08; D39 residue zero; C7.2 rulings maintainer-ratified (R1 amended). Kept for §4 chunk records + §6 delta log until content promotion |
 | `equality-and-laws.md` | B-027: equality protocol + lawful interfaces (structures.md §7–8) — kernel structural equals, declared coercions, law members, discharge tiers | **closed → B-027** | E-R1–E-R6 maintainer-ratified; chunks E1–E4 ALL landed 2026-08; residue → B-089. Kept for §6b chunk records |
