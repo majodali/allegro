@@ -802,10 +802,13 @@ the current type system that Phase 1 will hit:
 - `Object[String, Array[Alternative]]` — we need generic `Object` with a
   value-type parameter (like TS's `Record<string, V>`). Currently `Object`
   has `__getMember` field-by-field; no notion of uniform value type.
-- Tagged unions (`Rule = Terminal | NonTerm | ...`) are expressible via
-  `Int | String` style unions, but pattern-matching ergonomics are awkward
-  without sugar. Worth revisiting the pattern-matching syntax around tagged
-  union cases.
+- Tagged unions (`Rule = Terminal | NonTerm | ...`) have no surface at all
+  as of 2026-08: the `Int | String` union syntax this section referred to was
+  **retired at B-104 chunk 2** — it was used by nothing but its own tests, and
+  the type it built was the only Context in the system mixing engine slots
+  with plain bindings. The ergonomics complaint recorded here was the real
+  problem and it stands: whatever returns (B-105) has to answer
+  pattern-matching over tagged cases, not just spell an alternation.
 
 Neither blocks the Phase 0 formalism; both are candidates for platform
 improvements triggered by Phase 2 or Phase 5 pain.

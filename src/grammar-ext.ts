@@ -485,19 +485,10 @@ export function addTypeAnnotations(builder: GrammarBuilder): void {
   });
   (typeExpression as any).add(structuralTypeExpr);
 
-  // Union type: TypeExpression "|" TypeExpression (e.g., Int | String)
-  const pipe = builder.terminal("|");
-  const unionTypeExpr = builder.phrase([typeExpression, pipe, typeExpression]);
-  (unionTypeExpr as any).attribute("typeName", Object, function (node: any) {
-    return node.children[0].typeName + " | " + node.children[2].typeName;
-  });
-  (unionTypeExpr as any).attribute("typeExpr", Object, function (node: any) {
-    return helpers.makeExpr(helpers.prim("type_union"), [
-      node.children[0].typeExpr,
-      node.children[2].typeExpr,
-    ]);
-  });
-  (typeExpression as any).add(unionTypeExpr);
+  // B-104 chunk 2: the union type production (`TypeExpression "|"
+  // TypeExpression`) is removed here as it is in the grammar2 base, so the
+  // legacy Earley path and the live parser agree on what a type expression
+  // is. Redesign is B-105.
 
   // TypedParam: Ident ":" TypeExpression
   const typedParam = builder.phrase([ident, colon, typeExpression]);

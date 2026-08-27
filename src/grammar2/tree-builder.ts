@@ -1244,9 +1244,9 @@ function collectGenericParams(tree: ParseTree): GenericParam[] {
 /** Find the type_expr within an optional annotation block. */
 function findTypeExpr(tree: ParseTree): ParseTree | null {
   if (tree.kind !== "branch") return null;
-  // A type_expr is tagged as `type_union`, `type_generic`, `type_structural`,
+  // A type_expr is tagged as `type_generic`, `type_structural`,
   // `type_function` (Stage E), or `ident`. Search recursively.
-  if (tree.tag === "type_union" || tree.tag === "type_generic" ||
+  if (tree.tag === "type_generic" ||
       tree.tag === "type_structural" || tree.tag === "type_function" ||
       tree.tag === "ident") {
     return tree;
@@ -1262,7 +1262,6 @@ function findTypeExpr(tree: ParseTree): ParseTree | null {
  * Build a type expression from a parse tree. Supports:
  *   - ident                    → Symbol(name)
  *   - type_generic             → type_apply(Symbol(name), [args...])
- *   - type_union               → type_union(left, right)
  *   - type_function            → type_function(paramType1, …, paramTypeN, returnType)
  */
 function buildTypeExpr(tree: ParseTree, paramMap: Map<string, any>): any {
@@ -1318,17 +1317,6 @@ function buildTypeExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     for (let i = 1; i < tree.children.length; i++) walk(tree.children[i]);
     return makeExpr(prim("type_apply"), [makeSymbol(textOf(identTree)), ...args]);
   }
-  if (tree.tag === "type_union") {
-    // Children: [type_expr_atom, ws, "|", ws, type_expr]
-    const parts = tree.children.filter(ch =>
-      ch.kind === "branch" && (ch.tag === "ident" || ch.tag === "type_generic" ||
-        ch.tag === "type_union" || ch.tag === "type_structural" ||
-        ch.tag === "type_function")
-    );
-    if (parts.length < 2) throw new Error("type_union: expected 2 parts");
-    return makeExpr(prim("type_union"),
-      parts.map(p => buildTypeExpr(p, paramMap)));
-  }
   if (tree.tag === "type_structural") {
     // Children: ["~", type_expr_atom]
     const inner = tree.children.find(ch =>
@@ -1377,7 +1365,7 @@ function buildLambda(tree: ParseTree, outerParamMap: Map<string, any>): any {
     for (const ch of c) {
       if (ch === identTree) { seen = true; continue; }
       if (!seen) continue;
-      if (ch.kind === "branch" && (ch.tag === "type_generic" || ch.tag === "type_union"
+      if (ch.kind === "branch" && (ch.tag === "type_generic"
           || ch.tag === "type_structural" || ch.tag === "type_function"
           || ch.tag === "ident")) {
         typeExpr = buildTypeExpr(ch, outerParamMap);

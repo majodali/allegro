@@ -8,6 +8,110 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-104 chunk 2: the partition was imaginary; union types retired
+
+**The measurement that changed the plan.** `isMetaSlotKey` — the test the
+whole `__*` convention exists to serve — was instrumented to record every key
+it returned true for, then run against the full suite. Across **1,197 tests
+it fired for exactly one key**: `__length`, 296 times. `__name`,
+`__members`, `__type`, `__construct`, `__refines`, `__predicate`,
+`__getMember`, `__interface`, `__wraps`, `__union`, `__args`, `__generic`,
+`__discharged` — never once.
+
+The reason is structural, not luck. A type Context's namespace is **closed**:
+`Type.define({name: String, type: Int, members: Int, length: Int})` routes
+every one of those into `__members` under an FQN key
+(`<type#<main>::Collide>::name`), never beside `__name`. An instance carries
+**no metadata at all** — shape moved to the component plane at C4.3b, so
+`p = Point(1,2)` is `bindings: ["x","y"] / components: ["type"]`. And
+`__members` is itself FQN-keyed. Two populations that never meet do not need
+a partition — so **the `meta`-plane recommendation from the previous entry is
+withdrawn**. It would have been a new pile for old debris. These slots become
+ordinary bindings on a kernel-only Context.
+
+**Union types are removed** (maintainer ruling: *if not used outside tests,
+remove it*). Usage at removal: **four test assertions and nothing else** — no
+`lib/`, no `tests/*.alg`, no demo, no bench, no entry in the language
+reference or getting-started guide. What went: the `A | B` production in
+`grammar2/base-grammar.ts` and its `grammar-ext.ts` Earley twin, the
+`type_union` tree-builder case and primitive, and `makeUnionType`.
+
+- **It was the only genuinely mixed Context in the system.** A union type
+  Context held `__name`, `__type`, `__length` and `__union` beside plain
+  `instanceof` / `subtypeof` bindings beside numeric element keys — engine
+  slots and ordinary names in one namespace, which is the collision the
+  prefix was invented for and the only place it ever happened.
+- **Array-shaped but not dense.** `makeUnionType` stored alternatives via
+  `addBinding(union, String(i), …)` — the string-keyed path — so it needed an
+  explicit `__length`. It predates the C4.2 dense region and was never
+  migrated. That is the maintainer's question at ratification (*"if a union
+  type is implemented as an array, why isn't it dense?"*) and it is the first
+  thing B-105 has to answer.
+- **Its marker held the wrong thing**: `__union` stored `makeInt(1)` while
+  D39's registry named `Type.variants` as its target. Deleted with the
+  feature, per the `__isGeneric` ruling — the flag IS the kind.
+- **C6 had carved it out and never returned**: the structures plan's ruling
+  R6 kept `makeUnionType` outside member storage, deferring a re-derivation
+  that never happened.
+- **The assertions were replaced, not dropped.** A removed feature must not
+  degrade into a confusing partial one, so the new tests hold both halves of
+  the removal: `A | B` fails as a **parse error** rather than silently
+  building a half-formed type, and `type_union` is gone from the primitive
+  registry so the surface and the kernel cannot drift apart. The
+  suite-count floor caught the net −1 test and **failed the gate** — the
+  tripwire working exactly as designed. The floor was not lowered to get
+  past it; the missing coverage was written instead.
+- **One assumption corrected while writing those tests**: calling
+  `type_union(...)` by name does *not* throw. An unresolved symbol
+  residualizes (PE Rule 1) — correct base-language behaviour. The condition
+  that actually matters is that nothing MINTS a union, so the test asserts
+  the call stays an Expression.
+
+**Also deleted**: `__invariantsList`'s accessors — zero readers, zero writers
+since C6.1b folded invariants into refinement layers. Dead code for a slot
+swept two arcs ago.
+
+**Four registry rows reclassified.** `__el_`, `__start__`, `__error__` and
+`__anon_` were registered as `context-binding`. None of them is one, and no
+binding by any of those names has ever existed: the first three are local JS
+variables and element `.name` properties inside the *generated* Earley parser,
+and `__anon_` is a gensym'd grammar precedence-LEVEL name living in a fragment's
+level table. Two were PREFIX rows — the same hazard removed for
+`__grammar`/`__parse` in chunk 1, where a row matching nothing silently
+pre-approves every future key beneath it. Storage corrected; renaming the
+generated-parser three waits for the legacy parser's retirement (ruling).
+
+**Two corrections to the audit that produced this chunk.**
+
+- **`__length` is not deletable.** The audit called it debris. Its one
+  arbitrary writer is gone with unions, but `materializeView` emits it as part
+  of the C4.2 legacy-view compatibility contract — held by the W6
+  dense-view-coherence invariant and by boundary tests asserting the view
+  carries it and that `bindingList` has 3 elements + `__length`. Deleting it
+  would have weakened existing test conditions. It stays, and it is therefore
+  the **entire remaining job** of `isMetaSlotKey`: hiding one derived slot
+  from field walks.
+- **`__interface` is not the same shape as `__union`.** Both were ratified as
+  pure presence-markers on the audit's word. On implementation they diverge:
+  `__union` was redundant with a kind, but `structuralWrap` deliberately
+  **erases** `__interface` while **copying** `__type`, so `~SomeInterface`
+  keeps meta `Interface` while leaving declared conformance for the loose
+  base-name world (C5.2c, pinned by a boundary test). The marker encodes
+  something the meta-type does not. Removing it requires `structuralWrap` to
+  re-stamp the wrapper's meta-type — a semantic change to what `~Interface`
+  *is*, not a redundancy removal. Held back for its own gate rather than
+  folded into a deletion chunk.
+
+**Confirmed for the next chunk** (maintainer's condition on moving `__type` to
+the `type` component): the shape-vs-knowledge split is a **read-time**
+computation — `typeShape()` walks `__refines`/`__members`/`__predicate`, all
+of which stay binding-plane — so it is indifferent to where the raw stored
+type lives. The one constraint is identity: all 24 `writeShape` call sites
+mutate in place on a freshly-minted Context, and exactly one reference
+comparison exists (`typeShape(stored) === typeShape(expected)`). The generic
+channel writer derives a NEW value via `makeMultiValue`, so the move must
+write `ctx.components` in place rather than route through it.
+
 ## 2026-08 — B-104 chunk 1: the host plane loses its dunders
 
 The `__*` prefix was added long ago to keep engine metadata from colliding
