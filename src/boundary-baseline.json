@@ -19,9 +19,9 @@
       "dunder-template-key": 1
     },
     "src/slots.ts": {
-      "components-direct": 4,
-      "dunder-string-literal": 82,
-      "bindings-get-dunder": 11,
+      "components-direct": 12,
+      "dunder-string-literal": 73,
+      "bindings-get-dunder": 8,
       "kernel-writer-acquisition": 1
     },
     "src/structure.ts": {
@@ -59,9 +59,9 @@
     "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
     "warnFactor": 2,
     "workloadsMs": {
-      "basics": 472,
-      "recursion-tco": 580,
-      "collections": 429
+      "basics": 540,
+      "recursion-tco": 611,
+      "collections": 440
     }
   }
 }

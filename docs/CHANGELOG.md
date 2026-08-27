@@ -8,6 +8,64 @@
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
 
+## 2026-08 — B-104 chunk 3: shape storage becomes uniform
+
+`__type` is gone from the binding plane. Every value now carries its shape as
+the `type` **component**, the same plane every other channel already used —
+carriers, flattened records, proofs, arrays and bare type Contexts alike.
+`channelReadRaw` loses its three-way special case; `SLOT_KEYS.type` and the
+`bindingKey: "__type"` on the shape channel registration go with it.
+
+Before → after, on a type Context:
+
+```
+Point  bindings: ["__name","__type","__construct","__getMember","__members"]  components: []
+Point  bindings: ["__name","__construct","__getMember","__members"]           components: ["type"]
+```
+
+**The condition this was gated on held.** The shape-vs-knowledge split
+(C3.1/D36) is a **read-time computation**, not two storages: `typeShape()`
+walks `__refines`/`__members`/`__predicate`, all still binding-plane, so
+`shape` and `type` continue to answer from one stored value and the move
+does not touch the distinction. `channelReadRaw` now reads that one storage
+and applies `typeShape` for `shape` only — which is what the split always
+meant.
+
+**Identity is why `writeShape` does not use the channel writer.** The
+registered writer (`buildWriter`) derives a NEW value via `makeMultiValue`.
+Type Contexts are identity-sensitive — memoized generics, law registries, and
+the single reference comparison in the system,
+`typeShape(stored) === typeShape(expected)` in `applyBoundaryBound`. All 24
+`writeShape` call sites mint a fresh Context and stamp it, so the in-place
+component write preserves exactly the old binding write's contract. The shape
+channel's writer capability is never acquired anywhere, so dropping its
+`bindingKey` costs nothing.
+
+**Three clone paths were inheriting the meta-type by accident.**
+`structuralWrap`, `preserveOps` and `buildMethodLayer` all build a derived
+type by copying the source's bindings — which silently carried `__type` along
+because it was a binding. With shape on the component plane those clones
+would have come out **untyped**, and nothing in the type signature would have
+said so. A `carryShape(from, to)` helper makes the inheritance explicit at
+all three. The paths that re-stamp their own shape (`buildRefinedType`,
+`buildDistinctType`) correctly need nothing.
+
+This is the failure mode worth recording: moving a slot between planes breaks
+every reader that never named it — and a bindings-copy loop is exactly such a
+reader.
+
+- `structuralWrap` still does **not** carry `__interface`. That erasure is
+  C5.2c and deliberate, and it is why B-104(g) is still open: the wrap keeps
+  meta `Interface` while leaving the declared-conformance world, so the
+  marker is not redundant with the meta-type.
+- One hand-built test fixture stamped a descriptor's shape as a `__type`
+  binding; it now calls `writeShape`. No test condition changed.
+- `channelList` no longer reports `shape` and `type` differently depending on
+  where a value stored it — a bare type Context used to answer `["shape"]`
+  while an instance answered `["type"]`. Both now answer `["type"]`.
+
+Gate: **1197/1197, `GATE: PASSED`**, first run. Typecheck clean.
+
 ## 2026-08 — B-104 chunk 2: the partition was imaginary; union types retired
 
 **The measurement that changed the plan.** `isMetaSlotKey` — the test the

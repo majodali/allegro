@@ -933,8 +933,10 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
   // Body: access __name on self via __get_member... simpler: just return self.
   const describeFn = makeComposedFn([param], selfExpr);
   const desc = makeContext();
+  // B-104 chunk 3: the descriptor's shape is stamped on the component plane
+  // (it was a `__type` BINDING in this hand-built fixture before the move).
+  writeShape(desc, Type);
   const descBindings = [
-    [SLOT_KEYS.type, Type],
     ["name", stringToBits("describe")],
     ["value", describeFn],
   ] as const;
@@ -949,7 +951,7 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
   setMembers(metaType, metaMembers);
   slotSetName(metaType, stringToBits("MetaType"));
 
-  // Raw Context with __type = metaType.
+  // Raw Context whose shape channel holds metaType.
   const target = makeContext();
   writeShape(target, metaType);
   slotSetName(target, stringToBits("Instance"));

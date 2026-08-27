@@ -25,7 +25,7 @@ import {
   setWraps, setPredicate, setGenericArgs,
   setGenericBackLink, setProposition,
   setEffectBound, setAbstractDomain,
-  writeShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
+  writeShape, carryShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
   removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape, getFallbackMember,
   equalityShape, asContext,
 } from "./slots.js";
@@ -644,6 +644,12 @@ export function structuralWrap(type: ContextValue): ContextValue {
   const wrappedMembers = getMembers(type);
   if (wrappedMembers) setMembers(wrapper, wrappedMembers);
   setWraps(wrapper, type);
+  // B-104 chunk 3: the meta-type used to ride along in the binding copy
+  // above; shape is on the component plane now, so carry it explicitly.
+  // (The `__interface` marker is still deliberately NOT carried — that is
+  // the C5.2c erasure, and it is why the wrap keeps meta `Interface` while
+  // leaving the declared-conformance world. See B-104(g).)
+  carryShape(type, wrapper);
   return wrapper;
 }
 
@@ -1602,6 +1608,7 @@ function buildPreserveOps(refinedType: ContextValue, opNames: string[]): Context
     if (key === SLOT_KEYS.members || key === SLOT_KEYS.construct) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
+  carryShape(refinedType, newType);   // B-104 chunk 3 (was implicit in the copy)
 
   // Rebuild __construct so it tags results with the NEW type
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
@@ -1721,6 +1728,7 @@ function buildMethodLayer(baseType: ContextValue, methods: { name: string; impl:
     if (key === SLOT_KEYS.members || key === SLOT_KEYS.construct) continue;
     if (binding.value) addBinding(newType, key, binding.value);
   }
+  carryShape(baseType, newType);      // B-104 chunk 3 (was implicit in the copy)
   // The abstract domain rides as a JS-side property (not a binding) —
   // carry it so downstream layers (preserve) keep constraint rendering.
   const dom = getAbstractDomain(baseType);

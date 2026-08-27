@@ -114,9 +114,10 @@ ratified decisions are V-R1–V-R8 in `docs/plans/visibility.md`.
 ## 4. The meta-property protocol [under revision]
 
 Types and rich values communicate through string-keyed Context bindings —
-still `__`-prefixed on the BINDING plane: `__name`, `__type`, `__members`,
+still `__`-prefixed on the BINDING plane: `__name`, `__members`,
 `__construct`, `__getMember`, `__interface`, `__predicate`, `__refines`,
-`__wraps`, `__union`, `__args`, `__generic`, `__discharged`, `__length`.
+`__wraps`, `__args`, `__generic`, `__discharged`, `__length`. (`__type` and
+`__union` have since left — see below.)
 
 **Maintainer direction (2026-06):** the `__` prefix is an accreted artifact
 — it gestures at privacy and clash-avoidance but provides neither.
@@ -153,6 +154,16 @@ prefix had been hiding:
   keys — the one genuinely mixed Context left, now that unions are
   retired. Whatever replaces the predicate needs to cover that case and
   no other.
+- **Moved rather than renamed (B-104 chunk 3).** `__type` now lives on the
+  component plane as `type`, uniformly for every value. The shape-vs-knowledge
+  split survives untouched because it was never two storages — `shape` is
+  `type` with member-transparent refinement layers walked off, computed at
+  read time by `typeShape` over `__refines`/`__members`/`__predicate`, all of
+  which remain binding-plane. Writes are IN PLACE: the registered channel
+  writer derives a new value, and type Contexts are identity-sensitive.
+  Three clone paths (`structuralWrap`, `preserveOps`, `buildMethodLayer`)
+  had been inheriting the meta-type implicitly through their bindings copy
+  and now carry it explicitly via `carryShape`.
 - **Deleted rather than renamed (B-104 chunk 2).** `__union` — it stored
   the integer 1 as an is-a-union marker, never the variants D39 named as
   its target, and went with the union type itself (B-105).
