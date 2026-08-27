@@ -1,8 +1,7 @@
 # Concept spine — define Allegro, then make the code say it
 
-> Status: **draft** — §6 rulings 1–3 RATIFIED (maintainer, 2026-08);
-> ruling 4 deliberately HELD as a delta for S3. Plan awaiting final
-> ratification to move to `active`.
+> Status: **active** — ratified 2026-08 (§6 rulings 1–3; ruling 4
+> deliberately HELD as a delta for S3). **S1 landed**; S2 next.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -184,7 +183,7 @@ being written to justify a rename already in flight.
 
 | Chunk | Delivers |
 |---|---|
-| **S1** | Spine skeleton + entry format + T0/T1 (representation, structure, binding, scope). Establishes whether the four-part entry works before scaling it |
+| **S1** | ~~Spine skeleton + entry format + T0/T1~~ **DONE 2026-08** — `docs/design/concepts.md`, 17 entries, **9 deltas** raised (→ B-107, and three routed to T2). The format survives its own test: it produced defect reports on the tier we understand best, including one the ordering constraint forced into the open (carrier ↔ data plane are mutually referential in prose; broken by defining the carrier structurally and the data plane as the accessor over it) |
 | **S2** | T2 planes + T3 evaluation. The planes tier is the highest-value entry in the document |
 | **S3** | T4 types. Expect the most deltas here, and the `~Interface` definition |
 | **S4** | T5 obligations. Mostly reconciliation — the R-series rulings already carry rationale, so this is largely relocation and delta-hunting |

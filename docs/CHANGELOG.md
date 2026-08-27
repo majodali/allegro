@@ -4,6 +4,64 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S1: T0–T1, and the format survives its own test
+
+`docs/design/concepts.md` exists. It is the document a reader — or an agent —
+is meant to read first and completely: every salient Allegro concept in
+**dependency order**, four parts each (Definition / Rationale / As
+implemented / **Delta**), with the deep treatment left in the area docs.
+
+**S1 was the falsifiable chunk.** The plan committed to it: if the four-part
+entry produced no useful deltas on the tier we understand best, the format
+was wrong and had to change before being applied 28 times. It produced
+**nine deltas across seventeen entries** (T0 representation, T1 structure and
+binding), so the format stands and S2 proceeds.
+
+**What the deltas are.** Six are naming or documentation lag; three are one
+underlying gap.
+
+- **One concept, three names.** The class is `Structure`, the interface is
+  `StructureValue` (**2** occurrences — its own declaration and the alias),
+  and the name the codebase actually uses is `ContextValue` (**701**),
+  existing only as `export type ContextValue = StructureValue`. The
+  constructor is `makeContext` (**101**); `makeStructure` does not exist.
+- **`MultiValueType`** (25 uses) names a kind D46 retired, and its own
+  comment says it survives "so existing casts keep compiling".
+- **Stale headers.** `src/types.ts` opens "Five value kinds + Param
+  placeholder" — there are seven and Param is one of them.
+  `src/structure.ts` describes two planes; there are four.
+- **`ParamValue.predicates`** is declared, documented "reserved", has no
+  runtime reader, and a test asserts it stays empty.
+- **Four binding write disciplines**, one comment between them, no stated
+  rule for choosing.
+- **The three that are really one**: ComposedFunction's analysis metadata is
+  invisible in its declared shape; `parent`/`isScope`/`scopePredicates` are
+  declared on the value interface their own comments say they are not part
+  of; and `__length` is the sole remaining job of the partition test. All
+  three are *the planes are real and undeclared* — which is what T2 is for,
+  and why it is the highest-value tier in the document.
+
+All nine are filed: **B-107** (a–e now, f blocked on T2 §9).
+
+**The ordering constraint earned its place immediately.** "No entry may use a
+concept defined later" forced one genuine cycle into the open: *carrier* and
+*data plane* are mutually referential in prose — a carrier is a Structure
+whose data rides in `primary`, and the data plane is the carrier's primary.
+It resolves by defining the carrier **structurally** (a Structure with a
+`primary` field) and the data plane as the **accessor** over that shape. That
+is recorded in the entry rather than written around, which is the whole point
+of the constraint.
+
+**Every number in the document was verified, not remembered.** The counts
+were re-run against current `main`; the `__length` finding was re-measured by
+re-instrumenting `isMetaSlotKey` over the full suite *after* the union
+removal, on the chance that removing `makeUnionType` had changed it. It had
+not: still **296 hits, `__length`, nothing else**. The instrumentation was
+reverted; the working tree is clean.
+
+No `src/` changes. Gate: **1197/1197, `GATE: PASSED`**. Typecheck clean,
+doc-ref-lint clean.
+
 *The v1-era per-phase history formerly embedded in `CLAUDE.md` is
 migrated verbatim to the "v1 era" section at the bottom of this file
 (2026-08, B-095 chunk 3); new entries are appended at the top.*
