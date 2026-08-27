@@ -1099,3 +1099,23 @@ that prevents it.
     in passing: "`Int | String` style unions, but pattern-matching
     ergonomics are awkward". Whether unions come back at all is open —
     variant types reached through `define` may be the better surface
+  - **(h) Chunk 3 — `__type` to the component plane. ✅ DONE (2026-08).**
+    Maintainer-ratified with the in-place-mutation constraint. Shape storage
+    is now uniform: every value carries it as the `type` component, and
+    `channelReadRaw` loses its binding-plane special case. The gated
+    question — does this disturb shape declaration vs type knowledge? — is
+    answered no: the C3.1/D36 split is a READ-time computation (`typeShape`
+    walks `__refines`/`__members`/`__predicate`, all still binding-plane)
+    over ONE stored value, so where that value lives is irrelevant to it.
+    `writeShape` mutates `ctx.components` directly rather than routing
+    through the registered channel writer, which derives a new value via
+    `makeMultiValue` — type Contexts are identity-sensitive (memoized
+    generics, law registries, and the `typeShape(stored) === typeShape(expected)`
+    reference test in `applyBoundaryBound`). **The real hazard was not the
+    read path**: `structuralWrap`, `preserveOps` and `buildMethodLayer`
+    build derived types by copying bindings, and so had been inheriting the
+    meta-type implicitly for free. Post-move those clones would have come out
+    untyped with nothing in the types to say so; a `carryShape` helper makes
+    the inheritance explicit at all three. Paths that re-stamp their own shape
+    (`buildRefinedType`, `buildDistinctType`) needed nothing. Gate green at
+    1197 on the first run

@@ -106,7 +106,12 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // reader since the F1-F3 walker deletion.)
 
   // --- Channels (D36 / D21–D24): value-plane metadata, not fields ---------------
-  { name: "__type", storages: ["context-binding"], owner: "shape channel", disposition: "channel", target: "shape (D36)" },
+  // __type — MOVED to the component plane at B-104 chunk 3. Shape storage
+  // is now uniform: every value carries it as the `type` component (row
+  // below), so there is one storage and no binding-plane special case. The
+  // shape-vs-knowledge split (C3.1/D36) was always a READ-time computation
+  // — `typeShape` walks `__refines`/`__members`/`__predicate`, all still
+  // binding-plane — and is untouched by the move.
   { name: "__discharged", storages: ["context-binding"], owner: "discharged channel", disposition: "channel", target: "discharged integrity channel (D21–D24; kernel-private writer)" },
   { name: "effectSet", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects (F1 component made canonical)" },
   { name: "inferredEffects", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects" },
@@ -328,39 +333,41 @@ export function equalityShape(t: ContextValue): ContextValue {
 
 // --- Channel plane (read side) ------------------------------------------------------
 
-/** Raw channel read on a value: MultiValue component lookup, plus the two
- *  Context-binding channels (`__type`, `__discharged`) that predate the
- *  component plane. Free of any authority, per D23 (reads are free).
+/** Raw channel read on a value: MultiValue component lookup, plus the
+ *  `discharged` Context-binding channel that still predates the component
+ *  plane. Free of any authority, per D23 (reads are free).
  *
  *  C3.1: `shape` reads the computed dispatch shape (refinement layers
  *  walked off — identity for every non-refined type, including the
- *  meta-type reads on type values); `type` stays the raw stored view. */
+ *  meta-type reads on type values); `type` stays the raw stored view.
+ *  Both answer from ONE stored value; the split is this computation, not
+ *  two storages (B-104 chunk 3). */
 export function channelReadRaw(v: Value, channel: string): Value | undefined {
-  // C4.3b: the channel plane is universal — a flattened Context (typed
-  // record/array) carries `components` directly, so the generic lookup
-  // covers both roles. Contexts without channels have `components`
-  // undefined (lazy — plain contexts and scopes pay nothing).
+  // C4.3b + B-104 chunk 3: the channel plane is universal, and `type` is
+  // now on it for EVERY value — carriers, flattened records and bare type
+  // Contexts alike. Contexts without channels have `components` undefined
+  // (lazy — plain contexts and scopes pay nothing).
   const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
   if (comps !== undefined) {
     const comp = comps.get(channel);
     if (comp !== undefined) return comp as Value;
   }
-  if (channel === "shape" || channel === "type") {
-    let raw: Value | undefined;
-    if (v.kind === ValueKind.Structure) {
-      // C7.1: a carrier's type rides in its components; a plain
-      // structure answers through the __type binding-plane fallback.
-      raw = (v as { primary?: Value }).primary !== undefined
-        ? (comps?.get("type") as Value | undefined)
-        : slotRead(v as ContextValue, "__type");
-    } else {
+  if (channel === "shape") {
+    // One storage, two reads: `shape` is `type` with member-transparent
+    // refinement layers walked off. A non-Structure raw (or none) answers
+    // as itself — typeShape only applies to type Contexts.
+    let raw = comps?.get("type") as Value | undefined;
+    if (raw === undefined) {
       const ctx = asContext(v);
-      raw = ctx ? slotRead(ctx, "__type") : undefined;
+      raw = ctx ? (ctx as unknown as MultiValueType).components?.get("type") as Value | undefined : undefined;
     }
-    if (channel === "shape" && raw?.kind === ValueKind.Structure) {
-      return typeShape(raw as ContextValue);
-    }
+    if (raw?.kind === ValueKind.Structure) return typeShape(raw as ContextValue);
     return raw;
+  }
+  if (channel === "type") {
+    // A transparent scalar carrier answers through its primary's plane.
+    const ctx = asContext(v);
+    return ctx ? (ctx as unknown as MultiValueType).components?.get("type") as Value | undefined : undefined;
   }
   if (channel === "discharged") {
     const c = asContext(v);
@@ -412,12 +419,24 @@ export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as an
 // Channel-plane writes. `writeShape` remains a plain shim (shape-dispatch
 // integrity is C3.1's concern); the discharged channel is capability-gated
 // below (C1.4) — its raw writers are module-private.
-export function writeShape(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__type", v); }
+//
+// B-104 chunk 3: shape is stored on the component plane, written IN PLACE.
+// It cannot route through the registered channel writer: `buildWriter`
+// derives a NEW value via `makeMultiValue`, and type Contexts are
+// identity-sensitive (memoized generics, law registries, and the
+// `typeShape(stored) === typeShape(expected)` reference test in
+// types-std). All 24 call sites mint a fresh Context and stamp it, so an
+// in-place component write is exactly the old binding write's contract.
+export function writeShape(ctx: ContextValue, v: Value): void {
+  const s = ctx as unknown as MultiValueType;
+  if (s.components === undefined) s.components = new Map<string, Value>();
+  (s.components as Map<string, Value>).set("type", v);
+}
 function writeDischarged(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
 
 // Presence checks
 export function hasName(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__name"); }
-export function hasShapeSlot(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__type"); }
+export function hasShapeSlot(ctx: ContextValue): boolean { return (ctx as unknown as MultiValueType).components?.has("type") === true; }
 export function hasDischarged(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__discharged"); }
 
 // Set-only writes (bindings map, NO bindingList entry) — mirror the proof
@@ -486,7 +505,6 @@ export const SLOT_KEYS = {
   predicate: "__predicate",
   args: "__args",
   generic: "__generic",
-  type: "__type",
   discharged: "__discharged",
   proposition: "proposition",
   reason: "reason",
@@ -509,7 +527,7 @@ export function isMetaSlotKey(key: string): boolean {
 
 // Removal helpers (map + bindingList, mirroring the existing idiom exactly)
 export function removeRefines(ctx: ContextValue): void { ctx.bindings.delete("__refines"); }
-export function removeShapeSlot(ctx: ContextValue): void { ctx.bindings.delete("__type"); }
+export function removeShapeSlot(ctx: ContextValue): void { (ctx as unknown as MultiValueType).components?.delete("type"); }
 export function removeConstruct(ctx: ContextValue): void {
   ctx.bindings.delete("__construct");
   const idx = ctx.bindingList.findIndex((b) => b.key === "__construct");
@@ -540,6 +558,19 @@ const EMPTY_COMPONENTS: ReadonlyMap<string, Value> = new Map();
 export function cloneComponents(v: Value): Map<string, Value> {
   const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
   return comps !== undefined ? new Map(comps) : new Map();
+}
+
+/** B-104 chunk 3: carry the shape from one type Context to a derived one.
+ *
+ *  Three type-cloning paths (`structuralWrap`, `preserveOps`,
+ *  `buildMethodLayer`) used to inherit the meta-type for free, because the
+ *  shape was a BINDING and they copy bindings. With shape on the component
+ *  plane that inheritance is silent no longer — those clones would come out
+ *  untyped. This is the explicit replacement; paths that re-stamp their own
+ *  shape (`buildRefinedType`, `buildDistinctType`) do not need it. */
+export function carryShape(from: ContextValue, to: ContextValue): void {
+  const raw = (from as unknown as MultiValueType).components?.get("type") as Value | undefined;
+  if (raw !== undefined) writeShape(to, raw);
 }
 
 // --- Channel registry + writer capabilities (C1.4, per D21–D24) -----------------------
@@ -680,7 +711,11 @@ export function kernelChannelWriter(name: string): ChannelWriter {
 
 // Built-in channels, registered at module init. Rules per D36/D21–D24;
 // consulted by the C1.5 propagation table.
-registerChannel({ name: "shape", rule: "computed", bindingKey: "__type" });
+// B-104 chunk 3: no `bindingKey` — shape lives on the component plane like
+// every other channel. (Its writer capability is never acquired; reads go
+// through channelReadRaw, writes through the in-place `writeShape` above,
+// which must not derive a new value.)
+registerChannel({ name: "shape", rule: "computed" });
 registerChannel({ name: "error", rule: "viral" });
 registerChannel({ name: "effects", rule: "union" });
 registerChannel({ name: "predicates", rule: "computed" });
@@ -807,7 +842,6 @@ export function channelList(v: Value): string[] {
   if (v.kind === ValueKind.Structure) {
     const ctx = v as ContextValue;
     if (!isDense(ctx)) {
-      if (ctx.bindings.has("__type") && !out.includes("shape")) out.push("shape");
       if (ctx.bindings.has("__discharged") && !out.includes("discharged")) out.push("discharged");
     }
   }
