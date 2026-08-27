@@ -3,10 +3,19 @@
 // mentioned in a tracked markdown file must resolve. Dangling references
 // are how this project lost its thesis document for months.
 //
-// Scope: tracked *.md files, excluding `docs/plans/archive/` (history —
-// its references are frozen) and node_modules. Glob-ish mentions
-// (`docs/design/*.md`), ellipses (`docs/…`), and placeholders
-// (`<layer>`) never match the path pattern, so prose stays lintable.
+// Scope: tracked AND untracked-but-not-ignored *.md files, excluding
+// `docs/plans/archive/` (history — its references are frozen) and
+// node_modules. Glob-ish mentions (`docs/design/*.md`), ellipses
+// (`docs/…`), and placeholders (`<layer>`) never match the path pattern,
+// so prose stays lintable.
+//
+// Untracked files are IN SCOPE deliberately, matching the boundary lint's
+// `productionSources()` (`src/boundary-tests.ts`), which made the same call
+// for the same reason: a brand-new file has to be visible to the check
+// BEFORE its first commit. Scanning tracked files only made a local run a
+// false negative for exactly the case the lint exists to catch — a new doc
+// citing a path that does not resolve — and pushed the failure to CI, one
+// commit too late to be useful. (Found that way, 2026-08.)
 //
 // Run standalone: npx tsx scripts/doc-ref-lint.ts
 // Also invoked as a test from src/test/tooling.ts.
@@ -33,7 +42,7 @@ const REF_PATTERNS = [
 ];
 
 export function lintDocRefs(repoRoot: string): DocRefFinding[] {
-  const tracked = execSync("git ls-files '*.md'", {
+  const tracked = execSync("git ls-files --cached --others --exclude-standard '*.md'", {
     cwd: repoRoot,
     encoding: "utf-8",
   })

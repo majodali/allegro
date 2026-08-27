@@ -1,6 +1,8 @@
 # Concept spine — define Allegro, then make the code say it
 
-> Status: **draft** (awaiting maintainer ratification)
+> Status: **draft** — §6 rulings 1–3 RATIFIED (maintainer, 2026-08);
+> ruling 4 deliberately HELD as a delta for S3. Plan awaiting final
+> ratification to move to `active`.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -47,14 +49,28 @@ concepts badly, and the gap is measurable rather than a matter of taste.
   because "interface" was never defined precisely enough for the question
   to have an answer.
 
+One more, found while landing this plan: **`doc-ref-lint` scanned tracked
+files only.** A brand-new markdown file was invisible to it until its first
+commit, so a local run passed and CI failed — for a dangling reference the
+lint exists to catch. `src/boundary-tests.ts` had already faced the identical
+question and answered it correctly (`--others --exclude-standard`, with a
+comment explaining exactly why). The same idea, implemented twice, one of
+them wrong: which is the shape of debt this campaign is for.
+
 The pattern in every one of these: **a decision was taken, partially
 executed, and recorded as done.** The residue is invisible because nothing
 states the intended end-state in a form the code can be checked against.
 
 ## 2. The deliverable — a definitional spine
 
-A new Tier-1 document, `docs/design/concepts.md`, that defines every
-salient concept **in dependency order**, each entry in four parts:
+*(Written `design/concepts.md` rather than root-anchored throughout: the
+doc-reference lint requires a root-anchored `docs/…md` path to RESOLVE, and
+this one is the thing being proposed. Same convention `implementation-map.md`
+uses for the planned `allegretto/architecture.md`. It becomes a normal
+root-anchored reference once S1 creates it.)*
+
+A new Tier-1 document, `design/concepts.md` under `docs/`, that defines
+every salient concept **in dependency order**, each entry in four parts:
 
 | Part | What it holds |
 |---|---|
@@ -181,25 +197,33 @@ and should change before it is applied 28 times.
 
 ## 6. Rulings needed before S1
 
-1. **Location and shape.** One `docs/design/concepts.md` (recommended —
+1. **Location and shape.** One `design/concepts.md` (recommended —
    the ordering constraint only bites if the entries are in one sequence),
    or per-layer concept sections under the existing tree?
 2. **Does the spine outrank the area docs** when they disagree, or is a
    disagreement always a delta to be resolved rather than a precedence
    question? (Recommend: always a delta; no precedence rule, because a
    precedence rule lets one of them stay wrong.)
-3. **Naming campaign scope.** `ContextValue` → `StructureValue` is ~701
-   sites and mechanical. Does it wait for S5 triage, or is it pulled
-   forward as its own chunk given that it is the single largest source of
-   reading confusion? (Recommend: pull forward — it is independent of
-   every definition, and it makes reading the code during S2–S4 easier.)
-4. **`~Printable` is a valid interface** (maintainer, 2026-08). Recorded
-   here as the T4 §21 definition to be written to. Its consequence:
-   `applyBoundaryBound` should treat a wrapped interface as an interface,
-   which is **not** what the code does today — the marker is erased by
-   `structuralWrap`. So B-104(g) resolves as *delete the marker, keep the
-   meta-type, do not re-stamp* — and the behaviour change is a **fix**,
-   not a regression. It needs the test coverage noted below either way.
+3. **Naming campaign scope.** RULED (maintainer, 2026-08): **pulled
+   forward** as its own chunk, ahead of the S5 triage — it is independent
+   of every definition and makes reading the code during S2–S4 easier — and
+   **extended to the other clear cases**, not just the type name. In scope:
+   `ContextValue` → `StructureValue` (~701 sites), `makeContext` →
+   `makeStructure` (~101), and the `MultiValue*` residue D46 retired
+   (`MultiValueType`, `makeMultiValue`, ~25+). "Clear" means: the decision
+   is already ratified and executed in the runtime, and only the surface
+   name lags. Anything where the right name is still an open question waits
+   for its spine entry.
+4. **`~Printable`** — HELD (maintainer, 2026-08). Not ruled here. It is a
+   **delta in the ruling-2 sense**: `applyBoundaryBound` and
+   `shapeAwareSubtypeof` disagree about whether a wrapped interface is an
+   interface, and the disagreement is to be resolved *by* the T4 §21
+   definition, not ahead of it. B-104(g) therefore stays open through S3,
+   and the deliberate consequence is that no code changes on this question
+   until the definition exists to justify the change. The zero suite
+   coverage on that path (§7) is recorded as its own delta and can be
+   closed independently — a test pinning today's behaviour is not a ruling
+   on tomorrow's.
 
 ## 7. Deltas already in hand
 
@@ -215,6 +239,7 @@ Recorded now so S5 does not have to rediscover them.
 | The `shapeAwareSubtypeof` interface check is redundant with its name check | Instrumented: 42 interface encounters, 0 decisive |
 | 93 of 136 exported concepts undefined in `docs/design/` | Measured, bare forms allowed |
 | No evaluator or partial-evaluation design doc exists | `implementation-map.md` calls `allegretto/architecture.md` "planned" |
+| `doc-ref-lint` scanned TRACKED files only, so a new doc's references were invisible until after commit | Found by this plan's own CI failure — a local run passed, CI did not. Fixed here; the boundary lint had already made the opposite (correct) call for `src/` |
 
 ## 8. What this plan is not
 
