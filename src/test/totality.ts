@@ -30,7 +30,7 @@ test("Phase E Stage 0: notification kind constants exist", () => {
 
 test("C1.5b: collapseBodyMetadata stashes `partial` and unwraps the body", () => {
   // Hand-build a function whose body is `partial_attach(42)` and verify the
-  // collapse pass stashes __partial and leaves the bare body.
+  // collapse pass stashes partial and leaves the bare body.
   const inner = makeInt(42);
   const wrapped = makeExpr(makePrimitive("partial_attach", () => inner, true), [inner]);
   const cfn = makeComposedFn([], wrapped);
@@ -59,7 +59,7 @@ test("C1.5b: collapse leaves unwrapped bodies untouched", () => {
 });
 test("Phase E Stage 0 (C1.5b form): isFunctionPartial reads the collapsed property", () => {
   // Construct: a ComposedFunction whose body is `partial_attach(42)`; the
-  // collapse pass (run by evalSource in real pipelines) stashes __partial.
+  // collapse pass (run by evalSource in real pipelines) stashes partial.
   const body = makeInt(42);
   const wrapped = makeExpr(makePrimitive("partial_attach", () => body, true), [body]);
   const fn = makeComposedFn([], wrapped);
@@ -287,7 +287,7 @@ test("C1.5b: collapse stashes the `decreases` metric", () => {
   );
   const cfn = makeComposedFn([], wrapped);
   collapseBodyMetadata(cfn);
-  eq((cfn as any).__decreasesMetric === metric, true);
+  eq((cfn as any).decreasesMetric === metric, true);
   eq(cfn.body === body, true);
 });
 
@@ -300,8 +300,8 @@ test("C1.5b: collapse peels a stacked wrapper chain under type_check", () => {
   const typed = makeExpr(makePrimitive("type_check", () => partW, true), [partW, makeInt(0)]);
   const cfn = makeComposedFn([], typed);
   collapseBodyMetadata(cfn);
-  eq((cfn as any).__partial === true, true);
-  eq((cfn as any).__decreasesMetric === metric, true);
+  eq((cfn as any).partial === true, true);
+  eq((cfn as any).decreasesMetric === metric, true);
   eq((cfn.body as any).args[0] === body, true);
 });
 

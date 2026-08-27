@@ -45,7 +45,7 @@ export interface ProvenFinding {
 
 /** Resolve a paramType AST/Value to its concrete type Context (via the
  *  evalCtx Symbol lookup if needed). Returns the Context that may carry
- *  `__name`, `__abstractDomain`, etc. */
+ *  `__name`, `abstractDomain`, etc. */
 function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | null {
   let cur: Value = dataOf(t);
   if (cur.kind === ValueKind.Symbol) {
@@ -83,7 +83,7 @@ function pickSamples(typeCtx: ContextValue): Value[] | null {
 
   // Refined Int (NonNeg / PositiveInt / SmallPos / etc.) — read the
   // abstract domain's `lo` to pick non-trivial samples.
-  const dom = (typeCtx as any).__abstractDomain;
+  const dom = (typeCtx as any).abstractDomain;
   if (dom && dom.kind === "interval") {
     const lo = Number.isFinite(dom.lo) ? dom.lo : 0;
     const hi = Number.isFinite(dom.hi) ? dom.hi : Infinity;
@@ -207,7 +207,7 @@ export function checkProvenClauses(
     }
     if (!cfn) continue;
 
-    const provenClauses = (cfn as any).__provenClauses as Value[] | undefined;
+    const provenClauses = (cfn as any).provenClauses as Value[] | undefined;
     if (!provenClauses || provenClauses.length === 0) continue;
 
     // F7 minimum: single typed param. Multi-param + untyped emit info.

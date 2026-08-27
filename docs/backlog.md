@@ -70,7 +70,7 @@ The grouping below comes from co-change measurement over the last 40
 |---|---|---|
 | **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08), then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/design/standard/*.md`; touches no `src/` |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
-| **C — capability tracks** | T-tooling (B-064/065/067), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
+| **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
 
 **What lane B unlocks:** C and D may then run *as lanes in parallel
@@ -83,8 +83,12 @@ change removes it.
 `src/test/`: one module per area behind an index that registers nothing.
 A lane-D session working `effects.ts` and a lane-C session adding a
 tooling test now edit different files. Two follow-ons were filed rather
-than absorbed: **B-101** (a registration-count check in CI) and **B-102**
-(retire the dead `src/test.ts` entry in `SCAN_EXCLUDE`).
+than absorbed: **B-103** (a registration-count check in CI) and **B-102**
+(retire the dead `src/test.ts` entry in `SCAN_EXCLUDE`). *(Lane B filed the
+first as B-101, colliding with lane A's B-101 — the two lanes minted the
+same id concurrently. Lane A keeps it: its number is cited by ratified
+CT-R3/CT-R5 rulings in `docs/decisions.md`, so it is the one that cannot
+move. Renumbered here 2026-08.)*
 
 **Gate policy per lane** — A, B and C run on **pre-ratified chunk
 sequences**: the maintainer approves the chunk list once at the start of
@@ -915,7 +919,7 @@ that prevents it.
   not to be) is superseded here rather than revived
   (`docs/design/standard/contracts.md` §6/§7)
 
-- [ ] **B-101** · T-tooling · CI: assert the suite's REGISTRATION COUNT,
+- [ ] **B-103** · T-tooling · CI: assert the suite's REGISTRATION COUNT,
   not just that it passes. The lane-B split lost nine tests to a bad cut
   and every gate stayed green — typecheck clean, suite 1188/1188, `GATE:
   PASSED` — because a uniformly smaller suite is self-consistent. Two
@@ -934,3 +938,89 @@ that prevents it.
   carry zero violations since C0 — but a stale exemption invites someone
   to reintroduce the hole it used to hold open. Delete the entry (lane B
   could not: `boundary-tests.ts` is outside its file set)
+- [ ] **B-104** · L0 · **Retire the `__*` (dunder) identifier convention
+  from the source entirely** — maintainer directive 2026-08. The prefix
+  was a temporary collision-avoidance measure and is no longer needed;
+  it is also load-bearing in a way that a naming convention should not
+  be. Two halves, and they are not the same problem. **Chunk 1 landed
+  2026-08 — (a), (c) and (d) are DONE; (b) is what remains and needs a
+  ruling.**
+  - **(a) Host-plane names — free. ✅ DONE (chunk 1).** ~21 registered `js-property` slots
+    (`__abstractDomain`, `__effectLabels`, `__effectBound`,
+    `__inferredEffects`, `__genericParams`, `__partial`,
+    `__decreasesMetric`, `__declaredEffectsAst`, `__paramEffectPairs`,
+    `__provenClauses`, `__total`, `__assumeTerminates`, `__futureManager`,
+    `__tailCall`, `__grammarValue`, `__grammarHandle`,
+    `__grammar_fragment`, `__channelWriterFor`, `__lawBackings`,
+    `__predicateSet`, `__effectSet`) plus unregistered host expandos
+    (`__localMemberScope`, `__ownerShape`, `__memberNameIndex`,
+    `__hasPrivateMembers`, `__memberPrivilege`, `__declarationOnly`).
+    These are JS properties on host objects — they never share a
+    namespace with Allegro user names, so the prefix buys nothing.
+    Mechanical rename; no semantics. **Landed**: 27 names, ~180 sites,
+    zero behaviour change. `__compileMode` joined them — it was
+    registered as `context-binding` but every reader and writer is a JS
+    expando, so its storage class was corrected with the rename. The
+    dead `__grammar` / `__parse` PREFIX registry rows were retired at
+    the same time: a prefix row matching nothing is not inert, it
+    pre-approves every future `__grammar*` binding and hides it from
+    the W3 completeness walk
+  - **(b) Binding-plane meta slots — a design decision. ← THE REMAINING WORK.** `__name`,
+    `__members`, `__refines`, `__construct`, `__getMember`, `__interface`,
+    `__wraps`, `__union`, `__predicate`, `__args`, `__generic`, `__type`,
+    `__discharged`, `__length`, `__compileMode`, plus the synthetic
+    binding-name families (`__future_N`, `__bare_N`, `__anon_N`, `__el_N`,
+    `__inline_grammar_N`, `__start__`, `__error__`). These live in the
+    SAME `bindings` map as user fields, and `isMetaSlotKey(key) =
+    key.startsWith("__")` is the partition test between the two — read by
+    `types-std.ts` (member dispatch narrowing, spec walks, refinement key
+    filters), `runtime.ts` (source attachment), `primitives.ts` (pending
+    future scan) and the registry-completeness walk in
+    `boundary-tests.ts`. Dropping the prefix requires REPLACING that
+    partition, not renaming past it — separate storage plane, registry
+    membership, or interned keys. Needs a ruling before any code moves.
+    Three candidate answers, with the recommendation first:
+    1. **A fourth plane on `Structure`** — a `meta` map beside
+       `components` / `bindings` / `dense`. `isMetaSlotKey` stops being a
+       name test and becomes a STORAGE question, which is the property
+       that should have carried the partition all along; the names then
+       drop the prefix because nothing depends on it. Compatible with
+       D39: a slot dispositioned `member` later graduates out of the meta
+       plane into a declared member, one dispositioned `host-internal`
+       stays. Cost: every read/write path through the 15 slots, and the
+       W3 walk changes subject
+    2. **Registry membership** — keep one map, make the test
+       `slotRegistration(key) !== undefined`. Cheapest, but it makes
+       `name` / `members` / `length` unusable as ordinary user field
+       names, which is a language-visible regression
+    3. **Interned or symbol keys** — unforgeable by construction, but the
+       bindings map is string-keyed throughout (serialization, the
+       bindingList, module objects), so this is the largest change
+    Note the synthetic binding-name families are a SEPARATE sub-problem:
+    they are real names in the user namespace, not meta slots, so the
+    answer there is likely a `Binding` attribute (alongside `cell`,
+    `visibility`, `isComplete`) rather than a plane
+  - **(c) Enforcement gaps found while surveying. ✅ DONE (chunk 1).**
+    The `dunder-string-literal` pattern (`["']__[A-Za-z0-9_]*["']`)
+    matched quote-delimited literals only. Three spellings were invisible
+    to it and now have patterns: synthesized template keys
+    (`` `__future_${n}` `` — five sites, none previously counted),
+    property access, and primitive diagnostic names
+    (`"record.__construct"`). `bindings-get-dunder` now covers
+    `.has`/`.set`/`.delete` as well as `.get`. All three new patterns are
+    `ratchetOnly` — they count PRE-EXISTING violations for the first
+    time, so hard-failing them would fail the suite on the commit that
+    made them visible; they ratchet until (b) drives them to zero, then
+    the flag comes off. The property-access pattern matches against
+    source with string literals blanked, so a diagnostic name is not
+    miscounted as a host-plane read. *(Backticks were deliberately NOT
+    folded into `dunder-string-literal`: in this codebase a backticked
+    `__name` is nearly always a markdown code span in a doc comment —
+    prose about a slot, not a use of one. Folding them in would have
+    added ~30 false positives to a hard-fail pattern.)*
+  - **(d) Two raw NUL bytes in `src/slots.ts`. ✅ DONE (chunk 1).**
+    `unionBackings` built its dedup key with literal NUL bytes rather
+    than `\x00` escapes, which made git and `grep` treat the whole file
+    as binary — so `src/slots.ts`, the one file where every slot name
+    lives, was silently absent from plain-text searches, dunder searches
+    included. Now escaped; the file reads as text

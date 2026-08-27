@@ -75,14 +75,14 @@ export interface ParamValue {
    *  flow through here without another schema change. */
   predicates?: import("./refinements.js").PredicateSet;
   /** Effect bound for function-typed params — CONCRETE labels only. Set by
-   *  `typed_function_impl` from a param-type annotation's `__effectBound`
+   *  `typed_function_impl` from a param-type annotation's `effectBound`
    *  (Surface A: `f: pure`) and by the Surface C `param_effects` body-form
    *  peel-and-stamp pass. PE's Param-call branch reads this slot directly
    *  to propagate effects from param body to caller; call-site enforcement
    *  runs `impliesDomain` against it. */
   effectBound?: import("./effects.js").EffectSet;
   /** C7.2c: DECLARED effect variable — the name of the Effect-kinded entry
-   *  in the owner function's `__genericParams` this param's effects are
+   *  in the owner function's `genericParams` this param's effects are
    *  bound to (`apply[e: Effect](g: e, …)` → g.effectVar = "e"). Replaces
    *  the retired `__effectvar:NAME` marker-string labels inside
    *  `effectBound`: the reference is structural, the variable's bare name

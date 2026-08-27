@@ -108,6 +108,17 @@ evaluator/runtime set; this is the complete session list):
   promoting either to a halt is a maintainer decision, not assumed.
 - Boundary lint ratchet: no `"__"`-prefixed string literals outside
   the accessor layer; use `src/slots.ts` accessors / `isMetaSlotKey`.
+  B-104 chunk 1 widened it — a dunder now also counts as a synthesized
+  template key (`` `__future_${n}` ``), a property access, or a
+  primitive's diagnostic name. Those three patterns are `ratchetOnly`
+  (counts committed in `src/boundary-baseline.json`, no increases)
+  until B-104 drives them to zero, then they hard-fail like the rest.
+- The `__*` prefix is being RETIRED (B-104). Host-plane properties are
+  already plain names — do not reintroduce a dunder on a JS expando.
+  The binding-plane slots still carry it because
+  `isMetaSlotKey(key) = key.startsWith("__")` is the partition test
+  between engine metadata and user fields in one shared bindings map;
+  that partition needs replacing before those names can change.
 - Commit messages with backticks: write to a file, `git commit -F` —
   inline `-m` backticks get shell-expanded.
 

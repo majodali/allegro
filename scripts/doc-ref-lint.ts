@@ -9,7 +9,7 @@
 // (`<layer>`) never match the path pattern, so prose stays lintable.
 //
 // Run standalone: npx tsx scripts/doc-ref-lint.ts
-// Also invoked as a test from src/test.ts.
+// Also invoked as a test from src/test/tooling.ts.
 
 import { execSync } from "child_process";
 import * as fs from "fs";

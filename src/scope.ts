@@ -85,7 +85,7 @@ export function scopeBindings(scope: ContextValue): Map<string, Binding> {
 export function scopeCompileMode(scope: ContextValue): boolean {
   let cur: ContextValue | undefined = scope;
   while (cur) {
-    if ((cur as any).__compileMode) return true;
+    if ((cur as any).compileMode) return true;
     cur = cur.parent;
   }
   return false;
@@ -152,7 +152,7 @@ export function scopeOwnFacts(scope: ContextValue): Map<string, unknown> {
  *  call-site scope. Kernel-only mint — never exposed as a primitive. */
 export function scopePrivilegeExtend(parent: ContextValue, owner: ContextValue): ContextValue {
   const s = scopeNew(parent);
-  (s as any).__memberPrivilege = owner;
+  (s as any).memberPrivilege = owner;
   return s;
 }
 
@@ -161,7 +161,7 @@ export function scopePrivilegeExtend(parent: ContextValue, owner: ContextValue):
 export function scopeHoldsPrivilege(scope: ContextValue | undefined, owner: ContextValue): boolean {
   let cur: ContextValue | undefined = scope;
   while (cur) {
-    if ((cur as any).__memberPrivilege === owner) return true;
+    if ((cur as any).memberPrivilege === owner) return true;
     cur = cur.parent;
   }
   return false;
@@ -227,7 +227,7 @@ export function scopeAllBindings(scope: ContextValue): Map<string, Binding> {
   return out;
 }
 
-/** Chain-walking read of a host-plane field (e.g. `__futureManager`) —
+/** Chain-walking read of a host-plane field (e.g. `futureManager`) —
  *  set on the root evaluation scope, readable from any child layer. */
 export function scopeHostRead(scope: ContextValue, key: string): unknown {
   let cur: ContextValue | undefined = scope;

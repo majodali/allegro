@@ -73,7 +73,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
 
   // --- Refinement-type fields (on the type instance) -------------------------
   { name: "__predicate", storages: ["context-binding"], owner: "Refinement", disposition: "member", target: "predicate" },
-  { name: "__abstractDomain", storages: ["js-property"], owner: "Refinement", disposition: "member", target: "domain" },
+  { name: "abstractDomain", storages: ["js-property"], owner: "Refinement", disposition: "member", target: "domain" },
 
   // --- GenericType fields — C7.2a EXECUTED (D39 checklist) ---------------------
   // __params → the `params` declared instance binding on generic types (the
@@ -82,7 +82,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // the generic's `construct` slot (D45 one-surface). __args/__generic stay
   // as host-read instance data on applied concretes (member surface for
   // applied types consciously deferred — C7.2 ruling R1).
-  { name: "__genericParams", storages: ["js-property"], owner: "GenericType", disposition: "member", target: "params", notes: "on ComposedFunction; survives clones via subst/remapParams" },
+  { name: "genericParams", storages: ["js-property"], owner: "GenericType", disposition: "member", target: "params", notes: "on ComposedFunction; survives clones via subst/remapParams" },
   { name: "__args", storages: ["context-binding"], owner: "GenericType", disposition: "member", target: "args", notes: "C7.2a: host-read instance data on applied concretes; language surface deferred" },
   { name: "__generic", storages: ["context-binding"], owner: "GenericType", disposition: "member", target: "generic (constructor back-link)", notes: "C7.2a: host-read instance data on applied concretes; language surface deferred" },
 
@@ -93,11 +93,11 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // stays a CHANNEL (kernel-private writer), never a field.
 
   // --- Effect fields -------------------------------------------------------------
-  { name: "__effectLabels", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect.labels", notes: "C6.2 (D40): the instance IS its label set — Set<string>, empty for pure, null for opaque (top); the `kind`/`labels` data bindings are the declared-member view. Replaces the retired __effect_kind slot (D39: -> Effect.kind, checked off)" },
-  { name: "__effectBound", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect instance label-set representation (dissolves at C6.2; the annotation-bound reading becomes derived)", notes: "D39 addendum, maintainer-ratified 2026-07: member for now; when Effect re-derives through the kind recipe an instance IS its label set, so the stored bound collapses into it" },
+  { name: "effectLabels", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect.labels", notes: "C6.2 (D40): the instance IS its label set — Set<string>, empty for pure, null for opaque (top); the `kind`/`labels` data bindings are the declared-member view. Replaces the retired __effect_kind slot (D39: -> Effect.kind, checked off)" },
+  { name: "effectBound", storages: ["js-property"], owner: "Effect", disposition: "member", target: "Effect instance label-set representation (dissolves at C6.2; the annotation-bound reading becomes derived)", notes: "D39 addendum, maintainer-ratified 2026-07: member for now; when Effect re-derives through the kind recipe an instance IS its label set, so the stored bound collapses into it" },
   // __effectvar: label markers + __effectVarParams side table — C7.2c
   // EXECUTED (D39): dissolved into the declared structure — `Param.effectVar`
-  // references the Effect-kinded `__genericParams` entry by name; the
+  // references the Effect-kinded `genericParams` entry by name; the
   // variable's bare name rides inferred effect sets; concrete call sites
   // resolve by ordinary PE substitution. (The side table had no functional
   // reader since the F1-F3 walker deletion.)
@@ -105,10 +105,10 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // --- Channels (D36 / D21–D24): value-plane metadata, not fields ---------------
   { name: "__type", storages: ["context-binding"], owner: "shape channel", disposition: "channel", target: "shape (D36)" },
   { name: "__discharged", storages: ["context-binding"], owner: "discharged channel", disposition: "channel", target: "discharged integrity channel (D21–D24; kernel-private writer)" },
-  { name: "__effectSet", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects (F1 component made canonical)" },
-  { name: "__inferredEffects", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects" },
-  { name: "__predicateSet", storages: ["js-property"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
-  { name: "__lawBackings", storages: ["js-property"], owner: "proof kernel", disposition: "channel", target: "knowledge (D2 roll-up: transitive law-backing set on proofs, B-091)" },
+  { name: "effectSet", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects (F1 component made canonical)" },
+  { name: "inferredEffects", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects" },
+  { name: "predicateSet", storages: ["js-property"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
+  { name: "lawBackings", storages: ["js-property"], owner: "proof kernel", disposition: "channel", target: "knowledge (D2 roll-up: transitive law-backing set on proofs, B-091)" },
 
   // --- MultiValue components (current channel plane) ------------------------------
   { name: "type", storages: ["mv-component"], owner: "shape channel", disposition: "channel", target: "shape (D36)" },
@@ -129,20 +129,26 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "__bare_", storages: ["binding-name-prefix"], owner: "futures", disposition: "base-concept", target: "future cells (D33)", prefix: true },
 
   // --- Host-engine internals (never value slots) --------------------------------------
-  { name: "__channelWriterFor", storages: ["js-property"], owner: "channel plane", disposition: "host-internal", target: "n/a — brand on writer PrimitiveFunctions (C1.4); attenuation checks it" },
-  { name: "__partial", storages: ["js-property"], owner: "totality", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse); becomes a function-value channel entry at C4.x" },
-  { name: "__decreasesMetric", storages: ["js-property"], owner: "totality", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
-  { name: "__declaredEffectsAst", storages: ["js-property"], owner: "effects channel", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
-  { name: "__paramEffectPairs", storages: ["js-property"], owner: "Effect", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
-  { name: "__provenClauses", storages: ["js-property"], owner: "Proof", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
-  { name: "__compileMode", storages: ["context-binding"], owner: "evaluator", disposition: "host-internal", target: "n/a" },
-  { name: "__futureManager", storages: ["js-property"], owner: "futures", disposition: "host-internal", target: "n/a" },
-  { name: "__tailCall", storages: ["js-property"], owner: "evaluator", disposition: "host-internal", target: "n/a" },
-  { name: "__grammarValue", storages: ["js-property"], owner: "grammar2", disposition: "host-internal", target: "n/a" },
-  { name: "__grammarHandle", storages: ["js-property"], owner: "grammar2", disposition: "host-internal", target: "n/a" },
-  { name: "__grammar_fragment", storages: ["js-property"], owner: "grammar2", disposition: "host-internal", target: "n/a" },
-  { name: "__grammar", storages: ["context-binding", "js-property"], owner: "grammar2", disposition: "host-internal", target: "n/a", prefix: true },
-  { name: "__parse", storages: ["js-property"], owner: "grammar2", disposition: "host-internal", target: "n/a", prefix: true },
+  { name: "channelWriterFor", storages: ["js-property"], owner: "channel plane", disposition: "host-internal", target: "n/a — brand on writer PrimitiveFunctions (C1.4); attenuation checks it" },
+  { name: "partial", storages: ["js-property"], owner: "totality", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse); becomes a function-value channel entry at C4.x" },
+  { name: "decreasesMetric", storages: ["js-property"], owner: "totality", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
+  { name: "declaredEffectsAst", storages: ["js-property"], owner: "effects channel", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
+  { name: "paramEffectPairs", storages: ["js-property"], owner: "Effect", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
+  { name: "provenClauses", storages: ["js-property"], owner: "Proof", disposition: "host-internal", target: "n/a — body-form metadata (C1.5b collapse)" },
+  { name: "compileMode", storages: ["js-property"], owner: "evaluator", disposition: "host-internal", target: "n/a", notes: "B-104 chunk 1: was registered as context-binding, but every reader and writer is a JS expando on the ctx object (`evaluator.ts` precompile flag, `scope.ts` chain probe) — there has never been a binding by this name. Storage corrected with the rename" },
+  { name: "futureManager", storages: ["js-property"], owner: "futures", disposition: "host-internal", target: "n/a" },
+  { name: "tailCall", storages: ["js-property"], owner: "evaluator", disposition: "host-internal", target: "n/a" },
+  { name: "grammarValue", storages: ["js-property"], owner: "grammar2", disposition: "host-internal", target: "n/a" },
+  { name: "grammarHandle", storages: ["js-property"], owner: "grammar2", disposition: "host-internal", target: "n/a" },
+  { name: "grammarFragment", storages: ["js-property"], owner: "grammar2", disposition: "host-internal", target: "n/a" },
+  // B-104 chunk 1: the `__grammar` / `__parse` PREFIX rows are retired. They
+  // were registered when grammar metadata rode dunder-prefixed keys; the
+  // three js-property members (grammarValue, grammarHandle, grammarFragment)
+  // are registered by exact name above, and no binding by either prefix has
+  // existed since. A prefix row that matches nothing is not inert — it
+  // pre-approves every future `__grammar*` binding, hiding it from the W3
+  // completeness walk. `__inline_grammar` (below) IS still a live binding
+  // prefix and stays.
   { name: "__inline_grammar", storages: ["context-binding"], owner: "grammar2", disposition: "host-internal", target: "n/a", prefix: true },
   { name: "__el_", storages: ["context-binding"], owner: "Earley", disposition: "host-internal", target: "n/a", prefix: true },
   { name: "__start__", storages: ["context-binding"], owner: "Earley", disposition: "host-internal", target: "n/a" },
@@ -224,7 +230,7 @@ export function getVariants(ctx: ContextValue): Value | undefined { return slotR
 
 // Refinement fields
 export function getPredicate(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__predicate"); }
-export function getAbstractDomain(ctx: ContextValue): any { return (ctx as any).__abstractDomain; }
+export function getAbstractDomain(ctx: ContextValue): any { return (ctx as any).abstractDomain; }
 
 // GenericType fields
 export function getGenericArgs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__args"); }
@@ -238,8 +244,8 @@ export function getEqLhs(ctx: ContextValue): Value | undefined { return slotRead
 export function getEqRhs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "rhs"); }
 
 // Effect fields
-export function getEffectLabels(ctx: ContextValue): Set<string> | null | undefined { return (ctx as any).__effectLabels; }
-export function getEffectBound(ctx: ContextValue): any { return (ctx as any).__effectBound; }
+export function getEffectLabels(ctx: ContextValue): Set<string> | null | undefined { return (ctx as any).effectLabels; }
+export function getEffectBound(ctx: ContextValue): any { return (ctx as any).effectBound; }
 
 // Base concepts
 // C4.2: slot count and element reads are dense-aware — the dense region
@@ -374,7 +380,7 @@ export function renameInPlace(ctx: ContextValue, name: Value): void {
 
 // Refinement fields
 export function setPredicate(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__predicate", v); }
-export function setAbstractDomain(ctx: ContextValue, d: unknown): void { (ctx as any).__abstractDomain = d; }
+export function setAbstractDomain(ctx: ContextValue, d: unknown): void { (ctx as any).abstractDomain = d; }
 
 // GenericType fields (C7.2a: applied-concrete instance data, host-read)
 export function setGenericArgs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__args", v); }
@@ -388,8 +394,8 @@ export function setEqLhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "lh
 export function setEqRhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "rhs", v); }
 
 // Effect fields
-export function setEffectLabels(ctx: ContextValue, labels: Set<string> | null): void { (ctx as any).__effectLabels = labels; }
-export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as any).__effectBound = d; }
+export function setEffectLabels(ctx: ContextValue, labels: Set<string> | null): void { (ctx as any).effectLabels = labels; }
+export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as any).effectBound = d; }
 
 // Base concepts
 export function setSlotCount(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__length", v); }
@@ -430,19 +436,19 @@ export function stampLawBacking(ctx: ContextValue, equality: Value, lawName: Val
 
 /** D2 roll-up (B-091): the TRANSITIVE backing set a proof rests on —
  *  its own rule application's backing plus every input proof's set,
- *  unioned. Host-plane (js-property) storage, the `__effectSet` /
- *  `__predicateSet` pattern. The single E-R6 fields above remain the
+ *  unioned. Host-plane (js-property) storage, the `effectSet` /
+ *  `predicateSet` pattern. The single E-R6 fields above remain the
  *  proof's OWN rule backing (they are dispatched instance fields —
  *  `p.lawTier`); this set is what the Verdict's assumption ledger
  *  aggregates, so a nested chain does not lose inner backings. */
 export interface LawBackingRec { equality: string; law: string; tier: string }
 
 export function backingsOf(ctx: ContextValue): LawBackingRec[] {
-  return ((ctx as unknown as { __lawBackings?: LawBackingRec[] }).__lawBackings) ?? [];
+  return ((ctx as unknown as { lawBackings?: LawBackingRec[] }).lawBackings) ?? [];
 }
 export function stampBackings(ctx: ContextValue, recs: LawBackingRec[]): void {
   if (recs.length > 0) {
-    (ctx as unknown as { __lawBackings?: LawBackingRec[] }).__lawBackings = recs;
+    (ctx as unknown as { lawBackings?: LawBackingRec[] }).lawBackings = recs;
   }
 }
 export function unionBackings(...sets: LawBackingRec[][]): LawBackingRec[] {
@@ -450,7 +456,7 @@ export function unionBackings(...sets: LawBackingRec[][]): LawBackingRec[] {
   const out: LawBackingRec[] = [];
   for (const set of sets) {
     for (const r of set) {
-      const k = `${r.equality} ${r.law} ${r.tier}`;
+      const k = `${r.equality}\x00${r.law}\x00${r.tier}`;
       if (!seen.has(k)) { seen.add(k); out.push(r); }
     }
   }
@@ -486,7 +492,7 @@ export const SLOT_KEYS = {
  *  SLOT_REGISTRY. Call sites read them via scope.ts's chain-aware
  *  `scopeHostRead` using these constants, never raw literals. */
 export const HOST_KEYS = {
-  futureManager: "__futureManager",
+  futureManager: "futureManager",
 } as const;
 
 /** The "skip meta slots when copying user-visible bindings" test. */
@@ -741,15 +747,15 @@ export function sourceOf(v: Value): Value | undefined {
  *  ComposedFunction clones (subst/remapParams) — the C1.5b collapsed
  *  body-form metadata plus the PE effects stash. */
 export const PRESERVED_FN_META_KEYS = [
-  "__partial", "__decreasesMetric", "__declaredEffectsAst",
-  "__paramEffectPairs", "__provenClauses", "__inferredEffects",
+  "partial", "decreasesMetric", "declaredEffectsAst",
+  "paramEffectPairs", "provenClauses", "inferredEffects",
   // B-028 F3: the completion-discharge clauses (CE-R3).
-  "__total", "__assumeTerminates",
+  "total", "assumeTerminates",
 ] as const;
 
 /** Brand for Allegro-level channel-writer PrimitiveFunctions (host-internal
  *  js-property; registered in SLOT_REGISTRY). Attenuation checks it. */
-export const CHANNEL_WRITER_BRAND = "__channelWriterFor";
+export const CHANNEL_WRITER_BRAND = "channelWriterFor";
 
 // --- Propagation table (C1.5) ---------------------------------------------------
 //

@@ -457,9 +457,9 @@ const ctx_bindings: PrimitiveFnImpl = (args, pctx) => {
   // way. Everything else — including all names and flags — lists freely.
   const t = getType(args[0]);
   const shape = t ? typeShape(t) : null;
-  const guardInstance = shape !== null && (shape as any).__hasPrivateMembers
+  const guardInstance = shape !== null && (shape as any).hasPrivateMembers
     && !(pctx && scopeHoldsPrivilege(pctx, shape));
-  const descOwner = (ctx as any).__ownerShape as ContextValue | undefined;
+  const descOwner = (ctx as any).ownerShape as ContextValue | undefined;
   const guardDescriptor = descOwner !== undefined && isPrivateDescriptor(ctx)
     && !(pctx && scopeHoldsPrivilege(pctx, descOwner));
   const pairs: Value[] = [];
@@ -1365,7 +1365,7 @@ const grammar_parse_impl: PrimitiveFnImpl = (args) => {
 
 // ============ RUNTIME GRAMMAR EXTENSIONS ============
 // Module-scoped primitives that register new parselets/operators/keywords.
-// The module's ctx carries a hidden `__grammar_fragment` binding that
+// The module's ctx carries a hidden `grammarFragment` binding that
 // accumulates registrations; the module loader extracts it and attaches
 // the fragment to the Extension returned for this module.
 
@@ -1374,16 +1374,16 @@ import { emptyGrammarFragment } from "./types.js";
 
 /** Get the current module's grammar fragment, creating it on ctx if absent. */
 function getOrCreateFragment(ctx: ContextValue): GrammarFragment {
-  const existing = (ctx as any).__grammar_fragment as GrammarFragment | undefined;
+  const existing = (ctx as any).grammarFragment as GrammarFragment | undefined;
   if (existing) return existing;
   const fresh = emptyGrammarFragment();
-  (ctx as any).__grammar_fragment = fresh;
+  (ctx as any).grammarFragment = fresh;
   return fresh;
 }
 
 /** Extract the grammar fragment from a ctx if any registrations happened. */
 export function extractGrammarFragment(ctx: ContextValue): GrammarFragment | undefined {
-  return (ctx as any).__grammar_fragment as GrammarFragment | undefined;
+  return (ctx as any).grammarFragment as GrammarFragment | undefined;
 }
 
 const register_infix_impl: PrimitiveFnImpl = (args, ctx) => {
@@ -1442,7 +1442,7 @@ const register_expr_prefix_impl: PrimitiveFnImpl = (args, ctx) => {
 //
 // Each `*_add` primitive mutates the handle in place and returns it, so the
 // chain threads through. `grammar_fragment_finalize` converts the handle to
-// a Grammar Value (opaque Context with a hidden `__grammarValue` field the
+// a Grammar Value (opaque Context with a hidden `grammarValue` field the
 // `use X` pre-scanner recognizes at compile time).
 //
 // Step 4 implements the Phase 1 subset: infix/prefix/postfix/expr_prefix
@@ -1469,7 +1469,7 @@ function makeFragmentBuilderHandle(base: string): ContextValue {
   const fragment = emptyGrammarFragment();
   fragment.base = base;             // propagate to fragment for validator checks
   const data: GrammarHandleData = { fragment, base, anonLevelCounter: 0 };
-  (ctx as any).__grammarHandle = data;
+  (ctx as any).grammarHandle = data;
   return ctx;
 }
 
@@ -1478,7 +1478,7 @@ function asGrammarHandle(v: Value, fnName: string): GrammarHandleData {
   if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${fnName}: expected grammar fragment handle, got ${p.kind}`);
   }
-  const h = (p as any).__grammarHandle as GrammarHandleData | undefined;
+  const h = (p as any).grammarHandle as GrammarHandleData | undefined;
   if (!h) throw new AllegroError(`${fnName}: value is not a grammar fragment handle`);
   return h;
 }
@@ -1489,13 +1489,13 @@ function asGrammarHandle(v: Value, fnName: string): GrammarHandleData {
 export function asGrammarValue(v: Value): GrammarValueData | undefined {
   const p = dataOf(v);
   if (p.kind !== ValueKind.Structure) return undefined;
-  return (p as any).__grammarValue as GrammarValueData | undefined;
+  return (p as any).grammarValue as GrammarValueData | undefined;
 }
 
 function makeGrammarValue(fragment: GrammarFragment, base: string): ContextValue {
   const ctx  = makeContext() as ContextValue;
   const data: GrammarValueData = { fragment, baseChain: [base] };
-  (ctx as any).__grammarValue = data;
+  (ctx as any).grammarValue = data;
   return ctx;
 }
 
@@ -1632,7 +1632,7 @@ const grammar_fragment_new_from_impl: PrimitiveFnImpl = (args) => {
   // itself so finalize can reproduce it. Use a sentinel base name that
   // encodes the chain length; finalize reads the full chain from the handle.
   const handle = makeFragmentBuilderHandle(data.baseChain.join("/"));
-  const h = (handle as any).__grammarHandle as GrammarHandleData;
+  const h = (handle as any).grammarHandle as GrammarHandleData;
   // Attach the chain directly so finalize can use it verbatim.
   (h as any).extendsChain = data.baseChain;
   // Also copy the underlying fragment's declarations into the new one so
@@ -1784,7 +1784,7 @@ const grammar_fragment_finalize_impl: PrimitiveFnImpl = (args) => {
 function makeGrammarValueWithChain(fragment: GrammarFragment, baseChain: string[]): ContextValue {
   const ctx  = makeContext() as ContextValue;
   const data: GrammarValueData = { fragment, baseChain };
-  (ctx as any).__grammarValue = data;
+  (ctx as any).grammarValue = data;
   return ctx;
 }
 
@@ -1925,7 +1925,7 @@ _setEffectsInspector((fnValue, ctx) => {
   }
   if (d.kind === ValueKind.ComposedFunction) {
     const cfn = d as ComposedFunctionValue;
-    const stash = (cfn as any).__inferredEffects as Set<string> | undefined;
+    const stash = (cfn as any).inferredEffects as Set<string> | undefined;
     if (stash) return new Set(stash);
     if (ctx && !_precompileInProgress.has(cfn)) {
       _precompileInProgress.add(cfn);
@@ -2087,7 +2087,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // inside their declarer.
   //
   // C7.2c (was Stage C2): effect-variable param types (paramType is a Symbol
-  // matching an Effect-kinded entry in the function's `__genericParams`) set
+  // matching an Effect-kinded entry in the function's `genericParams`) set
   // the Param's DECLARED `effectVar` reference — the variable's bare name
   // rides inferred effect sets; concrete call sites resolve it by ordinary
   // PE substitution. The `__effectvar:` marker strings and the
@@ -2096,7 +2096,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (fnPrimary.kind === ValueKind.ComposedFunction) {
     const cFn = fnPrimary as any;
     const params = cFn.params as Array<{ effectBound?: Set<string>; effectVar?: string }>;
-    const genericParams = (cFn as any).__genericParams as Array<{ name: string; kind?: any }> | undefined;
+    const genericParams = (cFn as any).genericParams as Array<{ name: string; kind?: any }> | undefined;
     const effectVarNames = new Set<string>();
     if (genericParams) {
       for (const gp of genericParams) {
@@ -2112,7 +2112,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       // the literal bound (F2: writes to Param.effectBound directly, not
       // wrapped in a PredicateSet).
       if (pt.kind === ValueKind.Structure) {
-        const bound = (pt as any).__effectBound as _AbstractDomain | undefined;
+        const bound = (pt as any).effectBound as _AbstractDomain | undefined;
         if (bound && bound.kind === "effects") {
           params[i].effectBound = new Set(bound.labels);
         }
@@ -2134,7 +2134,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // the call ctx (so `pure`/`io`/etc. resolve via extensions) and stamp
     // the matching Param's effectBound. By-name match against
     // `cFn.params[i].name` survives `remapParams` clones.
-    const pePairs = (cFn as any).__paramEffectPairs as Value[] | undefined;
+    const pePairs = (cFn as any).paramEffectPairs as Value[] | undefined;
     if (pePairs) {
       for (let i = 0; i + 1 < pePairs.length; i += 2) {
         const paramRef = dataOf(pePairs[i]);
@@ -2161,14 +2161,14 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // so the cb's effects component is populated when the outer call's
   // applyPrimitive runs its arg-effects loop.
   if (fnPrimary.kind === ValueKind.ComposedFunction
-      && (fnPrimary as any).__inferredEffects === undefined
+      && (fnPrimary as any).inferredEffects === undefined
       && !_precompileInProgress.has(fnPrimary as ComposedFunctionValue)) {
     _precompileInProgress.add(fnPrimary as ComposedFunctionValue);
     try {
       _precompileFunction(fnPrimary as ComposedFunctionValue, paramTypes, ctx!);
     } catch (_e) {
       // Body PE may fail (e.g. type errors that surface only at full
-      // resolution). Leave __inferredEffects undefined; downstream paths
+      // resolution). Leave inferredEffects undefined; downstream paths
       // treat the absence as pure / no effects recorded.
     } finally {
       _precompileInProgress.delete(fnPrimary as ComposedFunctionValue);
@@ -2181,7 +2181,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Callers see the function's effects via `effectsOf` — the canonical
   // location for the function's effects (replacing the predicate-set/walker
   // path during the F1 → F2 migration).
-  const inferredEff = (fnPrimary as any).__inferredEffects as Set<string> | undefined;
+  const inferredEff = (fnPrimary as any).inferredEffects as Set<string> | undefined;
   if (inferredEff && inferredEff.size > 0) {
     typed = _withEffects(typed, inferredEff);
   }
@@ -2537,7 +2537,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       // possession evidence as dot access. The live reflective gate is
       // ctx_bindings (names + flags free, value pairs withheld).
       if (fieldName === "value" && isPrivateDescriptor(p as ContextValue)) {
-        const owner = (p as any).__ownerShape as ContextValue | undefined;
+        const owner = (p as any).ownerShape as ContextValue | undefined;
         if (owner && !(ctx && scopeHoldsPrivilege(ctx, owner))) {
           const nameV = (p as ContextValue).bindings.get("name")?.value;
           const memberName = nameV?.kind === ValueKind.Bits ? bitsToString(nameV as BitsValue) : "<member>";
@@ -2582,10 +2582,10 @@ function checkRefinementPredicate(
   // Phase B: subtyping via abstract domains. If the value carries a domain
   // and the expected type has one too, and the value's domain implies the
   // expected one, the predicate is proved without a runtime call.
-  const expectedDom = (expectedCtx as any).__abstractDomain as _AbstractDomain | undefined;
+  const expectedDom = (expectedCtx as any).abstractDomain as _AbstractDomain | undefined;
   if (expectedDom && expectedDom.kind !== "opaque") {
     const valueDom = _domainOf(v);
-    const actualTypeDom = actualType ? (actualType as any).__abstractDomain as _AbstractDomain | undefined : undefined;
+    const actualTypeDom = actualType ? (actualType as any).abstractDomain as _AbstractDomain | undefined : undefined;
     const effective = valueDom ?? actualTypeDom ?? null;
     if (effective && _impliesDomain(effective, expectedDom)) {
       return { ok: true };
@@ -2673,15 +2673,15 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   // Phase D1 Slice 2 Stage A: effect-bound discharge. Same shape as the
-  // checkArgType path in evaluator.ts — `__effectBound` on the expected type
+  // checkArgType path in evaluator.ts — `effectBound` on the expected type
   // (set by buildEffect for `pure` / named effects; absent on `opaque`)
   // triggers an actual ⊆ bound check via impliesDomain. Reuses the predicate
   // entailment infrastructure rather than introducing a parallel channel.
-  const effBound = (expectedCtx as any).__effectBound as _AbstractDomain | undefined;
+  const effBound = (expectedCtx as any).effectBound as _AbstractDomain | undefined;
   if (effBound && effBound.kind === "effects") {
     // F2: read effects from the value's `effects` MultiValue component
     // (PE-populated) rather than via the predicate-set view. `effectsOf`
-    // also reads `__inferredEffects` from bare ComposedFunctions so
+    // also reads `inferredEffects` from bare ComposedFunctions so
     // untyped functions are covered through the same path.
     const argEff = _effectsOf(v) ?? new Set<string>();
     const actualDom: _EffectsDomain = { kind: "effects", labels: argEff };
@@ -2708,10 +2708,10 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       const actualType0 = getType(v);
       // Phase B fast path: if abstract domains can prove the implication,
       // skip the runtime predicate evaluation.
-      const expectedDom = (expectedCtx as any).__abstractDomain as _AbstractDomain | undefined;
+      const expectedDom = (expectedCtx as any).abstractDomain as _AbstractDomain | undefined;
       if (expectedDom && expectedDom.kind !== "opaque") {
         const valueDom = _domainOf(v);
-        const actualTypeDom = actualType0 ? (actualType0 as any).__abstractDomain as _AbstractDomain | undefined : undefined;
+        const actualTypeDom = actualType0 ? (actualType0 as any).abstractDomain as _AbstractDomain | undefined : undefined;
         const effective = valueDom ?? actualTypeDom ?? null;
         if (effective && _impliesDomain(effective, expectedDom)) return baseChecked;
       }
@@ -3612,7 +3612,7 @@ const decreases_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 // B-028 F3 (CE-R3) — the completion-discharge clauses. `total` and
 // `assume terminates` lower to their markers at parse time; the block
 // preprocessor wraps the body with the matching `*_attach`, and
-// `collapseBodyMetadata` stashes `__total` / `__assumeTerminates` for
+// `collapseBodyMetadata` stashes `total` / `assumeTerminates` for
 // the divergence analysis. Runtime behaviour: transparent passthroughs.
 
 const total_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
@@ -3837,7 +3837,7 @@ const proof_by_eval_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 //
 // The discharge: read `value`'s effective abstract domain (predicate set,
 // propagated domain, or — for a bare literal — `eq(k)`), read the refined
-// type's `__abstractDomain`, and check entailment. On failure, reuse the
+// type's `abstractDomain`, and check entailment. On failure, reuse the
 // Phase B counterexample generator to produce a concrete breaking value.
 
 function fmtDomain(d: any): string {

@@ -85,7 +85,7 @@ export function formatEffects(e: EffectSet): string {
 export function unwrapEffectsAttach(fn: import("./types.js").ComposedFunctionValue): { declared: EffectSet } | null {
   // C1.5b: the declared-effects clause is stashed on the function by
   // collapseBodyMetadata (totality.ts) — no AST peeling.
-  const ast = (fn as any).__declaredEffectsAst as Value | undefined;
+  const ast = (fn as any).declaredEffectsAst as Value | undefined;
   if (ast === undefined) return null;
   return { declared: extractLabelArray(ast) };
 }
@@ -191,7 +191,7 @@ export function checkEffectsDeclarations(
     // ComposedFunction. `precompileFunctions` precompiles every function
     // binding (typed and untyped) so the stash is the canonical source —
     // empty when the body has no effects.
-    const stashed = (fn as any).__inferredEffects as EffectSet | undefined;
+    const stashed = (fn as any).inferredEffects as EffectSet | undefined;
     const inferred = stashed ?? new Set<string>();
     const inferredHard = new Set(inferred);
     inferredHard.delete("opaque");
@@ -225,7 +225,7 @@ export function opaqueEffectNotices(
     if (!b.key || !b.value) continue;
     const fn = asFunction(b.value);
     if (!fn) continue;
-    const inferred = (fn as any).__inferredEffects as EffectSet | undefined;
+    const inferred = (fn as any).inferredEffects as EffectSet | undefined;
     if (!inferred || !inferred.has("opaque")) continue;
     notices.push({
       binding: b.key,
@@ -251,7 +251,7 @@ export function opaqueEffectNotices(
 // other branchers naturally propagate without per-primitive bookkeeping.
 //
 // Storage mirrors `withPredicates`: the component value is a Context with a
-// JS-side `__effectSet` field. Encoding is hidden behind `withEffects` /
+// JS-side `effectSet` field. Encoding is hidden behind `withEffects` /
 // `effectsOf`; consumers shouldn't reach into the component directly.
 
 export const EFFECTS_COMPONENT_KEY = "effects";
@@ -266,20 +266,20 @@ installChannelMerge("effects", (a: Value, b: Value) => {
 
 function encodeEffects(eff: EffectSet): Value {
   const ctx: ContextValue = makeContext();
-  (ctx as any).__effectSet = eff;
+  (ctx as any).effectSet = eff;
   return ctx;
 }
 
 function decodeEffects(v: Value): EffectSet | null {
   if (v.kind !== ValueKind.Structure) return null;
-  const set = (v as any).__effectSet as EffectSet | undefined;
+  const set = (v as any).effectSet as EffectSet | undefined;
   return set ?? null;
 }
 
 /** Read a value's effect set, in order of preference:
  *    1. The `effects` MultiValue component (canonical — set by
  *       `typed_function_impl` from `precompileFunction`'s stash).
- *    2. The ComposedFunction's `__inferredEffects` stash (for bare
+ *    2. The ComposedFunction's `inferredEffects` stash (for bare
  *       ComposedFunctions and MultiValue-wrapped functions whose effects
  *       component hasn't been populated, e.g. untyped user-defined
  *       functions in standard mode).
@@ -290,7 +290,7 @@ export function effectsOf(v: Value): EffectSet | null {
   if (c) return decodeEffects(c);
   const p = dataOf(v);
   if (p.kind === ValueKind.ComposedFunction) {
-    const stash = (p as any).__inferredEffects as EffectSet | undefined;
+    const stash = (p as any).inferredEffects as EffectSet | undefined;
     if (stash) return stash;
   }
   return null;
