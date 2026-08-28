@@ -4,6 +4,60 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S2e: T2 planes, absorbing B-110
+
+The planes are written down. Six entries — plane, channel, propagation,
+writer capability, meta slot, and **the layer boundary** — and the last one
+absorbs B-110 per maintainer ruling.
+
+**§18 supplies the rule nobody could state.** A plane is distinguished by
+*who may write it* and *what evaluation does to it*: **data** (what the value
+is), **binding** (its named parts), **channel** (information about it,
+propagated per its declared rule), **host** (interpreter bookkeeping, not
+part of the value and invisible to Allegro). The placement rule is four
+questions in order — is it what the value *is*, is it a part a user names, is
+it information that must survive operations, or none of those. That question
+had no written answer for four years, which is why B-104 happened.
+
+**Absorbing B-110 was the right call, and the reason is sharper than
+"related".** §23 draws the contrast: `evaluator.ts` propagates channels
+through the plane interface — `viralChannels()`, `channelSpec(k)?.rule ===
+"union"`, `channelMerge(k)` — entirely layer-ignorant, exactly as R3′ and
+SC-7 intend. **In the same file** it imports 27 L2 symbols and hosts
+`checkArgType`, which evaluates refinement predicates and throws
+`Type error`. The plane discipline is not missing; one subsystem bypasses it.
+B-110 is therefore not a separate arc — it is §18's rule unapplied.
+
+**And the plane framing supplies the decomposition**, found by reading rather
+than assumed: **`getType(v)` is literally `channelReadRaw(v, "type")`** plus a
+kind check — an L2 alias for an L0 call. So the halves separate cleanly.
+*Reading* a type is already layer-ignorant (a channel named `type` is opaque
+to the base) and the L2 import is gratuitous. *Interpreting* it —
+`typeMethod`'s FQN member lookup, `unifyTypes`, `applyBoundaryBound`,
+refinement-predicate evaluation, `assertMemberAvailable` — is genuinely L2
+and must be **installed rather than imported**, in the shape
+`installChannelMerge` already has. Type-directed dispatch genuinely is needed
+during evaluation (R2 — discharge happens *by* evaluating), so the fix was
+never "delete the import"; it is that the evaluator needs a dispatch hook the
+layer installs.
+
+**Six deltas**, and they resolve the shape S1 could only gesture at. S1 found
+three entries that were "the same underlying gap — the planes are real and
+undeclared". Writing the planes down turns that into four *named* defects:
+the host plane is declared inside the value interface it is said not to be
+part of (§18 → B-107(f), which was blocked on this entry existing); the base
+registers eleven L2 channels itself (§19 → B-109(a)); integrity is enforced
+by a hardcoded name list rather than the registered flag, and the two sources
+disagree about `source` (§21 → B-109(b)(c)); and the meta-slot partition
+fires on exactly one key in the whole suite (§22 → B-104(b)(f)). Plus §23.
+
+**§20 has an empty delta** — the propagation mechanism is correct as built.
+Worth recording, because a document where every entry is a defect report is
+not being read carefully either.
+
+No `src/` changes; B-109 and B-110 remain untouched pending design sign-off,
+per maintainer direction. Gate: **1197/1197, `GATE: PASSED`**.
+
 ## 2026-08 — Concept spine S2d: the base implements the type system
 
 Two maintainer corrections, and the first one overturns S2c's central

@@ -1278,7 +1278,10 @@ that prevents it.
     It is to identify the concept-free capability the evaluator actually
     needs, in the shape of `installChannelMerge` (base holds an inspectable
     symbol, layer installs the meaning), so L2 supplies the semantics
-  - **This is an arc, not a chunk.** Sizing and sequencing belong in a plan
+  - **ABSORBED INTO THE CONCEPT SPINE'S T2 (maintainer ruling, 2026-08).** It
+    is not a separate arc: it is §18's plane-placement rule not being applied
+    to one subsystem. `concepts.md` §23 now scopes it, and the plane framing
+    supplies the decomposition — see below
   - **(d) One exception class for six classes of failure.** `AllegroError` is
     the only error class and NOTHING in `src/` catches it outside the suite.
     A host-invariant assertion ("has unresolved stub — check resolvePrimitives")

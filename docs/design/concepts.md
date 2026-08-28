@@ -5,8 +5,8 @@
 > (`allegretto/structures.md`, `standard/type-system.md`, …) are where the
 > deep treatment lives; this is what makes them legible.
 >
-> Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T1 written**
-> (S1, S2a); T2–T5 pending. Status tags per `README.md`.
+> Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T2 written**
+> (S1, S2a–S2e); T3–T5 pending. Status tags per `README.md`.
 >
 > **Start at Part 0.** It separates *requirement* from *specification* from
 > *implementation*, which is the distinction whose absence caused most of the
@@ -1255,7 +1255,196 @@ it is T2's call, not this entry's. Tracked at **B-104(f)**.
 
 ---
 
-## Deltas raised in T0–T1
+---
+
+# T2 · Planes
+
+The tier whose absence caused B-104. A **plane** is where a piece of
+information about a value lives, and the four are not interchangeable: which
+plane a thing belongs on determines who may write it, what happens to it
+under evaluation, and whether Allegro can see it at all.
+
+## 18. Plane
+
+> **Level: Specification** — satisfies R3′, R8, R12.
+
+**Definition.** A *plane* is one of four storage regions a value's
+information can occupy, distinguished by **who may write it** and **what
+evaluation does to it**:
+
+| Plane | Holds | Written by | Under evaluation | Visible to Allegro |
+|---|---|---|---|---|
+| **Data** | What the value *is* | construction | replaced by the result | yes — it is the value |
+| **Binding** | A composite's named parts | construction; kernel for engine slots | copied by the operations that copy structures | yes — user fields |
+| **Channel** | Information *about* the value | the channel's registered writer | per the channel's declared rule (SC-7) | yes, through channel reads |
+| **Host** | Interpreter bookkeeping | the host, freely | nothing — it is not part of the value | **no** |
+
+**Rationale.** The planes are what make R3′ possible: an operation can carry
+a channel it has never heard of precisely because the channel plane is
+separate from the data it is operating on. They are also the answer to "where
+should this new thing go?", which is the question nobody could answer for
+four years because the planes were never written down.
+
+**The rule for placing something new.** Ask in order: *Is it what the value
+is?* → data. *Is it a part a user names?* → binding. *Is it information about
+the value that must survive operations?* → channel, and it needs a registered
+rule and a writer. *Is it none of those?* → host, and it must not be
+observable from Allegro.
+
+**As implemented.** Data → `primary` / the value itself, read via `dataOf`.
+Binding → `bindings` + `bindingList` (+ `dense`). Channel → `components`.
+Host → JS expandos and declared-but-non-value fields on `Structure`.
+
+**Delta.** The host plane is **declared inside the value interface**:
+`parent`, `isScope` and `scopePredicates` sit on `StructureValue` while their
+own comments say they are "host-plane fields, never value slots". Nothing
+enforces the distinction — a plane that is documented in comments and
+contradicted by the type is not a plane, it is a convention. **→ B-107(f)**,
+which was blocked on this entry existing.
+
+## 19. Channel
+
+> **Level: Specification** — satisfies R3′, R12.
+
+**Definition.** A *channel* is a named region of the channel plane, with a
+**declared propagation rule** and a **writer capability**. Registration is
+one-shot: the first registrant receives the writer as a closure and no one
+else can obtain it. Reads are free.
+
+**Rationale.** One-shot registration is what makes R12 work without the base
+knowing which channels matter: authority is *the closure*, not the name, so
+"who may write `discharged`" is answered by possession rather than by a list
+the base would have to maintain (and would have to be told to maintain,
+violating R6).
+
+**As implemented.** `registerChannel(spec)` in `src/slots.ts` returns a
+`ChannelWriter`; `channelReadRaw(v, name)` reads; `channelSpec(name)` returns
+the registration. `kernelChannelWriter` is the kernel's acquisition path and
+is lint-restricted to two modules.
+
+**Delta.** The base **registers eleven L2 channels itself** at module init
+(`shape`, `error`, `effects`, `predicates`, `domain`, `knowledge`, `bound`,
+`discharged`, `warnings`, `source`, `exported`) and special-cases three by
+name. R6 says the layer should register its own. **→ B-109(a).**
+
+## 20. Propagation
+
+> **Level: Specification** — **SC-7**, satisfies R3′; criterion R12.
+
+**Definition.** A channel's *propagation rule* says what an operation does
+with that channel, drawn from a **fixed, inspectable vocabulary**: `viral`
+(present on any argument ⇒ present on the result), `union` (arguments'
+values combined by the channel's installed merge), `computed` (the channel's
+owner derives it), `positional`, `drop` (never carried forward). The base
+applies the rule without knowing what the channel means; the *semantics* a
+rule needs are installed by the channel's owner.
+
+**Rationale.** The vocabulary is fixed rather than open — a channel cannot
+register an arbitrary propagation closure — and the reason is R12, not
+convenience. `registerChannel` refuses a `viral` or `union` rule on an
+integrity channel, because those **fabricate**: they place a value on a
+result that no holder of the writer put there. That check is decidable only
+over an inspectable symbol; over a closure it is unwritable, and R12 degrades
+from enforced to hoped-for. See Part 0 §8.2.
+
+**As implemented.** `PropagationRule` in `src/slots.ts`; `viralChannels()`
+and `unionChannels()` are cached filters over the registry;
+`installChannelMerge(name, fn)` is how a layer supplies `union` semantics —
+`src/effects.ts` is the one caller, and the pattern to generalise.
+
+**Delta.** — *(the mechanism is correct; its wiring is §19's delta)*
+
+## 21. Writer capability
+
+> **Level: Specification** — satisfies R12.
+
+**Definition.** The authority to *originate* a channel value is a closure
+handed to whoever registered the channel. Reads require nothing (D23).
+Origination on a user-reachable construction path is refused unless the
+writer is held.
+
+**Rationale.** Metadata that anything can write cannot be evidence. Denial is
+an **abort, not an error value** (Part 0 §7 class C) — an error value would
+be forgeable, since the forger chooses what to do with it.
+
+**As implemented.** `ChannelWriter` closures; `assertNotIntegrityKey` guards
+object literals and `mv_set`; forgery scenarios A–F in the boundary battery.
+
+**Delta.** Integrity is enforced by a **hardcoded name list**
+(`INTEGRITY_CHANNEL_NAMES = ["discharged", "source"]`) rather than by the
+registered `integrity` flag — protection by name, which is the one form that
+cannot survive the layer registering its own channels. The two sources
+disagree: `source` is in the list but is registered **without**
+`integrity: true`. **→ B-109(b)/(c).**
+
+## 22. Meta slot
+
+> **Level: IMPLEMENTATION** — realises the binding plane. Dissolving.
+
+**Definition.** A *meta slot* is a binding the engine owns rather than the
+user, historically marked by a `__` name prefix.
+
+**Rationale (historical).** The prefix partitioned one shared bindings map
+between engine metadata and user fields. That partition was real when type
+Contexts and instances shared a namespace; it is not now.
+
+**As implemented.** `isMetaSlotKey(key) = key.startsWith("__")`, five guard
+sites, and `SLOT_REGISTRY` in `src/slots.ts`.
+
+**Delta.** Measured across the full suite, the predicate returns true for
+**exactly one key** — `__length`, 296 times, nothing else. Type Contexts hold
+only meta, instances hold only user fields, `__members` is FQN-keyed: the two
+populations never meet. The concept is a compatibility artifact of the dense
+legacy view (§17), not a plane distinction. **→ B-104(b)/(f).**
+
+## 23. The layer boundary
+
+> **Level: Specification** — satisfies R6. **This entry absorbs B-110.**
+
+**Definition.** L0 may not depend on L2. A layer supplies its meaning to the
+base by **installing** it against a plane interface; the base never imports
+the layer.
+
+**Rationale.** R6, and it is the same discipline as §20's
+`installChannelMerge`: the base holds an inspectable symbol, the layer
+installs what it means. That is what makes Allegro an extension stack rather
+than a privileged layer (R1).
+
+**As implemented — and this is the largest delta in the document.** The
+evaluator does this **correctly for channels and incorrectly for types, in
+the same file.**
+
+- *Correct:* `evaluator.ts` propagates channels through the plane interface —
+  `viralChannels()`, `channelSpec(k)?.rule === "union"`, `channelMerge(k)`.
+  Layer-ignorant, exactly as R3′/SC-7 intend.
+- *Incorrect:* it also imports **27 symbols** from three L2 modules
+  (`types-std`, `refinements`, `effects`), and `checkArgType` — which calls
+  `getType`, reads `typeContextName`, **evaluates refinement predicates**,
+  dispatches through an `instanceof` binding and throws `Type error` — lives
+  in `evaluator.ts` itself. `scope.ts` imports `PredicateSet`;
+  `futures.ts` imports `withType`, `ErrorType`, `StringType`.
+
+This violates the project's own stated invariant (`CLAUDE.md`:
+*"Dependencies point downward only"*).
+
+**The decomposition that makes it tractable**, found by reading rather than
+assumed: `getType(v)` is **literally `channelReadRaw(v, "type")`** plus a kind
+check — an L2 alias for an L0 call. So the two halves separate cleanly:
+
+| Half | Nature | Disposition |
+|---|---|---|
+| **Reading** the type off a value | Already layer-ignorant — a channel named `type` is opaque to the base | Use the plane interface directly; the L2 import is gratuitous |
+| **Interpreting** it — `typeMethod` (FQN member lookup), `unifyTypes`, `applyBoundaryBound`, refinement-predicate evaluation, `assertMemberAvailable` | Genuinely L2 semantics | **Installed, not imported** — the `installChannelMerge` shape |
+
+Type-directed dispatch *is* genuinely needed during evaluation — that is R2,
+since discharge happens by evaluating — so the fix was never "delete the
+import". It is that the evaluator needs a **dispatch hook the layer
+installs**, and reads the type through the plane it already uses for every
+other channel.
+
+**Delta. → B-110**, now scoped by this entry rather than left open-ended.
+
+## Deltas raised in T0–T2
 
 | # | Delta | Owner |
 |---|---|---|
@@ -1268,11 +1457,37 @@ it is T2's call, not this entry's. Tracked at **B-104(f)**.
 | 13 | Three binding write disciplines, no stated rule for choosing | B-107 |
 | 15 | Host-plane fields declared on the value interface they are said not to be part of | B-107 |
 | 17 | `__length` is the sole remaining job of the partition test | B-104(f) |
+| 18 | The host plane is declared inside the value interface — a plane contradicted by its own type | B-107(f) |
+| 19 | The base registers eleven L2 channels itself and special-cases three by name | B-109(a) |
+| 21 | Integrity enforced by hardcoded name list, not the registered flag; the two disagree about `source` | B-109(b)(c) |
+| 22 | The meta-slot partition fires on one key in the whole suite | B-104(b)(f) |
+| 23 | **L0 imports 27 symbols from L2**; `checkArgType` lives in the evaluator | B-110 |
 
 Nine deltas across seventeen entries, on the tier we understand best. Six of
 the nine are naming or documentation lag; three (7, 15, 17) are the same
 underlying gap — **the planes are real and undeclared** — which is what T2
 exists to fix and why it is the highest-value tier in this document.
+
+### What T2 added (S2e)
+
+Six more deltas, and they resolve the shape S1 could only gesture at. S1
+found three entries (§7, §15, §17) that were "the same underlying gap — the
+planes are real and undeclared". Writing the planes down turns that gap into
+four *named* defects (§18, §19, §21, §22) plus one that is larger than any of
+them: **§23, the L0→L2 dependency**.
+
+The useful part is the contrast §23 draws. `evaluator.ts` propagates channels
+through the plane interface — `viralChannels()`, `channelSpec(k)?.rule`,
+`channelMerge(k)`, entirely layer-ignorant — **and in the same file** imports
+27 L2 symbols and hosts `checkArgType`. The discipline is not missing; the
+type system simply bypasses it. That is why B-110 belongs here rather than as
+a separate arc: it is not a new problem, it is §18's plane rule not being
+applied to one subsystem.
+
+And the decomposition falls out of the plane framing: `getType(v)` is
+`channelReadRaw(v, "type")` with a kind check, so *reading* a type is already
+an L0 operation and only *interpreting* it is L2. The fix is a dispatch hook
+the layer installs — the shape `installChannelMerge` already has.
 
 ### What the level tags revealed (S2a)
 

@@ -1,7 +1,7 @@
 # Concept spine — define Allegro, then make the code say it
 
 > Status: **active** — ratified 2026-08 (§6 rulings 1–3; ruling 4
-> deliberately HELD as a delta for S3). **S1 + S2a–S2d landed**; S2 (T2 planes) next.
+> deliberately HELD as a delta for S3). **S1 + S2a–S2e landed**; S2f (T3 evaluation) next.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -188,7 +188,8 @@ being written to justify a rename already in flight.
 | **S2b** | ~~Level split + requirement completion~~ **DONE 2026-08** — specification choices (SC-1…SC-6) separated from implementation choices (IC-1…IC-6) per maintainer ruling; **R8–R14** added; requirements gained a **subject**, which relocated *discharge* and the *knowledge lattice* to Allegro with weaker base counterparts; both standing objections (propagation vs R6, integrity vs externalisation) answered and found to be **implementation violations** → **B-109**. Cohesion explicitly deferred with a stated method |
 | **S2c** | ~~Requirement-set cohesion~~ **DONE 2026-08** — all three checks found something. **7 of 14** requirements do not survive as requirements (derived, conflated, or not requirements at all); **2** real conflicts, including R4 stating something the base contradicts 117 times; **3** capabilities Allegro needs that nothing enables (candidates R15–R17: program-level aggregation, determinism, the host boundary). Two method amendments fed back into the methodology proposal |
 | **S2d** | ~~Abort classification + metadata merge~~ **DONE 2026-08** (maintainer corrections) — S2c's "R4 was over-broad" **overturned**: inconsistency is not evidence of a different requirement. Every base abort classified into six classes → candidates **R18/R19/R20**; one class is **rework**, not specification — the L0 evaluator implements L2 type checking (27 upward imports; `checkArgType` in `evaluator.ts`) → **B-110**. R3/R5/R11/R13 merged into **R3′** (non-interference); the fixed propagation vocabulary kept as **SC-7** because R12 is enforceable only over inspectable rules |
-| **S2** | T2 planes + T3 evaluation. The planes tier is the highest-value entry in the document |
+| **S2e** | ~~T2 planes~~ **DONE 2026-08**, absorbing **B-110** per maintainer ruling — the four planes and the placement rule, channel, propagation (SC-7), writer capability, meta slot, and **§23 the layer boundary**. Six deltas. S1's "three entries are the same undeclared-plane gap" becomes four named defects plus the L0→L2 dependency, which is not a new problem but §18's rule unapplied to one subsystem |
+| **S2f** | T3 evaluation — PE rules, resolved/residual, tail calls, future cells, the `evalSource` pipeline |
 | **S3** | T4 types. Expect the most deltas here, and the `~Interface` definition |
 | **S4** | T5 obligations. Mostly reconciliation — the R-series rulings already carry rationale, so this is largely relocation and delta-hunting |
 | **S5** | Delta triage: every delta from S1–S4 becomes a backlog item, ordered. This is the code campaign's plan, produced as evidence rather than guessed |
