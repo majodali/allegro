@@ -126,6 +126,32 @@ mechanism that could notice.
   practice converts invisible debt into a visible list. A project that would
   rather not see the list should not adopt it.
 
+## 6a. Amendments the pilot itself produced
+
+Added after the cohesion pass, because each was found by the practice failing
+in a specific way rather than by reasoning about it.
+
+- **Requirements carry an *As implemented* row too.** Part 0 was written with
+  Level / Definition / Rationale only — no code column — and it is the one
+  part of the pilot document that stated something **false**: a requirement
+  claiming "failure is a value, not a control-flow escape" in a codebase that
+  throws 117 times in its base layers. Every other entry had an *As
+  implemented* row and none of them made that mistake. A requirement nothing
+  in the code answers to is either aspirational or wrong, and there is no way
+  to tell which without looking.
+- **Run the cohesion check as its own pass, not per entry.** It finds a
+  different class of defect from the per-entry delta: the delta check compares
+  a statement to the code, cohesion compares statements to each other. In the
+  pilot, cohesion retired **seven of fourteen** proposed requirements — as
+  derived, conflated, or not requirements at all — and surfaced three needed
+  capabilities that nothing in the set enabled. None of that is visible one
+  entry at a time.
+- **Expect the requirement count to fall.** A smaller independent set is a
+  stronger one. Every item the pilot removed was removed by an argument that
+  also said where it now belongs, so nothing was lost — the model got shorter
+  and more load-bearing at once. A practice that only ever *adds* requirements
+  is not being checked.
+
 ## 7. Open questions for the amendment
 
 1. **Is the practice mandatory, tiered, or recommended?** Suggestion: tie it

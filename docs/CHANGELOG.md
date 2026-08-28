@@ -4,6 +4,90 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S2c: cohesion, and seven requirements that are not
+
+The requirement set was checked as a **set** rather than item by item. All
+three questions found something, and the headline is subtractive: of fourteen
+proposed requirements, **seven do not survive as requirements**, **two
+conflicts are real**, and **three capabilities Allegro needs are enabled by
+nothing**.
+
+**Derivability (§6.1).** A requirement that follows from others is a theorem,
+and listing it as an axiom hides how few independent commitments exist.
+
+- **R7 is not a requirement** — "any implementation satisfying the others
+  supports Allegro" is the *sufficiency claim*, which is §6.3's question. As a
+  requirement it is unfalsifiable; as a claim it is the most falsifiable
+  statement in the document.
+- **R11 is derived from R3 + R6**, by its own text — it introduced itself as
+  "the R6-compatible form of R3".
+- **R13** is a specification item on the propagation vocabulary.
+- **R3 conflates two levels**: "layer information must be associated with
+  values and preserved" is a requirement; "it rides *on* the value" is a
+  specification choice with a visible alternative (an occurrence-keyed side
+  table). The alternatives test — this document's own — says so.
+- **R1 is a purpose plus a criterion**, not a falsifiable requirement.
+  Nothing an implementation does could violate it, which is §0's own test.
+- **R8's derivation is wrong**: it claims R4, but R4 would apply per-universe
+  if there were two. What forces one universe is R1 + R9.
+- **R10 is largely derived** from R2 + R14; what it adds beyond them is only
+  the external (async) source.
+
+Fourteen → **nine** independent requirements. That is the good outcome:
+a smaller independent set is a stronger one, and every item removed was
+removed by an argument that also says where it now lives.
+
+**Conflict (§6.2) — and R4 was simply wrong.** The first draft of R4 said
+*"Failure is a value, not a control-flow escape."* The base contradicts it
+**117 times**: `primitives.ts` 99 throws, `evaluator.ts` 11, `slots.ts` 5,
+`scope.ts` 2, against **2** error-value constructions. The sentence is struck
+rather than caveated — a requirement the code contradicts 117 times is not a
+requirement anyone is holding. The genuine requirement is narrower
+(evaluation never gets stuck on *unresolved information*), and what halts
+versus what yields an error value is CE-R8's, a **layer** decision.
+
+Also: **R5 is weaker than it reads.** "Survives per its declared rule" is
+near-vacuous when `drop` is a declared rule. The requirement worth having is
+**non-interference** — no operation may drop a channel it does not know
+about, whatever its rule.
+
+**Sufficiency (§6.3) — three gaps.** The only falsification of the set as a
+whole, tested by naming Allegro features and asking what enables them.
+
+- **Program-level aggregation is enabled by nothing.** Every requirement is
+  per-value or per-evaluation, but `Verdict`, the assumption ledger,
+  `CompilationReport` and `Notification` are whole-program artifacts — and
+  they are the surface on which "nothing is silently trusted" is actually
+  delivered. **Candidate R15.**
+- **Determinism is required and unstated.** PE-as-compilation needs same
+  source ⇒ same residual, or a build is not reproducible and a discharged
+  proof is not re-checkable. R10 actively introduces ordering, and the B-028
+  arc was bitten by exactly this as an arrival-order non-confluence bug.
+  **Candidate R16.**
+- **The host boundary is unstated.** Primitives perform I/O and call the
+  host; R9 covers the syntax surface and nothing covers the capability
+  surface. SC-1 specifies `PrimitiveFunction` with no requirement above it —
+  an orphan by §0's own rule. **Candidate R17.**
+
+**What the pass says about the method (§6.4).** Cohesion found more than the
+per-entry Delta check, and a *different kind* of thing: Delta compares a
+statement to the code, cohesion compares statements to each other. The R4
+error is the case in point — Part 0 was the one part written without an *As
+implemented* row, and it is the one part that stated something false. Two
+amendments fed back into the methodology proposal: **requirements carry an
+As-implemented row like every other entry**, and **cohesion runs as its own
+pass**, since none of the seven derivability findings is visible one entry at
+a time.
+
+Findings are recorded, not applied: the set is unratified, so §6 proposes and
+the maintainer disposes. Challenged requirements are marked ⚠ inline and left
+in place. The one exception is R4's false sentence, struck immediately —
+leaving a known falsehood in a Tier-1 document is worse than an unratified
+correction.
+
+No `src/` changes; B-109 stays untouched pending design sign-off per
+maintainer direction. Gate: **1197/1197, `GATE: PASSED`**.
+
 ## 2026-08 — Concept spine S2b: the level split, R8–R14, and two live violations
 
 **The register splits in two.** Some of what S2a called implementation

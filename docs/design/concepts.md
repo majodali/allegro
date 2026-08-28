@@ -85,7 +85,13 @@ check (b). The two are different and a model needs both.
 ## 1. Requirements
 
 > **Level: Requirement.** R1–R14, proposed 2026-08; awaiting ratification as
-> a **set** — individually plausible is not the bar, cohesion is (§4).
+> a **set** — individually plausible is not the bar, cohesion is.
+>
+> **The cohesion pass has now run (§6), and seven of the fourteen do not
+> survive as requirements.** Items it challenges are marked ⚠ inline. They are
+> left in place rather than rewritten: the set is unratified, §6 proposes, the
+> maintainer disposes. Three capabilities Allegro needs are enabled by nothing
+> here (§6.3) — candidates R15–R17.
 >
 > Each requirement carries a **subject**. This matters more than it looks:
 > R6 forbids Allegretto from knowing about the layers, so a requirement whose
@@ -95,7 +101,7 @@ check (b). The two are different and a model needs both.
 > "the base must propagate the type channel" come to look contradictory.
 
 ### R1 — Allegretto is the simplest base language that can carry Allegro
-*Subject: Allegretto.*
+*Subject: Allegretto.* ⚠ **§6.1 F5** — purpose + criterion; not falsifiable as stated.
 
 Allegretto is not a language anyone is meant to write programs in. Its
 purpose is to be the substrate Allegro Standard is *built on*, as an
@@ -116,7 +122,7 @@ a separate pass over a separate IR — it is evaluation that ran far enough to
 answer, and *discharge* is the same act as computing.
 
 ### R3 — Values carry metadata, and each channel is processed orthogonally
-*Subject: Allegretto.*
+*Subject: Allegretto.* ⚠ **§6.1 F4** — conflates a requirement with a specification choice.
 
 A value must be able to carry information *about* itself alongside the data
 it *is*. Each **channel** must be processed independently: adding one must
@@ -131,15 +137,22 @@ layer would have to know about the effect layer to avoid dropping its data.
 *Subject: Allegretto.*
 
 The evaluator has a rule for every value it can meet. An unresolved input
-produces a **residual**, never a failure to proceed. Failure is a value, not
-a control-flow escape.
+produces a **residual**, never a failure to proceed.
 
 *Rationale.* R2 depends on this completely. If evaluation could get stuck, a
 program could fail to compile because it could not be *run*, and the
 compile/run distinction Allegro dissolves would come back.
 
+*Scope — corrected at S2c.* This requirement is about **unresolved
+information**, not about errors. A first draft added "Failure is a value, not
+a control-flow escape"; that sentence was **false and never true** — L0/L1
+throws 117 times. It is struck rather than kept with a caveat, because a
+requirement that the code contradicts 117 times is not a requirement anybody
+is holding. The real split is CE-R8's and it is a *layer* decision: what
+halts and what yields an error value. See §6.2 C4.
+
 ### R5 — Metadata survives evaluation
-*Subject: Allegretto.*
+*Subject: Allegretto.* ⚠ **§6.2 C5** — weaker than it reads; needs sharpening.
 
 A channel attached before an operation is observable after it, per that
 channel's declared propagation rule. A channel that could be silently dropped
@@ -165,7 +178,7 @@ plane; it must not know that one channel is called `type`. That distinction
 is load-bearing, and §4.1 records that the code violates it today.
 
 ### R7 — Allegretto is replaceable
-*Subject: Allegretto (meta).*
+*Subject: Allegretto (meta).* ⚠ **§6.1 F1** — not a requirement; this is the sufficiency claim.
 
 Any implementation satisfying R1–R6 and R8–R14 supports Allegro. Allegretto
 may change at any time — host implementation (replatforming, bootstrapping
@@ -176,7 +189,7 @@ changes continue to support Allegro's design goals.
 to a requirement.** This is why §3 exists.
 
 ### R8 — There is one value universe
-*Subject: Allegretto. Derives from R4.*
+*Subject: Allegretto.* ⚠ **§6.1 F6** — the claimed derivation from R4 does not hold; R1+R9 does.
 
 Everything the evaluator can meet is a Value. There is no second category —
 no statement, declaration, or type that is not itself a value.
@@ -201,7 +214,7 @@ true of semantics and false of syntax, and Allegro's notation would be a
 kernel feature no other stack could have.
 
 ### R10 — Evaluation is resumable on new information
-*Subject: Allegretto. Generalises R2 over time.*
+*Subject: Allegretto.* ⚠ **§6.1 F7** — largely derived from R2 + R14.
 
 Information may arrive after evaluation has begun — a module load, an async
 result. When it does, whatever depended on it re-evaluates. A value may be
@@ -213,7 +226,7 @@ single pass and anything not known at that instant would be permanently
 residual.
 
 ### R11 — Propagation is declared, not coded
-*Subject: Allegretto. The R6-compatible form of R3.*
+*Subject: Allegretto.* ⚠ **§6.1 F2** — derived from R3 + R6 by its own text; belongs in §2.
 
 Each channel declares its propagation discipline from a **fixed vocabulary**
 the base defines. The base applies the declaration without knowing what the
@@ -242,7 +255,7 @@ carried by holding the closure that writes it.
 the base must not enumerate them. §4.2 records that it does today.
 
 ### R13 — Channels can carry mergeable information
-*Subject: Allegretto.*
+*Subject: Allegretto.* ⚠ **§6.1 F3** — a specification item on the propagation vocabulary.
 
 A channel's propagation may **combine** two values rather than replace one
 with the other, with the combination supplied by the channel's owner.
@@ -555,17 +568,11 @@ integrity at registration. **→ B-109.**
 
 Recorded so the absence is visible rather than implied.
 
-- **Cohesion has not been checked.** R1–R14 are individually plausible; the
-  bar for ratification is that they hold together as a **set**. Three
-  questions the check must answer: (1) is any requirement *derivable* from
-  the others, and therefore not a requirement (R8 already declares itself
-  derived from R4 — is R10 similarly derived from R2? is R11 from R3+R6?);
-  (2) does any pair conflict under some reachable design (§4 found two
-  apparent conflicts that turned out to be implementation violations — a
-  third might not); (3) is the set *sufficient* — can an Allegretto
-  satisfying all fourteen fail to carry Allegro? That last one is the only
-  falsification of the set as a whole, and it is answered by trying to name a
-  layer feature that nothing above enables. **→ S2c.**
+- ~~Cohesion has not been checked.~~ **Done at S2c — see §6.** All three
+  questions were answered and all three found something: seven requirements
+  do not survive as requirements (§6.1), two conflicts are real (§6.2), and
+  three needed capabilities are enabled by nothing (§6.3). The set now
+  awaiting ratification is **nine** requirements plus **three** candidates.
 - **The registers cover T0–T1 only.** T2–T5 choices — propagation rules,
   discharge tiers, the knowledge lattice, the module surface — are not yet
   registered as SC or IC. Some of the R8–R14 requirements added here have no
@@ -576,6 +583,78 @@ Recorded so the absence is visible rather than implied.
 - **R1–R14 are proposed, not ratified**, and §4's two findings are recorded
   as violations on the assumption that R6 and R12 survive ratification in
   their current form. If either is amended, both findings must be re-read.
+
+## 6. Cohesion of the requirement set
+
+> Run at S2c, per the method §5 stated. The bar for ratification is not that
+> each requirement is plausible — it is that they hold together as a **set**.
+> Fourteen were proposed; **seven** do not survive as requirements, **two**
+> conflicts are real, and **three** capabilities Allegro needs are enabled by
+> nothing above. Findings, not amendments: the set is unratified, so this
+> section proposes and the maintainer disposes.
+
+### 6.1 Derivability — is anything here not a requirement?
+
+A requirement that follows from other requirements is a **theorem**, and
+listing it as an axiom hides how few independent commitments there really
+are.
+
+| # | Finding |
+|---|---|
+| **F1** | **R7 is not a requirement.** "Any implementation satisfying the others supports Allegro" is not a constraint on Allegretto — it is the claim that the set is **sufficient**, which is §6.3's question. As a requirement it is unfalsifiable (nothing could violate it); as a sufficiency claim it is the most falsifiable statement in the document. **Move to §6.3.** |
+| **F2** | **R11 is derived from R3 + R6**, by its own text — it introduces itself as "the R6-compatible form of R3". Given that metadata must propagate orthogonally (R3) and the base may not know the layers (R6), a declared vocabulary applied to opaque payloads is the *only* construction that satisfies both. That makes it a **specification** item, not an axiom. |
+| **F3** | **R13 is a specification item on the propagation vocabulary.** "Channels can merge" is a statement about how rich the vocabulary must be, justified by concrete layer needs (effects union, knowledge meet) — a *sufficiency* argument for the vocabulary, not an independent commitment. |
+| **F4** | **R3 conflates two levels.** "Layer information must be associated with values and preserved through evaluation" is a requirement. "It rides **on** the value" is a specification choice, and there is a visible alternative: an occurrence-keyed side table. The alternatives test — the one this document is built on — says a statement with alternatives is not a requirement. R3 should split. |
+| **F5** | **R1 is a purpose plus a criterion, not a falsifiable requirement.** "Allegretto exists to carry Allegro" is the purpose; "as simple as possible" is a design criterion used to adjudicate trade-offs. Neither can be violated by an implementation, which is §0's own test for requirement-hood. It should be relabelled — it is the most useful sentence in the document and the least like a requirement. |
+| **F6** | **R8's claimed derivation does not hold.** It says it derives from R4, but R4 would apply perfectly well *per universe* if there were two. What actually forces one universe is R1 + R9: Allegro is built as an extension stack, and an extension cannot produce a language construct that is not a value. Either R8 is independent or it derives from elsewhere; as written it is derived from the wrong thing. |
+| **F7** | **R10 is largely derived.** "Information arrives later" is forced by R14 (separately-loadable units) — loading *is* late arrival — and R2 already says evaluation proceeds as far as inputs allow. What R10 adds beyond `R2 + R14` is only the *external* source (async I/O), which is a much narrower claim than the one stated. |
+
+**Net.** Fourteen proposed → **nine** survive as requirements (R2, R4, R5,
+R6, R9, R12, R14, plus the requirement halves of R1 and R3); four become
+specification items (R11, R13, and the spec halves of R3 and R10); one
+becomes the sufficiency claim (R7); one needs its derivation corrected (R8).
+
+That is a good outcome, not a bad one: **a smaller independent set is a
+stronger one**, and every item removed was removed by an argument that also
+tells you where it now lives.
+
+### 6.2 Pairwise conflict — does any pair fail together?
+
+| # | Pair | Verdict |
+|---|---|---|
+| **C1** | R1 vs R3 / R9 / R13 / R14 | **Tension by design, not conflict.** Every capability requirement pushes against minimality; R1 is the criterion that adjudicates. But a statement that can only ever be *traded against*, never violated, is not a requirement — which independently reaches F5. |
+| **C2** | R6 vs R11 | **Resolved** (§4.1). Layer-ignorant mechanism, layer-aware wiring. Implementation violation → B-109. |
+| **C3** | R6 vs R12 | **Resolved** (§4.2). Authority is the capability, not the name. Implementation violation → B-109. |
+| **C4** | R4 vs the implementation | **REAL — and R4 was wrong.** The first draft's "failure is a value, not a control-flow escape" is contradicted **117 times in L0/L1** alone: `primitives.ts` 99 throws, `evaluator.ts` 11, `slots.ts` 5, `scope.ts` 2, against **2** error-value constructions. Corrected in place rather than caveated. The genuine requirement is narrower — evaluation never gets *stuck on unresolved information* — and what halts versus what yields an error value is CE-R8's, a **layer** decision the base has no view on. Recording the shape of the error: an over-broad requirement written from what sounded principled rather than from what the code does, which is exactly the failure mode §3's implementation-first rule exists to prevent, occurring in the one part of the document that had no *As implemented* row to fill in. **Part 0 needs that row too.** |
+| **C5** | R5 vs `drop` channels | **R5 is weaker than it reads.** "Survives per its declared rule" is nearly vacuous, since `drop` is a declared rule under which nothing survives. The requirement worth having is about **non-interference**: no operation may drop a channel it does not know about, whatever that channel's rule. Sharpen. |
+
+### 6.3 Sufficiency — can something satisfy all of these and still fail?
+
+The only falsification of the set as a whole, tested by naming Allegro
+features and asking what enables them. **Three gaps.**
+
+| # | Gap | Evidence |
+|---|---|---|
+| **S1** | **Program-level aggregation is enabled by nothing.** Every requirement above is per-value or per-evaluation. But `Verdict`, the assumption ledger, `CompilationReport` and `Notification` are **whole-program** artifacts: they aggregate across a compilation and are the surface on which "nothing is silently trusted" is actually delivered. An Allegretto satisfying R1–R14 could carry per-value metadata perfectly and give Allegro nowhere to accumulate a verdict. **Candidate R15.** |
+| **S2** | **Determinism is required and unstated.** PE-as-compilation needs same source ⇒ same residual; without it, a build is not reproducible and a discharged proof is not re-checkable. Nothing above says evaluation must be deterministic, and R10 (resumability) actively introduces ordering — the B-028 arc hit precisely this as an *arrival-order non-confluence* bug. **Candidate R16.** |
+| **S3** | **The host boundary is unstated.** Primitives perform I/O and call the host; that is what `PrimitiveFunction` is for and where every effect label originates. R9 covers the *syntax* surface; nothing covers the *capability* surface. SC-1 specifies the kind without a requirement above it — an orphan by §0's own rule. **Candidate R17.** |
+
+S1 and S2 are the load-bearing ones. S2 in particular is the requirement the
+codebase has *already been bitten by* and never wrote down.
+
+### 6.4 What this pass says about the method
+
+The cohesion check found more than the per-entry Delta check did, and found a
+different *kind* of thing: the Delta check compares a statement to the code,
+while cohesion compares statements to each other. **A model needs both, and
+they fail differently.** C4 is the case in point — it was found by comparing
+R4 to the code (a Delta-shaped check) only because the cohesion pass thought
+to look, since Part 0 has no *As implemented* row.
+
+**Proposed method amendment**, for the methodology delta: requirements carry
+an *As implemented* row like every other entry. A requirement nothing in the
+code answers to is either aspirational or wrong, and there is no way to tell
+which without looking.
 
 ---
 

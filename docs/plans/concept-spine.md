@@ -1,7 +1,7 @@
 # Concept spine — define Allegro, then make the code say it
 
 > Status: **active** — ratified 2026-08 (§6 rulings 1–3; ruling 4
-> deliberately HELD as a delta for S3). **S1 + S2a + S2b landed**; S2c (cohesion) next.
+> deliberately HELD as a delta for S3). **S1 + S2a + S2b + S2c landed**; S2 (T2 planes) next.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -186,7 +186,7 @@ being written to justify a rename already in flight.
 | **S1** | ~~Spine skeleton + entry format + T0/T1~~ **DONE 2026-08** — `docs/design/concepts.md`, 17 entries, **9 deltas** raised (→ B-107, and three routed to T2). The format survives its own test: it produced defect reports on the tier we understand best, including one the ordering constraint forced into the open (carrier ↔ data plane are mutually referential in prose; broken by defining the carrier structurally and the data plane as the accessor over it) |
 | **S2a** | ~~Part 0 · Foundations~~ **DONE 2026-08** (maintainer direction) — the requirement/specification/implementation stratification + the alternatives test + two-way traceability; requirements **R1–R7** (three from the maintainer, four surfaced here); the **implementation-choice register IC-1…IC-7** with alternatives, criterion and revisit trigger; every T0–T1 entry level-tagged. Finding: **4 of 17 entries were Implementation written as Specification**. Raised **B-108** (composite review) and the methodology proposal `conceptual-model-methodology-delta.md` |
 | **S2b** | ~~Level split + requirement completion~~ **DONE 2026-08** — specification choices (SC-1…SC-6) separated from implementation choices (IC-1…IC-6) per maintainer ruling; **R8–R14** added; requirements gained a **subject**, which relocated *discharge* and the *knowledge lattice* to Allegro with weaker base counterparts; both standing objections (propagation vs R6, integrity vs externalisation) answered and found to be **implementation violations** → **B-109**. Cohesion explicitly deferred with a stated method |
-| **S2c** | Requirement-set cohesion: derivability, pairwise conflict, and sufficiency. The last is the only falsification of the set as a whole |
+| **S2c** | ~~Requirement-set cohesion~~ **DONE 2026-08** — all three checks found something. **7 of 14** requirements do not survive as requirements (derived, conflated, or not requirements at all); **2** real conflicts, including R4 stating something the base contradicts 117 times; **3** capabilities Allegro needs that nothing enables (candidates R15–R17: program-level aggregation, determinism, the host boundary). Two method amendments fed back into the methodology proposal |
 | **S2** | T2 planes + T3 evaluation. The planes tier is the highest-value entry in the document |
 | **S3** | T4 types. Expect the most deltas here, and the `~Interface` definition |
 | **S4** | T5 obligations. Mostly reconciliation — the R-series rulings already carry rationale, so this is largely relocation and delta-hunting |
