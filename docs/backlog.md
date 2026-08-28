@@ -1055,7 +1055,26 @@ that prevents it.
     and it is therefore the ENTIRE remaining job of `isMetaSlotKey`:
     hiding one derived slot from field walks. Whatever replaces the
     partition needs to handle exactly this case and nothing else
-  - **(g) `__interface` — NOT the same shape as `__union`.** The audit
+  - **(g) `__interface` — RESOLVED at concept-spine S3 (`concepts.md` §36).**
+    Specified, not open. The definition — an interface is a **declaration-only
+    type**, and `InterfaceKind` is literally `Type` refined by *"has no
+    `construct`"* — makes the answer derivable rather than asserted: the
+    marker does **two jobs with one bit**. `applyBoundaryBound` reads it for
+    *is this an interface?*; `shapeAwareSubtypeof` reads it for *is this in
+    the loose base-name world?*; `structuralWrap` erases the marker AND the
+    name together, so one erasure answers both — but the facts are
+    orthogonal. `~Printable` has no construct (interfaces have none to copy),
+    so it satisfies InterfaceKind's own predicate: it IS an interface and it
+    is ALSO loose, as the maintainer ruled. The change: drop the marker check
+    in `shapeAwareSubtypeof` (measured 0-decisive — 42 interface encounters,
+    none where it changed the outcome, because the name check beside it
+    already carries the loose-world meaning); read the meta-type in
+    `applyBoundaryBound` (a behaviour change, and a FIX — that path has ZERO
+    suite coverage, so tests land first); leave `structuralWrap` alone
+    (**retracting** the meta-type re-stamp proposed before the definition
+    existed — anonymity already carries the loose-world signal); delete
+    `__interface`. Original finding follows.
+  - **(g-orig) `__interface` — NOT the same shape as `__union`.** The audit
     grouped them as pure presence-markers and the ratification covered
     both. On implementation the two diverge: `__union` was redundant with
     a kind, but `__interface` carries a distinction the meta-type does
@@ -1357,3 +1376,12 @@ that prevents it.
   matter. This is candidate **R16** (determinism) with no specification item
   and no test that would catch a recurrence. Needs: the property stated, then
   either a construction that guarantees it or a test that samples orders
+
+- [ ] **B-115** · L2 · **Law backings ride two carriers.** Raised by the
+  concept spine (S3, `concepts.md` §39). A proof's OWN rule backing is a set
+  of plain data bindings (`equality`, `lawName`, `lawTier` — the E-R6
+  fields, dispatched as `p.lawTier`); the TRANSITIVE backing set the
+  assumption ledger aggregates is a host-plane property (`lawBackings`, via
+  `stampBackings`/`backingsOf`). Two carriers for one concept, split by
+  aggregation depth rather than by meaning, and nothing tells a reader which
+  to use. Either unify them or state the rule

@@ -5,8 +5,8 @@
 > (`allegretto/structures.md`, `standard/type-system.md`, …) are where the
 > deep treatment lives; this is what makes them legible.
 >
-> Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T3 written**
-> (S1, S2a–S2f); T4–T5 pending. Status tags per `README.md`.
+> Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T4 written**
+> (S1, S2a–S2f, S3); T5 pending. Status tags per `README.md`.
 >
 > **Start at Part 0.** It separates *requirement* from *specification* from
 > *implementation*, which is the distinction whose absence caused most of the
@@ -1071,8 +1071,15 @@ that documents its own obsolescence is a rename that stopped halfway.
 
 **Definition.** The *data plane* of a value is the value it ultimately
 denotes, ignoring anything carried alongside. For every value except a
-carrier that is the value itself; for a carrier it is the primary. Reading it
-is `dataOf`, and it is the **only** sanctioned way to ask what a value *is*.
+carrier that is the value itself; for a carrier it is the primary.
+
+It has **two consumers with different interfaces**, and conflating them is a
+mistake worth naming. From **inside the language** — Allegretto or Allegro
+code — a value simply *is* its data: the carrier is invisible, which is
+exactly what D46's *transparent* carrier means, and there is no accessor to
+call. From **the host** — the interpreter reaching into a value it is
+implementing — the carrier is visible, and `dataOf` is the only sanctioned
+way to see past it.
 
 **Rationale.** Ordering note — this entry and §10 are mutually referential in
 prose (a carrier is defined by having a data plane; the data plane is defined
@@ -1086,7 +1093,8 @@ is what keeps channels intact across a call: a primitive that unwrapped its
 arguments would silently drop every channel they carry.
 
 **As implemented.** `dataOf(v)` in `src/types.ts` — one property read,
-re-exported from `src/slots.ts` as the accessor call sites use.
+re-exported from `src/slots.ts`. It is a **host function**; nothing in
+Allegretto or Allegro calls it, and nothing should.
 
 **Delta.** —
 
@@ -1516,14 +1524,30 @@ one the code currently bypasses.
 
 | Plane | Consumer | Interface | Producer | Interface |
 |---|---|---|---|---|
-| **Data** | anyone | `dataOf(v)` | construction | the representation constructors |
+| **Data** | Allegretto / Allegro code | **none** — a value *is* its data; the carrier is transparent (D46) | construction | the representation constructors |
+| **Data** | the host | `dataOf(v)` — the only sanctioned way to see past a carrier | the host | the representation constructors |
 | **Binding** | user code | member dispatch | construction | `makeStructure` + the binding writers |
-| **Binding** | engine (meta slots) | `src/slots.ts` accessors | kernel | the same accessors ⚠ *four write disciplines, §13* |
+| **Binding** | engine (meta slots) | `src/slots.ts` accessors | kernel | the same accessors ⚠ *four write disciplines, §13; and see the disposition note below* |
 | **Metadata** | anyone | `channelReadRaw(v, field)` — free (D23) | field owner | the writer closure from registration |
 | **Metadata** | the evaluator | the propagation table: `channelSpec(f)?.rule`, `viralChannels()`, `channelMerge(f)` | — | — |
 | **Metadata** | user-reachable construction | refused unless the writer is held (`assertNotIntegrityKey`) | — | — ⚠ *enforced by name list, §21* |
 | **Host** | the host only | direct field access | the host | direct field access ⚠ *declared on the value interface, §18* |
 | **Layer → base** | the base, for semantics it must not know | **install**, never import | the layer | `installChannelMerge` and hooks like it ⚠ *27 upward imports, §23* |
+
+**Disposition of the engine/meta-slot row.** It does **not** disappear when
+`__length` does. `__length` is the last key the *partition test* fires on
+(§22), so removing it retires `isMetaSlotKey` — but the *interface* is the
+accessor layer over engine-owned bindings, and that persists as long as such
+bindings exist.
+
+It should nonetheless **shrink to zero**, and D39 already says how:
+**14** registered slots are dispositioned as declared **members**. The proof
+fields are the precedent and are already executed — `proposition`, `lhs`,
+`rhs`, `reason`, `counterexample` are plain-named, engine-written and
+user-visible, which puts them on the *ordinary* binding interface rather than
+a privileged one. As the remaining 14 follow, this row dissolves into the row
+above it and the concept "engine meta slot" stops existing. That is the end
+state; the ⚠ is a defect in the interface meanwhile, independent of it.
 
 **The last row is the one that matters.** It is the only interface in the
 table that is not yet a mechanism — `installChannelMerge` is one instance of
@@ -1688,7 +1712,269 @@ other form: not an import into the evaluator, but layer stages hardcoded into
 the base's stage list. A layer should *register* a post-pass. Same root, same
 fix shape (§24). **→ B-110** (scope note).
 
-## Deltas raised in T0–T3
+---
+
+# T4 · Types
+
+Where Allegro Standard begins. Everything here is built **on** T0–T3 and
+none of it is known to the base — or should not be (§23).
+
+## 30. Type
+
+> **Level: Specification** — satisfies R2, R3′. *L2 concept; the base knows
+> only the metadata field it rides on.*
+
+**Definition.** A *type* is a value that constrains other values. It is an
+ordinary Structure (§9) whose bindings are engine-owned slots — a name, a
+member set, optionally a constructor, a refinement parent, a predicate. A
+value carries its type in the `type` **field** of the metadata plane, which
+is why a type can be attached to anything without changing its kind.
+
+**Rationale.** Types being values is what makes the type system an extension
+rather than a privileged layer (R1, R6): `Type.define` is an ordinary call
+returning an ordinary value. It is also what makes PE-as-discharge possible
+(R2) — a type check is an evaluation, not a separate pass.
+
+**As implemented.** `src/types-std.ts`; type Contexts built by `makeContext`
+plus the `src/slots.ts` writers; `getType(v)` is `channelReadRaw(v, "type")`
+with a kind check.
+
+**Delta.** The **type Context namespace is closed** — a user field named
+`name` is routed into `__members` under an FQN key and never lands beside
+`__name` — but nothing states or enforces that. It is the property S1
+measured and the reason the dunder partition was unnecessary; it deserves to
+be an invariant rather than an accident. **→ B-107.**
+
+## 31. Kind and meta-type
+
+> **Level: Specification** — satisfies R2.
+
+**Definition.** A type is itself a value, so it too carries a `type` field.
+That field's value is its **meta-type**, and a meta-type that other types are
+instances *of* is a **kind**: `Type`, `Refinement`, `Interface`,
+`GenericType`, `Effect`, `Proof`. `Type` is its own meta-type — the tower
+bottoms out by self-reference rather than by a special case.
+
+**Rationale.** Uniformity: "what is this?" is one question with one mechanism
+at every level, which is what lets `instanceof` work on a type as readily as
+on a number. Self-typing avoids a privileged root that would need its own
+rules.
+
+**As implemented.** `writeShape(Type, Type)` at module init in
+`src/types-std.ts`; `isTypeMeta` recognises a kind in the Type tower.
+
+**Delta.** — 
+
+## 32. Shape
+
+> **Level: Specification** — satisfies R2. **Distinct from §34.**
+
+**Definition.** The *shape* of a value is what runtime dispatch uses: its
+type with **member-transparent refinement layers walked off**. A refinement
+layer is member-transparent when it carries a predicate and shares its
+parent's member set by reference; layers that mint their own members
+(`preserveOps`, `mixin`, `extend`) are shapes in their own right, because
+their overrides must run.
+
+**Rationale.** Dispatch is virtual on the actual shape so overrides run
+(Liskov). Refinements are *knowledge*, not different behaviour —
+`PositiveInt(5)` dispatches exactly as `5` does — so walking transparent
+layers off is what keeps knowledge from changing which code executes.
+
+**As implemented.** `typeShape(t)` in `src/slots.ts`, walking `__refines`
+while `__members` is the same object. `shape` is registered as a metadata
+field but stores nothing — it is a **projection** of `type` (§19b).
+
+**Delta.** The projection is hardcoded in `channelReadRaw` rather than
+installed by the typing channel. **→ B-112(c).**
+
+## 33. Member and member symbol
+
+> **Level: Specification** — satisfies R6, R14. Choice: **SC-4**.
+
+**Definition.** A *member* is a named capability a type provides — a field, a
+method, or a law. Members are keyed not by their spelling but by an interned
+**member symbol** with a fully-qualified name, so two types may each declare
+`size` without either conforming to the other. **Conformance is symbol
+membership**: a type conforms to another when it holds that type's member
+symbols, which it obtains by *drawing* them.
+
+**Rationale.** D44 dissolved declared inheritance into conformance (drawing
+symbols) + refinement + composition. Making conformance an identity question
+rather than a spelling one is what removes the name-collision false positive
+the nominal chain-walk used to produce.
+
+**As implemented.** `__members` is a Context keyed by member FQN;
+`memberBindingByName` projects a base name through the kernel scope;
+`typeMethod` resolves.
+
+**Delta.** — 
+
+## 34. Knowledge
+
+> **Level: Specification** — satisfies R2, R3′. **Distinct from §32.**
+
+**Definition.** *Knowledge* is everything established **about** a value that
+does not change what it is: an imputed refinement bound, abstract domains,
+predicate sets. One monotonic lattice, with two carriers — **intrinsic**
+(certified at construction, rides the value) and **occurrence** (flow-derived,
+in the scope facts plane) — meeting at each use. Knowledge is the **static
+gate** that lets PE resolve a call at compile time; shape is what dispatches
+at run time.
+
+**Rationale.** The split (D36) is why an annotation can *narrow* without
+changing behaviour: `x: Animal` over a Dog hides Dog's members from that
+occurrence while the Dog's own methods still run. Fusing the two would make
+every annotation a coercion.
+
+**As implemented.** `knowledgeOf(v)` in `src/refinements.ts` — reads the
+stored `type` field, derives the bound by comparing it to `typeShape`, adds
+`predicatesOf(v)` and the occurrence bound.
+
+**Delta.** `knowledge` is registered as a metadata field but **nothing ever
+stores one** — it is a channel (capability) whose storage is three other
+fields plus the refinement layers (§19b). The registry cannot express that.
+**→ B-111.**
+
+## 35. Refinement
+
+> **Level: Specification** — satisfies R2.
+
+**Definition.** A *refinement* is a type plus a predicate: `Int & _ > 0`. It
+shares its parent's member set (making it member-transparent, §32), carries
+the predicate, and optionally an **abstract domain** — a compile-time
+summary the evaluator can reason with instead of re-running the predicate.
+
+**Rationale.** This is where "types are predicates" stops being a slogan: a
+refinement literally *is* the parent's constraint conjoined with one more,
+and PE discharges it by evaluating the predicate against what it knows.
+
+**As implemented.** `buildRefinedType` in `src/types-std.ts`;
+`domainFromPredicate` recognises algebraic shapes;
+`RefinementKind = buildRefinedType(Type, declarationOnlyPredicate)`.
+
+**Delta.** — 
+
+## 36. Interface
+
+> **Level: Specification** — satisfies R6, R14. **Resolves B-104(g).**
+
+**Definition.** An *interface* is a **declaration-only type**: one that
+declares members and provides no construction. That is its whole content —
+`InterfaceKind` is literally `Type` refined by the predicate *"has no
+`construct`"*. Conformance to an interface is ordinary symbol membership
+(§33); there is no declared is-a edge.
+
+**Rationale.** Declaration-only is a *property of the type*, checkable, not a
+flag someone sets. Making the kind's predicate the definition means
+"is this an interface?" has one answer with one mechanism.
+
+**As implemented.** `InterfaceKind = buildRefinedType(Type,
+declarationOnlyPredicate)` where the predicate is `getConstruct(t) ===
+undefined`; `Interface.define` builds the type, stamps meta `InterfaceKind`,
+**and additionally sets a `__interface` marker binding**.
+
+**Delta — and the definition settles it.** The marker is doing **two jobs
+with one bit**, which is why its two readers disagree:
+
+| Reader | What it wants from the bit | Correct source |
+|---|---|---|
+| `applyBoundaryBound` | *is this an interface?* | the meta-type — `InterfaceKind` |
+| `shapeAwareSubtypeof` | *is this in the LOOSE, base-name world?* | **anonymity** — no name |
+
+`structuralWrap` erases the marker **and** the name together, so `~Printable`
+reads as "not an interface" to the first and "loose" to the second, from one
+erasure. But those are **orthogonal facts**. `~Printable` has no construct —
+interfaces have none to copy — so it *satisfies `InterfaceKind`'s own
+predicate*. It **is** an interface, and it is *also* in the loose world.
+(Maintainer ruling, 2026-08, now derivable from the definition rather than
+asserted.)
+
+So the resolution is to stop conflating them:
+
+- **`shapeAwareSubtypeof`** — drop the marker check. The name check beside it
+  already carries the loose-world meaning, which is why the marker was
+  measured **0-decisive** there: 42 interface encounters across the suite,
+  none where the marker changed the outcome.
+- **`applyBoundaryBound`** — read the meta-type. `~Printable` becomes an
+  interface here, which is the behaviour change, and per the definition it is
+  a **fix**. That path has **zero suite coverage** (0 hits in 1197 tests;
+  fires immediately on a written case), so coverage lands first.
+- **`structuralWrap`** — nothing to erase; it already erases the name, which
+  is the loose-world signal, and it should *not* re-stamp the meta-type.
+  (This retracts the re-stamp I proposed before the definition existed.)
+- **`__interface` is deleted.**
+
+**→ B-104(g)**, now specified rather than open.
+
+## 37. Generic
+
+> **Level: Specification** — satisfies R2.
+
+**Definition.** A *generic* is a type constructor: a type parameterised over
+other types, applied to yield a concrete type. `GenericType` is the kind of
+such constructors — the flag *is* the kind (D39), there is no `__isGeneric`.
+An applied concrete records its arguments and a back-link to its generic.
+
+**Rationale.** Application is ordinary evaluation (R2), so a generic is a
+function over types and instantiation is a call — no separate mechanism.
+
+**As implemented.** `applyGenericType`, `isGenericType`; `genericParams` on
+the underlying ComposedFunction; `__args`/`__generic` on applied concretes.
+
+**Delta.** `__args` and `__generic` are host-read instance data with **no
+language surface** — deferred consciously at C7.2 ruling R1, still deferred.
+Recorded so the deferral stays visible. **→ B-107.**
+
+## 38. Identity: distinct, structural wrap, equality shape
+
+> **Level: Specification** — satisfies R2. Choice: **SC-4**.
+
+**Definition.** Three operations on identity rather than on structure:
+
+- **`distinct`** mints *fresh member symbols*, so a newtype does not conform
+  to its parent — non-conformance falls out of membership, with no is-a edge
+  to break.
+- **structural wrap (`~T`)** erases the name, projecting the type into the
+  **loose** world where matching is by base name rather than declared symbol
+  identity. Orthogonal to what kind the type is (§36).
+- **equality shape** walks the *full* refinement chain to the representation
+  root — further than dispatch shape (§32) — because refinements are
+  knowledge and never separate equal values: `PositiveInt(5) == 5`.
+  `distinct` mints no refines edge, so it stays its own equality shape.
+
+**Rationale.** Each is a different question about sameness — conformance,
+matching, equality — and each gets its own walk. Collapsing them is what
+produced the `~Printable` confusion (§36).
+
+**As implemented.** `buildDistinctType`, `structuralWrap`, `equalityShape` in
+`src/slots.ts`.
+
+**Delta.** — 
+
+## 39. Law and coercion
+
+> **Level: Specification** — satisfies R2; Allegro-side of R12.
+
+**Definition.** A *law* is a proposition declared as a member, discharged at a
+recorded **tier** (proved / sampled / admitted). A *coercion* is a declared
+conversion between equality shapes; without one, values of different
+equality shapes are simply unequal rather than convertible.
+
+**Rationale.** Both are the "nothing is silently trusted" surface: a law that
+cannot be proved is admitted *visibly*, with its tier in the ledger, rather
+than assumed.
+
+**As implemented.** `law_`-prefixed spec entries become Law descriptors;
+`stampLawBacking` and `backingsOf` carry the transitive backing set;
+E-R1–E-R6 in `equality-and-laws.md`.
+
+**Delta.** The transitive backing set rides a **host-plane property**
+(`lawBackings`) while the per-proof backing is a data binding — two carriers
+for one concept, split by aggregation depth rather than by meaning. Nothing
+says which a reader should use. **→ B-115.**
+
+## Deltas raised in T0–T4
 
 | # | Delta | Owner |
 |---|---|---|
@@ -1711,11 +1997,50 @@ fix shape (§24). **→ B-110** (scope note).
 | 27 | The TailCall forwarding obligation is convention-enforced; a wrapper that forgets is a silent cliff | B-113 |
 | 28 | Completion confluence is not guaranteed by construction — the B-028 arrival-order bug was fixed, not precluded | B-114 |
 | 29 | L2 post-passes are hardcoded into the base pipeline — §23's violation in its other form | B-110 |
+| 30 | The type-Context namespace is closed by construction but nothing states or enforces it | B-107 |
+| 32 | The `shape` projection is hardcoded in `channelReadRaw` rather than installed | B-112(c) |
+| 34 | `knowledge` is a registered field that nothing ever stores — a channel, not a field | B-111 |
+| 36 | **`__interface` does two jobs with one bit**; its two readers want different facts | B-104(g) — now specified |
+| 37 | `__args` / `__generic` are host-read with no language surface, deferred since C7.2 | B-107 |
+| 39 | Law backings ride two carriers split by aggregation depth, not by meaning | B-115 |
 
 Nine deltas across seventeen entries, on the tier we understand best. Six of
 the nine are naming or documentation lag; three (7, 15, 17) are the same
 underlying gap — **the planes are real and undeclared** — which is what T2
 exists to fix and why it is the highest-value tier in this document.
+
+### What T4 added (S3)
+
+Six deltas, and one of them is a *resolution* rather than a finding — which
+is what the tier was for.
+
+**§36 settles `~Printable` by defining "interface" precisely enough for the
+question to have an answer**, which is exactly what the plan predicted would
+be needed. `InterfaceKind` is literally `Type` refined by *"has no
+`construct`"*, so declaration-only is a checkable property of the type rather
+than a flag. From that definition the conflict dissolves: the `__interface`
+marker is doing **two jobs with one bit** — `applyBoundaryBound` reads it for
+*is this an interface?* and `shapeAwareSubtypeof` reads it for *is this in
+the loose, base-name world?* — and `structuralWrap` erases the marker and the
+name together, so one erasure answers both. The facts are orthogonal.
+`~Printable` has no construct (interfaces have none to copy), so it satisfies
+`InterfaceKind`'s own predicate: it **is** an interface, *and* it is loose.
+
+The maintainer ruled this months of reasoning ago; the value of the tier is
+that it is now **derivable from the definition** instead of asserted, and the
+derivation says exactly what changes — drop the marker check in
+`shapeAwareSubtypeof` (measured 0-decisive: 42 encounters, none decisive),
+read the meta-type in `applyBoundaryBound`, and delete the marker. It also
+**retracts** the `structuralWrap` re-stamp proposed before the definition
+existed: there is nothing to re-stamp, since anonymity already carries the
+loose-world signal.
+
+**§32 vs §34 is the ordering constraint's second real catch.** Shape and
+knowledge cannot be defined in terms of each other, and the plan predicted
+the dependency ladder would strain here. It held: shape is *what dispatches*,
+knowledge is *what is established about a value*, and both read the same
+stored `type` field — the split is two computations over one storage, exactly
+as the chunk-3 work found for `shape`/`type`.
 
 ### What T3 and the interfaces added (S2f)
 

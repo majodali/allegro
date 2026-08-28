@@ -4,6 +4,78 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S3: T4 types, and `~Printable` follows from a definition
+
+Ten entries — type, kind and meta-type, shape, member and member symbol,
+knowledge, refinement, **interface**, generic, identity, law and coercion —
+plus two maintainer corrections.
+
+**§36 resolves B-104(g) by defining "interface" precisely enough that the
+question has an answer.** That is what the plan predicted this tier would be
+for, and it worked: `InterfaceKind` is literally `Type` refined by the
+predicate *"has no `construct`"*, so declaration-only is a **checkable
+property of the type**, not a flag someone sets.
+
+From that, the conflict dissolves. The `__interface` marker is doing **two
+jobs with one bit**: `applyBoundaryBound` reads it for *is this an
+interface?*, `shapeAwareSubtypeof` reads it for *is this in the loose,
+base-name world?*, and `structuralWrap` erases the marker **and** the name
+together — so one erasure answers both questions. The facts are
+**orthogonal**. `~Printable` has no construct (interfaces have none to copy),
+so it satisfies `InterfaceKind`'s own predicate: it **is** an interface, and
+it is **also** loose.
+
+The maintainer ruled that months ago. What the tier adds is that it is now
+**derivable** rather than asserted, and the derivation names exactly what
+changes: drop the marker check in `shapeAwareSubtypeof` (measured
+**0-decisive** — 42 interface encounters across the suite, none where it
+changed the outcome, because the name check beside it already carries the
+loose-world meaning); read the meta-type in `applyBoundaryBound` (a behaviour
+change, and a **fix** — that path has zero suite coverage, so tests land
+first); delete the marker. It also **retracts** the `structuralWrap`
+re-stamp I proposed before the definition existed — there is nothing to
+re-stamp, since anonymity already carries the loose-world signal.
+
+**Two maintainer corrections, both of which changed entries.**
+
+*`dataOf` is a host function.* §11 had it as "the only sanctioned way to ask
+what a value is" for everyone. Wrong: the data plane has **two consumers with
+different interfaces**. From inside Allegretto or Allegro a value simply *is*
+its data — the carrier is invisible, which is exactly what D46's
+*transparent* carrier means, and there is no accessor to call. `dataOf` is
+the **host's** interface, for the interpreter reaching into a value it is
+implementing. §24's interface table now has two data rows.
+
+*The engine/meta-slot interface row.* Asked whether it disappears once
+`__length` goes: **no.** `__length` is the last key the partition test fires
+on, so removing it retires `isMetaSlotKey` — but the *interface* is the
+accessor layer over engine-owned bindings, which persists while such bindings
+exist. It should nonetheless shrink to zero, and D39 already says how: **14**
+registered slots are dispositioned as declared members, and the proof fields
+are the executed precedent — `proposition`, `lhs`, `rhs` are plain-named,
+engine-written and user-visible, which puts them on the *ordinary* binding
+interface. As the remaining 14 follow, the row dissolves and "engine meta
+slot" stops being a concept.
+
+**Five more deltas**: the type-Context namespace is closed by construction
+but nothing states or enforces it (B-107); the `shape` projection is
+hardcoded in `channelReadRaw` rather than installed (B-112(c)); `knowledge`
+is a registered field nothing ever stores — a channel, not a field (B-111);
+`__args`/`__generic` are host-read with no language surface, deferred since
+C7.2 and still deferred (B-107); and **law backings ride two carriers** — the
+per-proof backing is a data binding while the transitive set the ledger
+aggregates is a host-plane property, split by aggregation depth rather than
+by meaning, with nothing telling a reader which to use (**B-115**).
+
+**The ordering constraint caught its second real thing.** §32 (shape) and
+§34 (knowledge) cannot be defined in terms of each other, and the plan
+predicted the ladder would strain around here. It held: shape is *what
+dispatches*, knowledge is *what is established about a value*, and both read
+the same stored `type` field — two computations over one storage, the same
+structure the chunk-3 work found for `shape`/`type`.
+
+No `src/` changes. Gate: **1197/1197, `GATE: PASSED`**.
+
 ## 2026-08 — Concept spine S2f: metadata/field/channel, plane interfaces, T3
 
 Three maintainer items and the T3 tier.

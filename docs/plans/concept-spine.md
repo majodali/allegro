@@ -1,7 +1,7 @@
 # Concept spine — define Allegro, then make the code say it
 
 > Status: **active** — ratified 2026-08 (§6 rulings 1–3; ruling 4
-> deliberately HELD as a delta for S3). **S1 + S2a–S2f landed**; S3 (T4 types) next.
+> deliberately HELD as a delta for S3). **S1 + S2a–S2f + S3 landed**; S4 (T5 obligations) next.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -231,7 +231,7 @@ being written to justify a rename already in flight.
 | **S2d** | ~~Abort classification + metadata merge~~ **DONE 2026-08** (maintainer corrections) — S2c's "R4 was over-broad" **overturned**: inconsistency is not evidence of a different requirement. Every base abort classified into six classes → candidates **R18/R19/R20**; one class is **rework**, not specification — the L0 evaluator implements L2 type checking (27 upward imports; `checkArgType` in `evaluator.ts`) → **B-110**. R3/R5/R11/R13 merged into **R3′** (non-interference); the fixed propagation vocabulary kept as **SC-7** because R12 is enforceable only over inspectable rules |
 | **S2e** | ~~T2 planes~~ **DONE 2026-08**, absorbing **B-110** per maintainer ruling — the four planes and the placement rule, channel, propagation (SC-7), writer capability, meta slot, and **§23 the layer boundary**. Six deltas. S1's "three entries are the same undeclared-plane gap" becomes four named defects plus the L0→L2 dependency, which is not a new problem but §18's rule unapplied to one subsystem |
 | **S2f** | ~~T3 evaluation~~ **DONE 2026-08** — PE Rules 1/2, resolved/residual, tail calls, future cells and completion, the `evalSource` pipeline. Plus two maintainer items: the **metadata / field / channel** terminology (§19/§19b — which immediately exposed that the registry holds five different kinds of thing under one word, → B-111) and **plane interfaces elevated to a first-class entry** (§24 — four hooks owed, → B-112). T3's own finding: §29, the L2 post-passes are hardcoded into the base pipeline — §23's violation in its other form |
-| **S3** | T4 types. Expect the most deltas here, and the `~Interface` definition |
+| **S3** | ~~T4 types~~ **DONE 2026-08** — type, kind/meta-type, shape, member+symbol, knowledge, refinement, **interface**, generic, identity (distinct / structural wrap / equality shape), law+coercion. Six deltas, one of them a **resolution**: §36 defines "interface" precisely enough that `~Printable` follows from the definition rather than being ruled, and the derivation names exactly what changes → **B-104(g) specified**. Also caught the two maintainer corrections: `dataOf` is a HOST interface (Allegro code has none — a value *is* its data), and the engine/meta-slot interface row does not vanish with `__length` but should shrink to zero as D39's 14 member-dispositioned slots land |
 | **S4** | T5 obligations. Mostly reconciliation — the R-series rulings already carry rationale, so this is largely relocation and delta-hunting |
 | **S5** | Delta triage: every delta from S1–S4 becomes a backlog item, ordered. This is the code campaign's plan, produced as evidence rather than guessed |
 | **C1…Cn** | The code campaign itself, one chunk per delta cluster, gated normally |
