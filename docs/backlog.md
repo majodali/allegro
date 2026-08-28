@@ -1161,3 +1161,47 @@ that prevents it.
     distinction is asserted in prose and contradicted by the declaration.
     **Blocked on T2 §9** — the fix is to declare the planes first, so this
     waits for the spine rather than being guessed at
+
+- [ ] **B-108** · L0 · `[reval]` **Review the Allegretto composite —
+  IC-2 / IC-3 / IC-4 together.** Raised by the concept spine (S2a) at
+  maintainer direction; the three choices interact and cannot be judged
+  separately. The question is not "is the current design wrong" — the suite
+  says it works — it is **how much of the implementation is visible from the
+  specification**, which is the R7 criterion nobody applied when these were
+  taken.
+  - **The measurement.** `Structure` declares **11** fields in **4**
+    role-groups (carrier, record, dense, scope) plus 2 universal, and role is
+    read by field PRESENCE at **146** sites (`.primary` 67, `.dense` 21,
+    `.components` 20, `isCarrier` 14, `isScope` 13, `isDense` 6,
+    `viewMaterialized` 5), through 3 constructors. Representations went
+    2 → 1; configurations went 2 → 4; the variation moved from an explicit
+    kind tag to implicit field presence
+  - **The recorded rationale was never simplification.** `structures.md` I1
+    gives the payoff as "known type ⇒ known shape ⇒ slot access compiles to
+    offsets (feeds codegen)" — future codegen — and the class comment gives
+    "so every structure shares a single hidden class" — present V8. Both are
+    performance arguments. The unification was read as a conceptual
+    simplification because requirement / specification / implementation were
+    not separated; that separation now exists (concepts.md Part 0)
+  - **Options carried in `concepts.md` IC-3**: A map-first (current),
+    B sequence-first (LISP-style, maintainer's suggestion), C two
+    representations (the original), **E one entry-sequence** — a single
+    composite of optionally-keyed entries that is both map and list, under
+    which the dense region becomes a representation optimisation BELOW the
+    spec and `__length` + the legacy view + the W6 invariant all dissolve.
+    E was not previously on the table
+  - **The B question worth measuring, not assuming**: O(n) name lookup is
+    only costly if lookup is a RUNTIME operation. Under R2 most scope
+    resolution happens once at `resolveSymbols`. The asymptotics that rule
+    out association lists in an interpreter argue far more weakly in a
+    partial evaluator. Counter-pressure: channel reads ARE hot and ARE
+    by-name (R3+R5), which is exactly where B goes linear
+  - **IC-4 has no recorded criterion at all** — "channels by wrapping" was
+    never written down as a choice. The alternative (an optional channel map
+    on every value) deletes the carrier concept outright: no `primary`, no
+    67 presence-checks, no W1 non-nesting invariant, no `dataOf`
+    indirection — at the cost of an optional field on every representation,
+    including Bits
+  - **Deliverable**: a ruling on the composite, and whichever of IC-2/3/4 it
+    settles moves from Implementation to a recorded choice WITH a criterion
+    and a revisit trigger. Blocks nothing; informs T2 (planes) directly

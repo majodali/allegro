@@ -4,6 +4,110 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S2a: requirement, specification, implementation
+
+The spine gains **Part 0 · Foundations**, at maintainer direction, and it
+answers the question the whole campaign turned out to be about: *which of
+three kinds of statement am I making?*
+
+**The three levels.** A **requirement** is something that must be true for
+Allegro to be buildable — falsified by showing it can be built without it,
+and it has **no alternatives**. A **specification** is what Allegretto
+commits to in service of a requirement — few alternatives, and visible. An
+**implementation** is how this host currently realises the specification —
+many alternatives, replaceable silently. The enforcement is one question per
+entry, the **alternatives test**: if you can list alternatives to a
+"requirement" it is a specification; if you cannot list any for an
+"implementation choice" it is probably specification.
+
+**Traceability, both ways.** Every specification item names the requirement
+it satisfies; every implementation choice names the specification item it
+realises. Orphans are findings — an unjustified spec item, an unconstrained
+implementation choice, an unmet requirement. This is the *consistency* check;
+the per-entry Delta is the *code-fidelity* check. A model needs both, and the
+format previously had only the second.
+
+**Requirements R1–R7.** Three from the maintainer — Allegretto as the
+simplest base that can carry Allegro (R1); partial evaluation as the
+mechanism by which types, effects, proofs and errors are built on top (R2);
+values carrying metadata in orthogonally-processed channels (R3). Four
+surfaced by writing them down: evaluation is **total** over the value space
+(R4 — residuals, never stuck, which is what R2 depends on); metadata
+**survives** evaluation (R5 — why primitives take full values); the base does
+**not know** about the layers (R6 — stated about concepts, not mechanism:
+Allegretto provides the channel plane and does not know one channel is called
+`type`); and Allegretto is **replaceable** (R7 — anything satisfying R1–R6
+supports Allegro, which is what makes everything else an implementation
+choice unless traced upward).
+
+**The implementation-choice register, IC-1…IC-7.** Each with the alternatives
+that were available, the criterion that selected one, and what would justify
+revisiting. This is the element that was missing, and its value showed up
+immediately as a counter-example.
+
+**IC-2 — the finding.** The maintainer doubted that condensing MultiValue and
+Context into one Structure had simplified anything. It had not, and more
+usefully: **it was never a simplification decision.** The recorded rationale
+is entirely performance — `structures.md` I1 gives the payoff as *"known type
+⇒ known shape ⇒ slot access compiles to offsets (feeds codegen)"* (future),
+and the class comment gives *"so every structure shares a single hidden
+class"* (present, V8). Measurement agrees:
+
+| Measure | Value |
+|---|---|
+| Declared fields on `Structure` | 11 |
+| Role-groups | 4 (carrier, record, dense, scope) + 2 universal |
+| Sites discriminating role by field **presence** | **146** |
+| Constructors | 3 |
+
+Representations went 2 → 1 while configurations went 2 → 4, and the variation
+moved from an explicit kind tag to implicit field presence read at 146 sites.
+A reasonable trade for a performance goal; a poor one for a comprehension
+goal — and it was read as the latter for years, by its own author, purely
+because the levels were not separated.
+
+**IC-3 — the comparison that was never run.** Four options set against each
+other: map-first (current), sequence-first (LISP-style, the maintainer's
+suggestion), two representations (the original), and **one entry-sequence** —
+a single composite of optionally-keyed entries that is both map and list,
+which nobody had proposed and under which the dense region becomes a
+representation optimisation *below* the specification, dissolving `__length`,
+the legacy view and the W6 invariant with it. The argument for sequence-first
+that is usually missed is recorded too: O(n) name lookup only costs if lookup
+is a runtime operation, and under R2 most scope resolution happens once at
+`resolveSymbols` — so interpreter asymptotics argue much more weakly in a
+partial evaluator. The counter-pressure is that channel reads *are* hot and
+*are* by name.
+
+**IC-4 had no recorded criterion at all** — "channels by wrapping" was never
+written down as a choice. Its alternative (an optional channel map on every
+value) would delete the carrier concept outright: no `primary`, no 67
+presence-checks, no W1 non-nesting invariant, no `dataOf` indirection.
+
+All three go to **B-108** as one review, because they interact.
+
+**What level-tagging revealed.** Tagging the seventeen T0–T1 entries produced
+a finding the four-part format had missed on its own: **four of them are
+Implementation, not Specification** — the carrier, Structure roles, the dense
+region and the legacy view. All four had been written as concepts of the
+language; none would exist in a different Allegretto satisfying R1–R6. A
+quarter of the tier sitting one level above where it belongs, the same
+mistake four times, all tracing to IC-2/3/4.
+
+**Also landed**: `conceptual-model-methodology-delta.md`, proposing the
+practice as a methodology amendment — the three levels, the alternatives
+test, two-way traceability, implementation-first authorship, and choices
+recorded with alternatives + criterion + revisit trigger. §6 states the cost
+honestly (the deltas are added work, not removed work; a project that would
+rather not see the list should not adopt it) and §8 carries three process
+improvements adoptable independently: a decision may not be marked "executed"
+on a partial execution; prefer measurement to reasoning on questions about
+the running system; a lint that cannot see the artifact being added is a
+false negative.
+
+No `src/` changes. Gate: **1197/1197, `GATE: PASSED`**. Typecheck clean,
+doc-ref-lint clean.
+
 ## 2026-08 — Concept spine S1: T0–T1, and the format survives its own test
 
 `docs/design/concepts.md` exists. It is the document a reader — or an agent —
