@@ -4,6 +4,68 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S3b: the interface definition was wrong
+
+Two maintainer questions, and both changed the entry rather than defending it.
+
+**"Is `InterfaceKind` *has no construct*, or *all members signature-only*?"**
+Neither, and the alternative fails a one-line test: `Type.define({v: Int})`
+has only signature members and a construct, so "all members signature-only"
+would make every plain record an interface.
+
+What is actually true is that **two properties are enforced in two different
+places, and neither is the definition**: the *predicate* tests no-construct
+(checkable from any value); `Interface.define`'s *construction* guarantees
+signature-only members (not checkable from the value). The definition is
+neither — an interface is a type that exists **to be drawn from rather than
+instantiated**.
+
+The deeper point is the maintainer's own. "Has no construct" reads like
+**abstractness**, and abstract-vs-interface is a genuine distinction *in a
+language with inheritance* — an abstract type has no constructor and some
+implementations. **Allegro has no abstract types**, because D44 deleted the
+declared is-a edge and abstractness is defined by what you can *extend*. With
+nothing to extend, "cannot be instantiated" and "exists to be drawn from"
+have no daylight between them, so the predicate happens to select exactly the
+interfaces. That is a property of *this* type system, not a general truth,
+and it is worth stating precisely because the type system is being rebuilt
+around the absence of `extends`.
+
+A second delta falls out: the two guarantees are enforced **independently**
+and nothing ties them, and one fails silently —
+`Interface.define({greet: self => "hi"})` accepts the lambda, records `greet`
+as a **signature**, and **discards the body** with no diagnostic (measured:
+the member carries a `fieldType` and no `value`). **→ B-116.**
+
+**"What does *it's also loose* mean?"** A fair question, because the document
+used "loose" **six times without defining it**. §33b now does: **declared**
+conformance is holding the expected type's member *symbols*, obtained by
+drawing them — identity, not spelling; **loose** conformance is having
+members with the same *base names* — spelling, not identity, the duck-typing
+surface aimed at plain data. **Anonymity is the switch**, which is precisely
+what `~T` erases.
+
+So "`~Printable` is an interface **and** also loose" means two independent
+facts about one type: it is declaration-only, *and* it matches by base name
+rather than by drawn symbols. Unstated, that read as a contradiction.
+
+**The omission is a process failure worth recording.** The spine's own rule
+is that every salient concept gets an entry, and the ordering constraint
+should have caught a term used before it was defined. It did not, because the
+constraint is enforced by reading rather than by anything mechanical — a
+finding about the method, and one the eventual Vivace model would catch for
+free.
+
+**And a measurement was under-scoped.** S3 reported the `__interface` marker
+0-decisive at `shapeAwareSubtypeof`. There are **three** readers, not two.
+Re-measured across all of them: 42 interface encounters and **0 decisive at
+both** subtypeof sites, 0 hits at the third. The conclusion survives — an
+interface always has a name, so the name test beside the marker already
+excludes every interface — but the first number covered one site and was
+quoted as though it settled the question.
+
+No `src/` changes. Gate: **1197/1197, `GATE: PASSED`**.
+
 ## 2026-08 — Concept spine S3: T4 types, and `~Printable` follows from a definition
 
 Ten entries — type, kind and meta-type, shape, member and member symbol,

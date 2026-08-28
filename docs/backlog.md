@@ -1385,3 +1385,26 @@ that prevents it.
   `stampBackings`/`backingsOf`). Two carriers for one concept, split by
   aggregation depth rather than by meaning, and nothing tells a reader which
   to use. Either unify them or state the rule
+
+- [ ] **B-116** · L2 · **Interface's two guarantees are enforced
+  independently, and one of them fails silently.** Raised by the concept
+  spine (S3b, `concepts.md` §36). An interface has two properties: **no
+  construct** (tested by `InterfaceKind`'s predicate, checkable from any
+  value) and **all members signature-only** (guaranteed only by
+  `Interface.define`'s construction, not checkable from the value). Nothing
+  ties them — a type could satisfy the kind's predicate without having been
+  built by `Interface.define`.
+  - **The silent failure**: `Interface.define({greet: self => "hi"})` accepts
+    the lambda, records `greet` as a **signature**, and **discards the body**
+    with no diagnostic (measured — the member has no `value`, only a
+    `fieldType`). Either reject a body at declaration or state that it is
+    read as a declaration
+  - **Why the definitions collapse here**: "has no construct" reads like
+    ABSTRACTNESS, and in a language with inheritance an abstract type and an
+    interface are different things. Allegro has no abstract types — D44
+    deleted the declared is-a edge, and abstractness is defined by what you
+    can EXTEND. With nothing to extend, "cannot be instantiated" and "exists
+    to be drawn from" coincide, so the predicate happens to select exactly
+    the interfaces. A property of this type system, not a general truth, and
+    worth stating because the type system is being rebuilt around the absence
+    of `extends`

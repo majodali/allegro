@@ -1810,6 +1810,50 @@ the nominal chain-walk used to produce.
 
 **Delta.** — 
 
+## 33b. Declared and loose conformance
+
+> **Level: Specification** — satisfies R6, R14. *Added at S3b (maintainer):
+> the document used the word "loose" six times without defining it.*
+
+**Definition.** Two ways a value's type can satisfy an expected type:
+
+- **Declared conformance** — the actual type holds the expected type's
+  **member symbols**, obtained by *drawing* them (§33). Identity, not
+  spelling. Two types that each spell `size` do not conform.
+- **Loose conformance** — the actual type has members with the same **base
+  names**. Spelling, not identity. This is duck typing, and it is the surface
+  aimed at plain data.
+
+Which applies is a property of the **expected** type: an expected type that is
+**anonymous** takes the loose path; a named one takes the declared path.
+
+**Rationale.** Declared conformance is what makes conformance intentional —
+D44 dissolved inheritance into *drawing symbols*, so conforming is an act
+rather than a coincidence. But that is too strict for data arriving from
+outside a program's own declarations, so `~T` (§38) and anonymous inline
+types provide the loose surface deliberately. **Anonymity is the switch**: it
+is exactly what `~T` erases, and it is why the loose path needs no separate
+marker.
+
+**As implemented.** `structuralSubtypeof` in `src/types-std.ts`; the branch
+is `isInterfaceType(typeB) || getTypeNameFromCtx(typeB) !== null` → declared,
+else loose. The code's own comment states it: *"the LOOSE path (~T structural
+wraps, anonymous inline types) matches by base-name projection — the
+duck-typing surface, aimed at data values."*
+
+**Delta.** The branch tests the `__interface` marker **as well as** anonymity,
+which is redundant — an interface always has a name, so the name test alone
+already excludes every interface, and the marker measures 0-decisive at both
+subtypeof sites (§36). It is redundancy that made the marker look like it
+carried the loose/declared distinction when anonymity always did.
+**→ B-104(g).**
+
+*Note on §36.* "`~Printable` **is** an interface and it is **also** loose"
+means exactly: it is declaration-only (drawn from, not instantiated), **and**
+it matches by base name rather than by drawn symbols. Two independent facts
+about the same type. Saying it without §33b defined was the reason it read as
+a contradiction.
+
 ## 34. Knowledge
 
 > **Level: Specification** — satisfies R2, R3′. **Distinct from §32.**
@@ -1859,11 +1903,35 @@ and PE discharges it by evaluating the predicate against what it knows.
 
 > **Level: Specification** — satisfies R6, R14. **Resolves B-104(g).**
 
-**Definition.** An *interface* is a **declaration-only type**: one that
-declares members and provides no construction. That is its whole content —
-`InterfaceKind` is literally `Type` refined by the predicate *"has no
-`construct`"*. Conformance to an interface is ordinary symbol membership
+**Definition.** An *interface* is a type that exists **to be drawn from
+rather than instantiated**. Conformance to it is ordinary symbol membership
 (§33); there is no declared is-a edge.
+
+*Corrected at S3b (maintainer).* An earlier draft said the definition **is**
+`InterfaceKind`'s predicate — *"has no `construct`"*. That is what the
+predicate tests, but it is not the concept, and the alternative offered —
+*"all members are signature-only"* — does not survive either:
+`Type.define({v: Int})` has only signature members (a field) **and** a
+construct, so that reading would make every plain record an interface.
+
+The accurate statement is that **two different properties are enforced in two
+different places**, and neither is the definition:
+
+| Property | Enforced by | Checkable from the value? |
+|---|---|---|
+| No construct | `InterfaceKind`'s predicate — `getConstruct(t) === undefined` | **yes** |
+| All members signature-only | `Interface.define`'s *construction* — it accepts a method body and stores it as a **signature**, discarding the implementation (measured) | **no** |
+
+*Why they collapse here and would not elsewhere.* "Has no construct" reads
+like **abstractness**, and in a language with inheritance an abstract type
+(no constructor, some implementations) is a different thing from an
+interface (no implementations, drawn from). **Allegro has no abstract
+types** — D44 deleted the declared is-a edge, and abstractness is defined by
+what you can *extend*. With nothing to extend, "cannot be instantiated" and
+"exists to be drawn from" have no daylight between them, so the predicate
+happens to select exactly the interfaces. That is a property of this type
+system, not a general truth, and it is worth writing down precisely because
+the type system is being rebuilt around the absence of `extends`.
 
 **Rationale.** Declaration-only is a *property of the type*, checkable, not a
 flag someone sets. Making the kind's predicate the definition means
@@ -1892,10 +1960,13 @@ asserted.)
 
 So the resolution is to stop conflating them:
 
-- **`shapeAwareSubtypeof`** — drop the marker check. The name check beside it
-  already carries the loose-world meaning, which is why the marker was
-  measured **0-decisive** there: 42 interface encounters across the suite,
-  none where the marker changed the outcome.
+- **`shapeAwareSubtypeof` and `structuralSubtypeof`** — drop the marker check
+  from both. (There are **three** readers, not two: a first pass counted only
+  two.) The name check beside it already carries the loose-world meaning, and
+  the marker measures **0-decisive at both**: 42 interface encounters each,
+  none where the marker changed the outcome — because an interface always has
+  a name (`"<anonymous>"` at minimum), so the name test beside it already
+  excludes every interface.
 - **`applyBoundaryBound`** — read the meta-type. `~Printable` becomes an
   interface here, which is the behaviour change, and per the definition it is
   a **fix**. That path has **zero suite coverage** (0 hits in 1197 tests;
@@ -1904,6 +1975,15 @@ So the resolution is to stop conflating them:
   is the loose-world signal, and it should *not* re-stamp the meta-type.
   (This retracts the re-stamp I proposed before the definition existed.)
 - **`__interface` is deleted.**
+
+**A second delta, from the correction above.** The two properties are
+enforced independently and **nothing ties them**: the predicate is checkable
+from any value, the signature-only guarantee holds only for types built by
+`Interface.define`, and a type could satisfy the kind's predicate without
+having been built that way. `Interface.define` also **silently discards** a
+method body handed to it — `Interface.define({greet: self => "hi"})` records
+`greet` as a signature and drops the lambda, with no diagnostic. Either
+reject the body or state that it is a declaration. **→ B-116.**
 
 **→ B-104(g)**, now specified rather than open.
 
@@ -2000,7 +2080,9 @@ says which a reader should use. **→ B-115.**
 | 30 | The type-Context namespace is closed by construction but nothing states or enforces it | B-107 |
 | 32 | The `shape` projection is hardcoded in `channelReadRaw` rather than installed | B-112(c) |
 | 34 | `knowledge` is a registered field that nothing ever stores — a channel, not a field | B-111 |
-| 36 | **`__interface` does two jobs with one bit**; its two readers want different facts | B-104(g) — now specified |
+| 33b | The `structuralSubtypeof` branch tests the marker *and* anonymity; anonymity always carried the distinction | B-104(g) |
+| 36 | **`__interface` does two jobs with one bit**; its **three** readers want different facts | B-104(g) — now specified |
+| 36 | Interface's two guarantees are enforced independently; `Interface.define` **silently discards** a method body | B-116 |
 | 37 | `__args` / `__generic` are host-read with no language surface, deferred since C7.2 | B-107 |
 | 39 | Law backings ride two carriers split by aggregation depth, not by meaning | B-115 |
 
@@ -2008,6 +2090,46 @@ Nine deltas across seventeen entries, on the tier we understand best. Six of
 the nine are naming or documentation lag; three (7, 15, 17) are the same
 underlying gap — **the planes are real and undeclared** — which is what T2
 exists to fix and why it is the highest-value tier in this document.
+
+### Two corrections to T4 (S3b)
+
+Both from maintainer questions, and both changed the entry rather than
+defending it.
+
+**The interface definition was wrong, and so was the alternative.** S3 said
+the definition *is* `InterfaceKind`'s predicate ("has no `construct`"). That
+is what the predicate tests, not what the concept is. The offered
+alternative — "all members are signature-only" — fails too:
+`Type.define({v: Int})` has only signature members and a construct, so it
+would make every plain record an interface. The truth is that **two
+properties are enforced in two different places** (the predicate; and
+`Interface.define`'s construction) and **neither is the definition** — which
+is *drawn from rather than instantiated*.
+
+The deeper point is the maintainer's own: "has no construct" reads like
+**abstractness**, and abstract-vs-interface is a real distinction *in a
+language with inheritance*. **Allegro has no abstract types**, because D44
+deleted the declared is-a edge and abstractness is defined by what you can
+extend. With nothing to extend the two collapse — a property of this type
+system, not a general truth, and exactly the kind of thing that lands
+differently when the type system is rebuilt without `extends`.
+
+**"Loose" was used six times and never defined.** §33b now defines it, and
+the omission is a **process failure**: the spine's own rule is that every
+salient concept gets an entry, and the ordering constraint should have caught
+a term used before it was defined. It did not, because the constraint is
+currently enforced by reading rather than by anything mechanical — which is a
+finding about the method, and one the Vivace model would catch for free.
+
+Defining it also resolves what "`~Printable` is an interface **and** also
+loose" meant: two independent facts — declaration-only, *and* matching by
+base name rather than by drawn symbols. Unstated, it read as a contradiction.
+
+**And a measurement was under-scoped.** S3 reported the marker 0-decisive at
+`shapeAwareSubtypeof`. There are **three** readers, not two; re-measuring
+across all of them gives 42 encounters and **0 decisive at both** subtypeof
+sites, plus 0 hits at the third. The conclusion survives, but the first
+number covered one site and was quoted as though it covered the question.
 
 ### What T4 added (S3)
 
