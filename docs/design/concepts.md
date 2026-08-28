@@ -93,6 +93,14 @@ check (b). The two are different and a model needs both.
 > maintainer disposes. Three capabilities Allegro needs are enabled by nothing
 > here (§6.3) — candidates R15–R17.
 >
+> **S2d then merged four into one and classified every abort.** R3, R5, R11
+> and R13 become the single **R3′** (§8.1); the propagation vocabulary becomes
+> **SC-7**, kept because R12 is enforceable only over inspectable rules
+> (§8.2). Classifying the 117 base aborts (§7) showed the gap was never in
+> R4 — it was that **no requirement covered aborting at all**: candidates
+> **R18** (resource bounds), **R19** (plane separation), **R20** (ill-formed
+> application). Running total: **14 proposed → 6 surviving + 6 candidates.**
+>
 > Each requirement carries a **subject**. This matters more than it looks:
 > R6 forbids Allegretto from knowing about the layers, so a requirement whose
 > subject is *Allegro* cannot be discharged by anything in the base. Where
@@ -122,7 +130,7 @@ a separate pass over a separate IR — it is evaluation that ran far enough to
 answer, and *discharge* is the same act as computing.
 
 ### R3 — Values carry metadata, and each channel is processed orthogonally
-*Subject: Allegretto.* ⚠ **§6.1 F4** — conflates a requirement with a specification choice.
+*Subject: Allegretto.* ⚠ **§6.1 F4** + **§8.1** — superseded by the merged **R3′**.
 
 A value must be able to carry information *about* itself alongside the data
 it *is*. Each **channel** must be processed independently: adding one must
@@ -143,16 +151,20 @@ produces a **residual**, never a failure to proceed.
 program could fail to compile because it could not be *run*, and the
 compile/run distinction Allegro dissolves would come back.
 
-*Scope — corrected at S2c.* This requirement is about **unresolved
-information**, not about errors. A first draft added "Failure is a value, not
-a control-flow escape"; that sentence was **false and never true** — L0/L1
-throws 117 times. It is struck rather than kept with a caveat, because a
-requirement that the code contradicts 117 times is not a requirement anybody
-is holding. The real split is CE-R8's and it is a *layer* decision: what
-halts and what yields an error value. See §6.2 C4.
+*Scope.* This requirement is about **unresolved information**. A first draft
+added "Failure is a value, not a control-flow escape", which the base
+contradicts 117 times; that sentence is struck.
+
+*Correction to the correction (S2d, maintainer).* S2c then concluded the
+requirement had been over-broad. **That was the wrong inference.** 117
+inconsistent throws are evidence of *inconsistency*, not evidence of a
+different cohesive requirement — the code does not get a vote on what the
+requirement is. If Allegretto aborts, that behaviour must be a
+**specification**, supported by a requirement. §7 classifies every base throw
+and says, per class, whether it needs a specification or needs rework.
 
 ### R5 — Metadata survives evaluation
-*Subject: Allegretto.* ⚠ **§6.2 C5** — weaker than it reads; needs sharpening.
+*Subject: Allegretto.* ⚠ **§8.1** — merged into **R3′**, which states non-interference instead (the C5 sharpening).
 
 A channel attached before an operation is observable after it, per that
 channel's declared propagation rule. A channel that could be silently dropped
@@ -226,7 +238,7 @@ single pass and anything not known at that instant would be permanently
 residual.
 
 ### R11 — Propagation is declared, not coded
-*Subject: Allegretto.* ⚠ **§6.1 F2** — derived from R3 + R6 by its own text; belongs in §2.
+*Subject: Allegretto.* ⚠ **§8.1** — merged into **R3′**; the fixed vocabulary it implied becomes **SC-7** (§8.2).
 
 Each channel declares its propagation discipline from a **fixed vocabulary**
 the base defines. The base applies the declaration without knowing what the
@@ -255,7 +267,7 @@ carried by holding the closure that writes it.
 the base must not enumerate them. §4.2 records that it does today.
 
 ### R13 — Channels can carry mergeable information
-*Subject: Allegretto.* ⚠ **§6.1 F3** — a specification item on the propagation vocabulary.
+*Subject: Allegretto.* ⚠ **§8.2** — not a requirement; it is the argument that `union` must be in **SC-7**'s vocabulary.
 
 A channel's propagation may **combine** two values rather than replace one
 with the other, with the combination supplied by the channel's owner.
@@ -625,7 +637,7 @@ tells you where it now lives.
 | **C1** | R1 vs R3 / R9 / R13 / R14 | **Tension by design, not conflict.** Every capability requirement pushes against minimality; R1 is the criterion that adjudicates. But a statement that can only ever be *traded against*, never violated, is not a requirement — which independently reaches F5. |
 | **C2** | R6 vs R11 | **Resolved** (§4.1). Layer-ignorant mechanism, layer-aware wiring. Implementation violation → B-109. |
 | **C3** | R6 vs R12 | **Resolved** (§4.2). Authority is the capability, not the name. Implementation violation → B-109. |
-| **C4** | R4 vs the implementation | **REAL — and R4 was wrong.** The first draft's "failure is a value, not a control-flow escape" is contradicted **117 times in L0/L1** alone: `primitives.ts` 99 throws, `evaluator.ts` 11, `slots.ts` 5, `scope.ts` 2, against **2** error-value constructions. Corrected in place rather than caveated. The genuine requirement is narrower — evaluation never gets *stuck on unresolved information* — and what halts versus what yields an error value is CE-R8's, a **layer** decision the base has no view on. Recording the shape of the error: an over-broad requirement written from what sounded principled rather than from what the code does, which is exactly the failure mode §3's implementation-first rule exists to prevent, occurring in the one part of the document that had no *As implemented* row to fill in. **Part 0 needs that row too.** |
+| **C4** | R4 vs the implementation | **REAL — 117 throws in L0/L1.** `primitives.ts` 99, `evaluator.ts` 11, `slots.ts` 5, `scope.ts` 2, against **2** error-value constructions. *S2c concluded from this that R4 was over-broad; the maintainer corrected that at S2d and the correction is the important one:* inconsistent behaviour is evidence of **inconsistency**, not of an alternative requirement. Every abort must be a specification with a requirement above it, or it is rework. **§7 does that classification.** The methodological error is worth keeping visible: reading a requirement off the implementation is the exact inverse of the implementation-first rule, which says write down what the code does *and then compare* — not adopt it. |
 | **C5** | R5 vs `drop` channels | **R5 is weaker than it reads.** "Survives per its declared rule" is nearly vacuous, since `drop` is a declared rule under which nothing survives. The requirement worth having is about **non-interference**: no operation may drop a channel it does not know about, whatever that channel's rule. Sharpen. |
 
 ### 6.3 Sufficiency — can something satisfy all of these and still fail?
@@ -655,6 +667,171 @@ to look, since Part 0 has no *As implemented* row.
 an *As implemented* row like every other entry. A requirement nothing in the
 code answers to is either aspirational or wrong, and there is no way to tell
 which without looking.
+
+## 7. Abort classification (S2d)
+
+> Maintainer ruling: *"If Allegretto is going to throw exceptions in some
+> cases, that behavior needs to be a specification and needs to be supported
+> by a requirement."* So every abort is classified — **new specification**, or
+> **rework**. Nothing is left as "the code does this".
+
+**199 throws repo-wide; 117 in L0/L1.** There is exactly **one** exception
+class, `AllegroError`, and **nothing in `src/` catches it** outside the test
+suite. Every abort is therefore a hard stop, and every abort looks identical
+to every other from the outside.
+
+| Class | Where | What it is | Disposition |
+|---|---|---|---|
+| **A · Host-invariant assertion** | `evaluator.ts:463` ("has unresolved stub… Check resolvePrimitives"), `slots.ts:632`, `slots.ts:708` | An interpreter bug. Not reachable by any well-formed program | **Specification** — the host may abort on its own invariant violation, and this is *not language behaviour*. But it must be a **distinct mechanism**: see D1 |
+| **B · Plane violation** | `scope.ts:51`, `scope.ts:173` | A scope used as data, or data extended as a scope | **Specification**, under a requirement that does not yet exist — the plane separation is asserted in prose and enforced by throw. Candidate **R19** |
+| **C · Capability denial** | `slots.ts:687`, `:690`, `:754`; 2 in `primitives.ts` | Re-registering a channel; an integrity channel taking a fabricating rule; originating an integrity key without the writer | **Specification** under **R12**. Denial-is-an-abort is the right shape — an error *value* would be forgeable, since the forger chooses what to do with it |
+| **D · Resource guard** | `evaluator.ts:114` ("Maximum evaluation depth exceeded") | A bound the host imposes so non-termination surfaces | **Specification**, under a requirement that does not exist. Candidate **R18** — and it interacts with R4: a depth bound is exactly "evaluation got stuck", so the two must be stated together |
+| **E · Type errors thrown by the base** | `evaluator.ts` ×6, `primitives.ts` ×6 | `Type error: argument N expected X, got Y` | **REWORK.** This is R6 violated, not a specification to be written. See below |
+| **F · Primitive argument errors** | the bulk of `primitives.ts`'s 99 | A primitive given the wrong arity or an argument it cannot use | **Specification** — the base may reject an ill-formed application. Needs a requirement: candidate **R20**. Also needs D1, because today these are indistinguishable from class A |
+
+### 7.1 Class E is the finding
+
+`checkArgType` **lives in `src/evaluator.ts`** — the L0 evaluator — and it
+calls `getType`, reads `typeContextName`, evaluates refinement predicates,
+dispatches through an `instanceof` binding, and throws `Type error`. The
+evaluator does not merely *name* a layer concept; it **implements type
+checking**.
+
+The import list makes the scale plain. Three L0 modules import from L2:
+
+| L0 module | Imports from | Symbols |
+|---|---|---|
+| `evaluator.ts` | `types-std.js` (×2), `refinements.js`, `effects.js` | **27** — `getType`, `withType`, `typeMethod`, `applyBoundaryBound`, `unifyTypes`, `assertMemberAvailable`, `typePrivilegedCtx`, `PredicateSet`, `AbstractDomain`, `impliesDomain`, `effectsOf`, `unionEffectSets`, … |
+| `scope.ts` | `refinements.js` | `PredicateSet`, `mergePredicateSets` |
+| `futures.ts` | `types-std.js` | `withType`, `ErrorType`, `StringType` |
+
+This is a violation of **the project's own stated invariant**, not only of
+proposed R6: `CLAUDE.md` says *"Dependencies point downward only."* They do
+not. It is also the most consequential delta the spine has found — larger by
+far than the eleven hardcoded channel names (B-109(a)), which are a naming
+leak where this is a whole subsystem living one layer too low.
+
+**Disposition: rework, and it is an arc, not a chunk.** Recording the
+question it has to answer rather than pre-empting it: type-directed dispatch
+is genuinely needed *during* evaluation (that is R2 — discharge happens by
+evaluating), so the fix is not "delete the import". It is to determine what
+concept-free capability the evaluator actually needs — a dispatch hook the
+layer installs, in the shape of `installChannelMerge` — such that L2 supplies
+the meaning. **→ B-110.**
+
+### 7.2 D1 — one exception class for six classes of failure
+
+A host-invariant assertion (A) and a user's argument error (F) are the same
+JavaScript class, carry no discriminator, and nothing catches either. So:
+
+- A tool cannot report "this is an interpreter bug, please file it" separately
+  from "your program is wrong", because it cannot tell.
+- The R4 measurement that started this section had to be done by **reading
+  117 call sites**, since counting `AllegroError` alone cannot distinguish an
+  abort that is specified from one that is a bug.
+
+**Disposition: specification.** The abort classes above are the vocabulary;
+the mechanism needs to carry which one. **→ B-110.**
+
+### 7.3 What this changes about R4
+
+R4 stays as written — *evaluation never gets stuck on unresolved information*
+— and it is now **traceable**: classes A–D and F are aborts that are not "getting
+stuck on unresolved information" (they are invariant violations, denials,
+bounds, and ill-formed applications), so none of them contradicts it. Class E
+does not contradict R4 either; it violates R6. The 117 throws were never
+evidence against R4. They were evidence that **no requirement covered
+aborting at all** — which is the real gap, and which candidates R18, R19 and
+R20 fill.
+
+## 8. Metadata requirements, merged (S2d)
+
+> Maintainer ruling: *"R5, R11 and R13 could be reframed into a single
+> requirement about metadata field processing and independence — but the fixed
+> vocabulary is clearly specification. We also need to ask if the fixed
+> vocabulary is necessary or if it could be handled entirely by registered
+> rules."*
+
+### 8.1 The merge
+
+R3 (orthogonality), R5 (survival), R11 (declared propagation) and R13
+(mergeability) are four statements about one thing. Proposed replacement:
+
+> **R3′ — Metadata channels are independent.**
+> *Subject: Allegretto.*
+> A value may carry named information about itself. Each channel's handling
+> is **independent of every other**: an operation's treatment of one channel
+> may not depend on which other channels are present, and **no operation may
+> disturb a channel it does not know about**. How a given channel is handled
+> is determined by that channel's own declaration, not by the operation.
+
+That single sentence subsumes:
+
+| Was | Now |
+|---|---|
+| R3 orthogonality | "independent of every other" |
+| R5 survival | "no operation may disturb a channel it does not know about" — and this is the **non-interference** sharpening §6.2 C5 asked for, which the old R5 could not express because "survives per its rule" is vacuous under `drop` |
+| R11 declared-not-coded | "determined by that channel's own declaration, not by the operation" |
+| R13 mergeability | *dropped from the requirement* — see §8.2 |
+
+Four requirements → **one**, and it says more than the four did: the old R5
+could not forbid a `drop` channel being dropped by an operation that had
+never heard of it, because dropping was its rule. R3′ can, because
+non-interference is about **which operation** disturbs a channel, not about
+whether the channel survives.
+
+R3′ also absorbs §6.1 F4 correctly: it states the *requirement* (channels are
+independent) without the *specification choice* (where they are stored). On-
+value versus side-table is now purely SC territory.
+
+### 8.2 Is the fixed vocabulary necessary?
+
+The vocabulary — `viral`, `union`, `computed`, `positional`, `drop` — is
+**specification**, as ruled. The open question was whether it is *needed*, or
+whether a channel could simply register an arbitrary propagation function.
+
+**It is needed, and the reason is R12.**
+
+`registerChannel` performs this check:
+
+```
+if (spec.integrity && (spec.rule === "viral" || spec.rule === "union"))
+    throw …  // forgery vector C
+```
+
+An integrity channel may not take a **fabricating** rule — one that puts a
+value on a result that no holder of the writer put there. That check is
+possible only because rules are **inspectable symbols**. Hand the base an
+arbitrary closure and it cannot tell a fabricating rule from a
+non-fabricating one; the check becomes unwritable, and R12's guarantee — that
+metadata carrying authority is unforgeable — degrades from *enforced* to
+*hoped for*.
+
+So the two halves of the objection resolve against each other, which is the
+useful result:
+
+| | Arbitrary closures | Fixed vocabulary |
+|---|---|---|
+| R3′ independence | satisfied | satisfied |
+| R6 layer-ignorance | satisfied (base sees an opaque function) | satisfied (base sees an opaque symbol) |
+| **R12 integrity** | **not enforceable** — a closure is not inspectable | **enforceable** — fabricating rules are a decidable subset |
+| Cost | none | the vocabulary must be *sufficient*; a layer needing an unlisted discipline is blocked |
+
+**Proposed SC-7 — propagation is drawn from a fixed, inspectable
+vocabulary.** *Satisfies R3′; its criterion is R12 enforceability.* Revisit
+if a layer needs a discipline the vocabulary cannot express — at which point
+the choice is to extend the vocabulary (cheap, keeps R12) rather than to
+open it to closures (loses R12).
+
+This is also where R13 goes: "channels can merge" is not a requirement, it is
+the observation that **`union` must be in the vocabulary** — a sufficiency
+argument about SC-7's contents, recorded there.
+
+*Note.* `installChannelMerge` already fits this: the base holds the *symbol*
+`union` and the layer installs the *merge function* for its own channel. The
+discipline is inspectable, the semantics are the layer's. That is the pattern
+generalising, and it is further evidence the current design is right where
+its wiring is wrong.
 
 ---
 

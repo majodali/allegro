@@ -1250,3 +1250,40 @@ that prevents it.
     rather than precede it
   - **Gated on**: R6, R11 and R12 surviving ratification in their current
     form. If any is amended these findings must be re-read
+
+- [ ] **B-110** · L0 · **The L0 evaluator implements the L2 type system.**
+  Found by the concept spine (S2d) while classifying every abort in the base
+  per maintainer ruling. This is the largest delta the spine has produced and
+  it violates the project's OWN stated invariant — `CLAUDE.md`: *"Dependencies
+  point downward only."*
+  - **(a) The measurement.** Three L0 modules import from L2:
+    `evaluator.ts` from `types-std.js` (twice), `refinements.js` and
+    `effects.js` — **27 symbols** including `getType`, `withType`,
+    `typeMethod`, `applyBoundaryBound`, `unifyTypes`, `assertMemberAvailable`,
+    `typePrivilegedCtx`, `PredicateSet`, `AbstractDomain`, `impliesDomain`,
+    `effectsOf`, `unionEffectSets`; `scope.ts` from `refinements.js`
+    (`PredicateSet`, `mergePredicateSets`); `futures.ts` from `types-std.js`
+    (`withType`, `ErrorType`, `StringType`)
+  - **(b) `checkArgType` lives in `src/evaluator.ts`.** It calls `getType`,
+    reads `typeContextName`, EVALUATES REFINEMENT PREDICATES, dispatches
+    through an `instanceof` binding, and throws `Type error: argument N
+    expected X, got Y` (6 sites; 6 more in `primitives.ts`). The evaluator
+    does not merely name a layer concept — it implements type checking
+  - **(c) Not a naming leak.** B-109(a) is eleven hardcoded channel names in
+    the channel substrate; this is a whole subsystem living one layer too low.
+    Different scale, same root cause
+  - **The question it must answer, recorded rather than pre-empted**:
+    type-directed dispatch IS genuinely needed during evaluation — that is R2,
+    discharge happens BY evaluating — so the fix is not "delete the import".
+    It is to identify the concept-free capability the evaluator actually
+    needs, in the shape of `installChannelMerge` (base holds an inspectable
+    symbol, layer installs the meaning), so L2 supplies the semantics
+  - **This is an arc, not a chunk.** Sizing and sequencing belong in a plan
+  - **(d) One exception class for six classes of failure.** `AllegroError` is
+    the only error class and NOTHING in `src/` catches it outside the suite.
+    A host-invariant assertion ("has unresolved stub — check resolvePrimitives")
+    and a user's argument error are indistinguishable, so a tool cannot report
+    "this is an interpreter bug" separately from "your program is wrong", and
+    the S2d classification had to be done by reading 117 call sites. The abort
+    classes in `concepts.md` §7 are the vocabulary; the mechanism should carry
+    which one. Specification-level, and separable from (a)–(c)

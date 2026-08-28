@@ -4,6 +4,98 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S2d: the base implements the type system
+
+Two maintainer corrections, and the first one overturns S2c's central
+conclusion.
+
+**S2c read a requirement off the implementation, and that is backwards.**
+Finding 117 throws in the base, it concluded R4 had been over-broad. The
+maintainer's correction: *inconsistent behaviour is evidence of
+inconsistency, not of an alternative cohesive requirement.* If Allegretto
+aborts, that behaviour must be a **specification**, supported by a
+requirement — the code does not get a vote on what the requirement is. The
+methodological error is kept visible in §6.2 C4 because it is the exact
+inverse of the implementation-first rule, which says write down what the code
+does *and then compare*, not adopt it.
+
+**So every base abort is now classified** (§7), into six classes: host-
+invariant assertion, plane violation, capability denial, resource guard,
+type errors thrown by the base, and primitive argument errors. Four become
+specifications under requirements that **did not exist** — candidates
+**R18** (resource bounds), **R19** (plane separation), **R20** (ill-formed
+application). One is already covered by R12, and denial-as-abort is the right
+shape there: an error *value* would be forgeable, since the forger chooses
+what to do with it.
+
+**R4 was never the problem.** Classes A–D and F are aborts that are not
+"getting stuck on unresolved information" — invariant violations, denials,
+bounds, ill-formed applications — so none contradicts R4. The gap was that
+**no requirement covered aborting at all.**
+
+**And one class is rework, not specification.** `checkArgType` **lives in
+`src/evaluator.ts`** — the L0 evaluator — where it calls `getType`, reads
+`typeContextName`, evaluates refinement predicates, dispatches through an
+`instanceof` binding, and throws `Type error`. Three L0 modules import from
+L2: `evaluator.ts` takes **27 symbols** from `types-std`/`refinements`/
+`effects`; `scope.ts` takes `PredicateSet`; `futures.ts` takes `withType`,
+`ErrorType`, `StringType`.
+
+This violates the project's **own** stated invariant — `CLAUDE.md`:
+*"Dependencies point downward only."* It is the largest delta the spine has
+produced, and it is a different scale from B-109(a): eleven hardcoded channel
+names are a naming leak, this is a whole subsystem one layer too low. **→
+B-110**, recorded as an arc rather than a chunk, with the question it must
+answer written down rather than pre-empted: type-directed dispatch genuinely
+IS needed during evaluation (R2 — discharge happens by evaluating), so the
+fix is not "delete the import" but to find the concept-free capability the
+evaluator needs, shaped like `installChannelMerge`.
+
+**Also: one exception class for six kinds of failure.** `AllegroError` is the
+only error class and nothing in `src/` catches it outside the suite, so a
+host-invariant assertion ("has unresolved stub — check resolvePrimitives") is
+indistinguishable from a user's argument error. The classification above had
+to be done by reading 117 call sites for exactly that reason.
+
+**Second correction: four metadata requirements become one** (§8.1).
+
+> **R3′ — Metadata channels are independent.** A value may carry named
+> information about itself. Each channel's handling is independent of every
+> other: an operation's treatment of one channel may not depend on which
+> others are present, and **no operation may disturb a channel it does not
+> know about**. How a channel is handled is determined by that channel's own
+> declaration, not by the operation.
+
+R3, R5, R11 and R13 collapse into it, and it says **more** than they did: the
+old R5 ("metadata survives per its declared rule") could not forbid a `drop`
+channel being dropped by an operation that had never heard of it, because
+dropping was its rule. R3′ can, because non-interference is about *which
+operation* disturbs a channel rather than whether it survives. That is the
+sharpening §6.2 C5 asked for and could not express.
+
+**Is the fixed vocabulary necessary? Yes — and R12 is why** (§8.2). The
+vocabulary is specification, as ruled, and the open question was whether
+channels could simply register arbitrary propagation functions.
+`registerChannel` enforces *"integrity channels may not register fabricating
+propagation rules (viral/union)"* — forgery vector C — and that check is
+possible **only because rules are inspectable symbols**. Given an arbitrary
+closure the base cannot tell a fabricating rule from a non-fabricating one,
+and R12 degrades from enforced to hoped-for. Recorded as **SC-7**, whose
+criterion is R12 enforceability, revisit-if a layer needs a discipline the
+vocabulary cannot express — at which point the answer is to extend the
+vocabulary, not to open it to closures. R13 lands here too: "channels can
+merge" is not a requirement, it is the argument that `union` must be in the
+vocabulary.
+
+`installChannelMerge` already has this shape — the base holds the symbol
+`union`, the layer installs the merge function — which is more evidence the
+design is right where its wiring is wrong.
+
+Running total: **14 proposed requirements → 6 surviving + 6 candidates.**
+
+No `src/` changes; B-109 and B-110 both untouched pending design sign-off.
+Gate: **1197/1197, `GATE: PASSED`**.
+
 ## 2026-08 — Concept spine S2c: cohesion, and seven requirements that are not
 
 The requirement set was checked as a **set** rather than item by item. All
