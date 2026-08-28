@@ -82,297 +82,500 @@ item it realises. An orphan in either direction is a finding:
 This is the consistency check (a); the per-entry **Delta** is the code-fidelity
 check (b). The two are different and a model needs both.
 
-## 1. What Allegretto is for
+## 1. Requirements
 
-> **Level: Requirement.** Proposed 2026-08 from maintainer direction;
-> R1–R7 await ratification as a set.
+> **Level: Requirement.** R1–R14, proposed 2026-08; awaiting ratification as
+> a **set** — individually plausible is not the bar, cohesion is (§4).
+>
+> Each requirement carries a **subject**. This matters more than it looks:
+> R6 forbids Allegretto from knowing about the layers, so a requirement whose
+> subject is *Allegro* cannot be discharged by anything in the base. Where
+> Allegro needs a capability, the base requirement is the weaker, concept-free
+> enabler. Getting this wrong is how "the base must not know about types" and
+> "the base must propagate the type channel" come to look contradictory.
 
 ### R1 — Allegretto is the simplest base language that can carry Allegro
+*Subject: Allegretto.*
 
-Allegretto is not a language anyone is meant to write programs in. Its whole
-purpose is to be the substrate Allegro Standard is *built on* — as an
-extension stack, not as a privileged layer. Every feature it has must earn
-its place by being something Allegro cannot be built without.
+Allegretto is not a language anyone is meant to write programs in. Its
+purpose is to be the substrate Allegro Standard is *built on*, as an
+extension stack rather than a privileged layer. Every feature must earn its
+place by being something Allegro cannot be built without.
 
 *Consequence.* "Would Allegro still work without this?" is a legitimate
-challenge to any part of Allegretto, and the answer must be evidence, not
-preference.
+challenge to any part of Allegretto, answerable with evidence.
 
 ### R2 — Partial evaluation is the mechanism by which layers are added
+*Subject: Allegretto.*
 
-Types, effects, proofs, refinements, contracts and error handling are not
-built into the base. They are built **on** it, and the tool that makes that
-possible is partial evaluation: a program is evaluated as far as its known
-inputs allow, and what cannot be resolved becomes a residual that is itself
-an ordinary value. Checking is therefore not a separate pass over a separate
-IR — it is evaluation that ran far enough to answer, and *discharge* is the
-same act as computing.
-
-*Consequence.* Anything Allegro needs to check must be expressible as
-something Allegretto can evaluate. This is the requirement that forces R3.
+Types, effects, proofs, refinements, contracts and error handling are built
+**on** the base, and the tool that makes that possible is partial evaluation:
+a program is evaluated as far as its known inputs allow, and what cannot be
+resolved becomes a residual that is itself an ordinary value. Checking is not
+a separate pass over a separate IR — it is evaluation that ran far enough to
+answer, and *discharge* is the same act as computing.
 
 ### R3 — Values carry metadata, and each channel is processed orthogonally
+*Subject: Allegretto.*
 
-A value must be able to carry information *about* itself — its type, what is
-known about it, what effects produced it, whether it is in error, what proved
-it — alongside the data it *is*. Each such **channel** must be processed
-independently of the others: adding a channel must not require changing how
-any existing channel propagates, and no operation may need to know the full
-channel set.
+A value must be able to carry information *about* itself alongside the data
+it *is*. Each **channel** must be processed independently: adding one must
+not change how any existing channel propagates, and no operation may need to
+know the full channel set.
 
-*Rationale.* Without this, every layer Allegro adds would have to thread its
-own information through every operation by hand, and layers would not
-compose — the type layer would have to know about the effect layer to avoid
-dropping its data. Orthogonality is what allows R2's "build it on top" to
-mean *actually* on top.
-
-*Consequence.* The propagation table (T2 §10) is not an implementation
-convenience; it is the mechanism that makes this requirement hold, and
-hand-rolling per-channel logic anywhere is a direct violation.
+*Rationale.* Without this, every layer would thread its own information
+through every operation by hand, and layers would not compose — the type
+layer would have to know about the effect layer to avoid dropping its data.
 
 ### R4 — Evaluation is total over the value space
+*Subject: Allegretto.*
 
-The evaluator must have a rule for every value it can meet. An unresolved
-input produces a **residual**, never a failure to proceed. Failure is a
-value (the error channel), not a control-flow escape from evaluation.
+The evaluator has a rule for every value it can meet. An unresolved input
+produces a **residual**, never a failure to proceed. Failure is a value, not
+a control-flow escape.
 
-*Rationale.* R2 depends on this completely. If evaluation could get stuck,
-partial evaluation would be partial in the wrong sense: a program could fail
-to compile because it could not be *run*, and the compile/run distinction
-Allegro dissolves would come back.
+*Rationale.* R2 depends on this completely. If evaluation could get stuck, a
+program could fail to compile because it could not be *run*, and the
+compile/run distinction Allegro dissolves would come back.
 
 ### R5 — Metadata survives evaluation
+*Subject: Allegretto.*
 
-A channel attached to a value before an operation must be observable after
-it, according to that channel's declared propagation rule. A channel that
-could be silently dropped by an unrelated operation would make every layer
-built on it unsound.
+A channel attached before an operation is observable after it, per that
+channel's declared propagation rule. A channel that could be silently dropped
+would make every layer built on it unsound.
 
-*Consequence.* This is why primitives receive **full** values and read data
-through the data-plane accessor. A primitive that unwrapped its arguments
-would satisfy its own contract and violate this one invisibly.
+*Consequence.* Why primitives receive **full** values and read data through
+the data-plane accessor: a primitive that unwrapped its arguments would
+satisfy its own contract and violate this one invisibly.
 
 ### R6 — The base does not know about the layers
+*Subject: Allegretto.*
 
-No concept belonging to Allegro Standard — type, effect, proof, refinement,
-contract — may appear in Allegretto. Dependencies point downward only.
+No **concept** belonging to Allegro Standard — type, effect, proof,
+refinement, contract — may appear in Allegretto. Dependencies point downward
+only.
 
-*Rationale.* This is what makes Allegro a *curated extension stack* rather
-than a privileged layer, and therefore what makes the platform programmable
-by anyone else. A base that knew about types would make "the type system is
-an extension" a fiction.
+*Rationale.* This is what makes Allegro a curated extension stack rather than
+a privileged layer, and therefore what makes the platform programmable by
+anyone else.
 
-*Note.* R6 is stated about **concepts**, not about mechanism. Allegretto
-provides the channel plane; it does not know that one channel is called
-`type`. That distinction is load-bearing and is where this requirement is
-most easily violated by accident.
+*Stated about concepts, not mechanism.* Allegretto provides the channel
+plane; it must not know that one channel is called `type`. That distinction
+is load-bearing, and §4.1 records that the code violates it today.
 
 ### R7 — Allegretto is replaceable
+*Subject: Allegretto (meta).*
 
-Any implementation satisfying R1–R6 supports Allegro. Allegretto is subject
-to change at any time — in host implementation (replatforming, bootstrapping
-into itself) or in specification (a different metadata mechanism) — provided
-the changes continue to support Allegro's design goals.
+Any implementation satisfying R1–R6 and R8–R14 supports Allegro. Allegretto
+may change at any time — host implementation (replatforming, bootstrapping
+into itself) or specification (a different metadata mechanism) — provided the
+changes continue to support Allegro's design goals.
 
-*Consequence.* This is not a licence for churn; it is the statement that
-**everything below this line is an implementation choice unless it is
-traced to R1–R6.** It is the reason the register in §2 exists, and the reason
-every entry in T0–T5 carries a level.
+*Consequence.* **Everything is an implementation choice unless it is traced
+to a requirement.** This is why §3 exists.
 
-## 2. Implementation choice register
+### R8 — There is one value universe
+*Subject: Allegretto. Derives from R4.*
 
-> **Level: Implementation.** Each entry records the alternatives that were
-> available, the criterion that selected one, and what would justify
-> revisiting it. A choice with no recorded alternatives cannot later be
-> evaluated — which is precisely how "did that actually simplify things?"
-> became unanswerable.
+Everything the evaluator can meet is a Value. There is no second category —
+no statement, declaration, or type that is not itself a value.
 
-### IC-1 — Bits rather than a set of primitive types
+*Rationale.* R4's totality is only meaningful over a single space: "the
+evaluator has a rule for every value" says nothing if some inputs are not
+values. It is also what lets an extension build language constructs, since
+every part of the language is something it can receive and return.
 
-*Realises:* R1, R6.
+*Note on level.* This is a **requirement**, not a specification choice —
+there is no alternative that preserves R4. What the value kinds *are* is a
+separate, weaker question (SC-1).
 
-**Chosen.** One uninterpreted scalar representation: a bit vector with a
-known length. `Int`, `Float`, `String` and `Bool` are all Bits with a type
-attached at L2.
+### R9 — The language surface is extensible
+*Subject: Allegretto.*
+
+Syntax is not fixed in the base. A grammar is a value, and extensions
+contribute to it, so Allegro's surface is built rather than privileged.
+
+*Rationale.* R1 says Allegro is built on Allegretto; without R9 that would be
+true of semantics and false of syntax, and Allegro's notation would be a
+kernel feature no other stack could have.
+
+### R10 — Evaluation is resumable on new information
+*Subject: Allegretto. Generalises R2 over time.*
+
+Information may arrive after evaluation has begun — a module load, an async
+result. When it does, whatever depended on it re-evaluates. A value may be
+**pending**, and pending is not failure.
+
+*Rationale.* R2 says "evaluate as far as known inputs allow"; R10 is what
+happens when the set of known inputs *grows*. Without it, PE would be a
+single pass and anything not known at that instant would be permanently
+residual.
+
+### R11 — Propagation is declared, not coded
+*Subject: Allegretto. The R6-compatible form of R3.*
+
+Each channel declares its propagation discipline from a **fixed vocabulary**
+the base defines. The base applies the declaration without knowing what the
+channel means; the channel's owner supplies any semantics the discipline
+needs.
+
+*Rationale.* This is the resolution of the apparent conflict between R3 and
+R6. The base knowing *"some channels are viral"* is layer-ignorant; the base
+knowing *"the error channel is viral"* is not. Only the second violates R6,
+and it is avoidable: the vocabulary is generic, the registration is the
+layer's.
+
+### R12 — Metadata origination is capability-controlled
+*Subject: Allegretto for the mechanism; Allegro for the policy.*
+
+A channel carrying authority — that a proof discharged, that a value came
+from a recorded source — must be unforgeable by code that does not hold its
+writer. **Authority is a capability, not a name.**
+
+*Rationale.* Metadata that anything can write cannot be evidence. This is
+also what makes R11 safe: externalising registration would be a counterfeit
+vector if trust were carried by naming a channel, and is not if trust is
+carried by holding the closure that writes it.
+
+*Consequence.* Which channels need protection is a **layer** decision, so
+the base must not enumerate them. §4.2 records that it does today.
+
+### R13 — Channels can carry mergeable information
+*Subject: Allegretto.*
+
+A channel's propagation may **combine** two values rather than replace one
+with the other, with the combination supplied by the channel's owner.
+
+*Rationale.* Effect sets union; knowledge meets. Without a merge in the
+vocabulary, a layer needing one would have to intercept every operation, and
+R11's declared propagation would collapse back into hand-coded propagation —
+which is the R3 violation R11 exists to prevent.
+
+### R14 — Code is organised into separately-loadable units
+*Subject: Allegretto.*
+
+A program may be assembled from units loaded independently, with control over
+what each unit exposes. `use` / `import` is *a surface* for this; the
+requirement is the unit and its visibility boundary, not the keyword.
+
+*Rationale.* R10's "information arrives later" has loading as its principal
+case, and the visibility boundary is what makes a unit's internals
+refactorable — without it, every binding is public and nothing composes at
+scale.
+
+### Layer requirements that are NOT base requirements
+
+Two items raised as candidate requirements belong to Allegro, and their base
+counterparts are strictly weaker. Recording the distinction, because
+conflating them is what produces apparent R6 violations:
+
+| Allegro requirement | Its Allegretto counterpart |
+|---|---|
+| **Discharge** — an obligation is discharged by evaluating it, and what did not discharge remains visible as a stated obligation | **R2 + R4**: evaluation runs as far as it can and yields a residual otherwise. The base knows nothing of "obligation" |
+| **Knowledge lattice** — one monotonic lattice over imputed bound, domains and predicates, meeting at each use | **R13**: channels can carry mergeable information. The base supplies merge; the lattice is the layer's |
+
+## 2. Specification choices
+
+> **Level: Specification.** These have alternatives — but the alternatives
+> are **visible to Allegro**: changing one changes what the layers above are
+> written against. That is what separates them from §3.
+
+### SC-1 — Seven representation kinds
+*Satisfies R8, R1.*
+
+Bits, Symbol, Param, Expression, ComposedFunction, PrimitiveFunction,
+Structure.
+
+| Alternative | Trade |
+|---|---|
+| Fewer — fold Param into Symbol | Params are positional and Symbols are named; merging them would make substitution need a name environment (see SC-3) |
+| Fewer — no separate PrimitiveFunction | Host functions would need an Allegretto encoding; the `lazy`/`sourceAware` declarations have nowhere to live |
+| More — a distinct sequence kind alongside Structure | See IC-2: currently a Structure *role* rather than a kind |
+
+*Criterion:* minimality under R1, subject to R8 leaving nothing outside.
+*Visible to Allegro:* yes — L2 dispatches on these.
+
+### SC-2 — Bits is the only scalar
+*Satisfies R1, R6.*
+
+One uninterpreted scalar: a bit vector of known length. `Int`, `Float`,
+`String`, `Bool` are Bits with a type attached at L2.
 
 | Alternative | Why not |
 |---|---|
-| A fixed set of primitives (int/float/string/bool) | Violates R6 — the base would know a numeric tower it did not need, and Allegro could not redefine it |
+| A fixed set of primitives | Violates R6 — the base would know a numeric tower, and Allegro could not redefine it |
 | Tagged scalars (value + kind tag) | The tag is a degenerate type channel; R3 already provides one, better |
 
 *Criterion:* minimality under R1, layer-ignorance under R6.
 *Revisit if:* a numeric or textual operation cannot be expressed at L2
-without the base knowing its semantics.
-*Status:* holding. No recorded pressure against it.
+without the base knowing its semantics. *Status:* holding.
 
-### IC-2 — One Structure rather than two (MultiValue + Context)
+### SC-3 — Expressions are values
+*Satisfies R2, R4, R8.*
 
-*Realises:* R3 (metadata attachment), and the composite half of R1.
+An unevaluated application is an ordinary value, so a partially-evaluated
+program is also an ordinary value.
 
-**Chosen** at D1, completed at D46. Originally two representations: a
-*MultiValue* (a primary value plus named components) and a *Context* (named
-bindings). These were condensed into one `Structure` whose former MultiValue
-role became the **carrier configuration**.
+| Alternative | Trade |
+|---|---|
+| A separate IR for unevaluated code | Violates R8, and residuals could not flow through the same machinery as results — which is the whole of R2 |
 
-**This choice is under active doubt, and the doubt is well-founded.** The
-recorded rationale was never conceptual simplification:
+*Criterion:* R2 is not achievable otherwise. Borderline requirement; kept as
+specification because "the DAG is *a* representation of pending computation"
+admits alternatives even if "pending computation is a value" does not.
 
-- `structures.md` I1 states the payoff as *"known type ⇒ known shape ⇒ slot
-  access compiles to offsets (feeds codegen)"* — a **future codegen**
-  argument.
-- The class comment states all fields are declared up front *"so every
-  structure shares a single hidden class"* — a **present V8** argument.
+### SC-4 — Symbol identity is fully-qualified, not spelling
+*Satisfies R6, R14.*
 
-Neither claims the concept got simpler, and measurement says it did not:
+Two members spelled `size` in different types are different symbols.
+
+| Alternative | Trade |
+|---|---|
+| Name-string comparison | Conformance becomes a spelling question; D44 removed exactly this class of false positive |
+| Opaque gensym identity | Loses the human-readable projection printing, errors and loose matching rely on |
+
+*Criterion:* conformance must be an identity question. *Status:* holding —
+D44 is evidence the alternative was tried and failed.
+
+### SC-5 — One composite kind rather than two
+*Satisfies R1, R3. D1, completed D46.*
+
+MultiValue (primary + components) and Context (bindings) were condensed into
+one Structure whose former MultiValue role became the carrier configuration.
+
+| Alternative | Trade |
+|---|---|
+| Two kinds (the original) | Explicit about carrier vs record; costs one kind under R1 |
+| Three (add a sequence kind) | See IC-2 option E |
+
+**This is the specification half of a choice whose implementation half is
+IC-1, and separating them is what makes the maintainer's doubt answerable.**
+Reducing the *kind count* is a specification win under R1. What it cost is
+entirely at the implementation level, and is measured in IC-1.
+
+*Criterion applied:* kind-count minimality under R1.
+*Revisit:* with IC-1/IC-2 → **B-108**.
+
+### SC-6 — Scopes are values
+*Satisfies R8, R2.*
+
+An evaluation environment is an ordinary Structure, introspectable like any
+other, distinguished by role rather than by kind.
+
+| Alternative | Trade |
+|---|---|
+| Environments outside the value universe | Violates R8; reflection over scope becomes a special API |
+
+*Criterion:* R8. *Note:* scopes are the one place data-plane immutability
+(D22) does not hold — they are evaluator state. That carve-out is
+specification, not an implementation detail.
+
+## 3. Implementation choices
+
+> **Level: Implementation.** Alternatives here are **invisible to Allegro** —
+> a different choice changes no program's meaning. Each records the
+> alternatives, the criterion that selected one, and a revisit trigger. A
+> choice with no recorded alternatives cannot later be evaluated, which is
+> exactly how "did that actually simplify things?" became unanswerable.
+>
+> *Renumbered at S2b.* The former IC-1 (Bits) is now **SC-2**; the former
+> IC-2 split into **SC-5** (kind count) + **IC-1** (role configuration);
+> former IC-3 → **IC-2**, IC-4 → **IC-3**, IC-5 → **SC-4** + **IC-4**,
+> IC-6 → **IC-5**, IC-7 → **SC-3** + **IC-6**.
+
+### IC-1 — Structure's roles are read from field presence
+*Realises SC-5.*
+
+One class carrying every role's fields, with role inferred from which are
+populated.
+
+**Under active doubt, and the doubt is well-founded.** The recorded rationale
+was never conceptual simplification: `structures.md` I1 gives the payoff as
+*"known type ⇒ known shape ⇒ slot access compiles to offsets (feeds
+codegen)"* (future), and the class comment gives *"so every structure shares
+a single hidden class"* (present, V8).
 
 | Measure | Value |
 |---|---|
 | Declared fields on `Structure` | **11** |
-| Role-groups those fields partition into | **4** (carrier, record, dense, scope) + 2 universal |
-| Sites that discriminate role by field presence | **146** (`.primary` 67, `.dense` 21, `.components` 20, `isCarrier` 14, `isScope` 13, `isDense` 6, `viewMaterialized` 5) |
-| Constructors | 3 (`newMultiValueStructure`, `newContextStructure`, `newDenseStructure`) |
+| Role-groups | **4** (carrier, record, dense, scope) + 2 universal |
+| Sites discriminating role by field **presence** | **146** |
+| Constructors | 3 |
 
-So the count of *representations* went 2 → 1 while the count of
-*configurations* went 2 → 4, and the variation moved from an explicit kind
-tag to implicit field presence, read at 146 sites. That is a reasonable trade
-for a performance goal and a poor one for a comprehension goal — and it was
-only ever read as the latter because the levels were not separated. **This
-entry is the clearest instance of the confusion Part 0 exists to prevent.**
+So the *kind* count went 2 → 1 (the SC-5 win) while the *configuration*
+count went 2 → 4, and the variation moved from an explicit tag to implicit
+field presence read at 146 sites.
 
 | Alternative | Trade |
 |---|---|
-| Two representations (the original) | Explicit about carrier vs record; costs one more kind in the base |
-| One representation, explicit role **tag** | Same field surface, but role is stated rather than inferred; removes the 146 presence-checks in favour of one discriminant |
-| One representation, genuinely one role (§IC-3 option E) | The only option that actually simplifies; largest change |
+| Explicit role **tag** | Same fields, role stated rather than inferred; replaces 146 presence-checks with one discriminant |
+| Genuinely one role (IC-2 option E) | The only option that removes the configurations rather than renaming them |
 
 *Criterion applied:* host performance + future codegen.
-*Criterion NOT applied:* conceptual economy under R1.
-*Revisit:* **now** — this is IC-3's question, and B-108 carries it.
+*Criterion NOT applied:* comprehension. Both are legitimate; only one was
+used, and nothing recorded which. **→ B-108.**
 
-### IC-3 — Map-keyed composite rather than sequence-first
+### IC-2 — Structure indexing: map-first
+*Realises SC-5, SC-6.*
 
-*Realises:* the composite half of R1; scope lookup for R2.
-
-**Chosen.** The deepest composite is a string-keyed map (plus an ordered
-list view). Arrays are a numeric-keyed special case with a dense array
-region. Channels are a second map.
-
-The maintainer's alternative — LISP-style, with an ordered sequence as the
-deepest structure and maps built on top — deserves the comparison it never
-got:
+The composite is a string-keyed map plus an ordered list view; arrays are a
+numeric-keyed special case with a dense region; channels are a second map.
 
 | | **A · map-first** (current) | **B · sequence-first** | **C · two representations** | **E · one entry-sequence** |
 |---|---|---|---|---|
-| Deepest composite | string-keyed map | ordered sequence | MultiValue + Context | sequence of `(key?, value)` entries |
-| Positional data | special case (dense region) + a materialized legacy view | native | special case | native (entries with no key) |
-| Name lookup | O(1) | O(n) or a derived index | O(1) | O(n) raw; O(1) with an index below the spec |
-| Channels | second map | sequence of pairs; O(n) per read | native to MultiValue | second entry-sequence |
-| Spec/impl distance | wide — spec says one composite, impl has four configurations | narrow | narrow | narrow |
-| Cost of the gap | 146 role-presence sites; `__length`; the legacy view | derived-map machinery at L0 | one extra base kind | index is an impl detail, invisible above |
+| Deepest composite | string-keyed map | ordered sequence | MultiValue + Context | sequence of `(key?, value)` |
+| Positional data | special case + materialized legacy view | native | special case | native (entries with no key) |
+| Name lookup | O(1) | O(n) or derived index | O(1) | O(n) raw; O(1) with an index *below* the spec |
+| Channels | second map | sequence of pairs, O(n) per read | native to MultiValue | second entry-sequence |
+| Spec/impl distance | **wide** — spec says one composite, impl has four configurations | narrow | narrow | narrow |
+| Cost of the gap | 146 presence sites; `__length`; the legacy view | derived-map machinery at L0 | one extra kind | index invisible above the spec |
 
-**The argument for B that is usually missed:** O(n) name lookup is only
-expensive if lookup happens at *runtime*. Under R2 most scope resolution
-happens once, at `resolveSymbols`, not per evaluation — so the asymptotics
-that rule out association lists in an interpreter argue much more weakly in a
-partial evaluator. This is worth measuring rather than assuming; it is the
-kind of claim that has been wrong in both directions in this codebase.
+**The argument for B usually missed:** O(n) name lookup only costs if lookup
+is a *runtime* operation. Under R2 most scope resolution happens once, at
+`resolveSymbols` — so the asymptotics that rule out association lists in an
+interpreter argue far more weakly in a partial evaluator. Worth measuring,
+not assuming.
 
-**The argument against B:** channel reads are genuinely hot and genuinely
-by-name — `dataOf` and the channel read sit on every operation — so R3+R5
-push toward keyed access at the one place B makes it linear.
+**Against B:** channel reads *are* hot and *are* by name (R3+R5), which is
+precisely where B goes linear.
 
-**Option E is the one nobody proposed.** A single composite that is an
-ordered sequence of optionally-keyed entries is *both* a map and a list: a
-record is entries with keys, an array is entries without. The dense region
-stops being a role and becomes a representation optimisation **below** the
-specification, invisible above it — which is what the dense region should
-always have been, and would dissolve `__length`, the legacy view, and the W6
-invariant along with it.
+**Option E was never on the table.** A single composite of optionally-keyed
+entries is both map and list. The dense region stops being a role and becomes
+a representation optimisation **below** the specification — which is what it
+should always have been — dissolving `__length`, the legacy view and the W6
+invariant with it.
 
 *Criterion applied:* interpreter-shaped performance intuition.
-*Criterion that should apply:* spec/implementation distance under R7 — how
-much of the implementation is invisible from the specification.
-*Revisit:* **now.** → **B-108.**
+*Criterion that should apply:* spec/implementation distance under R7.
+**→ B-108.**
 
-### IC-4 — Channels by wrapping rather than on every value
+### IC-3 — Metadata storage: channels by wrapping
+*Realises R3.*
 
-*Realises:* R3.
-
-**Chosen.** A non-composite value carries channels by being wrapped in a
-**carrier** — a Structure whose data plane is empty and whose `primary` is
-the wrapped value.
+A non-composite value carries channels by being wrapped in a **carrier** — a
+Structure with an empty data plane whose `primary` is the wrapped value.
 
 | Alternative | Trade |
 |---|---|
-| Every value has an optional channel map | Deletes the carrier concept entirely: no `primary`, no 67 presence-checks, no W1 non-nesting invariant, no `dataOf` indirection. Costs an optional field on every representation, including Bits — which stops "Bits is just bits" from being literally true |
+| An optional channel map on every value | Deletes the carrier concept: no `primary`, no 67 presence-checks, no W1 non-nesting invariant, no `dataOf` indirection. Costs an optional field on every representation, including Bits — so "Bits is just bits" stops being literally true |
 
-This one has never been written down as a choice at all, which is why it has
-no recorded criterion. It is the largest single source of accidental
-complexity in T0 measured by call sites, and it is a genuine trade rather
-than an obvious win either way.
+**Never written down as a choice at all**, hence no recorded criterion. It is
+the largest single source of accidental complexity in T0 by call-site count,
+and a genuine trade rather than an obvious win. **→ B-108.**
 
-*Criterion applied:* unrecorded.
-*Revisit:* with IC-3 — the two interact. → **B-108.**
+### IC-4 — Symbols are interned by FQN
+*Realises SC-4.*
 
-### IC-5 — Symbol identity by interned FQN
-
-*Realises:* R6 (the base provides identity; L2 decides what identity *means*).
-
-**Chosen.** Registered symbols are interned by fully-qualified name, so the
-same FQN is the same object; transient parser symbols carry no FQN and
-resolve by base name.
+Same FQN ⇒ same object, so identity comparison is a pointer compare.
 
 | Alternative | Trade |
 |---|---|
-| Name-string comparison | Two types could not each have a member spelled `size` without conforming; D44 removed exactly this class of false positive |
-| Opaque gensym identity | Loses the human-readable projection that printing, error messages and loose matching all rely on |
+| Compare FQN strings at each site | Same semantics (SC-4 is unaffected), more allocation and slower comparison |
 
-*Criterion:* conformance must be an identity question, not a spelling one.
-*Status:* holding — D44 is the evidence that the alternative was tried and
-failed.
+*Criterion:* comparison cost on a hot path. *Status:* holding.
 
-### IC-6 — Scopes as a parent chain rather than flattened environments
+### IC-5 — Scopes layer by parent chain
+*Realises SC-6, R2.*
 
-*Realises:* R2 (call-site specialisation must be cheap).
-
-**Chosen.** O(1) extend, chain-walking lookup.
+O(1) extend, chain-walking lookup.
 
 | Alternative | Trade |
 |---|---|
-| Flatten-copy on extend | O(n) per call site; this was the prior implementation and the hot path that motivated the change |
+| Flatten-copy on extend | O(n) per call site; the prior implementation, and the hot path that motivated the change |
 
-*Criterion:* cost of the operation PE performs most.
-*Status:* holding.
+*Criterion:* cost of the operation PE performs most. *Status:* holding.
 
-### IC-7 — Expressions form a memoized DAG rather than a tree
+### IC-6 — Expressions memoize
+*Realises SC-3, R2.*
 
-*Realises:* R2, R4.
-
-**Chosen.** An `Expression` carries a memo table, and the same expression
-value may be referenced from many places.
+An Expression carries a memo table keyed by evaluation context.
 
 | Alternative | Trade |
 |---|---|
-| Tree, re-evaluated per reference | Exponential re-evaluation under PE, which specialises the same subexpression repeatedly |
+| No memo, re-evaluate per reference | Exponential re-evaluation under PE, which specialises the same subexpression repeatedly |
 
-*Criterion:* PE cost.
-*Status:* holding.
+*Criterion:* PE cost. *Status:* holding.
 
-## 3. What this part does not yet contain
+## 4. Known tensions
 
-Recorded so the absence is visible rather than implied:
+Recorded because they were raised as objections to the requirement set and
+deserve answers rather than silence. Both turn out to be **implemented**
+violations rather than design contradictions — which is the useful outcome,
+since a contradiction would need a redesign and a violation needs a fix.
 
-- **No requirement covers syntax or the grammar substrate.** L1 exists and is
-  unrepresented above; either it derives from R1/R6 or there is a missing
-  requirement.
-- **No requirement covers the async/completion surface** (future cells,
-  forward chaining). D33 settled the design; nothing above says why the base
-  must have it.
-- **The implementation register covers T0–T1 only.** T2–T5 choices —
-  propagation rules, discharge tiers, the knowledge lattice — are not yet
-  registered.
-- **R1–R7 are proposed, not ratified.** They are the maintainer's three
-  stated requirements plus four this exercise surfaced (R4, R5, R6, R7).
+### 4.1 Does declared propagation contradict R6?
+
+**Objection.** The channel plane must apply per-channel propagation rules;
+channels are layer concepts; therefore the base knows about the layers.
+
+**Resolution: R11.** The base owns a *fixed vocabulary* of disciplines —
+`viral`, `union`, `computed`, `drop`, `positional` — over an opaque payload.
+The layer registers `(name, rule)` and installs whatever semantics the
+discipline needs. The base knowing "some channels are viral" is
+layer-ignorant. The base knowing "the error channel is viral" is not.
+
+**The correct pattern exists and is used once**: `src/effects.ts` calls
+`installChannelMerge("effects", …)` — the layer supplying its own merge to a
+base that cannot import the encoding without a cycle. That is R11 working.
+
+**And the base violates R6 today.** `src/slots.ts` registers **eleven L2
+channel names itself** at module init — `shape`, `error`, `effects`,
+`predicates`, `domain`, `knowledge`, `bound`, `discharged`, `warnings`,
+`source`, `exported` — and special-cases `shape` / `type` / `discharged` by
+name in `channelReadRaw` and `buildWriter`. The mechanism is layer-ignorant;
+the wiring is not. **→ B-109.**
+
+### 4.2 Does externalising registration break counterfeit protection?
+
+**Objection.** If any layer may register a channel, what stops one registering
+a forged `discharged`?
+
+**Resolution: R12 — authority is the capability, not the name.**
+Registration is one-shot and *returns* the writer as a closure, so whoever
+registers first holds it and no one else can obtain it; integrity channels
+may not take fabricating rules (`viral`/`union`), which is forgery vector C.
+Under that principle the base never needs to know *which* channels are
+sensitive — only that registration is one-shot and that the `integrity` flag
+constrains the rule.
+
+**And the base does not follow its own principle.**
+`INTEGRITY_CHANNEL_NAMES = ["discharged", "source"]` is a hardcoded list in
+`slots.ts`, consulted by `assertNotIntegrityKey` — protection by *name*,
+which is exactly the thing that cannot externalise. Worse, the two sources of
+truth disagree: `source` is in that list but is registered as
+`{ name: "source", rule: "drop" }` **without `integrity: true`**. The guard
+and the registry hold different beliefs about the same channel.
+
+The fix direction is small and removes both problems: consult
+`channelSpec(name)?.integrity` instead of the hardcoded set, and mark `source`
+integrity at registration. **→ B-109.**
+
+## 5. What this part does not yet contain
+
+Recorded so the absence is visible rather than implied.
+
+- **Cohesion has not been checked.** R1–R14 are individually plausible; the
+  bar for ratification is that they hold together as a **set**. Three
+  questions the check must answer: (1) is any requirement *derivable* from
+  the others, and therefore not a requirement (R8 already declares itself
+  derived from R4 — is R10 similarly derived from R2? is R11 from R3+R6?);
+  (2) does any pair conflict under some reachable design (§4 found two
+  apparent conflicts that turned out to be implementation violations — a
+  third might not); (3) is the set *sufficient* — can an Allegretto
+  satisfying all fourteen fail to carry Allegro? That last one is the only
+  falsification of the set as a whole, and it is answered by trying to name a
+  layer feature that nothing above enables. **→ S2c.**
+- **The registers cover T0–T1 only.** T2–T5 choices — propagation rules,
+  discharge tiers, the knowledge lattice, the module surface — are not yet
+  registered as SC or IC. Some of the R8–R14 requirements added here have no
+  specification item at all yet, which by §0's own rule makes them *unmet or
+  met implicitly*: R9 (grammar/extension), R10 (resumability), R12
+  (integrity), R13 (merge), R14 (modules). That is expected at this stage
+  and is exactly the orphan the traceability check is meant to surface.
+- **R1–R14 are proposed, not ratified**, and §4's two findings are recorded
+  as violations on the assumption that R6 and R12 survive ratification in
+  their current form. If either is amended, both findings must be re-read.
 
 ---
 
@@ -383,7 +586,7 @@ Allegretto with no type system present at all.
 
 ## 1. Value
 
-> **Level: Specification** — satisfies R1, R4.
+> **Level: Specification** — satisfies R1, R4, R8.
 
 **Definition.** A *value* is anything Allegretto can compute with. There is
 no other category: there are no statements, no declarations, and no types
@@ -402,7 +605,7 @@ seven kind interfaces.
 
 ## 2. Representation kind
 
-> **Level: Specification** — satisfies R1, R6.
+> **Level: Specification** — satisfies R1, R6, R8. Choice: **SC-1**.
 
 **Definition.** A *representation kind* is the physical form a value takes.
 There are exactly seven: **Bits**, **Symbol**, **Param**, **Expression**,
@@ -426,7 +629,7 @@ predates both `Symbol` and the `Context`→`Structure` renaming. **→ B-107.**
 
 ## 3. Bits
 
-> **Level: Specification** — satisfies R1, R6. Choice: **IC-1**.
+> **Level: Specification** — satisfies R1, R6. Choice: **SC-2**.
 
 **Definition.** A *Bits* value is a vector of bits of a known length. It is
 the only representation that carries no reference to another value — the
@@ -446,7 +649,7 @@ rather than kernel ones.
 
 ## 4. Symbol
 
-> **Level: Specification** — satisfies R2, R6. Choice: **IC-5**.
+> **Level: Specification** — satisfies R2, R6, R14. Choices: **SC-4** (identity), **IC-4** (interning).
 
 **Definition.** A *Symbol* is a named reference to something not yet
 resolved. Symbols come in two populations: **registered** symbols, whose
@@ -493,7 +696,7 @@ the reservation belongs in prose. **→ B-107.**
 
 ## 6. Expression
 
-> **Level: Specification** — satisfies R2, R4. Choice: **IC-7**.
+> **Level: Specification** — satisfies R2, R4, R8. Choices: **SC-3** (expressions are values), **IC-6** (memoization).
 
 **Definition.** An *Expression* is an application node: a function value
 plus an argument list, with a memo table. Expressions form a **DAG**, not a
@@ -534,7 +737,7 @@ plane** (T2 §9) is the fix; recording it here so the T2 entry has a caller.
 
 ## 8. PrimitiveFunction
 
-> **Level: Specification** — satisfies R2, R5.
+> **Level: Specification** — satisfies R2, R5, R11.
 
 **Definition.** A *PrimitiveFunction* is a function implemented by the host
 rather than in Allegretto. Beyond its implementation it carries three
@@ -555,7 +758,7 @@ is `primitives` in `src/primitives.ts`.
 
 ## 9. Structure
 
-> **Level: Specification** — satisfies R1, R3. Choices: **IC-2**, **IC-3**.
+> **Level: Specification** — satisfies R1, R3, R8. Choice: **SC-5** (one composite kind). Implementation: **IC-1**, **IC-2**.
 
 **Definition.** A *Structure* is the one composite representation: a value
 built from other values. It is the only kind with internal parts, and every
@@ -585,7 +788,7 @@ the alias), and the name actually used throughout the codebase is
 
 ## 10. Carrier
 
-> **Level: IMPLEMENTATION** — choice **IC-4**, realising R3. Not part of the specification: a different metadata mechanism would delete this concept entirely.
+> **Level: IMPLEMENTATION** — choice **IC-3**, realising R3. Not part of the specification: a different metadata mechanism (a channel map on every value) would delete this concept entirely.
 
 **Definition.** A *carrier* is a Structure that stands in for another value:
 its data plane is empty, the value it stands for sits in `primary`, and its
@@ -608,7 +811,7 @@ that documents its own obsolescence is a rename that stopped halfway.
 
 ## 11. Data plane
 
-> **Level: Specification** — satisfies R5.
+> **Level: Specification** — satisfies R3, R5.
 
 **Definition.** The *data plane* of a value is the value it ultimately
 denotes, ignoring anything carried alongside. For every value except a
@@ -639,7 +842,7 @@ What a Structure is made of, and the three roles it plays.
 
 ## 12. Structure roles
 
-> **Level: IMPLEMENTATION** — choices **IC-2**, **IC-3**. The specification says *one* composite (§9); the roles are how this host realises it.
+> **Level: IMPLEMENTATION** — choices **IC-1**, **IC-2**. SC-5 says *one composite kind*; the four roles are how this host realises it, and the gap between those two sentences is IC-1's whole finding.
 
 **Definition.** A Structure plays exactly one of three roles, chosen at
 construction:
@@ -698,7 +901,7 @@ and no stated rule for choosing. **→ B-107.**
 
 ## 14. Binding attributes
 
-> **Level: Specification** — satisfies R2. (`cell`, `isComplete`, `incompleteDeps` serve the completion surface — see Part 0 §3, which records that no requirement yet covers it.)
+> **Level: Specification** — satisfies R2, **R10**. (`cell`, `isComplete`, `incompleteDeps` are the binding-level form of R10: information arriving later, tracked where it is waited on.)
 
 **Definition.** Beyond key and value, a binding carries four optional
 attributes, all of them properties of *the binding in its scope* rather than
@@ -724,7 +927,7 @@ binding-name families should follow rather than encoding state in a name
 
 ## 15. Scope
 
-> **Level: Specification** — satisfies R2. Choice: **IC-6**.
+> **Level: Specification** — satisfies R2, R8. Choices: **SC-6** (scopes are values), **IC-5** (chain layering).
 
 **Definition.** A *scope* is a Structure in the evaluation role: a binding
 map plus a link to a parent scope. Lookup walks the chain; extending is O(1)
@@ -750,7 +953,7 @@ by the declaration — the host plane is physically inside the value interface.
 
 ## 16. Dense region
 
-> **Level: IMPLEMENTATION** — choice **IC-3**. Invisible from the specification in principle; visible in practice, which is §17's delta.
+> **Level: IMPLEMENTATION** — choice **IC-2**. Invisible from the specification in principle; visible in practice, which is §17's delta.
 
 **Definition.** A Structure in the *dense* role stores its elements in a
 plain array rather than as per-element bindings. Its slot count is the array
@@ -771,7 +974,7 @@ materialize the legacy view.
 
 ## 17. The legacy view
 
-> **Level: IMPLEMENTATION** — choice **IC-3**. Pure compatibility scaffolding; nothing in the specification requires it.
+> **Level: IMPLEMENTATION** — choice **IC-2**. Pure compatibility scaffolding; nothing in the specification requires it.
 
 **Definition.** A dense Structure can still be read through the binding map
 and list. That view is **materialized lazily** on first such access, then
@@ -826,9 +1029,8 @@ were concepts of the language. They are not: they are how *this host* realises
 
 That is a quarter of T0–T1 sitting a level above where it belongs, and it is
 the same mistake in four places: an implementation choice, made for a
-performance criterion, read afterwards as part of the design. All four trace
-to **IC-2/IC-3/IC-4**, which is why those three are the ones under review at
-**B-108**.
+performance criterion, read afterwards as part of the design. All four trace to **IC-1/IC-2/IC-3**, which is why those three are the ones
+under review at **B-108**.
 
 The check is now mechanical rather than a matter of judgement: an entry that
 cannot name the requirement it traces up to is either misplaced or resting on

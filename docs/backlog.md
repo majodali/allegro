@@ -1183,7 +1183,11 @@ that prevents it.
     performance arguments. The unification was read as a conceptual
     simplification because requirement / specification / implementation were
     not separated; that separation now exists (concepts.md Part 0)
-  - **Options carried in `concepts.md` IC-3**: A map-first (current),
+  - **Options carried in `concepts.md` IC-2** (renumbered at S2b; the
+    kind-count half of the old IC-2 is now **SC-5**, a SPECIFICATION choice,
+    and the role-configuration half is **IC-1**. Separating them is what
+    makes the doubt answerable: reducing kinds 2 → 1 was a specification win
+    under R1; the cost was entirely at the implementation level): A map-first (current),
     B sequence-first (LISP-style, maintainer's suggestion), C two
     representations (the original), **E one entry-sequence** — a single
     composite of optionally-keyed entries that is both map and list, under
@@ -1196,12 +1200,53 @@ that prevents it.
     out association lists in an interpreter argue far more weakly in a
     partial evaluator. Counter-pressure: channel reads ARE hot and ARE
     by-name (R3+R5), which is exactly where B goes linear
-  - **IC-4 has no recorded criterion at all** — "channels by wrapping" was
+  - **IC-3 (was IC-4) has no recorded criterion at all** — "channels by wrapping" was
     never written down as a choice. The alternative (an optional channel map
     on every value) deletes the carrier concept outright: no `primary`, no
     67 presence-checks, no W1 non-nesting invariant, no `dataOf`
     indirection — at the cost of an optional field on every representation,
     including Bits
-  - **Deliverable**: a ruling on the composite, and whichever of IC-2/3/4 it
-    settles moves from Implementation to a recorded choice WITH a criterion
+  - **Deliverable**: a ruling on the composite, and whichever of SC-5 /
+    IC-1 / IC-2 / IC-3 it settles moves to a recorded choice WITH a criterion
     and a revisit trigger. Blocks nothing; informs T2 (planes) directly
+
+- [ ] **B-109** · L0 · **R6 and R12 are violated in the channel substrate.**
+  Found by the concept spine (S2b) while resolving two objections to the
+  requirement set. Both turned out to be **implementation** violations rather
+  than design contradictions — the mechanism is layer-ignorant, the wiring is
+  not — which is the good outcome: a contradiction would need a redesign.
+  - **(a) The base registers the layers' channels (R6, R11).** `src/slots.ts`
+    registers **eleven L2 channel names** itself at module init: `shape`,
+    `error`, `effects`, `predicates`, `domain`, `knowledge`, `bound`,
+    `discharged`, `warnings`, `source`, `exported`. It also special-cases
+    `shape` / `type` / `discharged` **by name** in `channelReadRaw` and
+    `buildWriter`. R11's whole point is that the base owns a fixed
+    *vocabulary* of propagation disciplines over an opaque payload, and the
+    LAYER registers `(name, rule)`. The base knowing "some channels are
+    viral" is layer-ignorant; the base knowing "the error channel is viral"
+    is not
+  - **The correct pattern already exists and is used exactly once**:
+    `src/effects.ts` calls `installChannelMerge("effects", …)` — the layer
+    supplying its own merge to a base that cannot import the encoding without
+    a cycle. That is R11 working, and it is the template for the other ten
+  - **(b) Integrity is enforced by name, not by capability (R12).**
+    `INTEGRITY_CHANNEL_NAMES = ["discharged", "source"]` is a hardcoded set in
+    `slots.ts` consulted by `assertNotIntegrityKey`. R12 says authority is the
+    **capability** — registration is one-shot and returns the writer closure,
+    so whoever registers first holds it — under which the base never needs to
+    enumerate sensitive channels. Protection by name is precisely the form
+    that cannot survive externalising registration, which is the objection
+    that surfaced this
+  - **(c) The two sources of truth disagree.** `source` is in
+    `INTEGRITY_CHANNEL_NAMES` but is registered as
+    `{ name: "source", rule: "drop" }` — **without `integrity: true`**. The
+    guard and the registry hold different beliefs about the same channel.
+    Harmless today (its rule is `drop` either way), but it is two mechanisms
+    where there should be one
+  - **Fix direction** (small, and it removes (b) and (c) together): consult
+    `channelSpec(name)?.integrity` instead of the hardcoded set, and mark
+    `source` integrity at registration. (a) is larger — moving eleven
+    registrations out of the base — and should follow the T2 planes entry
+    rather than precede it
+  - **Gated on**: R6, R11 and R12 surviving ratification in their current
+    form. If any is amended these findings must be re-read

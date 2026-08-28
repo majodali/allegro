@@ -4,6 +4,82 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S2b: the level split, R8–R14, and two live violations
+
+**The register splits in two.** Some of what S2a called implementation
+choices were specification choices, and the difference is whether Allegro can
+*see* it: a specification choice has alternatives, but changing one changes
+what the layers above are written against; an implementation choice is
+invisible to every program. Per maintainer ruling — a single value universe
+is a **requirement** (it follows from totality); the value kinds are
+**specification** (options exist, and L2 dispatches on them); metadata
+storage and structure indexing are **implementation**.
+
+So SC-1…SC-6 and IC-1…IC-6 now sit under R1–R14, with the old numbering
+mapped in place. The split immediately did work: **the old IC-2 was two
+choices wearing one number.** Reducing the composite kind count 2 → 1 is
+**SC-5**, a specification win under R1. What it cost — 11 fields, 4 role
+configurations, role read by field presence at 146 sites — is **IC-1**, and
+entirely at the implementation level. That separation is what makes the
+maintainer's original doubt answerable: the specification improved and the
+implementation did not, and one number could not say both.
+
+**Seven new requirements**, filling the gaps §3 had recorded: one value
+universe (R8, derived from R4); an extensible language surface (R9);
+resumable evaluation (R10 — the temporal generalisation of R2, covering
+async and module loading); **declared, not coded, propagation** (R11);
+capability-controlled metadata origination (R12); mergeable channels (R13);
+separately-loadable units with visibility boundaries (R14 — `use`/`import`
+is a surface, not the requirement).
+
+**Requirements now carry a subject**, and it earns its place immediately.
+Two candidates raised as requirements — *discharge* and the *knowledge
+lattice* — are Allegro requirements, not Allegretto ones, and their base
+counterparts are strictly weaker: discharge ↦ R2+R4 (evaluate as far as
+possible, residual otherwise; the base knows nothing of "obligation"), and
+the knowledge lattice ↦ R13 (the base supplies merge, the layer supplies the
+lattice). Conflating the two levels is exactly what makes R6 look violated
+when it is not.
+
+**Two objections, answered — and both are violations in the code.**
+
+*Does declared propagation contradict R6?* No: **R11** is the resolution. The
+base owns a fixed vocabulary — `viral`, `union`, `computed`, `drop`,
+`positional` — over an opaque payload, and the layer registers `(name, rule)`
+and installs its own semantics. Knowing "some channels are viral" is
+layer-ignorant; knowing "the error channel is viral" is not. The correct
+pattern **exists and is used exactly once** — `effects.ts` calls
+`installChannelMerge("effects", …)`. But `slots.ts` registers **eleven L2
+channel names itself** and special-cases `shape`/`type`/`discharged` by name.
+The mechanism is layer-ignorant; the wiring is not.
+
+*Does externalising registration break counterfeit protection?* No: **R12** —
+authority is the capability, not the name. Registration is one-shot and
+returns the writer closure, so the base never needs to enumerate sensitive
+channels. But `INTEGRITY_CHANNEL_NAMES = ["discharged", "source"]` is a
+hardcoded list, which is protection by name — the one form that cannot
+survive externalising. And the two sources of truth **disagree**: `source` is
+in that list yet is registered *without* `integrity: true`.
+
+Both → **B-109**, with the small fix for the second (consult
+`channelSpec(name)?.integrity`; mark `source` at registration) and the larger
+one for the first deferred behind the T2 planes entry.
+
+**Cohesion is explicitly not done.** §5 states the method rather than
+claiming the property: is any requirement derivable from the others (R8
+already declares itself derived from R4 — is R10 from R2? R11 from R3+R6?);
+does any pair conflict under a reachable design; and is the set *sufficient*
+— can an Allegretto satisfying all fourteen fail to carry Allegro? The last
+is the only falsification of the set as a whole. **→ S2c.**
+
+§5 also records, by the traceability rule's own logic, that **five of the
+seven new requirements have no specification item yet** (R9, R10, R12, R13,
+R14) — unmet or met implicitly. That is the orphan check working as designed
+rather than a gap to hide.
+
+No `src/` changes. Gate: **1197/1197, `GATE: PASSED`**. Typecheck clean,
+doc-ref-lint clean.
+
 ## 2026-08 — Concept spine S2a: requirement, specification, implementation
 
 The spine gains **Part 0 · Foundations**, at maintainer direction, and it
