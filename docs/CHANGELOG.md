@@ -4,6 +4,77 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S2f: metadata/field/channel, plane interfaces, T3
+
+Three maintainer items and the T3 tier.
+
+**The plane is renamed *metadata*; it holds *fields*; a *channel* is a
+capability.** A field is storage; a channel is the whole apparatus by which
+one capability rides values through PE — its fields, their rules, their
+writer, and the layer-side semantics. Typing is a channel. Effect analysis is
+a channel.
+
+**The rename is not cosmetic — the distinction already existed and had no
+name.** Eleven things are registered in one registry as if alike. They are
+**five different kinds**: seven stored fields; one *projection* (`shape`, no
+storage of its own, a computed view of `type`); one **capability with no
+field at all** — `knowledge`, where nothing ever stores a `knowledge`
+component and its own comment says its storage *is* `predicates`/`domain`
+plus the refinement layers; one retired entry (`exported`, moved to
+`Binding.visibility` at B-097 V1); one unused (`warnings`). `knowledge` is
+the proof: registered exactly like `predicates`, and not the same kind of
+thing at all. Nothing could have flagged that while all eleven were called
+"channels". **→ B-111.**
+
+**Plane interfaces become a first-class entry (§24).** A plane interface is
+the sanctioned route to a plane; reaching one any other way is a plane
+violation *whatever it computes correctly*. The entry carries the full
+producer/consumer table — and it reframes everything T2 found: **every T2
+delta is an instance of an absent interface.**
+
+Four are owed, and they have one shape:
+
+1. a **dispatch hook** — the evaluator needs type-directed dispatch during
+   evaluation (R2) and must not know what a type is;
+2. a **check hook** — `checkArgType` currently lives in the evaluator;
+3. a **projection hook** — `shape` is hardcoded in `channelReadRaw`;
+4. **channel registration** (B-111).
+
+All four are *the base holds an inspectable symbol, the layer installs the
+meaning* — SC-7's argument generalised from propagation to every plane
+boundary. Today two of eight interface rows have a real mechanism, four are
+conventions enforced by lint or nothing, and the layer→base row has one
+instance and no general form. **→ B-112**, which supersedes the open question
+inside B-110 by naming it.
+
+**T3 · Evaluation** — PE Rules 1 and 2, resolved/unresolved/residual, tail
+calls, future cells and completion, the `evalSource` pipeline. Its own
+finding is **§29: the L2 post-passes are hardcoded into the base's stage
+list** (effects, exhaustiveness, termination, proofs). That is §23's
+violation in its other form — not an import into the evaluator, but layer
+stages baked into the base pipeline. One root, two surfaces; a layer should
+*register* a post-pass.
+
+Two smaller T3 deltas: **TailCall forwarding is convention-only** (a body
+wrapper that swallows the sentinel is a silent performance cliff, not an
+error — **B-113**), and **completion confluence is not guaranteed by
+construction** — the B-028 arrival-order bug was *fixed*, not precluded, and
+candidate R16 (determinism) still has no specification item and no test that
+would catch a recurrence (**B-114**).
+
+**Recorded for the long term**: the maintainer intends this model to become
+**formal** — logical statements over requirements, specification,
+implementation choices, constraints and test cases, implemented in Vivace,
+with coverage, traceability and correctness checks automated. The plan gains
+§4a stating what that implies *now*: traceability links as data rather than
+prose, stable unique identifiers as join keys, the three orphan checks as the
+first automatable rules, and a **"Verified by" row** as a known-missing
+column (requirement ↔ test coverage is not yet derivable — recorded rather
+than guessed at). Explicitly *not* implied: contorting the prose into
+pseudo-formal notation ahead of the tooling.
+
+No `src/` changes. Gate: **1197/1197, `GATE: PASSED`**.
+
 ## 2026-08 — Concept spine S2e: T2 planes, absorbing B-110
 
 The planes are written down. Six entries — plane, channel, propagation,

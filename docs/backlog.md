@@ -1290,3 +1290,70 @@ that prevents it.
     the S2d classification had to be done by reading 117 call sites. The abort
     classes in `concepts.md` §7 are the vocabulary; the mechanism should carry
     which one. Specification-level, and separable from (a)–(c)
+
+- [ ] **B-111** · L0 · **Field vs channel — one word and one registry for two
+  concepts.** Raised by the concept spine (S2f, maintainer terminology). The
+  metadata plane holds **fields**; a **channel** is the whole apparatus by
+  which one capability rides values through PE — its fields, their rules,
+  their writer, and the layer-side semantics. Storage vs capability.
+  - **The evidence that this is a real distinction, not a rename.** Eleven
+    things are registered in one registry as if alike. They are five kinds:
+    seven **stored fields** (`type`, `predicates`, `domain`, `bound`,
+    `effects`, `error`, `discharged`, `source`); one **projection**
+    (`shape` — no storage, a computed view of `type` with refinement layers
+    walked off); one **capability with no field at all** (`knowledge` —
+    nothing ever stores a `knowledge` component, and its own comment says its
+    storage IS `predicates`/`domain` plus the refinement layers); one
+    **retired** entry (`exported`, moved to `Binding.visibility` at B-097 V1);
+    one **unused** (`warnings`)
+  - `knowledge` is the proof: registered exactly like `predicates`, and not
+    the same kind of thing at all
+  - **The change**: `registerChannel` becomes field registration, and a
+    channel-level registration is introduced — *these fields, these rules,
+    this semantics, this owner*. **B-109(a)** (moving registration out of the
+    base to the owning layers) is the natural moment, because a layer
+    registering its own capability IS a channel registration
+  - Nomenclature also affects `ChannelSpec`, `ChannelWriter`,
+    `channelReadRaw`, `channelSpec`, `viralChannels`, `unionChannels`,
+    `installChannelMerge`, `CHANNEL_TABLE`
+
+- [ ] **B-112** · L0 · **The four owed plane interfaces.** Raised by the
+  concept spine (S2f); `concepts.md` §24 carries the interface table.
+  Supersedes the open "what capability does the evaluator need" question in
+  B-110 by naming it. A plane interface is the sanctioned route to a plane;
+  reaching one any other way is a plane violation whatever it computes
+  correctly, and **every T2 delta is an instance of an absent interface**.
+  - **(a) Dispatch hook.** The evaluator needs type-directed dispatch during
+    evaluation (R2 — discharge happens BY evaluating) and must not know what
+    a type is. A channel installs *how to dispatch on my field*; the evaluator
+    calls it with an opaque field value
+  - **(b) Check hook.** `checkArgType` lives in `evaluator.ts` today. Same
+    shape: a channel installs *how to check a value against my field*
+  - **(c) Projection hook.** `shape` is a computed projection of `type`,
+    hardcoded in `channelReadRaw`. Channels should install their projections
+  - **(d) Channel registration** — see B-111
+  - **All four have one form**: the base holds an INSPECTABLE SYMBOL, the
+    layer installs the meaning. That is SC-7's argument (inspectable symbols
+    are what keep R12 enforceable) generalised from propagation to every plane
+    boundary. A hook that handed the base an opaque closure AND made it the
+    authority would lose the property, so hooks must be capability-gated the
+    way writers are
+  - Today two of eight interface rows have a real mechanism (`dataOf`,
+    `channelReadRaw` + the propagation table); four are conventions enforced
+    by lint or by nothing; the layer→base row has one instance
+    (`installChannelMerge`) and no general form
+
+- [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
+  Body wrappers (`type_check`, the `*_attach` family) must forward the
+  TailCall sentinel or a tail call silently degrades to an ordinary call — a
+  performance cliff, not an error. Enforced today by a recurring-lesson note
+  in `PROCESS.md` §6 and nothing else. Candidate boundary invariant: a wrapper
+  that swallows the sentinel should fail the suite
+
+- [ ] **B-114** · L0 · **Completion confluence is not guaranteed by
+  construction.** The B-028 arc found an arrival-order bug (an instance kept a
+  stale symbol when one field resolved before another) and FIXED it with
+  completion replacement — but nothing establishes that arrival order cannot
+  matter. This is candidate **R16** (determinism) with no specification item
+  and no test that would catch a recurrence. Needs: the property stated, then
+  either a construction that guarantees it or a test that samples orders

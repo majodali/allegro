@@ -1,7 +1,7 @@
 # Concept spine — define Allegro, then make the code say it
 
 > Status: **active** — ratified 2026-08 (§6 rulings 1–3; ruling 4
-> deliberately HELD as a delta for S3). **S1 + S2a–S2e landed**; S2f (T3 evaluation) next.
+> deliberately HELD as a delta for S3). **S1 + S2a–S2f landed**; S3 (T4 types) next.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -175,6 +175,47 @@ Deliberately **out of scope**: grammar-2 internals (covered by
 website. Their concepts get spine entries only where a lower tier depends
 on them.
 
+## 4a. The long-term target — a formal model in Vivace
+
+> Maintainer intent, recorded 2026-08 so the exercise builds toward it rather
+> than needing rework.
+
+The end state is a **formal software specification model**: logical
+statements covering requirements, specification, implementation choices,
+constraints and test cases, implemented in **Vivace**, with coverage,
+traceability and correctness checks **automated**. That capability does not
+exist yet, so the spine is prose for now — but prose written to become
+machine-readable.
+
+**What that implies for how entries are written, starting now:**
+
+- **Traceability links must be data, not prose.** "Satisfies R3′, R12" in a
+  fixed position is extractable; "this follows from what we said about
+  metadata" is not. Every entry already carries an explicit Level line naming
+  what it traces to — that is the seed of the relation the model will check.
+- **Identifiers must be stable and unique.** R-numbers, SC-numbers,
+  IC-numbers, entry numbers and B-numbers are the join keys. Renumbering is
+  expensive later; S2b's SC/IC renumbering is recorded in place for exactly
+  this reason.
+- **The three orphan checks are the first automatable rule** (Part 0 §0):
+  spec-without-requirement, implementation-without-spec,
+  requirement-without-spec. All three are graph queries over the links above.
+- **Test cases are a missing column.** The model wants requirement ↔ test
+  traceability, and the spine currently records *code* fidelity (the Delta
+  row) but not *test* coverage. A future entry format likely gains a
+  **Verified by** row naming the tests that hold the entry. Not added yet —
+  it would be guesswork before the tier is written — but the gap is recorded
+  so it is not discovered late.
+- **Cohesion findings are propositions.** §6's derivability results ("R11
+  follows from R3 + R6") are exactly the logical statements the model is
+  meant to hold. They are written as prose arguments now; they are the same
+  content.
+
+**What it does not imply.** The spine should not be contorted into pseudo-
+formal notation ahead of the tooling. Regular structure and stable
+identifiers are enough to make the later translation mechanical; premature
+formalism would make it less readable now for no gain.
+
 ## 5. Chunk sequence (proposed)
 
 Each chunk lands a tier of the spine PLUS the deltas it discovers, filed
@@ -189,7 +230,7 @@ being written to justify a rename already in flight.
 | **S2c** | ~~Requirement-set cohesion~~ **DONE 2026-08** — all three checks found something. **7 of 14** requirements do not survive as requirements (derived, conflated, or not requirements at all); **2** real conflicts, including R4 stating something the base contradicts 117 times; **3** capabilities Allegro needs that nothing enables (candidates R15–R17: program-level aggregation, determinism, the host boundary). Two method amendments fed back into the methodology proposal |
 | **S2d** | ~~Abort classification + metadata merge~~ **DONE 2026-08** (maintainer corrections) — S2c's "R4 was over-broad" **overturned**: inconsistency is not evidence of a different requirement. Every base abort classified into six classes → candidates **R18/R19/R20**; one class is **rework**, not specification — the L0 evaluator implements L2 type checking (27 upward imports; `checkArgType` in `evaluator.ts`) → **B-110**. R3/R5/R11/R13 merged into **R3′** (non-interference); the fixed propagation vocabulary kept as **SC-7** because R12 is enforceable only over inspectable rules |
 | **S2e** | ~~T2 planes~~ **DONE 2026-08**, absorbing **B-110** per maintainer ruling — the four planes and the placement rule, channel, propagation (SC-7), writer capability, meta slot, and **§23 the layer boundary**. Six deltas. S1's "three entries are the same undeclared-plane gap" becomes four named defects plus the L0→L2 dependency, which is not a new problem but §18's rule unapplied to one subsystem |
-| **S2f** | T3 evaluation — PE rules, resolved/residual, tail calls, future cells, the `evalSource` pipeline |
+| **S2f** | ~~T3 evaluation~~ **DONE 2026-08** — PE Rules 1/2, resolved/residual, tail calls, future cells and completion, the `evalSource` pipeline. Plus two maintainer items: the **metadata / field / channel** terminology (§19/§19b — which immediately exposed that the registry holds five different kinds of thing under one word, → B-111) and **plane interfaces elevated to a first-class entry** (§24 — four hooks owed, → B-112). T3's own finding: §29, the L2 post-passes are hardcoded into the base pipeline — §23's violation in its other form |
 | **S3** | T4 types. Expect the most deltas here, and the `~Interface` definition |
 | **S4** | T5 obligations. Mostly reconciliation — the R-series rulings already carry rationale, so this is largely relocation and delta-hunting |
 | **S5** | Delta triage: every delta from S1–S4 becomes a backlog item, ordered. This is the code campaign's plan, produced as evidence rather than guessed |

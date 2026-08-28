@@ -152,6 +152,28 @@ in a specific way rather than by reasoning about it.
   and more load-bearing at once. A practice that only ever *adds* requirements
   is not being checked.
 
+## 6b. The target form — machine-checkable
+
+The pilot's maintainer intends the model to become **formal**: logical
+statements over requirements, specification, implementation choices,
+constraints and test cases, with coverage, traceability and correctness
+checks automated. The amendment should not require that — most projects will
+not have a checker — but it should require the properties that make it
+*possible* later, because they cost nothing now:
+
+- **Traceability links in a fixed position**, not in prose.
+- **Stable, unique identifiers** for every requirement, choice and entry;
+  they are the join keys.
+- **The three orphan checks stated as rules**, since they are graph queries
+  and are the first thing a checker would run.
+- **A "Verified by" row** linking entries to the tests that hold them, so
+  requirement ↔ test coverage is derivable. The pilot has not added this yet
+  and records the gap rather than guessing at the format.
+
+The point is not to write pseudo-formal prose. It is that a model written
+with regular structure and stable identifiers can be *translated*, and one
+written as flowing argument cannot.
+
 ## 7. Open questions for the amendment
 
 1. **Is the practice mandatory, tiered, or recommended?** Suggestion: tie it

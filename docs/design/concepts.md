@@ -5,8 +5,8 @@
 > (`allegretto/structures.md`, `standard/type-system.md`, …) are where the
 > deep treatment lives; this is what makes them legible.
 >
-> Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T2 written**
-> (S1, S2a–S2e); T3–T5 pending. Status tags per `README.md`.
+> Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T3 written**
+> (S1, S2a–S2f); T4–T5 pending. Status tags per `README.md`.
 >
 > **Start at Part 0.** It separates *requirement* from *specification* from
 > *implementation*, which is the distinction whose absence caused most of the
@@ -1276,23 +1276,23 @@ evaluation does to it**:
 |---|---|---|---|---|
 | **Data** | What the value *is* | construction | replaced by the result | yes — it is the value |
 | **Binding** | A composite's named parts | construction; kernel for engine slots | copied by the operations that copy structures | yes — user fields |
-| **Channel** | Information *about* the value | the channel's registered writer | per the channel's declared rule (SC-7) | yes, through channel reads |
+| **Metadata** | Information *about* the value, in named **fields** | the field's registered writer | per the field's declared rule (SC-7) | yes, through field reads |
 | **Host** | Interpreter bookkeeping | the host, freely | nothing — it is not part of the value | **no** |
 
 **Rationale.** The planes are what make R3′ possible: an operation can carry
-a channel it has never heard of precisely because the channel plane is
+a metadata field it has never heard of precisely because the metadata plane is
 separate from the data it is operating on. They are also the answer to "where
 should this new thing go?", which is the question nobody could answer for
 four years because the planes were never written down.
 
 **The rule for placing something new.** Ask in order: *Is it what the value
 is?* → data. *Is it a part a user names?* → binding. *Is it information about
-the value that must survive operations?* → channel, and it needs a registered
+the value that must survive operations?* → metadata, and it needs a registered
 rule and a writer. *Is it none of those?* → host, and it must not be
 observable from Allegro.
 
 **As implemented.** Data → `primary` / the value itself, read via `dataOf`.
-Binding → `bindings` + `bindingList` (+ `dense`). Channel → `components`.
+Binding → `bindings` + `bindingList` (+ `dense`). Metadata → `components`.
 Host → JS expandos and declared-but-non-value fields on `Structure`.
 
 **Delta.** The host plane is **declared inside the value interface**:
@@ -1302,37 +1302,86 @@ enforces the distinction — a plane that is documented in comments and
 contradicted by the type is not a plane, it is a convention. **→ B-107(f)**,
 which was blocked on this entry existing.
 
-## 19. Channel
+## 19. Metadata field
 
-> **Level: Specification** — satisfies R3′, R12.
+> **Level: Specification** — satisfies R3′, R12. *Renamed at S2f from
+> "channel", which was two concepts sharing a word — see §19b.*
 
-**Definition.** A *channel* is a named region of the channel plane, with a
+**Definition.** A *field* is one named slot of the metadata plane, with a
 **declared propagation rule** and a **writer capability**. Registration is
 one-shot: the first registrant receives the writer as a closure and no one
 else can obtain it. Reads are free.
 
 **Rationale.** One-shot registration is what makes R12 work without the base
-knowing which channels matter: authority is *the closure*, not the name, so
+knowing which fields matter: authority is *the closure*, not the name, so
 "who may write `discharged`" is answered by possession rather than by a list
-the base would have to maintain (and would have to be told to maintain,
-violating R6).
+the base would have to maintain — and would have to be told to maintain,
+violating R6.
 
 **As implemented.** `registerChannel(spec)` in `src/slots.ts` returns a
 `ChannelWriter`; `channelReadRaw(v, name)` reads; `channelSpec(name)` returns
-the registration. `kernelChannelWriter` is the kernel's acquisition path and
-is lint-restricted to two modules.
+the registration; storage is the `components` map. `kernelChannelWriter` is
+the kernel's acquisition path, lint-restricted to two modules.
 
-**Delta.** The base **registers eleven L2 channels itself** at module init
-(`shape`, `error`, `effects`, `predicates`, `domain`, `knowledge`, `bound`,
-`discharged`, `warnings`, `source`, `exported`) and special-cases three by
-name. R6 says the layer should register its own. **→ B-109(a).**
+**Delta.** The base **registers eleven fields itself** at module init and
+special-cases three by name. R6 says the owning layer should register its
+own. **→ B-109(a).** Naming: the implementation calls fields "channels"
+throughout — see §19b's delta.
+
+## 19b. Channel
+
+> **Level: Specification** — satisfies R2, R3′. *New at S2f (maintainer).*
+
+**Definition.** A *channel* is the whole apparatus by which one capability
+rides values through partial evaluation: **one or more metadata fields**,
+their propagation rules, their writer, and the layer-side semantics that
+interpret them. Typing is a channel. Effect analysis is a channel. Proof
+discharge is a channel. A field is storage; a channel is a capability.
+
+**Rationale.** R2 says layers are added by partial evaluation, and R3′ says
+their information rides on values independently. A *channel* is what one such
+layer's participation actually consists of — which is more than a slot, and
+is why the two need different words. The distinction is not cosmetic: a
+capability may need several fields (knowledge needs three), and a field may
+be read through more than one projection (`shape` is a projection of `type`).
+
+**As implemented — the distinction already exists and has no name.** Eleven
+things are registered in one registry as though they were the same kind of
+thing. They are not:
+
+| Registered | Actually is | Channel |
+|---|---|---|
+| `type` | a stored field | typing |
+| `shape` | a **projection** of the `type` field (refinement layers walked off) — no storage of its own | typing |
+| `predicates` | a stored field | knowledge |
+| `domain` | a stored field | knowledge |
+| `bound` | a stored field | knowledge |
+| `knowledge` | a **capability with no field at all** — nothing ever stores a `knowledge` component; its own comment says its storage *is* `predicates`/`domain` plus the refinement layers | knowledge |
+| `effects` | a stored field | effect analysis |
+| `error` | a stored field | error propagation |
+| `discharged` | a stored field (binding-plane) | proof |
+| `source` | a stored field | provenance |
+| `warnings` | a field, currently unused | diagnostics |
+| `exported` | a **retired** field — B-097 V1 moved export-ness to `Binding.visibility` | — |
+
+So the registry holds **fields, one projection, one capability, one dead
+entry and one unused entry**, undifferentiated. `knowledge` is the proof: it
+is registered exactly like `predicates` and is not the same kind of thing at
+all.
+
+**Delta.** The code has one word and one registry for two concepts. Renaming
+`registerChannel` → field registration and introducing a channel-level
+registration (which fields, which semantics, which layer owns it) is the
+change; **B-109(a)** — moving registration to the layers — is the natural
+moment to do it, since a layer registering its own capability is exactly a
+channel registration. **→ B-111.**
 
 ## 20. Propagation
 
 > **Level: Specification** — **SC-7**, satisfies R3′; criterion R12.
 
-**Definition.** A channel's *propagation rule* says what an operation does
-with that channel, drawn from a **fixed, inspectable vocabulary**: `viral`
+**Definition.** A field's *propagation rule* says what an operation does
+with that field, drawn from a **fixed, inspectable vocabulary**: `viral`
 (present on any argument ⇒ present on the result), `union` (arguments'
 values combined by the channel's installed merge), `computed` (the channel's
 owner derives it), `positional`, `drop` (never carried forward). The base
@@ -1342,14 +1391,14 @@ rule needs are installed by the channel's owner.
 **Rationale.** The vocabulary is fixed rather than open — a channel cannot
 register an arbitrary propagation closure — and the reason is R12, not
 convenience. `registerChannel` refuses a `viral` or `union` rule on an
-integrity channel, because those **fabricate**: they place a value on a
+integrity field, because those **fabricate**: they place a value on a
 result that no holder of the writer put there. That check is decidable only
 over an inspectable symbol; over a closure it is unwritable, and R12 degrades
 from enforced to hoped-for. See Part 0 §8.2.
 
 **As implemented.** `PropagationRule` in `src/slots.ts`; `viralChannels()`
 and `unionChannels()` are cached filters over the registry;
-`installChannelMerge(name, fn)` is how a layer supplies `union` semantics —
+`installChannelMerge(name, fn)` is how a channel supplies `union` semantics —
 `src/effects.ts` is the one caller, and the pattern to generalise.
 
 **Delta.** — *(the mechanism is correct; its wiring is §19's delta)*
@@ -1358,8 +1407,8 @@ and `unionChannels()` are cached filters over the registry;
 
 > **Level: Specification** — satisfies R12.
 
-**Definition.** The authority to *originate* a channel value is a closure
-handed to whoever registered the channel. Reads require nothing (D23).
+**Definition.** The authority to *originate* a field value is a closure
+handed to whoever registered the field. Reads require nothing (D23).
 Origination on a user-reachable construction path is refused unless the
 writer is held.
 
@@ -1382,7 +1431,8 @@ disagree: `source` is in the list but is registered **without**
 > **Level: IMPLEMENTATION** — realises the binding plane. Dissolving.
 
 **Definition.** A *meta slot* is a binding the engine owns rather than the
-user, historically marked by a `__` name prefix.
+user, historically marked by a `__` name prefix. (Distinct from a metadata
+field: a meta slot lives on the BINDING plane, §18.)
 
 **Rationale (historical).** The prefix partitioned one shared bindings map
 between engine metadata and user fields. That partition was real when type
@@ -1444,7 +1494,201 @@ other channel.
 
 **Delta. → B-110**, now scoped by this entry rather than left open-ended.
 
-## Deltas raised in T0–T2
+## 24. Plane interfaces
+
+> **Level: Specification** — satisfies R3′, R6, R12. *Elevated to a
+> first-class concern at S2f (maintainer): the interfaces between planes and
+> their producers and consumers are a central design feature, not an
+> implementation detail of §18.*
+
+**Definition.** A *plane interface* is the sanctioned way a producer or
+consumer reaches a plane. Reaching a plane by any other route — a direct
+field read, an upward import, a hardcoded name — is a **plane violation**,
+whatever it happens to compute correctly.
+
+**Rationale.** §18 says what the planes are; without stated interfaces that
+is a taxonomy rather than a discipline. Every delta T2 records is a plane
+reached the wrong way, and each was invisible because the right way was never
+written down.
+
+**The interface table.** Rows are the sanctioned routes. An entry marked ⚠ is
+one the code currently bypasses.
+
+| Plane | Consumer | Interface | Producer | Interface |
+|---|---|---|---|---|
+| **Data** | anyone | `dataOf(v)` | construction | the representation constructors |
+| **Binding** | user code | member dispatch | construction | `makeStructure` + the binding writers |
+| **Binding** | engine (meta slots) | `src/slots.ts` accessors | kernel | the same accessors ⚠ *four write disciplines, §13* |
+| **Metadata** | anyone | `channelReadRaw(v, field)` — free (D23) | field owner | the writer closure from registration |
+| **Metadata** | the evaluator | the propagation table: `channelSpec(f)?.rule`, `viralChannels()`, `channelMerge(f)` | — | — |
+| **Metadata** | user-reachable construction | refused unless the writer is held (`assertNotIntegrityKey`) | — | — ⚠ *enforced by name list, §21* |
+| **Host** | the host only | direct field access | the host | direct field access ⚠ *declared on the value interface, §18* |
+| **Layer → base** | the base, for semantics it must not know | **install**, never import | the layer | `installChannelMerge` and hooks like it ⚠ *27 upward imports, §23* |
+
+**The last row is the one that matters.** It is the only interface in the
+table that is not yet a mechanism — `installChannelMerge` is one instance of
+a pattern that has no general form. The interfaces the specification still
+owes:
+
+1. **A dispatch hook.** The evaluator needs type-directed dispatch during
+   evaluation (R2 — discharge happens *by* evaluating) and must not know what
+   a type is. So a channel installs *how to dispatch on my field*, and the
+   evaluator calls it with an opaque field value. This is §23's decomposition
+   made concrete, and it is the interface B-110 is really about.
+2. **A check hook.** `checkArgType` currently lives in the evaluator. Under
+   the same shape, a channel installs *how to check a value against my
+   field*, and the evaluator calls it without knowing the answer is a "type".
+3. **A projection hook.** `shape` is a computed projection of the `type`
+   field (§19b), and the projection is hardcoded in `channelReadRaw`. A
+   channel should install its own projections.
+4. **A field-registration interface for channels** (§19b) — one registration
+   that says *these fields, these rules, this semantics, this owner*, rather
+   than eleven undifferentiated field registrations performed by the base.
+
+**Rationale for the shape.** All four have the same form, which is why they
+belong in one entry: **the base holds an inspectable symbol; the layer
+installs the meaning.** That is exactly SC-7's argument (§20) — inspectable
+symbols are what keep R12 enforceable — generalised from propagation to every
+plane interface. A hook that handed the base an opaque closure *and* let it
+be the authority would lose the same property, so the hooks must be
+capability-gated the way writers are.
+
+**As implemented.** Two of the eight rows have a real mechanism
+(`dataOf`, `channelReadRaw` + the propagation table). Four are conventions
+enforced by lint or by nothing. The layer→base row has one instance and no
+general form.
+
+**Delta.** The interfaces are the specification's biggest gap: four hooks are
+owed, and every T2 delta is an instance of one of them being absent. **→
+B-112**, which supersedes the "what capability does the evaluator need"
+question in B-110 by naming it.
+
+---
+
+# T3 · Evaluation
+
+How a program becomes a result, or a residual. This tier is R2 and R4 made
+concrete.
+
+## 25. Partial evaluation
+
+> **Level: Specification** — satisfies R2, R4.
+
+**Definition.** *Evaluation* reduces a value as far as its known inputs
+allow. Two rules govern what happens when they do not allow much:
+
+- **PE Rule 1.** An application with an unresolved argument produces a
+  **residual** — the application itself, as a value — with metadata fields
+  propagated onto it per their rules.
+- **PE Rule 2.** A lazy primitive whose control input is unresolved evaluates
+  **both** branches and residualises, so that what is known on either path is
+  still discovered.
+
+**Rationale.** Rule 1 is what makes compilation and execution the same act:
+a partially-evaluated program is an ordinary value (SC-3), so there is no
+separate IR and no separate checking pass. Rule 2 is what stops an unknown
+condition from hiding everything behind it — without it, a single unresolved
+`if` would end analysis for the whole branch.
+
+**As implemented.** `evaluate` / `evaluateExpr` in `src/evaluator.ts`;
+`isResolved` is the test; `makeExpr` builds the residual. Field propagation
+onto residuals runs through the propagation table (§20).
+
+**Delta.** — *(Rule 1 and Rule 2 are implemented as specified; the evaluator's
+delta is §23, which is about what it imports, not what it computes.)*
+
+## 26. Resolved, unresolved, residual
+
+> **Level: Specification** — satisfies R4.
+
+**Definition.** A value is **resolved** when it contains no unresolved part.
+It is **unresolved** when it is, or transitively contains, a symbol with no
+binding or a pending cell (§28). A **residual** is the value produced when an
+operation cannot complete: an Expression standing for the work not yet done,
+carrying the metadata the operation could determine.
+
+**Rationale.** R4 requires that "cannot complete" is a *value*, not a stuck
+state — that is the whole difference between partial evaluation and an
+interpreter that fails.
+
+**As implemented.** `isResolved(v)` in `src/types.ts`, walked structurally.
+
+**Delta.** — 
+
+## 27. Tail calls
+
+> **Level: IMPLEMENTATION** — realises R4 under a host constraint.
+
+**Definition.** A self-call in tail position is executed as a loop rather
+than a nested evaluation, via a sentinel the applying frame recognises.
+
+**Rationale.** Not a language concept — a host stack is finite, and without
+this, recursion depth would bound program size. It is in the spine because
+the sentinel is visible to anything wrapping a function body: body wrappers
+must **forward** it or tail calls silently become ordinary calls.
+
+**As implemented.** The `TailCall` sentinel in `src/evaluator.ts`
+(`isTailCall`, `makeTailCall`); `markTailCalls` in the pipeline;
+`type_check` and the `*_attach` wrappers forward it.
+
+**Delta.** The forwarding obligation is enforced by convention and a
+recurring-lesson note in `PROCESS.md` §6 — nothing checks it. A wrapper that
+forgets is a silent performance cliff, not an error. Candidate for a boundary
+invariant. **→ B-113.**
+
+## 28. Future cell and completion
+
+> **Level: Specification** — satisfies R10.
+
+**Definition.** A **cell** is a binding whose value is not yet available.
+References to it residualise. When the value arrives the cell is filled —
+once, monotonically — and everything that residualised on it is re-evaluated.
+This is **forward chaining**, and it is how information arriving later
+(a module load, an async result) re-enters an evaluation that already ran.
+
+**Rationale.** R10. Without it, PE would be a single pass and anything
+unknown at that instant would be permanently residual. Monotonicity is what
+keeps it sound: a cell that could change would invalidate results already
+derived from it.
+
+**As implemented.** `Binding.value === undefined` is the pending state, with
+`cell`, `isComplete` and `incompleteDeps` on the binding (§14);
+`FutureManager` in `src/futures.ts`; `applyPhase` drives the cascade;
+`propagateCompletions` in `src/runtime.ts` substitutes into complete
+dependents.
+
+**Delta.** Confluence is not guaranteed by construction. The B-028 arc found
+an **arrival-order** bug — an instance kept a stale symbol when one field
+resolved before another — fixed by completion replacement, but nothing
+*establishes* that arrival order cannot matter. This is candidate **R16**
+(determinism) with no specification item and no test that would catch a
+recurrence. **→ B-114.**
+
+## 29. The evalSource pipeline
+
+> **Level: IMPLEMENTATION** — realises R2, R9, R14.
+
+**Definition.** The fixed stage order that turns source into a result:
+parse (grammar2, with `use` pre-scan and fragment merge) → `typeLiterals` →
+`resolveSymbols` → `markTailCalls` → `collapseBodyMetadata` +
+`precompileFunctions` → `buildEvalCtx` → the evaluation loop with forward
+chaining. Then post-passes: effects declarations, exhaustiveness,
+termination, the proof-finding loop, proven clauses.
+
+**Rationale.** The order is what each stage may assume. `resolveSymbols`
+before `markTailCalls` because a tail call is recognised by its callee;
+`collapseBodyMetadata` before `precompileFunctions` because analysers read
+properties rather than peeling wrappers.
+
+**As implemented.** `evalSource` in `src/runtime.ts`.
+
+**Delta.** The **post-passes are L2 concepts running in the L0/L1 pipeline** —
+effects, exhaustiveness, termination, proofs. This is §23's violation in its
+other form: not an import into the evaluator, but layer stages hardcoded into
+the base's stage list. A layer should *register* a post-pass. Same root, same
+fix shape (§24). **→ B-110** (scope note).
+
+## Deltas raised in T0–T3
 
 | # | Delta | Owner |
 |---|---|---|
@@ -1462,11 +1706,38 @@ other channel.
 | 21 | Integrity enforced by hardcoded name list, not the registered flag; the two disagree about `source` | B-109(b)(c) |
 | 22 | The meta-slot partition fires on one key in the whole suite | B-104(b)(f) |
 | 23 | **L0 imports 27 symbols from L2**; `checkArgType` lives in the evaluator | B-110 |
+| 19b | One word and one registry for two concepts — fields, a projection, a capability, a dead entry and an unused one, undifferentiated | B-111 |
+| 24 | **Four plane interfaces are owed**: dispatch hook, check hook, projection hook, channel registration. Every other T2 delta is an instance of one being absent | B-112 |
+| 27 | The TailCall forwarding obligation is convention-enforced; a wrapper that forgets is a silent cliff | B-113 |
+| 28 | Completion confluence is not guaranteed by construction — the B-028 arrival-order bug was fixed, not precluded | B-114 |
+| 29 | L2 post-passes are hardcoded into the base pipeline — §23's violation in its other form | B-110 |
 
 Nine deltas across seventeen entries, on the tier we understand best. Six of
 the nine are naming or documentation lag; three (7, 15, 17) are the same
 underlying gap — **the planes are real and undeclared** — which is what T2
 exists to fix and why it is the highest-value tier in this document.
+
+### What T3 and the interfaces added (S2f)
+
+Five more, and the shape has changed. T0–T1 found naming lag; T2 found
+undeclared planes; **T3 finds the same violation in a second form** — §29:
+the L2 post-passes (effects, exhaustiveness, termination, proofs) are
+hardcoded into the base's stage list, which is §23's problem without the
+imports. One root, two surfaces.
+
+The terminology change earns its place immediately. Splitting **field** from
+**channel** (§19/§19b) makes a defect visible that had no vocabulary before:
+the registry holds eleven entries that are *five different kinds of thing* —
+seven stored fields, one projection (`shape`), one capability with no storage
+at all (`knowledge`, whose own comment admits its storage is three other
+fields), one retired entry (`exported`) and one unused (`warnings`). Nothing
+could have flagged that while all eleven were called "channels".
+
+And §24 reframes the rest: **every T2 delta is an instance of a plane
+interface being absent.** Four are owed — dispatch, check, projection, and
+channel registration — all of the same shape, *the base holds an inspectable
+symbol and the layer installs the meaning*, which is SC-7's argument
+generalised from propagation to every plane boundary.
 
 ### What T2 added (S2e)
 
