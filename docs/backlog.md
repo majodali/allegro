@@ -1408,3 +1408,29 @@ that prevents it.
     the interfaces. A property of this type system, not a general truth, and
     worth stating because the type system is being rebuilt around the absence
     of `extends`
+
+- [ ] **B-117** · L2 · **The verdict is assembled out-of-band rather than
+  accumulated.** Raised by the concept spine (S4b, maintainer correction —
+  `concepts.md` §45). S4 had claimed this as a REQUIREMENT gap (candidate
+  R15: the requirement set is per-value, the verdict is program-level). That
+  was wrong. **A program is a value**, and accumulating metadata across an
+  expression is what channel operations already do — effects union upward,
+  errors are viral, `div` is an effect and unions too. On that model the
+  verdict simply IS the top-level value's accumulated metadata, and it is
+  each channel's responsibility to define an accumulation that reaches it.
+  R3' plus SC-7's `union` already say this; **R15 is withdrawn**.
+  - **The evidence that the implementation does not work that way**:
+    `buildVerdict` in `src/pcp.ts` WALKS `evalCtx.bindings` out-of-band,
+    iterating top-level bindings looking for discharged proofs, rather than
+    reading accumulated metadata off a value. And the `warnings` field is
+    registered with rule **`union`** — precisely the accumulating discipline —
+    and is **UNUSED**. The mechanism exists and nothing reaches for it
+  - **This explains B-057/CT-R6.** Contracts are missing from the verdict
+    BECAUSE contracts have no accumulating field. Under out-of-band assembly,
+    adding them means adding a case to `buildVerdict`; under accumulation it
+    means giving contracts a field with `union` propagation and they arrive
+    for free. A channel that does not accumulate is simply absent from the
+    verdict — a better account than "somebody forgot"
+  - Interacts with **B-112** (plane interfaces): "accumulate toward the
+    verdict" is arguably a fifth owed interface, or the `union` rule applied
+    at whole-program scope. Sequencing question, not a separate problem

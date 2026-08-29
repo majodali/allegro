@@ -4,6 +4,72 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S4b: R15 withdrawn; the verdict should accumulate
+
+Five corrections from the S4 review. Two overturn findings rather than
+refining them.
+
+**R15 is withdrawn, and the correct account is better.** S4 claimed the
+verdict as a *requirement* gap: the requirement set is per-value, the verdict
+is program-level, therefore nothing enables it. The maintainer's counter is
+right — **a program is a value**, and accumulating metadata across an
+expression is what channel operations already do (effects union upward,
+errors are viral, `div` is an effect and unions too). The verdict *should be*
+the top-level value's accumulated metadata, with each channel defining an
+accumulation that reaches it. R3′ plus SC-7's `union` already say this.
+
+The real finding is an **implementation delta**, with direct evidence:
+`buildVerdict` **walks `evalCtx.bindings` out-of-band**, iterating top-level
+bindings looking for discharged proofs rather than reading accumulated
+metadata off a value — and the `warnings` field is registered with rule
+**`union`**, precisely the accumulating discipline, and is **unused**. The
+mechanism exists and nothing reaches for it. **→ B-117.**
+
+**And it explains §46.** Contracts are missing from the verdict *because
+contracts have no accumulating field*. Under out-of-band assembly, adding
+them means adding a case to `buildVerdict`; under accumulation it means
+giving contracts a field with `union` propagation and they arrive for free. A
+channel that does not accumulate is simply absent — a better account than
+"somebody forgot".
+
+**§36 rested on an unenforced assumption that my own proposed change would
+have falsified.** "An interface always has a name" — hence the marker being
+0-decisive — holds only *because `structuralWrap` erases the marker*. Swap in
+a meta-type test and the case is **created**: `~Printable` keeps meta
+`InterfaceKind` and has no name, so it would take the *declared* path instead
+of the loose one. A regression, introduced by the fix. The correct change is
+to drop the marker check and **not replace it** — anonymity alone is the
+loose/declared switch. Method rule worth keeping: **a delta measured before a
+change does not survive the change.**
+
+**§32 made refinements second-class; the code does not.** "Refinements are
+knowledge, not different behaviour" over-claimed. A refinement *may* add
+behaviour, and when it does it stops being member-transparent and becomes a
+shape in its own right — which is exactly what `typeShape`'s walk already
+tests, and what `preserveOps` / `mixin` / `extend` already do.
+`NonEmptyList.head` returning `T` rather than `Option[T]` is the motivating
+case rather than a contrived one: the refinement is precisely what makes the
+total signature sound.
+
+**§37 was too narrow.** Generics must parameterise over **values of any
+type**, not only over types — `Vector[3]`, `Matrix[3,4]`, units over
+dimension exponents. The machinery already admits non-Type parameter kinds
+(`apply[e: Effect](…)`); which kinds the language offers is recorded as open.
+
+**§34b: "domain" was used in four entries and never defined** — the same
+failure as "loose", one round later. Now defined, including the property that
+makes it usable: an abstract domain approximates in one direction only,
+answering "definitely yes" or "cannot tell", never "definitely no" by
+omission. Its delta: the domain rides the **host plane** while the knowledge
+it belongs to is a metadata channel, so `knowledge` is a capability whose
+fields span two planes (**B-111**).
+
+Two undefined terms in two consecutive rounds is a pattern rather than bad
+luck. The ordering constraint is meant to catch exactly this, is enforced by
+reading, and both were caught by the maintainer instead.
+
+No `src/` changes. Gate: **1197/1197, `GATE: PASSED`**.
+
 ## 2026-08 — Concept spine S4: T5 obligations; the spine's tiers are complete
 
 Seven entries — effect, declared and inferred effects, totality, divergence

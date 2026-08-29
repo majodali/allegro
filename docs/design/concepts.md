@@ -1777,9 +1777,31 @@ parent's member set by reference; layers that mint their own members
 their overrides must run.
 
 **Rationale.** Dispatch is virtual on the actual shape so overrides run
-(Liskov). Refinements are *knowledge*, not different behaviour —
-`PositiveInt(5)` dispatches exactly as `5` does — so walking transparent
-layers off is what keeps knowledge from changing which code executes.
+(Liskov). A refinement that adds *no* members adds no behaviour —
+`PositiveInt(5)` dispatches exactly as `5` does — so walking those layers off
+keeps knowledge from changing which code executes.
+
+*Corrected at S4b (maintainer).* An earlier draft said "refinements are
+knowledge, **not** different behaviour", full stop. That over-claimed and
+would make refinements second-class. **A refinement may add behaviour**, and
+when it does it stops being member-transparent and becomes a shape in its own
+right — which is exactly what the walk already tests. `NonEmptyList` is the
+motivating case rather than a contrived one: its `head` is **total**
+(`T`, not `Option[T]`), and the refinement is precisely what makes that
+signature sound. `SortedList.binarySearch` and `Utf8Bytes.chars` are the same
+shape of argument.
+
+So the accurate statement is a **split**, not a prohibition:
+
+| Refinement | Member set | Dispatch |
+|---|---|---|
+| adds no members | shared with parent by reference | transparent — walks off |
+| **mints its own members** | fresh | **is a shape** — its members dispatch |
+
+The mechanism already supports the second case (`preserveOps`, `mixin`,
+`extend` are named in `typeShape`'s own comment as minting their own member
+sets and therefore being shapes). The document, not the code, was the thing
+that made refinements sound second-class.
 
 **As implemented.** `typeShape(t)` in `src/slots.ts`, walking `__refines`
 while `__members` is the same object. `shape` is registered as a metadata
@@ -1841,11 +1863,19 @@ else loose. The code's own comment states it: *"the LOOSE path (~T structural
 wraps, anonymous inline types) matches by base-name projection — the
 duck-typing surface, aimed at data values."*
 
-**Delta.** The branch tests the `__interface` marker **as well as** anonymity,
-which is redundant — an interface always has a name, so the name test alone
-already excludes every interface, and the marker measures 0-decisive at both
-subtypeof sites (§36). It is redundancy that made the marker look like it
-carried the loose/declared distinction when anonymity always did.
+**Delta.** The branch tests the `__interface` marker **as well as** anonymity.
+Today that is redundant and the marker measures 0-decisive at both subtypeof
+sites (§36) — but *not* because "an interface always has a name", which an
+earlier draft asserted and which is **an unenforced assumption that is
+already false**. `Interface.define` sets `"<anonymous>"`, so interfaces built
+that way are named; `structuralWrap` **erases the name**, so `~SomeInterface`
+is a nameless interface. It does not show up in the measurement only because
+the wrap erases the marker too.
+
+The assumption therefore holds by *coincidence of two erasures*, not by
+construction, and §36 records that replacing the marker with a meta-type test
+here would break exactly this case. Anonymity is the correct switch; nothing
+else should be consulted. **→ B-104(g).**
 **→ B-104(g).**
 
 *Note on §36.* "`~Printable` **is** an interface and it is **also** loose"
@@ -1879,6 +1909,39 @@ stored `type` field, derives the bound by comparing it to `typeShape`, adds
 stores one** — it is a channel (capability) whose storage is three other
 fields plus the refinement layers (§19b). The registry cannot express that.
 **→ B-111.**
+
+## 34b. Abstract domain
+
+> **Level: Specification** — satisfies R2. *Added at S4b (maintainer): the
+> document used "domain" in four entries without defining it.*
+
+**Definition.** An *abstract domain* is a **compile-time summary of a set of
+values** — an interval, an equality, a known-not-equal, an effect set, or
+opaque (nothing known). It is what a predicate is recognised *as*, so that
+reasoning can proceed without re-running the predicate: given `x: Int & _ > 0`
+and `y: Int & _ > 0`, the domains say `x + y > 0` without evaluating anything.
+
+**Rationale.** R2 again, in its cheap form. PE could always discharge a
+refinement by *evaluating* the predicate, but that requires a concrete value.
+A domain lets the same reasoning run over a *residual* — which is the whole
+point of partial evaluation, and the difference between "checked when it runs"
+and "discharged at compile time".
+
+Domains are **approximations**: they answer "definitely yes" or "cannot tell",
+never "definitely no" by omission. That soundness direction is what lets them
+be consulted freely — a domain that cannot tell falls back to evaluation.
+
+**As implemented.** `AbstractDomain` in `src/refinements.ts` with
+`IntervalDomain`, `EqualDomain`, `NotEqualDomain`, `EffectsDomain`,
+`OpaqueDomain`; `domainFromPredicate` recognises the algebraic shape of a
+predicate; `impliesDomain` is the entailment test; the domain rides the host
+plane as `abstractDomain`.
+
+**Delta.** The domain rides the **host plane** on a type (a JS property),
+while the knowledge it belongs to (§34) is a metadata channel. §18's placement
+rule was never applied: it is derived-and-cached, which argues host plane, but
+nothing states that and it makes `knowledge` a capability whose fields span
+two planes. **→ B-111.**
 
 ## 35. Refinement
 
@@ -1961,12 +2024,27 @@ asserted.)
 So the resolution is to stop conflating them:
 
 - **`shapeAwareSubtypeof` and `structuralSubtypeof`** — drop the marker check
-  from both. (There are **three** readers, not two: a first pass counted only
-  two.) The name check beside it already carries the loose-world meaning, and
-  the marker measures **0-decisive at both**: 42 interface encounters each,
-  none where the marker changed the outcome — because an interface always has
-  a name (`"<anonymous>"` at minimum), so the name test beside it already
-  excludes every interface.
+  from both, **and do not replace it with a meta-type test.** (There are
+  **three** readers, not two: a first pass counted only two.) The condition
+  becomes anonymity alone. The marker measures **0-decisive at both** today:
+  42 interface encounters each, none where it changed the outcome.
+
+  ⚠ **The measurement does not license replacing it, and the maintainer
+  caught why.** "0-decisive" means *marker-true AND nameless never co-occur*
+  — which holds **because `structuralWrap` erases the marker**. Swap in a
+  meta-type test and the case is *created*: `~Printable` keeps meta
+  `InterfaceKind` (measured) and has **no name** (measured), so it becomes
+  interface-true and nameless — the very combination the measurement said
+  did not occur — and it would take the *declared* path instead of the loose
+  one. That is a regression, and it is a regression my own proposed change
+  would have introduced. The measurement described the code as it stands, not
+  as it would stand after the change; **a delta measured before a change does
+  not survive the change**, and that is worth stating as a method rule.
+
+  So: at these two sites the question is *loose or declared*, whose answer is
+  **anonymity** and nothing else. At `applyBoundaryBound` the question is *is
+  this an interface*, whose answer is the meta-type. The two sites diverge,
+  and that divergence is the whole point of §36.
 - **`applyBoundaryBound`** — read the meta-type. `~Printable` becomes an
   interface here, which is the behaviour change, and per the definition it is
   a **fix**. That path has **zero suite coverage** (0 hits in 1197 tests;
@@ -1991,8 +2069,16 @@ reject the body or state that it is a declaration. **→ B-116.**
 
 > **Level: Specification** — satisfies R2.
 
-**Definition.** A *generic* is a type constructor: a type parameterised over
-other types, applied to yield a concrete type. `GenericType` is the kind of
+**Definition.** A *generic* is a type constructor: a type **parameterised**,
+applied to yield a concrete type.
+
+*Corrected at S4b (maintainer).* An earlier draft said "parameterised over
+other **types**". Too narrow: Allegro needs types parameterised over **values
+of any type** — `Vector[3]`, `Matrix[3, 4]`, a units quantity over its
+dimension exponents. The parameter's *kind* is what varies, and the machinery
+already admits non-Type kinds (`apply[e: Effect](…)` binds an Effect-kinded
+parameter, C7.2c). Which kinds of parameter the language will actually offer
+is **open** — recorded as a design question, not settled here. `GenericType` is the kind of
 such constructors — the flag *is* the kind (D39), there is no `__isGeneric`.
 An applied concrete records its arguments and a back-link to its generic.
 
@@ -2197,13 +2283,37 @@ structurally different from everything in T2.
 `totalityFindings`, `divObligations`, `liveness`; `CompilationReport` and
 `Notification` in `src/runtime.ts`.
 
-**Delta — and it is a requirement gap, not a code defect.** Every requirement
-in Part 0 is **per-value or per-evaluation**. Nothing requires the base to
-support **program-level aggregation**, yet the verdict, the ledger, the
-compilation report and the notification stream all are exactly that. An
-Allegretto satisfying every stated requirement could carry per-value metadata
-perfectly and give Allegro nowhere to accumulate a verdict. **Candidate R15**,
-now with a concrete consumer rather than an abstract argument.
+**Delta — restated at S4b; the first version was wrong.**
+
+S4 claimed this as a **requirement gap** (candidate R15): the requirement set
+is per-value, the verdict is program-level, therefore nothing enables it. The
+maintainer's counter is correct and better: **a program is a value**, and
+accumulating metadata across an expression *is what channel operations
+already do*. Effects union upward; errors are viral; `div` is an effect and
+so unions too. On that model the verdict simply **is** the top-level value's
+accumulated metadata, and it is each channel's job to define an accumulation
+that reaches it. No new requirement is needed — R3′ plus SC-7's `union`
+already say it.
+
+So the gap is not in the requirements. It is that **the implementation does
+not work that way**, and the evidence is direct:
+
+- `buildVerdict` **walks `evalCtx.bindings` out-of-band**, iterating top-level
+  bindings looking for discharged proofs, rather than reading accumulated
+  metadata off a value.
+- The `warnings` field is registered with rule **`union`** — precisely the
+  accumulating discipline — and is **unused**. The mechanism for exactly this
+  exists and nothing reaches for it.
+
+**And this explains §46.** Contracts are missing from the verdict *because
+contracts have no accumulating field*. Under out-of-band assembly, adding
+them means adding a case to `buildVerdict`; under accumulation it means
+giving contracts a field with `union` propagation, and they arrive for free.
+A channel that does not accumulate is simply absent from the verdict — which
+is a much better account of §46 than "somebody forgot".
+
+**Candidate R15 is withdrawn.** The finding is an implementation delta and a
+significant one. **→ B-117.**
 
 ## 46. Contract
 
@@ -2270,6 +2380,8 @@ still open. **→ B-057.**
 | 44 | `discharged` is the **last** metadata field still on the binding plane | B-104, B-109 |
 | 45 | **Program-level aggregation is required by nothing** — the verdict has no requirement above it | candidate **R15** |
 | 46 | **Contracts never reach the verdict** — zero occurrences in `pcp.ts` | B-057 (CT-R6) |
+| 34b | The abstract domain rides the host plane while the knowledge it belongs to is a metadata channel | B-111 |
+| 45 | **The verdict is assembled out-of-band** rather than accumulated through the metadata plane; the `union` channel for it exists and is unused | B-117 |
 
 Nine deltas across seventeen entries, on the tier we understand best. Six of
 the nine are naming or documentation lag; three (7, 15, 17) are the same
@@ -2302,6 +2414,54 @@ termination are post-passes in the base pipeline) is §29, and §44's
 residue. That repetition is a good sign rather than a bad one: the tiers are
 finding the same defects from independent directions, which is what a
 dependency-ordered model should do.
+
+### Corrections from the S4 review (S4b)
+
+Five, and two of them overturn findings rather than refining them.
+
+**§45's R15 claim was wrong, and the correct account is better.** The verdict
+is program-level, so I claimed the per-value requirement set could not enable
+it. But **a program is a value**, and accumulation across an expression is
+already what channel operations do. The verdict *should* be the top-level
+value's accumulated metadata, with each channel defining an accumulation that
+reaches it — R3′ and SC-7's `union` already say so. **R15 withdrawn.** The
+real finding is an implementation delta with direct evidence: `buildVerdict`
+walks bindings out-of-band, and the `warnings` field — registered `union`,
+exactly the accumulating discipline — is **unused**. And it *explains* §46:
+contracts are absent from the verdict because contracts have no accumulating
+field, not because anyone forgot.
+
+**§36's "an interface always has a name" was an unenforced assumption that my
+own proposed change would falsify.** The 0-decisive measurement means
+marker-true and nameless never co-occur — which holds *because
+`structuralWrap` erases the marker*. Replace the marker with a meta-type test
+and the case is **created**: `~Printable` keeps meta `InterfaceKind` and has
+no name, so it would take the declared path instead of the loose one. The fix
+is to drop the marker check and **not replace it**; anonymity alone is the
+loose/declared switch. Method rule worth keeping: **a delta measured before a
+change does not survive the change.**
+
+**§32 made refinements second-class and the code does not.** "Refinements are
+knowledge, not different behaviour" over-claimed. A refinement *may* add
+behaviour, and when it does it stops being member-transparent and becomes a
+shape — which is what the walk already tests, and what `preserveOps` /
+`mixin` / `extend` already do. `NonEmptyList.head` returning `T` rather than
+`Option[T]` is the motivating case, not a contrived one: the refinement is
+precisely what makes the total signature sound.
+
+**§37 was too narrow** — generics must parameterise over *values of any
+type*, not only over types (`Vector[3]`, `Matrix[3,4]`). The machinery
+already admits non-Type parameter kinds; which kinds the language offers is
+open.
+
+**"Domain" was used in four entries and never defined** — the same failure as
+"loose" (§33b), one round later. §34b now defines it, including the property
+that makes it usable: domains approximate in one direction only, answering
+"definitely yes" or "cannot tell", never "definitely no" by omission.
+
+Two undefined terms in two consecutive rounds is a pattern, not bad luck. The
+ordering constraint is supposed to catch exactly this and is enforced by
+reading; both were caught by the maintainer instead.
 
 ### Open questions parked at S4 (maintainer)
 
