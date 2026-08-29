@@ -1,7 +1,10 @@
 # Concept spine — define Allegro, then make the code say it
 
 > Status: **active** — ratified 2026-08 (§6 rulings 1–3; ruling 4
-> deliberately HELD as a delta for S3). **S1 + S2a–S2f + S3 + S3b + S4 + S4b landed**; S5 (delta triage) next — the spine's tiers are complete.
+> deliberately HELD as a delta for S3). **S1 + S2a–S2f + S3 + S3b + S4 + S4b + S5 landed** — the spine's tiers are complete and §9 carries the
+> ordered code campaign (C1…C13). **No code moves until §9.5's rulings are
+> taken** (maintainer direction: nothing is modified until the design and
+> plan are committed).
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -235,7 +238,7 @@ being written to justify a rename already in flight.
 | **S3b** | ~~T4 corrections~~ **DONE 2026-08** (maintainer questions) — the **interface definition** rewritten (neither "has no construct" nor "all members signature-only"; two properties enforced in two places, neither being the concept — and Allegro has **no abstract types** because D44 removed what abstractness is defined against) → **B-116**; **§33b declared vs loose conformance** added, a term the document had used six times undefined; the marker measurement re-run across all **three** readers rather than one |
 | **S4** | ~~T5 obligations~~ **DONE 2026-08** — effect, declared/inferred effects, totality, divergence + D34 tiers, proof and discharge, **obligation/verdict/ledger**, contract. Six deltas. Two are the same defects T2/T3 already found, reached from a different direction; two are new and load-bearing: **§45** gives sufficiency gap S1 a named consumer (the verdict is program-level and no requirement enables it → **R15**), and **§46** makes CT-R6 measurable — `pcp.ts` has **zero** occurrences of contract/requires/ensures, so a clean verdict can coexist with unproven preconditions. Three maintainer questions parked as Allegro design questions that do not change Allegretto's requirements |
 | **S4b** | ~~S4 review corrections~~ **DONE 2026-08** (maintainer) — **R15 withdrawn** (the verdict should be accumulated metadata, not a new requirement → **B-117**); §36's nameless-interface assumption shown to be unenforced *and falsified by the proposed change itself*; §32 corrected (refinements MAY add behaviour — `NonEmptyList.head`); §37 widened to value-parameterised generics; **§34b abstract domain** added, the second undefined term in two rounds |
-| **S5** | Delta triage: every delta from S1–S4 becomes a backlog item, ordered. This is the code campaign's plan, produced as evidence rather than guessed |
+| **S5** | ~~Delta triage~~ **DONE 2026-08** — §9. All **34** deltas owned, clustered by *fix* rather than by symptom, and ordered into **C1…C13** with interfaces first per maintainer ratification. Auditing the table found five things a transcription would not have: one **orphan** (delta 7 owned by a spine section), one **stale** row (candidate R15, withdrawn at S4b), four deltas under three owners that are **one fix** (→ **B-118**: host-plane data that should be metadata fields), **B-108's "blocks nothing" is false** (it gates the last dunder), and **§6 ruling 3's pulled-forward naming chunk never ran** — recorded rather than re-planned, since a decision partially executed and recorded done is the campaign's own subject matter |
 | **C1…Cn** | The code campaign itself, one chunk per delta cluster, gated normally |
 
 **S1 is the falsifiable one.** If the four-part entry format does not
@@ -296,3 +299,142 @@ Every one is a claim that Allegro is **undocumented or misnamed**, which
 is a different and much cheaper problem. The campaign's success condition
 is that a reader can predict the code from the spine, and find the spine
 from the code.
+
+## 9. The delta triage (S5)
+
+The code campaign's plan, produced from the deltas rather than guessed.
+Input: the **34** distinct deltas recorded across 49 spine entries (16 are
+clean). Output: every delta owned by a work item, every item placed in a
+chunk, every chunk with a stated dependency and a falsifiable completion
+test.
+
+### 9.1 What auditing the delta table found
+
+Five things — which is why triage is a chunk and not a transcription.
+
+1. **One orphan.** Delta 7 was owned by "T2 §9" — a spine section, not a
+   work item, recorded when T2 did not exist yet. T2 has since landed, §18
+   declares the host plane, and the delta is still open with nobody holding
+   it.
+2. **Four deltas, three owners, one fix.** Deltas 7, 34b, 39 and 41 all say
+   the same sentence about different subjects: *X rides the host plane, and
+   §18's placement rule says it belongs on the metadata plane* — the
+   inferred effect set, the abstract domain, ComposedFunction's analysis
+   expandos, the transitive law backings. They were filed against B-107
+   (naming debt), B-111 (registry split) and B-115 (two carriers), and none
+   of those three is the fix. Minted as **B-118**. The distinction that
+   makes it a cluster rather than a coincidence: deltas 15 and 18 are
+   host-plane data *correctly placed and wrongly declared*; these four are
+   *wrongly placed*. With the planes undeclared the two were indistinguishable.
+3. **One stale row.** Delta 45 appeared twice — once owned by "candidate
+   R15", once by B-117. R15 was withdrawn at S4b; the row is deleted.
+4. **B-108 does not "block nothing".** Its own text says it does. But
+   B-104(f) is `__length` and the legacy view, and B-108's option E dissolves
+   both — so whether B-104(f) means *re-key `__length`* or *delete
+   `__length`* is decided by B-108's ruling. **B-108 gates the retirement of
+   the last dunder**, which makes it the highest-leverage unruled question
+   in the set.
+5. **A ratified chunk that never ran.** §6 ruling 3 pulled the naming
+   campaign forward "as its own chunk, ahead of the S5 triage". S2a–S4b ran
+   instead; it did not. Its stated justification — easier reading of the code
+   *during* S2–S4 — has expired, so its placement takes a fresh ruling
+   (§9.5) rather than inheriting the old one. Recorded rather than quietly
+   re-planned: *a decision taken, partially executed, and recorded as done*
+   is the exact defect this campaign exists to remove, and the campaign is
+   not exempt from it.
+
+### 9.2 The clusters
+
+Every delta, once, in the group its **fix** belongs to — not the group its
+symptom appeared in.
+
+| Cluster | Deltas | Items |
+|---|---|---|
+| **I · The plane interfaces** | 19, 19b, 21, 24, 32, 34 | B-111, B-112, B-109 |
+| **II · The layer boundary** | 23, 29, 42 | B-110 |
+| **III · Plane placement** | 7, 34b, 39, 41 | **B-118** (new), B-115 |
+| **IV · The Interface type** | 33b, 36(a), 36(b) | B-104(g), B-116 |
+| **V · Naming and declaration** | 2, 5, 9, 10, 12, 13, 15, 18, 30, 37 | B-107 |
+| **VI · The composite** | 17, 22 | B-108 → B-104(b)(f) |
+| **VII · Accumulation** | 44, 45, 46 | B-117, B-057 |
+| **VIII · Unheld guarantees** | 27, 28, 43 | B-113, B-114, B-100 |
+
+Ten of thirty-four are naming and declaration; the other twenty-four are
+structural, and **thirteen of those are one root** — the plane boundary has
+no interfaces, so everything that needed to cross it went around (I, II, III).
+
+### 9.3 The order
+
+Interfaces first, ratified by the maintainer (2026-08): *"they're the best
+way for my inner-architect to sense if the system is moving in the right
+direction."*
+
+| Chunk | Closes | Needs | Why here |
+|---|---|---|---|
+| **C1** | B-111 | — | **Field vs channel.** Structure and nomenclature only, no behaviour: the registry stops calling five kinds of thing by one word. Everything after it registers *something*, so it goes first. It also does the reclassifying the later chunks consume — `shape` → a projection (C4), `knowledge` → a capability with no field, `exported` → deletable (retired at B-097), `warnings` → the field C10 reaches for |
+| **C2** | B-112(d), B-109(b)(c) | C1 | **Registration as an interface**, and integrity read from the registered flag instead of `INTEGRITY_CHANNEL_NAMES`. The integrity half is small and belongs here rather than later: protection-by-name is precisely the form that cannot survive C3 |
+| **C3** | B-109(a) | C2 | **Registration moves to the owning layers** — eleven registrations out of `slots.ts`, following the `installChannelMerge` template that already works once. R6's fix, and the first chunk where the layering is *visible*: the base stops naming L2 concepts |
+| **C4** | B-112(c) | C1 | **The projection hook** — `shape` installed rather than hardcoded in `channelReadRaw`. Independent of C2/C3; sequenced after C1 only because C1 is what says `shape` is a projection and not a field |
+| **C5** | B-112(a)(b) | C3 | **Dispatch and check hooks.** The two large ones, and the point at which the base can dispatch on a type without knowing what a type is |
+| **C6** | B-110(a)(b)(c), deltas 29/42 | C5 | **The layer boundary.** `checkArgType` and the 27 upward imports move; the L2 post-passes stop being hardcoded into the base pipeline. The campaign's largest chunk, and last of the interface run because it is the *consumer* of all four hooks |
+| **C6b** | B-110(d) | — | **One exception class for six abort classes.** Specification-level and separable; runs any time after `concepts.md` §7's vocabulary is ratified |
+| **C7** | B-118, B-115 | C3 | **Plane placement.** The four wrongly-placed carriers become metadata fields. Needs C3, because "a layer registers its own channel" is what gives them a field to move to — and unifying law backings onto one carrier is B-115's answer rather than a separate one |
+| **C8** | B-104(g), B-116 | — | **The Interface type.** Independent of C1–C7 and fully specified by §36: write the missing test for `applyBoundaryBound`'s zero-covered guard *first*, then drop the marker check in `shapeAwareSubtypeof` **and do not replace it**, read the meta-type in `applyBoundaryBound`, delete `__interface` (10 sites) |
+| **C9** | B-107 | ruling §9.5(2) | **Naming and declaration debt.** ~830 mechanical sites plus five declaration fixes |
+| **C10** | B-117, then B-057 | C5 | **Accumulation.** `buildVerdict` reads accumulated metadata instead of walking `evalCtx.bindings`; contracts get a `union` field and reach the verdict for free rather than by a new case |
+| **C11** | B-113, B-114 | — | **Guarantees held by convention become held by construction or by a test** — TailCall forwarding, completion confluence. Independent |
+| **C12** | B-104(b)(f), B-105 | B-108 ruled | **The composite**: the last dunder, and union types. Blocked on a ruling, not on code |
+| **C13** | B-100, B-102, B-103 | — | Residue: the T-R6 soundness review and two tooling items |
+
+**Serial by necessity, not by preference.** C1–C7 all converge on
+`src/slots.ts`, `src/evaluator.ts` and `src/types-std.ts` — the same
+convergence that made the backlog's band D *"internally serial,
+permanently"*. C6b, C8, C11 and C13 touch none of those and can run in any
+lane. C9 touches every file the campaign touches, which is why its placement
+is a ruling and not a preference.
+
+**Nothing here is a redesign.** Every chunk moves a mechanism that already
+works to the side of a boundary that already exists. The one chunk that
+changes a language-visible answer is C8, and it changes it to the answer the
+maintainer already ruled — the difference being that it is now derivable
+from §36 rather than asserted.
+
+### 9.4 The completion test
+
+The methodology proposal's §8 says a decision may not be marked executed on a
+partial execution, and that a rename carries a count. Applied to this
+campaign:
+
+- **A chunk is done when the spine delta rows it claims read `—`.** Not when
+  the code lands: when the document that motivated it no longer records a
+  gap. One table, mechanically checkable, and it is the reason the delta
+  rows were written as defect reports rather than caveats.
+- **A chunk that closes a delta by editing the definition rather than the
+  code must say so and re-derive the entry.** That is a legitimate outcome —
+  §36 was one — but it is never the default and must never be silent.
+- **C9 carries counts as its completion test**, per §8: `ContextValue`
+  701 → 0, `makeContext` 104 → 0, `MultiValueType` 25 → 0. This is the
+  falsifiable form D1 and D46 lacked, which is how they came to be recorded
+  executed while unexecuted.
+
+### 9.5 Rulings needed before C1
+
+1. **Which interfaces?** Read as the **plane** interfaces (B-112) — C1–C6.
+   The other reading, the **Interface type** (C8), is a real cluster, is
+   fully specified, and is independent of everything else; if that is what
+   was meant, C8 moves to the front at no cost to any other chunk. Recorded
+   rather than assumed, because the two readings do not conflict.
+2. **Where does C9 go?** Recommendation: **first, ahead of C1**, as a single
+   mechanical commit with counts as its test. Against: it is not a design
+   chunk, and it delays the first architectural signal by one review. For,
+   and this is the deciding argument: the campaign's success condition is
+   that the code says what the spine says, so authoring C1–C8 in a
+   vocabulary the spine calls wrong is *deliberately created* debt that every
+   later chunk then pays for. The alternative is last, never in the middle.
+3. **B-108, the composite.** It is a ruling, not code, it can be taken at any
+   time, and it gates C12 — including the retirement of the last dunder. Its
+   "blocks nothing" line is now wrong and is corrected in the backlog.
+4. **Is "accumulate toward the verdict" a fifth plane interface?** Raised by
+   B-117 and undisputed at S4b. Recommendation: decide at **C5's gate**, when
+   the hook shape is concrete rather than sketched — if the answer is yes it
+   belongs in C5, and C10 becomes its first consumer.

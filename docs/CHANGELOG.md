@@ -4,6 +4,68 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S5: the delta triage, and the campaign is ordered
+
+The spine's tiers are complete, so S5 turns the accumulated deltas into the
+code campaign's plan — **produced from evidence rather than guessed**, which
+was the point of recording deltas as defect reports in the first place.
+`docs/plans/concept-spine.md` §9 carries it: all **34** distinct deltas
+across 49 entries (16 clean), each owned, clustered by its **fix** rather
+than by the symptom that surfaced it, and ordered into **C1…C13**.
+
+**Interfaces first**, ratified by the maintainer. C1 splits field from
+channel, C2 makes registration an interface and reads integrity from the
+registered flag, C3 moves the eleven registrations out of the base to the
+owning layers — the first chunk where the layering becomes *visible* — C4
+installs the projection, C5 the dispatch and check hooks, and C6 consumes
+all four to move `checkArgType` and the 27 upward imports out of L0. The
+recommended reading of "interfaces" is recorded in §9.5 alongside the other
+one (the Interface *type*, C8), because the two do not conflict and C8 is
+independent.
+
+**Auditing the delta table found five things a transcription would not.**
+
+- **One orphan.** Delta 7 was owned by "T2 §9" — a spine section, not a work
+  item, filed when T2 did not exist. T2 landed; the delta did not move.
+- **Four deltas, three owners, one fix.** Deltas 7, 34b, 39 and 41 all say
+  the same sentence about different subjects: *X rides the host plane and
+  §18 says it belongs on the metadata plane* — inferred effects, the abstract
+  domain, ComposedFunction's analysis expandos, the transitive law backings.
+  Filed against B-107, B-111 and B-115; none of those is the fix. **→ B-118**,
+  and **B-115 closes inside it**. The distinction that makes it a cluster:
+  deltas 15 and 18 are host-plane data *correctly placed and wrongly
+  declared* (B-107(f), now unblocked); these four are *wrongly placed*.
+  Undeclared planes made the two indistinguishable, which is exactly why
+  they were filed apart.
+- **One stale row.** Delta 45 was owned twice — once by candidate R15,
+  withdrawn at S4b. Deleted.
+- **B-108's "blocks nothing" is false.** Option E dissolves `__length`, the
+  legacy view and W6 together, so the composite ruling decides whether
+  B-104(f) is a re-key or a deletion. **B-108 gates the retirement of the
+  last dunder** — the highest-leverage unruled question in the set, and a
+  ruling rather than code, so it can be taken at any time.
+- **A ratified chunk never ran.** §6 ruling 3 pulled the naming campaign
+  forward "ahead of the S5 triage"; S2a–S4b ran instead. Its justification —
+  easier reading *during* S2–S4 — has expired, so its placement takes a fresh
+  ruling rather than inheriting the old one. Recorded rather than quietly
+  re-planned: a decision taken, partially executed and recorded as done is
+  this campaign's own subject matter, and the campaign is not exempt.
+
+**The completion test is the spine itself.** A chunk is done when the delta
+rows it claims read `—` — not when the code lands, but when the document that
+motivated it no longer records a gap. C9 carries counts (`ContextValue`
+701 → 0, `makeContext` 104 → 0, `MultiValueType` 25 → 0), which is the
+falsifiable form D1 and D46 lacked and how they came to be recorded executed
+while unexecuted.
+
+Ten of the thirty-four deltas are naming and declaration debt. Of the
+remaining twenty-four, **thirteen are one root**: the plane boundary has no
+interfaces, so everything needing to cross it went around.
+
+Documentation only — no `src/` changes, per the standing direction that
+nothing is modified until the design and plan are committed. Suite unchanged
+at **1197/1197**.
+
 ## 2026-08 — Concept spine S4b: R15 withdrawn; the verdict should accumulate
 
 Five corrections from the S4 review. Two overturn findings rather than

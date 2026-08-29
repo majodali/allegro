@@ -1054,7 +1054,11 @@ that prevents it.
     Deleting it would have weakened existing test conditions. It stays —
     and it is therefore the ENTIRE remaining job of `isMetaSlotKey`:
     hiding one derived slot from field walks. Whatever replaces the
-    partition needs to handle exactly this case and nothing else
+    partition needs to handle exactly this case and nothing else.
+    **GATED ON B-108** (S5 triage): option E dissolves `__length`, the legacy
+    view and the W6 invariant together, so the composite ruling decides
+    whether this is a re-key or a deletion. Sequencing it the other way risks
+    building a replacement for a slot that is about to stop existing
   - **(g) `__interface` — RESOLVED at concept-spine S3 (`concepts.md` §36).**
     Specified, not open. The definition — an interface is a **declaration-only
     type**, and `InterfaceKind` is literally `Type` refined by *"has no
@@ -1178,8 +1182,10 @@ that prevents it.
     `isScope` and `scopePredicates` sit on `StructureValue` while their own
     comments say they are "host-plane fields, never value slots". The plane
     distinction is asserted in prose and contradicted by the declaration.
-    **Blocked on T2 §9** — the fix is to declare the planes first, so this
-    waits for the spine rather than being guessed at
+    ~~Blocked on T2 §9~~ — **unblocked**: `concepts.md` §18 declares the
+    planes. Scope confirmed by the S5 triage: these three are correctly
+    PLACED and wrongly DECLARED, so the fix is declaration-side only.
+    Host-plane data that is wrongly *placed* is **B-118**, a different item
 
 - [ ] **B-108** · L0 · `[reval]` **Review the Allegretto composite —
   IC-2 / IC-3 / IC-4 together.** Raised by the concept spine (S2a) at
@@ -1227,7 +1233,14 @@ that prevents it.
     including Bits
   - **Deliverable**: a ruling on the composite, and whichever of SC-5 /
     IC-1 / IC-2 / IC-3 it settles moves to a recorded choice WITH a criterion
-    and a revisit trigger. Blocks nothing; informs T2 (planes) directly
+    and a revisit trigger. Informs T2 (planes) directly
+  - **It does NOT block nothing** (corrected by the S5 triage). Option E
+    dissolves `__length`, the legacy view and the W6 invariant together, so
+    whether **B-104(f)** means *re-key `__length`* or *delete it* is decided
+    here. **B-108 gates the retirement of the last dunder** — the
+    highest-leverage unruled question in the concept-spine set, and a ruling
+    rather than code, so it can be taken at any time. Campaign chunk C12
+    (`docs/plans/concept-spine.md` §9.3) waits on it
 
 - [ ] **B-109** · L0 · **R6 and R12 are violated in the channel substrate.**
   Found by the concept spine (S2b) while resolving two objections to the
@@ -1384,7 +1397,10 @@ that prevents it.
   assumption ledger aggregates is a host-plane property (`lawBackings`, via
   `stampBackings`/`backingsOf`). Two carriers for one concept, split by
   aggregation depth rather than by meaning, and nothing tells a reader which
-  to use. Either unify them or state the rule
+  to use. Either unify them or state the rule. **Closes inside B-118(d)**
+  (S5 triage): the host-plane half is one of four carriers on the wrong
+  plane, and moving it to a metadata field with an accumulating rule is the
+  unification
 
 - [ ] **B-116** · L2 · **Interface's two guarantees are enforced
   independently, and one of them fails silently.** Raised by the concept
@@ -1434,3 +1450,36 @@ that prevents it.
   - Interacts with **B-112** (plane interfaces): "accumulate toward the
     verdict" is arguably a fifth owed interface, or the `union` rule applied
     at whole-program scope. Sequencing question, not a separate problem
+
+- [ ] **B-118** · L0 · **Four carriers ride the host plane that belong on the
+  metadata plane.** Raised by the concept-spine S5 triage: four deltas filed
+  against three different owners are one fix. `concepts.md` §18's placement
+  rule — *a plane is chosen by who may write the data and what evaluation
+  must do to it* — was never applied to these, and each was put on the host
+  plane because the host plane is where a JS property goes when nobody asks
+  the question.
+  - **(a) Inferred effects** (delta 41). The inferred set is a
+    ComposedFunction expando while the DECLARED set is a metadata field with
+    a `union` rule. Two carriers for one capability, split by provenance
+  - **(b) The abstract domain** (delta 34b). Rides a host property on a type
+    while the knowledge it belongs to is a metadata channel (§34, §34b)
+  - **(c) ComposedFunction's analysis metadata** (delta 7) — `partial`,
+    `decreasesMetric`, `genericParams` and the rest of
+    `PRESERVED_FN_META_KEYS`, kept across clones by a hand-maintained list
+    precisely because propagation does not reach them
+  - **(d) The transitive law backing set** (delta 39) — `lawBackings` via
+    `stampBackings`/`backingsOf`, while a proof's OWN backing is plain data
+    bindings. This is **B-115**'s "unify them or state the rule", and moving
+    the host-plane half onto a metadata field with an accumulating rule IS
+    the unification, so B-115 closes here rather than separately
+  - **The test that distinguishes this item from B-107(f)**: deltas 15 and 18
+    are host-plane data that is correctly PLACED and wrongly DECLARED
+    (`parent`, `isScope`, `scopePredicates` on the value interface) — that is
+    B-107(f). These four are wrongly PLACED. Undeclared planes made the two
+    indistinguishable, which is why they were filed apart
+  - **Gated on B-109(a)** (registration moving to the owning layers): a layer
+    registering its own channel is what gives these a field to move onto.
+    Campaign chunk C7 — `docs/plans/concept-spine.md` §9.3
+  - **Not a blanket rule.** The host plane is legitimate and §18 says what
+    belongs there. Each of (a)–(d) must be argued individually against the
+    placement rule; the finding is that none of them ever was

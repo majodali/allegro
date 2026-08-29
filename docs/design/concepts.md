@@ -2349,7 +2349,7 @@ still open. **→ B-057.**
 |---|---|---|
 | 2 | `types.ts` header says "Five value kinds"; there are seven | B-107 |
 | 5 | `ParamValue.predicates` — reserved, no reader, asserted empty | B-107 |
-| 7 | ComposedFunction's host-plane metadata is invisible in its declared shape | T2 §9 |
+| 7 | ComposedFunction's analysis metadata rides the host plane, invisible in its declared shape | B-118 |
 | 9 | Three names for one concept: `Structure` / `StructureValue` (2) / `ContextValue` (701) | B-107 |
 | 10 | `MultiValueType` names a kind D46 retired | B-107 |
 | 12 | `structure.ts` documents two planes; there are four | B-107 |
@@ -2373,20 +2373,20 @@ still open. **→ B-057.**
 | 36 | **`__interface` does two jobs with one bit**; its **three** readers want different facts | B-104(g) — now specified |
 | 36 | Interface's two guarantees are enforced independently; `Interface.define` **silently discards** a method body | B-116 |
 | 37 | `__args` / `__generic` are host-read with no language surface, deferred since C7.2 | B-107 |
-| 39 | Law backings ride two carriers split by aggregation depth, not by meaning | B-115 |
-| 41 | Inferred effects ride the host plane; §18's placement rule was never applied | B-107 |
+| 39 | Law backings ride two carriers split by aggregation depth, not by meaning — one of them host-plane | B-115, B-118 |
+| 41 | Inferred effects ride the host plane; §18's placement rule was never applied | B-118 |
 | 42 | Exhaustiveness and termination are L2 post-passes in the base pipeline | B-110 |
 | 43 | The T-R6 cutoff was broadened on measurement without a soundness review | B-100 |
 | 44 | `discharged` is the **last** metadata field still on the binding plane | B-104, B-109 |
-| 45 | **Program-level aggregation is required by nothing** — the verdict has no requirement above it | candidate **R15** |
 | 46 | **Contracts never reach the verdict** — zero occurrences in `pcp.ts` | B-057 (CT-R6) |
-| 34b | The abstract domain rides the host plane while the knowledge it belongs to is a metadata channel | B-111 |
-| 45 | **The verdict is assembled out-of-band** rather than accumulated through the metadata plane; the `union` channel for it exists and is unused | B-117 |
+| 34b | The abstract domain rides the host plane while the knowledge it belongs to is a metadata channel | B-118 |
+| 45 | **The verdict is assembled out-of-band** rather than accumulated through the metadata plane; the `union` field for it exists and is unused | B-117 |
 
-Nine deltas across seventeen entries, on the tier we understand best. Six of
-the nine are naming or documentation lag; three (7, 15, 17) are the same
-underlying gap — **the planes are real and undeclared** — which is what T2
-exists to fix and why it is the highest-value tier in this document.
+**34 distinct deltas across 49 entries**; 16 entries are clean. Their
+triage — ownership, clustering, and the order the code campaign works
+them — is `docs/plans/concept-spine.md` §9 (S5). Two rows above changed
+there: delta 7 was owned by a spine section rather than a work item, and
+delta 45 carried a second row owned by candidate **R15**, withdrawn at S4b.
 
 ### What T5 added (S4)
 
@@ -2615,3 +2615,15 @@ under review at **B-108**.
 The check is now mechanical rather than a matter of judgement: an entry that
 cannot name the requirement it traces up to is either misplaced or resting on
 a requirement nobody has written down.
+
+### What T0–T1 found (S1)
+
+Nine deltas across seventeen entries, on the tier we understand best. Six of
+the nine are naming or documentation lag; three (7, 15, 17) are the same
+underlying gap — **the planes are real and undeclared** — which is what T2
+exists to fix and why it is the highest-value tier in this document.
+
+S5 sharpened the third group. Deltas 15 and 18 are host-plane data that is
+correctly *placed* and wrongly *declared*; delta 7 is host-plane data that is
+wrongly placed. Undeclared planes hid the difference, and it is the split
+between B-107(f) and B-118.
