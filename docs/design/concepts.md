@@ -5,8 +5,8 @@
 > (`allegretto/structures.md`, `standard/type-system.md`, …) are where the
 > deep treatment lives; this is what makes them legible.
 >
-> Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T4 written**
-> (S1, S2a–S2f, S3); T5 pending. Status tags per `README.md`.
+> Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T5 written**
+> (S1, S2a–S2f, S3, S3b, S4). Next: **S5**, delta triage. Status tags per `README.md`.
 >
 > **Start at Part 0.** It separates *requirement* from *specification* from
 > *implementation*, which is the distinction whose absence caused most of the
@@ -2054,7 +2054,186 @@ E-R1–E-R6 in `equality-and-laws.md`.
 for one concept, split by aggregation depth rather than by meaning. Nothing
 says which a reader should use. **→ B-115.**
 
-## Deltas raised in T0–T4
+---
+
+# T5 · Obligations
+
+What Allegro claims, and how those claims are discharged. Everything here
+rests on R2: an obligation is discharged by **evaluating** it, not by a
+separate proof engine.
+
+## 40. Effect
+
+> **Level: Specification** — satisfies R2, R3′.
+
+**Definition.** An *effect* is a label naming something a computation does
+beyond producing a value — `io`, `time`, `net`, `div`. A value carries the
+**set** of effects that produced it, in the `effects` field of the metadata
+plane, propagated by `union` (§20). The base defines no labels: they are
+extension vocabulary.
+
+**Rationale.** Union propagation is why effect tracking needs no separate
+pass — a result's effects are its arguments' effects merged, computed by the
+same machinery that carries every other field. That the base defines no
+labels is R6: Allegretto knows *that* effects union, never *what* `io` means.
+
+**As implemented.** `EffectSet` in `src/effects.ts`; `withEffects`/`effectsOf`;
+`installChannelMerge("effects", …)` supplies the union — the one instance of
+the R11 pattern working (§20).
+
+**Delta.** — 
+
+## 41. Declared and inferred effects
+
+> **Level: Specification** — satisfies R2; CE-R1.
+
+**Definition.** A function's effects may be **inferred** (accumulated from
+what it transitively calls) or **declared**. A declaration is not a hint: it
+is a **contract**, and an inferred effect the declaration does not admit
+**halts compilation**.
+
+**Rationale.** CE-R1. A declaration that could be silently exceeded would
+make effect annotations decorative, and Allegro's claim is that nothing is
+silently trusted — so the asymmetry is deliberate: declaring *more* than you
+use is allowed, declaring *less* is an error.
+
+**As implemented.** `inferredEffects` (host plane) on the function;
+`checkEffectsDeclarations` in the post-pass list; `declaredEffectsAst` from
+the body-form collapse.
+
+**Delta.** The inferred set rides the **host plane**, so it is invisible to
+the metadata plane's rules and to anything reflecting on a function. That is
+probably right — it is derived, not carried — but nothing says so, and §18's
+placement rule was never applied to it. **→ B-107.**
+
+## 42. Totality
+
+> **Level: Specification** — satisfies R2; T-R series.
+
+**Definition.** *Totality* is two separate claims: **exhaustiveness** (a
+match over a finite type covers it) and **termination** (a recursive
+function's recursion is well-founded, witnessed by a `decreases` metric or by
+structural descent). Neither is assumed; both are analysed.
+
+**Rationale.** They are separated because they fail differently and are
+believed at different strengths — a non-exhaustive match is an *information*
+notification (CE-R8), a failed termination claim is an error. Fusing them
+would force one severity on both.
+
+**As implemented.** `src/totality.ts` — SCC/Tarjan over the call graph,
+`decreases` metric readers, HOF edges; `checkExhaustiveness` and
+`checkTermination` in the post-passes.
+
+**Delta.** Both are **post-passes hardcoded into the base pipeline** (§29) —
+L2 analyses in the L0/L1 stage list. **→ B-110.**
+
+## 43. Divergence and discharge tiers
+
+> **Level: Specification** — satisfies R2; D31/D34.
+
+**Definition.** *Divergence* — possible non-termination — is a **computed
+effect**, `div`, not a separate analysis result: it rides the effects field
+like any other label. Its obligation is discharged at one of four recorded
+**tiers**: **auto** (the analysis proved it), **witnessed** (a supplied
+metric), **admitted** (a declared axiom — `assume terminates`), or
+**undischarged**.
+
+**Rationale.** Making `div` an effect (D31) is what lets termination
+participate in the machinery that already exists rather than needing its own
+propagation. The tiers (D34) are the "nothing is silently trusted" surface:
+an admitted claim is *visible* in the ledger rather than assumed, so the cost
+of admitting is disclosure rather than dishonesty.
+
+**As implemented.** `DivTier = "auto" | "witnessed" | "admitted" |
+"undischarged"` in `src/totality.ts`; `div` is a real effect label
+(`eff.has("div")` in `src/runtime.ts`); `divObligations` reaches the Verdict.
+
+**Delta.** The T-R6 inlining cutoff (which stops PE speculatively unfolding
+recursive calls) was **broadened on measurement without a soundness review**
+— it now keys on SCC cycle membership. Recorded at the time as pending.
+**→ B-100.**
+
+## 44. Proof and discharge
+
+> **Level: Specification** — satisfies R2, R12.
+
+**Definition.** A *proof* is a value carrying a proposition and, when it has
+been checked, a **discharged** mark. Discharge is not a separate act: PE
+evaluates the proposition, and a proposition that evaluates to true *is*
+discharged. The mark is written only by the kernel, through the writer
+capability (§21) — it is the canonical integrity field.
+
+**Rationale.** R2, exactly: "discharge is the same act as computing" is
+literal here. R12 is why the mark cannot be a plain field — a forgeable
+discharge mark would make every proof worthless.
+
+**As implemented.** `proof_check` and the proof constructors in
+`src/primitives.ts`; `checkProofs` in `src/proofs.ts`; the proof's data
+fields (`proposition`, `lhs`, `rhs`, `reason`, `counterexample`) are plain
+bindings, and `discharged` is the integrity field.
+
+**Delta.** `discharged` is the **last metadata field still on the binding
+plane** — it registers with `bindingKey: "__discharged"` while every other
+field moved to `components` at B-104 chunk 3. It is also the one whose
+integrity flag and guard list disagree (§21). **→ B-104, B-109.**
+
+## 45. Obligation, verdict, and the assumption ledger
+
+> **Level: Specification** — satisfies R2, R12. **Where sufficiency gap S1
+> lands (Part 0 §6.3).**
+
+**Definition.** An *obligation* is a claim a compilation must settle. A
+**verdict** is the whole-program record of how every obligation was settled —
+theorems, totality findings, div obligations, liveness dispositions — and the
+**assumption ledger** is the part of it listing what was *admitted* rather
+than proved. The verdict is the artifact on which "nothing is silently
+trusted" is actually delivered: a claim is either discharged or visible.
+
+**Rationale.** Per-value metadata cannot express this. A verdict is an
+aggregate over a *compilation*, not a property of any value, which makes it
+structurally different from everything in T2.
+
+**As implemented.** `Verdict` in `src/pcp.ts` — `theorems`,
+`totalityFindings`, `divObligations`, `liveness`; `CompilationReport` and
+`Notification` in `src/runtime.ts`.
+
+**Delta — and it is a requirement gap, not a code defect.** Every requirement
+in Part 0 is **per-value or per-evaluation**. Nothing requires the base to
+support **program-level aggregation**, yet the verdict, the ledger, the
+compilation report and the notification stream all are exactly that. An
+Allegretto satisfying every stated requirement could carry per-value metadata
+perfectly and give Allegro nowhere to accumulate a verdict. **Candidate R15**,
+now with a concrete consumer rather than an abstract argument.
+
+## 46. Contract
+
+> **Level: Specification** — satisfies R2; CT-R series.
+
+**Definition.** A *contract* is a claim about a function's use: a
+**precondition** (`requires`) the caller must satisfy, a **postcondition**
+(`ensures`) the function guarantees. An **invariant** is not a third thing —
+it is a refinement layer on a type (§35), which is why it persists down a
+chain without an inheritance policy carrying it.
+
+**Rationale.** CT-R4: invariants *are* refinements, so "does this invariant
+still hold on a subtype?" is answered structurally rather than by a rule
+about inheritance — which matters here because D44 removed inheritance.
+CT-R1: a `requires` discharges at one call site and residualises at another,
+because PE evaluates it against the knowledge the actual arguments carry.
+
+**As implemented.** `requires` derives branch predicates tagged with a
+`"requires"` source and narrows the scope facts plane; invariants are `&`
+refinement chains; failure **halts** (CT-R2) while a construction-path
+invariant failure yields an error *value* (CE-R8).
+
+**Delta.** **Contracts never reach the verdict.** `src/pcp.ts` contains
+**zero** occurrences of "contract", "requires" or "ensures". So an
+undischarged precondition is a pending obligation in D34's sense that reaches
+`inspect` only — a project can read a clean verdict while carrying unproven
+preconditions, which contradicts §45's whole purpose. Recorded as CT-R6 and
+still open. **→ B-057.**
+
+## Deltas raised in T0–T5
 
 | # | Delta | Owner |
 |---|---|---|
@@ -2085,11 +2264,63 @@ says which a reader should use. **→ B-115.**
 | 36 | Interface's two guarantees are enforced independently; `Interface.define` **silently discards** a method body | B-116 |
 | 37 | `__args` / `__generic` are host-read with no language surface, deferred since C7.2 | B-107 |
 | 39 | Law backings ride two carriers split by aggregation depth, not by meaning | B-115 |
+| 41 | Inferred effects ride the host plane; §18's placement rule was never applied | B-107 |
+| 42 | Exhaustiveness and termination are L2 post-passes in the base pipeline | B-110 |
+| 43 | The T-R6 cutoff was broadened on measurement without a soundness review | B-100 |
+| 44 | `discharged` is the **last** metadata field still on the binding plane | B-104, B-109 |
+| 45 | **Program-level aggregation is required by nothing** — the verdict has no requirement above it | candidate **R15** |
+| 46 | **Contracts never reach the verdict** — zero occurrences in `pcp.ts` | B-057 (CT-R6) |
 
 Nine deltas across seventeen entries, on the tier we understand best. Six of
 the nine are naming or documentation lag; three (7, 15, 17) are the same
 underlying gap — **the planes are real and undeclared** — which is what T2
 exists to fix and why it is the highest-value tier in this document.
+
+### What T5 added (S4)
+
+Six deltas, and the tier did what the plan predicted — *"mostly
+reconciliation"* — with one exception that matters more than the rest.
+
+**§45 is where sufficiency gap S1 stops being abstract.** Every requirement
+in Part 0 is per-value or per-evaluation. The **verdict** is not: it
+aggregates over a whole compilation, and it is the artifact on which "nothing
+is silently trusted" is actually delivered. An Allegretto satisfying every
+stated requirement could carry per-value metadata perfectly and give Allegro
+nowhere to accumulate a verdict. **Candidate R15** now has a named consumer
+instead of an argument.
+
+**§46 makes CT-R6 measurable.** `src/pcp.ts` contains **zero** occurrences of
+"contract", "requires" or "ensures" — so an undischarged precondition is a
+pending obligation that reaches `inspect` and never the verdict. A project
+can read a clean verdict while carrying unproven preconditions, which
+contradicts §45's entire purpose. The ruling recorded this as a gap in 2026;
+the count is what makes it checkable.
+
+**Two deltas are the same one already found.** §42 (exhaustiveness and
+termination are post-passes in the base pipeline) is §29, and §44's
+`discharged` being the **last** binding-plane metadata field is B-104's
+residue. That repetition is a good sign rather than a bad one: the tiers are
+finding the same defects from independent directions, which is what a
+dependency-ordered model should do.
+
+### Open questions parked at S4 (maintainer)
+
+Design questions for **Allegro**, which do not change what Allegro requires
+of **Allegretto** — so they are recorded rather than settled, and the
+distinction is exactly Part 0 §1's subject line doing its job:
+
+1. **Is "Interface" the right name for an abstract inheritable type?** §36
+   found that the concept here is *drawn from rather than instantiated*, and
+   that Allegro has no abstract types because D44 removed what abstractness
+   is defined against. Whether the surviving concept should keep the name
+   "Interface" is open.
+2. **What is the difference between `Interface` and `InterfaceKind`?** Both
+   exist in `types-std.ts`; the spine defines the kind (§31, §36) and does
+   not distinguish them. That is a gap in this document, not only in the code.
+3. **Is structural comparison useful on *types*, or only on data?** §33b
+   defines loose conformance as the duck-typing surface "aimed at data
+   values", and `~T` applies it to types. Whether that is valuable or merely
+   permitted — and whether it should be restricted — is open.
 
 ### Two corrections to T4 (S3b)
 

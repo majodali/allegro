@@ -1,7 +1,7 @@
 # Concept spine — define Allegro, then make the code say it
 
 > Status: **active** — ratified 2026-08 (§6 rulings 1–3; ruling 4
-> deliberately HELD as a delta for S3). **S1 + S2a–S2f + S3 + S3b landed**; S4 (T5 obligations) next.
+> deliberately HELD as a delta for S3). **S1 + S2a–S2f + S3 + S3b + S4 landed**; S5 (delta triage) next — the spine's tiers are complete.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -233,7 +233,7 @@ being written to justify a rename already in flight.
 | **S2f** | ~~T3 evaluation~~ **DONE 2026-08** — PE Rules 1/2, resolved/residual, tail calls, future cells and completion, the `evalSource` pipeline. Plus two maintainer items: the **metadata / field / channel** terminology (§19/§19b — which immediately exposed that the registry holds five different kinds of thing under one word, → B-111) and **plane interfaces elevated to a first-class entry** (§24 — four hooks owed, → B-112). T3's own finding: §29, the L2 post-passes are hardcoded into the base pipeline — §23's violation in its other form |
 | **S3** | ~~T4 types~~ **DONE 2026-08** — type, kind/meta-type, shape, member+symbol, knowledge, refinement, **interface**, generic, identity (distinct / structural wrap / equality shape), law+coercion. Six deltas, one of them a **resolution**: §36 defines "interface" precisely enough that `~Printable` follows from the definition rather than being ruled, and the derivation names exactly what changes → **B-104(g) specified**. Also caught the two maintainer corrections: `dataOf` is a HOST interface (Allegro code has none — a value *is* its data), and the engine/meta-slot interface row does not vanish with `__length` but should shrink to zero as D39's 14 member-dispositioned slots land |
 | **S3b** | ~~T4 corrections~~ **DONE 2026-08** (maintainer questions) — the **interface definition** rewritten (neither "has no construct" nor "all members signature-only"; two properties enforced in two places, neither being the concept — and Allegro has **no abstract types** because D44 removed what abstractness is defined against) → **B-116**; **§33b declared vs loose conformance** added, a term the document had used six times undefined; the marker measurement re-run across all **three** readers rather than one |
-| **S4** | T5 obligations. Mostly reconciliation — the R-series rulings already carry rationale, so this is largely relocation and delta-hunting |
+| **S4** | ~~T5 obligations~~ **DONE 2026-08** — effect, declared/inferred effects, totality, divergence + D34 tiers, proof and discharge, **obligation/verdict/ledger**, contract. Six deltas. Two are the same defects T2/T3 already found, reached from a different direction; two are new and load-bearing: **§45** gives sufficiency gap S1 a named consumer (the verdict is program-level and no requirement enables it → **R15**), and **§46** makes CT-R6 measurable — `pcp.ts` has **zero** occurrences of contract/requires/ensures, so a clean verdict can coexist with unproven preconditions. Three maintainer questions parked as Allegro design questions that do not change Allegretto's requirements |
 | **S5** | Delta triage: every delta from S1–S4 becomes a backlog item, ordered. This is the code campaign's plan, produced as evidence rather than guessed |
 | **C1…Cn** | The code campaign itself, one chunk per delta cluster, gated normally |
 

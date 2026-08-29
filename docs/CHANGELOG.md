@@ -4,6 +4,57 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Concept spine S4: T5 obligations; the spine's tiers are complete
+
+Seven entries — effect, declared and inferred effects, totality, divergence
+and the D34 discharge tiers, proof and discharge, **obligation/verdict/
+ledger**, contract. Six deltas. The tier was predicted to be "mostly
+reconciliation" and largely was, with two exceptions that matter.
+
+**§45 is where sufficiency gap S1 stops being abstract.** Every requirement
+in Part 0 is per-value or per-evaluation. The **verdict** is not: it
+aggregates over a whole compilation, and it is the artifact on which "nothing
+is silently trusted" is actually delivered. An Allegretto satisfying every
+stated requirement could carry per-value metadata perfectly and give Allegro
+nowhere to accumulate a verdict. **Candidate R15** now has a named consumer —
+`Verdict`, `CompilationReport`, `Notification` — rather than an argument.
+
+**§46 makes CT-R6 measurable.** `src/pcp.ts` contains **zero** occurrences of
+"contract", "requires" or "ensures". An undischarged precondition is a
+pending obligation in D34's sense that reaches `inspect` and never the
+verdict — so a project can read a clean verdict while carrying unproven
+preconditions, contradicting §45's entire purpose. The ruling recorded this
+as a gap; the count is what makes it checkable. **→ B-057.**
+
+**Two deltas are defects already found, reached from a different direction.**
+§42 — exhaustiveness and termination are L2 post-passes hardcoded into the
+base pipeline — is §29. §44 — `discharged` is the **last** metadata field
+still on the binding plane, registering with `bindingKey: "__discharged"`
+while every other field moved to `components` at B-104 chunk 3, and the one
+whose integrity flag and guard list disagree — is B-104/B-109 residue. The
+repetition is a good sign: dependency-ordered tiers converging on the same
+defects independently is what the ordering is for.
+
+Two more: inferred effects ride the host plane with §18's placement rule
+never applied (**B-107**), and the T-R6 inlining cutoff was broadened on
+measurement without the soundness review it was recorded as needing
+(**B-100**).
+
+**Three maintainer questions parked**, recorded rather than settled because
+they are **Allegro** design questions that do not change what Allegro
+requires of **Allegretto** — Part 0 §1's subject line doing its job:
+is "Interface" the right name for an abstract inheritable type; what
+distinguishes `Interface` from `InterfaceKind` (a gap in this document, not
+only in the code); and is structural comparison useful on *types* or only on
+data, given §33b defines the loose path as "aimed at data values" while `~T`
+applies it to types.
+
+**The spine's tiers are complete** — Part 0 and T0–T5, 46 entries. Next is
+**S5**, the delta triage that turns the accumulated list into an ordered code
+campaign.
+
+No `src/` changes. Gate: **1197/1197, `GATE: PASSED`**.
+
 ## 2026-08 — Concept spine S3b: the interface definition was wrong
 
 Two maintainer questions, and both changed the entry rather than defending it.
