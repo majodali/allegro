@@ -20,7 +20,7 @@
 
 import { dataOf, channelReadRaw, SLOT_KEYS } from "./slots.js";
 import {
-  Value, ValueKind, ContextValue, BitsValue,
+  Value, ValueKind, StructureValue, BitsValue,
   bitsToString,
 } from "./types.js";
 import { getTypeName } from "./types-std.js";
@@ -60,7 +60,7 @@ export function isDischargedProof(v: Value | undefined): boolean {
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 1n;
 }
 
-function ctxString(ctx: ContextValue, key: string): string | undefined {
+function ctxString(ctx: StructureValue, key: string): string | undefined {
   const b = ctx.bindings.get(key)?.value;
   if (!b) return undefined;
   const p = dataOf(b);
@@ -73,7 +73,7 @@ export function describeFailedProof(
   v: Value,
   binding: string | null,
 ): ProofFinding {
-  const ctx = dataOf(v) as ContextValue;
+  const ctx = dataOf(v) as StructureValue;
   return {
     binding,
     proposition:    ctxString(ctx, SLOT_KEYS.proposition) ?? "<proposition>",

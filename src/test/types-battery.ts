@@ -8,7 +8,7 @@
 import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
-import { dataOf, BitsValue, ContextValue, ValueKind, bitsToString, makeContext, makeParam, Value, makeComposedFn, stringToBits } from "../types.js";
+import { dataOf, BitsValue, StructureValue, ValueKind, bitsToString, makeStructure, makeParam, Value, makeComposedFn, stringToBits } from "../types.js";
 import { getTypeName, getType, isGenericType, createTypeSystem, IntType, Type, StringType, typeMethod, structuralWrap, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, typeMemberDescriptor, isGetterDescriptor, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, InterfaceKind } from "../types-std.js";
 import { getGenericArgs, channelReadRaw, getName, getWraps, getRefines, getMembers, getInterfaceMarker, getConstruct, componentsView, SLOT_KEYS, setMembers, setName as slotSetName, writeShape } from "../slots.js";
 import { formatValue, primitives as primRegistry } from "../primitives.js";
@@ -43,7 +43,7 @@ test("generics: array literal infers Array[Int]", () => {
   // Check it has type args
   const type = getType(result!);
   eq(type !== null, true);
-  const args = getGenericArgs(type as ContextValue);
+  const args = getGenericArgs(type as StructureValue);
   eq(args !== undefined, true);
 });
 
@@ -51,7 +51,7 @@ test("generics: array literal infers Array[String]", () => {
   const result = evalStd('["a", "b", "c"]');
   eq(getTypeName(result!), "Array");
   const type = getType(result!);
-  const args = getGenericArgs(type as ContextValue);
+  const args = getGenericArgs(type as StructureValue);
   eq(args !== undefined, true);
 });
 
@@ -62,7 +62,7 @@ test("generics: mixed element array gets bare Array", () => {
   eq(getTypeName(result!), "Array");
   const type = getType(result!);
   // Bare Array (generic) should not have __args
-  const args = getGenericArgs(type as ContextValue);
+  const args = getGenericArgs(type as StructureValue);
   eq(args, undefined);
 });
 
@@ -99,7 +99,7 @@ test("generics: Array is a generic type", () => {
   const result = evalStd("Array");
   const p = dataOf(result!);
   eq(p.kind === ValueKind.Structure, true);
-  eq(isGenericType(p as ContextValue), true);
+  eq(isGenericType(p as StructureValue), true);
 });
 
 test("generics: params is a typed Array[String] instance field", () => {
@@ -488,8 +488,8 @@ test("member descriptors: IntType has __members with Method descriptors", () => 
   eq(members.size > 0, true);
   const addDesc = members.get("add");
   eq(addDesc !== undefined, true);
-  eq(isMethodDescriptor(addDesc as ContextValue), true);
-  eq(isFieldDescriptor(addDesc as ContextValue), false);
+  eq(isMethodDescriptor(addDesc as StructureValue), true);
+  eq(isFieldDescriptor(addDesc as StructureValue), false);
 });
 
 test("member descriptors: typeMemberDescriptor returns descriptor", () => {
@@ -520,7 +520,7 @@ test("member descriptors: Type has __members with meta-methods", () => {
   eq(members.size > 0, true);
   const defineDesc = members.get("define");
   eq(defineDesc !== undefined, true);
-  eq(isMethodDescriptor(defineDesc as ContextValue), true);
+  eq(isMethodDescriptor(defineDesc as StructureValue), true);
 });
 
 test("member descriptors: Type has __members with meta-methods", () => {
@@ -528,23 +528,23 @@ test("member descriptors: Type has __members with meta-methods", () => {
   eq(members.size > 0, true);
   const instanceofDesc = members.get("instanceof");
   eq(instanceofDesc !== undefined, true);
-  eq(isMethodDescriptor(instanceofDesc as ContextValue), true);
+  eq(isMethodDescriptor(instanceofDesc as StructureValue), true);
 });
 
 test("member descriptors: record type has Field descriptors", () => {
   const result = evalStd(`Animal = Type.define({name: String, age: Int}, Int)
 Animal`);
-  const typeCtx = dataOf(result!) as ContextValue;
+  const typeCtx = dataOf(result!) as StructureValue;
   eq(typeCtx.kind, ValueKind.Structure);
   const members = memberDescriptorsOf(typeCtx);
   eq(members.size > 0, true);
   const nameDesc = members.get("name");
   eq(nameDesc !== undefined, true);
-  eq(isFieldDescriptor(nameDesc as ContextValue), true);
+  eq(isFieldDescriptor(nameDesc as StructureValue), true);
   // toString should be a Method descriptor
   const tsDesc = members.get("toString");
   eq(tsDesc !== undefined, true);
-  eq(isMethodDescriptor(tsDesc as ContextValue), true);
+  eq(isMethodDescriptor(tsDesc as StructureValue), true);
 });
 
 test("member descriptors: record field access via type_dispatch works", () => {
@@ -701,7 +701,7 @@ test("effect Allegro source: pure does not subtypeof opaque (order is not confor
 test("interfaces: Type.interface creates structural type with __interface marker", () => {
   const result = evalStd(`Printable = Interface.define({toString: Function})
 Printable`);
-  const iface = dataOf(result!) as ContextValue;
+  const iface = dataOf(result!) as StructureValue;
   eq(iface.kind, ValueKind.Structure);
   // __interface marker
   const marker = getInterfaceMarker(iface);
@@ -712,19 +712,19 @@ Printable`);
 });
 
 test("interfaces: interface has Field descriptors in __members", () => {
-  const result = dataOf(evalStd(`Interface.define({toString: Function, length: Int})`)!) as ContextValue;
+  const result = dataOf(evalStd(`Interface.define({toString: Function, length: Int})`)!) as StructureValue;
   const members = memberDescriptorsOf(result);
   eq(members.size > 0, true);
   const tsDesc = members.get("toString");
   eq(tsDesc !== undefined, true);
-  eq(isFieldDescriptor(tsDesc as ContextValue), true);
+  eq(isFieldDescriptor(tsDesc as StructureValue), true);
   const lenDesc = members.get("length");
   eq(lenDesc !== undefined, true);
-  eq(isFieldDescriptor(lenDesc as ContextValue), true);
+  eq(isFieldDescriptor(lenDesc as StructureValue), true);
 });
 
 test("interfaces: interface has no __construct", () => {
-  const result = dataOf(evalStd(`Interface.define({x: Int})`)!) as ContextValue;
+  const result = dataOf(evalStd(`Interface.define({x: Int})`)!) as StructureValue;
   eq(getConstruct(result) !== undefined, false);
 });
 
@@ -755,7 +755,7 @@ test("interfaces: parent member inheritance", () => {
   // Int has add, sub, etc. in __members. Interface.define({extra: Int}, Int) requires all of them plus extra.
   const result = evalStd(`WithExtra = Interface.define({extra: Int}, Int)
 WithExtra`);
-  const iface = dataOf(result!) as ContextValue;
+  const iface = dataOf(result!) as StructureValue;
   const members = memberDescriptorsOf(iface);
   // Should have 'add' from Int's __members
   eq(members.has("add"), true);
@@ -766,14 +766,14 @@ WithExtra`);
 test("interfaces: Type.interface also creates structural type", () => {
   const result = evalStd(`Sized = Interface.define({length: Int}, Int)
 Sized`);
-  const iface = dataOf(result!) as ContextValue;
+  const iface = dataOf(result!) as StructureValue;
   eq(channelReadRaw(iface, "type") === InterfaceKind, true);
 });
 
 test("interfaces: auto-named when bound to symbol", () => {
   const result = evalStd(`Printable = Interface.define({toString: Function})
 Printable`);
-  const iface = dataOf(result!) as ContextValue;
+  const iface = dataOf(result!) as StructureValue;
   const name = getName(iface);
   eq(name !== undefined, true);
   eq(bitsToString(name as BitsValue), "Printable");
@@ -925,14 +925,14 @@ a`);
 test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => {
   // Build a meta-type with a ComposedFunction method `describe` that returns
   // self's __name field (self is the raw type Context).
-  const metaType = makeContext();
-  const metaMembers = makeContext();
+  const metaType = makeStructure();
+  const metaMembers = makeStructure();
   // describe(self) => self.__name — as an Allegro lambda
   const param = makeParam(0);
   const selfExpr = param as unknown as Value;
   // Body: access __name on self via __get_member... simpler: just return self.
   const describeFn = makeComposedFn([param], selfExpr);
-  const desc = makeContext();
+  const desc = makeStructure();
   // B-104 chunk 3: the descriptor's shape is stamped on the component plane
   // (it was a `__type` BINDING in this hand-built fixture before the move).
   writeShape(desc, Type);
@@ -952,28 +952,28 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
   slotSetName(metaType, stringToBits("MetaType"));
 
   // Raw Context whose shape channel holds metaType.
-  const target = makeContext();
+  const target = makeStructure();
   writeShape(target, metaType);
   slotSetName(target, stringToBits("Instance"));
 
   // Call type_dispatch(target, "describe") via the primitive.
   const typeDispatch = primRegistry["type_dispatch"] as any;
   // Lazy primitive — pass raw args (unevaluated) and an evalFn + ctx.
-  const ctx = makeContext();
+  const ctx = makeStructure();
   // Seed ctx with the target under a name, and invoke the bound method.
   ctx.bindings.set("x", { key: "x", value: target });
   ctx.bindingList.push({ key: "x", value: target });
   const boundMethod = typeDispatch.fn(
     [target, stringToBits("describe")],
     ctx,
-    (v: Value, c: ContextValue) => evaluate(v, c),
+    (v: Value, c: StructureValue) => evaluate(v, c),
   );
   eq(boundMethod !== null && boundMethod !== undefined, true);
   // The returned value should be a bound primitive (since describe has one
   // positional arg — self — which gets auto-bound). Calling it with no args
   // invokes the ComposedFunction with self = target.
   eq(boundMethod.kind, ValueKind.PrimitiveFunction, "meta-method should return a bound primitive");
-  const result = boundMethod.fn([], ctx, (v: Value, c: ContextValue) => evaluate(v, c));
+  const result = boundMethod.fn([], ctx, (v: Value, c: StructureValue) => evaluate(v, c));
   // describeFn returns its self param; primary should be the raw target Context.
   eq(dataOf(result).kind, ValueKind.Structure);
   eq(dataOf(result) === target, true, "bound method should pass target as self");

@@ -8,7 +8,7 @@
 import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
-import { dataOf, BitsValue, bitsToString, ValueKind, ContextValue, Value } from "../types.js";
+import { dataOf, BitsValue, bitsToString, ValueKind, StructureValue, Value } from "../types.js";
 import { getTypeName, getType, createTypeSystem } from "../types-std.js";
 import { getName, componentsView, getMembers } from "../slots.js";
 import { formatValue } from "../primitives.js";
@@ -178,7 +178,7 @@ test("of: type of typed int", () => {
   eq(result !== null, true);
   // The type of 42 is the Int type context — which has __name = "Int"
   eq(result!.kind, ValueKind.Structure);
-  const nameBinding = getName(result as ContextValue);
+  const nameBinding = getName(result as StructureValue);
   eq(nameBinding !== undefined, true);
   eq(bitsToString(dataOf(nameBinding!) as BitsValue), "Int");
 });
@@ -478,7 +478,7 @@ p = Point(1, 2)
 type of p
 `);
   eq(result!.kind, ValueKind.Structure);
-  const nameB = getName(result as ContextValue);
+  const nameB = getName(result as StructureValue);
   eq(bitsToString(dataOf(nameB!) as BitsValue), "Point");
 });
 
@@ -683,10 +683,10 @@ test("distinct: symbol-fresh mint — no shared member symbols (C7.2b)", () => {
   // scope. Non-conformance falls out of symbol-identity membership by
   // construction — no member-symbol key overlaps with the parent's.
   const ext = createTypeSystem();
-  const intT = dataOf(ext.bindings["Int"] as unknown as Value) as ContextValue;
+  const intT = dataOf(ext.bindings["Int"] as unknown as Value) as StructureValue;
   const result = evalStd(`UserId = Int.distinct()\nUserId`);
-  const distinctT = dataOf(result!) as ContextValue;
-  const membersOf = (t: ContextValue) => getMembers(t) as ContextValue | undefined;
+  const distinctT = dataOf(result!) as StructureValue;
+  const membersOf = (t: StructureValue) => getMembers(t) as StructureValue | undefined;
   const parentMembers = membersOf(intT);
   const distinctMembers = membersOf(distinctT);
   eq(parentMembers !== undefined && distinctMembers !== undefined, true);
@@ -698,7 +698,7 @@ test("distinct: symbol-fresh mint — no shared member symbols (C7.2b)", () => {
   // drawn symbol point at ONE descriptor — while the fresh mint collapses
   // each member to a single fresh symbol. Compare base-name surfaces, not
   // raw key counts.)
-  const baseNames = (m: ContextValue) => new Set([...m.bindings.keys()].map(fqnBaseName));
+  const baseNames = (m: StructureValue) => new Set([...m.bindings.keys()].map(fqnBaseName));
   eq(baseNames(distinctMembers!).size, baseNames(parentMembers!).size);
 });
 

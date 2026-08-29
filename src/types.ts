@@ -1,9 +1,11 @@
 // Allegretto - Core Types
-// Five value kinds + Param placeholder
+// The seven representation kinds (docs/design/concepts.md §2): Bits,
+// Symbol, Param, Expression, ComposedFunction, PrimitiveFunction and
+// Structure — the one composite (D1/D46).
 
 // C4.1: the unified Structure class behind MultiValue/Context. structure.ts
 // imports only TYPES from this module, so there is no runtime cycle.
-import { newMultiValueStructure, newContextStructure, newDenseStructure, deriveWithChannels, isCarrier } from "./structure.js";
+import { newCarrierStructure, newRecordStructure, newDenseStructure, deriveWithChannels, isCarrier } from "./structure.js";
 
 export enum ValueKind {
   Bits = "Bits",
@@ -28,11 +30,11 @@ export interface BitsValue {
 
 // --- Primitive Function ---
 
-export type EvalFn = (value: Value, ctx: ContextValue) => Value;
+export type EvalFn = (value: Value, ctx: StructureValue) => Value;
 
 export type PrimitiveFnImpl = (
   args: Value[],
-  ctx: ContextValue,
+  ctx: StructureValue,
   evalFn: EvalFn,
 ) => Value;
 
@@ -123,7 +125,7 @@ export interface ExpressionValue {
   memo: Map<string, Value>;
 }
 
-// --- Context: evaluation context with bindings ---
+// --- Structure: the one composite representation (D1/D46) ---
 
 export interface Binding {
   key: string | null;
@@ -154,15 +156,24 @@ export interface Binding {
   cell?: boolean;
 }
 
-export interface StructureValue {
-  kind: ValueKind.Structure;
-  bindings: Map<string, Binding>;
-  bindingList: Binding[];
-  /** C2.1 scope protocol: parent-chain layer link (evaluation scopes only —
-   *  host-plane field, never a value slot). Lookup walks the chain. */
-  parent?: ContextValue;
-  /** C2.1: marks evaluation scopes vs data Contexts. Set by scopeNew/
-   *  scopeExtend and the root eval-context builders. */
+/**
+ * HOST PLANE (docs/design/concepts.md §18) — engine bookkeeping about a
+ * structure that is NOT part of the value. Nothing here is a slot, nothing
+ * propagates through partial evaluation, and no Allegro program can read it.
+ *
+ * Declared as its own interface rather than inline on `StructureValue`
+ * because the plane distinction used to live only in per-field comments,
+ * which the value interface then contradicted by declaring them as its own
+ * (concepts.md deltas 15 and 18 → B-107(f)). These three ARE correctly on
+ * the host plane; only the declaration was wrong. Host-plane data that
+ * belongs on the METADATA plane is a different item — B-118.
+ */
+export interface StructureHostFields {
+  /** C2.1 scope protocol: parent-chain layer link (evaluation scopes only).
+   *  Lookup walks the chain. */
+  parent?: StructureValue;
+  /** C2.1: marks evaluation scopes vs data structures. Set by scopeNew/
+   *  scopeExtend and the root eval-scope builders. */
   isScope?: boolean;
   /**
    * Phase C scope-local predicate narrowing. When a binding is referenced
@@ -172,22 +183,30 @@ export interface StructureValue {
    * resolved value's predicate set, so downstream references see the
    * narrowed view.
    *
-   * The map is opaque to most ContextValue consumers — module loaders, type
-   * machinery, etc. ignore it. Only the evaluator's Symbol resolution case
-   * and the branch / assert primitives read or write it.
+   * The map is opaque to most StructureValue consumers — module loaders,
+   * type machinery, etc. ignore it. Only the evaluator's Symbol resolution
+   * case and the branch / assert primitives read or write it.
    */
   scopePredicates?: Map<string, unknown>;
 }
 
-// --- The carrier (C7.1, D15/D46): the former MultiValue KIND is now a
-// CONFIGURATION of Structure — a transparent structure with an empty
-// data plane whose data rides in `primary` and whose channels ride in
-// `components`. It answers the same kind as every structure; the
-// host-level discriminant is primary presence (`isCarrier`). The legacy
-// type name survives as the carrier's static shape so existing casts
-// keep compiling.
+export interface StructureValue extends StructureHostFields {
+  kind: ValueKind.Structure;
+  /** Binding plane: what a name resolves to. Also the data plane's storage
+   *  for record-role structures — two planes, one map (concepts.md §13). */
+  bindings: Map<string, Binding>;
+  bindingList: Binding[];
+}
 
-export type MultiValueType = ContextValue & {
+// --- The carrier (C7.1, D15/D46; docs/design/concepts.md §10): the
+// former MultiValue KIND is now a CONFIGURATION of Structure — a
+// transparent structure with an empty data plane whose data rides in
+// `primary` and whose metadata rides in `components`. It answers the same
+// kind as every structure; the host-level discriminant is primary
+// presence (`isCarrier`). This is the carrier's static shape, for the
+// paths that have already established they hold one.
+
+export type CarrierStructure = StructureValue & {
   primary: Value;
   components: Map<string, Value>;
 };
@@ -199,7 +218,7 @@ export type Value =
   | PrimitiveFunctionValue
   | ComposedFunctionValue
   | ExpressionValue
-  | ContextValue
+  | StructureValue
   | ParamValue
   | SymbolValue;
 
@@ -268,11 +287,11 @@ export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunct
 // one hidden class, constructed only here. The returned objects satisfy
 // the legacy interfaces field-for-field; the physical layout migrates
 // inside structure.ts from now on.
-export function makeContext(): ContextValue {
-  return newContextStructure() as unknown as ContextValue;
+export function makeStructure(): StructureValue {
+  return newRecordStructure() as unknown as StructureValue;
 }
 
-export function makeMultiValue(primary: Value, components?: Map<string, Value>): MultiValueType {
+export function withMetadata(primary: Value, components?: Map<string, Value>): StructureValue {
   // C4.3b/C7.1: the ONE channel-attachment chokepoint. A record/array/type
   // primary flattens into a copy-on-write derive (channels ride directly);
   // a CARRIER primary re-wraps its inner data (W1: carriers never nest —
@@ -282,19 +301,19 @@ export function makeMultiValue(primary: Value, components?: Map<string, Value>):
   // `.primary`.
   if (primary.kind === ValueKind.Structure) {
     if (isCarrier(primary)) {
-      return newMultiValueStructure(
-        (primary as MultiValueType).primary, components ?? new Map()) as unknown as MultiValueType;
+      return newCarrierStructure(
+        (primary as CarrierStructure).primary, components ?? new Map()) as unknown as CarrierStructure;
     }
-    return deriveWithChannels(primary as ContextValue, components ?? new Map()) as unknown as MultiValueType;
+    return deriveWithChannels(primary as StructureValue, components ?? new Map()) as unknown as CarrierStructure;
   }
-  return newMultiValueStructure(primary, components ?? new Map()) as unknown as MultiValueType;
+  return newCarrierStructure(primary, components ?? new Map()) as unknown as CarrierStructure;
 }
 
 /** C4.2: construct a dense numeric-keyed structure (array context) — the
  *  element array is adopted. Element reads go through slots.ts `indexGet`;
  *  the legacy bindings view materializes lazily for stragglers. */
-export function makeDenseArrayCtx(elements: Value[]): ContextValue {
-  return newDenseStructure(elements) as unknown as ContextValue;
+export function makeDenseArray(elements: Value[]): StructureValue {
+  return newDenseStructure(elements) as unknown as StructureValue;
 }
 
 // --- Utilities ---
@@ -491,6 +510,3 @@ export class AllegroError extends Error {
     this.name = "AllegroError";
   }
 }
-/** C7.1 transitional alias — the `Context` NAME is retired (D25); existing
- *  references migrate opportunistically. */
-export type ContextValue = StructureValue;

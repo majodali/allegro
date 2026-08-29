@@ -6,7 +6,7 @@
 // =============================================================================
 
 import { test, eq, throws } from "./harness.js";
-import { evalSource, evalStr, evalNum, evalNumExt, mathExtension, makeCtxWith } from "./fixtures.js";
+import { evalSource, evalStr, evalNum, evalNumExt, mathExtension, makeStructureWith } from "./fixtures.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
 import { dataOf, ValueKind, makeInt } from "../types.js";
 

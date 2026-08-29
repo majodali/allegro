@@ -6,7 +6,7 @@
 import { evalSource, Extension } from "./runtime.js";
 import { dataOf, cloneComponents, setName, setFallbackMember, isBareBindingName, isFutureBindingName, componentsView } from "./slots.js";
 import { remapParams } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeContext, makeExpr, makeMultiValue, stringToBits, bitsToString, AllegroError } from "./types.js";
+import { Value, ValueKind, StructureValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeStructure, makeExpr, withMetadata, stringToBits, bitsToString, AllegroError } from "./types.js";
 import { withType } from "./types-std.js";
 import { primitives } from "./primitives.js";
 import { markExported } from "./symbols.js";
@@ -116,7 +116,7 @@ function captureModuleVars(
       if (pp === undefined) return value;
       const newP = captureModuleVars(pp, moduleBindings, ownParams, seen);
       if (newP === pp) return value;
-      return makeMultiValue(newP, cloneComponents(value));
+      return withMetadata(newP, cloneComponents(value));
     }
 
     default:
@@ -151,7 +151,7 @@ export function buildModuleObject(
   }
 
   // Build the underlying Context with ALL bindings (public + private)
-  const ctx = makeContext();
+  const ctx = makeStructure();
   for (const [key, value] of Object.entries(capturedBindings)) {
     ctx.bindings.set(key, { key, value });
     ctx.bindingList.push({ key, value });
@@ -160,13 +160,13 @@ export function buildModuleObject(
   // Build a module-specific type with __getMember for exported fields only.
   // The __getMember checks if the requested field is in the exported set,
   // enforcing encapsulation — private module bindings are inaccessible.
-  const moduleType = makeContext();
+  const moduleType = makeStructure();
 
   setName(moduleType, stringToBits(name));
 
   // __getMember: only allows access to exported fields
   const getMember: PrimitiveFnImpl = (args) => {
-    const moduleCtx = args[0] as ContextValue;
+    const moduleCtx = args[0] as StructureValue;
     const fieldName = bitsToString(args[1] as BitsValue);
     if (!exportedNames.has(fieldName)) {
       throw new AllegroError(`Module '${name}': '${fieldName}' is not exported`);
@@ -302,7 +302,7 @@ export class ModuleLoader {
     //     wrapped values via the module type's __getMember.
     const cleanSource = source.slice(scan.headerEnd);
     const allExtensions = [...this.extensions, ...depExtensions, ...useExtensions];
-    let evalCtx: ContextValue;
+    let evalCtx: StructureValue;
     try {
       const result = evalSource(
         cleanSource,

@@ -14,7 +14,7 @@
 import { dataOf, channelReadRaw, backingsOf } from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
-  Value, ValueKind, ContextValue, ComposedFunctionValue,
+  Value, ValueKind, StructureValue, ComposedFunctionValue,
   BitsValue, PrimitiveFunctionValue, ParamValue,
   bitsToString, bitsToFloat, isResolved,
 } from "./types.js";
@@ -269,7 +269,7 @@ export function summarizeValue(v: Value): ValueSummary {
   let restsOn: LawBackingRec[] | undefined;
   const structPrim = dataOf(v);
   if (structPrim.kind === ValueKind.Structure) {
-    const backings = backingsOf(structPrim as ContextValue);
+    const backings = backingsOf(structPrim as StructureValue);
     if (backings.length > 0) restsOn = backings;
   }
 
@@ -460,7 +460,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
     case ValueKind.Symbol:
       return `unresolved Symbol <${(dataOf(v) as { kind: ValueKind.Symbol; name: string }).name}>`;
     case ValueKind.Structure: {
-      const ctx = dataOf(v) as ContextValue;
+      const ctx = dataOf(v) as StructureValue;
       if ((ctx as any).grammarValue) {
         const chain = (ctx as any).grammarValue.baseChain?.join(" > ") ?? "?";
         return `Grammar (extends ${chain})`;
@@ -529,7 +529,7 @@ export function safetyGradeForSummary(
  * consume this single structure.
  */
 export function summarizeModule(
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
   report?:  CompilationReport,
   opts?: {
     /** Names to include (defaults to all user-defined bindings). */

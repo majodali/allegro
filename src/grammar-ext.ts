@@ -30,8 +30,8 @@ import {
   parserMakeSymbol,
 } from "./parser.js";
 import {
-  Value, ValueKind, ContextValue, BitsValue,
-  makeContext, makeInt, makeMultiValue, stringToBits, dataOf,
+  Value, ValueKind, StructureValue, BitsValue,
+  makeStructure, makeInt, withMetadata, stringToBits, dataOf,
 } from "./types.js";
 import { withType, StringType, ErrorType, IntType, makeArray, noneSingleton } from "./types-std.js";
 
@@ -52,7 +52,7 @@ export const helpers = {
   buildFn: parserBuildFn,
   substName: parserSubstName,
   stringToBits: parserStringToBits,
-  makeContext: parserMakeContext,
+  makeStructure: parserMakeContext,
   bind: parserBind,
   repChildren: parserRepChildren,
   makeSymbol: parserMakeSymbol,
@@ -691,7 +691,7 @@ export function parseGrammarToAllegro(gHandle: number, input: string): Value {
     const components = new Map<string, Value>();
     components.set("error", withType(stringToBits(msg), StringType));
     components.set("type", ErrorType);
-    return makeMultiValue(makeInt(0), components);
+    return withMetadata(makeInt(0), components);
   }
   return syntaxTreeToAllegroValue(result.tree);
 }

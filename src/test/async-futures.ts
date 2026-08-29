@@ -13,7 +13,7 @@ import { createFutureManager } from "../futures.js";
 import { channelReadRaw } from "../slots.js";
 import { formatValue, extractGrammarFragment } from "../primitives.js";
 import { primNames, typeNames } from "./alg-files.js";
-import { Value, ValueKind, BitsValue, ContextValue, dataOf, makeInt, bitsToString, isResolved } from "../types.js";
+import { Value, ValueKind, BitsValue, StructureValue, dataOf, makeInt, bitsToString, isResolved } from "../types.js";
 import { futureElementType, getType, typeContextName as tsTypeContextName, futureOf, IntType } from "../types-std.js";
 import { ModuleLoader } from "../modules.js";
 import { livenessDispositions } from "../effects.js";
@@ -154,7 +154,7 @@ export async function runAsyncTests(): Promise<void> {
     const r = runtimeEval("x = delay(10)\n", undefined, [typeExt], undefined, true, fm);
     const pending = r.registry.bindings.get("x")!.value!;
     eq(getTypeName(pending), "Future", "pending value carries Future");
-    const elT = futureElementType(getType(pending)! as ContextValue);
+    const elT = futureElementType(getType(pending)! as StructureValue);
     eq(elT !== null && tsTypeContextName(elT!) === "Int", true, "element type is Int");
     await fm.waitForAll();
     eq(getTypeName(r.registry.bindings.get("x")!.value!), "Int", "resolved value's own type shadows Future");

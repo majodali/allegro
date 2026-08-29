@@ -879,9 +879,9 @@ layer.
 **As implemented.** `ValueKind` in `src/types.ts` — a string enum, read as a
 plain field so the evaluator's hot switch stays monomorphic.
 
-**Delta.** `src/types.ts` opens with `// Five value kinds + Param placeholder`.
-There are seven, and `Param` is one of them rather than an aside. The header
-predates both `Symbol` and the `Context`→`Structure` renaming. **→ B-107.**
+**Delta.** — *(closed at C9. The header read "Five value kinds + Param
+placeholder" — there are seven, and Param is one of them; it predated both
+`Symbol` and the Context→Structure renaming.)*
 
 ## 3. Bits
 
@@ -1030,17 +1030,16 @@ question "which composite is this?" from every call site.
 
 **As implemented.** The class is `Structure` in `src/structure.ts`; the
 value-interface is `StructureValue` in `src/types.ts`; it is constructed only
-through the `src/types.ts` factories (`makeContext`, `makeMultiValue`,
-`makeDenseArrayCtx`).
+through the `src/types.ts` factories (`makeStructure`, `withMetadata`,
+`makeDenseArray`).
 
-**Delta.** **Three names for one concept.** The class is `Structure`, the
-interface is `StructureValue` (**2** occurrences — its own declaration and
-the alias), and the name actually used throughout the codebase is
-`ContextValue` (**701** occurrences), which exists solely as
-`export type ContextValue = StructureValue`. The constructor is
-`makeContext`; `makeStructure` does not exist. D1 and D46 are recorded
-**executed** — the runtime unification was; the renaming was done by alias.
-**→ B-107** (ratified, pulled forward).
+**Delta.** — *(closed at C9. The three names were `Structure` (the class),
+`StructureValue` (2 occurrences — its declaration and the alias) and
+`ContextValue` (701), the last existing solely as
+`export type ContextValue = StructureValue`. D1 and D46 were recorded
+**executed** when only the runtime unification was; the renaming had been
+done by alias. The alias is deleted and the interface is `StructureValue`
+at all 703 sites; `makeContext` → `makeStructure` at 101.)*
 
 ## 10. Carrier
 
@@ -1058,12 +1057,15 @@ so `dataOf` is one hop and not a loop.
 
 **As implemented.** No separate type — the host-level test is *primary
 presence*, `isCarrier(v)` in `src/structure.ts`. The static shape is
-`MultiValueType` in `src/types.ts`.
+`CarrierStructure` in `src/types.ts`.
 
-**Delta.** `MultiValueType` (**25** uses) names a kind D46 retired, and its
-own comment says it survives "so existing casts keep compiling". A type name
-that documents its own obsolescence is a rename that stopped halfway.
-**→ B-107** (ratified, in scope).
+**Delta.** — *(closed at C9. It was `MultiValueType`, 25 uses, naming a kind
+D46 retired, with a comment saying it survived "so existing casts keep
+compiling" — a type name documenting its own obsolescence. Renaming it also
+exposed that `withMetadata` (was `makeMultiValue`) DECLARED a carrier return
+while one of its three paths returns a non-carrier derive; the honest return
+type is `StructureValue` and only one site — a test cast — depended on the
+fiction.)*
 
 ## 11. Data plane
 
@@ -1130,10 +1132,11 @@ operations.
 `newDenseStructure`, `newMultiValueStructure`. Role is read from field
 presence (`dense`, `isScope`, `primary`) rather than stored as a tag.
 
-**Delta.** The header comment in `src/structure.ts` describes **two** planes
-("channel plane → components, slot/data plane → bindings"). There are four
-(T2 §9). It also says `__*` meta-slots "remain here until C5 re-keys them" —
-C5 did not; B-104 is doing it now, two milestones later. **→ B-107.**
+**Delta.** — *(closed at C9. The header described **two** planes ("channel
+plane → components, slot/data plane → bindings") where there are four, and
+said `__*` meta-slots "remain here until C5 re-keys them" — C5 did not, and
+B-104 is doing it two milestones later. Now names all four and points the
+host-plane row at `StructureHostFields`.)*
 
 ## 13. Binding
 
@@ -1153,15 +1156,19 @@ alone.
 `bindingList: Binding[]` on `StructureValue`. Null keys are minted by the
 tree-builder and `parser-helpers.ts`.
 
-**Delta.** The map and the list are maintained by convention at each write
-site, not by a single mutator, so they can diverge. `slotWrite` writes both;
-`slotSet` writes the map **only** — deliberately, to mirror the proof
-kernel's origination idiom; `removeName` deletes from the map and leaves the
-list entry standing; `removeConstruct` deletes from both. The
-leave-the-list-entry behaviour is documented on `renameInPlace` ("bindingList
-entries are separate objects and are deliberately left untouched") but not on
-the removers that share it. Four write disciplines, one comment between them,
-and no stated rule for choosing. **→ B-107.**
+**Delta.** — *(closed at C9, and writing the rule found its cause.* The map
+and the list are maintained by convention at each write site, not by a single
+mutator, so they can diverge — `slotWrite` writes both, `renameInPlace`
+mutates the map's entry only, `removeName` and `removeRefines` delete from
+the map and leave the list entry standing, `removeConstruct` deletes from
+both. Four disciplines, one comment between them. **The reason is that the
+map and the list are not aliases**: `slotWrite` and `addBinding` each
+construct **two separate `Binding` objects** for one key, so an in-place
+mutation reaches exactly one view. Every discipline follows from that, and it
+was documented nowhere. The rule now sits above `slotWrite`, including *why*
+the map-only paths are safe today — nothing enumerates a type structure's
+`bindingList` as fields — and that the exemption is circumstantial rather
+than structural.*)*
 
 ## 14. Binding attributes
 
@@ -1209,11 +1216,12 @@ lookup, plus the **facts plane** (`scopePredicates`) used for scope-local
 predicate narrowing. `isScope` marks them; `assertExtendable` rejects
 layering a scope over a typed data value.
 
-**Delta.** `parent`, `isScope` and `scopePredicates` are declared as fields
-on `StructureValue` and documented in comments as "host-plane fields, never
-value slots". The plane distinction is thus asserted in prose and contradicted
-by the declaration — the host plane is physically inside the value interface.
-**→ B-107**, and the reason T2 §9 has to exist.
+**Delta.** — *(closed at C9: `parent`, `isScope` and `scopePredicates` move
+to a declared `StructureHostFields` interface that `StructureValue` extends,
+so the plane is legible in the type instead of only in per-field comments
+that the declaration contradicted. They are **correctly placed** — only the
+declaration was wrong; host-plane data that belongs on the metadata plane is
+B-118.)*
 
 ## 16. Dense region
 
@@ -1303,12 +1311,13 @@ observable from Allegro.
 Binding → `bindings` + `bindingList` (+ `dense`). Metadata → `components`.
 Host → JS expandos and declared-but-non-value fields on `Structure`.
 
-**Delta.** The host plane is **declared inside the value interface**:
-`parent`, `isScope` and `scopePredicates` sit on `StructureValue` while their
-own comments say they are "host-plane fields, never value slots". Nothing
-enforces the distinction — a plane that is documented in comments and
-contradicted by the type is not a plane, it is a convention. **→ B-107(f)**,
-which was blocked on this entry existing.
+**Delta.** — *(closed at C9. The host plane was **declared inside the value
+interface** — `parent`, `isScope` and `scopePredicates` on `StructureValue`
+while their own comments said "host-plane fields, never value slots". A plane
+documented in comments and contradicted by the type is not a plane but a
+convention. `StructureHostFields` now declares it. Note the scope: this fixes
+the DECLARATION. Host-plane residents that belong on another plane are
+B-118, and that item exists because this entry made the two separable.)*
 
 ## 19. Metadata field
 
@@ -1735,7 +1744,7 @@ rather than a privileged layer (R1, R6): `Type.define` is an ordinary call
 returning an ordinary value. It is also what makes PE-as-discharge possible
 (R2) — a type check is an evaluation, not a separate pass.
 
-**As implemented.** `src/types-std.ts`; type Contexts built by `makeContext`
+**As implemented.** `src/types-std.ts`; type Contexts built by `makeStructure`
 plus the `src/slots.ts` writers; `getType(v)` is `channelReadRaw(v, "type")`
 with a kind check.
 
@@ -2347,16 +2356,16 @@ still open. **→ B-057.**
 
 | # | Delta | Owner |
 |---|---|---|
-| 2 | `types.ts` header says "Five value kinds"; there are seven | B-107 |
+| 2 | ~~`types.ts` header says "Five value kinds"; there are seven~~ **CLOSED C9** | B-107(c) |
 | 5 | `ParamValue.predicates` — reserved, no reader, asserted empty | B-107 |
 | 7 | ComposedFunction's analysis metadata rides the host plane, invisible in its declared shape | B-118 |
-| 9 | Three names for one concept: `Structure` / `StructureValue` (2) / `ContextValue` (701) | B-107 |
-| 10 | `MultiValueType` names a kind D46 retired | B-107 |
-| 12 | `structure.ts` documents two planes; there are four | B-107 |
-| 13 | Three binding write disciplines, no stated rule for choosing | B-107 |
-| 15 | Host-plane fields declared on the value interface they are said not to be part of | B-107 |
+| 9 | ~~Three names for one concept: `Structure` / `StructureValue` (2) / `ContextValue` (701)~~ **CLOSED C9** | B-107(a) |
+| 10 | ~~`MultiValueType` names a kind D46 retired~~ **CLOSED C9** | B-107(b) |
+| 12 | ~~`structure.ts` documents two planes; there are four~~ **CLOSED C9** | B-107(c) |
+| 13 | ~~Three binding write disciplines, no stated rule~~ **CLOSED C9** — the rule is stated, and the reason there are four is that the map and the list are **not aliases** | B-107(e) |
+| 15 | ~~Host-plane fields declared on the value interface they are said not to be part of~~ **CLOSED C9** | B-107(f) |
 | 17 | `__length` is the sole remaining job of the partition test | B-104(f) |
-| 18 | The host plane is declared inside the value interface — a plane contradicted by its own type | B-107(f) |
+| 18 | ~~The host plane is declared inside the value interface — a plane contradicted by its own type~~ **CLOSED C9** (`StructureHostFields`) | B-107(f) |
 | 19 | The base registers eleven L2 channels itself and special-cases three by name | B-109(a) |
 | 21 | Integrity enforced by hardcoded name list, not the registered flag; the two disagree about `source` | B-109(b)(c) |
 | 22 | The meta-slot partition fires on one key in the whole suite | B-104(b)(f) |
@@ -2366,7 +2375,7 @@ still open. **→ B-057.**
 | 27 | The TailCall forwarding obligation is convention-enforced; a wrapper that forgets is a silent cliff | B-113 |
 | 28 | Completion confluence is not guaranteed by construction — the B-028 arrival-order bug was fixed, not precluded | B-114 |
 | 29 | L2 post-passes are hardcoded into the base pipeline — §23's violation in its other form | B-110 |
-| 30 | The type-Context namespace is closed by construction but nothing states or enforces it | B-107 |
+| 30 | The type-Context namespace is closed by construction but nothing **enforces** it — *stated* at C9, enforcement outstanding | B-104(f) |
 | 32 | The `shape` projection is hardcoded in `channelReadRaw` rather than installed | B-112(c) |
 | 34 | `knowledge` is a registered field that nothing ever stores — a channel, not a field | B-111 |
 | 33b | The `structuralSubtypeof` branch tests the marker *and* anonymity; anonymity always carried the distinction | B-104(g) |
@@ -2381,6 +2390,14 @@ still open. **→ B-057.**
 | 46 | **Contracts never reach the verdict** — zero occurrences in `pcp.ts` | B-057 (CT-R6) |
 | 34b | The abstract domain rides the host plane while the knowledge it belongs to is a metadata channel | B-118 |
 | 45 | **The verdict is assembled out-of-band** rather than accumulated through the metadata plane; the `union` field for it exists and is unused | B-117 |
+
+### Raised by C9 (the naming pass)
+
+| # | Delta | Owner |
+|---|---|---|
+| 47 | **`Context` still names three different things in ~300 local identifiers.** C9 renamed every DECLARED name in which "Context" or "Ctx" denoted the retired composite kind. What remains is role-qualified and could not be renamed mechanically, because the roles are not all settled: `evalCtx` (**603**, and a public field of `evalSource`'s result) is a **scope** and §15 settles it; `typeCtx` / `typeContextName` / `typePrivilegedCtx` denote a **type Context**, a term *this document still uses*; and `src/parser.ts` has its own unrelated `makeContext` (a **parse** context), exported as `parserMakeContext`. Three meanings, one word | B-119 |
+| 48 | **`withMetadata` declared a carrier return for a non-carrier path.** One of its three paths returns a copy-on-write derive, not a carrier, and the declared type said otherwise. Corrected at C9; **exactly one site** depended on the fiction — a test cast — which is the evidence it was never load-bearing | — *(closed at C9)* |
+| 49 | **A structure's bindings map and binding list are not aliases.** `slotWrite` and `addBinding` each build **two** `Binding` objects for one key, so an in-place mutation reaches one view only. This is the root of all four write disciplines and was documented nowhere | — *(stated at C9; §13)* |
 
 **34 distinct deltas across 49 entries**; 16 entries are clean. Their
 triage — ownership, clustering, and the order the code campaign works

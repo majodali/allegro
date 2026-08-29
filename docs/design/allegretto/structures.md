@@ -44,7 +44,7 @@ slot probes answer dense structures without materializing); element
 access via slots.ts `indexGet`/`elementsOf`, O(1) by scaling test.
 C4.1 details: every MultiValue and Context
 is an instance of one host class (`src/structure.ts`), constructed
-exclusively through the `makeMultiValue`/`makeContext` factory shims
+exclusively through the `withMetadata`/`makeStructure` factory shims
 (six bypass sites converted; the W4 boundary invariant fails any future
 stray literal). One declared hidden class for all structures (measurably
 faster than the per-shape literals it replaced); role fixed at
@@ -98,8 +98,9 @@ answering the one structure kind, discriminated host-side by primary
 presence (`isCarrier` — the D46 host-level protocol). `ValueKind` is
 now: four leaf representations + `Structure` + the three computation
 forms; `ValueKind.Context` renamed `ValueKind.Structure` (D25's name
-retirement completed; `ContextValue` is a transitional alias of
-`StructureValue`). `makeMultiValue` remains the one channel-attachment
+retirement completed; the `ContextValue` alias is gone and the interface
+is `StructureValue` everywhere — B-107). `withMetadata` remains the one
+metadata-attachment
 chokepoint with three shapes: record data derives (C4.3b), carrier data
 re-wraps its inner primary (W1: carriers never nest), leaf data takes
 the carrier. W1/W5 restated: carriers never nest and their data plane
@@ -127,7 +128,7 @@ is not expected to survive beyond C6 — retirement is an expected outcome
 of the C6 kind-recipe work.*
 
 *C4.3b status (2026-08): MV-over-Context is UNCONSTRUCTIBLE — a Context
-primary handed to `makeMultiValue` flattens into a copy-on-write derive
+primary handed to `withMetadata` flattens into a copy-on-write derive
 (`deriveWithChannels`: new Structure sharing the source's data planes by
 reference, the given channel map authoritative — deletion stays
 expressible). Typed records, arrays, module objects, and proof contexts
@@ -374,7 +375,7 @@ be laundered. Three chunk-1 rulings recorded:
 ## 4. Scope [partial]
 
 *Status (2026-07, C2.1–C2.3): implemented host-side over the current
-ContextValue representation — parent-chain layering + chain lookup (C2.1),
+StructureValue representation — parent-chain layering + chain lookup (C2.1),
 facts plane (C2.2), resolution unification with future cells + root
 eval-context layering + `ctx_use`/`isUse` retirement + `ctx_resolve`
 residualising semantics (C2.3a/b). Still pending: Allegro-surface

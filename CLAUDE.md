@@ -86,7 +86,7 @@ evaluator/runtime set; this is the complete session list):
   via `dataOf`/`asBits`. `lazy` is evaluation-control only. The
   propagation table governs channels — never hand-roll per-channel
   logic (PROCESS §6).
-- Construct structures ONLY via `makeMultiValue`/`makeContext`; a
+- Construct structures ONLY via `withMetadata`/`makeStructure`; a
   stray object literal fails the W4 boundary invariant.
 - Every path cloning a `ComposedFunction` preserves metadata via the
   shared helpers — never hand-clone (PROCESS §6).

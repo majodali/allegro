@@ -30,11 +30,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
-import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr, makeContext } from "./types.js";
+import { Value, ValueKind, StructureValue, CarrierStructure, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, SLOT_KEYS, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredComponentKey, asStructure, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, SLOT_KEYS, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
-import { makeMultiValue } from "./types.js";
+import { withMetadata } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
@@ -346,10 +346,10 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     // invariants: W4 carriers are Structures; W5 a carrier's data plane
     // is EMPTY (the lazily-materialized view may exist but holds no
     // slots); W1 a carrier's primary is never a carrier and never a
-    // plain Context (records flatten through makeMultiValue).
-    const mv = v as MultiValueType;
+    // plain Context (records flatten through withMetadata).
+    const mv = v as CarrierStructure;
     if (!isStructure(v)) {
-      out.push({ invariant: "W4 structure-kind", detail: "carrier is not a Structure instance (bypassed makeMultiValue)", program });
+      out.push({ invariant: "W4 structure-kind", detail: "carrier is not a Structure instance (bypassed withMetadata)", program });
     } else if ((v as unknown as Structure).bindings !== undefined && (v as unknown as Structure).bindings.size > 0) {
       out.push({ invariant: "W5 role-transparency", detail: "carrier carries data slots (data plane must be empty — D15)", program });
     }
@@ -378,7 +378,7 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
   if (v.kind === ValueKind.Structure) {
     // C4.1 (W4): every Context is an instance of the unified Structure class.
     if (!isStructure(v)) {
-      out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeContext)", program });
+      out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeStructure)", program });
     } else if ((v as unknown as Structure).primary !== undefined) {
       // C4.3b (R5 reframe): the DATA planes are role-exclusive (a Context
       // never carries a primary; an MV never carries slots) — the CHANNEL
@@ -390,7 +390,7 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
       const s = v as unknown as Structure;
       if (s.dense !== undefined && s.viewMaterialized) {
         for (let i = 0; i < s.dense.length; i++) {
-          if ((v as ContextValue).bindings.get(String(i))?.value !== s.dense[i]) {
+          if ((v as StructureValue).bindings.get(String(i))?.value !== s.dense[i]) {
             out.push({ invariant: "W6 dense-view-coherence", detail: `view binding ${i} disagrees with the dense region`, program });
             break;
           }
@@ -408,7 +408,7 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
       }
       for (const comp of sComps.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
     }
-    for (const [key, b] of (v as ContextValue).bindings) {
+    for (const [key, b] of (v as StructureValue).bindings) {
       if (key.startsWith("__") && !isRegisteredSlotKey(key)) {
         out.push({ invariant: "W3 registry-completeness", detail: `unregistered slot key "${key}"`, program });
       }
@@ -554,13 +554,13 @@ export const FORGERY_SCENARIOS: ForgeryScenario[] = [
 
 function getTypeNameOf(v: Value): string | null {
   const t = channelReadRaw(v, "type");
-  const tc = t ? asContext(t as Value) : null;
+  const tc = t ? asStructure(t as Value) : null;
   const nv = tc ? getName(tc) : undefined;
   return nv ? bitsToString(dataOf(nv) as BitsValue) : null;
 }
 
 /** Evaluate an attack program; report whether (and how) it was refused. */
-function attack(src: string): { threw: string | null; evalCtx: ContextValue | null } {
+function attack(src: string): { threw: string | null; evalCtx: StructureValue | null } {
   try {
     const { evalCtx } = evalSource(src, undefined, [createTypeSystem()], undefined, true);
     return { threw: null, evalCtx };
@@ -649,7 +649,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "export stamp(v) => audit_writer(v, \"audited\")\n",
     extensions: [createTypeSystem()],
   }).loadAll();
-  const attackWithHolder = (src: string): { threw: string | null; evalCtx: ContextValue | null } => {
+  const attackWithHolder = (src: string): { threw: string | null; evalCtx: StructureValue | null } => {
     try {
       const { evalCtx } = evalSource(src, undefined, [createTypeSystem(), ...holderExts], undefined, true);
       return { threw: null, evalCtx };
@@ -683,20 +683,20 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "theorem t: 1 + 1 == 2\nx = 42",
       undefined, [createTypeSystem()], undefined, true
     );
-    // Type binding: MultiValue(IntType, {type: Type}) — asContext peels it.
+    // Type binding: MultiValue(IntType, {type: Type}) — asStructure peels it.
     // C2.3b: Int lives on the extensions layer of the root scope chain.
-    const intCtx = asContext(scopeLookup(evalCtx, "Int")?.value as Value);
+    const intCtx = asStructure(scopeLookup(evalCtx, "Int")?.value as Value);
     eq(intCtx !== null, true, "Int peels to a Context");
     const namePrimary = dataOf(getName(intCtx!) as Value) as BitsValue;
     eq(bitsToString(namePrimary), "Int", "getName reads __name");
-    const members = asContext(getMembers(intCtx!) as Value);
+    const members = asStructure(getMembers(intCtx!) as Value);
     eq(members !== null && members.bindings.size > 0, true, "getMembers reads __members");
     // Channel reads: shape on a typed value, discharged on a proof.
     const x = evalCtx.bindings.get("x")?.value as Value;
-    const shape = asContext(channelReadRaw(x, "shape") as Value);
+    const shape = asStructure(channelReadRaw(x, "shape") as Value);
     eq(shape !== null, true, "shape channel readable on a typed value");
     eq(bitsToString(dataOf(getName(shape!) as Value) as BitsValue), "Int", "shape of 42 is Int");
-    const proofCtx = asContext(evalCtx.bindings.get("t")?.value as Value);
+    const proofCtx = asStructure(evalCtx.bindings.get("t")?.value as Value);
     eq(proofCtx !== null, true, "theorem binding peels to a proof Context");
     const discharged = channelReadRaw(proofCtx! as Value, "discharged");
     eq(discharged !== undefined, true, "discharged channel readable on a proof");
@@ -773,13 +773,13 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // Capture the capsule the kernel hands a fallbackMember hook.
     const r = evalSource("held_name = 7\n", undefined, [createTypeSystem()], undefined, true);
     let capsule: Value | null = null;
-    const t = makeContext();
+    const t = makeStructure();
     setName(t, stringToBits("CapsuleProbe"));
     setFallbackMember(t, makePrimitive("probe.__getMember", (hargs) => {
       capsule = hargs[2];
       return hargs[2];
     }));
-    const inst = withType(makeContext(), t);
+    const inst = withType(makeStructure(), t);
     evaluate(makeExpr(primitives.type_dispatch, [inst, stringToBits("anything")]), r.evalCtx);
     eq(capsule !== null, true, "hook received the capsule");
     const cap = dataOf(capsule!) as import("./types.js").PrimitiveFunctionValue;
@@ -842,7 +842,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // mv_set produced a NEW value; the proof itself is untouched...
     eq(componentsView(t).has("note"), false, "original proof gained no component");
     // ...and still carries its original proposition + discharge.
-    const ctx = asContext(t)!;
+    const ctx = asStructure(t)!;
     const disch = channelReadRaw(t, "discharged") as Value;
     eq((dataOf(disch) as any).data, 1n, "still discharged");
     eq(bitsToString(dataOf(getProposition(ctx)!) as BitsValue).includes("1 + 1"), true, "proposition unchanged");
@@ -943,12 +943,12 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   test("scope/structure plane rejection (C2.1): each plane refuses the other", () => {
     // A shape-carrying data Context cannot be extended as a scope.
     const { evalCtx } = evalSource("p = {a: 1}", undefined, [createTypeSystem()], undefined, true);
-    const dataCtx = asContext(evalCtx.bindings.get("p")!.value as Value)!;
+    const dataCtx = asStructure(evalCtx.bindings.get("p")!.value as Value)!;
     // give it its shape slot form: typed objects carry shape via the MV
     // component; scope rejection keys on binding-plane shape — verify via a
     // type Context (which carries __type):
     // C2.3b: Int lives on the extensions layer of the root scope chain.
-    const intCtx = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
+    const intCtx = asStructure(scopeLookup(evalCtx, "Int")!.value as Value)!;
     let threw = "";
     try { scopeExtend(intCtx, []); } catch (e: any) { threw = String(e.message); }
     eq(threw.includes("cannot extend a data structure"), true, `scope-over-data: ${threw}`);
@@ -1063,9 +1063,9 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const x = evalCtx.bindings.get("x")!.value as Value;
     const stored = getType(x)!;
     eq(bitsToString(dataOf(getName(stored)!) as BitsValue), "PositiveInt", "stored type keeps the refinement bound");
-    const shape = channelReadRaw(x, "shape") as ContextValue;
+    const shape = channelReadRaw(x, "shape") as StructureValue;
     eq(bitsToString(dataOf(getName(shape)!) as BitsValue), "Int", "shape channel reads the dispatch shape");
-    const intCtx = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
+    const intCtx = asStructure(scopeLookup(evalCtx, "Int")!.value as Value)!;
     eq(shape === intCtx, true, "shape IS the Int type object (identity)");
     const k = knowledgeOf(x)!;
     eq(k !== null && k.bound === stored, true, "knowledge bound is the refinement certificate");
@@ -1079,7 +1079,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\ny = PI(5)\nz = y + 3",
       undefined, [createTypeSystem()], undefined, true);
     const y = evalCtx.bindings.get("y")!.value as Value;
-    const shape = channelReadRaw(y, "shape") as ContextValue;
+    const shape = channelReadRaw(y, "shape") as StructureValue;
     eq(bitsToString(dataOf(getName(shape)!) as BitsValue), "PI", "preserveOps type has its own member set — dispatch must reach its overrides");
     // ...and the lifted operator actually ran: z carries the PI tag.
     const z = evalCtx.bindings.get("z")!.value as Value;
@@ -1091,9 +1091,9 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "PositiveInt = Int & _ > 0\nx = 42\ns = \"hi\"",
       undefined, [createTypeSystem()], undefined, true);
     const x = evalCtx.bindings.get("x")!.value as Value;
-    const stringType = asContext(scopeLookup(evalCtx, "String")!.value as Value)!;
-    const intType = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
-    const refined = asContext(evalCtx.bindings.get("PositiveInt")!.value as Value)!;
+    const stringType = asStructure(scopeLookup(evalCtx, "String")!.value as Value)!;
+    const intType = asStructure(scopeLookup(evalCtx, "Int")!.value as Value)!;
+    const refined = asStructure(evalCtx.bindings.get("PositiveInt")!.value as Value)!;
     let threw = "";
     try { withType(x, stringType); } catch (e: any) { threw = String(e.message); }
     eq(threw.includes("shape is fixed at construction"), true, `cross-shape re-stamp refused: ${threw}`);
@@ -1281,7 +1281,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "data keys named after channels behave as plain fields (no channel confusion)");
     const oVal = r.evalCtx.bindings.get("o")!.value!;
     eq(getTypeNameOf(oVal), "Object", "the channel plane still reads the real type channel");
-    const oCtx = dataOf(oVal) as ContextValue;
+    const oCtx = dataOf(oVal) as StructureValue;
     eq(Number((dataOf(oCtx.bindings.get("type")!.value!) as BitsValue).data), 5,
       "the slot plane holds the hostile key independently");
   });
@@ -1308,9 +1308,9 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   });
 
   test("dense region (C4.2): O(1) index access — scaling test", () => {
-    const small = dataOf(makeArray(Array.from({ length: 200 }, (_, i) => makeInt(i)))) as ContextValue;
-    const big = dataOf(makeArray(Array.from({ length: 200_000 }, (_, i) => makeInt(i)))) as ContextValue;
-    const time = (ctx: ContextValue, len: number): number => {
+    const small = dataOf(makeArray(Array.from({ length: 200 }, (_, i) => makeInt(i)))) as StructureValue;
+    const big = dataOf(makeArray(Array.from({ length: 200_000 }, (_, i) => makeInt(i)))) as StructureValue;
+    const time = (ctx: StructureValue, len: number): number => {
       const t0 = performance.now();
       let acc = 0n;
       for (let k = 0; k < 50_000; k++) {
@@ -1344,13 +1344,13 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource("arr = [7, 8, 9]", undefined, [createTypeSystem()], undefined, true);
     const arrCtx = dataOf(r.evalCtx.bindings.get("arr")!.value!) as unknown as Structure;
     eq(arrCtx.viewMaterialized, false, "no view before the straggler read");
-    const viaMap = (arrCtx as unknown as ContextValue).bindings.get("0")?.value;
+    const viaMap = (arrCtx as unknown as StructureValue).bindings.get("0")?.value;
     eq(Number((dataOf(viaMap!) as BitsValue).data), 7, "string-key protocol answers from the materialized view");
     eq(arrCtx.viewMaterialized, true, "the straggler path materialized the view");
-    eq(Number((dataOf(indexGet(arrCtx as unknown as ContextValue, 1)!) as BitsValue).data), 8,
+    eq(Number((dataOf(indexGet(arrCtx as unknown as StructureValue, 1)!) as BitsValue).data), 8,
       "dense region stays authoritative after materialization");
-    eq(Number(((arrCtx as unknown as ContextValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
-    eq((arrCtx as unknown as ContextValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
+    eq(Number(((arrCtx as unknown as StructureValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
+    eq((arrCtx as unknown as StructureValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
   });
 
   // --- MV-over-Context flatten (C4.3b) -----------------------------------------
@@ -1383,7 +1383,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const intBinding = scopeLookup(r.evalCtx, "Int")!.value!;
     eq(intBinding === (IntType as unknown as Value), true,
       "the Int binding is the IntType Context itself — no wrapper, one identity");
-    eq(getType(intBinding as Value) === (dataOf(TypeMeta as unknown as Value) as ContextValue), true,
+    eq(getType(intBinding as Value) === (dataOf(TypeMeta as unknown as Value) as StructureValue), true,
       "getType is total: a bare type Context answers its meta-type through __type");
   });
 
@@ -1396,19 +1396,19 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(dataOf(t) === dataOf(TypeMeta as unknown as Value), true, "`type of Int` is the Type meta-type");
   });
 
-  test("flatten (C4.3b): MV-over-Context is unconstructible — makeMultiValue flattens", () => {
+  test("flatten (C4.3b): MV-over-Context is unconstructible — withMetadata flattens", () => {
     const r = evalSource("p = {a: 5}", undefined, [createTypeSystem()], undefined, true);
     const record = r.evalCtx.bindings.get("p")!.value!;
     // The standard writer idiom: clone the channel plane, extend, re-derive
     // (the given map is authoritative — deletion must stay expressible).
     const comps = cloneComponents(record);
     comps.set("exported", makeInt(1));
-    const stamped = makeMultiValue(dataOf(record), comps);
+    const stamped = withMetadata(dataOf(record), comps);
     eq((stamped as Value).kind, ValueKind.Structure, "wrapping a Context derives a flattened Context");
     eq(channelReadRaw(stamped as Value, "exported") !== undefined, true, "the new channel rides");
     eq(channelReadRaw(stamped as Value, "type") !== undefined, true, "cloned channels carry forward");
     eq(dataOf(stamped as Value) === (stamped as Value), true, "the derived value is transparent to dataOf");
-    eq((record as ContextValue).bindings.get("a") === (stamped as unknown as ContextValue).bindings.get("a"), true,
+    eq((record as StructureValue).bindings.get("a") === (stamped as unknown as StructureValue).bindings.get("a"), true,
       "copy-on-write derive shares the data plane by reference");
   });
 
@@ -1528,7 +1528,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   // --- Symbol-keyed members (C5.2a) --------------------------------------------
 
   test("symbol-keyed members (C5.2a/C6.1a): member sets key by per-type member FQNs", () => {
-    const members = getMembers(dataOf(IntType as unknown as Value) as ContextValue) as ContextValue;
+    const members = getMembers(dataOf(IntType as unknown as Value) as StructureValue) as StructureValue;
     // C6.1a: built-ins moved OFF the shared kernel scope — Int declares
     // its members in its OWN name-stable scope, so Int.add and Float.add
     // are distinct symbols and cross-built-in conformance is never
@@ -1537,7 +1537,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(members.bindings.has(intScope + "::add"), true, "storage key is the member symbol's FQN in Int's own scope");
     eq(members.bindings.has("add"), false, "bare string keys are gone from member storage");
     eq(members.bindings.has(kernelMemberFqn("add")), false, "the shared kernel scope is retired for built-ins");
-    eq(typeMethod(dataOf(IntType as unknown as Value) as ContextValue, "add") !== null, true,
+    eq(typeMethod(dataOf(IntType as unknown as Value) as StructureValue, "add") !== null, true,
       "typeMethod projects by base name through the per-type scope");
     // E3 (B-027 §8): the kernel scalars DRAW Equatable retroactively —
     // `eq` is multi-bound under Equatable's member symbol and the
@@ -1564,14 +1564,14 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource(
       "P = Int & _ > 0\nQ = Int & _ > 0 & _ < 100",
       undefined, [createTypeSystem()], undefined, true);
-    const intMembers = getMembers(dataOf(IntType as unknown as Value) as ContextValue);
+    const intMembers = getMembers(dataOf(IntType as unknown as Value) as StructureValue);
     for (const name of ["P", "Q"]) {
-      const t = dataOf(r.evalCtx.bindings.get(name)!.value!) as ContextValue;
+      const t = dataOf(r.evalCtx.bindings.get(name)!.value!) as StructureValue;
       eq(getMembers(t) === intMembers, true, `${name} shares Int's member-set object`);
     }
-    const wrapped = structuralWrapTS(dataOf(IntType as unknown as Value) as ContextValue);
+    const wrapped = structuralWrapTS(dataOf(IntType as unknown as Value) as StructureValue);
     eq(getMembers(wrapped) === intMembers, true, "~Int (structuralWrap) shares Int's member-set object");
-    const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as ContextValue;
+    const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as StructureValue;
     eq(typeShape(p) === dataOf(IntType as unknown as Value), true,
       "typeShape walks the transparent layer off (identity test intact)");
   });
@@ -1582,10 +1582,10 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource(
       "Animal = Type.define({name: String})\nDog = Type.define({name: String, age: Int}, Animal)",
       undefined, [createTypeSystem()], undefined, true);
-    const animal = dataOf(r.evalCtx.bindings.get("Animal")!.value!) as ContextValue;
-    const dog = dataOf(r.evalCtx.bindings.get("Dog")!.value!) as ContextValue;
-    const keyOf = (t: ContextValue, base: string): string | null => {
-      for (const key of (getMembers(t) as ContextValue).bindings.keys()) {
+    const animal = dataOf(r.evalCtx.bindings.get("Animal")!.value!) as StructureValue;
+    const dog = dataOf(r.evalCtx.bindings.get("Dog")!.value!) as StructureValue;
+    const keyOf = (t: StructureValue, base: string): string | null => {
+      for (const key of (getMembers(t) as StructureValue).bindings.keys()) {
         if (key.endsWith("::" + base)) return key;
       }
       return null;
@@ -1612,9 +1612,9 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource(
       "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\nx = PI(5)\ny = x + 3",
       undefined, [createTypeSystem()], undefined, true);
-    const pi = dataOf(r.evalCtx.bindings.get("PI")!.value!) as ContextValue;
-    const piMembers = getMembers(pi) as ContextValue;
-    const intMembers = getMembers(dataOf(IntType as unknown as Value) as ContextValue) as ContextValue;
+    const pi = dataOf(r.evalCtx.bindings.get("PI")!.value!) as StructureValue;
+    const piMembers = getMembers(pi) as StructureValue;
+    const intMembers = getMembers(dataOf(IntType as unknown as Value) as StructureValue) as StructureValue;
     // The lifted `add` sits under Int's own `add` key (an override — same symbol).
     const intAddKey = [...intMembers.bindings.keys()].find((k) => k.endsWith("::add"))!;
     eq(piMembers.bindings.has(intAddKey), true, "lifted op draws (binds) the parent op's symbol");
@@ -1632,15 +1632,15 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   test("draw-from (C5.2b): multi-bind — one target under several symbols stays unambiguous; distinct targets error", () => {
     // Hand-build the diamond shapes the machinery must handle before any
     // surface can produce them: a member set with two same-base-name keys.
-    const desc = typeMemberDescriptor(dataOf(IntType as unknown as Value) as ContextValue, "add")!;
-    const mkType = (twoTargets: boolean): ContextValue => {
+    const desc = typeMemberDescriptor(dataOf(IntType as unknown as Value) as StructureValue, "add")!;
+    const mkType = (twoTargets: boolean): StructureValue => {
       const t = evalSource("T = Type.define({v: Int})", undefined, [createTypeSystem()], undefined, true);
-      const ty = dataOf(t.evalCtx.bindings.get("T")!.value!) as ContextValue;
-      const members = getMembers(ty) as ContextValue;
+      const ty = dataOf(t.evalCtx.bindings.get("T")!.value!) as StructureValue;
+      const members = getMembers(ty) as StructureValue;
       const k1 = registerScopeSymbol("<type:testA>", "draw").fqn!;
       const k2 = registerScopeSymbol("<type:testB>", "draw").fqn!;
       const desc2 = twoTargets
-        ? typeMemberDescriptor(dataOf(IntType as unknown as Value) as ContextValue, "sub")!
+        ? typeMemberDescriptor(dataOf(IntType as unknown as Value) as StructureValue, "sub")!
         : desc;
       members.bindings.set(k1, { key: k1, value: desc as Value });
       members.bindings.set(k2, { key: k2, value: desc2 as Value });
@@ -1681,7 +1681,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "~T still matches the undeclared type by base name (the loose path)");
     // The wrap erases the interface marker — a wrapped interface IS the
     // loose world, not declared conformance with the name hidden.
-    const greets = dataOf(r.evalCtx.bindings.get("Greets")!.value!) as ContextValue;
+    const greets = dataOf(r.evalCtx.bindings.get("Greets")!.value!) as StructureValue;
     const wrapped = structuralWrapTS(greets);
     eq(isInterfaceTypeSlots(wrapped), false, "structuralWrap erases the __interface marker");
   });
@@ -1710,7 +1710,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // D44: composition mints NO is-a edge — conformance is symbol
     // membership, the refines slot stays empty on defined records.
     for (const name of ["Fresh", "Point"]) {
-      const t = dataOf(r.evalCtx.bindings.get(name)!.value!) as ContextValue;
+      const t = dataOf(r.evalCtx.bindings.get(name)!.value!) as StructureValue;
       eq(getRefines(t) === undefined, true, `${name}: define mints no refines edge`);
     }
   });
@@ -1788,7 +1788,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(formatValue(r.evalCtx.bindings.get("n")!.value!).includes("refinement check failed"), true,
       "the kind-minted refinement still rejects with a counterexample");
     // `type of P` IS the Refinement kind object (identity, not name match).
-    const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as ContextValue;
+    const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as StructureValue;
     eq(getType(p) === RefinementKindTS, true, "a refined type's meta IS the Refinement kind");
   });
 
@@ -1901,11 +1901,11 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     }
     // D37/D40: label-set identity is PHYSICAL identity (memoized mint) —
     // two independent conjunction mints are the same Context.
-    const conj = dataOf(r.evalCtx.bindings.get("conj")!.value!) as ContextValue;
+    const conj = dataOf(r.evalCtx.bindings.get("conj")!.value!) as StructureValue;
     const viaUnion = dataOf(evalSource(
       "x = Effect(\"time\") & Effect(\"io\")\nx",
       undefined, [createTypeSystem()], undefined, true)
-      .evalCtx.bindings.get("x")!.value!) as ContextValue;
+      .evalCtx.bindings.get("x")!.value!) as StructureValue;
     eq(conj === viaUnion, true, "equal label sets are the SAME instance, either operand order");
     // No member copies on instances; no refines edge (the C6.1a guard's
     // reason is gone — this pins its principled replacement).
@@ -2011,10 +2011,10 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(formatValue(r.evalCtx.bindings.get("p")!.value!), "5", "refined construction still certifies");
     // W1 restated: carriers never nest — re-typing a carrier re-wraps its
     // inner data, never the carrier.
-    const rewrapped = makeMultiValue(x, new Map([["type", dataOf(IntType as unknown as Value)]]));
-    eq((rewrapped as { primary?: Value }).primary !== undefined
-       && ((rewrapped as { primary: Value }).primary as { primary?: Value }).primary === undefined, true,
-      "makeMultiValue on a carrier re-wraps the inner data (no nesting)");
+    const rewrapped = withMetadata(x, new Map([["type", dataOf(IntType as unknown as Value)]]));
+    eq((rewrapped as unknown as { primary?: Value }).primary !== undefined
+       && ((rewrapped as unknown as { primary: Value }).primary as { primary?: Value }).primary === undefined, true,
+      "withMetadata on a carrier re-wraps the inner data (no nesting)");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------
@@ -2032,7 +2032,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       return makeInt(1);
     });
     const scope = scopeNew();
-    const typedFive = withType(makeInt(5), IntType as unknown as ContextValue);
+    const typedFive = withType(makeInt(5), IntType as unknown as StructureValue);
     evaluate(makeExpr(probe, [typedFive]), scope);
     eq(seenTypeName, "Int", "the impl sees the arg's type channel");
     eq(seenDataKind, ValueKind.Bits, "dataOf unwraps the transparent scalar to its data");

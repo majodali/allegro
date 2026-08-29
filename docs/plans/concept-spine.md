@@ -2,9 +2,10 @@
 
 > Status: **active** — ratified 2026-08 (§6 rulings 1–3; ruling 4
 > deliberately HELD as a delta for S3). **S1 + S2a–S2f + S3 + S3b + S4 + S4b + S5 landed** — the spine's tiers are complete and §9 carries the
-> ordered code campaign (C1…C13). **No code moves until §9.5's rulings are
-> taken** (maintainer direction: nothing is modified until the design and
-> plan are committed).
+> ordered code campaign (C1…C13). §9.5's rulings are taken (2026-08) and the
+> campaign has started: **C9 (naming) landed first** by maintainer ruling;
+> **C1 (field vs channel) is next**. The Interface *type* (C8) waits until
+> Allegretto is judged stable; B-108 is discussed after C9.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -380,7 +381,7 @@ direction."*
 | **C6b** | B-110(d) | — | **One exception class for six abort classes.** Specification-level and separable; runs any time after `concepts.md` §7's vocabulary is ratified |
 | **C7** | B-118, B-115 | C3 | **Plane placement.** The four wrongly-placed carriers become metadata fields. Needs C3, because "a layer registers its own channel" is what gives them a field to move to — and unifying law backings onto one carrier is B-115's answer rather than a separate one |
 | **C8** | B-104(g), B-116 | — | **The Interface type.** Independent of C1–C7 and fully specified by §36: write the missing test for `applyBoundaryBound`'s zero-covered guard *first*, then drop the marker check in `shapeAwareSubtypeof` **and do not replace it**, read the meta-type in `applyBoundaryBound`, delete `__interface` (10 sites) |
-| **C9** | B-107 | ruling §9.5(2) | **Naming and declaration debt.** ~830 mechanical sites plus five declaration fixes |
+| **C9** | B-107(a)(b)(c)(e)(f) | — | ~~Naming and declaration debt~~ **DONE 2026-08**, ruled first per §9.5(2). **976** identifier sites across 12 names, the `ContextValue` alias deleted, plus five declaration fixes. Green at 1197 on the first run. Found two things the rename was not looking for: `withMetadata` **declared a carrier return** for a path that returns a non-carrier (one site depended on it — a test cast), and the map/list write disciplines exist because **`slotWrite` builds two separate `Binding` objects** for one key. (d) held for a ruling; the residue is **B-119** |
 | **C10** | B-117, then B-057 | C5 | **Accumulation.** `buildVerdict` reads accumulated metadata instead of walking `evalCtx.bindings`; contracts get a `union` field and reach the verdict for free rather than by a new case |
 | **C11** | B-113, B-114 | — | **Guarantees held by convention become held by construction or by a test** — TailCall forwarding, completion confluence. Independent |
 | **C12** | B-104(b)(f), B-105 | B-108 ruled | **The composite**: the last dunder, and union types. Blocked on a ruling, not on code |
@@ -412,29 +413,41 @@ campaign:
 - **A chunk that closes a delta by editing the definition rather than the
   code must say so and re-derive the entry.** That is a legitimate outcome —
   §36 was one — but it is never the default and must never be silent.
-- **C9 carries counts as its completion test**, per §8: `ContextValue`
-  701 → 0, `makeContext` 104 → 0, `MultiValueType` 25 → 0. This is the
+- **C9 carried counts as its completion test**, per §8 — and they are the
   falsifiable form D1 and D46 lacked, which is how they came to be recorded
-  executed while unexecuted.
+  executed while unexecuted. **Verified at landing:** `ContextValue` 703 → 0,
+  `makeContext` 101 → 0, `MultiValueType` 25 → 0, `makeMultiValue` 68 → 0,
+  `asContext` 30 → 0, `makeCtxWith` 13 → 0, `extensionToContext` 9 → 0,
+  `asCtx` 9 → 0, `makeRawArrayCtx` 5 → 0, `makeDenseArrayCtx` 4 → 0,
+  `newMultiValueStructure` 4 → 0, `newContextStructure` 3 → 0. The one name
+  deliberately left is `src/parser.ts`'s own `makeContext`, which is a
+  **parse** context and a different concept (B-119(c)).
 
 ### 9.5 Rulings needed before C1
 
-1. **Which interfaces?** Read as the **plane** interfaces (B-112) — C1–C6.
-   The other reading, the **Interface type** (C8), is a real cluster, is
-   fully specified, and is independent of everything else; if that is what
-   was meant, C8 moves to the front at no cost to any other chunk. Recorded
-   rather than assumed, because the two readings do not conflict.
-2. **Where does C9 go?** Recommendation: **first, ahead of C1**, as a single
-   mechanical commit with counts as its test. Against: it is not a design
-   chunk, and it delays the first architectural signal by one review. For,
-   and this is the deciding argument: the campaign's success condition is
-   that the code says what the spine says, so authoring C1–C8 in a
-   vocabulary the spine calls wrong is *deliberately created* debt that every
-   later chunk then pays for. The alternative is last, never in the middle.
-3. **B-108, the composite.** It is a ruling, not code, it can be taken at any
-   time, and it gates C12 — including the retirement of the last dunder. Its
-   "blocks nothing" line is now wrong and is corrected in the backlog.
+1. ~~**Which interfaces?**~~ **RULED (maintainer, 2026-08): the plane
+   interfaces, and any interface defining the layer boundary** — C1–C6. The
+   **Interface type** (C8) waits *"until we're reasonably satisfied
+   Allegretto is stable"*, which sequences it behind C6 rather than merely
+   beside it: C8 is an L2 language-surface change, and settling the L0/L2
+   boundary first is what makes "stable" mean something.
+2. ~~**Where does C9 go?**~~ **RULED (maintainer, 2026-08): first**, ahead of
+   C1 — *"if any names are modified later we can address them as we go"*.
+   Landed; counts below. The pass also fixed the ordering rule's own premise:
+   C1–C8 are now authored in the vocabulary the spine uses.
+3. **B-108, the composite.** ~~It is a ruling, not code~~ — **scheduled
+   (maintainer, 2026-08): discuss after C9.** Maintainer's reading is that it
+   is *almost all implementation choices, all straightforward enough*, which
+   if it holds makes C12 cheap; the reason it still needs the conversation is
+   that whichever way it goes it decides whether B-104(f) is a re-key or a
+   deletion, and therefore when the last dunder can go.
 4. **Is "accumulate toward the verdict" a fifth plane interface?** Raised by
-   B-117 and undisputed at S4b. Recommendation: decide at **C5's gate**, when
-   the hook shape is concrete rather than sketched — if the answer is yes it
-   belongs in C5, and C10 becomes its first consumer.
+   B-117 and undisputed at S4b. **OPEN — to be discussed** (maintainer,
+   2026-08: *"not sure"*). The recommendation stands as a way of *deciding*
+   rather than an answer: take it at **C5's gate**, when the hook shape is
+   concrete rather than sketched. The question in one line — is a verdict
+   *produced by* the metadata plane (one more `union` field, and the top-level
+   value's accumulation IS the verdict), or *read off* it by something above
+   (a consumer that walks accumulated metadata and decides what a clean
+   compilation means)? The first needs no new interface; the second does. C5
+   is where the difference stops being verbal.

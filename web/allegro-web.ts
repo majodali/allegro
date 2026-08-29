@@ -6,12 +6,12 @@
 import { evalSource } from "../src/runtime.js";
 import { createTypeSystem } from "../src/types-std.js";
 import { formatValue, extractGrammarFragment, asGrammarValue, primitives as primRegistry } from "../src/primitives.js";
-import { ContextValue, Value, Extension } from "../src/types.js";
+import { StructureValue, Value, Extension } from "../src/types.js";
 import { createFutureManager, FutureManager } from "../src/futures.js";
 import { summarizeModule, renderModuleSummary } from "../src/introspect.js";
 
 const typeExt = createTypeSystem();
-let ctx: ContextValue | undefined = undefined;
+let ctx: StructureValue | undefined = undefined;
 let fm: FutureManager | undefined = undefined;
 
 // Library registry: name → source. Populated via Allegro.registerLibrary().

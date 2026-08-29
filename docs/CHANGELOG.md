@@ -4,6 +4,93 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Campaign C9: the naming, and what a mechanical pass turned up
+
+The concept spine's code campaign starts. Maintainer ruled C9 first — *"if
+any names are modified later we can address them as we go"* — so the
+vocabulary is fixed before C1–C8 are authored in it, which was the argument
+for going first: writing eight chunks in names the spine calls wrong is
+deliberately created debt.
+
+**976 identifier sites across twelve names, and the alias is gone.**
+
+| was | now | sites |
+|---|---|---|
+| `ContextValue` | `StructureValue` | 703 |
+| `makeContext` | `makeStructure` | 101 |
+| `makeMultiValue` | `withMetadata` | 68 |
+| `asContext` | `asStructure` | 30 |
+| `MultiValueType` | `CarrierStructure` | 25 |
+| `makeCtxWith` | `makeStructureWith` | 13 |
+| `extensionToContext` | `extensionToStructure` | 9 |
+| `asCtx` (primitives-local) | `asStructureArg` | 9 |
+| `makeRawArrayCtx` | `makeRawArray` | 5 |
+| `makeDenseArrayCtx` | `makeDenseArray` | 4 |
+| `newMultiValueStructure` | `newCarrierStructure` | 4 |
+| `newContextStructure` | `newRecordStructure` | 3 |
+
+`export type ContextValue = StructureValue` is deleted. D1 and D46 were
+recorded **executed** when only the runtime unification was; the rename had
+been done by aliasing. Counts are the completion test, per the methodology
+proposal §8 — the falsifiable form those two decisions lacked.
+
+**Two things the rename was not looking for.**
+
+`withMetadata` (was `makeMultiValue`) **declared a carrier return type while
+one of its three paths returns a non-carrier** — a record/array/type primary
+takes the copy-on-write derive, which has no `primary`. Corrected to
+`StructureValue`; **exactly one site** in the whole codebase depended on the
+fiction, and it was a cast in a test. A declared type that nothing production
+relies on was never describing the code.
+
+And the four binding write disciplines have a **cause**, not just a
+convention: `slotWrite` and `addBinding` each construct **two separate
+`Binding` objects** for one key, so `bindings` and `bindingList` are not
+aliases and an in-place mutation reaches exactly one view. Every discipline
+follows from that one fact, which was documented nowhere. The rule is now
+stated above `slotWrite` — including why the map-only deletes are safe today
+(nothing enumerates a type structure's `bindingList` as fields, the same
+measurement that found `isMetaSlotKey` fires on one key) and that the
+exemption is **circumstantial**, so B-104's partition retirement has to
+preserve it.
+
+**Declaration fixes.** `StructureHostFields` now declares `parent`,
+`isScope` and `scopePredicates` as their own interface that `StructureValue`
+extends, so the host plane is legible in the type instead of only in
+per-field comments the declaration contradicted (spine deltas 15 and 18).
+Both stale headers rewritten: `types.ts` said "Five value kinds" where there
+are seven, `structure.ts` described two planes where there are four. And
+§30's closed type-structure namespace — the property the whole `__*`
+partition rests on — is now **stated** on `isMetaSlotKey`, with its
+enforcement half moved to B-104(f), since a replacement that failed to
+preserve it would be unsound and nothing would say so.
+
+**Where the pass stopped, and why.** C9 renamed every DECLARED name in which
+"Context"/"Ctx" denoted the retired composite KIND. It did **not** touch the
+~300 role-qualified locals, because `Context` names three different things
+and only one of them is settled: `evalCtx` (**603**, and a public field of
+`evalSource`'s result) is a **scope** and §15 settles it, but it is an API
+change and was not in the ratified scope; `typeCtx` / `typeContextName` and
+~45 others denote a **type Context**, a term `concepts.md` itself still uses
+in §30's own delta, so renaming them means first deciding what a Structure in
+the type role is called; and `src/parser.ts` has its own unrelated
+`makeContext` for a **parse** context. **→ B-119**, with the line drawn by
+B-107's own scope rule: anything whose right name is still an open question
+waits for its spine entry.
+
+**Held.** B-107(d) — `ParamValue.predicates`, declared, reserved, with no
+reader and a test asserting it stays empty. Deleting the field means deleting
+that test, and PROCESS §6 makes removing a test condition a discussion rather
+than a judgement call. Not a naming fix either way.
+
+Spine deltas closed: **2, 9, 10, 12, 13, 15, 18** (30 narrowed to
+enforcement). Three new entries recorded (47/48/49). Rulings taken on the
+campaign order: plane and layer-boundary interfaces first, the Interface
+*type* deferred until Allegretto is judged stable, B-108 discussed next, and
+the fifth-interface question left open for C5's gate.
+
+Gate green at **1197/1197 on the first run**, typecheck clean.
+
 ## 2026-08 — Concept spine S5: the delta triage, and the campaign is ordered
 
 The spine's tiers are complete, so S5 turns the accumulated deltas into the

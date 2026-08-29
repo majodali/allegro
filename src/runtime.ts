@@ -15,7 +15,7 @@ import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError } from "./types.js";
+import { Value, ValueKind, StructureValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeStructure, makeExpr, makePrimitive, withMetadata, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError } from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf } from "./effects.js";
 import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOTALITY_NEEDS_ANNOTATION, DivObligation, DivergenceResult } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
@@ -70,7 +70,7 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       if (channelReadRaw(v, "type") !== undefined) return v;
       const newPrimary = typeLiterals(pp, seen);
       if (newPrimary === pp) return v;
-      return makeMultiValue(newPrimary, cloneComponents(v));
+      return withMetadata(newPrimary, cloneComponents(v));
     }
     default:
       return v;
@@ -134,7 +134,7 @@ export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
  */
 export function resolveSymbols(
   fileCtx: any,
-  base?: ContextValue,
+  base?: StructureValue,
   extensions?: Extension[],
   typed?: boolean,
 ): void {
@@ -350,7 +350,7 @@ function resolveNamedParams(
       if (pp === undefined) return value;
       const newP = resolveNamedParams(pp, resMap, selfName, seen);
       if (newP === pp) return value;
-      return makeMultiValue(newP, cloneComponents(value));
+      return withMetadata(newP, cloneComponents(value));
     }
   }
   return value;
@@ -436,7 +436,7 @@ function resolveNamedParamsInner(
       if (pp === undefined) return value;
       const newP = resolveNamedParamsInner(pp, resMap, owner, ownParamNames, selfName, seen);
       if (newP === pp) return value;
-      return makeMultiValue(newP, cloneComponents(value));
+      return withMetadata(newP, cloneComponents(value));
     }
   }
   return value;
@@ -569,7 +569,7 @@ function precompileFunctionsInner(
   report: CompilationReport,
 ): CompilationReport {
   // Build a minimal context for pre-compilation (primitives + extensions)
-  const compileCtx = makeContext();
+  const compileCtx = makeStructure();
   for (const [name, prim] of Object.entries(primitives)) {
     const binding = { key: name, value: prim as Value };
     compileCtx.bindings.set(name, binding);
@@ -663,7 +663,7 @@ function precompileFunctionsInner(
 
     if (inferredReturnType) {
       const inferredName = inferredReturnType.kind === ValueKind.Structure
-        ? getName(inferredReturnType as ContextValue)
+        ? getName(inferredReturnType as StructureValue)
         : null;
       const inferredStr = inferredName && inferredName.kind === ValueKind.Bits
         ? bitsToString(inferredName as BitsValue)
@@ -673,7 +673,7 @@ function precompileFunctionsInner(
       // Check against explicit return type if declared (typed functions only)
       const declaredReturn = fnType ? getFunctionReturnType(fnType) : null;
       if (declaredReturn && declaredReturn.kind === ValueKind.Structure) {
-        const declaredName = getName(declaredReturn as ContextValue);
+        const declaredName = getName(declaredReturn as StructureValue);
         const declaredStr = declaredName && declaredName.kind === ValueKind.Bits
           ? bitsToString(declaredName as BitsValue)
           : null;
@@ -718,13 +718,13 @@ function precompileFunctionsInner(
  */
 export function buildEvalCtx(
   fileCtx: any,
-  base?: ContextValue,
+  base?: StructureValue,
   extensions?: Extension[],
   typed?: boolean,
-): ContextValue {
+): StructureValue {
   // Per-layer add with replace-or-push semantics (same-name re-adds within
   // one layer replace the earlier entry rather than duplicating).
-  function addTo(layer: ContextValue, key: string, value: Value): void {
+  function addTo(layer: StructureValue, key: string, value: Value): void {
     const binding: Binding = { key, value };
     const existingIdx = layer.bindingList.findIndex(x => x.key === key);
     if (existingIdx >= 0) {
@@ -747,7 +747,7 @@ export function buildEvalCtx(
   }
 
   // Layer 2: Extensions (applied in order, later extensions shadow earlier ones)
-  let below: ContextValue = primLayer;
+  let below: StructureValue = primLayer;
   if (extensions && extensions.length > 0) {
     const extLayer = scopeNew(below);
     for (const ext of extensions) {
@@ -813,9 +813,9 @@ export function buildEvalCtx(
  * If the extension has a moduleObject (typed module), returns it as the primary.
  * Otherwise wraps bindings as a plain Context (backward compat).
  */
-export function extensionToContext(ext: Extension): Value {
+export function extensionToStructure(ext: Extension): Value {
   if (ext.moduleObject) return ext.moduleObject;
-  const ctx = makeContext();
+  const ctx = makeStructure();
   for (const [name, value] of Object.entries(ext.bindings)) {
     const binding: Binding = { key: name, value };
     ctx.bindings.set(name, binding);
@@ -861,7 +861,7 @@ function registerDeps(registry: DependencyRegistry, key: string, deps: Set<strin
  */
 function propagateCompletions(
   registry: DependencyRegistry,
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
   completedNames: Set<string>,
 ): void {
   // B-028 F1: ITERATIVE cascade. The former recursion's depth was
@@ -932,7 +932,7 @@ function propagateCompletions(
  */
 export function applyPhase(
   registry: DependencyRegistry,
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
   newBindings: Map<string, Value>,
 ): void {
   const completed = new Set<string>();
@@ -987,7 +987,7 @@ export function applyPhase(
  */
 export function evalSource(
   source: string,
-  base?: ContextValue,
+  base?: StructureValue,
   extensions?: Extension[],
   grammarExtension?: GrammarExtension,
   typed?: boolean,
@@ -1004,7 +1004,7 @@ export function evalSource(
    *  identity = FQN, interned in src/symbols.ts. Exporting is a separate
    *  act (the D42 partition), performed by the module loader. */
   moduleFqn?: string,
-): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
+): { value: Value | null; evalCtx: StructureValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
   // New pass: Allegro-minted channel registrations from prior passes are
   // sealed (see ChannelEntry.epoch in slots.ts).
   bumpChannelEpoch();
@@ -1053,7 +1053,7 @@ export function evalSource(
   }
 
   if (!fileCtx) {
-    return { value: null, evalCtx: base ?? makeContext(), registry: createRegistry() };
+    return { value: null, evalCtx: base ?? makeStructure(), registry: createRegistry() };
   }
 
   // Type literals if standard type system is active
@@ -1090,7 +1090,7 @@ export function evalSource(
     // `precompileFunctions` so we can `evaluate` user-defined type bindings
     // (`NonNeg = Int & _ >= 0`) on demand, in addition to looking up
     // extension-provided types (Int, Bool, …).
-    const totalityCompileCtx = makeContext();
+    const totalityCompileCtx = makeStructure();
     for (const [name, prim] of Object.entries(primitives)) {
       const binding = { key: name, value: prim as Value };
       totalityCompileCtx.bindings.set(name, binding);
@@ -1306,7 +1306,7 @@ export function evalSource(
       // construction carries the instance with the pending slot inside —
       // D12: incompleteness is a value in a slot). Scopes are not data;
       // never walk their bindings.
-      const ctx = v as ContextValue;
+      const ctx = v as StructureValue;
       if (!ctx.isScope) {
         for (const b of ctx.bindings.values()) {
           if (b.value !== undefined) collectSymbolRefs(b.value, refs, seen);
@@ -1370,7 +1370,7 @@ export function evalSource(
       }
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
-      const typeCtx = dataOf(val).kind === ValueKind.Structure ? dataOf(val) as ContextValue : null;
+      const typeCtx = dataOf(val).kind === ValueKind.Structure ? dataOf(val) as StructureValue : null;
       if (typeCtx && hasShapeSlot(typeCtx)) {
         const nameV = getName(typeCtx);
         if (nameV?.kind === ValueKind.Bits) {

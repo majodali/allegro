@@ -22,8 +22,8 @@
 
 import { dataOf, cloneComponents, componentsView, channelReadRaw, typeShape, getAbstractDomain } from "./slots.js";
 import {
-  Value, ValueKind, BitsValue, ContextValue,
-  makeMultiValue, makeContext, makeInt, isResolved,
+  Value, ValueKind, BitsValue, StructureValue,
+  withMetadata, makeStructure, makeInt, isResolved,
 } from "./types.js";
 
 // =============================================================================
@@ -603,7 +603,7 @@ const PREDICATES_COMPONENT_KEY = "predicates";
 export function withDomain(v: Value, domain: AbstractDomain): Value {
   const comps = cloneComponents(v);
   comps.set(DOMAIN_COMPONENT_KEY, encodeDomain(domain));
-  return makeMultiValue(dataOf(v), comps);
+  return withMetadata(dataOf(v), comps);
 }
 
 /** Read an abstract domain off a value, if one is present. With Phase C's
@@ -634,7 +634,7 @@ export function withPredicates(v: Value, set: PredicateSet): Value {
   const prior = predicatesOf(v);
   const merged = prior ? mergePredicateSets(prior, set) : set;
   comps.set(PREDICATES_COMPONENT_KEY, encodePredicates(merged));
-  return makeMultiValue(dataOf(v), comps);
+  return withMetadata(dataOf(v), comps);
 }
 
 /** Read a value's predicate set, if any. Returns a fresh PredicateSet —
@@ -658,7 +658,7 @@ export function predicatesOf(v: Value): PredicateSet | null {
 }
 
 function encodePredicates(set: PredicateSet): Value {
-  const ctx: ContextValue = makeContext();
+  const ctx: StructureValue = makeStructure();
   (ctx as any).predicateSet = set;
   return ctx;
 }
@@ -689,14 +689,14 @@ export interface Knowledge {
    *  member-transparent refinement layers (the construction certificate:
    *  `PositiveInt` on a `PositiveInt(5)`). Null when the stored type IS
    *  the dispatch shape. */
-  bound: ContextValue | null;
+  bound: StructureValue | null;
   /** The on-value predicate set (Phase C), if any. */
   predicates: PredicateSet | null;
   /** C3.2: the occurrence bound set by crossing an annotation boundary
    *  (`x: Animal` receiving a Dog). An UPPER bound on what this occurrence
    *  may assume — member AVAILABILITY follows it; dispatch does not. Null
    *  when no annotation boundary constrained this occurrence. */
-  occurrenceBound: ContextValue | null;
+  occurrenceBound: StructureValue | null;
 }
 
 // C3.2: the occurrence-bound component. Set when a value crosses an
@@ -708,17 +708,17 @@ export interface Knowledge {
 const BOUND_COMPONENT_KEY = "bound";
 
 /** Read the occurrence bound riding a value, if any. */
-export function occurrenceBoundOf(v: Value): ContextValue | null {
+export function occurrenceBoundOf(v: Value): StructureValue | null {
   // C4.3b: componentsView is total — flattened Contexts answer directly.
   const b = componentsView(v).get(BOUND_COMPONENT_KEY);
-  return b?.kind === ValueKind.Structure ? (b as ContextValue) : null;
+  return b?.kind === ValueKind.Structure ? (b as StructureValue) : null;
 }
 
 /** Stamp an occurrence bound (annotation-boundary crossing). */
-export function withOccurrenceBound(v: Value, bound: ContextValue): Value {
+export function withOccurrenceBound(v: Value, bound: StructureValue): Value {
   const comps = cloneComponents(v);
   comps.set(BOUND_COMPONENT_KEY, bound);
-  return makeMultiValue(dataOf(v), comps);
+  return withMetadata(dataOf(v), comps);
 }
 
 /** Remove the occurrence bound (narrowing / same-shape boundary reset). */
@@ -726,16 +726,16 @@ export function clearOccurrenceBound(v: Value): Value {
   if (occurrenceBoundOf(v) === null) return v;
   const comps = cloneComponents(v);
   comps.delete(BOUND_COMPONENT_KEY);
-  return makeMultiValue(dataOf(v), comps);
+  return withMetadata(dataOf(v), comps);
 }
 
 /** The intrinsic knowledge riding a value, or null when it carries none. */
 export function knowledgeOf(v: Value): Knowledge | null {
   const stored = channelReadRaw(v, "type");
-  let bound: ContextValue | null = null;
+  let bound: StructureValue | null = null;
   if (stored?.kind === ValueKind.Structure) {
-    const shape = typeShape(stored as ContextValue);
-    if (shape !== stored) bound = stored as ContextValue;
+    const shape = typeShape(stored as StructureValue);
+    if (shape !== stored) bound = stored as StructureValue;
   }
   const predicates = predicatesOf(v);
   const occurrenceBound = occurrenceBoundOf(v);
@@ -783,7 +783,7 @@ export function meetKnowledge(a: Knowledge, b: Knowledge): Knowledge {
  *  on a Context with a hidden `abstractDomain` field — cheap, opaque to the
  *  evaluator, decoded by the refinement helpers. */
 function encodeDomain(d: AbstractDomain): Value {
-  const ctx: ContextValue = makeContext();
+  const ctx: StructureValue = makeStructure();
   (ctx as any).abstractDomain = d;
   return ctx;
 }

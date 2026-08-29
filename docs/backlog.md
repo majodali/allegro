@@ -1143,8 +1143,10 @@ that prevents it.
     (`buildRefinedType`, `buildDistinctType`) needed nothing. Gate green at
     1197 on the first run
 
-- [ ] **B-107** · L0 · **Naming and declaration debt found by the concept
-  spine (S1, T0–T1).** Ruling-3 scope (maintainer-ratified 2026-08): the
+- [~] **B-107** · L0 · **Naming and declaration debt found by the concept
+  spine (S1, T0–T1).** **(a)(b)(c)(e)(f) LANDED at campaign chunk C9,
+  2026-08; (d) held for discussion, and delta 30's ENFORCEMENT half moved to
+  B-104(f). The residue the pass measured is B-119.** Ruling-3 scope (maintainer-ratified 2026-08): the
   renames pulled forward ahead of the S5 triage, extended beyond the type
   name to the other **clear** cases — where the decision is already ratified
   and executed in the runtime and only the surface name lags. Anything whose
@@ -1156,28 +1158,57 @@ that prevents it.
     `makeContext` (**101**); `makeStructure` does not exist. D1 and D46 are
     recorded EXECUTED: the runtime unification was, the renaming was done by
     alias. Rename `ContextValue` → `StructureValue` and `makeContext` →
-    `makeStructure`
+    `makeStructure`. **DONE C9**: alias deleted; 703 + 101 sites, plus
+    `asContext`→`asStructure` (30), `makeDenseArrayCtx`→`makeDenseArray`,
+    `makeRawArrayCtx`→`makeRawArray`, `makeCtxWith`→`makeStructureWith`,
+    `newContextStructure`→`newRecordStructure`,
+    `extensionToContext`→`extensionToStructure`, and primitives-local
+    `asCtx`→`asStructureArg`. Green at 1197 on the first run
   - **(b) `MultiValueType`** (**25** uses) names the kind D46 retired; its
     own comment says it survives "so existing casts keep compiling". The
     concept is the CARRIER (`isCarrier` is already the host test), so the
-    static shape should be named for it
+    static shape should be named for it. **DONE C9**: → `CarrierStructure`,
+    and `makeMultiValue` → **`withMetadata`** (68), named for what it does —
+    the one metadata-attachment chokepoint — since only one of its three
+    paths actually builds a carrier. Which surfaced a defect the rename was
+    not looking for: **the function DECLARED a carrier return** while the
+    derive path returns a non-carrier. Corrected to `StructureValue`;
+    **exactly one site** — a test cast — depended on the fiction, which is
+    the evidence it was never load-bearing
   - **(c) Stale file headers.** `src/types.ts` opens "Five value kinds +
     Param placeholder" — there are seven, and Param is one of them. The
     header predates both `Symbol` and the Context→Structure renaming.
     `src/structure.ts` describes **two** planes; there are four, and it says
     `__*` meta-slots "remain here until C5 re-keys them" — C5 did not, B-104
-    is doing it two milestones later
+    is doing it two milestones later. **DONE C9**: both headers rewritten;
+    `structure.ts` now names all four planes and points the host-plane row at
+    `StructureHostFields`
   - **(d) `ParamValue.predicates`** — declared, documented "reserved",
     **no runtime reader**, and a test asserts it stays empty. A reservation
     nothing reads or writes is indistinguishable from dead code; move the
-    reservation into prose and delete the field, or give it a reader
+    reservation into prose and delete the field, or give it a reader.
+    **HELD at C9 — needs a ruling.** Deleting the field requires deleting the
+    test that asserts it stays empty, and PROCESS §6 makes removing a test
+    condition a discussion, not a judgement call. The alternative (give it a
+    reader) is a feature, not a naming fix. Either way it is out of a naming
+    chunk's scope
   - **(e) Binding write disciplines.** `slotWrite` writes map + list,
     `slotSet` writes the map only (deliberately — the proof-kernel
     origination idiom), `removeName` deletes from the map and leaves the
     list entry, `removeConstruct` deletes from both. The
     leave-the-list-entry behaviour is documented on `renameInPlace` and
     nowhere else. Four disciplines, one comment, no stated rule for
-    choosing. Needs a rule, not necessarily a change
+    choosing. Needs a rule, not necessarily a change. **DONE C9 — and
+    writing the rule found its CAUSE.** `slotWrite` and `addBinding` each
+    construct **two separate `Binding` objects** for one key, so the map and
+    the list are **not aliases** and an in-place mutation reaches exactly one
+    view. All four disciplines follow from that one fact, which was
+    documented nowhere. The rule is now stated above `slotWrite`, including
+    why the map-only paths are safe today (nothing enumerates a type
+    structure's `bindingList` as fields — the same measurement that found
+    `isMetaSlotKey` fires on one key) and that the exemption is
+    circumstantial, so B-104's partition retirement must preserve it. Note
+    the item's own text was approximate: there is no `slotSet`
   - **(f) Host-plane fields declared on the value interface.** `parent`,
     `isScope` and `scopePredicates` sit on `StructureValue` while their own
     comments say they are "host-plane fields, never value slots". The plane
@@ -1185,7 +1216,10 @@ that prevents it.
     ~~Blocked on T2 §9~~ — **unblocked**: `concepts.md` §18 declares the
     planes. Scope confirmed by the S5 triage: these three are correctly
     PLACED and wrongly DECLARED, so the fix is declaration-side only.
-    Host-plane data that is wrongly *placed* is **B-118**, a different item
+    Host-plane data that is wrongly *placed* is **B-118**, a different item.
+    **DONE C9**: `StructureHostFields` declares the three, and
+    `StructureValue extends` it — the plane is legible in the type instead of
+    only in per-field comments the declaration contradicted
 
 - [ ] **B-108** · L0 · `[reval]` **Review the Allegretto composite —
   IC-2 / IC-3 / IC-4 together.** Raised by the concept spine (S2a) at
@@ -1483,3 +1517,32 @@ that prevents it.
   - **Not a blanket rule.** The host plane is legitimate and §18 says what
     belongs there. Each of (a)–(d) must be argued individually against the
     placement rule; the finding is that none of them ever was
+
+- [ ] **B-119** · L0 · **`Context` still names three different things.**
+  Measured by the C9 naming pass, which deliberately stopped at the line it
+  could defend. C9 renamed every DECLARED name in which "Context"/"Ctx"
+  denoted the retired composite KIND — a settled decision whose surface name
+  lagged. What remains is **role-qualified** and could not be renamed
+  mechanically, because the roles themselves are not all settled:
+  - **(a) `evalCtx` — 603 occurrences, and a public field.** It is the
+    evaluation **scope**: `evalCtx = scopeNew(below)`, it has a `parent`
+    chain, and `concepts.md` §15 defines Scope. So the rename (`evalScope`)
+    is *settled*, but it is an API change — `evalSource`'s result field, read
+    by `pcp.ts`, the CLI, the web bundle and ~100 test sites — and it was not
+    in B-107's ratified scope. Recommend doing it as its own single
+    mechanical commit
+  - **(b) `typeCtx` / `typeContextName` / `typePrivilegedCtx` / `intCtx` /
+    `proofCtx` and ~45 more.** These denote a **type Context** — a term
+    `concepts.md` itself still uses, in §30's own delta. Renaming them means
+    first deciding what a Structure in the type role is called, which is a
+    definition question for §30 and not a naming one. **Blocked on that
+    entry**, per B-107's own scope rule: *anything whose right name is still
+    an open question waits for its spine entry*
+  - **(c) `src/parser.ts` has its own `makeContext`** — a **parse** context,
+    unrelated to either, exported as `parserMakeContext`. Left alone (the
+    file is generated and `@ts-nocheck`), and recorded because it is the
+    third meaning and the reason the mechanical pass had to exclude a file
+  - The finding worth keeping: one word carried three distinct concepts —
+    the composite kind, four value ROLES, and a parser's own bookkeeping —
+    and only the first was retired. Renaming the first makes the other two
+    *more* visible, not less, which is the intended outcome

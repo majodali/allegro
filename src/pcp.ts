@@ -22,7 +22,7 @@
 // **Schema version is "pcp/1".** Forward-compatible additions get
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
-import type { ContextValue, BitsValue } from "./types.js";
+import type { StructureValue, BitsValue } from "./types.js";
 import { dataOf, SLOT_KEYS, backingsOf } from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import { ValueKind, bitsToString } from "./types.js";
@@ -36,7 +36,7 @@ import type { CompilationReport, Notification } from "./runtime.js";
  *  to THIS compilation unit by filtering to types reachable as bound
  *  values on the eval scope chain (source bindings + extension layers, so
  *  kernel scalars are always in view; another module's types are not). */
-function boundTypeFilter(evalCtx: ContextValue): (t: ContextValue) => boolean {
+function boundTypeFilter(evalCtx: StructureValue): (t: StructureValue) => boolean {
   const bound = new Set<unknown>();
   for (const [, b] of scopeAllBindings(evalCtx)) {
     if (b?.value) bound.add(dataOf(b.value));
@@ -684,7 +684,7 @@ export function formatVerdict(v: Verdict): string {
 // JSON formats. CLI subcommands + workers consume these to surface the
 // verifier's view to external provers.
 
-function _ctxString(ctx: ContextValue, key: string): string | undefined {
+function _ctxString(ctx: StructureValue, key: string): string | undefined {
   const b = ctx.bindings.get(key)?.value;
   if (!b) return undefined;
   const p = dataOf(b);
@@ -702,7 +702,7 @@ function _ctxString(ctx: ContextValue, key: string): string | undefined {
  *  `strategiesUsed` recorded by the prover in prior attempts. Without
  *  an obligation, hints reflect this attempt only. */
 export function buildVerdict(
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
   report: CompilationReport | undefined,
   obligation?: Obligation,
 ): Verdict {
@@ -711,7 +711,7 @@ export function buildVerdict(
     const v = binding.value;
     if (!v) continue;
     if (isDischargedProof(v)) {
-      const ctx = dataOf(v) as ContextValue;
+      const ctx = dataOf(v) as StructureValue;
       // E4 (E-R6): surface the recorded law backing when present.
       const eqName  = _ctxString(ctx, "equality");
       const lawName = _ctxString(ctx, "lawName");
@@ -728,7 +728,7 @@ export function buildVerdict(
         ...(restsOn.length > 0 ? { restsOn } : {}),
       });
     } else if (isFailedProof(v)) {
-      const ctx = dataOf(v) as ContextValue;
+      const ctx = dataOf(v) as StructureValue;
       theorems.push({
         name: key,
         proposition: _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>",
@@ -966,7 +966,7 @@ export function generateHints(
  *  discharge (failed or skipped) are included; otherwise every theorem
  *  is enumerated (useful for cataloguing). */
 export function extractObligations(
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
   report: CompilationReport | undefined,
   opts?: { pendingOnly?: boolean; sourceFile?: string },
 ): Obligation[] {
@@ -985,7 +985,7 @@ export function extractObligations(
     if (!discharged && !failed) continue;
     if (opts?.pendingOnly && discharged) continue;
 
-    const ctx = dataOf(v) as ContextValue;
+    const ctx = dataOf(v) as StructureValue;
     const proposition = _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>";
 
     // Prior attempt context: if failed, package the failure as a single

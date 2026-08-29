@@ -14,7 +14,7 @@
 import { ParseTree } from "./types.js";
 import {
   makeInt, makeBits, stringToBits, makeParam, makeSymbol, makeExpr,
-  makeComposedFn, makeContext, prim, bind, buildFn, substName,
+  makeComposedFn, makeStructure, prim, bind, buildFn, substName,
 } from "../parser-helpers.js";
 import { makeFloat } from "../types.js";
 import { getUserOp } from "./fragments.js";
@@ -2245,7 +2245,7 @@ function findLastExprBranch(children: ParseTree[]): ParseTree | null {
 
 export function buildProgram(tree: ParseTree): any {
   tree = peelUntilTag(tree);
-  const ctx = makeContext();
+  const ctx = makeStructure();
 
   function addStmt(stmt: BuiltBinding): void {
     const b: any = { key: stmt.key, value: stmt.value };

@@ -9,7 +9,7 @@ import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, evalNumExt, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
 import * as path from "path";
-import { bitsToString, dataOf, BitsValue, makeInt, makeContext, makeExpr, ValueKind, Value } from "../types.js";
+import { bitsToString, dataOf, BitsValue, makeInt, makeStructure, makeExpr, ValueKind, Value } from "../types.js";
 import { applyPhase } from "../runtime.js";
 import { evaluate } from "../evaluator.js";
 import { getTypeName } from "../types-std.js";
@@ -240,7 +240,7 @@ test("reactive: applyPhase triggers dependent re-evaluation", () => {
 
 test("reactive: depCollector records incomplete symbols during evaluation", () => {
   // Evaluate an expression that references an undefined symbol
-  const ctx = makeContext();
+  const ctx = makeStructure();
   ctx.bindings.set("a", { key: "a", value: makeInt(5) });
   ctx.bindingList.push({ key: "a", value: makeInt(5) });
   // 'b' is NOT defined

@@ -8,7 +8,7 @@
 import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { fileTest, primNames, typeNames, testsDir } from "./alg-files.js";
-import { evalSource as runtimeEval, Extension, extensionToContext } from "../runtime.js";
+import { evalSource as runtimeEval, Extension, extensionToStructure } from "../runtime.js";
 import { extractGrammarFragment } from "../primitives.js";
 import { isDischargedProof as _isDischargedProof, formatProofFinding } from "../proofs.js";
 import * as fs from "fs";
@@ -340,7 +340,7 @@ for (const [key, binding] of tacticsResult.evalCtx.bindings) {
     tacticsBindings[key] = binding.value;
   }
 }
-const tacticsModuleCtx = extensionToContext({ name: "tactics", bindings: tacticsBindings });
+const tacticsModuleCtx = extensionToStructure({ name: "tactics", bindings: tacticsBindings });
 const tacticsExt: Extension = { name: "tactics", bindings: { tactics: tacticsModuleCtx } };
 
 function tacticsEval(src: string) {
@@ -705,7 +705,7 @@ for (const [key, binding] of provableResult.evalCtx.bindings) {
     provableBindings[key] = binding.value;
   }
 }
-const provableModuleCtx = extensionToContext({ name: "provable", bindings: provableBindings });
+const provableModuleCtx = extensionToStructure({ name: "provable", bindings: provableBindings });
 const provableExt: Extension = { name: "provable", bindings: { provable: provableModuleCtx } };
 
 test("Phase G: lib/provable.alg loads with all theorems discharged", () => {

@@ -5,14 +5,14 @@
 // their underlying Promise resolves, triggering re-evaluation of dependents.
 // =============================================================================
 
-import { Value, ContextValue, makeSymbol, SymbolValue, makeMultiValue, stringToBits, isResolved } from "./types.js";
+import { Value, StructureValue, makeSymbol, SymbolValue, withMetadata, stringToBits, isResolved } from "./types.js";
 import { DependencyRegistry, applyPhase } from "./runtime.js";
 import { makeCell } from "./scope.js";
 import { withType, ErrorType, StringType } from "./types-std.js";
 
 export interface FutureManager {
   registry: DependencyRegistry;
-  evalCtx: ContextValue;
+  evalCtx: StructureValue;
   pendingCount: number;
   counter: number;
   /** Called when a deferred print fires (for streaming output) */
@@ -89,7 +89,7 @@ export function createFutureManager(): FutureManager {
       fm.pendingCount++;
       promise.then(
         (resolvedValue) => settle(resolvedValue),
-        (err) => settle(makeMultiValue(
+        (err) => settle(withMetadata(
           stringToBits(""),
           new Map<string, Value>([
             ["error", withType(stringToBits(String(err)), StringType)],

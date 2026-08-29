@@ -26,8 +26,8 @@
 
 import { dataOf, componentsView, cloneComponents, installChannelMerge } from "./slots.js";
 import {
-  Value, ValueKind, ComposedFunctionValue, ContextValue, MultiValueType,
-  makeMultiValue, makeContext,
+  Value, ValueKind, ComposedFunctionValue, StructureValue, CarrierStructure,
+  withMetadata, makeStructure,
 } from "./types.js";
 
 // =============================================================================
@@ -265,7 +265,7 @@ installChannelMerge("effects", (a: Value, b: Value) => {
 });
 
 function encodeEffects(eff: EffectSet): Value {
-  const ctx: ContextValue = makeContext();
+  const ctx: StructureValue = makeStructure();
   (ctx as any).effectSet = eff;
   return ctx;
 }
@@ -306,7 +306,7 @@ export function withEffects(v: Value, eff: EffectSet): Value {
   if (merged.size === 0) return v;
   const comps = cloneComponents(v);
   comps.set(EFFECTS_COMPONENT_KEY, encodeEffects(merged));
-  return makeMultiValue(dataOf(v), comps);
+  return withMetadata(dataOf(v), comps);
 }
 
 /** Compute the union of multiple effect sets. Null and undefined entries are

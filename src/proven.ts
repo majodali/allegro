@@ -24,9 +24,9 @@
 import { dataOf, getName, channelReadRaw, componentsView } from "./slots.js";
 import { scopeLookup } from "./scope.js";
 import {
-  Value, ValueKind, ContextValue, ComposedFunctionValue, ExpressionValue,
+  Value, ValueKind, StructureValue, ComposedFunctionValue, ExpressionValue,
   ParamValue, BitsValue,
-  bitsToString, makeInt, makeMultiValue,
+  bitsToString, makeInt, withMetadata,
 } from "./types.js";
 
 import { evaluate } from "./evaluator.js";
@@ -46,7 +46,7 @@ export interface ProvenFinding {
 /** Resolve a paramType AST/Value to its concrete type Context (via the
  *  evalCtx Symbol lookup if needed). Returns the Context that may carry
  *  `__name`, `abstractDomain`, etc. */
-function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | null {
+function resolveTypeContext(t: Value, evalCtx: StructureValue): StructureValue | null {
   let cur: Value = dataOf(t);
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
@@ -56,13 +56,13 @@ function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | nul
     if (!b?.value) return null;
     return resolveTypeContext(b.value, evalCtx);
   }
-  return cur.kind === ValueKind.Structure ? (cur as ContextValue) : null;
+  return cur.kind === ValueKind.Structure ? (cur as StructureValue) : null;
 }
 
 /** Pick sample inputs for a parameter based on its resolved type. Returns
  *  `null` when the type isn't one of the F7-minimum shapes; the caller
  *  records this as a "type not sampleable" info notification. */
-function pickSamples(typeCtx: ContextValue): Value[] | null {
+function pickSamples(typeCtx: StructureValue): Value[] | null {
   const nameBinding = getName(typeCtx);
   const name = nameBinding && dataOf(nameBinding).kind === ValueKind.Bits
     ? bitsToString(dataOf(nameBinding) as BitsValue) : null;
@@ -70,8 +70,8 @@ function pickSamples(typeCtx: ContextValue): Value[] | null {
   // Bool — enumerate the domain.
   if (name === "Bool") {
     return [
-      makeMultiValue(makeInt(1), new Map([["type", BoolType as Value]])),
-      makeMultiValue(makeInt(0), new Map([["type", BoolType as Value]])),
+      withMetadata(makeInt(1), new Map([["type", BoolType as Value]])),
+      withMetadata(makeInt(0), new Map([["type", BoolType as Value]])),
     ];
   }
 
@@ -79,7 +79,7 @@ function pickSamples(typeCtx: ContextValue): Value[] | null {
   // at call time inspects the value's type component to verify it
   // satisfies the param's declared type (which may be a refinement).
   const asTypedInt = (n: number): Value =>
-    makeMultiValue(makeInt(n), new Map([["type", IntType as Value]]));
+    withMetadata(makeInt(n), new Map([["type", IntType as Value]]));
 
   // Refined Int (NonNeg / PositiveInt / SmallPos / etc.) — read the
   // abstract domain's `lo` to pick non-trivial samples.
@@ -152,7 +152,7 @@ function substParams(
       seen.add(v);
       const pp = (v as any).primary;
       if (pp === undefined) return v;
-      return makeMultiValue(substParams(pp, cfn, posMap, seen), componentsView(v) as Map<string, import("./types.js").Value>);
+      return withMetadata(substParams(pp, cfn, posMap, seen), componentsView(v) as Map<string, import("./types.js").Value>);
     }
     case ValueKind.ComposedFunction: {
       seen.add(v);
@@ -182,7 +182,7 @@ function renderPredicateShape(cfn: ComposedFunctionValue): string {
 /** Walk an evalCtx and check every function binding that carries one or
  *  more `proven` clauses. Returns one finding per failing predicate. */
 export function checkProvenClauses(
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
 ): { errors: ProvenFinding[]; infos: ProvenFinding[] } {
   const errors: ProvenFinding[] = [];
   const infos: ProvenFinding[] = [];
@@ -199,7 +199,7 @@ export function checkProvenClauses(
         cfn = mv.primary as ComposedFunctionValue;
         const tComp = channelReadRaw(mv, "type");
         if (tComp?.kind === ValueKind.Structure) {
-          paramTypes = getFunctionParamTypes(tComp as ContextValue);
+          paramTypes = getFunctionParamTypes(tComp as StructureValue);
         }
       }
     } else if (val.kind === ValueKind.ComposedFunction) {

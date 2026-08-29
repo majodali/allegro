@@ -19,7 +19,7 @@ import {
   lit, nonterm, seq, alt, rep, opt, regex as ruleRegex,
 } from "./types.js";
 import { buildBaseGrammar, BASE_LEVEL_NAMES, BASE_OPERATORS_TO_LEVEL } from "./base-grammar.js";
-import type { GrammarFragment, Value, ContextValue, BitsValue } from "../types.js";
+import type { GrammarFragment, Value, StructureValue, BitsValue } from "../types.js";
 import { ValueKind, bitsToString } from "../types.js";
 
 // --- User operation registry ---
@@ -629,7 +629,7 @@ function ebnfObjectToRule(v: Value, labels: string[]): Rule {
   if (p.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: expected Context, got ${p.kind}`);
   }
-  const ctx  = p as ContextValue;
+  const ctx  = p as StructureValue;
   const kind = getStringField(ctx, "kind");
 
   switch (kind) {
@@ -749,19 +749,19 @@ function interleaveWs(items: Rule[]): Rule[] {
   return out;
 }
 
-function getField(ctx: ContextValue, key: string): Value {
+function getField(ctx: StructureValue, key: string): Value {
   const b = ctx.bindings.get(key);
   if (!b?.value) throw new Error(`EBNF object: missing field '${key}'`);
   return b.value;
 }
 
-function getStringField(ctx: ContextValue, key: string): string {
+function getStringField(ctx: StructureValue, key: string): string {
   const p = dataOf(getField(ctx, key));
   if (p.kind !== ValueKind.Bits) throw new Error(`EBNF object: field '${key}' not a string`);
   return bitsToString(p as BitsValue);
 }
 
-function getIntField(ctx: ContextValue, key: string): number {
+function getIntField(ctx: StructureValue, key: string): number {
   const b = ctx.bindings.get(key);
   if (!b?.value) return 0;
   const p = dataOf(b.value);
@@ -769,7 +769,7 @@ function getIntField(ctx: ContextValue, key: string): number {
   return Number((p as BitsValue).data);
 }
 
-function getArrayField(ctx: ContextValue, key: string): Value[] {
+function getArrayField(ctx: StructureValue, key: string): Value[] {
   const arr = dataOf(getField(ctx, key));
   if (arr.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: field '${key}' not an array`);

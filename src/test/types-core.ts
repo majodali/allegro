@@ -6,9 +6,9 @@
 // =============================================================================
 
 import { test, eq, throws } from "./harness.js";
-import { evalStd, evalNum, evalStr, typeExt, makeCtxWith } from "./fixtures.js";
+import { evalStd, evalNum, evalStr, typeExt, makeStructureWith } from "./fixtures.js";
 import { fileTest, primNames, typeNames, testsDir } from "./alg-files.js";
-import { evalSource as runtimeEval, Extension, extensionToContext } from "../runtime.js";
+import { evalSource as runtimeEval, Extension, extensionToStructure } from "../runtime.js";
 import { primitives as primRegistry } from "../primitives.js";
 import { withType as tsWithType } from "../types-std.js";
 import { effectsOf as tsEffectsOf, livenessDispositions } from "../effects.js";
@@ -16,7 +16,7 @@ import { runAlgFile, corpusWalk } from "./alg-files.js";
 import * as fs from "fs";
 import * as path from "path";
 import { getTypeName, structuralWrap, typeMethod, Type, typeMemberDescriptor, memberDescriptorsOf } from "../types-std.js";
-import { dataOf, BitsValue, bitsToString, makeInt, Value, makeContext, stringToBits, makePrimitive, makeExpr, ContextValue } from "../types.js";
+import { dataOf, BitsValue, bitsToString, makeInt, Value, makeStructure, stringToBits, makePrimitive, makeExpr, StructureValue } from "../types.js";
 import { formatValue } from "../primitives.js";
 import { channelReadRaw, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "../slots.js";
 import { evaluate } from "../evaluator.js";
@@ -157,7 +157,7 @@ test("type system: formatValue shows int for typed int", () => {
 });
 
 test("type system: dot access on untyped context falls back to ctx_resolve", () => {
-  const mathCtx = makeCtxWith({ pi: makeInt(3) });
+  const mathCtx = makeStructureWith({ pi: makeInt(3) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
   const result = evalStd("math.pi", [ext]);
   eq(result !== null, true);
@@ -439,7 +439,7 @@ for (const [key, binding] of mathResult.evalCtx.bindings) {
     mathBindings[key] = binding.value;
   }
 }
-const mathModuleCtx = extensionToContext({ name: "mymath", bindings: mathBindings });
+const mathModuleCtx = extensionToStructure({ name: "mymath", bindings: mathBindings });
 fileTest(path.join(testsDir, "modules.alg"), [{ name: "modules", bindings: { mymath: mathModuleCtx } }]);
 fileTest(path.join(testsDir, "type-annotations.alg"));
 fileTest(path.join(testsDir, "generics.alg"));
@@ -494,7 +494,7 @@ test("B-097 V1: exported typed function declaration marks its binding", () => {
 test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possession", () => {
   const r = runtimeEval("secret = 41\nsecret", undefined, [typeExt], undefined, true);
   const accessCtx = r.evalCtx;
-  const t = makeContext();
+  const t = makeStructure();
   slotSetName(t, stringToBits("Probe"));
   let arity = 0;
   const hook = makePrimitive("probe.__getMember", (hargs) => {
@@ -507,7 +507,7 @@ test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possess
     return makeInt(score);
   });
   slotSetFallbackMember(t, hook);
-  const inst = tsWithType(makeContext(), t);
+  const inst = tsWithType(makeStructure(), t);
   const td = primRegistry.type_dispatch;
   const out = evaluate(makeExpr(td, [inst, stringToBits("anything")]), accessCtx);
   eq(arity, 3, "hook received (instance, name, capsule)");
@@ -516,24 +516,24 @@ test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possess
 
 test("B-097 V2: an effectful fallbackMember's tag survives dispatch (applyPrimitive path)", () => {
   const r = runtimeEval("x = 1", undefined, [typeExt], undefined, true);
-  const t = makeContext();
+  const t = makeStructure();
   slotSetName(t, stringToBits("FxProbe"));
   const hook = makePrimitive("fx.__getMember", () => makeInt(5), false, ["io"]);
   slotSetFallbackMember(t, hook);
-  const inst = tsWithType(makeContext(), t);
+  const inst = tsWithType(makeStructure(), t);
   const out = evaluate(makeExpr(primRegistry.type_dispatch, [inst, stringToBits("f")]), r.evalCtx);
   const eff = tsEffectsOf(out);
   eq(eff != null && eff.has("io"), true, "hook effect tag harvested (was silently dropped pre-V2)");
 });
 
 test("B-097 V2: typeMethod raw-binding fallthrough is narrowed to protocol slots", () => {
-  const t = makeContext();
+  const t = makeStructure();
   slotSetName(t, stringToBits("Leaky"));
   // a stray non-slot binding on the type Context — pre-V2 this was
   // name-reachable through dispatch; post-V2 it is not a member.
   t.bindings.set("stray", { key: "stray", value: makeInt(9) });
   const r = runtimeEval("x = 1", undefined, [typeExt], undefined, true);
-  const inst = tsWithType(makeContext(), t);
+  const inst = tsWithType(makeStructure(), t);
   let threw = false;
   try { evaluate(makeExpr(primRegistry.type_dispatch, [inst, stringToBits("stray")]), r.evalCtx); }
   catch (e: any) { threw = e.message.includes("not found"); }
@@ -628,7 +628,7 @@ test("B-097 V3: conformance counts only externally-reachable members (V-R6)", ()
     "PrivX = Type.define({x2: Int, x: private(Int)})\n" +
     "PubX = Type.define({x: Int})\n" +
     "a = PrivX(1, 2)\nb = PubX(5)\nb\n", undefined, [typeExt], undefined, true);
-  const iface = dataOf(r.evalCtx.bindings.get("HasX")!.value!) as ContextValue;
+  const iface = dataOf(r.evalCtx.bindings.get("HasX")!.value!) as StructureValue;
   const privInst = r.evalCtx.bindings.get("a")!.value!;
   const pubInst = r.evalCtx.bindings.get("b")!.value!;
   const looseIface = structuralWrap(iface);
@@ -643,7 +643,7 @@ test("B-097 V3: conformance counts only externally-reachable members (V-R6)", ()
     "Wants = Interface.define({x: Int, hidden: private(Int)})\n" +
     "Impl = Type.define({x: Int}, Wants)\n" +
     "i = Impl(7)\ni\n", undefined, [typeExt], undefined, true);
-  const wants = dataOf(r2.evalCtx.bindings.get("Wants")!.value!) as ContextValue;
+  const wants = dataOf(r2.evalCtx.bindings.get("Wants")!.value!) as StructureValue;
   const impl = r2.evalCtx.bindings.get("i")!.value!;
   const declCheck = instOf.fn([wants, impl], undefined as any, undefined as any);
   eq(Number((dataOf(declCheck) as BitsValue).data), 1, "expected-side private is not required");
@@ -659,7 +659,7 @@ test("B-097 V3: a foreign type cannot draw a bundle's private member; privates n
     "Helpers = Type.define({calc: private((self) => 1), pub: (self) => 2})\n" +
     "User = Type.define({x: Int}, Helpers)\n" +
     "u = User(9)\nu\n", undefined, [typeExt], undefined, true);
-  const userType = dataOf(r.evalCtx.bindings.get("User")!.value!) as ContextValue;
+  const userType = dataOf(r.evalCtx.bindings.get("User")!.value!) as StructureValue;
   eq(typeMemberDescriptor(userType, "calc"), null, "private member stayed with the bundle");
   eq(typeMemberDescriptor(userType, "pub") !== null, true, "public bundle member copied as before");
 });
@@ -675,7 +675,7 @@ test("B-097 V3: reflection — names and flags free, accessors gated (V-R7)", ()
   const r = runtimeEval(
     "Vault = Type.define({owner: String, secret: private(Int), code: private((self) => 7)})\n" +
     "v = Vault(\"alice\", 42)\nv\n", undefined, [typeExt], undefined, true);
-  const vaultType = dataOf(r.evalCtx.bindings.get("Vault")!.value!) as ContextValue;
+  const vaultType = dataOf(r.evalCtx.bindings.get("Vault")!.value!) as StructureValue;
   // Enumeration lists private members (names-public), flags recorded —
   // introspection/PCP tooling keeps unrestricted name-level reads.
   const descs = memberDescriptorsOf(vaultType);
@@ -707,7 +707,7 @@ test("B-097 V3: readonly(...) is reserved vocabulary — recorded on the descrip
     "Point = Type.define({x: readonly(Int), y: Int})\n" +
     "p = Point(3, 4)\np.x\n", undefined, [typeExt], undefined, true);
   eq(Number((dataOf(r.value!) as BitsValue).data), 3, "reads work unchanged");
-  const pointType = dataOf(r.evalCtx.bindings.get("Point")!.value!) as ContextValue;
+  const pointType = dataOf(r.evalCtx.bindings.get("Point")!.value!) as StructureValue;
   const xDesc = typeMemberDescriptor(pointType, "x")!;
   eq(xDesc.bindings.get("readonly")?.value !== undefined, true, "attribute recorded for B-046");
 });

@@ -43,7 +43,7 @@ export function makeComposedFn(params: any[], body: any) {
   return fn;
 }
 
-export function makeContext() {
+export function makeStructure() {
   return { kind: 'Context' as const, bindings: new Map(), bindingList: [] as any[] };
 }
 
@@ -250,7 +250,7 @@ export function repChildren(repNode: any): any[] {
  * Used by the Earley parser's base grammar.
  */
 export function buildFileCtx(repNode: any) {
-  const ctx = makeContext();
+  const ctx = makeStructure();
   for (const child of repChildren(repNode)) {
     const s = child.children[0];
     if (s.binding) {

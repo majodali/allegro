@@ -14,7 +14,7 @@
 import { dataOf, channelReadRaw, getName } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ExpressionValue,
-  ContextValue, BitsValue,
+  StructureValue, BitsValue,
   bitsToString,
 } from "./types.js";
 import { getFunctionParamTypes } from "./types-std.js";
@@ -177,7 +177,7 @@ function peelFunctionAst(v: Value): {
     if (prim.kind === ValueKind.ComposedFunction) {
       let paramTypeAsts: Value[] = [];
       if (tComp && tComp.kind === ValueKind.Structure) {
-        const types = getFunctionParamTypes(tComp as ContextValue);
+        const types = getFunctionParamTypes(tComp as StructureValue);
         if (types) paramTypeAsts = types;
       }
       return { cfn: prim as ComposedFunctionValue, paramTypeAsts };
@@ -417,7 +417,7 @@ function analyzeChain(
 
 function typeContextName(t: Value): string | null {
   if (t.kind !== ValueKind.Structure) return null;
-  const n = getName(t as ContextValue);
+  const n = getName(t as StructureValue);
   if (!n) return null;
   const p = dataOf(n);
   if (p.kind !== ValueKind.Bits) return null;

@@ -10,7 +10,7 @@ import { g2ok, g2fail } from "./grammar2-engine.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
 import { asGrammarValue } from "../primitives.js";
-import { Value, ValueKind, BitsValue, ContextValue, dataOf, bitsToString } from "../types.js";
+import { Value, ValueKind, BitsValue, StructureValue, dataOf, bitsToString } from "../types.js";
 import { buildBaseGrammar } from "../grammar2/base-grammar.js";
 import { buildProgram } from "../grammar2/tree-builder.js";
 import { evaluate as evalVal } from "../evaluator.js";
@@ -849,7 +849,7 @@ test("grammar2/std: `of` infix accesses MultiValue component", () => {
   const r = evalStandard2("type of 42");
   const p = dataOf(r!);
   eq(p.kind, ValueKind.Structure);
-  const nameBind = getName(p as ContextValue);
+  const nameBind = getName(p as StructureValue);
   eq(bitsToString(nameBind as BitsValue), "Int");
 });
 
