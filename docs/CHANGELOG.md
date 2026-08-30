@@ -4,6 +4,59 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — C3: the base registers five fields, not eleven
+
+B-109(a) complete. `slots.ts` used to register eleven metadata fields at
+module init, including every layer's own — the R6/R11 violation the concept
+spine recorded as delta 19.
+
+**The split was decided by running the code, not by reading the layer
+diagram.** A field belongs to the base if the concept it serves survives in
+Allegretto. `make_error("boom")` and `source of x` both work under `--base`,
+so **`error` and `source` are Allegretto's own** and stay. That also corrects
+something C1 wrote into `types.ts` — "Allegretto defines no fields" was too
+strong. The accurate rule is that the base defines fields for *base concepts*
+and must not define the layers'.
+
+**Six moved to their owners**: `type`, `shape` and `discharged` →
+`types-std.ts`; `effects` → `effects.ts`; `predicates`, `domain`, `bound` →
+`refinements.ts`.
+
+**Three have no owner to move to**, and each is a B-111 finding rather than a
+relocation: `knowledge` is a capability whose storage is other fields and
+which nothing ever writes; `warnings` is registered `union` and unused;
+`exported` was retired at B-097 V1 when visibility became a property of the
+Binding. They stay in the base, wrongly, until B-111 says what they are.
+
+**Three findings from doing it, none visible from the plan.**
+
+**`discharged` could not go to `proofs.ts`.** Module init threw at once:
+`types-std.ts` acquires the discharged writer at *its* init, and `proofs.ts`
+imports `types-std.ts`. Looking at why, `proofs.ts` only reports —
+`isFailedProof`, `checkProofs`, `describeFailedProof` — while the origination
+site, `makeProof`, is in `types-std.ts`. **The proof kernel lives inside the
+type system.** That is a layering smell of B-110's family, and it was
+invisible until ownership had to be named.
+
+**Registration by module side effect is a load-order dependency.** It works
+here only because `runtime.ts` imports the owners eagerly. An integrity field
+registered too late would leave its gate *unarmed* rather than fail loudly —
+a worse failure than the one that threw. This is an argument for B-112(d),
+registration as an explicit interface with an init step, rather than as a
+module side effect. Pinned meanwhile by a boundary test asserting the gate is
+armed at evaluation time.
+
+**The boundary lint caught the move dragging debt out of the accessor
+layer.** `discharged`'s registration carries `bindingKey: "__discharged"`, and
+a dunder string literal outside `slots.ts` is a hard-fail (B-104). Fixed with
+`SLOT_KEYS.discharged` — the lint working as designed on a change it had never
+seen.
+
+A new boundary test pins the ownership split field by field, so one cannot
+drift back into the base without the move being deliberate and visible.
+
+Suite **1200/1200** (one test added), typecheck clean.
+
 ## 2026-08 — B-109(b)(c) landed, and `type` finally has an owner
 
 Pulled ahead of B-121's C2 by maintainer ruling, because B-125 found the

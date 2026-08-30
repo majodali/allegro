@@ -1371,11 +1371,39 @@ that prevents it.
     rather than precede it
   - **Gated on**: R6, R11 and R12 surviving ratification in their current
     form. If any is amended these findings must be re-read
-  - **Still open: (a) for the other ten fields.** `shape`, `error`, `effects`,
-    `predicates`, `domain`, `knowledge`, `bound`, `discharged`, `warnings`,
-    `source`, `exported` are still registered by `slots.ts` at module init.
-    `type` is the template: registration at the owning layer's module scope,
-    never inside a per-evaluation factory, since registration is one-shot
+  - **(a) COMPLETE 2026-08 (C3).** The base now registers **five** fields, not
+    eleven, and the split was decided by running the code rather than by
+    reading the layer diagram: **a field belongs to the base if the concept it
+    serves survives in Allegretto**. `make_error("boom")` and `source of x`
+    both work under `--base`, so `error` and `source` are Allegretto's own and
+    stay. Six moved to their owners — `type`, `shape`, `discharged` →
+    `types-std.ts`; `effects` → `effects.ts`; `predicates`, `domain`, `bound`
+    → `refinements.ts`. Three have **no owner to move to** and stay in the
+    base, wrongly, until B-111 rules on what they are: `knowledge` (a
+    capability whose storage is other fields; nothing ever writes it),
+    `warnings` (registered `union`, unused — B-117 intends to reach for it),
+    `exported` (retired at B-097 V1 when visibility became a Binding property)
+  - **Three findings from doing it**, none of which were visible from the
+    plan:
+    - **`discharged` could not go to `proofs.ts`.** Module init threw
+      immediately: `types-std.ts` acquires the discharged writer at ITS init,
+      and `proofs.ts` imports `types-std.ts`. Looking at why, `proofs.ts` only
+      REPORTS (`isFailedProof`, `checkProofs`, `describeFailedProof`) — the
+      origination site, `makeProof`, is in `types-std.ts`. **The proof kernel
+      lives inside the type system**, which is a layering smell of B-110's
+      family and was invisible until ownership had to be named
+    - **Registration by module side effect is a load-order dependency.** It
+      works here only because `runtime.ts` imports the owners eagerly. An
+      integrity field registered too late would leave its gate unarmed rather
+      than fail loudly. This is an argument for B-112(d) — registration as an
+      explicit interface with an init step — rather than as a module side
+      effect. Pinned meanwhile by a boundary test asserting the gate is armed
+      at evaluation time
+    - **The boundary lint caught the move dragging debt out of the accessor
+      layer**: `discharged`'s registration carries `bindingKey: "__discharged"`,
+      and a dunder string literal outside `slots.ts` is a hard-fail (B-104).
+      Fixed by using `SLOT_KEYS.discharged` — the lint working exactly as
+      designed on a change it had never seen
 
 - [ ] **B-110** · L0 · **The L0 evaluator implements the L2 type system.**
   Found by the concept spine (S2d) while classifying every abort in the base

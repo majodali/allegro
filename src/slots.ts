@@ -749,39 +749,50 @@ export function kernelFieldWriter(name: string): MetaFieldWriter {
   return e.writer;
 }
 
-// Built-in channels, registered at module init. Rules per D36/D21–D24;
-// consulted by the C1.5 propagation table.
-// B-104 chunk 3: no `bindingKey` — shape lives on the component plane like
-// every other channel. (Its writer capability is never acquired; reads go
-// through metaReadRaw, writes through the in-place `writeShape` above,
-// which must not derive a new value.)
-registerMetaField({ name: "shape", rule: "computed" });
-registerMetaField({ name: "error", rule: "viral" });
-registerMetaField({ name: "effects", rule: "union" });
-registerMetaField({ name: "predicates", rule: "computed" });
-registerMetaField({ name: "domain", rule: "computed" });
-// C3.1 (D36): the canonical knowledge channel — one lattice over the
-// imputed refinement bound + abstract domains + predicate set. Computed
-// view for now: `predicates`/`domain` meta + the refinement layers
-// of the stored type are its physical storage until the C4 representation
-// swap. Read via refinements.ts `knowledgeOf`.
-registerMetaField({ name: "knowledge", rule: "computed" });
-// C3.2 (D36): the occurrence bound — set by annotation-boundary crossing,
-// consumed by the member-AVAILABILITY gate (epistemic; "visibility" is
-// reserved for S3 access control). `drop`: a bound constrains the
-// occurrence it was stamped on, never results derived from it.
-registerMetaField({ name: "bound", rule: "drop" });
-registerMetaField({ name: "discharged", rule: "drop", integrity: true, bindingKey: "__discharged" });
-registerMetaField({ name: "warnings", rule: "union" });
+// --- Field registration: what the BASE owns ------------------------------------
+//
+// B-109(a) / concept-campaign C3 (2026-08). The base used to register eleven
+// fields at module init, including the layers' own. R6/R11 say the base owns
+// the MECHANISM and each layer owns ITS fields — so a field survives here only
+// if the base concept it serves survives in Allegretto.
+//
+// That test was run rather than argued: `make_error("boom")` and `source of x`
+// both work under `--base`, so `error` and `source` are Allegretto's own and
+// stay. The six L2 fields moved to their owners:
+//
+//   shape, type   → src/types-std.ts    (the type system)
+//   effects       → src/effects.ts      (the effects extension)
+//   predicates,
+//   domain, bound → src/refinements.ts  (refinement knowledge)
+//   discharged    → src/proofs.ts       (the proof kernel)
+//
+// Three have NO owner to move to, and each is a B-111 finding rather than a
+// relocation: `knowledge` is a capability whose storage is other fields and
+// which nothing ever writes; `warnings` is registered `union` and unused
+// (B-117 intends to reach for it when the verdict accumulates); `exported`
+// was retired at B-097 V1 when visibility became a property of the Binding.
+// They stay registered here, wrongly, until B-111 says what they are.
+
 // D47 (B-094): drop — a derived value was not produced by the recorded
-// expression; propagating source would fabricate provenance. Kernel-
+// expression, so propagating source would fabricate provenance. Kernel-
 // originated (evaluator attachment only); reads via `source of` are
-// observe-tagged (§3.1).
+// observe-tagged (§3.1). Integrity added at B-109(c) — it had been in the old
+// hardcoded name list while registered WITHOUT the flag, two sources of truth
+// disagreeing about one field.
 registerMetaField({ name: "source", rule: "drop", integrity: true });
-// ^ B-109(c) (2026-08): `integrity: true` added. `source` was listed in the
-// old hardcoded INTEGRITY_FIELD_NAMES set but registered WITHOUT the flag —
-// two sources of truth holding different beliefs about one field. The guard
-// now reads the registry, so the flag is what makes the field protected.
+registerMetaField({ name: "error", rule: "viral" });
+
+// --- Fields with no owner yet (B-111) ------------------------------------------
+// C3.1 (D36): `knowledge` is the canonical knowledge lattice — but nothing
+// ever stores a `knowledge` value. Its physical storage IS `predicates` /
+// `domain` plus the refinement layers of the stored type, and it is read
+// through refinements.ts `knowledgeOf`. A capability, not a field.
+registerMetaField({ name: "knowledge", rule: "computed" });
+// Registered `union` — precisely the accumulating discipline the verdict
+// needs — and never written. B-117.
+registerMetaField({ name: "warnings", rule: "union" });
+// Retired at B-097 V1 (D42/V-R4): visibility became a property of the BINDING,
+// never of the value. The registration outlived the concept.
 registerMetaField({ name: "exported", rule: "drop" });
 
 /** Binding keys that only a channel writer may originate. User-reachable

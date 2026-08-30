@@ -25,6 +25,7 @@ import {
 } from "./types.js";
 import { getTypeName } from "./types-std.js";
 
+
 export interface ProofFinding {
   /** Binding name for a `theorem`, or null for an anonymous `verify`. */
   binding: string | null;

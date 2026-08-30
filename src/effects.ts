@@ -24,7 +24,7 @@
 // syntax.
 // =============================================================================
 
-import { dataOf, metaOf, cloneMeta, installFieldMerge } from "./slots.js";
+import { dataOf, metaOf, cloneMeta, installFieldMerge, registerMetaField } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, StructureValue, CarrierStructure,
   withMetadata, makeStructure,
@@ -259,6 +259,14 @@ export const EFFECTS_FIELD = "effects";
 // C1.5: the effects channel's union-merge, installed into the propagation
 // table so generic executors can merge encoded effect sets without this
 // module's encoding leaking into slots.ts.
+// --- This layer's field (B-109(a), concept-campaign C3) ----------------------
+// The effects extension owns `effects`. `union` is the discipline: a result's
+// effects are the union of its operands' — which is also why the merge below
+// is INSTALLED by this layer rather than known to the base. Registered at
+// module scope; registration is one-shot, so it must not sit inside a
+// per-evaluation factory.
+registerMetaField({ name: "effects", rule: "union" });
+
 installFieldMerge("effects", (a: Value, b: Value) => {
   const merged = effectUnion(decodeEffects(a) ?? new Set(), decodeEffects(b) ?? new Set());
   return encodeEffects(merged);

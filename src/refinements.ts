@@ -20,11 +20,24 @@
 // See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { dataOf, cloneMeta, metaOf, metaReadRaw, typeShape, getAbstractDomain } from "./slots.js";
+import { dataOf, cloneMeta, metaOf, metaReadRaw, typeShape, getAbstractDomain, registerMetaField } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue,
   withMetadata, makeStructure, makeInt, isResolved,
 } from "./types.js";
+
+// --- This layer's fields (B-109(a), concept-campaign C3) ---------------------
+// Refinement knowledge owns three, all registered at module scope because
+// registration is one-shot and must not sit inside a per-evaluation factory.
+//
+// `predicates` and `domain` are `computed`: they are narrowed at annotated
+// evaluator sites rather than merged by the generic table. `bound` is the
+// occurrence bound (C3.2 / D36) — set when an annotation boundary is crossed,
+// consumed by the member-AVAILABILITY gate — and is `drop` because a bound
+// constrains the occurrence it was stamped on, never a result derived from it.
+registerMetaField({ name: "predicates", rule: "computed" });
+registerMetaField({ name: "domain", rule: "computed" });
+registerMetaField({ name: "bound", rule: "drop" });
 
 // =============================================================================
 // Abstract-domain representation

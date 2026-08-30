@@ -422,6 +422,26 @@ export function memberDescriptorsOf(type: StructureValue): Map<string, Structure
 // =============================================================================
 
 /** Helper to add a binding to a Context */
+// --- The proof kernel's field (B-109(a), concept-campaign C3) ---------------
+// `discharged` is an INTEGRITY field: only the holder of its writer may
+// originate the mark, which is what makes a discharge un-forgeable
+// (D21–D24). `drop`, because a value derived from a discharged proof is not
+// itself discharged — and D23 forbids a fabricating rule here regardless.
+// `bindingKey` records that its storage is still the binding-plane
+// `__discharged` slot, which is what `assertNotIntegrityKey` refuses in
+// user-reachable construction paths; it is the last metadata field on the
+// binding plane (concepts.md delta 44).
+//
+// Registered HERE and not in `proofs.ts`, and the reason is a finding rather
+// than a convenience: `proofs.ts` only REPORTS (`isFailedProof`,
+// `checkProofs`, `describeFailedProof`), while the origination site —
+// `makeProof`, holding the writer below — is in this module. **The proof
+// kernel lives inside the type system**, so registering by owner puts the
+// field where the writer is. That the two L2 capabilities share a module is
+// itself a layering smell, of the same family as B-110.
+registerMetaField({ name: "discharged", rule: "drop", integrity: true,
+                    bindingKey: SLOT_KEYS.discharged });
+
 // Held write capability for the discharged integrity channel (C1.4, D21-D24).
 // Module-scope, never exported — makeProof is this module's only
 // origination site.
@@ -3460,6 +3480,14 @@ export const UntypedFunctionType: StructureValue = buildType("UntypedFunction", 
 // Module-level, NOT inside `createTypeSystem()` — that is called once per
 // evaluation and registration is one-shot.
 registerMetaField({ name: "type", rule: "computed", integrity: true });
+// `shape` is the type system's too: a member-transparent projection of `type`
+// with refinement layers walked off (§32). It is registered as a field for now
+// and is not one — nothing stores a `shape` value; `metaReadRaw` computes it
+// from `type` on read. B-111/B-112(c) turn it into an installed projection;
+// until then it lives with its owner rather than in the base. Not integrity:
+// the capability is never acquired, because writes go through the in-place
+// `writeShape` rather than through a writer.
+registerMetaField({ name: "shape", rule: "computed" });
 
 // None type — represents the absence of a value
 const noneMethods: Record<string, PrimitiveFnImpl> = {

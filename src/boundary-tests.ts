@@ -874,6 +874,46 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(metaReadRaw(f, "discharged"), undefined, "and could not reach `discharged`");
   });
 
+  test("field ownership (B-109(a)/C3): the base registers only the base's own fields", () => {
+    // R6/R11: the base owns the MECHANISM, each layer owns ITS fields. The
+    // test of whether a field belongs to the base is whether the concept it
+    // serves survives in Allegretto — run rather than argued: `make_error`
+    // and `source of` both work under `--base`.
+    //
+    // This pins the split so a field cannot drift back into `slots.ts`
+    // without the move being a visible, deliberate change.
+    const owners: Record<string, string> = {
+      // base — Allegretto's own
+      source: "slots.ts", error: "slots.ts",
+      // no owner yet — B-111 says what these are before they can move
+      knowledge: "slots.ts", warnings: "slots.ts", exported: "slots.ts",
+      // moved to their owning layer at C3
+      type: "types-std.ts", shape: "types-std.ts", discharged: "types-std.ts",
+      effects: "effects.ts",
+      predicates: "refinements.ts", domain: "refinements.ts", bound: "refinements.ts",
+    };
+    for (const name of Object.keys(owners)) {
+      eq(metaFieldSpec(name) !== undefined, true, `${name} is registered`);
+    }
+    // Integrity is carried by the registration, not by a name list (B-109(b)).
+    for (const name of ["type", "discharged", "source"]) {
+      eq(metaFieldSpec(name)?.integrity, true, `${name} is an integrity field`);
+    }
+    // D23: an integrity field may not carry a fabricating rule.
+    for (const name of ["type", "discharged", "source"]) {
+      const rule = metaFieldSpec(name)?.rule;
+      eq(rule !== "viral" && rule !== "union", true,
+        `${name} rule '${rule}' is non-fabricating`);
+    }
+    // Registration order is a load-order dependency, so assert the integrity
+    // fields are live BEFORE any evaluation rather than trusting the import
+    // graph — moving `discharged` to a lazily-imported module broke exactly
+    // this and was caught only because module init threw.
+    const lit = attack('p = {__discharged: 1}');
+    eq(lit.threw?.includes("integrity channel") ?? false, true,
+      `the integrity gate is armed at evaluation time: ${lit.threw}`);
+  });
+
   test("forgery G (B-125): the metadata write surface is exactly the minted writers", () => {
     // The property `mv_set`'s deletion buys, asserted directly so that
     // reintroducing an unguarded write path fails here rather than silently.

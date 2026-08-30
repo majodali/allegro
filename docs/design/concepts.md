@@ -2552,7 +2552,7 @@ still open. **→ B-057.**
 | 15 | ~~Host-plane fields declared on the value interface they are said not to be part of~~ **CLOSED C9** | B-107(f) |
 | 17 | `__length` is the sole remaining job of the partition test — **now owned and decided: D48(a) deletes it with the dense role** | B-120 → B-104(f) |
 | 18 | ~~The host plane is declared inside the value interface — a plane contradicted by its own type~~ **CLOSED C9** (`StructureHostFields`) | B-107(f) |
-| 19 | The base registers eleven L2 fields itself and special-cases three by name — **`type` moved to its owning layer 2026-08**; ten remain | B-109(a) → C3 |
+| 19 | ~~The base registers eleven L2 fields itself~~ **CLOSED 2026-08 (C3)**: five remain, of which two (`error`, `source`) are Allegretto's own — verified under `--base` — and three await B-111. The by-name special-cases in `metaReadRaw`/`buildWriter` remain | B-109(a) done; special-cases → B-112(c) |
 | 21 | ~~Integrity enforced by hardcoded name list, not the registered flag; the two disagree about `source`~~ **CLOSED 2026-08** — the guard reads the registry, `source` carries the flag, and the bare-name check that conflated the binding and metadata planes is gone | B-109(b)(c) |
 | 22 | The meta-slot partition fires on one key in the whole suite — **that key is `__length`, which D48(a) removes** | B-120 → B-104(b)(f) |
 | 23 | **L0 imports 27 symbols from L2**; `checkArgType` lives in the evaluator | B-110 |
