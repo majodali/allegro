@@ -1055,10 +1055,12 @@ that prevents it.
     and it is therefore the ENTIRE remaining job of `isMetaSlotKey`:
     hiding one derived slot from field walks. Whatever replaces the
     partition needs to handle exactly this case and nothing else.
-    **GATED ON B-108** (S5 triage): option E dissolves `__length`, the legacy
-    view and the W6 invariant together, so the composite ruling decides
-    whether this is a re-key or a deletion. Sequencing it the other way risks
-    building a replacement for a slot that is about to stop existing
+    ~~GATED ON B-108~~ — **DECIDED (D48(a), 2026-08): DELETED, not re-keyed.**
+    Option E dissolves the dense role, and `__length`, the materialized legacy
+    view and the W6 invariant go with it. So nothing replaces the partition:
+    `isMetaSlotKey`'s entire remaining job disappears rather than moving.
+    **This sub-item now closes inside B-120** — and with it the `__*`
+    convention, since `__length` was the last key it ever fired on
   - **(g) `__interface` — RESOLVED at concept-spine S3 (`concepts.md` §36).**
     Specified, not open. The definition — an interface is a **declaration-only
     type**, and `InterfaceKind` is literally `Type` refined by *"has no
@@ -1092,6 +1094,10 @@ that prevents it.
     maintainer gate rather than folded into the deletions
 
 - [ ] **B-105** · L2 · **Union types — redesign or leave retired.**
+  *(Note added 2026-08: whatever the redesign, it lands on the D48(a)
+  entry-sequence composite, not on the map-plus-dense-region one — the
+  original "if a union type is implemented as an array, why isn't it dense?"
+  question dissolves with the dense role. Wait for B-120.)*
   Removed wholesale at B-104 chunk 2 (maintainer ruling: "if not used
   outside tests, remove it"). Usage at removal: **four test assertions,
   nothing else** — no `lib/`, no `tests/*.alg`, no demo, no bench, no
@@ -1221,8 +1227,25 @@ that prevents it.
     `StructureValue extends` it — the plane is legible in the type instead of
     only in per-field comments the declaration contradicted
 
-- [ ] **B-108** · L0 · `[reval]` **Review the Allegretto composite —
-  IC-2 / IC-3 / IC-4 together.** Raised by the concept spine (S2a) at
+- [x] **B-108** · L0 · `[reval]` **RULED 2026-08 → D48.** Review the
+  Allegretto composite — IC-2 / IC-3 / IC-4 together.
+  - **The ruling**, in one place: **(a) IC-2 → option E**; **(b) IC-3 → the
+    alternative** (metadata as a field on every kind); **(c)** construction
+    takes metadata and `withMetadata` splits into four named operations;
+    **(d) IC-1 DISSOLVES** — it could not be decided, because (a) and (b)
+    delete the roles it would have tagged, which is the item's own "cannot be
+    judged separately" premise proving itself; **SC-5 upheld.**
+  - **The item's central question is answered.** "Did unifying the composites
+    simplify things?" — **yes at the specification level and no at the
+    implementation level**, and it could not be answered while those were
+    fused. Kinds went 2 → 1 (the win); configurations went 2 → 4, and 74% of
+    all structures allocated became the configuration that exists solely to
+    hold one metadata field.
+  - **Execution**: NOT started. → **B-120** (option E) and **B-121** (metadata
+    field + lifecycle). Each is an arc, not a chunk, and gets a plan first.
+  - Full measurement record and reasoning: `docs/design/concepts.md` §3
+    (IC-1, IC-2, IC-3, IC-3a) and "What B-108 settled (D48)"
+  - *Original item text follows, kept as the record of what was asked.* Raised by the concept spine (S2a) at
   maintainer direction; the three choices interact and cannot be judged
   separately. The question is not "is the current design wrong" — the suite
   says it works — it is **how much of the implementation is visible from the
@@ -1267,7 +1290,8 @@ that prevents it.
     including Bits
   - **Deliverable**: a ruling on the composite, and whichever of SC-5 /
     IC-1 / IC-2 / IC-3 it settles moves to a recorded choice WITH a criterion
-    and a revisit trigger. Informs T2 (planes) directly
+    and a revisit trigger. Informs T2 (planes) directly. **DELIVERED** — all
+    four now carry a criterion and a revisit trigger
   - **It does NOT block nothing** (corrected by the S5 triage). Option E
     dissolves `__length`, the legacy view and the W6 invariant together, so
     whether **B-104(f)** means *re-key `__length`* or *delete it* is decided
@@ -1546,3 +1570,114 @@ that prevents it.
     the composite kind, four value ROLES, and a parser's own bookkeeping —
     and only the first was retired. Renaming the first makes the other two
     *more* visible, not less, which is the intended outcome
+
+- [ ] **B-120** · L0 · **The entry-sequence composite (D48(a), IC-2 option E).**
+  A Structure becomes a **sequence of optionally-keyed entries** — one thing
+  that is both map and list — rather than a string-keyed map plus an ordered
+  list view plus a dense special case. Ruled at B-108; **not designed in
+  detail — this arc gets its own plan before any code.**
+  - **What decided it** (measured, 50-file corpus through the real CLI): data
+    structures average **4.6 slots**, 97% have ≤ 8 and the modal size is
+    **2** — a `Map` is overhead at that size. Every large by-name lookup is
+    in a **scope**, and there are **227** scope objects in the whole corpus.
+    `scopeLookup` runs 10,309 times; `dataOf` runs 453,199 times. The O(n)
+    objection that ruled out a sequence-first composite for years was about
+    the rarer operation by a factor of 44
+  - **The consequence that makes it E rather than B**: the O(1) by-name
+    requirement belongs to ONE role, and that role is not data. A scope keeps
+    an index; the index sits **below** the specification because a scope is
+    host-plane machinery
+  - **What dissolves with it**: the dense region stops being a ROLE and
+    becomes a representation (which its level tag always said it was); the
+    materialized legacy view goes; **`__length` goes**, and with it the W6
+    dense-view-coherence invariant and the entire remaining job of
+    `isMetaSlotKey`. **This closes B-104(f) and B-104(b)** — the last dunder
+  - **Interacts with B-121**: together they leave **one role — record** —
+    which is what SC-5 said it was buying. Neither alone gets there
+  - **Open for the plan**: the entry representation itself; how the scope
+    index is built and invalidated; whether positional (null-key) entries and
+    the dense case are one thing or two; the migration order against the 146
+    role-presence sites; whether `bindings`/`bindingList` survive as views
+    during migration. **Revisit trigger on the ruling**: a measured workload
+    that puts large by-name lookup on the DATA path rather than the scope
+    path — that is the assumption E rests on
+
+- [ ] **B-121** · L0 · **Metadata is a field on every value, supplied at
+  construction (D48(b)(c), IC-3).** The carrier is deleted: a non-composite
+  value no longer becomes something else in order to carry a field. Ruled at
+  B-108; **arc, not a chunk — plan first.**
+  - **What decided it**: of 240,820 value allocations, **56,123 are
+    carriers** — 74% of all structures, and more than there are Bits values
+    (35,060) — and **98.5% hold exactly one field** (99.4% of that is
+    `type`). `dataOf` is called 453,199 times and really unwraps 182,311
+    (40%). The most common act in the system is allocating an eleven-field
+    `Structure` so a `Map` can hold one entry
+  - **It is not a new mechanism.** Structures already work this way —
+    `withMetadata` with a Structure primary takes `deriveWithChannels`, no
+    carrier. The carrier exists only because the other six kinds have nowhere
+    to put the field. The **read surface needs no change**: `channelReadRaw`,
+    `componentsView` and `cloneComponents` already take a `Value`, cast, and
+    read `.components`
+  - **(a) Host shape.** `MetadataBearing { meta?: Metadata }` (with
+    `Metadata = Map<string, Value>`) extended by all seven value interfaces;
+    `Structure.components` renamed `meta` — `components` reads like *parts of
+    a composite*, i.e. the data plane, which is what it is not
+  - **(b) Why optional, and it is NOT laziness.** Allegretto defines no
+    fields (R6/R11), so under `--base` a value legitimately carries nothing.
+    The two populations without metadata are: every value in Allegretto mode,
+    and engine intermediates that never become program values. It **cannot**
+    be a required argument of `makeInt` — that would make L0 depend on a
+    concept it does not have, B-110's violation in the construction path.
+    Optional in the type, **always declared on the object**, per the stable-
+    hidden-class convention `types.ts` already states on `makeParam`
+  - **(c) Construction takes metadata.** 12 call sites literally read
+    `withMetadata(makeInt(0), m)` — the value never exists without it — and
+    one of them is **PE Rule 1** (`evaluator.ts:511`,
+    `withMetadata(makeExpr(residualFn, evalArgs), components)`), on the path
+    that allocates 101,611 Expressions. The factories already exist and are
+    already an enforced chokepoint (W4); they simply do not take metadata
+  - **(d) Four operations, four names.** Classifying all 45 non-test call
+    sites: **create** (12), **derive** — same datum, new metadata (10),
+    **map** — new datum, metadata carried (9), **stamp** (~14). The map case
+    is spelled as TWO calls (`withMetadata(newP, cloneComponents(v))`) and
+    omitting the second **silently drops metadata** — the same
+    convention-only obligation as the TailCall sentinel (B-113). Naming it
+    removes the way to get it wrong
+  - **(e) The clone concerns are already solved, per kind.** Carriers wrap:
+    Bits 50.5% (none), PrimitiveFunction 46.0% (host expandos — `primitives.ts`
+    already clones one and re-stamps `CHANNEL_WRITER_BRAND`), ComposedFunction
+    1.3% (`param.owner`, `PRESERVED_FN_META_KEYS` — the shared helper CLAUDE.md
+    mandates), Expression 1.3% (`memo` — the clone must SHARE it), Param 0.8%,
+    **Symbol 0.0%** — so the interning hazard (SC-4: identity = FQN) does not
+    arise today. **Needs a ruling in the plan**: after a ComposedFunction
+    clone, does `param.owner` point at the original or the clone?
+    Behaviour-preserving answer is the original, which is what `remapParams`
+    already does — but it must be stated, because PE's Param-call branch
+    reads it
+  - **(f) Why copy-on-attach, stated once so it is not re-litigated.**
+    Measured: 59,027 attachments, **19,817 (33.6%) targeting an object that
+    has already been given metadata**. Metadata is a property of a value *in
+    a position*, not of the datum. Both no-allocation designs fail on that
+    one number — in-place mutation lets the second stamp overwrite the first
+    everywhere the value is held, and a side table (`WeakMap<Value,
+    Metadata>`) fails identically because its key is the object. D22 is the
+    rule adopted *because* of this, not the reason itself
+  - **(g) The legitimate in-place case, to be stated as a rule**: while a
+    value is provably unshared — during construction, before it escapes. The
+    carve-out already exists twice (`structure.ts`'s grandfathered builder
+    idiom; `writeShape` for identity-sensitive type Contexts, ruled at B-104
+    chunk 3) as an idiom rather than a rule. *Stamp in place only before the
+    value escapes; after that, derive*
+  - **Migration is strictly additive** and each step lands green: (1) add
+    `meta?` to the six interfaces, rename `Structure.components` → `meta` —
+    no behaviour change, nothing writes it yet, the readers already read it;
+    (2) attach to a per-kind clone instead of a carrier — one function, the
+    only risky step; `dataOf` still compiles and returns `v`; (3) delete
+    `primary` (194 occurrences), `isCarrier` (14), `newCarrierStructure`, W1
+    and its walker; (4) delete `dataOf` (902 occurrences) and its call sites
+  - **Separate, and possibly bigger**: **25,842 carriers wrap
+    PrimitiveFunctions** — registry singletons — each holding one `type`
+    field, and 33.6% of all attachments hit an already-attached object. That
+    smells like the same primitive being typed identically over and over.
+    Memoizing `(datum, fields) → value` is orthogonal to this item and was
+    not measured; do it as its own investigation, not inside this arc

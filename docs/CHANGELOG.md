@@ -4,6 +4,118 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-108 ruled: the composite, and the question was one level too high
+
+**D48**, minted. B-108 asked whether unifying MultiValue and Context actually
+simplified anything — a doubt its own author had carried for years and could
+not resolve, because nothing recorded what the alternatives were or which
+criterion selected one. It now has an answer, and the answer has a shape
+worth stating: **yes at the specification level, no at the implementation
+level, and the question could not be answered while those were fused.**
+
+**SC-5 is upheld.** One composite kind is a win under R1 and the review did
+not disturb it. What the review found is that the cost was pushed downward:
+kinds went 2 → 1 while *configurations* went 2 → 4, and 74% of every
+structure allocated became the configuration that exists only to hold one
+metadata field. That is exactly the confusion Part 0 exists to prevent, and
+the pilot's own central decision was the case that proved it.
+
+### The rulings
+
+- **(a) IC-2 → option E.** The composite becomes a **sequence of
+  optionally-keyed entries** — one thing that is both map and list. → **B-120**
+- **(b) IC-3 → the alternative.** Metadata becomes a `meta` **field on every
+  representation kind**, deleting the carrier, `primary`, `isCarrier`, W1 and
+  the `dataOf` indirection. → **B-121**
+- **(c) Construction takes metadata.** Factories gain a metadata parameter,
+  and the four operations currently sharing the name `withMetadata` — create,
+  derive, map, stamp — get four names. → **B-121**
+- **(d) IC-1 dissolves** rather than being decided: (a) and (b) delete the
+  roles an explicit tag would have tagged. B-108's premise that the three
+  could not be judged separately proved itself — ruling IC-1 first would have
+  built a discriminant for configurations that are being removed.
+
+### The measurements, because two of them overturned the reasoning
+
+50-file corpus, instrumented through the real CLI.
+
+| | |
+|---|---|
+| Value allocations | 240,820 — of which **75,595 Structures**, and **56,123 (74%) carriers** |
+| Carriers vs Bits values | **56,123 vs 35,060** — more carriers than the values they wrap |
+| Metadata fields per carrier | mean **1.0**; **98.5% hold exactly one**; 99.4% of it `type` |
+| Slots per data structure | mean **4.6**; 97% ≤ 8; modal size **2** |
+| Scope objects, ever | **227** (mean 70 bindings, max 177 — the prelude) |
+| `scopeLookup` vs `dataOf` calls | **10,309** vs **453,199** (40% really unwrap) |
+| Attachments targeting an already-attached object | **19,817 of 59,027 — 33.6%** |
+
+**The O(n) objection was about the wrong operation.** Name lookup — the cost
+that ruled out a sequence-first composite for years — happens 10,309 times;
+the carrier indirection happens 453,199 times. A `Map` was put on every
+composite to make the rare operation fast and the common one was paid for
+with an extra object per value.
+
+**And the O(1) requirement belongs to one role.** Data structures average 4.6
+slots, where a `Map` is overhead; every large by-name lookup is in a **scope**,
+and there are 227 of those in the whole corpus. Scopes are host-plane
+machinery, not data — so the indexing requirement that shaped the entire
+composite comes from the one role that is not a value. That is what selects E
+over B: a scope keeps an index, and the index sits *below* the specification.
+
+**The 33.6% figure defended copy-on-attach rather than overturning it**, and
+ruled out both no-allocation designs at once — in-place mutation lets a second
+stamp overwrite the first at every position holding the value, and a side
+table (`WeakMap<Value, Metadata>`, the obvious candidate nobody had listed)
+fails identically because its key is the object. Metadata is a property of a
+value *in a position*, not of the datum. D22 is the rule adopted **because**
+of that, not the reason itself.
+
+### The lifecycle ruling came from a question, not from measurement
+
+The review had framed IC-3 as "make attachment cheaper". Asked why values are
+cloned to receive metadata at all, the honest answer is that most of them
+should never have existed without it: **12 call sites literally read
+`withMetadata(makeInt(0), m)`**, and one of them is **PE Rule 1** —
+`withMetadata(makeExpr(residualFn, evalArgs), components)`, on the path that
+allocates 101,611 Expressions. A residual is *born* with propagated metadata
+by definition.
+
+Classifying all 45 non-test call sites showed `withMetadata` is **four
+operations wearing one name**: create (12), derive (10), map (9), stamp (~14).
+The map case is spelled as **two** calls — `withMetadata(newP,
+cloneComponents(v))` — and omitting the second **silently drops metadata**,
+the same convention-only obligation as the TailCall sentinel (B-113) and the
+ComposedFunction clone helper. Naming it removes the way to get it wrong.
+
+`meta` stays **optional, and not out of laziness**: Allegretto defines no
+fields (R6/R11), so under `--base` a value legitimately carries nothing. It
+cannot become a required argument of `makeInt` — that would make L0 depend on
+a concept it does not have, which is B-110's violation in the construction
+path.
+
+### What follows
+
+Together, (a) and (b) leave **one role — record** — which is what SC-5 said
+it was buying. Neither alone gets there.
+
+**B-104(f) is decided: `__length` is deleted, not re-keyed** — it dissolves
+with the dense role, and it was the last key `isMetaSlotKey` ever fired on. So
+the `__*` convention ends inside B-120 rather than needing a replacement.
+B-105 (unions) waits for the new composite rather than preceding it.
+
+Both are **arcs, not chunks**, and each gets its own plan before code. Their
+placement against C1–C6 is recorded as open (plan §9.5(5)): interfaces
+designed against a carrier model D48 has decided to delete is work already
+chosen to be redone, but moving them ahead would reorder a ratification, so
+it is the maintainer's call rather than an assumption.
+
+One thing left unmeasured and flagged: **25,842 carriers wrap
+PrimitiveFunctions** — registry singletons — each holding one `type` field.
+That smells like the same primitive typed identically over and over, and
+memoizing it is orthogonal to both arcs and possibly larger than either.
+
+Documentation only — no `src/` changes. Suite unchanged at **1197/1197**.
+
 ## 2026-08 — Campaign C9: the naming, and what a mechanical pass turned up
 
 The concept spine's code campaign starts. Maintainer ruled C9 first — *"if

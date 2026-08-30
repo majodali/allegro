@@ -5,7 +5,10 @@
 > ordered code campaign (C1…C13). §9.5's rulings are taken (2026-08) and the
 > campaign has started: **C9 (naming) landed first** by maintainer ruling;
 > **C1 (field vs channel) is next**. The Interface *type* (C8) waits until
-> Allegretto is judged stable; B-108 is discussed after C9.
+> Allegretto is judged stable. **B-108 is RULED (D48)** — option E for the
+> composite, metadata as a field on every value, and a construction-lifecycle
+> ruling; owners **B-120** / **B-121**, both arcs needing their own plan, and
+> their placement against C1–C6 is §9.5(5), still open.
 > Owner: B-106 (to be minted on ratification)
 > Outcome (K-007): every salient concept in Allegro has a definition, a
 > rationale, and a recorded delta against the code — and the code is then
@@ -384,7 +387,8 @@ direction."*
 | **C9** | B-107(a)(b)(c)(e)(f) | — | ~~Naming and declaration debt~~ **DONE 2026-08**, ruled first per §9.5(2). **976** identifier sites across 12 names, the `ContextValue` alias deleted, plus five declaration fixes. Green at 1197 on the first run. Found two things the rename was not looking for: `withMetadata` **declared a carrier return** for a path that returns a non-carrier (one site depended on it — a test cast), and the map/list write disciplines exist because **`slotWrite` builds two separate `Binding` objects** for one key. (d) held for a ruling; the residue is **B-119** |
 | **C10** | B-117, then B-057 | C5 | **Accumulation.** `buildVerdict` reads accumulated metadata instead of walking `evalCtx.bindings`; contracts get a `union` field and reach the verdict for free rather than by a new case |
 | **C11** | B-113, B-114 | — | **Guarantees held by convention become held by construction or by a test** — TailCall forwarding, completion confluence. Independent |
-| **C12** | B-104(b)(f), B-105 | B-108 ruled | **The composite**: the last dunder, and union types. Blocked on a ruling, not on code |
+| **C12** | B-120 · **the entry-sequence composite** (D48(a)) — and B-104(b)(f) close inside it, so the last dunder goes here | **B-108 RULED 2026-08** | The composite becomes a sequence of optionally-keyed entries; dense and the legacy view drop below the specification. **An arc, not a chunk — its own plan first.** B-105 (unions) waits for it rather than preceding it |
+| **C12b** | B-121 · **metadata on every value + the construction lifecycle** (D48(b)(c)) | B-108 RULED; sequencing vs C1–C6 **open** (§9.5(5)) | Deletes the carrier, `primary`, W1 and the `dataOf` indirection; factories take metadata and `withMetadata` splits into four named operations. **An arc, not a chunk — its own plan first** |
 | **C13** | B-100, B-102, B-103 | — | Residue: the T-R6 soundness review and two tooling items |
 
 **Serial by necessity, not by preference.** C1–C7 all converge on
@@ -435,12 +439,31 @@ campaign:
    C1 — *"if any names are modified later we can address them as we go"*.
    Landed; counts below. The pass also fixed the ordering rule's own premise:
    C1–C8 are now authored in the vocabulary the spine uses.
-3. **B-108, the composite.** ~~It is a ruling, not code~~ — **scheduled
+3. ~~**B-108, the composite.**~~ **RULED 2026-08 → D48**, and it went the way
+   the maintainer predicted in kind (*"almost all implementation choices"*)
+   but not in size: **IC-2 → option E**, **IC-3 → metadata as a field on
+   every value**, **IC-1 dissolved rather than decided**, SC-5 upheld, plus
+   **D48(c)**, a lifecycle ruling the review had not thought to ask for —
+   construction takes metadata, and `withMetadata`'s four operations get four
+   names. Owners **B-120** and **B-121**; the last dunder (B-104(f)) closes
+   inside B-120. Original note follows.
+   ~~It is a ruling, not code~~ — **scheduled
    (maintainer, 2026-08): discuss after C9.** Maintainer's reading is that it
    is *almost all implementation choices, all straightforward enough*, which
    if it holds makes C12 cheap; the reason it still needs the conversation is
    that whichever way it goes it decides whether B-104(f) is a re-key or a
    deletion, and therefore when the last dunder can go.
+5. **Where do B-120 and B-121 sit against C1–C6?** **OPEN — raised, not yet
+   ruled.** Both arcs rewrite how metadata attaches and how the composite is
+   indexed; C1–C6 build the plane interfaces *over* that representation.
+   Doing the interfaces first means designing them against a carrier model
+   that D48 has already decided to delete; doing the arcs first reorders the
+   interfaces-first ratification. The argument for arcs-first is that an
+   interface designed against a representation you have ruled out is work you
+   have decided to redo. The argument against is that the arcs are large and
+   the interfaces are the signal the maintainer asked for. Recorded rather
+   than assumed, because the ratification was explicit and this would move it.
+
 4. **Is "accumulate toward the verdict" a fifth plane interface?** Raised by
    B-117 and undisputed at S4b. **OPEN — to be discussed** (maintainer,
    2026-08: *"not sure"*). The recommendation stands as a way of *deciding*

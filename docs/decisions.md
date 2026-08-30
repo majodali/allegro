@@ -15,7 +15,7 @@ execution state and its backlog owner — acceptance and implementation
 are distinct facts.
 
 **Going forward**: new decisions continue the D-series here (next free
-number: D48), entered at ratification time with reasoning in a design
+number: D49), entered at ratification time with reasoning in a design
 note under `docs/design/`. Plan-scoped ruling families (the `X-R`
 pattern) may still be minted inside plans; they are indexed here when
 their plan's gate passes.
@@ -27,7 +27,7 @@ decisions; and "Phase D1/D2" in `docs/design/standard/effects.md` and
 the provability plans are roadmap phases. Neither series is indexed
 here.
 
-## D-series — core design decisions (D1–D47)
+## D-series — core design decisions (D1–D48)
 
 Origin: the structured-values-unification decision log
 (`docs/plans/archive/structured-values-unification.md`, frozen —
@@ -84,6 +84,7 @@ record.
 - **D45** — One construction surface: `define` uniform at every meta-level; Interface = refinement of Type, Refinement = sub-kind of Type; `construct` is the standardized per-kind minting authority bottoming out in `struct_new` + the gated shape stamp — accepted, 2026-08 (executed, C6.1a/C7.2a) — reasoning: `docs/design/allegretto/structures.md` §9
 - **D46** — MultiValue retirement = D15 execution: option B ratified (transparent Structure as scalar carrier), the definitional ladder (representations → values → types → kinds), `v.kind` demoted to a host discriminant — accepted, 2026-08 (executed, C7.1/B-088) — reasoning: `docs/design/allegretto/structures.md` §2
 - **D47** — The source channel, ASTs as channel payload: six sub-decisions — Expression+span payload, demand-driven attachment, `drop` propagation, kernel-private writer / free reads, effectful observation (`observe`), `source of x` surface — accepted, 2026-08 (executed, B-094 chunks 1+2; amended at chunk 2: the what-migrates prediction corrected — the lazy-workaround class is empty in the kernel, payoff prospective) — reasoning: `docs/design/allegretto/structures.md` §3.1
+- **D48** — The Allegretto composite, ruled as one question (B-108): **(a) IC-2 → option E** — the composite is a sequence of optionally-keyed entries; the dense region and the materialized legacy view become representation below the specification, taking `__length` and the W6 invariant with them, and a scope keeps its by-name index because a scope is not data; **(b) IC-3 → the alternative** — metadata is a `meta` field on every representation kind rather than on a carrier that wraps the value, deleting the carrier concept, `primary`, `isCarrier`, W1 and the `dataOf` indirection; **(c) construction lifecycle** — factories take metadata so a value that will carry it is built with it, and the four operations currently sharing the name `withMetadata` (create / derive / map / stamp) get four names; **(d) IC-1 dissolves** rather than being decided, because (a) and (b) delete the roles it would have tagged; **SC-5 upheld** — one composite kind was never the thing in doubt — accepted, 2026-08 (ruled, NOT executed — owners **B-120** (a) and **B-121** (b)(c); each arc gets its own plan before code) — reasoning: `docs/design/concepts.md` §3 (IC-1, IC-2, IC-3, IC-3a) and the B-108 measurement record
 
 ## E-R series — equality and laws (plan rulings, ratified 2026-08)
 

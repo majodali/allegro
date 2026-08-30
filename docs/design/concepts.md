@@ -380,7 +380,13 @@ Reducing the *kind count* is a specification win under R1. What it cost is
 entirely at the implementation level, and is measured in IC-1.
 
 *Criterion applied:* kind-count minimality under R1.
-*Revisit:* with IC-1/IC-2 → **B-108**.
+*Revisit:* ~~with IC-1/IC-2 → B-108~~ — **UPHELD at B-108 (D48, 2026-08).**
+The doubt was never here. One composite kind is a specification win under R1
+and the review did not disturb it; what the review found is that the *cost*
+was pushed down into IC-1/IC-2/IC-3, where four configurations replaced two
+kinds. Recording this explicitly because "was D1 right?" was answered **yes,
+and the question you were actually asking is one level down** — which is the
+whole reason Part 0 separates the levels.
 
 ### SC-6 — Scopes are values
 *Satisfies R8, R2.*
@@ -439,7 +445,19 @@ field presence read at 146 sites.
 
 *Criterion applied:* host performance + future codegen.
 *Criterion NOT applied:* comprehension. Both are legitimate; only one was
-used, and nothing recorded which. **→ B-108.**
+used, and nothing recorded which.
+
+> **RULED at B-108 (D48, 2026-08): this choice DISSOLVES rather than being
+> decided.** Under IC-2 option E the dense role becomes a representation
+> below the specification, and under IC-3's ruling the carrier role ceases to
+> exist; scope is host-plane. **One role — record — survives**, so there is
+> nothing left to discriminate and the explicit-tag alternative would be a
+> discriminant built for configurations that are being deleted. This is why
+> B-108 insisted the three be judged together: ruling IC-1 first would have
+> built the tag.
+>
+> *Until those two land the 146 presence-checks stand*, and this entry stays
+> as the record of what they cost. **Owner: B-120, B-121.**
 
 ### IC-2 — Structure indexing: map-first
 *Realises SC-5, SC-6.*
@@ -473,7 +491,44 @@ invariant with it.
 
 *Criterion applied:* interpreter-shaped performance intuition.
 *Criterion that should apply:* spec/implementation distance under R7.
-**→ B-108.**
+
+> ### RULED at B-108: **option E** (maintainer, 2026-08 — **D48(a)**)
+>
+> **The measurement that decided it** (50-file corpus, real CLI, instrumented):
+>
+> | | |
+> |---|---|
+> | Slots per DATA structure | mean **4.6**; **97% ≤ 8**; modal size **2** |
+> | Bindings per SCOPE | mean 70, max 177 (the prelude) |
+> | Scope objects, ever | **227** |
+> | `scopeLookup` calls | **10,309** |
+> | `dataOf` calls | **453,199** |
+>
+> Two things follow, and neither was visible from reasoning.
+>
+> **The O(n) objection was about the wrong operation.** Name lookup happens
+> 10,309 times; the carrier indirection happens 453,199 times. A Map was put
+> on every composite to make the rare operation fast, and the common one was
+> paid for with an extra object per value.
+>
+> **The O(1) requirement belongs to ONE role.** Data structures average 4.6
+> slots — a Map is overhead at that size — while every large by-name lookup
+> is in a scope, and there are 227 scopes in the entire corpus. Scopes are
+> host-plane machinery, not data. So the indexing requirement that shaped the
+> whole composite comes from the one role that is not a value.
+>
+> E is the shape that fits: **a sequence of optionally-keyed entries** is the
+> composite; a scope keeps an index, and that index is *below* the
+> specification because a scope is not data. `__length`, the materialized
+> legacy view and the W6 coherence invariant all dissolve with the dense
+> role, and delta 17 — the sole remaining job of `isMetaSlotKey` — goes with
+> them.
+>
+> *Criterion applied:* **spec/implementation distance under R7**, the one
+> IC-2 records as the criterion that should have applied.
+> *Revisit if:* a measured workload puts large by-name lookup on the DATA
+> path rather than the scope path — which is the assumption E rests on.
+> **Owner: B-120.** Not yet designed in detail; the arc gets its own plan.
 
 ### IC-3 — Metadata storage: channels by wrapping
 *Realises R3.*
@@ -487,7 +542,130 @@ Structure with an empty data plane whose `primary` is the wrapped value.
 
 **Never written down as a choice at all**, hence no recorded criterion. It is
 the largest single source of accidental complexity in T0 by call-site count,
-and a genuine trade rather than an obvious win. **→ B-108.**
+and a genuine trade rather than an obvious win.
+
+> ### RULED at B-108: **the alternative** — metadata is a field on every
+> value (maintainer, 2026-08 — **D48(b)**, with the construction lifecycle
+> **D48(c)**)
+>
+> **The measurement.** Of 240,820 value allocations in the corpus, **75,595
+> are Structures and 56,123 of those — 74% — are carriers**; carriers are
+> created *more often than Bits values exist at all* (35,060). **98.5% of
+> them hold exactly one field** (mean 1.0, max 4), and 99.4% of that is
+> `type`. `dataOf` is called 453,199 times and really unwraps 182,311 (40%).
+> So the most common act in the system is: allocate an eleven-field
+> `Structure` wrapping a value, so that a `Map` can hold **one** entry.
+>
+> **What carriers wrap** — which is what makes the change safe rather than
+> speculative:
+>
+> | wrapped kind | share | clone concern | pattern that already solves it |
+> |---|---|---|---|
+> | Bits | 50.5% | none | — |
+> | PrimitiveFunction | 46.0% | host expandos (`CHANNEL_WRITER_BRAND`) | `primitives.ts` already clones a primitive and re-stamps the brand |
+> | ComposedFunction | 1.3% | `param.owner` back-link, `PRESERVED_FN_META_KEYS` | the shared clone helper CLAUDE.md already mandates |
+> | Expression | 1.3% | `memo` — a clone must SHARE it (same fn+args ⇒ same memo; preserves IC-6) | needs stating; one line |
+> | Param | 0.8% | `owner` back-link | as ComposedFunction |
+> | **Symbol** | **0.0%** | interning (SC-4: identity = FQN ⇒ same object) would break under cloning | **does not arise** — measured zero |
+>
+> **This is not a new mechanism.** Structures ALREADY work this way:
+> `withMetadata` with a Structure primary takes `deriveWithChannels` and the
+> metadata rides in `components` — no carrier. The carrier exists only
+> because the other six kinds have nowhere to put that field. The ruling is
+> to give them it. The read surface needs **no change at all**:
+> `channelReadRaw`, `componentsView` and `cloneComponents` each take a
+> `Value`, cast, and read `.components` — they work the moment the field
+> exists everywhere.
+>
+> **Host shape.** A `MetadataBearing` interface (`meta?: Metadata`, where
+> `Metadata = Map<string, Value>`) extended by all seven value interfaces;
+> `Structure.components` renamed `meta` — `components` always read like
+> *parts of a composite*, which is the data plane, i.e. exactly what it is
+> not.
+>
+> **Why `meta` is optional, and it is not laziness.** **Allegretto defines no
+> fields** (R6, R11: the base owns the mechanism, layers own the fields), so
+> under `--base` every value legitimately carries nothing. Values without
+> metadata are exactly two populations: every value in Allegretto mode, and
+> engine intermediates that never become a program value. Neither is a
+> Standard-mode program value, and "every Standard-mode value has a type"
+> stays an L2 invariant. It **cannot** become a required argument of
+> `makeInt`: that would make L0 depend on a concept it does not have, which
+> is B-110's violation in the construction path. Optional in the type,
+> **always declared on the object** — `types.ts` already states that
+> convention on `makeParam` ("declare optional fields so V8/JSC see a stable
+> hidden class"), and the present lazily-absent `components` conflates the
+> principled reason with a performance one.
+>
+> *Criterion applied:* allocation cost + spec/implementation distance (R7).
+> *Revisit if:* a kind acquires identity semantics that copy-on-attach would
+> break — Symbol is the live example, at zero today.
+> **Owner: B-121.**
+
+### IC-3a — Metadata is supplied at CONSTRUCTION, not attached afterwards
+*Ruled with IC-3 — **D48(c)**.*
+
+The ruling above makes attachment cheaper. This one changes when it happens:
+**a value that will carry metadata should be built with it.** Classifying all
+45 non-test call sites of `withMetadata` showed it is **four operations
+wearing one name**:
+
+| pattern | sites | what it is |
+|---|---|---|
+| `withMetadata(makeInt(0), m)` | **12** | **create with metadata** — the value never exists without it; the two-step is only the factory not taking a parameter |
+| `withMetadata(dataOf(v), m)` | **10** | **derive** — same datum, new position, different metadata |
+| `withMetadata(newP, cloneComponents(v))` | **9** | **map** — new datum, old metadata carried across |
+| `withMetadata(result, {type: t})` | ~14 | **stamp** — computed value, computed metadata |
+
+`evaluator.ts:511` is in the first group and it is **PE Rule 1 itself** —
+`withMetadata(makeExpr(residualFn, evalArgs), components)`, on the path that
+allocates 101,611 Expressions. A residual is *born* with propagated metadata
+by definition; it should be one construction.
+
+The factories already exist and are already an enforced chokepoint (the W4
+boundary invariant; `makeBits`/`makeInt`/`makeFloat`/`makePrimitive`/
+`makeParam`/`makeSymbol`/`makeExpr`/`makeComposedFn`/`makeStructure`/
+`makeDenseArray`). They simply do not take metadata.
+
+**The shape:**
+
+```
+makeInt(42, meta?)          // create with metadata
+makeExpr(fn, args, meta?)   // PE Rule 1, one construction
+deriveMeta(v, meta)         // same datum, new metadata
+mapDatum(v, newDatum)       // new datum, metadata carried — impossible to forget
+stampMeta(v, meta)          // the general case that survives
+```
+
+**Why the third one matters most.** `withMetadata(newP, cloneComponents(v))`
+is spelled as **two** calls for **one** operation, and omitting the second
+silently drops metadata with no error — the same failure shape as the
+TailCall sentinel (B-113) and the ComposedFunction clone helper: an
+obligation held by convention. Naming it removes the way to get it wrong.
+
+**And the aliasing that rules out the no-allocation designs.** Measured:
+59,027 attachments, of which **19,817 (33.6%) target an object that has
+already been given metadata**. Metadata is a property of a value *in a
+position*, not of the datum, so both no-allocation designs fail on the same
+number — mutating in place lets the second stamp overwrite the first at every
+position holding it, and a side table (`WeakMap<Value, Metadata>`, the
+obvious candidate nobody had listed) fails identically because its key is the
+object. Immutability (D22) is the rule adopted *because* of this; it is not
+the reason itself.
+
+**The legitimate in-place case, which should become a rule.** While a value
+is provably unshared — during construction, before it escapes. That carve-out
+already exists twice (`structure.ts`'s grandfathered builder idiom;
+`writeShape` mutating `ctx.components` for identity-sensitive type Contexts,
+ruled in at B-104 chunk 3) and is an idiom rather than a stated rule: *stamp
+in place only before the value escapes; after that, derive.*
+
+*Criterion applied:* lifecycle honesty — a value should not exist in a state
+the specification says is impossible.
+*Revisit if:* a construction site is found where the metadata genuinely
+cannot be known until after the value exists and the value is not derived
+from another.
+**Owner: B-121.**
 
 ### IC-4 — Symbols are interned by FQN
 *Realises SC-4.*
@@ -1059,6 +1237,14 @@ so `dataOf` is one hop and not a loop.
 presence*, `isCarrier(v)` in `src/structure.ts`. The static shape is
 `CarrierStructure` in `src/types.ts`.
 
+**Status (D48(b), 2026-08): this concept is scheduled for DELETION.** IC-3
+was ruled the other way — metadata becomes a field on every value — so a
+non-composite value no longer needs to become something else in order to
+carry a field. When B-121 lands, §10 leaves the spine, `primary` (194
+occurrences) and `isCarrier` go with it, W1 (carriers never nest) has nothing
+to constrain, and `dataOf` (902 occurrences) becomes the identity function.
+The entry stays until then, because the code still works this way.
+
 **Delta.** — *(closed at C9. It was `MultiValueType`, 25 uses, naming a kind
 D46 retired, with a comment saying it survived "so existing casts keep
 compiling" — a type name documenting its own obsolescence. Renaming it also
@@ -1069,7 +1255,7 @@ fiction.)*
 
 ## 11. Data plane
 
-> **Level: Specification** — satisfies R3, R5.
+> **Level: Specification** — satisfies R3, R5. **D48(b) simplifies the implementation of this entry, not the entry**: once metadata is a field on every value, "the data of a value" is the value, and `dataOf` becomes the identity function the Allegro side already assumes it is.
 
 **Definition.** The *data plane* of a value is the value it ultimately
 denotes, ignoring anything carried alongside. For every value except a
@@ -1225,7 +1411,7 @@ B-118.)*
 
 ## 16. Dense region
 
-> **Level: IMPLEMENTATION** — choice **IC-2**. Invisible from the specification in principle; visible in practice, which is §17's delta.
+> **Level: IMPLEMENTATION** — choice **IC-2**. Invisible from the specification in principle; visible in practice, which is §17's delta. **D48(a): under option E the dense region stops being a ROLE and becomes a representation below the specification — which is what this level tag always said it was. Owner B-120.**
 
 **Definition.** A Structure in the *dense* role stores its elements in a
 plain array rather than as per-element bindings. Its slot count is the array
@@ -1246,7 +1432,7 @@ materialize the legacy view.
 
 ## 17. The legacy view
 
-> **Level: IMPLEMENTATION** — choice **IC-2**. Pure compatibility scaffolding; nothing in the specification requires it.
+> **Level: IMPLEMENTATION** — choice **IC-2**. Pure compatibility scaffolding; nothing in the specification requires it. **D48(a) DELETES it**: with no dense role there is no view to materialize, and `__length` and the W6 coherence invariant go with it. Owner B-120, which therefore closes B-104(f) — the last dunder.
 
 **Definition.** A dense Structure can still be read through the binding map
 and list. That view is **materialized lazily** on first such access, then
@@ -2364,11 +2550,11 @@ still open. **→ B-057.**
 | 12 | ~~`structure.ts` documents two planes; there are four~~ **CLOSED C9** | B-107(c) |
 | 13 | ~~Three binding write disciplines, no stated rule~~ **CLOSED C9** — the rule is stated, and the reason there are four is that the map and the list are **not aliases** | B-107(e) |
 | 15 | ~~Host-plane fields declared on the value interface they are said not to be part of~~ **CLOSED C9** | B-107(f) |
-| 17 | `__length` is the sole remaining job of the partition test | B-104(f) |
+| 17 | `__length` is the sole remaining job of the partition test — **now owned and decided: D48(a) deletes it with the dense role** | B-120 → B-104(f) |
 | 18 | ~~The host plane is declared inside the value interface — a plane contradicted by its own type~~ **CLOSED C9** (`StructureHostFields`) | B-107(f) |
 | 19 | The base registers eleven L2 channels itself and special-cases three by name | B-109(a) |
 | 21 | Integrity enforced by hardcoded name list, not the registered flag; the two disagree about `source` | B-109(b)(c) |
-| 22 | The meta-slot partition fires on one key in the whole suite | B-104(b)(f) |
+| 22 | The meta-slot partition fires on one key in the whole suite — **that key is `__length`, which D48(a) removes** | B-120 → B-104(b)(f) |
 | 23 | **L0 imports 27 symbols from L2**; `checkArgType` lives in the evaluator | B-110 |
 | 19b | One word and one registry for two concepts — fields, a projection, a capability, a dead entry and an unused one, undifferentiated | B-111 |
 | 24 | **Four plane interfaces are owed**: dispatch hook, check hook, projection hook, channel registration. Every other T2 delta is an instance of one being absent | B-112 |
@@ -2391,12 +2577,56 @@ still open. **→ B-057.**
 | 34b | The abstract domain rides the host plane while the knowledge it belongs to is a metadata channel | B-118 |
 | 45 | **The verdict is assembled out-of-band** rather than accumulated through the metadata plane; the `union` field for it exists and is unused | B-117 |
 
+### What B-108 settled (D48)
+
+The composite review, run after C9 and ruled by the maintainer. Its premise —
+*these three choices cannot be judged separately* — held: **IC-1 could not be
+decided at all, it dissolved**, and it would have been decided wrongly if
+taken first.
+
+**The doubt was aimed one level too high, and that is the finding.** "Did
+unifying the composites actually simplify things?" was carried for years as a
+question about D1. D1 is **SC-5**, it is specification, and it is *upheld* —
+one composite kind is a win under R1. What the review found is that the cost
+was pushed downward: kinds went 2 → 1 while configurations went 2 → 4, and
+74% of every structure allocated became the configuration that exists only to
+hold **one** metadata field. The question could not be answered while the
+levels were fused, which is precisely what Part 0 exists to prevent.
+
+**Three measurements did the deciding, and two overturned the reasoning.**
+
+- Data structures average **4.6 slots** (97% ≤ 8) while every large by-name
+  lookup lives in a **scope**, of which there are **227**. The O(n) objection
+  that had ruled out a sequence-first composite for years was about an
+  operation that happens 10,309 times, against an indirection that happens
+  453,199 times. → **E**.
+- **56,123 carriers**, more than there are Bits values, **98.5% holding
+  exactly one field**. → the carrier goes; metadata becomes a field on every
+  value.
+- **33.6% of attachments target an already-attached object.** This one did
+  not overturn anything — it *defended* copy-on-attach, and it rules out
+  both no-allocation designs at once, including the side table nobody had
+  listed.
+
+**And the maintainer's question changed the answer's shape.** The review had
+framed IC-3 as "make attachment cheaper". Asked why values are cloned to
+receive metadata at all, the honest answer is that most of them should never
+have existed without it: 12 call sites literally read
+`withMetadata(makeInt(0), m)`, one of them being PE Rule 1. So D48(c) rules
+the *lifecycle*, not just the representation — construction takes metadata,
+and the four operations currently sharing the name `withMetadata` get four
+names. That is a better outcome than the one the analysis proposed, and it
+came from a question about lifecycle rather than from more measurement.
+
 ### Raised by C9 (the naming pass)
 
 | # | Delta | Owner |
 |---|---|---|
 | 47 | **`Context` still names three different things in ~300 local identifiers.** C9 renamed every DECLARED name in which "Context" or "Ctx" denoted the retired composite kind. What remains is role-qualified and could not be renamed mechanically, because the roles are not all settled: `evalCtx` (**603**, and a public field of `evalSource`'s result) is a **scope** and §15 settles it; `typeCtx` / `typeContextName` / `typePrivilegedCtx` denote a **type Context**, a term *this document still uses*; and `src/parser.ts` has its own unrelated `makeContext` (a **parse** context), exported as `parserMakeContext`. Three meanings, one word | B-119 |
 | 48 | **`withMetadata` declared a carrier return for a non-carrier path.** One of its three paths returns a copy-on-write derive, not a carrier, and the declared type said otherwise. Corrected at C9; **exactly one site** depended on the fiction — a test cast — which is the evidence it was never load-bearing | — *(closed at C9)* |
+| 50 | **The carrier is 74% of all structures and 98.5% hold one field**; `dataOf` really unwraps 182,311 times | **D48(b)** → B-121 |
+| 51 | **`withMetadata` is four operations under one name**, and one of them (`withMetadata(newP, cloneComponents(v))`) is spelled as two calls where omitting the second silently drops metadata | **D48(c)** → B-121 |
+| 52 | **The O(1) name-lookup requirement comes from scopes, not from data** — 227 scope objects vs 19,245 data structures averaging 4.6 slots | **D48(a)** → B-120 |
 | 49 | **A structure's bindings map and binding list are not aliases.** `slotWrite` and `addBinding` each build **two** `Binding` objects for one key, so an in-place mutation reaches one view only. This is the root of all four write disciplines and was documented nowhere | — *(stated at C9; §13)* |
 
 **34 distinct deltas across 49 entries**; 16 entries are clean. Their
