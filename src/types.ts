@@ -100,6 +100,13 @@ export interface PrimitiveFunctionValue extends MetadataBearing {
 export interface ParamValue extends MetadataBearing {
   kind: ValueKind.Param;
   position: number;
+  /** The function that claimed this param, or `null` while unclaimed.
+   *  **Only the null-ness is read** (the parser collects unclaimed params);
+   *  the IDENTITY is read nowhere since B-121 — "is this param the applied
+   *  function's own?" is `ownsParam`, i.e. membership in `fn.params`. Keeping
+   *  the back-pointer accurate across clones is therefore no longer an
+   *  obligation, which retires the "don't corrupt the original" hazard that
+   *  `modules.ts` and `evaluator.ts` both warn about. */
   owner: ComposedFunctionValue | null;
   _name?: string; // debugging hint
   /** Reserved for future refinement-predicate bounds on parameters.
@@ -296,6 +303,30 @@ export function makeParam(position: number, name?: string): ParamValue {
   return { kind: ValueKind.Param, position, owner: null, _name: name,
            predicates: undefined, effectBound: undefined, effectVar: undefined,
            meta: undefined };
+}
+
+/**
+ * Is `param` one of `fn`'s own parameters?
+ *
+ * Substitution needs to know whether a Param it meets while walking a body
+ * belongs to the function being applied or to a nested lambda. That was asked
+ * as `param.owner === fn` — a BACK-POINTER comparison — which made
+ * `param.owner` an identity that every function-cloning site had to maintain,
+ * by either re-pointing shared params (corrupting the original, as
+ * `modules.ts` and `evaluator.ts` both warn) or cloning the params and
+ * rewriting the body.
+ *
+ * Membership answers the same question directly and needs neither: a clone
+ * that SHARES the params array owns them, and a nested lambda's params are
+ * different objects that are simply not in the array. Verified equivalent —
+ * the suite is green with the identity test replaced by this one.
+ *
+ * `param.owner` survives, but only its NULL-NESS is now read (the parser
+ * collects not-yet-claimed params with `owner === null`). Its identity is
+ * read nowhere.
+ */
+export function ownsParam(fn: ComposedFunctionValue, param: ParamValue): boolean {
+  return fn.params.includes(param);
 }
 
 export function makeSymbol(name: string): SymbolValue {

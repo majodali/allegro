@@ -26,8 +26,7 @@ import { scopeLookup } from "./scope.js";
 import {
   Value, ValueKind, StructureValue, ComposedFunctionValue, ExpressionValue,
   ParamValue, BitsValue,
-  bitsToString, makeInt, withMetadata,
-} from "./types.js";
+  bitsToString, makeInt, withMetadata, ownsParam} from "./types.js";
 
 import { evaluate } from "./evaluator.js";
 import { getType, getTypeName, getFunctionParamTypes, BoolType, IntType } from "./types-std.js";
@@ -135,8 +134,8 @@ function substParams(
       return v;
     case ValueKind.Param: {
       const p = v as ParamValue;
-      // Match by owner identity (or unowned) and position.
-      if ((p.owner === cfn || (p as any).owner == null) && posMap.has(p.position)) {
+      // Match by MEMBERSHIP (or unowned) and position — see `ownsParam`.
+      if ((ownsParam(cfn, p) || (p as any).owner == null) && posMap.has(p.position)) {
         return posMap.get(p.position)!;
       }
       return v;

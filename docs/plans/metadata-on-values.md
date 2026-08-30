@@ -104,7 +104,7 @@ Measured shares of what carriers wrap, with the clone concern for each:
 |---|---|---|---|
 | Bits | 50.5% | none | — |
 | PrimitiveFunction | 46.0% | host expandos (`FIELD_WRITER_BRAND`) | `primitives.ts` already clones one and re-stamps the brand |
-| ComposedFunction | 1.3% | `param.owner`; `PRESERVED_FN_META_KEYS` | the shared clone helper CLAUDE.md mandates. **RULED: `param.owner` continues to represent the ORIGINAL function** (maintainer, 2026-08) |
+| ComposedFunction | 1.3% | ~~`param.owner`~~ **DISSOLVED 2026-08**; `PRESERVED_FN_META_KEYS` | the shared clone helper CLAUDE.md mandates. The `owner` question is **moot**: substitution now asks `ownsParam(fn, p)` — membership in `fn.params` — so a clone sharing the array owns them and nothing reads the back-pointer's identity. No back-link, no mutation, no body rewrite |
 | Expression | 1.3% | `memo` | the clone **shares** the map — same `fn`+`args` ⇒ same memo, preserving IC-6 |
 | Param | 0.8% | `owner` | as ComposedFunction |
 | **Symbol** | **0.0%** | interning (SC-4: identity = FQN ⇒ same object) would break under cloning | **does not arise** — measured zero. §6 ruling 2 decides what happens if it ever does |

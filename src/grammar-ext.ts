@@ -362,7 +362,10 @@ function wrapParamsWithChecks(
   if (seen.has(body)) return body;
   seen.add(body);
 
-  if (body.kind === "Param" && body.owner === owner && typedParams.has(body.position)) {
+  // Membership rather than the `owner` back-pointer — see `ownsParam` in
+  // types.ts. `owner` is untyped here (grammar helpers), so the test is
+  // written out rather than imported.
+  if (body.kind === "Param" && owner?.params?.includes(body) && typedParams.has(body.position)) {
     const typeExpr = typedParams.get(body.position)!;
     return helpers.makeExpr(
       helpers.prim("type_check"),

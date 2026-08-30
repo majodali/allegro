@@ -4,6 +4,41 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — `param.owner`'s identity is read nowhere: the C2 blocker dissolves
+
+Maintainer pushed back on the clone→origin back-link C2 proposed, and asked
+what prevents pointing each `param.owner` at the clone. Answering it properly
+removed the question instead of settling it.
+
+**Why pointing `owner` at the clone is not free.** The params array is SHARED
+between a function and its metadata clone, so mutating `p.owner` re-points the
+ORIGINAL's params too — which the codebase already calls out in two places:
+*"CRITICAL: clone params so mutating p.owner doesn't corrupt the original"*
+(`modules.ts:83`) and *"mutating p.owner affects every previous substitution
+result"* (`evaluator.ts:770`). To do it safely you must clone the params, and
+then the body still holds references to the OLD Param objects, so you must
+rewrite the body as well. Nothing prevents it; it costs a full body walk per
+attachment.
+
+**The third option, which is one line.** The test `param.owner === fn` asks
+*"is this Param one of this function's own?"* — which is exactly
+`fn.params.includes(param)`. A clone that shares the array owns them; a nested
+lambda's params are different objects that are not in it, so nesting still
+disambiguates. Verified before proposing: the suite is green with the identity
+test replaced by membership, **independently of C2**.
+
+All three functional readers converted — `evaluator.ts` (substitution),
+`proven.ts`, `grammar-ext.ts` — behind `ownsParam` in `types.ts`.
+
+**What it retires.** `param.owner`'s IDENTITY is now read nowhere. Its
+null-ness still is: the parser collects not-yet-claimed params with
+`owner === null`. So the field survives with a much smaller job, and keeping
+the back-pointer accurate across clones stops being an obligation — which
+retires the hazard both comments above are warning about, and removes the C2
+blocker without a back-link.
+
+Suite **1200/1200**, typecheck clean.
+
 ## 2026-08 — B-121 C2 attempted and backed out: one idea, three symptoms
 
 C2 was the chunk the plan called risky, and the risk materialised. It is

@@ -4,8 +4,7 @@ import {
   Value, ValueKind, ExpressionValue, StructureValue,
   ComposedFunctionValue, ParamValue, CarrierStructure,
   AllegroError, isResolved, makeExpr, withMetadata, makeStructure,
-  DepCollector,
-} from "./types.js";
+  DepCollector, ownsParam} from "./types.js";
 import {
   getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
@@ -750,8 +749,9 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       return value;
 
     case ValueKind.Param: {
-      // Match params by position if they belong to this function (by identity or by being unowned)
-      if ((value.owner === owner || value.owner === null) && posMap.has(value.position)) {
+      // Match by position for params this function OWNS (membership, not the
+      // `owner` back-pointer — see `ownsParam`) or that are not yet claimed.
+      if ((ownsParam(owner, value) || value.owner === null) && posMap.has(value.position)) {
         return posMap.get(value.position)!;
       }
       return value;
