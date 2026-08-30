@@ -161,6 +161,64 @@ it alone.
 
 ## 5. Risks
 
+### 5.1a What the first C2 attempt established (2026-08)
+
+The attempt was backed out at the gate rather than landed. It is recorded here
+because it converts §5.1 from a prediction into a measurement, and because the
+fixes it found are precise enough to re-apply mechanically.
+
+**The root cause is one idea, not a list of sites.** Throughout the evaluator,
+*"does this value carry metadata?"* is asked as *"is its kind Structure?"* —
+which was true only because attaching metadata WRAPPED a scalar in a carrier.
+The moment a typed Bits is a Bits, every such test silently inverts. It does
+not fail loudly: the guard stops firing, the metadata stops propagating, and
+the first visible symptom is somewhere else entirely.
+
+Three instances were found and fixed, each a one-line change with a different
+symptom:
+
+| site | the test | symptom when it inverted |
+|---|---|---|
+| `applyPrimitive`, method path | `result.kind === Structure` meaning *already typed* | a typed method result was re-stamped with the operand's type |
+| `applyPrimitive`, general path | `evalArgs[0]?.kind === Structure` meaning *argument carries a type* | arithmetic results came back untyped; the first failure was a declared RETURN type not checking |
+| `applyPrimitive`, general path | `result.kind === Bits` meaning *untyped* | `float(x)` returns a Float-typed Bits, which was then re-stamped Int — `withType`'s shape guard refused |
+
+Each fix is to ask the metadata plane directly — `metaReadRaw(v, "type")` —
+which is also **more correct than the kind test was**: an untyped record used
+to take the already-typed branch.
+
+**A second class, unrelated to kind tests.** Seven hand-written
+ComposedFunction clones (`remapParams`, `subst`, `resolveFreeSymbols`,
+`typeLiterals`, three module/runtime rebuilds) carry `genericParams` and
+`PRESERVED_FN_META_KEYS` but **not** `meta` — because before C2 metadata lived
+on the carrier WRAPPING the function, so a function clone never had to think
+about it. All seven silently dropped it. This is exactly §3.2's `carryMeta`
+case, and it is now demonstrably load-bearing rather than a nicety.
+
+**And a correction to §6 ruling 2's premise, which was mine.** I told the
+maintainer that keeping `param.owner` pointing at the ORIGINAL function was
+the behaviour-preserving answer *because `remapParams` already does that*.
+It is not: `subst` substitutes a Param only when
+`param.owner === theFunctionBeingApplied`, so a metadata clone that shares its
+params matches nothing and **every function call residualises**. The ruling
+itself stands — `owner` should keep naming the original — but it needs a
+`sameComposedFn(a, b)` at the comparison sites, comparing through a
+host-plane back-link from clone to origin. `remapParams` gets away with
+sharing params because its result is not what gets applied.
+
+**Where it stood when backed out**: from roughly 20 failures to 14, with the
+classes narrowing rather than multiplying — but the tail was unknown and the
+gate was red, so the chunk stops here rather than being pushed through. The
+next attempt starts from the three kind-test fixes, `carryMeta` at the seven
+clone sites, and `sameComposedFn`, all of which are described above precisely
+enough to redo in minutes.
+
+**The method lesson worth keeping**: the four probes in §2 were all
+*type-level* and all came back clean, which is exactly why they missed this.
+The risk was behavioural, §5.1 said so, and nothing in the probe set could
+have found it short of running the suite. A probe that cannot fail the way
+the change fails is not evidence about that change.
+
 ### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
 
 `kind === ValueKind.Structure` appears 117 times and `!==` 68 more. Today a
@@ -222,7 +280,7 @@ separate optimisation below this choice and is out of scope.
 | Chunk | Delivers | Gate |
 |---|---|---|
 | **C1** | ~~`Metadata` / `MetadataBearing` declared and extended by all seven interfaces; `Structure.components` → `meta`; every factory declares the field~~ **DONE 2026-08**, widened by ruling 1 to the whole metadata vocabulary: **430 identifier renames across 28 files** plus the registry's storage and disposition labels. Nothing writes the new field yet | Suite **1198/1198**; typecheck clean |
-| **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier. Carriers stop being created; `newCarrierStructure` loses its only two callers. `dataOf` still compiles and returns `v` | **The risky chunk.** Suite green; §5.1's kind-comparison failures surface here or nowhere |
+| **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier. Carriers stop being created; `newCarrierStructure` loses its only two callers. `dataOf` still compiles and returns `v` | **ATTEMPTED 2026-08 and BACKED OUT at the gate** — §5.1's risk materialised and is now quantified. See §5.1a. The tree is green at the pre-attempt commit; nothing was landed red |
 | **C3** | The carrier's re-wrap moves into `evaluate` as one uniform carry (§4.2); the three carrier arms are deleted | Suite green; PE fixtures are the oracle for metadata surviving evaluation |
 | **C4** | Delete `primary` (196), `isCarrier` (14), `CarrierStructure` (24), `newCarrierStructure`, W1/W5 and their walker. `concepts.md` §10 leaves the spine | Counts to zero; §6 ruling 3 applied |
 | **C5** | Delete `dataOf` (903) and its call sites — mechanical, counts as the completion test | Counts to zero |

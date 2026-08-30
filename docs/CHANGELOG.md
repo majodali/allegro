@@ -4,6 +4,56 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 C2 attempted and backed out: one idea, three symptoms
+
+C2 was the chunk the plan called risky, and the risk materialised. It is
+recorded rather than landed: the working tree is back at the previous commit
+and the gate is green at **1200/1200**. Nothing was committed red.
+
+**The root cause is one idea repeated, not a list of sites.** Throughout the
+evaluator, *"does this value carry metadata?"* is asked as *"is its kind
+`Structure`?"* — true only because attaching metadata WRAPPED a scalar in a
+carrier. The moment a typed Bits is a Bits, every such test silently inverts.
+It does not fail loudly: the guard stops firing, propagation stops, and the
+first visible symptom appears somewhere else.
+
+Three instances, each one line, each with a different symptom:
+
+| the test | what it meant | symptom when it inverted |
+|---|---|---|
+| `result.kind === Structure` | already typed | a typed method result was re-stamped with the operand's type |
+| `evalArgs[0]?.kind === Structure` | the argument carries a type | arithmetic results came back untyped — the first failure was a declared RETURN type not checking |
+| `result.kind === Bits` | untyped | `float(x)` returns a Float-typed Bits, re-stamped Int; `withType`'s shape guard refused |
+
+Each fix asks the metadata plane directly, and each is **more correct than the
+kind test was** — an untyped record used to take the already-typed branch.
+
+**A second class.** Seven hand-written ComposedFunction clones carry
+`genericParams` and `PRESERVED_FN_META_KEYS` but not `meta`, because metadata
+used to live on the carrier *wrapping* the function. All seven dropped it
+silently. That is §3.2's `carryMeta` case, now demonstrably load-bearing.
+
+**And a correction to a ruling's premise, which was mine.** I told the
+maintainer that keeping `param.owner` on the ORIGINAL function was
+behaviour-preserving *because `remapParams` already does that*. It is not:
+`subst` substitutes a Param only when `param.owner === theFunctionBeingApplied`,
+so a metadata clone sharing its params matches nothing and **every function
+call residualises**. The ruling stands; it needs `sameComposedFn` at the
+comparison sites, through a host-plane back-link from clone to origin.
+`remapParams` gets away with sharing params because its result is not what
+gets applied.
+
+**The method lesson.** The plan ran four probes before C2 and all four came
+back clean — because all four were **type-level**, and the risk was
+behavioural. §5.1 said so in words. A probe that cannot fail the way the
+change fails is not evidence about that change.
+
+Roughly 20 failures down to 14 with the classes narrowing rather than
+multiplying, but the tail was unknown and the gate was red, so the chunk stops
+at the gate as PROCESS §3 requires. The next attempt starts from the three
+kind-test fixes, `carryMeta` at the seven clone sites, and `sameComposedFn` —
+all recorded in the plan §5.1a precisely enough to redo in minutes.
+
 ## 2026-08 — C3: the base registers five fields, not eleven
 
 B-109(a) complete. `slots.ts` used to register eleven metadata fields at

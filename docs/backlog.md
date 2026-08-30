@@ -1754,6 +1754,19 @@ that prevents it.
     idiom; `writeShape` for identity-sensitive type Contexts, ruled at B-104
     chunk 3) as an idiom rather than a rule. *Stamp in place only before the
     value escapes; after that, derive*
+  - **C2 ATTEMPTED and BACKED OUT at the gate, 2026-08** — see
+    `docs/plans/metadata-on-values.md` §5.1a for the full record. The root
+    cause is one idea repeated: throughout the evaluator, *"does this value
+    carry metadata?"* is asked as *"is its kind Structure?"*, which held only
+    while attaching metadata WRAPPED a scalar. Three instances found and fixed
+    (each one line, each a different symptom); a second class found in seven
+    hand-written ComposedFunction clones that carry `genericParams` and
+    `PRESERVED_FN_META_KEYS` but not `meta`; and §6 ruling 2's premise
+    corrected — the ruling stands, but `param.owner` identity is the
+    SUBSTITUTION KEY, so a metadata clone needs `sameComposedFn` at the
+    comparison sites or every call residualises. ~20 failures down to 14 with
+    the classes narrowing, but the tail was unknown, so the chunk stopped
+    rather than being pushed through. Nothing landed red
   - **Migration is strictly additive** and each step lands green: (1) add
     `meta?` to the six interfaces, rename `Structure.components` → `meta` —
     no behaviour change, nothing writes it yet, the readers already read it;
