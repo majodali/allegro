@@ -4,6 +4,56 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Why the suite missed two soundness holes, and what would catch them
+
+Follow-up to B-123. The two holes are **one class of defect**: a guarded
+operation reachable by a second, unguarded path. `mv_set` reached the metadata
+write without the capability check; `channel_read` reached the `source` field
+without the observe guard `component_get` enforces. Both were found by reading
+the surface while renaming it, not by testing.
+
+**The precise reason testing missed them.** The forgery battery enumerates
+**attacks** — `discharged`, `source` — not the **protected surface**. It
+asserts "this attack is refused", so a field nobody thought to attack (`type`)
+was never asked about. A hand-written attack list finds only the attacks
+someone imagined.
+
+**The fix has the shape of a mechanism the project already trusts.** Both
+sides are enumerable from data the codebase already holds: the guards are few,
+and the paths reaching them are the registered primitives. So the test becomes
+a **cross-product** rather than a list — for every guarded operation × every
+path that reaches it, assert the guard fires — with a newly added path failing
+the suite until it is reviewed. That is `boundary-baseline.json`'s ratchet,
+applied to capability instead of to lint patterns. Filed as **B-124**, with
+the guard × path table itself as the first deliverable, before any generated
+test: write down what is there, and the gaps are visible without a test having
+to find them.
+
+**Scope discipline, stated rather than assumed.** B-124 is deliberately not an
+open-ended soundness review. Both known holes are instances of one enumerable
+class, and an unbounded review would produce a document rather than a fix.
+And the limit is recorded so the audit is not oversold: **a suite refutes
+soundness, it never establishes it.** The cross-product moves the claim from
+"we tested the attacks we thought of" to "we tested every combination the
+registries admit" — bounded and checkable, still not a proof. The project's
+own thesis names the end state: the property stated in Allegro and discharged.
+
+**`mv_set` is ruled for deletion** (maintainer), and its three test call sites
+divide two ways — filed as **B-125**. Two of them (`equality-laws.ts:750`,
+`boundary-tests.ts:859`) use it as the attacker's tool against an integrity
+field; those properties survive and become true **by construction**, since
+with `mv_set` gone the only user-reachable write is a registered writer and
+re-registering an existing field is refused. They become unfalsifiable as
+written — an impossible operation cannot be tested for refusal — so each is
+replaced by the assertion that no path exists. The third
+(`boundary-tests.ts:842`) uses `mv_set` **benignly**, to show that writing
+metadata produces a new value and leaves the original proof untouched; that
+property is copy-on-attach (D22), is unrelated to the gate, and gets rewritten
+against a properly minted writer — a better test than the original, because it
+exercises the real surface rather than the legacy bypass.
+
+Documentation only; no `src/` changes. Suite unchanged at **1198/1198**.
+
 ## 2026-08 — Base-surface review: two unguarded metadata paths (B-123)
 
 C1 stopped at the ten registered primitives carrying the old

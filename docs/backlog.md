@@ -1810,3 +1810,75 @@ that prevents it.
   - **Public surface**: none. These names appear only in `docs/design/`,
     `docs/decisions.md` and the untracked `web/dist` bundle — not in
     `language-reference.md`, `getting-started.md`, the README or the website
+
+- [ ] **B-124** · L0 · **Guard-coverage audit: every path to a guarded
+  operation must carry the guard.** Raised by B-123, where two independent
+  soundness holes turned out to be **one class of defect**: a guarded
+  operation reachable by a second, unguarded path. `mv_set` reached the
+  metadata write without the capability check; `channel_read` reached the
+  `source` field without the observe guard `component_get` enforces. Neither
+  is exotic, and neither was found by testing — both were found by reading
+  the surface while renaming it.
+  - **Why the suite missed them, precisely.** The forgery battery enumerates
+    **attacks** (`discharged`, `source`), not the **protected surface**. It
+    asserts "this attack is refused", so an unprotected field nobody thought
+    to attack — `type` — was never asked about. A hand-written attack list
+    can only find the attacks someone imagined
+  - **The fix has the shape of the existing boundary ratchet.** Both sides
+    are enumerable from data the codebase already holds: the guards are few,
+    and the paths reaching them are the registered primitives. So the test
+    becomes a **cross-product** rather than a list — for every guarded
+    operation × every path that reaches it, assert the guard fires — and a
+    newly added path that is not on the reviewed list fails the suite until
+    it is. That is the `boundary-baseline.json` mechanism, applied to
+    capability rather than to lint patterns
+  - **The guards to enumerate**: integrity-field writes (capability, D23/D24);
+    `source` reads (observe effect, D47(e)); private member access
+    (`scopeHoldsPrivilege`, D41–D43); proof discharge (kernel writer);
+    declared effects (CE-R1); annotation and refinement checks; immutability
+    (D22)
+  - **Scope discipline** — this is deliberately NOT an open-ended "review the
+    system for soundness". Both known holes are instances of one enumerable
+    class; an unbounded review would produce a document rather than a fix.
+    Other classes get their own item when evidence for them appears
+  - **The honest limit, recorded so the audit is not oversold**: a suite
+    refutes soundness, it never establishes it. The cross-product moves the
+    claim from *"we tested the attacks we thought of"* to *"we tested every
+    combination the registries admit"*, which is bounded and checkable but
+    still not a proof. The project's own thesis names the end state — the
+    property stated in Allegro and discharged, not tested (`docs/VISION.md`
+    §1–§2, and the Vivace formal model in `concept-spine.md` §4a)
+  - **First deliverable**, before any generated test: the guard × path table
+    itself, as evidence. It is the same move the concept spine made — write
+    down what is actually there, and the gaps are visible without a test
+    having to find them
+
+- [ ] **B-125** · L0 · **Delete `mv_set`, and rebuild the three tests that
+  use it** (maintainer ruling, 2026-08; B-123(a)). `mv_set` is the
+  type-forgery path. Its three test call sites divide two ways, and the
+  division matters because **two of them become unfalsifiable once it is
+  gone** — an impossible operation cannot be tested for refusal.
+  - **(a) `equality-laws.ts:750`** — *"forged source origination is refused"*.
+    Uses `mv_set(5, "source", 42)` as the attacker's tool. The PROPERTY (no
+    origination of `source` without the kernel writer) survives and becomes
+    true **by construction**: with `mv_set` gone, the only user-reachable
+    write is a registered writer, and `channel_register("source", …)` is
+    refused as already-registered. Replace with the no-path assertion; the
+    test's second half (`component_get(x, "source")` answers `None`) is
+    independent of `mv_set` and stays untouched
+  - **(b) `boundary-tests.ts:859`** — *"forgery D"*. Uses
+    `mv_set({x: 1}, "discharged", 1)`. Same shape as (a): the property
+    survives, the vehicle goes, the replacement is the no-path assertion.
+    The first half of the test (reads are free) does not involve `mv_set`
+  - **(c) `boundary-tests.ts:842`** — *"forgery B"*. This one uses `mv_set`
+    **benignly**, to prove that writing metadata produces a NEW value and
+    leaves the original proof untouched. That property — copy-on-attach, D22
+    — is valuable, unrelated to the gate, and needs a surviving write path.
+    Rewrite it against a properly minted writer
+    (`w = channel_register("note", "drop")` then `w(t, 42)`), which is a
+    **better** test than the original because it exercises the real surface
+    rather than the legacy bypass
+  - **PROCESS §6**: (a) and (b) replace an assertion with a different one, so
+    they are discussed and not silently dropped. Neither weakens: an
+    unreachable operation is a stronger guarantee than a refused one, and the
+    replacement asserts the unreachability rather than assuming it
