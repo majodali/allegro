@@ -777,20 +777,44 @@ registerMetaField({ name: "warnings", rule: "union" });
 // expression; propagating source would fabricate provenance. Kernel-
 // originated (evaluator attachment only); reads via `source of` are
 // observe-tagged (§3.1).
-registerMetaField({ name: "source", rule: "drop" });
+registerMetaField({ name: "source", rule: "drop", integrity: true });
+// ^ B-109(c) (2026-08): `integrity: true` added. `source` was listed in the
+// old hardcoded INTEGRITY_FIELD_NAMES set but registered WITHOUT the flag —
+// two sources of truth holding different beliefs about one field. The guard
+// now reads the registry, so the flag is what makes the field protected.
 registerMetaField({ name: "exported", rule: "drop" });
 
 /** Binding keys that only a channel writer may originate. User-reachable
  *  construction paths (object literals, mv_set) consult this. `source` is
  *  D47(d): forged provenance would let a doctored source channel display a
  *  different claim than the one checked — kernel-originated only. */
-const INTEGRITY_BINDING_KEYS = new Set<string>(["__discharged"]);
-const INTEGRITY_FIELD_NAMES = new Set<string>(["discharged", "source"]);
+/**
+ * Gate for user-reachable construction paths: throws if the key would
+ * originate an integrity field without holding its writer.
+ *
+ * B-109(b)(c) (2026-08): authority is now read from the REGISTRY rather than
+ * from a hardcoded name list. The old list was a second source of truth and
+ * the two disagreed — `source` was in the list but registered WITHOUT
+ * `integrity: true`.
+ *
+ * It also checked BARE FIELD NAMES, which conflated two planes. An object
+ * literal writes the BINDING plane; it cannot originate a metadata field at
+ * all — `{type: "widget"}` gives the record a `type` slot while `type of` it
+ * still answers `Object`. So the bare-name check defended nothing and cost
+ * users the field names `discharged` and `source`. What it must still refuse
+ * is a binding-plane key that a field uses as its STORAGE (`__discharged`),
+ * which is a real origination path, and those come from the registry too.
+ */
+function integrityBindingKeys(): Set<string> {
+  const keys = new Set<string>();
+  for (const entry of META_FIELD_TABLE.values()) {
+    if (entry.spec.integrity && entry.spec.bindingKey) keys.add(entry.spec.bindingKey);
+  }
+  return keys;
+}
 
-/** Gate for user-reachable construction paths: throws if the key would
- *  originate an integrity channel without holding its writer. */
 export function assertNotIntegrityKey(key: string, site: string): void {
-  if (INTEGRITY_BINDING_KEYS.has(key) || INTEGRITY_FIELD_NAMES.has(key)) {
+  if (integrityBindingKeys().has(key)) {
     throw new AllegroError(
       `${site}: cannot originate integrity channel '${key.replace(/^__/, "")}' — origination requires the channel writer (D21–D24)`
     );

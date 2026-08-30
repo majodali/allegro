@@ -1306,7 +1306,32 @@ that prevents it.
     rather than code, so it can be taken at any time. Campaign chunk C12
     (`docs/plans/concept-spine.md` §9.3) waits on it
 
-- [ ] **B-109** · L0 · **R6 and R12 are violated in the channel substrate.**
+- [~] **B-109** · L0 · **R6 and R12 are violated in the channel substrate.**
+  **(b) and (c) LANDED 2026-08, and (a) landed for the ONE field where the gap
+  was live — `type`.** Pulled ahead of B-121's C2 by maintainer ruling, because
+  B-125 found the `type` capability unclaimed and exploitable today. The
+  remaining ten registrations move at the concept campaign's C3.
+  - **What landed.** `type` is registered by `types-std.ts` — its owning layer,
+    not the base — as `{ rule: "computed", integrity: true }`, so
+    `channel_register("type", …)` is now refused. `source` gained the
+    `integrity: true` it was missing while sitting in the hardcoded list.
+    `assertNotIntegrityKey` reads the REGISTRY, and both hardcoded sets are
+    deleted
+  - **A finding the fix depended on.** The old guard checked BARE FIELD NAMES,
+    which conflated two planes: an object literal writes the BINDING plane and
+    cannot originate a metadata field at all — `{type: "widget"}` gives the
+    record a `type` slot while `type of` it still answers `Object`. So the
+    bare-name check defended nothing and cost users the field names
+    `discharged` and `source`, both of which were **refused outright** in a
+    record literal. The guard now checks binding-plane STORAGE keys
+    (`__discharged`), derived from the registry — a real origination path.
+    Verified: `{type: …, source: …, discharged: …}` is accepted,
+    `{__discharged: 1}` is still refused
+  - **Behaviour loosened, stated rather than slipped in**: `{discharged: 1}`
+    and `{source: 1}` were errors and are now ordinary records. No test pinned
+    the old refusal — the two forgery tests pin the `__discharged` form — so
+    nothing was weakened, but it is a user-visible change and *forgery G* now
+    pins the new behaviour in both directions
   Found by the concept spine (S2b) while resolving two objections to the
   requirement set. Both turned out to be **implementation** violations rather
   than design contradictions — the mechanism is layer-ignorant, the wiring is
@@ -1346,6 +1371,11 @@ that prevents it.
     rather than precede it
   - **Gated on**: R6, R11 and R12 surviving ratification in their current
     form. If any is amended these findings must be re-read
+  - **Still open: (a) for the other ten fields.** `shape`, `error`, `effects`,
+    `predicates`, `domain`, `knowledge`, `bound`, `discharged`, `warnings`,
+    `source`, `exported` are still registered by `slots.ts` at module init.
+    `type` is the template: registration at the owning layer's module scope,
+    never inside a per-evaluation factory, since registration is one-shot
 
 - [ ] **B-110** · L0 · **The L0 evaluator implements the L2 type system.**
   Found by the concept spine (S2d) while classifying every abort in the base
@@ -1850,13 +1880,11 @@ that prevents it.
       the registry — `metaFieldSpec("type") === undefined` — rather than by
       attempting the registration, precisely because attempting it corrupts
       the process
-  - **The fix belongs to B-109(a)/(b)/(c)**, which already found that the base
-    registers the layers' fields and that integrity is enforced by a hardcoded
-    name list disagreeing with the registry. This adds the sharpest instance:
-    the most-used field in the system has **no registration, no owner and no
-    integrity flag**. The type system should register `type` with
-    `integrity: true` at layer init — which is exactly the C3 move in the
-    concept campaign (registration moves to the owning layers)
+  - **CLOSED 2026-08 at B-109.** The type system now registers `type` with
+    `integrity: true` at layer init, so `channel_register("type", …)` is
+    refused and the capability is held by its owner. Both halves of the
+    original finding are therefore closed: the unguarded write path (`mv_set`,
+    deleted at B-125) and the unclaimed capability behind it
 
 - [ ] **B-124** · L0 · **Guard-coverage audit: every path to a guarded
   operation must carry the guard.** Raised by B-123, where two independent

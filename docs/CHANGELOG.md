@@ -4,6 +4,53 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-109(b)(c) landed, and `type` finally has an owner
+
+Pulled ahead of B-121's C2 by maintainer ruling, because B-125 found the
+`type` field's write capability unclaimed and claimable today.
+
+**`type` is registered by `types-std.ts`** — its owning layer, not the base —
+as `{ rule: "computed", integrity: true }`. `channel_register("type", …)` is
+now refused, so the capability is held by its owner rather than by the first
+asker. `computed` is the honest rule: type propagation happens at annotated
+evaluator sites, not through the generic table, and it is non-fabricating,
+which D23 requires of an integrity field. Registered at module scope rather
+than inside `createTypeSystem()`, because that runs once per evaluation and
+registration is one-shot.
+
+This is **B-109(a)'s pattern applied to one field** — the one where the gap
+was live. The other ten registrations move at the concept campaign's C3, and
+`type` is now the template.
+
+**`source` gained the `integrity: true` it was missing.** It had been sitting
+in the hardcoded `INTEGRITY_FIELD_NAMES` list while registered without the
+flag — two sources of truth holding different beliefs about one field, which
+was B-109(c) exactly. **`assertNotIntegrityKey` now reads the registry** and
+both hardcoded sets are deleted.
+
+**A finding the fix depended on, and the reason it is not a one-line change.**
+The old guard checked **bare field names**, which conflated two planes. An
+object literal writes the **binding** plane and cannot originate a metadata
+field at all — `{type: "widget"}` gives the record a `type` slot while
+`type of` it still answers `Object`. So the bare-name check defended nothing,
+and it cost users two ordinary field names: `{discharged: 1}` and
+`{source: 1}` were **refused outright** in a record literal. Marking `type`
+integrity under the old guard would have added `type` to that list — breaking
+a very common record shape.
+
+The guard now checks binding-plane **storage** keys (`__discharged`), derived
+from the registry, which is a real origination path. Verified in both
+directions: `{type: …, source: …, discharged: …}` is accepted, and
+`{__discharged: 1}` is still refused.
+
+**A loosening, stated rather than slipped in**: `{discharged: 1}` and
+`{source: 1}` used to be errors and are now ordinary records. No test pinned
+the old refusal — the forgery tests pin the `__discharged` form — so nothing
+was weakened, but it is user-visible, and *forgery G* now pins the new
+behaviour in both directions along with the three capability refusals.
+
+Suite **1199/1199**, typecheck clean.
+
 ## 2026-08 — B-125: `mv_set` deleted, three tests rebuilt, and a bigger defect behind it
 
 `mv_set` is gone — the primitive that wrote any non-integrity metadata field

@@ -27,7 +27,7 @@ import {
   setEffectBound, setAbstractDomain,
   writeShape, carryShape, removeName, removeRefines, removeShapeSlot, kernelFieldWriter, assertNotIntegrityKey,
   removeConstruct, metaReadRaw, cloneMeta, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape, getFallbackMember,
-  equalityShape, asStructure,
+  equalityShape, asStructure, registerMetaField,
 } from "./slots.js";
 
 
@@ -3435,6 +3435,31 @@ const objectGetMember = makePrimitive("Object.__getMember", (args) => {
 });
 setFallbackMember(ObjectType, objectGetMember);
 export const UntypedFunctionType: StructureValue = buildType("UntypedFunction", untypedFnMethods);
+
+// --- The type system claims its own field (B-109(a), first instance) ---------
+//
+// `type` is the field this layer owns: it carries 99.4% of all metadata and it
+// is what dispatch reads. Until 2026-08 it was **not registered at all** — so
+// unlike `discharged` and `source` its writer capability was unclaimed, and
+// under D23/D24 the first registrant holds the writer. Any Allegro program
+// could call `channel_register("type", …)` and receive it. Worse, doing so
+// re-rules the field's propagation for the whole PROCESS: registering it
+// `viral` inside the boundary battery broke six unrelated tests, which is the
+// sharpest evidence that the capability is worth holding.
+//
+// Registered HERE rather than in `slots.ts` because this is the owning layer —
+// the base must not know that a field called `type` exists (R6/R11). That is
+// B-109(a)'s pattern, applied to the one field where the gap was live; the
+// other ten follow at the concept campaign's C3.
+//
+// `computed` is the honest rule: type propagation is performed at annotated
+// evaluator sites rather than by the generic table, which is exactly what
+// `computed` means. It is also non-fabricating, which an integrity field
+// requires (D23 forbids `viral`/`union` there).
+//
+// Module-level, NOT inside `createTypeSystem()` — that is called once per
+// evaluation and registration is one-shot.
+registerMetaField({ name: "type", rule: "computed", integrity: true });
 
 // None type — represents the absence of a value
 const noneMethods: Record<string, PrimitiveFnImpl> = {

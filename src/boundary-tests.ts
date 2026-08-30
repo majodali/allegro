@@ -886,26 +886,36 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
        || dataOf(y).kind !== ValueKind.Structure, true,
       "the deleted path no longer produces a value claiming a forged type");
 
-    // KNOWN GAP, pinned so it is visible rather than assumed closed —
-    // B-123(d): `type` is the most-used metadata field in the system and it
-    // is **not registered at all**, so unlike `discharged` and `source` its
-    // writer capability is unclaimed and the first asker receives it.
+    // B-109(a) CLOSED for `type` (2026-08). It was the most-used metadata
+    // field in the system and was **not registered at all**, so unlike
+    // `discharged` and `source` its writer capability was unclaimed and the
+    // first asker received it. `types-std.ts` now claims it at layer init.
     //
-    // This is asserted through the REGISTRY rather than by attempting the
+    // Asserted through the REGISTRY rather than by attempting the
     // registration, and that is not squeamishness: running
-    // `channel_register("type", "viral")` inside the suite re-rules the type
-    // field as viral for the whole PROCESS and broke six later tests when
-    // first tried — which is the sharpest available evidence that the
-    // capability is worth holding. The fix is B-109: the type system
-    // registers `type` with integrity at layer init. When it does, this
-    // expectation flips.
-    eq(metaFieldSpec("type"), undefined,
-      "TODAY `type` has no registration, no owner and no integrity flag — B-123(d)");
-    eq(metaFieldSpec("discharged")?.integrity, true,
-      "whereas `discharged` is registered by its owner, with integrity");
-    const held = attack('w = channel_register("discharged", "drop")');
-    eq(held.threw?.includes("already registered") ?? false, true,
-      "and a registered integrity field refuses re-registration");
+    // `channel_register("type", "viral")` inside the suite re-rules the field
+    // for the whole PROCESS and broke six later tests when first tried —
+    // which is why holding the capability matters.
+    eq(metaFieldSpec("type")?.integrity, true,
+      "`type` is registered by its owning layer, with integrity — B-109(a)");
+    eq(metaFieldSpec("type")?.rule, "computed",
+      "and with a non-fabricating rule, as D23 requires of an integrity field");
+    for (const name of ["type", "discharged", "source"]) {
+      const held = attack(`w = channel_register("${name}", "drop")`);
+      eq(held.threw?.includes("already registered") ?? false, true,
+        `${name}: the writer capability is held by its owner — ${held.threw}`);
+    }
+
+    // B-109(b)(c): integrity is read from the registry, not from a hardcoded
+    // name list, and the check is BINDING-PLANE keys only. An object literal
+    // writes the binding plane and cannot originate a metadata field, so a
+    // record may name a field `type`, `source` or `discharged` — while the
+    // binding-plane STORAGE key of an integrity field stays refused.
+    const rec = attack('r = {type: "widget", source: 1, discharged: 2}');
+    eq(rec.threw, null, `records may use those names as data: ${rec.threw}`);
+    const stor = attack('p = {__discharged: 1}');
+    eq(stor.threw?.includes("integrity channel") ?? false, true,
+      `the integrity field's binding-plane storage key is still refused: ${stor.threw}`);
   });
 
   test("forgery F (live): the writer capability cannot be forged or counterfeited", () => {

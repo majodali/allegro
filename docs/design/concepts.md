@@ -2552,8 +2552,8 @@ still open. **→ B-057.**
 | 15 | ~~Host-plane fields declared on the value interface they are said not to be part of~~ **CLOSED C9** | B-107(f) |
 | 17 | `__length` is the sole remaining job of the partition test — **now owned and decided: D48(a) deletes it with the dense role** | B-120 → B-104(f) |
 | 18 | ~~The host plane is declared inside the value interface — a plane contradicted by its own type~~ **CLOSED C9** (`StructureHostFields`) | B-107(f) |
-| 19 | The base registers eleven L2 channels itself and special-cases three by name | B-109(a) |
-| 21 | Integrity enforced by hardcoded name list, not the registered flag; the two disagree about `source` | B-109(b)(c) |
+| 19 | The base registers eleven L2 fields itself and special-cases three by name — **`type` moved to its owning layer 2026-08**; ten remain | B-109(a) → C3 |
+| 21 | ~~Integrity enforced by hardcoded name list, not the registered flag; the two disagree about `source`~~ **CLOSED 2026-08** — the guard reads the registry, `source` carries the flag, and the bare-name check that conflated the binding and metadata planes is gone | B-109(b)(c) |
 | 22 | The meta-slot partition fires on one key in the whole suite — **that key is `__length`, which D48(a) removes** | B-120 → B-104(b)(f) |
 | 23 | **L0 imports 27 symbols from L2**; `checkArgType` lives in the evaluator | B-110 |
 | 19b | One word and one registry for two concepts — fields, a projection, a capability, a dead entry and an unused one, undifferentiated | B-111 |
@@ -2624,7 +2624,7 @@ came from a question about lifecycle rather than from more measurement.
 |---|---|---|
 | 47 | **`Context` still names three different things in ~300 local identifiers.** C9 renamed every DECLARED name in which "Context" or "Ctx" denoted the retired composite kind. What remains is role-qualified and could not be renamed mechanically, because the roles are not all settled: `evalCtx` (**603**, and a public field of `evalSource`'s result) is a **scope** and §15 settles it; `typeCtx` / `typeContextName` / `typePrivilegedCtx` denote a **type Context**, a term *this document still uses*; and `src/parser.ts` has its own unrelated `makeContext` (a **parse** context), exported as `parserMakeContext`. Three meanings, one word | B-119 |
 | 48 | **`withMetadata` declared a carrier return for a non-carrier path.** One of its three paths returns a copy-on-write derive, not a carrier, and the declared type said otherwise. Corrected at C9; **exactly one site** depended on the fiction — a test cast — which is the evidence it was never load-bearing | — *(closed at C9)* |
-| 56 | **`type` — the most-used metadata field — has no registration, no owner and no integrity flag.** Its writer capability is unclaimed, and registering it re-rules type propagation for the whole process | **B-123(d)** → B-109 |
+| 56 | ~~**`type` — the most-used metadata field — has no registration, no owner and no integrity flag**~~ **CLOSED 2026-08**: registered by `types-std.ts` with integrity | B-109(a) |
 | 54 | **`mv_set` forges the `type` field from user code** — no capability required, and annotation checking accepts the result | **B-123(a)** |
 | 55 | **`channel_read` bypasses the D47(e) observe guard** that `component_get` enforces for `source` | **B-123(b)** |
 | 53 | ~~**A constant is rebuilt in a loop**: `wrapAsUntypedFunction` is deterministic per primitive, and both Layer-1 builders call it for every primitive on every scope build~~ **CLOSED** — carriers 56,123 → 38,954, exactly the predicted 17,169 | B-122 |
