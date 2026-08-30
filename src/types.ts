@@ -38,9 +38,11 @@ export type Metadata = Map<string, Value>;
 
 /**
  * Every representation kind carries metadata (D48(b), B-121). Optional
- * because **Allegretto defines no fields at all** — the base owns the
- * mechanism and layers own the fields (R6, R11) — so under `--base` a value
- * legitimately carries nothing. The two populations without metadata are
+ * because the base defines fields only for BASE concepts and never the
+ * layers' (R6, R11) — so under `--base` a value carries at most `error` and
+ * `source`, and usually nothing. (C1 wrote "Allegretto defines no fields at
+ * all"; C3 disproved it by running the code — `make_error` and `source of`
+ * both work in base mode, so those two are Allegretto's own.) The two populations without metadata are
  * every value in Allegretto mode and engine intermediates that never become
  * program values; neither is a Standard-mode program value.
  *
