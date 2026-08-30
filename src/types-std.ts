@@ -4326,11 +4326,51 @@ export function isProof(v: Value): boolean {
  * slot review, 2026-07. Arity is derivable from Function[ParamTypes, R]
  * wherever it's actually needed.)
  */
+/**
+ * B-122: for a bare registry primitive this function is a CONSTANT, and it
+ * was being recomputed in a loop. Both Layer-1 builders iterate every
+ * primitive on every scope build (`runtime.ts` — the resolution map and the
+ * primitive scope layer), and again on every module load: measured at 354
+ * calls over 177 distinct primitives for one file, 708 for a file with one
+ * module. 66.4% of all metadata attachments to PrimitiveFunctions were exact
+ * repeats, and that one path was 90% of every repeat attachment in the
+ * system.
+ *
+ * Memoized only for `PrimitiveFunction`, where determinism is PROVABLE
+ * rather than argued: a PrimitiveFunction has no `primary` (so `dataOf` is
+ * identity) and no `components` (so `cloneComponents` is empty), and
+ * `UntypedFunctionType` is a module-level const, so the result is exactly
+ * `withMetadata(fn, {type: UntypedFunctionType})` for the life of the
+ * process. Other inputs take the unmemoized path — a Structure's components
+ * can still be populated during construction, and the cache must not depend
+ * on an argument about every possible input.
+ *
+ * Sharing ONE wrapper across every scope and module is safe by an argument
+ * the code already relies on: the untyped branch of both builders already
+ * binds the same singleton `prim` into every scope, visibility is a property
+ * of the Binding and never of the value (D42/V-R4), and the wrapper is
+ * immutable — anything attaching further metadata derives a new value.
+ *
+ * This is NOT the general attachment memo the B-122 investigation rejected.
+ * That one would have been content-keyed over ~40,000 entries, holding
+ * values alive, to avoid the 3.2% of repeats that remain after this. This is
+ * a WeakMap over a pure function, ~177 entries, collected with its keys.
+ */
+const untypedFnWrappers = new WeakMap<object, Value>();
+
 export function wrapAsUntypedFunction(fn: Value): Value {
+  if (fn.kind === ValueKind.PrimitiveFunction) {
+    const hit = untypedFnWrappers.get(fn as unknown as object);
+    if (hit !== undefined) return hit;
+  }
   const primary = dataOf(fn);
   const components = cloneComponents(fn);
   components.set("type", UntypedFunctionType);
-  return withMetadata(primary, components);
+  const wrapped = withMetadata(primary, components);
+  if (fn.kind === ValueKind.PrimitiveFunction) {
+    untypedFnWrappers.set(fn as unknown as object, wrapped);
+  }
+  return wrapped;
 }
 
 /**

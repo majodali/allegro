@@ -9,7 +9,7 @@ import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
 import { dataOf, BitsValue, StructureValue, ValueKind, bitsToString, makeStructure, makeParam, Value, makeComposedFn, stringToBits } from "../types.js";
-import { getTypeName, getType, isGenericType, createTypeSystem, IntType, Type, StringType, typeMethod, structuralWrap, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, typeMemberDescriptor, isGetterDescriptor, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, InterfaceKind } from "../types-std.js";
+import { getTypeName, getType, isGenericType, createTypeSystem, IntType, Type, StringType, typeMethod, structuralWrap, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, typeMemberDescriptor, isGetterDescriptor, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, InterfaceKind, wrapAsUntypedFunction } from "../types-std.js";
 import { getGenericArgs, channelReadRaw, getName, getWraps, getRefines, getMembers, getInterfaceMarker, getConstruct, componentsView, SLOT_KEYS, setMembers, setName as slotSetName, writeShape } from "../slots.js";
 import { formatValue, primitives as primRegistry } from "../primitives.js";
 import { kernelMemberFqn } from "../symbols.js";
@@ -154,6 +154,29 @@ test("UntypedFunction: wrapped primitives are still callable", () => {
   const result = evalStd("print(42)");
   eq(result !== null, true);
   eq(Number((dataOf(result!) as BitsValue).data), 42);
+});
+
+test("UntypedFunction (B-122): the typed wrapper is built once per primitive", () => {
+  // The wrapper is a CONSTANT for a bare registry primitive — a
+  // PrimitiveFunction has no `primary` and no `components`, and
+  // UntypedFunctionType is a module-level const. Both Layer-1 builders used
+  // to rebuild it for every primitive on every scope build (354 calls over
+  // 177 distinct primitives for one file; 708 with a module), which was 90%
+  // of every repeat metadata attachment in the system.
+  const prim = primRegistry["print"] as Value;
+  eq(prim.kind, ValueKind.PrimitiveFunction, "print is a bare registry primitive");
+  eq(wrapAsUntypedFunction(prim) === wrapAsUntypedFunction(prim), true,
+    "same primitive answers the same wrapper object");
+  eq(getTypeName(wrapAsUntypedFunction(prim)) , "UntypedFunction",
+    "and it is still the UntypedFunction wrapper");
+
+  // The property that actually matters: separate evaluations share it, so
+  // the saving scales with scopes and modules rather than being per-call.
+  const a = runtimeEval("print", undefined, [createTypeSystem()], undefined, true);
+  const b = runtimeEval("print", undefined, [createTypeSystem()], undefined, true);
+  const pa = a.value, pb = b.value;
+  eq(pa !== null && pa === pb, true,
+    "two independent evaluations resolve `print` to the same wrapper object");
 });
 
 test("UntypedFunction: user-defined functions in Allegretto mode have no type", () => {

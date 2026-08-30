@@ -1612,6 +1612,10 @@ that prevents it.
     `type`). `dataOf` is called 453,199 times and really unwraps 182,311
     (40%). The most common act in the system is allocating an eleven-field
     `Structure` so a `Map` can hold one entry
+  - *Baseline note (2026-08): **B-122 has since removed 17,169** of those, so
+    the live figures are 38,954 carriers and 70.2% of structures. The ruling
+    rests on the shape, which is unchanged — carriers still outnumber the
+    Bits values they wrap*
   - **It is not a new mechanism.** Structures already work this way —
     `withMetadata` with a Structure primary takes `deriveWithChannels`, no
     carrier. The carrier exists only because the other six kinds have nowhere
@@ -1682,12 +1686,33 @@ that prevents it.
     Memoizing `(datum, fields) → value` is orthogonal to this item and was
     not measured; do it as its own investigation, not inside this arc
 
-- [ ] **B-122** · L0 · **`wrapAsUntypedFunction` rebuilds a constant, once per
-  primitive per scope-layer build.** Result of the memoization investigation
+- [x] **B-122** · L0 · **LANDED 2026-08.** `wrapAsUntypedFunction` rebuilds a
+  constant, once per primitive per scope-layer build.
+  - **Result, measured before and after on the same instrumentation:**
+    carriers **56,123 → 38,954** across the corpus — **17,169 allocations
+    removed, exactly the predicted hit count** — and total structure
+    allocations 72,691 → 55,522 (**−23.6%**). Prediction and outcome agreeing
+    to the unit is worth recording on its own: the memo key
+    `(datum identity, field identities)` modelled the real duplication
+    exactly, which is why the investigation could rule out the general memo
+    with confidence rather than by taste.
+  - **Implementation**: a `WeakMap<object, Value>` in `types-std.ts`,
+    memoizing **only** `PrimitiveFunction` inputs, where determinism is
+    *provable* rather than argued — a PrimitiveFunction has no `primary` (so
+    `dataOf` is identity) and no `components` (so `cloneComponents` is
+    empty), and `UntypedFunctionType` is a module-level const. Other inputs
+    take the unmemoized path, because a Structure's components can still be
+    populated during construction and a cache must not rest on a claim about
+    every possible input.
+  - **Test** (`types-battery.ts`) pins both halves: the same primitive
+    answers the same wrapper object, and **two independent evaluations
+    resolve `print` to the same object** — the property that makes the saving
+    scale with scopes and modules rather than being per-call.
+  - *Original analysis follows.* Result of the memoization investigation
   the D48 review flagged (2026-08). The investigation's answer is **do not
   build a memo** — the win is one loop-invariant, and hoisting it needs no
   cache at all.
-  - **What was measured.** Keying every `withMetadata` call by
+  - **What was measured** (pre-landing). Keying every `withMetadata` call by
     `(datum identity, field names + field-value identities)` over the 50-file
     corpus: **19,070 of 59,027 attachments (32.3%) are exact repeats**. But
     they are not spread out — **17,169 of them (90%) are one kind**:

@@ -4,6 +4,45 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-122: the constant, hoisted — 17,169 allocations, exactly as predicted
+
+The fix the investigation pointed at, landed. `wrapAsUntypedFunction` is now
+memoized per primitive, and the result matches the prediction to the unit:
+
+| | before | after |
+|---|---|---|
+| **carriers** | 56,123 | **38,954** |
+| records / dense | 14,704 / 1,864 | unchanged |
+| **total structures** | 72,691 | **55,522 (−23.6%)** |
+
+17,169 removed — precisely the repeat count the memo-key measurement
+predicted. That the model and the outcome agree exactly is worth recording
+on its own: it is why the same investigation could rule *against* the general
+content-keyed memo with confidence rather than by taste.
+
+**Memoized only for `PrimitiveFunction`, where determinism is provable rather
+than argued.** A PrimitiveFunction has no `primary` (so `dataOf` is identity)
+and no `components` (so `cloneComponents` is empty), and `UntypedFunctionType`
+is a module-level const — so the result is exactly
+`withMetadata(fn, {type: UntypedFunctionType})` for the life of the process.
+Every other input takes the unmemoized path, because a Structure's components
+can still be populated during construction and a cache must not rest on a
+claim about all possible inputs. A `WeakMap` keyed on the primitive: ~177
+entries, collected with their keys, no content key to build.
+
+**The test pins the property, not the mechanism.** One half asserts the same
+primitive answers the same wrapper; the other asserts that **two independent
+evaluations resolve `print` to the same object** — which is what makes the
+saving scale with scopes and modules instead of being per-call, and which
+would still be the right assertion under B-121's representation.
+
+Baseline note added to B-121: its ruling cites 56,123 carriers at 74% of
+structures; the live figures are now 38,954 and 70.2%. The ruling rests on
+the shape, which is unchanged — **carriers still outnumber the Bits values
+they wrap** (38,954 vs 35,060).
+
+Suite **1198/1198** (one test added), typecheck clean.
+
 ## 2026-08 — The memoization investigation: don't build the memo
 
 Ordered first by the maintainer, ahead of B-121. The answer is **no memo** —
