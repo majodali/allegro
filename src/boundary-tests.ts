@@ -839,11 +839,17 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   });
 
   test("forgery B (live): a real proof's proposition cannot be swapped under `discharged`", () => {
-    const r = attack('theorem t: 1 + 1 == 2\ncopy = mv_set(t, "note", 42)');
-    eq(r.threw, null, "benign component copy should evaluate");
+    // B-125: rewritten off `mv_set`, which is deleted. The property here was
+    // never about the gate — it is COPY-ON-ATTACH (D22): writing metadata
+    // yields a NEW value and leaves the original alone. It needs a surviving
+    // write path, so it now runs through a properly minted writer, which
+    // exercises the real capability surface rather than the legacy bypass.
+    const r = attack('theorem t: 1 + 1 == 2\nw = channel_register("forgery_b_note", "drop")\ncopy = w(t, 42)');
+    eq(r.threw, null, `benign metadata write should evaluate: ${r.threw}`);
     const t = r.evalCtx!.bindings.get("t")!.value as Value;
-    // mv_set produced a NEW value; the proof itself is untouched...
-    eq(metaOf(t).has("note"), false, "original proof gained no component");
+    const copy = r.evalCtx!.bindings.get("copy")!.value as Value;
+    eq(metaReadRaw(copy, "forgery_b_note") !== undefined, true, "the copy carries the new field");
+    eq(metaOf(t).has("forgery_b_note"), false, "original proof gained no field");
     // ...and still carries its original proposition + discharge.
     const ctx = asStructure(t)!;
     const disch = metaReadRaw(t, "discharged") as Value;
@@ -856,8 +862,50 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(read.threw, null, "free read");
     const d = read.evalCtx!.bindings.get("d")!.value as Value;
     eq((dataOf(d) as any).data, 1n, "read the real discharge mark");
-    const write = attack('f = mv_set({x: 1}, "discharged", 1)');
-    eq(write.threw?.includes("integrity channel") ?? false, true, `write-onto-fake: ${write.threw}`);
+    // B-125: `mv_set` — the unguarded write this used to attempt — is
+    // deleted, so the assertion is now the STRONGER one: there is no path,
+    // rather than one path that is refused. The only user-reachable write is
+    // a minted writer, and a writer is bound to its OWN field by
+    // construction, so holding one says nothing about `discharged`.
+    const write = attack('w = channel_register("forgery_d_probe", "drop")\nf = w({x: 1}, 1)');
+    eq(write.threw, null, `minting a writer for another field is allowed: ${write.threw}`);
+    const f = write.evalCtx!.bindings.get("f")!.value as Value;
+    eq(metaReadRaw(f, "forgery_d_probe") !== undefined, true, "the writer wrote its own field");
+    eq(metaReadRaw(f, "discharged"), undefined, "and could not reach `discharged`");
+  });
+
+  test("forgery G (B-125): the metadata write surface is exactly the minted writers", () => {
+    // The property `mv_set`'s deletion buys, asserted directly so that
+    // reintroducing an unguarded write path fails here rather than silently.
+    // `mv_set` wrote ANY non-integrity field with no capability, which made
+    // `mv_set(5, "type", String)` a type-forgery from ordinary user code.
+    const gone = attack('x = mv_set(5, "type", String)\ny = type of x');
+    eq(gone.threw, null, "an unbound name residualises rather than throwing");
+    const y = gone.evalCtx!.bindings.get("y")!.value as Value;
+    eq(y === undefined || metaReadRaw(y, "type") === undefined
+       || dataOf(y).kind !== ValueKind.Structure, true,
+      "the deleted path no longer produces a value claiming a forged type");
+
+    // KNOWN GAP, pinned so it is visible rather than assumed closed —
+    // B-123(d): `type` is the most-used metadata field in the system and it
+    // is **not registered at all**, so unlike `discharged` and `source` its
+    // writer capability is unclaimed and the first asker receives it.
+    //
+    // This is asserted through the REGISTRY rather than by attempting the
+    // registration, and that is not squeamishness: running
+    // `channel_register("type", "viral")` inside the suite re-rules the type
+    // field as viral for the whole PROCESS and broke six later tests when
+    // first tried — which is the sharpest available evidence that the
+    // capability is worth holding. The fix is B-109: the type system
+    // registers `type` with integrity at layer init. When it does, this
+    // expectation flips.
+    eq(metaFieldSpec("type"), undefined,
+      "TODAY `type` has no registration, no owner and no integrity flag — B-123(d)");
+    eq(metaFieldSpec("discharged")?.integrity, true,
+      "whereas `discharged` is registered by its owner, with integrity");
+    const held = attack('w = channel_register("discharged", "drop")');
+    eq(held.threw?.includes("already registered") ?? false, true,
+      "and a registered integrity field refuses re-registration");
   });
 
   test("forgery F (live): the writer capability cannot be forged or counterfeited", () => {

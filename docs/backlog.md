@@ -1514,6 +1514,13 @@ that prevents it.
   - Interacts with **B-112** (plane interfaces): "accumulate toward the
     verdict" is arguably a fifth owed interface, or the `union` rule applied
     at whole-program scope. Sequencing question, not a separate problem
+  - **A third instance, with a sharper example than the argument** (found at
+    B-125, 2026-08): a program calling an **undefined function** verifies
+    clean. `x = no_such_function(1)` residualises — correct under R2 — and
+    `verify` reports *"Verdict (verified)"* with a clean assumption ledger,
+    while `inspect` on the same program reports `unresolved refs:
+    no_such_function`. The information exists and does not reach the verdict,
+    which is this item's whole thesis and B-057's too
 
 - [ ] **B-118** · L0 · **Four carriers ride the host plane that belong on the
   metadata plane.** Raised by the concept-spine S5 triage: four deltas filed
@@ -1810,6 +1817,46 @@ that prevents it.
   - **Public surface**: none. These names appear only in `docs/design/`,
     `docs/decisions.md` and the untracked `web/dist` bundle — not in
     `language-reference.md`, `getting-started.md`, the README or the website
+  - **(d) CORRECTION, 2026-08 (B-125): deleting `mv_set` closed the
+    demonstrated exploit but NOT the underlying defect.** The root cause is
+    one line further down: **`type` is not registered as a metadata field at
+    all.** The base registers eleven — `shape`, `error`, `effects`,
+    `predicates`, `domain`, `knowledge`, `bound`, `discharged`, `warnings`,
+    `source`, `exported` — and `type` is not among them, though it is *the*
+    field (99.4% of all metadata) and the one the type system dispatches on.
+    Consequences, verified:
+    - `channel_register("type", "viral")` **succeeds**, where the same call
+      for `discharged` or `source` is refused as already-registered. Under
+      D23/D24 the first registrant holds the writer, so **the type field's
+      write capability is unclaimed and available to any program**
+    - a writer minted that way forges the read: `w("hello", Int)` then
+      `type of` it answers `Int`
+    - `type` is also absent from `INTEGRITY_FIELD_NAMES`
+    - **The decisive evidence, found by accident.** A first attempt to pin
+      this gap ran `channel_register("type", "viral")` inside the boundary
+      battery. It **broke six unrelated tests** — refinement knowledge across
+      a function boundary, the knowledge-bounds matrix, the conformance
+      split, the kind tower, carrier transparency, and the `basics.alg`
+      baseline. Registering `type` re-rules its propagation for the whole
+      **process**, so one Allegro program can change how types propagate for
+      everything evaluated afterwards. That is a larger defect than the
+      forgeable read, and it is why the capability is worth holding
+    - **Not established**: whether a single program can exploit this against
+      *itself* end to end. Probes through the writer path residualised rather
+      than computing a wrong answer, apparently because the whole chain stays
+      unresolved rather than because of any guard. Recorded as unknown rather
+      than claimed either way
+    - **Pinned** by boundary test *forgery G* (B-125), which asserts through
+      the registry — `metaFieldSpec("type") === undefined` — rather than by
+      attempting the registration, precisely because attempting it corrupts
+      the process
+  - **The fix belongs to B-109(a)/(b)/(c)**, which already found that the base
+    registers the layers' fields and that integrity is enforced by a hardcoded
+    name list disagreeing with the registry. This adds the sharpest instance:
+    the most-used field in the system has **no registration, no owner and no
+    integrity flag**. The type system should register `type` with
+    `integrity: true` at layer init — which is exactly the C3 move in the
+    concept campaign (registration moves to the owning layers)
 
 - [ ] **B-124** · L0 · **Guard-coverage audit: every path to a guarded
   operation must carry the guard.** Raised by B-123, where two independent
@@ -1853,8 +1900,8 @@ that prevents it.
     down what is actually there, and the gaps are visible without a test
     having to find them
 
-- [ ] **B-125** · L0 · **Delete `mv_set`, and rebuild the three tests that
-  use it** (maintainer ruling, 2026-08; B-123(a)). `mv_set` is the
+- [x] **B-125** · L0 · **LANDED 2026-08.** Delete `mv_set`, and rebuild the
+  three tests that use it (maintainer ruling, 2026-08; B-123(a)). `mv_set` is the
   type-forgery path. Its three test call sites divide two ways, and the
   division matters because **two of them become unfalsifiable once it is
   gone** — an impossible operation cannot be tested for refusal.

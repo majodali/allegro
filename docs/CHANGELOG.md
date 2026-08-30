@@ -4,6 +4,65 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-125: `mv_set` deleted, three tests rebuilt, and a bigger defect behind it
+
+`mv_set` is gone — the primitive that wrote any non-integrity metadata field
+with no capability, making `mv_set(5, "type", String)` a type-forgery from
+ordinary user code. Verified closed: the two probes that previously printed
+garbage through `String` and `Int` annotations now residualise.
+
+**The three tests, rebuilt.** Two used `mv_set` as the attacker's tool against
+an integrity field, and their property became **unfalsifiable** once the path
+was gone — an impossible operation cannot be tested for refusal. Each now
+asserts the stronger form: *there is no path*, rather than *one path is
+refused*. The third used it **benignly**, to show that writing metadata yields
+a new value and leaves the original proof untouched; that is copy-on-attach
+(D22), unrelated to the gate, and it now runs through a properly minted writer
+— a better test, because it exercises the real capability surface instead of
+the legacy bypass.
+
+**A new boundary test, *forgery G*,** pins what the deletion buys, so that
+reintroducing an unguarded write fails there rather than silently.
+
+**And the correction that matters: deleting `mv_set` closed the demonstrated
+exploit, not the underlying defect.** `type` — the field carrying 99.4% of all
+metadata, and the one the type system dispatches on — **is not registered at
+all.** The base registers eleven fields; `type` is not among them, it has no
+owner, and it is absent from the integrity set. Under D23/D24 the first
+registrant holds the writer, so **the type field's write capability is
+unclaimed**.
+
+**The decisive evidence arrived by accident.** A first version of forgery G
+asserted the gap by running `channel_register("type", "viral")`. It **broke six
+unrelated tests** — refinement knowledge across a function boundary, the
+knowledge-bounds matrix, the conformance split, the kind tower, carrier
+transparency, and the `basics.alg` baseline. Registering `type` re-rules its
+propagation for the whole **process**: one Allegro program can change how types
+propagate for everything evaluated afterwards. That is a larger defect than the
+forgeable read. Forgery G therefore asserts through the registry —
+`metaFieldSpec("type") === undefined` — rather than by attempting the
+registration, and says why in the test itself.
+
+What is *not* established: whether one program can exploit this against itself
+end to end. Probes through the writer path residualised rather than computing a
+wrong answer, apparently because the chain stays unresolved rather than because
+of any guard. Recorded as unknown rather than claimed either way.
+
+**The fix belongs to B-109** — which already found that the base registers the
+layers' fields and that integrity is enforced by a hardcoded list disagreeing
+with the registry. This is its sharpest instance, and the remedy is the concept
+campaign's C3: registration moves to the owning layers, and the type system
+registers `type` with integrity at layer init.
+
+**One more instance for B-117**, found while probing: a program calling an
+**undefined function** verifies clean. `x = no_such_function(1)` residualises —
+correct under R2 — and `verify` reports "Verdict (verified)" with a clean
+assumption ledger, while `inspect` on the same program reports
+`unresolved refs: no_such_function`. The information exists and does not reach
+the verdict, which is B-117's thesis and B-057's.
+
+Suite **1199/1199** (one test added), typecheck clean.
+
 ## 2026-08 — Why the suite missed two soundness holes, and what would catch them
 
 Follow-up to B-123. The two holes are **one class of defect**: a guarded

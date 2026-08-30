@@ -745,11 +745,17 @@ test("D47 chunk 2: proof entry points remain lazy non-value interpreters", () =>
   eq(msg.includes("could not be discharged"), true);
 });
 
-test("D47: forged source origination is refused (mv_set integrity gate)", () => {
+test("D47: `source` cannot be originated — no user-reachable write path (B-125)", () => {
+  // B-125 deleted `mv_set`, the unguarded write this test used to attack.
+  // The property is now asserted in its stronger form: there is NO path,
+  // rather than one path that is refused. The only user-reachable metadata
+  // write is a writer minted by `channel_register`, and a writer is bound to
+  // its own field by construction — so originating `source` would need its
+  // registration, which is refused because the owner already holds it.
   let msg = "";
-  try { evalStd('mv_set(5, "source", 42)'); }
+  try { evalStd('w = channel_register("source", "drop")'); }
   catch (e: any) { msg = String(e?.message ?? e); }
-  eq(msg.includes("cannot originate integrity channel 'source'"), true);
+  eq(msg.includes("already registered"), true, "source registration is refused");
   // And the generic accessor cannot read it either — the observe tag
   // cannot be laundered through component_get.
   const r = evalStd('x = 2 + 2\ncomponent_get(x, "source")');

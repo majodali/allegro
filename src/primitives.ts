@@ -548,16 +548,15 @@ const channel_attenuate_impl: PrimitiveFnImpl = (args) => {
   return prim;
 };
 
-const mv_set: PrimitiveFnImpl = (args) => {
-  const key = bitsToString(asBits(args[1], "mv_set"));
-  assertNotIntegrityKey(key, "mv_set");
-  const val = args[2];
-  // C4.3b: cloneMeta is total and withMetadata flattens Context
-  // primaries, so one path covers MV, flattened Context, and bare values.
-  const nc = cloneMeta(args[0]);
-  nc.set(key, val);
-  return withMetadata(dataOf(args[0]), nc);
-};
+// B-125 (2026-08): `mv_set` DELETED. It wrote any non-integrity metadata
+// field with NO writer capability, so `mv_set(5, "type", String)` succeeded
+// and annotation checking accepted the result — a type-forgery path from
+// ordinary user code, contradicting D23 (writes are capability-gated) and
+// D28 (`type` is owned by the type-system extension). D28 had already ruled
+// the whole `mv_*` family SUBSUMED into the channel writers; this executes
+// that half for the one member that was a soundness hole. The surviving
+// write path is a registered writer, which is bound to its own field by
+// construction: `w = channel_register(name, rule)` then `w(value, x)`.
 
 const mv_components: PrimitiveFnImpl = (args) => {
   // C4.3b: metaOf is total — flattened Contexts report their keys.
@@ -4331,7 +4330,6 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   mv_new: makePrimitive("mv_new", mv_new),
   mv_primary: makePrimitive("mv_primary", mv_primary),
   mv_get: makePrimitive("mv_get", mv_get),
-  mv_set: makePrimitive("mv_set", mv_set),
   channel_register: makePrimitive("channel_register", channel_register_impl),
   channel_read: makePrimitive("channel_read", channel_read_impl, true),
   channel_list: makePrimitive("channel_list", channel_list_impl, true),
