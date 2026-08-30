@@ -4,6 +4,56 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 C2 steps 1 and 2 land; step 3 finds a class the survey could not see
+
+C2 re-attempted in three gated steps, which worked far better than one change.
+**Steps 1 and 2 are landed and green**; only the attachment switch is
+outstanding, and it is now blocked on a question rather than on defects.
+
+**Step 1 — the 14 kind-test fixes**, applied *while carriers still exist*, so
+each is behaviour-neutral today and load-bearing after. Most needed the guard
+**deleted** rather than replaced: the metadata accessors are total, so the kind
+test was a pre-C1 necessity that had become redundant.
+
+One site was mis-classified, and it is the instructive one. `totality.ts:336`'s
+guard was doing **two** jobs — gating a metadata read *and* selecting a code
+path, since its branch ended in `return null` and the `Param` branch was the
+alternative. Deleting it wholesale made every Param subject return null and
+silently disabled exhaustiveness checking. That refines the survey's rule:
+classify what the code does, and **a guard may be doing more than one thing**.
+(The survey said 15 sites; the true count is 14 — one re-classified on reading.)
+
+**Step 2 — `carryMeta` at the seven clone sites.** It lives in `slots.ts`, not
+`types.ts`: the boundary lint flagged `.meta` access outside the accessor
+layer, correctly, and moving the helper beside `cloneMeta` is the right home
+anyway — better than widening the `allowedFiles` exemption, which would have
+exempted `types.ts` from the dunder patterns too.
+
+**Step 3 found a fourth class the survey missed by construction.** The survey
+classified `kind === Structure` tests; this one is invisible to that.
+**`dataOf` was doing double duty** — peeling the carrier *and*, as a side
+effect, **stripping metadata**, because a carrier's inner value held none. Now
+`dataOf` is the identity and strips nothing, so every site that used it to
+RESET a value before re-stamping carries the old type forward and trips
+`withType`'s shape guard. Five call sites, all saying "stamp" where they mean
+"replace" — `typed_float_impl` and the four built-in constructors — and
+`withTypeReplacing` already exists for exactly this.
+
+**What blocks step 3 is a question, not a defect.**
+`types-construction.ts:290` — *"error: creates error MultiValue"* — asserts
+`result.kind === ValueKind.Structure` for an error value. C2 deliberately
+makes that a Bits, so the assertion is not wrong; it is **about the thing being
+changed**. PROCESS §6 makes that a discussion, and the same question likely
+covers sibling assertions. Also outstanding: generic type variables, three
+checks that stop firing (one cause, not three), and one shard exiting early.
+
+**Method note, worth more than the fixes.** Each class was enumerated in ONE
+instrumented run — instrument the failing guard, record the call site, read the
+list — rather than found by iterating the suite. Three classes, three runs, no
+guessing.
+
+Suite **1200/1200** with steps 1 and 2 landed.
+
 ## 2026-08 — The C2 survey: 182 sites, 15 that break
 
 Run before re-attempting C2, to convert the unknown failure tail into a list.

@@ -283,6 +283,54 @@ type-level and all came back clean; this one is a classification of behaviour
 and it found the whole set in one pass. The rule worth keeping: *classify what
 the code DOES at each site, not what it looks like.*
 
+### 5.1c Step 3, and the class the survey could not see
+
+C2 was re-attempted in three gated steps, which worked far better than one
+change: **steps 1 and 2 are landed and green**, and only the switch itself is
+outstanding.
+
+| step | what | state |
+|---|---|---|
+| 1 | the 14 kind-test fixes (§5.1b) | **landed**, green — behaviour-neutral while carriers still exist |
+| 2 | `carryMeta` at the seven clone sites | **landed**, green |
+| 3 | `withMetadata` attaches per-kind clones | attempted, backed out; findings below |
+
+**A fourth class, which the survey missed by construction.** The survey
+classified `kind === Structure` tests. This one is invisible to that: **`dataOf`
+was doing double duty** — peeling the carrier *and*, as a side effect,
+**stripping metadata**, because a carrier's inner value held none. Now `dataOf`
+is the identity and strips nothing, so every site that used it to RESET a
+value before re-stamping carries the old type forward and trips `withType`'s
+shape guard.
+
+Enumerated the same way — instrument the guard, run the corpus, read the
+sites — and it is **five call sites**, all saying "stamp" where they mean
+"replace": `typed_float_impl`, and the four built-in constructors
+(`Int`/`Float`/`String`/`Bool` `__construct`). `withTypeReplacing` already
+exists for exactly this and its own comment says *"construction-point re-tags
+use withTypeReplacing"*. Both fixes are one word each.
+
+**What remains, and one of it is not mine to decide.**
+
+- **Tests that pin the carrier REPRESENTATION.** `types-construction.ts:290`
+  — *"error: creates error MultiValue"* — asserts `result.kind ===
+  ValueKind.Structure` for an error value. C2 deliberately makes that a Bits,
+  so the assertion is not wrong, it is **about the thing being changed**.
+  PROCESS §6 makes that a discussion, not a judgement call, and the same
+  question probably covers a handful of sibling assertions. **This blocks
+  step 3 regardless of the remaining defects.**
+- Generic type variables (`id[T](x: T): T` answers null) and unification.
+- Three checks that stop firing — effect-bound params, function-type args, and
+  a refinement rejection — which look like one cause, not three.
+- One shard still exits early on an uncaught error, not yet located.
+
+**Method note, worth more than the fixes.** Each class was enumerated in ONE
+instrumented run rather than found by iterating the suite: instrument the
+failing guard, record the call site, read the list. Three classes, three runs,
+no guessing. That is the same move as the survey, applied to a failure rather
+than to a grep — and it is what makes the remaining tail measurable instead of
+unknown.
+
 ### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
 
 `kind === ValueKind.Structure` appears 117 times and `!==` 68 more. Today a
