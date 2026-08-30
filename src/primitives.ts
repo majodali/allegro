@@ -1,14 +1,13 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, isMetaSlotKey } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, isMetaSlotKey, carryMeta} from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue, ParamValue,
   AllegroError, makeBits, makeInt, makeFloat, bitsToFloat, makePrimitive, makeExpr,
   makeParam, makeComposedFn, makeStructure, withMetadata, makeSymbol,
-  stringToBits, bitsToString,
-} from "./types.js";
+  stringToBits, bitsToString} from "./types.js";
 import { buildFn } from "./parser-helpers.js";
 import { fqnBaseName } from "./symbols.js";
 import { assertNotScope, scopeAssume, scopeExtend, scopeFactsFor, scopeOwnFacts, scopeLookup, scopeHostRead, scopeHoldsPrivilege, isPendingCell } from "./scope.js";
@@ -795,7 +794,7 @@ function replaceValueIdentity(v: Value, target: Value, replacement: Value, seen?
       const paramMap = new Map<import("./types.js").ParamValue, import("./types.js").ParamValue>();
       for (let i = 0; i < v.params.length; i++) paramMap.set(v.params[i], newParams[i]);
       const remapped = _remapParams(newBody, paramMap);
-      const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: newParams, body: remapped };
+      const newFn: ComposedFunctionValue = carryMeta(v, { kind: ValueKind.ComposedFunction, params: newParams, body: remapped });
       for (const p of newFn.params) p.owner = newFn;
       for (const k of PRESERVED_FN_META_KEYS) {
         if ((v as any)[k] !== undefined) (newFn as any)[k] = (v as any)[k];
@@ -1708,7 +1707,7 @@ function resolveFreeSymbols(v: Value, ctx: StructureValue, seen: Set<Value> = ne
       seen.add(v);
       const newBody = resolveFreeSymbols(v.body, ctx, seen);
       if (newBody === v.body) return v;
-      const newFn: any = { kind: ValueKind.ComposedFunction, params: v.params, body: newBody };
+      const newFn: any = carryMeta(v, { kind: ValueKind.ComposedFunction, params: v.params, body: newBody } as ComposedFunctionValue);
       // Retarget Params' owner to the new fn so substituteParams can find them.
       for (const p of newFn.params) p.owner = newFn;
       return newFn;

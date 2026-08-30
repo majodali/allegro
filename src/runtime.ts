@@ -5,7 +5,7 @@
 
 import { isCarrier } from "./structure.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { dataOf, metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource } from "./slots.js";
+import { dataOf, metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource, carryMeta} from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
@@ -15,7 +15,7 @@ import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, StructureValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeStructure, makeExpr, makePrimitive, withMetadata, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError } from "./types.js";
+import { Value, ValueKind, StructureValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeStructure, makeExpr, makePrimitive, withMetadata, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError} from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf } from "./effects.js";
 import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOTALITY_NEEDS_ANNOTATION, DivObligation, DivergenceResult } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
@@ -53,7 +53,7 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       seen.add(v);
       const newBody = typeLiterals(v.body, seen);
       if (newBody === v.body) return v;
-      const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: v.params, body: newBody };
+      const newFn: ComposedFunctionValue = carryMeta(v, { kind: ValueKind.ComposedFunction, params: v.params, body: newBody });
       for (const p of newFn.params) p.owner = newFn;
       // Preserve generic-param / effect-var-param metadata across clones so
       // Slice 2's polymorphism resolution still works after this pass.
@@ -328,11 +328,11 @@ function resolveNamedParams(
       const paramMap = new Map<ParamValue, ParamValue>();
       for (let i = 0; i < fn.params.length; i++) paramMap.set(fn.params[i], newParams[i]);
       const remappedBody = remapParams(newBody, paramMap);
-      const newFn: ComposedFunctionValue = {
+      const newFn: ComposedFunctionValue = carryMeta(fn, {
         kind: ValueKind.ComposedFunction,
         params: newParams,
         body: remappedBody,
-      };
+      });
       for (const p of newFn.params) p.owner = newFn;
       if ((fn as any).genericParams) (newFn as any).genericParams = (fn as any).genericParams;
       return newFn;
@@ -414,11 +414,11 @@ function resolveNamedParamsInner(
       const paramMap = new Map<ParamValue, ParamValue>();
       for (let i = 0; i < fn.params.length; i++) paramMap.set(fn.params[i], newParams[i]);
       const remappedBody = remapParams(newBody, paramMap);
-      const newFn: ComposedFunctionValue = {
+      const newFn: ComposedFunctionValue = carryMeta(fn, {
         kind: ValueKind.ComposedFunction,
         params: newParams,
         body: remappedBody,
-      };
+      });
       for (const p of newFn.params) p.owner = newFn;
       if ((fn as any).genericParams) (newFn as any).genericParams = (fn as any).genericParams;
       return newFn;

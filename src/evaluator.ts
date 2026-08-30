@@ -15,7 +15,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, dataOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource } from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, dataOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource, carryMeta} from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 import { isCarrier } from "./structure.js";
 
@@ -730,7 +730,7 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
     case ValueKind.ComposedFunction: {
       const newBody = remapParams(value.body, paramMap);
       if (newBody === value.body) return value;
-      const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
+      const newFn: ComposedFunctionValue = carryMeta(value, { kind: ValueKind.ComposedFunction, params: value.params, body: newBody });
       if ((value as any).genericParams) (newFn as any).genericParams = (value as any).genericParams;
       for (const k of PRESERVED_FN_META_KEYS) {
         if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
@@ -803,11 +803,11 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       const paramMap = new Map<ParamValue, ParamValue>();
       for (let i = 0; i < value.params.length; i++) paramMap.set(value.params[i], newParams[i]);
       const remappedBody = remapParams(newBody, paramMap);
-      const newFn: ComposedFunctionValue = {
+      const newFn: ComposedFunctionValue = carryMeta(value, {
         kind: ValueKind.ComposedFunction,
         params: newParams,
         body: remappedBody,
-      };
+      });
       for (const p of newFn.params) p.owner = newFn;
       // Preserve generic-param metadata across clones so Slice 2's
       // polymorphism resolution still works after substitution.

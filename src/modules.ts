@@ -4,9 +4,9 @@
 // =============================================================================
 
 import { evalSource, Extension } from "./runtime.js";
-import { dataOf, cloneMeta, setName, setFallbackMember, isBareBindingName, isFutureBindingName, metaOf } from "./slots.js";
+import { dataOf, cloneMeta, setName, setFallbackMember, isBareBindingName, isFutureBindingName, metaOf, carryMeta} from "./slots.js";
 import { remapParams } from "./evaluator.js";
-import { Value, ValueKind, StructureValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeStructure, makeExpr, withMetadata, stringToBits, bitsToString, AllegroError } from "./types.js";
+import { Value, ValueKind, StructureValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeStructure, makeExpr, withMetadata, stringToBits, bitsToString, AllegroError} from "./types.js";
 import { withType } from "./types-std.js";
 import { primitives } from "./primitives.js";
 import { markExported } from "./symbols.js";
@@ -95,11 +95,11 @@ function captureModuleVars(
       const paramMap = new Map<ParamValue, ParamValue>();
       for (let i = 0; i < fn.params.length; i++) paramMap.set(fn.params[i], newParams[i]);
       const remappedBody = remapParams(newBody, paramMap);
-      const newFn: ComposedFunctionValue = {
+      const newFn: ComposedFunctionValue = carryMeta(fn, {
         kind: ValueKind.ComposedFunction,
         params: newParams,
         body: remappedBody,
-      };
+      });
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
     }

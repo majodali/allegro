@@ -600,6 +600,29 @@ export function cloneMeta(v: Value): Map<string, Value> {
   return comps !== undefined ? new Map(comps) : new Map();
 }
 
+/**
+ * Carry `from`'s metadata onto a value derived from it, and return the
+ * derived value.
+ *
+ * This is the "map" case (B-121 plan §3.2): a NEW datum that must keep the OLD
+ * metadata. It was not an obligation before B-121, because metadata lived on
+ * the carrier WRAPPING a function rather than on the function itself — so a
+ * hand-written function clone never had to think about it. Once metadata is on
+ * the value, all seven such clones drop it silently, and the suite reports
+ * that as `type_check: value has no type` from somewhere else entirely.
+ *
+ * Use this rather than writing `meta: x.meta` by hand: the failure mode of
+ * forgetting is silence, the same shape as the TailCall sentinel (B-113) and
+ * the ComposedFunction clone helper. It lives here, in the accessor layer,
+ * because reading `.meta` directly is exactly what the boundary lint forbids
+ * everywhere else.
+ */
+export function carryMeta<T extends Value>(from: Value, to: T): T {
+  const m = (from as { meta?: Map<string, Value> }).meta;
+  if (m !== undefined) (to as { meta?: Map<string, Value> }).meta = m;
+  return to;
+}
+
 /** B-104 chunk 3: carry the shape from one type Context to a derived one.
  *
  *  Three type-cloning paths (`structuralWrap`, `preserveOps`,
