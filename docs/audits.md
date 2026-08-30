@@ -26,3 +26,4 @@ findings pointer (or —)`.
   record in the migration commit (f021d83); clears the 2026-08-21
   Article 8 lag warning (register backfill: the migration PR recorded
   the audit in its commit message only)
+- 2026-08-30 — form — full tree — audited c1493c7 against methodology 1.3.0 — 1 violations / 1 warnings / 1 info — Article 8 (warning): `docs/classification.md`; K-007 (violation): `docs/plans/parallel-lanes-process-delta.md`
