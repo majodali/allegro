@@ -5,7 +5,7 @@
 
 import { isCarrier } from "./structure.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource } from "./slots.js";
+import { dataOf, metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource } from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
@@ -67,10 +67,10 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       // corrupt it. Plain structures are inert.
       const pp = (v as { primary?: Value }).primary;
       if (pp === undefined) return v;
-      if (channelReadRaw(v, "type") !== undefined) return v;
+      if (metaReadRaw(v, "type") !== undefined) return v;
       const newPrimary = typeLiterals(pp, seen);
       if (newPrimary === pp) return v;
-      return withMetadata(newPrimary, cloneComponents(v));
+      return withMetadata(newPrimary, cloneMeta(v));
     }
     default:
       return v;
@@ -350,7 +350,7 @@ function resolveNamedParams(
       if (pp === undefined) return value;
       const newP = resolveNamedParams(pp, resMap, selfName, seen);
       if (newP === pp) return value;
-      return withMetadata(newP, cloneComponents(value));
+      return withMetadata(newP, cloneMeta(value));
     }
   }
   return value;
@@ -436,7 +436,7 @@ function resolveNamedParamsInner(
       if (pp === undefined) return value;
       const newP = resolveNamedParamsInner(pp, resMap, owner, ownParamNames, selfName, seen);
       if (newP === pp) return value;
-      return withMetadata(newP, cloneComponents(value));
+      return withMetadata(newP, cloneMeta(value));
     }
   }
   return value;
@@ -1006,8 +1006,8 @@ export function evalSource(
   moduleFqn?: string,
 ): { value: Value | null; evalCtx: StructureValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
   // New pass: Allegro-minted channel registrations from prior passes are
-  // sealed (see ChannelEntry.epoch in slots.ts).
-  bumpChannelEpoch();
+  // sealed (see MetaFieldEntry.epoch in slots.ts).
+  bumpMetaEpoch();
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 

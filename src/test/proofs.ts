@@ -14,7 +14,7 @@ import { isDischargedProof as _isDischargedProof, formatProofFinding } from "../
 import * as fs from "fs";
 import * as path from "path";
 import { Value, dataOf, BitsValue, bitsToString } from "../types.js";
-import { channelReadRaw } from "../slots.js";
+import { metaReadRaw } from "../slots.js";
 import { lawObligationRecords } from "../types-std.js";
 import { buildVerdict, formatVerdict } from "../pcp.js";
 
@@ -809,7 +809,7 @@ test("B-092 U1: dimension mismatch is a domain-vocabulary error value", () => {
     "bad = qty(3, m) + qty(2, s)\n1",
     undefined, [typeExt, unitsExt], undefined, true);
   const bad = evalCtx.bindings.get("bad")!.value!;
-  const err = channelReadRaw(bad, "error");
+  const err = metaReadRaw(bad, "error");
   eq(err !== undefined, true);
   eq(bitsToString(dataOf(err!) as BitsValue).includes("cannot add m and s"), true);
   eq(bitsToString(dataOf(err!) as BitsValue).includes("length vs time"), true);

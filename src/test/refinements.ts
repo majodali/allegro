@@ -19,7 +19,7 @@ import {
   entailsPredicate, predicatesOf,
 } from "../refinements.js";
 import { dataOf, ValueKind, bitsToString, BitsValue } from "../types.js";
-import { channelReadRaw } from "../slots.js";
+import { metaReadRaw } from "../slots.js";
 import { getType } from "../types-std.js";
 
 // --- Phase B: abstract-domain unit tests ---
@@ -256,7 +256,7 @@ bad = PI(0 - 5)
   if (okP.kind === ValueKind.Bits) eq(Number((okP as any).data), 5);
   // bad fails → Error-typed MultiValue
   const badV = evalCtx.bindings.get("bad")!.value!;
-  eq(channelReadRaw(badV, "error") !== undefined, true, "bad has error component");
+  eq(metaReadRaw(badV, "error") !== undefined, true, "bad has error component");
 });
 
 test("invariants-as-refinements: chained `&` clauses fail with per-clause domains", () => {
@@ -274,7 +274,7 @@ high = SP(200)
   // low fails on first invariant (self > 0)
   const lowV = evalCtx.bindings.get("low")!.value!;
   {
-    const err = channelReadRaw(lowV, "error");
+    const err = metaReadRaw(lowV, "error");
     if (err) {
       const ep = dataOf(err);
       if (ep.kind === ValueKind.Bits) {
@@ -286,7 +286,7 @@ high = SP(200)
   // high fails on second invariant (self < 100)
   const highV = evalCtx.bindings.get("high")!.value!;
   {
-    const err = channelReadRaw(highV, "error");
+    const err = metaReadRaw(highV, "error");
     if (err) {
       const ep = dataOf(err);
       if (ep.kind === ValueKind.Bits) {
@@ -311,7 +311,7 @@ bad = Range(10, 1)
   eq(getType(okV) !== null, true, "record carries its type channel directly");
   // bad fails the invariant
   const badV = evalCtx.bindings.get("bad")!.value!;
-  eq(channelReadRaw(badV, "error") !== undefined, true);
+  eq(metaReadRaw(badV, "error") !== undefined, true);
 });
 
 // --- Phase C Chunk 3: requires / ensures contracts ---

@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, channelReadRaw, componentsView, cloneComponents, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelChannelWriter, registerChannel, channelList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, CHANNEL_WRITER_BRAND, HOST_KEYS, viralChannels, sourceOf, SOURCE_COMPONENT_KEY, isMetaSlotKey } from "./slots.js";
+import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, isMetaSlotKey } from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue, ComposedFunctionValue,
@@ -17,7 +17,7 @@ import { assertNotScope, scopeAssume, scopeExtend, scopeFactsFor, scopeOwnFacts,
 // Module-scope, never exported, never bound into any Allegro extension —
 // the proof kernel's failed-proof constructor is the only origination site
 // in this module.
-const dischargedWriter = kernelChannelWriter("discharged");
+const dischargedWriter = kernelFieldWriter("discharged");
 import { grammar2Primitives } from "./grammar2/builder.js";
 import { BASE_OPERATORS_TO_LEVEL } from "./grammar2/base-grammar.js";
 
@@ -91,11 +91,11 @@ export function formatValue(v: Value): string {
   // go through dataOf (identity for Contexts) instead of `.primary`.
   if (v.kind === ValueKind.Structure) {
     // Error values — show error component
-    const errComp = channelReadRaw(v, "error");
+    const errComp = metaReadRaw(v, "error");
     if (errComp !== undefined) {
       return `error(${formatValue(errComp)})`;
     }
-    const typeComp = channelReadRaw(v, "type");
+    const typeComp = metaReadRaw(v, "type");
     if (typeComp && typeComp.kind === ValueKind.Structure) {
       const nameV = getName(typeComp as StructureValue);
       if (nameV && nameV.kind === ValueKind.Bits) {
@@ -439,10 +439,10 @@ const ctx_resolve: PrimitiveFnImpl = (args) => {
   const key = bitsToString(asBits(args[1], "ctx_resolve"));
   const b = scopeLookup(ctx, key);
   if (!b) {
-    const components = new Map<string, Value>();
-    components.set("error", withType(stringToBits(`ctx_resolve: '${key}' not found`), StringType));
-    components.set("type", ErrorType);
-    return withMetadata(makeInt(0), components);
+    const meta = new Map<string, Value>();
+    meta.set("error", withType(stringToBits(`ctx_resolve: '${key}' not found`), StringType));
+    meta.set("type", ErrorType);
+    return withMetadata(makeInt(0), meta);
   }
   if (isPendingCell(b)) return makeSymbol(key);
   return b.value!;
@@ -489,9 +489,9 @@ const mv_primary: PrimitiveFnImpl = (args) => dataOf(args[0]);
 
 const mv_get: PrimitiveFnImpl = (args) => {
   const key = bitsToString(asBits(args[1], "mv_get"));
-  // C4.3b: channelReadRaw is total — flattened Contexts answer their
+  // C4.3b: metaReadRaw is total — flattened Contexts answer their
   // channel plane (and binding-plane channels like a type value's meta-type).
-  const c = channelReadRaw(args[0], key) ?? componentsView(args[0]).get(key);
+  const c = metaReadRaw(args[0], key) ?? metaOf(args[0]).get(key);
   if (c === undefined) throw new AllegroError(`mv_get: '${key}' not found`);
   return c;
 };
@@ -508,30 +508,30 @@ const mv_get: PrimitiveFnImpl = (args) => {
 const channel_register_impl: PrimitiveFnImpl = (args) => {
   const name = bitsToString(asBits(args[0], "channel_register"));
   const rule = bitsToString(asBits(args[1], "channel_register"));
-  const writer = registerChannel({ name, rule: rule as import("./slots.js").PropagationRule }, true);
+  const writer = registerMetaField({ name, rule: rule as import("./slots.js").PropagationRule }, true);
   const prim = makePrimitive(`<channel:${name} writer>`, (wargs) => {
-    if (wargs.length !== 2) throw new AllegroError(`channel writer '${name}': expected (value, channelValue)`);
+    if (wargs.length !== 2) throw new AllegroError(`channel writer '${name}': expected (value, fieldValue)`);
     return writer.write(wargs[0], wargs[1]);
   });
-  (prim as any)[CHANNEL_WRITER_BRAND] = name;
+  (prim as any)[FIELD_WRITER_BRAND] = name;
   return prim;
 };
 
 const channel_read_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
   const name = bitsToString(asBits(dataOf(evalFn!(args[1], ctx!)), "channel_read"));
-  const c = channelReadRaw(v, name);
+  const c = metaReadRaw(v, name);
   return c === undefined ? noneSingleton : c;
 };
 
 const channel_list_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return makeArray(channelList(v).map((n) => withType(stringToBits(n), StringType)));
+  return makeArray(metaFieldList(v).map((n) => withType(stringToBits(n), StringType)));
 };
 
 const channel_attenuate_impl: PrimitiveFnImpl = (args) => {
   const base = dataOf(args[0]);
-  const brand = (base as any)[CHANNEL_WRITER_BRAND];
+  const brand = (base as any)[FIELD_WRITER_BRAND];
   if (base.kind !== ValueKind.PrimitiveFunction || !brand) {
     throw new AllegroError("channel_attenuate: first argument is not a channel writer");
   }
@@ -544,7 +544,7 @@ const channel_attenuate_impl: PrimitiveFnImpl = (args) => {
     }
     return (base as PrimitiveFunctionValue).fn(wargs, wctx, wevalFn);
   });
-  (prim as any)[CHANNEL_WRITER_BRAND] = brand;
+  (prim as any)[FIELD_WRITER_BRAND] = brand;
   return prim;
 };
 
@@ -552,17 +552,17 @@ const mv_set: PrimitiveFnImpl = (args) => {
   const key = bitsToString(asBits(args[1], "mv_set"));
   assertNotIntegrityKey(key, "mv_set");
   const val = args[2];
-  // C4.3b: cloneComponents is total and withMetadata flattens Context
+  // C4.3b: cloneMeta is total and withMetadata flattens Context
   // primaries, so one path covers MV, flattened Context, and bare values.
-  const nc = cloneComponents(args[0]);
+  const nc = cloneMeta(args[0]);
   nc.set(key, val);
   return withMetadata(dataOf(args[0]), nc);
 };
 
 const mv_components: PrimitiveFnImpl = (args) => {
-  // C4.3b: componentsView is total — flattened Contexts report their keys.
+  // C4.3b: metaOf is total — flattened Contexts report their keys.
   const keys: Value[] = [];
-  for (const k of componentsView(args[0]).keys()) keys.push(stringToBits(k));
+  for (const k of metaOf(args[0]).keys()) keys.push(stringToBits(k));
   return makeExpr(id_prim, keys);
 };
 
@@ -575,7 +575,7 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // branching on its (meaningless) primary — the legacy behavior silently
   // took the else branch (differential fixture err-in-if-cond).
   if (cond.kind === ValueKind.Structure
-      && channelReadRaw(cond, "error") !== undefined) {
+      && metaReadRaw(cond, "error") !== undefined) {
     return cond;
   }
   const condP = dataOf(cond);
@@ -596,7 +596,7 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return evalBranch;
   }
   // Condition unresolved — Rule 2: partially evaluate BOTH branches
-  // so that type information and other MultiValue components propagate.
+  // so that type information and other MultiValue meta propagate.
   const evalThen = evalFn!(args[1], ctx!);
   const evalElse = evalFn!(args[2], ctx!);
 
@@ -804,7 +804,7 @@ function replaceValueIdentity(v: Value, target: Value, replacement: Value, seen?
       if (pp === undefined) return v;
       const newP = replaceValueIdentity(pp, target, replacement, seen);
       if (newP === pp) return v;
-      return withMetadata(newP, cloneComponents(v));
+      return withMetadata(newP, cloneMeta(v));
     }
     default:
       return v;
@@ -984,11 +984,11 @@ const component_get_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // D47(e): source reads are OBSERVE-effectful and go through `source of`
   // (`source_get`); the generic accessor answers none so the effect tag
   // cannot be laundered around.
-  if (key === SOURCE_COMPONENT_KEY) return noneSingleton;
-  // C4.3b: channelReadRaw is total — flattened Contexts answer their channel
+  if (key === SOURCE_FIELD) return noneSingleton;
+  // C4.3b: metaReadRaw is total — flattened Contexts answer their channel
   // plane, and bare type Contexts answer `type of Int` through the `__type`
-  // binding-plane fallback. componentsView covers ad-hoc mv_set keys.
-  const c = channelReadRaw(value, key) ?? componentsView(value).get(key);
+  // binding-plane fallback. metaOf covers ad-hoc mv_set keys.
+  const c = metaReadRaw(value, key) ?? metaOf(value).get(key);
   if (c !== undefined) return c;
   // Component not found — return none instead of throwing
   return noneSingleton;
@@ -1037,10 +1037,10 @@ const make_error_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 1) throw new AllegroError(`make_error: need 1 arg, got ${args.length}`);
   const errorValue = evalFn!(args[0], ctx!);
   // Create MultiValue with error component and Error type, sentinel primary
-  const components = new Map<string, Value>();
-  components.set("error", errorValue);
-  components.set("type", ErrorType);
-  return withMetadata(makeInt(0), components);
+  const meta = new Map<string, Value>();
+  meta.set("error", errorValue);
+  meta.set("type", ErrorType);
+  return withMetadata(makeInt(0), meta);
 };
 
 const when_wildcard_impl: PrimitiveFnImpl = () => {
@@ -1181,10 +1181,10 @@ const fetch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     .then(text => withType(stringToBits(text), StringType))
     .catch(err => {
       // Return error value instead of throwing
-      const components = new Map<string, Value>();
-      components.set("error", withType(stringToBits(String(err)), StringType));
-      components.set("type", ErrorType);
-      return withMetadata(makeInt(0), components);
+      const meta = new Map<string, Value>();
+      meta.set("error", withType(stringToBits(String(err)), StringType));
+      meta.set("type", ErrorType);
+      return withMetadata(makeInt(0), meta);
     });
   // B-028 F2 (CE-R5): typed pending value — Future[String].
   return withType(fm.createFuture(promise), futureOf(StringType));
@@ -1715,7 +1715,7 @@ function resolveFreeSymbols(v: Value, ctx: StructureValue, seen: Set<Value> = ne
       if (pp === undefined) return v;
       const newPrimary = resolveFreeSymbols(pp, ctx, seen);
       if (newPrimary === pp) return v;
-      return withMetadata(newPrimary, cloneComponents(v));
+      return withMetadata(newPrimary, cloneMeta(v));
     }
     default:
       return v;
@@ -2440,10 +2440,10 @@ function dispatchThroughType(
 /** B-028 F4: does this value carry a viral channel (error, …)? Used by the
  *  dispatch not-found exits to propagate a failed guarded construction's
  *  error value instead of throwing out of the completion cascade. */
-function carriesViralChannel(v: Value): boolean {
+function carriesViralField(v: Value): boolean {
   if (v.kind !== ValueKind.Structure) return false;
-  for (const chan of viralChannels()) {
-    if (channelReadRaw(v, chan) !== undefined) return true;
+  for (const chan of viralFields()) {
+    if (metaReadRaw(v, chan) !== undefined) return true;
   }
   return false;
 }
@@ -2459,15 +2459,15 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // instead of dropping it (err-through-method). Resolved error values
     // still dispatch normally (Error's own members stay callable).
     if (obj.kind === ValueKind.Structure) {
-      for (const chan of viralChannels()) {
-        const comp = channelReadRaw(obj, chan);
+      for (const chan of viralFields()) {
+        const comp = metaReadRaw(obj, chan);
         if (comp !== undefined) {
-          const components = new Map<string, Value>([[chan, comp]]);
-          const typeComp = channelReadRaw(obj, "type");
-          if (typeComp) components.set("type", typeComp);
+          const meta = new Map<string, Value>([[chan, comp]]);
+          const typeComp = metaReadRaw(obj, "type");
+          if (typeComp) meta.set("type", typeComp);
           return withMetadata(
             makeExpr(makePrimitive("type_dispatch", type_dispatch_impl, true), [obj, fieldArg]),
-            components,
+            meta,
           );
         }
       }
@@ -2509,7 +2509,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // an error-carrying value propagates the error (viral discipline)
     // instead of throwing out of the cascade. Error's OWN members
     // (message, …) still dispatch through the ladder above.
-    if (carriesViralChannel(obj)) return obj;
+    if (carriesViralField(obj)) return obj;
     throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${typeName}`);
   }
 
@@ -2520,7 +2520,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // one), then direct binding lookup for data fields.
   const p = dataOf(obj);
   if (p.kind === ValueKind.Structure) {
-    const metaTypeV = channelReadRaw(p, "shape");
+    const metaTypeV = metaReadRaw(p, "shape");
     if (metaTypeV?.kind === ValueKind.Structure) {
       assertMemberAvailable(obj, fieldName, null);
       const metaHit = dispatchThroughType(metaTypeV as StructureValue, fieldName, p, p, ctx, evalFn);
@@ -2547,11 +2547,11 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       return b.value;
     }
 
-    if (carriesViralChannel(obj)) return obj; // B-028 F4: see the typed exit above
+    if (carriesViralField(obj)) return obj; // B-028 F4: see the typed exit above
     throw new AllegroError(`type_dispatch: '${fieldName}' not found`);
   }
 
-  if (carriesViralChannel(obj)) return obj; // B-028 F4: see the typed exit above
+  if (carriesViralField(obj)) return obj; // B-028 F4: see the typed exit above
   throw new AllegroError(`type_dispatch: '${fieldName}' not found on ${p.kind}`);
 };
 
@@ -2751,7 +2751,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   // Use the meta-type's instanceof method
-  const typeType = channelReadRaw(expectedCtx, "shape") as StructureValue | undefined;
+  const typeType = metaReadRaw(expectedCtx, "shape") as StructureValue | undefined;
   if (typeType) {
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
@@ -2876,7 +2876,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   // Use meta-type's instanceof
-  const typeType = channelReadRaw(expectedCtx, "shape") as StructureValue | undefined;
+  const typeType = metaReadRaw(expectedCtx, "shape") as StructureValue | undefined;
   if (typeType) {
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
@@ -2950,7 +2950,7 @@ const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   // If typeB uses structural checking (~wrapped or Type-based), use its subtypeof method
-  const metaTypeB = channelReadRaw(ctxB, "shape") as StructureValue | undefined;
+  const metaTypeB = metaReadRaw(ctxB, "shape") as StructureValue | undefined;
   if (metaTypeB) {
     const bSubtypeof = typeMethod(metaTypeB, "subtypeof");
     if (bSubtypeof?.kind === ValueKind.PrimitiveFunction) {
@@ -2963,7 +2963,7 @@ const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   // Otherwise use typeA's meta-type subtypeof method
-  const metaType = channelReadRaw(ctxA, "shape") as StructureValue | undefined;
+  const metaType = metaReadRaw(ctxA, "shape") as StructureValue | undefined;
   if (metaType) {
     const subtypeofMethod = typeMethod(metaType, "subtypeof");
     if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
@@ -3126,10 +3126,10 @@ const assert_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       constraintDesc = `: expected ${fmt(predDom)}`;
     }
     const msg = `invariant failed${constraintDesc}${cexDesc}`;
-    const components = new Map<string, Value>();
-    components.set("error", withType(stringToBits(msg), StringType));
-    components.set("type", ErrorType);
-    return withMetadata(makeInt(0), components);
+    const meta = new Map<string, Value>();
+    meta.set("error", withType(stringToBits(msg), StringType));
+    meta.set("type", ErrorType);
+    return withMetadata(makeInt(0), meta);
   }
   if (checkP.kind !== ValueKind.Bits) {
     // Predicate unresolved (depends on incomplete bindings) — keep as residual.
@@ -3728,7 +3728,7 @@ function proofCtx(v: Value): StructureValue | null {
 function isDischargedProofVal(v: Value): boolean {
   const c = proofCtx(v);
   if (!c) return false;
-  const d = channelReadRaw(c, "discharged");
+  const d = metaReadRaw(c, "discharged");
   return !!d && dataOf(d).kind === ValueKind.Bits
     && (dataOf(d) as BitsValue).data === 1n;
 }
@@ -4456,7 +4456,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   proof_refines: makePrimitive("proof_refines", proof_refines_impl),
   // Phase F3: proof combinators + the `theorem … by <term>` checker.
   // Plain eager (C4.3c: every eager impl receives full values, channels
-  // intact — the former channelAware mode is the universal default).
+  // intact — the former metaAware mode is the universal default).
   proof_refl:  makePrimitive("proof_refl",  proof_refl_impl),
   proof_sym:   makePrimitive("proof_sym",   proof_sym_impl),
   proof_trans: makePrimitive("proof_trans", proof_trans_impl),

@@ -18,7 +18,7 @@
 // constructors; they reuse this same failed-Proof shape so `checkProofs`
 // stays the single surfacing point.
 
-import { dataOf, channelReadRaw, SLOT_KEYS } from "./slots.js";
+import { dataOf, metaReadRaw, SLOT_KEYS } from "./slots.js";
 import {
   Value, ValueKind, StructureValue, BitsValue,
   bitsToString,
@@ -42,7 +42,7 @@ export function isFailedProof(v: Value | undefined): boolean {
   const p = dataOf(v);
   if (p.kind !== ValueKind.Structure) return false;
   if (getTypeName(v) !== "Proof") return false;
-  const d = channelReadRaw(p, "discharged");
+  const d = metaReadRaw(p, "discharged");
   if (!d) return false;
   const dp = dataOf(d);
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 0n;
@@ -54,7 +54,7 @@ export function isDischargedProof(v: Value | undefined): boolean {
   const p = dataOf(v);
   if (p.kind !== ValueKind.Structure) return false;
   if (getTypeName(v) !== "Proof") return false;
-  const d = channelReadRaw(p, "discharged");
+  const d = metaReadRaw(p, "discharged");
   if (!d) return false;
   const dp = dataOf(d);
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 1n;

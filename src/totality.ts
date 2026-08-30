@@ -11,7 +11,7 @@
 // to `info` severity so adoption is non-breaking. Per-project config promotes
 // them to `error` once a project's source is clean.
 
-import { dataOf, channelReadRaw, getName } from "./slots.js";
+import { dataOf, metaReadRaw, getName } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ExpressionValue,
   StructureValue, BitsValue,
@@ -172,7 +172,7 @@ function peelFunctionAst(v: Value): {
   // Post-evaluation: a typed-function carrier.
   if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
     const mv = v as any;
-    const tComp = channelReadRaw(mv, "type") as Value | undefined;
+    const tComp = metaReadRaw(mv, "type") as Value | undefined;
     const prim = mv.primary;
     if (prim.kind === ValueKind.ComposedFunction) {
       let paramTypeAsts: Value[] = [];
@@ -334,7 +334,7 @@ function resolveSubjectTypeName(
 ): string | null {
   // Strip carriers; flattened structures answer through the channel plane.
   if (subject.kind === ValueKind.Structure) {
-    const t = channelReadRaw(subject as Value, "type");
+    const t = metaReadRaw(subject as Value, "type");
     if (t) return resolveTypeName(t, typeLookup);
     const pp = (subject as { primary?: Value }).primary;
     if (pp !== undefined) {
@@ -926,7 +926,7 @@ function whyHofCallNotDecreasing(site: CallSite & { kind: "hof" }): string | nul
   return `HOF-mediated recursive call via \`.${site.method}\`: ${recvDesc} is not structurally smaller than any parameter (consider a \`decreases\` clause or \`partial\`)`;
 }
 
-/** Tarjan's strongly-connected-components algorithm. Returns a map from
+/** Tarjan's strongly-connected-meta algorithm. Returns a map from
  *  each node to its SCC's member set. Non-function callees in the graph
  *  (e.g. references to top-level value bindings that happen to share a
  *  name with no function) are skipped via the `graph.has` check. */
@@ -1018,13 +1018,13 @@ function checkUserMetric(
   if (metric.kind === ValueKind.Expression) {
     const fn = dataOf((metric as ExpressionValue).fn);
     if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
-      const components = (metric as ExpressionValue).args;
-      // For each call, walk through components left-to-right. The metric
+      const meta = (metric as ExpressionValue).args;
+      // For each call, walk through meta left-to-right. The metric
       // strictly decreases if SOME component strictly decreases AND ALL
-      // earlier components stay equal (i.e. the same param passes through
+      // earlier meta stay equal (i.e. the same param passes through
       // unchanged in those positions).
       for (const call of calls) {
-        const decreasedAt = findLexDecreasePosition(components, call);
+        const decreasedAt = findLexDecreasePosition(meta, call);
         if (decreasedAt < 0) {
           reasons.push(`lexicographic metric does not decrease on at least one recursive call`);
         }
@@ -1038,17 +1038,17 @@ function checkUserMetric(
   return { reasons, recognized: false };
 }
 
-/** Walk lex-tuple components: return the index of the first strictly-
- *  decreasing component where all earlier components are stable (same Param
+/** Walk lex-tuple meta: return the index of the first strictly-
+ *  decreasing component where all earlier meta are stable (same Param
  *  passes through), or -1 if no such index exists. */
-function findLexDecreasePosition(components: Value[], call: ExpressionValue): number {
-  for (let i = 0; i < components.length; i++) {
-    // All earlier components must stay equal — for Stage 3 minimum we
+function findLexDecreasePosition(meta: Value[], call: ExpressionValue): number {
+  for (let i = 0; i < meta.length; i++) {
+    // All earlier meta must stay equal — for Stage 3 minimum we
     // require each earlier component to be a Param at some position p such
     // that call.args[p] is the same Param (no change).
     let earlierStable = true;
     for (let j = 0; j < i; j++) {
-      const c = components[j];
+      const c = meta[j];
       if (c.kind !== ValueKind.Param) { earlierStable = false; break; }
       const pos = (c as any).position as number;
       if (pos >= call.args.length) { earlierStable = false; break; }
@@ -1060,7 +1060,7 @@ function findLexDecreasePosition(components: Value[], call: ExpressionValue): nu
     if (!earlierStable) continue;
 
     // Component i should strictly decrease.
-    const c = components[i];
+    const c = meta[i];
     if (c.kind !== ValueKind.Param) continue;
     const pos = (c as any).position as number;
     if (pos >= call.args.length) continue;

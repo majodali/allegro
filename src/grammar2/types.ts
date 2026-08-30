@@ -185,7 +185,7 @@ export interface Grammar {
      */
     levels?: Map<string, number>;
   };
-  meta: Record<string, unknown>;
+  grammarMeta: Record<string, unknown>;
   /**
    * Phase 6: provenance chain of base grammars. Present on grammars built via
    * `grammar { … }` / `grammar extends X { … }`. Compatibility check at `use`
@@ -201,7 +201,7 @@ export function makeGrammar(init?: Partial<Grammar>): Grammar {
     start:       init?.start ?? "",
     reserved:    init?.reserved ?? new Map(),
     precedence:  init?.precedence ?? { constraints: [] },
-    meta:        init?.meta ?? {},
+    grammarMeta: init?.grammarMeta ?? {},
     baseChain:   init?.baseChain,
   };
 }
@@ -241,7 +241,7 @@ export interface GrammarDelta {
   productions:      Map<string, Operation>;
   reserved:         Map<string, Set<string>>;
   precedence_adds:  PrecedenceInsert[];
-  meta:             Record<string, unknown>;
+  grammarMeta:      Record<string, unknown>;
 }
 
 export function makeDelta(init?: Partial<GrammarDelta>): GrammarDelta {
@@ -249,7 +249,7 @@ export function makeDelta(init?: Partial<GrammarDelta>): GrammarDelta {
     productions:     init?.productions     ?? new Map(),
     reserved:        init?.reserved        ?? new Map(),
     precedence_adds: init?.precedence_adds ?? [],
-    meta:            init?.meta            ?? {},
+    grammarMeta:     init?.grammarMeta     ?? {},
   };
 }
 

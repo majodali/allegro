@@ -253,11 +253,11 @@ const grammar2_parse_impl: PrimitiveFnImpl = (args) => {
   const input = stringArg(args[1], "grammar2_parse");
   const result = engineParse(g, input);
   if (!result.ok) {
-    const components = new Map<string, Value>([
+    const meta = new Map<string, Value>([
       ["error", withType(stringToBits(result.error.message), StringType)],
       ["type",  ErrorType],
     ]);
-    return withMetadata(makeInt(0), components);
+    return withMetadata(makeInt(0), meta);
   }
   return treeToValue(result.tree);
 };
@@ -281,12 +281,12 @@ function treeToValue(tree: ParseTree): Value {
     case "none":
       return noneSingleton;
     case "error": {
-      const components = new Map<string, Value>([
+      const meta = new Map<string, Value>([
         ["error", withType(stringToBits(tree.message), StringType)],
         ["type",  ErrorType],
       ]);
       const inner = tree.inner ? treeToValue(tree.inner) : makeInt(0);
-      return withMetadata(dataOf(inner), components);
+      return withMetadata(dataOf(inner), meta);
     }
   }
 }

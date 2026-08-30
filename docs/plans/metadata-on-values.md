@@ -1,6 +1,6 @@
 # Metadata on values — delete the carrier, build values with their metadata
 
-> Status: **draft** — awaiting maintainer ratification of §6.
+> Status: **active** — §6 ruled 2026-08; **C1 landed**.
 > Owner: **B-121**. Ruled at **D48(b)(c)** (B-108, 2026-08); the *whether*
 > is settled, this plan is the *how*.
 > Outcome (K-007): every representation kind carries its own metadata field,
@@ -27,8 +27,8 @@ rather than from measurement: **12 call sites literally read
 metadata — and one of them is PE Rule 1 itself.
 
 **The change is not a new mechanism.** Structures already work this way:
-`withMetadata` with a Structure primary takes `deriveWithChannels` and the
-metadata rides in `components`, with no carrier involved. The carrier exists
+`withMetadata` with a Structure primary takes `deriveWithMeta` and the
+metadata rides in `meta`, with no carrier involved. The carrier exists
 only because the other six kinds have nowhere to put that field.
 
 ## 2. Four probes run before writing this plan
@@ -67,22 +67,34 @@ does not have, which is B-110's violation relocated into the construction
 path. Optional in the type, **always declared on the object**, per the
 stable-hidden-class convention `types.ts` already states on `makeParam`.
 
-### 3.2 Four operations, four names
+### 3.2 One operation, and two things worth naming
 
-`withMetadata` is one name over four operations — 45 non-test call sites:
+*Corrected 2026-08, after the maintainer asked what distinguishes derive, map
+and stamp in their logic rather than their purpose. The answer is: nothing.
+"Four operations" was an over-decomposition — the mirror image of B-111's
+finding, which was one word over several concepts.*
 
-| operation | sites today | spelled |
+All three are the same function, `(datum, metadata) → value`. They differ only
+in where the two arguments come from:
+
+| pattern | datum argument | metadata argument |
 |---|---|---|
-| **create** — the value never exists without it | 12 | `makeInt(42, meta)`, `makeExpr(fn, args, meta)` |
-| **derive** — same datum, new metadata | 10 | `deriveMeta(v, meta)` |
-| **map** — new datum, metadata carried across | 9 | `mapDatum(v, newDatum)` |
-| **stamp** — computed value, computed metadata | ~14 | `stampMeta(v, meta)` |
+| derive | `dataOf(v)` | fresh `m` |
+| map | a freshly computed datum | `cloneMeta(v)` |
+| stamp | an already-computed value | fresh `m` |
 
-**The map case is the one that earns its name.** Today it is spelled as
-*two* calls — `withMetadata(newP, cloneComponents(v))` — and omitting the
-second **silently drops metadata with no error**. That is the same
-convention-only obligation as the TailCall sentinel (B-113) and the
-ComposedFunction clone helper. Naming it removes the way to get it wrong.
+**Derive disappears entirely** once carriers are gone: `dataOf` becomes the
+identity, so `derive(v, m)` *is* `stamp(v, m)`. They were never two operations
+that happened to coincide — they were one, hidden by the peel.
+
+The surface is therefore **one operation plus two conveniences**, and each
+convenience earns its place for a reason that is not logical:
+
+| surface | why it exists |
+|---|---|
+| `withMeta(v, meta)` | the operation. Replaces derive and stamp outright |
+| `makeInt(42, meta)`, `makeExpr(fn, args, meta)` | a **lifecycle guarantee** (D48(c)): the value never exists in a metadata-less state. It also saves the intermediate allocation, but that is not the reason |
+| `carryMeta(from, to)` | a **hazard guard**. The map case is spelled as *two* calls today — `withMetadata(newP, cloneMeta(v))` — and omitting the second silently drops metadata with no error, the same convention-only obligation as the TailCall sentinel (B-113). Naming it removes the way to get it wrong |
 
 ### 3.3 Per-kind construction, and why each is safe
 
@@ -91,7 +103,7 @@ Measured shares of what carriers wrap, with the clone concern for each:
 | kind | share | concern | already solved by |
 |---|---|---|---|
 | Bits | 50.5% | none | — |
-| PrimitiveFunction | 46.0% | host expandos (`CHANNEL_WRITER_BRAND`) | `primitives.ts` already clones one and re-stamps the brand |
+| PrimitiveFunction | 46.0% | host expandos (`FIELD_WRITER_BRAND`) | `primitives.ts` already clones one and re-stamps the brand |
 | ComposedFunction | 1.3% | `param.owner`; `PRESERVED_FN_META_KEYS` | the shared clone helper CLAUDE.md mandates. **RULED: `param.owner` continues to represent the ORIGINAL function** (maintainer, 2026-08) |
 | Expression | 1.3% | `memo` | the clone **shares** the map — same `fn`+`args` ⇒ same memo, preserving IC-6 |
 | Param | 0.8% | `owner` | as ComposedFunction |
@@ -118,8 +130,8 @@ only before the value escapes; after that, derive.*
 
 ### 4.1 Strictly additive, and the read side never moves
 
-The read surface needs **no change**: `channelReadRaw`, `componentsView` and
-`cloneComponents` each take a `Value`, cast, and read `.components`. They
+The read surface needs **no change**: `metaReadRaw`, `metaOf` and
+`cloneMeta` each take a `Value`, cast, and read `.meta`. They
 work the moment the field exists on every kind. So the migration adds the
 field first and everything keeps working before anything writes it.
 
@@ -177,31 +189,39 @@ calls. The metadata `Map` itself is **not** removed. Any further win —
 e.g. exploiting that 98.5% of metadata is a single `type` entry — is a
 separate optimisation below this choice and is out of scope.
 
-## 6. Rulings needed before C1
+## 6. Rulings — taken 2026-08
 
-1. **Names.** `Metadata` / `MetadataBearing` / `meta`, and
-   `deriveMeta` / `mapDatum` / `stampMeta` for the three non-construction
-   operations. Naming is cheap to change now and expensive later, and C1 of
-   the concept campaign (B-111) is about to settle *field* vs *channel* — so
-   these should be chosen to sit correctly beside that vocabulary.
-2. **Symbol.** Metadata on an interned Symbol is measured at **zero**. Do we
-   (a) leave it unhandled and let it work by the generic path, silently
-   breaking FQN identity if it ever happens; (b) assert against it; or
-   (c) permit `meta` as the one field settable on the interned instance?
-   Recommend **(b)** — an assertion costs nothing at zero occurrences and
-   converts a silent identity break into a loud one.
-3. **W1 / W5 retirement** (§5.2) — confirm that deleting invariants whose
-   subject no longer exists is not a PROCESS §6 test weakening.
-4. **Scope of C5.** Deleting `dataOf` touches ~903 sites mechanically. Land
-   it inside this arc, or as its own C9-style rename chunk after it?
-   Recommend **its own chunk** — it is pure churn with a count as its test,
-   and mixing it into a semantic chunk makes that chunk unreviewable.
+1. **Vocabulary — ruled, and wider than the question asked.** The plane is
+   **metadata**; the data attached to a value is **meta**; metadata has
+   **fields**, which are registered, so they are **metadata fields**. A
+   **channel** is an independent high-level system *capability* that uses
+   metadata fields. Every use of *component* or *channel* — alone or inside
+   an identifier — was to be examined and changed where it referred to
+   metadata.
+
+   The examination produced a clean answer: **today every registry entry is a
+   metadata field, so the host-side rename is total.** No channel-level
+   mechanism exists yet; B-111 introduces one and takes the word back. This
+   ruling therefore also settles **B-111's naming half**, leaving that item
+   structural.
+
+2. **Symbol — ruled: assert, but WARN rather than error.** Metadata on an
+   interned Symbol is measured at zero, and no use case for user-created
+   Symbols has been defined; if one appears, the form its metadata should
+   take is not yet clear. So the check emits a **warning**, and is expected
+   to be removable later. Lands with C2, where attachment changes.
+
+3. **W1 / W5 — ruled: retire obsolete tests, but review each one first.** Not
+   a blanket deletion. C4 presents each affected invariant and test
+   individually before removing it.
+
+4. **`dataOf` deletion — ruled: its own chunk** (C5).
 
 ## 7. Chunk sequence
 
 | Chunk | Delivers | Gate |
 |---|---|---|
-| **C1** | `Metadata` / `MetadataBearing` declared and extended by all seven interfaces; `Structure.components` → `meta`; every factory declares the field. **Nothing writes it yet** — the readers already read it | Suite green; **no behaviour change** is the claim, so a green suite on the first run is the evidence |
+| **C1** | ~~`Metadata` / `MetadataBearing` declared and extended by all seven interfaces; `Structure.components` → `meta`; every factory declares the field~~ **DONE 2026-08**, widened by ruling 1 to the whole metadata vocabulary: **430 identifier renames across 28 files** plus the registry's storage and disposition labels. Nothing writes the new field yet | Suite **1198/1198**; typecheck clean |
 | **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier. Carriers stop being created; `newCarrierStructure` loses its only two callers. `dataOf` still compiles and returns `v` | **The risky chunk.** Suite green; §5.1's kind-comparison failures surface here or nowhere |
 | **C3** | The carrier's re-wrap moves into `evaluate` as one uniform carry (§4.2); the three carrier arms are deleted | Suite green; PE fixtures are the oracle for metadata surviving evaluation |
 | **C4** | Delete `primary` (196), `isCarrier` (14), `CarrierStructure` (24), `newCarrierStructure`, W1/W5 and their walker. `concepts.md` §10 leaves the spine | Counts to zero; §6 ruling 3 applied |

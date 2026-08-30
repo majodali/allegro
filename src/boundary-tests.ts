@@ -32,7 +32,7 @@ import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, StructureValue, CarrierStructure, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asStructure, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, SLOT_KEYS, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, metaReadRaw, metaOf, cloneMeta, SLOT_REGISTRY, SLOT_KEYS, viralFields, unionFields, registerMetaField, typeShape, metaFieldSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { withMetadata } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
@@ -105,7 +105,10 @@ interface LintPattern {
 
 // The forbidden-access patterns the accessor layer (C1.1–C1.3) will absorb.
 const LINT_PATTERNS: LintPattern[] = [
-  { name: "components-direct", regex: /\.components\b/g },
+  { name: "meta-direct", regex: /(?<!import)\.meta\b/g },
+  // ^ B-121 C1: the metadata field is `meta`, a far more common word than
+  // the `components` it replaced, so the pattern has to exclude
+  // `import.meta` — a JS language construct, not the metadata plane.
   // B-104(c): the ratchet has to see every way a `__*` name can REACH a
   // key, or it ratchets one spelling while the others go uncounted. This
   // one — a quote-delimited literal — is the original, and stays hard-fail;
@@ -359,20 +362,20 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     if (mv.primary && (mv.primary as Value).kind === ValueKind.Structure) {
       out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is a Context (records flatten — C4.3b/C7.1)", program });
     }
-    const typeComp = mv.components.get("type");
+    const typeComp = mv.meta.get("type");
     if (typeComp && (typeComp as Value).kind !== ValueKind.Expression) {
       const tp = dataOf(typeComp as Value);
       if (!tp || tp.kind !== ValueKind.Structure) {
         out.push({ invariant: "W2 type-component-shape", detail: `type component primary has kind ${tp?.kind}`, program });
       }
     }
-    for (const key of mv.components.keys()) {
-      if (!isRegisteredComponentKey(key)) {
+    for (const key of mv.meta.keys()) {
+      if (!isRegisteredFieldName(key)) {
         out.push({ invariant: "W3 registry-completeness", detail: `unregistered MultiValue component key "${key}"`, program });
       }
     }
     checkValueInvariants(mv.primary as Value, program, out, seen, depth + 1);
-    for (const comp of mv.components.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
+    for (const comp of mv.meta.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
     return;
   }
   if (v.kind === ValueKind.Structure) {
@@ -382,7 +385,7 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     } else if ((v as unknown as Structure).primary !== undefined) {
       // C4.3b (R5 reframe): the DATA planes are role-exclusive (a Context
       // never carries a primary; an MV never carries slots) — the CHANNEL
-      // plane is universal (flattened Contexts carry components directly).
+      // plane is universal (flattened Contexts carry meta directly).
       out.push({ invariant: "W5 role-transparency", detail: "Context role carries a primary (data slots + primary — D17)", program });
     } else {
       // C4.2 (W6): when a dense structure's legacy view exists, it must
@@ -398,11 +401,11 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
       }
     }
     // C4.3b: W3 covers the Context role's channel plane too — flattened
-    // records/arrays carry registry-checked components directly.
-    const sComps = (v as unknown as Structure).components as Map<string, Value> | undefined;
+    // records/arrays carry registry-checked meta directly.
+    const sComps = (v as unknown as Structure).meta as Map<string, Value> | undefined;
     if (sComps !== undefined) {
       for (const key of sComps.keys()) {
-        if (!isRegisteredComponentKey(key)) {
+        if (!isRegisteredFieldName(key)) {
           out.push({ invariant: "W3 registry-completeness", detail: `unregistered Context component key "${key}"`, program });
         }
       }
@@ -520,7 +523,7 @@ export function runDifferentialFixture(f: { src: string; bind: string }): string
     const { evalCtx } = evalSource(f.src, undefined, [createTypeSystem()], undefined, true);
     const v = evalCtx.bindings.get(f.bind)?.value as Value;
     const eff = v ? effectsOf(v) : null;
-    const err = v ? channelReadRaw(v, "error") : undefined;
+    const err = v ? metaReadRaw(v, "error") : undefined;
     return `fmt=${formatValue(v)} | eff=${eff ? [...eff].sort().join(",") : "-"} | err=${err !== undefined ? formatValue(err as Value) : "-"}`;
   } catch (e: any) {
     return `THREW: ${String(e?.message ?? e).slice(0, 60)}`;
@@ -553,7 +556,7 @@ export const FORGERY_SCENARIOS: ForgeryScenario[] = [
 ];
 
 function getTypeNameOf(v: Value): string | null {
-  const t = channelReadRaw(v, "type");
+  const t = metaReadRaw(v, "type");
   const tc = t ? asStructure(t as Value) : null;
   const nv = tc ? getName(tc) : undefined;
   return nv ? bitsToString(dataOf(nv) as BitsValue) : null;
@@ -693,12 +696,12 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(members !== null && members.bindings.size > 0, true, "getMembers reads __members");
     // Channel reads: shape on a typed value, discharged on a proof.
     const x = evalCtx.bindings.get("x")?.value as Value;
-    const shape = asStructure(channelReadRaw(x, "shape") as Value);
+    const shape = asStructure(metaReadRaw(x, "shape") as Value);
     eq(shape !== null, true, "shape channel readable on a typed value");
     eq(bitsToString(dataOf(getName(shape!) as Value) as BitsValue), "Int", "shape of 42 is Int");
     const proofCtx = asStructure(evalCtx.bindings.get("t")?.value as Value);
     eq(proofCtx !== null, true, "theorem binding peels to a proof Context");
-    const discharged = channelReadRaw(proofCtx! as Value, "discharged");
+    const discharged = metaReadRaw(proofCtx! as Value, "discharged");
     eq(discharged !== undefined, true, "discharged channel readable on a proof");
     // Registry self-checks: every registration has an owner + target.
     eq(SLOT_REGISTRY.every((r) => r.owner.length > 0 && r.target.length > 0), true, "registry entries complete");
@@ -840,10 +843,10 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(r.threw, null, "benign component copy should evaluate");
     const t = r.evalCtx!.bindings.get("t")!.value as Value;
     // mv_set produced a NEW value; the proof itself is untouched...
-    eq(componentsView(t).has("note"), false, "original proof gained no component");
+    eq(metaOf(t).has("note"), false, "original proof gained no component");
     // ...and still carries its original proposition + discharge.
     const ctx = asStructure(t)!;
-    const disch = channelReadRaw(t, "discharged") as Value;
+    const disch = metaReadRaw(t, "discharged") as Value;
     eq((dataOf(disch) as any).data, 1n, "still discharged");
     eq(bitsToString(dataOf(getProposition(ctx)!) as BitsValue).includes("1 + 1"), true, "proposition unchanged");
   });
@@ -870,11 +873,11 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
 
   test("forgery C (live): `discharged` never propagates — drop rule enforced", () => {
     // 1. The propagation executors exclude the authority channel entirely.
-    eq(viralChannels().includes("discharged"), false, "not viral");
-    eq(unionChannels().includes("discharged"), false, "not union");
+    eq(viralFields().includes("discharged"), false, "not viral");
+    eq(unionFields().includes("discharged"), false, "not union");
     // 2. Registration-side: an integrity channel cannot take a fabricating rule.
     let threw = "";
-    try { registerChannel({ name: "forgeC_probe", rule: "viral", integrity: true }); }
+    try { registerMetaField({ name: "forgeC_probe", rule: "viral", integrity: true }); }
     catch (e: any) { threw = String(e.message); }
     eq(threw.includes("may not register fabricating"), true, `registration gate: ${threw}`);
     // 3. Propagation-side: combining a real proof with other values through
@@ -1063,7 +1066,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const x = evalCtx.bindings.get("x")!.value as Value;
     const stored = getType(x)!;
     eq(bitsToString(dataOf(getName(stored)!) as BitsValue), "PositiveInt", "stored type keeps the refinement bound");
-    const shape = channelReadRaw(x, "shape") as StructureValue;
+    const shape = metaReadRaw(x, "shape") as StructureValue;
     eq(bitsToString(dataOf(getName(shape)!) as BitsValue), "Int", "shape channel reads the dispatch shape");
     const intCtx = asStructure(scopeLookup(evalCtx, "Int")!.value as Value)!;
     eq(shape === intCtx, true, "shape IS the Int type object (identity)");
@@ -1071,7 +1074,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(k !== null && k.bound === stored, true, "knowledge bound is the refinement certificate");
     const dom = knowledgeDomain(k) as IntervalDomain | null;
     eq(dom?.kind === "interval" && dom.lo === 1, true, "knowledge domain is ≥ 1");
-    eq(channelSpec("knowledge")?.rule, "computed", "knowledge channel registered");
+    eq(metaFieldSpec("knowledge")?.rule, "computed", "knowledge channel registered");
   });
 
   test("shape/knowledge split (C3.1): a type that mints members IS a shape (preserveOps)", () => {
@@ -1079,7 +1082,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\ny = PI(5)\nz = y + 3",
       undefined, [createTypeSystem()], undefined, true);
     const y = evalCtx.bindings.get("y")!.value as Value;
-    const shape = channelReadRaw(y, "shape") as StructureValue;
+    const shape = metaReadRaw(y, "shape") as StructureValue;
     eq(bitsToString(dataOf(getName(shape)!) as BitsValue), "PI", "preserveOps type has its own member set — dispatch must reach its overrides");
     // ...and the lifted operator actually ran: z carries the PI tag.
     const z = evalCtx.bindings.get("z")!.value as Value;
@@ -1111,8 +1114,8 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r2 = evalSource("h = \"hello\"", undefined, [createTypeSystem()], undefined, true);
     const h = r2.evalCtx.bindings.get("h")!.value as Value;
     const narrowed = withPredicates(h, new PredicateSet([makePredicate(effectsDomain(new Set(["irrelevant"])))]));
-    const shapeBefore = channelReadRaw(h, "shape");
-    const shapeAfter = channelReadRaw(narrowed, "shape");
+    const shapeBefore = metaReadRaw(h, "shape");
+    const shapeAfter = metaReadRaw(narrowed, "shape");
     eq(shapeBefore === shapeAfter, true, "attached knowledge leaves the shape untouched");
     const lenGetter = typeMethod(typeShape(getType(narrowed)!), "length");
     eq(lenGetter !== null, true, "member lookup through the shape is knowledge-independent");
@@ -1401,12 +1404,12 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const record = r.evalCtx.bindings.get("p")!.value!;
     // The standard writer idiom: clone the channel plane, extend, re-derive
     // (the given map is authoritative — deletion must stay expressible).
-    const comps = cloneComponents(record);
+    const comps = cloneMeta(record);
     comps.set("exported", makeInt(1));
     const stamped = withMetadata(dataOf(record), comps);
     eq((stamped as Value).kind, ValueKind.Structure, "wrapping a Context derives a flattened Context");
-    eq(channelReadRaw(stamped as Value, "exported") !== undefined, true, "the new channel rides");
-    eq(channelReadRaw(stamped as Value, "type") !== undefined, true, "cloned channels carry forward");
+    eq(metaReadRaw(stamped as Value, "exported") !== undefined, true, "the new channel rides");
+    eq(metaReadRaw(stamped as Value, "type") !== undefined, true, "cloned channels carry forward");
     eq(dataOf(stamped as Value) === (stamped as Value), true, "the derived value is transparent to dataOf");
     eq((record as StructureValue).bindings.get("a") === (stamped as unknown as StructureValue).bindings.get("a"), true,
       "copy-on-write derive shares the data plane by reference");
@@ -1944,7 +1947,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const p = r2.evalCtx.bindings.get("p")!.value!;
     eq(dataOf(p).kind === ValueKind.Expression, true,
       "calling Proof mints nothing — the call stays an inert residual");
-    eq(channelReadRaw(p, "discharged") === undefined, true,
+    eq(metaReadRaw(p, "discharged") === undefined, true,
       "…with no discharged channel");
     // (3) Drawing Proof as a bundle copies FIELD declarations only — the
     // lookalike holds no discharged channel, does not conform, and its
@@ -1962,7 +1965,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "Fake = Type.define({v: Int}, Proof)\nx = Fake(1)\nx",
       undefined, [createTypeSystem()], undefined, true);
     const fakeInst = dataOf(r3b.evalCtx.bindings.get("x")!.value!);
-    eq(channelReadRaw(fakeInst, "discharged") === undefined, true,
+    eq(metaReadRaw(fakeInst, "discharged") === undefined, true,
       "the lookalike constructs records — never discharged witnesses");
     // (4) The object-literal forge stays dead (C1.4 gate; scenario A) —
     // the construction gate THROWS on integrity-channel origination.
@@ -2039,13 +2042,13 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   });
 
   test("transparency (C4.3c): proof combinators are plain eager and still see Proof channels", () => {
-    // The former channelAware registration mode is retired — proof_refl is
+    // The former metaAware registration mode is retired — proof_refl is
     // an ordinary eager primitive now, and the Proof structure (a flattened
     // Context since C4.3b) arrives whole.
     const r = evalSource("theorem t: 2 + 2 == 4 by proof_refl(4)\np = proof_refl(7)",
       undefined, [createTypeSystem()], undefined, true);
     const p = r.evalCtx.bindings.get("p")!.value!;
-    eq(channelReadRaw(p, "discharged") !== undefined, true, "proof discharged marker rides");
+    eq(metaReadRaw(p, "discharged") !== undefined, true, "proof discharged marker rides");
     eq(primitives["proof_refl"].lazy ?? false, false, "proof_refl is plain eager");
   });
 
@@ -2058,7 +2061,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource('e = error "boom"\nr = ((e + 1) * 2 - 3) / 4 + 5',
       undefined, [createTypeSystem()], undefined, true);
     const v = r.evalCtx.bindings.get("r")!.value!;
-    const err = channelReadRaw(v, "error");
+    const err = metaReadRaw(v, "error");
     eq(err !== undefined, true, "error channel survives every residual hop");
     eq(formatValue(err as Value), "boom", "the original error payload rides unchanged");
   });

@@ -13,7 +13,7 @@ import { bitsToString, dataOf, BitsValue, makeInt, makeStructure, makeExpr, Valu
 import { applyPhase } from "../runtime.js";
 import { evaluate } from "../evaluator.js";
 import { getTypeName } from "../types-std.js";
-import { componentsView } from "../slots.js";
+import { metaOf } from "../slots.js";
 import { extractGrammarFragment } from "../primitives.js";
 import { primNames, typeNames, fileTest, testsDir } from "./alg-files.js";
 
@@ -434,7 +434,7 @@ test("grammar combinators: parse failure returns error value", () => {
 a = grammar_terminal(g, "a")
 grammar_set_target(g, a)
 grammar_parse(g, "b")`);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 // == Runtime Grammar Extension (Phase 1) ==

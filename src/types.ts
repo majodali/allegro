@@ -5,7 +5,7 @@
 
 // C4.1: the unified Structure class behind MultiValue/Context. structure.ts
 // imports only TYPES from this module, so there is no runtime cycle.
-import { newCarrierStructure, newRecordStructure, newDenseStructure, deriveWithChannels, isCarrier } from "./structure.js";
+import { newCarrierStructure, newRecordStructure, newDenseStructure, deriveWithMeta, isCarrier } from "./structure.js";
 
 export enum ValueKind {
   Bits = "Bits",
@@ -20,9 +20,40 @@ export enum ValueKind {
   Symbol = "Symbol",
 }
 
+// --- The metadata plane (docs/design/concepts.md §18/§19) --------------------
+
+/**
+ * The metadata a value carries through partial evaluation, keyed by
+ * REGISTERED FIELD NAME (`src/slots.ts`). Each field declares a propagation
+ * rule and a writer capability; the propagation table decides what happens
+ * to each on every PE hop.
+ *
+ * Vocabulary (maintainer ruling, 2026-08): the plane is **metadata**, its
+ * entries are **metadata fields**, and a **channel** is a higher-level system
+ * capability that USES metadata fields. The registry holds only fields today,
+ * so nothing here is called a channel; B-111 introduces channel-level
+ * registration and takes the word back.
+ */
+export type Metadata = Map<string, Value>;
+
+/**
+ * Every representation kind carries metadata (D48(b), B-121). Optional
+ * because **Allegretto defines no fields at all** — the base owns the
+ * mechanism and layers own the fields (R6, R11) — so under `--base` a value
+ * legitimately carries nothing. The two populations without metadata are
+ * every value in Allegretto mode and engine intermediates that never become
+ * program values; neither is a Standard-mode program value.
+ *
+ * Optional in the TYPE, always declared on the OBJECT: see `makeParam` on
+ * why every factory sets its optional fields explicitly.
+ */
+export interface MetadataBearing {
+  meta?: Metadata;
+}
+
 // --- Bits: vector of bits with a known length ---
 
-export interface BitsValue {
+export interface BitsValue extends MetadataBearing {
   kind: ValueKind.Bits;
   length: number;
   data: bigint;
@@ -38,7 +69,7 @@ export type PrimitiveFnImpl = (
   evalFn: EvalFn,
 ) => Value;
 
-export interface PrimitiveFunctionValue {
+export interface PrimitiveFunctionValue extends MetadataBearing {
   kind: ValueKind.PrimitiveFunction;
   name: string;
   fn: PrimitiveFnImpl;
@@ -64,7 +95,7 @@ export interface PrimitiveFunctionValue {
 
 // --- Param: positional placeholder within function expressions ---
 
-export interface ParamValue {
+export interface ParamValue extends MetadataBearing {
   kind: ValueKind.Param;
   position: number;
   owner: ComposedFunctionValue | null;
@@ -97,7 +128,7 @@ export interface ParamValue {
 // Created by the parser for identifiers. Resolved by resolveSymbols to
 // the binding's value or a Param (for function parameters).
 
-export interface SymbolValue {
+export interface SymbolValue extends MetadataBearing {
   kind: ValueKind.Symbol;
   /** Base-name projection — printing, lexical resolution, loose matching. */
   name: string;
@@ -110,7 +141,7 @@ export interface SymbolValue {
 
 // --- Composed Function: expression body with declared params ---
 
-export interface ComposedFunctionValue {
+export interface ComposedFunctionValue extends MetadataBearing {
   kind: ValueKind.ComposedFunction;
   params: ParamValue[];
   body: Value;
@@ -118,7 +149,7 @@ export interface ComposedFunctionValue {
 
 // --- Expression: DAG node ---
 
-export interface ExpressionValue {
+export interface ExpressionValue extends MetadataBearing {
   kind: ValueKind.Expression;
   fn: Value;
   args: Value[];
@@ -190,7 +221,7 @@ export interface StructureHostFields {
   scopePredicates?: Map<string, unknown>;
 }
 
-export interface StructureValue extends StructureHostFields {
+export interface StructureValue extends StructureHostFields, MetadataBearing {
   kind: ValueKind.Structure;
   /** Binding plane: what a name resolves to. Also the data plane's storage
    *  for record-role structures — two planes, one map (concepts.md §13). */
@@ -201,14 +232,14 @@ export interface StructureValue extends StructureHostFields {
 // --- The carrier (C7.1, D15/D46; docs/design/concepts.md §10): the
 // former MultiValue KIND is now a CONFIGURATION of Structure — a
 // transparent structure with an empty data plane whose data rides in
-// `primary` and whose metadata rides in `components`. It answers the same
+// `primary` and whose metadata rides in `meta`. It answers the same
 // kind as every structure; the host-level discriminant is primary
 // presence (`isCarrier`). This is the carrier's static shape, for the
 // paths that have already established they hold one.
 
 export type CarrierStructure = StructureValue & {
   primary: Value;
-  components: Map<string, Value>;
+  meta: Metadata;
 };
 
 // --- Union type ---
@@ -225,7 +256,7 @@ export type Value =
 // --- Constructors ---
 
 export function makeBits(length: number, data: bigint | number): BitsValue {
-  return { kind: ValueKind.Bits, length, data: typeof data === "number" ? BigInt(data) : data };
+  return { kind: ValueKind.Bits, length, data: typeof data === "number" ? BigInt(data) : data, meta: undefined };
 }
 
 export function makeInt(value: number): BitsValue {
@@ -254,28 +285,29 @@ export function makePrimitive(
   effects?: string[],
   sourceAware?: boolean,
 ): PrimitiveFunctionValue {
-  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects, sourceAware };
+  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects, sourceAware, meta: undefined };
 }
 
 export function makeParam(position: number, name?: string): ParamValue {
   // Always declare optional fields so V8/JSC see a stable hidden class shape
   // across all Params, whether or not bounds end up being attached later.
   return { kind: ValueKind.Param, position, owner: null, _name: name,
-           predicates: undefined, effectBound: undefined, effectVar: undefined };
+           predicates: undefined, effectBound: undefined, effectVar: undefined,
+           meta: undefined };
 }
 
 export function makeSymbol(name: string): SymbolValue {
   // Transient reference symbol (no FQN). Declare the optional field for a
   // stable hidden class shared with registered symbols (src/symbols.ts).
-  return { kind: ValueKind.Symbol, name, fqn: undefined };
+  return { kind: ValueKind.Symbol, name, fqn: undefined, meta: undefined };
 }
 
 export function makeExpr(fn: Value, args: Value[]): ExpressionValue {
-  return { kind: ValueKind.Expression, fn, args, memo: new Map() };
+  return { kind: ValueKind.Expression, fn, args, memo: new Map(), meta: undefined };
 }
 
 export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunctionValue {
-  const fn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params, body };
+  const fn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params, body, meta: undefined };
   for (const p of params) {
     p.owner = fn;
   }
@@ -291,7 +323,7 @@ export function makeStructure(): StructureValue {
   return newRecordStructure() as unknown as StructureValue;
 }
 
-export function withMetadata(primary: Value, components?: Map<string, Value>): StructureValue {
+export function withMetadata(primary: Value, meta?: Map<string, Value>): StructureValue {
   // C4.3b/C7.1: the ONE channel-attachment chokepoint. A record/array/type
   // primary flattens into a copy-on-write derive (channels ride directly);
   // a CARRIER primary re-wraps its inner data (W1: carriers never nest —
@@ -302,11 +334,11 @@ export function withMetadata(primary: Value, components?: Map<string, Value>): S
   if (primary.kind === ValueKind.Structure) {
     if (isCarrier(primary)) {
       return newCarrierStructure(
-        (primary as CarrierStructure).primary, components ?? new Map()) as unknown as CarrierStructure;
+        (primary as CarrierStructure).primary, meta ?? new Map()) as unknown as CarrierStructure;
     }
-    return deriveWithChannels(primary as StructureValue, components ?? new Map()) as unknown as CarrierStructure;
+    return deriveWithMeta(primary as StructureValue, meta ?? new Map()) as unknown as CarrierStructure;
   }
-  return newCarrierStructure(primary, components ?? new Map()) as unknown as CarrierStructure;
+  return newCarrierStructure(primary, meta ?? new Map()) as unknown as CarrierStructure;
 }
 
 /** C4.2: construct a dense numeric-keyed structure (array context) — the

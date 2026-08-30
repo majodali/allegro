@@ -16,7 +16,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource } from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, dataOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource } from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 import { isCarrier } from "./structure.js";
 
@@ -128,22 +128,22 @@ export function evaluate(
       const ep = evaluate(mv.primary, ctx, depth + 1, depCollector);
       if (ep === mv.primary) return value;
       // If re-evaluation produced another structure, FLATTEN rather than NEST.
-      // Inner (freshly-evaluated) components shadow outer (stale) components —
+      // Inner (freshly-evaluated) meta shadow outer (stale) meta —
       // fresh resolved type info should replace pre-computed partial-eval types.
       // C4.3a (R3): union-rule channels (effects) merge by union via the
       // registry-installed merge instead of inner-shadows-outer — effects
       // observed before re-evaluation are facts, not stale guesses.
       if (ep.kind === ValueKind.Structure) {
-        const merged = cloneComponents(mv);
-        for (const [k, v] of componentsView(ep)) {
+        const merged = cloneMeta(mv);
+        for (const [k, v] of metaOf(ep)) {
           const prev = merged.get(k);
-          const mergeFn = prev !== undefined && channelSpec(k)?.rule === "union"
-            ? channelMerge(k) : undefined;
+          const mergeFn = prev !== undefined && metaFieldSpec(k)?.rule === "union"
+            ? fieldMerge(k) : undefined;
           merged.set(k, mergeFn ? mergeFn(prev!, v) : v);
         }
         return withMetadata(dataOf(ep), merged);
       }
-      return withMetadata(ep, cloneComponents(mv));
+      return withMetadata(ep, cloneMeta(mv));
     }
 
     case ValueKind.Param:
@@ -258,13 +258,13 @@ function evaluateExpr(
   for (const cand of [fnRaw, ...evalArgs]) {
     // C4.3b: flattened Contexts carry channels too.
     if (cand.kind !== ValueKind.Structure) continue;
-    for (const chan of viralChannels()) {
-      const comp = channelReadRaw(cand, chan);
+    for (const chan of viralFields()) {
+      const comp = metaReadRaw(cand, chan);
       if (comp) {
-        const components = new Map<string, Value>([[chan, comp]]);
-        const typeComp = channelReadRaw(cand, "type");
-        if (typeComp) components.set("type", typeComp);
-        const out = withMetadata(residual, components);
+        const meta = new Map<string, Value>([[chan, comp]]);
+        const typeComp = metaReadRaw(cand, "type");
+        if (typeComp) meta.set("type", typeComp);
+        const out = withMetadata(residual, meta);
         return residualEffects ? withEffects(out, residualEffects) : out;
       }
     }
@@ -361,11 +361,11 @@ function applyPrimitive(
   if (viralHit) return attachEff(viralHit);
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
-    // Even though args aren't fully resolved, their type components
+    // Even though args aren't fully resolved, their type meta
     // may be known. Use type-level dispatch to infer the result type.
     // C4.3b: flattened Contexts carry the type channel too.
     if (evalArgs[0]?.kind === ValueKind.Structure) {
-      const typeComp = channelReadRaw(evalArgs[0], "type");
+      const typeComp = metaReadRaw(evalArgs[0], "type");
       if (typeComp && typeComp.kind === ValueKind.Structure) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
         if (methodName) {
@@ -404,7 +404,7 @@ function applyPrimitive(
   // This enables operator overloading (e.g., String + String = concatenation).
   // C4.3b: flattened Contexts (typed records/arrays) dispatch too.
   if (evalArgs[0]?.kind === ValueKind.Structure) {
-    const typeComp = channelReadRaw(evalArgs[0], "type");
+    const typeComp = metaReadRaw(evalArgs[0], "type");
     if (typeComp && typeComp.kind === ValueKind.Structure) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
       if (methodName) {
@@ -456,7 +456,7 @@ function applyPrimitive(
   // channels intact, and read data through the accessors (dataOf/asBits
   // are identity-or-unwrap). The boundary no longer strips; the
   // propagation table alone governs channels. This also retires the
-  // C1.5 `channelAware` registration mode (it is now everyone's default)
+  // C1.5 `metaAware` registration mode (it is now everyone's default)
   // and the "register lazy to dodge stripping" idiom — lazy is purely an
   // evaluation-control choice again.
   if (typeof fn.fn !== "function") {
@@ -469,7 +469,7 @@ function applyPrimitive(
   let out: Value;
   if (result.kind === ValueKind.Bits
       && evalArgs[0]?.kind === ValueKind.Structure) {
-    const typeComp = channelReadRaw(evalArgs[0], "type");
+    const typeComp = metaReadRaw(evalArgs[0], "type");
     if (typeComp) out = withMetadata(result, new Map([["type", typeComp]]));
     else          out = result;
   } else {
@@ -498,17 +498,17 @@ function applyPrimitive(
 // Table linkage for the grandfathered/bespoke rules lives in
 // assertPropagationTableLinkage below.
 function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
-  const viral = viralChannels();
+  const viral = viralFields();
   for (const arg of evalArgs) {
     // C4.3b: flattened Contexts carry channels too.
     if (arg.kind !== ValueKind.Structure) continue;
     for (const chan of viral) {
-      const comp = channelReadRaw(arg, chan);
+      const comp = metaReadRaw(arg, chan);
       if (comp) {
-        const components = new Map<string, Value>([[chan, comp]]);
-        const typeComp = channelReadRaw(arg, "type");
-        if (typeComp) components.set("type", typeComp);
-        return withMetadata(makeExpr(residualFn, evalArgs), components);
+        const meta = new Map<string, Value>([[chan, comp]]);
+        const typeComp = metaReadRaw(arg, "type");
+        if (typeComp) meta.set("type", typeComp);
+        return withMetadata(makeExpr(residualFn, evalArgs), meta);
       }
     }
   }
@@ -526,7 +526,7 @@ function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
     ["predicates", "computed"], ["domain", "computed"], ["discharged", "drop"],
   ];
   for (const [chan, rule] of expect) {
-    const spec = channelSpec(chan);
+    const spec = metaFieldSpec(chan);
     if (!spec || spec.rule !== rule) {
       throw new Error(`propagation-table linkage: evaluator implements '${chan}' as ${rule}, registry says ${spec?.rule ?? "unregistered"}`);
     }
@@ -695,7 +695,7 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
       if (!isCarrier(value)) return value;
       const mv = value as CarrierStructure;
       const newP = remapParams(mv.primary, paramMap);
-      return newP === mv.primary ? value : withMetadata(newP, cloneComponents(mv));
+      return newP === mv.primary ? value : withMetadata(newP, cloneMeta(mv));
     }
     case ValueKind.Param: {
       const replacement = paramMap.get(value);
@@ -743,7 +743,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       if (!isCarrier(value)) return value;
       const mv = value as CarrierStructure;
       const newP = subst(mv.primary, owner, posMap, seen);
-      return newP === mv.primary ? value : withMetadata(newP, cloneComponents(mv));
+      return newP === mv.primary ? value : withMetadata(newP, cloneMeta(mv));
     }
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
@@ -962,7 +962,7 @@ function checkArgType(
   }
 
   // Use meta-type instanceof (Type's shape-aware check: nominal if both named, structural otherwise)
-  const typeType = channelReadRaw(expected, "shape") as StructureValue | undefined;
+  const typeType = metaReadRaw(expected, "shape") as StructureValue | undefined;
   if (typeType) {
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
@@ -1013,12 +1013,12 @@ export function precompileFunction(
       // Typed param: create MultiValue(Param, type: paramType). If the type
       // is refined and carries an abstract domain (Phase B), seed the domain
       // on the placeholder so propagation rules fire during precompile.
-      const components = new Map<string, Value>([["type", paramType]]);
+      const meta = new Map<string, Value>([["type", paramType]]);
       const dom = (paramType as any).abstractDomain;
       if (dom && dom.kind !== "opaque") {
         const domCtx: StructureValue = makeStructure();
         (domCtx as any).abstractDomain = dom;
-        components.set("domain", domCtx);
+        meta.set("domain", domCtx);
       }
       // F2: preserve effectBound/effectVar on the placeholder so PE's
       // Param-call residual path can attach the e-effect when the body
@@ -1027,7 +1027,7 @@ export function precompileFunction(
       const innerParam = makeParamHelper(param.position, param._name);
       if (param.effectBound) (innerParam as any).effectBound = param.effectBound;
       if (param.effectVar !== undefined) (innerParam as any).effectVar = param.effectVar;
-      const placeholder = withMetadata(innerParam, components);
+      const placeholder = withMetadata(innerParam, meta);
       placeholders.push(placeholder);
     } else {
       // Untyped or type variable — leave as bare Param. Same

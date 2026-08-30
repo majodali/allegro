@@ -4,6 +4,71 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 C1: the metadata vocabulary, and the field on every kind
+
+First chunk of `docs/plans/metadata-on-values.md`. Nothing writes the new
+field yet; the readers already read it, so no behaviour changes.
+
+**Vocabulary, per the maintainer ruling.** The plane is **metadata**, the data
+attached to a value is **meta**, metadata has **fields** which are registered,
+and a **channel** is a higher-level system capability that uses metadata
+fields. Examining every `component` and `channel` identifier gave a clean
+answer: **today every registry entry is a metadata field, so the host-side
+rename is total.** No channel-level mechanism exists yet — B-111 introduces
+one and takes the word back. That also settles **B-111's naming half**,
+leaving it structural work only.
+
+**430 renames across 28 files.** `channelReadRaw` → `metaReadRaw` (94),
+`components` → `meta` (122), `componentsView` → `metaOf` (49),
+`cloneComponents` → `cloneMeta` (35), `registerChannel` → `registerMetaField`
+(16), and 28 more, plus the registry's own labels (`"mv-component"` →
+`"metadata-field"` on 13 rows; the `"channel"` disposition on 14).
+
+**`Metadata` and `MetadataBearing` are declared, and all seven kinds extend
+them.** `meta` is optional because **Allegretto defines no fields at all** —
+the base owns the mechanism, layers own the fields (R6/R11) — so under
+`--base` a value legitimately carries nothing. Every factory sets it
+explicitly, per the stable-hidden-class convention `types.ts` already states
+on `makeParam`.
+
+**A scope boundary, stated rather than crossed.** Six of the names carrying
+the old vocabulary are **registered Allegro primitives** — `channel_register`,
+`channel_read`, `channel_list`, `channel_attenuate`, `component_get`,
+`mv_components` — named in ratified decisions D23/D24/D27/D28 and in
+`language-reference.md`. Renaming those is a language change, not a code
+rename, and it needs its own decision and the website loop. C1 did the host
+side only. (The `mv_*` primitives are also D46 residue in the language
+surface, which C9 did not reach.)
+
+**Two things the chunk turned up.**
+
+The boundary lint that forbids direct access to the metadata storage keyed on
+`.components`, a distinctive name; `.meta` is not. It now fires on
+`import.meta` — a JS language construct — so the pattern excludes it
+explicitly. The general lesson is worth keeping: **a lint keyed on a
+distinctive name gets less precise when the name becomes a common word.**
+
+And `grammar2/types.ts` had its own `meta` field: declared on two grammar
+records, initialized in both constructors, and **read nowhere**. Renamed
+`grammarMeta` to clear the collision, and recorded as a **second instance** of
+B-107(d)'s pattern — `ParamValue.predicates` is the first. Two instances in
+different subsystems make it a pattern rather than an oddity: a reserved slot
+with no reader is indistinguishable from dead code, and the project has no
+rule about it.
+
+**Correction to the plan, from a maintainer question.** §3.2 claimed four
+operations — create, derive, map, stamp. Asked what separates the last three
+in their *logic* rather than their purpose, the answer is nothing: all three
+are `(datum, metadata) → value`, differing only in where the two arguments
+come from. **Derive disappears entirely** once carriers are gone, because
+`dataOf` becomes the identity. The surface is one operation plus two
+conveniences — construction-with-metadata, which buys a lifecycle guarantee,
+and `carryMeta`, which exists because the map case is spelled as two calls and
+omitting the second silently drops metadata. The original was an
+over-decomposition, and the mirror image of B-111's finding.
+
+Suite **1198/1198**, typecheck clean, doc-ref-lint clean.
+
 ## 2026-08 — B-121 plan: delete the carrier, build values with their metadata
 
 `docs/plans/metadata-on-values.md`, draft, chunks C1–C7. D48(b)(c) settled

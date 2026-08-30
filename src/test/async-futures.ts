@@ -10,7 +10,7 @@ import { typeExt } from "./fixtures.js";
 import { getTypeName } from "../types-std.js";
 import { evalSource as runtimeEval, Extension, applyPhase } from "../runtime.js";
 import { createFutureManager } from "../futures.js";
-import { channelReadRaw } from "../slots.js";
+import { metaReadRaw } from "../slots.js";
 import { formatValue, extractGrammarFragment } from "../primitives.js";
 import { primNames, typeNames } from "./alg-files.js";
 import { Value, ValueKind, BitsValue, StructureValue, dataOf, makeInt, bitsToString, isResolved } from "../types.js";
@@ -100,7 +100,7 @@ export async function runAsyncTests(): Promise<void> {
     await fm.waitForAll();
     const cell = fm.registry.bindings.get(sym.name);
     eq(cell?.isComplete, true, "rejection completed the cell");
-    const err = channelReadRaw(cell!.value!, "error");
+    const err = metaReadRaw(cell!.value!, "error");
     eq(err !== undefined, true, "cell holds an error-channel value");
     eq(bitsToString(dataOf(err!) as BitsValue).includes("boom"), true, "rejection reason preserved");
   });
@@ -125,7 +125,7 @@ export async function runAsyncTests(): Promise<void> {
     eq(rb?.isComplete, false, "construction is HELD while the inspected field is pending (D32 guard)");
     await fm.waitForAll();
     eq(rb?.isComplete, true, "construction completed after the field resolved");
-    const err = channelReadRaw(rb!.value!, "error");
+    const err = metaReadRaw(rb!.value!, "error");
     eq(err !== undefined, true, "invariant checked BEFORE the value exists — 1 <= 0 fails as an error value");
   });
 
@@ -384,7 +384,7 @@ export async function runAsyncTests(): Promise<void> {
     await fm.waitForAll(); // delay resolves to 0; 0 > 0 fails the invariant
     const xb = r.registry.bindings.get("x");
     eq(xb?.isComplete, true, "the dependent completed (the pre-F4 cascade THREW here and killed the host)");
-    const err = channelReadRaw(xb!.value!, "error");
+    const err = metaReadRaw(xb!.value!, "error");
     eq(err !== undefined, true, "the projection completed as the construction error (viral discipline)");
     eq(bitsToString(dataOf(err!) as BitsValue).includes("refinement check failed"), true,
       "the error is the CONSTRUCTION's, propagated — not a fresh dispatch error");

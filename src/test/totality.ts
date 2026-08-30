@@ -407,7 +407,7 @@ fileTest(path.join(testsDir, "totality-decreases-demo.alg"));
 
 // --- Phase E Stage 4: mutual recursion via SCC ---
 //
-// The call-graph analyzer groups bindings into strongly-connected components.
+// The call-graph analyzer groups bindings into strongly-connected meta.
 // Within each SCC, EVERY call to an SCC member must be provably decreasing
 // (against the callee's param types) for the whole cycle to terminate.
 

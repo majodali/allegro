@@ -18,7 +18,7 @@ import { resolveSymbols, buildEvalCtx, resolvePrimitives, typeLiterals } from ".
 import { parse as g2parse } from "../grammar2/engine.js";
 import { getGrammarWithFragments as g2getGrammarWithFragments } from "../grammar2/fragments.js";
 import { getTypeName } from "../types-std.js";
-import { getName, componentsView, getSlotCount } from "../slots.js";
+import { getName, metaOf, getSlotCount } from "../slots.js";
 import { testsDir } from "./alg-files.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -855,7 +855,7 @@ test("grammar2/std: `of` infix accesses MultiValue component", () => {
 
 test("grammar2/std: `error expr` creates an error value", () => {
   const r = evalStandard2('error "something broke"');
-  eq(componentsView(r!).has("error"), true);
+  eq(metaOf(r!).has("error"), true);
 });
 
 test("grammar2/std: `error of x` extracts error component", () => {
@@ -995,7 +995,7 @@ test("grammar2/std: refinement type creation", () => {
 
 test("grammar2/std: refinement check failure produces error", () => {
   const r = evalStandard2("PI = Int & _ > 0\nPI(0 - 5)");
-  eq(componentsView(r!).has("error"), true);
+  eq(metaOf(r!).has("error"), true);
 });
 
 test("grammar2/std: compound refinement predicates", () => {
@@ -1429,7 +1429,7 @@ grammar2_parse(g, "hello")
   // Parse tree for the "s" production wrapping a single literal leaf.
   // Shape: Object { tag: "s", children: ["hello"] } OR just a String if the
   // engine collapsed the single-child branch. Either way, primary is not an error.
-  eq(componentsView(r!).has("error"), false);
+  eq(metaOf(r!).has("error"), false);
 });
 
 test("grammar2 primitives: sequence via Allegro", () => {
@@ -1439,7 +1439,7 @@ grammar2_add_production(g, "s", grammar2_seq([grammar2_lit("ab"), grammar2_lit("
 grammar2_set_start(g, "s")
 grammar2_parse(g, "abcd")
 `);
-  eq(componentsView(r!).has("error"), false);
+  eq(metaOf(r!).has("error"), false);
 });
 
 test("grammar2 primitives: parse failure produces error value", () => {
@@ -1449,7 +1449,7 @@ grammar2_add_production(g, "s", grammar2_lit("hello"))
 grammar2_set_start(g, "s")
 grammar2_parse(g, "world")
 `);
-  eq(componentsView(r!).has("error"), true);
+  eq(metaOf(r!).has("error"), true);
 });
 
 test("grammar2 primitives: left recursion works from Allegro", () => {

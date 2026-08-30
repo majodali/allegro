@@ -10,7 +10,7 @@ import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
 import { dataOf, BitsValue, StructureValue, ValueKind, bitsToString, makeStructure, makeParam, Value, makeComposedFn, stringToBits } from "../types.js";
 import { getTypeName, getType, isGenericType, createTypeSystem, IntType, Type, StringType, typeMethod, structuralWrap, memberDescriptorsOf, isMethodDescriptor, isFieldDescriptor, typeMemberDescriptor, isGetterDescriptor, Effect, pureEffect, opaqueEffect, effectSubsetOf, effectImplies, effectIntersect, effectUnion, InterfaceKind, wrapAsUntypedFunction } from "../types-std.js";
-import { getGenericArgs, channelReadRaw, getName, getWraps, getRefines, getMembers, getInterfaceMarker, getConstruct, componentsView, SLOT_KEYS, setMembers, setName as slotSetName, writeShape } from "../slots.js";
+import { getGenericArgs, metaReadRaw, getName, getWraps, getRefines, getMembers, getInterfaceMarker, getConstruct, metaOf, SLOT_KEYS, setMembers, setName as slotSetName, writeShape } from "../slots.js";
 import { formatValue, primitives as primRegistry } from "../primitives.js";
 import { kernelMemberFqn } from "../symbols.js";
 import { evaluate } from "../evaluator.js";
@@ -158,7 +158,7 @@ test("UntypedFunction: wrapped primitives are still callable", () => {
 
 test("UntypedFunction (B-122): the typed wrapper is built once per primitive", () => {
   // The wrapper is a CONSTANT for a bare registry primitive — a
-  // PrimitiveFunction has no `primary` and no `components`, and
+  // PrimitiveFunction has no `primary` and no `meta`, and
   // UntypedFunctionType is a module-level const. Both Layer-1 builders used
   // to rebuild it for every primitive on every scope build (354 calls over
   // 177 distinct primitives for one file; 708 with a module), which was 90%
@@ -428,14 +428,14 @@ test("compile: non-typed functions not in inferred list", () => {
 
 test("type hierarchy: all types have __type = Type", () => {
   // Int, String, Bool, Float, Object should all have __type = Type
-  const intType = channelReadRaw(IntType, "type");
+  const intType = metaReadRaw(IntType, "type");
   eq(intType === Type, true);
-  const strType = channelReadRaw(StringType, "type");
+  const strType = metaReadRaw(StringType, "type");
   eq(strType === Type, true);
 });
 
 test("type hierarchy: Type has __type = Type (self-referential)", () => {
-  const ttType = channelReadRaw(Type, "type");
+  const ttType = metaReadRaw(Type, "type");
   eq(ttType === Type, true);
 });
 
@@ -493,7 +493,7 @@ test("type hierarchy: nominal subtypeof - different types", () => {
 test("type hierarchy: structural_wrap makes type compare structurally by erasing __name", () => {
   const wrappedInt = structuralWrap(IntType);
   // __type stays Type (no longer flips meta-types — there's only one)
-  const wrapType = channelReadRaw(wrappedInt, "type");
+  const wrapType = metaReadRaw(wrappedInt, "type");
   eq(wrapType === Type, true);
   // __name erased — absence of name is what triggers structural dispatch
   const name = getName(wrappedInt);
@@ -608,7 +608,7 @@ test("typed types: type of Int returns Type", () => {
 // == Effect meta-type (Phase D1 sub-chunk 1.1) ==
 
 test("effect: Effect meta-type has __type = Type", () => {
-  const tt = channelReadRaw(Effect, "type");
+  const tt = metaReadRaw(Effect, "type");
   eq(tt === Type, true);
 });
 
@@ -731,7 +731,7 @@ Printable`);
   eq(marker !== undefined, true);
   eq((marker as BitsValue).data, 1n);
   // C6.1b (D45): an interface is an instance of the Interface kind.
-  eq(channelReadRaw(iface, "type") === InterfaceKind, true);
+  eq(metaReadRaw(iface, "type") === InterfaceKind, true);
 });
 
 test("interfaces: interface has Field descriptors in __members", () => {
@@ -790,7 +790,7 @@ test("interfaces: Type.interface also creates structural type", () => {
   const result = evalStd(`Sized = Interface.define({length: Int}, Int)
 Sized`);
   const iface = dataOf(result!) as StructureValue;
-  eq(channelReadRaw(iface, "type") === InterfaceKind, true);
+  eq(metaReadRaw(iface, "type") === InterfaceKind, true);
 });
 
 test("interfaces: auto-named when bound to symbol", () => {
@@ -902,7 +902,7 @@ PI(5)`);
 test("Refinement spec methods: predicate failure produces error", () => {
   const result = evalStd(`PI = Refinement.define({refines: Int, where: p => p > 0, double: self => self + self})
 PI(0 - 5)`);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("Refinement spec methods: method call works", () => {
@@ -920,13 +920,13 @@ T(50).triple()`);
 test("Refinement spec methods: upper-bound failure produces error", () => {
   const result = evalStd(`T = Refinement.define({refines: Int, where: w => w > 0 && w < 100, triple: self => self * 3})
 T(500)`);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("Refinement spec methods: lower-bound failure produces error", () => {
   const result = evalStd(`T = Refinement.define({refines: Int, where: w => w > 0 && w < 100, triple: self => self * 3})
 T(0 - 10)`);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("Refinement spec methods: refined base as `refines` chains predicates", () => {

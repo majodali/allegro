@@ -21,7 +21,7 @@
 // type) is F7+ and likely requires either richer abstract-domain
 // machinery or an external SMT discharge.
 
-import { dataOf, getName, channelReadRaw, componentsView } from "./slots.js";
+import { dataOf, getName, metaReadRaw, metaOf } from "./slots.js";
 import { scopeLookup } from "./scope.js";
 import {
   Value, ValueKind, StructureValue, ComposedFunctionValue, ExpressionValue,
@@ -152,7 +152,7 @@ function substParams(
       seen.add(v);
       const pp = (v as any).primary;
       if (pp === undefined) return v;
-      return withMetadata(substParams(pp, cfn, posMap, seen), componentsView(v) as Map<string, import("./types.js").Value>);
+      return withMetadata(substParams(pp, cfn, posMap, seen), metaOf(v) as Map<string, import("./types.js").Value>);
     }
     case ValueKind.ComposedFunction: {
       seen.add(v);
@@ -197,7 +197,7 @@ export function checkProvenClauses(
       const mv = val as any;
       if (mv.primary?.kind === ValueKind.ComposedFunction) {
         cfn = mv.primary as ComposedFunctionValue;
-        const tComp = channelReadRaw(mv, "type");
+        const tComp = metaReadRaw(mv, "type");
         if (tComp?.kind === ValueKind.Structure) {
           paramTypes = getFunctionParamTypes(tComp as StructureValue);
         }

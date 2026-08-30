@@ -18,7 +18,7 @@ import * as path from "path";
 import { getTypeName, structuralWrap, typeMethod, Type, typeMemberDescriptor, memberDescriptorsOf } from "../types-std.js";
 import { dataOf, BitsValue, bitsToString, makeInt, Value, makeStructure, stringToBits, makePrimitive, makeExpr, StructureValue } from "../types.js";
 import { formatValue } from "../primitives.js";
-import { channelReadRaw, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "../slots.js";
+import { metaReadRaw, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "../slots.js";
 import { evaluate } from "../evaluator.js";
 import { buildModuleObject } from "../modules.js";
 
@@ -466,7 +466,7 @@ test("module export: non-exported values don't have exported component", () => {
   const result = evalStd("x = 42\nx\n");
   // Should NOT have "exported" component
   {
-    eq(channelReadRaw(result!, "exported") === undefined, true);
+    eq(metaReadRaw(result!, "exported") === undefined, true);
   }
 });
 
@@ -474,7 +474,7 @@ test("B-097 V1: export marks the BINDING, not the value (no component)", () => {
   const r = runtimeEval("export x = 42\ny = x\n", undefined, [typeExt], undefined, true);
   eq(r.evalCtx.bindings.get("x")?.visibility, "exported");
   // The value itself carries NO exported marker any more.
-  eq(channelReadRaw(r.evalCtx.bindings.get("x")!.value!, "exported") === undefined, true);
+  eq(metaReadRaw(r.evalCtx.bindings.get("x")!.value!, "exported") === undefined, true);
 });
 
 test("B-097 V1: y = x does NOT export y (the aliasing wart is dead)", () => {

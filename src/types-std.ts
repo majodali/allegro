@@ -1,7 +1,7 @@
 // =============================================================================
 // Allegro Standard — Core Type Definitions
 // Defines Int and String types as Context values with method bindings.
-// Types are attached to values as MultiValue "type" components.
+// Types are attached to values as MultiValue "type" meta.
 // =============================================================================
 
 import { isCarrier } from "./structure.js";
@@ -25,8 +25,8 @@ import {
   setWraps, setPredicate, setGenericArgs,
   setGenericBackLink, setProposition,
   setEffectBound, setAbstractDomain,
-  writeShape, carryShape, removeName, removeRefines, removeShapeSlot, kernelChannelWriter, assertNotIntegrityKey,
-  removeConstruct, channelReadRaw, cloneComponents, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape, getFallbackMember,
+  writeShape, carryShape, removeName, removeRefines, removeShapeSlot, kernelFieldWriter, assertNotIntegrityKey,
+  removeConstruct, metaReadRaw, cloneMeta, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape, getFallbackMember,
   equalityShape, asStructure,
 } from "./slots.js";
 
@@ -48,7 +48,7 @@ const META_METHOD_NAMES = new Set([
  *  fallback (so `getType(IntType)` is `Type`, where it was null before the
  *  flatten — type values and typed values read uniformly). */
 export function getType(v: Value): StructureValue | null {
-  const t = channelReadRaw(v, "type");
+  const t = metaReadRaw(v, "type");
   if (t && t.kind === ValueKind.Structure) return t;
   return null;
 }
@@ -71,11 +71,11 @@ export function getTypeName(v: Value): string | null {
  *  construction, preserveOps result re-tagging) and remain legal. */
 export function withType(v: Value, type: StructureValue): Value {
   const primary = dataOf(v);
-  // C4.3b: cloneComponents is total — a flattened Context's channels carry
+  // C4.3b: cloneMeta is total — a flattened Context's channels carry
   // forward (and its prior type makes the shape guard live for Contexts;
   // construction-point re-tags use withTypeReplacing).
-  const components = cloneComponents(v);
-  const prior = components.get("type");
+  const meta = cloneMeta(v);
+  const prior = meta.get("type");
   if (prior !== undefined && prior !== (type as Value)
       && prior.kind === ValueKind.Structure && type?.kind === ValueKind.Structure) {
     const priorShape = typeShape(prior as StructureValue);
@@ -87,8 +87,8 @@ export function withType(v: Value, type: StructureValue): Value {
       );
     }
   }
-  components.set("type", type);
-  return withMetadata(primary, components);
+  meta.set("type", type);
+  return withMetadata(primary, meta);
 }
 
 /** C3.2 (D36): annotation-boundary crossing. Called AFTER the type check
@@ -129,14 +129,14 @@ export function applyBoundaryBound(v: Value, expected: StructureValue): Value {
  *  path. `typeLiterals` provisionally guesses every 64-bit literal as Int;
  *  the `typed_*` wrappers are the literal's REAL construction point and
  *  replace the guess outright (e.g. an 8-character string literal arrives
- *  Int-guessed and leaves String). Non-type components (error, effects,
+ *  Int-guessed and leaves String). Non-type meta (error, effects,
  *  predicates) are preserved. Post-construction code uses `withType`,
  *  which refuses cross-shape re-stamps (C3.1, D36). */
 export function withTypeReplacing(v: Value, type: StructureValue): Value {
   const primary = dataOf(v);
-  const components = cloneComponents(v);
-  components.set("type", type);
-  return withMetadata(primary, components);
+  const meta = cloneMeta(v);
+  meta.set("type", type);
+  return withMetadata(primary, meta);
 }
 
 /** Get the __name from a type Context directly (not from a typed value) */
@@ -425,7 +425,7 @@ export function memberDescriptorsOf(type: StructureValue): Map<string, Structure
 // Held write capability for the discharged integrity channel (C1.4, D21-D24).
 // Module-scope, never exported — makeProof is this module's only
 // origination site.
-const dischargedWriterStd = kernelChannelWriter("discharged");
+const dischargedWriterStd = kernelFieldWriter("discharged");
 
 function addBinding(ctx: StructureValue, key: string, value: Value): void {
   ctx.bindings.set(key, { key, value });
@@ -769,7 +769,7 @@ export function makeLawDescriptor(
 
 /** Check if a descriptor is a Law */
 export function isLawDescriptor(desc: StructureValue): boolean {
-  return channelReadRaw(desc, "shape") === LawType;
+  return metaReadRaw(desc, "shape") === LawType;
 }
 
 function lawDescriptorParts(desc: StructureValue): {
@@ -810,7 +810,7 @@ export function forAllBody(v: Value): Value | undefined {
 
 /** Check if a descriptor is a Method */
 export function isMethodDescriptor(desc: StructureValue): boolean {
-  return channelReadRaw(desc, "shape") === MethodType;
+  return metaReadRaw(desc, "shape") === MethodType;
 }
 
 /** B-097 V3 (D43): is this member declared `private`? */
@@ -848,7 +848,7 @@ export function specModifiers(v: Value): { inner: Value; attrs: MemberAttrs } | 
 
 /** Check if a descriptor is a Field */
 export function isFieldDescriptor(desc: StructureValue): boolean {
-  return channelReadRaw(desc, "shape") === FieldType;
+  return metaReadRaw(desc, "shape") === FieldType;
 }
 
 /** Check if a Method descriptor is a getter (auto-call with self) */
@@ -1448,7 +1448,7 @@ export function buildRefinedType(parentType: StructureValue, predicate: Value, c
       // deeper refinement check failed further up the chain), propagate
       // it without re-tagging or running this predicate. Without this, a
       // deeper refinement's error would get silently retagged.
-      if (channelReadRaw(value, "error") !== undefined) return value;
+      if (metaReadRaw(value, "error") !== undefined) return value;
 
       // Apply predicate
       const checkResult = cevalFn!(makeExpr(predicate, [value]), cctx!);
@@ -1495,10 +1495,10 @@ export function buildRefinedType(parentType: StructureValue, predicate: Value, c
           constraintDesc = `: expected ${formatDomain(dom)}`;
         }
         const msg = `refinement check failed${constraintDesc}${cexDesc}`;
-        const components = new Map<string, Value>();
-        components.set("error", withType(stringToBits(msg), StringType));
-        components.set("type", ErrorType);
-        return withMetadata(makeInt(0), components);
+        const meta = new Map<string, Value>();
+        meta.set("error", withType(stringToBits(msg), StringType));
+        meta.set("type", ErrorType);
+        return withMetadata(makeInt(0), meta);
       }
 
       // Re-tag with refined type, and attach the abstract domain so downstream
@@ -1617,7 +1617,7 @@ function buildPreserveOps(refinedType: StructureValue, opNames: string[]): Struc
     const preserveCheckImpl: PrimitiveFnImpl = (cargs, cctx, cevalFn) => {
       let value = cevalFn!(cargs[0], cctx!);
       value = resolveDataSlots(value, cctx, cevalFn);
-      if (channelReadRaw(value, "error") !== undefined) return value;
+      if (metaReadRaw(value, "error") !== undefined) return value;
       const checkResult = cevalFn!(makeExpr(predicate, [value]), cctx!);
       if (!isResolved(checkResult)) {
         return makeExpr(makePrimitive("refined.__check", preserveCheckImpl, true), [value]);
@@ -1649,10 +1649,10 @@ function buildPreserveOps(refinedType: StructureValue, opNames: string[]): Struc
           };
           constraintDesc = `: expected ${fmt(dom)}`;
         }
-        const components = new Map<string, Value>();
-        components.set("error", withType(stringToBits(`refinement check failed${constraintDesc}${cexDesc}`), StringType));
-        components.set("type", ErrorType);
-        return withMetadata(makeInt(0), components);
+        const meta = new Map<string, Value>();
+        meta.set("error", withType(stringToBits(`refinement check failed${constraintDesc}${cexDesc}`), StringType));
+        meta.set("type", ErrorType);
+        return withMetadata(makeInt(0), meta);
       }
       return withTypeReplacing(dataOf(value), newType);
     };
@@ -1766,7 +1766,7 @@ function buildMethodLayer(baseType: StructureValue, methods: { name: string; imp
   if (parentConstruct?.kind === ValueKind.PrimitiveFunction) {
     setConstruct(newType, makePrimitive("methods.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-      if (channelReadRaw(value, "error") !== undefined) return value;
+      if (metaReadRaw(value, "error") !== undefined) return value;
       return withTypeReplacing(dataOf(value), newType);
     }, true));
   }
@@ -2404,7 +2404,7 @@ function instantiateLawsFromMembers(
 function isDischargedProofValue(v: Value): boolean {
   const p = dataOf(v);
   if (p.kind !== ValueKind.Structure) return false;
-  const d = channelReadRaw(p, "discharged");
+  const d = metaReadRaw(p, "discharged");
   if (!d) return false;
   const dp = dataOf(d);
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 1n;
@@ -3680,7 +3680,7 @@ function defaultConcreteType(
  * are the instances of the GenericType kind. The __isGeneric flag is gone.
  */
 export function isGenericType(type: StructureValue): boolean {
-  return channelReadRaw(type, "type") === GenericType;
+  return metaReadRaw(type, "type") === GenericType;
 }
 
 /**
@@ -4338,10 +4338,10 @@ export function isProof(v: Value): boolean {
  *
  * Memoized only for `PrimitiveFunction`, where determinism is PROVABLE
  * rather than argued: a PrimitiveFunction has no `primary` (so `dataOf` is
- * identity) and no `components` (so `cloneComponents` is empty), and
+ * identity) and no `meta` (so `cloneMeta` is empty), and
  * `UntypedFunctionType` is a module-level const, so the result is exactly
  * `withMetadata(fn, {type: UntypedFunctionType})` for the life of the
- * process. Other inputs take the unmemoized path — a Structure's components
+ * process. Other inputs take the unmemoized path — a Structure's meta
  * can still be populated during construction, and the cache must not depend
  * on an argument about every possible input.
  *
@@ -4364,9 +4364,9 @@ export function wrapAsUntypedFunction(fn: Value): Value {
     if (hit !== undefined) return hit;
   }
   const primary = dataOf(fn);
-  const components = cloneComponents(fn);
-  components.set("type", UntypedFunctionType);
-  const wrapped = withMetadata(primary, components);
+  const meta = cloneMeta(fn);
+  meta.set("type", UntypedFunctionType);
+  const wrapped = withMetadata(primary, meta);
   if (fn.kind === ValueKind.PrimitiveFunction) {
     untypedFnWrappers.set(fn as unknown as object, wrapped);
   }
@@ -4378,7 +4378,7 @@ export function wrapAsUntypedFunction(fn: Value): Value {
  */
 /** C4.3b: user-visible type bindings ARE the type Context — the former
  *  MultiValue wrap is gone. A bare type Context already answers its
- *  meta-type through `channelReadRaw(t, "type"/"shape")` (the `__type`
+ *  meta-type through `metaReadRaw(t, "type"/"shape")` (the `__type`
  *  binding-plane fallback), and `getType` is total, so `type of Int`,
  *  `Int instanceof Type`, and meta-method dispatch all read the same
  *  storage the internal singletons use. Identity is the point: annotation

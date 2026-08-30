@@ -11,7 +11,7 @@
 // See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { dataOf, channelReadRaw, backingsOf } from "./slots.js";
+import { dataOf, metaReadRaw, backingsOf } from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, StructureValue, ComposedFunctionValue,
@@ -238,7 +238,7 @@ export function summarizeValue(v: Value): ValueSummary {
   // refined type Context's stored abstractDomain.
   let preds = predicatesOf(v);
   if (!preds && v.kind === ValueKind.Structure) {
-    const typeComp = channelReadRaw(v, "type");
+    const typeComp = metaReadRaw(v, "type");
     if (typeComp?.kind === ValueKind.Structure) {
       const fromType = (typeComp as any).abstractDomain;
       if (fromType && fromType.kind) {

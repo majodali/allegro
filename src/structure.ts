@@ -32,7 +32,7 @@
 //     numeric-keyed structures), read through `dataOf`
 //   - binding plane  → the same maps, keyed by NAME: what a scope
 //     resolves and what a type's members hang off
-//   - metadata plane → `components` (carrier role; every key is
+//   - metadata plane → `meta` (carrier role; every key is
 //     registry-checked by the W3 walker)
 //   - host plane     → NOT part of the value: `parent`, `isScope`,
 //     `scopePredicates` (declared as `StructureHostFields` in types.ts)
@@ -70,7 +70,7 @@ export class Structure {
 
   // --- Carrier configuration (transparent value: primary + channel plane) ---
   primary: Value;
-  components: Map<string, Value>;
+  meta: Map<string, Value>;
 
   // --- Context role (record/type/scope: slot plane) ---
   private _bindings: Map<string, Binding>;
@@ -97,7 +97,7 @@ export class Structure {
   constructor(immutable: boolean) {
     this.kind = ValueKind.Structure;
     this.primary = undefined as unknown as Value;
-    this.components = undefined as unknown as Map<string, Value>;
+    this.meta = undefined as unknown as Map<string, Value>;
     this._bindings = undefined as unknown as Map<string, Binding>;
     this._bindingList = undefined as unknown as Binding[];
     this.dense = undefined;
@@ -178,10 +178,10 @@ export function isCarrier(v: unknown): boolean {
 
 /** Construct the CARRIER configuration (the D15 transparent structure:
  *  empty data plane + primary channel). */
-export function newCarrierStructure(primary: Value, components: Map<string, Value>): Structure {
+export function newCarrierStructure(primary: Value, meta: Map<string, Value>): Structure {
   const s = new Structure(true);
   s.primary = primary;
-  s.components = components;
+  s.meta = meta;
   return s;
 }
 
@@ -211,10 +211,10 @@ export function newDenseStructure(elements: Value[]): Structure {
  *  Context primary flattens through here, so MV-over-Context is
  *  unconstructible. Scopes are evaluator state, not data — the channel
  *  plane never attaches to them (C2.1 plane rejection). */
-export function deriveWithChannels(ctx: StructureValue, components: Map<string, Value>): Structure {
+export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): Structure {
   const src = ctx as unknown as Structure;
   if (src.isScope) {
-    throw new Error("deriveWithChannels: channels cannot attach to an evaluation scope (plane rejection)");
+    throw new Error("deriveWithMeta: channels cannot attach to an evaluation scope (plane rejection)");
   }
   const s = new Structure(src.immutable);
   if (src.dense !== undefined) {
@@ -224,12 +224,12 @@ export function deriveWithChannels(ctx: StructureValue, components: Map<string, 
     s.bindingList = src.bindingList;
   }
   // The given map is AUTHORITATIVE — it becomes the derived structure's
-  // entire channel plane. Writers pre-clone via cloneComponents (total, so
+  // entire channel plane. Writers pre-clone via cloneMeta (total, so
   // a flattened source's channels are in the clone) and then set/delete;
   // merging here instead would make channel deletion (clearOccurrenceBound)
   // impossible. Callers overlaying a partial map onto an already-channeled
   // Context must clone-and-extend themselves (see evaluate's MV rebuild).
-  s.components = components;
+  s.meta = meta;
   return s;
 }
 

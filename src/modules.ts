@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { evalSource, Extension } from "./runtime.js";
-import { dataOf, cloneComponents, setName, setFallbackMember, isBareBindingName, isFutureBindingName, componentsView } from "./slots.js";
+import { dataOf, cloneMeta, setName, setFallbackMember, isBareBindingName, isFutureBindingName, metaOf } from "./slots.js";
 import { remapParams } from "./evaluator.js";
 import { Value, ValueKind, StructureValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeStructure, makeExpr, withMetadata, stringToBits, bitsToString, AllegroError } from "./types.js";
 import { withType } from "./types-std.js";
@@ -116,7 +116,7 @@ function captureModuleVars(
       if (pp === undefined) return value;
       const newP = captureModuleVars(pp, moduleBindings, ownParams, seen);
       if (newP === pp) return value;
-      return withMetadata(newP, cloneComponents(value));
+      return withMetadata(newP, cloneMeta(value));
     }
 
     default:

@@ -10,7 +10,7 @@ import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
 import { dataOf, BitsValue, bitsToString, ValueKind, StructureValue, Value } from "../types.js";
 import { getTypeName, getType, createTypeSystem } from "../types-std.js";
-import { getName, componentsView, getMembers } from "../slots.js";
+import { getName, metaOf, getMembers } from "../slots.js";
 import { formatValue } from "../primitives.js";
 import { fqnBaseName } from "../symbols.js";
 import { primNames } from "./alg-files.js";
@@ -292,7 +292,7 @@ test("error: creates error MultiValue", () => {
   eq(result !== null, true);
   eq(result!.kind, ValueKind.Structure);
   eq(getType(result!) !== null, true);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("error: has Error type", () => {
@@ -308,17 +308,17 @@ test("error: formatValue shows error", () => {
 test("error: propagates through arithmetic", () => {
   const result = evalStd('error "bad" + 5');
   eq(result !== null, true);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("error: propagates through multiplication", () => {
   const result = evalStd('3 * error "oops"');
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("error: propagates through function calls", () => {
   const result = evalStd('f(x) => x + 1\nf(error "bad")');
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("error: does not propagate through if condition", () => {
@@ -545,7 +545,7 @@ test("where: refinement fails → error", () => {
 PositiveInt = Int & _ > 0
 PositiveInt(0 - 1)
 `);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("where: refined type instanceof parent", () => {
@@ -567,7 +567,7 @@ PositiveInt(5)`);
 test("refinement: && syntax fails on invalid value", () => {
   const result = evalStd(`PositiveInt = Int & _ > 0
 PositiveInt(0 - 5)`);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("refinement: compound predicate with && and &&", () => {
@@ -579,7 +579,7 @@ SmallPos(50)`);
 test("refinement: compound predicate rejects out-of-range", () => {
   const result = evalStd(`SmallPos = Int & _ > 0 && _ < 100
 SmallPos(150)`);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("refinement: bare Int satisfies refined type at call site if predicate passes", () => {
@@ -633,7 +633,7 @@ test("preserveOps: lifted op produces error on predicate failure", () => {
   const result = evalStd(`PositiveInt = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})
 x = PositiveInt(5)
 x - 10`);
-  eq(componentsView(result!).has("error"), true);
+  eq(metaOf(result!).has("error"), true);
 });
 
 test("preserveOps: lifted op value is still correct", () => {

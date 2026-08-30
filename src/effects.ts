@@ -24,7 +24,7 @@
 // syntax.
 // =============================================================================
 
-import { dataOf, componentsView, cloneComponents, installChannelMerge } from "./slots.js";
+import { dataOf, metaOf, cloneMeta, installFieldMerge } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, StructureValue, CarrierStructure,
   withMetadata, makeStructure,
@@ -254,12 +254,12 @@ export function opaqueEffectNotices(
 // JS-side `effectSet` field. Encoding is hidden behind `withEffects` /
 // `effectsOf`; consumers shouldn't reach into the component directly.
 
-export const EFFECTS_COMPONENT_KEY = "effects";
+export const EFFECTS_FIELD = "effects";
 
 // C1.5: the effects channel's union-merge, installed into the propagation
 // table so generic executors can merge encoded effect sets without this
 // module's encoding leaking into slots.ts.
-installChannelMerge("effects", (a: Value, b: Value) => {
+installFieldMerge("effects", (a: Value, b: Value) => {
   const merged = effectUnion(decodeEffects(a) ?? new Set(), decodeEffects(b) ?? new Set());
   return encodeEffects(merged);
 });
@@ -285,8 +285,8 @@ function decodeEffects(v: Value): EffectSet | null {
  *       functions in standard mode).
  *  Returns null when neither source has effects (consumer treats as pure). */
 export function effectsOf(v: Value): EffectSet | null {
-  // C4.3b: componentsView is total — flattened Contexts answer directly.
-  const c = componentsView(v).get(EFFECTS_COMPONENT_KEY);
+  // C4.3b: metaOf is total — flattened Contexts answer directly.
+  const c = metaOf(v).get(EFFECTS_FIELD);
   if (c) return decodeEffects(c);
   const p = dataOf(v);
   if (p.kind === ValueKind.ComposedFunction) {
@@ -304,8 +304,8 @@ export function withEffects(v: Value, eff: EffectSet): Value {
   if (eff.size === 0 && prior === null) return v;
   const merged = prior ? effectUnion(prior, eff) : eff;
   if (merged.size === 0) return v;
-  const comps = cloneComponents(v);
-  comps.set(EFFECTS_COMPONENT_KEY, encodeEffects(merged));
+  const comps = cloneMeta(v);
+  comps.set(EFFECTS_FIELD, encodeEffects(merged));
   return withMetadata(dataOf(v), comps);
 }
 

@@ -688,10 +688,10 @@ export function parseGrammarToAllegro(gHandle: number, input: string): Value {
   if (result.errors.length > 0) {
     const err = result.errors[0];
     const msg = `parse error at ${err.start.line}:${err.start.column}: ${err.message}`;
-    const components = new Map<string, Value>();
-    components.set("error", withType(stringToBits(msg), StringType));
-    components.set("type", ErrorType);
-    return withMetadata(makeInt(0), components);
+    const meta = new Map<string, Value>();
+    meta.set("error", withType(stringToBits(msg), StringType));
+    meta.set("type", ErrorType);
+    return withMetadata(makeInt(0), meta);
   }
   return syntaxTreeToAllegroValue(result.tree);
 }

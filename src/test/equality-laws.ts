@@ -8,11 +8,11 @@
 import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
-import { sourceOf as _sourceOf, withSource as _withSource, componentsView as _componentsViewD47 } from "../slots.js";
+import { sourceOf as _sourceOf, withSource as _withSource, metaOf as _metaViewD47 } from "../slots.js";
 import { renderExprSource } from "../primitives.js";
 import { dataOf, BitsValue, bitsToString, Value, makePrimitive } from "../types.js";
 import { getTypeName, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, typeMemberDescriptor, EquatableType, isLawDescriptor, isFieldDescriptor } from "../types-std.js";
-import { channelReadRaw } from "../slots.js";
+import { metaReadRaw } from "../slots.js";
 import { buildVerdict, extractObligations, formatVerdict } from "../pcp.js";
 import { renderModuleSummary, summarizeModule } from "../introspect.js";
 import { effectsOf } from "../effects.js";
@@ -100,7 +100,7 @@ test("E1 equality: none keeps identity semantics", () => {
 
 test("E1 equality: errors stay viral through ==", () => {
   const result = evalStd('(error "boom") == 1');
-  eq(channelReadRaw(result!, "error") !== undefined, true);
+  eq(metaReadRaw(result!, "error") !== undefined, true);
 });
 
 test("E1 equality: type values compare by identity", () => {
@@ -184,7 +184,7 @@ test("E2 coercion: 1 == 1.0 flips true via the kernel Int→Float edge (§6 delt
   eq(eqNum("1 != 2.0"), 1);
 });
 
-test("E2 coercion: same-shape containers coerce their components", () => {
+test("E2 coercion: same-shape containers coerce their meta", () => {
   // Kernel structural equals recurses through the PROTOCOL, which now
   // includes the coercion step — mixed scalar fields meet at Float.
   eq(eqNum("{x: 1} == {x: 1.0}"), 1);
@@ -693,7 +693,7 @@ test("D47: drop propagation — derived values carry no source", () => {
   // d has its OWN binding-level source ("x + 1") but the underlying
   // arithmetic result did not inherit x's — check a non-binding result:
   const { value } = runtimeEval("x = 2 + 2\nx * 3", undefined, [typeExt], undefined, true);
-  eq(_componentsViewD47(value!).get("source"), undefined);
+  eq(_metaViewD47(value!).get("source"), undefined);
   eq(_sourceOf(d) !== undefined, true);
 });
 

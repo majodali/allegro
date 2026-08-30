@@ -20,7 +20,7 @@
 // See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { dataOf, cloneComponents, componentsView, channelReadRaw, typeShape, getAbstractDomain } from "./slots.js";
+import { dataOf, cloneMeta, metaOf, metaReadRaw, typeShape, getAbstractDomain } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue,
   withMetadata, makeStructure, makeInt, isResolved,
@@ -596,13 +596,13 @@ function domainsStructurallyEqual(a: AbstractDomain, b: AbstractDomain): boolean
 // Value-level helpers — attach / read the "domain" component on a MultiValue
 // =============================================================================
 
-const DOMAIN_COMPONENT_KEY = "domain";
-const PREDICATES_COMPONENT_KEY = "predicates";
+const DOMAIN_FIELD = "domain";
+const PREDICATES_FIELD = "predicates";
 
 /** Attach an abstract domain as a MultiValue component. Wraps if needed. */
 export function withDomain(v: Value, domain: AbstractDomain): Value {
-  const comps = cloneComponents(v);
-  comps.set(DOMAIN_COMPONENT_KEY, encodeDomain(domain));
+  const comps = cloneMeta(v);
+  comps.set(DOMAIN_FIELD, encodeDomain(domain));
   return withMetadata(dataOf(v), comps);
 }
 
@@ -611,9 +611,9 @@ export function withDomain(v: Value, domain: AbstractDomain): Value {
  *  for backward compatibility — preferring the new `predicates` component
  *  over the legacy single-domain one. */
 export function domainOf(v: Value): AbstractDomain | null {
-  // C4.3b: componentsView is total — flattened Contexts answer directly.
+  // C4.3b: metaOf is total — flattened Contexts answer directly.
   // Phase C: prefer the predicate set if present.
-  const setComp = componentsView(v).get(PREDICATES_COMPONENT_KEY);
+  const setComp = metaOf(v).get(PREDICATES_FIELD);
   if (setComp) {
     const set = decodePredicates(setComp);
     if (set) {
@@ -621,7 +621,7 @@ export function domainOf(v: Value): AbstractDomain | null {
       if (eff) return eff;
     }
   }
-  const c = componentsView(v).get(DOMAIN_COMPONENT_KEY);
+  const c = metaOf(v).get(DOMAIN_FIELD);
   if (!c) return null;
   return decodeDomain(c);
 }
@@ -629,11 +629,11 @@ export function domainOf(v: Value): AbstractDomain | null {
 /** Attach a predicate set as a MultiValue component. Always merges with any
  *  existing set; never overwrites silently. */
 export function withPredicates(v: Value, set: PredicateSet): Value {
-  const comps = cloneComponents(v);
+  const comps = cloneMeta(v);
   // Merge with any existing predicate set.
   const prior = predicatesOf(v);
   const merged = prior ? mergePredicateSets(prior, set) : set;
-  comps.set(PREDICATES_COMPONENT_KEY, encodePredicates(merged));
+  comps.set(PREDICATES_FIELD, encodePredicates(merged));
   return withMetadata(dataOf(v), comps);
 }
 
@@ -641,15 +641,15 @@ export function withPredicates(v: Value, set: PredicateSet): Value {
  *  callers can mutate the returned object freely (it's not shared with the
  *  value's stored encoding). */
 export function predicatesOf(v: Value): PredicateSet | null {
-  // C4.3b: componentsView is total — flattened Contexts answer directly.
-  const setComp = componentsView(v).get(PREDICATES_COMPONENT_KEY);
+  // C4.3b: metaOf is total — flattened Contexts answer directly.
+  const setComp = metaOf(v).get(PREDICATES_FIELD);
   if (setComp) {
     const set = decodePredicates(setComp);
     if (set) return set;
   }
   // Legacy fallback: lift a single-domain `domain` component into a
   // singleton set so old code paths continue to work during the migration.
-  const dc = componentsView(v).get(DOMAIN_COMPONENT_KEY);
+  const dc = metaOf(v).get(DOMAIN_FIELD);
   if (dc) {
     const dom = decodeDomain(dc);
     if (dom) return new PredicateSet([{ shape: dom, source: "refinement-type" }]);
@@ -680,7 +680,7 @@ function decodePredicates(v: Value): PredicateSet | null {
 //
 // Computed view over the current storage: the refinement layers of the
 // stored `type` component (walked off by `typeShape`) + the on-value
-// `predicates`/`domain` components. The physical storage moves under the
+// `predicates`/`domain` meta. The physical storage moves under the
 // `knowledge` channel at the C4 representation swap.
 // =============================================================================
 
@@ -705,33 +705,33 @@ export interface Knowledge {
 // occurrence starts with full knowledge) or when a `when … is T` type
 // pattern narrows. Propagation rule is `drop` — a bound constrains the
 // occurrence it was stamped on, never derived results.
-const BOUND_COMPONENT_KEY = "bound";
+const BOUND_FIELD = "bound";
 
 /** Read the occurrence bound riding a value, if any. */
 export function occurrenceBoundOf(v: Value): StructureValue | null {
-  // C4.3b: componentsView is total — flattened Contexts answer directly.
-  const b = componentsView(v).get(BOUND_COMPONENT_KEY);
+  // C4.3b: metaOf is total — flattened Contexts answer directly.
+  const b = metaOf(v).get(BOUND_FIELD);
   return b?.kind === ValueKind.Structure ? (b as StructureValue) : null;
 }
 
 /** Stamp an occurrence bound (annotation-boundary crossing). */
 export function withOccurrenceBound(v: Value, bound: StructureValue): Value {
-  const comps = cloneComponents(v);
-  comps.set(BOUND_COMPONENT_KEY, bound);
+  const comps = cloneMeta(v);
+  comps.set(BOUND_FIELD, bound);
   return withMetadata(dataOf(v), comps);
 }
 
 /** Remove the occurrence bound (narrowing / same-shape boundary reset). */
 export function clearOccurrenceBound(v: Value): Value {
   if (occurrenceBoundOf(v) === null) return v;
-  const comps = cloneComponents(v);
-  comps.delete(BOUND_COMPONENT_KEY);
+  const comps = cloneMeta(v);
+  comps.delete(BOUND_FIELD);
   return withMetadata(dataOf(v), comps);
 }
 
 /** The intrinsic knowledge riding a value, or null when it carries none. */
 export function knowledgeOf(v: Value): Knowledge | null {
-  const stored = channelReadRaw(v, "type");
+  const stored = metaReadRaw(v, "type");
   let bound: StructureValue | null = null;
   if (stored?.kind === ValueKind.Structure) {
     const shape = typeShape(stored as StructureValue);

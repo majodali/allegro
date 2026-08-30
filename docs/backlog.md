@@ -1193,6 +1193,12 @@ that prevents it.
     **no runtime reader**, and a test asserts it stays empty. A reservation
     nothing reads or writes is indistinguishable from dead code; move the
     reservation into prose and delete the field, or give it a reader.
+    **A SECOND INSTANCE found at B-121 C1**: `grammar2/types.ts`'s
+    `grammarMeta` (was `meta`) is declared on two grammar records, initialized
+    in both constructors, and **read nowhere** — the same shape, in a
+    different subsystem. Two instances make it a pattern: a reserved slot with
+    no reader is indistinguishable from dead code, and the project has no rule
+    about it. Worth one ruling covering both rather than two.
     **HELD at C9 — needs a ruling.** Deleting the field requires deleting the
     test that asserts it stays empty, and PROCESS §6 makes removing a test
     condition a discussion, not a judgement call. The alternative (give it a
@@ -1604,7 +1610,7 @@ that prevents it.
 
 - [ ] **B-121** · L0 · **Metadata is a field on every value, supplied at
   construction (D48(b)(c), IC-3).** **PLAN: `docs/plans/metadata-on-values.md`
-  (draft, 2026-08) — chunks C1–C7, four rulings needed at §6.** The plan adds
+  (active, 2026-08) — chunks C1–C7; §6 rulings taken; **C1 landed.** The plan adds
   four probes not in this entry: retyping `withMetadata` to return `Value`
   typechecks with **0 errors** (nothing depends on attachment producing a
   Structure); `newCarrierStructure` has exactly **2 callers, both inside
@@ -1630,10 +1636,13 @@ that prevents it.
     to put the field. The **read surface needs no change**: `channelReadRaw`,
     `componentsView` and `cloneComponents` already take a `Value`, cast, and
     read `.components`
-  - **(a) Host shape.** `MetadataBearing { meta?: Metadata }` (with
-    `Metadata = Map<string, Value>`) extended by all seven value interfaces;
-    `Structure.components` renamed `meta` — `components` reads like *parts of
-    a composite*, i.e. the data plane, which is what it is not
+  - **(a) Host shape. DONE at C1**: `MetadataBearing { meta?: Metadata }`
+    (with `Metadata = Map<string, Value>`) extended by all seven value
+    interfaces; `Structure.components` renamed `meta`. Widened by the
+    vocabulary ruling to **430 identifier renames across 28 files** — the
+    whole `channel*` family became `metaField*`/`meta*`, since **today every
+    registry entry is a metadata field**, which also settles B-111's naming
+    half and leaves that item structural
   - **(b) Why optional, and it is NOT laziness.** Allegretto defines no
     fields (R6/R11), so under `--base` a value legitimately carries nothing.
     The two populations without metadata are: every value in Allegretto mode,

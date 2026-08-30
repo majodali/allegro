@@ -1,5 +1,5 @@
 // =============================================================================
-// Effects: the D1 slices — bounds, HOF inference, effect variables, components.
+// Effects: the D1 slices — bounds, HOF inference, effect variables, meta.
 //
 // Extracted from the single-file suite (suite split, lane B). Registrations
 // run at import time; src/test/index.ts imports this module in suite order.
