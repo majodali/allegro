@@ -219,6 +219,54 @@ The risk was behavioural, §5.1 said so, and nothing in the probe set could
 have found it short of running the suite. A probe that cannot fail the way
 the change fails is not evidence about that change.
 
+### 5.1b The survey (2026-08) — 182 sites, 15 that break
+
+Run before re-attempting C2, as the maintainer directed, to convert the
+unknown tail into a list.
+
+**182 comparison sites** against `ValueKind.Structure` across `src/`
+(excluding the generated parser). Classified by what the branch DOES rather
+than by how the test is written, because the syntax carries no information:
+a site is dangerous only when `kind === Structure` is standing in for
+*"carries metadata"*.
+
+| | count |
+|---|---|
+| Sites where the branch neither reads nor writes the metadata plane | **144** — composite tests, unaffected |
+| Sites where it does — the risk set | **38** |
+| Of those, the subject is definitionally a TYPE (and a type IS a Structure) | **23** — safe |
+| **Sites where the test means "carries metadata"** | **15** |
+
+**The survey validates itself**: it independently flags the three sites the
+first C2 attempt found by trial, and it explains the failures that attempt saw
+but had not yet traced —
+
+| site | what it guards | symptom seen in the C2 attempt |
+|---|---|---|
+| `primitives.ts:92` (`formatValue`) | reading `error` / `type` | strings printing as `Bits(24, 0x736579)` |
+| `evaluator.ts:259`, `503` | propagating VIRAL fields from args | *"E1 equality: errors stay viral through `==`"* |
+| `primitives.ts:576` | an error-carrying `if` condition | `provable-demo.alg` |
+| `evaluator.ts:366`, `405`, `431`, `470` | type propagation onto results | the three found by trial |
+| `primitives.ts:2001`, `2460`; `evaluator.ts:135`; `totality.ts:173`, `336`; `introspect.ts:240` | type / viral / predicate reads | not reached before the attempt stopped |
+
+**And the fix is smaller than the count suggests.** The metadata accessors are
+already **total** — `metaOf(v)` answers an empty map and `metaReadRaw(v, k)`
+answers `undefined` for a value carrying nothing. So at most of these sites the
+kind test is not a guard that needs replacing; it is a **pre-C1 necessity that
+is now redundant**, and the fix is to *delete it*. The remainder ask a real
+question and get `metaReadRaw(v, "type") !== undefined` instead.
+
+**One site is a plane violation as well as a break.** `totality.ts:173` reads
+`(v as any).primary` directly to detect a carrier — the exact access the
+boundary lint forbids for `.meta`, going through an `any` cast that hides it.
+It dies with the carrier either way, but it should be counted against B-104's
+ratchet rather than discovered by C2.
+
+**Method note.** This is what §2's four probes should have been. They were all
+type-level and all came back clean; this one is a classification of behaviour
+and it found the whole set in one pass. The rule worth keeping: *classify what
+the code DOES at each site, not what it looks like.*
+
 ### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
 
 `kind === ValueKind.Structure` appears 117 times and `!==` 68 more. Today a
@@ -280,7 +328,7 @@ separate optimisation below this choice and is out of scope.
 | Chunk | Delivers | Gate |
 |---|---|---|
 | **C1** | ~~`Metadata` / `MetadataBearing` declared and extended by all seven interfaces; `Structure.components` → `meta`; every factory declares the field~~ **DONE 2026-08**, widened by ruling 1 to the whole metadata vocabulary: **430 identifier renames across 28 files** plus the registry's storage and disposition labels. Nothing writes the new field yet | Suite **1198/1198**; typecheck clean |
-| **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier. Carriers stop being created; `newCarrierStructure` loses its only two callers. `dataOf` still compiles and returns `v` | **ATTEMPTED 2026-08 and BACKED OUT at the gate** — §5.1's risk materialised and is now quantified. See §5.1a. The tree is green at the pre-attempt commit; nothing was landed red |
+| **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier, **preceded by the 15 kind-test fixes the survey (§5.1b) enumerates** and `carryMeta` at the seven clone sites. Carriers stop being created; `dataOf` still compiles and returns `v` | **ATTEMPTED 2026-08 and BACKED OUT at the gate** — §5.1's risk materialised and is now quantified. See §5.1a. The tree is green at the pre-attempt commit; nothing was landed red |
 | **C3** | The carrier's re-wrap moves into `evaluate` as one uniform carry (§4.2); the three carrier arms are deleted | Suite green; PE fixtures are the oracle for metadata surviving evaluation |
 | **C4** | Delete `primary` (196), `isCarrier` (14), `CarrierStructure` (24), `newCarrierStructure`, W1/W5 and their walker. `concepts.md` §10 leaves the spine | Counts to zero; §6 ruling 3 applied |
 | **C5** | Delete `dataOf` (903) and its call sites — mechanical, counts as the completion test | Counts to zero |

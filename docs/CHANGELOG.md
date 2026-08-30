@@ -4,6 +4,47 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — The C2 survey: 182 sites, 15 that break
+
+Run before re-attempting C2, to convert the unknown failure tail into a list.
+
+**182** comparison sites against `ValueKind.Structure` in `src/`. Classified by
+what each branch DOES rather than how the test is written, because the syntax
+carries no information — a site is dangerous only where `kind === Structure`
+stands in for *"carries metadata"*.
+
+| | |
+|---|---|
+| branch never touches the metadata plane — composite tests | **144** |
+| risk set | **38** |
+| …of which the subject is definitionally a TYPE (a type IS a Structure) | 23 |
+| **sites that actually break** | **15** |
+
+**The survey validates itself.** It independently flags all three sites the
+first C2 attempt found by trial, and it explains the failures that attempt saw
+but had not traced: `formatValue` (`primitives.ts:92`) is why strings printed
+as `Bits(24, 0x736579)`; viral-field propagation (`evaluator.ts:259`, `503`) is
+*"E1 equality: errors stay viral through `=='"*; and the error-carrying `if`
+condition (`primitives.ts:576`) is `provable-demo.alg`.
+
+**The fix is smaller than the count.** The metadata accessors are already
+total — `metaOf` answers an empty map, `metaReadRaw` answers `undefined` — so
+at most of the 15 the kind test is not a guard needing replacement but a
+**pre-C1 necessity that is now redundant**, and the fix is to delete it. The
+rest ask a real question and get `metaReadRaw(v, "type") !== undefined`.
+
+**One site is also a plane violation.** `totality.ts:173` detects a carrier by
+reading `(v as any).primary` — through an `any` cast, so the boundary lint
+cannot see it. It dies with the carrier regardless, but it belongs on B-104's
+ratchet rather than being discovered by C2.
+
+**Method note.** This is what §2's four probes should have been. All four were
+type-level and all came back clean; one classification pass over behaviour
+found the whole set. The rule: *classify what the code does at each site, not
+what it looks like.*
+
+Documentation only. Suite unchanged at **1200/1200**.
+
 ## 2026-08 — `param.owner`'s identity is read nowhere: the C2 blocker dissolves
 
 Maintainer pushed back on the clone→origin back-link C2 proposed, and asked

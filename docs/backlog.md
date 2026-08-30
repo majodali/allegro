@@ -1754,6 +1754,20 @@ that prevents it.
     idiom; `writeShape` for identity-sensitive type Contexts, ruled at B-104
     chunk 3) as an idiom rather than a rule. *Stamp in place only before the
     value escapes; after that, derive*
+  - **SURVEY DONE 2026-08** (`docs/plans/metadata-on-values.md` §5.1b), which
+    is what should have preceded the first C2 attempt. **182** comparison
+    sites against `ValueKind.Structure`; **144** have branches that never
+    touch the metadata plane and are unaffected; of the **38** that do, **23**
+    test a subject that is definitionally a TYPE. **15 sites actually break.**
+    The survey independently flags all three the trial-and-error attempt
+    found, and explains the failures that attempt saw but had not traced —
+    `formatValue` (strings printing as raw Bits), viral-field propagation
+    (errors no longer viral through `==`), and the error-carrying `if`
+    condition. **Most of the 15 need the guard DELETED, not replaced**: the
+    metadata accessors are already total, so the kind test is a pre-C1
+    necessity that is now redundant. One (`totality.ts:173`) reads
+    `(v as any).primary` through an `any` cast — a plane violation the
+    boundary lint cannot see, and B-104's to count
   - **C2 ATTEMPTED and BACKED OUT at the gate, 2026-08** — see
     `docs/plans/metadata-on-values.md` §5.1a for the full record. The root
     cause is one idea repeated: throughout the evaluator, *"does this value
