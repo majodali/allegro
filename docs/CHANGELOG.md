@@ -4,6 +4,55 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 plan: delete the carrier, build values with their metadata
+
+`docs/plans/metadata-on-values.md`, draft, chunks C1–C7. D48(b)(c) settled
+the *whether*; this is the *how*, and it is written from four probes rather
+than from reasoning about the code.
+
+**The probes, each one a risk the plan would otherwise have hedged against:**
+
+- Retype `withMetadata` from `StructureValue` to `Value` and typecheck →
+  **0 errors.** Nothing in the codebase depends on attaching metadata
+  producing a Structure. The step that looked riskiest is type-safe.
+- `newCarrierStructure` has **2 callers, both inside `withMetadata`** — so
+  carriers are constructed in exactly one function and can be eliminated
+  atomically rather than hunted.
+- The evaluator's carrier arm is `if (!isCarrier(value)) return value;` then
+  *evaluate the primary and re-wrap*. It is a **hand-written dispatch to the
+  inner kind's behaviour**, which the new representation performs by
+  construction. Three such arms exist and all three become dead.
+- **185** `kind === / !== ValueKind.Structure` comparisons — the real risk,
+  and it is behavioural rather than type-level.
+
+**The one thing that must move rather than vanish** is the re-wrap. Today
+only carriers get "evaluate the inner value, then carry the metadata onto the
+result"; afterwards every kind needs it. Doing it once in `evaluate` is one
+place instead of three, and C3 exists for that alone.
+
+**The risk is stated in the direction it actually runs.** A site meaning "is
+this composite?" is currently *wrong about carriers* and is defended by
+peeling with `dataOf` first — those get more correct. The danger is the
+inverse: a site relying on a typed scalar answering `Structure`. The plan
+does not claim to have found them all by reading, because it has not; the
+suite is the oracle and C2 is where they surface.
+
+**And what the plan refuses to claim.** It is not a performance arc.
+Attachment count is unchanged; what changes is *what* is allocated — a
+same-kind clone instead of an eleven-field `Structure` — and the metadata
+`Map` is **not** removed. The justification is R7 and the measured fact that
+74% of all structures existed to work around a missing field.
+
+Four rulings requested at §6: the names (which should be chosen beside
+B-111's field/channel vocabulary, landing at C1 of the concept campaign);
+what to do about metadata on an interned Symbol (measured at zero —
+recommend asserting, so a silent identity break becomes a loud one); whether
+retiring W1/W5 counts as a PROCESS §6 test weakening when their subject
+ceases to exist; and whether the ~903-site `dataOf` deletion is its own
+chunk (recommended) or folded in.
+
+Documentation only. Suite unchanged at **1198/1198**.
+
 ## 2026-08 — B-122: the constant, hoisted — 17,169 allocations, exactly as predicted
 
 The fix the investigation pointed at, landed. `wrapAsUntypedFunction` is now

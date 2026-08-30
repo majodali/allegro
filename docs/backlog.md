@@ -1603,7 +1603,15 @@ that prevents it.
     path — that is the assumption E rests on
 
 - [ ] **B-121** · L0 · **Metadata is a field on every value, supplied at
-  construction (D48(b)(c), IC-3).** The carrier is deleted: a non-composite
+  construction (D48(b)(c), IC-3).** **PLAN: `docs/plans/metadata-on-values.md`
+  (draft, 2026-08) — chunks C1–C7, four rulings needed at §6.** The plan adds
+  four probes not in this entry: retyping `withMetadata` to return `Value`
+  typechecks with **0 errors** (nothing depends on attachment producing a
+  Structure); `newCarrierStructure` has exactly **2 callers, both inside
+  `withMetadata`** (carriers can be eliminated atomically); the evaluator's
+  carrier arm is a hand-written dispatch to the inner kind, which the new
+  representation performs by construction; and **185** `kind ===/!==
+  ValueKind.Structure` comparisons are the real — behavioural — risk surface. The carrier is deleted: a non-composite
   value no longer becomes something else in order to carry a field. Ruled at
   B-108; **arc, not a chunk — plan first.**
   - **What decided it**: of 240,820 value allocations, **56,123 are
