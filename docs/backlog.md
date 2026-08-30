@@ -1649,11 +1649,11 @@ that prevents it.
     1.3% (`param.owner`, `PRESERVED_FN_META_KEYS` — the shared helper CLAUDE.md
     mandates), Expression 1.3% (`memo` — the clone must SHARE it), Param 0.8%,
     **Symbol 0.0%** — so the interning hazard (SC-4: identity = FQN) does not
-    arise today. **Needs a ruling in the plan**: after a ComposedFunction
-    clone, does `param.owner` point at the original or the clone?
-    Behaviour-preserving answer is the original, which is what `remapParams`
-    already does — but it must be stated, because PE's Param-call branch
-    reads it
+    arise today. **RULED (maintainer, 2026-08): `param.owner` continues to
+    represent the ORIGINAL function.** This is the behaviour-preserving
+    answer and the one `remapParams` already implements; stated here rather
+    than inherited, because PE's Param-call branch reads it and a clone that
+    silently re-pointed it would change evaluation
   - **(f) Why copy-on-attach, stated once so it is not re-litigated.**
     Measured: 59,027 attachments, **19,817 (33.6%) targeting an object that
     has already been given metadata**. Metadata is a property of a value *in
@@ -1681,3 +1681,44 @@ that prevents it.
     smells like the same primitive being typed identically over and over.
     Memoizing `(datum, fields) → value` is orthogonal to this item and was
     not measured; do it as its own investigation, not inside this arc
+
+- [ ] **B-122** · L0 · **`wrapAsUntypedFunction` rebuilds a constant, once per
+  primitive per scope-layer build.** Result of the memoization investigation
+  the D48 review flagged (2026-08). The investigation's answer is **do not
+  build a memo** — the win is one loop-invariant, and hoisting it needs no
+  cache at all.
+  - **What was measured.** Keying every `withMetadata` call by
+    `(datum identity, field names + field-value identities)` over the 50-file
+    corpus: **19,070 of 59,027 attachments (32.3%) are exact repeats**. But
+    they are not spread out — **17,169 of them (90%) are one kind**:
+    PrimitiveFunction, at a **66.4%** repeat rate. Bits repeat only 5.8%,
+    Structure 0%, Param 0%
+  - **The single cause.** `wrapAsUntypedFunction(prim)` in `types-std.ts`
+    does `dataOf(fn)` + `cloneComponents(fn)` + `set("type",
+    UntypedFunctionType)`. For a bare registry primitive that is
+    **deterministic** — same input object, same constant type, same result
+    every time. It is called from **two** Layer-1 builders that each iterate
+    every primitive (`runtime.ts:148`, the resolution map; `runtime.ts:743`,
+    the primitive scope layer), and again per module load
+  - **Single-process counts**: `tests/arrays.alg` → **354 calls over 177
+    distinct primitives**; `tests/modules.alg` → **708 calls over the same
+    177**. So the wrapper is rebuilt 2× per primitive per process, 4× with
+    one module, and it scales with module count
+  - **The fix is D48(c), not a cache.** Give the primitive its type where the
+    primitive is created — once — and let both Layer-1 builders reference the
+    same value. No content key, no 40k-entry table, no retention hazard.
+    354 → 177 for a single file; the saving grows with modules
+  - **Why sharing one wrapper object is safe**, by an argument the code
+    already relies on: the untyped branch of both builders already binds the
+    **same singleton** `prim` into every scope, visibility lives on the
+    Binding not the value (D42/V-R4), and the wrapper is an immutable value —
+    anything attaching further metadata derives a new one
+  - **Why a general memo is NOT worth building.** After this hoist the
+    residue is **1,901 repeats — 3.2% of attachments** (Bits 1,657,
+    ComposedFunction 225, Expression 19). Capturing that would need a
+    content-keyed table of ~40,000 entries holding values alive, to avoid 3%
+    of allocations. The measurement argues against the general mechanism as
+    clearly as it argues for the specific fix
+  - **Independent of B-120/B-121** and survives both unchanged: in either
+    representation the point is that the typed primitive is built once. Can
+    land before them or inside B-121's construction work

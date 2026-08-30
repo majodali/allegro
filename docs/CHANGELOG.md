@@ -4,6 +4,46 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — The memoization investigation: don't build the memo
+
+Ordered first by the maintainer, ahead of B-121. The answer is **no memo** —
+and the reason is a better finding than a cache would have been.
+
+**Keying every attachment by `(datum identity, field names + field-value
+identities)`** over the 50-file corpus: **19,070 of 59,027 attachments
+(32.3%) are exact repeats**. They are not spread across the system.
+**17,169 of them — 90% — are one kind**: PrimitiveFunction, repeating at
+**66.4%**. Bits repeat 5.8%; Structure and Param, 0%.
+
+**One function accounts for it.** `wrapAsUntypedFunction(prim)` is
+`dataOf(fn)` + `cloneComponents(fn)` + `set("type", UntypedFunctionType)` —
+for a bare registry primitive that is deterministic: same object, same
+constant type, same result. It is called from **two** Layer-1 builders that
+each iterate every primitive (`runtime.ts:148`, the resolution map;
+`runtime.ts:743`, the primitive scope layer), and again on every module load.
+Single-process: `tests/arrays.alg` → **354 calls over 177 distinct
+primitives**; `tests/modules.alg` → **708 over the same 177**.
+
+So it is not a memoization opportunity. It is a **loop-invariant constant
+rebuilt in a loop**, and the fix is D48(c) — build the typed primitive where
+the primitive is built, once, and let both builders reference it. No content
+key, no ~40,000-entry table, no values held alive by a cache. Sharing one
+wrapper is safe by an argument the code already depends on: the *untyped*
+branch of both builders already binds the same singleton into every scope,
+visibility lives on the Binding rather than the value (D42/V-R4), and the
+wrapper is immutable.
+
+**And the measurement argues against the general mechanism as clearly as it
+argues for the specific fix.** After the hoist the residue is **1,901
+repeats — 3.2% of attachments**. A content-keyed memo would exist to avoid
+3% of allocations while holding 40,000 values alive.
+
+Filed as **B-122**, independent of B-120/B-121 and surviving both unchanged.
+Also recorded: **`param.owner` continues to represent the original function**
+(maintainer ruling), closing the question B-121(e) left open.
+
+Documentation only — no `src/` changes. Suite unchanged at **1197/1197**.
+
 ## 2026-08 — B-108 ruled: the composite, and the question was one level too high
 
 **D48**, minted. B-108 asked whether unifying MultiValue and Context actually
