@@ -1119,3 +1119,45 @@ that prevents it.
     the inheritance explicit at all three. Paths that re-stamp their own shape
     (`buildRefinedType`, `buildDistinctType`) needed nothing. Gate green at
     1197 on the first run
+
+- [ ] **B-107** · L0 · **Naming and declaration debt found by the concept
+  spine (S1, T0–T1).** Ruling-3 scope (maintainer-ratified 2026-08): the
+  renames pulled forward ahead of the S5 triage, extended beyond the type
+  name to the other **clear** cases — where the decision is already ratified
+  and executed in the runtime and only the surface name lags. Anything whose
+  right name is still an open question waits for its spine entry.
+  - **(a) One concept, three names.** `Structure` (the class),
+    `StructureValue` (the interface — **2** occurrences, its own declaration
+    and the alias), and `ContextValue` (**701** occurrences), which exists
+    only as `export type ContextValue = StructureValue`. The constructor is
+    `makeContext` (**101**); `makeStructure` does not exist. D1 and D46 are
+    recorded EXECUTED: the runtime unification was, the renaming was done by
+    alias. Rename `ContextValue` → `StructureValue` and `makeContext` →
+    `makeStructure`
+  - **(b) `MultiValueType`** (**25** uses) names the kind D46 retired; its
+    own comment says it survives "so existing casts keep compiling". The
+    concept is the CARRIER (`isCarrier` is already the host test), so the
+    static shape should be named for it
+  - **(c) Stale file headers.** `src/types.ts` opens "Five value kinds +
+    Param placeholder" — there are seven, and Param is one of them. The
+    header predates both `Symbol` and the Context→Structure renaming.
+    `src/structure.ts` describes **two** planes; there are four, and it says
+    `__*` meta-slots "remain here until C5 re-keys them" — C5 did not, B-104
+    is doing it two milestones later
+  - **(d) `ParamValue.predicates`** — declared, documented "reserved",
+    **no runtime reader**, and a test asserts it stays empty. A reservation
+    nothing reads or writes is indistinguishable from dead code; move the
+    reservation into prose and delete the field, or give it a reader
+  - **(e) Binding write disciplines.** `slotWrite` writes map + list,
+    `slotSet` writes the map only (deliberately — the proof-kernel
+    origination idiom), `removeName` deletes from the map and leaves the
+    list entry, `removeConstruct` deletes from both. The
+    leave-the-list-entry behaviour is documented on `renameInPlace` and
+    nowhere else. Four disciplines, one comment, no stated rule for
+    choosing. Needs a rule, not necessarily a change
+  - **(f) Host-plane fields declared on the value interface.** `parent`,
+    `isScope` and `scopePredicates` sit on `StructureValue` while their own
+    comments say they are "host-plane fields, never value slots". The plane
+    distinction is asserted in prose and contradicted by the declaration.
+    **Blocked on T2 §9** — the fix is to declare the planes first, so this
+    waits for the spine rather than being guessed at

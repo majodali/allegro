@@ -9,7 +9,10 @@ and the invariants the boundary tests enforce.
 
 ## Status convention
 
-Every section is tagged with its implementation status:
+`concepts.md` uses its own per-entry **Delta** row instead of a status tag:
+an entry states what the concept is and what the code does, and the delta
+between them is either empty or owned by a backlog item. Everywhere else,
+every section is tagged with its implementation status:
 
 - **[implemented]** — shipped and tested; the doc describes current behavior
 - **[partial]** — partly shipped; the doc says which parts
@@ -21,6 +24,7 @@ Every section is tagged with its implementation status:
 
 | Location | Layer / scope | Documents |
 |---|---|---|
+| `concepts.md` | **Definitional spine** | Every salient concept in dependency order (definition / rationale / as-implemented / delta). **Read this first.** T0–T1 written; T2–T5 pending (`docs/plans/concept-spine.md`) |
 | `layers.md` | The spine | Layer model, capability tracks, milestone register |
 | `implementation-map.md` | File-level spine | Per-file map of src/ + trees, the evalSource pipeline, async runtime surface |
 | `allegretto/` | **L0** base language | `structures.md` (v2 design — draft pending sign-off); planned: `architecture.md` |
