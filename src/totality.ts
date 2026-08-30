@@ -169,11 +169,16 @@ function peelFunctionAst(v: Value): {
   cfn: ComposedFunctionValue;
   paramTypeAsts: Value[];
 } | null {
-  // Post-evaluation: a typed-function carrier.
-  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
-    const mv = v as any;
-    const tComp = metaReadRaw(mv, "type") as Value | undefined;
-    const prim = mv.primary;
+  // Post-evaluation: a function value carrying a type.
+  //
+  // B-121 C2: this detected a CARRIER by reading `(v as any).primary` — a
+  // direct data-plane access hidden behind an `any` cast, which is why the
+  // boundary lint never saw it (recorded against B-104's ratchet). The
+  // question is "a function value that carries a type", which `dataOf` and
+  // `metaReadRaw` answer for any kind.
+  {
+    const tComp = metaReadRaw(v, "type") as Value | undefined;
+    const prim = dataOf(v);
     if (prim.kind === ValueKind.ComposedFunction) {
       let paramTypeAsts: Value[] = [];
       if (tComp && tComp.kind === ValueKind.Structure) {
@@ -332,15 +337,17 @@ function resolveSubjectTypeName(
   paramTypeAsts: Value[],
   typeLookup: TypeLookup | undefined,
 ): string | null {
-  // Strip carriers; flattened structures answer through the channel plane.
-  if (subject.kind === ValueKind.Structure) {
-    const t = metaReadRaw(subject as Value, "type");
-    if (t) return resolveTypeName(t, typeLookup);
-    const pp = (subject as { primary?: Value }).primary;
-    if (pp !== undefined) {
-      return resolveSubjectTypeName(pp, paramTypeAsts, typeLookup);
-    }
-    return null;
+  // B-121 C2: the kind guard here was doing TWO jobs — gating a metadata read
+  // AND selecting a code path, because its branch ended in `return null` and
+  // the Param branch below it was the alternative. Dropping it wholesale made
+  // every Param subject return null and silently disabled exhaustiveness
+  // checking (five totality tests). So the metadata question is asked for any
+  // kind, and the branch now FALLS THROUGH instead of returning.
+  const t = metaReadRaw(subject as Value, "type");
+  if (t) return resolveTypeName(t, typeLookup);
+  const pp = (subject as { primary?: Value }).primary;
+  if (pp !== undefined) {
+    return resolveSubjectTypeName(pp, paramTypeAsts, typeLookup);
   }
   if (subject.kind === ValueKind.Param) {
     const pos = (subject as any).position as number;

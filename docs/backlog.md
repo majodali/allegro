@@ -2012,3 +2012,38 @@ that prevents it.
     they are discussed and not silently dropped. Neither weakens: an
     unreachable operation is a stronger guarantee than a refused one, and the
     replacement asserts the unreachability rather than assuming it
+
+- [ ] **B-126** · L0 · **`param.owner` is now a two-state flag wearing a
+  pointer's type.** Raised by the maintainer at B-121 (2026-08), after
+  `ownsParam` retired the field's identity: *this may end up misunderstood and
+  misused in the future.*
+  - **What it is now.** `owner: ComposedFunctionValue | null` is declared as a
+    back-pointer, and its **identity is read nowhere**. The only thing read is
+    whether it is `null` — the parser collects not-yet-claimed params
+    (`parser-helpers.ts:86`, `primitives.ts:387`), and `subst` treats an
+    unclaimed param as matchable by position alone. So the field's live job is
+    a single bit — *claimed / unclaimed* — and its declared type invites a
+    reader to believe the pointer means something
+  - **Why it invites misuse.** The type says "this param belongs to that
+    function", which is exactly the belief that made a metadata clone break
+    every function call at the first C2 attempt. Seven sites still write
+    `p.owner = newFn` to keep a pointer accurate that nothing consults, two of
+    them mutating a SHARED params array — the thing `modules.ts:83` and
+    `evaluator.ts:770` both warn is corrupting. A field whose declared meaning
+    exceeds its real one produces exactly this: maintenance work for an
+    invariant no reader depends on, and a wrong mental model for the next
+    person
+  - **Options**, in rough order of preference:
+    - **(a) Replace with a claimed flag** — `claimed?: boolean`, or drop the
+      field and mark unclaimed params some other way. The seven `p.owner = fn`
+      writes become one boolean set, and the two shared-array mutations stop
+      being hazards because a boolean does not alias
+    - **(b) Ask the question at the source.** "Unclaimed" is really "not yet
+      in any function's `params`", so the parser could track its own set of
+      pending params rather than marking them on the value — the same move
+      `ownsParam` made for the other half
+    - **(c) Keep the pointer and enforce it.** Only worth it if a future
+      reader genuinely needs to go param → function, which nothing does today
+  - **Not urgent, and not C2's.** Nothing is wrong at runtime; the risk is a
+    reader's model. Best taken after B-121 lands, when the clone sites are
+    settled and the change is a small one rather than a moving target

@@ -262,6 +262,22 @@ boundary lint forbids for `.meta`, going through an `any` cast that hides it.
 It dies with the carrier either way, but it should be counted against B-104's
 ratchet rather than discovered by C2.
 
+**Landed 2026-08, ahead of the attachment switch and green at every step.**
+All **14** sites corrected while carriers still exist, which is what makes them
+reviewable: each is behaviour-neutral today and load-bearing after. (The survey
+said 15; the true count is 14 — `primitives.ts:2704` re-classified on reading,
+its subject being `getRefines(...)`, a type.)
+
+**One site was mis-classified, and it is the interesting one.**
+`totality.ts:336`'s kind guard was doing **two** jobs: gating a metadata read
+*and* selecting a code path, because its branch ended in `return null` and the
+`Param` branch was the alternative. Deleting it wholesale made every Param
+subject return null and silently disabled exhaustiveness checking — five
+totality tests. The fix is to ask the metadata question for any kind and let
+the branch **fall through** rather than return. The lesson refines the rule
+above: classify what the code does, and *a guard may be doing more than one
+thing*.
+
 **Method note.** This is what §2's four probes should have been. They were all
 type-level and all came back clean; this one is a classification of behaviour
 and it found the whole set in one pass. The rule worth keeping: *classify what

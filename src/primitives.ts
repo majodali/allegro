@@ -89,7 +89,11 @@ export function formatValue(v: Value): string {
   // Typed-value display. C4.3b: flattened Contexts (typed records/arrays)
   // carry channels directly, so the gate covers both roles and data reads
   // go through dataOf (identity for Contexts) instead of `.primary`.
-  if (v.kind === ValueKind.Structure) {
+  // B-121 C2: the kind guard meant "carries metadata worth rendering", true
+  // only while a typed scalar was a carrier. `metaReadRaw` is total, so ask
+  // the plane. Without this a typed String prints as raw Bits once a typed
+  // Bits is a Bits.
+  {
     // Error values — show error component
     const errComp = metaReadRaw(v, "error");
     if (errComp !== undefined) {
@@ -573,8 +577,9 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // C4.3a (R2): an error-carrying condition propagates the error instead of
   // branching on its (meaningless) primary — the legacy behavior silently
   // took the else branch (differential fixture err-in-if-cond).
-  if (cond.kind === ValueKind.Structure
-      && metaReadRaw(cond, "error") !== undefined) {
+  // B-121 C2: kind guard dropped — the question is only whether the
+  // condition carries an error, and `metaReadRaw` answers it for any kind.
+  if (metaReadRaw(cond, "error") !== undefined) {
     return cond;
   }
   const condP = dataOf(cond);
@@ -1998,7 +2003,9 @@ const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const p = dataOf(v);
   if (p.kind === ValueKind.Bits) {
     // Check if it's a string representation (non-64-bit) that needs parsing
-    if (p.length !== 64 || (v.kind === ValueKind.Structure && getTypeName(v) === "String")) {
+    // B-121 C2: `v.kind === Structure &&` was the carrier test guarding a
+    // type read; `getTypeName` already answers null for an untyped value.
+    if (p.length !== 64 || getTypeName(v) === "String") {
       const str = bitsToString(p);
       return withType(makeFloat(parseFloat(str)), FloatType);
     }
@@ -2457,7 +2464,8 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // member on an unresolved error-carrying value propagates the error
     // instead of dropping it (err-through-method). Resolved error values
     // still dispatch normally (Error's own members stay callable).
-    if (obj.kind === ValueKind.Structure) {
+    // B-121 C2: kind guard dropped; `metaReadRaw` is total.
+    {
       for (const chan of viralFields()) {
         const comp = metaReadRaw(obj, chan);
         if (comp !== undefined) {

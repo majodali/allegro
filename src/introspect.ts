@@ -237,7 +237,10 @@ export function summarizeValue(v: Value): ValueSummary {
   // didn't go through __construct — synthesise a singleton set from the
   // refined type Context's stored abstractDomain.
   let preds = predicatesOf(v);
-  if (!preds && v.kind === ValueKind.Structure) {
+  // B-121 C2: kind guard dropped — the question is whether `v` carries a
+  // type, and a refined SCALAR is exactly the case the guard used to catch
+  // only because typing had made it a Structure.
+  if (!preds) {
     const typeComp = metaReadRaw(v, "type");
     if (typeComp?.kind === ValueKind.Structure) {
       const fromType = (typeComp as any).abstractDomain;

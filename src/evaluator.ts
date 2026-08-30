@@ -132,7 +132,9 @@ export function evaluate(
       // C4.3a (R3): union-rule channels (effects) merge by union via the
       // registry-installed merge instead of inner-shadows-outer — effects
       // observed before re-evaluation are facts, not stale guesses.
-      if (ep.kind === ValueKind.Structure) {
+      // B-121 C2: this asked `kind === Structure` to mean "the re-evaluated
+      // value carries metadata of its own". `metaOf` is total, so ask it.
+      if (metaOf(ep).size > 0) {
         const merged = cloneMeta(mv);
         for (const [k, v] of metaOf(ep)) {
           const prev = merged.get(k);
@@ -255,8 +257,11 @@ function evaluateExpr(
   // error value — err-through-method) or argument propagates instead of
   // being dropped at the application hop. First hit wins, matching viralScan.
   for (const cand of [fnRaw, ...evalArgs]) {
-    // C4.3b: flattened Contexts carry channels too.
-    if (cand.kind !== ValueKind.Structure) continue;
+    // B-121 C2: the kind guard here meant "might carry metadata", which was
+    // true only while a typed scalar was a carrier. `metaReadRaw` is total —
+    // it answers `undefined` for a value carrying nothing — so the guard was
+    // redundant even before, and dropping it is what keeps error virality
+    // working once a typed Bits is a Bits.
     for (const chan of viralFields()) {
       const comp = metaReadRaw(cand, chan);
       if (comp) {
@@ -362,8 +367,10 @@ function applyPrimitive(
     const residual = makeExpr(fn, evalArgs);
     // Even though args aren't fully resolved, their type meta
     // may be known. Use type-level dispatch to infer the result type.
-    // C4.3b: flattened Contexts carry the type channel too.
-    if (evalArgs[0]?.kind === ValueKind.Structure) {
+    // B-121 C2: the kind guard meant "carries a type", which held only while
+    // typing a scalar wrapped it. Read the field directly; `typeComp` is then
+    // checked for being a Structure, which it genuinely is — a type IS one.
+    if (evalArgs[0] !== undefined) {
       const typeComp = metaReadRaw(evalArgs[0], "type");
       if (typeComp && typeComp.kind === ValueKind.Structure) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
@@ -401,8 +408,10 @@ function applyPrimitive(
   // Type-directed dispatch: if the first arg has a type with a matching method,
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
-  // C4.3b: flattened Contexts (typed records/arrays) dispatch too.
-  if (evalArgs[0]?.kind === ValueKind.Structure) {
+  // B-121 C2: same correction — "carries a type" is a metadata question, and
+  // operator dispatch on a typed SCALAR is exactly the case the kind test
+  // used to catch only because the scalar had become a Structure.
+  if (evalArgs[0] !== undefined) {
     const typeComp = metaReadRaw(evalArgs[0], "type");
     if (typeComp && typeComp.kind === ValueKind.Structure) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
@@ -425,12 +434,15 @@ function applyPrimitive(
         if (method?.kind === ValueKind.PrimitiveFunction) {
           const primaryArgs = evalArgs.map(dataOf);
           const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
-          // If the method already returned a typed value (MultiValue), use it as-is.
-          // Methods know their return types (e.g., comparisons return Bool).
+          // If the method already returned a typed value, use it as-is —
+          // methods know their return types (comparisons return Bool).
+          // B-121 C2: was `result.kind === Structure`, i.e. "is a carrier",
+          // stand-in for "is typed". Asking directly is also more correct: an
+          // untyped record used to take the already-typed branch.
           let out: Value;
-          if (result.kind === ValueKind.Structure) out = result;
-          else if (result.kind === ValueKind.Bits)  out = withMetadata(result, new Map([["type", typeComp]]));
-          else                                       out = result;
+          if (metaReadRaw(result, "type") !== undefined) out = result;
+          else if (result.kind === ValueKind.Bits) out = withMetadata(result, new Map([["type", typeComp]]));
+          else                                     out = result;
           out = attachEff(out);
           return propagatedSet ? withPredicates(out, propagatedSet) : out;
         }
@@ -465,9 +477,15 @@ function applyPrimitive(
 
   // Type propagation: if the first arg had a type and the result is Bits,
   // propagate the type to the result.
+  // B-121 C2: two corrections. The argument guard was `kind === Structure`
+  // meaning "carries a type"; and `result.kind === Bits` implied "untyped",
+  // because a primitive returning a TYPED scalar returned a carrier. Both are
+  // metadata questions now — `float(x)` returns a Float-typed Bits, which the
+  // old shape would re-stamp with its argument's Int.
   let out: Value;
   if (result.kind === ValueKind.Bits
-      && evalArgs[0]?.kind === ValueKind.Structure) {
+      && metaReadRaw(result, "type") === undefined
+      && evalArgs[0] !== undefined) {
     const typeComp = metaReadRaw(evalArgs[0], "type");
     if (typeComp) out = withMetadata(result, new Map([["type", typeComp]]));
     else          out = result;
@@ -499,8 +517,9 @@ function applyPrimitive(
 function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
   const viral = viralFields();
   for (const arg of evalArgs) {
-    // C4.3b: flattened Contexts carry channels too.
-    if (arg.kind !== ValueKind.Structure) continue;
+    // B-121 C2: guard dropped — see the same pattern above. `metaReadRaw` is
+    // total, so asking every argument costs nothing and asking only
+    // Structures silently stopped propagating from typed scalars.
     for (const chan of viral) {
       const comp = metaReadRaw(arg, chan);
       if (comp) {
