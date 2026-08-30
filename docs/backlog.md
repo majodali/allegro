@@ -1764,3 +1764,49 @@ that prevents it.
   - **Independent of B-120/B-121** and survives both unchanged: in either
     representation the point is that the typed primitive is built once. Can
     land before them or inside B-121's construction work
+
+- [ ] **B-123** · L0 · **The metadata base surface: two unguarded paths, and
+  D28's subsumption never executed.** Found by the B-121 C1 review of every
+  registered primitive carrying the old `channel`/`component` vocabulary
+  (maintainer request, 2026-08). The naming question turned up two soundness
+  holes and five primitives that a ratified decision already said to delete.
+  - **(a) `mv_set` is a user-reachable TYPE-FORGERY path.** It writes any
+    non-integrity metadata field with **no writer capability** —
+    `assertNotIntegrityKey` blocks only `discharged` and `source`, so `type`
+    is writable by any program. Verified end to end:
+    - `mv_set(5, "type", String)` succeeds; `type of` it answers `String`
+    - `f(s: String) => s` **accepts** it and prints the bits of `5` as text
+    - `g(n: Int) => n + 1` applied to `mv_set("hello", "type", Int)` returns
+      **478560413033** — the bytes of `"hello"` plus one
+    This contradicts **D23** (writes are capability-gated) and **D28**, which
+    names `type` as owned by the type-system extension. Annotation checking is
+    defeated from ordinary user code, and the result is garbage rather than an
+    error — the opposite of "build safety in"
+  - **(b) `channel_read` bypasses the D47(e) observe guard.** `component_get`
+    returns `none` for the `source` field precisely so the observe effect
+    cannot be laundered; `channel_read` has no such check and returns the
+    source AST. Verified: `channel_read(x, "source") == none` is **false**
+    while `component_get(x, "source")` is `none`. Two readers of the same
+    plane, one guarded, one not — and the unguarded one has zero uses
+  - **(c) D28's subsumption is unexecuted.** D28 ruled
+    `mv_new`/`mv_primary`/`mv_get`/`mv_set`/`mv_components` and `component_get`
+    SUBSUMED into `channel_read` / channel writers / `channel_list`. The
+    `*_attach` half landed; this half did not. `mv_new` and `mv_primary`
+    become meaningless under **D48(b)** (a carrier with no metadata; `dataOf`
+    as identity), and `mv_get`/`mv_components` are worse-behaved duplicates —
+    `mv_get` throws where `channel_read` returns `none`, `mv_components`
+    returns an `id`-Expression where `channel_list` returns a typed array
+  - **Usage, measured**: **none of the ten** appears in `lib/`, `tests/*.alg`,
+    `demos/`, `website/`, `pcp/` or `bench/`. `component_get` is reached only
+    as the lowering target of the `Y of x` syntax, so renaming it is invisible
+    to users. `channel_list`, `mv_new`, `mv_primary`, `mv_get` and
+    `mv_components` have **zero suite references** as well
+  - **`mv_set` is both the hole and the test of the hole**: its only five
+    suite references are forgery-attack tests proving the *integrity* gate
+    holds. Deleting it removes the attack surface those tests exercise, so
+    they need rewriting against whatever write path survives — PROCESS §6
+    applies, and the tests should be reviewed individually the way B-121's
+    ruling 3 treats W1/W5
+  - **Public surface**: none. These names appear only in `docs/design/`,
+    `docs/decisions.md` and the untracked `web/dist` bundle — not in
+    `language-reference.md`, `getting-started.md`, the README or the website

@@ -4,6 +4,59 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — Base-surface review: two unguarded metadata paths (B-123)
+
+C1 stopped at the ten registered primitives carrying the old
+`channel`/`component` vocabulary, because renaming a primitive is a language
+change. Reviewing each one for the rename decision turned up two soundness
+holes and five primitives a ratified decision already said to delete.
+
+**`mv_set` forges the `type` field from ordinary user code.** It writes any
+non-integrity metadata field with no writer capability —
+`assertNotIntegrityKey` blocks only `discharged` and `source`, so `type` is
+writable by anyone. Verified end to end:
+
+- `mv_set(5, "type", String)` succeeds, and `type of` it answers `String`
+- `f(s: String) => s` **accepts** it and prints the bits of `5` as text
+- `g(n: Int) => n + 1` applied to `mv_set("hello", "type", Int)` returns
+  **478560413033** — the bytes of `"hello"`, plus one
+
+That contradicts D23 (writes are capability-gated) and D28, which names
+`type` as owned by the type-system extension. Annotation checking is defeated,
+and the failure is garbage rather than an error.
+
+**`channel_read` bypasses the D47(e) observe guard.** `component_get` returns
+`none` for the `source` field precisely so the observe effect cannot be
+laundered around; `channel_read` has no such check. Verified:
+`channel_read(x, "source") == none` is **false** while
+`component_get(x, "source")` is `none`. Two readers of one plane, one guarded
+and one not — and the unguarded one has zero uses anywhere.
+
+**D28's subsumption never ran.** It ruled `mv_new`/`mv_primary`/`mv_get`/
+`mv_set`/`mv_components` and `component_get` subsumed into `channel_read` /
+channel writers / `channel_list`; the `*_attach` half landed and this half did
+not. Two of them stop meaning anything under D48(b) — `mv_new` builds a
+carrier with no metadata, `mv_primary` is `dataOf` — and two are worse-behaved
+duplicates: `mv_get` throws where `channel_read` returns `none`,
+`mv_components` returns an `id`-Expression where `channel_list` returns a
+typed array.
+
+**Usage, measured**: none of the ten appears in `lib/`, `tests/*.alg`,
+`demos/`, `website/`, `pcp/` or `bench/`. `component_get` is reached only as
+the lowering target of `Y of x`, so renaming it is invisible to users. Five of
+the ten have zero suite references as well. No public-surface exposure —
+these names appear only in `docs/design/`, `docs/decisions.md` and the
+untracked `web/dist` bundle.
+
+**`mv_set` is both the hole and the test of the hole**: its only five suite
+references are forgery-attack tests proving the *integrity* gate holds.
+Deleting it removes the surface those tests exercise, so they need rewriting
+against whatever write path survives — the same individual review B-121's
+ruling 3 gives W1/W5.
+
+Filed as **B-123**. Documentation only; no `src/` changes. Suite unchanged at
+**1198/1198**.
+
 ## 2026-08 — B-121 C1: the metadata vocabulary, and the field on every kind
 
 First chunk of `docs/plans/metadata-on-values.md`. Nothing writes the new
