@@ -1,6 +1,6 @@
 # Metadata on values — delete the carrier, build values with their metadata
 
-> Status: **active** — §6 ruled 2026-08; **C1, C2, C4, C5 and C6 landed**; C7 outstanding.
+> Status: **COMPLETE** — §6 ruled 2026-08; C1–C7 landed, every completion count at zero.
 > Owner: **B-121**. Ruled at **D48(b)(c)** (B-108, 2026-08); the *whether*
 > is settled, this plan is the *how*.
 > Outcome (K-007): every representation kind carries its own metadata field,
@@ -496,6 +496,46 @@ would advertise a plane boundary that does not exist, which is its own kind of
 misleading. Worth revisiting when B-128 designs the enforcement, because that
 work may want a data-plane accessor back for reasons this chunk did not weigh.
 
+### 5.1h C7: closing the spine, and one entry left open on purpose
+
+**The in-place rule is stated where the carve-outs live.** `structure.ts`
+carries it in full beside the D22 immutable-bit carve-outs — *write in place
+only while the value is provably unshared; after it escapes, derive* — with the
+measurement it follows from (19,817 of 59,027 attachments target an
+already-stamped object, so a post-escape write would overwrite the first stamp
+at every position holding the value). `writeShape` in `slots.ts`, the other
+instance, now cites it as the rule's second clause rather than an exception to
+it: all 24 call sites stamp a fresh Context before it escapes.
+
+**§10 is retired in place rather than renumbered.** The plan said "§10 leaves
+the spine", and in substance it has — the concept is gone. But the section
+numbers are stable identifiers, the way §19b and §33b show, and entries cite
+each other by number; renumbering forty entries to remove one would break
+those for no gain. The marker records what the carrier was, why it went, and
+what went with it, which is information a reader of a concept spine wants.
+
+**§11 (data plane) lost the distinction that was the carrier's shadow.** It
+described *two consumers with different interfaces* — from inside the language
+a value simply is its data, while the host could see the wrapper and needed
+`dataOf` to see past it. Deleting the wrapper makes those one view. The rule
+that survives is the one that mattered: primitives receive FULL values, and an
+impl that stripped its arguments would drop every field they carry.
+
+**One delta is left open on purpose**, against the pattern of this plan. §11
+now names a plane with **no reader at all**, which runs against B-128's "police
+the planes with interfaces". The argument for it is in the entry — there is no
+projection left, so an accessor would advertise a boundary that does not exist
+— but that was settled inside a deletion chunk which was not weighing
+enforcement. Recording it as closed would hide a decision from the work most
+likely to want to revisit it, so §11's delta says B-128 should re-open it.
+
+**The spine deltas close, one with a correction.** Delta 50 (the carrier is 74%
+of structures) closes outright. Delta 51 (`withMetadata` is four operations)
+closes **as corrected**: it was one, and the four patterns differ only in where
+their arguments come from. The D48 write-up's sentence proposing four names is
+amended in place rather than quietly left standing, because a ruling that was
+half withdrawn should say so.
+
 ### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
 
 `kind === ValueKind.Structure` appears 117 times and `!==` 68 more. Today a
@@ -562,7 +602,7 @@ separate optimisation below this choice and is out of scope.
 | **C4** | Delete `primary`, `isCarrier`, `CarrierStructure`, `newCarrierStructure`, W1/W5 and the walker's carrier branch. `concepts.md` §10 leaves the spine | **DONE 2026-08.** Every count at zero; §6 ruling 3 applied — §5.1e records the review and the coverage regression it found |
 | **C5** | Delete `dataOf` and its call sites — mechanical, counts as the completion test | **DONE 2026-08.** **849** calls removed across 32 files; the count is zero and the retired-name lint now forbids the identifier. §5.1g |
 | **C6** | One operation and two conveniences (§3.2): the factories take metadata, the 12 create-then-attach pairs collapse — **PE Rule 1 first** — the 10 derive sites become stamps, and `withMetadata` is renamed `withMeta` to join the `*Meta` family | **DONE 2026-08.** Suite green; `withMetadata` at zero. §5.1f |
-| **C7** | The in-place rule (§3.4) stated where `writeShape` and the builder idiom live; `concepts.md` §10/§11 updated and their deltas closed | doc-ref-lint; spine delta rows read `—` |
+| **C7** | The in-place rule (§3.4) stated where `writeShape` and the builder idiom live; `concepts.md` §10/§11 updated and their deltas closed | **DONE 2026-08.** §10 retired in place (numbering is a stable identifier), §11 rewritten, spine deltas 50 and 51 closed — 51 with the correction that it was one operation, not four. §5.1h |
 
 **Completion test** (concept-campaign §9.4): a chunk is done when the spine
 delta rows it claims read `—`, and the renames carry counts —

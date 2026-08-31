@@ -444,13 +444,18 @@ export function setEffectBound(ctx: StructureValue, d: unknown): void { (ctx as 
 // integrity is C3.1's concern); the discharged channel is capability-gated
 // below (C1.4) — its raw writers are module-private.
 //
-// B-104 chunk 3: shape is stored on the component plane, written IN PLACE.
-// It cannot route through the registered channel writer: `buildWriter`
-// derives a NEW value via `withMeta`, and type Contexts are
-// identity-sensitive (memoized generics, law registries, and the
-// `typeShape(stored) === typeShape(expected)` reference test in
-// types-std). All 24 call sites mint a fresh Context and stamp it, so an
-// in-place component write is exactly the old binding write's contract.
+// B-104 chunk 3: shape is stored on the metadata plane, written IN PLACE.
+// It cannot route through the registered field writer: `buildWriter` derives
+// a NEW value via `withMeta`, and type Contexts are identity-sensitive
+// (memoized generics, law registries, and the `typeShape(stored) ===
+// typeShape(expected)` reference test in types-std).
+//
+// B-121 C7: this is the sanctioned case of THE IN-PLACE RULE, which
+// `structure.ts` states in full — *write in place only while the value is
+// provably unshared; after it escapes, derive*. The licence here is the
+// second clause of that rule rather than an exception to it: all 24 call
+// sites mint a fresh Context and stamp it before it escapes, so no other
+// position can be holding the value when this runs.
 export function writeShape(ctx: StructureValue, v: Value): void {
   if (ctx.meta === undefined) ctx.meta = new Map<string, Value>();
   (ctx.meta as Map<string, Value>).set("type", v);

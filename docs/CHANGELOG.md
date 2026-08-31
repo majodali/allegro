@@ -4,6 +4,52 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 C7 closes the arc: the in-place rule, and one delta left open on purpose
+
+The carrier arc is complete. Every completion count is zero — `primary`,
+`isCarrier`, `CarrierStructure`, `withMetadata`, `dataOf`.
+
+**The in-place rule is stated where the carve-outs live**, having been an idiom
+in two places and a rule in none. `structure.ts` carries it beside the D22
+immutable-bit carve-outs — *write in place only while the value is provably
+unshared; after it escapes, derive* — together with the measurement it follows
+from: 19,817 of 59,027 attachments target an already-stamped object, so a
+post-escape write would overwrite the first stamp at every position holding
+that value. `writeShape` now cites it as the rule's second clause rather than
+as an exception, since all 24 of its call sites stamp a fresh Context before it
+escapes.
+
+**§10 is retired in place rather than renumbered.** The plan said the entry
+"leaves the spine", and in substance it has. But section numbers are stable
+identifiers here — §19b and §33b exist precisely because entries are not
+reflowed — and other entries cite them, so renumbering forty entries to remove
+one buys nothing. The marker records what the carrier was, why it went, what
+went with it, and what the deletion taught, which is what a reader of a concept
+spine wants from a retired entry.
+
+**§11 (data plane) lost the distinction that was the carrier's shadow.** It had
+described two consumers with different interfaces: from inside the language a
+value simply is its data, while the host could see the wrapper and needed
+`dataOf` to see past it. That split was never a property of the plane. With the
+wrapper gone they are one view. The rule that survives is the one that mattered
+— primitives receive FULL values, and an impl that stripped its arguments would
+drop every field they carry.
+
+**One delta is left OPEN on purpose**, against this plan's pattern of closing
+what it touches. §11 now names a plane with no reader at all, which runs
+against B-128's "police the planes with interfaces". The argument for it is in
+the entry — no projection remains, so an accessor would advertise a boundary
+that does not exist — but it was settled inside a deletion chunk that was not
+weighing enforcement. Marking it closed would hide a decision from the work
+most likely to want to revisit it.
+
+**Spine delta 51 closes as CORRECTED, not as delivered.** It read
+"`withMetadata` is four operations under one name". It was one. The D48
+write-up's sentence proposing four names is amended in place rather than left
+standing, because a ruling half-withdrawn should say so.
+
+Suite **1202/1202**, typecheck clean, doc-ref lint clean.
+
 ## 2026-08 — B-121 C5: `dataOf` is deleted, 849 call sites with it
 
 The data-plane peel is gone — definition, `slots.ts` re-export, every import

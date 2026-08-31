@@ -16,8 +16,10 @@ both string-keyed slot collections serving three roles: data record,
 annotated value, and evaluation environment. The unification replaces them
 with two constructs sharing one substrate (D1, D19, D25):
 
-- **Structure** — the data construct: one slot plane plus an extensible
-  **channel plane** for annotations (type, error, effects, …).
+- **Structure** — the data construct: one slot plane, plus the extensible
+  **metadata plane** for annotations (type, error, effects, …) that B-121
+  made universal — every representation kind carries it now, so it is no
+  longer what distinguishes a Structure.
 - **Scope** — the evaluation environment: bindings, lexical parent chain,
   the forward-chaining substrate, and a scope-held facts plane.
 
@@ -34,6 +36,28 @@ layering proof the architecture demands — extensions are where the
 language lives.
 
 ## 2. Structure [partial]
+
+*Status (2026-08, B-121 — CURRENT). **The carrier is deleted**, and the
+status stamps below it describe a representation that no longer exists. They
+are kept because each records what was true when it landed; read this one for
+the present state.*
+
+*Metadata is a field on every representation kind, not a privilege of
+Structure. A typed `42` is a `Bits` carrying a `type` field — nothing wraps
+it. Deleted with the carrier: `primary`, `isCarrier`, `newCarrierStructure`,
+the `CarrierStructure` type, the **W1** non-nesting and **W5**
+role-transparency invariants (both existed only to keep two roles sharing one
+class from contaminating each other), and `dataOf`, the data-plane peel, which
+became the identity function and went with its 849 call sites. `withMetadata`
+is now `withMeta`, attaching metadata to a per-kind clone, and the factories
+take metadata directly so a value never exists without what it must carry.*
+
+*What survives from C4.1 unchanged, because it was about the COMPOSITE rather
+than the carrier: one host class for every Structure, one declared hidden
+class, construction only through the factory shims, and W4 failing any stray
+object literal. The ruling and the measurement behind it are D48(b)(c); the
+full record is `docs/plans/metadata-on-values.md` and `concepts.md` §10
+(retired) and §11.*
 
 *Status (2026-07, C4.1+C4.2): the KIND exists — every MultiValue and
 Context is a Structure instance, and the DENSE REGION is live: array
@@ -126,18 +150,6 @@ by union on MultiValue re-evaluation instead of inner-shadows-outer.
 as planned. The host `ValueKind.MultiValue` tag stays through C4.3 but
 is not expected to survive beyond C6 — retirement is an expected outcome
 of the C6 kind-recipe work.*
-
-*SUPERSEDED 2026-08 by B-121 C2/C4 — the paragraphs above and below describe
-the CARRIER, which no longer exists. `withMetadata` is now `withMeta` and
-attaches metadata to a per-kind clone, so a typed scalar is a `Bits` carrying a
-`type` field rather than a Structure wrapping one; `primary`, `isCarrier`,
-`newCarrierStructure`, `CarrierStructure` and the W1/W5 invariants are deleted,
-and `dataOf` is the identity pending C5. The C4.1 claims that survive intact
-are the ones about the composite: one host class, one hidden class,
-construction only through the factory shims, W4 catching a stray literal. Kept
-as written because they record what was true when C4.1 and C4.3b landed; the
-prose rewrite is C7. Current truth: `docs/design/concepts.md` §10/§11 and
-`docs/plans/metadata-on-values.md`.*
 
 *C4.3b status (2026-08): MV-over-Context is UNCONSTRUCTIBLE — a Context
 primary handed to `withMetadata` flattens into a copy-on-write derive

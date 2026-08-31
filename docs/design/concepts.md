@@ -1229,72 +1229,83 @@ through the `src/types.ts` factories (`makeStructure`, `withMetadata`,
 done by alias. The alias is deleted and the interface is `StructureValue`
 at all 703 sites; `makeContext` → `makeStructure` at 101.)*
 
-## 10. Carrier
+## 10. Carrier — RETIRED (B-121, 2026-08)
 
-> **Level: IMPLEMENTATION** — choice **IC-3**, realising R3. Not part of the specification: a different metadata mechanism (a channel map on every value) would delete this concept entirely.
+> **The concept no longer exists.** Retired rather than renumbered: the
+> section numbers here are stable identifiers, the way §19b and §33b are, and
+> other entries cite them. This marker is what §10 means now.
 
-**Definition.** A *carrier* is a Structure that stands in for another value:
-its data plane is empty, the value it stands for sits in `primary`, and its
-channels (T2) ride alongside. A carrier is how a non-composite value — a
-Bits, a function, a residual — comes to carry metadata without changing kind.
+A *carrier* was a Structure that stood in for another value — empty data
+plane, the value it stood for in `primary`, its metadata alongside. It was how
+a non-composite value came to carry metadata without changing kind, and it was
+D46's option B.
 
-**Rationale.** This is D46's option B, and it is why "attach a type to a
-number" does not require a MultiValue *kind*. Carriers never nest (the W1
-invariant): wrapping a carrier re-wraps its inner data rather than layering,
-so `dataOf` is one hop and not a loop.
+**Why it is gone.** IC-3 was re-ruled at **D48(b)** on measurement: of 240,820
+value allocations, **56,123 were carriers** — 74% of all structures, more than
+there are Bits values — and **98.5% held exactly one field**. The most common
+act in the system was allocating an eleven-field `Structure` so that a `Map`
+could hold one entry. Metadata is now a field on every representation kind
+(§19), so a non-composite value never becomes something else in order to carry
+one. A typed `42` is a `Bits`.
 
-**As implemented.** No separate type — the host-level test is *primary
-presence*, `isCarrier(v)` in `src/structure.ts`. The static shape is
-`CarrierStructure` in `src/types.ts`.
+**What went with it.** `primary`, `isCarrier`, `newCarrierStructure`, the
+`CarrierStructure` type, the **W1** non-nesting invariant and the **W5**
+role-transparency invariant — both of which existed only to keep two roles
+sharing one class from contaminating each other — and `dataOf`, the data-plane
+peel, which became the identity function and was deleted with its 849 call
+sites. The current story is §11 (data plane) and §19 (metadata field).
 
-**Status (D48(b), 2026-08): this concept is scheduled for DELETION.** IC-3
-was ruled the other way — metadata becomes a field on every value — so a
-non-composite value no longer needs to become something else in order to
-carry a field. When B-121 lands, §10 leaves the spine, `primary` (194
-occurrences) and `isCarrier` go with it, W1 (carriers never nest) has nothing
-to constrain, and `dataOf` (902 occurrences) becomes the identity function.
-The entry stays until then, because the code still works this way.
-
-**Delta.** — *(closed at C9. It was `MultiValueType`, 25 uses, naming a kind
-D46 retired, with a comment saying it survived "so existing casts keep
-compiling" — a type name documenting its own obsolescence. Renaming it also
-exposed that `withMetadata` (was `makeMultiValue`) DECLARED a carrier return
-while one of its three paths returns a non-carrier derive; the honest return
-type is `StructureValue` and only one site — a test cast — depended on the
-fiction.)*
+**What the deletion taught, since it is not visible in the result.** Removing
+a representation broke **eleven sites that no author knew depended on it** —
+`isCarrier`, `.primary`, and `kind === Structure` standing in for *"does this
+carry metadata?"*, a question that turned out to have eight spellings. Every
+failure was **silent**: a check stopped firing rather than throwing, so type
+annotations stopped rejecting, a failing `proven` clause downgraded to a skip,
+and `effects` stopped unioning. That is the evidence behind **B-128** — layer
+separation stated but not policed — and behind **B-127**, since two whole
+classes were invisible to a regex over source text. Full record:
+`docs/plans/metadata-on-values.md` §5.1a–§5.1g.
 
 ## 11. Data plane
 
-> **Level: Specification** — satisfies R3, R5. **D48(b) simplifies the implementation of this entry, not the entry**: once metadata is a field on every value, "the data of a value" is the value, and `dataOf` becomes the identity function the Allegro side already assumes it is.
+> **Level: Specification** — satisfies R3, R5. D48(b) did not change this entry; it made the entry *literal*.
 
 **Definition.** The *data plane* of a value is the value it ultimately
-denotes, ignoring anything carried alongside. For every value except a
-carrier that is the value itself; for a carrier it is the primary.
+denotes, ignoring anything carried alongside. **It is the value.** A
+composite's data is its slots; a scalar's data is its bits; and neither is
+reached by projecting past a wrapper, because there is no wrapper.
 
-It has **two consumers with different interfaces**, and conflating them is a
-mistake worth naming. From **inside the language** — Allegretto or Allegro
-code — a value simply *is* its data: the carrier is invisible, which is
-exactly what D46's *transparent* carrier means, and there is no accessor to
-call. From **the host** — the interpreter reaching into a value it is
-implementing — the carrier is visible, and `dataOf` is the only sanctioned
-way to see past it.
+**Rationale.** This entry used to describe **two consumers with different
+interfaces**, and that split was the carrier's shadow rather than a property
+of the plane. From inside the language a value simply *was* its data — the
+carrier being invisible is what D46's *transparent* carrier meant — while the
+host, implementing the value, could see the wrapper and needed `dataOf` to
+see past it. B-121 deleted the wrapper, so the host's view and the language's
+view are now the same view, and the accessor with them (§10).
 
-**Rationale.** Ordering note — this entry and §10 are mutually referential in
-prose (a carrier is defined by having a data plane; the data plane is defined
-by the carrier's primary). The cycle is broken by defining the carrier
-*structurally* (a Structure with a `primary` field) and the data plane as the
-*accessor* over that shape. Recorded rather than written around, per the
-ordering constraint.
+The rule that survives, and it is the one that matters: **primitives receive
+FULL values.** An impl that stripped its arguments down to their data would
+silently drop every metadata field they carry (R4/C4.3c). Before B-121 that
+rule needed a peel to be usable at all; now it needs nothing, which is the
+sense in which the implementation caught up with the specification.
 
-The rule that primitives receive FULL values and read data through `dataOf`
-is what keeps channels intact across a call: a primitive that unwrapped its
-arguments would silently drop every channel they carry.
+Ordering note, kept because it records a real check: this entry and §10 were
+mutually referential in prose — a carrier was defined by having a data plane,
+the data plane by the carrier's primary. The cycle was broken by defining the
+carrier *structurally* and the data plane as the accessor over that shape.
+With §10 retired the cycle is gone rather than broken.
 
-**As implemented.** `dataOf(v)` in `src/types.ts` — one property read,
-re-exported from `src/slots.ts`. It is a **host function**; nothing in
-Allegretto or Allegro calls it, and nothing should.
+**As implemented.** Nothing. There is no data-plane accessor, and the absence
+is the implementation. `dataOf` was deleted at B-121 C5 with 849 call sites,
+and the boundary lint forbids the identifier along with its earlier spelling
+`primaryOf`.
 
-**Delta.** —
+**Delta.** *Held open deliberately.* **B-128** asks that planes be separated by
+interfaces and the separation policed; this entry now names a plane with no
+reader at all. The argument for that is above — there is no projection left,
+so an accessor would advertise a boundary that does not exist — but it was
+settled inside a deletion chunk that was not weighing enforcement. B-128
+should re-open it rather than inherit it.
 
 ---
 
@@ -1315,8 +1326,9 @@ construction:
 | **Dense** | A numeric-keyed data value — arrays | a plain element array (§16) |
 | **Scope** | Evaluation environment, not data (§15) | binding map + parent link |
 
-Plus the carrier *configuration* (§10), which is orthogonal: a carrier is a
-record-role Structure with an empty data plane.
+B-121 removed a fourth, orthogonal configuration — the **carrier**, a
+record-role Structure with an empty data plane standing in for a non-composite
+value (§10, retired). With it gone, a Structure's role is its whole story.
 
 **Rationale.** Role is fixed at construction so that no value changes what it
 is under you, and so the host can keep one hidden class across all of them.
@@ -1325,7 +1337,7 @@ mutable; data structures are born immutable (D22). Each rejects the other's
 operations.
 
 **As implemented.** `src/structure.ts` — `newContextStructure`,
-`newDenseStructure`, `newMultiValueStructure`. Role is read from field
+`newDenseStructure`. Role is read from field
 presence (`dense`, `isScope`, `primary`) rather than stored as a tag.
 
 **Delta.** — *(closed at C9. The header described **two** planes ("channel
@@ -1486,7 +1498,7 @@ evaluation does to it**:
 
 | Plane | Holds | Written by | Under evaluation | Visible to Allegro |
 |---|---|---|---|---|
-| **Data** | What the value *is* | construction | replaced by the result | yes — it is the value |
+| **Data** | What the value *is* — the value itself, with no accessor (§11) | construction | replaced by the result | yes — it is the value |
 | **Binding** | A composite's named parts | construction; kernel for engine slots | copied by the operations that copy structures | yes — user fields |
 | **Metadata** | Information *about* the value, in named **fields** | the field's registered writer | per the field's declared rule (SC-7) | yes, through field reads |
 | **Host** | Interpreter bookkeeping | the host, freely | nothing — it is not part of the value | **no** |
@@ -1503,8 +1515,9 @@ the value that must survive operations?* → metadata, and it needs a registered
 rule and a writer. *Is it none of those?* → host, and it must not be
 observable from Allegro.
 
-**As implemented.** Data → `primary` / the value itself, read via `dataOf`.
-Binding → `bindings` + `bindingList` (+ `dense`). Metadata → `components`.
+**As implemented.** Data → the value itself; B-121 deleted `primary` and the
+`dataOf` accessor, so this plane has no reader (§11).
+Binding → `bindings` + `bindingList` (+ `dense`). Metadata → `meta`.
 Host → JS expandos and declared-but-non-value fields on `Structure`.
 
 **Delta.** — *(closed at C9. The host plane was **declared inside the value
@@ -1729,8 +1742,8 @@ one the code currently bypasses.
 
 | Plane | Consumer | Interface | Producer | Interface |
 |---|---|---|---|---|
-| **Data** | Allegretto / Allegro code | **none** — a value *is* its data; the carrier is transparent (D46) | construction | the representation constructors |
-| **Data** | the host | `dataOf(v)` — the only sanctioned way to see past a carrier | the host | the representation constructors |
+| **Data** | Allegretto / Allegro code | **none** — a value *is* its data | construction | the representation constructors |
+| **Data** | the host | **none since B-121** — the host's view and the language's are the same view now that no wrapper stands between them. Whether a plane with no reader is a plane properly policed is held open at §11's delta | the host | the representation constructors |
 | **Binding** | user code | member dispatch | construction | `makeStructure` + the binding writers |
 | **Binding** | engine (meta slots) | `src/slots.ts` accessors | kernel | the same accessors ⚠ *four write disciplines, §13; and see the disposition note below* |
 | **Metadata** | anyone | `channelReadRaw(v, field)` — free (D23) | field owner | the writer closure from registration |
@@ -1782,10 +1795,10 @@ plane interface. A hook that handed the base an opaque closure *and* let it
 be the authority would lose the same property, so the hooks must be
 capability-gated the way writers are.
 
-**As implemented.** Two of the eight rows have a real mechanism
-(`dataOf`, `channelReadRaw` + the propagation table). Four are conventions
-enforced by lint or by nothing. The layer→base row has one instance and no
-general form.
+**As implemented.** One of the eight rows has a real mechanism
+(`channelReadRaw` + the propagation table); the two Data rows now need none.
+Four rows are conventions enforced by lint or by nothing. The layer→base row
+has one instance and no general form.
 
 **Delta.** The interfaces are the specification's biggest gap: four hooks are
 owed, and every T2 delta is an instance of one of them being absent. **→
@@ -2628,6 +2641,12 @@ and the four operations currently sharing the name `withMetadata` get four
 names. That is a better outcome than the one the analysis proposed, and it
 came from a question about lifecycle rather than from more measurement.
 
+*(Amended 2026-08 at B-121 C6: the second half of that sentence was wrong.
+Asked what distinguishes the operations in their **logic** rather than their
+purpose, the answer was nothing — one operation, `(datum, metadata) → value`,
+whose patterns differ only in argument provenance. The lifecycle half stands
+and is implemented; the decomposition half was withdrawn.)*
+
 ### Raised by C9 (the naming pass)
 
 | # | Delta | Owner |
@@ -2638,8 +2657,8 @@ came from a question about lifecycle rather than from more measurement.
 | 54 | **`mv_set` forges the `type` field from user code** — no capability required, and annotation checking accepts the result | **B-123(a)** |
 | 55 | **`channel_read` bypasses the D47(e) observe guard** that `component_get` enforces for `source` | **B-123(b)** |
 | 53 | ~~**A constant is rebuilt in a loop**: `wrapAsUntypedFunction` is deterministic per primitive, and both Layer-1 builders call it for every primitive on every scope build~~ **CLOSED** — carriers 56,123 → 38,954, exactly the predicted 17,169 | B-122 |
-| 50 | **The carrier is 74% of all structures and 98.5% hold one field**; `dataOf` really unwraps 182,311 times | **D48(b)** → B-121 |
-| 51 | **`withMetadata` is four operations under one name**, and one of them (`withMetadata(newP, cloneComponents(v))`) is spelled as two calls where omitting the second silently drops metadata | **D48(c)** → B-121 |
+| 50 | ~~**The carrier is 74% of all structures and 98.5% hold one field**; `dataOf` really unwraps 182,311 times~~ **CLOSED 2026-08 (B-121 C2–C5)** — the carrier is deleted and so is `dataOf`. §10 is a retirement marker | **D48(b)** → B-121 |
+| 51 | ~~**`withMetadata` is four operations under one name**, and one of them (`withMetadata(newP, cloneComponents(v))`) is spelled as two calls where omitting the second silently drops metadata~~ **CLOSED 2026-08 (B-121 C6)** — with a correction: it was **one** operation, not four. The four patterns differ only in where their arguments come from, and deleting the peel turned the ten `derive` sites into `stamp` by deleting a word. The two-call hazard was real and is now `carryMeta` | **D48(c)** → B-121 |
 | 52 | **The O(1) name-lookup requirement comes from scopes, not from data** — 227 scope objects vs 19,245 data structures averaging 4.6 slots | **D48(a)** → B-120 |
 | 49 | **A structure's bindings map and binding list are not aliases.** `slotWrite` and `addBinding` each build **two** `Binding` objects for one key, so an in-place mutation reaches one view only. This is the root of all four write disciplines and was documented nowhere | — *(stated at C9; §13)* |
 
@@ -2867,6 +2886,8 @@ Specification** — the carrier (§10), Structure roles (§12), the dense region
 (§16) and the legacy view (§17). All four had been written as though they
 were concepts of the language. They are not: they are how *this host* realises
 §9, and a different Allegretto satisfying R1–R6 would have none of them.
+*(B-121 then proved the point on the first of them: the carrier was deleted
+outright and no requirement moved. §10 is a retirement marker.)*
 
 That is a quarter of T0–T1 sitting a level above where it belongs, and it is
 the same mistake in four places: an implementation choice, made for a

@@ -52,6 +52,25 @@
 //   - construction-phase population (addBinding after makeStructure) is
 //     the grandfathered builder idiom until construction protocols
 //     migrate (C6 recipe).
+//
+// THE IN-PLACE RULE (B-121 C7, plan §3.4). The carve-out above is an
+// instance of a general rule, stated here because it was previously an
+// idiom in two places and a rule in none:
+//
+//     Write in place only while the value is provably UNSHARED — during
+//     construction, before it escapes. After it escapes, derive.
+//
+// It is not a style preference; it follows from one measurement. Of 59,027
+// metadata attachments, 19,817 (33.6%) target an object that has ALREADY
+// been given metadata. Metadata is a property of a value *in a position*,
+// not of the datum, so a post-escape in-place write would overwrite the
+// first stamp at every position holding that value. (A side table keyed by
+// the object fails identically, since its key is the object.) D22 is the
+// rule adopted BECAUSE of this, and the pre-escape window is the one place
+// the argument does not apply.
+//
+// The other instance is `writeShape` in slots.ts, which states its own
+// version of this argument for identity-sensitive type Contexts.
 // =============================================================================
 
 import type { Value, Binding, StructureValue, BitsValue } from "./types.js";

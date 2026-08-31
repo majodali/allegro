@@ -1673,10 +1673,23 @@ that prevents it.
     that puts large by-name lookup on the DATA path rather than the scope
     path — that is the assumption E rests on
 
-- [ ] **B-121** · L0 · **Metadata is a field on every value, supplied at
-  construction (D48(b)(c), IC-3).** **PLAN: `docs/plans/metadata-on-values.md`
-  (active, 2026-08) — chunks C1–C7; §6 rulings taken; **C1, C2, C4, C5 and C6
-  landed**; only C7 (the in-place rule + doc sync) remains. The plan adds
+- [x] **B-121** · L0 · **LANDED 2026-08 — the carrier is deleted.** Metadata is
+  a field on every value, supplied at construction (D48(b)(c), IC-3).
+  **PLAN: `docs/plans/metadata-on-values.md` (COMPLETE) — C1–C7 landed, suite
+  1202/1202, every completion count at zero: `primary`, `isCarrier`,
+  `CarrierStructure`, `withMetadata`, `dataOf`.**
+  - **Two corrections to the plan as ruled**, both recorded rather than
+    quietly absorbed: `withMetadata` was **one** operation, not four (the
+    patterns differ only in argument provenance), and **`concepts.md` §11's
+    delta is left OPEN** — the data plane now has no reader at all, which runs
+    against B-128 and should be re-opened by that work rather than inherited
+    from a deletion chunk that was not weighing enforcement
+  - **What the migration cost, which is its most reusable output**: removing a
+    representation broke **eleven sites no author knew depended on it**, every
+    failure SILENT — a check stopped firing rather than throwing. → **B-127**
+    (grep cannot see the questions that matter) and **B-128** (layer
+    separation stated but not policed)
+  - The plan adds
   four probes not in this entry: retyping `withMetadata` to return `Value`
   typechecks with **0 errors** (nothing depends on attachment producing a
   Structure); `newCarrierStructure` has exactly **2 callers, both inside
@@ -1783,6 +1796,13 @@ that prevents it.
     `effects` stopped unioning. One of the six (`unifyTypes`) was NOT a
     stand-in — it separated a value-carrying-a-type from a type Context — and
     was restated, not deleted. `docs/plans/metadata-on-values.md` §5.1c
+  - **C7 LANDED 2026-08**, closing the arc. The in-place rule is stated in
+    `structure.ts` beside the D22 carve-outs (*write in place only while the
+    value is provably unshared; after it escapes, derive*), with `writeShape`
+    citing it as the rule's second clause rather than an exception. `concepts.md`
+    §10 retired in place — the numbers are stable identifiers, so renumbering
+    forty entries to delete one buys nothing — and §11 rewritten. Spine delta 50
+    closed; delta 51 closed AS CORRECTED. `docs/plans/metadata-on-values.md` §5.1h
   - **C5 LANDED 2026-08**, suite **1202/1202**. `dataOf` deleted with **849**
     call sites across 32 files; the retired-name lint now forbids `dataOf` as
     well as `primaryOf`. **Safe in a way C2 was not**: after C4 the body was
