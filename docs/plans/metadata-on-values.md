@@ -283,6 +283,27 @@ type-level and all came back clean; this one is a classification of behaviour
 and it found the whole set in one pass. The rule worth keeping: *classify what
 the code DOES at each site, not what it looks like.*
 
+### 5.1d Behavioural assertions are gold, structural tests are lead
+
+Maintainer ruling, 2026-08, on the two tests that pinned the carrier
+representation. Both were rewritten to assert what a program can observe —
+*a typed literal carries its type and its data is the scalar*; *an error value
+carries the `error` field and has a type* — instead of *it is a Structure,
+born immutable, with an empty data plane*.
+
+**They were changed on the GREEN tree and pass with carriers still in place.**
+That is the point rather than a convenience: a representation-independent
+assertion holds in BOTH representations, so proving it under the old one shows
+the rewrite is not a re-pointing of the test at the new answer. Six structural
+claims went; six behavioural ones took their place, and the composite
+assertions beside them — records, type Contexts and scopes really are
+Structures — were left untouched, because that is not what C2 changes.
+
+The rule generalises past this chunk and belongs in the methodology delta: a
+test that names a representation fails when the representation is *improved*,
+which trains a maintainer to weaken tests. A test that names an observable
+property fails only when behaviour regresses.
+
 ### 5.1c Step 3, and the class the survey could not see
 
 C2 was re-attempted in three gated steps, which worked far better than one

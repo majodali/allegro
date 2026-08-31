@@ -1359,18 +1359,28 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const { evalCtx } = evalSource(
       "x = 42\np = {a: 1}\nPositiveInt = Int & _ > 0\ny = PositiveInt(5)",
       undefined, [createTypeSystem()], undefined, true);
+    // B-121 C2 (maintainer ruling, 2026-08: *behavioural assertions are gold,
+    // structural tests are lead*). Four assertions here claimed a typed
+    // literal IS a carrier — a Structure, born immutable, with an empty data
+    // plane, answering the Structure kind. That is the representation D48(b)
+    // deletes, so they pinned the thing being changed rather than anything a
+    // program can observe. Replaced by what actually matters and holds in
+    // EITHER representation: a typed scalar carries its type, and its data is
+    // the scalar.
     const x = evalCtx.bindings.get("x")!.value!;
-    eq(isStructure(x), true, "typed literal (a CARRIER) is a Structure");
-    eq((x as unknown as Structure).immutable, true, "carriers born immutable (D22)");
-    // C7.1 (D15): a carrier's data plane is EMPTY — the lazily-
-    // materialized view may exist, but it holds no slots.
-    eq((x as unknown as Structure).bindings.size, 0, "carrier data plane is empty (D15/D17 restated)");
-    eq(x.kind, ValueKind.Structure, "the carrier answers the one structure kind (MultiValue kind retired)");
+    eq(getType(x) !== null, true, "a typed literal carries its type");
+    eq(getTypeNameOf(x), "Int", "and the type is the one inferred");
+    const xd = dataOf(x);
+    eq(xd.kind, ValueKind.Bits, "its data is the scalar itself");
+    eq((xd as BitsValue).data, 42n, "with the literal's value intact");
+    // The composite assertions are untouched — records, types and scopes are
+    // genuinely Structures, and that is not what C2 changes.
     const p = dataOf(evalCtx.bindings.get("p")!.value!);
     eq(isStructure(p), true, "object Context role is a Structure");
     eq((p as unknown as Structure).primary === undefined, true, "Context role has no primary (D17)");
     const y = evalCtx.bindings.get("y")!.value!;
-    eq(isStructure(y) && isStructure(getType(y)!), true, "refined value AND its type Context share the representation");
+    eq(isStructure(getType(y)!), true, "a refined value's type Context is a Structure");
+    eq(getTypeNameOf(y), "PositiveInt", "and the refined value reports it");
     eq(isStructure(evalCtx), true, "evaluation scopes share the substrate (plane split stays isScope/parent)");
   });
 

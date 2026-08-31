@@ -287,10 +287,14 @@ test("none: print", () => {
 
 // == Error Values ==
 
-test("error: creates error MultiValue", () => {
+test("error: an error value carries the error field and a type", () => {
+  // B-121 C2 (maintainer ruling, 2026-08: behavioural assertions are gold,
+  // structural tests are lead). Was "creates error MultiValue", asserting
+  // `kind === Structure` — the carrier representation D48(b) deletes, and a
+  // kind name retired at D46. What matters is that the value carries the
+  // `error` field and has a type, which holds in either representation.
   const result = evalStd('error "something went wrong"');
   eq(result !== null, true);
-  eq(result!.kind, ValueKind.Structure);
   eq(getType(result!) !== null, true);
   eq(metaOf(result!).has("error"), true);
 });

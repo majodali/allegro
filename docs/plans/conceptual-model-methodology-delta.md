@@ -201,6 +201,18 @@ Raised by the pilot, adoptable independently of the amendment:
   Three times in the pilot arc, instrumenting the suite settled in one run a
   question that repeated reasoning had got wrong — twice in *opposite*
   directions. Cheap, and it is the difference between a claim and a finding.
+- **Behavioural assertions are gold, structural tests are lead.** Maintainer's
+  formulation, and it earned its place: a test that names a REPRESENTATION
+  fails when the representation is *improved*, which trains a maintainer to
+  weaken tests under pressure; a test that names an OBSERVABLE PROPERTY fails
+  only when behaviour regresses. The pilot hit this changing how metadata is
+  stored — assertions like *"a typed literal is a Structure, born immutable,
+  with an empty data plane"* blocked a ruled improvement while asserting
+  nothing a program could see. The practical test when rewriting one: **a
+  representation-independent assertion passes under BOTH representations**, so
+  it can be changed and proved on the OLD code before the new code exists.
+  That distinguishes a genuine rewrite from re-pointing the test at the new
+  answer.
 - **A lint that cannot see the artifact being added is a false negative.**
   Found the hard way: a doc-reference check scanned tracked files only, so a
   new document's references were unverifiable until after the commit. The
