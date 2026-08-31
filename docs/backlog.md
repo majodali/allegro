@@ -1054,8 +1054,33 @@ that prevents it.
     Deleting it would have weakened existing test conditions. It stays —
     and it is therefore the ENTIRE remaining job of `isMetaSlotKey`:
     hiding one derived slot from field walks. Whatever replaces the
-    partition needs to handle exactly this case and nothing else
-  - **(g) `__interface` — NOT the same shape as `__union`.** The audit
+    partition needs to handle exactly this case and nothing else.
+    ~~GATED ON B-108~~ — **DECIDED (D48(a), 2026-08): DELETED, not re-keyed.**
+    Option E dissolves the dense role, and `__length`, the materialized legacy
+    view and the W6 invariant go with it. So nothing replaces the partition:
+    `isMetaSlotKey`'s entire remaining job disappears rather than moving.
+    **This sub-item now closes inside B-120** — and with it the `__*`
+    convention, since `__length` was the last key it ever fired on
+  - **(g) `__interface` — RESOLVED at concept-spine S3 (`concepts.md` §36).**
+    Specified, not open. The definition — an interface is a **declaration-only
+    type**, and `InterfaceKind` is literally `Type` refined by *"has no
+    `construct`"* — makes the answer derivable rather than asserted: the
+    marker does **two jobs with one bit**. `applyBoundaryBound` reads it for
+    *is this an interface?*; `shapeAwareSubtypeof` reads it for *is this in
+    the loose base-name world?*; `structuralWrap` erases the marker AND the
+    name together, so one erasure answers both — but the facts are
+    orthogonal. `~Printable` has no construct (interfaces have none to copy),
+    so it satisfies InterfaceKind's own predicate: it IS an interface and it
+    is ALSO loose, as the maintainer ruled. The change: drop the marker check
+    in `shapeAwareSubtypeof` (measured 0-decisive — 42 interface encounters,
+    none where it changed the outcome, because the name check beside it
+    already carries the loose-world meaning); read the meta-type in
+    `applyBoundaryBound` (a behaviour change, and a FIX — that path has ZERO
+    suite coverage, so tests land first); leave `structuralWrap` alone
+    (**retracting** the meta-type re-stamp proposed before the definition
+    existed — anonymity already carries the loose-world signal); delete
+    `__interface`. Original finding follows.
+  - **(g-orig) `__interface` — NOT the same shape as `__union`.** The audit
     grouped them as pure presence-markers and the ratification covered
     both. On implementation the two diverge: `__union` was redundant with
     a kind, but `__interface` carries a distinction the meta-type does
@@ -1069,6 +1094,10 @@ that prevents it.
     maintainer gate rather than folded into the deletions
 
 - [ ] **B-105** · L2 · **Union types — redesign or leave retired.**
+  *(Note added 2026-08: whatever the redesign, it lands on the D48(a)
+  entry-sequence composite, not on the map-plus-dense-region one — the
+  original "if a union type is implemented as an array, why isn't it dense?"
+  question dissolves with the dense role. Wait for B-120.)*
   Removed wholesale at B-104 chunk 2 (maintainer ruling: "if not used
   outside tests, remove it"). Usage at removal: **four test assertions,
   nothing else** — no `lib/`, no `tests/*.alg`, no demo, no bench, no
@@ -1120,8 +1149,10 @@ that prevents it.
     (`buildRefinedType`, `buildDistinctType`) needed nothing. Gate green at
     1197 on the first run
 
-- [ ] **B-107** · L0 · **Naming and declaration debt found by the concept
-  spine (S1, T0–T1).** Ruling-3 scope (maintainer-ratified 2026-08): the
+- [~] **B-107** · L0 · **Naming and declaration debt found by the concept
+  spine (S1, T0–T1).** **(a)(b)(c)(e)(f) LANDED at campaign chunk C9,
+  2026-08; (d) held for discussion, and delta 30's ENFORCEMENT half moved to
+  B-104(f). The residue the pass measured is B-119.** Ruling-3 scope (maintainer-ratified 2026-08): the
   renames pulled forward ahead of the S5 triage, extended beyond the type
   name to the other **clear** cases — where the decision is already ratified
   and executed in the runtime and only the surface name lags. Anything whose
@@ -1133,31 +1164,1042 @@ that prevents it.
     `makeContext` (**101**); `makeStructure` does not exist. D1 and D46 are
     recorded EXECUTED: the runtime unification was, the renaming was done by
     alias. Rename `ContextValue` → `StructureValue` and `makeContext` →
-    `makeStructure`
+    `makeStructure`. **DONE C9**: alias deleted; 703 + 101 sites, plus
+    `asContext`→`asStructure` (30), `makeDenseArrayCtx`→`makeDenseArray`,
+    `makeRawArrayCtx`→`makeRawArray`, `makeCtxWith`→`makeStructureWith`,
+    `newContextStructure`→`newRecordStructure`,
+    `extensionToContext`→`extensionToStructure`, and primitives-local
+    `asCtx`→`asStructureArg`. Green at 1197 on the first run
   - **(b) `MultiValueType`** (**25** uses) names the kind D46 retired; its
     own comment says it survives "so existing casts keep compiling". The
     concept is the CARRIER (`isCarrier` is already the host test), so the
-    static shape should be named for it
+    static shape should be named for it. **DONE C9**: → `CarrierStructure`,
+    and `makeMultiValue` → **`withMetadata`** (68), named for what it does —
+    the one metadata-attachment chokepoint — since only one of its three
+    paths actually builds a carrier. Which surfaced a defect the rename was
+    not looking for: **the function DECLARED a carrier return** while the
+    derive path returns a non-carrier. Corrected to `StructureValue`;
+    **exactly one site** — a test cast — depended on the fiction, which is
+    the evidence it was never load-bearing
   - **(c) Stale file headers.** `src/types.ts` opens "Five value kinds +
     Param placeholder" — there are seven, and Param is one of them. The
     header predates both `Symbol` and the Context→Structure renaming.
     `src/structure.ts` describes **two** planes; there are four, and it says
     `__*` meta-slots "remain here until C5 re-keys them" — C5 did not, B-104
-    is doing it two milestones later
+    is doing it two milestones later. **DONE C9**: both headers rewritten;
+    `structure.ts` now names all four planes and points the host-plane row at
+    `StructureHostFields`
   - **(d) `ParamValue.predicates`** — declared, documented "reserved",
     **no runtime reader**, and a test asserts it stays empty. A reservation
     nothing reads or writes is indistinguishable from dead code; move the
-    reservation into prose and delete the field, or give it a reader
+    reservation into prose and delete the field, or give it a reader.
+    **A SECOND INSTANCE found at B-121 C1**: `grammar2/types.ts`'s
+    `grammarMeta` (was `meta`) is declared on two grammar records, initialized
+    in both constructors, and **read nowhere** — the same shape, in a
+    different subsystem. Two instances make it a pattern: a reserved slot with
+    no reader is indistinguishable from dead code, and the project has no rule
+    about it. Worth one ruling covering both rather than two.
+    **HELD at C9 — needs a ruling.** Deleting the field requires deleting the
+    test that asserts it stays empty, and PROCESS §6 makes removing a test
+    condition a discussion, not a judgement call. The alternative (give it a
+    reader) is a feature, not a naming fix. Either way it is out of a naming
+    chunk's scope
   - **(e) Binding write disciplines.** `slotWrite` writes map + list,
     `slotSet` writes the map only (deliberately — the proof-kernel
     origination idiom), `removeName` deletes from the map and leaves the
     list entry, `removeConstruct` deletes from both. The
     leave-the-list-entry behaviour is documented on `renameInPlace` and
     nowhere else. Four disciplines, one comment, no stated rule for
-    choosing. Needs a rule, not necessarily a change
+    choosing. Needs a rule, not necessarily a change. **DONE C9 — and
+    writing the rule found its CAUSE.** `slotWrite` and `addBinding` each
+    construct **two separate `Binding` objects** for one key, so the map and
+    the list are **not aliases** and an in-place mutation reaches exactly one
+    view. All four disciplines follow from that one fact, which was
+    documented nowhere. The rule is now stated above `slotWrite`, including
+    why the map-only paths are safe today (nothing enumerates a type
+    structure's `bindingList` as fields — the same measurement that found
+    `isMetaSlotKey` fires on one key) and that the exemption is
+    circumstantial, so B-104's partition retirement must preserve it. Note
+    the item's own text was approximate: there is no `slotSet`
   - **(f) Host-plane fields declared on the value interface.** `parent`,
     `isScope` and `scopePredicates` sit on `StructureValue` while their own
     comments say they are "host-plane fields, never value slots". The plane
     distinction is asserted in prose and contradicted by the declaration.
-    **Blocked on T2 §9** — the fix is to declare the planes first, so this
-    waits for the spine rather than being guessed at
+    ~~Blocked on T2 §9~~ — **unblocked**: `concepts.md` §18 declares the
+    planes. Scope confirmed by the S5 triage: these three are correctly
+    PLACED and wrongly DECLARED, so the fix is declaration-side only.
+    Host-plane data that is wrongly *placed* is **B-118**, a different item.
+    **DONE C9**: `StructureHostFields` declares the three, and
+    `StructureValue extends` it — the plane is legible in the type instead of
+    only in per-field comments the declaration contradicted
+
+- [x] **B-108** · L0 · `[reval]` **RULED 2026-08 → D48.** Review the
+  Allegretto composite — IC-2 / IC-3 / IC-4 together.
+  - **The ruling**, in one place: **(a) IC-2 → option E**; **(b) IC-3 → the
+    alternative** (metadata as a field on every kind); **(c)** construction
+    takes metadata and `withMetadata` splits into four named operations;
+    **(d) IC-1 DISSOLVES** — it could not be decided, because (a) and (b)
+    delete the roles it would have tagged, which is the item's own "cannot be
+    judged separately" premise proving itself; **SC-5 upheld.**
+  - **The item's central question is answered.** "Did unifying the composites
+    simplify things?" — **yes at the specification level and no at the
+    implementation level**, and it could not be answered while those were
+    fused. Kinds went 2 → 1 (the win); configurations went 2 → 4, and 74% of
+    all structures allocated became the configuration that exists solely to
+    hold one metadata field.
+  - **Execution**: NOT started. → **B-120** (option E) and **B-121** (metadata
+    field + lifecycle). Each is an arc, not a chunk, and gets a plan first.
+  - Full measurement record and reasoning: `docs/design/concepts.md` §3
+    (IC-1, IC-2, IC-3, IC-3a) and "What B-108 settled (D48)"
+  - *Original item text follows, kept as the record of what was asked.* Raised by the concept spine (S2a) at
+  maintainer direction; the three choices interact and cannot be judged
+  separately. The question is not "is the current design wrong" — the suite
+  says it works — it is **how much of the implementation is visible from the
+  specification**, which is the R7 criterion nobody applied when these were
+  taken.
+  - **The measurement.** `Structure` declares **11** fields in **4**
+    role-groups (carrier, record, dense, scope) plus 2 universal, and role is
+    read by field PRESENCE at **146** sites (`.primary` 67, `.dense` 21,
+    `.components` 20, `isCarrier` 14, `isScope` 13, `isDense` 6,
+    `viewMaterialized` 5), through 3 constructors. Representations went
+    2 → 1; configurations went 2 → 4; the variation moved from an explicit
+    kind tag to implicit field presence
+  - **The recorded rationale was never simplification.** `structures.md` I1
+    gives the payoff as "known type ⇒ known shape ⇒ slot access compiles to
+    offsets (feeds codegen)" — future codegen — and the class comment gives
+    "so every structure shares a single hidden class" — present V8. Both are
+    performance arguments. The unification was read as a conceptual
+    simplification because requirement / specification / implementation were
+    not separated; that separation now exists (concepts.md Part 0)
+  - **Options carried in `concepts.md` IC-2** (renumbered at S2b; the
+    kind-count half of the old IC-2 is now **SC-5**, a SPECIFICATION choice,
+    and the role-configuration half is **IC-1**. Separating them is what
+    makes the doubt answerable: reducing kinds 2 → 1 was a specification win
+    under R1; the cost was entirely at the implementation level): A map-first (current),
+    B sequence-first (LISP-style, maintainer's suggestion), C two
+    representations (the original), **E one entry-sequence** — a single
+    composite of optionally-keyed entries that is both map and list, under
+    which the dense region becomes a representation optimisation BELOW the
+    spec and `__length` + the legacy view + the W6 invariant all dissolve.
+    E was not previously on the table
+  - **The B question worth measuring, not assuming**: O(n) name lookup is
+    only costly if lookup is a RUNTIME operation. Under R2 most scope
+    resolution happens once at `resolveSymbols`. The asymptotics that rule
+    out association lists in an interpreter argue far more weakly in a
+    partial evaluator. Counter-pressure: channel reads ARE hot and ARE
+    by-name (R3+R5), which is exactly where B goes linear
+  - **IC-3 (was IC-4) has no recorded criterion at all** — "channels by wrapping" was
+    never written down as a choice. The alternative (an optional channel map
+    on every value) deletes the carrier concept outright: no `primary`, no
+    67 presence-checks, no W1 non-nesting invariant, no `dataOf`
+    indirection — at the cost of an optional field on every representation,
+    including Bits
+  - **Deliverable**: a ruling on the composite, and whichever of SC-5 /
+    IC-1 / IC-2 / IC-3 it settles moves to a recorded choice WITH a criterion
+    and a revisit trigger. Informs T2 (planes) directly. **DELIVERED** — all
+    four now carry a criterion and a revisit trigger
+  - **It does NOT block nothing** (corrected by the S5 triage). Option E
+    dissolves `__length`, the legacy view and the W6 invariant together, so
+    whether **B-104(f)** means *re-key `__length`* or *delete it* is decided
+    here. **B-108 gates the retirement of the last dunder** — the
+    highest-leverage unruled question in the concept-spine set, and a ruling
+    rather than code, so it can be taken at any time. Campaign chunk C12
+    (`docs/plans/concept-spine.md` §9.3) waits on it
+
+- [~] **B-109** · L0 · **R6 and R12 are violated in the channel substrate.**
+  **(b) and (c) LANDED 2026-08, and (a) landed for the ONE field where the gap
+  was live — `type`.** Pulled ahead of B-121's C2 by maintainer ruling, because
+  B-125 found the `type` capability unclaimed and exploitable today. The
+  remaining ten registrations move at the concept campaign's C3.
+  - **What landed.** `type` is registered by `types-std.ts` — its owning layer,
+    not the base — as `{ rule: "computed", integrity: true }`, so
+    `channel_register("type", …)` is now refused. `source` gained the
+    `integrity: true` it was missing while sitting in the hardcoded list.
+    `assertNotIntegrityKey` reads the REGISTRY, and both hardcoded sets are
+    deleted
+  - **A finding the fix depended on.** The old guard checked BARE FIELD NAMES,
+    which conflated two planes: an object literal writes the BINDING plane and
+    cannot originate a metadata field at all — `{type: "widget"}` gives the
+    record a `type` slot while `type of` it still answers `Object`. So the
+    bare-name check defended nothing and cost users the field names
+    `discharged` and `source`, both of which were **refused outright** in a
+    record literal. The guard now checks binding-plane STORAGE keys
+    (`__discharged`), derived from the registry — a real origination path.
+    Verified: `{type: …, source: …, discharged: …}` is accepted,
+    `{__discharged: 1}` is still refused
+  - **Behaviour loosened, stated rather than slipped in**: `{discharged: 1}`
+    and `{source: 1}` were errors and are now ordinary records. No test pinned
+    the old refusal — the two forgery tests pin the `__discharged` form — so
+    nothing was weakened, but it is a user-visible change and *forgery G* now
+    pins the new behaviour in both directions
+  Found by the concept spine (S2b) while resolving two objections to the
+  requirement set. Both turned out to be **implementation** violations rather
+  than design contradictions — the mechanism is layer-ignorant, the wiring is
+  not — which is the good outcome: a contradiction would need a redesign.
+  - **(a) The base registers the layers' channels (R6, R11).** `src/slots.ts`
+    registers **eleven L2 channel names** itself at module init: `shape`,
+    `error`, `effects`, `predicates`, `domain`, `knowledge`, `bound`,
+    `discharged`, `warnings`, `source`, `exported`. It also special-cases
+    `shape` / `type` / `discharged` **by name** in `channelReadRaw` and
+    `buildWriter`. R11's whole point is that the base owns a fixed
+    *vocabulary* of propagation disciplines over an opaque payload, and the
+    LAYER registers `(name, rule)`. The base knowing "some channels are
+    viral" is layer-ignorant; the base knowing "the error channel is viral"
+    is not
+  - **The correct pattern already exists and is used exactly once**:
+    `src/effects.ts` calls `installChannelMerge("effects", …)` — the layer
+    supplying its own merge to a base that cannot import the encoding without
+    a cycle. That is R11 working, and it is the template for the other ten
+  - **(b) Integrity is enforced by name, not by capability (R12).**
+    `INTEGRITY_CHANNEL_NAMES = ["discharged", "source"]` is a hardcoded set in
+    `slots.ts` consulted by `assertNotIntegrityKey`. R12 says authority is the
+    **capability** — registration is one-shot and returns the writer closure,
+    so whoever registers first holds it — under which the base never needs to
+    enumerate sensitive channels. Protection by name is precisely the form
+    that cannot survive externalising registration, which is the objection
+    that surfaced this
+  - **(c) The two sources of truth disagree.** `source` is in
+    `INTEGRITY_CHANNEL_NAMES` but is registered as
+    `{ name: "source", rule: "drop" }` — **without `integrity: true`**. The
+    guard and the registry hold different beliefs about the same channel.
+    Harmless today (its rule is `drop` either way), but it is two mechanisms
+    where there should be one
+  - **Fix direction** (small, and it removes (b) and (c) together): consult
+    `channelSpec(name)?.integrity` instead of the hardcoded set, and mark
+    `source` integrity at registration. (a) is larger — moving eleven
+    registrations out of the base — and should follow the T2 planes entry
+    rather than precede it
+  - **Gated on**: R6, R11 and R12 surviving ratification in their current
+    form. If any is amended these findings must be re-read
+  - **(a) COMPLETE 2026-08 (C3).** The base now registers **five** fields, not
+    eleven, and the split was decided by running the code rather than by
+    reading the layer diagram: **a field belongs to the base if the concept it
+    serves survives in Allegretto**. `make_error("boom")` and `source of x`
+    both work under `--base`, so `error` and `source` are Allegretto's own and
+    stay. Six moved to their owners — `type`, `shape`, `discharged` →
+    `types-std.ts`; `effects` → `effects.ts`; `predicates`, `domain`, `bound`
+    → `refinements.ts`. Three have **no owner to move to** and stay in the
+    base, wrongly, until B-111 rules on what they are: `knowledge` (a
+    capability whose storage is other fields; nothing ever writes it),
+    `warnings` (registered `union`, unused — B-117 intends to reach for it),
+    `exported` (retired at B-097 V1 when visibility became a Binding property)
+  - **Three findings from doing it**, none of which were visible from the
+    plan:
+    - **`discharged` could not go to `proofs.ts`.** Module init threw
+      immediately: `types-std.ts` acquires the discharged writer at ITS init,
+      and `proofs.ts` imports `types-std.ts`. Looking at why, `proofs.ts` only
+      REPORTS (`isFailedProof`, `checkProofs`, `describeFailedProof`) — the
+      origination site, `makeProof`, is in `types-std.ts`. **The proof kernel
+      lives inside the type system**, which is a layering smell of B-110's
+      family and was invisible until ownership had to be named
+    - **Registration by module side effect is a load-order dependency.** It
+      works here only because `runtime.ts` imports the owners eagerly. An
+      integrity field registered too late would leave its gate unarmed rather
+      than fail loudly. This is an argument for B-112(d) — registration as an
+      explicit interface with an init step — rather than as a module side
+      effect. Pinned meanwhile by a boundary test asserting the gate is armed
+      at evaluation time
+    - **The boundary lint caught the move dragging debt out of the accessor
+      layer**: `discharged`'s registration carries `bindingKey: "__discharged"`,
+      and a dunder string literal outside `slots.ts` is a hard-fail (B-104).
+      Fixed by using `SLOT_KEYS.discharged` — the lint working exactly as
+      designed on a change it had never seen
+
+- [ ] **B-110** · L0 · **The L0 evaluator implements the L2 type system.**
+  Found by the concept spine (S2d) while classifying every abort in the base
+  per maintainer ruling. This is the largest delta the spine has produced and
+  it violates the project's OWN stated invariant — `CLAUDE.md`: *"Dependencies
+  point downward only."*
+  - **(a) The measurement.** Three L0 modules import from L2:
+    `evaluator.ts` from `types-std.js` (twice), `refinements.js` and
+    `effects.js` — **27 symbols** including `getType`, `withType`,
+    `typeMethod`, `applyBoundaryBound`, `unifyTypes`, `assertMemberAvailable`,
+    `typePrivilegedCtx`, `PredicateSet`, `AbstractDomain`, `impliesDomain`,
+    `effectsOf`, `unionEffectSets`; `scope.ts` from `refinements.js`
+    (`PredicateSet`, `mergePredicateSets`); `futures.ts` from `types-std.js`
+    (`withType`, `ErrorType`, `StringType`)
+  - **(b) `checkArgType` lives in `src/evaluator.ts`.** It calls `getType`,
+    reads `typeContextName`, EVALUATES REFINEMENT PREDICATES, dispatches
+    through an `instanceof` binding, and throws `Type error: argument N
+    expected X, got Y` (6 sites; 6 more in `primitives.ts`). The evaluator
+    does not merely name a layer concept — it implements type checking
+  - **(c) Not a naming leak.** B-109(a) is eleven hardcoded channel names in
+    the channel substrate; this is a whole subsystem living one layer too low.
+    Different scale, same root cause
+  - **The question it must answer, recorded rather than pre-empted**:
+    type-directed dispatch IS genuinely needed during evaluation — that is R2,
+    discharge happens BY evaluating — so the fix is not "delete the import".
+    It is to identify the concept-free capability the evaluator actually
+    needs, in the shape of `installChannelMerge` (base holds an inspectable
+    symbol, layer installs the meaning), so L2 supplies the semantics
+  - **ABSORBED INTO THE CONCEPT SPINE'S T2 (maintainer ruling, 2026-08).** It
+    is not a separate arc: it is §18's plane-placement rule not being applied
+    to one subsystem. `concepts.md` §23 now scopes it, and the plane framing
+    supplies the decomposition — see below
+  - **(d) One exception class for six classes of failure.** `AllegroError` is
+    the only error class and NOTHING in `src/` catches it outside the suite.
+    A host-invariant assertion ("has unresolved stub — check resolvePrimitives")
+    and a user's argument error are indistinguishable, so a tool cannot report
+    "this is an interpreter bug" separately from "your program is wrong", and
+    the S2d classification had to be done by reading 117 call sites. The abort
+    classes in `concepts.md` §7 are the vocabulary; the mechanism should carry
+    which one. Specification-level, and separable from (a)–(c)
+
+- [ ] **B-111** · L0 · **Field vs channel — one word and one registry for two
+  concepts.** Raised by the concept spine (S2f, maintainer terminology). The
+  metadata plane holds **fields**; a **channel** is the whole apparatus by
+  which one capability rides values through PE — its fields, their rules,
+  their writer, and the layer-side semantics. Storage vs capability.
+  - **The evidence that this is a real distinction, not a rename.** Eleven
+    things are registered in one registry as if alike. They are five kinds:
+    seven **stored fields** (`type`, `predicates`, `domain`, `bound`,
+    `effects`, `error`, `discharged`, `source`); one **projection**
+    (`shape` — no storage, a computed view of `type` with refinement layers
+    walked off); one **capability with no field at all** (`knowledge` —
+    nothing ever stores a `knowledge` component, and its own comment says its
+    storage IS `predicates`/`domain` plus the refinement layers); one
+    **retired** entry (`exported`, moved to `Binding.visibility` at B-097 V1);
+    one **unused** (`warnings`)
+  - `knowledge` is the proof: registered exactly like `predicates`, and not
+    the same kind of thing at all
+  - **The change**: `registerChannel` becomes field registration, and a
+    channel-level registration is introduced — *these fields, these rules,
+    this semantics, this owner*. **B-109(a)** (moving registration out of the
+    base to the owning layers) is the natural moment, because a layer
+    registering its own capability IS a channel registration
+  - Nomenclature also affects `ChannelSpec`, `ChannelWriter`,
+    `channelReadRaw`, `channelSpec`, `viralChannels`, `unionChannels`,
+    `installChannelMerge`, `CHANNEL_TABLE`
+
+- [ ] **B-112** · L0 · **The four owed plane interfaces.** Raised by the
+  concept spine (S2f); `concepts.md` §24 carries the interface table.
+  Supersedes the open "what capability does the evaluator need" question in
+  B-110 by naming it. A plane interface is the sanctioned route to a plane;
+  reaching one any other way is a plane violation whatever it computes
+  correctly, and **every T2 delta is an instance of an absent interface**.
+  - **(a) Dispatch hook.** The evaluator needs type-directed dispatch during
+    evaluation (R2 — discharge happens BY evaluating) and must not know what
+    a type is. A channel installs *how to dispatch on my field*; the evaluator
+    calls it with an opaque field value
+  - **(b) Check hook.** `checkArgType` lives in `evaluator.ts` today. Same
+    shape: a channel installs *how to check a value against my field*
+  - **(c) Projection hook.** `shape` is a computed projection of `type`,
+    hardcoded in `channelReadRaw`. Channels should install their projections
+  - **(d) Channel registration** — see B-111
+  - **All four have one form**: the base holds an INSPECTABLE SYMBOL, the
+    layer installs the meaning. That is SC-7's argument (inspectable symbols
+    are what keep R12 enforceable) generalised from propagation to every plane
+    boundary. A hook that handed the base an opaque closure AND made it the
+    authority would lose the property, so hooks must be capability-gated the
+    way writers are
+  - Today two of eight interface rows have a real mechanism (`dataOf`,
+    `channelReadRaw` + the propagation table); four are conventions enforced
+    by lint or by nothing; the layer→base row has one instance
+    (`installChannelMerge`) and no general form
+
+- [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
+  Body wrappers (`type_check`, the `*_attach` family) must forward the
+  TailCall sentinel or a tail call silently degrades to an ordinary call — a
+  performance cliff, not an error. Enforced today by a recurring-lesson note
+  in `PROCESS.md` §6 and nothing else. Candidate boundary invariant: a wrapper
+  that swallows the sentinel should fail the suite
+
+- [ ] **B-114** · L0 · **Completion confluence is not guaranteed by
+  construction.** The B-028 arc found an arrival-order bug (an instance kept a
+  stale symbol when one field resolved before another) and FIXED it with
+  completion replacement — but nothing establishes that arrival order cannot
+  matter. This is candidate **R16** (determinism) with no specification item
+  and no test that would catch a recurrence. Needs: the property stated, then
+  either a construction that guarantees it or a test that samples orders
+
+- [ ] **B-115** · L2 · **Law backings ride two carriers.** Raised by the
+  concept spine (S3, `concepts.md` §39). A proof's OWN rule backing is a set
+  of plain data bindings (`equality`, `lawName`, `lawTier` — the E-R6
+  fields, dispatched as `p.lawTier`); the TRANSITIVE backing set the
+  assumption ledger aggregates is a host-plane property (`lawBackings`, via
+  `stampBackings`/`backingsOf`). Two carriers for one concept, split by
+  aggregation depth rather than by meaning, and nothing tells a reader which
+  to use. Either unify them or state the rule. **Closes inside B-118(d)**
+  (S5 triage): the host-plane half is one of four carriers on the wrong
+  plane, and moving it to a metadata field with an accumulating rule is the
+  unification
+
+- [ ] **B-116** · L2 · **Interface's two guarantees are enforced
+  independently, and one of them fails silently.** Raised by the concept
+  spine (S3b, `concepts.md` §36). An interface has two properties: **no
+  construct** (tested by `InterfaceKind`'s predicate, checkable from any
+  value) and **all members signature-only** (guaranteed only by
+  `Interface.define`'s construction, not checkable from the value). Nothing
+  ties them — a type could satisfy the kind's predicate without having been
+  built by `Interface.define`.
+  - **The silent failure**: `Interface.define({greet: self => "hi"})` accepts
+    the lambda, records `greet` as a **signature**, and **discards the body**
+    with no diagnostic (measured — the member has no `value`, only a
+    `fieldType`). Either reject a body at declaration or state that it is
+    read as a declaration
+  - **Why the definitions collapse here**: "has no construct" reads like
+    ABSTRACTNESS, and in a language with inheritance an abstract type and an
+    interface are different things. Allegro has no abstract types — D44
+    deleted the declared is-a edge, and abstractness is defined by what you
+    can EXTEND. With nothing to extend, "cannot be instantiated" and "exists
+    to be drawn from" coincide, so the predicate happens to select exactly
+    the interfaces. A property of this type system, not a general truth, and
+    worth stating because the type system is being rebuilt around the absence
+    of `extends`
+
+- [ ] **B-117** · L2 · **The verdict is assembled out-of-band rather than
+  accumulated.** Raised by the concept spine (S4b, maintainer correction —
+  `concepts.md` §45). S4 had claimed this as a REQUIREMENT gap (candidate
+  R15: the requirement set is per-value, the verdict is program-level). That
+  was wrong. **A program is a value**, and accumulating metadata across an
+  expression is what channel operations already do — effects union upward,
+  errors are viral, `div` is an effect and unions too. On that model the
+  verdict simply IS the top-level value's accumulated metadata, and it is
+  each channel's responsibility to define an accumulation that reaches it.
+  R3' plus SC-7's `union` already say this; **R15 is withdrawn**.
+  - **The evidence that the implementation does not work that way**:
+    `buildVerdict` in `src/pcp.ts` WALKS `evalCtx.bindings` out-of-band,
+    iterating top-level bindings looking for discharged proofs, rather than
+    reading accumulated metadata off a value. And the `warnings` field is
+    registered with rule **`union`** — precisely the accumulating discipline —
+    and is **UNUSED**. The mechanism exists and nothing reaches for it
+  - **This explains B-057/CT-R6.** Contracts are missing from the verdict
+    BECAUSE contracts have no accumulating field. Under out-of-band assembly,
+    adding them means adding a case to `buildVerdict`; under accumulation it
+    means giving contracts a field with `union` propagation and they arrive
+    for free. A channel that does not accumulate is simply absent from the
+    verdict — a better account than "somebody forgot"
+  - Interacts with **B-112** (plane interfaces): "accumulate toward the
+    verdict" is arguably a fifth owed interface, or the `union` rule applied
+    at whole-program scope. Sequencing question, not a separate problem
+  - **A third instance, with a sharper example than the argument** (found at
+    B-125, 2026-08): a program calling an **undefined function** verifies
+    clean. `x = no_such_function(1)` residualises — correct under R2 — and
+    `verify` reports *"Verdict (verified)"* with a clean assumption ledger,
+    while `inspect` on the same program reports `unresolved refs:
+    no_such_function`. The information exists and does not reach the verdict,
+    which is this item's whole thesis and B-057's too
+
+- [ ] **B-118** · L0 · **Four carriers ride the host plane that belong on the
+  metadata plane.** Raised by the concept-spine S5 triage: four deltas filed
+  against three different owners are one fix. `concepts.md` §18's placement
+  rule — *a plane is chosen by who may write the data and what evaluation
+  must do to it* — was never applied to these, and each was put on the host
+  plane because the host plane is where a JS property goes when nobody asks
+  the question.
+  - **(a) Inferred effects** (delta 41). The inferred set is a
+    ComposedFunction expando while the DECLARED set is a metadata field with
+    a `union` rule. Two carriers for one capability, split by provenance
+  - **(b) The abstract domain** (delta 34b). Rides a host property on a type
+    while the knowledge it belongs to is a metadata channel (§34, §34b)
+  - **(c) ComposedFunction's analysis metadata** (delta 7) — `partial`,
+    `decreasesMetric`, `genericParams` and the rest of
+    `PRESERVED_FN_META_KEYS`, kept across clones by a hand-maintained list
+    precisely because propagation does not reach them
+  - **(d) The transitive law backing set** (delta 39) — `lawBackings` via
+    `stampBackings`/`backingsOf`, while a proof's OWN backing is plain data
+    bindings. This is **B-115**'s "unify them or state the rule", and moving
+    the host-plane half onto a metadata field with an accumulating rule IS
+    the unification, so B-115 closes here rather than separately
+  - **The test that distinguishes this item from B-107(f)**: deltas 15 and 18
+    are host-plane data that is correctly PLACED and wrongly DECLARED
+    (`parent`, `isScope`, `scopePredicates` on the value interface) — that is
+    B-107(f). These four are wrongly PLACED. Undeclared planes made the two
+    indistinguishable, which is why they were filed apart
+  - **Gated on B-109(a)** (registration moving to the owning layers): a layer
+    registering its own channel is what gives these a field to move onto.
+    Campaign chunk C7 — `docs/plans/concept-spine.md` §9.3
+  - **Not a blanket rule.** The host plane is legitimate and §18 says what
+    belongs there. Each of (a)–(d) must be argued individually against the
+    placement rule; the finding is that none of them ever was
+
+- [ ] **B-119** · L0 · **`Context` still names three different things.**
+  Measured by the C9 naming pass, which deliberately stopped at the line it
+  could defend. C9 renamed every DECLARED name in which "Context"/"Ctx"
+  denoted the retired composite KIND — a settled decision whose surface name
+  lagged. What remains is **role-qualified** and could not be renamed
+  mechanically, because the roles themselves are not all settled:
+  - **(a) `evalCtx` — 603 occurrences, and a public field.** It is the
+    evaluation **scope**: `evalCtx = scopeNew(below)`, it has a `parent`
+    chain, and `concepts.md` §15 defines Scope. So the rename (`evalScope`)
+    is *settled*, but it is an API change — `evalSource`'s result field, read
+    by `pcp.ts`, the CLI, the web bundle and ~100 test sites — and it was not
+    in B-107's ratified scope. Recommend doing it as its own single
+    mechanical commit
+  - **(b) `typeCtx` / `typeContextName` / `typePrivilegedCtx` / `intCtx` /
+    `proofCtx` and ~45 more.** These denote a **type Context** — a term
+    `concepts.md` itself still uses, in §30's own delta. Renaming them means
+    first deciding what a Structure in the type role is called, which is a
+    definition question for §30 and not a naming one. **Blocked on that
+    entry**, per B-107's own scope rule: *anything whose right name is still
+    an open question waits for its spine entry*
+  - **(c) `src/parser.ts` has its own `makeContext`** — a **parse** context,
+    unrelated to either, exported as `parserMakeContext`. Left alone (the
+    file is generated and `@ts-nocheck`), and recorded because it is the
+    third meaning and the reason the mechanical pass had to exclude a file
+  - The finding worth keeping: one word carried three distinct concepts —
+    the composite kind, four value ROLES, and a parser's own bookkeeping —
+    and only the first was retired. Renaming the first makes the other two
+    *more* visible, not less, which is the intended outcome
+
+- [ ] **B-120** · L0 · **The entry-sequence composite (D48(a), IC-2 option E).**
+  A Structure becomes a **sequence of optionally-keyed entries** — one thing
+  that is both map and list — rather than a string-keyed map plus an ordered
+  list view plus a dense special case. Ruled at B-108; **not designed in
+  detail — this arc gets its own plan before any code.**
+  - **What decided it** (measured, 50-file corpus through the real CLI): data
+    structures average **4.6 slots**, 97% have ≤ 8 and the modal size is
+    **2** — a `Map` is overhead at that size. Every large by-name lookup is
+    in a **scope**, and there are **227** scope objects in the whole corpus.
+    `scopeLookup` runs 10,309 times; `dataOf` runs 453,199 times. The O(n)
+    objection that ruled out a sequence-first composite for years was about
+    the rarer operation by a factor of 44
+  - **The consequence that makes it E rather than B**: the O(1) by-name
+    requirement belongs to ONE role, and that role is not data. A scope keeps
+    an index; the index sits **below** the specification because a scope is
+    host-plane machinery
+  - **What dissolves with it**: the dense region stops being a ROLE and
+    becomes a representation (which its level tag always said it was); the
+    materialized legacy view goes; **`__length` goes**, and with it the W6
+    dense-view-coherence invariant and the entire remaining job of
+    `isMetaSlotKey`. **This closes B-104(f) and B-104(b)** — the last dunder
+  - **Interacts with B-121**: together they leave **one role — record** —
+    which is what SC-5 said it was buying. Neither alone gets there
+  - **Open for the plan**: the entry representation itself; how the scope
+    index is built and invalidated; whether positional (null-key) entries and
+    the dense case are one thing or two; the migration order against the 146
+    role-presence sites; whether `bindings`/`bindingList` survive as views
+    during migration. **Revisit trigger on the ruling**: a measured workload
+    that puts large by-name lookup on the DATA path rather than the scope
+    path — that is the assumption E rests on
+
+- [x] **B-121** · L0 · **LANDED 2026-08 — the carrier is deleted.** Metadata is
+  a field on every value, supplied at construction (D48(b)(c), IC-3).
+  **PLAN: `docs/plans/metadata-on-values.md` (COMPLETE) — C1–C7 landed, suite
+  1202/1202, every completion count at zero: `primary`, `isCarrier`,
+  `CarrierStructure`, `withMetadata`, `dataOf`.**
+  - **Two corrections to the plan as ruled**, both recorded rather than
+    quietly absorbed: `withMetadata` was **one** operation, not four (the
+    patterns differ only in argument provenance), and **`concepts.md` §11's
+    delta is left OPEN** — the data plane now has no reader at all, which runs
+    against B-128 and should be re-opened by that work rather than inherited
+    from a deletion chunk that was not weighing enforcement
+  - **What the migration cost, which is its most reusable output**: removing a
+    representation broke **eleven sites no author knew depended on it**, every
+    failure SILENT — a check stopped firing rather than throwing. → **B-127**
+    (grep cannot see the questions that matter) and **B-128** (layer
+    separation stated but not policed)
+  - The plan adds
+  four probes not in this entry: retyping `withMetadata` to return `Value`
+  typechecks with **0 errors** (nothing depends on attachment producing a
+  Structure); `newCarrierStructure` has exactly **2 callers, both inside
+  `withMetadata`** (carriers can be eliminated atomically); the evaluator's
+  carrier arm is a hand-written dispatch to the inner kind, which the new
+  representation performs by construction; and **185** `kind ===/!==
+  ValueKind.Structure` comparisons are the real — behavioural — risk surface. The carrier is deleted: a non-composite
+  value no longer becomes something else in order to carry a field. Ruled at
+  B-108; **arc, not a chunk — plan first.**
+  - **What decided it**: of 240,820 value allocations, **56,123 are
+    carriers** — 74% of all structures, and more than there are Bits values
+    (35,060) — and **98.5% hold exactly one field** (99.4% of that is
+    `type`). `dataOf` is called 453,199 times and really unwraps 182,311
+    (40%). The most common act in the system is allocating an eleven-field
+    `Structure` so a `Map` can hold one entry
+  - *Baseline note (2026-08): **B-122 has since removed 17,169** of those, so
+    the live figures are 38,954 carriers and 70.2% of structures. The ruling
+    rests on the shape, which is unchanged — carriers still outnumber the
+    Bits values they wrap*
+  - **It is not a new mechanism.** Structures already work this way —
+    `withMetadata` with a Structure primary takes `deriveWithChannels`, no
+    carrier. The carrier exists only because the other six kinds have nowhere
+    to put the field. The **read surface needs no change**: `channelReadRaw`,
+    `componentsView` and `cloneComponents` already take a `Value`, cast, and
+    read `.components`
+  - **(a) Host shape. DONE at C1**: `MetadataBearing { meta?: Metadata }`
+    (with `Metadata = Map<string, Value>`) extended by all seven value
+    interfaces; `Structure.components` renamed `meta`. Widened by the
+    vocabulary ruling to **430 identifier renames across 28 files** — the
+    whole `channel*` family became `metaField*`/`meta*`, since **today every
+    registry entry is a metadata field**, which also settles B-111's naming
+    half and leaves that item structural
+  - **(b) Why optional, and it is NOT laziness.** Allegretto defines no
+    fields (R6/R11), so under `--base` a value legitimately carries nothing.
+    The two populations without metadata are: every value in Allegretto mode,
+    and engine intermediates that never become program values. It **cannot**
+    be a required argument of `makeInt` — that would make L0 depend on a
+    concept it does not have, B-110's violation in the construction path.
+    Optional in the type, **always declared on the object**, per the stable-
+    hidden-class convention `types.ts` already states on `makeParam`
+  - **(c) Construction takes metadata.** 12 call sites literally read
+    `withMetadata(makeInt(0), m)` — the value never exists without it — and
+    one of them is **PE Rule 1** (`evaluator.ts:511`,
+    `withMetadata(makeExpr(residualFn, evalArgs), components)`), on the path
+    that allocates 101,611 Expressions. The factories already exist and are
+    already an enforced chokepoint (W4); they simply do not take metadata
+  - **(d) Four operations, four names.** Classifying all 45 non-test call
+    sites: **create** (12), **derive** — same datum, new metadata (10),
+    **map** — new datum, metadata carried (9), **stamp** (~14). The map case
+    is spelled as TWO calls (`withMetadata(newP, cloneComponents(v))`) and
+    omitting the second **silently drops metadata** — the same
+    convention-only obligation as the TailCall sentinel (B-113). Naming it
+    removes the way to get it wrong
+  - **(e) The clone concerns are already solved, per kind.** Carriers wrap:
+    Bits 50.5% (none), PrimitiveFunction 46.0% (host expandos — `primitives.ts`
+    already clones one and re-stamps `CHANNEL_WRITER_BRAND`), ComposedFunction
+    1.3% (`param.owner`, `PRESERVED_FN_META_KEYS` — the shared helper CLAUDE.md
+    mandates), Expression 1.3% (`memo` — the clone must SHARE it), Param 0.8%,
+    **Symbol 0.0%** — so the interning hazard (SC-4: identity = FQN) does not
+    arise today. **RULED (maintainer, 2026-08): `param.owner` continues to
+    represent the ORIGINAL function.** This is the behaviour-preserving
+    answer and the one `remapParams` already implements; stated here rather
+    than inherited, because PE's Param-call branch reads it and a clone that
+    silently re-pointed it would change evaluation
+  - **(f) Why copy-on-attach, stated once so it is not re-litigated.**
+    Measured: 59,027 attachments, **19,817 (33.6%) targeting an object that
+    has already been given metadata**. Metadata is a property of a value *in
+    a position*, not of the datum. Both no-allocation designs fail on that
+    one number — in-place mutation lets the second stamp overwrite the first
+    everywhere the value is held, and a side table (`WeakMap<Value,
+    Metadata>`) fails identically because its key is the object. D22 is the
+    rule adopted *because* of this, not the reason itself
+  - **(g) The legitimate in-place case, to be stated as a rule**: while a
+    value is provably unshared — during construction, before it escapes. The
+    carve-out already exists twice (`structure.ts`'s grandfathered builder
+    idiom; `writeShape` for identity-sensitive type Contexts, ruled at B-104
+    chunk 3) as an idiom rather than a rule. *Stamp in place only before the
+    value escapes; after that, derive*
+  - **SURVEY DONE 2026-08** (`docs/plans/metadata-on-values.md` §5.1b), which
+    is what should have preceded the first C2 attempt. **182** comparison
+    sites against `ValueKind.Structure`; **144** have branches that never
+    touch the metadata plane and are unaffected; of the **38** that do, **23**
+    test a subject that is definitionally a TYPE. **15 sites actually break.**
+    The survey independently flags all three the trial-and-error attempt
+    found, and explains the failures that attempt saw but had not traced —
+    `formatValue` (strings printing as raw Bits), viral-field propagation
+    (errors no longer viral through `==`), and the error-carrying `if`
+    condition. **Most of the 15 need the guard DELETED, not replaced**: the
+    metadata accessors are already total, so the kind test is a pre-C1
+    necessity that is now redundant. One (`totality.ts:173`) reads
+    `(v as any).primary` through an `any` cast — a plane violation the
+    boundary lint cannot see, and B-104's to count
+  - **C2 LANDED 2026-08**, suite **1202/1202** — in three gated steps, after a
+    first attempt was backed out at the gate. `withMetadata` attaches to a
+    per-kind clone; carriers stop being created; `dataOf` still compiles and
+    returns `v` (C5 deletes it). Two classes the survey could not see, each
+    enumerated in ONE instrumented run: **`dataOf` was stripping metadata as a
+    side effect of peeling** (five re-stamp sites that mean `withTypeReplacing`),
+    and **six sites asking "carries metadata?" without naming a kind** —
+    `isCarrier` ×3, `carriesViralField`'s kind guard, `checkProvenClauses`'s
+    peel, and the metadata merge living only in `evaluate`'s Structure case.
+    Every one silently disabled a check rather than throwing: annotations
+    stopped rejecting, a failing `proven` clause downgraded to a skip, and
+    `effects` stopped unioning. One of the six (`unifyTypes`) was NOT a
+    stand-in — it separated a value-carrying-a-type from a type Context — and
+    was restated, not deleted. `docs/plans/metadata-on-values.md` §5.1c
+  - **C7 LANDED 2026-08**, closing the arc. The in-place rule is stated in
+    `structure.ts` beside the D22 carve-outs (*write in place only while the
+    value is provably unshared; after it escapes, derive*), with `writeShape`
+    citing it as the rule's second clause rather than an exception. `concepts.md`
+    §10 retired in place — the numbers are stable identifiers, so renumbering
+    forty entries to delete one buys nothing — and §11 rewritten. Spine delta 50
+    closed; delta 51 closed AS CORRECTED. `docs/plans/metadata-on-values.md` §5.1h
+  - **C5 LANDED 2026-08**, suite **1202/1202**. `dataOf` deleted with **849**
+    call sites across 32 files; the retired-name lint now forbids `dataOf` as
+    well as `primaryOf`. **Safe in a way C2 was not**: after C4 the body was
+    `return v`, so removing a call cannot change runtime behaviour — only
+    static types move, and every such move is a typecheck error rather than a
+    silent one. Three classes surfaced, all caught by `tsc`: **precedence**
+    (2 — removing a wrapper re-binds a following `as`), an **inference
+    barrier** (4 — the declared `Value` return was breaking a control-flow
+    cycle in `walkForWhen`), and one self-assignment. Two test assertions were
+    disarmed BY the transform (`dataOf(p) === p` → `p === p`) and retired.
+    **Open tension with B-128**: the data plane loses its named reader.
+    `docs/plans/metadata-on-values.md` §5.1g
+  - **C6 LANDED 2026-08**, suite **1202/1202**. The factories take metadata
+    (D48(c)) and the 12 create-then-attach sites collapse, PE Rule 1 first.
+    **(d)'s "four operations" is corrected to one**: derive, map and stamp are
+    all `(datum, metadata) → value` and differ only in where the arguments come
+    from. The 10 derive sites became stamps by deleting `dataOf`, which is the
+    evidence — derive was stamp seen through the peel. `withMetadata` is renamed
+    `withMeta` to join the `*Meta` family, so the completion test's
+    `withMetadata` → 0 is met by RENAME rather than by decomposition.
+    `carryMeta` stays as the one named pattern, on a hazard argument rather than
+    a logical one. `docs/plans/metadata-on-values.md` §5.1f
+  - **C4 LANDED 2026-08**, suite **1202/1202**. `primary`, `isCarrier`,
+    `newCarrierStructure`, `CarrierStructure` and W1/W5 deleted; `dataOf` is
+    now `return v` and waits for C5. The carrier was already unconstructed —
+    the factory had no callers and a probe recorded **zero** across 1200
+    tests — so every deletion was dead code. **The ruling-3 review found a
+    live regression**: W2 and W3 were checked only inside the walker's carrier
+    branch, so C2 killing that branch silently removed them from **564 of
+    2034** metadata-bearing values, leaving W2 with no coverage at all. Both
+    now key on `meta` rather than on kind (corpus inspects 3062, not 1470).
+    Also recorded: deleting a field can silently disarm an assertion that
+    merely mentions it — `types-battery.ts`'s `|| result.primary === undefined`
+    would have become an unconditional pass. `docs/plans/metadata-on-values.md`
+    §5.1e
+  - **First C2 attempt, backed out at the gate, 2026-08** — see
+    `docs/plans/metadata-on-values.md` §5.1a for the full record. The root
+    cause is one idea repeated: throughout the evaluator, *"does this value
+    carry metadata?"* is asked as *"is its kind Structure?"*, which held only
+    while attaching metadata WRAPPED a scalar. Three instances found and fixed
+    (each one line, each a different symptom); a second class found in seven
+    hand-written ComposedFunction clones that carry `genericParams` and
+    `PRESERVED_FN_META_KEYS` but not `meta`; and §6 ruling 2's premise
+    corrected — the ruling stands, but `param.owner` identity is the
+    SUBSTITUTION KEY, so a metadata clone needs `sameComposedFn` at the
+    comparison sites or every call residualises. ~20 failures down to 14 with
+    the classes narrowing, but the tail was unknown, so the chunk stopped
+    rather than being pushed through. Nothing landed red
+  - **Migration is strictly additive** and each step lands green: (1) add
+    `meta?` to the six interfaces, rename `Structure.components` → `meta` —
+    no behaviour change, nothing writes it yet, the readers already read it;
+    (2) attach to a per-kind clone instead of a carrier — one function, the
+    only risky step; `dataOf` still compiles and returns `v`; (3) delete
+    `primary` (194 occurrences), `isCarrier` (14), `newCarrierStructure`, W1
+    and its walker; (4) delete `dataOf` (902 occurrences) and its call sites
+  - **Separate, and possibly bigger**: **25,842 carriers wrap
+    PrimitiveFunctions** — registry singletons — each holding one `type`
+    field, and 33.6% of all attachments hit an already-attached object. That
+    smells like the same primitive being typed identically over and over.
+    Memoizing `(datum, fields) → value` is orthogonal to this item and was
+    not measured; do it as its own investigation, not inside this arc
+
+- [x] **B-122** · L0 · **LANDED 2026-08.** `wrapAsUntypedFunction` rebuilds a
+  constant, once per primitive per scope-layer build.
+  - **Result, measured before and after on the same instrumentation:**
+    carriers **56,123 → 38,954** across the corpus — **17,169 allocations
+    removed, exactly the predicted hit count** — and total structure
+    allocations 72,691 → 55,522 (**−23.6%**). Prediction and outcome agreeing
+    to the unit is worth recording on its own: the memo key
+    `(datum identity, field identities)` modelled the real duplication
+    exactly, which is why the investigation could rule out the general memo
+    with confidence rather than by taste.
+  - **Implementation**: a `WeakMap<object, Value>` in `types-std.ts`,
+    memoizing **only** `PrimitiveFunction` inputs, where determinism is
+    *provable* rather than argued — a PrimitiveFunction has no `primary` (so
+    `dataOf` is identity) and no `components` (so `cloneComponents` is
+    empty), and `UntypedFunctionType` is a module-level const. Other inputs
+    take the unmemoized path, because a Structure's components can still be
+    populated during construction and a cache must not rest on a claim about
+    every possible input.
+  - **Test** (`types-battery.ts`) pins both halves: the same primitive
+    answers the same wrapper object, and **two independent evaluations
+    resolve `print` to the same object** — the property that makes the saving
+    scale with scopes and modules rather than being per-call.
+  - *Original analysis follows.* Result of the memoization investigation
+  the D48 review flagged (2026-08). The investigation's answer is **do not
+  build a memo** — the win is one loop-invariant, and hoisting it needs no
+  cache at all.
+  - **What was measured** (pre-landing). Keying every `withMetadata` call by
+    `(datum identity, field names + field-value identities)` over the 50-file
+    corpus: **19,070 of 59,027 attachments (32.3%) are exact repeats**. But
+    they are not spread out — **17,169 of them (90%) are one kind**:
+    PrimitiveFunction, at a **66.4%** repeat rate. Bits repeat only 5.8%,
+    Structure 0%, Param 0%
+  - **The single cause.** `wrapAsUntypedFunction(prim)` in `types-std.ts`
+    does `dataOf(fn)` + `cloneComponents(fn)` + `set("type",
+    UntypedFunctionType)`. For a bare registry primitive that is
+    **deterministic** — same input object, same constant type, same result
+    every time. It is called from **two** Layer-1 builders that each iterate
+    every primitive (`runtime.ts:148`, the resolution map; `runtime.ts:743`,
+    the primitive scope layer), and again per module load
+  - **Single-process counts**: `tests/arrays.alg` → **354 calls over 177
+    distinct primitives**; `tests/modules.alg` → **708 calls over the same
+    177**. So the wrapper is rebuilt 2× per primitive per process, 4× with
+    one module, and it scales with module count
+  - **The fix is D48(c), not a cache.** Give the primitive its type where the
+    primitive is created — once — and let both Layer-1 builders reference the
+    same value. No content key, no 40k-entry table, no retention hazard.
+    354 → 177 for a single file; the saving grows with modules
+  - **Why sharing one wrapper object is safe**, by an argument the code
+    already relies on: the untyped branch of both builders already binds the
+    **same singleton** `prim` into every scope, visibility lives on the
+    Binding not the value (D42/V-R4), and the wrapper is an immutable value —
+    anything attaching further metadata derives a new one
+  - **Why a general memo is NOT worth building.** After this hoist the
+    residue is **1,901 repeats — 3.2% of attachments** (Bits 1,657,
+    ComposedFunction 225, Expression 19). Capturing that would need a
+    content-keyed table of ~40,000 entries holding values alive, to avoid 3%
+    of allocations. The measurement argues against the general mechanism as
+    clearly as it argues for the specific fix
+  - **Independent of B-120/B-121** and survives both unchanged: in either
+    representation the point is that the typed primitive is built once. Can
+    land before them or inside B-121's construction work
+
+- [ ] **B-123** · L0 · **The metadata base surface: two unguarded paths, and
+  D28's subsumption never executed.** Found by the B-121 C1 review of every
+  registered primitive carrying the old `channel`/`component` vocabulary
+  (maintainer request, 2026-08). The naming question turned up two soundness
+  holes and five primitives that a ratified decision already said to delete.
+  - **(a) `mv_set` is a user-reachable TYPE-FORGERY path.** It writes any
+    non-integrity metadata field with **no writer capability** —
+    `assertNotIntegrityKey` blocks only `discharged` and `source`, so `type`
+    is writable by any program. Verified end to end:
+    - `mv_set(5, "type", String)` succeeds; `type of` it answers `String`
+    - `f(s: String) => s` **accepts** it and prints the bits of `5` as text
+    - `g(n: Int) => n + 1` applied to `mv_set("hello", "type", Int)` returns
+      **478560413033** — the bytes of `"hello"` plus one
+    This contradicts **D23** (writes are capability-gated) and **D28**, which
+    names `type` as owned by the type-system extension. Annotation checking is
+    defeated from ordinary user code, and the result is garbage rather than an
+    error — the opposite of "build safety in"
+  - **(b) `channel_read` bypasses the D47(e) observe guard.** `component_get`
+    returns `none` for the `source` field precisely so the observe effect
+    cannot be laundered; `channel_read` has no such check and returns the
+    source AST. Verified: `channel_read(x, "source") == none` is **false**
+    while `component_get(x, "source")` is `none`. Two readers of the same
+    plane, one guarded, one not — and the unguarded one has zero uses
+  - **(c) D28's subsumption is unexecuted.** D28 ruled
+    `mv_new`/`mv_primary`/`mv_get`/`mv_set`/`mv_components` and `component_get`
+    SUBSUMED into `channel_read` / channel writers / `channel_list`. The
+    `*_attach` half landed; this half did not. `mv_new` and `mv_primary`
+    become meaningless under **D48(b)** (a carrier with no metadata; `dataOf`
+    as identity), and `mv_get`/`mv_components` are worse-behaved duplicates —
+    `mv_get` throws where `channel_read` returns `none`, `mv_components`
+    returns an `id`-Expression where `channel_list` returns a typed array
+  - **Usage, measured**: **none of the ten** appears in `lib/`, `tests/*.alg`,
+    `demos/`, `website/`, `pcp/` or `bench/`. `component_get` is reached only
+    as the lowering target of the `Y of x` syntax, so renaming it is invisible
+    to users. `channel_list`, `mv_new`, `mv_primary`, `mv_get` and
+    `mv_components` have **zero suite references** as well
+  - **`mv_set` is both the hole and the test of the hole**: its only five
+    suite references are forgery-attack tests proving the *integrity* gate
+    holds. Deleting it removes the attack surface those tests exercise, so
+    they need rewriting against whatever write path survives — PROCESS §6
+    applies, and the tests should be reviewed individually the way B-121's
+    ruling 3 treats W1/W5
+  - **Public surface**: none. These names appear only in `docs/design/`,
+    `docs/decisions.md` and the untracked `web/dist` bundle — not in
+    `language-reference.md`, `getting-started.md`, the README or the website
+  - **(d) CORRECTION, 2026-08 (B-125): deleting `mv_set` closed the
+    demonstrated exploit but NOT the underlying defect.** The root cause is
+    one line further down: **`type` is not registered as a metadata field at
+    all.** The base registers eleven — `shape`, `error`, `effects`,
+    `predicates`, `domain`, `knowledge`, `bound`, `discharged`, `warnings`,
+    `source`, `exported` — and `type` is not among them, though it is *the*
+    field (99.4% of all metadata) and the one the type system dispatches on.
+    Consequences, verified:
+    - `channel_register("type", "viral")` **succeeds**, where the same call
+      for `discharged` or `source` is refused as already-registered. Under
+      D23/D24 the first registrant holds the writer, so **the type field's
+      write capability is unclaimed and available to any program**
+    - a writer minted that way forges the read: `w("hello", Int)` then
+      `type of` it answers `Int`
+    - `type` is also absent from `INTEGRITY_FIELD_NAMES`
+    - **The decisive evidence, found by accident.** A first attempt to pin
+      this gap ran `channel_register("type", "viral")` inside the boundary
+      battery. It **broke six unrelated tests** — refinement knowledge across
+      a function boundary, the knowledge-bounds matrix, the conformance
+      split, the kind tower, carrier transparency, and the `basics.alg`
+      baseline. Registering `type` re-rules its propagation for the whole
+      **process**, so one Allegro program can change how types propagate for
+      everything evaluated afterwards. That is a larger defect than the
+      forgeable read, and it is why the capability is worth holding
+    - **Not established**: whether a single program can exploit this against
+      *itself* end to end. Probes through the writer path residualised rather
+      than computing a wrong answer, apparently because the whole chain stays
+      unresolved rather than because of any guard. Recorded as unknown rather
+      than claimed either way
+    - **Pinned** by boundary test *forgery G* (B-125), which asserts through
+      the registry — `metaFieldSpec("type") === undefined` — rather than by
+      attempting the registration, precisely because attempting it corrupts
+      the process
+  - **CLOSED 2026-08 at B-109.** The type system now registers `type` with
+    `integrity: true` at layer init, so `channel_register("type", …)` is
+    refused and the capability is held by its owner. Both halves of the
+    original finding are therefore closed: the unguarded write path (`mv_set`,
+    deleted at B-125) and the unclaimed capability behind it
+
+- [ ] **B-124** · L0 · **Guard-coverage audit: every path to a guarded
+  operation must carry the guard.** Raised by B-123, where two independent
+  soundness holes turned out to be **one class of defect**: a guarded
+  operation reachable by a second, unguarded path. `mv_set` reached the
+  metadata write without the capability check; `channel_read` reached the
+  `source` field without the observe guard `component_get` enforces. Neither
+  is exotic, and neither was found by testing — both were found by reading
+  the surface while renaming it.
+  - **Why the suite missed them, precisely.** The forgery battery enumerates
+    **attacks** (`discharged`, `source`), not the **protected surface**. It
+    asserts "this attack is refused", so an unprotected field nobody thought
+    to attack — `type` — was never asked about. A hand-written attack list
+    can only find the attacks someone imagined
+  - **The fix has the shape of the existing boundary ratchet.** Both sides
+    are enumerable from data the codebase already holds: the guards are few,
+    and the paths reaching them are the registered primitives. So the test
+    becomes a **cross-product** rather than a list — for every guarded
+    operation × every path that reaches it, assert the guard fires — and a
+    newly added path that is not on the reviewed list fails the suite until
+    it is. That is the `boundary-baseline.json` mechanism, applied to
+    capability rather than to lint patterns
+  - **The guards to enumerate**: integrity-field writes (capability, D23/D24);
+    `source` reads (observe effect, D47(e)); private member access
+    (`scopeHoldsPrivilege`, D41–D43); proof discharge (kernel writer);
+    declared effects (CE-R1); annotation and refinement checks; immutability
+    (D22)
+  - **Scope discipline** — this is deliberately NOT an open-ended "review the
+    system for soundness". Both known holes are instances of one enumerable
+    class; an unbounded review would produce a document rather than a fix.
+    Other classes get their own item when evidence for them appears
+  - **The honest limit, recorded so the audit is not oversold**: a suite
+    refutes soundness, it never establishes it. The cross-product moves the
+    claim from *"we tested the attacks we thought of"* to *"we tested every
+    combination the registries admit"*, which is bounded and checkable but
+    still not a proof. The project's own thesis names the end state — the
+    property stated in Allegro and discharged, not tested (`docs/VISION.md`
+    §1–§2, and the Vivace formal model in `concept-spine.md` §4a)
+  - **First deliverable**, before any generated test: the guard × path table
+    itself, as evidence. It is the same move the concept spine made — write
+    down what is actually there, and the gaps are visible without a test
+    having to find them
+
+- [x] **B-125** · L0 · **LANDED 2026-08.** Delete `mv_set`, and rebuild the
+  three tests that use it (maintainer ruling, 2026-08; B-123(a)). `mv_set` is the
+  type-forgery path. Its three test call sites divide two ways, and the
+  division matters because **two of them become unfalsifiable once it is
+  gone** — an impossible operation cannot be tested for refusal.
+  - **(a) `equality-laws.ts:750`** — *"forged source origination is refused"*.
+    Uses `mv_set(5, "source", 42)` as the attacker's tool. The PROPERTY (no
+    origination of `source` without the kernel writer) survives and becomes
+    true **by construction**: with `mv_set` gone, the only user-reachable
+    write is a registered writer, and `channel_register("source", …)` is
+    refused as already-registered. Replace with the no-path assertion; the
+    test's second half (`component_get(x, "source")` answers `None`) is
+    independent of `mv_set` and stays untouched
+  - **(b) `boundary-tests.ts:859`** — *"forgery D"*. Uses
+    `mv_set({x: 1}, "discharged", 1)`. Same shape as (a): the property
+    survives, the vehicle goes, the replacement is the no-path assertion.
+    The first half of the test (reads are free) does not involve `mv_set`
+  - **(c) `boundary-tests.ts:842`** — *"forgery B"*. This one uses `mv_set`
+    **benignly**, to prove that writing metadata produces a NEW value and
+    leaves the original proof untouched. That property — copy-on-attach, D22
+    — is valuable, unrelated to the gate, and needs a surviving write path.
+    Rewrite it against a properly minted writer
+    (`w = channel_register("note", "drop")` then `w(t, 42)`), which is a
+    **better** test than the original because it exercises the real surface
+    rather than the legacy bypass
+  - **PROCESS §6**: (a) and (b) replace an assertion with a different one, so
+    they are discussed and not silently dropped. Neither weakens: an
+    unreachable operation is a stronger guarantee than a refused one, and the
+    replacement asserts the unreachability rather than assuming it
+
+- [ ] **B-126** · L0 · **`param.owner` is now a two-state flag wearing a
+  pointer's type.** Raised by the maintainer at B-121 (2026-08), after
+  `ownsParam` retired the field's identity: *this may end up misunderstood and
+  misused in the future.*
+  - **What it is now.** `owner: ComposedFunctionValue | null` is declared as a
+    back-pointer, and its **identity is read nowhere**. The only thing read is
+    whether it is `null` — the parser collects not-yet-claimed params
+    (`parser-helpers.ts:86`, `primitives.ts:387`), and `subst` treats an
+    unclaimed param as matchable by position alone. So the field's live job is
+    a single bit — *claimed / unclaimed* — and its declared type invites a
+    reader to believe the pointer means something
+  - **Why it invites misuse.** The type says "this param belongs to that
+    function", which is exactly the belief that made a metadata clone break
+    every function call at the first C2 attempt. Seven sites still write
+    `p.owner = newFn` to keep a pointer accurate that nothing consults, two of
+    them mutating a SHARED params array — the thing `modules.ts:83` and
+    `evaluator.ts:770` both warn is corrupting. A field whose declared meaning
+    exceeds its real one produces exactly this: maintenance work for an
+    invariant no reader depends on, and a wrong mental model for the next
+    person
+  - **Options**, in rough order of preference:
+    - **(a) Replace with a claimed flag** — `claimed?: boolean`, or drop the
+      field and mark unclaimed params some other way. The seven `p.owner = fn`
+      writes become one boolean set, and the two shared-array mutations stop
+      being hazards because a boolean does not alias
+    - **(b) Ask the question at the source.** "Unclaimed" is really "not yet
+      in any function's `params`", so the parser could track its own set of
+      pending params rather than marking them on the value — the same move
+      `ownsParam` made for the other half
+    - **(c) Keep the pointer and enforce it.** Only worth it if a future
+      reader genuinely needs to go param → function, which nothing does today
+  - **Not urgent, and not C2's.** Nothing is wrong at runtime; the risk is a
+    reader's model. Best taken after B-121 lands, when the clone sites are
+    settled and the change is a small one rather than a moving target
+
+- [ ] **B-127** · T-tooling · **Code analysis is grep-based, and grep cannot
+  see the questions that matter.** Raised by the maintainer at B-121 C2
+  (2026-08): *we need to use a language's parser at minimum to reach the
+  hard-to-get-to issues.*
+  - **The evidence is a measured miss rate.** The C2 survey classified **182**
+    `ValueKind.Structure` comparison sites and predicted 15 breakages. It was
+    accurate about what it covered and it validated itself against the first
+    attempt's failures. It also missed **two entire classes**, because both
+    are invisible to a regex over source text:
+    - *A named predicate standing in for the question.* Six sites asked
+      "does this value carry metadata?" as `isCarrier(v)`,
+      `carriesViralField`'s kind guard, or `kind === Structure && primary !==
+      undefined`. No occurrence of the searched token
+    - *A function with a side effect nobody named.* `dataOf` peeled a carrier
+      AND, as a consequence, stripped metadata. Five sites depended on the
+      second behaviour. Nothing in the source says so; it is a property of
+      what the callee returns
+  - **What a parser buys, concretely.** The TypeScript compiler API answers
+    all three of the questions the survey had to guess at: *what is the
+    static type of this expression* (so "is this subject definitionally a
+    Structure?" stops being a judgement call — 23 of the 38 risk sites were
+    exactly that), *where does this symbol flow* (so a predicate's callers
+    are found by binding, not by name), and *which property accesses reach a
+    field* (so `.primary` through an `any` cast becomes visible — the
+    boundary lint cannot see one today, `totality.ts:173` is the instance,
+    and B-104 owes the count)
+  - **It is the enforcement substrate too.** The boundary lint is a regex
+    over string literals, which is why B-104 chunk 1 had to widen it three
+    times to describe patterns it could not distinguish structurally
+    (a synthesized template key, a property access, a diagnostic name), and
+    why those three sit in a `ratchetOnly` baseline instead of hard-failing.
+    A binder-aware check states each as what it is. **B-128 depends on this**
+  - **Scope, roughly.** A `scripts/analyze/` entry point over
+    `ts.createProgram`, with the queries above as the first three checks. Not
+    a linter framework — the suite is the gate, and these are analyses run
+    when a change needs a survey. First real customer: C5's `dataOf` deletion
+    (902 occurrences), where "does this call site need the peel?" is a
+    type question and grep cannot answer it
+
+- [ ] **B-128** · L0 · T-tooling · **Layer separation is stated but not
+  policed, so code relies on representation without knowing it.** Raised by
+  the maintainer at B-121 C2 (2026-08) as *the biggest learning*: *we were not
+  using layer interfaces and that really hurt when the code started relying on
+  implementation details — even unknowingly. We need to separate layers by
+  interfaces and police the separation.*
+  - **This is the enforcement half of B-112**, which owes the four plane
+    interfaces themselves. An interface nothing is required to go through is a
+    convention, and C2 measured what conventions cost
+  - **What C2 cost, and why the word *unknowingly* is the point.** Attaching
+    metadata changed representation. Nothing about the *interface* changed —
+    `metaReadRaw`, `dataOf`, `getType` all kept their signatures and their
+    meanings. Yet **eleven sites broke**, every one of them reaching past the
+    interface at a representation detail: `.primary` (a storage slot),
+    `kind === ValueKind.Structure` (a representation test standing in for a
+    plane question), `isCarrier` (a predicate over storage). Not one author
+    intended to depend on the representation. **Every failure was silent** —
+    a check stopped firing rather than throwing, so annotations stopped
+    rejecting, a failing `proven` clause downgraded to a skip, and `effects`
+    stopped unioning. The suite caught them only because behavioural tests
+    happened to cover those paths
+  - **What "police" has to mean here**, since the planes are not modules:
+    - **(a) The read surface is already the interface** — `slots.ts` is the
+      accessor layer and the boundary lint already forbids `"__"` literals
+      outside it. Extend the same treatment to *storage* access: `.primary`,
+      `.meta`, `.bindings` and `kind === ValueKind.Structure` are reachable
+      from anywhere today
+    - **(b) Make the representation unreachable rather than discouraged.**
+      The strongest version is that no module outside the accessor layer can
+      name the storage at all — which the host language can express (private
+      fields, or a branded opaque type) and which needs no lint
+    - **(c) A plane question must have exactly one spelling.** C2's whole cost
+      was *"does this carry metadata?"* having eight. One exported predicate,
+      and the check in (a) forbids the others
+  - **The one honest counterexample, worth keeping in view.** `unifyTypes`'s
+    `isCarrier` was NOT reaching past an interface — it separated a value
+    carrying a type from a type Context, a distinction with no accessor to
+    express it. The lesson cuts both ways: some of the eleven sites reached
+    for storage because **the interface had no word for what they meant**.
+    Policing without supplying the missing vocabulary just moves the problem
+  - **Sequencing**: B-112 supplies the interfaces, B-127 supplies the
+    analysis a structural check needs, this item makes the separation
+    enforced. Best evidence for whether it works: re-run C2's survey
+    afterwards and see whether the answer is a short list rather than a class
+    of things nobody could search for
+

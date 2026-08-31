@@ -13,7 +13,7 @@ import * as path from "path";
 import * as readline from "readline";
 import { formatValue, asGrammarValue } from "./primitives.js";
 import { evalSource, Extension } from "./runtime.js";
-import { ContextValue, GrammarFragment, Value } from "./types.js";
+import { StructureValue, GrammarFragment, Value } from "./types.js";
 import { createTypeSystem } from "./types-std.js";
 import { ModuleLoader } from "./modules.js";
 import { createFutureManager, FutureManager } from "./futures.js";
@@ -283,7 +283,7 @@ function repl(standard: boolean): void {
   rl.prompt();
 
   let buffer = "";
-  let ctx: ContextValue | undefined;
+  let ctx: StructureValue | undefined;
   const fm = standard ? createFutureManager() : undefined;
 
   rl.on("line", (line) => {

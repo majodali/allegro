@@ -10,7 +10,7 @@
 // slot" rule (D39) enforced mechanically from this chunk on.
 //
 // The typed accessors read the CURRENT representation (Context bindings,
-// MultiValue components, JS expando properties). Call sites migrate to them
+// MultiValue meta, JS expando properties). Call sites migrate to them
 // in C1.2/C1.3; the representation itself swaps under them in Phase 4 —
 // this module is the seam that makes that swap possible.
 // =============================================================================
@@ -18,10 +18,9 @@
 import {
   Value,
   ValueKind,
-  ContextValue,
-  MultiValueType,
+  StructureValue,
   AllegroError,
-  makeMultiValue,
+  withMeta,
 } from "./types.js";
 import { denseIndexGet, denseSlotCount, denseElements } from "./structure.js";
 
@@ -29,16 +28,16 @@ import { denseIndexGet, denseSlotCount, denseElements } from "./structure.js";
 
 /** Where the slot physically lives in the current representation. */
 export type SlotStorage =
-  | "context-binding"      // key in a ContextValue's bindings map
+  | "context-binding"      // key in a StructureValue's bindings map
   | "js-property"          // JS expando property on a Value object
-  | "mv-component"         // named MultiValue component
+  | "metadata-field"         // named MultiValue component
   | "binding-name-prefix"  // synthetic evaluation-context binding-name family
   | "label-marker";        // magic substring inside an effect label
 
 /** D39 disposition: what the slot becomes after the migration. */
 export type SlotDisposition =
   | "member"        // symbol-keyed member declared on the owning kind
-  | "channel"       // registered channel (D23/D24) on the channel plane
+  | "metadata-field" // a registered field of the metadata plane (D23/D24)
   | "base-concept"  // absorbed into a base-language concept (D18/D33)
   | "host-internal" // never a value slot; stays host-side, renamed freely
   | "delete";       // redundant once shape IS the kind — removed outright
@@ -112,24 +111,24 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   // shape-vs-knowledge split (C3.1/D36) was always a READ-time computation
   // — `typeShape` walks `__refines`/`__members`/`__predicate`, all still
   // binding-plane — and is untouched by the move.
-  { name: "__discharged", storages: ["context-binding"], owner: "discharged channel", disposition: "channel", target: "discharged integrity channel (D21–D24; kernel-private writer)" },
-  { name: "effectSet", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects (F1 component made canonical)" },
-  { name: "inferredEffects", storages: ["js-property"], owner: "effects channel", disposition: "channel", target: "effects" },
-  { name: "predicateSet", storages: ["js-property"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
-  { name: "lawBackings", storages: ["js-property"], owner: "proof kernel", disposition: "channel", target: "knowledge (D2 roll-up: transitive law-backing set on proofs, B-091)" },
+  { name: "__discharged", storages: ["context-binding"], owner: "discharged channel", disposition: "metadata-field", target: "discharged integrity channel (D21–D24; kernel-private writer)" },
+  { name: "effectSet", storages: ["js-property"], owner: "effects channel", disposition: "metadata-field", target: "effects (F1 component made canonical)" },
+  { name: "inferredEffects", storages: ["js-property"], owner: "effects channel", disposition: "metadata-field", target: "effects" },
+  { name: "predicateSet", storages: ["js-property"], owner: "knowledge channel", disposition: "metadata-field", target: "knowledge (D36)" },
+  { name: "lawBackings", storages: ["js-property"], owner: "proof kernel", disposition: "metadata-field", target: "knowledge (D2 roll-up: transitive law-backing set on proofs, B-091)" },
 
-  // --- MultiValue components (current channel plane) ------------------------------
-  { name: "type", storages: ["mv-component"], owner: "shape channel", disposition: "channel", target: "shape (D36)" },
-  { name: "error", storages: ["mv-component"], owner: "error channel", disposition: "channel", target: "error (viral propagation)" },
-  { name: "effects", storages: ["mv-component"], owner: "effects channel", disposition: "channel", target: "effects" },
-  { name: "predicates", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
-  { name: "source", storages: ["mv-component"], owner: "source channel", disposition: "channel", target: "source (D47: originating AST; kernel-originated, drop, observe-tagged reads)" },
-  { name: "domain", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36)" },
-  { name: "bound", storages: ["mv-component"], owner: "knowledge channel", disposition: "channel", target: "knowledge (D36) — occurrence bound (C3.2 annotation boundary)" },
-  { name: "exported", storages: ["mv-component"], owner: "module system", disposition: "base-concept", target: "Binding.visibility (scope-binding attribute — EXECUTED at B-097 V1)", notes: "D39 addendum EXECUTED at B-097 V1 (2026-08): export-ness moved to Binding.visibility; the value-plane marker (and its `y = x` aliasing wart) is retired — nothing in the language writes this component any more. Channel registration retained solely as the writer-idiom example in the boundary battery." },
-  { name: "arity", storages: ["mv-component"], owner: "Function", disposition: "delete", target: "n/a — was write-only dead metadata; the write in wrapAsUntypedFunction was removed 2026-07", notes: "D39 addendum, maintainer-ratified 2026-07: never read anywhere in the repo; arity is derivable from Function[ParamTypes, ReturnType] where needed. Entry retained as the audit record" },
-  { name: "warnings", storages: ["mv-component"], owner: "warnings channel", disposition: "channel", target: "warnings", notes: "documented in CLAUDE.md; currently unused in code" },
-  { name: "source", storages: ["mv-component"], owner: "source channel", disposition: "channel", target: "source", notes: "documented in CLAUDE.md; currently unused in code" },
+  // --- MultiValue meta (current channel plane) ------------------------------
+  { name: "type", storages: ["metadata-field"], owner: "shape channel", disposition: "metadata-field", target: "shape (D36)" },
+  { name: "error", storages: ["metadata-field"], owner: "error channel", disposition: "metadata-field", target: "error (viral propagation)" },
+  { name: "effects", storages: ["metadata-field"], owner: "effects channel", disposition: "metadata-field", target: "effects" },
+  { name: "predicates", storages: ["metadata-field"], owner: "knowledge channel", disposition: "metadata-field", target: "knowledge (D36)" },
+  { name: "source", storages: ["metadata-field"], owner: "source channel", disposition: "metadata-field", target: "source (D47: originating AST; kernel-originated, drop, observe-tagged reads)" },
+  { name: "domain", storages: ["metadata-field"], owner: "knowledge channel", disposition: "metadata-field", target: "knowledge (D36)" },
+  { name: "bound", storages: ["metadata-field"], owner: "knowledge channel", disposition: "metadata-field", target: "knowledge (D36) — occurrence bound (C3.2 annotation boundary)" },
+  { name: "exported", storages: ["metadata-field"], owner: "module system", disposition: "base-concept", target: "Binding.visibility (scope-binding attribute — EXECUTED at B-097 V1)", notes: "D39 addendum EXECUTED at B-097 V1 (2026-08): export-ness moved to Binding.visibility; the value-plane marker (and its `y = x` aliasing wart) is retired — nothing in the language writes this component any more. Channel registration retained solely as the writer-idiom example in the boundary battery." },
+  { name: "arity", storages: ["metadata-field"], owner: "Function", disposition: "delete", target: "n/a — was write-only dead metadata; the write in wrapAsUntypedFunction was removed 2026-07", notes: "D39 addendum, maintainer-ratified 2026-07: never read anywhere in the repo; arity is derivable from Function[ParamTypes, ReturnType] where needed. Entry retained as the audit record" },
+  { name: "warnings", storages: ["metadata-field"], owner: "warnings channel", disposition: "metadata-field", target: "warnings", notes: "documented in CLAUDE.md; currently unused in code" },
+  { name: "source", storages: ["metadata-field"], owner: "source channel", disposition: "metadata-field", target: "source", notes: "documented in CLAUDE.md; currently unused in code" },
 
   // --- Base concepts, not slots -----------------------------------------------------
   { name: "__length", storages: ["context-binding"], owner: "Array", disposition: "base-concept", target: "numeric-structure slot count (D18)", notes: "B-104 chunk 2 audit — RETAINED, correcting the audit's own recommendation. Its one arbitrary writer (makeUnionType) is gone with unions, but the slot is NOT debris: `materializeView` emits it as part of the C4.2 legacy-view compatibility contract, pinned by the W6 dense-view-coherence invariant and by boundary tests asserting the view carries it. `denseSlotCount` is authoritative for dense structures and falls back to this binding for non-dense numeric ones. It is also the ONLY key isMetaSlotKey ever returns true for (1197 tests, 296 hits, nothing else) — so the partition test's entire remaining job is hiding this one derived slot from field walks" },
@@ -189,9 +188,9 @@ export function isRegisteredSlotKey(key: string): boolean {
 }
 
 /** Is this MultiValue component key a registered channel/member? */
-export function isRegisteredComponentKey(key: string): boolean {
+export function isRegisteredFieldName(key: string): boolean {
   const r = EXACT.get(key);
-  return !!r && r.storages.includes("mv-component");
+  return !!r && r.storages.includes("metadata-field");
 }
 
 export function slotRegistration(key: string): SlotRegistration | undefined {
@@ -203,76 +202,101 @@ export function slotRegistration(key: string): SlotRegistration | undefined {
 // Read side landed with C1.1; write-side shims added in C1.2 for the
 // call-site migration (C1.4 turns the origination sites into capability-
 // gated writers on top of these). Accessors return the raw stored value —
-// including MultiValue-wrapped types (types are typed) — plus `asContext`
+// including MultiValue-wrapped types (types are typed) — plus `asStructure`
 // to peel to the primary Context where the caller needs the shape itself.
 
 // C4.2: dense structures (array contexts) only ever hold numeric element
 // keys plus `__length` — every slot probe can answer WITHOUT materializing
 // the legacy bindings view. Keeps type-slot probes on arbitrary values
 // (auto-naming's hasShapeSlot, getName, …) off the materialization path.
-function isDense(ctx: ContextValue): boolean {
+function isDense(ctx: StructureValue): boolean {
   return (ctx as unknown as { dense?: unknown }).dense !== undefined;
 }
 
-function slotRead(ctx: ContextValue, name: string): Value | undefined {
+function slotRead(ctx: StructureValue, name: string): Value | undefined {
   if (isDense(ctx)) return name === "__length" ? denseSlotCount(ctx) : undefined;
   return ctx.bindings.get(name)?.value as Value | undefined;
 }
 
-/** Mirrors types-std's addBinding exactly (map + bindingList, duplicates
- *  preserved on overwrite) — zero behavior change is the C1.2 oracle. */
-function slotWrite(ctx: ContextValue, key: string, value: Value): void {
+/* ---------------------------------------------------------------------------
+ * THE BINDING WRITE DISCIPLINE (B-107(e); concepts.md §13)
+ *
+ * A structure holds its bindings twice, and the two copies are NOT aliases:
+ * `slotWrite` and types-std's `addBinding` each construct TWO separate
+ * `Binding` objects for one key — one in `bindings` (the lookup index) and
+ * one in `bindingList` (the ordered enumeration view). Every write
+ * discipline in the codebase follows from that single fact:
+ *
+ *   1. A WRITE goes to BOTH, or the two views disagree. This is the default
+ *      and it is what `slotWrite` / `addBinding` do.
+ *   2. An IN-PLACE MUTATION of a binding's `value` reaches only the view
+ *      whose object it mutated. `renameInPlace` deliberately mutates the
+ *      map's copy alone; the list's copy goes stale.
+ *   3. A DELETE must mirror the write that created the entry, or a stale
+ *      list entry survives the removal. `removeConstruct` mirrors;
+ *      `removeName` and `removeRefines` do not, by design.
+ *
+ * (2) and (3) are safe TODAY for a reason that is not local to them: every
+ * key they touch is a `__*` slot on a TYPE structure, and nothing walks a
+ * type structure's `bindingList` as fields — measured, and the same finding
+ * that showed `isMetaSlotKey` fires on exactly one key across the suite
+ * (`__length`, B-104(f)). The exemption is circumstantial, not structural:
+ * anything that starts enumerating type structures, or any of these keys
+ * migrating to a user-visible name under B-104, removes it. Do not add a
+ * fourth discipline — use (1) unless one of the two recorded reasons
+ * applies, and say which.
+ * ------------------------------------------------------------------------- */
+function slotWrite(ctx: StructureValue, key: string, value: Value): void {
   ctx.bindings.set(key, { key, value });
   ctx.bindingList.push({ key, value });
 }
 
-/** Peel a carrier down to its Context primary, if that's what it is. */
-export function asContext(v: Value | null | undefined): ContextValue | null {
+/** Narrow a value to a Context, or null if it is not one. */
+export function asStructure(v: Value | null | undefined): StructureValue | null {
   if (!v) return null;
-  const p = (v as { primary?: Value }).primary ?? v;
-  return p && p.kind === ValueKind.Structure ? (p as ContextValue) : null;
+  return v.kind === ValueKind.Structure ? (v as StructureValue) : null;
 }
 
 // Type fields
 // (named getName, not getTypeName — types-std.ts already exports a
 // getTypeName with different semantics: value → type-name string)
-export function getName(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__name"); }
-export function getMembers(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__members"); }
-export function getRefines(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__refines"); }
-export function getConstruct(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__construct"); }
-export function getFallbackMember(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__getMember"); }
-export function isInterfaceType(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__interface"); }
-export function getInterfaceMarker(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__interface"); }
-export function getWraps(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__wraps"); }
+export function getName(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__name"); }
+export function getMembers(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__members"); }
+export function getRefines(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__refines"); }
+export function getConstruct(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__construct"); }
+export function getFallbackMember(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__getMember"); }
+export function isInterfaceType(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__interface"); }
+export function getInterfaceMarker(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__interface"); }
+export function getWraps(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__wraps"); }
 
 // Refinement fields
-export function getPredicate(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__predicate"); }
-export function getAbstractDomain(ctx: ContextValue): any { return (ctx as any).abstractDomain; }
+export function getPredicate(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__predicate"); }
+export function getAbstractDomain(ctx: StructureValue): any { return (ctx as any).abstractDomain; }
 
 // GenericType fields
-export function getGenericArgs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__args"); }
-export function getGenericBackLink(ctx: ContextValue): Value | undefined { return slotRead(ctx, "__generic"); }
+export function getGenericArgs(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__args"); }
+export function getGenericBackLink(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__generic"); }
 
 // Proof fields
-export function getProposition(ctx: ContextValue): Value | undefined { return slotRead(ctx, "proposition"); }
-export function getProofReason(ctx: ContextValue): Value | undefined { return slotRead(ctx, "reason"); }
-export function getProofCounterexample(ctx: ContextValue): Value | undefined { return slotRead(ctx, "counterexample"); }
-export function getEqLhs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "lhs"); }
-export function getEqRhs(ctx: ContextValue): Value | undefined { return slotRead(ctx, "rhs"); }
+export function getProposition(ctx: StructureValue): Value | undefined { return slotRead(ctx, "proposition"); }
+export function getProofReason(ctx: StructureValue): Value | undefined { return slotRead(ctx, "reason"); }
+export function getProofCounterexample(ctx: StructureValue): Value | undefined { return slotRead(ctx, "counterexample"); }
+export function getEqLhs(ctx: StructureValue): Value | undefined { return slotRead(ctx, "lhs"); }
+export function getEqRhs(ctx: StructureValue): Value | undefined { return slotRead(ctx, "rhs"); }
 
 // Effect fields
-export function getEffectLabels(ctx: ContextValue): Set<string> | null | undefined { return (ctx as any).effectLabels; }
-export function getEffectBound(ctx: ContextValue): any { return (ctx as any).effectBound; }
+export function getEffectLabels(ctx: StructureValue): Set<string> | null | undefined { return (ctx as any).effectLabels; }
+export function getEffectBound(ctx: StructureValue): any { return (ctx as any).effectBound; }
 
 // Base concepts
 // C4.2: slot count and element reads are dense-aware — the dense region
 // is authoritative when present; the `__length` slot / string-keyed map
 // remain the fallback for non-dense numeric contexts.
-export function getSlotCount(ctx: ContextValue): Value | undefined { return denseSlotCount(ctx); }
+export function getSlotCount(ctx: StructureValue): Value | undefined { return denseSlotCount(ctx); }
 /** O(1) numeric element read (D18: arrays are numeric-keyed structures). */
-export function indexGet(ctx: ContextValue, i: number): Value | undefined { return denseIndexGet(ctx, i); }
+export function indexGet(ctx: StructureValue, i: number): Value | undefined { return denseIndexGet(ctx, i); }
 /** All elements of a numeric-keyed structure (dense fast path). */
-export function elementsOf(ctx: ContextValue): Value[] { return denseElements(ctx); }
+export function elementsOf(ctx: StructureValue): Value[] { return denseElements(ctx); }
 export function isFutureBindingName(name: string): boolean { return name.startsWith("__future_"); }
 export function isBareBindingName(name: string): boolean { return name.startsWith("__bare_"); }
 
@@ -298,11 +322,11 @@ export function isBareBindingName(name: string): boolean { return name.startsWit
 
 /** The dispatch shape of a type Context: walk `__refines` past
  *  member-transparent refinement layers. Identity on non-refined types. */
-export function typeShape(t: ContextValue): ContextValue {
+export function typeShape(t: StructureValue): StructureValue {
   let cur = t;
   for (let guard = 0; guard < 64; guard++) {
     if (slotRead(cur, "__predicate") === undefined) return cur;
-    const parent = asContext(slotRead(cur, "__refines"));
+    const parent = asStructure(slotRead(cur, "__refines"));
     if (!parent) return cur;
     const ownMembers = slotRead(cur, "__members");
     const parentMembers = slotRead(parent, "__members");
@@ -321,10 +345,10 @@ export function typeShape(t: ContextValue): ContextValue {
  *  types mint NO refines edge (buildDistinctType skips the slot), so they
  *  stay their own equality shape: unequal to the parent until a coercion
  *  is declared (E2). */
-export function equalityShape(t: ContextValue): ContextValue {
+export function equalityShape(t: StructureValue): StructureValue {
   let cur = typeShape(t);
   for (let guard = 0; guard < 64; guard++) {
-    const parent = asContext(slotRead(cur, "__refines"));
+    const parent = asStructure(slotRead(cur, "__refines"));
     if (!parent) return cur;
     cur = typeShape(parent);
   }
@@ -342,12 +366,12 @@ export function equalityShape(t: ContextValue): ContextValue {
  *  meta-type reads on type values); `type` stays the raw stored view.
  *  Both answer from ONE stored value; the split is this computation, not
  *  two storages (B-104 chunk 3). */
-export function channelReadRaw(v: Value, channel: string): Value | undefined {
+export function metaReadRaw(v: Value, channel: string): Value | undefined {
   // C4.3b + B-104 chunk 3: the channel plane is universal, and `type` is
   // now on it for EVERY value — carriers, flattened records and bare type
-  // Contexts alike. Contexts without channels have `components` undefined
+  // Contexts alike. Contexts without channels have `meta` undefined
   // (lazy — plain contexts and scopes pay nothing).
-  const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
+  const comps = v.meta as Map<string, Value> | undefined;
   if (comps !== undefined) {
     const comp = comps.get(channel);
     if (comp !== undefined) return comp as Value;
@@ -358,19 +382,19 @@ export function channelReadRaw(v: Value, channel: string): Value | undefined {
     // as itself — typeShape only applies to type Contexts.
     let raw = comps?.get("type") as Value | undefined;
     if (raw === undefined) {
-      const ctx = asContext(v);
-      raw = ctx ? (ctx as unknown as MultiValueType).components?.get("type") as Value | undefined : undefined;
+      const ctx = asStructure(v);
+      raw = ctx ? ctx.meta?.get("type") as Value | undefined : undefined;
     }
-    if (raw?.kind === ValueKind.Structure) return typeShape(raw as ContextValue);
+    if (raw?.kind === ValueKind.Structure) return typeShape(raw as StructureValue);
     return raw;
   }
   if (channel === "type") {
     // A transparent scalar carrier answers through its primary's plane.
-    const ctx = asContext(v);
-    return ctx ? (ctx as unknown as MultiValueType).components?.get("type") as Value | undefined : undefined;
+    const ctx = asStructure(v);
+    return ctx ? ctx.meta?.get("type") as Value | undefined : undefined;
   }
   if (channel === "discharged") {
-    const c = asContext(v);
+    const c = asStructure(v);
     if (c) return slotRead(c, "__discharged");
   }
   return undefined;
@@ -379,40 +403,40 @@ export function channelReadRaw(v: Value, channel: string): Value | undefined {
 // --- Write-side shims (C1.2) --------------------------------------------------------
 
 // Type fields
-export function setName(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__name", v); }
-export function setMembers(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__members", v); }
-export function setRefines(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__refines", v); }
-export function setConstruct(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__construct", v); }
-export function setFallbackMember(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__getMember", v); }
-export function markInterface(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__interface", v); }
-export function setWraps(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__wraps", v); }
-export function removeName(ctx: ContextValue): void { ctx.bindings.delete("__name"); }
+export function setName(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__name", v); }
+export function setMembers(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__members", v); }
+export function setRefines(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__refines", v); }
+export function setConstruct(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__construct", v); }
+export function setFallbackMember(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__getMember", v); }
+export function markInterface(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__interface", v); }
+export function setWraps(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__wraps", v); }
+export function removeName(ctx: StructureValue): void { ctx.bindings.delete("__name"); }
 /** In-place rename used by the auto-naming pass. Mutates the bindings-map
  *  entry ONLY — bindingList entries are separate objects and are
  *  deliberately left untouched, mirroring the pre-accessor behavior. */
-export function renameInPlace(ctx: ContextValue, name: Value): void {
+export function renameInPlace(ctx: StructureValue, name: Value): void {
   const b = ctx.bindings.get("__name");
   if (b) b.value = name;
 }
 
 // Refinement fields
-export function setPredicate(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__predicate", v); }
-export function setAbstractDomain(ctx: ContextValue, d: unknown): void { (ctx as any).abstractDomain = d; }
+export function setPredicate(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__predicate", v); }
+export function setAbstractDomain(ctx: StructureValue, d: unknown): void { (ctx as any).abstractDomain = d; }
 
 // GenericType fields (C7.2a: applied-concrete instance data, host-read)
-export function setGenericArgs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__args", v); }
-export function setGenericBackLink(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__generic", v); }
+export function setGenericArgs(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__args", v); }
+export function setGenericBackLink(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__generic", v); }
 
 // Proof fields
-export function setProposition(ctx: ContextValue, v: Value): void { slotWrite(ctx, "proposition", v); }
-export function setProofReason(ctx: ContextValue, v: Value): void { slotWrite(ctx, "reason", v); }
-export function setProofCounterexample(ctx: ContextValue, v: Value): void { slotWrite(ctx, "counterexample", v); }
-export function setEqLhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "lhs", v); }
-export function setEqRhs(ctx: ContextValue, v: Value): void { slotWrite(ctx, "rhs", v); }
+export function setProposition(ctx: StructureValue, v: Value): void { slotWrite(ctx, "proposition", v); }
+export function setProofReason(ctx: StructureValue, v: Value): void { slotWrite(ctx, "reason", v); }
+export function setProofCounterexample(ctx: StructureValue, v: Value): void { slotWrite(ctx, "counterexample", v); }
+export function setEqLhs(ctx: StructureValue, v: Value): void { slotWrite(ctx, "lhs", v); }
+export function setEqRhs(ctx: StructureValue, v: Value): void { slotWrite(ctx, "rhs", v); }
 
 // Effect fields
-export function setEffectLabels(ctx: ContextValue, labels: Set<string> | null): void { (ctx as any).effectLabels = labels; }
-export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as any).effectBound = d; }
+export function setEffectLabels(ctx: StructureValue, labels: Set<string> | null): void { (ctx as any).effectLabels = labels; }
+export function setEffectBound(ctx: StructureValue, d: unknown): void { (ctx as any).effectBound = d; }
 
 // Base concepts
 
@@ -420,43 +444,47 @@ export function setEffectBound(ctx: ContextValue, d: unknown): void { (ctx as an
 // integrity is C3.1's concern); the discharged channel is capability-gated
 // below (C1.4) — its raw writers are module-private.
 //
-// B-104 chunk 3: shape is stored on the component plane, written IN PLACE.
-// It cannot route through the registered channel writer: `buildWriter`
-// derives a NEW value via `makeMultiValue`, and type Contexts are
-// identity-sensitive (memoized generics, law registries, and the
-// `typeShape(stored) === typeShape(expected)` reference test in
-// types-std). All 24 call sites mint a fresh Context and stamp it, so an
-// in-place component write is exactly the old binding write's contract.
-export function writeShape(ctx: ContextValue, v: Value): void {
-  const s = ctx as unknown as MultiValueType;
-  if (s.components === undefined) s.components = new Map<string, Value>();
-  (s.components as Map<string, Value>).set("type", v);
+// B-104 chunk 3: shape is stored on the metadata plane, written IN PLACE.
+// It cannot route through the registered field writer: `buildWriter` derives
+// a NEW value via `withMeta`, and type Contexts are identity-sensitive
+// (memoized generics, law registries, and the `typeShape(stored) ===
+// typeShape(expected)` reference test in types-std).
+//
+// B-121 C7: this is the sanctioned case of THE IN-PLACE RULE, which
+// `structure.ts` states in full — *write in place only while the value is
+// provably unshared; after it escapes, derive*. The licence here is the
+// second clause of that rule rather than an exception to it: all 24 call
+// sites mint a fresh Context and stamp it before it escapes, so no other
+// position can be holding the value when this runs.
+export function writeShape(ctx: StructureValue, v: Value): void {
+  if (ctx.meta === undefined) ctx.meta = new Map<string, Value>();
+  (ctx.meta as Map<string, Value>).set("type", v);
 }
-function writeDischarged(ctx: ContextValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
+function writeDischarged(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
 
 // Presence checks
-export function hasName(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__name"); }
-export function hasShapeSlot(ctx: ContextValue): boolean { return (ctx as unknown as MultiValueType).components?.has("type") === true; }
-export function hasDischarged(ctx: ContextValue): boolean { return !isDense(ctx) && ctx.bindings.has("__discharged"); }
+export function hasName(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__name"); }
+export function hasShapeSlot(ctx: StructureValue): boolean { return ctx.meta?.has("type") === true; }
+export function hasDischarged(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__discharged"); }
 
 // Set-only writes (bindings map, NO bindingList entry) — mirror the proof
 // kernel's origination idiom in primitives.ts exactly. These are the
 // chokepoints the C1.4 discharged-channel writer capability wraps.
-function slotSet(ctx: ContextValue, key: string, value: Value): void {
+function slotSet(ctx: StructureValue, key: string, value: Value): void {
   ctx.bindings.set(key, { key, value });
 }
-export function stampProposition(ctx: ContextValue, v: Value): void { slotSet(ctx, "proposition", v); }
-function stampDischarged(ctx: ContextValue, v: Value): void { slotSet(ctx, "__discharged", v); }
-export function stampProofReason(ctx: ContextValue, v: Value): void { slotSet(ctx, "reason", v); }
-export function stampProofCounterexample(ctx: ContextValue, v: Value): void { slotSet(ctx, "counterexample", v); }
-export function stampEqOperands(ctx: ContextValue, lhs: Value, rhs: Value): void {
+export function stampProposition(ctx: StructureValue, v: Value): void { slotSet(ctx, "proposition", v); }
+function stampDischarged(ctx: StructureValue, v: Value): void { slotSet(ctx, "__discharged", v); }
+export function stampProofReason(ctx: StructureValue, v: Value): void { slotSet(ctx, "reason", v); }
+export function stampProofCounterexample(ctx: StructureValue, v: Value): void { slotSet(ctx, "counterexample", v); }
+export function stampEqOperands(ctx: StructureValue, lhs: Value, rhs: Value): void {
   slotSet(ctx, "lhs", lhs);
   slotSet(ctx, "rhs", rhs);
 }
 /** E4 (E-R6): equality proofs record which equality they chained and
  *  which law tier backed it — plain instance-data bindings (the C6.3
  *  pattern), no new `__*` slots. */
-export function stampLawBacking(ctx: ContextValue, equality: Value, lawName: Value, lawTier: Value): void {
+export function stampLawBacking(ctx: StructureValue, equality: Value, lawName: Value, lawTier: Value): void {
   slotSet(ctx, "equality", equality);
   slotSet(ctx, "lawName", lawName);
   slotSet(ctx, "lawTier", lawTier);
@@ -471,10 +499,10 @@ export function stampLawBacking(ctx: ContextValue, equality: Value, lawName: Val
  *  aggregates, so a nested chain does not lose inner backings. */
 export interface LawBackingRec { equality: string; law: string; tier: string }
 
-export function backingsOf(ctx: ContextValue): LawBackingRec[] {
+export function backingsOf(ctx: StructureValue): LawBackingRec[] {
   return ((ctx as unknown as { lawBackings?: LawBackingRec[] }).lawBackings) ?? [];
 }
-export function stampBackings(ctx: ContextValue, recs: LawBackingRec[]): void {
+export function stampBackings(ctx: StructureValue, recs: LawBackingRec[]): void {
   if (recs.length > 0) {
     (ctx as unknown as { lawBackings?: LawBackingRec[] }).lawBackings = recs;
   }
@@ -520,15 +548,29 @@ export const HOST_KEYS = {
   futureManager: "futureManager",
 } as const;
 
-/** The "skip meta slots when copying user-visible bindings" test. */
+/**
+ * The "skip meta slots when copying user-visible bindings" test.
+ *
+ * THE PROPERTY THIS TEST RESTS ON (concepts.md §30, delta 30 — stated here
+ * at C9; still unenforced): **the type-structure namespace is closed.** A
+ * type structure's own bindings map holds engine slots only — a user field
+ * named `name` is routed into `__members` under an FQN key and never lands
+ * beside `__name`. That is why the `__*` partition was never load-bearing,
+ * and why instrumenting this predicate across the whole suite returned true
+ * for exactly one key (`__length`, 296 times; B-104(f)). It is currently an
+ * accident of how members are written rather than an invariant anything
+ * checks — the enforcement half belongs with B-104's retirement of the
+ * partition, since a replacement that does not preserve this property would
+ * be unsound and nothing would say so.
+ */
 export function isMetaSlotKey(key: string): boolean {
   return key.startsWith("__");
 }
 
 // Removal helpers (map + bindingList, mirroring the existing idiom exactly)
-export function removeRefines(ctx: ContextValue): void { ctx.bindings.delete("__refines"); }
-export function removeShapeSlot(ctx: ContextValue): void { (ctx as unknown as MultiValueType).components?.delete("type"); }
-export function removeConstruct(ctx: ContextValue): void {
+export function removeRefines(ctx: StructureValue): void { ctx.bindings.delete("__refines"); }
+export function removeShapeSlot(ctx: StructureValue): void { ctx.meta?.delete("type"); }
+export function removeConstruct(ctx: StructureValue): void {
   ctx.bindings.delete("__construct");
   const idx = ctx.bindingList.findIndex((b) => b.key === "__construct");
   if (idx >= 0) ctx.bindingList.splice(idx, 1);
@@ -539,25 +581,46 @@ export function removeConstruct(ctx: ContextValue): void {
 /** Data-plane read (C4.3c: `primaryOf` retired — this is THE accessor).
  *  Identity for flattened Contexts and every non-scalar; unwraps the
  *  `primary` of a transparent scalar structure. */
-import { dataOf } from "./types.js";
-export { dataOf };
 
 // --- Component plane (MultiValue) -------------------------------------------------------
 
-/** Read-only view over a value's components. C4.3b: the channel plane is
- *  universal — flattened Contexts (typed records/arrays) carry components
+/** Read-only view over a value's meta. C4.3b: the channel plane is
+ *  universal — flattened Contexts (typed records/arrays) carry meta
  *  directly; values without a channel plane view as empty. */
-export function componentsView(v: Value): ReadonlyMap<string, Value> {
-  const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
-  return comps !== undefined ? comps : EMPTY_COMPONENTS;
+export function metaOf(v: Value): ReadonlyMap<string, Value> {
+  const comps = v.meta as Map<string, Value> | undefined;
+  return comps !== undefined ? comps : EMPTY_META;
 }
-const EMPTY_COMPONENTS: ReadonlyMap<string, Value> = new Map();
+const EMPTY_META: ReadonlyMap<string, Value> = new Map();
 
-/** Mutable copy of a value's components — the standard "carry components
+/** Mutable copy of a value's meta — the standard "carry meta
  *  forward onto a derived value" idiom. Empty map for channel-less values. */
-export function cloneComponents(v: Value): Map<string, Value> {
-  const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
+export function cloneMeta(v: Value): Map<string, Value> {
+  const comps = v.meta as Map<string, Value> | undefined;
   return comps !== undefined ? new Map(comps) : new Map();
+}
+
+/**
+ * Carry `from`'s metadata onto a value derived from it, and return the
+ * derived value.
+ *
+ * This is the "map" case (B-121 plan §3.2): a NEW datum that must keep the OLD
+ * metadata. It was not an obligation before B-121, because metadata lived on
+ * the carrier WRAPPING a function rather than on the function itself — so a
+ * hand-written function clone never had to think about it. Once metadata is on
+ * the value, all seven such clones drop it silently, and the suite reports
+ * that as `type_check: value has no type` from somewhere else entirely.
+ *
+ * Use this rather than writing `meta: x.meta` by hand: the failure mode of
+ * forgetting is silence, the same shape as the TailCall sentinel (B-113) and
+ * the ComposedFunction clone helper. It lives here, in the accessor layer,
+ * because reading `.meta` directly is exactly what the boundary lint forbids
+ * everywhere else.
+ */
+export function carryMeta<T extends Value>(from: Value, to: T): T {
+  const m = (from as { meta?: Map<string, Value> }).meta;
+  if (m !== undefined) (to as { meta?: Map<string, Value> }).meta = m;
+  return to;
 }
 
 /** B-104 chunk 3: carry the shape from one type Context to a derived one.
@@ -568,8 +631,8 @@ export function cloneComponents(v: Value): Map<string, Value> {
  *  plane that inheritance is silent no longer — those clones would come out
  *  untyped. This is the explicit replacement; paths that re-stamp their own
  *  shape (`buildRefinedType`, `buildDistinctType`) do not need it. */
-export function carryShape(from: ContextValue, to: ContextValue): void {
-  const raw = (from as unknown as MultiValueType).components?.get("type") as Value | undefined;
+export function carryShape(from: StructureValue, to: StructureValue): void {
+  const raw = from.meta?.get("type") as Value | undefined;
   if (raw !== undefined) writeShape(to, raw);
 }
 
@@ -585,7 +648,7 @@ export function carryShape(from: ContextValue, to: ContextValue): void {
 
 export type PropagationRule = "viral" | "union" | "computed" | "positional" | "drop";
 
-export interface ChannelSpec {
+export interface MetaFieldSpec {
   name: string;
   rule: PropagationRule;
   /** Origination requires the writer capability. */
@@ -599,14 +662,14 @@ export interface ChannelSpec {
 /** A held write capability for one channel. For binding-plane channels the
  *  write mutates the target Context (origination on a fresh kernel value);
  *  for component-plane channels it returns a new MultiValue. */
-export interface ChannelWriter {
+export interface MetaFieldWriter {
   channel: string;
-  write(target: Value, channelValue: Value): Value;
+  write(target: Value, fieldValue: Value): Value;
 }
 
-interface ChannelEntry {
-  spec: ChannelSpec;
-  writer: ChannelWriter;
+interface MetaFieldEntry {
+  spec: MetaFieldSpec;
+  writer: MetaFieldWriter;
   /** evalSource pass in which an Allegro-minted channel was registered.
    *  The evaluation loop legitimately re-evaluates top-level bindings
    *  within one pass (fixpoint), so re-registration with an identical spec
@@ -617,29 +680,29 @@ interface ChannelEntry {
   minted: boolean;
 }
 
-const CHANNEL_TABLE = new Map<string, ChannelEntry>();
-let channelEpoch = 0;
+const META_FIELD_TABLE = new Map<string, MetaFieldEntry>();
+let metaEpoch = 0;
 
 /** Called at the start of each evalSource pass (see runtime.ts). */
-export function bumpChannelEpoch(): void { channelEpoch++; }
+export function bumpMetaEpoch(): void { metaEpoch++; }
 
-function buildWriter(spec: ChannelSpec): ChannelWriter {
+function buildWriter(spec: MetaFieldSpec): MetaFieldWriter {
   return {
     channel: spec.name,
-    write(target: Value, channelValue: Value): Value {
+    write(target: Value, fieldValue: Value): Value {
       if (spec.bindingKey) {
         if (target.kind !== ValueKind.Structure) {
           throw new AllegroError(`channel '${spec.name}': binding-plane write target must be a Context`);
         }
-        if (spec.name === "discharged") stampDischarged(target as ContextValue, channelValue);
-        else slotSet(target as ContextValue, spec.bindingKey, channelValue);
+        if (spec.name === "discharged") stampDischarged(target as StructureValue, fieldValue);
+        else slotSet(target as StructureValue, spec.bindingKey, fieldValue);
         return target;
       }
-      const comps = cloneComponents(target);
-      comps.set(spec.name, channelValue);
-      // makeMultiValue handles all three shapes: carrier primaries
+      const comps = cloneMeta(target);
+      comps.set(spec.name, fieldValue);
+      // withMeta handles all three shapes: carrier primaries
       // re-wrap (W1), record primaries derive, leaves take the carrier.
-      return makeMultiValue(dataOf(target), comps) as Value;
+      return withMeta(target, comps) as Value;
     },
   };
 }
@@ -647,9 +710,9 @@ function buildWriter(spec: ChannelSpec): ChannelWriter {
 let _viralCache: string[] | null = null;
 /** Component-plane channels with viral propagation (first occurrence wins,
  *  carried onto the result residual). Cached; registration invalidates. */
-export function viralChannels(): string[] {
+export function viralFields(): string[] {
   if (!_viralCache) {
-    _viralCache = [...CHANNEL_TABLE.values()]
+    _viralCache = [...META_FIELD_TABLE.values()]
       .filter((e) => e.spec.rule === "viral" && !e.spec.bindingKey)
       .map((e) => e.spec.name);
   }
@@ -659,9 +722,9 @@ export function viralChannels(): string[] {
 let _unionCache: string[] | null = null;
 /** Component-plane channels with union propagation (arg channels merged
  *  onto the result via the installed merge). */
-export function unionChannels(): string[] {
+export function unionFields(): string[] {
   if (!_unionCache) {
-    _unionCache = [...CHANNEL_TABLE.values()]
+    _unionCache = [...META_FIELD_TABLE.values()]
       .filter((e) => e.spec.rule === "union" && !e.spec.bindingKey)
       .map((e) => e.spec.name);
   }
@@ -676,12 +739,12 @@ function invalidatePropagationCaches(): void {
 /** One-shot channel registration → writer capability. Throws on duplicate
  *  names (re-registration is forgery vector F) and on fabricating rules for
  *  integrity channels (forgery vector C). */
-export function registerChannel(spec: ChannelSpec, minted = false): ChannelWriter {
-  const existing = CHANNEL_TABLE.get(spec.name);
+export function registerMetaField(spec: MetaFieldSpec, minted = false): MetaFieldWriter {
+  const existing = META_FIELD_TABLE.get(spec.name);
   if (existing) {
     // Same-pass re-evaluation of the SAME Allegro registration site: hand
     // back the held writer. Anything else is forgery vector F.
-    if (existing.minted && minted && existing.epoch === channelEpoch && existing.spec.rule === spec.rule) {
+    if (existing.minted && minted && existing.epoch === metaEpoch && existing.spec.rule === spec.rule) {
       return existing.writer;
     }
     throw new AllegroError(`channel '${spec.name}' is already registered — the writer capability is held by its owner`);
@@ -690,67 +753,102 @@ export function registerChannel(spec: ChannelSpec, minted = false): ChannelWrite
     throw new AllegroError(`channel '${spec.name}': integrity channels may not register fabricating propagation rules (viral/union) — D23`);
   }
   const writer = buildWriter(spec);
-  CHANNEL_TABLE.set(spec.name, { spec, writer, epoch: minted ? channelEpoch : -1, minted });
+  META_FIELD_TABLE.set(spec.name, { spec, writer, epoch: minted ? metaEpoch : -1, minted });
   invalidatePropagationCaches();
   return writer;
 }
 
-export function channelSpec(name: string): ChannelSpec | undefined {
-  return CHANNEL_TABLE.get(name)?.spec;
+export function metaFieldSpec(name: string): MetaFieldSpec | undefined {
+  return META_FIELD_TABLE.get(name)?.spec;
 }
 
 /** TS-kernel writer acquisition. Discipline is the boundary lint: call sites
  *  outside the kernel modules (types-std.ts, primitives.ts) fail the suite.
  *  The writer is never exposed to Allegro — extension bindings do not
  *  include it, and Allegretto cannot construct a host closure (D24). */
-export function kernelChannelWriter(name: string): ChannelWriter {
-  const e = CHANNEL_TABLE.get(name);
+export function kernelFieldWriter(name: string): MetaFieldWriter {
+  const e = META_FIELD_TABLE.get(name);
   if (!e) throw new AllegroError(`no such channel: '${name}'`);
   return e.writer;
 }
 
-// Built-in channels, registered at module init. Rules per D36/D21–D24;
-// consulted by the C1.5 propagation table.
-// B-104 chunk 3: no `bindingKey` — shape lives on the component plane like
-// every other channel. (Its writer capability is never acquired; reads go
-// through channelReadRaw, writes through the in-place `writeShape` above,
-// which must not derive a new value.)
-registerChannel({ name: "shape", rule: "computed" });
-registerChannel({ name: "error", rule: "viral" });
-registerChannel({ name: "effects", rule: "union" });
-registerChannel({ name: "predicates", rule: "computed" });
-registerChannel({ name: "domain", rule: "computed" });
-// C3.1 (D36): the canonical knowledge channel — one lattice over the
-// imputed refinement bound + abstract domains + predicate set. Computed
-// view for now: `predicates`/`domain` components + the refinement layers
-// of the stored type are its physical storage until the C4 representation
-// swap. Read via refinements.ts `knowledgeOf`.
-registerChannel({ name: "knowledge", rule: "computed" });
-// C3.2 (D36): the occurrence bound — set by annotation-boundary crossing,
-// consumed by the member-AVAILABILITY gate (epistemic; "visibility" is
-// reserved for S3 access control). `drop`: a bound constrains the
-// occurrence it was stamped on, never results derived from it.
-registerChannel({ name: "bound", rule: "drop" });
-registerChannel({ name: "discharged", rule: "drop", integrity: true, bindingKey: "__discharged" });
-registerChannel({ name: "warnings", rule: "union" });
+// --- Field registration: what the BASE owns ------------------------------------
+//
+// B-109(a) / concept-campaign C3 (2026-08). The base used to register eleven
+// fields at module init, including the layers' own. R6/R11 say the base owns
+// the MECHANISM and each layer owns ITS fields — so a field survives here only
+// if the base concept it serves survives in Allegretto.
+//
+// That test was run rather than argued: `make_error("boom")` and `source of x`
+// both work under `--base`, so `error` and `source` are Allegretto's own and
+// stay. The six L2 fields moved to their owners:
+//
+//   shape, type   → src/types-std.ts    (the type system)
+//   effects       → src/effects.ts      (the effects extension)
+//   predicates,
+//   domain, bound → src/refinements.ts  (refinement knowledge)
+//   discharged    → src/proofs.ts       (the proof kernel)
+//
+// Three have NO owner to move to, and each is a B-111 finding rather than a
+// relocation: `knowledge` is a capability whose storage is other fields and
+// which nothing ever writes; `warnings` is registered `union` and unused
+// (B-117 intends to reach for it when the verdict accumulates); `exported`
+// was retired at B-097 V1 when visibility became a property of the Binding.
+// They stay registered here, wrongly, until B-111 says what they are.
+
 // D47 (B-094): drop — a derived value was not produced by the recorded
-// expression; propagating source would fabricate provenance. Kernel-
+// expression, so propagating source would fabricate provenance. Kernel-
 // originated (evaluator attachment only); reads via `source of` are
-// observe-tagged (§3.1).
-registerChannel({ name: "source", rule: "drop" });
-registerChannel({ name: "exported", rule: "drop" });
+// observe-tagged (§3.1). Integrity added at B-109(c) — it had been in the old
+// hardcoded name list while registered WITHOUT the flag, two sources of truth
+// disagreeing about one field.
+registerMetaField({ name: "source", rule: "drop", integrity: true });
+registerMetaField({ name: "error", rule: "viral" });
+
+// --- Fields with no owner yet (B-111) ------------------------------------------
+// C3.1 (D36): `knowledge` is the canonical knowledge lattice — but nothing
+// ever stores a `knowledge` value. Its physical storage IS `predicates` /
+// `domain` plus the refinement layers of the stored type, and it is read
+// through refinements.ts `knowledgeOf`. A capability, not a field.
+registerMetaField({ name: "knowledge", rule: "computed" });
+// Registered `union` — precisely the accumulating discipline the verdict
+// needs — and never written. B-117.
+registerMetaField({ name: "warnings", rule: "union" });
+// Retired at B-097 V1 (D42/V-R4): visibility became a property of the BINDING,
+// never of the value. The registration outlived the concept.
+registerMetaField({ name: "exported", rule: "drop" });
 
 /** Binding keys that only a channel writer may originate. User-reachable
  *  construction paths (object literals, mv_set) consult this. `source` is
  *  D47(d): forged provenance would let a doctored source channel display a
  *  different claim than the one checked — kernel-originated only. */
-const INTEGRITY_BINDING_KEYS = new Set<string>(["__discharged"]);
-const INTEGRITY_CHANNEL_NAMES = new Set<string>(["discharged", "source"]);
+/**
+ * Gate for user-reachable construction paths: throws if the key would
+ * originate an integrity field without holding its writer.
+ *
+ * B-109(b)(c) (2026-08): authority is now read from the REGISTRY rather than
+ * from a hardcoded name list. The old list was a second source of truth and
+ * the two disagreed — `source` was in the list but registered WITHOUT
+ * `integrity: true`.
+ *
+ * It also checked BARE FIELD NAMES, which conflated two planes. An object
+ * literal writes the BINDING plane; it cannot originate a metadata field at
+ * all — `{type: "widget"}` gives the record a `type` slot while `type of` it
+ * still answers `Object`. So the bare-name check defended nothing and cost
+ * users the field names `discharged` and `source`. What it must still refuse
+ * is a binding-plane key that a field uses as its STORAGE (`__discharged`),
+ * which is a real origination path, and those come from the registry too.
+ */
+function integrityBindingKeys(): Set<string> {
+  const keys = new Set<string>();
+  for (const entry of META_FIELD_TABLE.values()) {
+    if (entry.spec.integrity && entry.spec.bindingKey) keys.add(entry.spec.bindingKey);
+  }
+  return keys;
+}
 
-/** Gate for user-reachable construction paths: throws if the key would
- *  originate an integrity channel without holding its writer. */
 export function assertNotIntegrityKey(key: string, site: string): void {
-  if (INTEGRITY_BINDING_KEYS.has(key) || INTEGRITY_CHANNEL_NAMES.has(key)) {
+  if (integrityBindingKeys().has(key)) {
     throw new AllegroError(
       `${site}: cannot originate integrity channel '${key.replace(/^__/, "")}' — origination requires the channel writer (D21–D24)`
     );
@@ -769,20 +867,20 @@ export function assertNotIntegrityKey(key: string, site: string): void {
 // first-class user value needs an inert quote carrier, deferred until user
 // meta-functions land.
 
-export const SOURCE_COMPONENT_KEY = "source";
+export const SOURCE_FIELD = "source";
 
 /** Kernel-internal: attach the originating AST to a value. Not exposed as a
  *  primitive — origination authority stays with the evaluator. */
 export function withSource(v: Value, ast: Value): Value {
-  const comps = cloneComponents(v);
-  comps.set(SOURCE_COMPONENT_KEY, ast);
-  return makeMultiValue(dataOf(v), comps) as Value;
+  const comps = cloneMeta(v);
+  comps.set(SOURCE_FIELD, ast);
+  return withMeta(v, comps) as Value;
 }
 
 /** Kernel-internal read of the source channel (free for kernel use; the
  *  LANGUAGE-level read is `source_get`, which carries the observe tag). */
 export function sourceOf(v: Value): Value | undefined {
-  return componentsView(v).get(SOURCE_COMPONENT_KEY);
+  return metaOf(v).get(SOURCE_FIELD);
 }
 
 /** Host-internal function-metadata properties preserved across
@@ -797,7 +895,7 @@ export const PRESERVED_FN_META_KEYS = [
 
 /** Brand for Allegro-level channel-writer PrimitiveFunctions (host-internal
  *  js-property; registered in SLOT_REGISTRY). Attenuation checks it. */
-export const CHANNEL_WRITER_BRAND = "channelWriterFor";
+export const FIELD_WRITER_BRAND = "channelWriterFor";
 
 // --- Propagation table (C1.5) ---------------------------------------------------
 //
@@ -820,12 +918,12 @@ export const CHANNEL_WRITER_BRAND = "channelWriterFor";
 /** Union-merge behavior per channel, installed at module init by the
  *  channel's owner (e.g. effects.ts) — slots.ts cannot import the encodings
  *  without a cycle. */
-const CHANNEL_MERGES = new Map<string, (a: Value, b: Value) => Value>();
-export function installChannelMerge(name: string, merge: (a: Value, b: Value) => Value): void {
-  CHANNEL_MERGES.set(name, merge);
+const FIELD_MERGES = new Map<string, (a: Value, b: Value) => Value>();
+export function installFieldMerge(name: string, merge: (a: Value, b: Value) => Value): void {
+  FIELD_MERGES.set(name, merge);
 }
-export function channelMerge(name: string): ((a: Value, b: Value) => Value) | undefined {
-  return CHANNEL_MERGES.get(name);
+export function fieldMerge(name: string): ((a: Value, b: Value) => Value) | undefined {
+  return FIELD_MERGES.get(name);
 }
 
 
@@ -833,14 +931,14 @@ export function channelMerge(name: string): ((a: Value, b: Value) => Value) | un
 /** List the channels present on a value (component keys + binding-plane channels).
  *  C4.3b: the channel plane is universal — flattened Contexts report their
  *  component keys alongside the legacy binding-plane channels. */
-export function channelList(v: Value): string[] {
+export function metaFieldList(v: Value): string[] {
   const out: string[] = [];
-  const comps = (v as MultiValueType).components as Map<string, Value> | undefined;
+  const comps = v.meta as Map<string, Value> | undefined;
   if (comps !== undefined) {
     out.push(...comps.keys());
   }
   if (v.kind === ValueKind.Structure) {
-    const ctx = v as ContextValue;
+    const ctx = v as StructureValue;
     if (!isDense(ctx)) {
       if (ctx.bindings.has("__discharged") && !out.includes("discharged")) out.push("discharged");
     }

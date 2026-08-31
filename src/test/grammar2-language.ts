@@ -10,7 +10,7 @@ import { g2ok, g2fail } from "./grammar2-engine.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
 import { asGrammarValue } from "../primitives.js";
-import { Value, ValueKind, BitsValue, ContextValue, dataOf, bitsToString } from "../types.js";
+import { Value, ValueKind, BitsValue, StructureValue, bitsToString } from "../types.js";
 import { buildBaseGrammar } from "../grammar2/base-grammar.js";
 import { buildProgram } from "../grammar2/tree-builder.js";
 import { evaluate as evalVal } from "../evaluator.js";
@@ -18,7 +18,7 @@ import { resolveSymbols, buildEvalCtx, resolvePrimitives, typeLiterals } from ".
 import { parse as g2parse } from "../grammar2/engine.js";
 import { getGrammarWithFragments as g2getGrammarWithFragments } from "../grammar2/fragments.js";
 import { getTypeName } from "../types-std.js";
-import { getName, componentsView, getSlotCount } from "../slots.js";
+import { getName, metaOf, getSlotCount } from "../slots.js";
 import { testsDir } from "./alg-files.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -702,44 +702,44 @@ test("grammar2/std: string literal produces String-typed value", () => {
 
 test("grammar2/std: dot access — string length getter", () => {
   const r = evalStandard2('"hello".length');
-  eq(Number((dataOf(r) as BitsValue).data), 5);
+  eq(Number((r as BitsValue).data), 5);
 });
 
 test("grammar2/std: dot access — string method call", () => {
   const r = evalStandard2('"hello".slice(0, 3)');
-  eq(bitsToString(dataOf(r) as BitsValue), "hel");
+  eq(bitsToString(r as BitsValue), "hel");
 });
 
 test("grammar2/std: dot access — Int.toString()", () => {
   const r = evalStandard2("42.toString()");
-  eq(bitsToString(dataOf(r) as BitsValue), "42");
+  eq(bitsToString(r as BitsValue), "42");
 });
 
 test("grammar2/std: dot access — Float.toString()", () => {
   const r = evalStandard2("3.14.toString()");
-  eq(bitsToString(dataOf(r) as BitsValue), "3.14");
+  eq(bitsToString(r as BitsValue), "3.14");
 });
 
 test("grammar2/std: dot access — Bool.toString()", () => {
   const r = evalStandard2("true.toString()");
-  eq(bitsToString(dataOf(r) as BitsValue), "true");
+  eq(bitsToString(r as BitsValue), "true");
 });
 
 test("grammar2/std: chained dot access and method calls", () => {
   const r = evalStandard2('"hello".indexOf("ll")');
-  eq(Number((dataOf(r) as BitsValue).data), 2);
+  eq(Number((r as BitsValue).data), 2);
 });
 
 test("grammar2/std: bound variable dot access", () => {
   const r = evalStandard2('s = "a,b,c".split(",")\ns.length');
-  eq(Number((dataOf(r) as BitsValue).data), 3);
+  eq(Number((r as BitsValue).data), 3);
 });
 
 test("grammar2/std: bracket indexing on array", () => {
   // `.split(",")` returns an Array[String]. arr[0] dispatches through
   // the array's `get` method.
   const r = evalStandard2('arr = "a,b,c".split(",")\narr[1]');
-  eq(bitsToString(dataOf(r) as BitsValue), "b");
+  eq(bitsToString(r as BitsValue), "b");
 });
 
 // --- Phase 2c-2: collection literals + string interpolation ---
@@ -751,7 +751,7 @@ test("grammar2/std: array literal", () => {
 
 test("grammar2/std: array element access via bracket", () => {
   const r = evalStandard2("[10, 20, 30][1]");
-  eq(Number((dataOf(r) as BitsValue).data), 20);
+  eq(Number((r as BitsValue).data), 20);
 });
 
 test("grammar2/std: empty array", () => {
@@ -761,7 +761,7 @@ test("grammar2/std: empty array", () => {
 
 test("grammar2/std: array map method", () => {
   const r = evalStandard2("[1, 2, 3].map(x => x * 2).length");
-  eq(Number((dataOf(r) as BitsValue).data), 3);
+  eq(Number((r as BitsValue).data), 3);
 });
 
 test("grammar2/std: object literal", () => {
@@ -771,42 +771,42 @@ test("grammar2/std: object literal", () => {
 
 test("grammar2/std: object field access via dot", () => {
   const r = evalStandard2("p = {x: 10, y: 20}\np.x");
-  eq(Number((dataOf(r) as BitsValue).data), 10);
+  eq(Number((r as BitsValue).data), 10);
 });
 
 test("grammar2/std: nested object field access", () => {
   const r = evalStandard2("nested = {a: {b: 42}}\nnested.a.b");
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+  eq(Number((r as BitsValue).data), 42);
 });
 
 test("grammar2/std: string interpolation", () => {
   const r = evalStandard2('name = "world"\n"hello {name}"');
-  eq(bitsToString(dataOf(r) as BitsValue), "hello world");
+  eq(bitsToString(r as BitsValue), "hello world");
 });
 
 test("grammar2/std: string interpolation with expression", () => {
   const r = evalStandard2('"2 + 2 = {2 + 2}"');
-  eq(bitsToString(dataOf(r) as BitsValue), "2 + 2 = 4");
+  eq(bitsToString(r as BitsValue), "2 + 2 = 4");
 });
 
 test("grammar2/std: escaped braces in string", () => {
   const r = evalStandard2('"\\{literal\\}"');
-  eq(bitsToString(dataOf(r) as BitsValue), "{literal}");
+  eq(bitsToString(r as BitsValue), "{literal}");
 });
 
 test("grammar2/std: array concat method", () => {
   const r = evalStandard2("[1, 2].concat([3, 4]).length");
-  eq(Number((dataOf(r) as BitsValue).data), 4);
+  eq(Number((r as BitsValue).data), 4);
 });
 
 test("grammar2/std: array filter/reduce chain", () => {
   const r = evalStandard2("[1, 2, 3, 4, 5].filter(x => x > 2).reduce((a, x) => a + x, 0)");
-  eq(Number((dataOf(r) as BitsValue).data), 12);
+  eq(Number((r as BitsValue).data), 12);
 });
 
 test("grammar2/std: object with multiple fields", () => {
   const r = evalStandard2("{a: 1, b: 2, c: 3}.b");
-  eq(Number((dataOf(r) as BitsValue).data), 2);
+  eq(Number((r as BitsValue).data), 2);
 });
 
 test("grammar2/std: empty object literal", () => {
@@ -818,113 +818,113 @@ test("grammar2/std: array of objects with .map on field", () => {
   const r = evalStandard2(
     'people = [{name: "Alice", age: 30}, {name: "Bob", age: 25}]\npeople.map(p => p.name).length'
   );
-  eq(Number((dataOf(r) as BitsValue).data), 2);
+  eq(Number((r as BitsValue).data), 2);
 });
 
 // --- Phase 2c-4: keyword operators ---
 
 test("grammar2/std: instanceof operator", () => {
   const r = evalStandard2("42 instanceof Int");
-  eq(Number((dataOf(r) as BitsValue).data), 1);
+  eq(Number((r as BitsValue).data), 1);
 });
 
 test("grammar2/std: subtypeof operator", () => {
   const r = evalStandard2("Type subtypeof Type");
-  eq(Number((dataOf(r) as BitsValue).data), 1);
+  eq(Number((r as BitsValue).data), 1);
 });
 
 test("grammar2/std: `and` keyword as logical and", () => {
   const r = evalStandard2("true and false");
-  eq(Number((dataOf(r) as BitsValue).data), 0);
+  eq(Number((r as BitsValue).data), 0);
 });
 
 test("grammar2/std: `or` keyword as logical or", () => {
   const r = evalStandard2("false or true");
-  eq(Number((dataOf(r) as BitsValue).data), 1);
+  eq(Number((r as BitsValue).data), 1);
 });
 
 test("grammar2/std: `of` infix accesses MultiValue component", () => {
   // `type of 42` returns the Int type (a raw Context). Verify it's a Context
   // with name "Int".
   const r = evalStandard2("type of 42");
-  const p = dataOf(r!);
+  const p = r!;
   eq(p.kind, ValueKind.Structure);
-  const nameBind = getName(p as ContextValue);
+  const nameBind = getName(p as StructureValue);
   eq(bitsToString(nameBind as BitsValue), "Int");
 });
 
 test("grammar2/std: `error expr` creates an error value", () => {
   const r = evalStandard2('error "something broke"');
-  eq(componentsView(r!).has("error"), true);
+  eq(metaOf(r!).has("error"), true);
 });
 
 test("grammar2/std: `error of x` extracts error component", () => {
   const r = evalStandard2('x = error "boom"\nerror of x');
-  eq(bitsToString(dataOf(r) as BitsValue), "boom");
+  eq(bitsToString(r as BitsValue), "boom");
 });
 
 // --- Phase 2c-4: type annotations ---
 
 test("grammar2/std: typed function params", () => {
   const r = evalStandard2("add(x: Int, y: Int) => x + y\nadd(3, 4)");
-  eq(Number((dataOf(r) as BitsValue).data), 7);
+  eq(Number((r as BitsValue).data), 7);
 });
 
 test("grammar2/std: typed function return type", () => {
   const r = evalStandard2("double(x: Int): Int => x * 2\ndouble(21)");
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+  eq(Number((r as BitsValue).data), 42);
 });
 
 test("grammar2/std: typed lambda (paren form)", () => {
   const r = evalStandard2("mul = (x: Int, y: Int) => x * y\nmul(6, 7)");
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+  eq(Number((r as BitsValue).data), 42);
 });
 
 test("grammar2/std: typed lambda (single-param form)", () => {
   const r = evalStandard2("f = x: Int => x * 2\nf(21)");
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+  eq(Number((r as BitsValue).data), 42);
 });
 
 test("grammar2/std: binding type annotation", () => {
   const r = evalStandard2("x: Int = 42\nx");
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+  eq(Number((r as BitsValue).data), 42);
 });
 
 test("grammar2/std: generic type annotation Array[Int]", () => {
   const r = evalStandard2("head(arr: Array[Int]): Int => arr[0]\nhead([10, 20, 30])");
-  eq(Number((dataOf(r) as BitsValue).data), 10);
+  eq(Number((r as BitsValue).data), 10);
 });
 
 test("grammar2/std: mixed typed and untyped functions coexist", () => {
   const r = evalStandard2("identity(x) => x\ntyped(x: Int): Int => x + 1\ntyped(identity(41))");
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+  eq(Number((r as BitsValue).data), 42);
 });
 
 // --- Phase 2c-4: when/is/then pattern matching ---
 
 test("grammar2/std: when with int literal match", () => {
   const r = evalStandard2("when 42 is 42 then 1 else 0");
-  eq(Number((dataOf(r) as BitsValue).data), 1);
+  eq(Number((r as BitsValue).data), 1);
 });
 
 test("grammar2/std: when with int literal miss", () => {
   const r = evalStandard2("when 42 is 99 then 1 else 0");
-  eq(Number((dataOf(r) as BitsValue).data), 0);
+  eq(Number((r as BitsValue).data), 0);
 });
 
 test("grammar2/std: when with wildcard", () => {
   const r = evalStandard2("when 42 is _ then 99 else 0");
-  eq(Number((dataOf(r) as BitsValue).data), 99);
+  eq(Number((r as BitsValue).data), 99);
 });
 
 test("grammar2/std: when with ident binding", () => {
   const r = evalStandard2("when 10 is n then n + 5 else 0");
-  eq(Number((dataOf(r) as BitsValue).data), 15);
+  eq(Number((r as BitsValue).data), 15);
 });
 
 test("grammar2/std: when resolve-first (known var matches)", () => {
   const r = evalStandard2("known = 42\nwhen 42 is known then 1 else 0");
-  eq(Number((dataOf(r) as BitsValue).data), 1);
+  eq(Number((r as BitsValue).data), 1);
 });
 
 test("grammar2/std: when multi-case (inline lines)", () => {
@@ -935,22 +935,22 @@ m = when v
   is 2 then 20
   is 3 then 30
 m`);
-  eq(Number((dataOf(r) as BitsValue).data), 20);
+  eq(Number((r as BitsValue).data), 20);
 });
 
 test("grammar2/std: when with structural destructuring", () => {
   const r = evalStandard2('point = {x: 3, y: 4}\nwhen point is {x, y} then x + y else 0');
-  eq(Number((dataOf(r) as BitsValue).data), 7);
+  eq(Number((r as BitsValue).data), 7);
 });
 
 test("grammar2/std: when with type destructuring", () => {
   const r = evalStandard2('obj = {width: 5, height: 10}\nwhen obj is Object(width, height) then width * height else 0');
-  eq(Number((dataOf(r) as BitsValue).data), 50);
+  eq(Number((r as BitsValue).data), 50);
 });
 
 test("grammar2/std: when with guard", () => {
   const r = evalStandard2("when 5 is n and n > 0 then n * 2 else 0");
-  eq(Number((dataOf(r) as BitsValue).data), 10);
+  eq(Number((r as BitsValue).data), 10);
 });
 
 test("grammar2/std: pattern-match.alg runs end-to-end", () => {
@@ -979,34 +979,34 @@ test("grammar2/std: pattern-match.alg runs end-to-end", () => {
 
 test("grammar2/std: hex literal", () => {
   const r = evalStandard2("0xFF");
-  eq(Number((dataOf(r) as BitsValue).data), 255);
+  eq(Number((r as BitsValue).data), 255);
 });
 
 test("grammar2/std: binary literal", () => {
   const r = evalStandard2("0b1010");
-  eq(Number((dataOf(r) as BitsValue).data), 10);
+  eq(Number((r as BitsValue).data), 10);
 });
 
 test("grammar2/std: refinement type creation", () => {
   // Int & _ > 0 creates a refined type
   const r = evalStandard2("PI = Int & _ > 0\nPI(5)");
-  eq(Number((dataOf(r) as BitsValue).data), 5);
+  eq(Number((r as BitsValue).data), 5);
 });
 
 test("grammar2/std: refinement check failure produces error", () => {
   const r = evalStandard2("PI = Int & _ > 0\nPI(0 - 5)");
-  eq(componentsView(r!).has("error"), true);
+  eq(metaOf(r!).has("error"), true);
 });
 
 test("grammar2/std: compound refinement predicates", () => {
   const r = evalStandard2("SmallPos = Int & _ > 0 && _ < 100\nSmallPos(50)");
-  eq(Number((dataOf(r) as BitsValue).data), 50);
+  eq(Number((r as BitsValue).data), 50);
 });
 
 test("grammar2/std: structural wrap type annotation", () => {
   // ~Int creates a structural wrap
   const r = evalStandard2("f(x: ~Int) => x\nf(42)");
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+  eq(Number((r as BitsValue).data), 42);
 });
 
 // B-104 chunk 2: union types are removed (maintainer ruling; redesign B-105).
@@ -1025,13 +1025,13 @@ test("grammar2/std: export binding wraps value", () => {
   // component — same contract (exported binding usable, export-ness
   // recorded), new carrier.
   const r2 = runtimeEval("export x = 42\nx", undefined, [typeExt], undefined, true);
-  eq(Number((dataOf(r2.value!) as BitsValue).data), 42);
+  eq(Number((r2.value! as BitsValue).data), 42);
   eq(r2.evalCtx.bindings.get("x")?.visibility, "exported");
 });
 
 test("grammar2/std: export function declaration", () => {
   const r = evalStandard2("export double(n: Int): Int => n * 2\ndouble(21)");
-  eq(Number((dataOf(r) as BitsValue).data), 42);
+  eq(Number((r as BitsValue).data), 42);
 });
 
 // Helper for file-based grammar2 tests
@@ -1100,7 +1100,7 @@ f() =>
   y = x + 1
   y * 2
 f()`);
-  eq(Number((dataOf(r) as BitsValue).data), 8);
+  eq(Number((r as BitsValue).data), 8);
 });
 
 // grammar-regex.alg deferred — parses fully through grammar2 with block
@@ -1133,34 +1133,34 @@ test("grammar2/std: type-annotations.alg runs end-to-end", () => {
 
 test("grammar2/std: if-then-else can span lines", () => {
   const r = evalStandard2("x = 5\nif x > 0\n  then x\n  else 0 - x");
-  eq(Number((dataOf(r) as BitsValue).data), 5);
+  eq(Number((r as BitsValue).data), 5);
 });
 
 test("grammar2/std: function body spans lines", () => {
   const r = evalStandard2("f(n) =>\n  if n == 0\n    then 1\n    else n + 1\nf(0)");
-  eq(Number((dataOf(r) as BitsValue).data), 1);
+  eq(Number((r as BitsValue).data), 1);
 });
 
 test("grammar2/std: binary operator continues onto next line", () => {
   const r = evalStandard2("x = 1 +\n    2 +\n    3\nx");
-  eq(Number((dataOf(r) as BitsValue).data), 6);
+  eq(Number((r as BitsValue).data), 6);
 });
 
 test("grammar2/std: function call args spread across lines", () => {
   const r = evalStandard2("f(a, b, c) => a + b + c\nf(\n  1,\n  2,\n  3)");
-  eq(Number((dataOf(r) as BitsValue).data), 6);
+  eq(Number((r as BitsValue).data), 6);
 });
 
 test("grammar2/std: array literal spread across lines", () => {
   const r = evalStandard2("arr = [\n  1,\n  2,\n  3\n]\narr.length");
-  eq(Number((dataOf(r) as BitsValue).data), 3);
+  eq(Number((r as BitsValue).data), 3);
 });
 
 test("grammar2/std: continuation doesn't cross back to base column", () => {
   // After `x = 1`, `y` is at col 0 (same as top of stack) → NEWLINE fires,
   // two separate stmts. Without continuation logic this would fail.
   const r = evalStandard2("x = 1\ny = 2\nx + y");
-  eq(Number((dataOf(r) as BitsValue).data), 3);
+  eq(Number((r as BitsValue).data), 3);
 });
 
 test("grammar2/std: recursive multi-line function (arrays.alg idiom)", () => {
@@ -1172,7 +1172,7 @@ myMap(arr, f) =>
 
 myMap([1, 2, 3], x => x * 10).length
 `);
-  eq(Number((dataOf(r) as BitsValue).data), 3);
+  eq(Number((r as BitsValue).data), 3);
 });
 
 test("grammar2/std: arrays.alg runs end-to-end", () => {
@@ -1429,7 +1429,7 @@ grammar2_parse(g, "hello")
   // Parse tree for the "s" production wrapping a single literal leaf.
   // Shape: Object { tag: "s", children: ["hello"] } OR just a String if the
   // engine collapsed the single-child branch. Either way, primary is not an error.
-  eq(componentsView(r!).has("error"), false);
+  eq(metaOf(r!).has("error"), false);
 });
 
 test("grammar2 primitives: sequence via Allegro", () => {
@@ -1439,7 +1439,7 @@ grammar2_add_production(g, "s", grammar2_seq([grammar2_lit("ab"), grammar2_lit("
 grammar2_set_start(g, "s")
 grammar2_parse(g, "abcd")
 `);
-  eq(componentsView(r!).has("error"), false);
+  eq(metaOf(r!).has("error"), false);
 });
 
 test("grammar2 primitives: parse failure produces error value", () => {
@@ -1449,7 +1449,7 @@ grammar2_add_production(g, "s", grammar2_lit("hello"))
 grammar2_set_start(g, "s")
 grammar2_parse(g, "world")
 `);
-  eq(componentsView(r!).has("error"), true);
+  eq(metaOf(r!).has("error"), true);
 });
 
 test("grammar2 primitives: left recursion works from Allegro", () => {
@@ -1465,7 +1465,7 @@ grammar2_add_production(g, "expr",
 grammar2_set_start(g, "expr")
 if error of grammar2_parse(g, "1+2+3+4") == none then "ok" else "err"
 `);
-  eq(bitsToString(dataOf(r!) as BitsValue), "ok");
+  eq(bitsToString(r! as BitsValue), "ok");
 });
 
 test("grammar2 primitives: indent block works from Allegro", () => {
@@ -1485,7 +1485,7 @@ if error of grammar2_parse(g, "if
     a
     b") == none then "ok" else "err"
 `);
-  eq(bitsToString(dataOf(r!) as BitsValue), "ok");
+  eq(bitsToString(r! as BitsValue), "ok");
 });
 
 test("grammar2 primitives: regex DSL end-to-end from Allegro", () => {
@@ -1530,14 +1530,14 @@ grammar2_set_start(g, "pattern")
 ]
 `);
   // Expected: 5 "ok", then 3 "err".
-  const p = dataOf(r!) as any;
+  const p = r! as any;
   // p is the Array Context with __length and numeric bindings.
   const len = Number((getSlotCount(p) as any).data);
   eq(len, 8);
   const results: string[] = [];
   for (let i = 0; i < len; i++) {
     const el = p.bindings.get(String(i)).value;
-    results.push(bitsToString(dataOf(el) as any));
+    results.push(bitsToString(el as any));
   }
   eq(results.join(","), "ok,ok,ok,ok,ok,err,err,err");
 });

@@ -14,7 +14,7 @@ import {
   NOTIF_TOTALITY_NEEDS_ANNOTATION,
 } from "../totality.js";
 import * as path from "path";
-import { makeInt, makeExpr, makePrimitive, makeComposedFn, dataOf, ValueKind, BitsValue } from "../types.js";
+import { makeInt, makeExpr, makePrimitive, makeComposedFn, ValueKind, BitsValue } from "../types.js";
 import { fileTest, testsDir } from "./alg-files.js";
 import { primitives as primRegistry } from "../primitives.js";
 import { summarizeModule, renderModuleSummary } from "../introspect.js";
@@ -407,7 +407,7 @@ fileTest(path.join(testsDir, "totality-decreases-demo.alg"));
 
 // --- Phase E Stage 4: mutual recursion via SCC ---
 //
-// The call-graph analyzer groups bindings into strongly-connected components.
+// The call-graph analyzer groups bindings into strongly-connected meta.
 // Within each SCC, EVERY call to an SCC member must be provably decreasing
 // (against the callee's param types) for the whole cycle to terminate.
 
@@ -745,7 +745,7 @@ countdown(5)
   const { value } = runtimeEval(src, undefined, [typeExt], undefined, true);
   eq(value !== null, true);
   if (value) {
-    const p = dataOf(value);
+    const p = value;
     eq(p.kind, ValueKind.Bits);
     eq(Number((p as BitsValue).data), 0);
   }
@@ -761,7 +761,7 @@ countdown(100000)
 `;
   const { value } = runtimeEval(src, undefined, [typeExt], undefined, true);
   if (value) {
-    const p = dataOf(value);
+    const p = value;
     eq(p.kind, ValueKind.Bits);
     eq(Number((p as BitsValue).data), 0);
   }

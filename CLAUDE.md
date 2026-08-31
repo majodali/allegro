@@ -82,11 +82,20 @@ evaluator/runtime set; this is the complete session list):
 - `bench/`, `pcp/`, `scripts/` live OUTSIDE tsconfig's rootDir — run
   via tsx, validated by the suite; TS6059 from tsc is sanctioned and
   `scripts/typecheck.sh` is the only correct typecheck invocation.
-- Eager primitives receive FULL values (channels intact); read data
-  via `dataOf`/`asBits`. `lazy` is evaluation-control only. The
-  propagation table governs channels — never hand-roll per-channel
-  logic (PROCESS §6).
-- Construct structures ONLY via `makeMultiValue`/`makeContext`; a
+- Eager primitives receive FULL values (metadata intact) — never strip
+  an argument, or you drop every field it carries. `lazy` is
+  evaluation-control only. The propagation table governs metadata —
+  never hand-roll per-field logic (PROCESS §6).
+- Metadata rides EVERY kind (B-121): a typed `42` is a `Bits` with a
+  `type` field, not a wrapper. `withMeta` is the one attachment
+  operation; the factories take metadata so a value never exists
+  without it; `carryMeta` moves it across a new datum. The carrier,
+  `primary`, `isCarrier` and `dataOf` are deleted and the boundary
+  lint forbids the last two by name.
+- Write metadata in place ONLY while a value is provably unshared —
+  during construction, before it escapes. After that, derive
+  (`src/structure.ts` states the rule and why).
+- Construct structures ONLY via `withMeta`/`makeStructure`; a
   stray object literal fails the W4 boundary invariant.
 - Every path cloning a `ComposedFunction` preserves metadata via the
   shared helpers — never hand-clone (PROCESS §6).

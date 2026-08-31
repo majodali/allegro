@@ -16,8 +16,10 @@ both string-keyed slot collections serving three roles: data record,
 annotated value, and evaluation environment. The unification replaces them
 with two constructs sharing one substrate (D1, D19, D25):
 
-- **Structure** — the data construct: one slot plane plus an extensible
-  **channel plane** for annotations (type, error, effects, …).
+- **Structure** — the data construct: one slot plane, plus the extensible
+  **metadata plane** for annotations (type, error, effects, …) that B-121
+  made universal — every representation kind carries it now, so it is no
+  longer what distinguishes a Structure.
 - **Scope** — the evaluation environment: bindings, lexical parent chain,
   the forward-chaining substrate, and a scope-held facts plane.
 
@@ -35,6 +37,28 @@ language lives.
 
 ## 2. Structure [partial]
 
+*Status (2026-08, B-121 — CURRENT). **The carrier is deleted**, and the
+status stamps below it describe a representation that no longer exists. They
+are kept because each records what was true when it landed; read this one for
+the present state.*
+
+*Metadata is a field on every representation kind, not a privilege of
+Structure. A typed `42` is a `Bits` carrying a `type` field — nothing wraps
+it. Deleted with the carrier: `primary`, `isCarrier`, `newCarrierStructure`,
+the `CarrierStructure` type, the **W1** non-nesting and **W5**
+role-transparency invariants (both existed only to keep two roles sharing one
+class from contaminating each other), and `dataOf`, the data-plane peel, which
+became the identity function and went with its 849 call sites. `withMetadata`
+is now `withMeta`, attaching metadata to a per-kind clone, and the factories
+take metadata directly so a value never exists without what it must carry.*
+
+*What survives from C4.1 unchanged, because it was about the COMPOSITE rather
+than the carrier: one host class for every Structure, one declared hidden
+class, construction only through the factory shims, and W4 failing any stray
+object literal. The ruling and the measurement behind it are D48(b)(c); the
+full record is `docs/plans/metadata-on-values.md` and `concepts.md` §10
+(retired) and §11.*
+
 *Status (2026-07, C4.1+C4.2): the KIND exists — every MultiValue and
 Context is a Structure instance, and the DENSE REGION is live: array
 contexts store elements in a plain JS array as the SOLE storage (no
@@ -44,7 +68,7 @@ slot probes answer dense structures without materializing); element
 access via slots.ts `indexGet`/`elementsOf`, O(1) by scaling test.
 C4.1 details: every MultiValue and Context
 is an instance of one host class (`src/structure.ts`), constructed
-exclusively through the `makeMultiValue`/`makeContext` factory shims
+exclusively through the `withMetadata`/`makeStructure` factory shims
 (six bypass sites converted; the W4 boundary invariant fails any future
 stray literal). One declared hidden class for all structures (measurably
 faster than the per-shape literals it replaced); role fixed at
@@ -98,8 +122,9 @@ answering the one structure kind, discriminated host-side by primary
 presence (`isCarrier` — the D46 host-level protocol). `ValueKind` is
 now: four leaf representations + `Structure` + the three computation
 forms; `ValueKind.Context` renamed `ValueKind.Structure` (D25's name
-retirement completed; `ContextValue` is a transitional alias of
-`StructureValue`). `makeMultiValue` remains the one channel-attachment
+retirement completed; the `ContextValue` alias is gone and the interface
+is `StructureValue` everywhere — B-107). `withMetadata` remains the one
+metadata-attachment
 chokepoint with three shapes: record data derives (C4.3b), carrier data
 re-wraps its inner primary (W1: carriers never nest), leaf data takes
 the carrier. W1/W5 restated: carriers never nest and their data plane
@@ -127,7 +152,7 @@ is not expected to survive beyond C6 — retirement is an expected outcome
 of the C6 kind-recipe work.*
 
 *C4.3b status (2026-08): MV-over-Context is UNCONSTRUCTIBLE — a Context
-primary handed to `makeMultiValue` flattens into a copy-on-write derive
+primary handed to `withMetadata` flattens into a copy-on-write derive
 (`deriveWithChannels`: new Structure sharing the source's data planes by
 reference, the given channel map authoritative — deletion stays
 expressible). Typed records, arrays, module objects, and proof contexts
@@ -374,7 +399,7 @@ be laundered. Three chunk-1 rulings recorded:
 ## 4. Scope [partial]
 
 *Status (2026-07, C2.1–C2.3): implemented host-side over the current
-ContextValue representation — parent-chain layering + chain lookup (C2.1),
+StructureValue representation — parent-chain layering + chain lookup (C2.1),
 facts plane (C2.2), resolution unification with future cells + root
 eval-context layering + `ctx_use`/`isUse` retirement + `ctx_resolve`
 residualising semantics (C2.3a/b). Still pending: Allegro-surface

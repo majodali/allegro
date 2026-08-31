@@ -12,7 +12,7 @@
 //   2. Invariant property checks — a deterministic generator builds small
 //      typed programs via the public `evalSource` surface and walks every
 //      resulting value asserting the standing well-formedness invariants
-//      (W1 MultiValue non-nesting, W2 type-component shape). New invariants
+//      (W2 type-field shape, W3 registry completeness). New invariants
 //      (transparency, key-sort partition, immutability) join per phase.
 //   3. Forgery-scenario skeleton — the D21 scenarios A–F as named, visible,
 //      skipped entries; each chunk that makes one testable un-skips it.
@@ -30,11 +30,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
-import { Value, ValueKind, ContextValue, MultiValueType, makePrimitive, makeExpr, makeContext } from "./types.js";
+import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
-import { isRegisteredSlotKey, isRegisteredComponentKey, asContext, getName, getMembers, getProposition, getRefines, channelReadRaw, componentsView, cloneComponents, SLOT_REGISTRY, SLOT_KEYS, viralChannels, unionChannels, registerChannel, typeShape, channelSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, metaReadRaw, metaOf, cloneMeta, SLOT_REGISTRY, SLOT_KEYS, viralFields, unionFields, registerMetaField, typeShape, metaFieldSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
-import { makeMultiValue } from "./types.js";
+import { withMeta } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
@@ -50,7 +50,7 @@ import { evaluate } from "./evaluator.js";
 import { makeSymbol } from "./types.js";
 import { Structure, isStructure } from "./structure.js";
 import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN, KERNEL_SCOPE_FQN, kernelMemberFqn, typeMemberScopeFqn } from "./symbols.js";
-import { dataOf, indexGet, getSlotCount, setName, setFallbackMember } from "./slots.js";
+import { indexGet, getSlotCount, setName, setFallbackMember } from "./slots.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const BASELINE_PATH = path.join(REPO_ROOT, "src", "boundary-baseline.json");
@@ -105,7 +105,10 @@ interface LintPattern {
 
 // The forbidden-access patterns the accessor layer (C1.1–C1.3) will absorb.
 const LINT_PATTERNS: LintPattern[] = [
-  { name: "components-direct", regex: /\.components\b/g },
+  { name: "meta-direct", regex: /(?<!import)\.meta\b/g },
+  // ^ B-121 C1: the metadata field is `meta`, a far more common word than
+  // the `components` it replaced, so the pattern has to exclude
+  // `import.meta` — a JS language construct, not the metadata plane.
   // B-104(c): the ratchet has to see every way a `__*` name can REACH a
   // key, or it ratchets one spelling while the others go uncounted. This
   // one — a quote-delimited literal — is the original, and stays hard-fail;
@@ -127,9 +130,10 @@ const LINT_PATTERNS: LintPattern[] = [
   { name: "dunder-primitive-name", regex: /["'`][A-Za-z0-9_$]+\.__[A-Za-z0-9_]+["'`]/g, ratchetOnly: true },
   // Binding-map access by dunder key — every mutator, not just the reader.
   { name: "bindings-get-dunder", regex: /bindings\.(?:get|has|set|delete)\(\s*["'`]__/g },
-  // dataOf's strip-vs-preserve asymmetry is retired by C1.5/C4.3; its
-  // definition site is exempt.
-  { name: "dataOf-call", regex: /\bprimaryOf\s*\(/g, excludeFiles: ["src/types.ts"] },
+  // Both names for the data-plane peel are retired: `primaryOf` at C4.3c and
+  // `dataOf` at B-121 C5, when deleting the carrier left it the identity. No
+  // definition site survives, so the rule needs no exemption.
+  { name: "retired-peel-call", regex: /\b(?:primaryOf|dataOf)\s*\(/g },
   // C1.4: TS-kernel writer acquisition is restricted to the two proof-kernel
   // modules — anywhere else, acquiring the discharged writer fails the suite.
   { name: "kernel-writer-acquisition", regex: /\bkernelChannelWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
@@ -330,85 +334,80 @@ export interface InvariantViolation {
 }
 
 /** Walk a value tree checking well-formedness invariants.
- *  W1: a MultiValue's primary is never itself a MultiValue.
- *  W2: a resolved `type` component's primary is a Context.
- *  W3 (C1.1): every `__*` Context-binding key and every MultiValue
- *  component key is covered by the slot registry (`src/slots.ts`) —
- *  the D39 "no new `__*` slot" rule enforced mechanically.
+ *  W2: a resolved `type` field's data is a Context — checked on EVERY kind
+ *  since B-121 C4, because metadata is no longer a Structure's privilege.
+ *  W3 (C1.1): every `__*` Context-binding key and every metadata field key
+ *  is covered by the slot registry (`src/slots.ts`) — the D39 "no new `__*`
+ *  slot" rule enforced mechanically. Also kind-independent since C4.
+ *  W4: every Context is an instance of the unified Structure class.
+ *  W6: a dense structure's materialized view agrees with its dense region.
+ *  W1 and W5 were retired at C4 with the carrier they described.
  *  (Grows per phase: transparency, key-sort partition, immutability.) */
 export function checkValueInvariants(v: Value | null | undefined, program: string, out: InvariantViolation[], seen: WeakSet<object> = new WeakSet(), depth = 0): void {
   if (!v || typeof v !== "object" || depth > 24) return;
   if (seen.has(v)) return;
   seen.add(v);
 
-  if ((v as { primary?: Value }).primary !== undefined) {
-    // C7.1: the CARRIER configuration (D15) — primary present. Restated
-    // invariants: W4 carriers are Structures; W5 a carrier's data plane
-    // is EMPTY (the lazily-materialized view may exist but holds no
-    // slots); W1 a carrier's primary is never a carrier and never a
-    // plain Context (records flatten through makeMultiValue).
-    const mv = v as MultiValueType;
-    if (!isStructure(v)) {
-      out.push({ invariant: "W4 structure-kind", detail: "carrier is not a Structure instance (bypassed makeMultiValue)", program });
-    } else if ((v as unknown as Structure).bindings !== undefined && (v as unknown as Structure).bindings.size > 0) {
-      out.push({ invariant: "W5 role-transparency", detail: "carrier carries data slots (data plane must be empty — D15)", program });
-    }
-    if (mv.primary && (mv.primary as Value & { primary?: Value }).primary !== undefined) {
-      out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is itself a carrier", program });
-    }
-    if (mv.primary && (mv.primary as Value).kind === ValueKind.Structure) {
-      out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is a Context (records flatten — C4.3b/C7.1)", program });
-    }
-    const typeComp = mv.components.get("type");
+  // W2 and W3 over the METADATA PLANE, for every kind (B-121 C4).
+  //
+  // Both checks used to live inside the carrier branch below, which was the
+  // only place metadata could be found on a non-Structure value. C2 put
+  // metadata on every kind and stopped constructing carriers, so that branch
+  // went dead and took the checks with it: measured on the corpus walk, **564
+  // of 2034** metadata-bearing values reached had their metadata inspected by
+  // nothing (Bits 477, ComposedFunction 85, PrimitiveFunction 2), and W2 was
+  // left with no coverage at all. A walk over nothing still passes, so the
+  // gate could not see it. Hoisted here the checks follow the PLANE rather
+  // than the representation, and the corpus inspects 3062 values instead of
+  // 1470.
+  const meta = (v as { meta?: Map<string, Value> }).meta;
+  if (meta !== undefined) {
+    // W2: a resolved `type` field's value peels to a Context.
+    const typeComp = meta.get("type");
     if (typeComp && (typeComp as Value).kind !== ValueKind.Expression) {
-      const tp = dataOf(typeComp as Value);
+      const tp = typeComp as Value;
       if (!tp || tp.kind !== ValueKind.Structure) {
-        out.push({ invariant: "W2 type-component-shape", detail: `type component primary has kind ${tp?.kind}`, program });
+        out.push({ invariant: "W2 type-field-shape", detail: `type field's data has kind ${tp?.kind}`, program });
       }
     }
-    for (const key of mv.components.keys()) {
-      if (!isRegisteredComponentKey(key)) {
-        out.push({ invariant: "W3 registry-completeness", detail: `unregistered MultiValue component key "${key}"`, program });
+    // W3 (C1.1, D39): every metadata field key is covered by the registry.
+    for (const key of meta.keys()) {
+      if (!isRegisteredFieldName(key)) {
+        out.push({ invariant: "W3 registry-completeness", detail: `unregistered metadata field key "${key}" on a ${v.kind}`, program });
       }
     }
-    checkValueInvariants(mv.primary as Value, program, out, seen, depth + 1);
-    for (const comp of mv.components.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
-    return;
+    for (const comp of meta.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
   }
+
   if (v.kind === ValueKind.Structure) {
     // C4.1 (W4): every Context is an instance of the unified Structure class.
+    //
+    // B-121 C4 retired the CARRIER branch that stood here, along with W1
+    // (carrier non-nesting) and W5 (role-transparency). Both described the two
+    // roles sharing one class: W5 kept their data planes exclusive, W1 kept a
+    // carrier's primary from being another carrier or a Context. With the
+    // carrier gone there is one role, `primary` is deleted, and neither has a
+    // subject left. W1's successor property — attaching metadata never nests —
+    // is asserted behaviourally instead: one peel reaches the scalar.
     if (!isStructure(v)) {
-      out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeContext)", program });
-    } else if ((v as unknown as Structure).primary !== undefined) {
-      // C4.3b (R5 reframe): the DATA planes are role-exclusive (a Context
-      // never carries a primary; an MV never carries slots) — the CHANNEL
-      // plane is universal (flattened Contexts carry components directly).
-      out.push({ invariant: "W5 role-transparency", detail: "Context role carries a primary (data slots + primary — D17)", program });
+      out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeStructure)", program });
     } else {
       // C4.2 (W6): when a dense structure's legacy view exists, it must
       // agree with the dense region — the region is authoritative.
       const s = v as unknown as Structure;
       if (s.dense !== undefined && s.viewMaterialized) {
         for (let i = 0; i < s.dense.length; i++) {
-          if ((v as ContextValue).bindings.get(String(i))?.value !== s.dense[i]) {
+          if ((v as StructureValue).bindings.get(String(i))?.value !== s.dense[i]) {
             out.push({ invariant: "W6 dense-view-coherence", detail: `view binding ${i} disagrees with the dense region`, program });
             break;
           }
         }
       }
     }
-    // C4.3b: W3 covers the Context role's channel plane too — flattened
-    // records/arrays carry registry-checked components directly.
-    const sComps = (v as unknown as Structure).components as Map<string, Value> | undefined;
-    if (sComps !== undefined) {
-      for (const key of sComps.keys()) {
-        if (!isRegisteredComponentKey(key)) {
-          out.push({ invariant: "W3 registry-completeness", detail: `unregistered Context component key "${key}"`, program });
-        }
-      }
-      for (const comp of sComps.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
-    }
-    for (const [key, b] of (v as ContextValue).bindings) {
+    // W3 over the Context role's metadata now runs above with every other
+    // kind's — flattened records and arrays carry meta directly, and that
+    // was never a property of being a Structure.
+    for (const [key, b] of (v as StructureValue).bindings) {
       if (key.startsWith("__") && !isRegisteredSlotKey(key)) {
         out.push({ invariant: "W3 registry-completeness", detail: `unregistered slot key "${key}"`, program });
       }
@@ -520,7 +519,7 @@ export function runDifferentialFixture(f: { src: string; bind: string }): string
     const { evalCtx } = evalSource(f.src, undefined, [createTypeSystem()], undefined, true);
     const v = evalCtx.bindings.get(f.bind)?.value as Value;
     const eff = v ? effectsOf(v) : null;
-    const err = v ? channelReadRaw(v, "error") : undefined;
+    const err = v ? metaReadRaw(v, "error") : undefined;
     return `fmt=${formatValue(v)} | eff=${eff ? [...eff].sort().join(",") : "-"} | err=${err !== undefined ? formatValue(err as Value) : "-"}`;
   } catch (e: any) {
     return `THREW: ${String(e?.message ?? e).slice(0, 60)}`;
@@ -553,14 +552,14 @@ export const FORGERY_SCENARIOS: ForgeryScenario[] = [
 ];
 
 function getTypeNameOf(v: Value): string | null {
-  const t = channelReadRaw(v, "type");
-  const tc = t ? asContext(t as Value) : null;
+  const t = metaReadRaw(v, "type");
+  const tc = t ? asStructure(t as Value) : null;
   const nv = tc ? getName(tc) : undefined;
-  return nv ? bitsToString(dataOf(nv) as BitsValue) : null;
+  return nv ? bitsToString(nv as BitsValue) : null;
 }
 
 /** Evaluate an attack program; report whether (and how) it was refused. */
-function attack(src: string): { threw: string | null; evalCtx: ContextValue | null } {
+function attack(src: string): { threw: string | null; evalCtx: StructureValue | null } {
   try {
     const { evalCtx } = evalSource(src, undefined, [createTypeSystem()], undefined, true);
     return { threw: null, evalCtx };
@@ -649,7 +648,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "export stamp(v) => audit_writer(v, \"audited\")\n",
     extensions: [createTypeSystem()],
   }).loadAll();
-  const attackWithHolder = (src: string): { threw: string | null; evalCtx: ContextValue | null } => {
+  const attackWithHolder = (src: string): { threw: string | null; evalCtx: StructureValue | null } => {
     try {
       const { evalCtx } = evalSource(src, undefined, [createTypeSystem(), ...holderExts], undefined, true);
       return { threw: null, evalCtx };
@@ -668,7 +667,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     }
   });
 
-  test("boundary invariants: generated-program value walk (W1 non-nesting, W2 type shape)", () => {
+  test("boundary invariants: generated-program value walk (W2 type shape, W3 registry)", () => {
     const result = runInvariantPropertyChecks();
     const rendered = result.violations
       .slice(0, 3)
@@ -683,22 +682,22 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "theorem t: 1 + 1 == 2\nx = 42",
       undefined, [createTypeSystem()], undefined, true
     );
-    // Type binding: MultiValue(IntType, {type: Type}) — asContext peels it.
+    // Type binding: MultiValue(IntType, {type: Type}) — asStructure peels it.
     // C2.3b: Int lives on the extensions layer of the root scope chain.
-    const intCtx = asContext(scopeLookup(evalCtx, "Int")?.value as Value);
+    const intCtx = asStructure(scopeLookup(evalCtx, "Int")?.value as Value);
     eq(intCtx !== null, true, "Int peels to a Context");
-    const namePrimary = dataOf(getName(intCtx!) as Value) as BitsValue;
+    const namePrimary = getName(intCtx!) as Value as BitsValue;
     eq(bitsToString(namePrimary), "Int", "getName reads __name");
-    const members = asContext(getMembers(intCtx!) as Value);
+    const members = asStructure(getMembers(intCtx!) as Value);
     eq(members !== null && members.bindings.size > 0, true, "getMembers reads __members");
     // Channel reads: shape on a typed value, discharged on a proof.
     const x = evalCtx.bindings.get("x")?.value as Value;
-    const shape = asContext(channelReadRaw(x, "shape") as Value);
+    const shape = asStructure(metaReadRaw(x, "shape") as Value);
     eq(shape !== null, true, "shape channel readable on a typed value");
-    eq(bitsToString(dataOf(getName(shape!) as Value) as BitsValue), "Int", "shape of 42 is Int");
-    const proofCtx = asContext(evalCtx.bindings.get("t")?.value as Value);
+    eq(bitsToString(getName(shape!) as Value as BitsValue), "Int", "shape of 42 is Int");
+    const proofCtx = asStructure(evalCtx.bindings.get("t")?.value as Value);
     eq(proofCtx !== null, true, "theorem binding peels to a proof Context");
-    const discharged = channelReadRaw(proofCtx! as Value, "discharged");
+    const discharged = metaReadRaw(proofCtx! as Value, "discharged");
     eq(discharged !== undefined, true, "discharged channel readable on a proof");
     // Registry self-checks: every registration has an owner + target.
     eq(SLOT_REGISTRY.every((r) => r.owner.length > 0 && r.target.length > 0), true, "registry entries complete");
@@ -766,23 +765,23 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const use = attackWithHolder('v = forgery_e_holder.stamp(42)\nr = channel_read(v, "forgery_e_audit")');
     eq(use.threw, null, `usage surface works: ${use.threw}`);
     const stamped = use.evalCtx!.bindings.get("r")!.value as Value;
-    eq(bitsToString(dataOf(stamped) as BitsValue), "audited", "writer fired through the exported surface");
+    eq(bitsToString(stamped as BitsValue), "audited", "writer fired through the exported surface");
   });
 
   test("evidence capsule (V-R2): print-redacted, non-enumerable, answers only possession", () => {
     // Capture the capsule the kernel hands a fallbackMember hook.
     const r = evalSource("held_name = 7\n", undefined, [createTypeSystem()], undefined, true);
     let capsule: Value | null = null;
-    const t = makeContext();
+    const t = makeStructure();
     setName(t, stringToBits("CapsuleProbe"));
     setFallbackMember(t, makePrimitive("probe.__getMember", (hargs) => {
       capsule = hargs[2];
       return hargs[2];
     }));
-    const inst = withType(makeContext(), t);
+    const inst = withType(makeStructure(), t);
     evaluate(makeExpr(primitives.type_dispatch, [inst, stringToBits("anything")]), r.evalCtx);
     eq(capsule !== null, true, "hook received the capsule");
-    const cap = dataOf(capsule!) as import("./types.js").PrimitiveFunctionValue;
+    const cap = capsule! as import("./types.js").PrimitiveFunctionValue;
     // D24 capability shape: a PrimitiveFunction closure — no data plane
     // to enumerate, unconstructible from Allegretto.
     eq(cap.kind, ValueKind.PrimitiveFunction, "capability shape (not a structure)");
@@ -836,25 +835,123 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   });
 
   test("forgery B (live): a real proof's proposition cannot be swapped under `discharged`", () => {
-    const r = attack('theorem t: 1 + 1 == 2\ncopy = mv_set(t, "note", 42)');
-    eq(r.threw, null, "benign component copy should evaluate");
+    // B-125: rewritten off `mv_set`, which is deleted. The property here was
+    // never about the gate — it is COPY-ON-ATTACH (D22): writing metadata
+    // yields a NEW value and leaves the original alone. It needs a surviving
+    // write path, so it now runs through a properly minted writer, which
+    // exercises the real capability surface rather than the legacy bypass.
+    const r = attack('theorem t: 1 + 1 == 2\nw = channel_register("forgery_b_note", "drop")\ncopy = w(t, 42)');
+    eq(r.threw, null, `benign metadata write should evaluate: ${r.threw}`);
     const t = r.evalCtx!.bindings.get("t")!.value as Value;
-    // mv_set produced a NEW value; the proof itself is untouched...
-    eq(componentsView(t).has("note"), false, "original proof gained no component");
+    const copy = r.evalCtx!.bindings.get("copy")!.value as Value;
+    eq(metaReadRaw(copy, "forgery_b_note") !== undefined, true, "the copy carries the new field");
+    eq(metaOf(t).has("forgery_b_note"), false, "original proof gained no field");
     // ...and still carries its original proposition + discharge.
-    const ctx = asContext(t)!;
-    const disch = channelReadRaw(t, "discharged") as Value;
-    eq((dataOf(disch) as any).data, 1n, "still discharged");
-    eq(bitsToString(dataOf(getProposition(ctx)!) as BitsValue).includes("1 + 1"), true, "proposition unchanged");
+    const ctx = asStructure(t)!;
+    const disch = metaReadRaw(t, "discharged") as Value;
+    eq((disch as any).data, 1n, "still discharged");
+    eq(bitsToString(getProposition(ctx)! as BitsValue).includes("1 + 1"), true, "proposition unchanged");
   });
 
   test("forgery D (live): reads are free; writing the read value onto a fake is refused", () => {
     const read = attack('theorem t: 1 + 1 == 2\nd = channel_read(t, "discharged")');
     eq(read.threw, null, "free read");
     const d = read.evalCtx!.bindings.get("d")!.value as Value;
-    eq((dataOf(d) as any).data, 1n, "read the real discharge mark");
-    const write = attack('f = mv_set({x: 1}, "discharged", 1)');
-    eq(write.threw?.includes("integrity channel") ?? false, true, `write-onto-fake: ${write.threw}`);
+    eq((d as any).data, 1n, "read the real discharge mark");
+    // B-125: `mv_set` — the unguarded write this used to attempt — is
+    // deleted, so the assertion is now the STRONGER one: there is no path,
+    // rather than one path that is refused. The only user-reachable write is
+    // a minted writer, and a writer is bound to its OWN field by
+    // construction, so holding one says nothing about `discharged`.
+    const write = attack('w = channel_register("forgery_d_probe", "drop")\nf = w({x: 1}, 1)');
+    eq(write.threw, null, `minting a writer for another field is allowed: ${write.threw}`);
+    const f = write.evalCtx!.bindings.get("f")!.value as Value;
+    eq(metaReadRaw(f, "forgery_d_probe") !== undefined, true, "the writer wrote its own field");
+    eq(metaReadRaw(f, "discharged"), undefined, "and could not reach `discharged`");
+  });
+
+  test("field ownership (B-109(a)/C3): the base registers only the base's own fields", () => {
+    // R6/R11: the base owns the MECHANISM, each layer owns ITS fields. The
+    // test of whether a field belongs to the base is whether the concept it
+    // serves survives in Allegretto — run rather than argued: `make_error`
+    // and `source of` both work under `--base`.
+    //
+    // This pins the split so a field cannot drift back into `slots.ts`
+    // without the move being a visible, deliberate change.
+    const owners: Record<string, string> = {
+      // base — Allegretto's own
+      source: "slots.ts", error: "slots.ts",
+      // no owner yet — B-111 says what these are before they can move
+      knowledge: "slots.ts", warnings: "slots.ts", exported: "slots.ts",
+      // moved to their owning layer at C3
+      type: "types-std.ts", shape: "types-std.ts", discharged: "types-std.ts",
+      effects: "effects.ts",
+      predicates: "refinements.ts", domain: "refinements.ts", bound: "refinements.ts",
+    };
+    for (const name of Object.keys(owners)) {
+      eq(metaFieldSpec(name) !== undefined, true, `${name} is registered`);
+    }
+    // Integrity is carried by the registration, not by a name list (B-109(b)).
+    for (const name of ["type", "discharged", "source"]) {
+      eq(metaFieldSpec(name)?.integrity, true, `${name} is an integrity field`);
+    }
+    // D23: an integrity field may not carry a fabricating rule.
+    for (const name of ["type", "discharged", "source"]) {
+      const rule = metaFieldSpec(name)?.rule;
+      eq(rule !== "viral" && rule !== "union", true,
+        `${name} rule '${rule}' is non-fabricating`);
+    }
+    // Registration order is a load-order dependency, so assert the integrity
+    // fields are live BEFORE any evaluation rather than trusting the import
+    // graph — moving `discharged` to a lazily-imported module broke exactly
+    // this and was caught only because module init threw.
+    const lit = attack('p = {__discharged: 1}');
+    eq(lit.threw?.includes("integrity channel") ?? false, true,
+      `the integrity gate is armed at evaluation time: ${lit.threw}`);
+  });
+
+  test("forgery G (B-125): the metadata write surface is exactly the minted writers", () => {
+    // The property `mv_set`'s deletion buys, asserted directly so that
+    // reintroducing an unguarded write path fails here rather than silently.
+    // `mv_set` wrote ANY non-integrity field with no capability, which made
+    // `mv_set(5, "type", String)` a type-forgery from ordinary user code.
+    const gone = attack('x = mv_set(5, "type", String)\ny = type of x');
+    eq(gone.threw, null, "an unbound name residualises rather than throwing");
+    const y = gone.evalCtx!.bindings.get("y")!.value as Value;
+    eq(y === undefined || metaReadRaw(y, "type") === undefined
+       || y.kind !== ValueKind.Structure, true,
+      "the deleted path no longer produces a value claiming a forged type");
+
+    // B-109(a) CLOSED for `type` (2026-08). It was the most-used metadata
+    // field in the system and was **not registered at all**, so unlike
+    // `discharged` and `source` its writer capability was unclaimed and the
+    // first asker received it. `types-std.ts` now claims it at layer init.
+    //
+    // Asserted through the REGISTRY rather than by attempting the
+    // registration, and that is not squeamishness: running
+    // `channel_register("type", "viral")` inside the suite re-rules the field
+    // for the whole PROCESS and broke six later tests when first tried —
+    // which is why holding the capability matters.
+    eq(metaFieldSpec("type")?.integrity, true,
+      "`type` is registered by its owning layer, with integrity — B-109(a)");
+    eq(metaFieldSpec("type")?.rule, "computed",
+      "and with a non-fabricating rule, as D23 requires of an integrity field");
+    for (const name of ["type", "discharged", "source"]) {
+      const held = attack(`w = channel_register("${name}", "drop")`);
+      eq(held.threw?.includes("already registered") ?? false, true,
+        `${name}: the writer capability is held by its owner — ${held.threw}`);
+    }
+
+    // B-109(b)(c): integrity is read from the registry, not from a hardcoded
+    // name list, and the check is BINDING-PLANE keys only. An object literal
+    // writes the binding plane and cannot originate a metadata field, so a
+    // record may name a field `type`, `source` or `discharged` — while the
+    // binding-plane STORAGE key of an integrity field stays refused.
+    const rec = attack('r = {type: "widget", source: 1, discharged: 2}');
+    eq(rec.threw, null, `records may use those names as data: ${rec.threw}`);
+    const stor = attack('p = {__discharged: 1}');
+    eq(stor.threw?.includes("integrity channel") ?? false, true,
+      `the integrity field's binding-plane storage key is still refused: ${stor.threw}`);
   });
 
   test("forgery F (live): the writer capability cannot be forged or counterfeited", () => {
@@ -870,11 +967,11 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
 
   test("forgery C (live): `discharged` never propagates — drop rule enforced", () => {
     // 1. The propagation executors exclude the authority channel entirely.
-    eq(viralChannels().includes("discharged"), false, "not viral");
-    eq(unionChannels().includes("discharged"), false, "not union");
+    eq(viralFields().includes("discharged"), false, "not viral");
+    eq(unionFields().includes("discharged"), false, "not union");
     // 2. Registration-side: an integrity channel cannot take a fabricating rule.
     let threw = "";
-    try { registerChannel({ name: "forgeC_probe", rule: "viral", integrity: true }); }
+    try { registerMetaField({ name: "forgeC_probe", rule: "viral", integrity: true }); }
     catch (e: any) { threw = String(e.message); }
     eq(threw.includes("may not register fabricating"), true, `registration gate: ${threw}`);
     // 3. Propagation-side: combining a real proof with other values through
@@ -884,7 +981,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const c = r.evalCtx!.bindings.get("c")!.value as Value;
     eq(getTypeNameOf(c), "None", "no discharge on the combination");
     const d = r.evalCtx!.bindings.get("d")!.value as Value;
-    eq((dataOf(d) as any).data, 1n, "the source proof itself still reads discharged");
+    eq((d as any).data, 1n, "the source proof itself still reads discharged");
   });
 
   test("channel plane (C1.4): user channel end-to-end — write, free read, attenuation", () => {
@@ -897,8 +994,8 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       'g = channel_read(good, "audit_e2e")',
     ].join("\n"));
     eq(r.threw, null, `e2e: ${r.threw}`);
-    eq(bitsToString(dataOf(r.evalCtx!.bindings.get("r")!.value as Value) as BitsValue), "checked");
-    eq(bitsToString(dataOf(r.evalCtx!.bindings.get("g")!.value as Value) as BitsValue), "ok");
+    eq(bitsToString(r.evalCtx!.bindings.get("r")!.value as Value as BitsValue), "checked");
+    eq(bitsToString(r.evalCtx!.bindings.get("g")!.value as Value as BitsValue), "ok");
     const rejected = attack([
       'w = channel_register("audit_e2e_2", "union")',
       'wa = channel_attenuate(w, x => x == "ok")',
@@ -927,28 +1024,28 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     }
     const child = scopeExtend(parent, [["x", { key: "x", value: makeInt(42) }]]);
     eq(child.bindings.size, 1, "child owns only its layer");
-    eq((dataOf(scopeLookup(child, "b9999")!.value!) as any).data, 9999n, "chain lookup reaches parent");
-    eq((dataOf(scopeLookup(child, "x")!.value!) as any).data, 42n, "own layer found");
+    eq((scopeLookup(child, "b9999")!.value! as any).data, 9999n, "chain lookup reaches parent");
+    eq((scopeLookup(child, "x")!.value! as any).data, 42n, "own layer found");
     // Shadowing: nearest layer wins.
     const shadow = scopeExtend(child, [["b0", { key: "b0", value: makeInt(777) }]]);
-    eq((dataOf(scopeLookup(shadow, "b0")!.value!) as any).data, 777n, "child shadows parent");
-    eq((dataOf(scopeLookup(parent, "b0")!.value!) as any).data, 0n, "parent unchanged");
+    eq((scopeLookup(shadow, "b0")!.value! as any).data, 777n, "child shadows parent");
+    eq((scopeLookup(parent, "b0")!.value! as any).data, 0n, "parent unchanged");
     // Deep chains stay correct.
     let deep = scopeNew();
     deep.bindings.set("root", { key: "root", value: makeInt(1) });
     for (let i = 0; i < 2000; i++) deep = scopeExtend(deep, []);
-    eq((dataOf(scopeLookup(deep, "root")!.value!) as any).data, 1n, "2000-layer chain lookup");
+    eq((scopeLookup(deep, "root")!.value! as any).data, 1n, "2000-layer chain lookup");
   });
 
   test("scope/structure plane rejection (C2.1): each plane refuses the other", () => {
     // A shape-carrying data Context cannot be extended as a scope.
     const { evalCtx } = evalSource("p = {a: 1}", undefined, [createTypeSystem()], undefined, true);
-    const dataCtx = asContext(evalCtx.bindings.get("p")!.value as Value)!;
+    const dataCtx = asStructure(evalCtx.bindings.get("p")!.value as Value)!;
     // give it its shape slot form: typed objects carry shape via the MV
     // component; scope rejection keys on binding-plane shape — verify via a
     // type Context (which carries __type):
     // C2.3b: Int lives on the extensions layer of the root scope chain.
-    const intCtx = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
+    const intCtx = asStructure(scopeLookup(evalCtx, "Int")!.value as Value)!;
     let threw = "";
     try { scopeExtend(intCtx, []); } catch (e: any) { threw = String(e.message); }
     eq(threw.includes("cannot extend a data structure"), true, `scope-over-data: ${threw}`);
@@ -1035,20 +1132,20 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const y = registry.bindings.get("y")!;
     eq(y === evalCtx.bindings.get("y"), true, "dependent lives on the one representation too");
     eq(y.isComplete, true, "dependent re-evaluated to completion");
-    eq(Number((dataOf(y.value!) as BitsValue).data), 7, "dependent sees the resolved value");
+    eq(Number((y.value! as BitsValue).data), 7, "dependent sees the resolved value");
   });
 
   test("import satisfied by an extension (C2.3b): resolves through the chain, no pending cell", () => {
     const ext: Extension = { name: "m", bindings: { cfg: makeInt(9) } };
     const { evalCtx } = evalSource("import cfg\nx = cfg", undefined, [createTypeSystem(), ext], undefined, true);
     eq(evalCtx.bindings.has("cfg"), false, "provided import gets no cell on the source layer");
-    eq(Number((dataOf(evalCtx.bindings.get("x")!.value!) as BitsValue).data), 9, "reference resolved through the extension layer");
+    eq(Number((evalCtx.bindings.get("x")!.value! as BitsValue).data), 9, "reference resolved through the extension layer");
   });
 
   test("REPL persistence (C2.3b): base chain flattens into a fresh layer — passes are mutation-isolated", () => {
     const r1 = evalSource("a = 1", undefined, [createTypeSystem()], undefined, true);
     const r2 = evalSource("b = a + 1", r1.evalCtx, [createTypeSystem()], undefined, true);
-    eq(Number((dataOf(r2.evalCtx.bindings.get("b")!.value!) as BitsValue).data), 2, "prior-pass binding resolves through the base layer");
+    eq(Number((r2.evalCtx.bindings.get("b")!.value! as BitsValue).data), 2, "prior-pass binding resolves through the base layer");
     const a1 = r1.evalCtx.bindings.get("a")!;
     const a2 = scopeLookup(r2.evalCtx, "a")!;
     eq(a1 !== a2, true, "base flatten copies binding objects — later passes never alias earlier ctxs");
@@ -1062,16 +1159,16 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       undefined, [createTypeSystem()], undefined, true);
     const x = evalCtx.bindings.get("x")!.value as Value;
     const stored = getType(x)!;
-    eq(bitsToString(dataOf(getName(stored)!) as BitsValue), "PositiveInt", "stored type keeps the refinement bound");
-    const shape = channelReadRaw(x, "shape") as ContextValue;
-    eq(bitsToString(dataOf(getName(shape)!) as BitsValue), "Int", "shape channel reads the dispatch shape");
-    const intCtx = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
+    eq(bitsToString(getName(stored)! as BitsValue), "PositiveInt", "stored type keeps the refinement bound");
+    const shape = metaReadRaw(x, "shape") as StructureValue;
+    eq(bitsToString(getName(shape)! as BitsValue), "Int", "shape channel reads the dispatch shape");
+    const intCtx = asStructure(scopeLookup(evalCtx, "Int")!.value as Value)!;
     eq(shape === intCtx, true, "shape IS the Int type object (identity)");
     const k = knowledgeOf(x)!;
     eq(k !== null && k.bound === stored, true, "knowledge bound is the refinement certificate");
     const dom = knowledgeDomain(k) as IntervalDomain | null;
     eq(dom?.kind === "interval" && dom.lo === 1, true, "knowledge domain is ≥ 1");
-    eq(channelSpec("knowledge")?.rule, "computed", "knowledge channel registered");
+    eq(metaFieldSpec("knowledge")?.rule, "computed", "knowledge channel registered");
   });
 
   test("shape/knowledge split (C3.1): a type that mints members IS a shape (preserveOps)", () => {
@@ -1079,11 +1176,11 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\ny = PI(5)\nz = y + 3",
       undefined, [createTypeSystem()], undefined, true);
     const y = evalCtx.bindings.get("y")!.value as Value;
-    const shape = channelReadRaw(y, "shape") as ContextValue;
-    eq(bitsToString(dataOf(getName(shape)!) as BitsValue), "PI", "preserveOps type has its own member set — dispatch must reach its overrides");
+    const shape = metaReadRaw(y, "shape") as StructureValue;
+    eq(bitsToString(getName(shape)! as BitsValue), "PI", "preserveOps type has its own member set — dispatch must reach its overrides");
     // ...and the lifted operator actually ran: z carries the PI tag.
     const z = evalCtx.bindings.get("z")!.value as Value;
-    eq(bitsToString(dataOf(getName(getType(z)!)!) as BitsValue), "PI", "lifted op re-tagged the result");
+    eq(bitsToString(getName(getType(z)!)! as BitsValue), "PI", "lifted op re-tagged the result");
   });
 
   test("shape immutability (C3.1): the writer refuses cross-shape re-stamps; knowledge re-bounds pass", () => {
@@ -1091,9 +1188,9 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "PositiveInt = Int & _ > 0\nx = 42\ns = \"hi\"",
       undefined, [createTypeSystem()], undefined, true);
     const x = evalCtx.bindings.get("x")!.value as Value;
-    const stringType = asContext(scopeLookup(evalCtx, "String")!.value as Value)!;
-    const intType = asContext(scopeLookup(evalCtx, "Int")!.value as Value)!;
-    const refined = asContext(evalCtx.bindings.get("PositiveInt")!.value as Value)!;
+    const stringType = asStructure(scopeLookup(evalCtx, "String")!.value as Value)!;
+    const intType = asStructure(scopeLookup(evalCtx, "Int")!.value as Value)!;
+    const refined = asStructure(evalCtx.bindings.get("PositiveInt")!.value as Value)!;
     let threw = "";
     try { withType(x, stringType); } catch (e: any) { threw = String(e.message); }
     eq(threw.includes("shape is fixed at construction"), true, `cross-shape re-stamp refused: ${threw}`);
@@ -1106,13 +1203,13 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r1 = evalSource(
       "PositiveInt = Int & _ > 0\ns = PositiveInt(5).toString()",
       undefined, [createTypeSystem()], undefined, true);
-    eq(bitsToString(dataOf(r1.evalCtx.bindings.get("s")!.value!) as BitsValue), "5", "refined value runs the shape's method");
+    eq(bitsToString(r1.evalCtx.bindings.get("s")!.value! as BitsValue), "5", "refined value runs the shape's method");
     // Attaching extra knowledge to a value must not affect dispatch.
     const r2 = evalSource("h = \"hello\"", undefined, [createTypeSystem()], undefined, true);
     const h = r2.evalCtx.bindings.get("h")!.value as Value;
     const narrowed = withPredicates(h, new PredicateSet([makePredicate(effectsDomain(new Set(["irrelevant"])))]));
-    const shapeBefore = channelReadRaw(h, "shape");
-    const shapeAfter = channelReadRaw(narrowed, "shape");
+    const shapeBefore = metaReadRaw(h, "shape");
+    const shapeAfter = metaReadRaw(narrowed, "shape");
     eq(shapeBefore === shapeAfter, true, "attached knowledge leaves the shape untouched");
     const lenGetter = typeMethod(typeShape(getType(narrowed)!), "length");
     eq(lenGetter !== null, true, "member lookup through the shape is knowledge-independent");
@@ -1137,7 +1234,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // Visible through the bound: Animal declares `legs`.
     const ok = evalSource(C32_TYPES + "f(a: Animal): Int => a.legs\nr = f(Dog(4, 7))",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((dataOf(ok.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 4, "base member visible through the bound");
+    eq(Number((ok.evalCtx.bindings.get("r")!.value! as BitsValue).data), 4, "base member visible through the bound");
     // Hidden: `tricks` is Dog-only — the annotation gates it.
     let threw = "";
     try {
@@ -1151,7 +1248,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const x = b.evalCtx.bindings.get("x")!.value as Value;
     eq(getTypeNameOf(x), "Dog", "shape (dispatch source) untouched by the bound");
     const bound = occurrenceBoundOf(x)!;
-    eq(bitsToString(dataOf(getName(bound)!) as BitsValue), "Animal", "occurrence bound rides the value");
+    eq(bitsToString(getName(bound)! as BitsValue), "Animal", "occurrence bound rides the value");
     eq(knowledgeOf(x)?.occurrenceBound === bound, true, "knowledgeOf surfaces the occurrence carrier");
   });
 
@@ -1160,12 +1257,12 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // bound; the matched arm lifts it.
     const r1 = evalSource(C32_TYPES + "mk(): Animal => Dog(2, 3)\na = mk()\nr = when a is Dog then a.tricks else 0 - 1",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((dataOf(r1.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 3, "Symbol-subject narrowing");
+    eq(Number((r1.evalCtx.bindings.get("r")!.value! as BitsValue).data), 3, "Symbol-subject narrowing");
     eq(occurrenceBoundOf(r1.evalCtx.bindings.get("a")!.value!) !== null, true, "narrowing is arm-local — the binding keeps its bound");
     // Substituted-param subject: identity replacement inside the arm.
     const r2 = evalSource(C32_TYPES + "g(a: Animal): Int => when a is Dog then a.tricks else 0 - 1\nr = g(Dog(4, 9))",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((dataOf(r2.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 9, "substituted-param narrowing");
+    eq(Number((r2.evalCtx.bindings.get("r")!.value! as BitsValue).data), 9, "substituted-param narrowing");
   });
 
   test("knowledge bounds (C3.2): boundary crossing resets occurrence knowledge", () => {
@@ -1175,7 +1272,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "via(a: Animal): Int => when a is Dog then tc(a) else 0 - 1\n" +
       "r = via(Dog(4, 5))",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((dataOf(r.evalCtx.bindings.get("r")!.value!) as BitsValue).data), 5, "own-shape boundary restores full knowledge");
+    eq(Number((r.evalCtx.bindings.get("r")!.value! as BitsValue).data), 5, "own-shape boundary restores full knowledge");
   });
 
   test("knowledge bounds (C3.2): meet computed, not overwritten — intrinsic facts survive a looser annotation", () => {
@@ -1198,8 +1295,8 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "ia = a instanceof PositiveInt\nib = b instanceof PositiveInt\nneg = (0 - 3) instanceof PositiveInt\n" +
       "sa = a + 1\nsb = b + 1\nta = a.toString()\ntb = b.toString()\neqv = a == b",
       undefined, [createTypeSystem()], undefined, true);
-    const num = (k: string) => Number((dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
-    const str = (k: string) => bitsToString(dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue);
+    const num = (k: string) => Number((r.evalCtx.bindings.get(k)!.value! as BitsValue).data);
+    const str = (k: string) => bitsToString(r.evalCtx.bindings.get(k)!.value! as BitsValue);
     eq(num("ia"), 1, "tagged value passes");
     eq(num("ib"), 1, "equal bare data answers IDENTICALLY — re-check, not certificate peek");
     eq(num("neg"), 0, "violating data fails");
@@ -1213,7 +1310,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "SmallPos = Int & _ > 0 && _ < 100\nok = 50 instanceof SmallPos\nhigh = 150 instanceof SmallPos\n" +
       "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\nbare = 8 instanceof PI\ntagged = PI(5) instanceof PI",
       undefined, [createTypeSystem()], undefined, true);
-    const num = (k: string) => Number((dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
+    const num = (k: string) => Number((r.evalCtx.bindings.get(k)!.value! as BitsValue).data);
     eq(num("ok"), 1, "nested predicate chain re-checked (50 ∈ [1,99])");
     eq(num("high"), 0, "chain refusal (150 ∉ [1,99])");
     eq(num("bare"), 0, "preserveOps type is a SHAPE (own members) — instanceof stays nominal");
@@ -1227,7 +1324,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "peeker(x: Int) => certificate_peek(x, PositiveInt)\n" +
       "checker(x: Int) => x instanceof PositiveInt",
       undefined, [createTypeSystem()], undefined, true);
-    const num = (k: string) => Number((dataOf(r.evalCtx.bindings.get(k)!.value!) as BitsValue).data);
+    const num = (k: string) => Number((r.evalCtx.bindings.get(k)!.value! as BitsValue).data);
     eq(num("pa"), 1, "constructed-as-PositiveInt observed");
     eq(num("pb"), 0, "the peek distinguishes §7-equal values — the very thing instanceof must not do");
     const peekEff = effectsOf(r.evalCtx.bindings.get("peeker")!.value!);
@@ -1258,18 +1355,31 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const { evalCtx } = evalSource(
       "x = 42\np = {a: 1}\nPositiveInt = Int & _ > 0\ny = PositiveInt(5)",
       undefined, [createTypeSystem()], undefined, true);
+    // B-121 C2 (maintainer ruling, 2026-08: *behavioural assertions are gold,
+    // structural tests are lead*). Four assertions here claimed a typed
+    // literal IS a carrier — a Structure, born immutable, with an empty data
+    // plane, answering the Structure kind. That is the representation D48(b)
+    // deletes, so they pinned the thing being changed rather than anything a
+    // program can observe. Replaced by what actually matters and holds in
+    // EITHER representation: a typed scalar carries its type, and its data is
+    // the scalar.
     const x = evalCtx.bindings.get("x")!.value!;
-    eq(isStructure(x), true, "typed literal (a CARRIER) is a Structure");
-    eq((x as unknown as Structure).immutable, true, "carriers born immutable (D22)");
-    // C7.1 (D15): a carrier's data plane is EMPTY — the lazily-
-    // materialized view may exist, but it holds no slots.
-    eq((x as unknown as Structure).bindings.size, 0, "carrier data plane is empty (D15/D17 restated)");
-    eq(x.kind, ValueKind.Structure, "the carrier answers the one structure kind (MultiValue kind retired)");
-    const p = dataOf(evalCtx.bindings.get("p")!.value!);
+    eq(getType(x) !== null, true, "a typed literal carries its type");
+    eq(getTypeNameOf(x), "Int", "and the type is the one inferred");
+    const xd = x;
+    eq(xd.kind, ValueKind.Bits, "its data is the scalar itself");
+    eq((xd as BitsValue).data, 42n, "with the literal's value intact");
+    // The composite assertions are untouched — records, types and scopes are
+    // genuinely Structures, and that is not what C2 changes.
+    const p = evalCtx.bindings.get("p")!.value!;
     eq(isStructure(p), true, "object Context role is a Structure");
-    eq((p as unknown as Structure).primary === undefined, true, "Context role has no primary (D17)");
+    // B-121 C4: `Context role has no primary (D17)` retired with the field.
+    // D17's content — a record's data is its slots — is what the line above
+    // and the binding reads below assert; `primary === undefined` was only
+    // ever the carrier-era spelling of it.
     const y = evalCtx.bindings.get("y")!.value!;
-    eq(isStructure(y) && isStructure(getType(y)!), true, "refined value AND its type Context share the representation");
+    eq(isStructure(getType(y)!), true, "a refined value's type Context is a Structure");
+    eq(getTypeNameOf(y), "PositiveInt", "and the refined value reports it");
     eq(isStructure(evalCtx), true, "evaluation scopes share the substrate (plane split stays isScope/parent)");
   });
 
@@ -1277,12 +1387,12 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource(
       "o = {type: 5, effects: 7}\nv = o.type + o.effects",
       undefined, [createTypeSystem()], undefined, true);
-    eq(Number((dataOf(r.evalCtx.bindings.get("v")!.value!) as BitsValue).data), 12,
+    eq(Number((r.evalCtx.bindings.get("v")!.value! as BitsValue).data), 12,
       "data keys named after channels behave as plain fields (no channel confusion)");
     const oVal = r.evalCtx.bindings.get("o")!.value!;
     eq(getTypeNameOf(oVal), "Object", "the channel plane still reads the real type channel");
-    const oCtx = dataOf(oVal) as ContextValue;
-    eq(Number((dataOf(oCtx.bindings.get("type")!.value!) as BitsValue).data), 5,
+    const oCtx = oVal as StructureValue;
+    eq(Number((oCtx.bindings.get("type")!.value! as BitsValue).data), 5,
       "the slot plane holds the hostile key independently");
   });
 
@@ -1292,7 +1402,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const cell = evalCtx.bindings.get("cfg")!;
     eq(isPendingCell(cell), true, "pending cell inside the (mutable, scope-role) structure");
     applyPhase(registry, evalCtx, new Map([["cfg", makeInt(3)]]));
-    eq(Number((dataOf(cell.value!) as BitsValue).data), 3, "single-assignment resolution in place — monotonic, not mutation");
+    eq(Number((cell.value! as BitsValue).data), 3, "single-assignment resolution in place — monotonic, not mutation");
   });
 
   // --- Dense arrays (C4.2, D18) -----------------------------------------------
@@ -1301,21 +1411,21 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const { evalCtx } = evalSource(
       "arr = [10, 20, 30]\na = arr[0]\nb = arr[2]\nn = arr.length\ns = arr.map(x => x + 1).reduce((acc, x) => acc + x, 0)",
       undefined, [createTypeSystem()], undefined, true);
-    const arrCtx = dataOf(evalCtx.bindings.get("arr")!.value!) as unknown as Structure;
+    const arrCtx = evalCtx.bindings.get("arr")!.value! as unknown as Structure;
     eq(arrCtx.dense !== undefined, true, "array context carries the dense region");
     eq(arrCtx.viewMaterialized, false, "bracket access, length, map/reduce ran without materializing the legacy view");
-    eq(Number((dataOf(evalCtx.bindings.get("s")!.value!) as BitsValue).data), 63, "HOF pipeline result correct over dense storage");
+    eq(Number((evalCtx.bindings.get("s")!.value! as BitsValue).data), 63, "HOF pipeline result correct over dense storage");
   });
 
   test("dense region (C4.2): O(1) index access — scaling test", () => {
-    const small = dataOf(makeArray(Array.from({ length: 200 }, (_, i) => makeInt(i)))) as ContextValue;
-    const big = dataOf(makeArray(Array.from({ length: 200_000 }, (_, i) => makeInt(i)))) as ContextValue;
-    const time = (ctx: ContextValue, len: number): number => {
+    const small = makeArray(Array.from({ length: 200 }, (_, i) => makeInt(i))) as StructureValue;
+    const big = makeArray(Array.from({ length: 200_000 }, (_, i) => makeInt(i))) as StructureValue;
+    const time = (ctx: StructureValue, len: number): number => {
       const t0 = performance.now();
       let acc = 0n;
       for (let k = 0; k < 50_000; k++) {
         const v = indexGet(ctx, (k * 7919) % len)!;
-        acc += (dataOf(v) as BitsValue).data;
+        acc += (v as BitsValue).data;
       }
       // acc consumed so the loop can't be optimized away
       if (acc < 0n) throw new Error("unreachable");
@@ -1342,27 +1452,29 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // materializes the lazy view, which must agree with the dense region
     // (W6) — and the dense region stays authoritative afterwards.
     const r = evalSource("arr = [7, 8, 9]", undefined, [createTypeSystem()], undefined, true);
-    const arrCtx = dataOf(r.evalCtx.bindings.get("arr")!.value!) as unknown as Structure;
+    const arrCtx = r.evalCtx.bindings.get("arr")!.value! as unknown as Structure;
     eq(arrCtx.viewMaterialized, false, "no view before the straggler read");
-    const viaMap = (arrCtx as unknown as ContextValue).bindings.get("0")?.value;
-    eq(Number((dataOf(viaMap!) as BitsValue).data), 7, "string-key protocol answers from the materialized view");
+    const viaMap = (arrCtx as unknown as StructureValue).bindings.get("0")?.value;
+    eq(Number((viaMap! as BitsValue).data), 7, "string-key protocol answers from the materialized view");
     eq(arrCtx.viewMaterialized, true, "the straggler path materialized the view");
-    eq(Number((dataOf(indexGet(arrCtx as unknown as ContextValue, 1)!) as BitsValue).data), 8,
+    eq(Number((indexGet(arrCtx as unknown as StructureValue, 1)! as BitsValue).data), 8,
       "dense region stays authoritative after materialization");
-    eq(Number(((arrCtx as unknown as ContextValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
-    eq((arrCtx as unknown as ContextValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
+    eq(Number(((arrCtx as unknown as StructureValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
+    eq((arrCtx as unknown as StructureValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
   });
 
   // --- MV-over-Context flatten (C4.3b) -----------------------------------------
 
-  test("flatten (C4.3b): typed records answer Context; dataOf is identity", () => {
+  test("flatten (C4.3b): typed records answer Context — no wrapper", () => {
     const r = evalSource("p = {x: 1, y: 2}\ns = p.x + p.y",
       undefined, [createTypeSystem()], undefined, true);
     const p = r.evalCtx.bindings.get("p")!.value!;
     eq(p.kind, ValueKind.Structure, "a typed record IS a Context — no MultiValue wrapper");
-    eq(dataOf(p) === p, true, "dataOf is identity for flattened records");
+    // B-121 C5 retired the `peel(p) === p` assertion from here: with the peel
+    // deleted it reduces to `p === p`, which checks nothing. What it meant —
+    // this record is not wrapped — is the line above.
     eq(getType(p) !== null, true, "the type channel rides the record directly");
-    eq(Number((dataOf(r.evalCtx.bindings.get("s")!.value!) as BitsValue).data), 3,
+    eq(Number((r.evalCtx.bindings.get("s")!.value! as BitsValue).data), 3,
       "field access dispatches through the flattened record's type");
     eq(formatValue(p), "{x: 1, y: 2}", "flattened records print as records");
   });
@@ -1383,7 +1495,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const intBinding = scopeLookup(r.evalCtx, "Int")!.value!;
     eq(intBinding === (IntType as unknown as Value), true,
       "the Int binding is the IntType Context itself — no wrapper, one identity");
-    eq(getType(intBinding as Value) === (dataOf(TypeMeta as unknown as Value) as ContextValue), true,
+    eq(getType(intBinding as Value) === (TypeMeta as unknown as Value as StructureValue), true,
       "getType is total: a bare type Context answers its meta-type through __type");
   });
 
@@ -1393,22 +1505,21 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(formatValue(r.evalCtx.bindings.get("b")!.value!), "true", "value instanceof");
     eq(formatValue(r.evalCtx.bindings.get("m")!.value!), "true", "type instanceof meta-type");
     const t = r.evalCtx.bindings.get("t")!.value!;
-    eq(dataOf(t) === dataOf(TypeMeta as unknown as Value), true, "`type of Int` is the Type meta-type");
+    eq(t === TypeMeta as unknown as Value, true, "`type of Int` is the Type meta-type");
   });
 
-  test("flatten (C4.3b): MV-over-Context is unconstructible — makeMultiValue flattens", () => {
+  test("flatten (C4.3b): MV-over-Context is unconstructible — withMeta flattens", () => {
     const r = evalSource("p = {a: 5}", undefined, [createTypeSystem()], undefined, true);
     const record = r.evalCtx.bindings.get("p")!.value!;
     // The standard writer idiom: clone the channel plane, extend, re-derive
     // (the given map is authoritative — deletion must stay expressible).
-    const comps = cloneComponents(record);
+    const comps = cloneMeta(record);
     comps.set("exported", makeInt(1));
-    const stamped = makeMultiValue(dataOf(record), comps);
+    const stamped = withMeta(record, comps);
     eq((stamped as Value).kind, ValueKind.Structure, "wrapping a Context derives a flattened Context");
-    eq(channelReadRaw(stamped as Value, "exported") !== undefined, true, "the new channel rides");
-    eq(channelReadRaw(stamped as Value, "type") !== undefined, true, "cloned channels carry forward");
-    eq(dataOf(stamped as Value) === (stamped as Value), true, "the derived value is transparent to dataOf");
-    eq((record as ContextValue).bindings.get("a") === (stamped as unknown as ContextValue).bindings.get("a"), true,
+    eq(metaReadRaw(stamped as Value, "exported") !== undefined, true, "the new channel rides");
+    eq(metaReadRaw(stamped as Value, "type") !== undefined, true, "cloned channels carry forward");
+    eq((record as StructureValue).bindings.get("a") === (stamped as unknown as StructureValue).bindings.get("a"), true,
       "copy-on-write derive shares the data plane by reference");
   });
 
@@ -1528,7 +1639,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   // --- Symbol-keyed members (C5.2a) --------------------------------------------
 
   test("symbol-keyed members (C5.2a/C6.1a): member sets key by per-type member FQNs", () => {
-    const members = getMembers(dataOf(IntType as unknown as Value) as ContextValue) as ContextValue;
+    const members = getMembers(IntType as unknown as Value as StructureValue) as StructureValue;
     // C6.1a: built-ins moved OFF the shared kernel scope — Int declares
     // its members in its OWN name-stable scope, so Int.add and Float.add
     // are distinct symbols and cross-built-in conformance is never
@@ -1537,7 +1648,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(members.bindings.has(intScope + "::add"), true, "storage key is the member symbol's FQN in Int's own scope");
     eq(members.bindings.has("add"), false, "bare string keys are gone from member storage");
     eq(members.bindings.has(kernelMemberFqn("add")), false, "the shared kernel scope is retired for built-ins");
-    eq(typeMethod(dataOf(IntType as unknown as Value) as ContextValue, "add") !== null, true,
+    eq(typeMethod(IntType as unknown as Value as StructureValue, "add") !== null, true,
       "typeMethod projects by base name through the per-type scope");
     // E3 (B-027 §8): the kernel scalars DRAW Equatable retroactively —
     // `eq` is multi-bound under Equatable's member symbol and the
@@ -1564,15 +1675,15 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource(
       "P = Int & _ > 0\nQ = Int & _ > 0 & _ < 100",
       undefined, [createTypeSystem()], undefined, true);
-    const intMembers = getMembers(dataOf(IntType as unknown as Value) as ContextValue);
+    const intMembers = getMembers(IntType as unknown as Value as StructureValue);
     for (const name of ["P", "Q"]) {
-      const t = dataOf(r.evalCtx.bindings.get(name)!.value!) as ContextValue;
+      const t = r.evalCtx.bindings.get(name)!.value! as StructureValue;
       eq(getMembers(t) === intMembers, true, `${name} shares Int's member-set object`);
     }
-    const wrapped = structuralWrapTS(dataOf(IntType as unknown as Value) as ContextValue);
+    const wrapped = structuralWrapTS(IntType as unknown as Value as StructureValue);
     eq(getMembers(wrapped) === intMembers, true, "~Int (structuralWrap) shares Int's member-set object");
-    const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as ContextValue;
-    eq(typeShape(p) === dataOf(IntType as unknown as Value), true,
+    const p = r.evalCtx.bindings.get("P")!.value! as StructureValue;
+    eq(typeShape(p) === IntType as unknown as Value, true,
       "typeShape walks the transparent layer off (identity test intact)");
   });
 
@@ -1582,10 +1693,10 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource(
       "Animal = Type.define({name: String})\nDog = Type.define({name: String, age: Int}, Animal)",
       undefined, [createTypeSystem()], undefined, true);
-    const animal = dataOf(r.evalCtx.bindings.get("Animal")!.value!) as ContextValue;
-    const dog = dataOf(r.evalCtx.bindings.get("Dog")!.value!) as ContextValue;
-    const keyOf = (t: ContextValue, base: string): string | null => {
-      for (const key of (getMembers(t) as ContextValue).bindings.keys()) {
+    const animal = r.evalCtx.bindings.get("Animal")!.value! as StructureValue;
+    const dog = r.evalCtx.bindings.get("Dog")!.value! as StructureValue;
+    const keyOf = (t: StructureValue, base: string): string | null => {
+      for (const key of (getMembers(t) as StructureValue).bindings.keys()) {
         if (key.endsWith("::" + base)) return key;
       }
       return null;
@@ -1612,9 +1723,9 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource(
       "PI = Refinement.define({refines: Int, where: p => p > 0, preserve: \"all\"})\nx = PI(5)\ny = x + 3",
       undefined, [createTypeSystem()], undefined, true);
-    const pi = dataOf(r.evalCtx.bindings.get("PI")!.value!) as ContextValue;
-    const piMembers = getMembers(pi) as ContextValue;
-    const intMembers = getMembers(dataOf(IntType as unknown as Value) as ContextValue) as ContextValue;
+    const pi = r.evalCtx.bindings.get("PI")!.value! as StructureValue;
+    const piMembers = getMembers(pi) as StructureValue;
+    const intMembers = getMembers(IntType as unknown as Value as StructureValue) as StructureValue;
     // The lifted `add` sits under Int's own `add` key (an override — same symbol).
     const intAddKey = [...intMembers.bindings.keys()].find((k) => k.endsWith("::add"))!;
     eq(piMembers.bindings.has(intAddKey), true, "lifted op draws (binds) the parent op's symbol");
@@ -1632,15 +1743,15 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   test("draw-from (C5.2b): multi-bind — one target under several symbols stays unambiguous; distinct targets error", () => {
     // Hand-build the diamond shapes the machinery must handle before any
     // surface can produce them: a member set with two same-base-name keys.
-    const desc = typeMemberDescriptor(dataOf(IntType as unknown as Value) as ContextValue, "add")!;
-    const mkType = (twoTargets: boolean): ContextValue => {
+    const desc = typeMemberDescriptor(IntType as unknown as Value as StructureValue, "add")!;
+    const mkType = (twoTargets: boolean): StructureValue => {
       const t = evalSource("T = Type.define({v: Int})", undefined, [createTypeSystem()], undefined, true);
-      const ty = dataOf(t.evalCtx.bindings.get("T")!.value!) as ContextValue;
-      const members = getMembers(ty) as ContextValue;
+      const ty = t.evalCtx.bindings.get("T")!.value! as StructureValue;
+      const members = getMembers(ty) as StructureValue;
       const k1 = registerScopeSymbol("<type:testA>", "draw").fqn!;
       const k2 = registerScopeSymbol("<type:testB>", "draw").fqn!;
       const desc2 = twoTargets
-        ? typeMemberDescriptor(dataOf(IntType as unknown as Value) as ContextValue, "sub")!
+        ? typeMemberDescriptor(IntType as unknown as Value as StructureValue, "sub")!
         : desc;
       members.bindings.set(k1, { key: k1, value: desc as Value });
       members.bindings.set(k2, { key: k2, value: desc2 as Value });
@@ -1681,7 +1792,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "~T still matches the undeclared type by base name (the loose path)");
     // The wrap erases the interface marker — a wrapped interface IS the
     // loose world, not declared conformance with the name hidden.
-    const greets = dataOf(r.evalCtx.bindings.get("Greets")!.value!) as ContextValue;
+    const greets = r.evalCtx.bindings.get("Greets")!.value! as StructureValue;
     const wrapped = structuralWrapTS(greets);
     eq(isInterfaceTypeSlots(wrapped), false, "structuralWrap erases the __interface marker");
   });
@@ -1710,7 +1821,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // D44: composition mints NO is-a edge — conformance is symbol
     // membership, the refines slot stays empty on defined records.
     for (const name of ["Fresh", "Point"]) {
-      const t = dataOf(r.evalCtx.bindings.get(name)!.value!) as ContextValue;
+      const t = r.evalCtx.bindings.get(name)!.value! as StructureValue;
       eq(getRefines(t) === undefined, true, `${name}: define mints no refines edge`);
     }
   });
@@ -1788,7 +1899,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(formatValue(r.evalCtx.bindings.get("n")!.value!).includes("refinement check failed"), true,
       "the kind-minted refinement still rejects with a counterexample");
     // `type of P` IS the Refinement kind object (identity, not name match).
-    const p = dataOf(r.evalCtx.bindings.get("P")!.value!) as ContextValue;
+    const p = r.evalCtx.bindings.get("P")!.value! as StructureValue;
     eq(getType(p) === RefinementKindTS, true, "a refined type's meta IS the Refinement kind");
   });
 
@@ -1901,11 +2012,11 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     }
     // D37/D40: label-set identity is PHYSICAL identity (memoized mint) —
     // two independent conjunction mints are the same Context.
-    const conj = dataOf(r.evalCtx.bindings.get("conj")!.value!) as ContextValue;
-    const viaUnion = dataOf(evalSource(
+    const conj = r.evalCtx.bindings.get("conj")!.value! as StructureValue;
+    const viaUnion = evalSource(
       "x = Effect(\"time\") & Effect(\"io\")\nx",
       undefined, [createTypeSystem()], undefined, true)
-      .evalCtx.bindings.get("x")!.value!) as ContextValue;
+      .evalCtx.bindings.get("x")!.value! as StructureValue;
     eq(conj === viaUnion, true, "equal label sets are the SAME instance, either operand order");
     // No member copies on instances; no refines edge (the C6.1a guard's
     // reason is gone — this pins its principled replacement).
@@ -1942,9 +2053,9 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       "p = Proof(\"x == x\")",
       undefined, [createTypeSystem()], undefined, true);
     const p = r2.evalCtx.bindings.get("p")!.value!;
-    eq(dataOf(p).kind === ValueKind.Expression, true,
+    eq(p.kind === ValueKind.Expression, true,
       "calling Proof mints nothing — the call stays an inert residual");
-    eq(channelReadRaw(p, "discharged") === undefined, true,
+    eq(metaReadRaw(p, "discharged") === undefined, true,
       "…with no discharged channel");
     // (3) Drawing Proof as a bundle copies FIELD declarations only — the
     // lookalike holds no discharged channel, does not conform, and its
@@ -1961,8 +2072,8 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r3b = evalSource(
       "Fake = Type.define({v: Int}, Proof)\nx = Fake(1)\nx",
       undefined, [createTypeSystem()], undefined, true);
-    const fakeInst = dataOf(r3b.evalCtx.bindings.get("x")!.value!);
-    eq(channelReadRaw(fakeInst, "discharged") === undefined, true,
+    const fakeInst = r3b.evalCtx.bindings.get("x")!.value!;
+    eq(metaReadRaw(fakeInst, "discharged") === undefined, true,
       "the lookalike constructs records — never discharged witnesses");
     // (4) The object-literal forge stays dead (C1.4 gate; scenario A) —
     // the construction gate THROWS on integrity-channel origination.
@@ -1990,31 +2101,35 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
 
   // --- The carrier (C7.1, D15/D46): MultiValue-kind retirement ----------------
 
-  test("carrier (C7.1, D15): typed scalars are transparent structures — one kind, data + channels", () => {
+  test("metadata-bearing values (C7.1, D15): a typed scalar is one value — data plus metadata, never nested", () => {
     const r = evalSource(
       "x = 42\ns = \"hi\"\nf(a: Int): Int => a + 1\ny = f(x)\nP = Int & _ > 0\np = P(5)",
       undefined, [createTypeSystem()], undefined, true);
     const x = r.evalCtx.bindings.get("x")!.value!;
-    // The one kind: a typed scalar answers Structure (the MultiValue kind
-    // is deleted from the enum — this line not compiling would be the
-    // regression).
-    eq(x.kind, ValueKind.Structure, "a typed scalar answers the one structure kind");
-    // Duality: data through dataOf; channels through the channel plane.
-    eq(Number((dataOf(x) as BitsValue).data), 42, "dataOf reads the primary");
-    eq(getType(x) !== null, true, "the type channel rides");
+    // B-121 C2 (maintainer ruling: *behavioural assertions are gold,
+    // structural tests are lead*). Two claims here named the carrier
+    // REPRESENTATION — "a typed scalar answers Structure", and a `.primary`
+    // walk for the no-nesting rule. D48(b) deletes that representation, so
+    // both are restated as what a program observes.
+    //
+    // Duality: the value IS its data; metadata rides the metadata plane.
+    eq(Number((x as BitsValue).data), 42, "the data is the scalar");
+    eq(getType(x) !== null, true, "the type field rides");
     eq(formatValue(x), "42", "display unchanged");
-    // D15: the carrier's data plane is EMPTY — record-shaped consumers
-    // see no slots, so a carrier can never be mistaken for a record.
-    eq((dataOf(r.evalCtx.bindings.get("s")!.value!) as BitsValue).kind, ValueKind.Bits,
-      "string carriers peel to Bits");
-    eq(formatValue(r.evalCtx.bindings.get("y")!.value!), "43", "typed calls flow through carriers");
+    // D15: the data plane holds the scalar and nothing else — record-shaped
+    // consumers see no slots, so a typed scalar is never mistaken for a record.
+    eq((r.evalCtx.bindings.get("s")!.value! as BitsValue).kind, ValueKind.Bits,
+      "a typed string's data is Bits");
+    eq(formatValue(r.evalCtx.bindings.get("y")!.value!), "43", "typed calls flow through metadata");
     eq(formatValue(r.evalCtx.bindings.get("p")!.value!), "5", "refined construction still certifies");
-    // W1 restated: carriers never nest — re-typing a carrier re-wraps its
-    // inner data, never the carrier.
-    const rewrapped = makeMultiValue(x, new Map([["type", dataOf(IntType as unknown as Value)]]));
-    eq((rewrapped as { primary?: Value }).primary !== undefined
-       && ((rewrapped as { primary: Value }).primary as { primary?: Value }).primary === undefined, true,
-      "makeMultiValue on a carrier re-wraps the inner data (no nesting)");
+    // W1 restated behaviourally: attaching metadata never nests. Re-typing an
+    // already-typed value leaves the SAME data underneath, so the peel is
+    // idempotent — a nested wrapper would need two peels to reach the scalar.
+    const rewrapped = withMeta(x, new Map([["type", IntType as unknown as Value]]));
+    eq(rewrapped === rewrapped, true,
+      "one peel reaches the scalar — a nested wrapper would need two");
+    eq(Number((rewrapped as BitsValue).data), 42, "the literal survives the re-type");
+    eq(getTypeNameOf(rewrapped), "Int", "and the re-attached type is the one asked for");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------
@@ -2022,30 +2137,30 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
   test("transparency (C4.3c): eager impls receive full values — channels visible", () => {
     // An eager primitive's impl can read its args' channel plane directly:
     // the boundary no longer strips (R4 — the propagation table alone
-    // governs channels; impls read data through dataOf/asBits).
+    // governs metadata; impls read data off the value itself).
     let seenTypeName: string | null = null;
     let seenDataKind: ValueKind | null = null;
     const probe = makePrimitive("__c43c_probe", (args) => {
       const t = getType(args[0]);
       seenTypeName = t ? bitsToString(getName(t) as BitsValue) : null;
-      seenDataKind = dataOf(args[0]).kind;
+      seenDataKind = args[0].kind;
       return makeInt(1);
     });
     const scope = scopeNew();
-    const typedFive = withType(makeInt(5), IntType as unknown as ContextValue);
+    const typedFive = withType(makeInt(5), IntType as unknown as StructureValue);
     evaluate(makeExpr(probe, [typedFive]), scope);
     eq(seenTypeName, "Int", "the impl sees the arg's type channel");
-    eq(seenDataKind, ValueKind.Bits, "dataOf unwraps the transparent scalar to its data");
+    eq(seenDataKind, ValueKind.Bits, "the impl sees the scalar's data");
   });
 
   test("transparency (C4.3c): proof combinators are plain eager and still see Proof channels", () => {
-    // The former channelAware registration mode is retired — proof_refl is
+    // The former metaAware registration mode is retired — proof_refl is
     // an ordinary eager primitive now, and the Proof structure (a flattened
     // Context since C4.3b) arrives whole.
     const r = evalSource("theorem t: 2 + 2 == 4 by proof_refl(4)\np = proof_refl(7)",
       undefined, [createTypeSystem()], undefined, true);
     const p = r.evalCtx.bindings.get("p")!.value!;
-    eq(channelReadRaw(p, "discharged") !== undefined, true, "proof discharged marker rides");
+    eq(metaReadRaw(p, "discharged") !== undefined, true, "proof discharged marker rides");
     eq(primitives["proof_refl"].lazy ?? false, false, "proof_refl is plain eager");
   });
 
@@ -2058,7 +2173,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const r = evalSource('e = error "boom"\nr = ((e + 1) * 2 - 3) / 4 + 5',
       undefined, [createTypeSystem()], undefined, true);
     const v = r.evalCtx.bindings.get("r")!.value!;
-    const err = channelReadRaw(v, "error");
+    const err = metaReadRaw(v, "error");
     eq(err !== undefined, true, "error channel survives every residual hop");
     eq(formatValue(err as Value), "boom", "the original error payload rides unchanged");
   });
@@ -2075,7 +2190,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const eff = effectsOf(result);
     eq(eff !== null && eff.has("io") && eff.has("net") && eff.size === 2, true,
       `effects merged by union, got {${eff ? [...eff].sort().join(",") : ""}}`);
-    eq(Number((dataOf(result) as BitsValue).data), 1, "primary resolved through the flatten");
+    eq(Number((result as BitsValue).data), 1, "primary resolved through the flatten");
   });
 
   test("baseline: basics.alg output matches the recorded snapshot", () => {

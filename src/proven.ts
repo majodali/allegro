@@ -21,13 +21,12 @@
 // type) is F7+ and likely requires either richer abstract-domain
 // machinery or an external SMT discharge.
 
-import { dataOf, getName, channelReadRaw, componentsView } from "./slots.js";
+import { getName, metaReadRaw, metaOf } from "./slots.js";
 import { scopeLookup } from "./scope.js";
 import {
-  Value, ValueKind, ContextValue, ComposedFunctionValue, ExpressionValue,
+  Value, ValueKind, StructureValue, ComposedFunctionValue, ExpressionValue,
   ParamValue, BitsValue,
-  bitsToString, makeInt, makeMultiValue,
-} from "./types.js";
+  bitsToString, makeInt, withMeta, ownsParam} from "./types.js";
 
 import { evaluate } from "./evaluator.js";
 import { getType, getTypeName, getFunctionParamTypes, BoolType, IntType } from "./types-std.js";
@@ -46,8 +45,8 @@ export interface ProvenFinding {
 /** Resolve a paramType AST/Value to its concrete type Context (via the
  *  evalCtx Symbol lookup if needed). Returns the Context that may carry
  *  `__name`, `abstractDomain`, etc. */
-function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | null {
-  let cur: Value = dataOf(t);
+function resolveTypeContext(t: Value, evalCtx: StructureValue): StructureValue | null {
+  let cur: Value = t;
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
     // C2.3b: chain-aware — type names (Int, Bool, user refinements) may
@@ -56,22 +55,22 @@ function resolveTypeContext(t: Value, evalCtx: ContextValue): ContextValue | nul
     if (!b?.value) return null;
     return resolveTypeContext(b.value, evalCtx);
   }
-  return cur.kind === ValueKind.Structure ? (cur as ContextValue) : null;
+  return cur.kind === ValueKind.Structure ? (cur as StructureValue) : null;
 }
 
 /** Pick sample inputs for a parameter based on its resolved type. Returns
  *  `null` when the type isn't one of the F7-minimum shapes; the caller
  *  records this as a "type not sampleable" info notification. */
-function pickSamples(typeCtx: ContextValue): Value[] | null {
+function pickSamples(typeCtx: StructureValue): Value[] | null {
   const nameBinding = getName(typeCtx);
-  const name = nameBinding && dataOf(nameBinding).kind === ValueKind.Bits
-    ? bitsToString(dataOf(nameBinding) as BitsValue) : null;
+  const name = nameBinding && nameBinding.kind === ValueKind.Bits
+    ? bitsToString(nameBinding as BitsValue) : null;
 
   // Bool — enumerate the domain.
   if (name === "Bool") {
     return [
-      makeMultiValue(makeInt(1), new Map([["type", BoolType as Value]])),
-      makeMultiValue(makeInt(0), new Map([["type", BoolType as Value]])),
+      makeInt(1, new Map([["type", BoolType as Value]])),
+      makeInt(0, new Map([["type", BoolType as Value]])),
     ];
   }
 
@@ -79,7 +78,7 @@ function pickSamples(typeCtx: ContextValue): Value[] | null {
   // at call time inspects the value's type component to verify it
   // satisfies the param's declared type (which may be a refinement).
   const asTypedInt = (n: number): Value =>
-    makeMultiValue(makeInt(n), new Map([["type", IntType as Value]]));
+    makeInt(n, new Map([["type", IntType as Value]]));
 
   // Refined Int (NonNeg / PositiveInt / SmallPos / etc.) — read the
   // abstract domain's `lo` to pick non-trivial samples.
@@ -105,7 +104,7 @@ function pickSamples(typeCtx: ContextValue): Value[] | null {
 
 /** Render a sample value as a short string for counterexamples. */
 function describeSample(v: Value): string {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) return "?";
   const b = p as BitsValue;
   if (b.length !== 64) return "?";
@@ -135,8 +134,8 @@ function substParams(
       return v;
     case ValueKind.Param: {
       const p = v as ParamValue;
-      // Match by owner identity (or unowned) and position.
-      if ((p.owner === cfn || (p as any).owner == null) && posMap.has(p.position)) {
+      // Match by MEMBERSHIP (or unowned) and position — see `ownsParam`.
+      if ((ownsParam(cfn, p) || (p as any).owner == null) && posMap.has(p.position)) {
         return posMap.get(p.position)!;
       }
       return v;
@@ -148,12 +147,8 @@ function substParams(
       const args = e.args.map(a => substParams(a, cfn, posMap, seen));
       return { ...e, fn, args };
     }
-    case ValueKind.Structure: {
-      seen.add(v);
-      const pp = (v as any).primary;
-      if (pp === undefined) return v;
-      return makeMultiValue(substParams(pp, cfn, posMap, seen), componentsView(v) as Map<string, import("./types.js").Value>);
-    }
+    case ValueKind.Structure:
+      return v; // inert — B-121 C4 deleted the carrier arm
     case ValueKind.ComposedFunction: {
       seen.add(v);
       // Don't recurse into inner ComposedFunctions — their Params have a
@@ -182,7 +177,7 @@ function renderPredicateShape(cfn: ComposedFunctionValue): string {
 /** Walk an evalCtx and check every function binding that carries one or
  *  more `proven` clauses. Returns one finding per failing predicate. */
 export function checkProvenClauses(
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
 ): { errors: ProvenFinding[]; infos: ProvenFinding[] } {
   const errors: ProvenFinding[] = [];
   const infos: ProvenFinding[] = [];
@@ -193,17 +188,18 @@ export function checkProvenClauses(
     // Need a ComposedFunction body to peel + sample.
     let cfn: ComposedFunctionValue | null = null;
     let paramTypes: Value[] | null = null;
-    if (val.kind === ValueKind.Structure && (val as any).primary !== undefined) {
-      const mv = val as any;
-      if (mv.primary?.kind === ValueKind.ComposedFunction) {
-        cfn = mv.primary as ComposedFunctionValue;
-        const tComp = channelReadRaw(mv, "type");
-        if (tComp?.kind === ValueKind.Structure) {
-          paramTypes = getFunctionParamTypes(tComp as ContextValue);
-        }
+    // B-121 C2: a typed function is a ComposedFunction carrying a `type`
+    // field, not a Structure wrapping one. The value answers directly, and
+    // `metaReadRaw` is total, so read the type off the binding either way —
+    // asking `kind === Structure` first made every typed function look
+    // untyped and downgraded its failing `proven` clause to a skip.
+    const datum = val;
+    if (datum.kind === ValueKind.ComposedFunction) {
+      cfn = datum as ComposedFunctionValue;
+      const tComp = metaReadRaw(val, "type");
+      if (tComp?.kind === ValueKind.Structure) {
+        paramTypes = getFunctionParamTypes(tComp as StructureValue);
       }
-    } else if (val.kind === ValueKind.ComposedFunction) {
-      cfn = val as ComposedFunctionValue;
     }
     if (!cfn) continue;
 
@@ -240,8 +236,8 @@ export function checkProvenClauses(
     const samples = pickSamples(typeCtx);
     if (!samples) {
       const tn = getName(typeCtx);
-      const tname = tn && dataOf(tn).kind === ValueKind.Bits
-        ? bitsToString(dataOf(tn) as BitsValue) : "<type>";
+      const tname = tn && tn.kind === ValueKind.Bits
+        ? bitsToString(tn as BitsValue) : "<type>";
       infos.push({
         binding: name,
         proposition: renderPredicateShape(cfn),
@@ -265,7 +261,7 @@ export function checkProvenClauses(
           failed = { sample, reason: `evaluation threw: ${e.message}` };
           break;
         }
-        const rp = dataOf(result);
+        const rp = result;
         if (rp.kind !== ValueKind.Bits || (rp as BitsValue).data !== 1n) {
           const rendered = rp.kind === ValueKind.Bits
             ? `${rp.data}` : `<${rp.kind}>`;

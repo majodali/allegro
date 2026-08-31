@@ -1,11 +1,10 @@
 // Allegretto - Evaluator
 
 import {
-  Value, ValueKind, ExpressionValue, ContextValue,
-  ComposedFunctionValue, ParamValue, MultiValueType,
-  AllegroError, isResolved, makeExpr, makeMultiValue, makeContext,
-  DepCollector,
-} from "./types.js";
+  Value, ValueKind, ExpressionValue, StructureValue,
+  ComposedFunctionValue, ParamValue,
+  AllegroError, isResolved, makeExpr, withMeta, makeStructure,
+  DepCollector, ownsParam, Metadata} from "./types.js";
 import {
   getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
@@ -16,9 +15,8 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, channelReadRaw, cloneComponents, componentsView, dataOf, viralChannels, channelSpec, channelMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource } from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource, carryMeta} from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
-import { isCarrier } from "./structure.js";
 
 const MAX_DEPTH = 10000;
 
@@ -108,8 +106,34 @@ const PRIM_TO_METHOD = new Map<string, string>([
 
 // --- Core evaluation ---
 
+/** Lay an outer value's metadata under the metadata of what it evaluated to.
+ *
+ *  Re-evaluation FLATTENS rather than nests: the result's own (fresh) fields
+ *  shadow the outer (stale) ones, because resolved type info should replace a
+ *  partial-eval guess. C4.3a (R3) exempts union-rule fields (effects), which
+ *  merge through the registry-installed merge instead — effects observed
+ *  before re-evaluation are facts, not guesses.
+ *
+ *  B-121 C2: every kind carries metadata now, so this is no longer the
+ *  carrier-Structure case's private business. Symbols and Expressions carry
+ *  their own fields and re-evaluate to something else, so they merge here too.
+ */
+function mergeOverMeta(outer: Metadata, inner: Value): Value {
+  // B-121 C6: the two exits were `withMeta(inner, outer)` and the same call
+  // over the peeled inner value. They differed only while `dataOf` peeled a
+  // carrier — the derive/stamp distinction §3.2 found to be one operation
+  // hidden by the peel — so they are now the same line. C5 deleted the peel.
+  for (const [k, v] of metaOf(inner)) {
+    const prev = outer.get(k);
+    const mergeFn = prev !== undefined && metaFieldSpec(k)?.rule === "union"
+      ? fieldMerge(k) : undefined;
+    outer.set(k, mergeFn ? mergeFn(prev!, v) : v);
+  }
+  return withMeta(inner, outer);
+}
+
 export function evaluate(
-  value: Value, ctx: ContextValue, depth: number = 0, depCollector?: DepCollector,
+  value: Value, ctx: StructureValue, depth: number = 0, depCollector?: DepCollector,
 ): Value {
   if (depth > MAX_DEPTH) throw new AllegroError("Maximum evaluation depth exceeded");
 
@@ -119,32 +143,13 @@ export function evaluate(
     case ValueKind.ComposedFunction:
       return value;
 
-    case ValueKind.Structure: {
-      // C7.1: a CARRIER (primary present) re-evaluates its primary — a
-      // residual under channels is still pending computation; plain
-      // structures self-evaluate.
-      if (!isCarrier(value)) return value;
-      const mv = value as MultiValueType;
-      const ep = evaluate(mv.primary, ctx, depth + 1, depCollector);
-      if (ep === mv.primary) return value;
-      // If re-evaluation produced another structure, FLATTEN rather than NEST.
-      // Inner (freshly-evaluated) components shadow outer (stale) components —
-      // fresh resolved type info should replace pre-computed partial-eval types.
-      // C4.3a (R3): union-rule channels (effects) merge by union via the
-      // registry-installed merge instead of inner-shadows-outer — effects
-      // observed before re-evaluation are facts, not stale guesses.
-      if (ep.kind === ValueKind.Structure) {
-        const merged = cloneComponents(mv);
-        for (const [k, v] of componentsView(ep)) {
-          const prev = merged.get(k);
-          const mergeFn = prev !== undefined && channelSpec(k)?.rule === "union"
-            ? channelMerge(k) : undefined;
-          merged.set(k, mergeFn ? mergeFn(prev!, v) : v);
-        }
-        return makeMultiValue(dataOf(ep), merged);
-      }
-      return makeMultiValue(ep, cloneComponents(mv));
-    }
+    case ValueKind.Structure:
+      // Structures self-evaluate. B-121 C4 deleted the CARRIER arm that stood
+      // here — it re-evaluated the wrapped value, because a residual under
+      // metadata was still pending computation. A residual now carries its own
+      // metadata as an Expression and is handled by that case; `mergeOverMeta`,
+      // extracted from this arm at C2, is what it calls.
+      return value;
 
     case ValueKind.Param:
       return value;
@@ -153,6 +158,11 @@ export function evaluate(
       const resolved = scopeLookup(ctx, value.name);
       if (resolved?.value !== undefined) {
         let result = evaluate(resolved.value, ctx, depth + 1, depCollector);
+        // B-121 C2: a Symbol carries its own metadata now (pre-C2 those
+        // fields rode an enclosing carrier Structure and merged in the
+        // Structure case). Lay them under the resolved value's own.
+        const ownMeta = metaOf(value);
+        if (ownMeta.size > 0) result = mergeOverMeta(new Map(ownMeta), result);
         // Phase C Chunk 2: augment with any scope-local predicates for this
         // name (from branch conditions or in-scope `assert` statements).
         // C2.1: chain-aware — nearest layer wins.
@@ -169,16 +179,22 @@ export function evaluate(
 
     case ValueKind.Expression: {
       const result = evaluateExpr(value, ctx, depth, depCollector);
+      // B-121 C2: as for Symbol — an Expression's own fields used to ride an
+      // enclosing carrier. A TailCall sentinel passes through untouched.
+      const ownMeta = metaOf(value);
+      if (ownMeta.size > 0 && !isTailCall(result)) {
+        return mergeOverMeta(new Map(ownMeta), result as Value);
+      }
       return result as Value;
     }
   }
 }
 
 function evaluateExpr(
-  expr: ExpressionValue, ctx: ContextValue, depth: number, depCollector?: DepCollector,
+  expr: ExpressionValue, ctx: StructureValue, depth: number, depCollector?: DepCollector,
 ): Value | TailCall {
   const fnRaw = evaluate(expr.fn, ctx, depth + 1, depCollector);
-  const fn = dataOf(fnRaw);
+  const fn = fnRaw;
 
   if (fn.kind === ValueKind.PrimitiveFunction) {
     return applyPrimitive(fn, expr.args, ctx, depth, depCollector);
@@ -192,9 +208,8 @@ function evaluateExpr(
     return applyComposed(fn, expr.args, ctx, depth, fnRaw, depCollector);
   }
 
-  // Context as function — constructor call via __construct. `fn` is
-  // already dataOf(fnRaw), so carriers are peeled.
-  const fnCtx = fn.kind === ValueKind.Structure ? fn as ContextValue : null;
+  // Context as function — constructor call via __construct.
+  const fnCtx = fn.kind === ValueKind.Structure ? fn as StructureValue : null;
   if (fnCtx) {
     const ctorSlot = getConstruct(fnCtx);
     if (ctorSlot) {
@@ -256,15 +271,18 @@ function evaluateExpr(
   // error value — err-through-method) or argument propagates instead of
   // being dropped at the application hop. First hit wins, matching viralScan.
   for (const cand of [fnRaw, ...evalArgs]) {
-    // C4.3b: flattened Contexts carry channels too.
-    if (cand.kind !== ValueKind.Structure) continue;
-    for (const chan of viralChannels()) {
-      const comp = channelReadRaw(cand, chan);
+    // B-121 C2: the kind guard here meant "might carry metadata", which was
+    // true only while a typed scalar was a carrier. `metaReadRaw` is total —
+    // it answers `undefined` for a value carrying nothing — so the guard was
+    // redundant even before, and dropping it is what keeps error virality
+    // working once a typed Bits is a Bits.
+    for (const chan of viralFields()) {
+      const comp = metaReadRaw(cand, chan);
       if (comp) {
-        const components = new Map<string, Value>([[chan, comp]]);
-        const typeComp = channelReadRaw(cand, "type");
-        if (typeComp) components.set("type", typeComp);
-        const out = makeMultiValue(residual, components);
+        const meta = new Map<string, Value>([[chan, comp]]);
+        const typeComp = metaReadRaw(cand, "type");
+        if (typeComp) meta.set("type", typeComp);
+        const out = withMeta(residual, meta);
         return residualEffects ? withEffects(out, residualEffects) : out;
       }
     }
@@ -277,7 +295,7 @@ function evaluateExpr(
 function applyPrimitive(
   fn: import("./types.js").PrimitiveFunctionValue,
   args: Value[],
-  ctx: ContextValue,
+  ctx: StructureValue,
   depth: number,
   depCollector?: DepCollector,
 ): Value {
@@ -287,7 +305,7 @@ function applyPrimitive(
   // for eager primitives we read effects off the evaluated args after the
   // fact (logic further down).
   const trackedEffects: EffectSet = new Set();
-  const evalFn = (v: Value, c: ContextValue) => {
+  const evalFn = (v: Value, c: StructureValue) => {
     const r = evaluate(v, c, depth + 1, depCollector);
     if (fn.lazy) {
       const e = effectsOf(r);
@@ -361,18 +379,20 @@ function applyPrimitive(
   if (viralHit) return attachEff(viralHit);
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
-    // Even though args aren't fully resolved, their type components
+    // Even though args aren't fully resolved, their type meta
     // may be known. Use type-level dispatch to infer the result type.
-    // C4.3b: flattened Contexts carry the type channel too.
-    if (evalArgs[0]?.kind === ValueKind.Structure) {
-      const typeComp = channelReadRaw(evalArgs[0], "type");
+    // B-121 C2: the kind guard meant "carries a type", which held only while
+    // typing a scalar wrapped it. Read the field directly; `typeComp` is then
+    // checked for being a Structure, which it genuinely is — a type IS one.
+    if (evalArgs[0] !== undefined) {
+      const typeComp = metaReadRaw(evalArgs[0], "type");
       if (typeComp && typeComp.kind === ValueKind.Structure) {
         const methodName = PRIM_TO_METHOD.get(fn.name);
         if (methodName) {
           // Propagate left operand's type as the residual's type.
           // For comparisons this is imprecise (should be Bool), but the
           // correct type will be determined when the expression fully evaluates.
-          return attachEff(makeMultiValue(residual, new Map([["type", typeComp]])));
+          return attachEff(withMeta(residual, new Map([["type", typeComp]])));
         }
       }
     }
@@ -402,9 +422,11 @@ function applyPrimitive(
   // Type-directed dispatch: if the first arg has a type with a matching method,
   // dispatch through the type instead of calling the base primitive directly.
   // This enables operator overloading (e.g., String + String = concatenation).
-  // C4.3b: flattened Contexts (typed records/arrays) dispatch too.
-  if (evalArgs[0]?.kind === ValueKind.Structure) {
-    const typeComp = channelReadRaw(evalArgs[0], "type");
+  // B-121 C2: same correction — "carries a type" is a metadata question, and
+  // operator dispatch on a typed SCALAR is exactly the case the kind test
+  // used to catch only because the scalar had become a Structure.
+  if (evalArgs[0] !== undefined) {
+    const typeComp = metaReadRaw(evalArgs[0], "type");
     if (typeComp && typeComp.kind === ValueKind.Structure) {
       const methodName = PRIM_TO_METHOD.get(fn.name);
       if (methodName) {
@@ -412,26 +434,28 @@ function applyPrimitive(
         // availability gate as dot access — the formerly deferred C3.2
         // item. An occurrence bound that lacks the operator member
         // denies, exactly as `x.add` would (conscious delta 3).
-        assertMemberAvailable(evalArgs[0], methodName, typeComp as ContextValue);
+        assertMemberAvailable(evalArgs[0], methodName, typeComp as StructureValue);
         // C3.1 (D36): dispatch reads the SHAPE. Member-transparent
         // refinement layers share the parent's member set, so walking them
         // off never changes which method runs; preserveOps/mixin layers
         // mint their own members and ARE shapes (their overrides run).
-        const opShape = typeShape(typeComp as ContextValue);
+        const opShape = typeShape(typeComp as StructureValue);
         // B-097 V3 (D41 stage 3): kernel mediation covers operators too —
         // `a + b` on a type whose `add` is private denies outside the
         // defining scope, exactly as `a.add` would.
         assertMemberReachable(opShape, methodName, ctx);
         const method = typeMethod(opShape, methodName);
         if (method?.kind === ValueKind.PrimitiveFunction) {
-          const primaryArgs = evalArgs.map(dataOf);
-          const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
-          // If the method already returned a typed value (MultiValue), use it as-is.
-          // Methods know their return types (e.g., comparisons return Bool).
+          const result = (method as import("./types.js").PrimitiveFunctionValue).fn(evalArgs, ctx, evalFn);
+          // If the method already returned a typed value, use it as-is —
+          // methods know their return types (comparisons return Bool).
+          // B-121 C2: was `result.kind === Structure`, i.e. "is a carrier",
+          // stand-in for "is typed". Asking directly is also more correct: an
+          // untyped record used to take the already-typed branch.
           let out: Value;
-          if (result.kind === ValueKind.Structure) out = result;
-          else if (result.kind === ValueKind.Bits)  out = makeMultiValue(result, new Map([["type", typeComp]]));
-          else                                       out = result;
+          if (metaReadRaw(result, "type") !== undefined) out = result;
+          else if (result.kind === ValueKind.Bits) out = withMeta(result, new Map([["type", typeComp]]));
+          else                                     out = result;
           out = attachEff(out);
           return propagatedSet ? withPredicates(out, propagatedSet) : out;
         }
@@ -441,7 +465,7 @@ function applyPrimitive(
         // `q1 + q2` on a record type fell through to raw bits_add.
         // Dispatch the same way type_dispatch does for method members:
         // self is the first parameter, full values (channels intact).
-        const mData = method != null ? dataOf(method) : undefined;
+        const mData = method != null ? method : undefined;
         if (mData?.kind === ValueKind.ComposedFunction) {
           // B-097 V3: a composed operator member is the type's own code —
           // its body runs with the type's member privilege planted.
@@ -453,10 +477,10 @@ function applyPrimitive(
   }
 
   // C4.3c (R4): TRANSPARENCY — eager impls receive the full values,
-  // channels intact, and read data through the accessors (dataOf/asBits
-  // are identity-or-unwrap). The boundary no longer strips; the
+  // metadata intact, and read data through the accessors (`asBits` and
+  // friends narrow a kind; nothing peels). The boundary no longer strips; the
   // propagation table alone governs channels. This also retires the
-  // C1.5 `channelAware` registration mode (it is now everyone's default)
+  // C1.5 `metaAware` registration mode (it is now everyone's default)
   // and the "register lazy to dodge stripping" idiom — lazy is purely an
   // evaluation-control choice again.
   if (typeof fn.fn !== "function") {
@@ -466,11 +490,17 @@ function applyPrimitive(
 
   // Type propagation: if the first arg had a type and the result is Bits,
   // propagate the type to the result.
+  // B-121 C2: two corrections. The argument guard was `kind === Structure`
+  // meaning "carries a type"; and `result.kind === Bits` implied "untyped",
+  // because a primitive returning a TYPED scalar returned a carrier. Both are
+  // metadata questions now — `float(x)` returns a Float-typed Bits, which the
+  // old shape would re-stamp with its argument's Int.
   let out: Value;
   if (result.kind === ValueKind.Bits
-      && evalArgs[0]?.kind === ValueKind.Structure) {
-    const typeComp = channelReadRaw(evalArgs[0], "type");
-    if (typeComp) out = makeMultiValue(result, new Map([["type", typeComp]]));
+      && metaReadRaw(result, "type") === undefined
+      && evalArgs[0] !== undefined) {
+    const typeComp = metaReadRaw(evalArgs[0], "type");
+    if (typeComp) out = withMeta(result, new Map([["type", typeComp]]));
     else          out = result;
   } else {
     out = result;
@@ -498,17 +528,18 @@ function applyPrimitive(
 // Table linkage for the grandfathered/bespoke rules lives in
 // assertPropagationTableLinkage below.
 function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
-  const viral = viralChannels();
+  const viral = viralFields();
   for (const arg of evalArgs) {
-    // C4.3b: flattened Contexts carry channels too.
-    if (arg.kind !== ValueKind.Structure) continue;
+    // B-121 C2: guard dropped — see the same pattern above. `metaReadRaw` is
+    // total, so asking every argument costs nothing and asking only
+    // Structures silently stopped propagating from typed scalars.
     for (const chan of viral) {
-      const comp = channelReadRaw(arg, chan);
+      const comp = metaReadRaw(arg, chan);
       if (comp) {
-        const components = new Map<string, Value>([[chan, comp]]);
-        const typeComp = channelReadRaw(arg, "type");
-        if (typeComp) components.set("type", typeComp);
-        return makeMultiValue(makeExpr(residualFn, evalArgs), components);
+        const meta = new Map<string, Value>([[chan, comp]]);
+        const typeComp = metaReadRaw(arg, "type");
+        if (typeComp) meta.set("type", typeComp);
+        return makeExpr(residualFn, evalArgs, meta);
       }
     }
   }
@@ -526,7 +557,7 @@ function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
     ["predicates", "computed"], ["domain", "computed"], ["discharged", "drop"],
   ];
   for (const [chan, rule] of expect) {
-    const spec = channelSpec(chan);
+    const spec = metaFieldSpec(chan);
     if (!spec || spec.rule !== rule) {
       throw new Error(`propagation-table linkage: evaluator implements '${chan}' as ${rule}, registry says ${spec?.rule ?? "unregistered"}`);
     }
@@ -538,7 +569,7 @@ function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
 function applyComposed(
   fn: ComposedFunctionValue,
   args: Value[],
-  ctx: ContextValue,
+  ctx: StructureValue,
   depth: number,
   fnRaw?: Value,
   depCollector?: DepCollector,
@@ -558,7 +589,13 @@ function applyComposed(
     // Type variable unification
     let enrichedCtx = ctx;
     let inferredReturnType: Value | null = null;
-    if (currentFnRaw && isCarrier(currentFnRaw)) {
+    // B-121 C2: was `isCarrier(currentFnRaw)` — "is a carrier" standing in
+    // for "carries a type". A typed function is now a ComposedFunction with
+    // `meta`, not a wrapper, so the guard stopped firing and this whole block
+    // — type-variable unification AND call-site argument checking — was
+    // skipped. Annotations silently stopped rejecting. The `fnType` test on
+    // the next line already asks the real question.
+    if (currentFnRaw) {
       const fnType = getType(currentFnRaw);
       const _fnTypeName = fnType ? getTypeName(currentFnRaw) : null;
       if (fnType && _fnTypeName === "Function") {
@@ -589,12 +626,12 @@ function applyComposed(
           for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
             const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
             if (resolvedParamType.kind !== ValueKind.Structure) continue; // unresolved type var
-            checkArgType(evalArgs[i], resolvedParamType as ContextValue, i, enrichedCtx, depth, depCollector);
+            checkArgType(evalArgs[i], resolvedParamType as StructureValue, i, enrichedCtx, depth, depCollector);
             // C3.2 (D36): the annotation is a knowledge upper-bound — the
             // param crossing is an abstraction boundary. Stamp (widening)
             // or reset (own-shape) the occurrence bound on the value that
             // gets substituted into the body.
-            evalArgs[i] = applyBoundaryBound(evalArgs[i], resolvedParamType as ContextValue);
+            evalArgs[i] = applyBoundaryBound(evalArgs[i], resolvedParamType as StructureValue);
             // Stage D — Surface C call-site enforcement (F2): when the
             // param-type slot has no `effectBound` but `param_effects
             // f: pure` stamped an effect bound onto the Param.effectBound
@@ -668,7 +705,7 @@ function applyComposed(
     if (inferredReturnType && inferredReturnType.kind === ValueKind.Structure) {
       const currentType = getType(result);
       if (!currentType) {
-        result = withType(result, inferredReturnType as ContextValue);
+        result = withType(result, inferredReturnType as StructureValue);
       }
     }
 
@@ -690,13 +727,10 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
     case ValueKind.PrimitiveFunction:
     case ValueKind.Symbol:
       return value;
-    case ValueKind.Structure: {
-      // C7.1: carriers walk their primary; plain structures are inert.
-      if (!isCarrier(value)) return value;
-      const mv = value as MultiValueType;
-      const newP = remapParams(mv.primary, paramMap);
-      return newP === mv.primary ? value : makeMultiValue(newP, cloneComponents(mv));
-    }
+    case ValueKind.Structure:
+      // Structures are inert. B-121 C4: the carrier arm that walked `primary`
+      // is deleted — an Expression carrying metadata is walked by its own case.
+      return value;
     case ValueKind.Param: {
       const replacement = paramMap.get(value);
       return replacement ?? value;
@@ -712,7 +746,7 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
     case ValueKind.ComposedFunction: {
       const newBody = remapParams(value.body, paramMap);
       if (newBody === value.body) return value;
-      const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: value.params, body: newBody };
+      const newFn: ComposedFunctionValue = carryMeta(value, { kind: ValueKind.ComposedFunction, params: value.params, body: newBody });
       if ((value as any).genericParams) (newFn as any).genericParams = (value as any).genericParams;
       for (const k of PRESERVED_FN_META_KEYS) {
         if ((value as any)[k] !== undefined) (newFn as any)[k] = (value as any)[k];
@@ -738,20 +772,17 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
   // (no circular function references in expression tree)
 
   switch (value.kind) {
-    case ValueKind.Structure: {
-      // C7.1: carriers walk their primary; plain structures are inert.
-      if (!isCarrier(value)) return value;
-      const mv = value as MultiValueType;
-      const newP = subst(mv.primary, owner, posMap, seen);
-      return newP === mv.primary ? value : makeMultiValue(newP, cloneComponents(mv));
-    }
+    case ValueKind.Structure:
+      // Structures are inert — see `remapParams` above.
+      return value;
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
       return value;
 
     case ValueKind.Param: {
-      // Match params by position if they belong to this function (by identity or by being unowned)
-      if ((value.owner === owner || value.owner === null) && posMap.has(value.position)) {
+      // Match by position for params this function OWNS (membership, not the
+      // `owner` back-pointer — see `ownsParam`) or that are not yet claimed.
+      if ((ownsParam(owner, value) || value.owner === null) && posMap.has(value.position)) {
         return posMap.get(value.position)!;
       }
       return value;
@@ -784,11 +815,11 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
       const paramMap = new Map<ParamValue, ParamValue>();
       for (let i = 0; i < value.params.length; i++) paramMap.set(value.params[i], newParams[i]);
       const remappedBody = remapParams(newBody, paramMap);
-      const newFn: ComposedFunctionValue = {
+      const newFn: ComposedFunctionValue = carryMeta(value, {
         kind: ValueKind.ComposedFunction,
         params: newParams,
         body: remappedBody,
-      };
+      });
       for (const p of newFn.params) p.owner = newFn;
       // Preserve generic-param metadata across clones so Slice 2's
       // polymorphism resolution still works after substitution.
@@ -814,7 +845,7 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
 
 // --- Context helpers ---
 
-export function resolveInContext(ctx: ContextValue, name: string): Value | undefined {
+export function resolveInContext(ctx: StructureValue, name: string): Value | undefined {
   return scopeLookup(ctx, name)?.value;
 }
 
@@ -829,9 +860,9 @@ import { normalizeType } from "./types-std.js";
  */
 function checkArgType(
   arg: Value,
-  expectedType: ContextValue,
+  expectedType: StructureValue,
   argIndex: number,
-  ctx?: ContextValue,
+  ctx?: StructureValue,
   depth?: number,
   depCollector?: DepCollector,
 ): void {
@@ -867,12 +898,12 @@ function checkArgType(
     const base = getRefines(expected);
     if (base?.kind === ValueKind.Structure) {
       // Recurse on the base type (unwraps nested refinements)
-      checkArgType(arg, base as ContextValue, argIndex, ctx, depth, depCollector);
+      checkArgType(arg, base as StructureValue, argIndex, ctx, depth, depCollector);
       // Base check passed — evaluate the predicate (unless same refined type)
       const argType0 = getType(arg);
       if (argType0 !== expected && ctx && depth !== undefined) {
         const result = evaluate(makeExpr(refinementPredicate, [arg]), ctx, depth + 1, depCollector);
-        const p = dataOf(result);
+        const p = result;
         if (p.kind === ValueKind.Bits && p.data === 0n) {
           const name = typeContextName(expected) ?? "<refined>";
           throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}`);
@@ -914,7 +945,7 @@ function checkArgType(
     if (argType === expected) return; // same refined type — predicate already holds
     if (!ctx || depth === undefined) return; // no eval context — best-effort skip
     const result = evaluate(makeExpr(predicate, [arg]), ctx, depth + 1, depCollector);
-    const p = dataOf(result);
+    const p = result;
     if (p.kind === ValueKind.Bits && p.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`);
     }
@@ -927,8 +958,8 @@ function checkArgType(
     const expectedArgs = getGenericArgs(expected);
     const actualArgs = getGenericArgs(argType);
     if (expectedArgs?.kind === ValueKind.Structure && actualArgs?.kind === ValueKind.Structure) {
-      const expCtx = expectedArgs as ContextValue;
-      const actCtx = actualArgs as ContextValue;
+      const expCtx = expectedArgs as StructureValue;
+      const actCtx = actualArgs as StructureValue;
       const expLenV = getSlotCount(expCtx);
       const actLenV = getSlotCount(actCtx);
       const expLen = Number(expLenV?.kind === ValueKind.Bits ? (expLenV as any).data : 0n);
@@ -953,7 +984,7 @@ function checkArgType(
   const directInstanceof = expected.bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const checkResult = directInstanceof.fn([arg], undefined as any, undefined as any);
-    const checkP = dataOf(checkResult);
+    const checkP = checkResult;
     if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
     }
@@ -962,12 +993,12 @@ function checkArgType(
   }
 
   // Use meta-type instanceof (Type's shape-aware check: nominal if both named, structural otherwise)
-  const typeType = channelReadRaw(expected, "shape") as ContextValue | undefined;
+  const typeType = metaReadRaw(expected, "shape") as StructureValue | undefined;
   if (typeType) {
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const checkResult = instanceofMethod.fn([expected, arg], undefined as any, undefined as any);
-      const checkP = dataOf(checkResult);
+      const checkP = checkResult;
       if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
         throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
       }
@@ -999,7 +1030,7 @@ import { makeParam as makeParamHelper } from "./types.js";
 export function precompileFunction(
   fn: ComposedFunctionValue,
   paramTypes: Value[],
-  ctx: ContextValue,
+  ctx: StructureValue,
 ): { inferredReturnType: Value | null; inferredEffects: EffectSet | null; errors: string[] } {
   const errors: string[] = [];
 
@@ -1013,12 +1044,12 @@ export function precompileFunction(
       // Typed param: create MultiValue(Param, type: paramType). If the type
       // is refined and carries an abstract domain (Phase B), seed the domain
       // on the placeholder so propagation rules fire during precompile.
-      const components = new Map<string, Value>([["type", paramType]]);
+      const meta = new Map<string, Value>([["type", paramType]]);
       const dom = (paramType as any).abstractDomain;
       if (dom && dom.kind !== "opaque") {
-        const domCtx: ContextValue = makeContext();
+        const domCtx: StructureValue = makeStructure();
         (domCtx as any).abstractDomain = dom;
-        components.set("domain", domCtx);
+        meta.set("domain", domCtx);
       }
       // F2: preserve effectBound/effectVar on the placeholder so PE's
       // Param-call residual path can attach the e-effect when the body
@@ -1027,7 +1058,7 @@ export function precompileFunction(
       const innerParam = makeParamHelper(param.position, param._name);
       if (param.effectBound) (innerParam as any).effectBound = param.effectBound;
       if (param.effectVar !== undefined) (innerParam as any).effectVar = param.effectVar;
-      const placeholder = makeMultiValue(innerParam, components);
+      const placeholder = withMeta(innerParam, meta);
       placeholders.push(placeholder);
     } else {
       // Untyped or type variable — leave as bare Param. Same

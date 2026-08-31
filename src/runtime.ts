@@ -3,9 +3,8 @@
 // Bridges the parser's output to the evaluator.
 // =============================================================================
 
-import { isCarrier } from "./structure.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { dataOf, channelReadRaw, cloneComponents, hasShapeSlot, getName, renameInPlace, bumpChannelEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource } from "./slots.js";
+import { metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource, carryMeta} from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
@@ -15,7 +14,7 @@ import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, ContextValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeContext, makeExpr, makePrimitive, makeMultiValue, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError } from "./types.js";
+import { Value, ValueKind, StructureValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeStructure, makeExpr, makePrimitive, withMeta, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError} from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf } from "./effects.js";
 import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOTALITY_NEEDS_ANNOTATION, DivObligation, DivergenceResult } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
@@ -53,25 +52,18 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       seen.add(v);
       const newBody = typeLiterals(v.body, seen);
       if (newBody === v.body) return v;
-      const newFn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params: v.params, body: newBody };
+      const newFn: ComposedFunctionValue = carryMeta(v, { kind: ValueKind.ComposedFunction, params: v.params, body: newBody });
       for (const p of newFn.params) p.owner = newFn;
       // Preserve generic-param / effect-var-param metadata across clones so
       // Slice 2's polymorphism resolution still works after this pass.
       if ((v as any).genericParams) (newFn as any).genericParams = (v as any).genericParams;
       return newFn;
     }
-    case ValueKind.Structure: {
-      // C7.1: only CARRIERS recurse — and only untyped ones. A carrier
-      // already holding a type component was deliberately typed (e.g. by
-      // an earlier typeLiterals pass in a module); re-wrapping would
-      // corrupt it. Plain structures are inert.
-      const pp = (v as { primary?: Value }).primary;
-      if (pp === undefined) return v;
-      if (channelReadRaw(v, "type") !== undefined) return v;
-      const newPrimary = typeLiterals(pp, seen);
-      if (newPrimary === pp) return v;
-      return makeMultiValue(newPrimary, cloneComponents(v));
-    }
+    case ValueKind.Structure:
+      // Structures are inert. B-121 C4: the carrier arm is deleted — the
+      // values this pass types are Bits, which the literal cases above reach
+      // directly now instead of through a wrapper.
+      return v;
     default:
       return v;
   }
@@ -104,11 +96,6 @@ export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
     return v;
   }
 
-  if ((v as { primary?: unknown }).primary !== undefined) {
-    v.primary = resolvePrimitives(v.primary, seen);
-    return v;
-  }
-
   return v;
 }
 
@@ -134,7 +121,7 @@ export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
  */
 export function resolveSymbols(
   fileCtx: any,
-  base?: ContextValue,
+  base?: StructureValue,
   extensions?: Extension[],
   typed?: boolean,
 ): void {
@@ -259,10 +246,9 @@ function patchNamedParams(
     if (!shadows) {
       patchNamedParams(value.body, name, binding, seen);
     }
-  } else if (value.kind === ValueKind.Structure) {
-    const pp = (value as { primary?: Value }).primary;
-    if (pp !== undefined) patchNamedParams(pp, name, binding, seen);
   }
+  // B-121 C4: the Structure arm walked a carrier's `primary`; structures
+  // themselves were always inert here.
 }
 
 /**
@@ -328,11 +314,11 @@ function resolveNamedParams(
       const paramMap = new Map<ParamValue, ParamValue>();
       for (let i = 0; i < fn.params.length; i++) paramMap.set(fn.params[i], newParams[i]);
       const remappedBody = remapParams(newBody, paramMap);
-      const newFn: ComposedFunctionValue = {
+      const newFn: ComposedFunctionValue = carryMeta(fn, {
         kind: ValueKind.ComposedFunction,
         params: newParams,
         body: remappedBody,
-      };
+      });
       for (const p of newFn.params) p.owner = newFn;
       if ((fn as any).genericParams) (newFn as any).genericParams = (fn as any).genericParams;
       return newFn;
@@ -345,13 +331,8 @@ function resolveNamedParams(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.Structure: {
-      const pp = (value as { primary?: Value }).primary;
-      if (pp === undefined) return value;
-      const newP = resolveNamedParams(pp, resMap, selfName, seen);
-      if (newP === pp) return value;
-      return makeMultiValue(newP, cloneComponents(value));
-    }
+    case ValueKind.Structure:
+      return value; // inert — B-121 C4 deleted the carrier arm
   }
   return value;
 }
@@ -414,11 +395,11 @@ function resolveNamedParamsInner(
       const paramMap = new Map<ParamValue, ParamValue>();
       for (let i = 0; i < fn.params.length; i++) paramMap.set(fn.params[i], newParams[i]);
       const remappedBody = remapParams(newBody, paramMap);
-      const newFn: ComposedFunctionValue = {
+      const newFn: ComposedFunctionValue = carryMeta(fn, {
         kind: ValueKind.ComposedFunction,
         params: newParams,
         body: remappedBody,
-      };
+      });
       for (const p of newFn.params) p.owner = newFn;
       if ((fn as any).genericParams) (newFn as any).genericParams = (fn as any).genericParams;
       return newFn;
@@ -431,13 +412,8 @@ function resolveNamedParamsInner(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.Structure: {
-      const pp = (value as { primary?: Value }).primary;
-      if (pp === undefined) return value;
-      const newP = resolveNamedParamsInner(pp, resMap, owner, ownParamNames, selfName, seen);
-      if (newP === pp) return value;
-      return makeMultiValue(newP, cloneComponents(value));
-    }
+    case ValueKind.Structure:
+      return value; // inert — B-121 C4 deleted the carrier arm
   }
   return value;
 }
@@ -472,8 +448,6 @@ function markTailCallsInValue(v: any, seen: Set<any>): void {
   } else if (v.kind === "Expression") {
     markTailCallsInValue(v.fn, seen);
     for (const a of v.args) markTailCallsInValue(a, seen);
-  } else if ((v as { primary?: unknown }).primary !== undefined) {
-    markTailCallsInValue((v as any).primary, seen);
   }
 }
 
@@ -569,7 +543,7 @@ function precompileFunctionsInner(
   report: CompilationReport,
 ): CompilationReport {
   // Build a minimal context for pre-compilation (primitives + extensions)
-  const compileCtx = makeContext();
+  const compileCtx = makeStructure();
   for (const [name, prim] of Object.entries(primitives)) {
     const binding = { key: name, value: prim as Value };
     compileCtx.bindings.set(name, binding);
@@ -625,16 +599,20 @@ function precompileFunctionsInner(
     let fn: Value;
     let fnType: Value | null = null;
     let paramTypes: Value[] | null = null;
-    if (isCarrier(val)) {
-      fnType = getType(val);
-      if (!fnType) continue;
-      const typeName = getTypeName(val);
-      const isTyped = typeName === "Function";
-      const isUntyped = typeName === "UntypedFunction";
-      if (!isTyped && !isUntyped) continue;
-      const valP = (val as { primary?: Value }).primary!;
-      if (valP.kind !== ValueKind.ComposedFunction) continue;
-      fn = valP;
+    // B-121 C2: was `if (isCarrier(val))` reading `val.primary` — "is a
+    // carrier over a ComposedFunction" standing in for "a function value
+    // carrying a type". A typed function is now a ComposedFunction with
+    // `meta`, so both the guard and the `.primary` read had to go. The typed
+    // branch is tried first because a typed function also satisfies the plain
+    // one below it.
+    const fnType0 = getType(val);
+    const typeName0 = fnType0 ? getTypeName(val) : null;
+    const isTyped = typeName0 === "Function";
+    const isUntyped = typeName0 === "UntypedFunction";
+    const datum = val;
+    if (fnType0 && (isTyped || isUntyped) && datum.kind === ValueKind.ComposedFunction) {
+      fnType = fnType0;
+      fn = datum;
       paramTypes = isTyped ? getFunctionParamTypes(fnType) : null;
       if (isTyped && !paramTypes) continue;
     } else if (val.kind === ValueKind.ComposedFunction) {
@@ -663,7 +641,7 @@ function precompileFunctionsInner(
 
     if (inferredReturnType) {
       const inferredName = inferredReturnType.kind === ValueKind.Structure
-        ? getName(inferredReturnType as ContextValue)
+        ? getName(inferredReturnType as StructureValue)
         : null;
       const inferredStr = inferredName && inferredName.kind === ValueKind.Bits
         ? bitsToString(inferredName as BitsValue)
@@ -673,7 +651,7 @@ function precompileFunctionsInner(
       // Check against explicit return type if declared (typed functions only)
       const declaredReturn = fnType ? getFunctionReturnType(fnType) : null;
       if (declaredReturn && declaredReturn.kind === ValueKind.Structure) {
-        const declaredName = getName(declaredReturn as ContextValue);
+        const declaredName = getName(declaredReturn as StructureValue);
         const declaredStr = declaredName && declaredName.kind === ValueKind.Bits
           ? bitsToString(declaredName as BitsValue)
           : null;
@@ -718,13 +696,13 @@ function precompileFunctionsInner(
  */
 export function buildEvalCtx(
   fileCtx: any,
-  base?: ContextValue,
+  base?: StructureValue,
   extensions?: Extension[],
   typed?: boolean,
-): ContextValue {
+): StructureValue {
   // Per-layer add with replace-or-push semantics (same-name re-adds within
   // one layer replace the earlier entry rather than duplicating).
-  function addTo(layer: ContextValue, key: string, value: Value): void {
+  function addTo(layer: StructureValue, key: string, value: Value): void {
     const binding: Binding = { key, value };
     const existingIdx = layer.bindingList.findIndex(x => x.key === key);
     if (existingIdx >= 0) {
@@ -747,7 +725,7 @@ export function buildEvalCtx(
   }
 
   // Layer 2: Extensions (applied in order, later extensions shadow earlier ones)
-  let below: ContextValue = primLayer;
+  let below: StructureValue = primLayer;
   if (extensions && extensions.length > 0) {
     const extLayer = scopeNew(below);
     for (const ext of extensions) {
@@ -813,9 +791,9 @@ export function buildEvalCtx(
  * If the extension has a moduleObject (typed module), returns it as the primary.
  * Otherwise wraps bindings as a plain Context (backward compat).
  */
-export function extensionToContext(ext: Extension): Value {
+export function extensionToStructure(ext: Extension): Value {
   if (ext.moduleObject) return ext.moduleObject;
-  const ctx = makeContext();
+  const ctx = makeStructure();
   for (const [name, value] of Object.entries(ext.bindings)) {
     const binding: Binding = { key: name, value };
     ctx.bindings.set(name, binding);
@@ -861,7 +839,7 @@ function registerDeps(registry: DependencyRegistry, key: string, deps: Set<strin
  */
 function propagateCompletions(
   registry: DependencyRegistry,
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
   completedNames: Set<string>,
 ): void {
   // B-028 F1: ITERATIVE cascade. The former recursion's depth was
@@ -932,7 +910,7 @@ function propagateCompletions(
  */
 export function applyPhase(
   registry: DependencyRegistry,
-  evalCtx: ContextValue,
+  evalCtx: StructureValue,
   newBindings: Map<string, Value>,
 ): void {
   const completed = new Set<string>();
@@ -987,7 +965,7 @@ export function applyPhase(
  */
 export function evalSource(
   source: string,
-  base?: ContextValue,
+  base?: StructureValue,
   extensions?: Extension[],
   grammarExtension?: GrammarExtension,
   typed?: boolean,
@@ -1004,10 +982,10 @@ export function evalSource(
    *  identity = FQN, interned in src/symbols.ts. Exporting is a separate
    *  act (the D42 partition), performed by the module loader. */
   moduleFqn?: string,
-): { value: Value | null; evalCtx: ContextValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
+): { value: Value | null; evalCtx: StructureValue; compilationReport?: CompilationReport; registry: DependencyRegistry } {
   // New pass: Allegro-minted channel registrations from prior passes are
-  // sealed (see ChannelEntry.epoch in slots.ts).
-  bumpChannelEpoch();
+  // sealed (see MetaFieldEntry.epoch in slots.ts).
+  bumpMetaEpoch();
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
@@ -1053,7 +1031,7 @@ export function evalSource(
   }
 
   if (!fileCtx) {
-    return { value: null, evalCtx: base ?? makeContext(), registry: createRegistry() };
+    return { value: null, evalCtx: base ?? makeStructure(), registry: createRegistry() };
   }
 
   // Type literals if standard type system is active
@@ -1090,7 +1068,7 @@ export function evalSource(
     // `precompileFunctions` so we can `evaluate` user-defined type bindings
     // (`NonNeg = Int & _ >= 0`) on demand, in addition to looking up
     // extension-provided types (Int, Bool, …).
-    const totalityCompileCtx = makeContext();
+    const totalityCompileCtx = makeStructure();
     for (const [name, prim] of Object.entries(primitives)) {
       const binding = { key: name, value: prim as Value };
       totalityCompileCtx.bindings.set(name, binding);
@@ -1165,7 +1143,7 @@ export function evalSource(
       if (cfn) cutoffCfns.add(cfn as unknown as Value);
     }
     if (cutoffCfns.size > 0) {
-      setInlineCutoff((fnValue: Value) => cutoffCfns.has(dataOf(fnValue)));
+      setInlineCutoff((fnValue: Value) => cutoffCfns.has(fnValue));
     }
   }
   // Pre-compile typed functions: infer return types and detect type errors
@@ -1246,7 +1224,7 @@ export function evalSource(
       const cfn = divR!.stampTargets.get(name);
       if (cfn) divCfns.add(cfn as unknown as Value);
     }
-    setDivergenceProbe((fnValue: Value) => divCfns.has(dataOf(fnValue)));
+    setDivergenceProbe((fnValue: Value) => divCfns.has(fnValue));
 
     // Phase D1: check effect declarations against inferred sets — now
     // INCLUDING div (CE-R1: a declaration is a contract; `effects pure`
@@ -1299,14 +1277,12 @@ export function evalSource(
       for (const a of v.args) collectSymbolRefs(a, refs, seen);
     }
     if (v.kind === ValueKind.Structure) {
-      const pp = (v as { primary?: Value }).primary;
-      if (pp !== undefined) collectSymbolRefs(pp, refs, seen);
       // B-028 F1: a pending future inside a DATA structure's field is a
       // dependency of the binding holding it (a residualized guarded
       // construction carries the instance with the pending slot inside —
       // D12: incompleteness is a value in a slot). Scopes are not data;
       // never walk their bindings.
-      const ctx = v as ContextValue;
+      const ctx = v as StructureValue;
       if (!ctx.isScope) {
         for (const b of ctx.bindings.values()) {
           if (b.value !== undefined) collectSymbolRefs(b.value, refs, seen);
@@ -1370,7 +1346,7 @@ export function evalSource(
       }
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
-      const typeCtx = dataOf(val).kind === ValueKind.Structure ? dataOf(val) as ContextValue : null;
+      const typeCtx = val.kind === ValueKind.Structure ? val as StructureValue : null;
       if (typeCtx && hasShapeSlot(typeCtx)) {
         const nameV = getName(typeCtx);
         if (nameV?.kind === ValueKind.Bits) {
@@ -1411,7 +1387,7 @@ export function evalSource(
       // forward chaining REPLACES them on completion, dropping anything
       // attached here.
       const storedVal = (complete && !isMetaSlotKey(b.key)
-          && dataOf(val).kind !== ValueKind.Structure)
+          && val.kind !== ValueKind.Structure)
         ? withSource(val, b.value)
         : val;
       let ctxBinding = evalCtx.bindings.get(b.key);

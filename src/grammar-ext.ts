@@ -30,9 +30,8 @@ import {
   parserMakeSymbol,
 } from "./parser.js";
 import {
-  Value, ValueKind, ContextValue, BitsValue,
-  makeContext, makeInt, makeMultiValue, stringToBits, dataOf,
-} from "./types.js";
+  Value, ValueKind, StructureValue, BitsValue,
+  makeStructure, makeInt, withMeta, stringToBits, } from "./types.js";
 import { withType, StringType, ErrorType, IntType, makeArray, noneSingleton } from "./types-std.js";
 
 // --- Types ---
@@ -52,7 +51,7 @@ export const helpers = {
   buildFn: parserBuildFn,
   substName: parserSubstName,
   stringToBits: parserStringToBits,
-  makeContext: parserMakeContext,
+  makeStructure: parserMakeContext,
   bind: parserBind,
   repChildren: parserRepChildren,
   makeSymbol: parserMakeSymbol,
@@ -362,7 +361,10 @@ function wrapParamsWithChecks(
   if (seen.has(body)) return body;
   seen.add(body);
 
-  if (body.kind === "Param" && body.owner === owner && typedParams.has(body.position)) {
+  // Membership rather than the `owner` back-pointer — see `ownsParam` in
+  // types.ts. `owner` is untyped here (grammar helpers), so the test is
+  // written out rather than imported.
+  if (body.kind === "Param" && owner?.params?.includes(body) && typedParams.has(body.position)) {
     const typeExpr = typedParams.get(body.position)!;
     return helpers.makeExpr(
       helpers.prim("type_check"),
@@ -688,10 +690,10 @@ export function parseGrammarToAllegro(gHandle: number, input: string): Value {
   if (result.errors.length > 0) {
     const err = result.errors[0];
     const msg = `parse error at ${err.start.line}:${err.start.column}: ${err.message}`;
-    const components = new Map<string, Value>();
-    components.set("error", withType(stringToBits(msg), StringType));
-    components.set("type", ErrorType);
-    return makeMultiValue(makeInt(0), components);
+    const meta = new Map<string, Value>();
+    meta.set("error", withType(stringToBits(msg), StringType));
+    meta.set("type", ErrorType);
+    return makeInt(0, meta);
   }
   return syntaxTreeToAllegroValue(result.tree);
 }

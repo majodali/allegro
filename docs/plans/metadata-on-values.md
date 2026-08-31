@@ -1,0 +1,631 @@
+# Metadata on values — delete the carrier, build values with their metadata
+
+> Status: **COMPLETE** — §6 ruled 2026-08; C1–C7 landed, every completion count at zero.
+> Owner: **B-121**. Ruled at **D48(b)(c)** (B-108, 2026-08); the *whether*
+> is settled, this plan is the *how*.
+> Outcome (K-007): every representation kind carries its own metadata field,
+> values that will carry metadata are constructed with it, and the carrier —
+> together with `primary`, `isCarrier`, W1 and the `dataOf` indirection —
+> no longer exists.
+
+## 1. Why — settled, and restated only as much as the plan needs
+
+D48(b) was ruled on measurement, not preference. Of 240,820 value
+allocations in the corpus, **56,123 were carriers** — 74% of all structures,
+more than there are Bits values — and **98.5% held exactly one field**
+(99.4% of it `type`). `dataOf` runs 453,199 times and really unwraps 40% of
+them. The most common act in the system was allocating an eleven-field
+`Structure` so that a `Map` could hold one entry.
+
+*(B-122 has since removed 17,169 of those — the live figures are 38,954
+carriers, 70.2% of structures. The shape is unchanged: carriers still
+outnumber the Bits values they wrap.)*
+
+D48(c) added the lifecycle half, which came from a maintainer question
+rather than from measurement: **12 call sites literally read
+`withMetadata(makeInt(0), m)`** — the value never exists without its
+metadata — and one of them is PE Rule 1 itself.
+
+**The change is not a new mechanism.** Structures already work this way:
+`withMetadata` with a Structure primary takes `deriveWithMeta` and the
+metadata rides in `meta`, with no carrier involved. The carrier exists
+only because the other six kinds have nowhere to put that field.
+
+## 2. Four probes run before writing this plan
+
+Each one was a risk this plan would otherwise have had to hedge against.
+
+| Probe | Result | Consequence |
+|---|---|---|
+| Change `withMetadata`'s return type from `StructureValue` to `Value` and typecheck | **0 errors** | **Nothing depends on attaching metadata producing a Structure.** The step feared most is type-safe |
+| Who calls `newCarrierStructure`? | **2 sites, both inside `withMetadata`** | Carriers are constructed in exactly one function, so they can be eliminated atomically rather than hunted |
+| What does the evaluator's carrier arm do? | `if (!isCarrier(value)) return value;` then **evaluate the primary and re-wrap** | It is a hand-written dispatch to the inner kind's behaviour — which the new representation performs by construction (§4.2) |
+| How many `kind === / !== ValueKind.Structure` comparisons exist? | **185** | The real risk surface, and it is behavioural rather than type-level (§5.1) |
+
+## 3. The target
+
+### 3.1 Host types
+
+```ts
+/** METADATA PLANE (concepts.md §18/§19) — the fields a value carries
+ *  through partial evaluation, keyed by registered field name. */
+export type Metadata = Map<string, Value>;
+export interface MetadataBearing { meta?: Metadata; }
+```
+
+extended by all seven value interfaces. `Structure.components` is renamed
+`meta`: `components` always read like *parts of a composite*, which is the
+data plane — exactly what it is not.
+
+**`meta` is optional, and not out of laziness.** Allegretto defines no
+fields (R6, R11: the base owns the mechanism, layers own the fields), so
+under `--base` a value legitimately carries nothing. The two populations
+without metadata are *every value in Allegretto mode* and *engine
+intermediates that never become program values*. It **cannot** become a
+required argument of `makeInt`: that would make L0 depend on a concept it
+does not have, which is B-110's violation relocated into the construction
+path. Optional in the type, **always declared on the object**, per the
+stable-hidden-class convention `types.ts` already states on `makeParam`.
+
+### 3.2 One operation, and two things worth naming
+
+*Corrected 2026-08, after the maintainer asked what distinguishes derive, map
+and stamp in their logic rather than their purpose. The answer is: nothing.
+"Four operations" was an over-decomposition — the mirror image of B-111's
+finding, which was one word over several concepts.*
+
+All three are the same function, `(datum, metadata) → value`. They differ only
+in where the two arguments come from:
+
+| pattern | datum argument | metadata argument |
+|---|---|---|
+| derive | `dataOf(v)` | fresh `m` |
+| map | a freshly computed datum | `cloneMeta(v)` |
+| stamp | an already-computed value | fresh `m` |
+
+**Derive disappears entirely** once carriers are gone: `dataOf` becomes the
+identity, so `derive(v, m)` *is* `stamp(v, m)`. They were never two operations
+that happened to coincide — they were one, hidden by the peel.
+
+The surface is therefore **one operation plus two conveniences**, and each
+convenience earns its place for a reason that is not logical:
+
+| surface | why it exists |
+|---|---|
+| `withMeta(v, meta)` | the operation. Replaces derive and stamp outright |
+| `makeInt(42, meta)`, `makeExpr(fn, args, meta)` | a **lifecycle guarantee** (D48(c)): the value never exists in a metadata-less state. It also saves the intermediate allocation, but that is not the reason |
+| `carryMeta(from, to)` | a **hazard guard**. The map case is spelled as *two* calls today — `withMetadata(newP, cloneMeta(v))` — and omitting the second silently drops metadata with no error, the same convention-only obligation as the TailCall sentinel (B-113). Naming it removes the way to get it wrong |
+
+### 3.3 Per-kind construction, and why each is safe
+
+Measured shares of what carriers wrap, with the clone concern for each:
+
+| kind | share | concern | already solved by |
+|---|---|---|---|
+| Bits | 50.5% | none | — |
+| PrimitiveFunction | 46.0% | host expandos (`FIELD_WRITER_BRAND`) | `primitives.ts` already clones one and re-stamps the brand |
+| ComposedFunction | 1.3% | ~~`param.owner`~~ **DISSOLVED 2026-08**; `PRESERVED_FN_META_KEYS` | the shared clone helper CLAUDE.md mandates. The `owner` question is **moot**: substitution now asks `ownsParam(fn, p)` — membership in `fn.params` — so a clone sharing the array owns them and nothing reads the back-pointer's identity. No back-link, no mutation, no body rewrite |
+| Expression | 1.3% | `memo` | the clone **shares** the map — same `fn`+`args` ⇒ same memo, preserving IC-6 |
+| Param | 0.8% | `owner` | as ComposedFunction |
+| **Symbol** | **0.0%** | interning (SC-4: identity = FQN ⇒ same object) would break under cloning | **does not arise** — measured zero. §6 ruling 2 decides what happens if it ever does |
+
+### 3.4 Why copy-on-attach, recorded so it is not re-litigated
+
+59,027 attachments, of which **19,817 (33.6%) target an object that has
+already been given metadata**. Metadata is a property of a value *in a
+position*, not of the datum. Both no-allocation designs fail on that one
+number: in-place mutation lets a second stamp overwrite the first at every
+position holding the value, and a side table (`WeakMap<Value, Metadata>`)
+fails identically because its key is the object. D22 is the rule adopted
+*because* of this, not the reason itself.
+
+**The legitimate in-place case, which this plan states as a rule**: while a
+value is provably unshared — during construction, before it escapes. The
+carve-out already exists twice, as an idiom rather than a rule
+(`structure.ts`'s grandfathered builder idiom; `writeShape` for
+identity-sensitive type Contexts, ruled at B-104 chunk 3). *Stamp in place
+only before the value escapes; after that, derive.*
+
+## 4. Method
+
+### 4.1 Strictly additive, and the read side never moves
+
+The read surface needs **no change**: `metaReadRaw`, `metaOf` and
+`cloneMeta` each take a `Value`, cast, and read `.meta`. They
+work the moment the field exists on every kind. So the migration adds the
+field first and everything keeps working before anything writes it.
+
+### 4.2 The carrier's evaluator arm is a manual dispatch
+
+```ts
+case ValueKind.Structure: {
+  if (!isCarrier(value)) return value;      // plain structure: inert
+  const mv = value as CarrierStructure;
+  const ep = evaluate(mv.primary, ctx, …);  // carrier: evaluate the inner value
+  …                                         // then re-wrap with its metadata
+}
+```
+
+Three such arms exist (`evaluate`, `remapParams`, and the substitution walk).
+Each forwards to the inner kind's behaviour and then carries the metadata
+onto the result — which is exactly what the new representation does by
+construction: a typed Bits *is* a Bits and takes the Bits branch.
+
+**The one thing that must move rather than vanish** is the re-wrap. Today
+only carriers get "evaluate the inner value, carry the metadata onto the
+result"; afterwards, every kind needs it. Doing it once in `evaluate` — *if
+the input carried metadata and the output is a different object, carry it* —
+is one place instead of three, and is `mapDatum` applied uniformly. **This is
+the single most important correctness step in the plan** and C3 exists for
+it alone.
+
+## 5. Risks
+
+### 5.1a What the first C2 attempt established (2026-08)
+
+The attempt was backed out at the gate rather than landed. It is recorded here
+because it converts §5.1 from a prediction into a measurement, and because the
+fixes it found are precise enough to re-apply mechanically.
+
+**The root cause is one idea, not a list of sites.** Throughout the evaluator,
+*"does this value carry metadata?"* is asked as *"is its kind Structure?"* —
+which was true only because attaching metadata WRAPPED a scalar in a carrier.
+The moment a typed Bits is a Bits, every such test silently inverts. It does
+not fail loudly: the guard stops firing, the metadata stops propagating, and
+the first visible symptom is somewhere else entirely.
+
+Three instances were found and fixed, each a one-line change with a different
+symptom:
+
+| site | the test | symptom when it inverted |
+|---|---|---|
+| `applyPrimitive`, method path | `result.kind === Structure` meaning *already typed* | a typed method result was re-stamped with the operand's type |
+| `applyPrimitive`, general path | `evalArgs[0]?.kind === Structure` meaning *argument carries a type* | arithmetic results came back untyped; the first failure was a declared RETURN type not checking |
+| `applyPrimitive`, general path | `result.kind === Bits` meaning *untyped* | `float(x)` returns a Float-typed Bits, which was then re-stamped Int — `withType`'s shape guard refused |
+
+Each fix is to ask the metadata plane directly — `metaReadRaw(v, "type")` —
+which is also **more correct than the kind test was**: an untyped record used
+to take the already-typed branch.
+
+**A second class, unrelated to kind tests.** Seven hand-written
+ComposedFunction clones (`remapParams`, `subst`, `resolveFreeSymbols`,
+`typeLiterals`, three module/runtime rebuilds) carry `genericParams` and
+`PRESERVED_FN_META_KEYS` but **not** `meta` — because before C2 metadata lived
+on the carrier WRAPPING the function, so a function clone never had to think
+about it. All seven silently dropped it. This is exactly §3.2's `carryMeta`
+case, and it is now demonstrably load-bearing rather than a nicety.
+
+**And a correction to §6 ruling 2's premise, which was mine.** I told the
+maintainer that keeping `param.owner` pointing at the ORIGINAL function was
+the behaviour-preserving answer *because `remapParams` already does that*.
+It is not: `subst` substitutes a Param only when
+`param.owner === theFunctionBeingApplied`, so a metadata clone that shares its
+params matches nothing and **every function call residualises**. The ruling
+itself stands — `owner` should keep naming the original — but it needs a
+`sameComposedFn(a, b)` at the comparison sites, comparing through a
+host-plane back-link from clone to origin. `remapParams` gets away with
+sharing params because its result is not what gets applied.
+
+**Where it stood when backed out**: from roughly 20 failures to 14, with the
+classes narrowing rather than multiplying — but the tail was unknown and the
+gate was red, so the chunk stops here rather than being pushed through. The
+next attempt starts from the three kind-test fixes, `carryMeta` at the seven
+clone sites, and `sameComposedFn`, all of which are described above precisely
+enough to redo in minutes.
+
+**The method lesson worth keeping**: the four probes in §2 were all
+*type-level* and all came back clean, which is exactly why they missed this.
+The risk was behavioural, §5.1 said so, and nothing in the probe set could
+have found it short of running the suite. A probe that cannot fail the way
+the change fails is not evidence about that change.
+
+### 5.1b The survey (2026-08) — 182 sites, 15 that break
+
+Run before re-attempting C2, as the maintainer directed, to convert the
+unknown tail into a list.
+
+**182 comparison sites** against `ValueKind.Structure` across `src/`
+(excluding the generated parser). Classified by what the branch DOES rather
+than by how the test is written, because the syntax carries no information:
+a site is dangerous only when `kind === Structure` is standing in for
+*"carries metadata"*.
+
+| | count |
+|---|---|
+| Sites where the branch neither reads nor writes the metadata plane | **144** — composite tests, unaffected |
+| Sites where it does — the risk set | **38** |
+| Of those, the subject is definitionally a TYPE (and a type IS a Structure) | **23** — safe |
+| **Sites where the test means "carries metadata"** | **15** |
+
+**The survey validates itself**: it independently flags the three sites the
+first C2 attempt found by trial, and it explains the failures that attempt saw
+but had not yet traced —
+
+| site | what it guards | symptom seen in the C2 attempt |
+|---|---|---|
+| `primitives.ts:92` (`formatValue`) | reading `error` / `type` | strings printing as `Bits(24, 0x736579)` |
+| `evaluator.ts:259`, `503` | propagating VIRAL fields from args | *"E1 equality: errors stay viral through `==`"* |
+| `primitives.ts:576` | an error-carrying `if` condition | `provable-demo.alg` |
+| `evaluator.ts:366`, `405`, `431`, `470` | type propagation onto results | the three found by trial |
+| `primitives.ts:2001`, `2460`; `evaluator.ts:135`; `totality.ts:173`, `336`; `introspect.ts:240` | type / viral / predicate reads | not reached before the attempt stopped |
+
+**And the fix is smaller than the count suggests.** The metadata accessors are
+already **total** — `metaOf(v)` answers an empty map and `metaReadRaw(v, k)`
+answers `undefined` for a value carrying nothing. So at most of these sites the
+kind test is not a guard that needs replacing; it is a **pre-C1 necessity that
+is now redundant**, and the fix is to *delete it*. The remainder ask a real
+question and get `metaReadRaw(v, "type") !== undefined` instead.
+
+**One site is a plane violation as well as a break.** `totality.ts:173` reads
+`(v as any).primary` directly to detect a carrier — the exact access the
+boundary lint forbids for `.meta`, going through an `any` cast that hides it.
+It dies with the carrier either way, but it should be counted against B-104's
+ratchet rather than discovered by C2.
+
+**Landed 2026-08, ahead of the attachment switch and green at every step.**
+All **14** sites corrected while carriers still exist, which is what makes them
+reviewable: each is behaviour-neutral today and load-bearing after. (The survey
+said 15; the true count is 14 — `primitives.ts:2704` re-classified on reading,
+its subject being `getRefines(...)`, a type.)
+
+**One site was mis-classified, and it is the interesting one.**
+`totality.ts:336`'s kind guard was doing **two** jobs: gating a metadata read
+*and* selecting a code path, because its branch ended in `return null` and the
+`Param` branch was the alternative. Deleting it wholesale made every Param
+subject return null and silently disabled exhaustiveness checking — five
+totality tests. The fix is to ask the metadata question for any kind and let
+the branch **fall through** rather than return. The lesson refines the rule
+above: classify what the code does, and *a guard may be doing more than one
+thing*.
+
+**Method note.** This is what §2's four probes should have been. They were all
+type-level and all came back clean; this one is a classification of behaviour
+and it found the whole set in one pass. The rule worth keeping: *classify what
+the code DOES at each site, not what it looks like.*
+
+### 5.1d Behavioural assertions are gold, structural tests are lead
+
+Maintainer ruling, 2026-08, on the two tests that pinned the carrier
+representation. Both were rewritten to assert what a program can observe —
+*a typed literal carries its type and its data is the scalar*; *an error value
+carries the `error` field and has a type* — instead of *it is a Structure,
+born immutable, with an empty data plane*.
+
+**They were changed on the GREEN tree and pass with carriers still in place.**
+That is the point rather than a convenience: a representation-independent
+assertion holds in BOTH representations, so proving it under the old one shows
+the rewrite is not a re-pointing of the test at the new answer. Six structural
+claims went; six behavioural ones took their place, and the composite
+assertions beside them — records, type Contexts and scopes really are
+Structures — were left untouched, because that is not what C2 changes.
+
+The rule generalises past this chunk and belongs in the methodology delta: a
+test that names a representation fails when the representation is *improved*,
+which trains a maintainer to weaken tests. A test that names an observable
+property fails only when behaviour regresses.
+
+### 5.1c Step 3, and the class the survey could not see
+
+C2 was re-attempted in three gated steps, which worked far better than one
+change: **steps 1 and 2 are landed and green**, and only the switch itself is
+outstanding.
+
+| step | what | state |
+|---|---|---|
+| 1 | the 14 kind-test fixes (§5.1b) | **landed**, green — behaviour-neutral while carriers still exist |
+| 2 | `carryMeta` at the seven clone sites | **landed**, green |
+| 3 | `withMetadata` attaches per-kind clones | **landed**, green at 1202/1202 |
+
+**A fourth class, which the survey missed by construction.** The survey
+classified `kind === Structure` tests. This one is invisible to that: **`dataOf`
+was doing double duty** — peeling the carrier *and*, as a side effect,
+**stripping metadata**, because a carrier's inner value held none. Now `dataOf`
+is the identity and strips nothing, so every site that used it to RESET a
+value before re-stamping carries the old type forward and trips `withType`'s
+shape guard.
+
+Enumerated the same way — instrument the guard, run the corpus, read the
+sites — and it is **five call sites**, all saying "stamp" where they mean
+"replace": `typed_float_impl`, and the four built-in constructors
+(`Int`/`Float`/`String`/`Bool` `__construct`). `withTypeReplacing` already
+exists for exactly this and its own comment says *"construction-point re-tags
+use withTypeReplacing"*. Both fixes are one word each.
+
+**A fifth class: "carries metadata" written without naming a kind.** The
+survey's regex looked for `ValueKind.Structure`. Six sites asked the same
+question in words the regex could not match, and each one silently disabled a
+check rather than throwing:
+
+| site | what it said | what it meant | symptom |
+|---|---|---|---|
+| `evaluator.ts` call-site block | `isCarrier(currentFnRaw)` | does this function carry a type? | type-variable unification **and** `checkArgType` skipped — `f(s: String) => s; f(42)` stopped rejecting |
+| `runtime.ts` precompile | `isCarrier(val)` + a `.primary` read | is this a function value carrying a type? | typed functions never precompiled |
+| `types-std.ts` `unifyTypes` | `isCarrier(actualType)` | is this a VALUE carrying a type, or the type itself? | genuine discrimination — see below |
+| `primitives.ts` `carriesViralField` | `kind !== Structure → false` | does this value carry a viral field? | an error value that is not a Structure threw out of the completion cascade |
+| `proven.ts` `checkProvenClauses` | `kind === Structure && primary !== undefined` | is this a function carrying a type? | every typed function looked untyped, so a **failing `proven` clause downgraded to a skip** |
+| `evaluator.ts` metadata merge | only the `Structure` case merged | any value may carry metadata over what it evaluates to | Symbols and Expressions dropped their own fields — `effects` stopped unioning |
+
+`unifyTypes` is the one that was not a stand-in. `isCarrier` there separated a
+**value carrying a type** from a **type Context**, whose `getType` reports its
+meta-type instead — a real distinction that survives C2 and had to be restated
+directly (`dataOf(t).kind !== Structure`), not deleted.
+
+The merge site generalised rather than moved: `mergeOverMeta` now states the
+flatten rule once, and the `Symbol` and `Expression` cases call it. Before C2
+those kinds could not carry metadata, so an enclosing carrier Structure held
+their fields and the Structure case did the merging for them.
+
+**The representation-pinning tests were the blocking question, and it is
+answered.** §5.1d records the ruling. Three tests carried such assertions; all
+three are rewritten behaviourally, and the third — *"typed scalars are
+transparent structures"* — is now *"a typed scalar is one value — data plus
+metadata, never nested"*, asserting an idempotent `dataOf` peel instead of a
+`.primary` walk.
+
+**Method note, worth more than the fixes.** Each class was enumerated in ONE
+instrumented run rather than found by iterating the suite: instrument the
+failing guard, record the call site, read the list. That is the same move as
+the survey, applied to a failure rather than to a grep — and it is what turned
+a tail that read as unbounded on the first attempt into a list of six.
+
+### 5.1e C4: the review the ruling required, and what it turned up
+
+**The carrier was already gone before C4 started.** `newCarrierStructure` had
+no callers — the `types.ts` import was unused — and instrumenting the factory
+and running the full suite recorded **zero carriers constructed across 1200
+tests**. So every deletion below removed dead code rather than changing
+behaviour, which is what made the chunk safe to take in one pass.
+
+**The review found a live coverage regression, which is why ruling 3 was
+worth having.** W2 and W3 were checked inside the boundary walker's carrier
+branch — the only place metadata could be found on a non-Structure value. C2
+stopped constructing carriers, so that branch went dead and silently took both
+checks with it. Measured on the corpus walk: **564 of the 2034** metadata-bearing
+values the walk reaches had their metadata inspected by nothing (Bits 477,
+ComposedFunction 85, PrimitiveFunction 2), and **W2 had no coverage at all**.
+A walk over nothing still passes, so the gate could not see it — the same
+silent-failure shape as C2's six sites.
+
+Fixed by hoisting both checks to key on `meta` being present rather than on
+what kind the value is, which is what they were always about. The corpus now
+inspects **3062** values instead of 1470, with zero violations. That is a MOVE,
+so it landed ahead of the retirements rather than waiting on the ruling.
+
+| invariant | disposition | reasoning |
+|---|---|---|
+| **W1** carrier-non-nesting | retired | Both arms test a carrier's `primary`. Its successor — attaching metadata never nests — is asserted behaviourally in C2's test as an idempotent `dataOf` peel. With `primary` deleted, `dataOf` is the identity and W1 is vacuous rather than merely unchecked |
+| **W2** type-field-shape | kept, moved | Was checked only in the carrier branch; now kind-independent |
+| **W3** registry-completeness | kept, moved | Same. The `__*` binding-key half is unaffected |
+| **W4** structure-kind | one arm retired | "carrier is not a Structure instance" goes; "Context is not a Structure instance" is untouched |
+| **W5** role-transparency | retired | Both arms are about two roles sharing one class. With one role left there is nothing to keep exclusive |
+| **W6** dense-view-coherence | untouched | Not about the carrier |
+
+**Three tests, reviewed individually as the ruling requires.** The walk test
+kept its body and lost W1 from its name. `Context role has no primary (D17)`
+was retired — D17's content is asserted by the lines around it, and
+`primary === undefined` was only the carrier-era spelling of it. The third is
+the one worth recording: `types-battery.ts`'s
+`eq(getType(result) !== null || result.primary === undefined, true)` would have
+had its right disjunct become permanently true, turning a real check into an
+unconditional pass. Deleting a field can silently disarm an assertion that
+merely mentions it. The disjunct was dropped, which strengthens the test to
+what its name claims, and the maintainer ruled on that rather than the plan
+assuming it.
+
+**The deletion itself was uniform.** 46 `.primary` reads across twelve files
+were almost all one shape — a dead tree-walk arm, one per walker — plus the
+peel inside `dataOf`, `isResolved` and `asStructure`. Every `CarrierStructure`
+cast was a route to `.meta`, which C1 had already put on all seven kinds, so
+the casts dropped rather than moved. `dataOf` is now literally `return v` and
+waits for C5.
+
+### 5.1f C6: what "four operations" turned out to be
+
+The chunk delivered what §3.2 says rather than what the C6 row said, because
+the row predated the maintainer's correction. Recorded here so the gap between
+them is deliberate.
+
+**Factories take metadata (D48(c)) — the substance of the chunk.** `makeBits`,
+`makeInt`, `makeFloat`, `makeExpr` and `makeSymbol` take an optional `meta`,
+and the **12** create-then-attach sites collapse into one construction, PE Rule
+1 first. The parameter is optional because Allegretto defines no fields
+(R6/R11), and it is always DECLARED on the object either way, per the
+stable-hidden-class convention. The guarantee is a lifecycle one — there is no
+window in which the value exists without what it must carry — and skipping the
+intermediate allocation is a consequence, not the reason.
+
+**The 10 derive sites became stamps by deleting a word.** `withMeta(dataOf(v),
+m)` and `withMeta(v, m)` differed only while `dataOf` peeled a carrier. This is
+the concrete evidence for §3.2's correction: derive was never an operation, it
+was stamp seen through the peel.
+
+**`withMetadata` is renamed `withMeta`.** The completion test asked for that
+count to reach zero, and it does — but by rename, not by the decomposition into
+`deriveMeta`/`mapDatum`/`stampMeta` the test was written to expect. The name
+now matches the family it belongs to (`carryMeta`, `cloneMeta`, `metaOf`,
+`metaReadRaw`), which is the only argument for the change; it is churn
+otherwise, and worth flagging as such.
+
+**Nothing else was added.** The temptation was to give the remaining ~24 stamp
+sites a name each, which is what "four operations" would have produced: a
+vocabulary describing where arguments come from rather than what the code does.
+`carryMeta` survives as the one named pattern, and it earns that on a hazard
+argument — the map case is two calls and the second is forgettable — not a
+logical one.
+
+### 5.1g C5: deleting the peel, and why it was safe in a way the survey was not
+
+**849 calls removed across 32 files**, plus the definition, the `slots.ts`
+re-export and every import specifier. `dataOf` is gone and the retired-name
+lint — which already forbade `primaryOf` — now forbids both.
+
+**The safety argument is different in kind from C2's**, and worth stating
+because it is what justified doing 849 sites in one pass. `dataOf` was
+*provably the identity function* after C4: its whole body was `return v`. So
+removing a call cannot change runtime behaviour, whatever the call site does.
+Only the STATIC types move — and every way they can move is a typecheck error,
+not a silent failure. That is the opposite of C2, where the risk was precisely
+that checks stopped firing without saying so.
+
+**What the type shift actually surfaced**, all caught by `tsc`:
+
+| finding | sites | what it was |
+|---|---|---|
+| precedence | 2 | `dataOf(a ?? b) as BitsValue` → `a ?? b as BitsValue`, which binds the cast to `b` alone. Removing a call wrapper re-binds a following `as` |
+| inference barrier | 4 | `dataOf`'s declared `Value` return was breaking a control-flow cycle in `walkForWhen`: narrowing `cur` in the loop depends on `cur = elseFn.body`, which depends on `args`, which depends on the narrowed `cur`. TS7022. Fixed by annotating what the peel implied |
+| self-assignment | 1 | `cur = dataOf(cur)` became `cur = cur` |
+
+The precedence class was found by re-scanning HEAD for the shape rather than
+by waiting for the compiler: *a `dataOf` call whose argument holds a
+top-level low-precedence operator and which is followed by `.`, `[` or `as`*.
+It reported exactly two, both already known — a negative result that bounded
+the class instead of leaving it open.
+
+**Two assertions the deletion disarmed, which is the C4 lesson repeating.**
+`eq(dataOf(p) === p, …)` reduces to `eq(p === p, …)` — a line that reads like a
+check and tests nothing. The transform CREATED them, so this is not a case of
+spotting an old hazard but of a mechanical edit manufacturing one. Both are
+retired: what they asserted (this value is not wrapped) is structural truth
+now, and the behavioural line beside each already carries it.
+
+**The B-128 tension, recorded rather than resolved.** Deleting the data-plane
+accessor runs against "police the planes with interfaces": the data plane
+loses its named reader. The counter-argument is that there is no longer a
+projection to name — a value's data IS the value, so an identity function
+would advertise a plane boundary that does not exist, which is its own kind of
+misleading. Worth revisiting when B-128 designs the enforcement, because that
+work may want a data-plane accessor back for reasons this chunk did not weigh.
+
+### 5.1h C7: closing the spine, and one entry left open on purpose
+
+**The in-place rule is stated where the carve-outs live.** `structure.ts`
+carries it in full beside the D22 immutable-bit carve-outs — *write in place
+only while the value is provably unshared; after it escapes, derive* — with the
+measurement it follows from (19,817 of 59,027 attachments target an
+already-stamped object, so a post-escape write would overwrite the first stamp
+at every position holding the value). `writeShape` in `slots.ts`, the other
+instance, now cites it as the rule's second clause rather than an exception to
+it: all 24 call sites stamp a fresh Context before it escapes.
+
+**§10 is retired in place rather than renumbered.** The plan said "§10 leaves
+the spine", and in substance it has — the concept is gone. But the section
+numbers are stable identifiers, the way §19b and §33b show, and entries cite
+each other by number; renumbering forty entries to remove one would break
+those for no gain. The marker records what the carrier was, why it went, and
+what went with it, which is information a reader of a concept spine wants.
+
+**§11 (data plane) lost the distinction that was the carrier's shadow.** It
+described *two consumers with different interfaces* — from inside the language
+a value simply is its data, while the host could see the wrapper and needed
+`dataOf` to see past it. Deleting the wrapper makes those one view. The rule
+that survives is the one that mattered: primitives receive FULL values, and an
+impl that stripped its arguments would drop every field they carry.
+
+**One delta is left open on purpose**, against the pattern of this plan. §11
+now names a plane with **no reader at all**, which runs against B-128's "police
+the planes with interfaces". The argument for it is in the entry — there is no
+projection left, so an accessor would advertise a boundary that does not exist
+— but that was settled inside a deletion chunk which was not weighing
+enforcement. Recording it as closed would hide a decision from the work most
+likely to want to revisit it, so §11's delta says B-128 should re-open it.
+
+**The spine deltas close, one with a correction.** Delta 50 (the carrier is 74%
+of structures) closes outright. Delta 51 (`withMetadata` is four operations)
+closes **as corrected**: it was one, and the four patterns differ only in where
+their arguments come from. The D48 write-up's sentence proposing four names is
+amended in place rather than quietly left standing, because a ruling that was
+half withdrawn should say so.
+
+### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
+
+`kind === ValueKind.Structure` appears 117 times and `!==` 68 more. Today a
+typed `42` answers **Structure**; afterwards it answers **Bits**. Any site
+meaning *"is this composite?"* is currently **wrong about carriers** and is
+defended by peeling with `dataOf` first (903 uses) — those sites get *more*
+correct, not less. The danger is the inverse: a site that relies on a typed
+scalar answering Structure. **The suite is the oracle** and C2 is where this
+surfaces; the plan does not claim to have found them all by reading, because
+it has not.
+
+### 5.2 Boundary invariants about a concept being deleted
+
+W1 (carriers never nest) and W5 (a carrier's data plane is empty) become
+vacuous — there is nothing left to violate. Removing them is **not**
+weakening a test condition in PROCESS §6's sense, because the construction
+they forbid becomes unconstructible, but it is close enough to the line that
+§6 ruling 3 asks for it explicitly rather than assuming it.
+
+### 5.3 Allocation is not obviously reduced, and the plan should not claim it is
+
+Attachment count is unchanged (~1:1 with carriers today). What changes is
+**what** is allocated: a same-kind clone (Bits: 3 fields) instead of an
+eleven-field `Structure`, plus one fewer indirection on 453,199 `dataOf`
+calls. The metadata `Map` itself is **not** removed. Any further win —
+e.g. exploiting that 98.5% of metadata is a single `type` entry — is a
+separate optimisation below this choice and is out of scope.
+
+## 6. Rulings — taken 2026-08
+
+1. **Vocabulary — ruled, and wider than the question asked.** The plane is
+   **metadata**; the data attached to a value is **meta**; metadata has
+   **fields**, which are registered, so they are **metadata fields**. A
+   **channel** is an independent high-level system *capability* that uses
+   metadata fields. Every use of *component* or *channel* — alone or inside
+   an identifier — was to be examined and changed where it referred to
+   metadata.
+
+   The examination produced a clean answer: **today every registry entry is a
+   metadata field, so the host-side rename is total.** No channel-level
+   mechanism exists yet; B-111 introduces one and takes the word back. This
+   ruling therefore also settles **B-111's naming half**, leaving that item
+   structural.
+
+2. **Symbol — ruled: assert, but WARN rather than error.** Metadata on an
+   interned Symbol is measured at zero, and no use case for user-created
+   Symbols has been defined; if one appears, the form its metadata should
+   take is not yet clear. So the check emits a **warning**, and is expected
+   to be removable later. Lands with C2, where attachment changes.
+
+3. **W1 / W5 — ruled: retire obsolete tests, but review each one first.** Not
+   a blanket deletion. C4 presents each affected invariant and test
+   individually before removing it.
+
+4. **`dataOf` deletion — ruled: its own chunk** (C5).
+
+## 7. Chunk sequence
+
+| Chunk | Delivers | Gate |
+|---|---|---|
+| **C1** | ~~`Metadata` / `MetadataBearing` declared and extended by all seven interfaces; `Structure.components` → `meta`; every factory declares the field~~ **DONE 2026-08**, widened by ruling 1 to the whole metadata vocabulary: **430 identifier renames across 28 files** plus the registry's storage and disposition labels. Nothing writes the new field yet | Suite **1198/1198**; typecheck clean |
+| **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier, **preceded by the 14 kind-test fixes the survey (§5.1b) enumerates** and `carryMeta` at the seven clone sites. Carriers stop being created; `dataOf` still compiles and returns `v` | **DONE 2026-08** in three gated steps after a first attempt was backed out at the gate (§5.1a). Suite **1202/1202**; typecheck clean. Steps and the two classes the survey could not see: §5.1c |
+| **C3** | The carrier's re-wrap moves into `evaluate` as one uniform carry (§4.2); the three carrier arms are deleted | Suite green; PE fixtures are the oracle for metadata surviving evaluation |
+| **C4** | Delete `primary`, `isCarrier`, `CarrierStructure`, `newCarrierStructure`, W1/W5 and the walker's carrier branch. `concepts.md` §10 leaves the spine | **DONE 2026-08.** Every count at zero; §6 ruling 3 applied — §5.1e records the review and the coverage regression it found |
+| **C5** | Delete `dataOf` and its call sites — mechanical, counts as the completion test | **DONE 2026-08.** **849** calls removed across 32 files; the count is zero and the retired-name lint now forbids the identifier. §5.1g |
+| **C6** | One operation and two conveniences (§3.2): the factories take metadata, the 12 create-then-attach pairs collapse — **PE Rule 1 first** — the 10 derive sites become stamps, and `withMetadata` is renamed `withMeta` to join the `*Meta` family | **DONE 2026-08.** Suite green; `withMetadata` at zero. §5.1f |
+| **C7** | The in-place rule (§3.4) stated where `writeShape` and the builder idiom live; `concepts.md` §10/§11 updated and their deltas closed | **DONE 2026-08.** §10 retired in place (numbering is a stable identifier), §11 rewritten, spine deltas 50 and 51 closed — 51 with the correction that it was one operation, not four. §5.1h |
+
+**Completion test** (concept-campaign §9.4): a chunk is done when the spine
+delta rows it claims read `—`, and the renames carry counts —
+`primary` 196 → 0 (C4), `isCarrier` 14 → 0 (C4),
+`CarrierStructure` 24 → 0 (C4), `withMetadata` 69 → 0 (C6, renamed `withMeta`),
+`dataOf` 903 → 0 (C5).
+
+*Revised at C6*: the completion test read `withMetadata` → 0 because the plan
+then expected three replacement names. §3.2's correction leaves one operation,
+so the count reaches zero by RENAME rather than by decomposition — the same
+number, a different reason, and worth saying so rather than letting a green
+count imply a decomposition that did not happen.
+
+## 8. What this plan is not
+
+It is **not** a performance arc. The allocation shape improves, but §5.3 says
+plainly what does and does not get cheaper, and no chunk is justified by a
+benchmark. The justification is R7 — the distance between what the
+specification says a value is and what the implementation makes it — and the
+measured fact that 74% of all structures existed to work around a missing
+field.
+
+It is also **not** IC-2. B-120 (the entry-sequence composite) changes what a
+*Structure* is; this changes where *metadata* lives. They meet only at the
+end, where together they leave one role — record — which is what SC-5 said
+it was buying.

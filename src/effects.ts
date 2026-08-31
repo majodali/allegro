@@ -24,10 +24,10 @@
 // syntax.
 // =============================================================================
 
-import { dataOf, componentsView, cloneComponents, installChannelMerge } from "./slots.js";
+import { metaOf, cloneMeta, installFieldMerge, registerMetaField } from "./slots.js";
 import {
-  Value, ValueKind, ComposedFunctionValue, ContextValue, MultiValueType,
-  makeMultiValue, makeContext,
+  Value, ValueKind, ComposedFunctionValue, StructureValue,
+  withMeta, makeStructure,
 } from "./types.js";
 
 // =============================================================================
@@ -97,12 +97,12 @@ export function unwrapEffectsAttach(fn: import("./types.js").ComposedFunctionVal
  *  the analyzer treats that as "no declaration". */
 function extractLabelArray(v: Value): EffectSet {
   const out: EffectSet = new Set();
-  const e = dataOf(v);
+  const e = v;
   if (e.kind !== ValueKind.Expression) return out;
-  const fn = dataOf(e.fn);
+  const fn = e.fn;
   if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "typed_array") return out;
   for (const a of e.args) {
-    const p = dataOf(a);
+    const p = a;
     if (p.kind === ValueKind.Symbol) out.add(p.name);
     // Bits-encoded string literals would be `String "label"` — also accept.
     // (Not currently emitted by the grammar, but cheap to support.)
@@ -156,10 +156,10 @@ export function effectDifference(inferred: EffectSet, declared: EffectSet): Effe
  *  after. Slice 2 Stage C3: covers polymorphic functions whose declared
  *  effect sets need to be checked at compile time, not deferred to a callsite. */
 function asFunction(v: Value): ComposedFunctionValue | null {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.ComposedFunction) return p;
   if (p.kind === ValueKind.Expression) {
-    const target = dataOf(p.fn);
+    const target = p.fn;
     if (target.kind === ValueKind.PrimitiveFunction
         && (target as any).name === "typed_function"
         && p.args.length >= 1) {
@@ -254,18 +254,26 @@ export function opaqueEffectNotices(
 // JS-side `effectSet` field. Encoding is hidden behind `withEffects` /
 // `effectsOf`; consumers shouldn't reach into the component directly.
 
-export const EFFECTS_COMPONENT_KEY = "effects";
+export const EFFECTS_FIELD = "effects";
 
 // C1.5: the effects channel's union-merge, installed into the propagation
 // table so generic executors can merge encoded effect sets without this
 // module's encoding leaking into slots.ts.
-installChannelMerge("effects", (a: Value, b: Value) => {
+// --- This layer's field (B-109(a), concept-campaign C3) ----------------------
+// The effects extension owns `effects`. `union` is the discipline: a result's
+// effects are the union of its operands' — which is also why the merge below
+// is INSTALLED by this layer rather than known to the base. Registered at
+// module scope; registration is one-shot, so it must not sit inside a
+// per-evaluation factory.
+registerMetaField({ name: "effects", rule: "union" });
+
+installFieldMerge("effects", (a: Value, b: Value) => {
   const merged = effectUnion(decodeEffects(a) ?? new Set(), decodeEffects(b) ?? new Set());
   return encodeEffects(merged);
 });
 
 function encodeEffects(eff: EffectSet): Value {
-  const ctx: ContextValue = makeContext();
+  const ctx: StructureValue = makeStructure();
   (ctx as any).effectSet = eff;
   return ctx;
 }
@@ -285,10 +293,10 @@ function decodeEffects(v: Value): EffectSet | null {
  *       functions in standard mode).
  *  Returns null when neither source has effects (consumer treats as pure). */
 export function effectsOf(v: Value): EffectSet | null {
-  // C4.3b: componentsView is total — flattened Contexts answer directly.
-  const c = componentsView(v).get(EFFECTS_COMPONENT_KEY);
+  // C4.3b: metaOf is total — flattened Contexts answer directly.
+  const c = metaOf(v).get(EFFECTS_FIELD);
   if (c) return decodeEffects(c);
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.ComposedFunction) {
     const stash = (p as any).inferredEffects as EffectSet | undefined;
     if (stash) return stash;
@@ -304,9 +312,9 @@ export function withEffects(v: Value, eff: EffectSet): Value {
   if (eff.size === 0 && prior === null) return v;
   const merged = prior ? effectUnion(prior, eff) : eff;
   if (merged.size === 0) return v;
-  const comps = cloneComponents(v);
-  comps.set(EFFECTS_COMPONENT_KEY, encodeEffects(merged));
-  return makeMultiValue(dataOf(v), comps);
+  const comps = cloneMeta(v);
+  comps.set(EFFECTS_FIELD, encodeEffects(merged));
+  return withMeta(v, comps);
 }
 
 /** Compute the union of multiple effect sets. Null and undefined entries are

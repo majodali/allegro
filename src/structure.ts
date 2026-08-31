@@ -2,10 +2,10 @@
 // Structure — the unified host representation (structures Phase 4, C4.1–C4.2 / B-019–B-020)
 //
 // Design (docs/design/allegretto/structures.md §2, I1): an instance is
-// (shape ref, flat slot storage, channel storage, immutable bit, optional
-// dense region). C4.1 landed the KIND: every MultiValue and every Context
-// is an instance of ONE host class, constructed exclusively through the
-// types.ts factories (`makeMultiValue` / `makeContext` / `makeDenseArrayCtx`
+// (shape ref, flat slot storage, metadata storage, immutable bit, optional
+// dense region). C4.1 landed the KIND: every composite value is an
+// instance of ONE host class, constructed exclusively through the
+// types.ts factories (`withMeta` / `makeStructure` / `makeDenseArray`
 // are the shims the plan promised). The public field surface is unchanged
 // (the ~1000-test suite is the oracle) — the object layout is a single
 // declared hidden class, and every later physical change happens inside
@@ -24,14 +24,22 @@
 // behave exactly as before. The W6 invariant asserts view/dense
 // coherence whenever a view exists.
 //
-// Role is FIXED at construction (a MultiValue never becomes a Context);
+// Role is FIXED at construction (a carrier never becomes a record);
 // `kind` is a plain field so the evaluator's hot switch is unaffected.
-// The two planes map onto the current storage:
-//   - channel plane  → `components` (MultiValue role; every key is
+// There are FOUR planes (docs/design/concepts.md §18), and three of them
+// are stored here:
+//   - data plane     → `bindings` + `bindingList` (+ `dense` for
+//     numeric-keyed structures). B-121 C5 deleted `dataOf`, the accessor
+//     that used to project it: a value's data IS the value now
+//   - binding plane  → the same maps, keyed by NAME: what a scope
+//     resolves and what a type's members hang off
+//   - metadata plane → `meta` (carrier role; every key is
 //     registry-checked by the W3 walker)
-//   - slot/data plane → `bindings` + `bindingList` (+ `dense` for
-//     numeric-keyed structures; legacy `__*` meta-slots remain here
-//     until C5 re-keys them)
+//   - host plane     → NOT part of the value: `parent`, `isScope`,
+//     `scopePredicates` (declared as `StructureHostFields` in types.ts)
+//     and `viewMaterialized`
+// The one binding-plane/metadata straggler is `__length` on a
+// materialized dense view — B-104(f), gated on B-108.
 //
 // Immutable bit (D22): structures are born-immutable BY DEFAULT; the bit
 // is DECLARED state at C4.1, with the standing carve-outs enforced by the
@@ -41,29 +49,47 @@
 //   - future cells are single-assignment monotonic (D33) — a pending
 //     cell inside an immutable structure does not violate deep
 //     immutability (the D22 carve-out);
-//   - construction-phase population (addBinding after makeContext) is
+//   - construction-phase population (addBinding after makeStructure) is
 //     the grandfathered builder idiom until construction protocols
 //     migrate (C6 recipe).
+//
+// THE IN-PLACE RULE (B-121 C7, plan §3.4). The carve-out above is an
+// instance of a general rule, stated here because it was previously an
+// idiom in two places and a rule in none:
+//
+//     Write in place only while the value is provably UNSHARED — during
+//     construction, before it escapes. After it escapes, derive.
+//
+// It is not a style preference; it follows from one measurement. Of 59,027
+// metadata attachments, 19,817 (33.6%) target an object that has ALREADY
+// been given metadata. Metadata is a property of a value *in a position*,
+// not of the datum, so a post-escape in-place write would overwrite the
+// first stamp at every position holding that value. (A side table keyed by
+// the object fails identically, since its key is the object.) D22 is the
+// rule adopted BECAUSE of this, and the pre-escape window is the one place
+// the argument does not apply.
+//
+// The other instance is `writeShape` in slots.ts, which states its own
+// version of this argument for identity-sensitive type Contexts.
 // =============================================================================
 
-import type { Value, Binding, ContextValue, BitsValue } from "./types.js";
+import type { Value, Binding, StructureValue, BitsValue } from "./types.js";
 import { ValueKind, makeInt } from "./types.js";
 
 const LENGTH_KEY = "__length";
 
-/** The one host representation behind MultiValue and Context. All fields
+/** The one host representation behind every composite value. All fields
  *  are declared up front so every structure shares a single hidden class
  *  (the I1 motivation), whichever role it plays. */
 export class Structure {
-  // C7.1 (D15/D46): ONE kind. The former MultiValue role is the CARRIER
-  // configuration — primary set, empty data plane — and it answers the
-  // same kind as every structure. `isCarrier` is the host-level
-  // discriminant (primary presence), not the kind tag.
+  // C7.1 (D15/D46): ONE kind. B-121 C4 deleted the CARRIER configuration —
+  // `primary`, its constructor initializer, the two empty-view branches on
+  // the binding getters, `isCarrier` and `newCarrierStructure`. A composite
+  // is the only role left, so a Structure is now what its name says.
   kind: ValueKind.Structure;
 
-  // --- Carrier configuration (transparent value: primary + channel plane) ---
-  primary: Value;
-  components: Map<string, Value>;
+  // --- Metadata plane (universal since C2: every kind carries one) ---
+  meta: Map<string, Value>;
 
   // --- Context role (record/type/scope: slot plane) ---
   private _bindings: Map<string, Binding>;
@@ -78,7 +104,7 @@ export class Structure {
   private _slotCountBits?: Value;
 
   // --- Scope-role fields (C2.1/C2.2; host-plane, never value slots) ---
-  parent?: ContextValue;
+  parent?: StructureValue;
   isScope?: boolean;
   scopePredicates?: Map<string, unknown>;
 
@@ -89,8 +115,7 @@ export class Structure {
 
   constructor(immutable: boolean) {
     this.kind = ValueKind.Structure;
-    this.primary = undefined as unknown as Value;
-    this.components = undefined as unknown as Map<string, Value>;
+    this.meta = undefined as unknown as Map<string, Value>;
     this._bindings = undefined as unknown as Map<string, Binding>;
     this._bindingList = undefined as unknown as Binding[];
     this.dense = undefined;
@@ -108,9 +133,6 @@ export class Structure {
   get bindings(): Map<string, Binding> {
     if (this._bindings === undefined) {
       if (this.dense !== undefined) materializeView(this);
-      // C7.1: a carrier's data plane is EMPTY (D15) — materialize the
-      // empty view on first ask so record-shaped consumers see no slots.
-      else if (this.primary !== undefined) { this._bindings = new Map(); this._bindingList = []; }
     }
     return this._bindings;
   }
@@ -121,7 +143,6 @@ export class Structure {
   get bindingList(): Binding[] {
     if (this._bindingList === undefined) {
       if (this.dense !== undefined) materializeView(this);
-      else if (this.primary !== undefined) { this._bindings = new Map(); this._bindingList = []; }
     }
     return this._bindingList;
   }
@@ -162,26 +183,10 @@ function materializeView(s: Structure): void {
   s.bindingList = bindingList;
 }
 
-/** C7.1: the host-level carrier discriminant — a structure whose data is
- *  a non-Structure primary riding under an (empty) data plane. This is
- *  the "MultiValue interface" as protocol, not kind (D46). */
-export function isCarrier(v: unknown): boolean {
-  return v instanceof Structure && (v as Structure).primary !== undefined;
-}
-
-/** Construct the CARRIER configuration (the D15 transparent structure:
- *  empty data plane + primary channel). */
-export function newMultiValueStructure(primary: Value, components: Map<string, Value>): Structure {
-  const s = new Structure(true);
-  s.primary = primary;
-  s.components = components;
-  return s;
-}
-
 /** Construct the Context role. Scopes are mutable evaluator state; data
  *  contexts carry the immutable bit (population-during-construction is
  *  the grandfathered builder idiom until the C6 recipe). */
-export function newContextStructure(): Structure {
+export function newRecordStructure(): Structure {
   const s = new Structure(true);
   s.bindings = new Map();
   s.bindingList = [];
@@ -200,14 +205,14 @@ export function newDenseStructure(elements: Value[]): Structure {
 /** C4.3b: copy-on-write derive — a new Context-role structure SHARING the
  *  source's data planes by reference (sound: data contexts are immutable,
  *  D22) with the given channel plane attached. This is how channels attach
- *  to records/types without a MultiValue wrapper: `makeMultiValue` with a
+ *  to records/types without a MultiValue wrapper: `withMeta` with a
  *  Context primary flattens through here, so MV-over-Context is
  *  unconstructible. Scopes are evaluator state, not data — the channel
  *  plane never attaches to them (C2.1 plane rejection). */
-export function deriveWithChannels(ctx: ContextValue, components: Map<string, Value>): Structure {
+export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): Structure {
   const src = ctx as unknown as Structure;
   if (src.isScope) {
-    throw new Error("deriveWithChannels: channels cannot attach to an evaluation scope (plane rejection)");
+    throw new Error("deriveWithMeta: channels cannot attach to an evaluation scope (plane rejection)");
   }
   const s = new Structure(src.immutable);
   if (src.dense !== undefined) {
@@ -217,18 +222,18 @@ export function deriveWithChannels(ctx: ContextValue, components: Map<string, Va
     s.bindingList = src.bindingList;
   }
   // The given map is AUTHORITATIVE — it becomes the derived structure's
-  // entire channel plane. Writers pre-clone via cloneComponents (total, so
+  // entire channel plane. Writers pre-clone via cloneMeta (total, so
   // a flattened source's channels are in the clone) and then set/delete;
   // merging here instead would make channel deletion (clearOccurrenceBound)
   // impossible. Callers overlaying a partial map onto an already-channeled
   // Context must clone-and-extend themselves (see evaluate's MV rebuild).
-  s.components = components;
+  s.meta = meta;
   return s;
 }
 
 /** O(1) element read on the dense region, with the legacy-map fallback
  *  for non-dense numeric-keyed contexts (unions, hand-built tests). */
-export function denseIndexGet(ctx: ContextValue, i: number): Value | undefined {
+export function denseIndexGet(ctx: StructureValue, i: number): Value | undefined {
   const s = ctx as unknown as Structure;
   if (s.dense !== undefined) return s.dense[i];
   return ctx.bindings.get(String(i))?.value;
@@ -236,14 +241,14 @@ export function denseIndexGet(ctx: ContextValue, i: number): Value | undefined {
 
 /** Dense-aware slot count read (Bits), or undefined when neither a dense
  *  region nor a `__length` slot exists. */
-export function denseSlotCount(ctx: ContextValue): Value | undefined {
+export function denseSlotCount(ctx: StructureValue): Value | undefined {
   const s = ctx as unknown as Structure;
   if (s.dense !== undefined) return s.slotCountBits();
   return ctx.bindings.get(LENGTH_KEY)?.value;
 }
 
 /** All elements of a numeric-keyed structure (dense fast path). */
-export function denseElements(ctx: ContextValue): Value[] {
+export function denseElements(ctx: StructureValue): Value[] {
   const s = ctx as unknown as Structure;
   if (s.dense !== undefined) return s.dense.slice();
   const lenV = denseSlotCount(ctx);

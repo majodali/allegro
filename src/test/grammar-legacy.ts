@@ -6,11 +6,11 @@
 // =============================================================================
 
 import { test, eq, throws } from "./harness.js";
-import { evalNum, evalNumExt, makeCtxWith, typeExt } from "./fixtures.js";
+import { evalNum, evalNumExt, makeStructureWith, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
 import { GrammarExtension, registryGet } from "../grammar-ext.js";
-import { dataOf, ValueKind, makeInt, makePrimitive, AllegroError, ContextValue, BitsValue, makeFloat, stringToBits, makeContext, Value, bitsToFloat, bitsToString } from "../types.js";
-import { extensionToContext } from "../runtime.js";
+import { ValueKind, makeInt, makePrimitive, AllegroError, StructureValue, BitsValue, makeFloat, stringToBits, makeStructure, Value, bitsToFloat, bitsToString } from "../types.js";
+import { extensionToStructure } from "../runtime.js";
 import { Grammar, parseGrammar } from "../parser.js";
 
 // == Grammar Extensions ==
@@ -27,7 +27,7 @@ function evalNumGrammar(
   const result = runtimeEval(source + "\n", undefined, extensions, grammarExt);
   const val = result.value;
   if (val === null) throw new Error("No value produced");
-  const p = dataOf(val);
+  const p = val;
   if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
   if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
   return Number(p.data);
@@ -38,21 +38,21 @@ test("hybrid parser: base syntax", () => {
 });
 
 test("hybrid parser: dot access resolves from context", () => {
-  const mathCtx = makeCtxWith({ pi: makeInt(3) });
+  const mathCtx = makeStructureWith({ pi: makeInt(3) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
   eq(evalNumExt("math.pi", [ext]), 3);
 });
 
 test("hybrid parser: dot access chained", () => {
-  const inner = makeCtxWith({ x: makeInt(42) });
-  const outer = makeCtxWith({ inner: inner });
+  const inner = makeStructureWith({ x: makeInt(42) });
+  const outer = makeStructureWith({ inner: inner });
   const ext: Extension = { name: "test", bindings: { outer: outer } };
   eq(evalNumExt("outer.inner.x", [ext]), 42);
 });
 
 test("hybrid parser: dot access with function call", () => {
-  const mathCtx = makeCtxWith({ double: makePrimitive("double", (args) => {
-    const p = dataOf(args[0]);
+  const mathCtx = makeStructureWith({ double: makePrimitive("double", (args) => {
+    const p = args[0];
     if (p.kind !== ValueKind.Bits) throw new AllegroError("double: expected Bits");
     return makeInt(Number(p.data) * 2);
   }) });
@@ -61,7 +61,7 @@ test("hybrid parser: dot access with function call", () => {
 });
 
 test("hybrid parser: dot access in arithmetic", () => {
-  const mathCtx = makeCtxWith({ pi: makeInt(3), e: makeInt(2) });
+  const mathCtx = makeStructureWith({ pi: makeInt(3), e: makeInt(2) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
   eq(evalNumExt("math.pi + math.e", [ext]), 5);
 });
@@ -72,7 +72,7 @@ test("hybrid parser: import statement with extension binding", () => {
 });
 
 test("hybrid parser: import + dot access", () => {
-  const mathCtx = makeCtxWith({ pi: makeInt(3) });
+  const mathCtx = makeStructureWith({ pi: makeInt(3) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
   eq(evalNumExt("import math\nmath.pi", [ext]), 3);
 });
@@ -82,9 +82,9 @@ test("hybrid parser: import doesn't shadow extension binding", () => {
   eq(evalNumExt("import x\nx", [ext]), 99);
 });
 
-test("grammar ext: extensionToContext wraps bindings", () => {
+test("grammar ext: extensionToStructure wraps bindings", () => {
   const ext: Extension = { name: "math", bindings: { pi: makeInt(3), tau: makeInt(6) } };
-  const ctx = extensionToContext(ext) as ContextValue;
+  const ctx = extensionToStructure(ext) as StructureValue;
   eq(ctx.kind, ValueKind.Structure);
   eq(ctx.bindings.size, 2);
   const pi = ctx.bindings.get("pi");
@@ -102,7 +102,7 @@ test("allegro grammar: build extension from Allegro code", () => {
   const source = `grammar_build(grammar_add_import(grammar_add_dot_access(grammar_builder())))`;
   const result = runtimeEval(source + "\n");
   const val = result.value!;
-  const p = dataOf(val);
+  const p = val;
   eq(p.kind, ValueKind.Bits, "grammar_build should return a handle");
   const handle = Number((p as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
@@ -114,12 +114,12 @@ test("allegro grammar: extension built from Allegro enables dot access", () => {
   // Step 1: Allegro code builds the grammar extension
   const buildResult = runtimeEval("ext = grammar_build(grammar_add_dot_access(grammar_builder()))\next\n");
   const extVal = buildResult.value!;
-  const extP = dataOf(extVal);
+  const extP = extVal;
   const handle = Number((extP as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
 
   // Step 2: Use the Allegro-built extension to parse code with dot access
-  const mathCtx = makeCtxWith({ pi: makeInt(3) });
+  const mathCtx = makeStructureWith({ pi: makeInt(3) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
   eq(evalNumGrammar("math.pi", [ext], grammarExt), 3);
 });
@@ -128,7 +128,7 @@ test("allegro grammar: extension built from Allegro enables import", () => {
   // Step 1: Build extension from Allegro
   const buildResult = runtimeEval("ext = grammar_build(grammar_add_import(grammar_builder()))\next\n");
   const extVal = buildResult.value!;
-  const extP = dataOf(extVal);
+  const extP = extVal;
   const handle = Number((extP as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
 
@@ -143,11 +143,11 @@ test("allegro grammar: full pipeline - build, then use dot + import", () => {
 grammar_build(grammar_add_import(grammar_add_dot_access(grammar_builder())))
 `;
   const buildResult = runtimeEval(buildSource);
-  const extP = dataOf(buildResult.value!);
+  const extP = buildResult.value!;
   const grammarExt = registryGet(Number((extP as BitsValue).data)) as GrammarExtension;
 
   // Step 2: Use it to parse a program with import + dot access
-  const mathCtx = makeCtxWith({ pi: makeInt(3), e: makeInt(2) });
+  const mathCtx = makeStructureWith({ pi: makeInt(3), e: makeInt(2) });
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
   eq(evalNumGrammar("import math\nmath.pi + math.e", [ext], grammarExt), 5);
 });
@@ -221,7 +221,7 @@ function buildJsonGrammar(): Grammar {
   const arrayVal = g.phrase([lbracket, arrayElements, rbracket], "ArrayVal");
   (arrayVal as any).attribute("val", Object, function (node: any) {
     const elementsNode = node.children[1]; // the Repetition node
-    const result = makeContext();
+    const result = makeStructure();
     let index = 0;
     for (const child of elementsNode.children) {
       if (child.val !== undefined) {
@@ -254,7 +254,7 @@ function buildJsonGrammar(): Grammar {
   const objectVal = g.phrase([lbrace, objectEntries, rbrace], "ObjectVal");
   (objectVal as any).attribute("val", Object, function (node: any) {
     const entriesNode = node.children[1];
-    const result = makeContext();
+    const result = makeStructure();
     for (const child of entriesNode.children) {
       if (child.key !== undefined && child.val !== undefined) {
         const key = child.key as string;
@@ -316,7 +316,7 @@ test("standalone grammar: parse JSON array", () => {
   const g = buildJsonGrammar();
   const result = parseGrammar(g, "[1, 2, 3]");
   eq(result.errors.length, 0);
-  const val = result.tree.val as ContextValue;
+  const val = result.tree.val as StructureValue;
   eq(val.kind, ValueKind.Structure);
   // Check length
   const len = (val.bindings.get("length")!).value as BitsValue;
@@ -331,7 +331,7 @@ test("standalone grammar: parse JSON empty array", () => {
   const g = buildJsonGrammar();
   const result = parseGrammar(g, "[]");
   eq(result.errors.length, 0);
-  const val = result.tree.val as ContextValue;
+  const val = result.tree.val as StructureValue;
   const len = (val.bindings.get("length")!).value as BitsValue;
   eq(Number(len.data), 0);
 });
@@ -340,7 +340,7 @@ test("standalone grammar: parse JSON object", () => {
   const g = buildJsonGrammar();
   const result = parseGrammar(g, '{"x": 10, "y": 20}');
   eq(result.errors.length, 0);
-  const val = result.tree.val as ContextValue;
+  const val = result.tree.val as StructureValue;
   eq(val.kind, ValueKind.Structure);
   eq(Number((val.bindings.get("x")!.value as BitsValue).data), 10);
   eq(Number((val.bindings.get("y")!.value as BitsValue).data), 20);
@@ -350,9 +350,9 @@ test("standalone grammar: parse nested JSON", () => {
   const g = buildJsonGrammar();
   const result = parseGrammar(g, '{"items": [1, 2], "name": "test"}');
   eq(result.errors.length, 0);
-  const val = result.tree.val as ContextValue;
+  const val = result.tree.val as StructureValue;
   // Check items array
-  const items = val.bindings.get("items")!.value as ContextValue;
+  const items = val.bindings.get("items")!.value as StructureValue;
   eq(items.kind, ValueKind.Structure);
   eq(Number((items.bindings.get("length")!.value as BitsValue).data), 2);
   eq(Number((items.bindings.get("0")!.value as BitsValue).data), 1);

@@ -20,11 +20,24 @@
 // See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { dataOf, cloneComponents, componentsView, channelReadRaw, typeShape, getAbstractDomain } from "./slots.js";
+import { cloneMeta, metaOf, metaReadRaw, typeShape, getAbstractDomain, registerMetaField } from "./slots.js";
 import {
-  Value, ValueKind, BitsValue, ContextValue,
-  makeMultiValue, makeContext, makeInt, isResolved,
+  Value, ValueKind, BitsValue, StructureValue,
+  withMeta, makeStructure, makeInt, isResolved,
 } from "./types.js";
+
+// --- This layer's fields (B-109(a), concept-campaign C3) ---------------------
+// Refinement knowledge owns three, all registered at module scope because
+// registration is one-shot and must not sit inside a per-evaluation factory.
+//
+// `predicates` and `domain` are `computed`: they are narrowed at annotated
+// evaluator sites rather than merged by the generic table. `bound` is the
+// occurrence bound (C3.2 / D36) — set when an annotation boundary is crossed,
+// consumed by the member-AVAILABILITY gate — and is `drop` because a bound
+// constrains the occurrence it was stamped on, never a result derived from it.
+registerMetaField({ name: "predicates", rule: "computed" });
+registerMetaField({ name: "domain", rule: "computed" });
+registerMetaField({ name: "bound", rule: "drop" });
 
 // =============================================================================
 // Abstract-domain representation
@@ -136,7 +149,7 @@ export function formatDomain(d: AbstractDomain): string {
  * use.
  */
 export function domainFromPredicate(predicate: Value): AbstractDomain {
-  const p = dataOf(predicate);
+  const p = predicate;
   if (p.kind !== ValueKind.ComposedFunction) {
     return { kind: "opaque", predicate };
   }
@@ -151,9 +164,9 @@ export function domainFromPredicate(predicate: Value): AbstractDomain {
  *  abstract domain. Returns null if the shape isn't recognised. */
 function interpretPredicateExpr(expr: Value, paramId: unknown): AbstractDomain | null {
   // Strip MultiValue wrapping (typed_and etc. may wrap results).
-  const e = dataOf(expr);
+  const e = expr;
   if (e.kind !== ValueKind.Expression) return null;
-  const fn = dataOf(e.fn);
+  const fn = e.fn;
   if (fn.kind !== ValueKind.PrimitiveFunction) return null;
 
   // Conjunction — combine the two sides.
@@ -163,7 +176,7 @@ function interpretPredicateExpr(expr: Value, paramId: unknown): AbstractDomain |
   if (fn.name === "typed_and") {
     if (e.args.length !== 2) return null;
     const leftDom  = interpretPredicateExpr(e.args[0], paramId);
-    const rightArg = dataOf(e.args[1]);
+    const rightArg = e.args[1];
     let rightDom: AbstractDomain | null = null;
     if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
       rightDom = interpretPredicateExpr(rightArg.body, paramId);
@@ -219,12 +232,12 @@ function recogniseComparison(
 }
 
 function isParam(v: Value, paramId: unknown): boolean {
-  const p = dataOf(v);
+  const p = v;
   return p.kind === ValueKind.Param && (p as any) === paramId;
 }
 
 function asIntLiteral(v: Value): number | null {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) return null;
   const b = p as BitsValue;
   if (b.length !== 64) return null;
@@ -596,14 +609,14 @@ function domainsStructurallyEqual(a: AbstractDomain, b: AbstractDomain): boolean
 // Value-level helpers — attach / read the "domain" component on a MultiValue
 // =============================================================================
 
-const DOMAIN_COMPONENT_KEY = "domain";
-const PREDICATES_COMPONENT_KEY = "predicates";
+const DOMAIN_FIELD = "domain";
+const PREDICATES_FIELD = "predicates";
 
 /** Attach an abstract domain as a MultiValue component. Wraps if needed. */
 export function withDomain(v: Value, domain: AbstractDomain): Value {
-  const comps = cloneComponents(v);
-  comps.set(DOMAIN_COMPONENT_KEY, encodeDomain(domain));
-  return makeMultiValue(dataOf(v), comps);
+  const comps = cloneMeta(v);
+  comps.set(DOMAIN_FIELD, encodeDomain(domain));
+  return withMeta(v, comps);
 }
 
 /** Read an abstract domain off a value, if one is present. With Phase C's
@@ -611,9 +624,9 @@ export function withDomain(v: Value, domain: AbstractDomain): Value {
  *  for backward compatibility — preferring the new `predicates` component
  *  over the legacy single-domain one. */
 export function domainOf(v: Value): AbstractDomain | null {
-  // C4.3b: componentsView is total — flattened Contexts answer directly.
+  // C4.3b: metaOf is total — flattened Contexts answer directly.
   // Phase C: prefer the predicate set if present.
-  const setComp = componentsView(v).get(PREDICATES_COMPONENT_KEY);
+  const setComp = metaOf(v).get(PREDICATES_FIELD);
   if (setComp) {
     const set = decodePredicates(setComp);
     if (set) {
@@ -621,7 +634,7 @@ export function domainOf(v: Value): AbstractDomain | null {
       if (eff) return eff;
     }
   }
-  const c = componentsView(v).get(DOMAIN_COMPONENT_KEY);
+  const c = metaOf(v).get(DOMAIN_FIELD);
   if (!c) return null;
   return decodeDomain(c);
 }
@@ -629,27 +642,27 @@ export function domainOf(v: Value): AbstractDomain | null {
 /** Attach a predicate set as a MultiValue component. Always merges with any
  *  existing set; never overwrites silently. */
 export function withPredicates(v: Value, set: PredicateSet): Value {
-  const comps = cloneComponents(v);
+  const comps = cloneMeta(v);
   // Merge with any existing predicate set.
   const prior = predicatesOf(v);
   const merged = prior ? mergePredicateSets(prior, set) : set;
-  comps.set(PREDICATES_COMPONENT_KEY, encodePredicates(merged));
-  return makeMultiValue(dataOf(v), comps);
+  comps.set(PREDICATES_FIELD, encodePredicates(merged));
+  return withMeta(v, comps);
 }
 
 /** Read a value's predicate set, if any. Returns a fresh PredicateSet —
  *  callers can mutate the returned object freely (it's not shared with the
  *  value's stored encoding). */
 export function predicatesOf(v: Value): PredicateSet | null {
-  // C4.3b: componentsView is total — flattened Contexts answer directly.
-  const setComp = componentsView(v).get(PREDICATES_COMPONENT_KEY);
+  // C4.3b: metaOf is total — flattened Contexts answer directly.
+  const setComp = metaOf(v).get(PREDICATES_FIELD);
   if (setComp) {
     const set = decodePredicates(setComp);
     if (set) return set;
   }
   // Legacy fallback: lift a single-domain `domain` component into a
   // singleton set so old code paths continue to work during the migration.
-  const dc = componentsView(v).get(DOMAIN_COMPONENT_KEY);
+  const dc = metaOf(v).get(DOMAIN_FIELD);
   if (dc) {
     const dom = decodeDomain(dc);
     if (dom) return new PredicateSet([{ shape: dom, source: "refinement-type" }]);
@@ -658,7 +671,7 @@ export function predicatesOf(v: Value): PredicateSet | null {
 }
 
 function encodePredicates(set: PredicateSet): Value {
-  const ctx: ContextValue = makeContext();
+  const ctx: StructureValue = makeStructure();
   (ctx as any).predicateSet = set;
   return ctx;
 }
@@ -680,7 +693,7 @@ function decodePredicates(v: Value): PredicateSet | null {
 //
 // Computed view over the current storage: the refinement layers of the
 // stored `type` component (walked off by `typeShape`) + the on-value
-// `predicates`/`domain` components. The physical storage moves under the
+// `predicates`/`domain` meta. The physical storage moves under the
 // `knowledge` channel at the C4 representation swap.
 // =============================================================================
 
@@ -689,14 +702,14 @@ export interface Knowledge {
    *  member-transparent refinement layers (the construction certificate:
    *  `PositiveInt` on a `PositiveInt(5)`). Null when the stored type IS
    *  the dispatch shape. */
-  bound: ContextValue | null;
+  bound: StructureValue | null;
   /** The on-value predicate set (Phase C), if any. */
   predicates: PredicateSet | null;
   /** C3.2: the occurrence bound set by crossing an annotation boundary
    *  (`x: Animal` receiving a Dog). An UPPER bound on what this occurrence
    *  may assume — member AVAILABILITY follows it; dispatch does not. Null
    *  when no annotation boundary constrained this occurrence. */
-  occurrenceBound: ContextValue | null;
+  occurrenceBound: StructureValue | null;
 }
 
 // C3.2: the occurrence-bound component. Set when a value crosses an
@@ -705,37 +718,37 @@ export interface Knowledge {
 // occurrence starts with full knowledge) or when a `when … is T` type
 // pattern narrows. Propagation rule is `drop` — a bound constrains the
 // occurrence it was stamped on, never derived results.
-const BOUND_COMPONENT_KEY = "bound";
+const BOUND_FIELD = "bound";
 
 /** Read the occurrence bound riding a value, if any. */
-export function occurrenceBoundOf(v: Value): ContextValue | null {
-  // C4.3b: componentsView is total — flattened Contexts answer directly.
-  const b = componentsView(v).get(BOUND_COMPONENT_KEY);
-  return b?.kind === ValueKind.Structure ? (b as ContextValue) : null;
+export function occurrenceBoundOf(v: Value): StructureValue | null {
+  // C4.3b: metaOf is total — flattened Contexts answer directly.
+  const b = metaOf(v).get(BOUND_FIELD);
+  return b?.kind === ValueKind.Structure ? (b as StructureValue) : null;
 }
 
 /** Stamp an occurrence bound (annotation-boundary crossing). */
-export function withOccurrenceBound(v: Value, bound: ContextValue): Value {
-  const comps = cloneComponents(v);
-  comps.set(BOUND_COMPONENT_KEY, bound);
-  return makeMultiValue(dataOf(v), comps);
+export function withOccurrenceBound(v: Value, bound: StructureValue): Value {
+  const comps = cloneMeta(v);
+  comps.set(BOUND_FIELD, bound);
+  return withMeta(v, comps);
 }
 
 /** Remove the occurrence bound (narrowing / same-shape boundary reset). */
 export function clearOccurrenceBound(v: Value): Value {
   if (occurrenceBoundOf(v) === null) return v;
-  const comps = cloneComponents(v);
-  comps.delete(BOUND_COMPONENT_KEY);
-  return makeMultiValue(dataOf(v), comps);
+  const comps = cloneMeta(v);
+  comps.delete(BOUND_FIELD);
+  return withMeta(v, comps);
 }
 
 /** The intrinsic knowledge riding a value, or null when it carries none. */
 export function knowledgeOf(v: Value): Knowledge | null {
-  const stored = channelReadRaw(v, "type");
-  let bound: ContextValue | null = null;
+  const stored = metaReadRaw(v, "type");
+  let bound: StructureValue | null = null;
   if (stored?.kind === ValueKind.Structure) {
-    const shape = typeShape(stored as ContextValue);
-    if (shape !== stored) bound = stored as ContextValue;
+    const shape = typeShape(stored as StructureValue);
+    if (shape !== stored) bound = stored as StructureValue;
   }
   const predicates = predicatesOf(v);
   const occurrenceBound = occurrenceBoundOf(v);
@@ -783,7 +796,7 @@ export function meetKnowledge(a: Knowledge, b: Knowledge): Knowledge {
  *  on a Context with a hidden `abstractDomain` field — cheap, opaque to the
  *  evaluator, decoded by the refinement helpers. */
 function encodeDomain(d: AbstractDomain): Value {
-  const ctx: ContextValue = makeContext();
+  const ctx: StructureValue = makeStructure();
   (ctx as any).abstractDomain = d;
   return ctx;
 }
@@ -891,9 +904,9 @@ function collectNarrowing(
   source: PredicateSource,
   out: Map<string, PredicateSet>,
 ): void {
-  const e = dataOf(expr);
+  const e = expr;
   if (e.kind !== ValueKind.Expression) return;
-  const fn = dataOf(e.fn);
+  const fn = e.fn;
   if (fn.kind !== ValueKind.PrimitiveFunction) return;
 
   // Conjunction — `cond1 && cond2`.
@@ -902,7 +915,7 @@ function collectNarrowing(
   if (fn.name === "typed_and" && polarity === true) {
     if (e.args.length !== 2) return;
     collectNarrowing(e.args[0], true, source, out);
-    const rightArg = dataOf(e.args[1]);
+    const rightArg = e.args[1];
     if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
       collectNarrowing(rightArg.body, true, source, out);
     } else {
@@ -913,8 +926,8 @@ function collectNarrowing(
 
   // Comparison — find which side is a Symbol and which is a literal.
   if (e.args.length !== 2) return;
-  const left = dataOf(e.args[0]);
-  const right = dataOf(e.args[1]);
+  const left = e.args[0];
+  const right = e.args[1];
   let symbolArg: Value | null = null;
   let literalArg: Value | null = null;
   let opOrder: "sym-lit" | "lit-sym" | null = null;
@@ -948,7 +961,7 @@ function collectNarrowing(
   }
   if (!dom) return;
 
-  const symPrim = dataOf(symbolArg);
+  const symPrim = symbolArg;
   if (symPrim.kind !== ValueKind.Symbol) return;
   const name = symPrim.name;
 

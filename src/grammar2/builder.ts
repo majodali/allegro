@@ -13,7 +13,7 @@
 //   - error     → an error MultiValue with message + inner tree
 // =============================================================================
 
-import { dataOf, getSlotCount, indexGet } from "../slots.js";
+import { getSlotCount, indexGet } from "../slots.js";
 import {
   Rule, Grammar, Guard, Production,
   lit, cls, regex, eof, empty, fail, indent as indentTerm,
@@ -26,8 +26,8 @@ import {
 import { parse as engineParse } from "./engine.js";
 
 import {
-  Value, ValueKind, ContextValue, BitsValue, PrimitiveFnImpl,
-  makePrimitive, makeContext, makeInt, makeMultiValue, stringToBits, bitsToString,
+  Value, ValueKind, StructureValue, BitsValue, PrimitiveFnImpl,
+  makePrimitive, makeStructure, makeInt, withMeta, stringToBits, bitsToString,
   AllegroError,
 } from "../types.js";
 import { makeArray, makeObject, withType, StringType, ErrorType, noneSingleton, IntType } from "../types-std.js";
@@ -51,7 +51,7 @@ function fetch(id: number, expectedKind: string): any {
 }
 
 function handleArg(v: Value, primName: string): number {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected grammar handle (integer), got ${p.kind}`);
   }
@@ -59,7 +59,7 @@ function handleArg(v: Value, primName: string): number {
 }
 
 function stringArg(v: Value, primName: string): string {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected String, got ${p.kind}`);
   }
@@ -67,7 +67,7 @@ function stringArg(v: Value, primName: string): string {
 }
 
 function intArg(v: Value, primName: string): number {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected Int, got ${p.kind}`);
   }
@@ -75,11 +75,11 @@ function intArg(v: Value, primName: string): number {
 }
 
 function arrayArg(v: Value, primName: string): Value[] {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${primName}: expected Array, got ${p.kind}`);
   }
-  const ctx = p as ContextValue;
+  const ctx = p as StructureValue;
   const lengthV = getSlotCount(ctx);
   if (!lengthV) {
     throw new AllegroError(`${primName}: value is not an Array (no length slot)`);
@@ -102,11 +102,11 @@ function handleToValue(id: number): Value {
 
 function readAttrs(v: Value | undefined, primName: string): import("./types.js").RuleAttrs | undefined {
   if (!v) return undefined;
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${primName}: attrs must be an Object`);
   }
-  const ctx = p as ContextValue;
+  const ctx = p as StructureValue;
   const attrs: import("./types.js").RuleAttrs = {};
   const nameVal = ctx.bindings.get("name")?.value;
   if (nameVal) attrs.name = stringArg(nameVal, primName);
@@ -182,11 +182,11 @@ const grammar2_rep_impl: PrimitiveFnImpl = (args) => {
   const item = fetch(handleArg(args[0], "grammar2_rep"), "Rule") as Rule;
   const opts: { min?: number; max?: number | null; sep?: Rule } = {};
   if (args[1]) {
-    const p = dataOf(args[1]);
+    const p = args[1];
     if (p.kind !== ValueKind.Structure) {
       throw new AllegroError("grammar2_rep: opts must be an Object");
     }
-    const ctx = p as ContextValue;
+    const ctx = p as StructureValue;
     const minV = ctx.bindings.get("min")?.value;
     if (minV) opts.min = intArg(minV, "grammar2_rep.min");
     const maxV = ctx.bindings.get("max")?.value;
@@ -253,11 +253,11 @@ const grammar2_parse_impl: PrimitiveFnImpl = (args) => {
   const input = stringArg(args[1], "grammar2_parse");
   const result = engineParse(g, input);
   if (!result.ok) {
-    const components = new Map<string, Value>([
+    const meta = new Map<string, Value>([
       ["error", withType(stringToBits(result.error.message), StringType)],
       ["type",  ErrorType],
     ]);
-    return makeMultiValue(makeInt(0), components);
+    return makeInt(0, meta);
   }
   return treeToValue(result.tree);
 };
@@ -281,12 +281,12 @@ function treeToValue(tree: ParseTree): Value {
     case "none":
       return noneSingleton;
     case "error": {
-      const components = new Map<string, Value>([
+      const meta = new Map<string, Value>([
         ["error", withType(stringToBits(tree.message), StringType)],
         ["type",  ErrorType],
       ]);
       const inner = tree.inner ? treeToValue(tree.inner) : makeInt(0);
-      return makeMultiValue(dataOf(inner), components);
+      return withMeta(inner, meta);
     }
   }
 }

@@ -18,8 +18,8 @@ import {
   PredicateSet, addPredicate, mergePredicateSets, simplifyPredicateSet,
   entailsPredicate, predicatesOf,
 } from "../refinements.js";
-import { dataOf, ValueKind, bitsToString, BitsValue } from "../types.js";
-import { channelReadRaw } from "../slots.js";
+import { ValueKind, bitsToString, BitsValue } from "../types.js";
+import { metaReadRaw } from "../slots.js";
 import { getType } from "../types-std.js";
 
 // --- Phase B: abstract-domain unit tests ---
@@ -184,7 +184,7 @@ big = if x > 100 then x + 50 else 0
   // (In partial-eval mode big is fully resolved to 250, but the analyzer
   //  would see ≥ 151 for the residual case.)
   // The runtime value is what matters for this regression test:
-  const primary = dataOf(bigVal);
+  const primary = bigVal;
   eq(primary.kind, ValueKind.Bits);
   if (primary.kind === ValueKind.Bits) {
     eq(Number((primary as any).data), 250);
@@ -203,7 +203,7 @@ y = if x > 0 then x + 10 else 0 - x
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const yVal = evalCtx.bindings.get("y")!.value!;
-  const primary = dataOf(yVal);
+  const primary = yVal;
   if (primary.kind === ValueKind.Bits) {
     eq(Number((primary as any).data), 5);
   }
@@ -252,11 +252,11 @@ bad = PI(0 - 5)
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   // ok succeeds → resolved Int value
   const okV = evalCtx.bindings.get("ok")!.value!;
-  const okP = dataOf(okV);
+  const okP = okV;
   if (okP.kind === ValueKind.Bits) eq(Number((okP as any).data), 5);
   // bad fails → Error-typed MultiValue
   const badV = evalCtx.bindings.get("bad")!.value!;
-  eq(channelReadRaw(badV, "error") !== undefined, true, "bad has error component");
+  eq(metaReadRaw(badV, "error") !== undefined, true, "bad has error component");
 });
 
 test("invariants-as-refinements: chained `&` clauses fail with per-clause domains", () => {
@@ -269,14 +269,14 @@ high = SP(200)
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   // mid succeeds
   const midV = evalCtx.bindings.get("mid")!.value!;
-  const midP = dataOf(midV);
+  const midP = midV;
   if (midP.kind === ValueKind.Bits) eq(Number((midP as any).data), 50);
   // low fails on first invariant (self > 0)
   const lowV = evalCtx.bindings.get("low")!.value!;
   {
-    const err = channelReadRaw(lowV, "error");
+    const err = metaReadRaw(lowV, "error");
     if (err) {
-      const ep = dataOf(err);
+      const ep = err;
       if (ep.kind === ValueKind.Bits) {
         const msg = bitsToString(ep as BitsValue);
         eq(msg.includes("≥ 1"), true, `expected the first clause's domain (≥ 1) in: ${msg}`);
@@ -286,9 +286,9 @@ high = SP(200)
   // high fails on second invariant (self < 100)
   const highV = evalCtx.bindings.get("high")!.value!;
   {
-    const err = channelReadRaw(highV, "error");
+    const err = metaReadRaw(highV, "error");
     if (err) {
-      const ep = dataOf(err);
+      const ep = err;
       if (ep.kind === ValueKind.Bits) {
         const msg = bitsToString(ep as BitsValue);
         eq(msg.includes("≤ 99"), true, `expected the second clause's domain (≤ 99) in: ${msg}`);
@@ -311,7 +311,7 @@ bad = Range(10, 1)
   eq(getType(okV) !== null, true, "record carries its type channel directly");
   // bad fails the invariant
   const badV = evalCtx.bindings.get("bad")!.value!;
-  eq(channelReadRaw(badV, "error") !== undefined, true);
+  eq(metaReadRaw(badV, "error") !== undefined, true);
 });
 
 // --- Phase C Chunk 3: requires / ensures contracts ---
@@ -335,7 +335,7 @@ y = guard(5)
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const yV = evalCtx.bindings.get("y")!.value!;
-  const yPrim = dataOf(yV);
+  const yPrim = yV;
   if (yPrim.kind === ValueKind.Bits) {
     eq(yPrim.data, 6n);
   }

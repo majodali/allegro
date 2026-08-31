@@ -1,9 +1,11 @@
 // Allegretto - Core Types
-// Five value kinds + Param placeholder
+// The seven representation kinds (docs/design/concepts.md §2): Bits,
+// Symbol, Param, Expression, ComposedFunction, PrimitiveFunction and
+// Structure — the one composite (D1/D46).
 
 // C4.1: the unified Structure class behind MultiValue/Context. structure.ts
 // imports only TYPES from this module, so there is no runtime cycle.
-import { newMultiValueStructure, newContextStructure, newDenseStructure, deriveWithChannels, isCarrier } from "./structure.js";
+import { newRecordStructure, newDenseStructure, deriveWithMeta } from "./structure.js";
 
 export enum ValueKind {
   Bits = "Bits",
@@ -18,9 +20,42 @@ export enum ValueKind {
   Symbol = "Symbol",
 }
 
+// --- The metadata plane (docs/design/concepts.md §18/§19) --------------------
+
+/**
+ * The metadata a value carries through partial evaluation, keyed by
+ * REGISTERED FIELD NAME (`src/slots.ts`). Each field declares a propagation
+ * rule and a writer capability; the propagation table decides what happens
+ * to each on every PE hop.
+ *
+ * Vocabulary (maintainer ruling, 2026-08): the plane is **metadata**, its
+ * entries are **metadata fields**, and a **channel** is a higher-level system
+ * capability that USES metadata fields. The registry holds only fields today,
+ * so nothing here is called a channel; B-111 introduces channel-level
+ * registration and takes the word back.
+ */
+export type Metadata = Map<string, Value>;
+
+/**
+ * Every representation kind carries metadata (D48(b), B-121). Optional
+ * because the base defines fields only for BASE concepts and never the
+ * layers' (R6, R11) — so under `--base` a value carries at most `error` and
+ * `source`, and usually nothing. (C1 wrote "Allegretto defines no fields at
+ * all"; C3 disproved it by running the code — `make_error` and `source of`
+ * both work in base mode, so those two are Allegretto's own.) The two populations without metadata are
+ * every value in Allegretto mode and engine intermediates that never become
+ * program values; neither is a Standard-mode program value.
+ *
+ * Optional in the TYPE, always declared on the OBJECT: see `makeParam` on
+ * why every factory sets its optional fields explicitly.
+ */
+export interface MetadataBearing {
+  meta?: Metadata;
+}
+
 // --- Bits: vector of bits with a known length ---
 
-export interface BitsValue {
+export interface BitsValue extends MetadataBearing {
   kind: ValueKind.Bits;
   length: number;
   data: bigint;
@@ -28,15 +63,15 @@ export interface BitsValue {
 
 // --- Primitive Function ---
 
-export type EvalFn = (value: Value, ctx: ContextValue) => Value;
+export type EvalFn = (value: Value, ctx: StructureValue) => Value;
 
 export type PrimitiveFnImpl = (
   args: Value[],
-  ctx: ContextValue,
+  ctx: StructureValue,
   evalFn: EvalFn,
 ) => Value;
 
-export interface PrimitiveFunctionValue {
+export interface PrimitiveFunctionValue extends MetadataBearing {
   kind: ValueKind.PrimitiveFunction;
   name: string;
   fn: PrimitiveFnImpl;
@@ -62,9 +97,16 @@ export interface PrimitiveFunctionValue {
 
 // --- Param: positional placeholder within function expressions ---
 
-export interface ParamValue {
+export interface ParamValue extends MetadataBearing {
   kind: ValueKind.Param;
   position: number;
+  /** The function that claimed this param, or `null` while unclaimed.
+   *  **Only the null-ness is read** (the parser collects unclaimed params);
+   *  the IDENTITY is read nowhere since B-121 — "is this param the applied
+   *  function's own?" is `ownsParam`, i.e. membership in `fn.params`. Keeping
+   *  the back-pointer accurate across clones is therefore no longer an
+   *  obligation, which retires the "don't corrupt the original" hazard that
+   *  `modules.ts` and `evaluator.ts` both warn about. */
   owner: ComposedFunctionValue | null;
   _name?: string; // debugging hint
   /** Reserved for future refinement-predicate bounds on parameters.
@@ -95,7 +137,7 @@ export interface ParamValue {
 // Created by the parser for identifiers. Resolved by resolveSymbols to
 // the binding's value or a Param (for function parameters).
 
-export interface SymbolValue {
+export interface SymbolValue extends MetadataBearing {
   kind: ValueKind.Symbol;
   /** Base-name projection — printing, lexical resolution, loose matching. */
   name: string;
@@ -108,7 +150,7 @@ export interface SymbolValue {
 
 // --- Composed Function: expression body with declared params ---
 
-export interface ComposedFunctionValue {
+export interface ComposedFunctionValue extends MetadataBearing {
   kind: ValueKind.ComposedFunction;
   params: ParamValue[];
   body: Value;
@@ -116,14 +158,14 @@ export interface ComposedFunctionValue {
 
 // --- Expression: DAG node ---
 
-export interface ExpressionValue {
+export interface ExpressionValue extends MetadataBearing {
   kind: ValueKind.Expression;
   fn: Value;
   args: Value[];
   memo: Map<string, Value>;
 }
 
-// --- Context: evaluation context with bindings ---
+// --- Structure: the one composite representation (D1/D46) ---
 
 export interface Binding {
   key: string | null;
@@ -154,15 +196,24 @@ export interface Binding {
   cell?: boolean;
 }
 
-export interface StructureValue {
-  kind: ValueKind.Structure;
-  bindings: Map<string, Binding>;
-  bindingList: Binding[];
-  /** C2.1 scope protocol: parent-chain layer link (evaluation scopes only —
-   *  host-plane field, never a value slot). Lookup walks the chain. */
-  parent?: ContextValue;
-  /** C2.1: marks evaluation scopes vs data Contexts. Set by scopeNew/
-   *  scopeExtend and the root eval-context builders. */
+/**
+ * HOST PLANE (docs/design/concepts.md §18) — engine bookkeeping about a
+ * structure that is NOT part of the value. Nothing here is a slot, nothing
+ * propagates through partial evaluation, and no Allegro program can read it.
+ *
+ * Declared as its own interface rather than inline on `StructureValue`
+ * because the plane distinction used to live only in per-field comments,
+ * which the value interface then contradicted by declaring them as its own
+ * (concepts.md deltas 15 and 18 → B-107(f)). These three ARE correctly on
+ * the host plane; only the declaration was wrong. Host-plane data that
+ * belongs on the METADATA plane is a different item — B-118.
+ */
+export interface StructureHostFields {
+  /** C2.1 scope protocol: parent-chain layer link (evaluation scopes only).
+   *  Lookup walks the chain. */
+  parent?: StructureValue;
+  /** C2.1: marks evaluation scopes vs data structures. Set by scopeNew/
+   *  scopeExtend and the root eval-scope builders. */
   isScope?: boolean;
   /**
    * Phase C scope-local predicate narrowing. When a binding is referenced
@@ -172,25 +223,20 @@ export interface StructureValue {
    * resolved value's predicate set, so downstream references see the
    * narrowed view.
    *
-   * The map is opaque to most ContextValue consumers — module loaders, type
-   * machinery, etc. ignore it. Only the evaluator's Symbol resolution case
-   * and the branch / assert primitives read or write it.
+   * The map is opaque to most StructureValue consumers — module loaders,
+   * type machinery, etc. ignore it. Only the evaluator's Symbol resolution
+   * case and the branch / assert primitives read or write it.
    */
   scopePredicates?: Map<string, unknown>;
 }
 
-// --- The carrier (C7.1, D15/D46): the former MultiValue KIND is now a
-// CONFIGURATION of Structure — a transparent structure with an empty
-// data plane whose data rides in `primary` and whose channels ride in
-// `components`. It answers the same kind as every structure; the
-// host-level discriminant is primary presence (`isCarrier`). The legacy
-// type name survives as the carrier's static shape so existing casts
-// keep compiling.
-
-export type MultiValueType = ContextValue & {
-  primary: Value;
-  components: Map<string, Value>;
-};
+export interface StructureValue extends StructureHostFields, MetadataBearing {
+  kind: ValueKind.Structure;
+  /** Binding plane: what a name resolves to. Also the data plane's storage
+   *  for record-role structures — two planes, one map (concepts.md §13). */
+  bindings: Map<string, Binding>;
+  bindingList: Binding[];
+}
 
 // --- Union type ---
 
@@ -199,26 +245,39 @@ export type Value =
   | PrimitiveFunctionValue
   | ComposedFunctionValue
   | ExpressionValue
-  | ContextValue
+  | StructureValue
   | ParamValue
   | SymbolValue;
 
 // --- Constructors ---
 
-export function makeBits(length: number, data: bigint | number): BitsValue {
-  return { kind: ValueKind.Bits, length, data: typeof data === "number" ? BigInt(data) : data };
+// B-121 C6 (D48(c)): the factories take metadata.
+//
+// Twelve call sites read `withMeta(makeInt(0), m)` — the value never
+// exists in a metadata-less state, and one of them is PE Rule 1 itself, on
+// the path that allocates 101,611 Expressions. Passing the metadata to the
+// factory is a **lifecycle guarantee** first: there is no window in which the
+// value is constructed but not yet carrying what it must carry. Skipping the
+// intermediate allocation is a consequence, not the reason.
+//
+// The parameter is optional because Allegretto defines no fields (R6/R11), so
+// under `--base` a value legitimately carries none. It is always DECLARED on
+// the object either way, per the stable-hidden-class convention below.
+
+export function makeBits(length: number, data: bigint | number, meta?: Metadata): BitsValue {
+  return { kind: ValueKind.Bits, length, data: typeof data === "number" ? BigInt(data) : data, meta };
 }
 
-export function makeInt(value: number): BitsValue {
-  return makeBits(64, BigInt(value));
+export function makeInt(value: number, meta?: Metadata): BitsValue {
+  return makeBits(64, BigInt(value), meta);
 }
 
-export function makeFloat(value: number): BitsValue {
+export function makeFloat(value: number, meta?: Metadata): BitsValue {
   const buf = new ArrayBuffer(8);
   new DataView(buf).setFloat64(0, value, true); // little-endian
   const lo = BigInt(new Uint32Array(buf)[0]);
   const hi = BigInt(new Uint32Array(buf)[1]);
-  return makeBits(64, (hi << 32n) | lo);
+  return makeBits(64, (hi << 32n) | lo, meta);
 }
 
 export function bitsToFloat(v: BitsValue): number {
@@ -235,28 +294,53 @@ export function makePrimitive(
   effects?: string[],
   sourceAware?: boolean,
 ): PrimitiveFunctionValue {
-  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects, sourceAware };
+  return { kind: ValueKind.PrimitiveFunction, name, fn, lazy, effects, sourceAware, meta: undefined };
 }
 
 export function makeParam(position: number, name?: string): ParamValue {
   // Always declare optional fields so V8/JSC see a stable hidden class shape
   // across all Params, whether or not bounds end up being attached later.
   return { kind: ValueKind.Param, position, owner: null, _name: name,
-           predicates: undefined, effectBound: undefined, effectVar: undefined };
+           predicates: undefined, effectBound: undefined, effectVar: undefined,
+           meta: undefined };
 }
 
-export function makeSymbol(name: string): SymbolValue {
+/**
+ * Is `param` one of `fn`'s own parameters?
+ *
+ * Substitution needs to know whether a Param it meets while walking a body
+ * belongs to the function being applied or to a nested lambda. That was asked
+ * as `param.owner === fn` — a BACK-POINTER comparison — which made
+ * `param.owner` an identity that every function-cloning site had to maintain,
+ * by either re-pointing shared params (corrupting the original, as
+ * `modules.ts` and `evaluator.ts` both warn) or cloning the params and
+ * rewriting the body.
+ *
+ * Membership answers the same question directly and needs neither: a clone
+ * that SHARES the params array owns them, and a nested lambda's params are
+ * different objects that are simply not in the array. Verified equivalent —
+ * the suite is green with the identity test replaced by this one.
+ *
+ * `param.owner` survives, but only its NULL-NESS is now read (the parser
+ * collects not-yet-claimed params with `owner === null`). Its identity is
+ * read nowhere.
+ */
+export function ownsParam(fn: ComposedFunctionValue, param: ParamValue): boolean {
+  return fn.params.includes(param);
+}
+
+export function makeSymbol(name: string, meta?: Metadata): SymbolValue {
   // Transient reference symbol (no FQN). Declare the optional field for a
   // stable hidden class shared with registered symbols (src/symbols.ts).
-  return { kind: ValueKind.Symbol, name, fqn: undefined };
+  return { kind: ValueKind.Symbol, name, fqn: undefined, meta };
 }
 
-export function makeExpr(fn: Value, args: Value[]): ExpressionValue {
-  return { kind: ValueKind.Expression, fn, args, memo: new Map() };
+export function makeExpr(fn: Value, args: Value[], meta?: Metadata): ExpressionValue {
+  return { kind: ValueKind.Expression, fn, args, memo: new Map(), meta };
 }
 
 export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunctionValue {
-  const fn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params, body };
+  const fn: ComposedFunctionValue = { kind: ValueKind.ComposedFunction, params, body, meta: undefined };
   for (const p of params) {
     p.owner = fn;
   }
@@ -268,47 +352,100 @@ export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunct
 // one hidden class, constructed only here. The returned objects satisfy
 // the legacy interfaces field-for-field; the physical layout migrates
 // inside structure.ts from now on.
-export function makeContext(): ContextValue {
-  return newContextStructure() as unknown as ContextValue;
+export function makeStructure(): StructureValue {
+  return newRecordStructure() as unknown as StructureValue;
 }
 
-export function makeMultiValue(primary: Value, components?: Map<string, Value>): MultiValueType {
-  // C4.3b/C7.1: the ONE channel-attachment chokepoint. A record/array/type
-  // primary flattens into a copy-on-write derive (channels ride directly);
-  // a CARRIER primary re-wraps its inner data (W1: carriers never nest —
-  // the given channel map is authoritative, mirroring the derive); a
-  // non-Structure primary (Bits, functions, residuals) takes the D15
-  // transparent carrier. Call sites read data through dataOf, never
-  // `.primary`.
-  if (primary.kind === ValueKind.Structure) {
-    if (isCarrier(primary)) {
-      return newMultiValueStructure(
-        (primary as MultiValueType).primary, components ?? new Map()) as unknown as MultiValueType;
-    }
-    return deriveWithChannels(primary as ContextValue, components ?? new Map()) as unknown as MultiValueType;
+/**
+ * THE metadata-attachment operation (B-121 C2, D48(b)).
+ *
+ * **This is the whole surface**, alongside two conveniences: the factories
+ * above, which take metadata so a value never exists without what it must
+ * carry (D48(c)), and `carryMeta`, which names the copy-metadata-across step
+ * that was previously a second call a caller could forget.
+ *
+ * C6 established there is one operation here, not several. Classifying the 45
+ * call sites had produced three — *derive* (same datum, new metadata), *map*
+ * (new datum, metadata carried) and *stamp* — but they differ only in where
+ * the two arguments come from, never in what the function does. Derive was
+ * `withMeta` over the PEELED value, which looked distinct from
+ * `withMeta(v, m)`; with the peel gone, the ten derive sites became
+ * stamps by deleting a word. Naming them separately would have been the
+ * mirror image of B-111's finding — several concepts under one word, and here
+ * one concept under several.
+ *
+ * Attaching metadata yields a NEW value **of the same kind**. Until C2 a
+ * non-Structure was wrapped in a CARRIER — an eleven-field `Structure` whose
+ * `primary` held the real value — so 74% of every structure allocated was a
+ * wrapper existing to hold, in 98.5% of cases, a single field. Now every kind
+ * carries `meta` itself: a typed Bits is a Bits.
+ *
+ * Why a NEW value rather than a mutation: metadata is a property of a value
+ * *in a position*, not of the datum. Measured, 33.6% of attachments target an
+ * object that has already been given metadata, so stamping in place would
+ * overwrite the first stamp everywhere the value is held. (A side table keyed
+ * by the object fails identically. D22 is the rule adopted BECAUSE of this.)
+ *
+ * The clones preserve identity-bearing host state per kind:
+ *  - functions SPREAD, so JS expandos ride along automatically — the
+ *    `FIELD_WRITER_BRAND` on a writer, `genericParams` and the
+ *    `PRESERVED_FN_META_KEYS` family on a ComposedFunction. A spread cannot
+ *    forget one the way a hand-written field list can.
+ *  - a ComposedFunction clone SHARES its `params`, which is safe because
+ *    substitution asks `ownsParam` — membership in `fn.params` — rather than
+ *    the `param.owner` back-pointer.
+ *  - an Expression clone SHARES its `memo`: same `fn` and `args` mean the same
+ *    memo is correct, and re-deriving it would forfeit IC-6.
+ */
+export function withMeta(v: Value, meta?: Metadata): Value {
+  const m = meta ?? new Map<string, Value>();
+  switch (v.kind) {
+    case ValueKind.Structure:
+      return deriveWithMeta(v as StructureValue, m) as unknown as StructureValue;
+    case ValueKind.Bits:
+      return { kind: ValueKind.Bits, length: v.length, data: v.data, meta: m };
+    case ValueKind.Expression:
+      return { kind: ValueKind.Expression, fn: v.fn, args: v.args, memo: v.memo, meta: m };
+    case ValueKind.Symbol:
+      if (v.fqn !== undefined) warnInternedSymbolMeta();
+      return { kind: ValueKind.Symbol, name: v.name, fqn: v.fqn, meta: m };
+    default:
+      // Param, PrimitiveFunction, ComposedFunction — spread carries expandos.
+      return { ...v, meta: m };
   }
-  return newMultiValueStructure(primary, components ?? new Map()) as unknown as MultiValueType;
 }
+
+/**
+ * B-121 §6 ruling 2 (maintainer): a WARNING, not an error, and expected to be
+ * removable. A registered Symbol's identity IS its FQN — same FQN, same object
+ * (SC-4/IC-4) — so cloning one to attach metadata breaks pointer identity.
+ * Measured across the corpus, carriers wrapped a Symbol **zero** times, and no
+ * use case for user-created Symbols is defined, so what form such metadata
+ * should take is not yet clear. Warn rather than refuse, and count it so the
+ * suite can see the mechanism fire.
+ */
+let internedSymbolMetaCount = 0;
+function warnInternedSymbolMeta(): void {
+  internedSymbolMetaCount++;
+  if (internedSymbolMetaCount === 1) {
+    console.warn(
+      "[allegro] metadata attached to an interned Symbol: its identity is its " +
+      "FQN (SC-4/IC-4), and the clone breaks pointer identity. Measured at zero " +
+      "occurrences when this warning was added — see B-121 §6 ruling 2.");
+  }
+}
+
+/** Test hook for the warning above; removed with it. */
+export function internedSymbolMetaWarnings(): number { return internedSymbolMetaCount; }
 
 /** C4.2: construct a dense numeric-keyed structure (array context) — the
  *  element array is adopted. Element reads go through slots.ts `indexGet`;
  *  the legacy bindings view materializes lazily for stragglers. */
-export function makeDenseArrayCtx(elements: Value[]): ContextValue {
-  return newDenseStructure(elements) as unknown as ContextValue;
+export function makeDenseArray(elements: Value[]): StructureValue {
+  return newDenseStructure(elements) as unknown as StructureValue;
 }
 
 // --- Utilities ---
-
-/** Data-plane read: identity for everything except a transparent scalar
- *  structure (MultiValue role), whose data lives in `primary`. C4.3c: the
- *  former `primaryOf` name is retired — this IS the accessor (re-exported
- *  through slots.ts; both import paths resolve to this one function). */
-export function dataOf(v: Value): Value {
-  // Carrier check by primary presence — one property read; non-Structure
-  // values lack the field entirely.
-  const p = (v as { primary?: Value }).primary;
-  return p !== undefined ? p : v;
-}
 
 export function isResolved(v: Value): boolean {
   switch (v.kind) {
@@ -316,12 +453,11 @@ export function isResolved(v: Value): boolean {
     case ValueKind.PrimitiveFunction:
     case ValueKind.ComposedFunction:
       return true;
-    case ValueKind.Structure: {
-      // C7.1: a carrier is as resolved as its primary (a residual under
-      // channels is still a residual); plain structures self-resolve.
-      const p = (v as { primary?: Value }).primary;
-      return p === undefined ? true : isResolved(p);
-    }
+    case ValueKind.Structure:
+      // Structures self-resolve. B-121 C4: the carrier arm — "as resolved as
+      // its primary", because a residual under metadata was still a residual —
+      // is deleted; such a residual is an Expression now, handled below.
+      return true;
     case ValueKind.Param:
     case ValueKind.Symbol:
       return false;
@@ -491,6 +627,3 @@ export class AllegroError extends Error {
     this.name = "AllegroError";
   }
 }
-/** C7.1 transitional alias — the `Context` NAME is retired (D25); existing
- *  references migrate opportunistically. */
-export type ContextValue = StructureValue;

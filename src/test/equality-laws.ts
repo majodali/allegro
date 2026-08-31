@@ -8,11 +8,11 @@
 import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
-import { sourceOf as _sourceOf, withSource as _withSource, componentsView as _componentsViewD47 } from "../slots.js";
+import { sourceOf as _sourceOf, withSource as _withSource, metaOf as _metaViewD47 } from "../slots.js";
 import { renderExprSource } from "../primitives.js";
-import { dataOf, BitsValue, bitsToString, Value, makePrimitive } from "../types.js";
+import { BitsValue, bitsToString, Value, makePrimitive } from "../types.js";
 import { getTypeName, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, typeMemberDescriptor, EquatableType, isLawDescriptor, isFieldDescriptor } from "../types-std.js";
-import { channelReadRaw } from "../slots.js";
+import { metaReadRaw } from "../slots.js";
 import { buildVerdict, extractObligations, formatVerdict } from "../pcp.js";
 import { renderModuleSummary, summarizeModule } from "../introspect.js";
 import { effectsOf } from "../effects.js";
@@ -21,12 +21,12 @@ import { effectsOf } from "../effects.js";
 
 function eqNum(src: string): number {
   const result = evalStd(src);
-  return Number((dataOf(result!) as BitsValue).data);
+  return Number((result! as BitsValue).data);
 }
 
 test("E1 equality: array structural equality is true, Bool-typed", () => {
   const result = evalStd("[1,2] == [1,2]");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
   eq(getTypeName(result!), "Bool");
 });
 
@@ -100,7 +100,7 @@ test("E1 equality: none keeps identity semantics", () => {
 
 test("E1 equality: errors stay viral through ==", () => {
   const result = evalStd('(error "boom") == 1');
-  eq(channelReadRaw(result!, "error") !== undefined, true);
+  eq(metaReadRaw(result!, "error") !== undefined, true);
 });
 
 test("E1 equality: type values compare by identity", () => {
@@ -120,7 +120,7 @@ test("E1 equality: print of a structural comparison no longer crashes", () => {
   // Regression: the old reference-eq stub returned an untyped int the
   // dispatch fallback mistyped as Array/Object, crashing formatValue.
   const result = evalStd("v = [1,2] == [1,2]\nv.toString()");
-  eq(bitsToString(dataOf(result!) as BitsValue), "true");
+  eq(bitsToString(result! as BitsValue), "true");
 });
 
 test("E1 equality: no-throw sweep — == is total over every kind pair", () => {
@@ -147,7 +147,7 @@ v10 = UserId(1)
   }
   // Every pair must produce a value (typed Bool), never a host throw.
   const result = evalStd(bindings + lines.join("\n") + "\nv0 == v0");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("E1 equality: kernel lawfulness empirical shadow (refl/sym/trans)", () => {
@@ -184,7 +184,7 @@ test("E2 coercion: 1 == 1.0 flips true via the kernel Int→Float edge (§6 delt
   eq(eqNum("1 != 2.0"), 1);
 });
 
-test("E2 coercion: same-shape containers coerce their components", () => {
+test("E2 coercion: same-shape containers coerce their meta", () => {
   // Kernel structural equals recurses through the PROTOCOL, which now
   // includes the coercion step — mixed scalar fields meet at Float.
   eq(eqNum("{x: 1} == {x: 1.0}"), 1);
@@ -263,9 +263,9 @@ test("E2 coercion: declare rejects vacuous and malformed declarations", () => {
 test("E3 laws: kernel scalars conform to Equatable with kernel-tier obligations", () => {
   // Retroactive conformance: built-in eq impls answer Equatable's symbols.
   const r1 = evalStd("42 instanceof Equatable");
-  eq(Number((dataOf(r1!) as BitsValue).data), 1);
+  eq(Number((r1! as BitsValue).data), 1);
   const r2 = evalStd('"hi" instanceof Equatable');
-  eq(Number((dataOf(r2!) as BitsValue).data), 1);
+  eq(Number((r2! as BitsValue).data), 1);
   // refl/sym/trans discharge via the parametric certificate — tier kernel.
   for (const t of ["Int", "Float", "String", "Bool"]) {
     const recs = lawObligationRecords().filter(x => x.type === t);
@@ -285,7 +285,7 @@ test("E3 laws: Equatable carries Law descriptors (ordinary members)", () => {
 
 test("E3 laws: record drawing Equatable with kernel equals discharges at tier kernel", () => {
   const r = evalStd("E3Pt = Type.define({x: Int, y: Int}, Equatable)\nE3Pt(1, 2) instanceof Equatable");
-  eq(Number((dataOf(r!) as BitsValue).data), 1);
+  eq(Number((r! as BitsValue).data), 1);
   const recs = lawObligationRecords().filter(x => x.type === "E3Pt");
   eq(recs.map(x => x.law).sort().join(","), "refl,sym,trans");
   eq(recs.every(x => x.status === "discharged" && x.tier === "kernel"), true);
@@ -540,11 +540,11 @@ theorem t: v1 == v1 by proof_trans(proof_refl(v1), proof_refl(v1))
 
 test("E4 E-R6: proof fields dispatch — p.equality / p.lawName / p.lawTier", () => {
   const r = evalStd("p = proof_trans(proof_refl(7), proof_refl(7))\np.lawTier");
-  eq(bitsToString(dataOf(r!) as BitsValue), "kernel");
+  eq(bitsToString(r! as BitsValue), "kernel");
   const r2 = evalStd("p = proof_trans(proof_refl(7), proof_refl(7))\np.equality");
-  eq(bitsToString(dataOf(r2!) as BitsValue), "Int");
+  eq(bitsToString(r2! as BitsValue), "Int");
   const r3 = evalStd("p = proof_refl(7)\np.lawName");
-  eq(bitsToString(dataOf(r3!) as BitsValue), "refl");
+  eq(bitsToString(r3! as BitsValue), "refl");
 });
 
 test("E4: proven beats admitted — Law.assume on a discharged obligation is a no-op", () => {
@@ -672,19 +672,19 @@ theorem lg_proven: 1 == 1 by proof_refl(1)
 
 test("D47: binding-level source — `source of x` renders the RHS AST", () => {
   const r = evalStd("x = 2 + 2\nsource of x");
-  eq(bitsToString(dataOf(r!) as BitsValue), "2 + 2");
+  eq(bitsToString(r! as BitsValue), "2 + 2");
   const r2 = evalStd("y = 5\nsource of y");
-  eq(bitsToString(dataOf(r2!) as BitsValue), "5");
+  eq(bitsToString(r2! as BitsValue), "5");
   // Lexical fidelity: symbols render by name.
   const r3 = evalStd("x = 2 + 2\nz = x + 1\nsource of z");
-  eq(bitsToString(dataOf(r3!) as BitsValue), "x + 1");
+  eq(bitsToString(r3! as BitsValue), "x + 1");
 });
 
 test("D47: absent source answers none, and equality ignores the channel", () => {
   const r = evalStd("source of 7");
   eq(getTypeName(r!), "None");
   const r2 = evalStd("x = 2 + 2\nx == 4");
-  eq(Number((dataOf(r2!) as BitsValue).data), 1);
+  eq(Number((r2! as BitsValue).data), 1);
 });
 
 test("D47: drop propagation — derived values carry no source", () => {
@@ -693,7 +693,7 @@ test("D47: drop propagation — derived values carry no source", () => {
   // d has its OWN binding-level source ("x + 1") but the underlying
   // arithmetic result did not inherit x's — check a non-binding result:
   const { value } = runtimeEval("x = 2 + 2\nx * 3", undefined, [typeExt], undefined, true);
-  eq(_componentsViewD47(value!).get("source"), undefined);
+  eq(_metaViewD47(value!).get("source"), undefined);
   eq(_sourceOf(d) !== undefined, true);
 });
 
@@ -709,7 +709,7 @@ test("D47: source-aware primitive receives each arg's originating AST", () => {
   const { value } = runtimeEval("probe(1 + 2)", undefined,
     [typeExt, { name: "d47", bindings: { probe } }], undefined, true);
   eq(seen, "1 + 2");
-  eq(Number((dataOf(value!) as BitsValue).data), 3);
+  eq(Number((value! as BitsValue).data), 3);
 });
 
 test("D47: source reads carry the observe effect (certificate_peek precedent)", () => {
@@ -720,13 +720,13 @@ test("D47: source reads carry the observe effect (certificate_peek precedent)", 
 
 test("D47 chunk 2: explain — the reference source-aware consumer", () => {
   const r = evalStd("x = 4\nexplain(x * 3)");
-  eq(bitsToString(dataOf(r!) as BitsValue), "x * 3 = 12");
+  eq(bitsToString(r! as BitsValue), "x * 3 = 12");
   // No redundant echo when the source IS the value.
   const r2 = evalStd("explain(7)");
-  eq(bitsToString(dataOf(r2!) as BitsValue), "7");
+  eq(bitsToString(r2! as BitsValue), "7");
   // Compound operands parenthesize for fidelity.
   const r3 = evalStd("y = 5\nexplain(y * y - 2)");
-  eq(bitsToString(dataOf(r3!) as BitsValue), "(y * y) - 2 = 23");
+  eq(bitsToString(r3! as BitsValue), "(y * y) - 2 = 23");
 });
 
 test("D47 chunk 2: explain carries observe (it reveals how a value was written)", () => {
@@ -745,11 +745,17 @@ test("D47 chunk 2: proof entry points remain lazy non-value interpreters", () =>
   eq(msg.includes("could not be discharged"), true);
 });
 
-test("D47: forged source origination is refused (mv_set integrity gate)", () => {
+test("D47: `source` cannot be originated — no user-reachable write path (B-125)", () => {
+  // B-125 deleted `mv_set`, the unguarded write this test used to attack.
+  // The property is now asserted in its stronger form: there is NO path,
+  // rather than one path that is refused. The only user-reachable metadata
+  // write is a writer minted by `channel_register`, and a writer is bound to
+  // its own field by construction — so originating `source` would need its
+  // registration, which is refused because the owner already holds it.
   let msg = "";
-  try { evalStd('mv_set(5, "source", 42)'); }
+  try { evalStd('w = channel_register("source", "drop")'); }
   catch (e: any) { msg = String(e?.message ?? e); }
-  eq(msg.includes("cannot originate integrity channel 'source'"), true);
+  eq(msg.includes("already registered"), true, "source registration is refused");
   // And the generic accessor cannot read it either — the observe tag
   // cannot be laundered through component_get.
   const r = evalStd('x = 2 + 2\ncomponent_get(x, "source")');
