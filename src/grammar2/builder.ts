@@ -27,7 +27,7 @@ import { parse as engineParse } from "./engine.js";
 
 import {
   Value, ValueKind, StructureValue, BitsValue, PrimitiveFnImpl,
-  makePrimitive, makeStructure, makeInt, withMetadata, stringToBits, bitsToString,
+  makePrimitive, makeStructure, makeInt, withMeta, stringToBits, bitsToString,
   AllegroError,
 } from "../types.js";
 import { makeArray, makeObject, withType, StringType, ErrorType, noneSingleton, IntType } from "../types-std.js";
@@ -257,7 +257,7 @@ const grammar2_parse_impl: PrimitiveFnImpl = (args) => {
       ["error", withType(stringToBits(result.error.message), StringType)],
       ["type",  ErrorType],
     ]);
-    return withMetadata(makeInt(0), meta);
+    return makeInt(0, meta);
   }
   return treeToValue(result.tree);
 };
@@ -286,7 +286,7 @@ function treeToValue(tree: ParseTree): Value {
         ["type",  ErrorType],
       ]);
       const inner = tree.inner ? treeToValue(tree.inner) : makeInt(0);
-      return withMetadata(dataOf(inner), meta);
+      return withMeta(inner, meta);
     }
   }
 }

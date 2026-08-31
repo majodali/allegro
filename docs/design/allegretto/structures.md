@@ -127,6 +127,18 @@ as planned. The host `ValueKind.MultiValue` tag stays through C4.3 but
 is not expected to survive beyond C6 — retirement is an expected outcome
 of the C6 kind-recipe work.*
 
+*SUPERSEDED 2026-08 by B-121 C2/C4 — the paragraphs above and below describe
+the CARRIER, which no longer exists. `withMetadata` is now `withMeta` and
+attaches metadata to a per-kind clone, so a typed scalar is a `Bits` carrying a
+`type` field rather than a Structure wrapping one; `primary`, `isCarrier`,
+`newCarrierStructure`, `CarrierStructure` and the W1/W5 invariants are deleted,
+and `dataOf` is the identity pending C5. The C4.1 claims that survive intact
+are the ones about the composite: one host class, one hidden class,
+construction only through the factory shims, W4 catching a stray literal. Kept
+as written because they record what was true when C4.1 and C4.3b landed; the
+prose rewrite is C7. Current truth: `docs/design/concepts.md` §10/§11 and
+`docs/plans/metadata-on-values.md`.*
+
 *C4.3b status (2026-08): MV-over-Context is UNCONSTRUCTIBLE — a Context
 primary handed to `withMetadata` flattens into a copy-on-write derive
 (`deriveWithChannels`: new Structure sharing the source's data planes by

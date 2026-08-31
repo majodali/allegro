@@ -14,7 +14,7 @@ import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
-import { Value, ValueKind, StructureValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeStructure, makeExpr, makePrimitive, withMetadata, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError} from "./types.js";
+import { Value, ValueKind, StructureValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeStructure, makeExpr, makePrimitive, withMeta, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError} from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf } from "./effects.js";
 import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOTALITY_NEEDS_ANNOTATION, DivObligation, DivergenceResult } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";

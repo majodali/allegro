@@ -3,7 +3,7 @@
 import {
   Value, ValueKind, ExpressionValue, StructureValue,
   ComposedFunctionValue, ParamValue,
-  AllegroError, isResolved, makeExpr, withMetadata, makeStructure,
+  AllegroError, isResolved, makeExpr, withMeta, makeStructure,
   DepCollector, ownsParam, Metadata} from "./types.js";
 import {
   getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
@@ -119,15 +119,17 @@ const PRIM_TO_METHOD = new Map<string, string>([
  *  their own fields and re-evaluate to something else, so they merge here too.
  */
 function mergeOverMeta(outer: Metadata, inner: Value): Value {
-  const innerMeta = metaOf(inner);
-  if (innerMeta.size === 0) return withMetadata(inner, outer);
-  for (const [k, v] of innerMeta) {
+  // B-121 C6: the two exits were `withMeta(inner, outer)` and
+  // `withMeta(dataOf(inner), outer)`. They differed only while `dataOf`
+  // peeled a carrier — the derive/stamp distinction §3.2 found to be one
+  // operation hidden by the peel — so they are now the same line.
+  for (const [k, v] of metaOf(inner)) {
     const prev = outer.get(k);
     const mergeFn = prev !== undefined && metaFieldSpec(k)?.rule === "union"
       ? fieldMerge(k) : undefined;
     outer.set(k, mergeFn ? mergeFn(prev!, v) : v);
   }
-  return withMetadata(dataOf(inner), outer);
+  return withMeta(inner, outer);
 }
 
 export function evaluate(
@@ -281,7 +283,7 @@ function evaluateExpr(
         const meta = new Map<string, Value>([[chan, comp]]);
         const typeComp = metaReadRaw(cand, "type");
         if (typeComp) meta.set("type", typeComp);
-        const out = withMetadata(residual, meta);
+        const out = withMeta(residual, meta);
         return residualEffects ? withEffects(out, residualEffects) : out;
       }
     }
@@ -391,7 +393,7 @@ function applyPrimitive(
           // Propagate left operand's type as the residual's type.
           // For comparisons this is imprecise (should be Bool), but the
           // correct type will be determined when the expression fully evaluates.
-          return attachEff(withMetadata(residual, new Map([["type", typeComp]])));
+          return attachEff(withMeta(residual, new Map([["type", typeComp]])));
         }
       }
     }
@@ -454,7 +456,7 @@ function applyPrimitive(
           // untyped record used to take the already-typed branch.
           let out: Value;
           if (metaReadRaw(result, "type") !== undefined) out = result;
-          else if (result.kind === ValueKind.Bits) out = withMetadata(result, new Map([["type", typeComp]]));
+          else if (result.kind === ValueKind.Bits) out = withMeta(result, new Map([["type", typeComp]]));
           else                                     out = result;
           out = attachEff(out);
           return propagatedSet ? withPredicates(out, propagatedSet) : out;
@@ -500,7 +502,7 @@ function applyPrimitive(
       && metaReadRaw(result, "type") === undefined
       && evalArgs[0] !== undefined) {
     const typeComp = metaReadRaw(evalArgs[0], "type");
-    if (typeComp) out = withMetadata(result, new Map([["type", typeComp]]));
+    if (typeComp) out = withMeta(result, new Map([["type", typeComp]]));
     else          out = result;
   } else {
     out = result;
@@ -539,7 +541,7 @@ function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
         const meta = new Map<string, Value>([[chan, comp]]);
         const typeComp = metaReadRaw(arg, "type");
         if (typeComp) meta.set("type", typeComp);
-        return withMetadata(makeExpr(residualFn, evalArgs), meta);
+        return makeExpr(residualFn, evalArgs, meta);
       }
     }
   }
@@ -1058,7 +1060,7 @@ export function precompileFunction(
       const innerParam = makeParamHelper(param.position, param._name);
       if (param.effectBound) (innerParam as any).effectBound = param.effectBound;
       if (param.effectVar !== undefined) (innerParam as any).effectVar = param.effectVar;
-      const placeholder = withMetadata(innerParam, meta);
+      const placeholder = withMeta(innerParam, meta);
       placeholders.push(placeholder);
     } else {
       // Untyped or type variable — leave as bare Param. Same

@@ -20,7 +20,7 @@ import {
   ValueKind,
   StructureValue,
   AllegroError,
-  withMetadata,
+  withMeta,
 } from "./types.js";
 import { denseIndexGet, denseSlotCount, denseElements } from "./structure.js";
 
@@ -446,7 +446,7 @@ export function setEffectBound(ctx: StructureValue, d: unknown): void { (ctx as 
 //
 // B-104 chunk 3: shape is stored on the component plane, written IN PLACE.
 // It cannot route through the registered channel writer: `buildWriter`
-// derives a NEW value via `withMetadata`, and type Contexts are
+// derives a NEW value via `withMeta`, and type Contexts are
 // identity-sensitive (memoized generics, law registries, and the
 // `typeShape(stored) === typeShape(expected)` reference test in
 // types-std). All 24 call sites mint a fresh Context and stamp it, so an
@@ -697,9 +697,9 @@ function buildWriter(spec: MetaFieldSpec): MetaFieldWriter {
       }
       const comps = cloneMeta(target);
       comps.set(spec.name, fieldValue);
-      // withMetadata handles all three shapes: carrier primaries
+      // withMeta handles all three shapes: carrier primaries
       // re-wrap (W1), record primaries derive, leaves take the carrier.
-      return withMetadata(dataOf(target), comps) as Value;
+      return withMeta(target, comps) as Value;
     },
   };
 }
@@ -871,7 +871,7 @@ export const SOURCE_FIELD = "source";
 export function withSource(v: Value, ast: Value): Value {
   const comps = cloneMeta(v);
   comps.set(SOURCE_FIELD, ast);
-  return withMetadata(dataOf(v), comps) as Value;
+  return withMeta(v, comps) as Value;
 }
 
 /** Kernel-internal read of the source channel (free for kernel use; the

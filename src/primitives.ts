@@ -6,7 +6,7 @@ import {
   Value, ValueKind, BitsValue, StructureValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue, ParamValue,
   AllegroError, makeBits, makeInt, makeFloat, bitsToFloat, makePrimitive, makeExpr,
-  makeParam, makeComposedFn, makeStructure, withMetadata, makeSymbol,
+  makeParam, makeComposedFn, makeStructure, withMeta, makeSymbol,
   stringToBits, bitsToString} from "./types.js";
 import { buildFn } from "./parser-helpers.js";
 import { fqnBaseName } from "./symbols.js";
@@ -441,7 +441,7 @@ const ctx_resolve: PrimitiveFnImpl = (args) => {
     const meta = new Map<string, Value>();
     meta.set("error", withType(stringToBits(`ctx_resolve: '${key}' not found`), StringType));
     meta.set("type", ErrorType);
-    return withMetadata(makeInt(0), meta);
+    return makeInt(0, meta);
   }
   if (isPendingCell(b)) return makeSymbol(key);
   return b.value!;
@@ -482,7 +482,7 @@ const ctx_bindings: PrimitiveFnImpl = (args, pctx) => {
 
 // ============ MULTI-VALUE ============
 
-const mv_new: PrimitiveFnImpl = (args) => withMetadata(args[0]);
+const mv_new: PrimitiveFnImpl = (args) => withMeta(args[0]);
 
 const mv_primary: PrimitiveFnImpl = (args) => dataOf(args[0]);
 
@@ -1033,7 +1033,7 @@ const make_error_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const meta = new Map<string, Value>();
   meta.set("error", errorValue);
   meta.set("type", ErrorType);
-  return withMetadata(makeInt(0), meta);
+  return makeInt(0, meta);
 };
 
 const when_wildcard_impl: PrimitiveFnImpl = () => {
@@ -1177,7 +1177,7 @@ const fetch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       const meta = new Map<string, Value>();
       meta.set("error", withType(stringToBits(String(err)), StringType));
       meta.set("type", ErrorType);
-      return withMetadata(makeInt(0), meta);
+      return makeInt(0, meta);
     });
   // B-028 F2 (CE-R5): typed pending value — Future[String].
   return withType(fm.createFuture(promise), futureOf(StringType));
@@ -2459,10 +2459,8 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
           const meta = new Map<string, Value>([[chan, comp]]);
           const typeComp = metaReadRaw(obj, "type");
           if (typeComp) meta.set("type", typeComp);
-          return withMetadata(
-            makeExpr(makePrimitive("type_dispatch", type_dispatch_impl, true), [obj, fieldArg]),
-            meta,
-          );
+          return makeExpr(
+            makePrimitive("type_dispatch", type_dispatch_impl, true), [obj, fieldArg], meta);
         }
       }
     }
@@ -3123,7 +3121,7 @@ const assert_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const meta = new Map<string, Value>();
     meta.set("error", withType(stringToBits(msg), StringType));
     meta.set("type", ErrorType);
-    return withMetadata(makeInt(0), meta);
+    return makeInt(0, meta);
   }
   if (checkP.kind !== ValueKind.Bits) {
     // Predicate unresolved (depends on incomplete bindings) — keep as residual.

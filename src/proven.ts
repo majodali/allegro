@@ -26,7 +26,7 @@ import { scopeLookup } from "./scope.js";
 import {
   Value, ValueKind, StructureValue, ComposedFunctionValue, ExpressionValue,
   ParamValue, BitsValue,
-  bitsToString, makeInt, withMetadata, ownsParam} from "./types.js";
+  bitsToString, makeInt, withMeta, ownsParam} from "./types.js";
 
 import { evaluate } from "./evaluator.js";
 import { getType, getTypeName, getFunctionParamTypes, BoolType, IntType } from "./types-std.js";
@@ -69,8 +69,8 @@ function pickSamples(typeCtx: StructureValue): Value[] | null {
   // Bool — enumerate the domain.
   if (name === "Bool") {
     return [
-      withMetadata(makeInt(1), new Map([["type", BoolType as Value]])),
-      withMetadata(makeInt(0), new Map([["type", BoolType as Value]])),
+      makeInt(1, new Map([["type", BoolType as Value]])),
+      makeInt(0, new Map([["type", BoolType as Value]])),
     ];
   }
 
@@ -78,7 +78,7 @@ function pickSamples(typeCtx: StructureValue): Value[] | null {
   // at call time inspects the value's type component to verify it
   // satisfies the param's declared type (which may be a refinement).
   const asTypedInt = (n: number): Value =>
-    withMetadata(makeInt(n), new Map([["type", IntType as Value]]));
+    makeInt(n, new Map([["type", IntType as Value]]));
 
   // Refined Int (NonNeg / PositiveInt / SmallPos / etc.) — read the
   // abstract domain's `lo` to pick non-trivial samples.

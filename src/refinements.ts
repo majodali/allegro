@@ -23,7 +23,7 @@
 import { dataOf, cloneMeta, metaOf, metaReadRaw, typeShape, getAbstractDomain, registerMetaField } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue,
-  withMetadata, makeStructure, makeInt, isResolved,
+  withMeta, makeStructure, makeInt, isResolved,
 } from "./types.js";
 
 // --- This layer's fields (B-109(a), concept-campaign C3) ---------------------
@@ -616,7 +616,7 @@ const PREDICATES_FIELD = "predicates";
 export function withDomain(v: Value, domain: AbstractDomain): Value {
   const comps = cloneMeta(v);
   comps.set(DOMAIN_FIELD, encodeDomain(domain));
-  return withMetadata(dataOf(v), comps);
+  return withMeta(v, comps);
 }
 
 /** Read an abstract domain off a value, if one is present. With Phase C's
@@ -647,7 +647,7 @@ export function withPredicates(v: Value, set: PredicateSet): Value {
   const prior = predicatesOf(v);
   const merged = prior ? mergePredicateSets(prior, set) : set;
   comps.set(PREDICATES_FIELD, encodePredicates(merged));
-  return withMetadata(dataOf(v), comps);
+  return withMeta(v, comps);
 }
 
 /** Read a value's predicate set, if any. Returns a fresh PredicateSet —
@@ -731,7 +731,7 @@ export function occurrenceBoundOf(v: Value): StructureValue | null {
 export function withOccurrenceBound(v: Value, bound: StructureValue): Value {
   const comps = cloneMeta(v);
   comps.set(BOUND_FIELD, bound);
-  return withMetadata(dataOf(v), comps);
+  return withMeta(v, comps);
 }
 
 /** Remove the occurrence bound (narrowing / same-shape boundary reset). */
@@ -739,7 +739,7 @@ export function clearOccurrenceBound(v: Value): Value {
   if (occurrenceBoundOf(v) === null) return v;
   const comps = cloneMeta(v);
   comps.delete(BOUND_FIELD);
-  return withMetadata(dataOf(v), comps);
+  return withMeta(v, comps);
 }
 
 /** The intrinsic knowledge riding a value, or null when it carries none. */

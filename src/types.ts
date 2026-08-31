@@ -251,20 +251,33 @@ export type Value =
 
 // --- Constructors ---
 
-export function makeBits(length: number, data: bigint | number): BitsValue {
-  return { kind: ValueKind.Bits, length, data: typeof data === "number" ? BigInt(data) : data, meta: undefined };
+// B-121 C6 (D48(c)): the factories take metadata.
+//
+// Twelve call sites read `withMeta(makeInt(0), m)` — the value never
+// exists in a metadata-less state, and one of them is PE Rule 1 itself, on
+// the path that allocates 101,611 Expressions. Passing the metadata to the
+// factory is a **lifecycle guarantee** first: there is no window in which the
+// value is constructed but not yet carrying what it must carry. Skipping the
+// intermediate allocation is a consequence, not the reason.
+//
+// The parameter is optional because Allegretto defines no fields (R6/R11), so
+// under `--base` a value legitimately carries none. It is always DECLARED on
+// the object either way, per the stable-hidden-class convention below.
+
+export function makeBits(length: number, data: bigint | number, meta?: Metadata): BitsValue {
+  return { kind: ValueKind.Bits, length, data: typeof data === "number" ? BigInt(data) : data, meta };
 }
 
-export function makeInt(value: number): BitsValue {
-  return makeBits(64, BigInt(value));
+export function makeInt(value: number, meta?: Metadata): BitsValue {
+  return makeBits(64, BigInt(value), meta);
 }
 
-export function makeFloat(value: number): BitsValue {
+export function makeFloat(value: number, meta?: Metadata): BitsValue {
   const buf = new ArrayBuffer(8);
   new DataView(buf).setFloat64(0, value, true); // little-endian
   const lo = BigInt(new Uint32Array(buf)[0]);
   const hi = BigInt(new Uint32Array(buf)[1]);
-  return makeBits(64, (hi << 32n) | lo);
+  return makeBits(64, (hi << 32n) | lo, meta);
 }
 
 export function bitsToFloat(v: BitsValue): number {
@@ -316,14 +329,14 @@ export function ownsParam(fn: ComposedFunctionValue, param: ParamValue): boolean
   return fn.params.includes(param);
 }
 
-export function makeSymbol(name: string): SymbolValue {
+export function makeSymbol(name: string, meta?: Metadata): SymbolValue {
   // Transient reference symbol (no FQN). Declare the optional field for a
   // stable hidden class shared with registered symbols (src/symbols.ts).
-  return { kind: ValueKind.Symbol, name, fqn: undefined, meta: undefined };
+  return { kind: ValueKind.Symbol, name, fqn: undefined, meta };
 }
 
-export function makeExpr(fn: Value, args: Value[]): ExpressionValue {
-  return { kind: ValueKind.Expression, fn, args, memo: new Map(), meta: undefined };
+export function makeExpr(fn: Value, args: Value[], meta?: Metadata): ExpressionValue {
+  return { kind: ValueKind.Expression, fn, args, memo: new Map(), meta };
 }
 
 export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunctionValue {
@@ -344,7 +357,22 @@ export function makeStructure(): StructureValue {
 }
 
 /**
- * THE metadata-attachment chokepoint (B-121 C2, D48(b)).
+ * THE metadata-attachment operation (B-121 C2, D48(b)).
+ *
+ * **This is the whole surface**, alongside two conveniences: the factories
+ * above, which take metadata so a value never exists without what it must
+ * carry (D48(c)), and `carryMeta`, which names the copy-metadata-across step
+ * that was previously a second call a caller could forget.
+ *
+ * C6 established there is one operation here, not several. Classifying the 45
+ * call sites had produced three — *derive* (same datum, new metadata), *map*
+ * (new datum, metadata carried) and *stamp* — but they differ only in where
+ * the two arguments come from, never in what the function does. Derive was
+ * `withMeta(dataOf(v), m)`, which the peel made look distinct from
+ * `withMeta(v, m)`; with `dataOf` the identity, the ten derive sites became
+ * stamps by deleting a word. Naming them separately would have been the
+ * mirror image of B-111's finding — several concepts under one word, and here
+ * one concept under several.
  *
  * Attaching metadata yields a NEW value **of the same kind**. Until C2 a
  * non-Structure was wrapped in a CARRIER — an eleven-field `Structure` whose
@@ -369,7 +397,7 @@ export function makeStructure(): StructureValue {
  *  - an Expression clone SHARES its `memo`: same `fn` and `args` mean the same
  *    memo is correct, and re-deriving it would forfeit IC-6.
  */
-export function withMetadata(v: Value, meta?: Metadata): Value {
+export function withMeta(v: Value, meta?: Metadata): Value {
   const m = meta ?? new Map<string, Value>();
   switch (v.kind) {
     case ValueKind.Structure:

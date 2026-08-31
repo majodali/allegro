@@ -27,7 +27,7 @@
 import { dataOf, metaOf, cloneMeta, installFieldMerge, registerMetaField } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, StructureValue,
-  withMetadata, makeStructure,
+  withMeta, makeStructure,
 } from "./types.js";
 
 // =============================================================================
@@ -314,7 +314,7 @@ export function withEffects(v: Value, eff: EffectSet): Value {
   if (merged.size === 0) return v;
   const comps = cloneMeta(v);
   comps.set(EFFECTS_FIELD, encodeEffects(merged));
-  return withMetadata(dataOf(v), comps);
+  return withMeta(v, comps);
 }
 
 /** Compute the union of multiple effect sets. Null and undefined entries are

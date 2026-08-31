@@ -6,7 +6,7 @@
 import { evalSource, Extension } from "./runtime.js";
 import { dataOf, cloneMeta, setName, setFallbackMember, isBareBindingName, isFutureBindingName, metaOf, carryMeta} from "./slots.js";
 import { remapParams } from "./evaluator.js";
-import { Value, ValueKind, StructureValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeStructure, makeExpr, withMetadata, stringToBits, bitsToString, AllegroError} from "./types.js";
+import { Value, ValueKind, StructureValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeStructure, makeExpr, withMeta, stringToBits, bitsToString, AllegroError} from "./types.js";
 import { withType } from "./types-std.js";
 import { primitives } from "./primitives.js";
 import { markExported } from "./symbols.js";

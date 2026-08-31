@@ -7,7 +7,7 @@
 import {
   Value, ValueKind, BitsValue, StructureValue, PrimitiveFnImpl, PrimitiveFunctionValue,
   ComposedFunctionValue, EvalFn,
-  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeStructure, withMetadata, makeDenseArray,
+  makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeStructure, withMeta, makeDenseArray,
   makeComposedFn, makeParam,
   stringToBits, bitsToString, AllegroError, isResolved,
   Extension,
@@ -87,7 +87,7 @@ export function withType(v: Value, type: StructureValue): Value {
     }
   }
   meta.set("type", type);
-  return withMetadata(primary, meta);
+  return withMeta(primary, meta);
 }
 
 /** C3.2 (D36): annotation-boundary crossing. Called AFTER the type check
@@ -135,7 +135,7 @@ export function withTypeReplacing(v: Value, type: StructureValue): Value {
   const primary = dataOf(v);
   const meta = cloneMeta(v);
   meta.set("type", type);
-  return withMetadata(primary, meta);
+  return withMeta(primary, meta);
 }
 
 /** Get the __name from a type Context directly (not from a typed value) */
@@ -1517,7 +1517,7 @@ export function buildRefinedType(parentType: StructureValue, predicate: Value, c
         const meta = new Map<string, Value>();
         meta.set("error", withType(stringToBits(msg), StringType));
         meta.set("type", ErrorType);
-        return withMetadata(makeInt(0), meta);
+        return makeInt(0, meta);
       }
 
       // Re-tag with refined type, and attach the abstract domain so downstream
@@ -1671,7 +1671,7 @@ function buildPreserveOps(refinedType: StructureValue, opNames: string[]): Struc
         const meta = new Map<string, Value>();
         meta.set("error", withType(stringToBits(`refinement check failed${constraintDesc}${cexDesc}`), StringType));
         meta.set("type", ErrorType);
-        return withMetadata(makeInt(0), meta);
+        return makeInt(0, meta);
       }
       return withTypeReplacing(dataOf(value), newType);
     };
@@ -4403,7 +4403,7 @@ export function isProof(v: Value): boolean {
  * rather than argued: a PrimitiveFunction has no `primary` (so `dataOf` is
  * identity) and no `meta` (so `cloneMeta` is empty), and
  * `UntypedFunctionType` is a module-level const, so the result is exactly
- * `withMetadata(fn, {type: UntypedFunctionType})` for the life of the
+ * `withMeta(fn, {type: UntypedFunctionType})` for the life of the
  * process. Other inputs take the unmemoized path — a Structure's meta
  * can still be populated during construction, and the cache must not depend
  * on an argument about every possible input.
@@ -4429,7 +4429,7 @@ export function wrapAsUntypedFunction(fn: Value): Value {
   const primary = dataOf(fn);
   const meta = cloneMeta(fn);
   meta.set("type", UntypedFunctionType);
-  const wrapped = withMetadata(primary, meta);
+  const wrapped = withMeta(primary, meta);
   if (fn.kind === ValueKind.PrimitiveFunction) {
     untypedFnWrappers.set(fn as unknown as object, wrapped);
   }

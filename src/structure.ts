@@ -5,7 +5,7 @@
 // (shape ref, flat slot storage, metadata storage, immutable bit, optional
 // dense region). C4.1 landed the KIND: every composite value is an
 // instance of ONE host class, constructed exclusively through the
-// types.ts factories (`withMetadata` / `makeStructure` / `makeDenseArray`
+// types.ts factories (`withMeta` / `makeStructure` / `makeDenseArray`
 // are the shims the plan promised). The public field surface is unchanged
 // (the ~1000-test suite is the oracle) — the object layout is a single
 // declared hidden class, and every later physical change happens inside
@@ -185,7 +185,7 @@ export function newDenseStructure(elements: Value[]): Structure {
 /** C4.3b: copy-on-write derive — a new Context-role structure SHARING the
  *  source's data planes by reference (sound: data contexts are immutable,
  *  D22) with the given channel plane attached. This is how channels attach
- *  to records/types without a MultiValue wrapper: `withMetadata` with a
+ *  to records/types without a MultiValue wrapper: `withMeta` with a
  *  Context primary flattens through here, so MV-over-Context is
  *  unconstructible. Scopes are evaluator state, not data — the channel
  *  plane never attaches to them (C2.1 plane rejection). */

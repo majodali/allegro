@@ -4,6 +4,51 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 C6: the factories take metadata, and "four operations" turns out to be one
+
+`makeBits`, `makeInt`, `makeFloat`, `makeExpr` and `makeSymbol` now take an
+optional `meta`, and the **12** create-then-attach sites collapse into one
+construction — **PE Rule 1 first**, on the path that allocates 101,611
+Expressions. The guarantee is a lifecycle one (D48(c)): there is no window in
+which a value exists without what it must carry. Skipping the intermediate
+allocation is a consequence, not the reason. The parameter is optional because
+Allegretto defines no fields (R6/R11), and it is always declared on the object
+either way, per the stable-hidden-class convention.
+
+**The chunk delivered §3.2 rather than its own row**, which predated the
+maintainer's correction. The plan had classified 45 `withMetadata` call sites
+into four patterns and proposed four names. Asked what distinguishes derive,
+map and stamp in their *logic* rather than their purpose, the answer was
+nothing: all three are `(datum, metadata) → value`, differing only in where the
+two arguments come from.
+
+**The ten derive sites became stamps by deleting a word.** `withMeta(dataOf(v),
+m)` differed from `withMeta(v, m)` only while `dataOf` peeled a carrier. That
+is the concrete evidence for the correction — derive was never an operation, it
+was stamp seen through the peel, and `mergeOverMeta`'s two exits collapsed to
+one line for the same reason. Naming the patterns separately would have been
+B-111's finding in mirror image: several concepts under one word there, one
+concept under several here.
+
+**`withMetadata` is renamed `withMeta`**, joining `carryMeta`, `cloneMeta`,
+`metaOf` and `metaReadRaw`. The completion test asked for that count to reach
+zero and it does — but by rename, not by the decomposition the test was written
+to expect. Recorded in the plan so a green count does not imply a
+decomposition that did not happen. Consistency with the family is the only
+argument for the change; it is churn otherwise.
+
+**What was deliberately not added**: a name for each of the ~24 remaining stamp
+sites. That vocabulary would describe where arguments come from rather than
+what the code does. `carryMeta` survives as the one named pattern and earns it
+on a hazard argument — the map case is two calls and the second is forgettable,
+the same convention-only obligation as the TailCall sentinel — not a logical
+one.
+
+`docs/design/allegretto/structures.md` is marked superseded where it describes
+the carrier; the prose rewrite is C7.
+
+Suite **1202/1202**, typecheck clean.
+
 ## 2026-08 — B-121 C4: the carrier surface is deleted, and W2/W3 follow the plane instead of the representation
 
 `primary`, `isCarrier`, `newCarrierStructure`, the `CarrierStructure` type, and

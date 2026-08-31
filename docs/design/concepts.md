@@ -607,8 +607,7 @@ and a genuine trade rather than an obvious win.
 
 The ruling above makes attachment cheaper. This one changes when it happens:
 **a value that will carry metadata should be built with it.** Classifying all
-45 non-test call sites of `withMetadata` showed it is **four operations
-wearing one name**:
+45 non-test call sites of `withMetadata` sorted them into four patterns:
 
 | pattern | sites | what it is |
 |---|---|---|
@@ -616,6 +615,16 @@ wearing one name**:
 | `withMetadata(dataOf(v), m)` | **10** | **derive** — same datum, new position, different metadata |
 | `withMetadata(newP, cloneComponents(v))` | **9** | **map** — new datum, old metadata carried across |
 | `withMetadata(result, {type: t})` | ~14 | **stamp** — computed value, computed metadata |
+
+**Four patterns, but not four operations** — corrected 2026-08, when the
+maintainer asked what distinguishes derive, map and stamp in their *logic*
+rather than their purpose. Nothing does. All three are `(datum, metadata) →
+value`, differing only in where the two arguments come from. Derive was the
+clearest case: `withMeta(dataOf(v), m)` looked distinct from `withMeta(v, m)`
+only because of the peel, so once `dataOf` became the identity the ten derive
+sites turned into stamps by deleting a word. Naming them separately would have
+been B-111's finding in mirror image — several concepts under one word there,
+one concept under several here.
 
 `evaluator.ts:511` is in the first group and it is **PE Rule 1 itself** —
 `withMetadata(makeExpr(residualFn, evalArgs), components)`, on the path that
@@ -627,21 +636,22 @@ boundary invariant; `makeBits`/`makeInt`/`makeFloat`/`makePrimitive`/
 `makeParam`/`makeSymbol`/`makeExpr`/`makeComposedFn`/`makeStructure`/
 `makeDenseArray`). They simply do not take metadata.
 
-**The shape:**
+**The shape, as built at C6** — one operation and two conveniences:
 
 ```
-makeInt(42, meta?)          // create with metadata
+withMeta(v, meta)           // THE operation; derive and stamp are both this
+makeInt(42, meta?)          // create with metadata — a lifecycle guarantee
 makeExpr(fn, args, meta?)   // PE Rule 1, one construction
-deriveMeta(v, meta)         // same datum, new metadata
-mapDatum(v, newDatum)       // new datum, metadata carried — impossible to forget
-stampMeta(v, meta)          // the general case that survives
+carryMeta(from, to)         // metadata across a new datum — impossible to forget
 ```
 
-**Why the third one matters most.** `withMetadata(newP, cloneComponents(v))`
-is spelled as **two** calls for **one** operation, and omitting the second
-silently drops metadata with no error — the same failure shape as the
-TailCall sentinel (B-113) and the ComposedFunction clone helper: an
-obligation held by convention. Naming it removes the way to get it wrong.
+**Why `carryMeta` earns its place**, though it is not a distinct operation.
+The map pattern is spelled as **two** calls — `withMeta(newP, cloneMeta(v))` —
+and omitting the second silently drops metadata with no error, the same
+convention-only obligation as the TailCall sentinel (B-113) and the
+ComposedFunction clone helper. Naming it removes the way to get it wrong. That
+is a hazard argument, not a logical one, which is why it is a convenience
+rather than part of the surface.
 
 **And the aliasing that rules out the no-allocation designs.** Measured:
 59,027 attachments, of which **19,817 (33.6%) target an object that has

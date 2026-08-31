@@ -31,7 +31,7 @@ import {
 } from "./parser.js";
 import {
   Value, ValueKind, StructureValue, BitsValue,
-  makeStructure, makeInt, withMetadata, stringToBits, dataOf,
+  makeStructure, makeInt, withMeta, stringToBits, dataOf,
 } from "./types.js";
 import { withType, StringType, ErrorType, IntType, makeArray, noneSingleton } from "./types-std.js";
 
@@ -694,7 +694,7 @@ export function parseGrammarToAllegro(gHandle: number, input: string): Value {
     const meta = new Map<string, Value>();
     meta.set("error", withType(stringToBits(msg), StringType));
     meta.set("type", ErrorType);
-    return withMetadata(makeInt(0), meta);
+    return makeInt(0, meta);
   }
   return syntaxTreeToAllegroValue(result.tree);
 }

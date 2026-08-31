@@ -1,6 +1,6 @@
 # Metadata on values — delete the carrier, build values with their metadata
 
-> Status: **active** — §6 ruled 2026-08; **C1, C2 and C4 landed**.
+> Status: **active** — §6 ruled 2026-08; **C1, C2, C4 and C6 landed**; C5 and C7 outstanding.
 > Owner: **B-121**. Ruled at **D48(b)(c)** (B-108, 2026-08); the *whether*
 > is settled, this plan is the *how*.
 > Outcome (K-007): every representation kind carries its own metadata field,
@@ -419,6 +419,40 @@ cast was a route to `.meta`, which C1 had already put on all seven kinds, so
 the casts dropped rather than moved. `dataOf` is now literally `return v` and
 waits for C5.
 
+### 5.1f C6: what "four operations" turned out to be
+
+The chunk delivered what §3.2 says rather than what the C6 row said, because
+the row predated the maintainer's correction. Recorded here so the gap between
+them is deliberate.
+
+**Factories take metadata (D48(c)) — the substance of the chunk.** `makeBits`,
+`makeInt`, `makeFloat`, `makeExpr` and `makeSymbol` take an optional `meta`,
+and the **12** create-then-attach sites collapse into one construction, PE Rule
+1 first. The parameter is optional because Allegretto defines no fields
+(R6/R11), and it is always DECLARED on the object either way, per the
+stable-hidden-class convention. The guarantee is a lifecycle one — there is no
+window in which the value exists without what it must carry — and skipping the
+intermediate allocation is a consequence, not the reason.
+
+**The 10 derive sites became stamps by deleting a word.** `withMeta(dataOf(v),
+m)` and `withMeta(v, m)` differed only while `dataOf` peeled a carrier. This is
+the concrete evidence for §3.2's correction: derive was never an operation, it
+was stamp seen through the peel.
+
+**`withMetadata` is renamed `withMeta`.** The completion test asked for that
+count to reach zero, and it does — but by rename, not by the decomposition into
+`deriveMeta`/`mapDatum`/`stampMeta` the test was written to expect. The name
+now matches the family it belongs to (`carryMeta`, `cloneMeta`, `metaOf`,
+`metaReadRaw`), which is the only argument for the change; it is churn
+otherwise, and worth flagging as such.
+
+**Nothing else was added.** The temptation was to give the remaining ~24 stamp
+sites a name each, which is what "four operations" would have produced: a
+vocabulary describing where arguments come from rather than what the code does.
+`carryMeta` survives as the one named pattern, and it earns that on a hazard
+argument — the map case is two calls and the second is forgettable — not a
+logical one.
+
 ### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
 
 `kind === ValueKind.Structure` appears 117 times and `!==` 68 more. Today a
@@ -484,13 +518,20 @@ separate optimisation below this choice and is out of scope.
 | **C3** | The carrier's re-wrap moves into `evaluate` as one uniform carry (§4.2); the three carrier arms are deleted | Suite green; PE fixtures are the oracle for metadata surviving evaluation |
 | **C4** | Delete `primary`, `isCarrier`, `CarrierStructure`, `newCarrierStructure`, W1/W5 and the walker's carrier branch. `concepts.md` §10 leaves the spine | **DONE 2026-08.** Every count at zero; §6 ruling 3 applied — §5.1e records the review and the coverage regression it found |
 | **C5** | Delete `dataOf` (903) and its call sites — mechanical, counts as the completion test | Counts to zero |
-| **C6** | The four operations: factories take metadata, `deriveMeta` / `mapDatum` / `stampMeta` replace `withMetadata`'s 45 sites, and the 12 create-then-attach pairs collapse — **PE Rule 1 first** | Suite green; the `withMetadata` count reaches zero |
+| **C6** | One operation and two conveniences (§3.2): the factories take metadata, the 12 create-then-attach pairs collapse — **PE Rule 1 first** — the 10 derive sites become stamps, and `withMetadata` is renamed `withMeta` to join the `*Meta` family | **DONE 2026-08.** Suite green; `withMetadata` at zero. §5.1f |
 | **C7** | The in-place rule (§3.4) stated where `writeShape` and the builder idiom live; `concepts.md` §10/§11 updated and their deltas closed | doc-ref-lint; spine delta rows read `—` |
 
 **Completion test** (concept-campaign §9.4): a chunk is done when the spine
 delta rows it claims read `—`, and the renames carry counts —
-`primary` 196 → 0, `dataOf` 903 → 0, `isCarrier` 14 → 0,
-`CarrierStructure` 24 → 0, `withMetadata` 69 → 0.
+`primary` 196 → 0 (C4), `isCarrier` 14 → 0 (C4),
+`CarrierStructure` 24 → 0 (C4), `withMetadata` 69 → 0 (C6, renamed `withMeta`),
+`dataOf` 903 → 0 (C5, outstanding).
+
+*Revised at C6*: the completion test read `withMetadata` → 0 because the plan
+then expected three replacement names. §3.2's correction leaves one operation,
+so the count reaches zero by RENAME rather than by decomposition — the same
+number, a different reason, and worth saying so rather than letting a green
+count imply a decomposition that did not happen.
 
 ## 8. What this plan is not
 

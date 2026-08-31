@@ -34,7 +34,7 @@ import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructur
 import { ModuleLoader } from "./modules.js";
 import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, metaReadRaw, metaOf, cloneMeta, SLOT_REGISTRY, SLOT_KEYS, viralFields, unionFields, registerMetaField, typeShape, metaFieldSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
-import { withMetadata } from "./types.js";
+import { withMeta } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
@@ -1505,14 +1505,14 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(dataOf(t) === dataOf(TypeMeta as unknown as Value), true, "`type of Int` is the Type meta-type");
   });
 
-  test("flatten (C4.3b): MV-over-Context is unconstructible — withMetadata flattens", () => {
+  test("flatten (C4.3b): MV-over-Context is unconstructible — withMeta flattens", () => {
     const r = evalSource("p = {a: 5}", undefined, [createTypeSystem()], undefined, true);
     const record = r.evalCtx.bindings.get("p")!.value!;
     // The standard writer idiom: clone the channel plane, extend, re-derive
     // (the given map is authoritative — deletion must stay expressible).
     const comps = cloneMeta(record);
     comps.set("exported", makeInt(1));
-    const stamped = withMetadata(dataOf(record), comps);
+    const stamped = withMeta(record, comps);
     eq((stamped as Value).kind, ValueKind.Structure, "wrapping a Context derives a flattened Context");
     eq(metaReadRaw(stamped as Value, "exported") !== undefined, true, "the new channel rides");
     eq(metaReadRaw(stamped as Value, "type") !== undefined, true, "cloned channels carry forward");
@@ -2123,7 +2123,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // W1 restated behaviourally: attaching metadata never nests. Re-typing an
     // already-typed value leaves the SAME data underneath, so the peel is
     // idempotent — a nested wrapper would need two peels to reach the scalar.
-    const rewrapped = withMetadata(x, new Map([["type", dataOf(IntType as unknown as Value)]]));
+    const rewrapped = withMeta(x, new Map([["type", dataOf(IntType as unknown as Value)]]));
     eq(dataOf(dataOf(rewrapped)) === dataOf(rewrapped), true,
       "one peel reaches the scalar — a nested wrapper would need two");
     eq(Number((dataOf(rewrapped) as BitsValue).data), 42, "the literal survives the re-type");
