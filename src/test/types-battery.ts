@@ -602,7 +602,12 @@ Point instanceof Type`);
 
 test("typed types: type of Int returns Type", () => {
   const result = evalStd("type of Int");
-  eq(getType(result!) !== null || (result! as any).primary === undefined, true);
+  // B-121 C4: the `|| result.primary === undefined` escape is dropped. With
+  // `primary` deleted that disjunct is permanently true, which would have
+  // made the whole assertion pass unconditionally — a check that stops
+  // checking rather than failing. What the test is named for is the left
+  // side, so it now has to hold on its own.
+  eq(getType(result!) !== null, true, "`type of Int` answers a value carrying a type");
 });
 
 // == Effect meta-type (Phase D1 sub-chunk 1.1) ==

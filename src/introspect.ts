@@ -207,8 +207,7 @@ export function summarizeValue(v: Value): ValueSummary {
         return;
       }
       case ValueKind.Structure:
-        if ((node as any).primary !== undefined) walk((node as any).primary, depth, seen);
-        return;
+        return; // inert — B-121 C4 deleted the carrier arm
       case ValueKind.Bits:
       case ValueKind.Param:
         return;

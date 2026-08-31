@@ -26,7 +26,7 @@
 
 import { dataOf, metaOf, cloneMeta, installFieldMerge, registerMetaField } from "./slots.js";
 import {
-  Value, ValueKind, ComposedFunctionValue, StructureValue, CarrierStructure,
+  Value, ValueKind, ComposedFunctionValue, StructureValue,
   withMetadata, makeStructure,
 } from "./types.js";
 

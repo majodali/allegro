@@ -1675,7 +1675,7 @@ that prevents it.
 
 - [ ] **B-121** · L0 · **Metadata is a field on every value, supplied at
   construction (D48(b)(c), IC-3).** **PLAN: `docs/plans/metadata-on-values.md`
-  (active, 2026-08) — chunks C1–C7; §6 rulings taken; **C1 and C2 landed.** The plan adds
+  (active, 2026-08) — chunks C1–C7; §6 rulings taken; **C1, C2 and C4 landed.** The plan adds
   four probes not in this entry: retyping `withMetadata` to return `Value`
   typechecks with **0 errors** (nothing depends on attachment producing a
   Structure); `newCarrierStructure` has exactly **2 callers, both inside
@@ -1782,6 +1782,19 @@ that prevents it.
     `effects` stopped unioning. One of the six (`unifyTypes`) was NOT a
     stand-in — it separated a value-carrying-a-type from a type Context — and
     was restated, not deleted. `docs/plans/metadata-on-values.md` §5.1c
+  - **C4 LANDED 2026-08**, suite **1202/1202**. `primary`, `isCarrier`,
+    `newCarrierStructure`, `CarrierStructure` and W1/W5 deleted; `dataOf` is
+    now `return v` and waits for C5. The carrier was already unconstructed —
+    the factory had no callers and a probe recorded **zero** across 1200
+    tests — so every deletion was dead code. **The ruling-3 review found a
+    live regression**: W2 and W3 were checked only inside the walker's carrier
+    branch, so C2 killing that branch silently removed them from **564 of
+    2034** metadata-bearing values, leaving W2 with no coverage at all. Both
+    now key on `meta` rather than on kind (corpus inspects 3062, not 1470).
+    Also recorded: deleting a field can silently disarm an assertion that
+    merely mentions it — `types-battery.ts`'s `|| result.primary === undefined`
+    would have become an unconditional pass. `docs/plans/metadata-on-values.md`
+    §5.1e
   - **First C2 attempt, backed out at the gate, 2026-08** — see
     `docs/plans/metadata-on-values.md` §5.1a for the full record. The root
     cause is one idea repeated: throughout the evaluator, *"does this value

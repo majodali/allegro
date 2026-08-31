@@ -12,7 +12,7 @@
 //   2. Invariant property checks — a deterministic generator builds small
 //      typed programs via the public `evalSource` surface and walks every
 //      resulting value asserting the standing well-formedness invariants
-//      (W1 MultiValue non-nesting, W2 type-component shape). New invariants
+//      (W2 type-field shape, W3 registry completeness). New invariants
 //      (transparency, key-sort partition, immutability) join per phase.
 //   3. Forgery-scenario skeleton — the D21 scenarios A–F as named, visible,
 //      skipped entries; each chunk that makes one testable un-skips it.
@@ -30,7 +30,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
-import { Value, ValueKind, StructureValue, CarrierStructure, makePrimitive, makeExpr, makeStructure } from "./types.js";
+import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
 import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, metaReadRaw, metaOf, cloneMeta, SLOT_REGISTRY, SLOT_KEYS, viralFields, unionFields, registerMetaField, typeShape, metaFieldSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
@@ -333,12 +333,14 @@ export interface InvariantViolation {
 }
 
 /** Walk a value tree checking well-formedness invariants.
- *  W1: a MultiValue's primary is never itself a MultiValue.
  *  W2: a resolved `type` field's data is a Context — checked on EVERY kind
  *  since B-121 C4, because metadata is no longer a Structure's privilege.
  *  W3 (C1.1): every `__*` Context-binding key and every metadata field key
  *  is covered by the slot registry (`src/slots.ts`) — the D39 "no new `__*`
  *  slot" rule enforced mechanically. Also kind-independent since C4.
+ *  W4: every Context is an instance of the unified Structure class.
+ *  W6: a dense structure's materialized view agrees with its dense region.
+ *  W1 and W5 were retired at C4 with the carrier they described.
  *  (Grows per phase: transparency, key-sort partition, immutability.) */
 export function checkValueInvariants(v: Value | null | undefined, program: string, out: InvariantViolation[], seen: WeakSet<object> = new WeakSet(), depth = 0): void {
   if (!v || typeof v !== "object" || depth > 24) return;
@@ -376,37 +378,18 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     for (const comp of meta.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
   }
 
-  if ((v as { primary?: Value }).primary !== undefined) {
-    // C7.1: the CARRIER configuration (D15) — primary present. Restated
-    // invariants: W4 carriers are Structures; W5 a carrier's data plane
-    // is EMPTY (the lazily-materialized view may exist but holds no
-    // slots); W1 a carrier's primary is never a carrier and never a
-    // plain Context (records flatten through withMetadata).
-    const mv = v as CarrierStructure;
-    if (!isStructure(v)) {
-      out.push({ invariant: "W4 structure-kind", detail: "carrier is not a Structure instance (bypassed withMetadata)", program });
-    } else if ((v as unknown as Structure).bindings !== undefined && (v as unknown as Structure).bindings.size > 0) {
-      out.push({ invariant: "W5 role-transparency", detail: "carrier carries data slots (data plane must be empty — D15)", program });
-    }
-    if (mv.primary && (mv.primary as Value & { primary?: Value }).primary !== undefined) {
-      out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is itself a carrier", program });
-    }
-    if (mv.primary && (mv.primary as Value).kind === ValueKind.Structure) {
-      out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is a Context (records flatten — C4.3b/C7.1)", program });
-    }
-    // W2/W3 and the metadata recursion now run above, for every kind.
-    checkValueInvariants(mv.primary as Value, program, out, seen, depth + 1);
-    return;
-  }
   if (v.kind === ValueKind.Structure) {
     // C4.1 (W4): every Context is an instance of the unified Structure class.
+    //
+    // B-121 C4 retired the CARRIER branch that stood here, along with W1
+    // (carrier non-nesting) and W5 (role-transparency). Both described the two
+    // roles sharing one class: W5 kept their data planes exclusive, W1 kept a
+    // carrier's primary from being another carrier or a Context. With the
+    // carrier gone there is one role, `primary` is deleted, and neither has a
+    // subject left. W1's successor property — attaching metadata never nests —
+    // is asserted behaviourally instead, as an idempotent `dataOf` peel.
     if (!isStructure(v)) {
       out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeStructure)", program });
-    } else if ((v as unknown as Structure).primary !== undefined) {
-      // C4.3b (R5 reframe): the DATA planes are role-exclusive (a Context
-      // never carries a primary; an MV never carries slots) — the CHANNEL
-      // plane is universal (flattened Contexts carry meta directly).
-      out.push({ invariant: "W5 role-transparency", detail: "Context role carries a primary (data slots + primary — D17)", program });
     } else {
       // C4.2 (W6): when a dense structure's legacy view exists, it must
       // agree with the dense region — the region is authoritative.
@@ -683,7 +666,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     }
   });
 
-  test("boundary invariants: generated-program value walk (W1 non-nesting, W2 type shape)", () => {
+  test("boundary invariants: generated-program value walk (W2 type shape, W3 registry)", () => {
     const result = runInvariantPropertyChecks();
     const rendered = result.violations
       .slice(0, 3)
@@ -1389,7 +1372,10 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // genuinely Structures, and that is not what C2 changes.
     const p = dataOf(evalCtx.bindings.get("p")!.value!);
     eq(isStructure(p), true, "object Context role is a Structure");
-    eq((p as unknown as Structure).primary === undefined, true, "Context role has no primary (D17)");
+    // B-121 C4: `Context role has no primary (D17)` retired with the field.
+    // D17's content — a record's data is its slots — is what the line above
+    // and the binding reads below assert; `primary === undefined` was only
+    // ever the carrier-era spelling of it.
     const y = evalCtx.bindings.get("y")!.value!;
     eq(isStructure(getType(y)!), true, "a refined value's type Context is a Structure");
     eq(getTypeNameOf(y), "PositiveInt", "and the refined value reports it");

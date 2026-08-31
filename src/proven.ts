@@ -147,12 +147,8 @@ function substParams(
       const args = e.args.map(a => substParams(a, cfn, posMap, seen));
       return { ...e, fn, args };
     }
-    case ValueKind.Structure: {
-      seen.add(v);
-      const pp = (v as any).primary;
-      if (pp === undefined) return v;
-      return withMetadata(substParams(pp, cfn, posMap, seen), metaOf(v) as Map<string, import("./types.js").Value>);
-    }
+    case ValueKind.Structure:
+      return v; // inert — B-121 C4 deleted the carrier arm
     case ValueKind.ComposedFunction: {
       seen.add(v);
       // Don't recurse into inner ComposedFunctions — their Params have a

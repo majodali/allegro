@@ -62,14 +62,13 @@ const LENGTH_KEY = "__length";
  *  are declared up front so every structure shares a single hidden class
  *  (the I1 motivation), whichever role it plays. */
 export class Structure {
-  // C7.1 (D15/D46): ONE kind. The former MultiValue role is the CARRIER
-  // configuration — primary set, empty data plane — and it answers the
-  // same kind as every structure. `isCarrier` is the host-level
-  // discriminant (primary presence), not the kind tag.
+  // C7.1 (D15/D46): ONE kind. B-121 C4 deleted the CARRIER configuration —
+  // `primary`, its constructor initializer, the two empty-view branches on
+  // the binding getters, `isCarrier` and `newCarrierStructure`. A composite
+  // is the only role left, so a Structure is now what its name says.
   kind: ValueKind.Structure;
 
-  // --- Carrier configuration (transparent value: primary + channel plane) ---
-  primary: Value;
+  // --- Metadata plane (universal since C2: every kind carries one) ---
   meta: Map<string, Value>;
 
   // --- Context role (record/type/scope: slot plane) ---
@@ -96,7 +95,6 @@ export class Structure {
 
   constructor(immutable: boolean) {
     this.kind = ValueKind.Structure;
-    this.primary = undefined as unknown as Value;
     this.meta = undefined as unknown as Map<string, Value>;
     this._bindings = undefined as unknown as Map<string, Binding>;
     this._bindingList = undefined as unknown as Binding[];
@@ -115,9 +113,6 @@ export class Structure {
   get bindings(): Map<string, Binding> {
     if (this._bindings === undefined) {
       if (this.dense !== undefined) materializeView(this);
-      // C7.1: a carrier's data plane is EMPTY (D15) — materialize the
-      // empty view on first ask so record-shaped consumers see no slots.
-      else if (this.primary !== undefined) { this._bindings = new Map(); this._bindingList = []; }
     }
     return this._bindings;
   }
@@ -128,7 +123,6 @@ export class Structure {
   get bindingList(): Binding[] {
     if (this._bindingList === undefined) {
       if (this.dense !== undefined) materializeView(this);
-      else if (this.primary !== undefined) { this._bindings = new Map(); this._bindingList = []; }
     }
     return this._bindingList;
   }
@@ -167,22 +161,6 @@ function materializeView(s: Structure): void {
   bindingList.push(lenB);
   s.bindings = bindings;
   s.bindingList = bindingList;
-}
-
-/** C7.1: the host-level carrier discriminant — a structure whose data is
- *  a non-Structure primary riding under an (empty) data plane. This is
- *  the "MultiValue interface" as protocol, not kind (D46). */
-export function isCarrier(v: unknown): boolean {
-  return v instanceof Structure && (v as Structure).primary !== undefined;
-}
-
-/** Construct the CARRIER configuration (the D15 transparent structure:
- *  empty data plane + primary channel). */
-export function newCarrierStructure(primary: Value, meta: Map<string, Value>): Structure {
-  const s = new Structure(true);
-  s.primary = primary;
-  s.meta = meta;
-  return s;
 }
 
 /** Construct the Context role. Scopes are mutable evaluator state; data

@@ -2,7 +2,7 @@
 
 import {
   Value, ValueKind, ExpressionValue, StructureValue,
-  ComposedFunctionValue, ParamValue, CarrierStructure,
+  ComposedFunctionValue, ParamValue,
   AllegroError, isResolved, makeExpr, withMetadata, makeStructure,
   DepCollector, ownsParam, Metadata} from "./types.js";
 import {
@@ -17,7 +17,6 @@ import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain,
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, dataOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource, carryMeta} from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
-import { isCarrier } from "./structure.js";
 
 const MAX_DEPTH = 10000;
 
@@ -142,19 +141,13 @@ export function evaluate(
     case ValueKind.ComposedFunction:
       return value;
 
-    case ValueKind.Structure: {
-      // C7.1: a CARRIER (primary present) re-evaluates its primary — a
-      // residual under channels is still pending computation; plain
-      // structures self-evaluate.
-      if (!isCarrier(value)) return value;
-      const mv = value as CarrierStructure;
-      const ep = evaluate(mv.primary, ctx, depth + 1, depCollector);
-      if (ep === mv.primary) return value;
-      // Flatten rather than nest — `mergeOverMeta` states the rule. B-121 C2
-      // extracted it from here so Symbols and Expressions, which carry their
-      // own metadata now, get the same treatment.
-      return mergeOverMeta(cloneMeta(mv), ep);
-    }
+    case ValueKind.Structure:
+      // Structures self-evaluate. B-121 C4 deleted the CARRIER arm that stood
+      // here — it re-evaluated the wrapped value, because a residual under
+      // metadata was still pending computation. A residual now carries its own
+      // metadata as an Expression and is handled by that case; `mergeOverMeta`,
+      // extracted from this arm at C2, is what it calls.
+      return value;
 
     case ValueKind.Param:
       return value;
@@ -734,13 +727,10 @@ export function remapParams(value: Value, paramMap: Map<ParamValue, ParamValue>)
     case ValueKind.PrimitiveFunction:
     case ValueKind.Symbol:
       return value;
-    case ValueKind.Structure: {
-      // C7.1: carriers walk their primary; plain structures are inert.
-      if (!isCarrier(value)) return value;
-      const mv = value as CarrierStructure;
-      const newP = remapParams(mv.primary, paramMap);
-      return newP === mv.primary ? value : withMetadata(newP, cloneMeta(mv));
-    }
+    case ValueKind.Structure:
+      // Structures are inert. B-121 C4: the carrier arm that walked `primary`
+      // is deleted — an Expression carrying metadata is walked by its own case.
+      return value;
     case ValueKind.Param: {
       const replacement = paramMap.get(value);
       return replacement ?? value;
@@ -782,13 +772,9 @@ function subst(value: Value, owner: ComposedFunctionValue, posMap: Map<number, V
   // (no circular function references in expression tree)
 
   switch (value.kind) {
-    case ValueKind.Structure: {
-      // C7.1: carriers walk their primary; plain structures are inert.
-      if (!isCarrier(value)) return value;
-      const mv = value as CarrierStructure;
-      const newP = subst(mv.primary, owner, posMap, seen);
-      return newP === mv.primary ? value : withMetadata(newP, cloneMeta(mv));
-    }
+    case ValueKind.Structure:
+      // Structures are inert — see `remapParams` above.
+      return value;
     case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
       return value;

@@ -111,13 +111,8 @@ function captureModuleVars(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.Structure: {
-      const pp = (value as { primary?: Value }).primary;
-      if (pp === undefined) return value;
-      const newP = captureModuleVars(pp, moduleBindings, ownParams, seen);
-      if (newP === pp) return value;
-      return withMetadata(newP, cloneMeta(value));
-    }
+    case ValueKind.Structure:
+      return value; // inert — B-121 C4 deleted the carrier arm
 
     default:
       return value;

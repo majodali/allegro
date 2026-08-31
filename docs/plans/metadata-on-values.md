@@ -1,6 +1,6 @@
 # Metadata on values — delete the carrier, build values with their metadata
 
-> Status: **active** — §6 ruled 2026-08; **C1 landed**.
+> Status: **active** — §6 ruled 2026-08; **C1, C2 and C4 landed**.
 > Owner: **B-121**. Ruled at **D48(b)(c)** (B-108, 2026-08); the *whether*
 > is settled, this plan is the *how*.
 > Outcome (K-007): every representation kind carries its own metadata field,
@@ -368,6 +368,57 @@ failing guard, record the call site, read the list. That is the same move as
 the survey, applied to a failure rather than to a grep — and it is what turned
 a tail that read as unbounded on the first attempt into a list of six.
 
+### 5.1e C4: the review the ruling required, and what it turned up
+
+**The carrier was already gone before C4 started.** `newCarrierStructure` had
+no callers — the `types.ts` import was unused — and instrumenting the factory
+and running the full suite recorded **zero carriers constructed across 1200
+tests**. So every deletion below removed dead code rather than changing
+behaviour, which is what made the chunk safe to take in one pass.
+
+**The review found a live coverage regression, which is why ruling 3 was
+worth having.** W2 and W3 were checked inside the boundary walker's carrier
+branch — the only place metadata could be found on a non-Structure value. C2
+stopped constructing carriers, so that branch went dead and silently took both
+checks with it. Measured on the corpus walk: **564 of the 2034** metadata-bearing
+values the walk reaches had their metadata inspected by nothing (Bits 477,
+ComposedFunction 85, PrimitiveFunction 2), and **W2 had no coverage at all**.
+A walk over nothing still passes, so the gate could not see it — the same
+silent-failure shape as C2's six sites.
+
+Fixed by hoisting both checks to key on `meta` being present rather than on
+what kind the value is, which is what they were always about. The corpus now
+inspects **3062** values instead of 1470, with zero violations. That is a MOVE,
+so it landed ahead of the retirements rather than waiting on the ruling.
+
+| invariant | disposition | reasoning |
+|---|---|---|
+| **W1** carrier-non-nesting | retired | Both arms test a carrier's `primary`. Its successor — attaching metadata never nests — is asserted behaviourally in C2's test as an idempotent `dataOf` peel. With `primary` deleted, `dataOf` is the identity and W1 is vacuous rather than merely unchecked |
+| **W2** type-field-shape | kept, moved | Was checked only in the carrier branch; now kind-independent |
+| **W3** registry-completeness | kept, moved | Same. The `__*` binding-key half is unaffected |
+| **W4** structure-kind | one arm retired | "carrier is not a Structure instance" goes; "Context is not a Structure instance" is untouched |
+| **W5** role-transparency | retired | Both arms are about two roles sharing one class. With one role left there is nothing to keep exclusive |
+| **W6** dense-view-coherence | untouched | Not about the carrier |
+
+**Three tests, reviewed individually as the ruling requires.** The walk test
+kept its body and lost W1 from its name. `Context role has no primary (D17)`
+was retired — D17's content is asserted by the lines around it, and
+`primary === undefined` was only the carrier-era spelling of it. The third is
+the one worth recording: `types-battery.ts`'s
+`eq(getType(result) !== null || result.primary === undefined, true)` would have
+had its right disjunct become permanently true, turning a real check into an
+unconditional pass. Deleting a field can silently disarm an assertion that
+merely mentions it. The disjunct was dropped, which strengthens the test to
+what its name claims, and the maintainer ruled on that rather than the plan
+assuming it.
+
+**The deletion itself was uniform.** 46 `.primary` reads across twelve files
+were almost all one shape — a dead tree-walk arm, one per walker — plus the
+peel inside `dataOf`, `isResolved` and `asStructure`. Every `CarrierStructure`
+cast was a route to `.meta`, which C1 had already put on all seven kinds, so
+the casts dropped rather than moved. `dataOf` is now literally `return v` and
+waits for C5.
+
 ### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
 
 `kind === ValueKind.Structure` appears 117 times and `!==` 68 more. Today a
@@ -431,7 +482,7 @@ separate optimisation below this choice and is out of scope.
 | **C1** | ~~`Metadata` / `MetadataBearing` declared and extended by all seven interfaces; `Structure.components` → `meta`; every factory declares the field~~ **DONE 2026-08**, widened by ruling 1 to the whole metadata vocabulary: **430 identifier renames across 28 files** plus the registry's storage and disposition labels. Nothing writes the new field yet | Suite **1198/1198**; typecheck clean |
 | **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier, **preceded by the 14 kind-test fixes the survey (§5.1b) enumerates** and `carryMeta` at the seven clone sites. Carriers stop being created; `dataOf` still compiles and returns `v` | **DONE 2026-08** in three gated steps after a first attempt was backed out at the gate (§5.1a). Suite **1202/1202**; typecheck clean. Steps and the two classes the survey could not see: §5.1c |
 | **C3** | The carrier's re-wrap moves into `evaluate` as one uniform carry (§4.2); the three carrier arms are deleted | Suite green; PE fixtures are the oracle for metadata surviving evaluation |
-| **C4** | Delete `primary` (196), `isCarrier` (14), `CarrierStructure` (24), `newCarrierStructure`, W1/W5 and their walker. `concepts.md` §10 leaves the spine | Counts to zero; §6 ruling 3 applied |
+| **C4** | Delete `primary`, `isCarrier`, `CarrierStructure`, `newCarrierStructure`, W1/W5 and the walker's carrier branch. `concepts.md` §10 leaves the spine | **DONE 2026-08.** Every count at zero; §6 ruling 3 applied — §5.1e records the review and the coverage regression it found |
 | **C5** | Delete `dataOf` (903) and its call sites — mechanical, counts as the completion test | Counts to zero |
 | **C6** | The four operations: factories take metadata, `deriveMeta` / `mapDatum` / `stampMeta` replace `withMetadata`'s 45 sites, and the 12 create-then-attach pairs collapse — **PE Rule 1 first** | Suite green; the `withMetadata` count reaches zero |
 | **C7** | The in-place rule (§3.4) stated where `writeShape` and the builder idiom live; `concepts.md` §10/§11 updated and their deltas closed | doc-ref-lint; spine delta rows read `—` |

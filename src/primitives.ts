@@ -393,12 +393,8 @@ function collectUnownedParams(v: Value, out: import("./types.js").ParamValue[], 
       collectUnownedParams(v.fn, out, seen);
       for (const a of v.args) collectUnownedParams(a, out, seen);
       break;
-    case ValueKind.Structure: {
-      // C7.1: carriers walk their primary; plain structures are inert.
-      const pp = (v as { primary?: Value }).primary;
-      if (pp !== undefined) collectUnownedParams(pp, out, seen);
-      break;
-    }
+    case ValueKind.Structure:
+      break; // inert — B-121 C4 deleted the carrier arm
     case ValueKind.ComposedFunction:
       break; // don't descend - inner params are owned
     default:
@@ -801,14 +797,8 @@ function replaceValueIdentity(v: Value, target: Value, replacement: Value, seen?
       }
       return newFn;
     }
-    case ValueKind.Structure: {
-      // C7.1: carriers walk their primary; plain structures are inert.
-      const pp = (v as { primary?: Value }).primary;
-      if (pp === undefined) return v;
-      const newP = replaceValueIdentity(pp, target, replacement, seen);
-      if (newP === pp) return v;
-      return withMetadata(newP, cloneMeta(v));
-    }
+    case ValueKind.Structure:
+      return v; // inert — B-121 C4 deleted the carrier arm
     default:
       return v;
   }
@@ -1712,14 +1702,8 @@ function resolveFreeSymbols(v: Value, ctx: StructureValue, seen: Set<Value> = ne
       for (const p of newFn.params) p.owner = newFn;
       return newFn;
     }
-    case ValueKind.Structure: {
-      // C7.1: carriers walk their primary; plain structures are inert.
-      const pp = (v as { primary?: Value }).primary;
-      if (pp === undefined) return v;
-      const newPrimary = resolveFreeSymbols(pp, ctx, seen);
-      if (newPrimary === pp) return v;
-      return withMetadata(newPrimary, cloneMeta(v));
-    }
+    case ValueKind.Structure:
+      return v; // inert — B-121 C4 deleted the carrier arm
     default:
       return v;
   }

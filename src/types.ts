@@ -5,7 +5,7 @@
 
 // C4.1: the unified Structure class behind MultiValue/Context. structure.ts
 // imports only TYPES from this module, so there is no runtime cycle.
-import { newCarrierStructure, newRecordStructure, newDenseStructure, deriveWithMeta, isCarrier } from "./structure.js";
+import { newRecordStructure, newDenseStructure, deriveWithMeta } from "./structure.js";
 
 export enum ValueKind {
   Bits = "Bits",
@@ -238,19 +238,6 @@ export interface StructureValue extends StructureHostFields, MetadataBearing {
   bindingList: Binding[];
 }
 
-// --- The carrier (C7.1, D15/D46; docs/design/concepts.md §10): the
-// former MultiValue KIND is now a CONFIGURATION of Structure — a
-// transparent structure with an empty data plane whose data rides in
-// `primary` and whose metadata rides in `meta`. It answers the same
-// kind as every structure; the host-level discriminant is primary
-// presence (`isCarrier`). This is the carrier's static shape, for the
-// paths that have already established they hold one.
-
-export type CarrierStructure = StructureValue & {
-  primary: Value;
-  meta: Metadata;
-};
-
 // --- Union type ---
 
 export type Value =
@@ -432,15 +419,15 @@ export function makeDenseArray(elements: Value[]): StructureValue {
 
 // --- Utilities ---
 
-/** Data-plane read: identity for everything except a transparent scalar
- *  structure (MultiValue role), whose data lives in `primary`. C4.3c: the
- *  former `primaryOf` name is retired — this IS the accessor (re-exported
- *  through slots.ts; both import paths resolve to this one function). */
+/** Data-plane read.
+ *
+ *  **This is now the identity function.** It peeled a carrier down to the
+ *  value inside; C2 stopped creating carriers and C4 deleted `primary`, so a
+ *  value's data IS the value. C5 deletes the function and its ~900 call sites;
+ *  it stays here until then so that deletion is its own reviewable chunk
+ *  rather than noise inside this one. */
 export function dataOf(v: Value): Value {
-  // Carrier check by primary presence — one property read; non-Structure
-  // values lack the field entirely.
-  const p = (v as { primary?: Value }).primary;
-  return p !== undefined ? p : v;
+  return v;
 }
 
 export function isResolved(v: Value): boolean {
@@ -449,12 +436,11 @@ export function isResolved(v: Value): boolean {
     case ValueKind.PrimitiveFunction:
     case ValueKind.ComposedFunction:
       return true;
-    case ValueKind.Structure: {
-      // C7.1: a carrier is as resolved as its primary (a residual under
-      // channels is still a residual); plain structures self-resolve.
-      const p = (v as { primary?: Value }).primary;
-      return p === undefined ? true : isResolved(p);
-    }
+    case ValueKind.Structure:
+      // Structures self-resolve. B-121 C4: the carrier arm — "as resolved as
+      // its primary", because a residual under metadata was still a residual —
+      // is deleted; such a residual is an Expression now, handled below.
+      return true;
     case ValueKind.Param:
     case ValueKind.Symbol:
       return false;

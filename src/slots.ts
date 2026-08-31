@@ -19,7 +19,6 @@ import {
   Value,
   ValueKind,
   StructureValue,
-  CarrierStructure,
   AllegroError,
   withMetadata,
 } from "./types.js";
@@ -252,11 +251,10 @@ function slotWrite(ctx: StructureValue, key: string, value: Value): void {
   ctx.bindingList.push({ key, value });
 }
 
-/** Peel a carrier down to its Context primary, if that's what it is. */
+/** Narrow a value to a Context, or null if it is not one. */
 export function asStructure(v: Value | null | undefined): StructureValue | null {
   if (!v) return null;
-  const p = (v as { primary?: Value }).primary ?? v;
-  return p && p.kind === ValueKind.Structure ? (p as StructureValue) : null;
+  return v.kind === ValueKind.Structure ? (v as StructureValue) : null;
 }
 
 // Type fields
@@ -373,7 +371,7 @@ export function metaReadRaw(v: Value, channel: string): Value | undefined {
   // now on it for EVERY value — carriers, flattened records and bare type
   // Contexts alike. Contexts without channels have `meta` undefined
   // (lazy — plain contexts and scopes pay nothing).
-  const comps = (v as CarrierStructure).meta as Map<string, Value> | undefined;
+  const comps = v.meta as Map<string, Value> | undefined;
   if (comps !== undefined) {
     const comp = comps.get(channel);
     if (comp !== undefined) return comp as Value;
@@ -385,7 +383,7 @@ export function metaReadRaw(v: Value, channel: string): Value | undefined {
     let raw = comps?.get("type") as Value | undefined;
     if (raw === undefined) {
       const ctx = asStructure(v);
-      raw = ctx ? (ctx as unknown as CarrierStructure).meta?.get("type") as Value | undefined : undefined;
+      raw = ctx ? ctx.meta?.get("type") as Value | undefined : undefined;
     }
     if (raw?.kind === ValueKind.Structure) return typeShape(raw as StructureValue);
     return raw;
@@ -393,7 +391,7 @@ export function metaReadRaw(v: Value, channel: string): Value | undefined {
   if (channel === "type") {
     // A transparent scalar carrier answers through its primary's plane.
     const ctx = asStructure(v);
-    return ctx ? (ctx as unknown as CarrierStructure).meta?.get("type") as Value | undefined : undefined;
+    return ctx ? ctx.meta?.get("type") as Value | undefined : undefined;
   }
   if (channel === "discharged") {
     const c = asStructure(v);
@@ -454,15 +452,14 @@ export function setEffectBound(ctx: StructureValue, d: unknown): void { (ctx as 
 // types-std). All 24 call sites mint a fresh Context and stamp it, so an
 // in-place component write is exactly the old binding write's contract.
 export function writeShape(ctx: StructureValue, v: Value): void {
-  const s = ctx as unknown as CarrierStructure;
-  if (s.meta === undefined) s.meta = new Map<string, Value>();
-  (s.meta as Map<string, Value>).set("type", v);
+  if (ctx.meta === undefined) ctx.meta = new Map<string, Value>();
+  (ctx.meta as Map<string, Value>).set("type", v);
 }
 function writeDischarged(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
 
 // Presence checks
 export function hasName(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__name"); }
-export function hasShapeSlot(ctx: StructureValue): boolean { return (ctx as unknown as CarrierStructure).meta?.has("type") === true; }
+export function hasShapeSlot(ctx: StructureValue): boolean { return ctx.meta?.has("type") === true; }
 export function hasDischarged(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__discharged"); }
 
 // Set-only writes (bindings map, NO bindingList entry) — mirror the proof
@@ -567,7 +564,7 @@ export function isMetaSlotKey(key: string): boolean {
 
 // Removal helpers (map + bindingList, mirroring the existing idiom exactly)
 export function removeRefines(ctx: StructureValue): void { ctx.bindings.delete("__refines"); }
-export function removeShapeSlot(ctx: StructureValue): void { (ctx as unknown as CarrierStructure).meta?.delete("type"); }
+export function removeShapeSlot(ctx: StructureValue): void { ctx.meta?.delete("type"); }
 export function removeConstruct(ctx: StructureValue): void {
   ctx.bindings.delete("__construct");
   const idx = ctx.bindingList.findIndex((b) => b.key === "__construct");
@@ -588,7 +585,7 @@ export { dataOf };
  *  universal — flattened Contexts (typed records/arrays) carry meta
  *  directly; values without a channel plane view as empty. */
 export function metaOf(v: Value): ReadonlyMap<string, Value> {
-  const comps = (v as CarrierStructure).meta as Map<string, Value> | undefined;
+  const comps = v.meta as Map<string, Value> | undefined;
   return comps !== undefined ? comps : EMPTY_META;
 }
 const EMPTY_META: ReadonlyMap<string, Value> = new Map();
@@ -596,7 +593,7 @@ const EMPTY_META: ReadonlyMap<string, Value> = new Map();
 /** Mutable copy of a value's meta — the standard "carry meta
  *  forward onto a derived value" idiom. Empty map for channel-less values. */
 export function cloneMeta(v: Value): Map<string, Value> {
-  const comps = (v as CarrierStructure).meta as Map<string, Value> | undefined;
+  const comps = v.meta as Map<string, Value> | undefined;
   return comps !== undefined ? new Map(comps) : new Map();
 }
 
@@ -632,7 +629,7 @@ export function carryMeta<T extends Value>(from: Value, to: T): T {
  *  untyped. This is the explicit replacement; paths that re-stamp their own
  *  shape (`buildRefinedType`, `buildDistinctType`) do not need it. */
 export function carryShape(from: StructureValue, to: StructureValue): void {
-  const raw = (from as unknown as CarrierStructure).meta?.get("type") as Value | undefined;
+  const raw = from.meta?.get("type") as Value | undefined;
   if (raw !== undefined) writeShape(to, raw);
 }
 
@@ -933,7 +930,7 @@ export function fieldMerge(name: string): ((a: Value, b: Value) => Value) | unde
  *  component keys alongside the legacy binding-plane channels. */
 export function metaFieldList(v: Value): string[] {
   const out: string[] = [];
-  const comps = (v as CarrierStructure).meta as Map<string, Value> | undefined;
+  const comps = v.meta as Map<string, Value> | undefined;
   if (comps !== undefined) {
     out.push(...comps.keys());
   }

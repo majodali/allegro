@@ -111,9 +111,6 @@ export function collapseBodyMetadata(v: Value | undefined, seen: Set<Value> = ne
     for (const a of e.args) collapseBodyMetadata(a, seen);
     return;
   }
-  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
-    collapseBodyMetadata((v as any).primary, seen);
-  }
 }
 
 export function isFunctionPartial(fn: ComposedFunctionValue): boolean {
@@ -317,10 +314,6 @@ function walkForWhen(
     walkForWhen((v as ComposedFunctionValue).body, visit, visited);
     return;
   }
-  if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
-    walkForWhen((v as any).primary, visit, visited);
-    return;
-  }
 }
 
 function isWhenNoMatch(v: Value): boolean {
@@ -345,10 +338,6 @@ function resolveSubjectTypeName(
   // kind, and the branch now FALLS THROUGH instead of returning.
   const t = metaReadRaw(subject as Value, "type");
   if (t) return resolveTypeName(t, typeLookup);
-  const pp = (subject as { primary?: Value }).primary;
-  if (pp !== undefined) {
-    return resolveSubjectTypeName(pp, paramTypeAsts, typeLookup);
-  }
   if (subject.kind === ValueKind.Param) {
     const pos = (subject as any).position as number;
     const pt = paramTypeAsts[pos];
@@ -363,10 +352,7 @@ function resolveSubjectTypeName(
 /** Resolve a type AST node to a concrete type name (e.g. "Bool", "Int"). */
 function resolveTypeName(t: Value, typeLookup: TypeLookup | undefined): string | null {
   // Direct Context type values carry __name.
-  if (t.kind === ValueKind.Structure) {
-    const pp = (t as { primary?: Value }).primary;
-    return pp !== undefined ? resolveTypeName(pp, typeLookup) : typeContextName(t);
-  }
+  if (t.kind === ValueKind.Structure) return typeContextName(t);
   // Symbol — look up against extensions (`Bool` etc.).
   if (t.kind === ValueKind.Symbol) {
     if (!typeLookup) return null;
@@ -859,8 +845,6 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
     for (const a of e.args) collectCalleeNames(a, out, seen);
   } else if (v.kind === ValueKind.ComposedFunction) {
     collectCalleeNames((v as ComposedFunctionValue).body, out, seen);
-  } else if (v.kind === ValueKind.Structure && (v as any).primary !== undefined) {
-    collectCalleeNames((v as any).primary, out, seen);
   }
 }
 
@@ -898,8 +882,6 @@ function findCallsToCycle(
     for (const a of e.args) findCallsToCycle(a, cycle, out, seen);
   } else if (body.kind === ValueKind.ComposedFunction) {
     findCallsToCycle((body as ComposedFunctionValue).body, cycle, out, seen);
-  } else if (body.kind === ValueKind.Structure && (body as any).primary !== undefined) {
-    findCallsToCycle((body as any).primary, cycle, out, seen);
   }
 }
 
@@ -1183,13 +1165,6 @@ function collectBoolLiterals(cases: ChainCase[]): Set<boolean> {
       if (b.length === 1) {
         out.add(b.data === 1n);
       } else if (b.length === 64) {
-        if (b.data === 0n) out.add(false);
-        else if (b.data === 1n) out.add(true);
-      }
-    } else if (c.pattern.kind === ValueKind.Structure && (c.pattern as any).primary !== undefined) {
-      const pp = dataOf(c.pattern);
-      if (pp.kind === ValueKind.Bits) {
-        const b = pp as BitsValue;
         if (b.data === 0n) out.add(false);
         else if (b.data === 1n) out.add(true);
       }

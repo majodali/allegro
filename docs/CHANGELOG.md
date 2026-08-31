@@ -4,6 +4,51 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 C4: the carrier surface is deleted, and W2/W3 follow the plane instead of the representation
+
+`primary`, `isCarrier`, `newCarrierStructure`, the `CarrierStructure` type, and
+the W1/W5 invariants are gone. `dataOf` is now literally `return v` and waits
+for C5, which deletes it and its ~900 call sites as its own chunk.
+
+**The carrier was already gone before C4 began.** `newCarrierStructure` had no
+callers — the `types.ts` import was unused — and instrumenting the factory and
+running the full suite recorded **zero carriers constructed across 1200 tests**.
+Every deletion here removed dead code rather than changing behaviour, which is
+what made a single pass safe.
+
+**The review §6 ruling 3 required found a live regression, which is the point
+of having had the rule.** W2 and W3 were checked inside the boundary walker's
+carrier branch — the only place metadata could be found on a non-Structure
+value. C2 stopped constructing carriers, so that branch went dead and silently
+took both checks with it. Measured on the corpus walk: **564 of 2034**
+metadata-bearing values reached had their metadata inspected by nothing, and
+**W2 had no coverage at all**. A walk over nothing still passes, so the gate
+could not see it — the same silent-failure shape as C2's six sites, in the
+mechanism meant to catch them. Both checks now key on `meta` being present
+rather than on kind, which is what they were always about; the corpus inspects
+**3062** values instead of 1470.
+
+**Retired, each reviewed individually.** W1 (carrier non-nesting) and W5
+(role-transparency) both described two roles sharing one class; with one role
+left, neither has a subject. W1's successor property — attaching metadata never
+nests — is asserted behaviourally in C2's test as an idempotent `dataOf` peel.
+W4 lost its carrier arm and kept its Context arm.
+
+**One test is worth recording.** `types-battery.ts` asserted
+`getType(result) !== null || result.primary === undefined`. Deleting the field
+makes the right disjunct permanently true, which would have turned a real check
+into an unconditional pass — a test that stops testing rather than failing.
+The disjunct was dropped, strengthening it to what its name claims. Deleting a
+field can silently disarm any assertion that merely mentions it.
+
+**The deletion itself was uniform.** 46 `.primary` reads across twelve files
+were almost all one shape — a dead tree-walk arm, one per walker — plus the
+peel inside `dataOf`, `isResolved` and `asStructure`. Every `CarrierStructure`
+cast was a route to `.meta`, which C1 had already put on all seven kinds, so
+the casts dropped rather than moved.
+
+Suite **1202/1202**, typecheck clean.
+
 ## 2026-08 — B-121 C2 lands: metadata rides every kind, and the carrier stops being created
 
 `withMetadata` now attaches to a **per-kind clone** — a typed `42` is a `Bits`

@@ -3,7 +3,6 @@
 // Bridges the parser's output to the evaluator.
 // =============================================================================
 
-import { isCarrier } from "./structure.js";
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { dataOf, metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource, carryMeta} from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
@@ -60,18 +59,11 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
       if ((v as any).genericParams) (newFn as any).genericParams = (v as any).genericParams;
       return newFn;
     }
-    case ValueKind.Structure: {
-      // C7.1: only CARRIERS recurse — and only untyped ones. A carrier
-      // already holding a type component was deliberately typed (e.g. by
-      // an earlier typeLiterals pass in a module); re-wrapping would
-      // corrupt it. Plain structures are inert.
-      const pp = (v as { primary?: Value }).primary;
-      if (pp === undefined) return v;
-      if (metaReadRaw(v, "type") !== undefined) return v;
-      const newPrimary = typeLiterals(pp, seen);
-      if (newPrimary === pp) return v;
-      return withMetadata(newPrimary, cloneMeta(v));
-    }
+    case ValueKind.Structure:
+      // Structures are inert. B-121 C4: the carrier arm is deleted — the
+      // values this pass types are Bits, which the literal cases above reach
+      // directly now instead of through a wrapper.
+      return v;
     default:
       return v;
   }
@@ -101,11 +93,6 @@ export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
 
   if (v.kind === "ComposedFunction") {
     v.body = resolvePrimitives(v.body, seen);
-    return v;
-  }
-
-  if ((v as { primary?: unknown }).primary !== undefined) {
-    v.primary = resolvePrimitives(v.primary, seen);
     return v;
   }
 
@@ -259,10 +246,9 @@ function patchNamedParams(
     if (!shadows) {
       patchNamedParams(value.body, name, binding, seen);
     }
-  } else if (value.kind === ValueKind.Structure) {
-    const pp = (value as { primary?: Value }).primary;
-    if (pp !== undefined) patchNamedParams(pp, name, binding, seen);
   }
+  // B-121 C4: the Structure arm walked a carrier's `primary`; structures
+  // themselves were always inert here.
 }
 
 /**
@@ -345,13 +331,8 @@ function resolveNamedParams(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.Structure: {
-      const pp = (value as { primary?: Value }).primary;
-      if (pp === undefined) return value;
-      const newP = resolveNamedParams(pp, resMap, selfName, seen);
-      if (newP === pp) return value;
-      return withMetadata(newP, cloneMeta(value));
-    }
+    case ValueKind.Structure:
+      return value; // inert — B-121 C4 deleted the carrier arm
   }
   return value;
 }
@@ -431,13 +412,8 @@ function resolveNamedParamsInner(
       return makeExpr(newFn, newArgs);
     }
 
-    case ValueKind.Structure: {
-      const pp = (value as { primary?: Value }).primary;
-      if (pp === undefined) return value;
-      const newP = resolveNamedParamsInner(pp, resMap, owner, ownParamNames, selfName, seen);
-      if (newP === pp) return value;
-      return withMetadata(newP, cloneMeta(value));
-    }
+    case ValueKind.Structure:
+      return value; // inert — B-121 C4 deleted the carrier arm
   }
   return value;
 }
@@ -472,8 +448,6 @@ function markTailCallsInValue(v: any, seen: Set<any>): void {
   } else if (v.kind === "Expression") {
     markTailCallsInValue(v.fn, seen);
     for (const a of v.args) markTailCallsInValue(a, seen);
-  } else if ((v as { primary?: unknown }).primary !== undefined) {
-    markTailCallsInValue((v as any).primary, seen);
   }
 }
 
@@ -1303,8 +1277,6 @@ export function evalSource(
       for (const a of v.args) collectSymbolRefs(a, refs, seen);
     }
     if (v.kind === ValueKind.Structure) {
-      const pp = (v as { primary?: Value }).primary;
-      if (pp !== undefined) collectSymbolRefs(pp, refs, seen);
       // B-028 F1: a pending future inside a DATA structure's field is a
       // dependency of the binding holding it (a residualized guarded
       // construction carries the instance with the pending slot inside —

@@ -4,9 +4,8 @@
 // Types are attached to values as MultiValue "type" meta.
 // =============================================================================
 
-import { isCarrier } from "./structure.js";
 import {
-  Value, ValueKind, BitsValue, StructureValue, CarrierStructure, PrimitiveFnImpl, PrimitiveFunctionValue,
+  Value, ValueKind, BitsValue, StructureValue, PrimitiveFnImpl, PrimitiveFunctionValue,
   ComposedFunctionValue, EvalFn,
   makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeStructure, withMetadata, makeDenseArray,
   makeComposedFn, makeParam,
@@ -3629,14 +3628,10 @@ export function buildGenericType(
   }
 
   function cacheKeyOne(a: Value, idx: number): string {
-    // C7.1: carriers key by their DATA (a typed 3 and a typed 5 must not
-    // collide on the empty-bindings context key) — peel before the
-    // structure branch.
-    if (a.kind === ValueKind.Structure && (a as { primary?: Value }).primary !== undefined) {
-      const p = dataOf(a);
-      if (p.kind === ValueKind.Bits) return `v:${(p as BitsValue).data}`;
-      return cacheKeyOne(p, idx);
-    }
+    // B-121 C4: the carrier arm that peeled before this branch is deleted.
+    // It keyed a typed scalar by its DATA so a typed 3 and a typed 5 would not
+    // collide on the empty-bindings context key; a typed scalar is a Bits now
+    // and the Bits branch below computes the same key.
     if (a.kind === ValueKind.Structure) {
       const ctx = a as StructureValue;
       // Named type (Int, String, Array, etc.)

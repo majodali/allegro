@@ -689,10 +689,10 @@ function isPatternTag(tag: string | undefined): boolean {
 function isPrimitiveCall(value: any, primName: string): boolean {
   if (!value || typeof value !== "object") return false;
   if (value.kind !== "Expression") return false;
-  // The fn may be a MultiValue-wrapped function (e.g. when a stmt_form's
-  // template was evaluated in a lib module's typed env). Peel to primary.
-  let fn = value.fn;
-  if (fn && (fn as { primary?: unknown }).primary !== undefined) fn = (fn as { primary?: any }).primary;
+  // B-121 C4: a typed function used to arrive wrapped (e.g. when a stmt_form's
+  // template was evaluated in a lib module's typed env) and had to be peeled.
+  // It carries its type directly now, so the kind tests below see it as it is.
+  const fn = value.fn;
   if (!fn) return false;
   if (fn.kind === "PrimitiveFunction" && fn.name === primName) return true;
   if (fn.kind === "Symbol" && fn.name === primName) return true;
