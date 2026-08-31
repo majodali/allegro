@@ -368,8 +368,8 @@ export function makeStructure(): StructureValue {
  * call sites had produced three — *derive* (same datum, new metadata), *map*
  * (new datum, metadata carried) and *stamp* — but they differ only in where
  * the two arguments come from, never in what the function does. Derive was
- * `withMeta(dataOf(v), m)`, which the peel made look distinct from
- * `withMeta(v, m)`; with `dataOf` the identity, the ten derive sites became
+ * `withMeta` over the PEELED value, which looked distinct from
+ * `withMeta(v, m)`; with the peel gone, the ten derive sites became
  * stamps by deleting a word. Naming them separately would have been the
  * mirror image of B-111's finding — several concepts under one word, and here
  * one concept under several.
@@ -446,17 +446,6 @@ export function makeDenseArray(elements: Value[]): StructureValue {
 }
 
 // --- Utilities ---
-
-/** Data-plane read.
- *
- *  **This is now the identity function.** It peeled a carrier down to the
- *  value inside; C2 stopped creating carriers and C4 deleted `primary`, so a
- *  value's data IS the value. C5 deletes the function and its ~900 call sites;
- *  it stays here until then so that deletion is its own reviewable chunk
- *  rather than noise inside this one. */
-export function dataOf(v: Value): Value {
-  return v;
-}
 
 export function isResolved(v: Value): boolean {
   switch (v.kind) {

@@ -21,7 +21,7 @@
 // type) is F7+ and likely requires either richer abstract-domain
 // machinery or an external SMT discharge.
 
-import { dataOf, getName, metaReadRaw, metaOf } from "./slots.js";
+import { getName, metaReadRaw, metaOf } from "./slots.js";
 import { scopeLookup } from "./scope.js";
 import {
   Value, ValueKind, StructureValue, ComposedFunctionValue, ExpressionValue,
@@ -46,7 +46,7 @@ export interface ProvenFinding {
  *  evalCtx Symbol lookup if needed). Returns the Context that may carry
  *  `__name`, `abstractDomain`, etc. */
 function resolveTypeContext(t: Value, evalCtx: StructureValue): StructureValue | null {
-  let cur: Value = dataOf(t);
+  let cur: Value = t;
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
     // C2.3b: chain-aware — type names (Int, Bool, user refinements) may
@@ -63,8 +63,8 @@ function resolveTypeContext(t: Value, evalCtx: StructureValue): StructureValue |
  *  records this as a "type not sampleable" info notification. */
 function pickSamples(typeCtx: StructureValue): Value[] | null {
   const nameBinding = getName(typeCtx);
-  const name = nameBinding && dataOf(nameBinding).kind === ValueKind.Bits
-    ? bitsToString(dataOf(nameBinding) as BitsValue) : null;
+  const name = nameBinding && nameBinding.kind === ValueKind.Bits
+    ? bitsToString(nameBinding as BitsValue) : null;
 
   // Bool — enumerate the domain.
   if (name === "Bool") {
@@ -104,7 +104,7 @@ function pickSamples(typeCtx: StructureValue): Value[] | null {
 
 /** Render a sample value as a short string for counterexamples. */
 function describeSample(v: Value): string {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) return "?";
   const b = p as BitsValue;
   if (b.length !== 64) return "?";
@@ -189,11 +189,11 @@ export function checkProvenClauses(
     let cfn: ComposedFunctionValue | null = null;
     let paramTypes: Value[] | null = null;
     // B-121 C2: a typed function is a ComposedFunction carrying a `type`
-    // field, not a Structure wrapping one. `dataOf` answers both shapes, and
+    // field, not a Structure wrapping one. The value answers directly, and
     // `metaReadRaw` is total, so read the type off the binding either way —
     // asking `kind === Structure` first made every typed function look
     // untyped and downgraded its failing `proven` clause to a skip.
-    const datum = dataOf(val);
+    const datum = val;
     if (datum.kind === ValueKind.ComposedFunction) {
       cfn = datum as ComposedFunctionValue;
       const tComp = metaReadRaw(val, "type");
@@ -236,8 +236,8 @@ export function checkProvenClauses(
     const samples = pickSamples(typeCtx);
     if (!samples) {
       const tn = getName(typeCtx);
-      const tname = tn && dataOf(tn).kind === ValueKind.Bits
-        ? bitsToString(dataOf(tn) as BitsValue) : "<type>";
+      const tname = tn && tn.kind === ValueKind.Bits
+        ? bitsToString(tn as BitsValue) : "<type>";
       infos.push({
         binding: name,
         proposition: renderPredicateShape(cfn),
@@ -261,7 +261,7 @@ export function checkProvenClauses(
           failed = { sample, reason: `evaluation threw: ${e.message}` };
           break;
         }
-        const rp = dataOf(result);
+        const rp = result;
         if (rp.kind !== ValueKind.Bits || (rp as BitsValue).data !== 1n) {
           const rendered = rp.kind === ValueKind.Bits
             ? `${rp.data}` : `<${rp.kind}>`;

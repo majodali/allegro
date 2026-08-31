@@ -14,7 +14,7 @@ import { ModuleLoader } from "../modules.js";
 import { evalNumExt, evalStd } from "./fixtures.js";
 import { exportedSymbols, symbolFromWire } from "../symbols.js";
 import { Extension } from "../runtime.js";
-import { dataOf, BitsValue } from "../types.js";
+import { BitsValue } from "../types.js";
 
 // == Module Loader ==
 
@@ -158,7 +158,7 @@ export async function runModuleTests(): Promise<void> {
     // Exported binding should work
     const pubResult = evalStd("mymod.pub\n", [ext]);
     eq(pubResult !== null, true, "exported value should be accessible");
-    eq(Number((dataOf(pubResult!) as BitsValue).data), 42);
+    eq(Number((pubResult! as BitsValue).data), 42);
 
     // Private binding should NOT be accessible
     let threw = false;
@@ -184,7 +184,7 @@ export async function runModuleTests(): Promise<void> {
     // Exported function should work
     const sqResult = evalStd("mathmod.square(5)\n", [ext]);
     eq(sqResult !== null, true, "exported function should work");
-    eq(Number((dataOf(sqResult!) as BitsValue).data), 25);
+    eq(Number((sqResult! as BitsValue).data), 25);
 
     // Private helper should NOT be accessible
     let threw = false;

@@ -9,7 +9,7 @@ import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, evalNumExt, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
 import * as path from "path";
-import { bitsToString, dataOf, BitsValue, makeInt, makeStructure, makeExpr, ValueKind, Value } from "../types.js";
+import { bitsToString, BitsValue, makeInt, makeStructure, makeExpr, ValueKind, Value } from "../types.js";
 import { applyPhase } from "../runtime.js";
 import { evaluate } from "../evaluator.js";
 import { getTypeName } from "../types-std.js";
@@ -21,22 +21,22 @@ import { primNames, typeNames, fileTest, testsDir } from "./alg-files.js";
 
 test("guard: basic guard passes", () => {
   const result = evalStd('when 5 is n and n > 0 then "pos" else "neg"');
-  eq(bitsToString(dataOf(result!) as BitsValue), "pos");
+  eq(bitsToString(result! as BitsValue), "pos");
 });
 
 test("guard: basic guard fails → else", () => {
   const result = evalStd('when 0 - 5 is n and n > 0 then "pos" else "neg"');
-  eq(bitsToString(dataOf(result!) as BitsValue), "neg");
+  eq(bitsToString(result! as BitsValue), "neg");
 });
 
 test("guard: with destructuring", () => {
   const result = evalStd('when {x: 5} is {x} and x > 3 then "big" else "small"');
-  eq(bitsToString(dataOf(result!) as BitsValue), "big");
+  eq(bitsToString(result! as BitsValue), "big");
 });
 
 test("guard: fails with destructuring → else", () => {
   const result = evalStd('when {x: 1} is {x} and x > 3 then "big" else "small"');
-  eq(bitsToString(dataOf(result!) as BitsValue), "small");
+  eq(bitsToString(result! as BitsValue), "small");
 });
 
 test("guard: multi-case fallthrough", () => {
@@ -47,7 +47,7 @@ classify(n) => when n
   is _ then "zero"
 classify(5)
 `;
-  eq(bitsToString(dataOf(evalStd(src)!) as BitsValue), "positive");
+  eq(bitsToString(evalStd(src)! as BitsValue), "positive");
 });
 
 test("guard: multi-case fallthrough to second", () => {
@@ -58,7 +58,7 @@ classify(n) => when n
   is _ then "zero"
 classify(0 - 3)
 `;
-  eq(bitsToString(dataOf(evalStd(src)!) as BitsValue), "negative");
+  eq(bitsToString(evalStd(src)! as BitsValue), "negative");
 });
 
 test("guard: multi-case fallthrough to wildcard", () => {
@@ -69,7 +69,7 @@ classify(n) => when n
   is _ then "zero"
 classify(0)
 `;
-  eq(bitsToString(dataOf(evalStd(src)!) as BitsValue), "zero");
+  eq(bitsToString(evalStd(src)! as BitsValue), "zero");
 });
 
 test("guard: no guard (backward compat)", () => {
@@ -80,12 +80,12 @@ test("guard: no guard (backward compat)", () => {
 
 test("nested: struct in struct", () => {
   const result = evalStd('when {a: {b: 42}} is {a: {b}} then b else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("nested: struct fail falls through", () => {
   const result = evalStd('when {a: 1} is {a: {b}} then b else 99');
-  eq(Number((dataOf(result!) as BitsValue).data), 99);
+  eq(Number((result! as BitsValue).data), 99);
 });
 
 test("nested: mixed fields", () => {
@@ -93,38 +93,38 @@ test("nested: mixed fields", () => {
 p = {center: {x: 10, y: 20}, radius: 5}
 when p is {center: {x, y}, radius} then x + y + radius else 0
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 35);
+  eq(Number((result! as BitsValue).data), 35);
 });
 
 test("nested: type sub-pattern", () => {
   const result = evalStd('when {x: 42} is {x: Int} then x else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("nested: type sub-pattern mismatch", () => {
   const result = evalStd('when {x: "hello"} is {x: Int} then x else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 0);
+  eq(Number((result! as BitsValue).data), 0);
 });
 
 test("nested: literal sub-pattern match", () => {
   const result = evalStd('when {x: 42} is {x: 42} then "yes" else "no"');
-  eq(bitsToString(dataOf(result!) as BitsValue), "yes");
+  eq(bitsToString(result! as BitsValue), "yes");
 });
 
 test("nested: literal sub-pattern mismatch", () => {
   const result = evalStd('when {x: 42} is {x: 99} then "yes" else "no"');
-  eq(bitsToString(dataOf(result!) as BitsValue), "no");
+  eq(bitsToString(result! as BitsValue), "no");
 });
 
 test("nested: wildcard sub-pattern", () => {
   const result = evalStd('when {x: 42, y: 10} is {x: _, y} then y else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 10);
+  eq(Number((result! as BitsValue).data), 10);
 });
 
 test("nested: binding sub-pattern uses field name", () => {
   // {x: val} — val is the pattern (unresolved → binding), x is the binding name
   const result = evalStd('when {x: 42} is {x: val} then x + 1 else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 43);
+  eq(Number((result! as BitsValue).data), 43);
 });
 
 // == Combined Guards + Nested ==
@@ -134,39 +134,39 @@ test("guard + nested: combined", () => {
 p = {x: 5, y: 10}
 when p is {x, y} and x + y > 10 then "big" else "small"
 `);
-  eq(bitsToString(dataOf(result!) as BitsValue), "big");
+  eq(bitsToString(result! as BitsValue), "big");
 });
 
 // == Multi-Line Expressions (Offside Rule) ==
 
 test("multiline: if/then/else across lines", () => {
   const result = evalStd("if true\n    then 42\n    else 0");
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("multiline: if with expression condition", () => {
   const result = evalStd("x = 5\nif x > 0\n    then x\n    else 0 - x");
-  eq(Number((dataOf(result!) as BitsValue).data), 5);
+  eq(Number((result! as BitsValue).data), 5);
 });
 
 test("multiline: binary operator continuation", () => {
   const result = evalStd("a = 1 +\n    2 +\n    3\na");
-  eq(Number((dataOf(result!) as BitsValue).data), 6);
+  eq(Number((result! as BitsValue).data), 6);
 });
 
 test("multiline: function with multi-line if body", () => {
   const result = evalStd("abs(x) =>\n    if x > 0\n        then x\n        else 0 - x\nabs(0 - 5)");
-  eq(Number((dataOf(result!) as BitsValue).data), 5);
+  eq(Number((result! as BitsValue).data), 5);
 });
 
 test("multiline: nested if in function with block", () => {
   const result = evalStd("f(x) =>\n    y = if x > 0\n        then x * 2\n        else 0\n    y + 1\nf(5)");
-  eq(Number((dataOf(result!) as BitsValue).data), 11);
+  eq(Number((result! as BitsValue).data), 11);
 });
 
 test("multiline: when multi-case still works", () => {
   const result = evalStd("v = 2\nwhen v\n    is 1 then 10\n    is 2 then 20\n    is _ then 0");
-  eq(Number((dataOf(result!) as BitsValue).data), 20);
+  eq(Number((result! as BitsValue).data), 20);
 });
 
 test("multiline: single-line if unchanged", () => {
@@ -204,7 +204,7 @@ test("reactive: applyPhase provides binding and triggers re-eval", () => {
   // The new binding should be in evalCtx
   const extraB = evalCtx.bindings.get("extra");
   eq(extraB?.value !== undefined, true, "extra binding available");
-  eq(Number((dataOf(extraB!.value!) as BitsValue).data), 100);
+  eq(Number((extraB!.value! as BitsValue).data), 100);
 });
 
 test("reactive: applyPhase triggers dependent re-evaluation", () => {
@@ -235,7 +235,7 @@ test("reactive: applyPhase triggers dependent re-evaluation", () => {
   // result should now be re-evaluated
   const rb = registry.bindings.get("result");
   eq(rb?.isComplete, true, "result should be complete after config provided");
-  eq(Number((dataOf(rb!.value!) as BitsValue).data), 99, "result should be 99");
+  eq(Number((rb!.value! as BitsValue).data), 99, "result should be 99");
 });
 
 test("reactive: depCollector records incomplete symbols during evaluation", () => {
@@ -259,17 +259,17 @@ test("reactive: depCollector records incomplete symbols during evaluation", () =
 
 test("pipe: simple function application", () => {
   const result = evalStd("double(x) => x * 2\n5 |> double");
-  eq(Number((dataOf(result!) as BitsValue).data), 10);
+  eq(Number((result! as BitsValue).data), 10);
 });
 
 test("pipe: chained", () => {
   const result = evalStd("double(x) => x * 2\nadd1(x) => x + 1\n5 |> double |> add1");
-  eq(Number((dataOf(result!) as BitsValue).data), 11);
+  eq(Number((result! as BitsValue).data), 11);
 });
 
 test("pipe: with lambda", () => {
   const result = evalStd("5 |> (x => x * 3)");
-  eq(Number((dataOf(result!) as BitsValue).data), 15);
+  eq(Number((result! as BitsValue).data), 15);
 });
 
 test("pipe: preserves types", () => {
@@ -279,7 +279,7 @@ test("pipe: preserves types", () => {
 
 test("pipe: with string", () => {
   const result = evalStd('"hello" |> (s => s.length)');
-  eq(Number((dataOf(result!) as BitsValue).data), 5);
+  eq(Number((result! as BitsValue).data), 5);
 });
 
 // == Full Type Inference ==
@@ -362,7 +362,7 @@ test("grammar combinators: terminal matches regex pattern", () => {
 t = grammar_terminal(g, "/[0-9]+/")
 grammar_set_target(g, t)
 grammar_parse(g, "42")`);
-  const pv = dataOf(result!);
+  const pv = result!;
   eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "42", true);
 });
 
@@ -371,7 +371,7 @@ test("grammar combinators: terminal matches literal text", () => {
 t = grammar_terminal(g, "hello")
 grammar_set_target(g, t)
 grammar_parse(g, "hello")`);
-  const pv = dataOf(result!);
+  const pv = result!;
   eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "hello", true);
 });
 
@@ -382,7 +382,7 @@ b = grammar_terminal(g, "b")
 p = grammar_phrase(g, [a, b])
 grammar_set_target(g, p)
 grammar_parse(g, "ab")`);
-  const pv = dataOf(result!) as any;
+  const pv = result! as any;
   eq(pv.kind === ValueKind.Structure, true);
 });
 
@@ -393,7 +393,7 @@ b = grammar_terminal(g, "b")
 c = grammar_choice(g, [a, b])
 grammar_set_target(g, c)
 grammar_parse(g, "b")`);
-  const pv = dataOf(result!);
+  const pv = result!;
   eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "b", true);
 });
 
@@ -405,7 +405,7 @@ rep = grammar_repeat(g, a, {min: 1, delimiter: comma})
 grammar_set_target(g, rep)
 tree = grammar_parse(g, "a,a,a")
 tree.length`);
-  eq(Number((dataOf(result!) as BitsValue).data), 3);
+  eq(Number((result! as BitsValue).data), 3);
 });
 
 test("grammar combinators: optional returns matched value", () => {
@@ -414,7 +414,7 @@ a = grammar_terminal(g, "a")
 opt = grammar_optional(g, a)
 grammar_set_target(g, opt)
 grammar_parse(g, "a")`);
-  const pv = dataOf(result!);
+  const pv = result!;
   eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "a", true);
 });
 
@@ -425,7 +425,7 @@ choice = grammar_choice(g, [])
 grammar_choice_add(choice, digit)
 grammar_set_target(g, choice)
 grammar_parse(g, "5")`);
-  const pv = dataOf(result!);
+  const pv = result!;
   eq(pv.kind === ValueKind.Bits && bitsToString(pv as BitsValue) === "5", true);
 });
 
@@ -523,7 +523,7 @@ register_infix("**", 40, (l, r) => pow_int(l, r))
   }
   const ext: Extension = { name: "pow_test", bindings, grammarFragment: frag };
   const consumerResult = runtimeEval("2 ** 10", undefined, [typeExt, ext], undefined, true);
-  eq(Number((dataOf(consumerResult.value!) as BitsValue).data), 1024);
+  eq(Number((consumerResult.value! as BitsValue).data), 1024);
 });
 
 test("runtime grammar: module-scoped expr-prefix keyword applied at parse time", () => {
@@ -533,7 +533,7 @@ test("runtime grammar: module-scoped expr-prefix keyword applied at parse time",
   eq(frag !== undefined, true);
   const ext: Extension = { name: "neg_test", bindings: {}, grammarFragment: frag };
   const consumerResult = runtimeEval("negate 7", undefined, [typeExt, ext], undefined, true);
-  eq(Number((dataOf(consumerResult.value!) as BitsValue).data), -7);
+  eq(Number((consumerResult.value! as BitsValue).data), -7);
 });
 
 // Run the end-to-end grammar-runtime.alg test (uses `use pow` header, Phase 6)

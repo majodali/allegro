@@ -13,7 +13,7 @@
 //   - error     → an error MultiValue with message + inner tree
 // =============================================================================
 
-import { dataOf, getSlotCount, indexGet } from "../slots.js";
+import { getSlotCount, indexGet } from "../slots.js";
 import {
   Rule, Grammar, Guard, Production,
   lit, cls, regex, eof, empty, fail, indent as indentTerm,
@@ -51,7 +51,7 @@ function fetch(id: number, expectedKind: string): any {
 }
 
 function handleArg(v: Value, primName: string): number {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected grammar handle (integer), got ${p.kind}`);
   }
@@ -59,7 +59,7 @@ function handleArg(v: Value, primName: string): number {
 }
 
 function stringArg(v: Value, primName: string): string {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected String, got ${p.kind}`);
   }
@@ -67,7 +67,7 @@ function stringArg(v: Value, primName: string): string {
 }
 
 function intArg(v: Value, primName: string): number {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) {
     throw new AllegroError(`${primName}: expected Int, got ${p.kind}`);
   }
@@ -75,7 +75,7 @@ function intArg(v: Value, primName: string): number {
 }
 
 function arrayArg(v: Value, primName: string): Value[] {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${primName}: expected Array, got ${p.kind}`);
   }
@@ -102,7 +102,7 @@ function handleToValue(id: number): Value {
 
 function readAttrs(v: Value | undefined, primName: string): import("./types.js").RuleAttrs | undefined {
   if (!v) return undefined;
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${primName}: attrs must be an Object`);
   }
@@ -182,7 +182,7 @@ const grammar2_rep_impl: PrimitiveFnImpl = (args) => {
   const item = fetch(handleArg(args[0], "grammar2_rep"), "Rule") as Rule;
   const opts: { min?: number; max?: number | null; sep?: Rule } = {};
   if (args[1]) {
-    const p = dataOf(args[1]);
+    const p = args[1];
     if (p.kind !== ValueKind.Structure) {
       throw new AllegroError("grammar2_rep: opts must be an Object");
     }

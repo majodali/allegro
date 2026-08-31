@@ -8,7 +8,7 @@
 import { test, eq, throws } from "./harness.js";
 import { evalSource, evalStr, evalNum, evalNumExt, mathExtension, makeStructureWith } from "./fixtures.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
-import { dataOf, ValueKind, makeInt } from "../types.js";
+import { ValueKind, makeInt } from "../types.js";
 
 // == Arithmetic ==
 
@@ -238,7 +238,7 @@ test("persistent context across evaluations", () => {
   const r1 = runtimeEval("x = 10\n");
   const r2 = runtimeEval("x + 5\n", r1.evalCtx);
   const p = r2.value!;
-  const v = dataOf(p);
+  const v = p;
   if (v.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${v.kind}`);
   eq(Number(v.data), 15);
 });
@@ -247,7 +247,7 @@ test("persistent context: function then call", () => {
   const r1 = runtimeEval("double(n) => n * 2\n");
   const r2 = runtimeEval("double(21)\n", r1.evalCtx);
   const p = r2.value!;
-  const v = dataOf(p);
+  const v = p;
   if (v.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${v.kind}`);
   eq(Number(v.data), 42);
 });
@@ -257,7 +257,7 @@ test("persistent context: redefine binding", () => {
   const r2 = runtimeEval("x = 20\n", r1.evalCtx);
   const r3 = runtimeEval("x\n", r2.evalCtx);
   const p = r3.value!;
-  const v = dataOf(p);
+  const v = p;
   if (v.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${v.kind}`);
   eq(Number(v.data), 20);
 });

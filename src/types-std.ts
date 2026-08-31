@@ -25,7 +25,7 @@ import {
   setGenericBackLink, setProposition,
   setEffectBound, setAbstractDomain,
   writeShape, carryShape, removeName, removeRefines, removeShapeSlot, kernelFieldWriter, assertNotIntegrityKey,
-  removeConstruct, metaReadRaw, cloneMeta, SLOT_KEYS, isMetaSlotKey, dataOf, typeShape, getFallbackMember,
+  removeConstruct, metaReadRaw, cloneMeta, SLOT_KEYS, isMetaSlotKey, typeShape, getFallbackMember,
   equalityShape, asStructure, registerMetaField,
 } from "./slots.js";
 
@@ -69,7 +69,7 @@ export function getTypeName(v: Value): string | null {
  *  are knowledge re-bounds (refinement certificate tagging at
  *  construction, preserveOps result re-tagging) and remain legal. */
 export function withType(v: Value, type: StructureValue): Value {
-  const primary = dataOf(v);
+  const primary = v;
   // C4.3b: cloneMeta is total — a flattened Context's channels carry
   // forward (and its prior type makes the shape guard live for Contexts;
   // construction-point re-tags use withTypeReplacing).
@@ -132,7 +132,7 @@ export function applyBoundaryBound(v: Value, expected: StructureValue): Value {
  *  predicates) are preserved. Post-construction code uses `withType`,
  *  which refuses cross-shape re-stamps (C3.1, D36). */
 export function withTypeReplacing(v: Value, type: StructureValue): Value {
-  const primary = dataOf(v);
+  const primary = v;
   const meta = cloneMeta(v);
   meta.set("type", type);
   return withMeta(primary, meta);
@@ -140,9 +140,7 @@ export function withTypeReplacing(v: Value, type: StructureValue): Value {
 
 /** Get the __name from a type Context directly (not from a typed value) */
 export function typeContextName(v: Value): string | null {
-  // dataOf peels a carrier (whose primary is never a Context — W1) and is
-  // identity for the bare type Contexts this reads.
-  const ctx = dataOf(v);
+  const ctx = v;
   if (ctx.kind !== ValueKind.Structure) return null;
   const nv = getName(ctx as StructureValue);
   if (nv?.kind === ValueKind.Bits) return bitsToString(nv);
@@ -197,7 +195,7 @@ export function assertMemberAvailable(
 ): void {
   const bound = occurrenceBoundOf(obj);
   if (!bound || bound === storedType) return;
-  if (bound === (dataOf(ObjectType as unknown as Value) as StructureValue)) return;
+  if (bound === (ObjectType as unknown as Value as StructureValue)) return;
   const boundMembers = getMembers(bound);
   const membersEmpty = !boundMembers ||
     (boundMembers.kind === ValueKind.Structure && (boundMembers as StructureValue).bindings.size === 0);
@@ -609,8 +607,8 @@ function typeArgsMatch(actual: StructureValue, expected: StructureValue): boolea
   if (expElems.length !== actElems.length) return false;
 
   for (let i = 0; i < expElems.length; i++) {
-    const expArg = dataOf(expElems[i]);
-    const actArg = dataOf(actElems[i]);
+    const expArg = expElems[i];
+    const actArg = actElems[i];
     if (expArg.kind !== ValueKind.Structure || actArg.kind !== ValueKind.Structure) continue;
     const expName = getTypeNameFromCtx(expArg as StructureValue);
     const actName = getTypeNameFromCtx(actArg as StructureValue);
@@ -824,7 +822,7 @@ export function makeForAllProp(body: Value): StructureValue {
 /** The quantified body of a for_all marker, or undefined when `v` is not
  *  one. */
 export function forAllBody(v: Value): Value | undefined {
-  return forAllRegistry.get(dataOf(v));
+  return forAllRegistry.get(v);
 }
 
 /** Check if a descriptor is a Method */
@@ -849,7 +847,7 @@ const modifierRegistry = new WeakMap<Value, { inner: Value; attrs: MemberAttrs }
 
 function makeModifiedSpec(inner: Value, attr: keyof MemberAttrs): StructureValue {
   const marker = makeStructure();
-  const existing = modifierRegistry.get(dataOf(inner));
+  const existing = modifierRegistry.get(inner);
   if (existing) {
     // Compose wrappers: readonly(private(T)) accumulates both attrs.
     modifierRegistry.set(marker, { inner: existing.inner, attrs: { ...existing.attrs, [attr]: true } });
@@ -862,7 +860,7 @@ function makeModifiedSpec(inner: Value, attr: keyof MemberAttrs): StructureValue
 /** The wrapped declaration + attrs of a modifier marker, or undefined
  *  when `v` is not one. */
 export function specModifiers(v: Value): { inner: Value; attrs: MemberAttrs } | undefined {
-  return modifierRegistry.get(dataOf(v));
+  return modifierRegistry.get(v);
 }
 
 /** Check if a descriptor is a Field */
@@ -908,7 +906,7 @@ function buildRecordType(
   evalFn?: EvalFn,
 ): StructureValue {
   // Extract field specs from the Object's Context
-  const fieldCtx = dataOf(fieldSpecObj);
+  const fieldCtx = fieldSpecObj;
   if (fieldCtx.kind !== ValueKind.Structure) {
     throw new AllegroError("define: argument must be an object literal {field: Type, ...}");
   }
@@ -947,7 +945,7 @@ function buildRecordType(
         laws.push({ name: key.slice(4), body });
         continue;
       }
-      const entry = dataOf(declValue);
+      const entry = declValue;
       if (key === "construct") {
         if (mods) {
           throw new AllegroError("define: modifiers do not apply to the reserved key 'construct'");
@@ -1057,8 +1055,8 @@ function buildRecordType(
   for (const l of laws) {
     const desc = makeLawDescriptor(
       l.name, l.body,
-      dataOf(l.body).kind === ValueKind.ComposedFunction
-        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1);
+      l.body.kind === ValueKind.ComposedFunction
+        ? (l.body as ComposedFunctionValue).params.length : 1);
     for (const key of drawMemberKeys(drawn, l.name, recordScope)) {
       addMemberAt(members, key, desc);
     }
@@ -1123,7 +1121,7 @@ function buildRecordType(
       // body runs with the type's member privilege (it may read private
       // members of instances it works with).
       const result = ctorEvalFn!(makeExpr(declaredCtor, ctorArgs), typePrivilegedCtx(newType, ctorCtx!));
-      return withTypeReplacing(dataOf(result), newType);
+      return withTypeReplacing(result, newType);
     }, true));
   } else {
     // Auto-generate __construct: positional args in field order
@@ -1167,8 +1165,8 @@ function buildRecordType(
         if (valType) {
           const tsMethod = typeMethod(valType, "toString");
           if (tsMethod?.kind === ValueKind.PrimitiveFunction) {
-            const str = (tsMethod as PrimitiveFunctionValue).fn([dataOf(val)], undefined as any, undefined as any);
-            const sp = dataOf(str);
+            const str = (tsMethod as PrimitiveFunctionValue).fn([val], undefined as any, undefined as any);
+            const sp = str;
             if (sp.kind === ValueKind.Bits) {
               parts.push(`${f.name}: ${bitsToString(sp as BitsValue)}`);
               continue;
@@ -1213,7 +1211,7 @@ function buildInterfaceType(
   memberSpecObj: Value,
   drawn: StructureValue[],
 ): StructureValue {
-  const specCtx = dataOf(memberSpecObj);
+  const specCtx = memberSpecObj;
   if (specCtx.kind !== ValueKind.Structure) {
     throw new AllegroError("Interface.define: argument must be an object literal {member: Type, ...}");
   }
@@ -1284,8 +1282,8 @@ function buildInterfaceType(
   for (const l of declaredLaws) {
     const desc = makeLawDescriptor(
       l.name, l.body,
-      dataOf(l.body).kind === ValueKind.ComposedFunction
-        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1);
+      l.body.kind === ValueKind.ComposedFunction
+        ? (l.body as ComposedFunctionValue).params.length : 1);
     for (const key of drawMemberKeys(drawn, l.name, ifaceScope)) {
       addMemberAt(members, key, desc);
     }
@@ -1342,7 +1340,7 @@ export function resolveDataSlots(
   cellRefsOnly = false,
 ): Value {
   if (!ctx || !evalFn) return v;
-  const inst = dataOf(v);
+  const inst = v;
   if (inst.kind !== ValueKind.Structure) return v;
   const instCtx = inst as StructureValue;
   if (instCtx.isScope) return v;
@@ -1382,7 +1380,7 @@ export function resolveDataSlots(
  *  resolved future still answers)? Guards background substitution. */
 function referencesCell(v: Value, ctx: StructureValue, depth = 0): boolean {
   if (depth > 32) return false;
-  const d = dataOf(v);
+  const d = v;
   if (d.kind === ValueKind.Symbol) {
     const b = scopeLookup(ctx, d.name);
     return b !== undefined && b.cell === true;
@@ -1481,13 +1479,13 @@ export function buildRefinedType(parentType: StructureValue, predicate: Value, c
       if (!isResolved(checkResult)) {
         return makeExpr(makePrimitive("refined.__check", refinedCheckImpl, true), [value]);
       }
-      const checkP = dataOf(checkResult);
+      const checkP = checkResult;
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
         // Predicate failed — return a targeted error. If the refined type has
         // a recognised abstract domain, render it in the message so the user
         // sees what constraint the value violated.
         const dom = getAbstractDomain(refinedType);
-        const primary = dataOf(value);
+        const primary = value;
         let cexDesc = "";
         if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
           const signed = (primary as BitsValue).data >= 0x8000000000000000n
@@ -1523,7 +1521,7 @@ export function buildRefinedType(parentType: StructureValue, predicate: Value, c
       // Re-tag with refined type, and attach the abstract domain so downstream
       // arithmetic can propagate the refinement without re-parsing the
       // predicate.
-      const typed = withTypeReplacing(dataOf(value), refinedType);
+      const typed = withTypeReplacing(value, refinedType);
       const dom = getAbstractDomain(refinedType);
       if (dom) {
         // Phase C: attach a single-predicate set rather than a single
@@ -1595,7 +1593,7 @@ function buildDistinctType(parentType: StructureValue): StructureValue {
 
     setConstruct(distinctType, makePrimitive("distinct.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
-      return withTypeReplacing(dataOf(value), distinctType);
+      return withTypeReplacing(value, distinctType);
     }, true));
   }
 
@@ -1641,11 +1639,11 @@ function buildPreserveOps(refinedType: StructureValue, opNames: string[]): Struc
       if (!isResolved(checkResult)) {
         return makeExpr(makePrimitive("refined.__check", preserveCheckImpl, true), [value]);
       }
-      const checkP = dataOf(checkResult);
+      const checkP = checkResult;
       if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
         // Same constraint-rendering logic as buildRefinedType's __construct.
         const dom = getAbstractDomain(refinedType);
-        const primary = dataOf(value);
+        const primary = value;
         let cexDesc = "";
         if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
           const signed = (primary as BitsValue).data >= 0x8000000000000000n
@@ -1673,7 +1671,7 @@ function buildPreserveOps(refinedType: StructureValue, opNames: string[]): Struc
         meta.set("type", ErrorType);
         return makeInt(0, meta);
       }
-      return withTypeReplacing(dataOf(value), newType);
+      return withTypeReplacing(value, newType);
     };
     setConstruct(newType, makePrimitive("refined.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
@@ -1712,7 +1710,7 @@ function buildPreserveOps(refinedType: StructureValue, opNames: string[]): Struc
       const parentResult = (parentOp as PrimitiveFunctionValue).fn(args, ctx as any, evalFn as any);
       // __construct is lazy — wrap the result in an identity expression so it evaluates to itself
       const identityPrim = makePrimitive("identity", (a) => a[0]);
-      const wrapped = makeExpr(identityPrim, [dataOf(parentResult)]);
+      const wrapped = makeExpr(identityPrim, [parentResult]);
       return newConstruct.fn([wrapped], ctx as any, evalFn as any);
     }) as PrimitiveFnImpl);
 
@@ -1767,7 +1765,7 @@ function buildMethodLayer(baseType: StructureValue, methods: { name: string; imp
       throw new AllegroError(`method '${m.name}' conflicts with an existing member`);
     }
     const key = memberFqnIn(layerScope, m.name);
-    const impl = dataOf(m.impl);
+    const impl = m.impl;
     if (impl.kind === ValueKind.PrimitiveFunction) {
       addMemberAt(newMembers, key, makeMethodDescriptor(m.name, impl as PrimitiveFunctionValue));
     } else if (impl.kind === ValueKind.ComposedFunction) {
@@ -1786,7 +1784,7 @@ function buildMethodLayer(baseType: StructureValue, methods: { name: string; imp
     setConstruct(newType, makePrimitive("methods.__construct", (args, ctx, evalFn) => {
       const value = (parentConstruct as PrimitiveFunctionValue).fn(args, ctx, evalFn);
       if (metaReadRaw(value, "error") !== undefined) return value;
-      return withTypeReplacing(dataOf(value), newType);
+      return withTypeReplacing(value, newType);
     }, true));
   }
   return newType;
@@ -1822,7 +1820,7 @@ addMember(typeMembers, TYPE_MEMBER_SCOPE, "define", makeMethodDescriptor("define
     // kinds: Type — (spec, ...bundles) record mint; Refinement —
     // (base, predicate) refinement mint; Interface — (spec) declaration
     // mint).
-    const kind = dataOf(args[0]);
+    const kind = args[0];
     if (kind.kind !== ValueKind.Structure || !isKind(kind as StructureValue)) {
       const name = kind.kind === ValueKind.Structure
         ? (getTypeNameFromCtx(kind as StructureValue) ?? "<anonymous>") : "<value>";
@@ -1907,7 +1905,7 @@ function toSigned(b: BitsValue): bigint {
 }
 
 function asBitsTyped(v: Value, ctx: string): BitsValue {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) throw new AllegroError(`${ctx}: expected Bits, got ${p.kind}`);
   return p;
 }
@@ -2068,7 +2066,7 @@ function applyCoercionPath(
 ): Value | null {
   let cur = v;
   for (const edge of path) {
-    const fn = dataOf(edge.fn);
+    const fn = edge.fn;
     if (fn.kind === ValueKind.PrimitiveFunction) {
       cur = (fn as PrimitiveFunctionValue).fn([cur], ctx as any, evalFn as any);
     } else if (fn.kind === ValueKind.ComposedFunction && evalFn && ctx) {
@@ -2104,19 +2102,19 @@ export function protocolEqualsBool(
     const m = typeMethod(sa, "eq");                  // §7 step 1: custom equals
     if (m) {
       if (m.kind === ValueKind.PrimitiveFunction) {
-        const r = (m as PrimitiveFunctionValue).fn([dataOf(a), dataOf(b)], ctx as any, evalFn as any);
-        const rd = dataOf(r);
+        const r = (m as PrimitiveFunctionValue).fn([a, b], ctx as any, evalFn as any);
+        const rd = r;
         return rd.kind === ValueKind.Bits && (rd as BitsValue).data !== 0n;
       }
       if (m.kind === ValueKind.ComposedFunction && evalFn && ctx) {
         // Spec-supplied `eq` method: (self, other) — full values flow in.
         const r = evalFn(makeExpr(m, [a, b]), ctx);
-        const rd = dataOf(r);
+        const rd = r;
         return rd.kind === ValueKind.Bits && (rd as BitsValue).data !== 0n;
       }
     }
   }
-  return kernelStructuralEquals(dataOf(a), dataOf(b), ctx, evalFn);
+  return kernelStructuralEquals(a, b, ctx, evalFn);
 }
 
 /** The kernel structural equals over data-plane representations. Bits
@@ -2269,7 +2267,7 @@ export function lawObligationRecords(filter?: (type: StructureValue) => boolean)
  *  implementation. */
 function equalsIsKernel(t: StructureValue): boolean {
   const impl = typeMethod(equalityShape(t), "eq");
-  return impl === null || kernelEqImpls.has(dataOf(impl));
+  return impl === null || kernelEqImpls.has(impl);
 }
 
 /** Quantifier samples for a law over `t`. `exhaustive` marks FULL domain
@@ -2312,7 +2310,7 @@ function lawSamples(t: StructureValue): { samples: Value[]; exhaustive: boolean 
 /** Render a sample tuple for counterexample messages. */
 function renderLawArgs(args: Value[]): string {
   return args.map(a => {
-    const d = dataOf(a);
+    const d = a;
     if (d.kind !== ValueKind.Bits) return "?";
     const b = d as BitsValue;
     if (b.length !== 64) return "?";
@@ -2326,7 +2324,7 @@ function renderLawArgs(args: Value[]): string {
  *  false when the body folds to a Bits truth value, null when it can't be
  *  evaluated here (missing evalFn, residual result). */
 function runLawProp(body: Value, args: Value[], ctx?: StructureValue, evalFn?: EvalFn): boolean | null {
-  const d = dataOf(body);
+  const d = body;
   try {
     let result: Value;
     if (d.kind === ValueKind.PrimitiveFunction) {
@@ -2336,7 +2334,7 @@ function runLawProp(body: Value, args: Value[], ctx?: StructureValue, evalFn?: E
     } else {
       return null;
     }
-    const rd = dataOf(result);
+    const rd = result;
     if (rd.kind !== ValueKind.Bits) return null;
     return (rd as BitsValue).data !== 0n;
   } catch {
@@ -2421,11 +2419,11 @@ function instantiateLawsFromMembers(
 /** Structural discharged-Proof check (local: proofs.ts imports this
  *  module, so the canonical `isDischargedProof` can't be imported here). */
 function isDischargedProofValue(v: Value): boolean {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) return false;
   const d = metaReadRaw(p, "discharged");
   if (!d) return false;
-  const dp = dataOf(d);
+  const dp = d;
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 1n;
 }
 
@@ -2572,7 +2570,7 @@ function assertInvariantTotal(predicate: Value, ctx?: StructureValue): void {
  *  inferred-set stash). Null = no diverging callee found. */
 function divCarrierCalledBy(predicate: Value, ctx?: StructureValue): string | null {
   if (!ctx) return null;
-  const p = dataOf(predicate);
+  const p = predicate;
   if (p.kind !== ValueKind.ComposedFunction) return null;
   const names = new Set<string>();
   const seen = new Set<Value>();
@@ -2592,7 +2590,7 @@ function divCarrierCalledBy(predicate: Value, ctx?: StructureValue): string | nu
     const b = scopeLookup(ctx, name);
     const v = b?.value;
     if (!v) continue;
-    const d = dataOf(v);
+    const d = v;
     if (d.kind !== ValueKind.ComposedFunction && d.kind !== ValueKind.PrimitiveFunction) continue;
     if (divergenceProbe && divergenceProbe(v)) return name;
     const eff = fnEffectsOf(v);
@@ -2920,30 +2918,30 @@ function arrayElements(ctx: StructureValue): Value[] {
 
 // Inline primitives for use inside ComposedFunctions (no circular import)
 const arrLengthPrim = makePrimitive("arr_length", (args) => {
-  const ctx = dataOf(args[0]) as StructureValue;
+  const ctx = args[0] as StructureValue;
   return withType(getSlotCount(ctx) ?? makeInt(0), IntType);
 });
 const arrGetPrim = makePrimitive("arr_get", (args) => {
-  const ctx = dataOf(args[0]) as StructureValue;
-  const idx = Number(toSigned(asBitsTyped(dataOf(args[1]), "arr_get")));
+  const ctx = args[0] as StructureValue;
+  const idx = Number(toSigned(asBitsTyped(args[1], "arr_get")));
   const v = indexGet(ctx, idx);
   if (v === undefined) throw new AllegroError(`Array index ${idx} out of bounds`);
   return v;
 });
 const intGtePrim = makePrimitive("int_gte", (args) => {
   return withType(
-    makeInt(toSigned(asBitsTyped(dataOf(args[0]), "int_gte")) >= toSigned(asBitsTyped(dataOf(args[1]), "int_gte")) ? 1 : 0),
+    makeInt(toSigned(asBitsTyped(args[0], "int_gte")) >= toSigned(asBitsTyped(args[1], "int_gte")) ? 1 : 0),
     BoolType,
   );
 });
 const intAddPrim = makePrimitive("int_add", (args) => {
-  const a = toSigned(asBitsTyped(dataOf(args[0]), "int_add"));
-  const b = toSigned(asBitsTyped(dataOf(args[1]), "int_add"));
+  const a = toSigned(asBitsTyped(args[0], "int_add"));
+  const b = toSigned(asBitsTyped(args[1], "int_add"));
   return withType(makeInt(Number(a + b)), IntType);
 });
 const evalIfPrim = makePrimitive("eval_if", (args, ctx, evalFn) => {
   const cond = evalFn!(args[0], ctx!);
-  const condP = dataOf(cond);
+  const condP = cond;
   if (condP.kind === ValueKind.Bits) {
     const branch = (condP as BitsValue).data !== 0n ? args[1] : args[2];
     const evalBranch = evalFn!(branch, ctx!);
@@ -2961,8 +2959,8 @@ const makeArrayPrim = makePrimitive("make_array", (args, ctx, evalFn) => {
 const arrConcatPrim = makePrimitive("arr_concat", (args, ctx, evalFn) => {
   const a = evalFn!(args[0], ctx!);
   const b = evalFn!(args[1], ctx!);
-  const aCtx = dataOf(a) as StructureValue;
-  const bCtx = dataOf(b) as StructureValue;
+  const aCtx = a as StructureValue;
+  const bCtx = b as StructureValue;
   return makeArray([...arrayElements(aCtx), ...arrayElements(bCtx)]);
 }, true);
 
@@ -3102,7 +3100,7 @@ const arrayMethods: Record<string, PrimitiveFnImpl> = {
   },
   concat: (args) => {
     const aCtx = args[0] as StructureValue;
-    const bCtx = dataOf(args[1]) as StructureValue;
+    const bCtx = args[1] as StructureValue;
     return makeArray([...arrayElements(aCtx), ...arrayElements(bCtx)]);
   },
   slice: (args) => {
@@ -3286,14 +3284,14 @@ writeShape(RefinementKind, Type);
 // results re-check the predicate and keep the refined tag (the old
 // `.preserveOps()` fluent surface, folded into the spec per D45).
 setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx, evalFn) => {
-  const first = dataOf(evalFn!(args[0], ctx!));
+  const first = evalFn!(args[0], ctx!);
   if (first.kind !== ValueKind.Structure) {
     throw new AllegroError("Refinement: base must be a type");
   }
   const specRefines = args.length === 1
     ? (first as StructureValue).bindings.get("refines")?.value : undefined;
   if (specRefines !== undefined) {
-    const base = dataOf(specRefines);
+    const base = specRefines;
     if (base.kind !== ValueKind.Structure) {
       throw new AllegroError("Refinement: `refines` must be a type");
     }
@@ -3301,7 +3299,7 @@ setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx,
     if (wherePred === undefined) {
       throw new AllegroError("Refinement: spec requires a `where` predicate");
     }
-    let refined = buildRefinedType(base as StructureValue, dataOf(wherePred));
+    let refined = buildRefinedType(base as StructureValue, wherePred);
     // Non-reserved spec entries are METHOD implementations layered onto
     // the refined type (the old `.mixin()` on refinements): every entry
     // beyond refines/where/preserve must be a function value. The method
@@ -3328,7 +3326,7 @@ setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx,
         refinementLaws.push({ name: k.slice(4), body });
         continue;
       }
-      const entry = dataOf(b.value);
+      const entry = b.value;
       if (entry.kind !== ValueKind.ComposedFunction && entry.kind !== ValueKind.PrimitiveFunction) {
         throw new AllegroError(
           `Refinement: spec entry '${k}' must be a method (function value) — fields live on record kinds`);
@@ -3343,14 +3341,14 @@ setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx,
     }
     const preserve = (first as StructureValue).bindings.get("preserve")?.value;
     if (preserve !== undefined) {
-      const p = dataOf(preserve);
+      const p = preserve;
       const opNames: string[] = [];
       if (p.kind === ValueKind.Bits) {
         const s = bitsToString(p as BitsValue);
         if (s !== "all") throw new AllegroError(`Refinement: preserve must be "all" or a list of operator names (got "${s}")`);
       } else if (p.kind === ValueKind.Structure) {
         for (const el of arrayElements(p as StructureValue)) {
-          const e = dataOf(el);
+          const e = el;
           if (e.kind === ValueKind.Bits) opNames.push(bitsToString(e as BitsValue));
         }
       } else {
@@ -3362,8 +3360,8 @@ setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx,
     // refined type. Sampling reads the refinement's abstract domain; a
     // concrete counterexample halts the definition.
     for (const l of refinementLaws) {
-      const arity = dataOf(l.body).kind === ValueKind.ComposedFunction
-        ? (dataOf(l.body) as ComposedFunctionValue).params.length : 1;
+      const arity = l.body.kind === ValueKind.ComposedFunction
+        ? (l.body as ComposedFunctionValue).params.length : 1;
       instantiateLaw(refined, makeLawDescriptor(l.name, l.body, arity), ctx, evalFn);
     }
     return wrapType(refined);
@@ -3380,7 +3378,7 @@ setConstruct(Type, makePrimitive("Type.__construct", (args, ctx, evalFn) => {
   const spec = evalFn!(args[0], ctx!);
   const drawn: StructureValue[] = [];
   for (let i = 1; i < args.length; i++) {
-    const b = dataOf(evalFn!(args[i], ctx!));
+    const b = evalFn!(args[i], ctx!);
     if (b.kind !== ValueKind.Structure) {
       throw new AllegroError("Type: drawn bundles must be types");
     }
@@ -3394,7 +3392,7 @@ setConstruct(Type, makePrimitive("Type.__construct", (args, ctx, evalFn) => {
 // refinement would inherit mints records — an Interface instance is a
 // declaration, so the kind's authority is the interface mint instead).
 const declarationOnlyPredicate = makePrimitive("Interface.__declarationOnly", (args) => {
-  const t = dataOf(args[0]);
+  const t = args[0];
   return makeInt(
     t.kind === ValueKind.Structure && getConstruct(t as StructureValue) === undefined ? 1 : 0);
 });
@@ -3406,7 +3404,7 @@ setConstruct(InterfaceKind, makePrimitive("Interface.__construct", (args, ctx, e
   const spec = evalFn!(args[0], ctx!);
   const drawn: StructureValue[] = [];
   for (let i = 1; i < args.length; i++) {
-    const b = dataOf(evalFn!(args[i], ctx!));
+    const b = evalFn!(args[i], ctx!);
     if (b.kind !== ValueKind.Structure) {
       throw new AllegroError("Interface: drawn bundles must be types");
     }
@@ -3514,32 +3512,33 @@ export const ErrorType: StructureValue = buildType("Error", errorMethods);
 // `Int(x)` means "make an Int from x", so a prior type is what is being
 // replaced, not a conflict. They read as `withType` because `dataOf` used to
 // strip metadata as a side effect of peeling a carrier — the argument arrived
-// bare and the shape guard never saw a prior type. `dataOf` is the identity
-// now, so the intent has to be said rather than assumed.
+// bare and the shape guard never saw a prior type. The peel became the
+// identity at C2 and was deleted at C5, so the intent has to be said rather
+// than assumed.
 // =============================================================================
 
 // Int(x) — wrap a value with Int type
 setConstruct(IntType, makePrimitive("Int.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withTypeReplacing(dataOf(v), IntType);
+  return withTypeReplacing(v, IntType);
 }, true));
 
 // Float(x) — wrap a value with Float type
 setConstruct(FloatType, makePrimitive("Float.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withTypeReplacing(dataOf(v), FloatType);
+  return withTypeReplacing(v, FloatType);
 }, true));
 
 // String(x) — wrap a value with String type
 setConstruct(StringType, makePrimitive("String.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withTypeReplacing(dataOf(v), StringType);
+  return withTypeReplacing(v, StringType);
 }, true));
 
 // Bool(x) — wrap a value with Bool type
 setConstruct(BoolType, makePrimitive("Bool.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withTypeReplacing(dataOf(v), BoolType);
+  return withTypeReplacing(v, BoolType);
 }, true));
 
 // =============================================================================
@@ -3590,7 +3589,7 @@ addMemberAt(genericTypeMembers, "get",
   makeMethodDescriptor("get", makePrimitive("GenericType.get", (args, ctx, evalFn) => {
     const self = args[0];
     const typeArgs = args.slice(1).map(a => evalFn ? evalFn(a, ctx!) : a);
-    return applyGenericType(dataOf(self) as StructureValue, typeArgs);
+    return applyGenericType(self as StructureValue, typeArgs);
   })));
 // The `params` field descriptor is declared after ArrayType exists
 // (bootstrap order — ArrayType is itself minted through buildGenericType).
@@ -3745,7 +3744,7 @@ export function isGenericType(type: StructureValue): boolean {
 export function getTypeArgs(type: StructureValue): Value[] | null {
   const argsV = getGenericArgs(type);
   if (!argsV) return null;
-  const ctx = dataOf(argsV);
+  const ctx = argsV;
   if (ctx.kind !== ValueKind.Structure) return null;
   return arrayElements(ctx as StructureValue);
 }
@@ -3765,7 +3764,7 @@ export function getGenericType(type: StructureValue): StructureValue | null {
 function getGenericParamCount(generic: StructureValue): number {
   const paramsV = generic.bindings.get("params")?.value;
   if (!paramsV) return 0;
-  const paramsCtx = dataOf(paramsV);
+  const paramsCtx = paramsV;
   if (paramsCtx.kind !== ValueKind.Structure) return 0;
   const lenV = getSlotCount(paramsCtx as StructureValue);
   return lenV ? Number((lenV as BitsValue).data) : 0;
@@ -3859,7 +3858,7 @@ export const FutureType: StructureValue = buildGenericType(
   {},
   (generic, args) => {
     // D33: Future[Future[T]] IS Future[T] — a future of a future flattens.
-    const el = args[0] !== undefined ? dataOf(args[0]) : undefined;
+    const el = args[0] !== undefined ? args[0] : undefined;
     if (el?.kind === ValueKind.Structure && getGenericType(el as StructureValue) === FutureType) {
       return el as StructureValue;
     }
@@ -3878,7 +3877,7 @@ export function futureElementType(type: StructureValue): StructureValue | null {
   if (type === FutureType) return AnyType;
   if (getGenericType(type) !== FutureType) return null;
   const args = getTypeArgs(type);
-  const el = args && args[0] !== undefined ? dataOf(args[0]) : undefined;
+  const el = args && args[0] !== undefined ? args[0] : undefined;
   return el?.kind === ValueKind.Structure ? (el as StructureValue) : AnyType;
 }
 
@@ -3908,7 +3907,7 @@ export function makeFunctionType(paramTypes: Value[], returnType: Value): Struct
 export function getFunctionParamTypes(fnType: StructureValue): Value[] | null {
   const args = getTypeArgs(fnType);
   if (!args || args.length < 2) return null;
-  const paramTypesCtx = dataOf(args[0]);
+  const paramTypesCtx = args[0];
   if (paramTypesCtx.kind !== ValueKind.Structure) return null;
   return arrayElements(paramTypesCtx as StructureValue);
 }
@@ -4063,7 +4062,7 @@ export function unifyTypes(
     // directly: a non-composite datum carrying a type is a value; a Structure
     // is the type itself. That reproduces the pre-C2 behaviour exactly,
     // because a typed record was a flattened Structure and already skipped.
-    const actualCtx = dataOf(actualType).kind !== ValueKind.Structure
+    const actualCtx = actualType.kind !== ValueKind.Structure
       ? getType(actualType) : null;
     if (!actualCtx) return bindings; // no type on actual, can't unify
 
@@ -4114,7 +4113,7 @@ export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings)
     const ctx = typeExpr as StructureValue;
     const argsV2 = getGenericArgs(ctx);
     if (argsV2) {
-      const argsCtx = dataOf(argsV2);
+      const argsCtx = argsV2;
       if (argsCtx.kind === ValueKind.Structure) {
         const args = arrayElements(argsCtx as StructureValue);
         const resolvedArgs = args.map(a => resolveTypeWithBindings(a, bindings));
@@ -4264,29 +4263,29 @@ export function effectUnion(e1: StructureValue, e2: StructureValue): StructureVa
 // their shape (io.union(time) finds Effect's member with self = io).
 addMember(effectMembers, EFFECT_MEMBER_SCOPE, "subset_of", makeMethodDescriptor("subset_of",
   makePrimitive("Effect.subset_of", (args) => {
-    const e1 = dataOf(args[0]) as StructureValue;
-    const e2 = dataOf(args[1]) as StructureValue;
+    const e1 = args[0] as StructureValue;
+    const e2 = args[1] as StructureValue;
     return withType(makeInt(effectSubsetOf(e1, e2) ? 1 : 0), BoolType);
   })
 ));
 addMember(effectMembers, EFFECT_MEMBER_SCOPE, "implies", makeMethodDescriptor("implies",
   makePrimitive("Effect.implies", (args) => {
-    const e1 = dataOf(args[0]) as StructureValue;
-    const e2 = dataOf(args[1]) as StructureValue;
+    const e1 = args[0] as StructureValue;
+    const e2 = args[1] as StructureValue;
     return withType(makeInt(effectImplies(e1, e2) ? 1 : 0), BoolType);
   })
 ));
 addMember(effectMembers, EFFECT_MEMBER_SCOPE, "intersect", makeMethodDescriptor("intersect",
   makePrimitive("Effect.intersect", (args) => {
-    const e1 = dataOf(args[0]) as StructureValue;
-    const e2 = dataOf(args[1]) as StructureValue;
+    const e1 = args[0] as StructureValue;
+    const e2 = args[1] as StructureValue;
     return wrapType(effectIntersect(e1, e2));
   })
 ));
 addMember(effectMembers, EFFECT_MEMBER_SCOPE, "union", makeMethodDescriptor("union",
   makePrimitive("Effect.union", (args) => {
-    const e1 = dataOf(args[0]) as StructureValue;
-    const e2 = dataOf(args[1]) as StructureValue;
+    const e1 = args[0] as StructureValue;
+    const e2 = args[1] as StructureValue;
     return wrapType(effectUnion(e1, e2));
   })
 ));
@@ -4295,7 +4294,7 @@ setMembers(Effect, effectMembers);
 // Constructor authority (D40 R2 / D45): `Effect("net")` mints a named
 // effect; `Effect.define("net")` is the named-factory route.
 setConstruct(Effect, makePrimitive("Effect.__construct", (args, ctx, evalFn) => {
-  const nameV = dataOf(evalFn!(args[0], ctx!));
+  const nameV = evalFn!(args[0], ctx!);
   if (nameV.kind !== ValueKind.Bits) {
     throw new AllegroError("Effect: the label must be a string");
   }
@@ -4400,8 +4399,8 @@ export function isProof(v: Value): boolean {
  * system.
  *
  * Memoized only for `PrimitiveFunction`, where determinism is PROVABLE
- * rather than argued: a PrimitiveFunction has no `primary` (so `dataOf` is
- * identity) and no `meta` (so `cloneMeta` is empty), and
+ * rather than argued: a PrimitiveFunction carries no `meta` (so `cloneMeta`
+ * is empty) and
  * `UntypedFunctionType` is a module-level const, so the result is exactly
  * `withMeta(fn, {type: UntypedFunctionType})` for the life of the
  * process. Other inputs take the unmemoized path — a Structure's meta
@@ -4426,7 +4425,7 @@ export function wrapAsUntypedFunction(fn: Value): Value {
     const hit = untypedFnWrappers.get(fn as unknown as object);
     if (hit !== undefined) return hit;
   }
-  const primary = dataOf(fn);
+  const primary = fn;
   const meta = cloneMeta(fn);
   meta.set("type", UntypedFunctionType);
   const wrapped = withMeta(primary, meta);
@@ -4457,13 +4456,13 @@ export function wrapType(type: StructureValue): Value {
 // machinery. Declarations instantiate their §7 obligations PENDING (E3
 // routes them through PCP discharge).
 const coercionDeclarePrim = makePrimitive("Coercion.declare", (args, ctx) => {
-  const from = asStructure(dataOf(args[0]));
-  const to = asStructure(dataOf(args[1]));
+  const from = asStructure(args[0]);
+  const to = asStructure(args[1]);
   if (!from || !to) {
     throw new AllegroError("Coercion.declare: expected (FromType, ToType, fn)");
   }
   const fn = args[2];
-  const fd = dataOf(fn);
+  const fd = fn;
   if (fd.kind !== ValueKind.PrimitiveFunction && fd.kind !== ValueKind.ComposedFunction) {
     throw new AllegroError("Coercion.declare: third argument must be a function");
   }
@@ -4477,12 +4476,12 @@ const coercionDeclarePrim = makePrimitive("Coercion.declare", (args, ctx) => {
 // E3: the witnessed tier for the §7 coercion obligations — attach a
 // discharged Proof term to a declared edge's preservation/coherence slot.
 const coercionWitnessPrim = makePrimitive("Coercion.witness", (args) => {
-  const from = asStructure(dataOf(args[0]));
-  const to = asStructure(dataOf(args[1]));
+  const from = asStructure(args[0]);
+  const to = asStructure(args[1]);
   if (!from || !to) {
     throw new AllegroError("Coercion.witness: expected (FromType, ToType, obligation, proof)");
   }
-  const obD = dataOf(args[2]);
+  const obD = args[2];
   const which = obD.kind === ValueKind.Bits ? bitsToString(obD as BitsValue) : "";
   if (which !== "equality-preservation" && which !== "coherence") {
     throw new AllegroError(
@@ -4504,12 +4503,12 @@ const coercionWitnessPrim = makePrimitive("Coercion.witness", (args) => {
 // E4: the admitted tier for coercion obligations — mark a declared
 // edge's obligation ASSUMED (verdict-visible; no-op when discharged).
 const coercionAssumePrim = makePrimitive("Coercion.assume", (args) => {
-  const from = asStructure(dataOf(args[0]));
-  const to = asStructure(dataOf(args[1]));
+  const from = asStructure(args[0]);
+  const to = asStructure(args[1]);
   if (!from || !to) {
     throw new AllegroError("Coercion.assume: expected (FromType, ToType, obligation)");
   }
-  const obD = dataOf(args[2]);
+  const obD = args[2];
   const which = obD.kind === ValueKind.Bits ? bitsToString(obD as BitsValue) : "";
   if (which !== "equality-preservation" && which !== "coherence") {
     throw new AllegroError(
@@ -4535,9 +4534,9 @@ const coercionSurface: Value = makeObject([
 // E3: the `Law.witness(Type, "name", proof)` surface — the `by` path for
 // law obligations.
 const lawWitnessPrim = makePrimitive("Law.witness", (args) => {
-  const t = asStructure(dataOf(args[0]));
+  const t = asStructure(args[0]);
   if (!t) throw new AllegroError("Law.witness: expected (Type, lawName, proof)");
-  const nameD = dataOf(args[1]);
+  const nameD = args[1];
   if (nameD.kind !== ValueKind.Bits) {
     throw new AllegroError("Law.witness: law name must be a String");
   }
@@ -4546,9 +4545,9 @@ const lawWitnessPrim = makePrimitive("Law.witness", (args) => {
 });
 // E4: `Law.assume(Type, "name")` — the admitted tier (`assume law`).
 const lawAssumePrim = makePrimitive("Law.assume", (args) => {
-  const t = asStructure(dataOf(args[0]));
+  const t = asStructure(args[0]);
   if (!t) throw new AllegroError("Law.assume: expected (Type, lawName)");
-  const nameD = dataOf(args[1]);
+  const nameD = args[1];
   if (nameD.kind !== ValueKind.Bits) {
     throw new AllegroError("Law.assume: law name must be a String");
   }
@@ -4563,7 +4562,7 @@ const lawSurface: Value = makeObject([
 // E3: `for_all(fn)` — the quantified-proposition constructor (E-R3). All
 // params of the body range over the implementing type.
 const forAllPrim = makePrimitive("for_all", (args) => {
-  const d = dataOf(args[0]);
+  const d = args[0];
   if (d.kind !== ValueKind.ComposedFunction && d.kind !== ValueKind.PrimitiveFunction) {
     throw new AllegroError("for_all: argument must be a function (the quantified proposition body)");
   }

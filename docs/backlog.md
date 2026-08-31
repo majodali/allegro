@@ -1675,8 +1675,8 @@ that prevents it.
 
 - [ ] **B-121** · L0 · **Metadata is a field on every value, supplied at
   construction (D48(b)(c), IC-3).** **PLAN: `docs/plans/metadata-on-values.md`
-  (active, 2026-08) — chunks C1–C7; §6 rulings taken; **C1, C2, C4 and C6
-  landed**; C5 (delete `dataOf`) and C7 (the in-place rule + doc sync) remain. The plan adds
+  (active, 2026-08) — chunks C1–C7; §6 rulings taken; **C1, C2, C4, C5 and C6
+  landed**; only C7 (the in-place rule + doc sync) remains. The plan adds
   four probes not in this entry: retyping `withMetadata` to return `Value`
   typechecks with **0 errors** (nothing depends on attachment producing a
   Structure); `newCarrierStructure` has exactly **2 callers, both inside
@@ -1783,6 +1783,18 @@ that prevents it.
     `effects` stopped unioning. One of the six (`unifyTypes`) was NOT a
     stand-in — it separated a value-carrying-a-type from a type Context — and
     was restated, not deleted. `docs/plans/metadata-on-values.md` §5.1c
+  - **C5 LANDED 2026-08**, suite **1202/1202**. `dataOf` deleted with **849**
+    call sites across 32 files; the retired-name lint now forbids `dataOf` as
+    well as `primaryOf`. **Safe in a way C2 was not**: after C4 the body was
+    `return v`, so removing a call cannot change runtime behaviour — only
+    static types move, and every such move is a typecheck error rather than a
+    silent one. Three classes surfaced, all caught by `tsc`: **precedence**
+    (2 — removing a wrapper re-binds a following `as`), an **inference
+    barrier** (4 — the declared `Value` return was breaking a control-flow
+    cycle in `walkForWhen`), and one self-assignment. Two test assertions were
+    disarmed BY the transform (`dataOf(p) === p` → `p === p`) and retired.
+    **Open tension with B-128**: the data plane loses its named reader.
+    `docs/plans/metadata-on-values.md` §5.1g
   - **C6 LANDED 2026-08**, suite **1202/1202**. The factories take metadata
     (D48(c)) and the 12 create-then-attach sites collapse, PE Rule 1 first.
     **(d)'s "four operations" is corrected to one**: derive, map and stamp are

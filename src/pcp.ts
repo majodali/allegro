@@ -23,7 +23,7 @@
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
 import type { StructureValue, BitsValue } from "./types.js";
-import { dataOf, SLOT_KEYS, backingsOf } from "./slots.js";
+import { SLOT_KEYS, backingsOf } from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import { ValueKind, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
@@ -39,7 +39,7 @@ import type { CompilationReport, Notification } from "./runtime.js";
 function boundTypeFilter(evalCtx: StructureValue): (t: StructureValue) => boolean {
   const bound = new Set<unknown>();
   for (const [, b] of scopeAllBindings(evalCtx)) {
-    if (b?.value) bound.add(dataOf(b.value));
+    if (b?.value) bound.add(b.value);
   }
   return (t) => bound.has(t);
 }
@@ -687,7 +687,7 @@ export function formatVerdict(v: Verdict): string {
 function _ctxString(ctx: StructureValue, key: string): string | undefined {
   const b = ctx.bindings.get(key)?.value;
   if (!b) return undefined;
-  const p = dataOf(b);
+  const p = b;
   return p.kind === ValueKind.Bits ? bitsToString(p as BitsValue) : undefined;
 }
 
@@ -711,7 +711,7 @@ export function buildVerdict(
     const v = binding.value;
     if (!v) continue;
     if (isDischargedProof(v)) {
-      const ctx = dataOf(v) as StructureValue;
+      const ctx = v as StructureValue;
       // E4 (E-R6): surface the recorded law backing when present.
       const eqName  = _ctxString(ctx, "equality");
       const lawName = _ctxString(ctx, "lawName");
@@ -728,7 +728,7 @@ export function buildVerdict(
         ...(restsOn.length > 0 ? { restsOn } : {}),
       });
     } else if (isFailedProof(v)) {
-      const ctx = dataOf(v) as StructureValue;
+      const ctx = v as StructureValue;
       theorems.push({
         name: key,
         proposition: _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>",
@@ -985,7 +985,7 @@ export function extractObligations(
     if (!discharged && !failed) continue;
     if (opts?.pendingOnly && discharged) continue;
 
-    const ctx = dataOf(v) as StructureValue;
+    const ctx = v as StructureValue;
     const proposition = _ctxString(ctx, SLOT_KEYS.proposition) ?? "<unknown>";
 
     // Prior attempt context: if failed, package the failure as a single

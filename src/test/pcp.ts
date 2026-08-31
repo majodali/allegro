@@ -8,7 +8,7 @@
 import { test, asyncTest, eq, throws } from "./harness.js";
 import { evalStd, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
-import { Value, ValueKind, BitsValue, StructureValue, dataOf, bitsToString, makeInt } from "../types.js";
+import { Value, ValueKind, BitsValue, StructureValue, bitsToString, makeInt } from "../types.js";
 import { formatValue } from "../primitives.js";
 import { spawnSync } from "child_process";
 import { generateHints, IterationHints } from "../pcp.js";

@@ -16,7 +16,7 @@ import { runAlgFile, corpusWalk } from "./alg-files.js";
 import * as fs from "fs";
 import * as path from "path";
 import { getTypeName, structuralWrap, typeMethod, Type, typeMemberDescriptor, memberDescriptorsOf } from "../types-std.js";
-import { dataOf, BitsValue, bitsToString, makeInt, Value, makeStructure, stringToBits, makePrimitive, makeExpr, StructureValue } from "../types.js";
+import { BitsValue, bitsToString, makeInt, Value, makeStructure, stringToBits, makePrimitive, makeExpr, StructureValue } from "../types.js";
 import { formatValue } from "../primitives.js";
 import { metaReadRaw, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "../slots.js";
 import { evaluate } from "../evaluator.js";
@@ -28,8 +28,8 @@ test("type system: int literal has Int type", () => {
   const result = evalStd("42");
   eq(result !== null, true);
   eq(getTypeName(result!), "Int");
-  eq(Number(dataOf(result!) as any).valueOf !== undefined, true);
-  const p = dataOf(result!) as BitsValue;
+  eq(Number(result! as any).valueOf !== undefined, true);
+  const p = result! as BitsValue;
   eq(Number(p.data), 42);
 });
 
@@ -37,70 +37,70 @@ test("type system: string literal has String type", () => {
   const result = evalStd('"hello"');
   eq(result !== null, true);
   eq(getTypeName(result!), "String");
-  eq(bitsToString(dataOf(result!) as BitsValue), "hello");
+  eq(bitsToString(result! as BitsValue), "hello");
 });
 
 test("type system: int arithmetic preserves type", () => {
   const result = evalStd("3 + 4");
   eq(result !== null, true);
   eq(getTypeName(result!), "Int");
-  const p = dataOf(result!) as BitsValue;
+  const p = result! as BitsValue;
   eq(Number(p.data), 7);
 });
 
 test("type system: int subtraction", () => {
   const result = evalStd("10 - 3");
   eq(getTypeName(result!), "Int");
-  eq(Number((dataOf(result!) as BitsValue).data), 7);
+  eq(Number((result! as BitsValue).data), 7);
 });
 
 test("type system: int multiplication", () => {
   const result = evalStd("6 * 7");
   eq(getTypeName(result!), "Int");
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("type system: int comparison returns typed Bool", () => {
   const result = evalStd("3 < 5");
   eq(getTypeName(result!), "Bool");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("type system: string dot length", () => {
   const result = evalStd('"hello".length');
   eq(result !== null, true);
-  const p = dataOf(result!) as BitsValue;
+  const p = result! as BitsValue;
   eq(Number(p.data), 5);
 });
 
 test("type system: int dot toString", () => {
   const result = evalStd("42.toString()");
   eq(result !== null, true);
-  eq(bitsToString(dataOf(result!) as BitsValue), "42");
+  eq(bitsToString(result! as BitsValue), "42");
 });
 
 test("type system: string dot slice", () => {
   const result = evalStd('"hello".slice(1, 3)');
   eq(result !== null, true);
-  eq(bitsToString(dataOf(result!) as BitsValue), "el");
+  eq(bitsToString(result! as BitsValue), "el");
 });
 
 test("type system: string dot indexOf", () => {
   const result = evalStd('"hello".indexOf("ll")');
   eq(result !== null, true);
-  eq(Number((dataOf(result!) as BitsValue).data), 2);
+  eq(Number((result! as BitsValue).data), 2);
 });
 
 test("type system: string trim returns typed String", () => {
   const result = evalStd('"  hello  ".trim()');
   eq(getTypeName(result!), "String");
-  eq(bitsToString(dataOf(result!) as BitsValue), "hello");
+  eq(bitsToString(result! as BitsValue), "hello");
 });
 
 test("type system: string startsWith returns typed Bool", () => {
   const result = evalStd('"hello".startsWith("hel")');
   eq(getTypeName(result!), "Bool");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("type system: string split returns typed Array", () => {
@@ -111,13 +111,13 @@ test("type system: string split returns typed Array", () => {
 test("type system: string replace returns typed String", () => {
   const result = evalStd('"aabb".replace("b", "x")');
   eq(getTypeName(result!), "String");
-  eq(bitsToString(dataOf(result!) as BitsValue), "aaxx");
+  eq(bitsToString(result! as BitsValue), "aaxx");
 });
 
 test("type system: string toUpperCase returns typed String", () => {
   const result = evalStd('"hello".toUpperCase()');
   eq(getTypeName(result!), "String");
-  eq(bitsToString(dataOf(result!) as BitsValue), "HELLO");
+  eq(bitsToString(result! as BitsValue), "HELLO");
 });
 
 test("type system: string toCharCodes returns typed Array", () => {
@@ -129,21 +129,21 @@ test("type system: string concat with +", () => {
   const result = evalStd('"hello" + " world"');
   eq(result !== null, true);
   eq(getTypeName(result!), "String");
-  eq(bitsToString(dataOf(result!) as BitsValue), "hello world");
+  eq(bitsToString(result! as BitsValue), "hello world");
 });
 
 test("type system: typed function calls", () => {
   const result = evalStd("f(x) => x + 1\nf(5)");
   eq(result !== null, true);
   eq(getTypeName(result!), "Int");
-  eq(Number((dataOf(result!) as BitsValue).data), 6);
+  eq(Number((result! as BitsValue).data), 6);
 });
 
 test("type system: typed recursion", () => {
   const result = evalStd("factorial(n) => if n == 0 then 1 else n * factorial(n - 1)\nfactorial(5)");
   eq(result !== null, true);
   eq(getTypeName(result!), "Int");
-  eq(Number((dataOf(result!) as BitsValue).data), 120);
+  eq(Number((result! as BitsValue).data), 120);
 });
 
 test("type system: formatValue shows string without quotes for typed string", () => {
@@ -161,7 +161,7 @@ test("type system: dot access on untyped context falls back to ctx_resolve", () 
   const ext: Extension = { name: "test", bindings: { math: mathCtx } };
   const result = evalStd("math.pi", [ext]);
   eq(result !== null, true);
-  eq(Number((dataOf(result!) as BitsValue).data), 3);
+  eq(Number((result! as BitsValue).data), 3);
 });
 
 test("type system: basics.alg works in typed mode", () => {
@@ -220,12 +220,12 @@ test("type system: float division", () => {
 test("type system: float comparison", () => {
   const result = evalStd("3.14 > 2.71");
   eq(result !== null, true);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("type system: float toString", () => {
   const result = evalStd("3.14.toString()");
-  eq(bitsToString(dataOf(result!) as BitsValue), "3.14");
+  eq(bitsToString(result! as BitsValue), "3.14");
 });
 
 // == Bool Type ==
@@ -245,7 +245,7 @@ test("type system: false literal has Bool type", () => {
 
 test("type system: bool toString", () => {
   const result = evalStd("true.toString()");
-  eq(bitsToString(dataOf(result!) as BitsValue), "true");
+  eq(bitsToString(result! as BitsValue), "true");
 });
 
 // == Array Type ==
@@ -266,13 +266,13 @@ test("type system: array with elements", () => {
 test("type system: array length", () => {
   const result = evalStd("[10, 20, 30].length");
   eq(result !== null, true);
-  eq(Number((dataOf(result!) as BitsValue).data), 3);
+  eq(Number((result! as BitsValue).data), 3);
 });
 
 test("type system: array bracket access", () => {
   const result = evalStd("[10, 20, 30][1]");
   eq(result !== null, true);
-  eq(Number((dataOf(result!) as BitsValue).data), 20);
+  eq(Number((result! as BitsValue).data), 20);
 });
 
 test("type system: array of strings", () => {
@@ -302,18 +302,18 @@ test("type system: object with fields", () => {
 test("type system: object field access via dot", () => {
   const result = evalStd("{x: 42, y: 7}.x");
   eq(result !== null, true);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("type system: object bracket access", () => {
   const result = evalStd('{name: "alice"}["name"]');
   eq(result !== null, true);
-  eq(bitsToString(dataOf(result!) as BitsValue), "alice");
+  eq(bitsToString(result! as BitsValue), "alice");
 });
 
 test("type system: nested object", () => {
   const result = evalStd("{a: {x: 1}}.a.x");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("type system: object keys", () => {
@@ -331,12 +331,12 @@ test("type system: array with 5 elements", () => {
 
 test("type system: array with 5 elements bracket access last", () => {
   const result = evalStd("[10, 20, 30, 40, 50][4]");
-  eq(Number((dataOf(result!) as BitsValue).data), 50);
+  eq(Number((result! as BitsValue).data), 50);
 });
 
 test("type system: object with 4 fields", () => {
   const result = evalStd("{a: 1, b: 2, c: 3, d: 4}.d");
-  eq(Number((dataOf(result!) as BitsValue).data), 4);
+  eq(Number((result! as BitsValue).data), 4);
 });
 
 // == Logical Operators ==
@@ -386,8 +386,8 @@ test("logical: comparison with ||", () => {
 });
 
 test("logical: != operator works", () => {
-  eq(Number((dataOf(evalStd("3 != 4")!) as BitsValue).data), 1);
-  eq(Number((dataOf(evalStd("3 != 3")!) as BitsValue).data), 0);
+  eq(Number((evalStd("3 != 4")! as BitsValue).data), 1);
+  eq(Number((evalStd("3 != 3")! as BitsValue).data), 0);
 });
 
 // == Array Higher-Order Methods ==
@@ -406,7 +406,7 @@ test("array: filter", () => {
 
 test("array: reduce (sum)", () => {
   const result = evalStd("[1, 2, 3, 4].reduce((acc, x) => acc + x, 0)");
-  eq(Number((dataOf(result!) as BitsValue).data), 10);
+  eq(Number((result! as BitsValue).data), 10);
 });
 
 test("array: map with string", () => {
@@ -455,7 +455,7 @@ test("module export: export keyword marks value with exported component", () => 
   const result = r.value;
   eq(result !== null, true);
   // Should still be usable as a number
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
   // Export-ness is recorded — on the binding
   eq(r.evalCtx.bindings.get("x")?.visibility, "exported");
   {
@@ -485,7 +485,7 @@ test("B-097 V1: y = x does NOT export y (the aliasing wart is dead)", () => {
 test("B-097 V1: exported typed function declaration marks its binding", () => {
   const r = runtimeEval("export double(n: Int): Int => n * 2\ndouble(21)\n", undefined, [typeExt], undefined, true);
   eq(r.evalCtx.bindings.get("double")?.visibility, "exported");
-  eq(Number((dataOf(r.value!) as BitsValue).data), 42);
+  eq(Number((r.value! as BitsValue).data), 42);
 });
 
 // == B-097 V2: pipeline unification ==
@@ -499,11 +499,11 @@ test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possess
   let arity = 0;
   const hook = makePrimitive("probe.__getMember", (hargs) => {
     arity = hargs.length;
-    const capsule = dataOf(hargs[2]) as import("../types.js").PrimitiveFunctionValue;
+    const capsule = hargs[2] as import("../types.js").PrimitiveFunctionValue;
     const holdsSecret = capsule.fn([stringToBits("secret")], undefined as any, undefined as any);
     const holdsNope = capsule.fn([stringToBits("no_such_name")], undefined as any, undefined as any);
-    const score = (Number((dataOf(holdsSecret) as BitsValue).data) === 1 ? 10 : 0)
-    + (Number((dataOf(holdsNope) as BitsValue).data) === 1 ? 1 : 0);
+    const score = (Number((holdsSecret as BitsValue).data) === 1 ? 10 : 0)
+    + (Number((holdsNope as BitsValue).data) === 1 ? 1 : 0);
     return makeInt(score);
   });
   slotSetFallbackMember(t, hook);
@@ -511,7 +511,7 @@ test("B-097 V2: fallbackMember is 3-ary — the evidence capsule answers possess
   const td = primRegistry.type_dispatch;
   const out = evaluate(makeExpr(td, [inst, stringToBits("anything")]), accessCtx);
   eq(arity, 3, "hook received (instance, name, capsule)");
-  eq(Number((dataOf(out) as BitsValue).data), 10, "capsule: holds in-scope name, denies unknown");
+  eq(Number((out as BitsValue).data), 10, "capsule: holds in-scope name, denies unknown");
 });
 
 test("B-097 V2: an effectful fallbackMember's tag survives dispatch (applyPrimitive path)", () => {
@@ -556,7 +556,7 @@ test("B-097 V3: private field — the type's own method reads it; external dot a
   const out = evalStd(
     "Vault = Type.define({owner: String, secret: private(Int), reveal: (self) => self.secret})\n" +
     "v = Vault(\"alice\", 42)\nv.reveal()\n");
-  eq(Number((dataOf(out!) as BitsValue).data), 42, "own method holds the member privilege");
+  eq(Number((out! as BitsValue).data), 42, "own method holds the member privilege");
   const msg = stdErrorMessage(
     "Vault = Type.define({owner: String, secret: private(Int)})\n" +
     "v = Vault(\"alice\", 42)\nv.secret\n");
@@ -567,7 +567,7 @@ test("B-097 V3: private method — internal call works, external call denies", (
   const out = evalStd(
     "Counter = Type.define({n: Int, bump: private((self) => self.n + 1), next: (self) => self.bump()})\n" +
     "c = Counter(41)\nc.next()\n");
-  eq(Number((dataOf(out!) as BitsValue).data), 42);
+  eq(Number((out! as BitsValue).data), 42);
   const msg = stdErrorMessage(
     "Counter = Type.define({n: Int, bump: private((self) => self.n + 1)})\n" +
     "c = Counter(41)\nc.bump()\n");
@@ -578,7 +578,7 @@ test("B-097 V3: private operator member — a + b denies outside, works from the
   const out = evalStd(
     "Money = Type.define({amt: Int, add: private((self, other) => Money(self.amt + other.amt)), plus: (self, other) => self + other})\n" +
     "Money(2).plus(Money(3)).amt\n");
-  eq(Number((dataOf(out!) as BitsValue).data), 5, "operator dispatch inside a member body holds privilege");
+  eq(Number((out! as BitsValue).data), 5, "operator dispatch inside a member body holds privilege");
   const msg = stdErrorMessage(
     "Money = Type.define({amt: Int, add: private((self, other) => Money(self.amt + other.amt))})\n" +
     "Money(2) + Money(3)\n");
@@ -597,11 +597,11 @@ test("B-097 V3: destructuring a private field outside its scope is an ERROR nami
     "Vault = Type.define({owner: String, secret: private(Int)})\n" +
     "v = Vault(\"alice\", 42)\n" +
     "when v is Vault(owner) then owner else \"no\"\n");
-  eq(bitsToString(dataOf(pub!) as BitsValue), "alice");
+  eq(bitsToString(pub! as BitsValue), "alice");
   const inner = evalStd(
     "Vault = Type.define({owner: String, secret: private(Int), peek: (self) => when self is Vault(secret) then secret else 0 - 1})\n" +
     "Vault(\"alice\", 42).peek()\n");
-  eq(Number((dataOf(inner!) as BitsValue).data), 42);
+  eq(Number((inner! as BitsValue).data), 42);
 });
 
 test("B-097 V3: printer omits private fields with an honest `…` marker (V-R6)", () => {
@@ -615,7 +615,7 @@ test("B-097 V3: printer omits private fields with an honest `…` marker (V-R6)"
   const ts = evalStd(
     "Vault = Type.define({owner: String, secret: private(Int)})\n" +
     "Vault(\"alice\", 42).toString()\n");
-  const tsStr = bitsToString(dataOf(ts!) as BitsValue);
+  const tsStr = bitsToString(ts! as BitsValue);
   eq(tsStr.includes("42"), false, "auto-toString omits private fields too");
   eq(tsStr.includes("…"), true);
 });
@@ -628,25 +628,25 @@ test("B-097 V3: conformance counts only externally-reachable members (V-R6)", ()
     "PrivX = Type.define({x2: Int, x: private(Int)})\n" +
     "PubX = Type.define({x: Int})\n" +
     "a = PrivX(1, 2)\nb = PubX(5)\nb\n", undefined, [typeExt], undefined, true);
-  const iface = dataOf(r.evalCtx.bindings.get("HasX")!.value!) as StructureValue;
+  const iface = r.evalCtx.bindings.get("HasX")!.value! as StructureValue;
   const privInst = r.evalCtx.bindings.get("a")!.value!;
   const pubInst = r.evalCtx.bindings.get("b")!.value!;
   const looseIface = structuralWrap(iface);
   const instOf = typeMethod(Type, "instanceof")! as import("../types.js").PrimitiveFunctionValue;
   const privCheck = instOf.fn([looseIface, privInst], undefined as any, undefined as any);
-  eq(Number((dataOf(privCheck) as BitsValue).data), 0, "private x does not satisfy ~{x}");
+  eq(Number((privCheck as BitsValue).data), 0, "private x does not satisfy ~{x}");
   const pubCheck = instOf.fn([looseIface, pubInst], undefined as any, undefined as any);
-  eq(Number((dataOf(pubCheck) as BitsValue).data), 1, "public x does");
+  eq(Number((pubCheck as BitsValue).data), 1, "public x does");
   // Expected side: an interface's own private declaration imposes no
   // requirement on conformers (its symbol is interface-local).
   const r2 = runtimeEval(
     "Wants = Interface.define({x: Int, hidden: private(Int)})\n" +
     "Impl = Type.define({x: Int}, Wants)\n" +
     "i = Impl(7)\ni\n", undefined, [typeExt], undefined, true);
-  const wants = dataOf(r2.evalCtx.bindings.get("Wants")!.value!) as StructureValue;
+  const wants = r2.evalCtx.bindings.get("Wants")!.value! as StructureValue;
   const impl = r2.evalCtx.bindings.get("i")!.value!;
   const declCheck = instOf.fn([wants, impl], undefined as any, undefined as any);
-  eq(Number((dataOf(declCheck) as BitsValue).data), 1, "expected-side private is not required");
+  eq(Number((declCheck as BitsValue).data), 1, "expected-side private is not required");
 });
 
 test("B-097 V3: a foreign type cannot draw a bundle's private member; privates never propagate", () => {
@@ -659,7 +659,7 @@ test("B-097 V3: a foreign type cannot draw a bundle's private member; privates n
     "Helpers = Type.define({calc: private((self) => 1), pub: (self) => 2})\n" +
     "User = Type.define({x: Int}, Helpers)\n" +
     "u = User(9)\nu\n", undefined, [typeExt], undefined, true);
-  const userType = dataOf(r.evalCtx.bindings.get("User")!.value!) as StructureValue;
+  const userType = r.evalCtx.bindings.get("User")!.value! as StructureValue;
   eq(typeMemberDescriptor(userType, "calc"), null, "private member stayed with the bundle");
   eq(typeMemberDescriptor(userType, "pub") !== null, true, "public bundle member copied as before");
 });
@@ -675,7 +675,7 @@ test("B-097 V3: reflection — names and flags free, accessors gated (V-R7)", ()
   const r = runtimeEval(
     "Vault = Type.define({owner: String, secret: private(Int), code: private((self) => 7)})\n" +
     "v = Vault(\"alice\", 42)\nv\n", undefined, [typeExt], undefined, true);
-  const vaultType = dataOf(r.evalCtx.bindings.get("Vault")!.value!) as StructureValue;
+  const vaultType = r.evalCtx.bindings.get("Vault")!.value! as StructureValue;
   // Enumeration lists private members (names-public), flags recorded —
   // introspection/PCP tooling keeps unrestricted name-level reads.
   const descs = memberDescriptorsOf(vaultType);
@@ -684,7 +684,7 @@ test("B-097 V3: reflection — names and flags free, accessors gated (V-R7)", ()
   const listKeys = (v: Value): string[] => {
     const listing = primRegistry.ctx_bindings.fn([v], r.evalCtx, evaluate) as import("../types.js").ExpressionValue;
     return listing.args.map((pair) =>
-      bitsToString(dataOf((pair as import("../types.js").ExpressionValue).args[0]) as BitsValue));
+      bitsToString((pair as import("../types.js").ExpressionValue).args[0] as BitsValue));
   };
   // The descriptor's reflective listing keeps name + flag pairs free but
   // withholds the ACCESSOR (the implementation) without possession
@@ -706,15 +706,15 @@ test("B-097 V3: readonly(...) is reserved vocabulary — recorded on the descrip
   const r = runtimeEval(
     "Point = Type.define({x: readonly(Int), y: Int})\n" +
     "p = Point(3, 4)\np.x\n", undefined, [typeExt], undefined, true);
-  eq(Number((dataOf(r.value!) as BitsValue).data), 3, "reads work unchanged");
-  const pointType = dataOf(r.evalCtx.bindings.get("Point")!.value!) as StructureValue;
+  eq(Number((r.value! as BitsValue).data), 3, "reads work unchanged");
+  const pointType = r.evalCtx.bindings.get("Point")!.value! as StructureValue;
   const xDesc = typeMemberDescriptor(pointType, "x")!;
   eq(xDesc.bindings.get("readonly")?.value !== undefined, true, "attribute recorded for B-046");
 });
 
 test("module export: exported functions work normally", () => {
   const result = evalStd("export f = x => x * 2\nf(21)\n");
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("module export: typed module object exposes exports via dot", () => {
@@ -742,11 +742,11 @@ test("module export: typed module object exposes exports via dot", () => {
   // Access exported field via type_dispatch
   const ext: Extension = { name: "test", bindings: { testmod: moduleObj } };
   const pubResult = evalStd("testmod.pub_val", [ext]);
-  eq(Number((dataOf(pubResult!) as BitsValue).data), 42);
+  eq(Number((pubResult! as BitsValue).data), 42);
 
   // Access exported function
   const fnResult = evalStd("testmod.pub_fn(21)", [ext]);
-  eq(Number((dataOf(fnResult!) as BitsValue).data), 42);
+  eq(Number((fnResult! as BitsValue).data), 42);
 
   // Private field should NOT be accessible via type_dispatch
   let threw = false;

@@ -576,8 +576,6 @@ export function removeConstruct(ctx: StructureValue): void {
 /** Data-plane read (C4.3c: `primaryOf` retired — this is THE accessor).
  *  Identity for flattened Contexts and every non-scalar; unwraps the
  *  `primary` of a transparent scalar structure. */
-import { dataOf } from "./types.js";
-export { dataOf };
 
 // --- Component plane (MultiValue) -------------------------------------------------------
 

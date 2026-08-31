@@ -13,7 +13,7 @@ import { extractGrammarFragment } from "../primitives.js";
 import { isDischargedProof as _isDischargedProof, formatProofFinding } from "../proofs.js";
 import * as fs from "fs";
 import * as path from "path";
-import { Value, dataOf, BitsValue, bitsToString } from "../types.js";
+import { Value, BitsValue, bitsToString } from "../types.js";
 import { metaReadRaw } from "../slots.js";
 import { lawObligationRecords } from "../types-std.js";
 import { buildVerdict, formatVerdict } from "../pcp.js";
@@ -740,8 +740,8 @@ test("Phase G: downstream consumer sees the lib + its functions work", () => {
   const { evalCtx } = runtimeEval(src, undefined, [typeExt, provableExt], undefined, true);
   const x = evalCtx.bindings.get("x")?.value;
   const y = evalCtx.bindings.get("y")?.value;
-  eq(Number((dataOf(x!) as BitsValue).data), 5);
-  eq(Number((dataOf(y!) as BitsValue).data), 49);
+  eq(Number((x! as BitsValue).data), 5);
+  eq(Number((y! as BitsValue).data), 49);
 });
 
 test("Phase G: a downstream theorem about the lib's functions discharges", () => {
@@ -811,8 +811,8 @@ test("B-092 U1: dimension mismatch is a domain-vocabulary error value", () => {
   const bad = evalCtx.bindings.get("bad")!.value!;
   const err = metaReadRaw(bad, "error");
   eq(err !== undefined, true);
-  eq(bitsToString(dataOf(err!) as BitsValue).includes("cannot add m and s"), true);
-  eq(bitsToString(dataOf(err!) as BitsValue).includes("length vs time"), true);
+  eq(bitsToString(err! as BitsValue).includes("cannot add m and s"), true);
+  eq(bitsToString(err! as BitsValue).includes("length vs time"), true);
 });
 
 test("B-092 U3: Quantity draws Equatable — obligations recorded at honest tiers", () => {
@@ -868,10 +868,10 @@ theorem ks: qty(1, km) == qty(1000, m)
 test("B-092 U1: dimension algebra is exact structural data (group laws on vectors)", () => {
   const r = evalStd2(
     "dim_mul(velocity_dim, time_dim) == length_dim", unitsExt);
-  eq(Number((dataOf(r!) as BitsValue).data), 1);
+  eq(Number((r! as BitsValue).data), 1);
   const r2 = evalStd2(
     "dim_div(force_dim, mass_dim) == acceleration_dim", unitsExt);
-  eq(Number((dataOf(r2!) as BitsValue).data), 1);
+  eq(Number((r2! as BitsValue).data), 1);
 });
 
 function evalStd2(src: string, ext: Extension): Value | undefined {

@@ -31,8 +31,7 @@ import {
 } from "./parser.js";
 import {
   Value, ValueKind, StructureValue, BitsValue,
-  makeStructure, makeInt, withMeta, stringToBits, dataOf,
-} from "./types.js";
+  makeStructure, makeInt, withMeta, stringToBits, } from "./types.js";
 import { withType, StringType, ErrorType, IntType, makeArray, noneSingleton } from "./types-std.js";
 
 // --- Types ---

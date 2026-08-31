@@ -4,6 +4,52 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 C5: `dataOf` is deleted, 849 call sites with it
+
+The data-plane peel is gone — definition, `slots.ts` re-export, every import
+specifier, and **849 calls across 32 files**. The retired-name boundary lint,
+which already forbade `primaryOf`, now forbids both spellings.
+
+**Why 849 sites in one pass was safe, which is not the argument C2 could make.**
+After C4, `dataOf`'s entire body was `return v`. It was *provably the identity
+function*, so removing a call cannot change runtime behaviour whatever the call
+site does. Only the static types move, and every way they can move is a
+typecheck error rather than a silent one. C2's risk was the exact opposite:
+checks that stopped firing without saying so.
+
+**Three classes the type shift surfaced, all caught by `tsc`:**
+
+*Precedence, 2 sites.* `dataOf(a ?? b) as BitsValue` becomes `a ?? b as
+BitsValue`, which binds the cast to `b` alone. Removing a call wrapper re-binds
+a following `as`. Found by re-scanning HEAD for the shape — *a call whose
+argument holds a top-level low-precedence operator and which is followed by
+`.`, `[` or `as`* — rather than by waiting for the compiler. It reported
+exactly two, both already known, which bounded the class instead of leaving it
+open.
+
+*Inference barrier, 4 sites.* `dataOf`'s declared `Value` return was breaking a
+control-flow cycle in `walkForWhen`: narrowing `cur` inside the loop depends on
+`cur = elseFn.body`, which depends on `args`, which depends on the narrowed
+`cur`. TS7022 once the barrier went. Fixed by annotating what the peel implied.
+
+*Self-assignment, 1 site.* `cur = dataOf(cur)` became `cur = cur`.
+
+**Two assertions the deletion disarmed — the C4 lesson, this time
+self-inflicted.** `eq(dataOf(p) === p, …)` reduces to `eq(p === p, …)`: a line
+that reads like a check and tests nothing. The mechanical transform created
+them rather than merely failing to notice old ones. Both retired — what they
+asserted (this value is not wrapped) is structural truth now, and the
+behavioural line beside each already carries it.
+
+**One tension recorded rather than resolved.** Deleting the data-plane accessor
+runs against B-128's "police the planes with interfaces": the data plane loses
+its named reader. The counter is that there is no projection left to name — a
+value's data IS the value — so an identity function would advertise a boundary
+that does not exist. Worth revisiting when B-128 designs the enforcement, since
+that work may want the accessor back for reasons this chunk did not weigh.
+
+Suite **1202/1202**, typecheck clean.
+
 ## 2026-08 — B-121 C6: the factories take metadata, and "four operations" turns out to be one
 
 `makeBits`, `makeInt`, `makeFloat`, `makeExpr` and `makeSymbol` now take an

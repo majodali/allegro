@@ -8,7 +8,7 @@
 import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
-import { dataOf, BitsValue, bitsToString, ValueKind, StructureValue, Value } from "../types.js";
+import { BitsValue, bitsToString, ValueKind, StructureValue, Value } from "../types.js";
 import { getTypeName, getType, createTypeSystem } from "../types-std.js";
 import { getName, metaOf, getMembers } from "../slots.js";
 import { formatValue } from "../primitives.js";
@@ -49,7 +49,7 @@ test("union type: the removal is complete on the primitive side too (B-104 c2)",
   // that matters is that nothing MINTS a union: the call stays a residual
   // Expression instead of producing a type Context.
   const r = evalStd('type_union(Int, String)');
-  eq(dataOf(r!).kind, ValueKind.Expression, "the call residualizes rather than minting a union type");
+  eq(r!.kind, ValueKind.Expression, "the call residualizes rather than minting a union type");
 });
 
 // == Structural Type (~) ==
@@ -58,19 +58,19 @@ test("structural type: ~Type in annotation", () => {
   // ~Int should accept any type with Int's structure
   // For now just verify the syntax parses and ~Int can be used
   const result = evalStd('f(x: ~Int) => x\nf(42)');
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 // == Binding Type Annotations ==
 
 test("binding type: x: Int = 42", () => {
   const result = evalStd('x: Int = 42\nx');
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("binding type: x: String = hello", () => {
   const result = evalStd('x: String = "hello"\nx');
-  eq(bitsToString(dataOf(result!) as BitsValue), "hello");
+  eq(bitsToString(result! as BitsValue), "hello");
 });
 
 test("binding type: mismatch throws", () => {
@@ -82,7 +82,7 @@ test("binding type: mismatch throws", () => {
 
 test("binding type: used in expression", () => {
   const result = evalStd('x: Int = 5\ny: Int = 10\nx + y');
-  eq(Number((dataOf(result!) as BitsValue).data), 15);
+  eq(Number((result! as BitsValue).data), 15);
 });
 
 // == Pattern Matching (when/is/then) ==
@@ -97,7 +97,7 @@ test("when: literal match — miss", () => {
 
 test("when: literal string match", () => {
   const result = evalStd('when "hello" is "hello" then 1 else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("when: wildcard always matches", () => {
@@ -163,12 +163,12 @@ test("when: negative literal", () => {
 test("when: typed mode preserves types", () => {
   const result = evalStd("when 42 is _ then 99 else 0");
   eq(getTypeName(result!), "Int");
-  eq(Number((dataOf(result!) as BitsValue).data), 99);
+  eq(Number((result! as BitsValue).data), 99);
 });
 
 test("when: true/false literal match", () => {
   const result = evalStd("when true is true then 1 else 0");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 // == MultiValue Access (Y of x) ==
@@ -180,7 +180,7 @@ test("of: type of typed int", () => {
   eq(result!.kind, ValueKind.Structure);
   const nameBinding = getName(result as StructureValue);
   eq(nameBinding !== undefined, true);
-  eq(bitsToString(dataOf(nameBinding!) as BitsValue), "Int");
+  eq(bitsToString(nameBinding! as BitsValue), "Int");
 });
 
 test("of: type of typed string", () => {
@@ -198,19 +198,19 @@ test("of: used in expression", () => {
 
 test("when: struct destruct — extract fields", () => {
   const result = evalStd('p = {x: 10, y: 20}\nwhen p is {x, y} then x + y else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 30);
+  eq(Number((result! as BitsValue).data), 30);
 });
 
 test("when: struct destruct — field missing → no match", () => {
   const result = evalStd('p = {x: 10}\nwhen p is {x, y} then x + y else 99');
-  eq(Number((dataOf(result!) as BitsValue).data), 99);
+  eq(Number((result! as BitsValue).data), 99);
 });
 
 test("when: struct destruct — sub-pattern binding uses field name", () => {
   // {x: a} means extract field x, match against pattern a (unresolved → binding)
   // The binding name is x (field name), not a
   const result = evalStd('p = {x: 10, y: 20}\nwhen p is {x: a, y: b} then x * y else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 200);
+  eq(Number((result! as BitsValue).data), 200);
 });
 
 test("when: struct destruct — multi-case", () => {
@@ -223,30 +223,30 @@ when p
 `;
   // {z} won't match because p doesn't have field z... wait, p has x and y not z
   // Actually {z} checks if field "z" exists — it doesn't, so falls through
-  eq(Number((dataOf(evalStd(src)!) as BitsValue).data), 15);
+  eq(Number((evalStd(src)! as BitsValue).data), 15);
 });
 
 test("when: struct destruct — single field", () => {
   const result = evalStd('p = {name: "hello"}\nwhen p is {name} then name else "none"');
-  eq(bitsToString(dataOf(result!) as BitsValue), "hello");
+  eq(bitsToString(result! as BitsValue), "hello");
 });
 
 // == Type Destructuring ==
 
 test("when: type destruct — Object type", () => {
   const result = evalStd('p = {x: 10, y: 20}\nwhen p is Object(x, y) then x + y else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 30);
+  eq(Number((result! as BitsValue).data), 30);
 });
 
 test("when: type destruct — Object type mismatch", () => {
   // 42 is Int, not Object → should fall to else
   const result = evalStd('when 42 is Object(x) then x else 99');
-  eq(Number((dataOf(result!) as BitsValue).data), 99);
+  eq(Number((result! as BitsValue).data), 99);
 });
 
 test("when: type destruct — sub-pattern uses field name", () => {
   const result = evalStd('p = {x: 3, y: 4}\nwhen p is Object(x: a, y: b) then x + y else 0');
-  eq(Number((dataOf(result!) as BitsValue).data), 7);
+  eq(Number((result! as BitsValue).data), 7);
 });
 
 test("when: type destruct — multi-case objects", () => {
@@ -257,7 +257,7 @@ when v
   is Object(x, y) then x * y
   is _ then 0
 `;
-  eq(Number((dataOf(evalStd(src)!) as BitsValue).data), 200);
+  eq(Number((evalStd(src)! as BitsValue).data), 200);
 });
 
 // == None Type ==
@@ -328,7 +328,7 @@ test("error: propagates through function calls", () => {
 test("error: does not propagate through if condition", () => {
   // if-then-else is lazy — the error in unused branch shouldn't propagate
   const result = evalStd('if true then 42 else error "bad"');
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("error: error of non-error returns none", () => {
@@ -340,7 +340,7 @@ test("error: error of error returns the error value", () => {
   const result = evalStd('error of (error "bad")');
   eq(result !== null, true);
   // The error component is the string "bad"
-  eq(bitsToString(dataOf(result!) as BitsValue), "bad");
+  eq(bitsToString(result! as BitsValue), "bad");
 });
 
 test("error: type of returns Error type context", () => {
@@ -360,7 +360,7 @@ when e
   // 'none' resolves to the none value, so this is a literal match
   // 'msg' is a binding since it's not in scope
   const result = evalStd(src);
-  eq(bitsToString(dataOf(result!) as BitsValue), "error: bad");
+  eq(bitsToString(result! as BitsValue), "error: bad");
 });
 
 // == instanceof ==
@@ -368,42 +368,42 @@ when e
 test("instanceof: int is Int", () => {
   const result = evalStd("42 instanceof Int");
   eq(getTypeName(result!), "Bool");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("instanceof: string is String", () => {
   const result = evalStd('"hello" instanceof String');
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("instanceof: int is not String", () => {
   const result = evalStd("42 instanceof String");
-  eq(Number((dataOf(result!) as BitsValue).data), 0);
+  eq(Number((result! as BitsValue).data), 0);
 });
 
 test("instanceof: bool is Bool", () => {
   const result = evalStd("true instanceof Bool");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("instanceof: object is Object", () => {
   const result = evalStd("{x: 1} instanceof Object");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("instanceof: Any matches everything", () => {
   const result = evalStd("42 instanceof Any");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("instanceof: none is None", () => {
   const result = evalStd("none instanceof None");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("instanceof: in if condition", () => {
   const result = evalStd('if 42 instanceof Int then "yes" else "no"');
-  eq(bitsToString(dataOf(result!) as BitsValue), "yes");
+  eq(bitsToString(result! as BitsValue), "yes");
 });
 
 // == subtypeof ==
@@ -411,12 +411,12 @@ test("instanceof: in if condition", () => {
 test("subtypeof: Type subtypeof Type", () => {
   const result = evalStd("Type subtypeof Type");
   eq(getTypeName(result!), "Bool");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("subtypeof: Int not subtypeof String", () => {
   const result = evalStd("Int subtypeof String");
-  eq(Number((dataOf(result!) as BitsValue).data), 0);
+  eq(Number((result! as BitsValue).data), 0);
 });
 
 // == Constructors ==
@@ -424,24 +424,24 @@ test("subtypeof: Int not subtypeof String", () => {
 test("constructor: Int(42)", () => {
   const result = evalStd("Int(42)");
   eq(getTypeName(result!), "Int");
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("constructor: String(42) wraps as String", () => {
   const result = evalStd('String("hello")');
   eq(getTypeName(result!), "String");
-  eq(bitsToString(dataOf(result!) as BitsValue), "hello");
+  eq(bitsToString(result! as BitsValue), "hello");
 });
 
 test("constructor: Bool(1)", () => {
   const result = evalStd("Bool(1)");
   eq(getTypeName(result!), "Bool");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("constructor: result passes instanceof", () => {
   const result = evalStd("Int(42) instanceof Int");
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 // == Type construction API (define, where, distinct, constructor) ==
@@ -452,7 +452,7 @@ Point = Type.define({x: Int, y: Int})
 p = Point(10, 20)
 p.x
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 10);
+  eq(Number((result! as BitsValue).data), 10);
 });
 
 test("define: field access y", () => {
@@ -461,7 +461,7 @@ Point = Type.define({x: Int, y: Int})
 p = Point(10, 20)
 p.y
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 20);
+  eq(Number((result! as BitsValue).data), 20);
 });
 
 test("define: instanceof works", () => {
@@ -470,7 +470,7 @@ Point = Type.define({x: Int, y: Int})
 p = Point(10, 20)
 p instanceof Point
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("define: auto-naming propagates to instances", () => {
@@ -483,7 +483,7 @@ type of p
 `);
   eq(result!.kind, ValueKind.Structure);
   const nameB = getName(result as StructureValue);
-  eq(bitsToString(dataOf(nameB!) as BitsValue), "Point");
+  eq(bitsToString(nameB! as BitsValue), "Point");
 });
 
 test("define: wrong arg count throws", () => {
@@ -523,7 +523,7 @@ Pair = Type.define({a: Int, b: Int})
 p = Pair(1, 2)
 p.a
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("define: subtypeof chain", () => {
@@ -532,7 +532,7 @@ Shape = Type.define({})
 Point = Type.define({x: Int, y: Int}, Shape)
 Point subtypeof Shape
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("where: refinement passes", () => {
@@ -541,7 +541,7 @@ PositiveInt = Int & _ > 0
 x = PositiveInt(5)
 x
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 5);
+  eq(Number((result! as BitsValue).data), 5);
 });
 
 test("where: refinement fails → error", () => {
@@ -557,7 +557,7 @@ test("where: refined type instanceof parent", () => {
 PositiveInt = Int & _ > 0
 PositiveInt(5) instanceof Int
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 // == Refinement types: && syntax ==
@@ -565,7 +565,7 @@ PositiveInt(5) instanceof Int
 test("refinement: && syntax creates refined type", () => {
   const result = evalStd(`PositiveInt = Int & _ > 0
 PositiveInt(5)`);
-  eq(Number((dataOf(result!) as BitsValue).data), 5);
+  eq(Number((result! as BitsValue).data), 5);
 });
 
 test("refinement: && syntax fails on invalid value", () => {
@@ -577,7 +577,7 @@ PositiveInt(0 - 5)`);
 test("refinement: compound predicate with && and &&", () => {
   const result = evalStd(`SmallPos = Int & _ > 0 && _ < 100
 SmallPos(50)`);
-  eq(Number((dataOf(result!) as BitsValue).data), 50);
+  eq(Number((result! as BitsValue).data), 50);
 });
 
 test("refinement: compound predicate rejects out-of-range", () => {
@@ -590,7 +590,7 @@ test("refinement: bare Int satisfies refined type at call site if predicate pass
   const result = evalStd(`PositiveInt = Int & _ > 0
 double(x: PositiveInt): Int => x * 2
 double(5)`);
-  eq(Number((dataOf(result!) as BitsValue).data), 10);
+  eq(Number((result! as BitsValue).data), 10);
 });
 
 test("refinement: call site rejects value failing predicate", () => {
@@ -610,17 +610,17 @@ test("refinement: already-refined value passes without re-checking", () => {
 f(x: PositiveInt): Int => x
 x = PositiveInt(7)
 f(x)`);
-  eq(Number((dataOf(result!) as BitsValue).data), 7);
+  eq(Number((result! as BitsValue).data), 7);
 });
 
 test("refinement: logical AND still works for bools", () => {
   const result = evalStd(`true && false`);
-  eq(Number((dataOf(result!) as BitsValue).data), 0);
+  eq(Number((result! as BitsValue).data), 0);
 });
 
 test("refinement: logical AND short-circuits", () => {
   const result = evalStd(`true && true`);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 // == preserveOps ==
@@ -630,7 +630,7 @@ test("preserveOps: lifted add preserves refined type", () => {
 x = PositiveInt(5)
 y = x + 3
 y instanceof PositiveInt`);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("preserveOps: lifted op produces error on predicate failure", () => {
@@ -644,7 +644,7 @@ test("preserveOps: lifted op value is still correct", () => {
   const result = evalStd(`PositiveInt = Refinement.define({refines: Int, where: p => p > 0, preserve: "all"})
 x = PositiveInt(5)
 x + 3`);
-  eq(Number((dataOf(result!) as BitsValue).data), 8);
+  eq(Number((result! as BitsValue).data), 8);
 });
 
 test("preserveOps: specific ops can be lifted", () => {
@@ -652,7 +652,7 @@ test("preserveOps: specific ops can be lifted", () => {
 x = PositiveInt(5)
 y = x + 3
 y instanceof PositiveInt`);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("distinct: breaks instanceof", () => {
@@ -660,7 +660,7 @@ test("distinct: breaks instanceof", () => {
 UserId = Int.distinct()
 UserId(42) instanceof Int
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 0);
+  eq(Number((result! as BitsValue).data), 0);
 });
 
 test("distinct: instanceof self works", () => {
@@ -668,7 +668,7 @@ test("distinct: instanceof self works", () => {
 UserId = Int.distinct()
 UserId(42) instanceof UserId
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("distinct: value preserved", () => {
@@ -679,7 +679,7 @@ x + 0
 `);
   // Addition may or may not work depending on whether methods are copied
   // At minimum the primary value should be 42
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("distinct: symbol-fresh mint — no shared member symbols (C7.2b)", () => {
@@ -687,9 +687,9 @@ test("distinct: symbol-fresh mint — no shared member symbols (C7.2b)", () => {
   // scope. Non-conformance falls out of symbol-identity membership by
   // construction — no member-symbol key overlaps with the parent's.
   const ext = createTypeSystem();
-  const intT = dataOf(ext.bindings["Int"] as unknown as Value) as StructureValue;
+  const intT = ext.bindings["Int"] as unknown as Value as StructureValue;
   const result = evalStd(`UserId = Int.distinct()\nUserId`);
-  const distinctT = dataOf(result!) as StructureValue;
+  const distinctT = result! as StructureValue;
   const membersOf = (t: StructureValue) => getMembers(t) as StructureValue | undefined;
   const parentMembers = membersOf(intT);
   const distinctMembers = membersOf(distinctT);
@@ -713,7 +713,7 @@ a = UserId subtypeof Int
 b = Int subtypeof UserId
 a || b
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 0);
+  eq(Number((result! as BitsValue).data), 0);
 });
 
 test("distinct: dispatch works through fresh symbols (C7.2b)", () => {
@@ -722,7 +722,7 @@ UserId = Int.distinct()
 x = UserId(41)
 (x + 1).toString()
 `);
-  eq(bitsToString(dataOf(result!) as BitsValue), "42");
+  eq(bitsToString(result! as BitsValue), "42");
 });
 
 test("construct spec key: custom construction authority", () => {
@@ -734,7 +734,7 @@ Point = Type.define({x: Int, y: Int, construct: (a, b) => {x: a * 2, y: b * 2}})
 p = Point(5, 10)
 p.x
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 10);
+  eq(Number((result! as BitsValue).data), 10);
 });
 
 test("construct spec key: result is tagged with the defined type", () => {
@@ -743,7 +743,7 @@ Point = Type.define({x: Int, y: Int, construct: (a, b) => {x: a, y: b}})
 p = Point(1, 2)
 p instanceof Point
 `);
-  eq(Number((dataOf(result!) as BitsValue).data), 1);
+  eq(Number((result! as BitsValue).data), 1);
 });
 
 test("constructor meta-method is removed (C7.2b)", () => {

@@ -29,7 +29,8 @@
 // There are FOUR planes (docs/design/concepts.md §18), and three of them
 // are stored here:
 //   - data plane     → `bindings` + `bindingList` (+ `dense` for
-//     numeric-keyed structures), read through `dataOf`
+//     numeric-keyed structures). B-121 C5 deleted `dataOf`, the accessor
+//     that used to project it: a value's data IS the value now
 //   - binding plane  → the same maps, keyed by NAME: what a scope
 //     resolves and what a type's members hang off
 //   - metadata plane → `meta` (carrier role; every key is

@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { dataOf, metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource, carryMeta} from "./slots.js";
+import { metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource, carryMeta} from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
@@ -609,7 +609,7 @@ function precompileFunctionsInner(
     const typeName0 = fnType0 ? getTypeName(val) : null;
     const isTyped = typeName0 === "Function";
     const isUntyped = typeName0 === "UntypedFunction";
-    const datum = dataOf(val);
+    const datum = val;
     if (fnType0 && (isTyped || isUntyped) && datum.kind === ValueKind.ComposedFunction) {
       fnType = fnType0;
       fn = datum;
@@ -1143,7 +1143,7 @@ export function evalSource(
       if (cfn) cutoffCfns.add(cfn as unknown as Value);
     }
     if (cutoffCfns.size > 0) {
-      setInlineCutoff((fnValue: Value) => cutoffCfns.has(dataOf(fnValue)));
+      setInlineCutoff((fnValue: Value) => cutoffCfns.has(fnValue));
     }
   }
   // Pre-compile typed functions: infer return types and detect type errors
@@ -1224,7 +1224,7 @@ export function evalSource(
       const cfn = divR!.stampTargets.get(name);
       if (cfn) divCfns.add(cfn as unknown as Value);
     }
-    setDivergenceProbe((fnValue: Value) => divCfns.has(dataOf(fnValue)));
+    setDivergenceProbe((fnValue: Value) => divCfns.has(fnValue));
 
     // Phase D1: check effect declarations against inferred sets — now
     // INCLUDING div (CE-R1: a declaration is a contract; `effects pure`
@@ -1346,7 +1346,7 @@ export function evalSource(
       }
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
-      const typeCtx = dataOf(val).kind === ValueKind.Structure ? dataOf(val) as StructureValue : null;
+      const typeCtx = val.kind === ValueKind.Structure ? val as StructureValue : null;
       if (typeCtx && hasShapeSlot(typeCtx)) {
         const nameV = getName(typeCtx);
         if (nameV?.kind === ValueKind.Bits) {
@@ -1387,7 +1387,7 @@ export function evalSource(
       // forward chaining REPLACES them on completion, dropping anything
       // attached here.
       const storedVal = (complete && !isMetaSlotKey(b.key)
-          && dataOf(val).kind !== ValueKind.Structure)
+          && val.kind !== ValueKind.Structure)
         ? withSource(val, b.value)
         : val;
       let ctxBinding = evalCtx.bindings.get(b.key);

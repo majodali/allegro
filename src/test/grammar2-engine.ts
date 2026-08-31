@@ -8,7 +8,7 @@
 import { test, eq, throws } from "./harness.js";
 import { evalStd, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
-import { Value, ValueKind, dataOf, bitsToString } from "../types.js";
+import { Value, ValueKind, bitsToString } from "../types.js";
 import { parse as g2parse, ParseResult as G2ParseResult } from "../grammar2/engine.js";
 import { getGrammarWithFragments as g2getGrammarWithFragments } from "../grammar2/fragments.js";
 import { analyze as g2analyze, formatReport as g2format, analyzeWithDisjointnessCheck } from "../grammar2/analyzer.js";
@@ -351,22 +351,22 @@ function callAllegroFn2(fnName: string, grammar: g2.Grammar, nullable: any): any
 
 /** Extract an array of `{code, message, production}` error/warning records. */
 function extractErrorList(result: any): { code?: string; message?: string; production?: string }[] {
-  const p = dataOf(result);
+  const p = result;
   if (p.kind !== ValueKind.Structure) return [];
   const len = Number((getSlotCount(p) as any)?.data ?? 0n);
   const out: { code?: string; message?: string; production?: string }[] = [];
   for (let i = 0; i < len; i++) {
     const entry = p.bindings.get(String(i))?.value;
-    const entryP = dataOf(entry!);
+    const entryP = entry!;
     if (entryP.kind === ValueKind.Structure) {
       const code = entryP.bindings.get("code")?.value;
       const msg = entryP.bindings.get("message")?.value;
       const prod = entryP.bindings.get("production")?.value;
       out.push({
-        code:       code ? bitsToString(dataOf(code) as any) : undefined,
-        message:    msg ? bitsToString(dataOf(msg) as any) : undefined,
+        code:       code ? bitsToString(code as any) : undefined,
+        message:    msg ? bitsToString(msg as any) : undefined,
         production: prod && (prod as any).kind === ValueKind.Bits ? bitsToString(prod as any) :
-                    prod ? bitsToString(dataOf(prod) as any) : undefined,
+                    prod ? bitsToString(prod as any) : undefined,
       });
     }
   }
@@ -375,14 +375,14 @@ function extractErrorList(result: any): { code?: string; message?: string; produ
 
 /** Extract an array of strings from an Allegro Array result. */
 function extractStringList(result: any): string[] {
-  const p = dataOf(result);
+  const p = result;
   if (p.kind !== ValueKind.Structure) return [];
   const len = Number((getSlotCount(p) as any)?.data ?? 0n);
   const out: string[] = [];
   for (let i = 0; i < len; i++) {
     const entry = p.bindings.get(String(i))?.value;
     if (!entry) continue;
-    const entryP = dataOf(entry);
+    const entryP = entry;
     if (entryP.kind === ValueKind.Bits) out.push(bitsToString(entryP));
   }
   return out;
@@ -550,7 +550,7 @@ test("Phase 5: Allegro analyze() top-level returns unified report", () => {
   g2.addProduction(g, { name: "lr",     rule: g2.nonterm("lr") });                              // left rec (unreachable too)
 
   const result = callAllegroFn1("analyze", g);
-  const p = dataOf(result);
+  const p = result;
   eq(p.kind, ValueKind.Structure, "analyze returned an object");
   if (p.kind !== ValueKind.Structure) return;
 

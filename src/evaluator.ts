@@ -15,7 +15,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, dataOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource, carryMeta} from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource, carryMeta} from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
@@ -119,10 +119,10 @@ const PRIM_TO_METHOD = new Map<string, string>([
  *  their own fields and re-evaluate to something else, so they merge here too.
  */
 function mergeOverMeta(outer: Metadata, inner: Value): Value {
-  // B-121 C6: the two exits were `withMeta(inner, outer)` and
-  // `withMeta(dataOf(inner), outer)`. They differed only while `dataOf`
-  // peeled a carrier — the derive/stamp distinction §3.2 found to be one
-  // operation hidden by the peel — so they are now the same line.
+  // B-121 C6: the two exits were `withMeta(inner, outer)` and the same call
+  // over the peeled inner value. They differed only while `dataOf` peeled a
+  // carrier — the derive/stamp distinction §3.2 found to be one operation
+  // hidden by the peel — so they are now the same line. C5 deleted the peel.
   for (const [k, v] of metaOf(inner)) {
     const prev = outer.get(k);
     const mergeFn = prev !== undefined && metaFieldSpec(k)?.rule === "union"
@@ -194,7 +194,7 @@ function evaluateExpr(
   expr: ExpressionValue, ctx: StructureValue, depth: number, depCollector?: DepCollector,
 ): Value | TailCall {
   const fnRaw = evaluate(expr.fn, ctx, depth + 1, depCollector);
-  const fn = dataOf(fnRaw);
+  const fn = fnRaw;
 
   if (fn.kind === ValueKind.PrimitiveFunction) {
     return applyPrimitive(fn, expr.args, ctx, depth, depCollector);
@@ -208,8 +208,7 @@ function evaluateExpr(
     return applyComposed(fn, expr.args, ctx, depth, fnRaw, depCollector);
   }
 
-  // Context as function — constructor call via __construct. `fn` is
-  // already dataOf(fnRaw), so carriers are peeled.
+  // Context as function — constructor call via __construct.
   const fnCtx = fn.kind === ValueKind.Structure ? fn as StructureValue : null;
   if (fnCtx) {
     const ctorSlot = getConstruct(fnCtx);
@@ -447,8 +446,7 @@ function applyPrimitive(
         assertMemberReachable(opShape, methodName, ctx);
         const method = typeMethod(opShape, methodName);
         if (method?.kind === ValueKind.PrimitiveFunction) {
-          const primaryArgs = evalArgs.map(dataOf);
-          const result = (method as import("./types.js").PrimitiveFunctionValue).fn(primaryArgs, ctx, evalFn);
+          const result = (method as import("./types.js").PrimitiveFunctionValue).fn(evalArgs, ctx, evalFn);
           // If the method already returned a typed value, use it as-is —
           // methods know their return types (comparisons return Bool).
           // B-121 C2: was `result.kind === Structure`, i.e. "is a carrier",
@@ -467,7 +465,7 @@ function applyPrimitive(
         // `q1 + q2` on a record type fell through to raw bits_add.
         // Dispatch the same way type_dispatch does for method members:
         // self is the first parameter, full values (channels intact).
-        const mData = method != null ? dataOf(method) : undefined;
+        const mData = method != null ? method : undefined;
         if (mData?.kind === ValueKind.ComposedFunction) {
           // B-097 V3: a composed operator member is the type's own code —
           // its body runs with the type's member privilege planted.
@@ -479,8 +477,8 @@ function applyPrimitive(
   }
 
   // C4.3c (R4): TRANSPARENCY — eager impls receive the full values,
-  // channels intact, and read data through the accessors (dataOf/asBits
-  // are identity-or-unwrap). The boundary no longer strips; the
+  // metadata intact, and read data through the accessors (`asBits` and
+  // friends narrow a kind; nothing peels). The boundary no longer strips; the
   // propagation table alone governs channels. This also retires the
   // C1.5 `metaAware` registration mode (it is now everyone's default)
   // and the "register lazy to dodge stripping" idiom — lazy is purely an
@@ -905,7 +903,7 @@ function checkArgType(
       const argType0 = getType(arg);
       if (argType0 !== expected && ctx && depth !== undefined) {
         const result = evaluate(makeExpr(refinementPredicate, [arg]), ctx, depth + 1, depCollector);
-        const p = dataOf(result);
+        const p = result;
         if (p.kind === ValueKind.Bits && p.data === 0n) {
           const name = typeContextName(expected) ?? "<refined>";
           throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}`);
@@ -947,7 +945,7 @@ function checkArgType(
     if (argType === expected) return; // same refined type — predicate already holds
     if (!ctx || depth === undefined) return; // no eval context — best-effort skip
     const result = evaluate(makeExpr(predicate, [arg]), ctx, depth + 1, depCollector);
-    const p = dataOf(result);
+    const p = result;
     if (p.kind === ValueKind.Bits && p.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`);
     }
@@ -986,7 +984,7 @@ function checkArgType(
   const directInstanceof = expected.bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const checkResult = directInstanceof.fn([arg], undefined as any, undefined as any);
-    const checkP = dataOf(checkResult);
+    const checkP = checkResult;
     if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
       throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
     }
@@ -1000,7 +998,7 @@ function checkArgType(
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const checkResult = instanceofMethod.fn([expected, arg], undefined as any, undefined as any);
-      const checkP = dataOf(checkResult);
+      const checkP = checkResult;
       if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
         throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
       }

@@ -18,7 +18,7 @@
 import { formatValue } from "../primitives.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
 import { createTypeSystem } from "../types-std.js";
-import { Value, ValueKind, BitsValue, AllegroError, makePrimitive, makeInt, makeStructure, dataOf } from "../types.js";
+import { Value, ValueKind, BitsValue, AllegroError, makePrimitive, makeInt, makeStructure } from "../types.js";
 
 export function evalSource(source: string): Value | null {
   return runtimeEval(source + "\n").value;
@@ -35,7 +35,7 @@ export function evalStr(source: string): string {
 export function evalNum(source: string): number {
   const val = evalSource(source);
   if (val === null) throw new Error("No value produced");
-  const p = dataOf(val);
+  const p = val;
   if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
   // Handle signed 64-bit
   if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
@@ -47,21 +47,21 @@ export const mathExtension: Extension = {
   name: "math",
   bindings: {
     abs: makePrimitive("abs", (args) => {
-      const p = dataOf(args[0]);
+      const p = args[0];
       if (p.kind !== ValueKind.Bits) throw new AllegroError("abs: expected Bits");
       const v = p.length === 64 && p.data >= 2n ** 63n ? p.data - 2n ** 64n : p.data;
       return makeInt(Number(v < 0n ? -v : v));
     }),
     max: makePrimitive("max", (args) => {
-      const a = dataOf(args[0]) as BitsValue;
-      const b = dataOf(args[1]) as BitsValue;
+      const a = args[0] as BitsValue;
+      const b = args[1] as BitsValue;
       const av = a.length === 64 && a.data >= 2n ** 63n ? a.data - 2n ** 64n : a.data;
       const bv = b.length === 64 && b.data >= 2n ** 63n ? b.data - 2n ** 64n : b.data;
       return av >= bv ? a : b;
     }),
     min: makePrimitive("min", (args) => {
-      const a = dataOf(args[0]) as BitsValue;
-      const b = dataOf(args[1]) as BitsValue;
+      const a = args[0] as BitsValue;
+      const b = args[1] as BitsValue;
       const av = a.length === 64 && a.data >= 2n ** 63n ? a.data - 2n ** 64n : a.data;
       const bv = b.length === 64 && b.data >= 2n ** 63n ? b.data - 2n ** 64n : b.data;
       return av <= bv ? a : b;
@@ -74,7 +74,7 @@ export function evalNumExt(source: string, extensions?: Extension[]): number {
   const result = runtimeEval(source + "\n", undefined, extensions);
   const val = result.value;
   if (val === null) throw new Error("No value produced");
-  const p = dataOf(val);
+  const p = val;
   if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
   if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
   return Number(p.data);

@@ -9,7 +9,7 @@ import { test, eq, throws } from "./harness.js";
 import { evalNum, evalNumExt, makeStructureWith, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
 import { GrammarExtension, registryGet } from "../grammar-ext.js";
-import { dataOf, ValueKind, makeInt, makePrimitive, AllegroError, StructureValue, BitsValue, makeFloat, stringToBits, makeStructure, Value, bitsToFloat, bitsToString } from "../types.js";
+import { ValueKind, makeInt, makePrimitive, AllegroError, StructureValue, BitsValue, makeFloat, stringToBits, makeStructure, Value, bitsToFloat, bitsToString } from "../types.js";
 import { extensionToStructure } from "../runtime.js";
 import { Grammar, parseGrammar } from "../parser.js";
 
@@ -27,7 +27,7 @@ function evalNumGrammar(
   const result = runtimeEval(source + "\n", undefined, extensions, grammarExt);
   const val = result.value;
   if (val === null) throw new Error("No value produced");
-  const p = dataOf(val);
+  const p = val;
   if (p.kind !== ValueKind.Bits) throw new Error(`Expected Bits, got ${p.kind}`);
   if (p.length === 64 && p.data >= 2n ** 63n) return Number(p.data - 2n ** 64n);
   return Number(p.data);
@@ -52,7 +52,7 @@ test("hybrid parser: dot access chained", () => {
 
 test("hybrid parser: dot access with function call", () => {
   const mathCtx = makeStructureWith({ double: makePrimitive("double", (args) => {
-    const p = dataOf(args[0]);
+    const p = args[0];
     if (p.kind !== ValueKind.Bits) throw new AllegroError("double: expected Bits");
     return makeInt(Number(p.data) * 2);
   }) });
@@ -102,7 +102,7 @@ test("allegro grammar: build extension from Allegro code", () => {
   const source = `grammar_build(grammar_add_import(grammar_add_dot_access(grammar_builder())))`;
   const result = runtimeEval(source + "\n");
   const val = result.value!;
-  const p = dataOf(val);
+  const p = val;
   eq(p.kind, ValueKind.Bits, "grammar_build should return a handle");
   const handle = Number((p as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
@@ -114,7 +114,7 @@ test("allegro grammar: extension built from Allegro enables dot access", () => {
   // Step 1: Allegro code builds the grammar extension
   const buildResult = runtimeEval("ext = grammar_build(grammar_add_dot_access(grammar_builder()))\next\n");
   const extVal = buildResult.value!;
-  const extP = dataOf(extVal);
+  const extP = extVal;
   const handle = Number((extP as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
 
@@ -128,7 +128,7 @@ test("allegro grammar: extension built from Allegro enables import", () => {
   // Step 1: Build extension from Allegro
   const buildResult = runtimeEval("ext = grammar_build(grammar_add_import(grammar_builder()))\next\n");
   const extVal = buildResult.value!;
-  const extP = dataOf(extVal);
+  const extP = extVal;
   const handle = Number((extP as BitsValue).data);
   const grammarExt = registryGet(handle) as GrammarExtension;
 
@@ -143,7 +143,7 @@ test("allegro grammar: full pipeline - build, then use dot + import", () => {
 grammar_build(grammar_add_import(grammar_add_dot_access(grammar_builder())))
 `;
   const buildResult = runtimeEval(buildSource);
-  const extP = dataOf(buildResult.value!);
+  const extP = buildResult.value!;
   const grammarExt = registryGet(Number((extP as BitsValue).data)) as GrammarExtension;
 
   // Step 2: Use it to parse a program with import + dot access

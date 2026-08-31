@@ -13,7 +13,7 @@
 // substitution templates.
 // =============================================================================
 
-import { dataOf, getSlotCount, indexGet } from "../slots.js";
+import { getSlotCount, indexGet } from "../slots.js";
 import {
   Grammar, Rule, makeGrammar, addProduction,
   lit, nonterm, seq, alt, rep, opt, regex as ruleRegex,
@@ -625,7 +625,7 @@ function rewriteNonterm(rule: Rule, fromName: string, toName: string): Rule {
  * parse tree carries the label as a tag, enabling dispatch-time extraction.
  */
 function ebnfObjectToRule(v: Value, labels: string[]): Rule {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: expected Context, got ${p.kind}`);
   }
@@ -756,7 +756,7 @@ function getField(ctx: StructureValue, key: string): Value {
 }
 
 function getStringField(ctx: StructureValue, key: string): string {
-  const p = dataOf(getField(ctx, key));
+  const p = getField(ctx, key);
   if (p.kind !== ValueKind.Bits) throw new Error(`EBNF object: field '${key}' not a string`);
   return bitsToString(p as BitsValue);
 }
@@ -764,13 +764,13 @@ function getStringField(ctx: StructureValue, key: string): string {
 function getIntField(ctx: StructureValue, key: string): number {
   const b = ctx.bindings.get(key);
   if (!b?.value) return 0;
-  const p = dataOf(b.value);
+  const p = b.value;
   if (p.kind !== ValueKind.Bits) return 0;
   return Number((p as BitsValue).data);
 }
 
 function getArrayField(ctx: StructureValue, key: string): Value[] {
-  const arr = dataOf(getField(ctx, key));
+  const arr = getField(ctx, key);
   if (arr.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: field '${key}' not an array`);
   }

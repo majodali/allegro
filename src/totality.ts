@@ -11,7 +11,7 @@
 // to `info` severity so adoption is non-breaking. Per-project config promotes
 // them to `error` once a project's source is clean.
 
-import { dataOf, metaReadRaw, getName } from "./slots.js";
+import { metaReadRaw, getName } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ExpressionValue,
   StructureValue, BitsValue,
@@ -67,7 +67,7 @@ function collapseOneFunction(cfn: ComposedFunctionValue): void {
     const cur = getCur();
     if (cur.kind !== ValueKind.Expression) return;
     const e = cur as ExpressionValue;
-    const fn = dataOf(e.fn);
+    const fn = e.fn;
     if (fn.kind !== ValueKind.PrimitiveFunction) return;
     const name = (fn as any).name as string;
     if (name === "type_check") {
@@ -171,11 +171,11 @@ function peelFunctionAst(v: Value): {
   // B-121 C2: this detected a CARRIER by reading `(v as any).primary` — a
   // direct data-plane access hidden behind an `any` cast, which is why the
   // boundary lint never saw it (recorded against B-104's ratchet). The
-  // question is "a function value that carries a type", which `dataOf` and
-  // `metaReadRaw` answer for any kind.
+  // question is "a function value that carries a type", which `metaReadRaw`
+  // answers for any kind.
   {
     const tComp = metaReadRaw(v, "type") as Value | undefined;
-    const prim = dataOf(v);
+    const prim = v;
     if (prim.kind === ValueKind.ComposedFunction) {
       let paramTypeAsts: Value[] = [];
       if (tComp && tComp.kind === ValueKind.Structure) {
@@ -189,7 +189,7 @@ function peelFunctionAst(v: Value): {
     return { cfn: v as ComposedFunctionValue, paramTypeAsts: [] };
   }
   if (v.kind !== ValueKind.Expression) return null;
-  const target = dataOf((v as ExpressionValue).fn);
+  const target = (v as ExpressionValue).fn;
   if (target.kind !== ValueKind.PrimitiveFunction) return null;
   if ((target as any).name !== "typed_function") return null;
   const args = (v as ExpressionValue).args;
@@ -198,7 +198,7 @@ function peelFunctionAst(v: Value): {
   // args[2..2+paramCount-1] = paramTypes, last = returnType.
   const inner = peelFunctionAst(args[0]);
   if (!inner) return null;
-  const paramCountP = dataOf(args[1]);
+  const paramCountP = args[1];
   let paramCount = 0;
   if (paramCountP.kind === ValueKind.Bits) {
     paramCount = Number((paramCountP as BitsValue).data);
@@ -263,20 +263,25 @@ function walkForWhen(
   visited.add(v);
 
   if (v.kind === ValueKind.Expression) {
-    const fn = dataOf((v as ExpressionValue).fn);
+    const fn = (v as ExpressionValue).fn;
     if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "eval_when") {
       // Top of a chain. Flatten by walking else-branch thunks.
       const subject = (v as ExpressionValue).args[0];
       const cases: ChainCase[] = [];
       let cur: Value = v;
       while (cur.kind === ValueKind.Expression) {
-        const cfn = dataOf((cur as ExpressionValue).fn);
+        const cfn = (cur as ExpressionValue).fn;
         if (cfn.kind !== ValueKind.PrimitiveFunction || (cfn as any).name !== "eval_when") break;
-        const args = (cur as ExpressionValue).args;
+        // B-121 C5: annotated because `dataOf`'s declared `Value` return was
+        // acting as an inference barrier here. Without it, narrowing `cur`
+        // inside the loop depends on the assignment `cur = elseFn.body`, which
+        // depends on `args`, which depends on the narrowed `cur` — a cycle TS
+        // reports as TS7022. The annotation states the type the peel implied.
+        const args: Value[] = (cur as ExpressionValue).args;
         if (args.length < 5) break;
         cases.push({ pattern: args[1] });
         // elseFn is a zero-arg ComposedFunction whose body is the rest of the chain.
-        const elseFn = dataOf(args[4]);
+        const elseFn: Value = args[4];
         if (elseFn.kind === ValueKind.ComposedFunction) {
           cur = (elseFn as ComposedFunctionValue).body;
         } else {
@@ -291,14 +296,14 @@ function walkForWhen(
       // when chains. The then branches live inside arg 3 (thenFn body).
       cur = v;
       while (cur.kind === ValueKind.Expression) {
-        const cfn = dataOf((cur as ExpressionValue).fn);
+        const cfn = (cur as ExpressionValue).fn;
         if (cfn.kind !== ValueKind.PrimitiveFunction || (cfn as any).name !== "eval_when") break;
-        const args = (cur as ExpressionValue).args;
-        const thenFn = dataOf(args[3]);
+        const args: Value[] = (cur as ExpressionValue).args;   // see above
+        const thenFn: Value = args[3];
         if (thenFn.kind === ValueKind.ComposedFunction) {
           walkForWhen((thenFn as ComposedFunctionValue).body, visit, visited);
         }
-        const elseFn = dataOf(args[4]);
+        const elseFn: Value = args[4];
         if (elseFn.kind === ValueKind.ComposedFunction) {
           cur = (elseFn as ComposedFunctionValue).body;
         } else break;
@@ -318,7 +323,7 @@ function walkForWhen(
 
 function isWhenNoMatch(v: Value): boolean {
   if (v.kind !== ValueKind.Expression) return false;
-  const fn = dataOf((v as ExpressionValue).fn);
+  const fn = (v as ExpressionValue).fn;
   return fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "when_no_match";
 }
 
@@ -412,17 +417,17 @@ function typeContextName(t: Value): string | null {
   if (t.kind !== ValueKind.Structure) return null;
   const n = getName(t as StructureValue);
   if (!n) return null;
-  const p = dataOf(n);
+  const p = n;
   if (p.kind !== ValueKind.Bits) return null;
   return bitsToString(p as BitsValue);
 }
 
 function hasWildcardOrBinding(cases: ChainCase[]): boolean {
   for (const c of cases) {
-    const p = dataOf(c.pattern);
+    const p = c.pattern;
     // Wildcard marker: `when_wildcard()` expression.
     if (p.kind === ValueKind.Expression) {
-      const fn = dataOf((p as ExpressionValue).fn);
+      const fn = (p as ExpressionValue).fn;
       if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "when_wildcard") return true;
     }
     // Bind-to-name: pattern is a bare Symbol like `is n`. Matches anything.
@@ -750,7 +755,7 @@ function renderTerminationCounterexample(
     return `${bindingName}(${sampleArgs}) → ${bindingName}(${sampleArgs}) [same input passes back]`;
   }
   // HOF edge.
-  const recv = dataOf(first.receiver);
+  const recv = first.receiver;
   const recvDesc = recv.kind === ValueKind.Param
     ? ((recv as any)._name ?? "arr")
     : "<receiver>";
@@ -768,15 +773,15 @@ function renderMetricCounterexample(
   const first = cycleCalls.find((s): s is CallSite & { kind: "direct" } => s.kind === "direct");
   if (!first) return undefined;
   let metricDesc = "<metric>";
-  const mp = dataOf(metric);
+  const mp = metric;
   if (mp.kind === ValueKind.Param) {
     metricDesc = (mp as any)._name ?? `param${(mp as any).position}`;
   } else if (mp.kind === ValueKind.Expression) {
-    const fn = dataOf((mp as ExpressionValue).fn);
+    const fn = (mp as ExpressionValue).fn;
     if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
       metricDesc = `[${(mp as ExpressionValue).args
         .map(a => {
-          const p = dataOf(a);
+          const p = a;
           if (p.kind === ValueKind.Param) return (p as any)._name ?? `param${(p as any).position}`;
           return "_";
         })
@@ -802,14 +807,14 @@ const _HOF_METHODS = new Set(["map", "filter", "reduce"]);
 function matchStdlibHof(
   e: ExpressionValue,
 ): { method: "map" | "filter" | "reduce"; receiver: Value; args: Value[] } | null {
-  const outerFn = dataOf(e.fn);
+  const outerFn = e.fn;
   if (outerFn.kind !== ValueKind.Expression) return null;
-  const dispFn = dataOf((outerFn as ExpressionValue).fn);
+  const dispFn = (outerFn as ExpressionValue).fn;
   if (dispFn.kind !== ValueKind.PrimitiveFunction) return null;
   if ((dispFn as any).name !== "type_dispatch") return null;
   const dispArgs = (outerFn as ExpressionValue).args;
   if (dispArgs.length !== 2) return null;
-  const methodVal = dataOf(dispArgs[1]);
+  const methodVal = dispArgs[1];
   if (methodVal.kind !== ValueKind.Bits) return null;
   const method = bitsToString(methodVal as BitsValue);
   if (!_HOF_METHODS.has(method)) return null;
@@ -831,13 +836,13 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
   seen.add(v);
   if (v.kind === ValueKind.Expression) {
     const e = v as ExpressionValue;
-    const fn = dataOf(e.fn);
+    const fn = e.fn;
     if (fn.kind === ValueKind.Symbol) out.add((fn as any).name);
     // Stage 5: HOF callback positions.
     const hof = matchStdlibHof(e);
     if (hof) {
       for (const a of hof.args) {
-        const ap = dataOf(a);
+        const ap = a;
         if (ap.kind === ValueKind.Symbol) out.add((ap as any).name);
       }
     }
@@ -860,7 +865,7 @@ function findCallsToCycle(
   seen.add(body);
   if (body.kind === ValueKind.Expression) {
     const e = body as ExpressionValue;
-    const fn = dataOf(e.fn);
+    const fn = e.fn;
     if (fn.kind === ValueKind.Symbol) {
       const name = (fn as any).name as string;
       if (cycle.has(name)) out.push({ kind: "direct", callee: name, call: e });
@@ -869,7 +874,7 @@ function findCallsToCycle(
     const hof = matchStdlibHof(e);
     if (hof) {
       for (const a of hof.args) {
-        const ap = dataOf(a);
+        const ap = a;
         if (ap.kind === ValueKind.Symbol) {
           const name = (ap as any).name as string;
           if (cycle.has(name)) {
@@ -892,14 +897,14 @@ function findCallsToCycle(
  *  structural induction). Bare-Param receivers (e.g. `arr.map(self)` on
  *  the function's own array param) are NOT decreasing and fire. */
 function isHofReceiverStructurallySmaller(receiver: Value): boolean {
-  const p = dataOf(receiver);
+  const p = receiver;
   if (p.kind !== ValueKind.Expression) return false;
-  const inner = dataOf((p as ExpressionValue).fn);
+  const inner = (p as ExpressionValue).fn;
   if (inner.kind !== ValueKind.PrimitiveFunction) return false;
   if ((inner as any).name !== "type_dispatch") return false;
   const args = (p as ExpressionValue).args;
   if (args.length !== 2) return false;
-  const recvArg = dataOf(args[0]);
+  const recvArg = args[0];
   // `param.field` shape: dispatch's first arg is a bare Param. The field
   // value is a sub-component by record-structural induction.
   return recvArg.kind === ValueKind.Param;
@@ -908,7 +913,7 @@ function isHofReceiverStructurallySmaller(receiver: Value): boolean {
 /** Explain why an HOF cycle edge doesn't terminate, or null when it does. */
 function whyHofCallNotDecreasing(site: CallSite & { kind: "hof" }): string | null {
   if (isHofReceiverStructurallySmaller(site.receiver)) return null;
-  const recv = dataOf(site.receiver);
+  const recv = site.receiver;
   const recvDesc = recv.kind === ValueKind.Param
     ? `param \`${(recv as any)._name ?? `param${(recv as any).position}`}\``
     : "the receiver";
@@ -1005,7 +1010,7 @@ function checkUserMetric(
 
   // Shape 2: typed_array of params → lexicographic.
   if (metric.kind === ValueKind.Expression) {
-    const fn = dataOf((metric as ExpressionValue).fn);
+    const fn = (metric as ExpressionValue).fn;
     if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
       const meta = (metric as ExpressionValue).args;
       // For each call, walk through meta left-to-right. The metric
@@ -1041,7 +1046,7 @@ function findLexDecreasePosition(meta: Value[], call: ExpressionValue): number {
       if (c.kind !== ValueKind.Param) { earlierStable = false; break; }
       const pos = (c as any).position as number;
       if (pos >= call.args.length) { earlierStable = false; break; }
-      const argP = dataOf(call.args[pos]);
+      const argP = call.args[pos];
       if (argP.kind !== ValueKind.Param || (argP as any).position !== pos) {
         earlierStable = false; break;
       }
@@ -1107,15 +1112,15 @@ function whyNotDecreasing(
  *  literals. */
 function recognizeParamMinusK(v: Value): { pos: number; name: string } | null {
   if (v.kind !== ValueKind.Expression) return null;
-  const fn = dataOf((v as ExpressionValue).fn);
+  const fn = (v as ExpressionValue).fn;
   if (fn.kind !== ValueKind.PrimitiveFunction) return null;
   const fnName = (fn as any).name as string;
   if (fnName !== "bits_sub" && fnName !== "typed_sub") return null;
   const args = (v as ExpressionValue).args;
   if (args.length !== 2) return null;
-  const left = dataOf(args[0]);
+  const left = args[0];
   if (left.kind !== ValueKind.Param) return null;
-  const right = dataOf(args[1]);
+  const right = args[1];
   if (right.kind !== ValueKind.Bits) return null;
   const k = (right as BitsValue).data;
   if (k <= 0n) return null;
@@ -1137,8 +1142,7 @@ function typeHasNonNegativeLowerBound(
 ): boolean {
   if (seen.has(t)) return false;
   seen.add(t);
-  let cur = t;
-  cur = dataOf(cur);
+  let cur: Value = t;
   if (cur.kind === ValueKind.Symbol) {
     const name = (cur as any).name as string;
     const resolved = typeLookup?.(name);
@@ -1156,7 +1160,7 @@ function typeHasNonNegativeLowerBound(
 function collectBoolLiterals(cases: ChainCase[]): Set<boolean> {
   const out = new Set<boolean>();
   for (const c of cases) {
-    const p = dataOf(c.pattern);
+    const p = c.pattern;
     // Bool literals come through typed_function calls / `true`/`false` resolve
     // to MultiValue(Int, {type: Bool}); after PE the raw form is Bits(1)/Bits(0)
     // possibly wrapped in MultiValue with Bool type.

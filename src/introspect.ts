@@ -11,7 +11,7 @@
 // See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { dataOf, metaReadRaw, backingsOf } from "./slots.js";
+import { metaReadRaw, backingsOf } from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, StructureValue, ComposedFunctionValue,
@@ -168,7 +168,7 @@ export function summarizeValue(v: Value): ValueSummary {
         // shape, when the primitive was invoked directly by name). In
         // Standard mode, resolveSymbols wraps primitives as UntypedFunction
         // MultiValues — peel that wrapper before matching.
-        const fnPrim = dataOf(node.fn);
+        const fnPrim = node.fn;
         const fnName = (fnPrim.kind === ValueKind.PrimitiveFunction || fnPrim.kind === ValueKind.Symbol)
           ? fnPrim.name : null;
         if (fnName) {
@@ -230,7 +230,7 @@ export function summarizeValue(v: Value): ValueSummary {
     }
   }
 
-  const kindAtPrimary = dataOf(v).kind;
+  const kindAtPrimary = v.kind;
   const typeName = getTypeName(v);
   // Pull predicate set from the value itself, or — for refined values that
   // didn't go through __construct — synthesise a singleton set from the
@@ -256,7 +256,7 @@ export function summarizeValue(v: Value): ValueSummary {
   // come from the body's `effects_attach` wrapper.
   let inferredEffects: EffectSet | null = null;
   let declaredEffects: EffectSet | null = null;
-  const fnPrim = dataOf(v);
+  const fnPrim = v;
   if (fnPrim.kind === ValueKind.ComposedFunction) {
     inferredEffects = effectsOf(v);
     const wrap = unwrapEffectsAttach(fnPrim as import("./types.js").ComposedFunctionValue);
@@ -269,7 +269,7 @@ export function summarizeValue(v: Value): ValueSummary {
   // D2 roll-up (B-091): a Proof value's transitive law-backing set —
   // what the proof rests on, through the whole combinator chain.
   let restsOn: LawBackingRec[] | undefined;
-  const structPrim = dataOf(v);
+  const structPrim = v;
   if (structPrim.kind === ValueKind.Structure) {
     const backings = backingsOf(structPrim as StructureValue);
     if (backings.length > 0) restsOn = backings;
@@ -322,9 +322,9 @@ function recogniseBoolExpr(expr: Value): ContractSummary | null {
  *  Returns the first single-Param constraint found. Multi-param predicates
  *  return null until Phase D introduces relational tracking. */
 function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
-  const e = dataOf(expr);
+  const e = expr;
   if (e.kind !== ValueKind.Expression) return null;
-  const fn = dataOf(e.fn);
+  const fn = e.fn;
   // Accept Symbol too — when the boolean expr survives without resolveSymbols
   // running (rare; the runtime fast-path normally resolves first).
   if (fn.kind !== ValueKind.PrimitiveFunction && fn.kind !== ValueKind.Symbol) return null;
@@ -334,7 +334,7 @@ function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
   if (fn.name === "typed_and" && e.args.length === 2) {
     const left = recogniseParamBoolExpr(e.args[0]);
     if (left) return left;
-    const rightArg = dataOf(e.args[1]);
+    const rightArg = e.args[1];
     if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
       return recogniseParamBoolExpr(rightArg.body);
     }
@@ -342,8 +342,8 @@ function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
   }
 
   if (e.args.length !== 2) return null;
-  const a = dataOf(e.args[0]);
-  const b = dataOf(e.args[1]);
+  const a = e.args[0];
+  const b = e.args[1];
   let paramName: string | null = null;
   let lit: number | null = null;
   let leftIsParam = false;
@@ -390,7 +390,7 @@ function recogniseParamBoolExpr(expr: Value): ContractSummary | null {
  *  Mirrors refinements.ts asIntLiteral but lives here to avoid widening
  *  that module's export surface for a single use. */
 function asIntLiteral(v: Value): number | null {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) return null;
   if (p.length !== 64) return null;
   const data = p.data;
@@ -405,7 +405,7 @@ function asIntLiteral(v: Value): number | null {
  *  filter). Returns empty set if the value is not a function. */
 function collectParamNames(v: Value): Set<string> {
   const out = new Set<string>();
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.ComposedFunction) {
     for (const param of p.params) {
       if (param._name) out.add(param._name);
@@ -417,7 +417,7 @@ function collectParamNames(v: Value): Set<string> {
 function describeValue(v: Value, kind: ValueKind, typeName: string | null): string {
   switch (kind) {
     case ValueKind.Bits: {
-      const bits = dataOf(v) as BitsValue;
+      const bits = v as BitsValue;
       if (typeName === "String") {
         const s = bitsToString(bits);
         return s.length <= 40 ? `String "${s}"` : `String "${s.slice(0, 37)}..."`;
@@ -438,7 +438,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return `Bits(len=${bits.length})`;
     }
     case ValueKind.Expression: {
-      const ev = dataOf(v) as Value;
+      const ev = v as Value;
       if (ev.kind === ValueKind.Expression) {
         const fn = ev.fn;
         const fnName = fn.kind === ValueKind.PrimitiveFunction ? fn.name :
@@ -449,7 +449,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return "Expression";
     }
     case ValueKind.ComposedFunction: {
-      const cf = dataOf(v).kind === ValueKind.ComposedFunction ? dataOf(v) as ComposedFunctionValue : null;
+      const cf = v.kind === ValueKind.ComposedFunction ? v as ComposedFunctionValue : null;
       if (cf && cf.kind === ValueKind.ComposedFunction) {
         const paramNames = cf.params.map(p => p._name ?? `_${p.position}`).join(", ");
         if (typeName === "Function") return `Function(${paramNames})`;
@@ -458,11 +458,11 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return "ComposedFunction";
     }
     case ValueKind.PrimitiveFunction:
-      return `Primitive <${(dataOf(v) as PrimitiveFunctionValue).name}>`;
+      return `Primitive <${(v as PrimitiveFunctionValue).name}>`;
     case ValueKind.Symbol:
-      return `unresolved Symbol <${(dataOf(v) as { kind: ValueKind.Symbol; name: string }).name}>`;
+      return `unresolved Symbol <${(v as { kind: ValueKind.Symbol; name: string }).name}>`;
     case ValueKind.Structure: {
-      const ctx = dataOf(v) as StructureValue;
+      const ctx = v as StructureValue;
       if ((ctx as any).grammarValue) {
         const chain = (ctx as any).grammarValue.baseChain?.join(" > ") ?? "?";
         return `Grammar (extends ${chain})`;
@@ -475,7 +475,7 @@ function describeValue(v: Value, kind: ValueKind, typeName: string | null): stri
       return "Context";
     }
     case ValueKind.Param:
-      return `Param <${(dataOf(v) as ParamValue)._name ?? "?"}>`;
+      return `Param <${(v as ParamValue)._name ?? "?"}>`;
   }
 }
 

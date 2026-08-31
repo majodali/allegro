@@ -13,7 +13,7 @@ import { createFutureManager } from "../futures.js";
 import { metaReadRaw } from "../slots.js";
 import { formatValue, extractGrammarFragment } from "../primitives.js";
 import { primNames, typeNames } from "./alg-files.js";
-import { Value, ValueKind, BitsValue, StructureValue, dataOf, makeInt, bitsToString, isResolved } from "../types.js";
+import { Value, ValueKind, BitsValue, StructureValue, makeInt, bitsToString, isResolved } from "../types.js";
 import { futureElementType, getType, typeContextName as tsTypeContextName, futureOf, IntType } from "../types-std.js";
 import { ModuleLoader } from "../modules.js";
 import { livenessDispositions } from "../effects.js";
@@ -89,7 +89,7 @@ export async function runAsyncTests(): Promise<void> {
     await fm.waitForAll();
     const y = r1.registry.bindings.get("y");
     eq(y?.isComplete, true, "pass-1 dependent completed after the cross-pass resolution");
-    eq(Number((dataOf(y!.value!) as BitsValue).data), 1, "y = 0 + 1 through the minting pass's registry");
+    eq(Number((y!.value! as BitsValue).data), 1, "y = 0 + 1 through the minting pass's registry");
   });
 
   await asyncTest("B-028 F1: a rejected promise settles as an ERROR VALUE — never a throw (D11)", async () => {
@@ -102,7 +102,7 @@ export async function runAsyncTests(): Promise<void> {
     eq(cell?.isComplete, true, "rejection completed the cell");
     const err = metaReadRaw(cell!.value!, "error");
     eq(err !== undefined, true, "cell holds an error-channel value");
-    eq(bitsToString(dataOf(err!) as BitsValue).includes("boom"), true, "rejection reason preserved");
+    eq(bitsToString(err! as BitsValue).includes("boom"), true, "rejection reason preserved");
   });
 
   await asyncTest("B-028 F1 (D33): future cells are WRITE-ONCE — a second phase resolution throws", async () => {
@@ -113,7 +113,7 @@ export async function runAsyncTests(): Promise<void> {
     try { applyPhase(registry, evalCtx, new Map([["cfg", makeInt(8)]])); }
     catch (e: any) { threw = e.message; }
     eq(threw.includes("write-once"), true, `second resolution refused: ${threw}`);
-    eq(Number((dataOf(evalCtx.bindings.get("cfg")!.value!) as BitsValue).data), 7, "first resolution stands");
+    eq(Number((evalCtx.bindings.get("cfg")!.value! as BitsValue).data), 7, "first resolution stands");
   });
 
   await asyncTest("B-028 F1 (CE-R8/D32): a FAILING invariant over a pending field errors — never a mis-tagged value", async () => {
@@ -144,7 +144,7 @@ export async function runAsyncTests(): Promise<void> {
     await fm2.waitForAll();
     const vb = r2.registry.bindings.get("v");
     eq(vb?.isComplete, true, "scalar refined construction completed");
-    eq(Number((dataOf(vb!.value!) as BitsValue).data), 0, "delay resolved to 0, predicate 0 >= 0 held");
+    eq(Number((vb!.value! as BitsValue).data), 0, "delay resolved to 0, predicate 0 >= 0 held");
   });
 
   // == B-028 F2: typed futures + detection ==
@@ -185,7 +185,7 @@ export async function runAsyncTests(): Promise<void> {
     const fm3 = createFutureManager();
     const r3 = runtimeEval("NonNeg = Int & _ >= 0\nw: NonNeg = delay(5)\n", undefined, [typeExt], undefined, true, fm3);
     await fm3.waitForAll();
-    eq(Number((dataOf(r3.registry.bindings.get("w")!.value!) as BitsValue).data), 0, "type_check re-fired on resolution");
+    eq(Number((r3.registry.bindings.get("w")!.value! as BitsValue).data), 0, "type_check re-fired on resolution");
   });
 
   await asyncTest("B-028 F2 (CE-R4): is_resolved answers the scheduling question and pays for it (`sched`)", async () => {
@@ -386,7 +386,7 @@ export async function runAsyncTests(): Promise<void> {
     eq(xb?.isComplete, true, "the dependent completed (the pre-F4 cascade THREW here and killed the host)");
     const err = metaReadRaw(xb!.value!, "error");
     eq(err !== undefined, true, "the projection completed as the construction error (viral discipline)");
-    eq(bitsToString(dataOf(err!) as BitsValue).includes("refinement check failed"), true,
+    eq(bitsToString(err! as BitsValue).includes("refinement check failed"), true,
       "the error is the CONSTRUCTION's, propagated — not a fresh dispatch error");
   });
 

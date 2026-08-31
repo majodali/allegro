@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { evalSource, Extension } from "./runtime.js";
-import { dataOf, cloneMeta, setName, setFallbackMember, isBareBindingName, isFutureBindingName, metaOf, carryMeta} from "./slots.js";
+import { cloneMeta, setName, setFallbackMember, isBareBindingName, isFutureBindingName, metaOf, carryMeta} from "./slots.js";
 import { remapParams } from "./evaluator.js";
 import { Value, ValueKind, StructureValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeStructure, makeExpr, withMeta, stringToBits, bitsToString, AllegroError} from "./types.js";
 import { withType } from "./types-std.js";
@@ -135,7 +135,7 @@ export function buildModuleObject(
   // Skip self-referential bindings (recursive functions).
   const capturedBindings: Record<string, Value> = {};
   for (const [key, value] of Object.entries(allBindings)) {
-    const p = dataOf(value);
+    const p = value;
     if (p.kind === ValueKind.ComposedFunction) {
       // Exclude this binding's own name to prevent infinite recursion
       const selfExclude = new Set([key]);

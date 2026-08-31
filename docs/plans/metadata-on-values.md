@@ -1,6 +1,6 @@
 # Metadata on values — delete the carrier, build values with their metadata
 
-> Status: **active** — §6 ruled 2026-08; **C1, C2, C4 and C6 landed**; C5 and C7 outstanding.
+> Status: **active** — §6 ruled 2026-08; **C1, C2, C4, C5 and C6 landed**; C7 outstanding.
 > Owner: **B-121**. Ruled at **D48(b)(c)** (B-108, 2026-08); the *whether*
 > is settled, this plan is the *how*.
 > Outcome (K-007): every representation kind carries its own metadata field,
@@ -453,6 +453,49 @@ vocabulary describing where arguments come from rather than what the code does.
 argument — the map case is two calls and the second is forgettable — not a
 logical one.
 
+### 5.1g C5: deleting the peel, and why it was safe in a way the survey was not
+
+**849 calls removed across 32 files**, plus the definition, the `slots.ts`
+re-export and every import specifier. `dataOf` is gone and the retired-name
+lint — which already forbade `primaryOf` — now forbids both.
+
+**The safety argument is different in kind from C2's**, and worth stating
+because it is what justified doing 849 sites in one pass. `dataOf` was
+*provably the identity function* after C4: its whole body was `return v`. So
+removing a call cannot change runtime behaviour, whatever the call site does.
+Only the STATIC types move — and every way they can move is a typecheck error,
+not a silent failure. That is the opposite of C2, where the risk was precisely
+that checks stopped firing without saying so.
+
+**What the type shift actually surfaced**, all caught by `tsc`:
+
+| finding | sites | what it was |
+|---|---|---|
+| precedence | 2 | `dataOf(a ?? b) as BitsValue` → `a ?? b as BitsValue`, which binds the cast to `b` alone. Removing a call wrapper re-binds a following `as` |
+| inference barrier | 4 | `dataOf`'s declared `Value` return was breaking a control-flow cycle in `walkForWhen`: narrowing `cur` in the loop depends on `cur = elseFn.body`, which depends on `args`, which depends on the narrowed `cur`. TS7022. Fixed by annotating what the peel implied |
+| self-assignment | 1 | `cur = dataOf(cur)` became `cur = cur` |
+
+The precedence class was found by re-scanning HEAD for the shape rather than
+by waiting for the compiler: *a `dataOf` call whose argument holds a
+top-level low-precedence operator and which is followed by `.`, `[` or `as`*.
+It reported exactly two, both already known — a negative result that bounded
+the class instead of leaving it open.
+
+**Two assertions the deletion disarmed, which is the C4 lesson repeating.**
+`eq(dataOf(p) === p, …)` reduces to `eq(p === p, …)` — a line that reads like a
+check and tests nothing. The transform CREATED them, so this is not a case of
+spotting an old hazard but of a mechanical edit manufacturing one. Both are
+retired: what they asserted (this value is not wrapped) is structural truth
+now, and the behavioural line beside each already carries it.
+
+**The B-128 tension, recorded rather than resolved.** Deleting the data-plane
+accessor runs against "police the planes with interfaces": the data plane
+loses its named reader. The counter-argument is that there is no longer a
+projection to name — a value's data IS the value, so an identity function
+would advertise a plane boundary that does not exist, which is its own kind of
+misleading. Worth revisiting when B-128 designs the enforcement, because that
+work may want a data-plane accessor back for reasons this chunk did not weigh.
+
 ### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
 
 `kind === ValueKind.Structure` appears 117 times and `!==` 68 more. Today a
@@ -517,7 +560,7 @@ separate optimisation below this choice and is out of scope.
 | **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier, **preceded by the 14 kind-test fixes the survey (§5.1b) enumerates** and `carryMeta` at the seven clone sites. Carriers stop being created; `dataOf` still compiles and returns `v` | **DONE 2026-08** in three gated steps after a first attempt was backed out at the gate (§5.1a). Suite **1202/1202**; typecheck clean. Steps and the two classes the survey could not see: §5.1c |
 | **C3** | The carrier's re-wrap moves into `evaluate` as one uniform carry (§4.2); the three carrier arms are deleted | Suite green; PE fixtures are the oracle for metadata surviving evaluation |
 | **C4** | Delete `primary`, `isCarrier`, `CarrierStructure`, `newCarrierStructure`, W1/W5 and the walker's carrier branch. `concepts.md` §10 leaves the spine | **DONE 2026-08.** Every count at zero; §6 ruling 3 applied — §5.1e records the review and the coverage regression it found |
-| **C5** | Delete `dataOf` (903) and its call sites — mechanical, counts as the completion test | Counts to zero |
+| **C5** | Delete `dataOf` and its call sites — mechanical, counts as the completion test | **DONE 2026-08.** **849** calls removed across 32 files; the count is zero and the retired-name lint now forbids the identifier. §5.1g |
 | **C6** | One operation and two conveniences (§3.2): the factories take metadata, the 12 create-then-attach pairs collapse — **PE Rule 1 first** — the 10 derive sites become stamps, and `withMetadata` is renamed `withMeta` to join the `*Meta` family | **DONE 2026-08.** Suite green; `withMetadata` at zero. §5.1f |
 | **C7** | The in-place rule (§3.4) stated where `writeShape` and the builder idiom live; `concepts.md` §10/§11 updated and their deltas closed | doc-ref-lint; spine delta rows read `—` |
 
@@ -525,7 +568,7 @@ separate optimisation below this choice and is out of scope.
 delta rows it claims read `—`, and the renames carry counts —
 `primary` 196 → 0 (C4), `isCarrier` 14 → 0 (C4),
 `CarrierStructure` 24 → 0 (C4), `withMetadata` 69 → 0 (C6, renamed `withMeta`),
-`dataOf` 903 → 0 (C5, outstanding).
+`dataOf` 903 → 0 (C5).
 
 *Revised at C6*: the completion test read `withMetadata` → 0 because the plan
 then expected three replacement names. §3.2's correction leaves one operation,

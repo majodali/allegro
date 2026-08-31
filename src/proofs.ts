@@ -18,7 +18,7 @@
 // constructors; they reuse this same failed-Proof shape so `checkProofs`
 // stays the single surfacing point.
 
-import { dataOf, metaReadRaw, SLOT_KEYS } from "./slots.js";
+import { metaReadRaw, SLOT_KEYS } from "./slots.js";
 import {
   Value, ValueKind, StructureValue, BitsValue,
   bitsToString,
@@ -40,31 +40,31 @@ export interface ProofFinding {
 /** Is this evaluated value a Proof that did NOT discharge? */
 export function isFailedProof(v: Value | undefined): boolean {
   if (!v) return false;
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) return false;
   if (getTypeName(v) !== "Proof") return false;
   const d = metaReadRaw(p, "discharged");
   if (!d) return false;
-  const dp = dataOf(d);
+  const dp = d;
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 0n;
 }
 
 /** Is this a discharged (valid) Proof? */
 export function isDischargedProof(v: Value | undefined): boolean {
   if (!v) return false;
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) return false;
   if (getTypeName(v) !== "Proof") return false;
   const d = metaReadRaw(p, "discharged");
   if (!d) return false;
-  const dp = dataOf(d);
+  const dp = d;
   return dp.kind === ValueKind.Bits && (dp as BitsValue).data === 1n;
 }
 
 function ctxString(ctx: StructureValue, key: string): string | undefined {
   const b = ctx.bindings.get(key)?.value;
   if (!b) return undefined;
-  const p = dataOf(b);
+  const p = b;
   return p.kind === ValueKind.Bits ? bitsToString(p as BitsValue) : undefined;
 }
 
@@ -74,7 +74,7 @@ export function describeFailedProof(
   v: Value,
   binding: string | null,
 ): ProofFinding {
-  const ctx = dataOf(v) as StructureValue;
+  const ctx = v as StructureValue;
   return {
     binding,
     proposition:    ctxString(ctx, SLOT_KEYS.proposition) ?? "<proposition>",

@@ -24,7 +24,7 @@
 // syntax.
 // =============================================================================
 
-import { dataOf, metaOf, cloneMeta, installFieldMerge, registerMetaField } from "./slots.js";
+import { metaOf, cloneMeta, installFieldMerge, registerMetaField } from "./slots.js";
 import {
   Value, ValueKind, ComposedFunctionValue, StructureValue,
   withMeta, makeStructure,
@@ -97,12 +97,12 @@ export function unwrapEffectsAttach(fn: import("./types.js").ComposedFunctionVal
  *  the analyzer treats that as "no declaration". */
 function extractLabelArray(v: Value): EffectSet {
   const out: EffectSet = new Set();
-  const e = dataOf(v);
+  const e = v;
   if (e.kind !== ValueKind.Expression) return out;
-  const fn = dataOf(e.fn);
+  const fn = e.fn;
   if (fn.kind !== ValueKind.PrimitiveFunction || fn.name !== "typed_array") return out;
   for (const a of e.args) {
-    const p = dataOf(a);
+    const p = a;
     if (p.kind === ValueKind.Symbol) out.add(p.name);
     // Bits-encoded string literals would be `String "label"` — also accept.
     // (Not currently emitted by the grammar, but cheap to support.)
@@ -156,10 +156,10 @@ export function effectDifference(inferred: EffectSet, declared: EffectSet): Effe
  *  after. Slice 2 Stage C3: covers polymorphic functions whose declared
  *  effect sets need to be checked at compile time, not deferred to a callsite. */
 function asFunction(v: Value): ComposedFunctionValue | null {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.ComposedFunction) return p;
   if (p.kind === ValueKind.Expression) {
-    const target = dataOf(p.fn);
+    const target = p.fn;
     if (target.kind === ValueKind.PrimitiveFunction
         && (target as any).name === "typed_function"
         && p.args.length >= 1) {
@@ -296,7 +296,7 @@ export function effectsOf(v: Value): EffectSet | null {
   // C4.3b: metaOf is total — flattened Contexts answer directly.
   const c = metaOf(v).get(EFFECTS_FIELD);
   if (c) return decodeEffects(c);
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.ComposedFunction) {
     const stash = (p as any).inferredEffects as EffectSet | undefined;
     if (stash) return stash;

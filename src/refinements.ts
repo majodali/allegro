@@ -20,7 +20,7 @@
 // See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { dataOf, cloneMeta, metaOf, metaReadRaw, typeShape, getAbstractDomain, registerMetaField } from "./slots.js";
+import { cloneMeta, metaOf, metaReadRaw, typeShape, getAbstractDomain, registerMetaField } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue,
   withMeta, makeStructure, makeInt, isResolved,
@@ -149,7 +149,7 @@ export function formatDomain(d: AbstractDomain): string {
  * use.
  */
 export function domainFromPredicate(predicate: Value): AbstractDomain {
-  const p = dataOf(predicate);
+  const p = predicate;
   if (p.kind !== ValueKind.ComposedFunction) {
     return { kind: "opaque", predicate };
   }
@@ -164,9 +164,9 @@ export function domainFromPredicate(predicate: Value): AbstractDomain {
  *  abstract domain. Returns null if the shape isn't recognised. */
 function interpretPredicateExpr(expr: Value, paramId: unknown): AbstractDomain | null {
   // Strip MultiValue wrapping (typed_and etc. may wrap results).
-  const e = dataOf(expr);
+  const e = expr;
   if (e.kind !== ValueKind.Expression) return null;
-  const fn = dataOf(e.fn);
+  const fn = e.fn;
   if (fn.kind !== ValueKind.PrimitiveFunction) return null;
 
   // Conjunction — combine the two sides.
@@ -176,7 +176,7 @@ function interpretPredicateExpr(expr: Value, paramId: unknown): AbstractDomain |
   if (fn.name === "typed_and") {
     if (e.args.length !== 2) return null;
     const leftDom  = interpretPredicateExpr(e.args[0], paramId);
-    const rightArg = dataOf(e.args[1]);
+    const rightArg = e.args[1];
     let rightDom: AbstractDomain | null = null;
     if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
       rightDom = interpretPredicateExpr(rightArg.body, paramId);
@@ -232,12 +232,12 @@ function recogniseComparison(
 }
 
 function isParam(v: Value, paramId: unknown): boolean {
-  const p = dataOf(v);
+  const p = v;
   return p.kind === ValueKind.Param && (p as any) === paramId;
 }
 
 function asIntLiteral(v: Value): number | null {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) return null;
   const b = p as BitsValue;
   if (b.length !== 64) return null;
@@ -904,9 +904,9 @@ function collectNarrowing(
   source: PredicateSource,
   out: Map<string, PredicateSet>,
 ): void {
-  const e = dataOf(expr);
+  const e = expr;
   if (e.kind !== ValueKind.Expression) return;
-  const fn = dataOf(e.fn);
+  const fn = e.fn;
   if (fn.kind !== ValueKind.PrimitiveFunction) return;
 
   // Conjunction — `cond1 && cond2`.
@@ -915,7 +915,7 @@ function collectNarrowing(
   if (fn.name === "typed_and" && polarity === true) {
     if (e.args.length !== 2) return;
     collectNarrowing(e.args[0], true, source, out);
-    const rightArg = dataOf(e.args[1]);
+    const rightArg = e.args[1];
     if (rightArg.kind === ValueKind.ComposedFunction && rightArg.params.length === 0) {
       collectNarrowing(rightArg.body, true, source, out);
     } else {
@@ -926,8 +926,8 @@ function collectNarrowing(
 
   // Comparison — find which side is a Symbol and which is a literal.
   if (e.args.length !== 2) return;
-  const left = dataOf(e.args[0]);
-  const right = dataOf(e.args[1]);
+  const left = e.args[0];
+  const right = e.args[1];
   let symbolArg: Value | null = null;
   let literalArg: Value | null = null;
   let opOrder: "sym-lit" | "lit-sym" | null = null;
@@ -961,7 +961,7 @@ function collectNarrowing(
   }
   if (!dom) return;
 
-  const symPrim = dataOf(symbolArg);
+  const symPrim = symbolArg;
   if (symPrim.kind !== ValueKind.Symbol) return;
   const name = symPrim.name;
 

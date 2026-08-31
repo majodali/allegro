@@ -17,7 +17,7 @@ import {
   effectsOf, withEffects,
   EffectSet,
 } from "../effects.js";
-import { Value, dataOf, makeParam, BitsValue, ValueKind, bitsToString, makeInt } from "../types.js";
+import { Value, makeParam, BitsValue, ValueKind, bitsToString, makeInt } from "../types.js";
 import { summarizeValue as _summarizeValueChunk3, summarizeValue } from "../introspect.js";
 import { formatDomain, intersectDomains, joinDomains, impliesDomain, PredicateSet, entailsPredicate } from "../refinements.js";
 import { pureEffect, opaqueEffect } from "../types-std.js";
@@ -53,7 +53,7 @@ test("Phase D1: pure function has empty inferred effect set", () => {
   const src = `f(x) => x + 1\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("f")!.value as Value;
-  const fnP = dataOf(fn) as ComposedFunctionValue;
+  const fnP = fn as ComposedFunctionValue;
   const inferred = inferredEffectsOf(fnP);
   eq(inferred.size, 0, "no effects from arithmetic");
 });
@@ -65,7 +65,7 @@ test("Phase D1: function calling print infers io", () => {
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("f")!.value as Value;
-  const fnP = dataOf(fn) as ComposedFunctionValue;
+  const fnP = fn as ComposedFunctionValue;
   const inferred = inferredEffectsOf(fnP);
   eq(inferred.has("io"), true, `expected io inferred, got: ${[...inferred].join(",")}`);
 });
@@ -136,7 +136,7 @@ test("Phase D1: unwrapEffectsAttach extracts declared label set", () => {
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("f")!.value!;
-  const fnP = dataOf(fn) as ComposedFunctionValue;
+  const fnP = fn as ComposedFunctionValue;
   const wrap = unwrapEffectsAttach(fnP);
   eq(wrap !== null, true, "expected effects_attach wrapper");
   if (wrap) {
@@ -324,7 +324,7 @@ test("Phase D1.2: declared and inferred coexist on function value", () => {
   const inferred = inferredEffectsOf(fn);
   eq(inferred.has("io"), true);
   // Declared set on the body — io from the effects_attach metadata.
-  const fnP = dataOf(fn) as ComposedFunctionValue;
+  const fnP = fn as ComposedFunctionValue;
   const wrap = unwrapEffectsAttach(fnP);
   eq(wrap !== null, true);
   if (wrap) eq(wrap.declared.has("io"), true);
@@ -361,7 +361,7 @@ sq(x) =>
 pure_caller(sq)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("Stage A: f: pure rejects a function that uses print", () => {
@@ -393,7 +393,7 @@ greet(name) =>
 any_caller(greet)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("Stage A: x: pure binding accepts a pure function", () => {
@@ -405,7 +405,7 @@ y: pure = sq
 42
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("Stage A: x: pure binding rejects an io function", () => {
@@ -431,7 +431,7 @@ test("Stage B: unbounded function-typed param → opaque inferred", () => {
 caller
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("caller")!.value!);
+  const fn = evalCtx.bindings.get("caller")!.value!;
   eq(fn.kind, ValueKind.ComposedFunction);
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
@@ -447,7 +447,7 @@ test("Stage B: f: pure bound → pure inferred", () => {
 pure_caller
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("pure_caller")!.value!);
+  const fn = evalCtx.bindings.get("pure_caller")!.value!;
   eq(fn.kind, ValueKind.ComposedFunction);
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
@@ -464,7 +464,7 @@ test("Stage B (F2): typed_function stamps Param.effectBound from effectBound", (
 bounded
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("bounded")!.value!);
+  const fn = evalCtx.bindings.get("bounded")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const p = fn.params[0];
     eq(p.effectBound !== undefined, true);
@@ -518,7 +518,7 @@ test("Stage C1: id[T](x: T): T parses and runs", () => {
   // Explicit type-variable declaration. Should behave identically to the
   // auto-promoted form for now (Stage C2 will introduce kind-based dispatch).
   const result = evalStd(`id[T](x: T): T => x\nid(42)`);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("Stage C1: f[e: Effect] declared, function call works", () => {
@@ -526,20 +526,20 @@ test("Stage C1: f[e: Effect] declared, function call works", () => {
   // unification is Stage C2. The function still runs end-to-end.
   const result = evalStd(`apply[e: Effect](g: e, x: Int): Int => g(x)
 apply((x: Int): Int => x * 2, 21)`);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("Stage C1: multi-variable generic params parse", () => {
   const result = evalStd(`pair[T, U](x: T, y: U): T => x
 pair(7, "hello")`);
-  eq(Number((dataOf(result!) as BitsValue).data), 7);
+  eq(Number((result! as BitsValue).data), 7);
 });
 
 test("Stage C1: auto-promoted type variable still works (no decl)", () => {
   // Existing unannotated mechanism — `T` in `x: T` is auto-promoted as a
   // type variable. Generic-param decl is opt-in for clarity.
   const result = evalStd(`id(x: T): T => x\nid(99)`);
-  eq(Number((dataOf(result!) as BitsValue).data), 99);
+  eq(Number((result! as BitsValue).data), 99);
 });
 
 test("Stage C1: genericParams metadata stamped on the underlying ComposedFunction", () => {
@@ -550,7 +550,7 @@ test("Stage C1: genericParams metadata stamped on the underlying ComposedFunctio
   const src = `id[T, e: Effect](x: T): T => x\nid`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const fn = evalCtx.bindings.get("id")!.value!;
-  const cFn = dataOf(fn);
+  const cFn = fn;
   const meta = (cFn as any).genericParams;
   eq(Array.isArray(meta), true);
   if (Array.isArray(meta)) {
@@ -566,7 +566,7 @@ test("Stage C1: genericParams metadata stamped on the underlying ComposedFunctio
 test("Stage C1: export NAME[generic_decl](...) parses", () => {
   // Make sure the generic-decl path also works through the export grammar.
   const result = evalStd(`export id[T](x: T): T => x\nid(123)`);
-  eq(Number((dataOf(result!) as BitsValue).data), 123);
+  eq(Number((result! as BitsValue).data), 123);
 });
 
 // --- Phase D1 Slice 2 Stage C2: effect-variable unification at call sites ---
@@ -578,7 +578,7 @@ test("C7.2c: effect-variable params carry the declared effectVar reference", () 
   // side table and `__effectvar:` marker labels are retired.
   const src = `apply[e: Effect](g: e, x: Int): Int => g(x)\napply`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("apply")!.value!);
+  const fn = evalCtx.bindings.get("apply")!.value!;
   eq((fn as any).__effectVarParams === undefined, true);
   if (fn.kind === ValueKind.ComposedFunction) {
     eq((fn.params[0] as any).effectVar, "e");
@@ -599,7 +599,7 @@ caller
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
-  const fn = dataOf(evalCtx.bindings.get("caller")!.value!);
+  const fn = evalCtx.bindings.get("caller")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.size, 0, "expected pure inferred from pure-callback resolution");
@@ -616,7 +616,7 @@ caller
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
-  const fn = dataOf(evalCtx.bindings.get("caller")!.value!);
+  const fn = evalCtx.bindings.get("caller")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.has("io"), true, "expected io propagated from print callback");
@@ -633,7 +633,7 @@ forwarder
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
-  const fn = dataOf(evalCtx.bindings.get("forwarder")!.value!);
+  const fn = evalCtx.bindings.get("forwarder")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), true);
@@ -650,7 +650,7 @@ forwarder
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
-  const fn = dataOf(evalCtx.bindings.get("forwarder")!.value!);
+  const fn = evalCtx.bindings.get("forwarder")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), false, "expected precise pure, not opaque");
@@ -671,7 +671,7 @@ io_then_pure(x: Int) =>
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
-  const fn = dataOf(evalCtx.bindings.get("io_then_pure")!.value!);
+  const fn = evalCtx.bindings.get("io_then_pure")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.has("io"), true, `expected io from g1, got: ${[...inferred].join(",")}`);
@@ -689,7 +689,7 @@ pure_then_io(x: Int) =>
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
-  const fn = dataOf(evalCtx.bindings.get("pure_then_io")!.value!);
+  const fn = evalCtx.bindings.get("pure_then_io")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.has("io"), true);
@@ -707,7 +707,7 @@ twice_io(x: Int) =>
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const lookup = (n: string) => evalCtx.bindings.get(n)?.value;
-  const fn = dataOf(evalCtx.bindings.get("twice_io")!.value!);
+  const fn = evalCtx.bindings.get("twice_io")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.has("io"), true);
@@ -720,7 +720,7 @@ test("Stage C3: typed_amp(pure, opaque) returns opaque (effect lattice top)", ()
   const src = `result = pure & opaque\nresult\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const v = evalCtx.bindings.get("result")!.value!;
-  const p = dataOf(v);
+  const p = v;
   eq(p.kind, ValueKind.Structure);
   if (p.kind === ValueKind.Structure) {
     const name = getName(p);
@@ -732,7 +732,7 @@ test("Stage C3: typed_amp(pure, pure) returns pure (idempotence at value level)"
   const src = `result = pure & pure\nresult\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const v = evalCtx.bindings.get("result")!.value!;
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.Structure) {
     const name = getName(p);
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "pure");
@@ -759,7 +759,7 @@ test("Stage C3: auto-promotion (no [e: Effect] decl) yields opaque, not silent z
   // predicates, so the walker's Param-call branch falls through to opaque.
   const src = `forwarder(f, x: Int): Int => f(x)\nforwarder\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("forwarder")!.value!);
+  const fn = evalCtx.bindings.get("forwarder")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), true,
@@ -784,8 +784,8 @@ auto_caller(f, x: Int): Int =>
   apply_auto(f, x)
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const ann = dataOf(evalCtx.bindings.get("ann_caller")!.value!);
-  const auto = dataOf(evalCtx.bindings.get("auto_caller")!.value!);
+  const ann = evalCtx.bindings.get("ann_caller")!.value!;
+  const auto = evalCtx.bindings.get("auto_caller")!.value!;
   if (ann.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(ann);
     eq(inferred.has("opaque"), false,
@@ -857,7 +857,7 @@ test("Stage D (F2): param_effects_attach stamps Param.effectBound with effect bo
 apply_pure
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("apply_pure")!.value!);
+  const fn = evalCtx.bindings.get("apply_pure")!.value!;
   eq(fn.kind, ValueKind.ComposedFunction);
   if (fn.kind === ValueKind.ComposedFunction) {
     const gBound = (fn.params[0] as any).effectBound as Set<string> | undefined;
@@ -910,7 +910,7 @@ test("Stage D: opaque-bound param leaves predicates unset (universal)", () => {
 forwarder
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("forwarder")!.value!);
+  const fn = evalCtx.bindings.get("forwarder")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const bound = (fn.params[0] as any).effectBound;
     eq(bound === undefined, true, "opaque should not stamp effectBound");
@@ -927,7 +927,7 @@ test("Stage D: walker reads Surface C bound and propagates effects to caller", (
 apply_pure
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("apply_pure")!.value!);
+  const fn = evalCtx.bindings.get("apply_pure")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const inferred = inferredEffectsOf(fn);
     eq(inferred.has("opaque"), false, `Surface C should give precise pure, got: ${[...inferred].join(",")}`);
@@ -943,7 +943,7 @@ test("Stage D (F2): multiple param_effects markers stamp Param.effectBound indep
 pipe
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("pipe")!.value!);
+  const fn = evalCtx.bindings.get("pipe")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const fBound = (fn.params[0] as any).effectBound as Set<string> | undefined;
     const gBound = (fn.params[1] as any).effectBound as Set<string> | undefined;
@@ -968,7 +968,7 @@ apply1(f: (Int) => Int, x: Int): Int => f(x)
 apply1(inc, 41)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("Stage E: multi-param function-type annotation accepts matching arg", () => {
@@ -977,7 +977,7 @@ apply2(f: (Int, Int) => Int, a: Int, b: Int): Int => f(a, b)
 apply2(add, 3, 4)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 7);
+  eq(Number((result! as BitsValue).data), 7);
 });
 
 test("Stage E: zero-param function-type annotation works", () => {
@@ -986,7 +986,7 @@ run(f: () => Int): Int => f()
 run(get_99)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 99);
+  eq(Number((result! as BitsValue).data), 99);
 });
 
 test("Stage E: curried function-type return parses right-recursively", () => {
@@ -1000,7 +1000,7 @@ make_adder(n: Int): (Int) => Int =>
 apply_curried(make_adder, 3, 4)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 7);
+  eq(Number((result! as BitsValue).data), 7);
 });
 
 test("Stage E: function-type as binding annotation accepts matching value", () => {
@@ -1009,7 +1009,7 @@ y: (Int) => Int = id_int
 y(42)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 42);
+  eq(Number((result! as BitsValue).data), 42);
 });
 
 test("Stage E: function-type rejects non-function arg at call site", () => {
@@ -1033,7 +1033,7 @@ t
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const v = evalCtx.bindings.get("t")!.value!;
-  const p = dataOf(v);
+  const p = v;
   eq(p.kind, ValueKind.Structure);
   if (p.kind === ValueKind.Structure) {
     const name = getName(p);
@@ -1047,7 +1047,7 @@ t
 `;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
   const v = evalCtx.bindings.get("t")!.value!;
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.Structure) {
     const name = getName(p);
     eq(name?.kind === ValueKind.Bits ? bitsToString(name as BitsValue) : null, "Function");
@@ -1062,7 +1062,7 @@ fns: Array[(Int) => Int] = [inc, dbl]
 fns[0](5) + fns[1](5)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 16);
+  eq(Number((result! as BitsValue).data), 16);
 });
 
 test("Stage E: function-type compatible with return-type annotation", () => {
@@ -1074,7 +1074,7 @@ add5 = make_adder(5)
 add5(10)
 `;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 15);
+  eq(Number((result! as BitsValue).data), 15);
 });
 
 // --- Phase D1 Slice 2 Stage F1: effects-as-component substrate (PE-driven) ---
@@ -1180,7 +1180,7 @@ test("Stage F1: empty effects on a value with no prior set is a no-op", () => {
 test("Stage F2: Param.effectBound carries Surface A pure annotation", () => {
   const src = `bounded(f: pure): Int => f(0)\nbounded\n`;
   const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
-  const fn = dataOf(evalCtx.bindings.get("bounded")!.value!);
+  const fn = evalCtx.bindings.get("bounded")!.value!;
   if (fn.kind === ValueKind.ComposedFunction) {
     const bound = (fn.params[0] as any).effectBound;
     eq(bound !== undefined, true, "f should carry effectBound");
@@ -1316,7 +1316,7 @@ test("Stage F3a: pure primitives still fold at compile time", () => {
   // precompile — only effectful primitives defer.
   const src = `sq(x: Int): Int => x * x\nsq(7)\n`;
   const result = evalStd(src);
-  eq(Number((dataOf(result!) as BitsValue).data), 49);
+  eq(Number((result! as BitsValue).data), 49);
 });
 
 test("Stage F3a: deferred residual carries effects component", () => {
@@ -1416,7 +1416,7 @@ f
   // f returns the inline lambda when called; for direct verification call
   // f() and check the returned lambda's effects component.
   const f = evalCtx.bindings.get("f")!.value!;
-  const fnPrim = dataOf(f);
+  const fnPrim = f;
   if (fnPrim.kind === ValueKind.ComposedFunction) {
     // f is pure (returns a function value, doesn't fire io itself).
     // But the lambda it returns carries io. f's inferredEffects is none;

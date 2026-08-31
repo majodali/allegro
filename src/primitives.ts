@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { dataOf, getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, isMetaSlotKey, carryMeta} from "./slots.js";
+import { getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, isMetaSlotKey, carryMeta} from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue, ComposedFunctionValue,
@@ -39,7 +39,7 @@ const INFIX_OF_PRIM = new Map<string, string>([
 
 export function renderExprSource(v: Value, depth: number = 0): string {
   if (depth > 24) return "…";
-  const d = dataOf(v);
+  const d = v;
   switch (d.kind) {
     case ValueKind.Symbol:
       return d.name;
@@ -49,11 +49,11 @@ export function renderExprSource(v: Value, depth: number = 0): string {
       return formatValue(v);
     case ValueKind.Expression: {
       const e = d as ExpressionValue;
-      const fnD = dataOf(e.fn);
+      const fnD = e.fn;
       const sub = (a: Value): string => {
         const t = renderExprSource(a, depth + 1);
         // Parenthesize compound operands of infix renderings for fidelity.
-        return dataOf(a).kind === ValueKind.Expression && / /.test(t) && !t.startsWith("(")
+        return a.kind === ValueKind.Expression && / /.test(t) && !t.startsWith("(")
           ? `(${t})` : t;
       };
       if (fnD.kind === ValueKind.PrimitiveFunction) {
@@ -64,8 +64,8 @@ export function renderExprSource(v: Value, depth: number = 0): string {
         }
         // `obj.member(...)` — a call whose fn is type_dispatch(obj, "member").
         if (name === "type_dispatch" && e.args.length === 2
-            && dataOf(e.args[1]).kind === ValueKind.Bits) {
-          return `${sub(e.args[0])}.${bitsToString(dataOf(e.args[1]) as BitsValue)}`;
+            && e.args[1].kind === ValueKind.Bits) {
+          return `${sub(e.args[0])}.${bitsToString(e.args[1] as BitsValue)}`;
         }
         return `${name}(${e.args.map(a => renderExprSource(a, depth + 1)).join(", ")})`;
       }
@@ -86,8 +86,7 @@ export function renderExprSource(v: Value, depth: number = 0): string {
 
 export function formatValue(v: Value): string {
   // Typed-value display. C4.3b: flattened Contexts (typed records/arrays)
-  // carry channels directly, so the gate covers both roles and data reads
-  // go through dataOf (identity for Contexts) instead of `.primary`.
+  // carry their metadata directly, so the gate covers both roles.
   // B-121 C2: the kind guard meant "carries metadata worth rendering", true
   // only while a typed scalar was a carrier. `metaReadRaw` is total, so ask
   // the plane. Without this a typed String prints as raw Bits once a typed
@@ -103,7 +102,7 @@ export function formatValue(v: Value): string {
       const nameV = getName(typeComp as StructureValue);
       if (nameV && nameV.kind === ValueKind.Bits) {
         const typeName = bitsToString(nameV);
-        const data = dataOf(v);
+        const data = v;
         // C6.2: a TYPE VALUE — its meta is a KIND (Type, Refinement,
         // Interface, Effect, …) — renders as its own name: `print(pure)`
         // → "pure", `print(io & time)` → "io & time", `print(Int)` →
@@ -182,7 +181,7 @@ export function formatValue(v: Value): string {
       }
     }
   }
-  const p = dataOf(v);
+  const p = v;
   switch (p.kind) {
     case ValueKind.Bits: {
       // Try to display as signed 64-bit integer
@@ -212,13 +211,13 @@ function toSignedExport(b: BitsValue): bigint {
 // --- Helpers ---
 
 function asBits(v: Value, ctx: string): BitsValue {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Bits) throw new AllegroError(`${ctx}: expected Bits, got ${p.kind}`);
   return p;
 }
 
 function asStructureArg(v: Value, ctx: string): StructureValue {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) throw new AllegroError(`${ctx}: expected Context, got ${p.kind}`);
   return p;
 }
@@ -341,19 +340,19 @@ const expr_apply: PrimitiveFnImpl = (args) => {
 };
 
 const expr_fn: PrimitiveFnImpl = (args) => {
-  const e = dataOf(args[0]);
+  const e = args[0];
   if (e.kind !== ValueKind.Expression) throw new AllegroError("expr_fn: expected Expression");
   return e.fn;
 };
 
 const expr_args: PrimitiveFnImpl = (args) => {
-  const e = dataOf(args[0]);
+  const e = args[0];
   if (e.kind !== ValueKind.Expression) throw new AllegroError("expr_args: expected Expression");
   return makeExpr(id_prim, e.args);
 };
 
 const expr_arg: PrimitiveFnImpl = (args) => {
-  const e = dataOf(args[0]);
+  const e = args[0];
   if (e.kind !== ValueKind.Expression) throw new AllegroError("expr_arg: expected Expression");
   const i = Number(asBits(args[1], "expr_arg").data);
   if (i < 0 || i >= e.args.length) throw new AllegroError(`expr_arg: index ${i} out of range`);
@@ -361,7 +360,7 @@ const expr_arg: PrimitiveFnImpl = (args) => {
 };
 
 const expr_argc: PrimitiveFnImpl = (args) => {
-  const e = dataOf(args[0]);
+  const e = args[0];
   if (e.kind !== ValueKind.Expression) throw new AllegroError("expr_argc: expected Expression");
   return makeInt(e.args.length);
 };
@@ -484,7 +483,7 @@ const ctx_bindings: PrimitiveFnImpl = (args, pctx) => {
 
 const mv_new: PrimitiveFnImpl = (args) => withMeta(args[0]);
 
-const mv_primary: PrimitiveFnImpl = (args) => dataOf(args[0]);
+const mv_primary: PrimitiveFnImpl = (args) => args[0];
 
 const mv_get: PrimitiveFnImpl = (args) => {
   const key = bitsToString(asBits(args[1], "mv_get"));
@@ -518,7 +517,7 @@ const channel_register_impl: PrimitiveFnImpl = (args) => {
 
 const channel_read_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  const name = bitsToString(asBits(dataOf(evalFn!(args[1], ctx!)), "channel_read"));
+  const name = bitsToString(asBits(evalFn!(args[1], ctx!), "channel_read"));
   const c = metaReadRaw(v, name);
   return c === undefined ? noneSingleton : c;
 };
@@ -529,15 +528,15 @@ const channel_list_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 };
 
 const channel_attenuate_impl: PrimitiveFnImpl = (args) => {
-  const base = dataOf(args[0]);
+  const base = args[0];
   const brand = (base as any)[FIELD_WRITER_BRAND];
   if (base.kind !== ValueKind.PrimitiveFunction || !brand) {
     throw new AllegroError("channel_attenuate: first argument is not a channel writer");
   }
-  const pred = dataOf(args[1]);
+  const pred = args[1];
   const prim = makePrimitive(`<channel:${brand} writer (attenuated)>`, (wargs, wctx, wevalFn) => {
     const ok = wevalFn!(makeExpr(pred, [wargs[1]]), wctx!);
-    const okP = dataOf(ok);
+    const okP = ok;
     if (okP.kind !== ValueKind.Bits || (okP as BitsValue).data === 0n) {
       throw new AllegroError(`channel writer '${brand}': attenuation predicate rejected the write`);
     }
@@ -577,7 +576,7 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (metaReadRaw(cond, "error") !== undefined) {
     return cond;
   }
-  const condP = dataOf(cond);
+  const condP = cond;
   if (condP.kind === ValueKind.Bits) {
     const took_then = condP.data !== 0n;
     const branch = took_then ? args[1] : args[2];
@@ -646,7 +645,7 @@ function isPatternPrim(v: Value, name: string): boolean {
 function matchSubPattern(
   value: Value, subPattern: Value, evalFn: EvalFn, ctx: StructureValue,
 ): Value[] | null {
-  const subP = dataOf(subPattern);
+  const subP = subPattern;
 
   // Wildcard
   if (isPatternPrim(subPattern, "when_wildcard")) {
@@ -660,7 +659,7 @@ function matchSubPattern(
 
   // Nested struct destruct
   if (isPatternPrim(subPattern, "when_struct_destruct")) {
-    const innerCtx = dataOf(value);
+    const innerCtx = value;
     if (innerCtx.kind !== ValueKind.Structure) return null;
     return extractFields(innerCtx as StructureValue, (subPattern as any).args, evalFn, ctx, value);
   }
@@ -671,12 +670,10 @@ function matchSubPattern(
     const fieldSpecs = (subPattern as any).args.slice(1);
     const valTypeName = getTypeName(value);
     const patTypeName = typeValue.kind === ValueKind.Structure
-      ? bitsToString(dataOf(
-          getName(typeValue as StructureValue) ?? stringToBits("")
-        ) as BitsValue)
+      ? bitsToString((getName(typeValue as StructureValue) ?? stringToBits("")) as BitsValue)
       : null;
     if (!valTypeName || !patTypeName || valTypeName !== patTypeName) return null;
-    const innerCtx = dataOf(value);
+    const innerCtx = value;
     if (innerCtx.kind !== ValueKind.Structure) return null;
     return extractFields(innerCtx as StructureValue, fieldSpecs, evalFn, ctx, value);
   }
@@ -686,16 +683,14 @@ function matchSubPattern(
       hasName(subP as StructureValue) &&
       hasShapeSlot(subP as StructureValue)) {
     const valTypeName = getTypeName(value);
-    const patName = bitsToString(dataOf(
-      getName(subP as StructureValue)!
-    ) as BitsValue);
+    const patName = bitsToString(getName(subP as StructureValue)! as BitsValue);
     if (valTypeName === patName) return [value]; // match + bind
     return null;
   }
 
   // Bits literal → equality check
   if (subP.kind === ValueKind.Bits) {
-    const valP = dataOf(value);
+    const valP = value;
     if (valP.kind === ValueKind.Bits &&
         (valP as BitsValue).length === (subP as BitsValue).length &&
         (valP as BitsValue).data === (subP as BitsValue).data) {
@@ -705,7 +700,7 @@ function matchSubPattern(
   }
 
   // Reference equality fallback
-  if (dataOf(value) === subP) return [];
+  if (value === subP) return [];
   return null;
 }
 
@@ -728,7 +723,7 @@ function extractFields(
   const subjShape = subjType ? typeShape(subjType) : null;
   const values: Value[] = [];
   for (let i = 0; i < specArgs.length; i += 2) {
-    const fieldName = bitsToString(dataOf(specArgs[i]) as BitsValue);
+    const fieldName = bitsToString(specArgs[i] as BitsValue);
     if (subjShape) assertMemberReachable(subjShape, fieldName, evalCtx);
     const b = ctx.bindings.get(fieldName);
     if (!b?.value) return null; // field not found → no match
@@ -843,7 +838,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const thenBranch = args[3];
   const elseBranch = args[4];
 
-  const subjectP = dataOf(subject);
+  const subjectP = subject;
   let matched = false;
   let extractedValues: Value[] = [];
   // C3.2 (D36): a matched TYPE pattern narrows the subject's occurrence
@@ -861,11 +856,9 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const fieldSpecs = patternExpr.args.slice(1);
 
     const subjectTypeName = getTypeName(subject);
-    const typeCtx = dataOf(typeValue);
+    const typeCtx = typeValue;
     const patternTypeName = typeCtx.kind === ValueKind.Structure
-      ? bitsToString(dataOf(
-          getName(typeCtx as StructureValue) ?? stringToBits("")
-        ) as BitsValue)
+      ? bitsToString((getName(typeCtx as StructureValue) ?? stringToBits("")) as BitsValue)
       : null;
 
     if (subjectTypeName && patternTypeName && subjectTypeName === patternTypeName) {
@@ -897,16 +890,14 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   } else {
     // Literal or type match
-    const patternP = dataOf(pattern);
+    const patternP = pattern;
 
     // Type context → instanceof check (for patterns like `is Int`)
     if (patternP.kind === ValueKind.Structure &&
         hasName(patternP as StructureValue) &&
         hasShapeSlot(patternP as StructureValue)) {
       const subjectTypeName = getTypeName(subject);
-      const patternName = bitsToString(dataOf(
-        getName(patternP as StructureValue)!
-      ) as BitsValue);
+      const patternName = bitsToString(getName(patternP as StructureValue)! as BitsValue);
       if (subjectTypeName === patternName) {
         matched = true;
         // The pattern names the subject's own type — narrowed: the arm
@@ -948,11 +939,11 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
     // Evaluate guard if present
     const evalGuard = evalFn!(armGuard, matchCtx);
-    const guardP = dataOf(evalGuard);
+    const guardP = evalGuard;
     if (guardP.kind === ValueKind.ComposedFunction && (guardP as any).params?.length > 0) {
       // Guard is a function — apply with extracted values
       const guardResult = evalFn!(makeExpr(evalGuard, extractedValues), matchCtx);
-      const guardRP = dataOf(guardResult);
+      const guardRP = guardResult;
       if (guardRP.kind === ValueKind.Bits && (guardRP as BitsValue).data === 0n) {
         // Guard failed — fall through
         return evalElseBranch(elseBranch, ctx!, evalFn!);
@@ -973,7 +964,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 const component_get_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) throw new AllegroError(`component_get: need 2 args, got ${args.length}`);
   const value = evalFn!(args[0], ctx!);
-  const key = bitsToString(dataOf(args[1]) as BitsValue);
+  const key = bitsToString(args[1] as BitsValue);
   // D47(e): source reads are OBSERVE-effectful and go through `source of`
   // (`source_get`); the generic accessor answers none so the effect tag
   // cannot be laundered around.
@@ -1065,7 +1056,7 @@ const when_no_match_impl: PrimitiveFnImpl = (args, _ctx, _evalFn) => {
  *  can substitute once the cell lands. */
 function refsPendingCell(v: Value, ctx: StructureValue, depth = 0): boolean {
   if (depth > 32) return false;
-  const d = dataOf(v);
+  const d = v;
   if (d.kind === ValueKind.Symbol) {
     const cell = scopeLookup(ctx, d.name);
     return cell !== undefined && cell.isComplete === false;
@@ -1082,7 +1073,7 @@ function refsPendingCell(v: Value, ctx: StructureValue, depth = 0): boolean {
  *  land, and untouched slots complete later (D32 pipelining). Shallow at
  *  the structure level, matching resolveDataSlots. */
 function hasPendingFutureSlot(v: Value, ctx: StructureValue): boolean {
-  const inst = dataOf(v);
+  const inst = v;
   if (inst.kind !== ValueKind.Structure) return false;
   const instCtx = inst as StructureValue;
   if (instCtx.isScope) return false;
@@ -1140,7 +1131,7 @@ const delay_wrapper: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(v)) {
     return makeExpr(makePrimitive("delay", delay_wrapper, true), [v]);
   }
-  const ms = Number(asBits(dataOf(v), "delay").data);
+  const ms = Number(asBits(v, "delay").data);
   const fm = (ctx ? scopeHostRead(ctx, HOST_KEYS.futureManager) : undefined) as import("./futures.js").FutureManager | undefined;
   if (!fm) {
     throw new AllegroError("delay: requires async runtime (no FutureManager available)");
@@ -1161,7 +1152,7 @@ const fetch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(v)) {
     return makeExpr(makePrimitive("fetch", fetch_impl, true), [v]);
   }
-  const url = bitsToString(asBits(dataOf(v), "fetch"));
+  const url = bitsToString(asBits(v, "fetch"));
   const fm = (ctx ? scopeHostRead(ctx, HOST_KEYS.futureManager) : undefined) as import("./futures.js").FutureManager | undefined;
   if (!fm) {
     throw new AllegroError("fetch: requires async runtime (no FutureManager available)");
@@ -1251,19 +1242,19 @@ const grammar_build_impl: PrimitiveFnImpl = (args) => {
 function optionalStringFromCtx(ctx: StructureValue, key: string): string | undefined {
   const b = ctx.bindings.get(key);
   if (!b?.value) return undefined;
-  const p = dataOf(b.value);
+  const p = b.value;
   if (p.kind !== ValueKind.Bits) return undefined;
   return bitsToString(p as BitsValue);
 }
 function optionalIntFromCtx(ctx: StructureValue, key: string): number | undefined {
   const b = ctx.bindings.get(key);
   if (!b?.value) return undefined;
-  const p = dataOf(b.value);
+  const p = b.value;
   if (p.kind !== ValueKind.Bits) return undefined;
   return Number((p as BitsValue).data);
 }
 function arrayHandlesFromValue(v: Value, fnName: string): number[] {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${fnName}: expected Array of handles`);
   }
@@ -1274,7 +1265,7 @@ function arrayHandlesFromValue(v: Value, fnName: string): number[] {
   for (let i = 0; i < len; i++) {
     const itemV = indexGet(ctx, i);
     if (itemV === undefined) continue;
-    const ip = dataOf(itemV);
+    const ip = itemV;
     if (ip.kind !== ValueKind.Bits) {
       throw new AllegroError(`${fnName}: element ${i} is not a handle`);
     }
@@ -1287,7 +1278,7 @@ const grammar_new_impl: PrimitiveFnImpl = (args) => {
   // Optional options object as first arg
   let opts: { whitespace?: string } = {};
   if (args.length > 0) {
-    const p = dataOf(args[0]);
+    const p = args[0];
     if (p.kind === ValueKind.Structure) {
       const ws = optionalStringFromCtx(p as StructureValue, "whitespace");
       if (ws !== undefined) opts.whitespace = ws;
@@ -1326,7 +1317,7 @@ const grammar_repeat_impl: PrimitiveFnImpl = (args) => {
   const elementHandle = Number(asBits(args[1], "grammar_repeat").data);
   let opts: { min?: number; max?: number; delimiter?: number } = {};
   if (args.length > 2) {
-    const p = dataOf(args[2]);
+    const p = args[2];
     if (p.kind === ValueKind.Structure) {
       const ctx = p as StructureValue;
       opts.min = optionalIntFromCtx(ctx, "min");
@@ -1467,7 +1458,7 @@ function makeFragmentBuilderHandle(base: string): StructureValue {
 }
 
 function asGrammarHandle(v: Value, fnName: string): GrammarHandleData {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${fnName}: expected grammar fragment handle, got ${p.kind}`);
   }
@@ -1480,7 +1471,7 @@ function asGrammarHandle(v: Value, fnName: string): GrammarHandleData {
  *  Returns the Grammar data if so, otherwise undefined. Used by the `use X`
  *  pre-scanner (step 8) and fragment merger. */
 export function asGrammarValue(v: Value): GrammarValueData | undefined {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) return undefined;
   return (p as any).grammarValue as GrammarValueData | undefined;
 }
@@ -1502,7 +1493,7 @@ interface PrecSpecRead {
 }
 
 function readPrecSpec(v: Value, fnName: string): PrecSpecRead {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) {
     throw new AllegroError(`${fnName}: expected prec_spec object, got ${p.kind}`);
   }
@@ -1510,7 +1501,7 @@ function readPrecSpec(v: Value, fnName: string): PrecSpecRead {
   for (const key of ["at", "above", "below", "prec"] as const) {
     const b = p.bindings.get(key);
     if (b?.value) {
-      const bp = dataOf(b.value);
+      const bp = b.value;
       if (bp.kind === ValueKind.Bits) out[key] = bitsToString(bp);
     }
   }
@@ -1906,7 +1897,7 @@ const _precompileInProgress = new WeakSet<ComposedFunctionValue>();
 _setEffectsInspector((fnValue, ctx) => {
   const eff = _effectsOf(fnValue);
   if (eff) return new Set(eff);
-  const d = dataOf(fnValue);
+  const d = fnValue;
   if (d.kind === ValueKind.PrimitiveFunction) {
     return new Set((d as PrimitiveFunctionValue).effects ?? []);
   }
@@ -1983,7 +1974,7 @@ const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
   if (!isResolved(v)) return makeExpr(makePrimitive("typed_float", typed_float_impl, true), [v]);
   // If arg is a string (Bits from stringToBits), parse it as a float
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.Bits) {
     // Check if it's a string representation (non-64-bit) that needs parsing
     // B-121 C2: `v.kind === Structure &&` was the carrier test guarding a
@@ -1994,7 +1985,7 @@ const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
     // B-121 C2: REPLACE, not re-stamp. `dataOf` used to strip metadata as a
     // side effect of peeling a carrier, so `p` arrived bare and the shape
-    // guard never saw a prior type. `dataOf` is the identity now.
+    // guard never saw a prior type. The peel is gone (C5).
     return withTypeReplacing(p, FloatType);
   }
   return withTypeReplacing(v, FloatType);
@@ -2028,7 +2019,7 @@ const typed_object_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (!isResolved(keyV) || !isResolved(valV)) {
       return makeExpr(makePrimitive("typed_object", typed_object_impl, true), args);
     }
-    entries.push([bitsToString(dataOf(keyV) as BitsValue), valV]);
+    entries.push([bitsToString(keyV as BitsValue), valV]);
   }
   return makeObject(entries);
 };
@@ -2041,14 +2032,14 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(fn)) {
     return makeExpr(makePrimitive("typed_function", typed_function_impl, true), args);
   }
-  const paramCount = Number(asBits(dataOf(evalFn!(args[1], ctx!)), "typed_function").data);
+  const paramCount = Number(asBits(evalFn!(args[1], ctx!), "typed_function").data);
   const paramTypes: Value[] = [];
   for (let i = 0; i < paramCount; i++) {
     const pt = evalFn!(args[2 + i], ctx!);
     // Type variables (unresolved Params) are kept as-is — they'll be
     // resolved during unification when the function is called
     if (isResolved(pt)) {
-      const ptPrimary = dataOf(pt);
+      const ptPrimary = pt;
       if (ptPrimary.kind === ValueKind.Structure && isGenericType(ptPrimary as StructureValue)) {
         paramTypes.push(normalizeType(ptPrimary as StructureValue));
       } else {
@@ -2065,7 +2056,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // Return type contains unresolved type variables — store as-is
     returnType = returnTypeRaw;
   } else {
-    const rtp = dataOf(returnTypeRaw);
+    const rtp = returnTypeRaw;
     if (rtp.kind === ValueKind.Structure && isGenericType(rtp as StructureValue)) {
       returnType = normalizeType(rtp as StructureValue);
     } else {
@@ -2084,7 +2075,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // rides inferred effect sets; concrete call sites resolve it by ordinary
   // PE substitution. The `__effectvar:` marker strings and the
   // `__effectVarParams` side table are retired (D39).
-  const fnPrimary = dataOf(fn);
+  const fnPrimary = fn;
   if (fnPrimary.kind === ValueKind.ComposedFunction) {
     const cFn = fnPrimary as any;
     const params = cFn.params as Array<{ effectBound?: Set<string>; effectVar?: string }>;
@@ -2129,14 +2120,14 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const pePairs = (cFn as any).paramEffectPairs as Value[] | undefined;
     if (pePairs) {
       for (let i = 0; i + 1 < pePairs.length; i += 2) {
-        const paramRef = dataOf(pePairs[i]);
+        const paramRef = pePairs[i];
         if (paramRef.kind !== ValueKind.Param) continue;
         const paramName = (paramRef as any)._name as string | undefined;
         if (!paramName) continue;
         const idx = (cFn.params as any[]).findIndex(p => p._name === paramName);
         if (idx < 0) continue;
         const effVal = evalFn!(pePairs[i + 1], ctx!);
-        const effPrim = dataOf(effVal);
+        const effPrim = effVal;
         if (effPrim.kind !== ValueKind.Structure) continue;
         const bound = getEffectBound(effPrim as StructureValue) as _AbstractDomain | undefined;
         if (bound && bound.kind === "effects") {
@@ -2190,7 +2181,7 @@ const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(left)) {
     return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, args[1]]);
   }
-  const leftP = dataOf(left);
+  const leftP = left;
   if (leftP.kind === ValueKind.Bits && leftP.data === 0n) {
     return withType(makeInt(0), BoolType);
   }
@@ -2203,7 +2194,7 @@ const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
     rightVal = evalFn!(right.body, ctx!);
   }
-  const rightP = dataOf(rightVal);
+  const rightP = rightVal;
   if (rightP.kind === ValueKind.Bits && rightP.data === 0n) {
     return withType(makeInt(0), BoolType);
   }
@@ -2237,7 +2228,7 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // once both resolve, etc.). When the right side is unresolved (a symbolic
   // effect variable), return a residual so the expression survives until call
   // sites bind concrete values.
-  const leftPrim = dataOf(left);
+  const leftPrim = left;
   if (leftPrim.kind === ValueKind.Structure && isEffectExtending(leftPrim as StructureValue)) {
     const right = (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0)
       ? evalFn!(thunk.body, ctx!)
@@ -2245,7 +2236,7 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (!isResolved(right)) {
       return makeExpr(makePrimitive("typed_amp", typed_amp_impl, true), [left, right]);
     }
-    const rightPrim = dataOf(right);
+    const rightPrim = right;
     if (rightPrim.kind === ValueKind.Structure && isEffectExtending(rightPrim as StructureValue)) {
       return wrapType(_effectUnion(leftPrim as StructureValue, rightPrim as StructureValue));
     }
@@ -2254,7 +2245,7 @@ const typed_amp_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (thunk.kind === ValueKind.ComposedFunction && thunk.params.length === 0) {
     // Refinement: extract the raw body and wrap as `_ => body`.
     const predicate = buildFn(["_"], thunk.body) as Value;
-    const parentType = dataOf(left) as StructureValue;
+    const parentType = left as StructureValue;
     // B-028 F4: ctx rides along so the D32 invariant-totality gate can
     // infer the predicate's effects at refinement creation.
     return wrapType(buildRefinedType(parentType, predicate, ctx));
@@ -2282,7 +2273,7 @@ const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("typed_or", typed_or_impl, true), [left, args[1]]);
   }
   // Short-circuit: if left is truthy, return true without evaluating right
-  const leftP = dataOf(left);
+  const leftP = left;
   if (leftP.kind === ValueKind.Bits && leftP.data !== 0n) {
     return withType(makeInt(1), BoolType);
   }
@@ -2295,7 +2286,7 @@ const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
     rightVal = evalFn!(right.body, ctx!);
   }
-  const rightP = dataOf(rightVal);
+  const rightP = rightVal;
   if (rightP.kind === ValueKind.Bits && rightP.data !== 0n) {
     return withType(makeInt(1), BoolType);
   }
@@ -2307,7 +2298,7 @@ const typed_not_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(val)) {
     return makeExpr(makePrimitive("typed_not", typed_not_impl, true), [val]);
   }
-  const p = dataOf(val);
+  const p = val;
   if (p.kind === ValueKind.Bits && p.data === 0n) {
     return withType(makeInt(1), BoolType);
   }
@@ -2401,7 +2392,7 @@ function dispatchThroughType(
       }
       if (impl) return impl;
     } else if (isFieldDescriptor(desc)) {
-      const instanceCtx = dataOf(selfExpr);
+      const instanceCtx = selfExpr;
       if (instanceCtx.kind === ValueKind.Structure) {
         const b = (instanceCtx as StructureValue).bindings.get(fieldName);
         if (b?.value !== undefined) return b.value;
@@ -2480,7 +2471,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     assertMemberAvailable(obj, fieldName, storedType);
     // B-097 V2 (V-R1): the ONE dispatch ladder (descriptors + protocol
     // slots), shared with the meta path below.
-    const hit = dispatchThroughType(type, fieldName, dataOf(obj), obj, ctx, evalFn);
+    const hit = dispatchThroughType(type, fieldName, obj, obj, ctx, evalFn);
     if (hit !== null) return hit;
 
     // fallbackMember hook (the user policy hook — open-type string-key
@@ -2490,7 +2481,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const getMember = getFallbackMember(type);
     if (getMember?.kind === ValueKind.PrimitiveFunction) {
       return evalFn!(
-        makeExpr(getMember, [dataOf(obj), stringToBits(fieldName), mintEvidenceCapsule(ctx!)]),
+        makeExpr(getMember, [obj, stringToBits(fieldName), mintEvidenceCapsule(ctx!)]),
         ctx!,
       );
     }
@@ -2510,7 +2501,7 @@ const type_dispatch_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // had NO availability gate and drifted, is deleted; conscious delta 2:
   // this path now refuses unavailable members exactly like the typed
   // one), then direct binding lookup for data fields.
-  const p = dataOf(obj);
+  const p = obj;
   if (p.kind === ValueKind.Structure) {
     const metaTypeV = metaReadRaw(p, "shape");
     if (metaTypeV?.kind === ValueKind.Structure) {
@@ -2586,7 +2577,7 @@ function checkRefinementPredicate(
 
   // Evaluate predicate against the value
   const result = evalFn(makeExpr(predicate, [v]), ctx);
-  const p = dataOf(result);
+  const p = result;
   if (p.kind === ValueKind.Bits) {
     return { ok: (p as BitsValue).data !== 0n };
   }
@@ -2631,7 +2622,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
 
   // Step 2: Normalize — resolve bare generics to Generic[Any, ...]
-  const rawExpectedCtx = asStructureArg(dataOf(expectedType), "type_check");
+  const rawExpectedCtx = asStructureArg(expectedType, "type_check");
   const expectedCtx = normalizeType(rawExpectedCtx);
 
   const expectedNameV = getName(expectedCtx);
@@ -2710,7 +2701,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       // Fall back to runtime predicate evaluation.
       if (actualType0 !== expectedCtx) {
         const result = evalFn!(makeExpr(refinementPredicate, [v]), ctx!);
-        const p = dataOf(result);
+        const p = result;
         if (p.kind === ValueKind.Bits && (p as BitsValue).data === 0n) {
           throw new AllegroError(`Type error: refinement predicate failed for ${expectedName}`);
         }
@@ -2735,7 +2726,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const directInstanceof = expectedCtx.bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const checkResult = directInstanceof.fn([v], undefined as any, undefined as any);
-    const checkP = dataOf(checkResult);
+    const checkP = checkResult;
     if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
       throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
     }
@@ -2748,7 +2739,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const checkResult = instanceofMethod.fn([expectedCtx, v], undefined as any, undefined as any);
-      const checkP = dataOf(checkResult);
+      const checkP = checkResult;
       if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
         throw new AllegroError(`Type error: expected ${expectedName}, got ${actualName}`);
       }
@@ -2779,8 +2770,8 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const actualArgs = getTypeArgs(actualType);
     if (actualArgs && actualArgs.length === expectedArgs.length) {
       for (let i = 0; i < expectedArgs.length; i++) {
-        const expArgCtx = dataOf(expectedArgs[i]);
-        const actArgCtx = dataOf(actualArgs[i]);
+        const expArgCtx = expectedArgs[i];
+        const actArgCtx = actualArgs[i];
         if (expArgCtx.kind === ValueKind.Structure && actArgCtx.kind === ValueKind.Structure) {
           const expArgName = getName(expArgCtx as StructureValue);
           const actArgName = getName(actArgCtx as StructureValue);
@@ -2808,7 +2799,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("type_instanceof", type_instanceof_impl, true), [v, expectedType]);
   }
 
-  const expectedCtx = dataOf(expectedType);
+  const expectedCtx = expectedType;
   if (expectedCtx.kind !== ValueKind.Structure) return withType(makeInt(0), BoolType);
 
   // Bare generic in expression position (`arr instanceof Array`) auto-
@@ -2845,7 +2836,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const base = getRefines(expectedCtx as StructureValue);
     if (base?.kind === ValueKind.Structure) {
       const baseRes = type_instanceof_impl([v, base], ctx, evalFn);
-      const brp = dataOf(baseRes);
+      const brp = baseRes;
       if (brp.kind !== ValueKind.Bits) {
         return makeExpr(makePrimitive("type_instanceof", type_instanceof_impl, true), [v, expectedType]);
       }
@@ -2863,7 +2854,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const directInstanceof = (expectedCtx as StructureValue).bindings.get("instanceof")?.value;
   if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
     const result = directInstanceof.fn([v], undefined as any, undefined as any);
-    const rp = dataOf(result);
+    const rp = result;
     return withType(makeInt(rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n ? 1 : 0), BoolType);
   }
 
@@ -2873,7 +2864,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const instanceofMethod = typeMethod(typeType, "instanceof");
     if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
       const result = instanceofMethod.fn([expectedCtx as StructureValue, v], undefined as any, undefined as any);
-      const rp = dataOf(result);
+      const rp = result;
       const baseOk = rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n;
       if (!baseOk) return withType(makeInt(0), BoolType);
       // Base check passed — also check refinement predicate if present
@@ -2910,7 +2901,7 @@ const type_instanceof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 const certificate_peek_impl: PrimitiveFnImpl = (args) => {
   if (args.length !== 2) throw new AllegroError(`certificate_peek: need 2 args, got ${args.length}`);
   const v = args[0];
-  const t = dataOf(args[1]);
+  const t = args[1];
   if (t.kind !== ValueKind.Structure) return withType(makeInt(0), BoolType);
   const stored = getType(v);
   if (!stored) return withType(makeInt(0), BoolType);
@@ -2921,7 +2912,7 @@ const certificate_peek_impl: PrimitiveFnImpl = (args) => {
     if (tName !== null && typeContextName(cur) === tName) return withType(makeInt(1), BoolType);
     if (getPredicate(cur) === undefined) break; // reached the shape — no more certificate layers
     const p = getRefines(cur);
-    cur = p !== undefined && dataOf(p).kind === ValueKind.Structure ? (dataOf(p) as StructureValue) : null;
+    cur = p !== undefined && p.kind === ValueKind.Structure ? (p as StructureValue) : null;
   }
   return withType(makeInt(0), BoolType);
 };
@@ -2935,8 +2926,8 @@ const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     return makeExpr(makePrimitive("type_subtypeof", type_subtypeof_impl, true), [typeA, typeB]);
   }
 
-  const ctxA = dataOf(typeA);
-  const ctxB = dataOf(typeB);
+  const ctxA = typeA;
+  const ctxB = typeB;
   if (ctxA.kind !== ValueKind.Structure || ctxB.kind !== ValueKind.Structure) {
     return withType(makeInt(0), BoolType);
   }
@@ -2947,7 +2938,7 @@ const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const bSubtypeof = typeMethod(metaTypeB, "subtypeof");
     if (bSubtypeof?.kind === ValueKind.PrimitiveFunction) {
       const result = bSubtypeof.fn([ctxA as StructureValue, ctxB as StructureValue], undefined as any, undefined as any);
-      const rp = dataOf(result);
+      const rp = result;
       if (rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n) {
         return withType(makeInt(1), BoolType);
       }
@@ -2960,7 +2951,7 @@ const type_subtypeof_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const subtypeofMethod = typeMethod(metaType, "subtypeof");
     if (subtypeofMethod?.kind === ValueKind.PrimitiveFunction) {
       const result = subtypeofMethod.fn([ctxA as StructureValue, ctxB as StructureValue], undefined as any, undefined as any);
-      const rp = dataOf(result);
+      const rp = result;
       return withType(makeInt(rp.kind === ValueKind.Bits && (rp as BitsValue).data !== 0n ? 1 : 0), BoolType);
     }
   }
@@ -2986,7 +2977,7 @@ const type_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (!isResolved(v)) {
       return makeExpr(makePrimitive("type_function", type_function_impl, true), args);
     }
-    evalArgs.push(dataOf(v));
+    evalArgs.push(v);
   }
   const returnType = evalArgs[evalArgs.length - 1];
   const paramTypes = evalArgs.slice(0, -1);
@@ -2998,7 +2989,7 @@ const type_apply_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(generic)) {
     return makeExpr(makePrimitive("type_apply", type_apply_impl, true), args);
   }
-  const genericCtx = asStructureArg(dataOf(generic), "type_apply");
+  const genericCtx = asStructureArg(generic, "type_apply");
   if (!isGenericType(genericCtx)) {
     const name = getTypeName(generic) ?? "unknown";
     throw new AllegroError(`type_apply: ${name} is not a generic type`);
@@ -3010,7 +3001,7 @@ const type_apply_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (!isResolved(arg)) {
       return makeExpr(makePrimitive("type_apply", type_apply_impl, true), [generic, ...args.slice(1)]);
     }
-    typeArgs.push(dataOf(arg));
+    typeArgs.push(arg);
   }
   return wrapType(applyGenericType(genericCtx, typeArgs));
 };
@@ -3025,7 +3016,7 @@ const structural_wrap_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(v)) {
     return makeExpr(makePrimitive("structural_wrap", structural_wrap_impl, true), [v]);
   }
-  const typeCtx = asStructureArg(dataOf(v), "structural_wrap");
+  const typeCtx = asStructureArg(v, "structural_wrap");
   return wrapType(structuralWrap(typeCtx));
 };
 
@@ -3037,7 +3028,7 @@ const type_refine_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(typeVal) || !isResolved(predicate)) {
     return makeExpr(makePrimitive("type_refine", type_refine_impl, true), [typeVal, predicate]);
   }
-  const parentType = asStructureArg(dataOf(typeVal), "type_refine");
+  const parentType = asStructureArg(typeVal, "type_refine");
   return wrapType(buildRefinedType(parentType, predicate, ctx));
 };
 
@@ -3092,11 +3083,11 @@ const assert_invariant_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Runtime evaluation of the predicate against the value.
   const checkResult = evalFn!(makeExpr(predicate, [value]), ctx!);
-  const checkP = dataOf(checkResult);
+  const checkP = checkResult;
   if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
     // Build a counterexample-style error message.
     let cexDesc = "";
-    const primary = dataOf(value);
+    const primary = value;
     if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
       const data = (primary as BitsValue).data;
       const signed = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
@@ -3190,7 +3181,7 @@ const assert_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!allEntailed) {
     // Runtime check.
     const cond = evalFn!(condExpr, ctx!);
-    const condP = dataOf(cond);
+    const condP = cond;
     if (condP.kind !== ValueKind.Bits) {
       // Unresolved — keep as residual.
       return makeExpr(makePrimitive("assert_stmt", assert_stmt_impl, true), [cond]);
@@ -3221,7 +3212,7 @@ const assert_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
             const binding = scopeLookup(ctx!, name);
             let actualDesc = "";
             if (binding?.value) {
-              const p = dataOf(binding.value);
+              const p = binding.value;
               if (p.kind === ValueKind.Bits && (p as BitsValue).length === 64) {
                 const data = (p as BitsValue).data;
                 const signed = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
@@ -3349,7 +3340,7 @@ const requires_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   if (!allEntailed) {
     const cond = evalFn!(condExpr, ctx!);
-    const condP = dataOf(cond);
+    const condP = cond;
     if (condP.kind !== ValueKind.Bits) {
       return makeExpr(makePrimitive("requires_stmt", requires_stmt_impl, true), [cond]);
     }
@@ -3374,7 +3365,7 @@ const requires_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
             const binding = scopeLookup(ctx!, name);
             let actualDesc = "";
             if (binding?.value) {
-              const p = dataOf(binding.value);
+              const p = binding.value;
               if (p.kind === ValueKind.Bits && (p as BitsValue).length === 64) {
                 const data = (p as BitsValue).data;
                 const signed = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
@@ -3453,10 +3444,10 @@ const ensures_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Runtime check.
   const checkResult = evalFn!(makeExpr(lambda, [result]), ctx!);
-  const checkP = dataOf(checkResult);
+  const checkP = checkResult;
   if (checkP.kind === ValueKind.Bits && (checkP as BitsValue).data === 0n) {
     let cexDesc = "";
-    const primary = dataOf(result);
+    const primary = result;
     if (primary.kind === ValueKind.Bits && (primary as BitsValue).length === 64) {
       const data = (primary as BitsValue).data;
       const signed = data >= 0x8000000000000000n ? data - 0x10000000000000000n : data;
@@ -3676,7 +3667,7 @@ function makeFailedProof(prop: string, reason: string, counterexample?: string):
 // extended to stash these when the proposition is structurally `L == R`.
 
 function _valDesc(v: Value): string {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind === ValueKind.Bits && (p as BitsValue).length === 64) {
     const d = (p as BitsValue).data;
     return String(d >= 0x8000000000000000n ? d - 0x10000000000000000n : d);
@@ -3690,7 +3681,7 @@ function _valDesc(v: Value): string {
 /** Attach equality operands to a discharged proof (mutates its primary
  *  Context — the proof is freshly built by its constructor). */
 function attachEqOperands(proof: Value, lhs: Value, rhs: Value): Value {
-  const ctx = dataOf(proof) as StructureValue;
+  const ctx = proof as StructureValue;
   stampEqOperands(ctx, lhs, rhs);
   return proof;
 }
@@ -3710,7 +3701,7 @@ function eqOperandsOf(v: Value): { lhs: Value; rhs: Value } | null {
  *  marker bindings. Structural (not type-component-based) so it works on
  *  any residual-stripped view of a proof as well as the full value. */
 function proofCtx(v: Value): StructureValue | null {
-  const p = dataOf(v);
+  const p = v;
   if (p.kind !== ValueKind.Structure) return null;
   const c = p as StructureValue;
   return hasDischarged(c) ? c : null;
@@ -3721,13 +3712,13 @@ function isDischargedProofVal(v: Value): boolean {
   const c = proofCtx(v);
   if (!c) return false;
   const d = metaReadRaw(c, "discharged");
-  return !!d && dataOf(d).kind === ValueKind.Bits
-    && (dataOf(d) as BitsValue).data === 1n;
+  return !!d && d.kind === ValueKind.Bits
+    && (d as BitsValue).data === 1n;
 }
 
 /** Value-level equality for proof operands (concrete Bits, else identity). */
 function proofValEqual(a: Value, b: Value): boolean {
-  const pa = dataOf(a), pb = dataOf(b);
+  const pa = a, pb = b;
   if (pa.kind === ValueKind.Bits && pb.kind === ValueKind.Bits) {
     return (pa as BitsValue).data === (pb as BitsValue).data
       && (pa as BitsValue).length === (pb as BitsValue).length;
@@ -3739,7 +3730,7 @@ function proofValEqual(a: Value, b: Value): boolean {
  *  side ASTs (unevaluated). */
 function eqExprSides(propExpr: Value): { l: Value; r: Value } | null {
   if (!propExpr || propExpr.kind !== ValueKind.Expression) return null;
-  const fn = dataOf((propExpr as ExpressionValue).fn);
+  const fn = (propExpr as ExpressionValue).fn;
   if (fn.kind !== ValueKind.PrimitiveFunction) return null;
   const n = (fn as any).name as string;
   if (n !== "bits_eq" && n !== "typed_eq") return null;
@@ -3758,11 +3749,11 @@ const proof_by_eval_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 2) {
     throw new AllegroError(`proof_by_eval: expected 2 args (propSrc, prop), got ${args.length}`);
   }
-  const srcP = dataOf(args[0]);
+  const srcP = args[0];
   const propSrc = srcP.kind === ValueKind.Bits ? bitsToString(srcP as BitsValue) : "<proposition>";
 
   const result = evalFn!(args[1], ctx!);
-  const rp = dataOf(result);
+  const rp = result;
 
   // Composition (F2+): the proposition may itself evaluate to a Proof —
   // e.g. `theorem t: proof_refines(5, PositiveInt)` or any future proof
@@ -3842,13 +3833,13 @@ const proof_refines_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const refined = evalFn!(args[1], ctx!);
 
   // The refined type's OWN name (its `__name` binding), not its meta-type.
-  const rtCtx = dataOf(refined) as any;
+  const rtCtx = refined as any;
   const nameBinding = rtCtx?.kind === ValueKind.Structure ? getName(rtCtx) : undefined;
-  const typeName = (nameBinding && dataOf(nameBinding).kind === ValueKind.Bits)
-    ? bitsToString(dataOf(nameBinding) as BitsValue)
+  const typeName = (nameBinding && nameBinding.kind === ValueKind.Bits)
+    ? bitsToString(nameBinding as BitsValue)
     : (getTypeName(refined) ?? "<type>");
   // Render the value: a 64-bit Int as its signed integer, else "value".
-  const litP = dataOf(value);
+  const litP = value;
   let valDesc = "value";
   if (litP.kind === ValueKind.Bits && (litP as BitsValue).length === 64) {
     const d = (litP as BitsValue).data;
@@ -3864,7 +3855,7 @@ const proof_refines_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
   // Expected: the refined type's abstract domain (set by buildRefinedType /
   // Type.invariant via domainFromPredicate).
-  const rt = dataOf(refined) as any;
+  const rt = refined as any;
   const rtPredicate = rt?.kind === ValueKind.Structure ? getPredicate(rt) : undefined;
   const expected = (rt && getAbstractDomain(rt))
     ? getAbstractDomain(rt)
@@ -3913,7 +3904,7 @@ function lawBackingFor(operand: Value, lawName: string):
   { equality: string; tier?: string; refused?: true } | null {
   const t = getType(operand);
   if (!t) return null;
-  const td = dataOf(t);
+  const td = t;
   if (td.kind !== ValueKind.Structure) return null;
   return _equalityLawBacking(td as StructureValue, lawName);
 }
@@ -3923,7 +3914,7 @@ function lawBackingFor(operand: Value, lawName: string):
  *  input proof's transitive set (B-091 — nested chains keep inner
  *  backings; the Verdict's assumption ledger aggregates this). */
 function recordLawBacking(proof: Value, backing: { equality: string; tier?: string } | null, lawName: string, inputs: Value[] = []): Value {
-  const outCtx = dataOf(proof) as StructureValue;
+  const outCtx = proof as StructureValue;
   if (backing && backing.tier) {
     stampLawBacking(outCtx,
       withType(stringToBits(backing.equality), StringType),
@@ -4054,7 +4045,7 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 3) {
     throw new AllegroError(`proof_check: expected 3 args (propSrc, prop, proof), got ${args.length}`);
   }
-  const srcP = dataOf(args[0]);
+  const srcP = args[0];
   const propSrc = srcP.kind === ValueKind.Bits ? bitsToString(srcP as BitsValue) : "<proposition>";
 
   const proof = evalFn!(args[2], ctx!);
@@ -4066,10 +4057,10 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     if (fctx) {
       const rv = getProofReason(fctx);
       const cv = getProofCounterexample(fctx);
-      const reason = rv && dataOf(rv).kind === ValueKind.Bits
-        ? bitsToString(dataOf(rv) as BitsValue) : "proof term did not discharge";
-      const cex = cv && dataOf(cv).kind === ValueKind.Bits
-        ? bitsToString(dataOf(cv) as BitsValue) : undefined;
+      const reason = rv && rv.kind === ValueKind.Bits
+        ? bitsToString(rv as BitsValue) : "proof term did not discharge";
+      const cex = cv && cv.kind === ValueKind.Bits
+        ? bitsToString(cv as BitsValue) : undefined;
       return makeFailedProof(propSrc, `\`by\` proof failed: ${reason}`, cex);
     }
     return makeFailedProof(propSrc, `proof term is not a Proof`,
@@ -4101,11 +4092,11 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         const ln = pc.bindings.get("lawName")?.value;
         const lt = pc.bindings.get("lawTier")?.value;
         if (eq && ln && lt) {
-          stampLawBacking(dataOf(relabeled) as StructureValue, eq, ln, lt);
+          stampLawBacking(relabeled as StructureValue, eq, ln, lt);
         }
         // D2 roll-up: the theorem inherits the by-term's TRANSITIVE
         // backing set, not just the outermost rule's fields.
-        stampBackings(dataOf(relabeled) as StructureValue, backingsOf(pc));
+        stampBackings(relabeled as StructureValue, backingsOf(pc));
       }
       return relabeled;
     }
@@ -4119,7 +4110,7 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // proposition itself folds true, OR is itself a discharged Proof
   // (composition — e.g. `theorem p: proof_refines(5, T) by proof_refines(5, T)`).
   const propVal = evalFn!(args[1], ctx!);
-  const pv = dataOf(propVal);
+  const pv = propVal;
   if (pv.kind === ValueKind.Bits && (pv as BitsValue).data === 1n) {
     return _makeProof(propSrc);
   }
@@ -4169,7 +4160,7 @@ const prove_for_all_bool_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // Bare Bits work too — the predicate's type check will wrap as needed.
   const trueRes  = evalFn!(makeExpr(pred, [fromBool(true)]),  ctx!);
   const falseRes = evalFn!(makeExpr(pred, [fromBool(false)]), ctx!);
-  const tp = dataOf(trueRes), fp = dataOf(falseRes);
+  const tp = trueRes, fp = falseRes;
   const tOk = tp.kind === ValueKind.Bits && (tp as BitsValue).data === 1n;
   const fOk = fp.kind === ValueKind.Bits && (fp as BitsValue).data === 1n;
   if (tOk && fOk) {
@@ -4202,7 +4193,7 @@ const prove_induction_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
   // Sanity-check the base case: predicate(0) must fold to true.
   const p0 = evalFn!(makeExpr(pred, [makeInt(0)]), ctx!);
-  const p0p = dataOf(p0);
+  const p0p = p0;
   if (p0p.kind !== ValueKind.Bits || (p0p as BitsValue).data !== 1n) {
     return makeFailedProof(`forall n: NonNeg, p(n)`,
       `predicate(0) does not hold`,
@@ -4221,7 +4212,7 @@ const prove_induction_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         `step(${n}, ih) did not produce a discharged proof — the inductive step doesn't construct a witness at this sample`);
     }
     const pn1 = evalFn!(makeExpr(pred, [makeInt(n + 1)]), ctx!);
-    const pn1p = dataOf(pn1);
+    const pn1p = pn1;
     if (pn1p.kind !== ValueKind.Bits || (pn1p as BitsValue).data !== 1n) {
       return makeFailedProof(`forall n: NonNeg, p(n)`,
         `predicate(${n + 1}) does not hold`,
@@ -4267,7 +4258,7 @@ function makeTypedBinOp(opName: string): PrimitiveFnImpl {
       throw new AllegroError(`typed_${opName}: method is not a primitive function`);
     }
     // Call method with primaries (methods operate on raw values)
-    const result = method.fn([dataOf(left), dataOf(right)], ctx, evalFn);
+    const result = method.fn([left, right], ctx, evalFn);
     // Type methods already return properly typed values (e.g., comparisons return Bool,
     // arithmetic returns the operand type). C4.3b: a typed result may be an
     // MV (scalar) or a flattened Context (record/array) — check the channel,
