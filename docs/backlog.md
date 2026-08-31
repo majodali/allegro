@@ -2061,3 +2061,89 @@ that prevents it.
   - **Not urgent, and not C2's.** Nothing is wrong at runtime; the risk is a
     reader's model. Best taken after B-121 lands, when the clone sites are
     settled and the change is a small one rather than a moving target
+
+- [ ] **B-127** · T-tooling · **Code analysis is grep-based, and grep cannot
+  see the questions that matter.** Raised by the maintainer at B-121 C2
+  (2026-08): *we need to use a language's parser at minimum to reach the
+  hard-to-get-to issues.*
+  - **The evidence is a measured miss rate.** The C2 survey classified **182**
+    `ValueKind.Structure` comparison sites and predicted 15 breakages. It was
+    accurate about what it covered and it validated itself against the first
+    attempt's failures. It also missed **two entire classes**, because both
+    are invisible to a regex over source text:
+    - *A named predicate standing in for the question.* Six sites asked
+      "does this value carry metadata?" as `isCarrier(v)`,
+      `carriesViralField`'s kind guard, or `kind === Structure && primary !==
+      undefined`. No occurrence of the searched token
+    - *A function with a side effect nobody named.* `dataOf` peeled a carrier
+      AND, as a consequence, stripped metadata. Five sites depended on the
+      second behaviour. Nothing in the source says so; it is a property of
+      what the callee returns
+  - **What a parser buys, concretely.** The TypeScript compiler API answers
+    all three of the questions the survey had to guess at: *what is the
+    static type of this expression* (so "is this subject definitionally a
+    Structure?" stops being a judgement call — 23 of the 38 risk sites were
+    exactly that), *where does this symbol flow* (so a predicate's callers
+    are found by binding, not by name), and *which property accesses reach a
+    field* (so `.primary` through an `any` cast becomes visible — the
+    boundary lint cannot see one today, `totality.ts:173` is the instance,
+    and B-104 owes the count)
+  - **It is the enforcement substrate too.** The boundary lint is a regex
+    over string literals, which is why B-104 chunk 1 had to widen it three
+    times to describe patterns it could not distinguish structurally
+    (a synthesized template key, a property access, a diagnostic name), and
+    why those three sit in a `ratchetOnly` baseline instead of hard-failing.
+    A binder-aware check states each as what it is. **B-128 depends on this**
+  - **Scope, roughly.** A `scripts/analyze/` entry point over
+    `ts.createProgram`, with the queries above as the first three checks. Not
+    a linter framework — the suite is the gate, and these are analyses run
+    when a change needs a survey. First real customer: C5's `dataOf` deletion
+    (902 occurrences), where "does this call site need the peel?" is a
+    type question and grep cannot answer it
+
+- [ ] **B-128** · L0 · T-tooling · **Layer separation is stated but not
+  policed, so code relies on representation without knowing it.** Raised by
+  the maintainer at B-121 C2 (2026-08) as *the biggest learning*: *we were not
+  using layer interfaces and that really hurt when the code started relying on
+  implementation details — even unknowingly. We need to separate layers by
+  interfaces and police the separation.*
+  - **This is the enforcement half of B-112**, which owes the four plane
+    interfaces themselves. An interface nothing is required to go through is a
+    convention, and C2 measured what conventions cost
+  - **What C2 cost, and why the word *unknowingly* is the point.** Attaching
+    metadata changed representation. Nothing about the *interface* changed —
+    `metaReadRaw`, `dataOf`, `getType` all kept their signatures and their
+    meanings. Yet **eleven sites broke**, every one of them reaching past the
+    interface at a representation detail: `.primary` (a storage slot),
+    `kind === ValueKind.Structure` (a representation test standing in for a
+    plane question), `isCarrier` (a predicate over storage). Not one author
+    intended to depend on the representation. **Every failure was silent** —
+    a check stopped firing rather than throwing, so annotations stopped
+    rejecting, a failing `proven` clause downgraded to a skip, and `effects`
+    stopped unioning. The suite caught them only because behavioural tests
+    happened to cover those paths
+  - **What "police" has to mean here**, since the planes are not modules:
+    - **(a) The read surface is already the interface** — `slots.ts` is the
+      accessor layer and the boundary lint already forbids `"__"` literals
+      outside it. Extend the same treatment to *storage* access: `.primary`,
+      `.meta`, `.bindings` and `kind === ValueKind.Structure` are reachable
+      from anywhere today
+    - **(b) Make the representation unreachable rather than discouraged.**
+      The strongest version is that no module outside the accessor layer can
+      name the storage at all — which the host language can express (private
+      fields, or a branded opaque type) and which needs no lint
+    - **(c) A plane question must have exactly one spelling.** C2's whole cost
+      was *"does this carry metadata?"* having eight. One exported predicate,
+      and the check in (a) forbids the others
+  - **The one honest counterexample, worth keeping in view.** `unifyTypes`'s
+    `isCarrier` was NOT reaching past an interface — it separated a value
+    carrying a type from a type Context, a distinction with no accessor to
+    express it. The lesson cuts both ways: some of the eleven sites reached
+    for storage because **the interface had no word for what they meant**.
+    Policing without supplying the missing vocabulary just moves the problem
+  - **Sequencing**: B-112 supplies the interfaces, B-127 supplies the
+    analysis a structural check needs, this item makes the separation
+    enforced. Best evidence for whether it works: re-run C2's survey
+    afterwards and see whether the answer is a short list rather than a class
+    of things nobody could search for
+
