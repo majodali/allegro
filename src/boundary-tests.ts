@@ -334,15 +334,47 @@ export interface InvariantViolation {
 
 /** Walk a value tree checking well-formedness invariants.
  *  W1: a MultiValue's primary is never itself a MultiValue.
- *  W2: a resolved `type` component's primary is a Context.
- *  W3 (C1.1): every `__*` Context-binding key and every MultiValue
- *  component key is covered by the slot registry (`src/slots.ts`) —
- *  the D39 "no new `__*` slot" rule enforced mechanically.
+ *  W2: a resolved `type` field's data is a Context — checked on EVERY kind
+ *  since B-121 C4, because metadata is no longer a Structure's privilege.
+ *  W3 (C1.1): every `__*` Context-binding key and every metadata field key
+ *  is covered by the slot registry (`src/slots.ts`) — the D39 "no new `__*`
+ *  slot" rule enforced mechanically. Also kind-independent since C4.
  *  (Grows per phase: transparency, key-sort partition, immutability.) */
 export function checkValueInvariants(v: Value | null | undefined, program: string, out: InvariantViolation[], seen: WeakSet<object> = new WeakSet(), depth = 0): void {
   if (!v || typeof v !== "object" || depth > 24) return;
   if (seen.has(v)) return;
   seen.add(v);
+
+  // W2 and W3 over the METADATA PLANE, for every kind (B-121 C4).
+  //
+  // Both checks used to live inside the carrier branch below, which was the
+  // only place metadata could be found on a non-Structure value. C2 put
+  // metadata on every kind and stopped constructing carriers, so that branch
+  // went dead and took the checks with it: measured on the corpus walk, **564
+  // of 2034** metadata-bearing values reached had their metadata inspected by
+  // nothing (Bits 477, ComposedFunction 85, PrimitiveFunction 2), and W2 was
+  // left with no coverage at all. A walk over nothing still passes, so the
+  // gate could not see it. Hoisted here the checks follow the PLANE rather
+  // than the representation, and the corpus inspects 3062 values instead of
+  // 1470.
+  const meta = (v as { meta?: Map<string, Value> }).meta;
+  if (meta !== undefined) {
+    // W2: a resolved `type` field's value peels to a Context.
+    const typeComp = meta.get("type");
+    if (typeComp && (typeComp as Value).kind !== ValueKind.Expression) {
+      const tp = dataOf(typeComp as Value);
+      if (!tp || tp.kind !== ValueKind.Structure) {
+        out.push({ invariant: "W2 type-field-shape", detail: `type field's data has kind ${tp?.kind}`, program });
+      }
+    }
+    // W3 (C1.1, D39): every metadata field key is covered by the registry.
+    for (const key of meta.keys()) {
+      if (!isRegisteredFieldName(key)) {
+        out.push({ invariant: "W3 registry-completeness", detail: `unregistered metadata field key "${key}" on a ${v.kind}`, program });
+      }
+    }
+    for (const comp of meta.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
+  }
 
   if ((v as { primary?: Value }).primary !== undefined) {
     // C7.1: the CARRIER configuration (D15) — primary present. Restated
@@ -362,20 +394,8 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     if (mv.primary && (mv.primary as Value).kind === ValueKind.Structure) {
       out.push({ invariant: "W1 carrier-non-nesting", detail: "carrier primary is a Context (records flatten — C4.3b/C7.1)", program });
     }
-    const typeComp = mv.meta.get("type");
-    if (typeComp && (typeComp as Value).kind !== ValueKind.Expression) {
-      const tp = dataOf(typeComp as Value);
-      if (!tp || tp.kind !== ValueKind.Structure) {
-        out.push({ invariant: "W2 type-component-shape", detail: `type component primary has kind ${tp?.kind}`, program });
-      }
-    }
-    for (const key of mv.meta.keys()) {
-      if (!isRegisteredFieldName(key)) {
-        out.push({ invariant: "W3 registry-completeness", detail: `unregistered MultiValue component key "${key}"`, program });
-      }
-    }
+    // W2/W3 and the metadata recursion now run above, for every kind.
     checkValueInvariants(mv.primary as Value, program, out, seen, depth + 1);
-    for (const comp of mv.meta.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
     return;
   }
   if (v.kind === ValueKind.Structure) {
@@ -400,17 +420,9 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
         }
       }
     }
-    // C4.3b: W3 covers the Context role's channel plane too — flattened
-    // records/arrays carry registry-checked meta directly.
-    const sComps = (v as unknown as Structure).meta as Map<string, Value> | undefined;
-    if (sComps !== undefined) {
-      for (const key of sComps.keys()) {
-        if (!isRegisteredFieldName(key)) {
-          out.push({ invariant: "W3 registry-completeness", detail: `unregistered Context component key "${key}"`, program });
-        }
-      }
-      for (const comp of sComps.values()) checkValueInvariants(comp as Value, program, out, seen, depth + 1);
-    }
+    // W3 over the Context role's metadata now runs above with every other
+    // kind's — flattened records and arrays carry meta directly, and that
+    // was never a property of being a Structure.
     for (const [key, b] of (v as StructureValue).bindings) {
       if (key.startsWith("__") && !isRegisteredSlotKey(key)) {
         out.push({ invariant: "W3 registry-completeness", detail: `unregistered slot key "${key}"`, program });
