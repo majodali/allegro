@@ -356,23 +356,72 @@ export function makeStructure(): StructureValue {
   return newRecordStructure() as unknown as StructureValue;
 }
 
-export function withMetadata(primary: Value, meta?: Map<string, Value>): StructureValue {
-  // C4.3b/C7.1: the ONE channel-attachment chokepoint. A record/array/type
-  // primary flattens into a copy-on-write derive (channels ride directly);
-  // a CARRIER primary re-wraps its inner data (W1: carriers never nest —
-  // the given channel map is authoritative, mirroring the derive); a
-  // non-Structure primary (Bits, functions, residuals) takes the D15
-  // transparent carrier. Call sites read data through dataOf, never
-  // `.primary`.
-  if (primary.kind === ValueKind.Structure) {
-    if (isCarrier(primary)) {
-      return newCarrierStructure(
-        (primary as CarrierStructure).primary, meta ?? new Map()) as unknown as CarrierStructure;
-    }
-    return deriveWithMeta(primary as StructureValue, meta ?? new Map()) as unknown as CarrierStructure;
+/**
+ * THE metadata-attachment chokepoint (B-121 C2, D48(b)).
+ *
+ * Attaching metadata yields a NEW value **of the same kind**. Until C2 a
+ * non-Structure was wrapped in a CARRIER — an eleven-field `Structure` whose
+ * `primary` held the real value — so 74% of every structure allocated was a
+ * wrapper existing to hold, in 98.5% of cases, a single field. Now every kind
+ * carries `meta` itself: a typed Bits is a Bits.
+ *
+ * Why a NEW value rather than a mutation: metadata is a property of a value
+ * *in a position*, not of the datum. Measured, 33.6% of attachments target an
+ * object that has already been given metadata, so stamping in place would
+ * overwrite the first stamp everywhere the value is held. (A side table keyed
+ * by the object fails identically. D22 is the rule adopted BECAUSE of this.)
+ *
+ * The clones preserve identity-bearing host state per kind:
+ *  - functions SPREAD, so JS expandos ride along automatically — the
+ *    `FIELD_WRITER_BRAND` on a writer, `genericParams` and the
+ *    `PRESERVED_FN_META_KEYS` family on a ComposedFunction. A spread cannot
+ *    forget one the way a hand-written field list can.
+ *  - a ComposedFunction clone SHARES its `params`, which is safe because
+ *    substitution asks `ownsParam` — membership in `fn.params` — rather than
+ *    the `param.owner` back-pointer.
+ *  - an Expression clone SHARES its `memo`: same `fn` and `args` mean the same
+ *    memo is correct, and re-deriving it would forfeit IC-6.
+ */
+export function withMetadata(v: Value, meta?: Metadata): Value {
+  const m = meta ?? new Map<string, Value>();
+  switch (v.kind) {
+    case ValueKind.Structure:
+      return deriveWithMeta(v as StructureValue, m) as unknown as StructureValue;
+    case ValueKind.Bits:
+      return { kind: ValueKind.Bits, length: v.length, data: v.data, meta: m };
+    case ValueKind.Expression:
+      return { kind: ValueKind.Expression, fn: v.fn, args: v.args, memo: v.memo, meta: m };
+    case ValueKind.Symbol:
+      if (v.fqn !== undefined) warnInternedSymbolMeta();
+      return { kind: ValueKind.Symbol, name: v.name, fqn: v.fqn, meta: m };
+    default:
+      // Param, PrimitiveFunction, ComposedFunction — spread carries expandos.
+      return { ...v, meta: m };
   }
-  return newCarrierStructure(primary, meta ?? new Map()) as unknown as CarrierStructure;
 }
+
+/**
+ * B-121 §6 ruling 2 (maintainer): a WARNING, not an error, and expected to be
+ * removable. A registered Symbol's identity IS its FQN — same FQN, same object
+ * (SC-4/IC-4) — so cloning one to attach metadata breaks pointer identity.
+ * Measured across the corpus, carriers wrapped a Symbol **zero** times, and no
+ * use case for user-created Symbols is defined, so what form such metadata
+ * should take is not yet clear. Warn rather than refuse, and count it so the
+ * suite can see the mechanism fire.
+ */
+let internedSymbolMetaCount = 0;
+function warnInternedSymbolMeta(): void {
+  internedSymbolMetaCount++;
+  if (internedSymbolMetaCount === 1) {
+    console.warn(
+      "[allegro] metadata attached to an interned Symbol: its identity is its " +
+      "FQN (SC-4/IC-4), and the clone breaks pointer identity. Measured at zero " +
+      "occurrences when this warning was added — see B-121 §6 ruling 2.");
+  }
+}
+
+/** Test hook for the warning above; removed with it. */
+export function internedSymbolMetaWarnings(): number { return internedSymbolMetaCount; }
 
 /** C4.2: construct a dense numeric-keyed structure (array context) — the
  *  element array is adopted. Element reads go through slots.ts `indexGet`;

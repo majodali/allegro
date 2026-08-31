@@ -4,6 +4,53 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-08 — B-121 C2 lands: metadata rides every kind, and the carrier stops being created
+
+`withMetadata` now attaches to a **per-kind clone** — a typed `42` is a `Bits`
+carrying a `type` field, not an eleven-field `Structure` wrapping one. This is
+D48(b) implemented. `dataOf` still compiles and returns its argument, so the
+read side has not moved; C5 deletes it.
+
+**Three gated steps, after a first attempt was backed out at the gate.** Steps
+1 (the 14 kind-test fixes) and 2 (`carryMeta` at the seven clone sites) landed
+earlier and were behaviour-neutral while carriers still existed. This entry
+covers step 3, the switch itself.
+
+**Two classes of defect the survey could not see**, each found by instrumenting
+the failing guard and reading the call sites it recorded — one run per class,
+no iterating the suite.
+
+*`dataOf` was doing double duty*: peeling the carrier and, as a side effect,
+**stripping metadata**, because a carrier's inner value held none. Five sites
+used it to reset a value before re-stamping a type, then tripped `withType`'s
+shape guard when the old type came forward. All five mean "replace", and
+`withTypeReplacing` already exists: `typed_float_impl` and the four built-in
+constructors.
+
+*Six sites asked "does this carry metadata?" without naming a kind*, so the
+survey's `ValueKind.Structure` regex could not match them — and each silently
+disabled a check rather than throwing. `f(s: String) => s; f(42)` stopped
+rejecting, because `isCarrier(currentFnRaw)` gated the entire call-site block
+including `checkArgType`. A failing `proven` clause downgraded to an info
+"skipped" notification, because `checkProvenClauses` read the function's type
+only off a Structure. `effects` stopped unioning, because only the `Structure`
+case of `evaluate` merged an outer value's metadata over what it evaluated to.
+Full table in `docs/plans/metadata-on-values.md` §5.1c.
+
+**One of the six was not a stand-in.** `unifyTypes` used `isCarrier` to
+separate a *value carrying a type* from a *type Context*, whose `getType`
+reports its meta-type — a real distinction that survives C2 and was restated
+directly rather than deleted. Classifying by what a guard DOES, not how it is
+written, is what caught this; the same rule caught `totality.ts` in step 1.
+
+**The blocking question is answered and the third pinning test is rewritten.**
+Per the maintainer's ruling — *behavioural assertions are gold, structural
+tests are lead* — "typed scalars are transparent structures" is now "a typed
+scalar is one value — data plus metadata, never nested", asserting an
+idempotent `dataOf` peel where it walked `.primary`.
+
+Suite **1202/1202**, typecheck clean.
+
 ## 2026-08 — B-121 C2 steps 1 and 2 land; step 3 finds a class the survey could not see
 
 C2 re-attempted in three gated steps, which worked far better than one change.

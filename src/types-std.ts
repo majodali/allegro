@@ -3510,30 +3510,37 @@ export const ErrorType: StructureValue = buildType("Error", errorMethods);
 
 // =============================================================================
 // Built-in Type Constructors (__construct)
+//
+// B-121 C2: these REPLACE the argument's type rather than re-stamping it.
+// `Int(x)` means "make an Int from x", so a prior type is what is being
+// replaced, not a conflict. They read as `withType` because `dataOf` used to
+// strip metadata as a side effect of peeling a carrier — the argument arrived
+// bare and the shape guard never saw a prior type. `dataOf` is the identity
+// now, so the intent has to be said rather than assumed.
 // =============================================================================
 
 // Int(x) — wrap a value with Int type
 setConstruct(IntType, makePrimitive("Int.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(dataOf(v), IntType);
+  return withTypeReplacing(dataOf(v), IntType);
 }, true));
 
 // Float(x) — wrap a value with Float type
 setConstruct(FloatType, makePrimitive("Float.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(dataOf(v), FloatType);
+  return withTypeReplacing(dataOf(v), FloatType);
 }, true));
 
 // String(x) — wrap a value with String type
 setConstruct(StringType, makePrimitive("String.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(dataOf(v), StringType);
+  return withTypeReplacing(dataOf(v), StringType);
 }, true));
 
 // Bool(x) — wrap a value with Bool type
 setConstruct(BoolType, makePrimitive("Bool.__construct", (args, ctx, evalFn) => {
   const v = evalFn!(args[0], ctx!);
-  return withType(dataOf(v), BoolType);
+  return withTypeReplacing(dataOf(v), BoolType);
 }, true));
 
 // =============================================================================
@@ -4054,7 +4061,15 @@ export function unifyTypes(
     // unification here — a bare type Context skips (getType on it would now
     // report its META-type, which is not what this comparison wants; the
     // call-site checkArgType does the real concrete-type check).
-    const actualCtx = isCarrier(actualType) ? getType(actualType) : null;
+    // B-121 C2: `isCarrier` was doing REAL discriminating work here, not
+    // just guarding a metadata read — it separated a VALUE carrying a type
+    // from a type Context, whose `getType` reports its META-type instead.
+    // Both carry a `type` field now, so the distinction has to be made
+    // directly: a non-composite datum carrying a type is a value; a Structure
+    // is the type itself. That reproduces the pre-C2 behaviour exactly,
+    // because a typed record was a flattened Structure and already skipped.
+    const actualCtx = dataOf(actualType).kind !== ValueKind.Structure
+      ? getType(actualType) : null;
     if (!actualCtx) return bindings; // no type on actual, can't unify
 
     // Check base name

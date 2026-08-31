@@ -1675,7 +1675,7 @@ that prevents it.
 
 - [ ] **B-121** · L0 · **Metadata is a field on every value, supplied at
   construction (D48(b)(c), IC-3).** **PLAN: `docs/plans/metadata-on-values.md`
-  (active, 2026-08) — chunks C1–C7; §6 rulings taken; **C1 landed.** The plan adds
+  (active, 2026-08) — chunks C1–C7; §6 rulings taken; **C1 and C2 landed.** The plan adds
   four probes not in this entry: retyping `withMetadata` to return `Value`
   typechecks with **0 errors** (nothing depends on attachment producing a
   Structure); `newCarrierStructure` has exactly **2 callers, both inside
@@ -1768,7 +1768,21 @@ that prevents it.
     necessity that is now redundant. One (`totality.ts:173`) reads
     `(v as any).primary` through an `any` cast — a plane violation the
     boundary lint cannot see, and B-104's to count
-  - **C2 ATTEMPTED and BACKED OUT at the gate, 2026-08** — see
+  - **C2 LANDED 2026-08**, suite **1202/1202** — in three gated steps, after a
+    first attempt was backed out at the gate. `withMetadata` attaches to a
+    per-kind clone; carriers stop being created; `dataOf` still compiles and
+    returns `v` (C5 deletes it). Two classes the survey could not see, each
+    enumerated in ONE instrumented run: **`dataOf` was stripping metadata as a
+    side effect of peeling** (five re-stamp sites that mean `withTypeReplacing`),
+    and **six sites asking "carries metadata?" without naming a kind** —
+    `isCarrier` ×3, `carriesViralField`'s kind guard, `checkProvenClauses`'s
+    peel, and the metadata merge living only in `evaluate`'s Structure case.
+    Every one silently disabled a check rather than throwing: annotations
+    stopped rejecting, a failing `proven` clause downgraded to a skip, and
+    `effects` stopped unioning. One of the six (`unifyTypes`) was NOT a
+    stand-in — it separated a value-carrying-a-type from a type Context — and
+    was restated, not deleted. `docs/plans/metadata-on-values.md` §5.1c
+  - **First C2 attempt, backed out at the gate, 2026-08** — see
     `docs/plans/metadata-on-values.md` §5.1a for the full record. The root
     cause is one idea repeated: throughout the evaluator, *"does this value
     carry metadata?"* is asked as *"is its kind Structure?"*, which held only

@@ -2008,7 +2008,10 @@ const typed_float_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       const str = bitsToString(p);
       return withType(makeFloat(parseFloat(str)), FloatType);
     }
-    return withType(p, FloatType);
+    // B-121 C2: REPLACE, not re-stamp. `dataOf` used to strip metadata as a
+    // side effect of peeling a carrier, so `p` arrived bare and the shape
+    // guard never saw a prior type. `dataOf` is the identity now.
+    return withTypeReplacing(p, FloatType);
   }
   return withTypeReplacing(v, FloatType);
 };
@@ -2446,7 +2449,8 @@ function dispatchThroughType(
  *  dispatch not-found exits to propagate a failed guarded construction's
  *  error value instead of throwing out of the completion cascade. */
 function carriesViralField(v: Value): boolean {
-  if (v.kind !== ValueKind.Structure) return false;
+  // B-121 C2: kind guard dropped — metadata rides every kind now, so an
+  // error value that is not a Structure still answers the viral question.
   for (const chan of viralFields()) {
     if (metaReadRaw(v, chan) !== undefined) return true;
   }

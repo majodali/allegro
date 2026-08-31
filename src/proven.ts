@@ -192,17 +192,18 @@ export function checkProvenClauses(
     // Need a ComposedFunction body to peel + sample.
     let cfn: ComposedFunctionValue | null = null;
     let paramTypes: Value[] | null = null;
-    if (val.kind === ValueKind.Structure && (val as any).primary !== undefined) {
-      const mv = val as any;
-      if (mv.primary?.kind === ValueKind.ComposedFunction) {
-        cfn = mv.primary as ComposedFunctionValue;
-        const tComp = metaReadRaw(mv, "type");
-        if (tComp?.kind === ValueKind.Structure) {
-          paramTypes = getFunctionParamTypes(tComp as StructureValue);
-        }
+    // B-121 C2: a typed function is a ComposedFunction carrying a `type`
+    // field, not a Structure wrapping one. `dataOf` answers both shapes, and
+    // `metaReadRaw` is total, so read the type off the binding either way —
+    // asking `kind === Structure` first made every typed function look
+    // untyped and downgraded its failing `proven` clause to a skip.
+    const datum = dataOf(val);
+    if (datum.kind === ValueKind.ComposedFunction) {
+      cfn = datum as ComposedFunctionValue;
+      const tComp = metaReadRaw(val, "type");
+      if (tComp?.kind === ValueKind.Structure) {
+        paramTypes = getFunctionParamTypes(tComp as StructureValue);
       }
-    } else if (val.kind === ValueKind.ComposedFunction) {
-      cfn = val as ComposedFunctionValue;
     }
     if (!cfn) continue;
 

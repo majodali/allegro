@@ -4,7 +4,7 @@ import {
   Value, ValueKind, ExpressionValue, StructureValue,
   ComposedFunctionValue, ParamValue, CarrierStructure,
   AllegroError, isResolved, makeExpr, withMetadata, makeStructure,
-  DepCollector, ownsParam} from "./types.js";
+  DepCollector, ownsParam, Metadata} from "./types.js";
 import {
   getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
   unifyTypes, resolveTypeWithBindings, TypeBindings, typeContextName,
@@ -107,6 +107,30 @@ const PRIM_TO_METHOD = new Map<string, string>([
 
 // --- Core evaluation ---
 
+/** Lay an outer value's metadata under the metadata of what it evaluated to.
+ *
+ *  Re-evaluation FLATTENS rather than nests: the result's own (fresh) fields
+ *  shadow the outer (stale) ones, because resolved type info should replace a
+ *  partial-eval guess. C4.3a (R3) exempts union-rule fields (effects), which
+ *  merge through the registry-installed merge instead — effects observed
+ *  before re-evaluation are facts, not guesses.
+ *
+ *  B-121 C2: every kind carries metadata now, so this is no longer the
+ *  carrier-Structure case's private business. Symbols and Expressions carry
+ *  their own fields and re-evaluate to something else, so they merge here too.
+ */
+function mergeOverMeta(outer: Metadata, inner: Value): Value {
+  const innerMeta = metaOf(inner);
+  if (innerMeta.size === 0) return withMetadata(inner, outer);
+  for (const [k, v] of innerMeta) {
+    const prev = outer.get(k);
+    const mergeFn = prev !== undefined && metaFieldSpec(k)?.rule === "union"
+      ? fieldMerge(k) : undefined;
+    outer.set(k, mergeFn ? mergeFn(prev!, v) : v);
+  }
+  return withMetadata(dataOf(inner), outer);
+}
+
 export function evaluate(
   value: Value, ctx: StructureValue, depth: number = 0, depCollector?: DepCollector,
 ): Value {
@@ -126,25 +150,10 @@ export function evaluate(
       const mv = value as CarrierStructure;
       const ep = evaluate(mv.primary, ctx, depth + 1, depCollector);
       if (ep === mv.primary) return value;
-      // If re-evaluation produced another structure, FLATTEN rather than NEST.
-      // Inner (freshly-evaluated) meta shadow outer (stale) meta —
-      // fresh resolved type info should replace pre-computed partial-eval types.
-      // C4.3a (R3): union-rule channels (effects) merge by union via the
-      // registry-installed merge instead of inner-shadows-outer — effects
-      // observed before re-evaluation are facts, not stale guesses.
-      // B-121 C2: this asked `kind === Structure` to mean "the re-evaluated
-      // value carries metadata of its own". `metaOf` is total, so ask it.
-      if (metaOf(ep).size > 0) {
-        const merged = cloneMeta(mv);
-        for (const [k, v] of metaOf(ep)) {
-          const prev = merged.get(k);
-          const mergeFn = prev !== undefined && metaFieldSpec(k)?.rule === "union"
-            ? fieldMerge(k) : undefined;
-          merged.set(k, mergeFn ? mergeFn(prev!, v) : v);
-        }
-        return withMetadata(dataOf(ep), merged);
-      }
-      return withMetadata(ep, cloneMeta(mv));
+      // Flatten rather than nest — `mergeOverMeta` states the rule. B-121 C2
+      // extracted it from here so Symbols and Expressions, which carry their
+      // own metadata now, get the same treatment.
+      return mergeOverMeta(cloneMeta(mv), ep);
     }
 
     case ValueKind.Param:
@@ -154,6 +163,11 @@ export function evaluate(
       const resolved = scopeLookup(ctx, value.name);
       if (resolved?.value !== undefined) {
         let result = evaluate(resolved.value, ctx, depth + 1, depCollector);
+        // B-121 C2: a Symbol carries its own metadata now (pre-C2 those
+        // fields rode an enclosing carrier Structure and merged in the
+        // Structure case). Lay them under the resolved value's own.
+        const ownMeta = metaOf(value);
+        if (ownMeta.size > 0) result = mergeOverMeta(new Map(ownMeta), result);
         // Phase C Chunk 2: augment with any scope-local predicates for this
         // name (from branch conditions or in-scope `assert` statements).
         // C2.1: chain-aware — nearest layer wins.
@@ -170,6 +184,12 @@ export function evaluate(
 
     case ValueKind.Expression: {
       const result = evaluateExpr(value, ctx, depth, depCollector);
+      // B-121 C2: as for Symbol — an Expression's own fields used to ride an
+      // enclosing carrier. A TailCall sentinel passes through untouched.
+      const ownMeta = metaOf(value);
+      if (ownMeta.size > 0 && !isTailCall(result)) {
+        return mergeOverMeta(new Map(ownMeta), result as Value);
+      }
       return result as Value;
     }
   }
@@ -576,7 +596,13 @@ function applyComposed(
     // Type variable unification
     let enrichedCtx = ctx;
     let inferredReturnType: Value | null = null;
-    if (currentFnRaw && isCarrier(currentFnRaw)) {
+    // B-121 C2: was `isCarrier(currentFnRaw)` — "is a carrier" standing in
+    // for "carries a type". A typed function is now a ComposedFunction with
+    // `meta`, not a wrapper, so the guard stopped firing and this whole block
+    // — type-variable unification AND call-site argument checking — was
+    // skipped. Annotations silently stopped rejecting. The `fnType` test on
+    // the next line already asks the real question.
+    if (currentFnRaw) {
       const fnType = getType(currentFnRaw);
       const _fnTypeName = fnType ? getTypeName(currentFnRaw) : null;
       if (fnType && _fnTypeName === "Function") {

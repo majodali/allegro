@@ -625,16 +625,20 @@ function precompileFunctionsInner(
     let fn: Value;
     let fnType: Value | null = null;
     let paramTypes: Value[] | null = null;
-    if (isCarrier(val)) {
-      fnType = getType(val);
-      if (!fnType) continue;
-      const typeName = getTypeName(val);
-      const isTyped = typeName === "Function";
-      const isUntyped = typeName === "UntypedFunction";
-      if (!isTyped && !isUntyped) continue;
-      const valP = (val as { primary?: Value }).primary!;
-      if (valP.kind !== ValueKind.ComposedFunction) continue;
-      fn = valP;
+    // B-121 C2: was `if (isCarrier(val))` reading `val.primary` — "is a
+    // carrier over a ComposedFunction" standing in for "a function value
+    // carrying a type". A typed function is now a ComposedFunction with
+    // `meta`, so both the guard and the `.primary` read had to go. The typed
+    // branch is tried first because a typed function also satisfies the plain
+    // one below it.
+    const fnType0 = getType(val);
+    const typeName0 = fnType0 ? getTypeName(val) : null;
+    const isTyped = typeName0 === "Function";
+    const isUntyped = typeName0 === "UntypedFunction";
+    const datum = dataOf(val);
+    if (fnType0 && (isTyped || isUntyped) && datum.kind === ValueKind.ComposedFunction) {
+      fnType = fnType0;
+      fn = datum;
       paramTypes = isTyped ? getFunctionParamTypes(fnType) : null;
       if (isTyped && !paramTypes) continue;
     } else if (val.kind === ValueKind.ComposedFunction) {

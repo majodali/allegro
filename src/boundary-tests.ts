@@ -2101,31 +2101,35 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
 
   // --- The carrier (C7.1, D15/D46): MultiValue-kind retirement ----------------
 
-  test("carrier (C7.1, D15): typed scalars are transparent structures — one kind, data + channels", () => {
+  test("metadata-bearing values (C7.1, D15): a typed scalar is one value — data plus metadata, never nested", () => {
     const r = evalSource(
       "x = 42\ns = \"hi\"\nf(a: Int): Int => a + 1\ny = f(x)\nP = Int & _ > 0\np = P(5)",
       undefined, [createTypeSystem()], undefined, true);
     const x = r.evalCtx.bindings.get("x")!.value!;
-    // The one kind: a typed scalar answers Structure (the MultiValue kind
-    // is deleted from the enum — this line not compiling would be the
-    // regression).
-    eq(x.kind, ValueKind.Structure, "a typed scalar answers the one structure kind");
-    // Duality: data through dataOf; channels through the channel plane.
-    eq(Number((dataOf(x) as BitsValue).data), 42, "dataOf reads the primary");
-    eq(getType(x) !== null, true, "the type channel rides");
+    // B-121 C2 (maintainer ruling: *behavioural assertions are gold,
+    // structural tests are lead*). Two claims here named the carrier
+    // REPRESENTATION — "a typed scalar answers Structure", and a `.primary`
+    // walk for the no-nesting rule. D48(b) deletes that representation, so
+    // both are restated as what a program observes.
+    //
+    // Duality: data through dataOf, metadata through the metadata plane.
+    eq(Number((dataOf(x) as BitsValue).data), 42, "dataOf reads the data");
+    eq(getType(x) !== null, true, "the type field rides");
     eq(formatValue(x), "42", "display unchanged");
-    // D15: the carrier's data plane is EMPTY — record-shaped consumers
-    // see no slots, so a carrier can never be mistaken for a record.
+    // D15: the data plane holds the scalar and nothing else — record-shaped
+    // consumers see no slots, so a typed scalar is never mistaken for a record.
     eq((dataOf(r.evalCtx.bindings.get("s")!.value!) as BitsValue).kind, ValueKind.Bits,
-      "string carriers peel to Bits");
-    eq(formatValue(r.evalCtx.bindings.get("y")!.value!), "43", "typed calls flow through carriers");
+      "a typed string's data is Bits");
+    eq(formatValue(r.evalCtx.bindings.get("y")!.value!), "43", "typed calls flow through metadata");
     eq(formatValue(r.evalCtx.bindings.get("p")!.value!), "5", "refined construction still certifies");
-    // W1 restated: carriers never nest — re-typing a carrier re-wraps its
-    // inner data, never the carrier.
+    // W1 restated behaviourally: attaching metadata never nests. Re-typing an
+    // already-typed value leaves the SAME data underneath, so the peel is
+    // idempotent — a nested wrapper would need two peels to reach the scalar.
     const rewrapped = withMetadata(x, new Map([["type", dataOf(IntType as unknown as Value)]]));
-    eq((rewrapped as unknown as { primary?: Value }).primary !== undefined
-       && ((rewrapped as unknown as { primary: Value }).primary as { primary?: Value }).primary === undefined, true,
-      "withMetadata on a carrier re-wraps the inner data (no nesting)");
+    eq(dataOf(dataOf(rewrapped)) === dataOf(rewrapped), true,
+      "one peel reaches the scalar — a nested wrapper would need two");
+    eq(Number((dataOf(rewrapped) as BitsValue).data), 42, "the literal survives the re-type");
+    eq(getTypeNameOf(rewrapped), "Int", "and the re-attached type is the one asked for");
   });
 
   // --- Scalar transparency at the eager boundary (C4.3c, R4) -------------------

@@ -314,7 +314,7 @@ outstanding.
 |---|---|---|
 | 1 | the 14 kind-test fixes (§5.1b) | **landed**, green — behaviour-neutral while carriers still exist |
 | 2 | `carryMeta` at the seven clone sites | **landed**, green |
-| 3 | `withMetadata` attaches per-kind clones | attempted, backed out; findings below |
+| 3 | `withMetadata` attaches per-kind clones | **landed**, green at 1202/1202 |
 
 **A fourth class, which the survey missed by construction.** The survey
 classified `kind === Structure` tests. This one is invisible to that: **`dataOf`
@@ -331,26 +331,42 @@ sites — and it is **five call sites**, all saying "stamp" where they mean
 exists for exactly this and its own comment says *"construction-point re-tags
 use withTypeReplacing"*. Both fixes are one word each.
 
-**What remains, and one of it is not mine to decide.**
+**A fifth class: "carries metadata" written without naming a kind.** The
+survey's regex looked for `ValueKind.Structure`. Six sites asked the same
+question in words the regex could not match, and each one silently disabled a
+check rather than throwing:
 
-- **Tests that pin the carrier REPRESENTATION.** `types-construction.ts:290`
-  — *"error: creates error MultiValue"* — asserts `result.kind ===
-  ValueKind.Structure` for an error value. C2 deliberately makes that a Bits,
-  so the assertion is not wrong, it is **about the thing being changed**.
-  PROCESS §6 makes that a discussion, not a judgement call, and the same
-  question probably covers a handful of sibling assertions. **This blocks
-  step 3 regardless of the remaining defects.**
-- Generic type variables (`id[T](x: T): T` answers null) and unification.
-- Three checks that stop firing — effect-bound params, function-type args, and
-  a refinement rejection — which look like one cause, not three.
-- One shard still exits early on an uncaught error, not yet located.
+| site | what it said | what it meant | symptom |
+|---|---|---|---|
+| `evaluator.ts` call-site block | `isCarrier(currentFnRaw)` | does this function carry a type? | type-variable unification **and** `checkArgType` skipped — `f(s: String) => s; f(42)` stopped rejecting |
+| `runtime.ts` precompile | `isCarrier(val)` + a `.primary` read | is this a function value carrying a type? | typed functions never precompiled |
+| `types-std.ts` `unifyTypes` | `isCarrier(actualType)` | is this a VALUE carrying a type, or the type itself? | genuine discrimination — see below |
+| `primitives.ts` `carriesViralField` | `kind !== Structure → false` | does this value carry a viral field? | an error value that is not a Structure threw out of the completion cascade |
+| `proven.ts` `checkProvenClauses` | `kind === Structure && primary !== undefined` | is this a function carrying a type? | every typed function looked untyped, so a **failing `proven` clause downgraded to a skip** |
+| `evaluator.ts` metadata merge | only the `Structure` case merged | any value may carry metadata over what it evaluates to | Symbols and Expressions dropped their own fields — `effects` stopped unioning |
+
+`unifyTypes` is the one that was not a stand-in. `isCarrier` there separated a
+**value carrying a type** from a **type Context**, whose `getType` reports its
+meta-type instead — a real distinction that survives C2 and had to be restated
+directly (`dataOf(t).kind !== Structure`), not deleted.
+
+The merge site generalised rather than moved: `mergeOverMeta` now states the
+flatten rule once, and the `Symbol` and `Expression` cases call it. Before C2
+those kinds could not carry metadata, so an enclosing carrier Structure held
+their fields and the Structure case did the merging for them.
+
+**The representation-pinning tests were the blocking question, and it is
+answered.** §5.1d records the ruling. Three tests carried such assertions; all
+three are rewritten behaviourally, and the third — *"typed scalars are
+transparent structures"* — is now *"a typed scalar is one value — data plus
+metadata, never nested"*, asserting an idempotent `dataOf` peel instead of a
+`.primary` walk.
 
 **Method note, worth more than the fixes.** Each class was enumerated in ONE
 instrumented run rather than found by iterating the suite: instrument the
-failing guard, record the call site, read the list. Three classes, three runs,
-no guessing. That is the same move as the survey, applied to a failure rather
-than to a grep — and it is what makes the remaining tail measurable instead of
-unknown.
+failing guard, record the call site, read the list. That is the same move as
+the survey, applied to a failure rather than to a grep — and it is what turned
+a tail that read as unbounded on the first attempt into a list of six.
 
 ### 5.1 The 185 kind-comparisons — the real risk, and it points the safe way
 
@@ -413,7 +429,7 @@ separate optimisation below this choice and is out of scope.
 | Chunk | Delivers | Gate |
 |---|---|---|
 | **C1** | ~~`Metadata` / `MetadataBearing` declared and extended by all seven interfaces; `Structure.components` → `meta`; every factory declares the field~~ **DONE 2026-08**, widened by ruling 1 to the whole metadata vocabulary: **430 identifier renames across 28 files** plus the registry's storage and disposition labels. Nothing writes the new field yet | Suite **1198/1198**; typecheck clean |
-| **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier, **preceded by the 15 kind-test fixes the survey (§5.1b) enumerates** and `carryMeta` at the seven clone sites. Carriers stop being created; `dataOf` still compiles and returns `v` | **ATTEMPTED 2026-08 and BACKED OUT at the gate** — §5.1's risk materialised and is now quantified. See §5.1a. The tree is green at the pre-attempt commit; nothing was landed red |
+| **C2** | `withMetadata` attaches to a per-kind clone instead of a carrier, **preceded by the 14 kind-test fixes the survey (§5.1b) enumerates** and `carryMeta` at the seven clone sites. Carriers stop being created; `dataOf` still compiles and returns `v` | **DONE 2026-08** in three gated steps after a first attempt was backed out at the gate (§5.1a). Suite **1202/1202**; typecheck clean. Steps and the two classes the survey could not see: §5.1c |
 | **C3** | The carrier's re-wrap moves into `evaluate` as one uniform carry (§4.2); the three carrier arms are deleted | Suite green; PE fixtures are the oracle for metadata surviving evaluation |
 | **C4** | Delete `primary` (196), `isCarrier` (14), `CarrierStructure` (24), `newCarrierStructure`, W1/W5 and their walker. `concepts.md` §10 leaves the spine | Counts to zero; §6 ruling 3 applied |
 | **C5** | Delete `dataOf` (903) and its call sites — mechanical, counts as the completion test | Counts to zero |
