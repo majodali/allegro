@@ -16,6 +16,7 @@ import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, 
 import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
 import { scopePrivilegeExtend, scopeHoldsPrivilege, scopeLookup } from "./scope.js";
 import { effectsOf as fnEffectsOf } from "./effects.js";
+import { putEntry, removeEntry } from "./structure.js";
 import {
   getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericBackLink,
@@ -377,8 +378,8 @@ export function stabilizeTypeMemberScope(typeCtx: StructureValue, stableScope: s
   }
   for (const [oldK, newK] of renames) {
     const bnd = members.bindings.get(oldK)!;
-    members.bindings.delete(oldK);
-    members.bindings.set(newK, { key: newK, value: bnd.value });
+    removeEntry(members, oldK);
+    putEntry(members, { key: newK, value: bnd.value });
     for (const e of members.bindingList) {
       if (e.key === oldK) (e as { key: string }).key = newK;
     }
@@ -445,8 +446,7 @@ registerMetaField({ name: "discharged", rule: "drop", integrity: true,
 const dischargedWriterStd = kernelFieldWriter("discharged");
 
 function addBinding(ctx: StructureValue, key: string, value: Value): void {
-  ctx.bindings.set(key, { key, value });
-  ctx.bindingList.push({ key, value });
+  putEntry(ctx, { key, value });
 }
 
 /**
@@ -652,8 +652,7 @@ export function structuralWrap(type: StructureValue): StructureValue {
     // the LOOSE (base-name) world; a wrapped interface duck-types by name
     // instead of demanding declared symbol identity.
     if (key === SLOT_KEYS.interface) continue;
-    wrapper.bindings.set(key, { ...binding });
-    wrapper.bindingList.push({ ...binding });
+    putEntry(wrapper, { ...binding });
   }
   // C5.2a (ruling R1): member-set sharing is EXPLICIT — the wrap is
   // member-transparent (same member-set object as the wrapped type), which
@@ -1368,8 +1367,7 @@ export function resolveDataSlots(
   for (const [key, b] of instCtx.bindings) {
     if (b.value === undefined) continue;
     const nv = updates.get(key) ?? b.value;
-    fresh.bindings.set(key, { key, value: nv });
-    fresh.bindingList.push({ key, value: nv });
+    putEntry(fresh, { key, value: nv });
   }
   const storedType = getType(v);
   return storedType ? withTypeReplacing(fresh, storedType) : fresh;
@@ -3150,8 +3148,7 @@ export function makeObject(entries: [string, Value][]): Value {
   const ctx = makeStructure();
   for (const [key, value] of entries) {
     assertNotIntegrityKey(key, "object literal");
-    ctx.bindings.set(key, { key, value });
-    ctx.bindingList.push({ key, value });
+    putEntry(ctx, { key, value });
   }
   return withType(ctx, ObjectType);
 }

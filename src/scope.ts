@@ -27,6 +27,7 @@ import {
 } from "./types.js";
 import { hasShapeSlot } from "./slots.js";
 import { PredicateSet, mergePredicateSets } from "./refinements.js";
+import { putEntry } from "./structure.js";
 
 /** Create a fresh scope, optionally layered over a parent scope. */
 export function scopeNew(parent?: StructureValue): StructureValue {
@@ -57,8 +58,7 @@ function assertExtendable(parent: StructureValue, op: string): void {
 export function scopeExtend(parent: StructureValue, entries: Iterable<[string, Binding]>): StructureValue {
   const child = scopeNew(parent);
   for (const [k, b] of entries) {
-    child.bindings.set(k, b);
-    child.bindingList.push(b);
+    putEntry(child, b);
   }
   return child;
 }

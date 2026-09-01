@@ -11,6 +11,7 @@ import { withType } from "./types-std.js";
 import { primitives } from "./primitives.js";
 import { markExported } from "./symbols.js";
 import { scanUses } from "./use-scanner.js";
+import { putEntry } from "./structure.js";
 
 // --- Types ---
 
@@ -148,8 +149,7 @@ export function buildModuleObject(
   // Build the underlying Context with ALL bindings (public + private)
   const ctx = makeStructure();
   for (const [key, value] of Object.entries(capturedBindings)) {
-    ctx.bindings.set(key, { key, value });
-    ctx.bindingList.push({ key, value });
+    putEntry(ctx, { key, value });
   }
 
   // Build a module-specific type with __getMember for exported fields only.

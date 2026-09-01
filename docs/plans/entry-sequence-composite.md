@@ -217,7 +217,7 @@ Provisional — the maintainer sets the boundaries (W-001).
 
 | Chunk | Delivers | Gate |
 |---|---|---|
-| **E1** | `bindings` becomes a derived cached index over `entries`; `slotWrite` writes one object. The 2254 divergences go to zero | Suite green; a new battery test asserts map and list agree for every corpus structure |
+| **E1** | One write path (`putEntry` / `setEntry` / `removeEntry`); every Structure writer routed through it, so both containers hold one object. The 2254 divergences go to zero | **DONE 2026-09.** Suite 1202/1202. W7 slot-store-coherence added and verified to fail on the reintroduced defect. Deriving the map from `entries` moves to E3, where the index policy is set |
 | **E2** | Benchmark the scan/index crossover (§5.1); set the index policy from the result | Bench recorded in the plan; no behaviour change |
 | **E3** | Scope index: built and invalidated at `scopeExtend` / `addBinding`; data structures stop carrying one | Suite green; scope-heavy bench no worse |
 | **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | Suite green; array demos are the oracle |
