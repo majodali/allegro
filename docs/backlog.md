@@ -102,6 +102,12 @@ an arc, and the lane lands them in order without stopping between each.
 **Lane D keeps the per-chunk gate** (PROCESS §3): land, summarize, stop.
 Everything else in the landing checklist is unchanged for every lane.
 
+> This gate policy is **deviation D-1** against W-001 (two delivery modes,
+> human-gated), recorded 2026-09-01 in
+> [docs/classification.md](classification.md#deviation-register). An
+> amendment adding the sequence mode is drafted; B-131 retires the
+> deviation when it is adopted.
+
 **Before starting in any lane** (PROCESS §7): check open PRs for
 overlapping work. Sessions run in separate containers with separate
 clones and cannot see each other's uncommitted work, so a collision
@@ -2237,3 +2243,16 @@ that prevents it.
   - **When**: after B-129, and after the rules have been exercised.
   - **Pointer**: methodology [style guide](https://github.com/majodali/methodology/blob/main/docs/style.md)
     and [P-001–P-005 (prose \& presentation)](https://github.com/majodali/methodology/blob/main/docs/rules/prose.md).
+
+- [ ] **B-131** · T-docs · **Retire deviation D-1 when the W-001 amendment is
+  adopted.**
+  - **What**: delete the D-1 entry from
+    [docs/classification.md](classification.md#deviation-register) and drop
+    the deviation note from `docs/PROCESS.md` §3, once a methodology release
+    carries the pre-ratified sequence mode and this project migrates to it.
+  - **Why**: D-1 records a contradiction between the declared per-lane
+    practice and W-001's per-chunk gate. The amendment is the accommodation;
+    the deviation is the interim.
+  - **When**: blocked on the amendment being released and adopted. The
+    PROCESS half needs a Tier-0 PR.
+  - **Pointer**: methodology [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated).
