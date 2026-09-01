@@ -10,6 +10,12 @@
 > `docs/CHANGELOG.md` — it does not accumulate here. The v1 feature set
 > awaiting disposition through the rewrite lives in `V1-INVENTORY.md`.
 >
+> **Row shape (P-006, from the v1.4.0 migration 2026-09-01)**: an entry
+> carries *what*, *when/status*, and a *pointer*; reasoning belongs in the
+> linked plan or design doc, not here. Entries written before that date do
+> not follow it — the editorial pass is **B-129**, and until it runs this
+> register mixes both shapes.
+>
 > **Revalidation-register items** (tagged `[reval]`) carry v1 design whose
 > only record is an archived plan (`docs/plans/archive/README.md` has
 > the triage record). Working one means: read the archived source,
@@ -2203,3 +2209,31 @@ that prevents it.
     afterwards and see whether the answer is a short list rather than a class
     of things nobody could search for
 
+
+- [ ] **B-129** · T-docs · **Editorial pass: bring the registers to P-006
+  (registers hold uniform rows).**
+  - **What**: rewrite `docs/backlog.md`, `docs/decisions.md` and
+    `docs/CHANGELOG.md` entries to the declared row shape — what, when,
+    status, pointer — moving reasoning into linked documents.
+  - **Why**: P-006 binds registers from the v1.4.0 migration
+    (2026-09-01). Existing entries predate it: many run 100–250 words with
+    nested parentheticals, which the methodology's 2026-08-30 documentation
+    review cites as the portfolio-wide anti-pattern this rule corrects.
+  - **When**: scheduled work, not a migration duty — the v1.4.0 release note
+    says editorial passes run on the project's own schedule.
+  - **Owner note**: the technical-writer session takes the rewrites once the
+    rules have been tested in ordinary work (owner ruling, 2026-09-01).
+  - **Pointer**: methodology [P-006 (registers hold uniform rows)](https://github.com/majodali/methodology/blob/main/docs/rules/prose.md#p-006--registers-hold-uniform-rows)
+    and its [style guide](https://github.com/majodali/methodology/blob/main/docs/style.md).
+
+- [ ] **B-130** · T-docs · **Editorial pass: P-001–P-005 across the Tier-1
+  design corpus.**
+  - **What**: `docs/design/concepts.md`, `docs/design/layers.md` and the
+    area docs — headers that state their contents (P-005), citations
+    carrying names (P-004), bold as structure only (P-003), one idea per
+    sentence (P-002), sections readable from a link (P-001).
+  - **Why**: same adoption; the P- rules bind new and edited prose from
+    2026-09-01 and existing documents migrate on schedule.
+  - **When**: after B-129, and after the rules have been exercised.
+  - **Pointer**: methodology [style guide](https://github.com/majodali/methodology/blob/main/docs/style.md)
+    and [P-001–P-005 (prose \& presentation)](https://github.com/majodali/methodology/blob/main/docs/rules/prose.md).

@@ -4,6 +4,61 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — Migrated to methodology v1.4.0 from v1.2.0
+
+The Classification pin moves to 1.4.0. No deviations recorded (owner ruling,
+2026-09-01).
+
+### Why the migration is small
+
+All eight amendments across v1.3.0 and v1.4.0 ship a migration note of `none`
+or `none mandatory`. Nothing required immediate rework. The pin bump and one
+Workflow reword are the whole migration, per release process step 5.
+
+v1.3.0's four amendments do not bind this project. Project families and
+citation-form custom definitions are opt-in. Q-001 (template scaffolds stay
+compliant) applies to `[type: template]` projects only. The links-move
+limitation adds no project duty.
+
+### Rules that bind from adoption
+
+P-001 to P-006 (prose and presentation) bind new and edited prose. They cite
+the methodology's new style guide. P-006 (registers hold uniform rows) is the
+one with existing debt here, and B-129 schedules that pass.
+
+W-008 (reports map their deliverables) binds chat reports that deliver an
+artifact. A report separates restatement from novelty and ends with its asks.
+
+K-010 (superseded content is never silently readable) and K-011 (found
+contradictions are marked, not routed around) bind decision propagation. Both
+use the style guide's supersession marker: a blockquote starting "Superseded
+by", citing the decision by identifier and name.
+
+The B-121 arc met exactly the problem K-010 and K-011 address. Three documents
+described the carrier after it was deleted. Each was fixed by judgement rather
+than by rule.
+
+### The Workflow declaration is reworded, not changed
+
+The methodology now defines a canonical three-part form: ordered stages, the
+designated live stage, and the Backlog default rule. Review round 1 named this
+project as one of three whose declarations prompted the amendment. The three
+parts were already present in substance. Rewording them makes `deployed`
+derivable by tooling and clears a standing audit info finding.
+
+### Two editorial passes are filed, not done
+
+B-129 brings the registers to P-006. B-130 brings the Tier-1 design corpus to
+P-001 through P-005. Both wait until the rules have been exercised in ordinary
+work; the technical-writer session then takes the rewrites (owner ruling,
+2026-09-01).
+
+### Owner action outside this repo
+
+The methodology's Portfolio register still records this project's earlier pin.
+Refreshing it needs a change in `majodali/methodology`, which this repo cannot
+make. Coordination item C1 in the adoption plan already covers portfolio rows.
+
 ## 2026-08 — B-121 C7 closes the arc: the in-place rule, and one delta left open on purpose
 
 The carrier arc is complete. Every completion count is zero — `primary`,
