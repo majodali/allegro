@@ -4,6 +4,50 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-120 E4: the dense role collapses into the entry sequence
+
+An array is its entries, every key null. The `dense` array, `materializeView`,
+`viewMaterialized`, `slotCountBits`, the `__length` slot, `isDense` and the
+**W6** invariant are all deleted. E5's list arrived with the region rather than
+after it; only `isMetaSlotKey` remains for E5, which closes B-104(b). B-104(f)
+closes here.
+
+### One host-plane bit survives, and the plan missed it
+
+§3.3 said an array is *`entries` with every key null*. True, and not
+sufficient: an empty array and an empty record are then the same object, so
+`getSlotCount` cannot tell "zero elements" from "not a sequence".
+
+`Structure.positional` replaces the `dense` **array**, not the question it
+answered. The dense ROLE — a second storage shape with its own accessors and a
+materialized view — is what D48(a) deletes; *are these entries positional?*
+survives as one boolean, the way `isScope` does. It also buys O(1) indexing: a
+wholly-positional structure reads `entries[i]`, anything else walks the unkeyed
+subsequence. A keyed write clears the flag, because after one the index and the
+position disagree.
+
+### The string-key protocol had consumers after all
+
+E3's write-up said an array's elements being reachable as `bindings.get("0")`
+had no consumer, citing E2's measurement that 0 of 166 dense structures ever
+materialized their view, and that no `.alg` source indexes an array by string.
+
+Both facts were true and the conclusion was wrong. E2's corpus walk covers
+`tests/*.alg`, not the TypeScript test harness — which read analyzer output
+positionally in three places. Nine tests failed. Those three move to
+`indexGet`, correctly: they consume Allegro arrays.
+
+The fourth case is the useful one. `grammar-legacy.ts`'s JSON grammar builds an
+array-shaped value as a **genuine string-keyed record** — `"0"`, `"1"`, `"2"`
+plus a `length` key. Migrating it to `indexGet` broke it, because it never was
+a positional structure. `bindings.get(String(i))` is not reliably the retired
+protocol; sometimes it is an ordinary record read with numeric keys.
+
+**A measurement's scope is part of its claim.** "Zero in the corpus" was
+reported as "zero", and the gap between those is where the nine failures lived.
+
+Suite **1202/1202**, typecheck clean.
+
 ## 2026-09 — B-120 E3: the stored map is deleted; the by-name view is derived
 
 `entries` is the slot plane. The `Map` beside it is gone, replaced by

@@ -205,16 +205,18 @@ export function slotRegistration(key: string): SlotRegistration | undefined {
 // including MultiValue-wrapped types (types are typed) — plus `asStructure`
 // to peel to the primary Context where the caller needs the shape itself.
 
-// C4.2: dense structures (array contexts) only ever hold numeric element
-// keys plus `__length` — every slot probe can answer WITHOUT materializing
-// the legacy bindings view. Keeps type-slot probes on arbitrary values
-// (auto-naming's hasShapeSlot, getName, …) off the materialization path.
-function isDense(ctx: StructureValue): boolean {
-  return (ctx as unknown as { dense?: unknown }).dense !== undefined;
-}
+// B-120 E4: `isDense` is deleted with the dense region. It guarded slot probes
+// against materializing an array's legacy view — a view that no longer exists,
+// for a region that is now the entry sequence itself. A probe on an array
+// finds nothing because every entry is unkeyed, which is the same answer the
+// guard used to short-circuit to.
+//
+// `__length` goes with it: an array's length is its entry count, read through
+// `getSlotCount`, not a derived binding the view had to emit. That closes
+// **B-104(f)** — and leaves `isMetaSlotKey` with no key it ever fires on,
+// which is **B-104(b)**, taken at E5.
 
 function slotRead(ctx: StructureValue, name: string): Value | undefined {
-  if (isDense(ctx)) return name === "__length" ? denseSlotCount(ctx) : undefined;
   return ctx.bindings.get(name)?.value as Value | undefined;
 }
 
@@ -264,7 +266,7 @@ export function getMembers(ctx: StructureValue): Value | undefined { return slot
 export function getRefines(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__refines"); }
 export function getConstruct(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__construct"); }
 export function getFallbackMember(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__getMember"); }
-export function isInterfaceType(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__interface"); }
+export function isInterfaceType(ctx: StructureValue): boolean { return ctx.bindings.has("__interface"); }
 export function getInterfaceMarker(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__interface"); }
 export function getWraps(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__wraps"); }
 
@@ -467,9 +469,9 @@ export function writeShape(ctx: StructureValue, v: Value): void {
 function writeDischarged(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
 
 // Presence checks
-export function hasName(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__name"); }
+export function hasName(ctx: StructureValue): boolean { return ctx.bindings.has("__name"); }
 export function hasShapeSlot(ctx: StructureValue): boolean { return ctx.meta?.has("type") === true; }
-export function hasDischarged(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__discharged"); }
+export function hasDischarged(ctx: StructureValue): boolean { return ctx.bindings.has("__discharged"); }
 
 // B-120 E1: these were SET-ONLY writes — the map, deliberately not the list —
 // which is where the measured "map holds entries the list lacks" class came
@@ -946,9 +948,7 @@ export function metaFieldList(v: Value): string[] {
   }
   if (v.kind === ValueKind.Structure) {
     const ctx = v as StructureValue;
-    if (!isDense(ctx)) {
-      if (ctx.bindings.has("__discharged") && !out.includes("discharged")) out.push("discharged");
-    }
+    if (ctx.bindings.has("__discharged") && !out.includes("discharged")) out.push("discharged");
   }
   return out;
 }

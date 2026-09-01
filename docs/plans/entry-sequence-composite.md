@@ -271,6 +271,47 @@ Those are different quantities: §6a models slot lookup and index construction
 alone, not evaluation. Per-file A/B against `main` is the comparison that
 answers the question, and it shows no regression.
 
+### 5.3 An empty array needs a flag, which the plan missed
+
+§3.3 said an array is *`entries` with every key null*. True, and not sufficient:
+**an empty array and an empty record are then the same object**, so
+`getSlotCount` cannot tell "zero elements" from "not a sequence".
+
+E4 keeps one host-plane bit, `Structure.positional`, set by
+`newDenseStructure`. It replaces the `dense` **array**, not the question the
+array answered. The dense ROLE — a second storage shape with its own
+accessors and a materialized legacy view — is what D48(a) deletes; *are these
+entries positional?* survives as a boolean, the way `isScope` does.
+
+The flag also buys O(1) indexing. A wholly-positional structure reads
+`entries[i]` directly; anything else walks the unkeyed subsequence. A keyed
+write clears the flag, because after one the index and the position disagree.
+The existing 200-vs-200,000-element scaling test is what holds this honest.
+
+### 5.4 The string-key protocol had consumers after all
+
+E3's write-up said an array's elements being reachable as `bindings.get("0")`
+had no consumer, citing E2's measurement that **0 of 166** dense structures
+ever materialized their view, and that no `.alg` source indexes an array by
+string.
+
+**Both facts were true and the conclusion was wrong.** E2's corpus walk covers
+`tests/*.alg`; it does not cover the TypeScript test harness, which read
+analyzer output positionally through `bindings.get(String(i))` in three places.
+Those broke, and they were right to break — they consume an Allegro array, so
+they move to `indexGet`.
+
+One case went the other way and is the more useful half. `grammar-legacy.ts`'s
+JSON grammar builds an array-shaped value as a **genuine string-keyed record**
+— `"0"`, `"1"`, `"2"`, plus a `length` key — using `makeStructure`. Migrating
+it to `indexGet` broke it, because it never was a positional structure.
+`bindings.get(String(i))` is *not* reliably the retired array protocol; it is
+sometimes an ordinary record read that happens to use numeric keys.
+
+The lesson generalises past this chunk: **a measurement's scope is part of its
+claim.** "Zero in the corpus" was reported as "zero", and the gap between those
+is where the nine failures lived.
+
 ## 6. Rulings — taken 2026-09-01
 
 All five recommendations accepted by the maintainer as written.
@@ -395,8 +436,8 @@ Provisional — the maintainer sets the boundaries (W-001).
 | **E1** | One write path (`putEntry` / `setEntry` / `removeEntry`); every Structure writer routed through it, so both containers hold one object. The 2254 divergences go to zero | **DONE 2026-09.** Suite 1202/1202. W7 slot-store-coherence added and verified to fail on the reintroduced defect. Deriving the map from `entries` moves to E3, where the index policy is set |
 | **E2** | Benchmark the scan/index crossover (§5.1); set the index policy from the result | **DONE 2026-09.** `scripts/bench-slot-lookup.ts` committed and its results recorded in §5.1. The measurement fired D48(a)'s own revisit trigger (§5.1a) and supersedes §6 ruling 3; §6a proposes the replacement policy and awaits ratification. No behaviour change |
 | **E3** | `bindings` becomes derived from `entries` (moved here from E1), and the §6a policy is implemented: build lazily on first lookup when size > 8 | **DONE 2026-09.** Suite 1202/1202. `SlotView` replaces the stored map; measured on the real implementation, **93.4%** of 4.24M lookups are served by a scan averaging **3.63** entries and 268 indexes are built. Per-file wall clock within noise of main (§5.2) |
-| **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | Suite green; array demos are the oracle |
-| **E5** | Delete `materializeView`, `viewMaterialized`, `__length`, W6 and `isMetaSlotKey`. Closes B-104(b) and B-104(f) | Counts to zero; boundary lint at baseline |
+| **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | **DONE 2026-09.** Suite 1202/1202. `dense`, `materializeView`, `viewMaterialized`, `slotCountBits`, `__length`, `isDense` and **W6** all deleted — E5's list arrived with the region rather than after it. Two things the plan did not anticipate: §5.3 (the positional flag) and §5.4 (the string-key protocol had consumers) |
+| **E5** | ~~Delete `materializeView`, `viewMaterialized`, `__length`, W6~~ **done at E4** — they went with the region. E5 is now only `isMetaSlotKey`, whose last key (`__length`) is gone. Closes **B-104(b)**; B-104(f) closed at E4 | Counts to zero; boundary lint at baseline |
 | **E6** | `concepts.md` §12 (structure roles), §16 (dense region), §17 (the legacy view) and IC-2 updated; deltas 17 and 22 closed | doc-ref lint; spine delta rows read `—` |
 
 **Completion test**: `dense` 0, `__length` 0, `isMetaSlotKey` 0, `bindingList`

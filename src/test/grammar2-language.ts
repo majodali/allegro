@@ -23,6 +23,7 @@ import { testsDir } from "./alg-files.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as g2 from "../grammar2/types.js";
+import { indexGet } from "../slots.js";
 
 // --- Phase 6 step 3: grammar { … } block parsing ---
 //
@@ -1536,7 +1537,7 @@ grammar2_set_start(g, "pattern")
   eq(len, 8);
   const results: string[] = [];
   for (let i = 0; i < len; i++) {
-    const el = p.bindings.get(String(i)).value;
+    const el = indexGet(p, i)!;     // B-120 E4: positional, not string-keyed
     results.push(bitsToString(el as any));
   }
   eq(results.join(","), "ok,ok,ok,ok,ok,err,err,err");

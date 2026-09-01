@@ -76,8 +76,6 @@
 import type { Value, Binding, StructureValue, BitsValue } from "./types.js";
 import { ValueKind, makeInt } from "./types.js";
 
-const LENGTH_KEY = "__length";
-
 /** The one host representation behind every composite value. All fields
  *  are declared up front so every structure shares a single hidden class
  *  (the I1 motivation), whichever role it plays. */
@@ -101,13 +99,17 @@ export class Structure {
    *  nothing (B-120 E2 measurement). */
   private _view?: SlotView;
 
-  // --- C4.2 dense region (numeric-keyed structures — arrays) ---
-  /** Element storage for array contexts. When present, this IS the slot
-   *  plane; `entries` holds the lazily-materialized legacy view (or stays
-   *  undefined until someone asks). E4 collapses this into `entries`. */
-  dense?: Value[];
-  /** Cached Bits for the slot count (avoids re-allocating per read). */
-  private _slotCountBits?: Value;
+  /** Host plane: these entries are POSITIONAL — every one unkeyed, so index
+   *  `i` is `entries[i]` and the slot count is `entries.length`. Set by
+   *  `newDenseStructure`; cleared the moment a keyed entry is written, which
+   *  drops positional reads onto the general subsequence path.
+   *
+   *  B-120 E4: this replaces the `dense` array. The dense ROLE — a second
+   *  storage shape with its own accessors and a materialized legacy view —
+   *  is what D48(a) deletes. The QUESTION it answered, *are these entries
+   *  positional?*, survives as one host-plane bit, the way `isScope` does.
+   *  Without it an empty array and an empty record are the same object. */
+  positional?: boolean;
 
   // --- Scope-role fields (C2.1/C2.2; host-plane, never value slots) ---
   parent?: StructureValue;
@@ -124,8 +126,7 @@ export class Structure {
     this.meta = undefined as unknown as Map<string, Value>;
     this.entries = undefined as unknown as Binding[];
     this._view = undefined;
-    this.dense = undefined;
-    this._slotCountBits = undefined;
+    this.positional = undefined;
     this.parent = undefined;
     this.isScope = undefined;
     this.scopePredicates = undefined;
@@ -136,39 +137,18 @@ export class Structure {
    *  Cached per structure and built on first access. */
   get bindings(): SlotView {
     let v = this._view;
-    if (v === undefined) {
-      if (this.entries === undefined && this.dense !== undefined) materializeView(this);
-      v = this._view = new SlotView(this);
-    }
+    if (v === undefined) v = this._view = new SlotView(this);
     return v;
   }
 
-  get bindingList(): Binding[] {
-    if (this.entries === undefined) {
-      if (this.dense !== undefined) materializeView(this);
-    }
-    return this.entries;
-  }
+  get bindingList(): Binding[] { return this.entries; }
   set bindingList(l: Binding[]) {
     this.entries = l;
     this._view = undefined;
   }
 
-  /** True iff the legacy view has been materialized (dense structures). */
-  get viewMaterialized(): boolean {
-    return this.dense !== undefined && this.entries !== undefined;
-  }
-
   /** Invalidate the derived view after a write to `entries`. */
   invalidateView(): void { this._view?.invalidate(); }
-
-  /** Slot count as a cached Bits value (dense structures only). */
-  slotCountBits(): Value {
-    if (this._slotCountBits === undefined) {
-      this._slotCountBits = makeInt(this.dense!.length);
-    }
-    return this._slotCountBits;
-  }
 }
 
 /**
@@ -262,19 +242,6 @@ export class SlotView implements ReadonlyMap<string, Binding> {
   get [Symbol.toStringTag](): string { return "SlotView"; }
 }
 
-/** Build the legacy map/list view of a dense structure: one Binding per
- *  element under its decimal string key, plus the `__length` slot. The
- *  dense region stays authoritative for `indexGet`/`getSlotCount`. */
-function materializeView(s: Structure): void {
-  const entries: Binding[] = [];
-  const dense = s.dense!;
-  for (let i = 0; i < dense.length; i++) {
-    entries.push({ key: String(i), value: dense[i] });
-  }
-  entries.push({ key: LENGTH_KEY, value: s.slotCountBits() });
-  s.bindingList = entries;
-}
-
 /** Construct the Context role. Scopes are mutable evaluator state; data
  *  contexts carry the immutable bit (population-during-construction is
  *  the grandfathered builder idiom until the C6 recipe). */
@@ -288,8 +255,14 @@ export function newRecordStructure(): Structure {
  *  element array is adopted, not copied — callers hand over ownership
  *  (arrays are immutable, D22). */
 export function newDenseStructure(elements: Value[]): Structure {
+  // B-120 E4: an array IS the entry sequence, with every key null. The dense
+  // role is gone — it was a second storage shape for the one case the
+  // sequence always described, and D48(a)'s level tag said so all along.
   const s = new Structure(true);
-  s.dense = elements;
+  const entries: Binding[] = new Array(elements.length);
+  for (let i = 0; i < elements.length; i++) entries[i] = { key: null, value: elements[i] };
+  s.entries = entries;
+  s.positional = true;
   return s;
 }
 
@@ -306,13 +279,10 @@ export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): S
     throw new Error("deriveWithMeta: channels cannot attach to an evaluation scope (plane rejection)");
   }
   const s = new Structure(src.immutable);
-  if (src.dense !== undefined) {
-    s.dense = src.dense; // shared by reference — arrays are immutable
-  } else {
-    // Shares the entry array by reference — sound because data contexts are
-    // immutable (D22). The derived view is per-structure and rebuilds.
-    s.entries = src.entries;
-  }
+  // Shares the entry array by reference — sound because data contexts are
+  // immutable (D22). The derived view is per-structure and rebuilds.
+  s.entries = src.entries;
+  s.positional = src.positional;   // metadata does not stop an array being one
   // The given map is AUTHORITATIVE — it becomes the derived structure's
   // entire channel plane. Writers pre-clone via cloneMeta (total, so
   // a flattened source's channels are in the clone) and then set/delete;
@@ -323,34 +293,44 @@ export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): S
   return s;
 }
 
-/** O(1) element read on the dense region, with the legacy-map fallback
- *  for non-dense numeric-keyed contexts (unions, hand-built tests). */
+// POSITIONAL ACCESS (B-120 E4).
+//
+// A positional structure is one whose entries carry no key. The three readers
+// below lost their fallback arms with the dense region: those arms served
+// numeric STRING keys ("0", "1", …) on a non-dense structure, and the corpus
+// has **zero** of those — the fallback was dead before it was deleted.
+//
+// `__length` goes with them. An array's length is `entries.length`; it was
+// only ever a derived slot the materialized view had to emit.
+
+/** The i-th positional entry's value. O(1) on a wholly-positional structure,
+ *  which is what an array is; a subsequence walk otherwise. */
 export function denseIndexGet(ctx: StructureValue, i: number): Value | undefined {
   const s = ctx as unknown as Structure;
-  if (s.dense !== undefined) return s.dense[i];
-  return ctx.bindings.get(String(i))?.value;
+  const es = s.entries;
+  if (s.positional === true) return es[i]?.value;
+  let n = 0;
+  for (let j = 0; j < es.length; j++) {
+    if (es[j].key === null && n++ === i) return es[j].value;
+  }
+  return undefined;
 }
 
-/** Dense-aware slot count read (Bits), or undefined when neither a dense
- *  region nor a `__length` slot exists. */
+/** Slot count for a positional structure, or undefined when it is not one.
+ *  An EMPTY array still answers 0 — which is why the flag exists rather than
+ *  the count being inferred from the entries. */
 export function denseSlotCount(ctx: StructureValue): Value | undefined {
   const s = ctx as unknown as Structure;
-  if (s.dense !== undefined) return s.slotCountBits();
-  return ctx.bindings.get(LENGTH_KEY)?.value;
+  if (s.positional !== true) return undefined;
+  return makeInt(s.entries.length);
 }
 
-/** All elements of a numeric-keyed structure (dense fast path). */
+/** All values of a positional structure. */
 export function denseElements(ctx: StructureValue): Value[] {
   const s = ctx as unknown as Structure;
-  if (s.dense !== undefined) return s.dense.slice();
-  const lenV = denseSlotCount(ctx);
-  if (!lenV) return [];
-  const len = Number((lenV as BitsValue).data);
+  const es = s.entries;
   const out: Value[] = [];
-  for (let i = 0; i < len; i++) {
-    const b = ctx.bindings.get(String(i));
-    if (b?.value) out.push(b.value);
-  }
+  for (let i = 0; i < es.length; i++) if (es[i].key === null) out.push(es[i].value as Value);
   return out;
 }
 
@@ -395,8 +375,11 @@ export function isStructure(v: unknown): v is Structure {
  */
 export function putEntry(ctx: StructureValue, entry: Binding): void {
   const s = ctx as unknown as Structure;
-  const es = s.bindingList;          // materializes a dense structure's view
+  const es = s.entries;
   if (entry.key !== null) {
+    // A keyed write ends the positional guarantee: index `i` is no longer
+    // `entries[i]`, so positional reads take the subsequence path.
+    s.positional = undefined;
     for (let i = 0; i < es.length; i++) {
       if (es[i].key === entry.key) { es[i] = entry; s.invalidateView(); return; }
     }

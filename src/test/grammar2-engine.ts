@@ -20,6 +20,7 @@ import { makeExpr } from "../types.js";
 import { getSlotCount } from "../slots.js";
 import * as g2 from "../grammar2/types.js";
 import * as fs from "fs";
+import { indexGet } from "../slots.js";
 
 // == Grammar 2 (Phase 1) — new formalism + engine ==
 //
@@ -356,7 +357,7 @@ function extractErrorList(result: any): { code?: string; message?: string; produ
   const len = Number((getSlotCount(p) as any)?.data ?? 0n);
   const out: { code?: string; message?: string; production?: string }[] = [];
   for (let i = 0; i < len; i++) {
-    const entry = p.bindings.get(String(i))?.value;
+    const entry = indexGet(p, i);   // B-120 E4: positional, not string-keyed
     const entryP = entry!;
     if (entryP.kind === ValueKind.Structure) {
       const code = entryP.bindings.get("code")?.value;
@@ -380,7 +381,7 @@ function extractStringList(result: any): string[] {
   const len = Number((getSlotCount(p) as any)?.data ?? 0n);
   const out: string[] = [];
   for (let i = 0; i < len; i++) {
-    const entry = p.bindings.get(String(i))?.value;
+    const entry = indexGet(p, i);   // B-120 E4: positional, not string-keyed
     if (!entry) continue;
     const entryP = entry;
     if (entryP.kind === ValueKind.Bits) out.push(bitsToString(entryP));

@@ -32,7 +32,7 @@ import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
-import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, metaReadRaw, metaOf, cloneMeta, SLOT_REGISTRY, SLOT_KEYS, viralFields, unionFields, registerMetaField, typeShape, metaFieldSpec, isInterfaceType as isInterfaceTypeSlots } from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, metaReadRaw, metaOf, cloneMeta, SLOT_REGISTRY, SLOT_KEYS, viralFields, unionFields, registerMetaField, typeShape, metaFieldSpec, isInterfaceType as isInterfaceTypeSlots , elementsOf} from "./slots.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { withMeta } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
@@ -427,17 +427,12 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
         }
         void st;
       }
-      // C4.2 (W6): when a dense structure's legacy view exists, it must
-      // agree with the dense region — the region is authoritative.
-      const s = v as unknown as Structure;
-      if (s.dense !== undefined && s.viewMaterialized) {
-        for (let i = 0; i < s.dense.length; i++) {
-          if ((v as StructureValue).bindings.get(String(i))?.value !== s.dense[i]) {
-            out.push({ invariant: "W6 dense-view-coherence", detail: `view binding ${i} disagrees with the dense region`, program });
-            break;
-          }
-        }
-      }
+      // W6 (dense-view-coherence) is RETIRED at B-120 E4 with its subject.
+      // It asserted that a dense structure's materialized legacy view agreed
+      // with the dense region; there is no dense region and no second view.
+      // It was already vacuous — E2 measured 0 of 166 dense structures ever
+      // materializing a view, so it had nothing to check even before it had
+      // nothing to check about.
     }
     // W3 over the Context role's metadata now runs above with every other
     // kind's — flattened records and arrays carry meta directly, and that
@@ -1442,14 +1437,21 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
 
   // --- Dense arrays (C4.2, D18) -----------------------------------------------
 
-  test("dense region (C4.2): arrays store elements densely; hot paths never materialize the view", () => {
+  test("positional structures (B-120 E4): an array is its entry sequence, keys and all", () => {
     const { evalCtx } = evalSource(
       "arr = [10, 20, 30]\na = arr[0]\nb = arr[2]\nn = arr.length\ns = arr.map(x => x + 1).reduce((acc, x) => acc + x, 0)",
       undefined, [createTypeSystem()], undefined, true);
-    const arrCtx = evalCtx.bindings.get("arr")!.value! as unknown as Structure;
-    eq(arrCtx.dense !== undefined, true, "array context carries the dense region");
-    eq(arrCtx.viewMaterialized, false, "bracket access, length, map/reduce ran without materializing the legacy view");
-    eq(Number((evalCtx.bindings.get("s")!.value! as BitsValue).data), 63, "HOF pipeline result correct over dense storage");
+    // The representation pins this test carried — `dense !== undefined` and
+    // `viewMaterialized === false` — named the two things E4 deletes. What
+    // they were protecting is that arrays index, measure and iterate
+    // correctly, which is asserted directly.
+    eq(Number((evalCtx.bindings.get("a")!.value! as BitsValue).data), 10, "bracket access reads the first element");
+    eq(Number((evalCtx.bindings.get("b")!.value! as BitsValue).data), 30, "and the last");
+    eq(Number((evalCtx.bindings.get("n")!.value! as BitsValue).data), 3, "length is the entry count");
+    eq(Number((evalCtx.bindings.get("s")!.value! as BitsValue).data), 63, "HOF pipeline result correct over the entry sequence");
+    // Positional entries carry no key, which is what makes them positional.
+    const arrCtx = evalCtx.bindings.get("arr")!.value! as unknown as StructureValue;
+    eq(arrCtx.bindingList.every((e) => e.key === null), true, "every array entry is unkeyed");
   });
 
   test("dense region (C4.2): O(1) index access — scaling test", () => {
@@ -1482,20 +1484,20 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       `index access is length-independent (200 elems: ${tSmall.toFixed(1)}ms, 200k elems: ${tBig.toFixed(1)}ms)`);
   });
 
-  test("dense region (C4.2): array/object duality — the legacy view answers the string-key protocol", () => {
-    // A straggler reading the string-key protocol (bindings.get("0"))
-    // materializes the lazy view, which must agree with the dense region
-    // (W6) — and the dense region stays authoritative afterwards.
+  test("positional structures (B-120 E4): the string-key protocol is RETIRED", () => {
+    // This test asserted the C4.2 compatibility contract: an array's elements
+    // were also reachable as `bindings.get("0")`, and a `__length` slot rode
+    // the materialized view. E4 deletes both. Recorded as a behaviour change
+    // rather than dropped, because it is one — and because this test was the
+    // protocol's ONLY consumer: E2 measured 0 of 166 dense structures ever
+    // materializing the view, and no `.alg` source indexes an array by string.
     const r = evalSource("arr = [7, 8, 9]", undefined, [createTypeSystem()], undefined, true);
-    const arrCtx = r.evalCtx.bindings.get("arr")!.value! as unknown as Structure;
-    eq(arrCtx.viewMaterialized, false, "no view before the straggler read");
-    const viaMap = (arrCtx as unknown as StructureValue).bindings.get("0")?.value;
-    eq(Number((viaMap! as BitsValue).data), 7, "string-key protocol answers from the materialized view");
-    eq(arrCtx.viewMaterialized, true, "the straggler path materialized the view");
-    eq(Number((indexGet(arrCtx as unknown as StructureValue, 1)! as BitsValue).data), 8,
-      "dense region stays authoritative after materialization");
-    eq(Number(((arrCtx as unknown as StructureValue).bindings.get("__length")!.value as BitsValue).data), 3, "view carries the __length slot");
-    eq((arrCtx as unknown as StructureValue).bindingList.length, 4, "bindingList view: 3 elements + __length");
+    const arrCtx = r.evalCtx.bindings.get("arr")!.value! as unknown as StructureValue;
+    eq(arrCtx.bindings.get("0"), undefined, "elements are no longer reachable by string key");
+    eq(arrCtx.bindings.get("__length"), undefined, "and there is no __length slot");
+    // Positional access is the surviving protocol, and it still answers.
+    eq(Number((indexGet(arrCtx, 1)! as BitsValue).data), 8, "positional access reads the element");
+    eq(arrCtx.bindingList.length, 3, "three elements, and nothing derived alongside them");
   });
 
   // --- MV-over-Context flatten (C4.3b) -----------------------------------------
@@ -1514,13 +1516,16 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(formatValue(p), "{x: 1, y: 2}", "flattened records print as records");
   });
 
-  test("flatten (C4.3b): typed arrays answer Context with the dense region + channels", () => {
+  test("flatten (C4.3b): typed arrays answer Context, carrying metadata alongside their entries", () => {
     const r = evalSource("arr = [1, 2, 3]\nm = arr.map(x => x * 2)",
       undefined, [createTypeSystem()], undefined, true);
     const arr = r.evalCtx.bindings.get("arr")!.value!;
     eq(arr.kind, ValueKind.Structure, "a typed array IS a Context");
-    eq((arr as unknown as Structure).dense !== undefined, true, "dense region rides with the channel plane");
-    eq(getTypeNameOf(arr), "Array", "type channel present on the flattened array");
+    // B-120 E4: `dense !== undefined` named the region that is now the entry
+    // sequence. What it protected — metadata rides an array without
+    // disturbing its elements — is the two lines below.
+    eq(elementsOf(arr as StructureValue).length, 3, "the entries survive the metadata");
+    eq(getTypeNameOf(arr), "Array", "type field present on the flattened array");
     eq(formatValue(arr), "[1, 2, 3]", "flattened arrays print as arrays");
     eq(formatValue(r.evalCtx.bindings.get("m")!.value!), "[2, 4, 6]", "HOFs work over flattened arrays");
   });
