@@ -66,6 +66,21 @@ in a memory file.
    — a chunk that turns out to need a decision is a stop, not a judgment
    call. Lanes not declared pre-ratified keep the per-chunk gate above.
    The landing checklist (§5) is unchanged for every lane.
+
+   **The PR is the gate (2026-09).** A merged PR is the maintainer's
+   approval. Nothing else is.
+   - An open question does not open a new branch. Update the same branch,
+     then update the PR description to match.
+   - A new branch waits for the current PR to merge. Starting the next
+     chunk on a fresh branch while a PR is open splits the review across
+     two branches.
+   - The maintainer reviews and merges at any time, without checking which
+     branch is in flight. That is expected. The discipline sits on the
+     agent's side, not the maintainer's.
+
+   Motivated by 2026-09-01: a session opened a PR against a stale
+   `origin/main` after the maintainer had already merged that branch's
+   earlier work. The description claimed 41 commits; the diff held two.
 4. **Land with the checklist** (§5) — every chunk, same PR/commit.
 
 **Deviation rule.** If implementation diverges from the plan or a design doc
