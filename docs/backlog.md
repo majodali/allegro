@@ -1657,8 +1657,18 @@ that prevents it.
 - [ ] **B-120** · L0 · **The entry-sequence composite (D48(a), IC-2 option E).**
   A Structure becomes a **sequence of optionally-keyed entries** — one thing
   that is both map and list — rather than a string-keyed map plus an ordered
-  list view plus a dense special case. Ruled at B-108; **not designed in
-  detail — this arc gets its own plan before any code.**
+  list view plus a dense special case. Ruled at B-108.
+  **PLAN: [docs/plans/entry-sequence-composite.md](plans/entry-sequence-composite.md)
+  (draft, 2026-09) — chunks E1–E6; §6 carries five questions for ratification
+  before E1.** The plan adds five probes: data structures measure mean **2.85**
+  slots (median 2, mode 2, 97.1% ≤ 8); **0** of 166 dense structures ever
+  materialize the legacy view, so the W6 invariant is vacuous; **0**
+  numeric-keyed non-dense structures exist, so three fallback arms are dead;
+  and **2254 of 2540** record structures hold *different objects* in
+  `bindings` and `bindingList` for the same slot — delta 49 quantified. The
+  entry sequence also already exists unnamed: `Binding` is an optionally-keyed
+  entry, and `tree-builder.ts` reads `key === null` in twelve places against a
+  list the map cannot represent.
   - **What decided it** (measured, 50-file corpus through the real CLI): data
     structures average **4.6 slots**, 97% have ≤ 8 and the modal size is
     **2** — a `Map` is overhead at that size. Every large by-name lookup is
