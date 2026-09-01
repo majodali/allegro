@@ -306,6 +306,30 @@ It inherits the counter's cost and adds a second gate that mostly removes
 indexes worth building. At 61.2 ms it is the most expensive of the
 count-based options.
 
+### Why no count-based rule can win, however well graded
+
+Raised in review: a *graded* rule tracking the break-even boundary — something
+like `(N>8 && C>32) || (N>7 && C>35) || … || (C>100)` — rather than the flat
+conjunction costed above. It is the better shape, and it still cannot win. The
+bound closes the whole family, so this is settled rather than merely untuned.
+
+| | |
+|---|---|
+| Oracle — index exactly when it pays, with foreknowledge | **43.3 ms** |
+| Lazy size > 8 | **49.1 ms** |
+| Headroom any smarter rule could recover | **5.8 ms** |
+| Cost of the counter it would need | **9.5 ms** |
+
+A graded curve approaches the oracle's *decisions*, but it must read `C`, and
+reading `C` costs 1.79 ns on every one of 5,341,280 lookups. Its floor is
+therefore 43.3 + 9.5 = **52.8 ms** — worse than the flat size gate, and worse
+before any tuning is applied. That is why every count policy measured landed
+between 55 and 61 ms: they were not badly chosen, they were paying a tax
+larger than the prize.
+
+**The tuning stops here**, and it stops on a bound rather than on a judgement
+that the numbers are good enough.
+
 ### The threshold is not a tuning knob
 
 Every threshold from 6 to 64 costs 49.1–49.2 ms. The choice is flat because
