@@ -1659,8 +1659,8 @@ that prevents it.
   that is both map and list — rather than a string-keyed map plus an ordered
   list view plus a dense special case. Ruled at B-108.
   **PLAN: [docs/plans/entry-sequence-composite.md](plans/entry-sequence-composite.md)
-  (draft, 2026-09) — chunks E1–E6; §6 carries five questions for ratification
-  before E1.** The plan adds five probes: data structures measure mean **2.85**
+  (active, 2026-09) — chunks E1–E6; §6 ruled 2026-09-01, all five
+  recommendations accepted, and E1 has its go-ahead.** The plan adds five probes: data structures measure mean **2.85**
   slots (median 2, mode 2, 97.1% ≤ 8); **0** of 166 dense structures ever
   materialize the legacy view, so the W6 invariant is vacuous; **0**
   numeric-keyed non-dense structures exist, so three fallback arms are dead;
