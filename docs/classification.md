@@ -6,20 +6,26 @@ field definitions and omission defaults per the methodology
 [vocabulary](https://github.com/majodali/methodology/blob/main/docs/vocabulary.md).
 
 - **C-tier**: C2 — serious project, pre-users
-- **Pinned methodology version**: 1.2.0 (compliance target; migrated from 1.1.0 on 2026-08-24 — both v1.2.0 amendments ship migration-note: none)
+- **Pinned methodology version**: 1.4.0 (compliance target; migrated
+  from 1.2.0 on 2026-09-01. All eight amendments across v1.3.0 and
+  v1.4.0 ship migration-note `none` or `none mandatory`, so the pin
+  bump plus the Workflow reword below is the whole migration. No
+  deviations — owner ruling, 2026-09-01.)
 - **S-level**: S0 — public code only
 - **Type**: `language/tool platform`
 - **Target**: `static site` (allegrolang.org — landing page, sandbox,
   and the web-bundled interpreter, deployed via `deploy.sh`)
-- **Workflow**: stages `in-dev → merged → live`; **`live` is the
-  designated live-operation stage** (published at allegrolang.org;
-  deploys are owner-run, never agent-run).
-  Stage references in the Backlog: a checked entry is at `merged`
-  unless it carries an explicit `[stage: live]` tag (used for entries
-  whose public surface is deployed); an unchecked entry under active
-  work may carry `[stage: in-dev]`. This convention is the project's
-  declared manner of referencing stages, so designations stay current
-  without restating the default on every entry.
+- **Workflow**:
+
+  `stages: in-dev → merged → live; live = live; backlog default: checked ⇒ merged, unchecked ⇒ in-dev`
+
+  The live stage is published at allegrolang.org; deploys are
+  owner-run, never agent-run. A Backlog entry departing from the
+  default carries an explicit `stage:` marker — `[stage: live]` for an
+  entry whose public surface is deployed, `[stage: in-dev]` for one
+  under active work. Reworded to the canonical form at the v1.4.0
+  migration (methodology vocabulary, *Workflow*); the three parts were
+  already present in substance.
 
 ## Deviation register
 
