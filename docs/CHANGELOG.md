@@ -4,6 +4,38 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — The PR is the gate (PROCESS §3 amendment, Tier 0)
+
+A merged PR is the maintainer's approval. Nothing else is.
+
+### What the rule says
+
+An open question does not open a new branch. The same branch is updated and its
+PR description is brought up to date.
+
+A new branch waits for the current PR to merge. Starting the next chunk on a
+fresh branch while a PR is open splits the review across two branches.
+
+The maintainer reviews and merges at any time, without checking which branch is
+in flight. The discipline sits on the agent's side.
+
+### What prompted it
+
+On 2026-09-01 a session opened a PR against a stale `origin/main`. The
+maintainer had already merged that branch's earlier work through two other PRs.
+The description claimed 41 commits and described the whole B-121 arc; the actual
+diff held two commits and five documentation files.
+
+The description was corrected before review. The failure was procedural, not
+technical: the session never re-fetched `main` after starting work.
+
+### Where it is recorded
+
+`docs/PROCESS.md` §3 (feature lifecycle) holds the rule, as a labelled
+paragraph beside the per-lane exception. `CLAUDE.md`'s branch-practice bullet
+mirrors it and adds the operational step: fetch `origin/main` before opening a
+PR.
+
 ## 2026-09 — Migrated to methodology v1.4.0 from v1.2.0
 
 The Classification pin moves to 1.4.0. No deviations recorded (owner ruling,

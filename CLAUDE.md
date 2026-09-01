@@ -151,7 +151,11 @@ evaluator/runtime set; this is the complete session list):
   explicit maintainer sign-off; surface conflicts, don't pick a side.
 - Branch practice (W-006): single-use outcome-named branches off
   main, one per deliverable/move, PR for owner review, deleted after
-  merge. Deploys (`deploy.sh`) are owner-run only.
+  merge. A merged PR is the approval signal — open questions update
+  the same branch and its PR, and a new branch waits for the merge
+  (PROCESS §3, "The PR is the gate"). Before opening a PR, fetch
+  `origin/main`: the maintainer may have merged while you worked.
+  Deploys (`deploy.sh`) are owner-run only.
 
 ## Status pointers
 
