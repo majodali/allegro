@@ -38,6 +38,7 @@ npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file  (--base for Allegretto)
 npx tsx src/index.ts inspect|verify|obligations|propose|prove <file>  # → docs/getting-started.md
 npm run bench                       # H-arc benchmark corpus
+npx tsx scripts/bench-slot-lookup.ts  # B-120: slot scan vs index crossover
 npm run build:web                   # web bundle; deploy.sh is OWNER-RUN only
 npm run check-deployed              # audit live site vs origin/main (needs site egress)
 ```
