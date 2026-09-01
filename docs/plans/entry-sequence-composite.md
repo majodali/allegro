@@ -1,6 +1,6 @@
 # The entry-sequence composite — one storage, an index below the spec
 
-> Status: **draft** — awaiting ratification of §6.
+> Status: **active** — §6 ruled 2026-09-01; chunk E1 has its go-ahead.
 > Owner: **B-120**. Ruled at **D48(a)** (B-108, 2026-08); the *whether* is
 > settled, this plan is the *how*.
 > Outcome (K-007): a Structure is an ordered sequence of optionally-keyed
@@ -186,30 +186,30 @@ guarding view/dense coherence never fires. Deleting it removes no coverage.
 This is the C4 lesson from B-121 repeating: **check whether an invariant has a
 live subject before treating its deletion as a loss.**
 
-## 6. Open questions — for ratification before chunk 1
+## 6. Rulings — taken 2026-09-01
 
-1. **Which store is authoritative during migration?** Recommendation: `entries`
-   is the store and `bindings` becomes a derived cached index (§4.1). The
-   alternative — keep the map authoritative and derive the list — preserves
-   the hot path but keeps the null-key entries unrepresentable.
+All five recommendations accepted by the maintainer as written.
 
-2. **Do duplicate keys stay legal?** Recommendation: no. A keyed write replaces
-   the entry in place; positional entries are appended. The 28 duplicates today
-   are stale write-log residue, not intent. Ruling this now avoids designing
-   for a case nobody wants.
+1. **`entries` is the authoritative store**; `bindings` becomes a derived,
+   cached index (§4.1). The alternative — keep the map authoritative and derive
+   the list — would have preserved the hot path but left null-key entries
+   unrepresentable, which is the thing §2.2 shows the code already needs.
 
-3. **Index policy.** Recommendation: index scopes only, and revisit on the
-   §5.1 benchmark. The alternative is a size threshold on any structure, which
-   is more general and harder to reason about.
+2. **Duplicate keys are not legal.** A keyed write replaces its entry in place;
+   positional entries append. The 28 duplicates measured today are stale
+   write-log residue, not intent, so nothing is designed for them.
 
-4. **Is chunk 1 its own deliverable?** It fixes a measured defect affecting
-   2254 structures and does not depend on the rest of the arc. Recommendation:
-   land it as its own PR under **B-120**, so the fix is not gated on the
-   representation change.
+3. **Index scopes only**, revisited on the §5.1 benchmark at E2. A size
+   threshold on any structure was the alternative: more general, harder to
+   reason about, and unmotivated until the benchmark says otherwise.
 
-5. **Sequencing against B-127.** Recommendation: build B-127's analysis before
-   the call-site migration (§4.2), and treat this arc as its first customer.
-   This is a recommendation about order, not a dependency.
+4. **E1 lands as its own PR** under B-120. It fixes a measured defect affecting
+   2254 structures and depends on nothing else in the arc, so it is not gated
+   on the representation change.
+
+5. **B-127 (code analysis is grep-based) comes before the call-site
+   migration**, with this arc as its first customer. An ordering, not a
+   dependency: E1 does not need it, and E4 onward does.
 
 ## 7. Chunk sequence
 
