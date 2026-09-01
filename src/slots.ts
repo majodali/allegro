@@ -22,7 +22,7 @@ import {
   AllegroError,
   withMeta,
 } from "./types.js";
-import { denseIndexGet, denseSlotCount, denseElements } from "./structure.js";
+import { denseIndexGet, denseSlotCount, denseElements, setEntry, removeEntry } from "./structure.js";
 
 // --- Registry ------------------------------------------------------------------
 
@@ -247,8 +247,7 @@ function slotRead(ctx: StructureValue, name: string): Value | undefined {
  * applies, and say which.
  * ------------------------------------------------------------------------- */
 function slotWrite(ctx: StructureValue, key: string, value: Value): void {
-  ctx.bindings.set(key, { key, value });
-  ctx.bindingList.push({ key, value });
+  setEntry(ctx, key, value);
 }
 
 /** Narrow a value to a Context, or null if it is not one. */
@@ -410,10 +409,15 @@ export function setConstruct(ctx: StructureValue, v: Value): void { slotWrite(ct
 export function setFallbackMember(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__getMember", v); }
 export function markInterface(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__interface", v); }
 export function setWraps(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__wraps", v); }
-export function removeName(ctx: StructureValue): void { ctx.bindings.delete("__name"); }
-/** In-place rename used by the auto-naming pass. Mutates the bindings-map
- *  entry ONLY — bindingList entries are separate objects and are
- *  deliberately left untouched, mirroring the pre-accessor behavior. */
+export function removeName(ctx: StructureValue): void { removeEntry(ctx, "__name"); }
+/** In-place rename used by the auto-naming pass.
+ *
+ *  B-120 E1: this used to mutate the map's `Binding` and leave the list's
+ *  copy stale, which discipline (2) recorded and called circumstantially
+ *  safe. One store means one object, so the mutation now reaches every
+ *  reader. The write is in place because the auto-naming pass runs during
+ *  construction, before the type Context escapes — the in-place rule
+ *  (`src/structure.ts`), not an exception to it. */
 export function renameInPlace(ctx: StructureValue, name: Value): void {
   const b = ctx.bindings.get("__name");
   if (b) b.value = name;
@@ -467,11 +471,15 @@ export function hasName(ctx: StructureValue): boolean { return !isDense(ctx) && 
 export function hasShapeSlot(ctx: StructureValue): boolean { return ctx.meta?.has("type") === true; }
 export function hasDischarged(ctx: StructureValue): boolean { return !isDense(ctx) && ctx.bindings.has("__discharged"); }
 
-// Set-only writes (bindings map, NO bindingList entry) — mirror the proof
-// kernel's origination idiom in primitives.ts exactly. These are the
-// chokepoints the C1.4 discharged-channel writer capability wraps.
+// B-120 E1: these were SET-ONLY writes — the map, deliberately not the list —
+// which is where the measured "map holds entries the list lacks" class came
+// from (15 structures, all proof contexts: `proposition`, `__discharged`,
+// `lhs`, `rhs`). With one store the distinction cannot be expressed, and it
+// was never wanted for its own sake: it existed because writing both stores
+// by hand was the thing callers kept getting wrong. They remain the
+// chokepoints the C1.4 discharged-field writer capability wraps.
 function slotSet(ctx: StructureValue, key: string, value: Value): void {
-  ctx.bindings.set(key, { key, value });
+  setEntry(ctx, key, value);
 }
 export function stampProposition(ctx: StructureValue, v: Value): void { slotSet(ctx, "proposition", v); }
 function stampDischarged(ctx: StructureValue, v: Value): void { slotSet(ctx, "__discharged", v); }
@@ -567,13 +575,12 @@ export function isMetaSlotKey(key: string): boolean {
   return key.startsWith("__");
 }
 
-// Removal helpers (map + bindingList, mirroring the existing idiom exactly)
-export function removeRefines(ctx: StructureValue): void { ctx.bindings.delete("__refines"); }
+// Removal helpers — one store, so a removal cannot leave a stale entry
+// behind. Discipline (3) is retired: there is no second view to mirror.
+export function removeRefines(ctx: StructureValue): void { removeEntry(ctx, "__refines"); }
 export function removeShapeSlot(ctx: StructureValue): void { ctx.meta?.delete("type"); }
 export function removeConstruct(ctx: StructureValue): void {
-  ctx.bindings.delete("__construct");
-  const idx = ctx.bindingList.findIndex((b) => b.key === "__construct");
-  if (idx >= 0) ctx.bindingList.splice(idx, 1);
+  removeEntry(ctx, "__construct");
 }
 
 // --- Data plane -----------------------------------------------------------------------
