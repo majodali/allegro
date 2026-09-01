@@ -238,6 +238,39 @@ guarding view/dense coherence never fires. Deleting it removes no coverage.
 This is the C4 lesson from B-121 repeating: **check whether an invariant has a
 live subject before treating its deletion as a loss.**
 
+### 5.2 What E3 measured on the real implementation, not the model
+
+The model in §6a predicted the *policy*; these are the numbers the code
+actually produces over the 29-file corpus.
+
+| | |
+|---|---|
+| Slot views allocated | 110,133 |
+| Lookups | 4,238,700 |
+| …served by a scan | **3,959,000 (93.4%)** |
+| …served by an index | 279,700 (6.6%) |
+| Indexes built | **268** |
+| Mean entries examined per scan | **3.63** |
+
+The shape is what §6a predicted: a scan handles almost everything at under four
+entries, and a couple of hundred structures carry the index.
+
+**Wall clock is within noise of the previous representation**, per file:
+
+| file | E3 | main |
+|---|---|---|
+| `arrays.alg` | 4396 ms | 4374 ms |
+| `dot-access.alg` | 1188 ms | 1159 ms |
+| `effects-demo.alg` | 49 ms | 51 ms |
+| `contracts-demo.alg` | 56 ms | 49 ms |
+
+*A caution recorded because it nearly became a false alarm.* The first E3
+reading compared the corpus's **total** wall clock (235 s for 29 full
+`evalSource` runs) against §6a's **49 ms**, and read it as a 50× regression.
+Those are different quantities: §6a models slot lookup and index construction
+alone, not evaluation. Per-file A/B against `main` is the comparison that
+answers the question, and it shows no regression.
+
 ## 6. Rulings — taken 2026-09-01
 
 All five recommendations accepted by the maintainer as written.
@@ -361,7 +394,7 @@ Provisional — the maintainer sets the boundaries (W-001).
 |---|---|---|
 | **E1** | One write path (`putEntry` / `setEntry` / `removeEntry`); every Structure writer routed through it, so both containers hold one object. The 2254 divergences go to zero | **DONE 2026-09.** Suite 1202/1202. W7 slot-store-coherence added and verified to fail on the reintroduced defect. Deriving the map from `entries` moves to E3, where the index policy is set |
 | **E2** | Benchmark the scan/index crossover (§5.1); set the index policy from the result | **DONE 2026-09.** `scripts/bench-slot-lookup.ts` committed and its results recorded in §5.1. The measurement fired D48(a)'s own revisit trigger (§5.1a) and supersedes §6 ruling 3; §6a proposes the replacement policy and awaits ratification. No behaviour change |
-| **E3** | `bindings` becomes derived from `entries` (moved here from E1), and the §6a policy is implemented: build lazily on first lookup when size > 8 | Suite green; `scripts/bench-slot-lookup.ts` re-run; corpus lookup cost no worse than the 49.1 ms §6a models |
+| **E3** | `bindings` becomes derived from `entries` (moved here from E1), and the §6a policy is implemented: build lazily on first lookup when size > 8 | **DONE 2026-09.** Suite 1202/1202. `SlotView` replaces the stored map; measured on the real implementation, **93.4%** of 4.24M lookups are served by a scan averaging **3.63** entries and 268 indexes are built. Per-file wall clock within noise of main (§5.2) |
 | **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | Suite green; array demos are the oracle |
 | **E5** | Delete `materializeView`, `viewMaterialized`, `__length`, W6 and `isMetaSlotKey`. Closes B-104(b) and B-104(f) | Counts to zero; boundary lint at baseline |
 | **E6** | `concepts.md` §12 (structure roles), §16 (dense region), §17 (the legacy view) and IC-2 updated; deltas 17 and 22 closed | doc-ref lint; spine delta rows read `—` |

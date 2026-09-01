@@ -234,8 +234,13 @@ export interface StructureValue extends StructureHostFields, MetadataBearing {
   kind: ValueKind.Structure;
   /** Binding plane: what a name resolves to. Also the data plane's storage
    *  for record-role structures — two planes, one map (concepts.md §13). */
-  bindings: Map<string, Binding>;
-  bindingList: Binding[];
+  /** By-name view over the entries — DERIVED since B-120 E3, not stored.
+   *  Read-only by declaration: every write goes through `putEntry` /
+   *  `setEntry` / `removeEntry` in `structure.ts`, which is what keeps the
+   *  view and the store from drifting apart the way the two stores did. */
+  bindings: ReadonlyMap<string, Binding>;
+  /** THE slot store: an ordered sequence of optionally-keyed entries. */
+  bindingList: readonly Binding[];
 }
 
 // --- Union type ---

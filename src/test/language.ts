@@ -16,6 +16,7 @@ import { getTypeName } from "../types-std.js";
 import { metaOf } from "../slots.js";
 import { extractGrammarFragment } from "../primitives.js";
 import { primNames, typeNames, fileTest, testsDir } from "./alg-files.js";
+import { putEntry } from "../structure.js";
 
 // == Guard Clauses (and) ==
 
@@ -222,8 +223,8 @@ test("reactive: applyPhase triggers dependent re-evaluation", () => {
     incompleteDeps: new Set(["config"]),
     isComplete: false,
   };
-  evalCtx.bindings.set("result", cell);
-  registry.bindings.set("result", cell);
+  putEntry(evalCtx, cell);
+  registry.bindings.set("result", cell);   // a DependencyRegistry, not a Structure
   // Register dependency
   let deps = registry.dependents.get("config");
   if (!deps) { deps = new Set(); registry.dependents.set("config", deps); }
@@ -241,8 +242,7 @@ test("reactive: applyPhase triggers dependent re-evaluation", () => {
 test("reactive: depCollector records incomplete symbols during evaluation", () => {
   // Evaluate an expression that references an undefined symbol
   const ctx = makeStructure();
-  ctx.bindings.set("a", { key: "a", value: makeInt(5) });
-  ctx.bindingList.push({ key: "a", value: makeInt(5) });
+  putEntry(ctx, { key: "a", value: makeInt(5) });
   // 'b' is NOT defined
 
   const collector = { incompleteRefs: new Set<string>() };

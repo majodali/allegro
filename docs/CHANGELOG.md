@@ -4,6 +4,56 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-120 E3: the stored map is deleted; the by-name view is derived
+
+`entries` is the slot plane. The `Map` beside it is gone, replaced by
+`SlotView` — a derived, cached view that scans small structures and builds a
+hash index only for large ones.
+
+### What changed
+
+`Structure._bindings` is deleted. `Structure.entries` is the store, and
+`bindings` returns a `SlotView` implementing the `ReadonlyMap` surface the 193
+call sites already used. `types.ts` now declares `bindings` as
+`ReadonlyMap<string, Binding>` and `bindingList` as `readonly Binding[]`, which
+is what makes the write path the only way in.
+
+The index threshold is §6a's, ruled on the E2 measurement: build on first
+lookup, only when the structure holds more than 8 entries.
+
+### Measured on the implementation, not the model
+
+| | |
+|---|---|
+| Lookups | 4,238,700 |
+| …served by a scan | 3,959,000 (93.4%) |
+| …served by an index | 279,700 (6.6%) |
+| Indexes built | 268 |
+| Mean entries per scan | 3.63 |
+
+Per-file wall clock is within noise of the previous representation: 4396 vs
+4374 ms on `arrays.alg`, 1188 vs 1159 on `dot-access.alg`, 49 vs 51 on
+`effects-demo.alg`.
+
+### A false alarm worth recording
+
+The first reading compared the corpus's total wall clock — 235 s for 29 full
+`evalSource` runs — against §6a's 49 ms, and looked like a 50× regression.
+Those are different quantities. §6a models slot lookup and index construction
+alone; the corpus figure is all of evaluation. The A/B against `main` is what
+answers the question.
+
+### One site reverted, for a recorded reason
+
+`grammar2/tree-builder.ts` called `putEntry` on a parse-time context. Those are
+plain `{ kind: 'Context', bindings, bindingList }` literals from
+`parser-helpers.ts`, not Structures (**B-132**), so the Structure write path
+does not apply. E1 got away with it because `putEntry` only touched fields the
+literals happen to have; E3's view invalidation is a method they do not. The
+site is back to direct writes with the reason in a comment.
+
+Suite **1202/1202**, typecheck clean.
+
 ## 2026-09 — B-120 E2: the crossover measured, and D48(a)'s revisit trigger fires
 
 The plan required the scan/index crossover measured before the index policy was

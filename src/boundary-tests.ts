@@ -51,6 +51,7 @@ import { makeSymbol } from "./types.js";
 import { Structure, isStructure } from "./structure.js";
 import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN, KERNEL_SCOPE_FQN, kernelMemberFqn, typeMemberScopeFqn } from "./symbols.js";
 import { indexGet, getSlotCount, setName, setFallbackMember } from "./slots.js";
+import { putEntry } from "./structure.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const BASELINE_PATH = path.join(REPO_ROOT, "src", "boundary-baseline.json");
@@ -1054,7 +1055,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // holds exactly its own entries — no flatten-copy.
     const parent = scopeNew();
     for (let i = 0; i < 10000; i++) {
-      parent.bindings.set(`b${i}`, { key: `b${i}`, value: makeInt(i) });
+      putEntry(parent, { key: `b${i}`, value: makeInt(i) });
     }
     const child = scopeExtend(parent, [["x", { key: "x", value: makeInt(42) }]]);
     eq(child.bindings.size, 1, "child owns only its layer");
@@ -1066,7 +1067,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq((scopeLookup(parent, "b0")!.value! as any).data, 0n, "parent unchanged");
     // Deep chains stay correct.
     let deep = scopeNew();
-    deep.bindings.set("root", { key: "root", value: makeInt(1) });
+    putEntry(deep, { key: "root", value: makeInt(1) });
     for (let i = 0; i < 2000; i++) deep = scopeExtend(deep, []);
     eq((scopeLookup(deep, "root")!.value! as any).data, 1n, "2000-layer chain lookup");
   });
@@ -1094,7 +1095,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
 
   test("facts plane (C2.2): immutable layering, branch isolation, chain merge", () => {
     const parent = scopeNew();
-    parent.bindings.set("x", { key: "x", value: makeInt(1) });
+    putEntry(parent, { key: "x", value: makeInt(1) });
     const factA = new PredicateSet([makePredicate(effectsDomain(new Set(["a"])))]);
     const factB = new PredicateSet([makePredicate(effectsDomain(new Set(["b"])))]);
     const branchA = scopeAssume(parent, new Map([["x", factA]]));
@@ -1148,7 +1149,7 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // The reflective op mirrors the distinction: pending → residual Symbol,
     // absent → Error-typed value. Never a throw (D11).
     const sc = scopeNew();
-    sc.bindings.set("cfg", makeCell("cfg"));
+    putEntry(sc, makeCell("cfg"));
     const pending = (primitives.ctx_resolve as any).fn([sc, stringToBits("cfg")]);
     eq(pending.kind === ValueKind.Symbol && pending.name === "cfg", true, "ctx_resolve residualises a pending cell");
     const missing = (primitives.ctx_resolve as any).fn([sc, stringToBits("nope")]);
@@ -1787,8 +1788,8 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
       const desc2 = twoTargets
         ? typeMemberDescriptor(IntType as unknown as Value as StructureValue, "sub")!
         : desc;
-      members.bindings.set(k1, { key: k1, value: desc as Value });
-      members.bindings.set(k2, { key: k2, value: desc2 as Value });
+      putEntry(members, { key: k1, value: desc as Value });
+      putEntry(members, { key: k2, value: desc2 as Value });
       return ty;
     };
     // One descriptor multi-bound to two symbols = ONE target → resolves.

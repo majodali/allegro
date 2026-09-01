@@ -76,7 +76,7 @@ export function scopeLookup(scope: StructureValue, name: string): Binding | unde
 }
 
 /** The scope's OWN layer (not the flattened chain view). */
-export function scopeBindings(scope: StructureValue): Map<string, Binding> {
+export function scopeBindings(scope: StructureValue): ReadonlyMap<string, Binding> {
   return scope.bindings;
 }
 
