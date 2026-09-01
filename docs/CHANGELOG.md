@@ -4,6 +4,38 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — Deviation D-1 recorded: the per-lane gate policy contradicts W-001
+
+The parallel-lane gate policy has contradicted W-001 (two delivery modes,
+human-gated) since 2026-08, with nothing recorded. D-1 records it.
+
+### What the contradiction is
+
+W-001 requires agents to "gate every chunk on summary and human review".
+`docs/PROCESS.md` §3's per-lane exception says a pre-ratified lane lands its
+chunks in order without stopping between each. Both statements cannot hold.
+
+The practice is not wrong. Approval moves from per-chunk to per-sequence
+rather than being removed, and the sequence stops on a failed check, a scope
+change, or a chunk that needs a decision. What was missing is the record.
+
+### Why it went unrecorded
+
+W-001 did not change in v1.3.0 or v1.4.0, so the gap predates the migration
+and the migration assessment did not surface it. Reading the release notes for
+changed rules does not find a contradiction with an unchanged one.
+
+### What happens next
+
+An amendment adding the pre-ratified sequence mode to W-001 is drafted, with
+allegro as its evidencing instance. D-1 is the interim. B-131 retires it once
+the amendment is released and adopted.
+
+The deviating practice now carries a pointer to D-1 in `docs/backlog.md`
+§"Parallel lanes", so a reader of the gate policy sees the deviation there.
+The matching pointer in `docs/PROCESS.md` §3 needs a Tier-0 PR and is folded
+into B-131.
+
 ## 2026-09 — The PR is the gate (PROCESS §3 amendment, Tier 0)
 
 A merged PR is the maintainer's approval. Nothing else is.

@@ -29,11 +29,36 @@ field definitions and omission defaults per the methodology
 
 ## Deviation register
 
-No deviations recorded. (W-006 is adopted in full — owner ruling at
-the chunk-1 gate, 2026-08: agent work uses single-use, outcome-named
-branches, deleted after merge, from the next deliverable onward. The
-harness-designated branch that carried the pre-adoption arcs merges at
-that gate and retires the old practice.)
+**D-1 — W-001, the per-chunk gate: pre-ratified lanes land a chunk
+sequence without stopping between chunks.**
+
+- **Rule**: [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated),
+  fourth conjunct — agents MUST "gate every chunk on summary and human
+  review".
+- **Deviating practice**: `docs/PROCESS.md` §3 (feature lifecycle), the
+  per-lane exception, and `docs/backlog.md` §"Parallel lanes" (gate policy
+  per lane). A lane the maintainer declares pre-ratified runs an approved
+  chunk **sequence**: the chunk list is agreed once at the start of the
+  arc, and the lane lands the chunks in order without a per-chunk stop.
+- **Rationale**: approval moves from per-chunk to per-sequence rather than
+  being removed. The maintainer still sets the boundaries and still gives
+  an explicit go-ahead, once, before the first chunk. The sequence stops on
+  a failed check, on a scope change, and on a chunk that turns out to need
+  a decision.
+- **Recorded**: 2026-09-01, on the owner's instruction, after the practice
+  was found to contradict W-001 with nothing recorded. It has been the
+  declared practice since 2026-08 and was missed at the v1.4.0 migration
+  assessment; W-001 did not change in v1.3.0 or v1.4.0, so the gap predates
+  that migration.
+- **Disposition**: temporary. An amendment to W-001 adding the
+  pre-ratified sequence mode is drafted, with allegro as its evidencing
+  instance. This entry retires when that amendment is released and adopted
+  — tracked as **B-131**.
+
+*(W-006 is adopted in full — owner ruling at the chunk-1 gate, 2026-08:
+agent work uses single-use, outcome-named branches, deleted after merge.
+Extended 2026-09-01: a merged PR is the approval signal, open questions
+update the same branch and its PR, and a new branch waits for the merge.)*
 
 ## Custom definitions
 
