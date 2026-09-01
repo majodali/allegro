@@ -1300,12 +1300,15 @@ is the implementation. `dataOf` was deleted at B-121 C5 with 849 call sites,
 and the boundary lint forbids the identifier along with its earlier spelling
 `primaryOf`.
 
-**Delta.** *Held open deliberately.* **B-128** asks that planes be separated by
-interfaces and the separation policed; this entry now names a plane with no
-reader at all. The argument for that is above — there is no projection left,
-so an accessor would advertise a boundary that does not exist — but it was
-settled inside a deletion chunk that was not weighing enforcement. B-128
-should re-open it rather than inherit it.
+**Delta.** — *(Opened at C7 against B-128 — a plane with no reader looked like
+a plane not policed — and **closed by maintainer ruling, 2026-08**: it is not
+an inconsistency. The purpose of governing access by interfaces is that access
+be **well defined**, not that every plane carry an accessor. For the data plane
+the governing constraint is a different one: above L0, values may be created or
+modified **only through defined Allegretto functions**. That is what makes data
+access well defined here, and it is unaffected by there being nothing to
+project. B-128's scope is unchanged; this entry is simply not one of its
+cases.)*
 
 ---
 
