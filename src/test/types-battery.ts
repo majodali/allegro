@@ -14,6 +14,7 @@ import { getGenericArgs, metaReadRaw, getName, getWraps, getRefines, getMembers,
 import { formatValue, primitives as primRegistry } from "../primitives.js";
 import { kernelMemberFqn } from "../symbols.js";
 import { evaluate } from "../evaluator.js";
+import { putEntry } from "../structure.js";
 
 // == Generics ==
 
@@ -969,13 +970,11 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
     ["value", describeFn],
   ] as const;
   for (const [k, v] of descBindings) {
-    desc.bindings.set(k, { key: k, value: v as Value });
-    desc.bindingList.push({ key: k, value: v as Value });
+    putEntry(desc, { key: k, value: v as Value });
   }
   // C5.2a: member sets are keyed by the member symbol's FQN.
   const describeKey = kernelMemberFqn("describe");
-  metaMembers.bindings.set(describeKey, { key: describeKey, value: desc });
-  metaMembers.bindingList.push({ key: describeKey, value: desc });
+  putEntry(metaMembers, { key: describeKey, value: desc });
   setMembers(metaType, metaMembers);
   slotSetName(metaType, stringToBits("MetaType"));
 
@@ -989,8 +988,7 @@ test("meta-type dispatch: ComposedFunction method descriptor is invoked", () => 
   // Lazy primitive — pass raw args (unevaluated) and an evalFn + ctx.
   const ctx = makeStructure();
   // Seed ctx with the target under a name, and invoke the bound method.
-  ctx.bindings.set("x", { key: "x", value: target });
-  ctx.bindingList.push({ key: "x", value: target });
+  putEntry(ctx, { key: "x", value: target });
   const boundMethod = typeDispatch.fn(
     [target, stringToBits("describe")],
     ctx,

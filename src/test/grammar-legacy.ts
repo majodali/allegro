@@ -12,6 +12,7 @@ import { GrammarExtension, registryGet } from "../grammar-ext.js";
 import { ValueKind, makeInt, makePrimitive, AllegroError, StructureValue, BitsValue, makeFloat, stringToBits, makeStructure, Value, bitsToFloat, bitsToString } from "../types.js";
 import { extensionToStructure } from "../runtime.js";
 import { Grammar, parseGrammar } from "../parser.js";
+import { putEntry } from "../structure.js";
 
 // == Grammar Extensions ==
 
@@ -226,14 +227,12 @@ function buildJsonGrammar(): Grammar {
     for (const child of elementsNode.children) {
       if (child.val !== undefined) {
         const key = String(index);
-        result.bindings.set(key, { key, value: child.val as Value });
-        result.bindingList.push({ key, value: child.val as Value });
+        putEntry(result, { key, value: child.val as Value });
         index++;
       }
     }
     const lenKey = "length";
-    result.bindings.set(lenKey, { key: lenKey, value: makeInt(index) });
-    result.bindingList.push({ key: lenKey, value: makeInt(index) });
+    putEntry(result, { key: lenKey, value: makeInt(index) });
     return result;
   });
 
@@ -258,8 +257,7 @@ function buildJsonGrammar(): Grammar {
     for (const child of entriesNode.children) {
       if (child.key !== undefined && child.val !== undefined) {
         const key = child.key as string;
-        result.bindings.set(key, { key, value: child.val as Value });
-        result.bindingList.push({ key, value: child.val as Value });
+        putEntry(result, { key, value: child.val as Value });
       }
     }
     return result;

@@ -21,6 +21,7 @@ import { formatValue } from "../primitives.js";
 import { metaReadRaw, setName as slotSetName, setFallbackMember as slotSetFallbackMember } from "../slots.js";
 import { evaluate } from "../evaluator.js";
 import { buildModuleObject } from "../modules.js";
+import { putEntry } from "../structure.js";
 
 // == Allegro Standard — Type System ==
 
@@ -531,7 +532,7 @@ test("B-097 V2: typeMethod raw-binding fallthrough is narrowed to protocol slots
   slotSetName(t, stringToBits("Leaky"));
   // a stray non-slot binding on the type Context — pre-V2 this was
   // name-reachable through dispatch; post-V2 it is not a member.
-  t.bindings.set("stray", { key: "stray", value: makeInt(9) });
+  putEntry(t, { key: "stray", value: makeInt(9) });
   const r = runtimeEval("x = 1", undefined, [typeExt], undefined, true);
   const inst = tsWithType(makeStructure(), t);
   let threw = false;

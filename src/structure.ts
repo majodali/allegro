@@ -92,13 +92,19 @@ export class Structure {
   meta: Map<string, Value>;
 
   // --- Context role (record/type/scope: slot plane) ---
-  private _bindings: Map<string, Binding>;
-  private _bindingList: Binding[];
+  /** THE slot store (B-120 E3): an ordered sequence of optionally-keyed
+   *  entries. The map that used to sit beside it is now derived — see
+   *  `SlotView` and the `bindings` getter. */
+  entries: Binding[];
+  /** Cached derived view over `entries`. One per structure, built on first
+   *  `.bindings` access, so the 60% of structures never looked up allocate
+   *  nothing (B-120 E2 measurement). */
+  private _view?: SlotView;
 
   // --- C4.2 dense region (numeric-keyed structures — arrays) ---
   /** Element storage for array contexts. When present, this IS the slot
-   *  plane; `_bindings`/`_bindingList` hold the lazily-materialized
-   *  legacy view (or stay undefined until someone asks). */
+   *  plane; `entries` holds the lazily-materialized legacy view (or stays
+   *  undefined until someone asks). E4 collapses this into `entries`. */
   dense?: Value[];
   /** Cached Bits for the slot count (avoids re-allocating per read). */
   private _slotCountBits?: Value;
@@ -116,8 +122,8 @@ export class Structure {
   constructor(immutable: boolean) {
     this.kind = ValueKind.Structure;
     this.meta = undefined as unknown as Map<string, Value>;
-    this._bindings = undefined as unknown as Map<string, Binding>;
-    this._bindingList = undefined as unknown as Binding[];
+    this.entries = undefined as unknown as Binding[];
+    this._view = undefined;
     this.dense = undefined;
     this._slotCountBits = undefined;
     this.parent = undefined;
@@ -126,34 +132,35 @@ export class Structure {
     this.immutable = immutable;
   }
 
-  /** Legacy slot-plane view. For dense structures the map is materialized
-   *  on first access (then cached; W6 asserts coherence). Non-dense
-   *  structures return their storage directly — the getter is a
-   *  monomorphic two-check fast path on the scope-lookup hot loop. */
-  get bindings(): Map<string, Binding> {
-    if (this._bindings === undefined) {
-      if (this.dense !== undefined) materializeView(this);
+  /** The by-name view over `entries` — DERIVED, not stored (B-120 E3).
+   *  Cached per structure and built on first access. */
+  get bindings(): SlotView {
+    let v = this._view;
+    if (v === undefined) {
+      if (this.entries === undefined && this.dense !== undefined) materializeView(this);
+      v = this._view = new SlotView(this);
     }
-    return this._bindings;
-  }
-  set bindings(m: Map<string, Binding>) {
-    this._bindings = m;
+    return v;
   }
 
   get bindingList(): Binding[] {
-    if (this._bindingList === undefined) {
+    if (this.entries === undefined) {
       if (this.dense !== undefined) materializeView(this);
     }
-    return this._bindingList;
+    return this.entries;
   }
   set bindingList(l: Binding[]) {
-    this._bindingList = l;
+    this.entries = l;
+    this._view = undefined;
   }
 
   /** True iff the legacy view has been materialized (dense structures). */
   get viewMaterialized(): boolean {
-    return this.dense !== undefined && this._bindings !== undefined;
+    return this.dense !== undefined && this.entries !== undefined;
   }
+
+  /** Invalidate the derived view after a write to `entries`. */
+  invalidateView(): void { this._view?.invalidate(); }
 
   /** Slot count as a cached Bits value (dense structures only). */
   slotCountBits(): Value {
@@ -164,23 +171,108 @@ export class Structure {
   }
 }
 
+/**
+ * The by-name view over a Structure's entries (B-120 E3).
+ *
+ * Reads satisfy the `ReadonlyMap` surface the 193 `.bindings` call sites
+ * already use, so nothing above this file changed. What changed is beneath:
+ * there is no stored map. A lookup SCANS the entries, and builds a hash index
+ * only when the structure is big enough for the index to repay its
+ * construction.
+ *
+ * THE INDEX THRESHOLD (plan §6a, ruled 2026-09 on measurement).
+ *
+ * Costed over all 277,378 data structures the corpus builds, against the
+ * per-operation numbers in `scripts/bench-slot-lookup.ts`:
+ *
+ *   lazy, size > 8, no counter    49.1 ms      86 indexes
+ *   count >= 16                   55.2 ms     832
+ *   count >= 32 AND size > 4      61.2 ms     708
+ *   always index (the old code)   74.8 ms  277,347
+ *   never index                  771.0 ms       0
+ *
+ * Counting lookups loses, and no graded count rule can win: reading a counter
+ * costs 1.79 ns on every one of 5.34M lookups (9.5 ms), while the entire gap
+ * between this policy and a perfect oracle is 5.8 ms. The tax exceeds the
+ * prize, so size alone decides.
+ *
+ * The threshold is not a tuning knob — every value from 6 to 64 costs the
+ * same 49.1 ms, because 86 structures of 277,378 carry the whole case for an
+ * index and one of them (the 227-entry compile context) is most of it. Eight
+ * is chosen because 97% of structures hold eight entries or fewer, so the rule
+ * reads as *index the exceptions*.
+ */
+const INDEX_THRESHOLD = 8;
+
+export class SlotView implements ReadonlyMap<string, Binding> {
+  private _index?: Map<string, Binding>;
+  private _size = -1;
+  constructor(private readonly s: Structure) {}
+
+  /** Dropped when `entries` is written; rebuilt on the next lookup. */
+  invalidate(): void { this._index = undefined; this._size = -1; }
+
+  private index(): Map<string, Binding> | undefined {
+    const es = this.s.entries;
+    if (es.length <= INDEX_THRESHOLD) return undefined;
+    let ix = this._index;
+    if (ix === undefined) {
+      ix = this._index = new Map<string, Binding>();
+      for (let i = 0; i < es.length; i++) {
+        const k = es[i].key;
+        if (k !== null) ix.set(k, es[i]);
+      }
+    }
+    return ix;
+  }
+
+  get(key: string): Binding | undefined {
+    const ix = this.index();
+    if (ix !== undefined) return ix.get(key);
+    const es = this.s.entries;
+    for (let i = 0; i < es.length; i++) if (es[i].key === key) return es[i];
+    return undefined;
+  }
+
+  has(key: string): boolean { return this.get(key) !== undefined; }
+
+  get size(): number {
+    if (this._size < 0) {
+      const es = this.s.entries;
+      let n = 0;
+      for (let i = 0; i < es.length; i++) if (es[i].key !== null) n++;
+      this._size = n;
+    }
+    return this._size;
+  }
+
+  *keys(): MapIterator<string> {
+    for (const e of this.s.entries) if (e.key !== null) yield e.key;
+  }
+  *values(): MapIterator<Binding> {
+    for (const e of this.s.entries) if (e.key !== null) yield e;
+  }
+  *entries(): MapIterator<[string, Binding]> {
+    for (const e of this.s.entries) if (e.key !== null) yield [e.key, e];
+  }
+  [Symbol.iterator](): MapIterator<[string, Binding]> { return this.entries(); }
+  forEach(f: (v: Binding, k: string, m: ReadonlyMap<string, Binding>) => void, thisArg?: unknown): void {
+    for (const e of this.s.entries) if (e.key !== null) f.call(thisArg, e, e.key, this);
+  }
+  get [Symbol.toStringTag](): string { return "SlotView"; }
+}
+
 /** Build the legacy map/list view of a dense structure: one Binding per
  *  element under its decimal string key, plus the `__length` slot. The
  *  dense region stays authoritative for `indexGet`/`getSlotCount`. */
 function materializeView(s: Structure): void {
-  const bindings = new Map<string, Binding>();
-  const bindingList: Binding[] = [];
+  const entries: Binding[] = [];
   const dense = s.dense!;
   for (let i = 0; i < dense.length; i++) {
-    const b: Binding = { key: String(i), value: dense[i] };
-    bindings.set(b.key as string, b);
-    bindingList.push(b);
+    entries.push({ key: String(i), value: dense[i] });
   }
-  const lenB: Binding = { key: LENGTH_KEY, value: s.slotCountBits() };
-  bindings.set(LENGTH_KEY, lenB);
-  bindingList.push(lenB);
-  s.bindings = bindings;
-  s.bindingList = bindingList;
+  entries.push({ key: LENGTH_KEY, value: s.slotCountBits() });
+  s.bindingList = entries;
 }
 
 /** Construct the Context role. Scopes are mutable evaluator state; data
@@ -188,8 +280,7 @@ function materializeView(s: Structure): void {
  *  the grandfathered builder idiom until the C6 recipe). */
 export function newRecordStructure(): Structure {
   const s = new Structure(true);
-  s.bindings = new Map();
-  s.bindingList = [];
+  s.entries = [];
   return s;
 }
 
@@ -218,8 +309,9 @@ export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): S
   if (src.dense !== undefined) {
     s.dense = src.dense; // shared by reference — arrays are immutable
   } else {
-    s.bindings = src.bindings;
-    s.bindingList = src.bindingList;
+    // Shares the entry array by reference — sound because data contexts are
+    // immutable (D22). The derived view is per-structure and rebuilds.
+    s.entries = src.entries;
   }
   // The given map is AUTHORITATIVE — it becomes the derived structure's
   // entire channel plane. Writers pre-clone via cloneMeta (total, so
@@ -276,7 +368,9 @@ export function isStructure(v: unknown): v is Structure {
 // convention: a `Map` and an array, written by adjacent lines. `slotWrite`
 // allocated a separate `{ key, value }` object for each, so the two held
 // different objects for the same slot and a write through one was invisible
-// to the other.
+// to the other. E1 made every write go through one path; E3 deleted the
+// second store outright, so `entries` is the slot plane and the map is a
+// derived view (`SlotView`).
 //
 // Measured over the 29 self-contained `tests/*.alg` files: **2254 of 2540**
 // record structures held different objects for one slot; 28 had stale
@@ -301,40 +395,28 @@ export function isStructure(v: unknown): v is Structure {
  */
 export function putEntry(ctx: StructureValue, entry: Binding): void {
   const s = ctx as unknown as Structure;
-  if (entry.key === null) { s.bindingList.push(entry); return; }
-  const existing = s.bindings.get(entry.key);
-  s.bindings.set(entry.key, entry);
-  if (existing !== undefined) {
-    const i = s.bindingList.indexOf(existing);
-    if (i >= 0) { s.bindingList[i] = entry; return; }
+  const es = s.bindingList;          // materializes a dense structure's view
+  if (entry.key !== null) {
+    for (let i = 0; i < es.length; i++) {
+      if (es[i].key === entry.key) { es[i] = entry; s.invalidateView(); return; }
+    }
   }
-  s.bindingList.push(entry);
+  es.push(entry);
+  s.invalidateView();
 }
 
 /** Write a slot from a key and a value — the common case, and the shape
- *  `slotWrite` had. Allocates the one `Binding` both stores share. */
+ *  `slotWrite` had. */
 export function setEntry(ctx: StructureValue, key: string, value: Value | undefined): void {
   putEntry(ctx, { key, value });
 }
 
-/** Remove the entry under `key` from both stores. Returns whether one went. */
+/** Remove the entry under `key`. Returns whether one went. */
 export function removeEntry(ctx: StructureValue, key: string): boolean {
   const s = ctx as unknown as Structure;
-  const existing = s.bindings.get(key);
-  if (existing === undefined) {
-    // The stores could disagree before E1, so fall back to a list scan
-    // rather than trusting the map's answer about the list.
-    const i = s.bindingList.findIndex((b) => b.key === key);
-    if (i < 0) return false;
-    s.bindingList.splice(i, 1);
-    return true;
+  const es = s.bindingList;
+  for (let i = 0; i < es.length; i++) {
+    if (es[i].key === key) { es.splice(i, 1); s.invalidateView(); return true; }
   }
-  s.bindings.delete(key);
-  const i = s.bindingList.indexOf(existing);
-  if (i >= 0) s.bindingList.splice(i, 1);
-  else {
-    const j = s.bindingList.findIndex((b) => b.key === key);
-    if (j >= 0) s.bindingList.splice(j, 1);
-  }
-  return true;
+  return false;
 }
