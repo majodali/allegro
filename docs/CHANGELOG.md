@@ -4,6 +4,66 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-120 E2: the crossover measured, and D48(a)'s revisit trigger fires
+
+The plan required the scan/index crossover measured before the index policy was
+set. It is measured, and it moved the policy.
+
+### What was measured
+
+`scripts/bench-slot-lookup.ts` times lookup and index construction at sizes 1
+to 64. A scan wins outright to N=4 and stays within 2× to N=8. Past N=12 the
+map dominates. Building the index costs 30 to 160 lookups' worth at the sizes
+structures actually are.
+
+A second measurement counted lookups per structure across the same 29 corpus
+files, by subclassing the slot map to tally `get`.
+
+| | |
+|---|---|
+| Data structures constructed | 277,378 |
+| …never looked up once | 166,558 (60%) |
+| Total data lookups | 5,341,280 |
+| Total scope lookups | 13,693 |
+| Share of lookups landing in a scope | 0.3% |
+| Lookups held by the top 10 structures | 68.1% |
+
+### The ruling's own revisit condition is met
+
+D48(a) ruled that the O(1) requirement belongs to one role and that role is not
+data. It named the condition that would reopen it: a measured workload putting
+large by-name lookup on the data path rather than the scope path.
+
+Scopes take 0.3% of lookups. The other 99.7% are on data structures, and ten
+structures hold 68% of them. The hottest is a three-slot type Context taking
+1.92M lookups alone. Two more are the compile context — 227 primitive
+bindings, not a scope.
+
+### What survives
+
+The conclusion holds; the reason given for it does not. A scan does beat a map
+at the sizes that matter, and the hot structures are small — three to five
+slots — which is exactly where the scan wins. Lookups are not rare on data,
+they are almost all on data. Option E is still right, on better evidence than
+it was ruled on.
+
+§6 ruling 3 — index scopes only — is superseded. It would leave 99.7% of
+lookups unindexed while building 92 indexes that earn nothing.
+
+### What is proposed instead
+
+Plan §6a: a lazy, count-triggered index. A structure builds none when created,
+counts its lookups, and builds one on the Nth. Neither role-based nor
+size-based — the hottest structure in the corpus has three slots, so any size
+threshold that skips the 165,415 two-slot structures also skips the busiest
+structure in the system.
+
+The proposal awaits ratification, and carries its own open question: whether
+the counter pays for itself on the 60% that are never looked up. E3 measures
+that rather than assuming it.
+
+No behaviour change. Suite **1202/1202**.
+
 ## 2026-09 — B-120 E1: the slot plane becomes one store
 
 A Structure held its slots twice — a `Map` for lookup, an array for ordered
