@@ -4,6 +4,70 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-120 E1: the slot plane becomes one store
+
+A Structure held its slots twice — a `Map` for lookup, an array for ordered
+enumeration — kept in step by convention. Every write now goes through one
+path, so the two are views of one store.
+
+### What was wrong
+
+`slotWrite` allocated two `{ key, value }` objects on adjacent lines, one per
+container. Measured over the 29 self-contained `tests/*.alg` files:
+
+| Class | Before | After |
+|---|---|---|
+| Different objects for one slot | 2254 of 2540 | **0** |
+| List holds stale duplicate entries | 28 | **0** |
+| Map holds entries the list lacks | 15 | **0** |
+
+Anything iterating the list saw a different structure from anything iterating
+the map.
+
+### Two disciplines become structural
+
+`slots.ts` documented four binding write disciplines. Two of them —
+`renameInPlace` mutating only the map's copy, and a delete not mirroring the
+write that created the entry — were described as safe "for a reason that is
+not local to them", and the comment called the exemption "circumstantial, not
+structural".
+
+One store removes the circumstance. An in-place mutation reaches every reader
+because there is one object. A delete cannot leave a stale entry because there
+is one place to delete from.
+
+The set-only discipline goes with them. It produced the "map holds entries the
+list lacks" class — 15 proof contexts carrying `proposition`, `__discharged`,
+`lhs` and `rhs`. Those slots are list-visible now and the suite is unchanged.
+
+### How the write sites were found
+
+Declaring `bindings` as `ReadonlyMap` and `bindingList` as `readonly Binding[]`
+made the compiler list all 80 mutation sites — 63 in `src/`, 17 in tests. That
+is B-127's argument in miniature: the question "who writes this store?" is a
+type question, and the type checker answers it exhaustively where a grep
+guesses.
+
+### W7 asserts it, and the assertion was verified to fail
+
+The boundary walker gains **W7 slot-store-coherence**: for every corpus
+structure, the keyed entries in the list are the same objects as the map's, in
+the same number, with no duplicate keys.
+
+The defect was reintroduced deliberately to confirm W7 catches it. It reported
+violations; restoring the fix returned it to zero. A check that has never been
+seen to fail is not yet a check — this session has now been bitten twice by
+assertions that could not fail.
+
+### Two writers deliberately left alone
+
+`src/parser.ts` is generated and self-contained by design, and `parser-helpers.ts`
+mints plain object literals with the retired `'Context'` kind rather than real
+Structures. Neither is a Structure writer, so neither is E1's business. The
+second is filed as **B-132**.
+
+Suite **1202/1202**, typecheck clean.
+
 ## 2026-09 — Deviation D-1 recorded: the per-lane gate policy contradicts W-001
 
 The parallel-lane gate policy has contradicted W-001 (two delivery modes,

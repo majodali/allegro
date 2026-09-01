@@ -418,12 +418,10 @@ const ctx_bind: PrimitiveFnImpl = (args) => {
   const newCtx = makeStructure();
   for (const [k, b] of ctx.bindings) {
     const copy = { ...b };
-    newCtx.bindings.set(k, copy);
-    newCtx.bindingList.push(copy);
+    putEntry(newCtx, copy);
   }
   const binding = { key, value };
-  newCtx.bindings.set(key, binding);
-  newCtx.bindingList.push(binding);
+  putEntry(newCtx, binding);
   return newCtx;
 };
 
@@ -1883,6 +1881,7 @@ import {
 declareLiveness("delay", "live");
 declareLiveness("fetch", "admitted", "the fetched endpoint eventually responds");
 import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams } from "./evaluator.js";
+import { putEntry } from "./structure.js";
 
 // F3b: tracks ComposedFunctions whose body is currently being precompiled,
 // so the recursive call inside `factorial(n) => factorial(n-1)` doesn't

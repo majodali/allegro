@@ -2266,3 +2266,15 @@ that prevents it.
   - **When**: blocked on the amendment being released and adopted. The
     PROCESS half needs a Tier-0 PR.
   - **Pointer**: methodology [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated).
+
+- [ ] **B-132** · L0 · **Parse-time contexts are plain literals using the
+  retired `Context` kind.**
+  - **What**: `parser-helpers.ts`'s own `makeStructure` returns
+    `{ kind: 'Context', bindings, bindingList }` — an object literal, not a
+    `Structure`, naming a kind D25 retired.
+  - **Why**: found at B-120 E1 while routing every Structure writer through
+    one write path. These contexts cannot use it, and the W4 boundary
+    invariant would fail them if the walker ever reached one.
+  - **When**: not urgent — they are parse-time and are converted before
+    evaluation. Related to B-119 (`Context` names three things).
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §2.2.

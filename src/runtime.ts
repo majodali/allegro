@@ -21,6 +21,7 @@ import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } 
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
 import { registerScopeSymbol, MAIN_SCOPE_FQN, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
 import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended, setDivergenceProbe, resolveDataSlots } from "./types-std.js";
+import { putEntry } from "./structure.js";
 
 // Re-export Extension for backward compatibility
 export type { Extension };
@@ -546,28 +547,24 @@ function precompileFunctionsInner(
   const compileCtx = makeStructure();
   for (const [name, prim] of Object.entries(primitives)) {
     const binding = { key: name, value: prim as Value };
-    compileCtx.bindings.set(name, binding);
-    compileCtx.bindingList.push(binding);
+    putEntry(compileCtx, binding);
   }
   if (extensions) {
     for (const ext of extensions) {
       for (const [name, value] of Object.entries(ext.bindings)) {
         const binding = { key: name, value };
-        compileCtx.bindings.set(name, binding);
-        compileCtx.bindingList.push(binding);
+        putEntry(compileCtx, binding);
       }
       if (ext.moduleObject) {
         const binding = { key: ext.name, value: ext.moduleObject };
-        compileCtx.bindings.set(ext.name, binding);
-        compileCtx.bindingList.push(binding);
+        putEntry(compileCtx, binding);
       }
     }
   }
   // Add source bindings to compile context
   for (const b of fileCtx.bindingList) {
     if (b.key !== null && b.value !== undefined) {
-      compileCtx.bindings.set(b.key, { key: b.key, value: b.value });
-      compileCtx.bindingList.push({ key: b.key, value: b.value });
+      putEntry(compileCtx, { key: b.key, value: b.value });
     }
   }
 
@@ -703,14 +700,9 @@ export function buildEvalCtx(
   // Per-layer add with replace-or-push semantics (same-name re-adds within
   // one layer replace the earlier entry rather than duplicating).
   function addTo(layer: StructureValue, key: string, value: Value): void {
-    const binding: Binding = { key, value };
-    const existingIdx = layer.bindingList.findIndex(x => x.key === key);
-    if (existingIdx >= 0) {
-      layer.bindingList[existingIdx] = binding;
-    } else {
-      layer.bindingList.push(binding);
-    }
-    layer.bindings.set(key, binding);
+    // B-120 E1: this hand-wrote putEntry's replace-or-append semantics, which
+    // is why it was already correct where the adjacent-lines idiom was not.
+    putEntry(layer, { key, value });
   }
 
   // Layer 1: Primitives
@@ -754,8 +746,7 @@ export function buildEvalCtx(
         // REPL `import foo` awaiting a later phase stays unresolved (and
         // residualising) across passes, exactly as the flat copy did.
         const cell = makeCell(key);
-        baseLayer.bindings.set(key, cell);
-        baseLayer.bindingList.push(cell);
+        putEntry(baseLayer, cell);
       }
     }
     below = baseLayer;
@@ -778,8 +769,7 @@ export function buildEvalCtx(
       // Names provided by a lower layer (e.g. `import math` satisfied by a
       // module extension) resolve through the chain and get no cell.
       const cell = makeCell(b.key);
-      evalCtx.bindings.set(b.key, cell);
-      evalCtx.bindingList.push(cell);
+      putEntry(evalCtx, cell);
     }
   }
 
@@ -796,8 +786,7 @@ export function extensionToStructure(ext: Extension): Value {
   const ctx = makeStructure();
   for (const [name, value] of Object.entries(ext.bindings)) {
     const binding: Binding = { key: name, value };
-    ctx.bindings.set(name, binding);
-    ctx.bindingList.push(binding);
+    putEntry(ctx, binding);
   }
   return ctx;
 }
@@ -935,8 +924,7 @@ export function applyPhase(
       resolveCell(existing, value, true);
     } else {
       const binding: Binding = { key: name, value, isComplete: true };
-      evalCtx.bindings.set(name, binding);
-      evalCtx.bindingList.push(binding);
+      putEntry(evalCtx, binding);
     }
     // Defensive: a registry entry that predates the unification (or was
     // installed by an external caller) may not alias the ctx binding.
@@ -1071,21 +1059,19 @@ export function evalSource(
     const totalityCompileCtx = makeStructure();
     for (const [name, prim] of Object.entries(primitives)) {
       const binding = { key: name, value: prim as Value };
-      totalityCompileCtx.bindings.set(name, binding);
-      totalityCompileCtx.bindingList.push(binding);
+      putEntry(totalityCompileCtx, binding);
     }
     if (extensions) {
       for (const ext of extensions) {
         for (const [name, value] of Object.entries(ext.bindings)) {
           const binding = { key: name, value };
-          totalityCompileCtx.bindings.set(name, binding);
-          totalityCompileCtx.bindingList.push(binding);
+          putEntry(totalityCompileCtx, binding);
         }
       }
     }
     for (const b of fileCtx.bindingList) {
       if (b.key !== null && b.value !== undefined) {
-        totalityCompileCtx.bindings.set(b.key, { key: b.key, value: b.value });
+        putEntry(totalityCompileCtx, { key: b.key, value: b.value });
       }
     }
     // B-028 F1 (delivers B-087): memoize the type lookup. The analyzers
@@ -1341,8 +1327,7 @@ export function evalSource(
         };
         registry.bindings.set(bareKey, cell);
         registerDeps(registry, bareKey, collector.incompleteRefs);
-        evalCtx.bindings.set(bareKey, cell);
-        evalCtx.bindingList.push(cell);
+        putEntry(evalCtx, cell);
       }
     } else {
       // Auto-name types immediately (types may be bare Contexts or MultiValue-wrapped)
@@ -1393,8 +1378,7 @@ export function evalSource(
       let ctxBinding = evalCtx.bindings.get(b.key);
       if (!ctxBinding) {
         ctxBinding = { key: b.key, value: storedVal };
-        evalCtx.bindings.set(b.key, ctxBinding);
-        evalCtx.bindingList.push(ctxBinding);
+        putEntry(evalCtx, ctxBinding);
       }
       resolveCell(ctxBinding, storedVal, complete, collector.incompleteRefs);
       registry.bindings.set(b.key, ctxBinding);

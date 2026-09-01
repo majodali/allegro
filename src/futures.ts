@@ -9,6 +9,7 @@ import { Value, StructureValue, makeSymbol, SymbolValue, withMeta, stringToBits,
 import { DependencyRegistry, applyPhase } from "./runtime.js";
 import { makeCell } from "./scope.js";
 import { withType, ErrorType, StringType } from "./types-std.js";
+import { putEntry } from "./structure.js";
 
 export interface FutureManager {
   registry: DependencyRegistry;
@@ -48,8 +49,7 @@ export function createFutureManager(): FutureManager {
       // dependency registry (C2.3b: the binding IS the cell — value stays
       // undefined until the Promise resolves it via applyPhase).
       const cell = makeCell(name);
-      fm.evalCtx.bindings.set(name, cell);
-      fm.evalCtx.bindingList.push(cell);
+      putEntry(fm.evalCtx, cell);
       fm.registry.bindings.set(name, cell);
 
       // B-028 F1: capture the MINTING pass's registry/ctx. evalSource

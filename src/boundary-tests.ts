@@ -341,6 +341,8 @@ export interface InvariantViolation {
  *  slot" rule enforced mechanically. Also kind-independent since C4.
  *  W4: every Context is an instance of the unified Structure class.
  *  W6: a dense structure's materialized view agrees with its dense region.
+ *  W7 (B-120 E1): the slot map and the entry list are ONE store — same
+ *  objects, same keyed count, no duplicate keys.
  *  W1 and W5 were retired at C4 with the carrier they described.
  *  (Grows per phase: transparency, key-sort partition, immutability.) */
 export function checkValueInvariants(v: Value | null | undefined, program: string, out: InvariantViolation[], seen: WeakSet<object> = new WeakSet(), depth = 0): void {
@@ -392,6 +394,38 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     if (!isStructure(v)) {
       out.push({ invariant: "W4 structure-kind", detail: "Context is not a Structure instance (bypassed makeStructure)", program });
     } else {
+      // W7 (B-120 E1): THE SLOT STORE IS ONE STORE.
+      //
+      // A structure held its slots twice — a `Map` for lookup and an array
+      // for ordered enumeration — kept in step by convention, and measurably
+      // not in step: 2254 of 2540 corpus records held different objects for
+      // one slot, 28 had stale duplicates in the list, 15 had entries the
+      // list never got. Every write now goes through `putEntry`, so the two
+      // are views of one store. This asserts it, because the thing that let
+      // the divergence run for years is that nothing looked.
+      {
+        const st = v as unknown as Structure;
+        const keyed = (v as StructureValue).bindingList.filter((b) => b.key !== null);
+        const map = (v as StructureValue).bindings;
+        if (keyed.length !== map.size) {
+          out.push({ invariant: "W7 slot-store-coherence", detail: `list holds ${keyed.length} keyed entries, map holds ${map.size}`, program });
+        } else {
+          const seenKeys = new Set<string>();
+          for (const b of keyed) {
+            const k = b.key as string;
+            if (seenKeys.has(k)) {
+              out.push({ invariant: "W7 slot-store-coherence", detail: `duplicate key "${k}" in the entry list`, program });
+              break;
+            }
+            seenKeys.add(k);
+            if (map.get(k) !== b) {
+              out.push({ invariant: "W7 slot-store-coherence", detail: `key "${k}" is a different object in the map than in the list`, program });
+              break;
+            }
+          }
+        }
+        void st;
+      }
       // C4.2 (W6): when a dense structure's legacy view exists, it must
       // agree with the dense region — the region is authoritative.
       const s = v as unknown as Structure;

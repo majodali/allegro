@@ -19,6 +19,7 @@ import {
 import { makeFloat } from "../types.js";
 import { getUserOp } from "./fragments.js";
 import { substituteParams } from "../evaluator.js";
+import { putEntry } from "../structure.js";
 
 // --- Helpers ---
 
@@ -2250,8 +2251,7 @@ export function buildProgram(tree: ParseTree): any {
   function addStmt(stmt: BuiltBinding): void {
     const b: any = { key: stmt.key, value: stmt.value };
     if (stmt.exported) b.visibility = "exported";
-    (ctx as any).bindingList.push(b);
-    if (stmt.key !== null) (ctx as any).bindings.set(stmt.key, b);
+    putEntry(ctx as any, b);
   }
 
   // The program tree is either a "program" branch or untagged wrapper.

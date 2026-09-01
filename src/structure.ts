@@ -268,3 +268,73 @@ export function denseElements(ctx: StructureValue): Value[] {
 export function isStructure(v: unknown): v is Structure {
   return v instanceof Structure;
 }
+
+// =============================================================================
+// THE ENTRY WRITE PATH (B-120 chunk E1)
+//
+// A Structure's slot plane was TWO stores that had to be kept in step by
+// convention: a `Map` and an array, written by adjacent lines. `slotWrite`
+// allocated a separate `{ key, value }` object for each, so the two held
+// different objects for the same slot and a write through one was invisible
+// to the other.
+//
+// Measured over the 29 self-contained `tests/*.alg` files: **2254 of 2540**
+// record structures held different objects for one slot; 28 had stale
+// duplicate entries in the list; 15 had entries the map held and the list did
+// not. Anything iterating the list saw a different structure from anything
+// iterating the map. That is delta 49 (C9), and these three functions are the
+// single place a slot is written from now on.
+//
+// The plan is `docs/plans/entry-sequence-composite.md`. E1 fixes the
+// divergence without changing the representation; later chunks make the
+// sequence the storage and the map an index below the specification.
+// =============================================================================
+
+/**
+ * Write a slot: replace the entry under `key` if one exists, otherwise
+ * append. **One `Binding` object goes into both stores**, which is what
+ * makes them agree.
+ *
+ * Duplicate keys are not legal (plan §6 ruling 2). A keyed write replaces
+ * in place rather than appending a second entry, so the stale-duplicate class
+ * cannot recur.
+ */
+export function putEntry(ctx: StructureValue, entry: Binding): void {
+  const s = ctx as unknown as Structure;
+  if (entry.key === null) { s.bindingList.push(entry); return; }
+  const existing = s.bindings.get(entry.key);
+  s.bindings.set(entry.key, entry);
+  if (existing !== undefined) {
+    const i = s.bindingList.indexOf(existing);
+    if (i >= 0) { s.bindingList[i] = entry; return; }
+  }
+  s.bindingList.push(entry);
+}
+
+/** Write a slot from a key and a value — the common case, and the shape
+ *  `slotWrite` had. Allocates the one `Binding` both stores share. */
+export function setEntry(ctx: StructureValue, key: string, value: Value | undefined): void {
+  putEntry(ctx, { key, value });
+}
+
+/** Remove the entry under `key` from both stores. Returns whether one went. */
+export function removeEntry(ctx: StructureValue, key: string): boolean {
+  const s = ctx as unknown as Structure;
+  const existing = s.bindings.get(key);
+  if (existing === undefined) {
+    // The stores could disagree before E1, so fall back to a list scan
+    // rather than trusting the map's answer about the list.
+    const i = s.bindingList.findIndex((b) => b.key === key);
+    if (i < 0) return false;
+    s.bindingList.splice(i, 1);
+    return true;
+  }
+  s.bindings.delete(key);
+  const i = s.bindingList.indexOf(existing);
+  if (i >= 0) s.bindingList.splice(i, 1);
+  else {
+    const j = s.bindingList.findIndex((b) => b.key === key);
+    if (j >= 0) s.bindingList.splice(j, 1);
+  }
+  return true;
+}
