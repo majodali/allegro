@@ -52,15 +52,36 @@ lookups unindexed while building 92 indexes that earn nothing.
 
 ### What is proposed instead
 
-Plan §6a: a lazy, count-triggered index. A structure builds none when created,
-counts its lookups, and builds one on the Nth. Neither role-based nor
-size-based — the hottest structure in the corpus has three slots, so any size
-threshold that skips the 165,415 two-slot structures also skips the busiest
-structure in the system.
+Plan §6a: build the index lazily on first lookup, if the structure has more
+than 8 entries. No counting.
 
-The proposal awaits ratification, and carries its own open question: whether
-the counter pays for itself on the 60% that are never looked up. E3 measures
-that rather than assuming it.
+Every policy was costed against the corpus, from the measured `(size, lookups)`
+of all 277,378 data structures and the per-operation costs above. The counter's
+own cost is charged at a measured 1.79 ns per lookup.
+
+| Policy | Total | Indexes |
+|---|---|---|
+| Lazy, size > 8, no counter | **49.1 ms** | 86 |
+| Count ≥ 16 | 55.2 ms | 832 |
+| Count ≥ 32 **and** size > 4 | 61.2 ms | 708 |
+| Always index (today) | 74.8 ms | 277,347 |
+| Never index | 771.0 ms | 0 |
+
+Counting loses because it taxes every lookup — 9.5 ms across the corpus — to
+sharpen a decision size already predicts. That answers §6a's earlier open
+question: the counter does not pay for itself.
+
+The threshold is not a tuning knob. Every value from 6 to 64 costs 49.1 ms,
+because the case for an index rests on 86 structures of 277,378, one of which
+is most of it.
+
+### A correction, prompted by the maintainer's question
+
+The first §6a argued no size threshold could work, because the hottest
+structure in the corpus has three slots. That was wrong. Indexing it saves
+**1.92 ms** across its 1.92M lookups, because at size 3 a scan and a map
+lookup differ by about a nanosecond. Being hot and being worth indexing are
+different properties, and the measurement was needed to tell them apart.
 
 No behaviour change. Suite **1202/1202**.
 

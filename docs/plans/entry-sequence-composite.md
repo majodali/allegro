@@ -263,47 +263,71 @@ All five recommendations accepted by the maintainer as written.
    migration**, with this arc as its first customer. An ordering, not a
    dependency: E1 does not need it, and E4 onward does.
 
-## 6a. The index policy — proposed at E2, awaiting ratification
+## 6a. The index policy — measured at E2, awaiting ratification
 
 §6 ruling 3 said index scopes only, and reserved the question for this
-benchmark. The benchmark says otherwise (§5.1a), so this proposes a
-replacement rather than assuming one.
+benchmark. The benchmark reopened it (§5.1a), and the maintainer's question —
+*why not trigger on count and size?* — is what produced the answer below.
 
-**Proposed: a lazy, count-triggered index. Neither role-based nor size-based.**
+**Proposed: build the index lazily on first lookup, if the structure has more
+than 8 entries. No counting.**
 
-A structure builds no index when it is created. It counts its lookups. On the
-Nth lookup it builds an index and uses it from then on. The count and the
-index are host-plane state, so nothing above the specification can observe
-either.
+### Every policy costed against the corpus
 
-**Why not the alternatives.**
+Total lookup and index-construction time for all 277,378 data structures,
+modelled from the per-operation costs in §5.1 and the measured
+`(size, lookups)` of every structure. The counter's own cost is charged at the
+measured **1.79 ns per lookup** — 9.5 ms across the corpus's 5,341,280 data
+lookups.
 
-*Scopes only* (the superseded ruling) indexes 0.3% of the traffic. It would
-leave the 1.92M-lookup type Context and the 227-entry compile context on a
-scan, and build 92 indexes that earn nothing.
+| Policy | Total | Indexes built |
+|---|---|---|
+| **Lazy, size > 8, no counter** | **49.1 ms** | **86** |
+| Lazy, size > 16 | 49.1 ms | 83 |
+| Lazy, size > 6 | 49.1 ms | 129 |
+| Count ≥ 16 | 55.2 ms | 832 |
+| Count ≥ 32 | 57.7 ms | 772 |
+| Count ≥ 32 **and** size > 4 | 61.2 ms | 708 |
+| Always index (today) | 74.8 ms | 277,347 |
+| Never index | 771.0 ms | 0 |
 
-*A size threshold* indexes the wrong axis. The hottest structure in the corpus
-has **three** slots. Any threshold high enough to skip the 165,415 two-slot
-structures also skips the busiest structure in the system.
+### Why counting loses
 
-*Always index* is what the code does today, and 60% of structures never
-receive a single lookup. That is 166,558 maps built to answer nothing.
+The counter taxes **every** lookup to sharpen a decision that size already
+predicts. 5.34M lookups at 1.79 ns is 9.5 ms, which is more than counting ever
+recovers. Size is free: the structure already knows how many entries it has.
 
-**Why counting works.** It reads the only variable that decides the outcome —
-how often this structure is actually asked — and it needs no prediction. A
-structure looked up once pays one counter increment. A structure looked up two
-million times pays the build once and gets map speed for the rest.
+This retires §6a's earlier open question — *does the counter pay for itself?*
+Measured, it does not.
 
-**The threshold.** Break-even is 34 lookups at N=8, 44 at N=4, 75 at N=3. A
-single **N = 32** is within a factor of two of break-even across the whole
-range where structures actually live, and needs no size test. E3 sets it from
-this table; the benchmark is committed so the choice can be re-checked.
+### Why the count-and-size conjunction loses too
 
-**Open question for ratification.** Is the counter worth its own cost on the
-never-looked-up 60%? It is one integer increment per lookup and no allocation,
-against a Map construction saved — but it is a per-lookup cost on the hot path,
-so E3 should measure it rather than assume, and this plan should not pretend
-otherwise.
+It inherits the counter's cost and adds a second gate that mostly removes
+indexes worth building. At 61.2 ms it is the most expensive of the
+count-based options.
+
+### The threshold is not a tuning knob
+
+Every threshold from 6 to 64 costs 49.1–49.2 ms. The choice is flat because
+**the case for an index rests on a handful of structures**: 86 of 277,378, and
+one of them — the 227-entry compile context — is most of it. Eight is chosen
+because 97% of structures hold eight entries or fewer, so the rule reads as
+*index the exceptions*.
+
+### The correction this makes to §5.1a
+
+§5.1a argued that no size threshold could work, because the hottest structure
+in the corpus has three slots. That argument was wrong, and the numbers say so:
+indexing that structure saves **1.92 ms** across its 1.92M lookups, because at
+size 3 a scan and a map lookup differ by about a nanosecond. Being hot and
+being worth indexing are different properties, and only the second one matters.
+
+### What "never index" would cost, since the option was raised
+
+771 ms against 49 ms — but **~600 ms of that is one structure**, the compile
+context, scanned 219,000 times at 227 entries. Deferring the index entirely is
+survivable and would be dominated by a single object, which is worth knowing if
+the arc is ever paused mid-way.
 
 ## 7. Chunk sequence
 
@@ -313,7 +337,7 @@ Provisional — the maintainer sets the boundaries (W-001).
 |---|---|---|
 | **E1** | One write path (`putEntry` / `setEntry` / `removeEntry`); every Structure writer routed through it, so both containers hold one object. The 2254 divergences go to zero | **DONE 2026-09.** Suite 1202/1202. W7 slot-store-coherence added and verified to fail on the reintroduced defect. Deriving the map from `entries` moves to E3, where the index policy is set |
 | **E2** | Benchmark the scan/index crossover (§5.1); set the index policy from the result | **DONE 2026-09.** `scripts/bench-slot-lookup.ts` committed and its results recorded in §5.1. The measurement fired D48(a)'s own revisit trigger (§5.1a) and supersedes §6 ruling 3; §6a proposes the replacement policy and awaits ratification. No behaviour change |
-| **E3** | `bindings` becomes derived from `entries` (moved here from E1), and the §6a index policy is implemented and measured — including whether the lookup counter pays for itself | Suite green; `scripts/bench-slot-lookup.ts` re-run; corpus lookup counts no worse |
+| **E3** | `bindings` becomes derived from `entries` (moved here from E1), and the §6a policy is implemented: build lazily on first lookup when size > 8 | Suite green; `scripts/bench-slot-lookup.ts` re-run; corpus lookup cost no worse than the 49.1 ms §6a models |
 | **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | Suite green; array demos are the oracle |
 | **E5** | Delete `materializeView`, `viewMaterialized`, `__length`, W6 and `isMetaSlotKey`. Closes B-104(b) and B-104(f) | Counts to zero; boundary lint at baseline |
 | **E6** | `concepts.md` §12 (structure roles), §16 (dense region), §17 (the legacy view) and IC-2 updated; deltas 17 and 22 closed | doc-ref lint; spine delta rows read `—` |
