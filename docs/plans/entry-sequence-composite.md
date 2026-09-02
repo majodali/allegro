@@ -420,19 +420,24 @@ reasoning about the interpreter, while one that sees `ValueKind.Scope` is
 reasoning about the program. The argument points the same way in both cases,
 which is the reason to treat them as one audit rather than two fixes.
 
-**Recommendation.** Three separable items, none of them E4's deliverable:
+**Recommendation, and where each item went.** Three separable items, none of
+them E4's deliverable. E4 merged as it stood — its deliverable is sound
+independently of all three, and the flag it introduced is no worse than the
+`dense` array it replaced.
 
 1. `positional` — split `getSlotCount` into an always-answering
    `positionalCount`, move the two shape tests, demote the flag to a private
-   derived cache. Small, self-contained, no decision-register change.
-2. `immutable` — delete. No decision-register change; D22 is unaffected.
-3. Scope as a kind — a **D25 revisit**, maintainer's call, and the largest of
-   the three. Not to be started on the strength of this audit alone.
+   derived cache. → **B-133**.
+2. `immutable` — delete, or give it a reader. D22 is unaffected. → **B-134**.
+3. Scope as a kind — a **D25 revisit**, and the largest of the three. Not
+   filed: under discussion with the maintainer (2026-09). The argument for it
+   is above and stops there.
 
-E4's own deliverable — the dense region collapsing into the entry sequence — is
-sound independently of all three, and the flag it introduced is no worse than
-the `dense` array it replaced. The recommendation is to merge E4 as it stands
-and take item 1 as its own chunk, rather than reopen a green gate.
+The maintainer generalised the audit at the same gate — *we may want to define
+some tighter rules to validate host-plane properties and design across all L0
+types* — which is **B-135**. The plane turns out to exist on almost every
+representation (`Binding` carries four such fields, `ParamValue` five,
+`PrimitiveFunctionValue` three) with no stated rule for what may live there.
 
 ## 6. Rulings — taken 2026-09-01
 

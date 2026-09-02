@@ -2139,6 +2139,9 @@ that prevents it.
   - **Not urgent, and not C2's.** Nothing is wrong at runtime; the risk is a
     reader's model. Best taken after B-121 lands, when the clone sites are
     settled and the change is a small one rather than a moving target
+  - **Generalised by B-135** (2026-09): this is one instance of a host-plane
+    property whose declared meaning exceeds its real one. Whatever rule B-135
+    states should decide this item rather than the reverse
 
 - [ ] **B-127** · T-tooling · **Code analysis is grep-based, and grep cannot
   see the questions that matter.** Raised by the maintainer at B-121 C2
@@ -2224,6 +2227,10 @@ that prevents it.
     enforced. Best evidence for whether it works: re-run C2's survey
     afterwards and see whether the answer is a short list rather than a class
     of things nobody could search for
+  - **B-135 supplies the host plane's half of (c)**: a plane question with one
+    spelling needs the plane to have a stated content rule first.
+    `Structure.memberPrivilege`, written and read through `as any` and
+    declared nowhere, is what an unpoliced host plane looks like today
 
 
 - [ ] **B-129** · T-docs · **Editorial pass: bring the registers to P-006
@@ -2278,3 +2285,77 @@ that prevents it.
   - **When**: not urgent — they are parse-time and are converted before
     evaluation. Related to B-119 (`Context` names three things).
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §2.2.
+
+- [ ] **B-133** · L0 · **`Structure.positional` is a storage bit answering a
+  type question.**
+  - **What**: split `getSlotCount` into an always-answering
+    `positionalCount(ctx): number`; move the two callers that use its
+    `undefined` as an is-this-an-Array test (`grammar2/builder.ts`,
+    `types-std.ts`'s *Array-like Context* branch) onto a shape check that does
+    not read storage; demote `positional` to a private, unexported, derived
+    cache with the same status as `_view`.
+  - **Why**: the field never leaves `structure.ts`, but its effect does —
+    `undefined` is overloaded as a shape test, and 2 of 13 callers use it as
+    one. The other 11 already know they hold an array, which is the case for
+    the maintainer's two-getters route. `positionalCount` then answers `0` for
+    an empty array and an empty record alike, which is correct for both, so
+    the array/record distinction leaves L0 for the type.
+  - **When**: ready. Small and self-contained; no decision-register change.
+    One diagnostic is lost — `grammar2/builder.ts` stops rejecting a record
+    passed where an array is expected — and that is a type error L2 should
+    catch, not something a storage bit should pay for. **Blocked on nothing**,
+    but the L1-has-no-type-system tension it exposes belongs to B-112.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
+
+- [ ] **B-134** · L0 · **`Structure.immutable` is declared state with no
+  reader, and it is wrong.**
+  - **What**: delete the field, or give it a reader. It is written once (the
+    constructor, always `true`), read once (a copy in `deriveWithMeta`), and
+    branched on nowhere.
+  - **Why**: its documented contract is false in the field. The header says
+    evaluation scopes are mutable, but `scopeNew` goes through
+    `makeStructure`, so **every scope carries `immutable: true`** and has since
+    C4.1 with no consequence. A field that has been wrong on every scope that
+    long is not carrying information. D22 is unaffected either way — the
+    boundary battery is what enforces it, not this bit.
+  - **When**: ready, and cheap. Sequence after B-133 so the two host-plane
+    edits to `structure.ts` do not collide.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
+
+- [ ] **B-135** · L0 · **Nothing says what may live on an L0 type's host
+  plane.** Raised by the maintainer at B-120 E4 (2026-09): *we may want to
+  define some tighter rules to validate host-plane properties and design
+  across all L0 types.*
+  - **What**: a stated rule for the host plane — what a property there may
+    answer, what it may not, and a check that holds it. Then an audit of every
+    L0 type against it.
+  - **Why**: the plane exists on almost every representation and has no test.
+    `Structure` carries seven such fields, `Binding` four (`visibility`,
+    `incompleteDeps`, `isComplete`, `cell`), `ParamValue` five,
+    `PrimitiveFunctionValue` three (`lazy`, `effects`, `sourceAware`),
+    `ExpressionValue` one (`memo`), `SymbolValue` one (`fqn`). Without a rule
+    the register drifts three ways at once, and each way already has an
+    instance: a property that answers a **type** question from storage
+    (B-133), a property with **no reader at all** (B-134, and
+    `ParamValue.predicates`, reserved and unused at runtime), and a property
+    that is simply **undeclared** — `Structure.memberPrivilege` is written and
+    read through `as any` and appears in no interface.
+  - **The counterexample the rule has to accommodate**: `Binding.visibility`
+    is a deliberate, ruled instance of exactly this pattern (D42/V-R4 —
+    visibility is a property of the binding, never of the value). The plane is
+    not the problem; the absence of a test is.
+  - **The code-generation stake**, which is why the maintainer raised it: a
+    generator that must read a host property to know what a value means is
+    modelling the interpreter's private state through a side channel outside
+    both the value and its type. One derived from the representation reads
+    what the specification says the value *is*.
+  - **When**: after B-133 and B-134 supply two worked instances, and alongside
+    B-112 (which owes the plane interfaces) and B-128 (which owes the
+    policing). Generalises **B-126**, whose subject — `param.owner` is a
+    two-state flag wearing a pointer's type — is the same failure on a
+    different type.
+  - **Not in scope**: whether Scope should become an Allegretto `ValueKind`.
+    That is a D25 revisit and is under discussion with the maintainer; the
+    argument for it is recorded at the pointer below and is deliberately not
+    filed here.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
