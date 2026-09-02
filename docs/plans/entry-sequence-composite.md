@@ -271,6 +271,169 @@ Those are different quantities: §6a models slot lookup and index construction
 alone, not evaluation. Per-file A/B against `main` is the comparison that
 answers the question, and it shows no regression.
 
+### 5.3 An empty array needs a flag, which the plan missed
+
+§3.3 said an array is *`entries` with every key null*. True, and not sufficient:
+**an empty array and an empty record are then the same object**, so
+`getSlotCount` cannot tell "zero elements" from "not a sequence".
+
+E4 keeps one host-plane bit, `Structure.positional`, set by
+`newDenseStructure`. It replaces the `dense` **array**, not the question the
+array answered. The dense ROLE — a second storage shape with its own
+accessors and a materialized legacy view — is what D48(a) deletes; *are these
+entries positional?* survives as a boolean, the way `isScope` does.
+
+The flag also buys O(1) indexing. A wholly-positional structure reads
+`entries[i]` directly; anything else walks the unkeyed subsequence. A keyed
+write clears the flag, because after one the index and the position disagree.
+The existing 200-vs-200,000-element scaling test is what holds this honest.
+
+### 5.4 The string-key protocol had consumers after all
+
+E3's write-up said an array's elements being reachable as `bindings.get("0")`
+had no consumer, citing E2's measurement that **0 of 166** dense structures
+ever materialized their view, and that no `.alg` source indexes an array by
+string.
+
+**Both facts were true and the conclusion was wrong.** E2's corpus walk covers
+`tests/*.alg`; it does not cover the TypeScript test harness, which read
+analyzer output positionally through `bindings.get(String(i))` in three places.
+Those broke, and they were right to break — they consume an Allegro array, so
+they move to `indexGet`.
+
+One case went the other way and is the more useful half. `grammar-legacy.ts`'s
+JSON grammar builds an array-shaped value as a **genuine string-keyed record**
+— `"0"`, `"1"`, `"2"`, plus a `length` key — using `makeStructure`. Migrating
+it to `indexGet` broke it, because it never was a positional structure.
+`bindings.get(String(i))` is *not* reliably the retired array protocol; it is
+sometimes an ordinary record read that happens to use numeric keys.
+
+The lesson generalises past this chunk: **a measurement's scope is part of its
+claim.** "Zero in the corpus" was reported as "zero", and the gap between those
+is where the nine failures lived.
+
+### 5.5 The host-plane audit — E4's open question
+
+At the E4 gate the maintainer challenged `positional` and generalised it: these
+properties are type indicators, they will compete with type information at L2
+and above, and reasoning over host properties will complicate code generation.
+Two routes were named — *two getters, one by index and one by key, with L0
+callers knowing what they hold*, and *new `ValueKind` entries if L0 genuinely
+needs type information*. This section is the audit that was asked for. It takes
+no ruling; §6b records one when it is made.
+
+`Structure` carries seven host-plane fields. They are not one problem.
+
+| Field | Writers | Behavioural readers | What it really is |
+|---|---|---|---|
+| `immutable` | constructor only | **none** | dead |
+| `isScope` | `scopeNew` | 5 | a kind, worn as a flag |
+| `parent` | `scopeNew` | 7, all in `scope.ts` | scope payload |
+| `scopePredicates` | `scope.ts` | 3, all in `scope.ts` | scope payload |
+| `memberPrivilege` | `scope.ts:155` (`as any`) | 1 (`as any`) | scope payload, undeclared |
+| `positional` | `newDenseStructure`, `deriveWithMeta`, `putEntry` | 3, all in `structure.ts` | a cache doing a second job |
+| `_view` | `structure.ts` | `structure.ts` | a cache, and only that |
+
+**`immutable` is not a property, it is a comment.** It is written once, in the
+constructor. Every factory passes `true` — `newRecordStructure`,
+`newDenseStructure`, and `deriveWithMeta` by copying. It is read once, to be
+copied. Nothing anywhere branches on it. Worse, its documented contract is
+false in the field: the header says scopes are mutable, but `scopeNew` calls
+`makeStructure`, so **every scope carries `immutable: true`**. A field that has
+been wrong on every scope since C4.1 without a single consequence is not
+carrying information. D22 is a real rule; this bit is not its enforcement —
+the boundary battery is. Deleting it leaves D22 exactly as enforced as it is
+today, and costs one slot less on every structure.
+
+**`isScope`, `parent`, `scopePredicates` and `memberPrivilege` are one
+property, not four.** Every one is written only by the scope constructors and
+read only when the structure is a scope. And the five `isScope` reads outside
+`scope.ts` all ask the same question in the same shape — *skip this, it is not
+data* (`resolveDataSlots`, `hasPendingFutureSlot`, `collectSymbolRefs`) or
+*refuse this, it is not data* (`deriveWithMeta`, `assertNotScope`).
+
+This one is **not** a type indicator, and it will never compete with L2. A
+scope is not a value of any type; it is evaluator state stored in the value
+representation. No L2 type can ever answer "is this a scope", so nothing is
+being duplicated — a kind distinction is simply being carried as a boolean.
+That is precisely the maintainer's second route, and it lands well here:
+`ValueKind.Scope` would collapse four fields into one tag, move the three
+payload fields onto a `Scope` class that data structures stop paying for,
+retire an `as any` expando that appears in no interface, and turn
+`if (!ctx.isScope)` into a switch the compiler can check exhaustively — the
+same "enumeration by compiler, not grep" property E1 and E3 both relied on.
+
+It also **reopens D25**, which ruled the other way: *Scope is the
+evaluation-environment ROLE of the shared substrate … the Context kind-name
+retires*. `types.ts` records that ruling inside the enum itself. This is a
+decision-register change and a maintainer call; the case is stated here and
+goes no further.
+
+**`positional` is the real instance, and the prediction has already come
+true.** The field is not on `StructureValue` or `StructureHostFields` — only
+`structure.ts` reads it, through a cast — so the *property* does not leak. Its
+*effect* does, because `getSlotCount` returns `undefined` for a non-positional
+structure and two callers use exactly that as a type test:
+
+- `grammar2/builder.ts:83` — `if (!lengthV) throw "value is not an Array (no
+  length slot)"`. A type test written against a storage bit.
+- `types-std.ts:3647` — `// Array-like Context`, then `lenV?.kind === Bits` to
+  decide whether to key a cache as an array.
+
+The other eleven callers do not: they already hold an array and write
+`?? makeInt(0)`. So eleven sites are the case the maintainer describes — the
+caller knows what it has — and two are shape tests that should be asking the
+type. One of those two is the awkward one: `grammar2/builder.ts` is **L1**,
+which validates a user-supplied argument and has no type system to ask.
+
+**What the two-getters route means concretely.** The two getters already exist
+— `indexGet` by index, `bindings.get` by key. What is missing is a *count*:
+`getSlotCount` conflates "how many positional entries" with "is this positional
+at all" by overloading `undefined`. Split it and the problem dissolves:
+
+- `positionalCount(ctx): number` — always answers, `0` for a record. Serves all
+  eleven knowing callers with no flag involved.
+- the two shape tests move to whatever L1 argument validation becomes.
+
+Then `positional` survives only as an **optimisation**: `entries.every(e =>
+e.key === null)`, cached, keeping `denseIndexGet` and the count O(1) instead of
+O(n). Private, unexported, wholly derivable — the same status as `_view`, and
+defensible on exactly the terms `_view` is. §5.3's argument that an empty array
+and an empty record are indistinguishable turns out to be an artefact of the
+overload, not a fact about the representation: `positionalCount` answers `0`
+for both, which is **correct** for both. The array/record distinction leaves L0
+entirely and moves to the type, which is where the maintainer said it belongs.
+
+One thing is genuinely lost: `grammar2/builder.ts` stops rejecting a record
+passed where an array is expected, and reads it as empty instead. That is a
+diagnostic, not a semantic — and it is a type error that L2 should be catching.
+It should not be paid for with a storage bit.
+
+**The code-generation argument, stated at full strength.** A generator emitting
+from `entries` must know whether index `i` means `entries[i]`. If that answer
+lives in a host bit, the generator has to model the interpreter's private
+state — a side channel outside both the value and its type. If it is derived
+from the entry sequence, the generator reads the same thing the specification
+says a composite *is*, and needs no side channel at all. The identical argument
+applies to scopes: a generator asking "is this `Structure` a scope" is
+reasoning about the interpreter, while one that sees `ValueKind.Scope` is
+reasoning about the program. The argument points the same way in both cases,
+which is the reason to treat them as one audit rather than two fixes.
+
+**Recommendation.** Three separable items, none of them E4's deliverable:
+
+1. `positional` — split `getSlotCount` into an always-answering
+   `positionalCount`, move the two shape tests, demote the flag to a private
+   derived cache. Small, self-contained, no decision-register change.
+2. `immutable` — delete. No decision-register change; D22 is unaffected.
+3. Scope as a kind — a **D25 revisit**, maintainer's call, and the largest of
+   the three. Not to be started on the strength of this audit alone.
+
+E4's own deliverable — the dense region collapsing into the entry sequence — is
+sound independently of all three, and the flag it introduced is no worse than
+the `dense` array it replaced. The recommendation is to merge E4 as it stands
+and take item 1 as its own chunk, rather than reopen a green gate.
+
 ## 6. Rulings — taken 2026-09-01
 
 All five recommendations accepted by the maintainer as written.
@@ -395,12 +558,18 @@ Provisional — the maintainer sets the boundaries (W-001).
 | **E1** | One write path (`putEntry` / `setEntry` / `removeEntry`); every Structure writer routed through it, so both containers hold one object. The 2254 divergences go to zero | **DONE 2026-09.** Suite 1202/1202. W7 slot-store-coherence added and verified to fail on the reintroduced defect. Deriving the map from `entries` moves to E3, where the index policy is set |
 | **E2** | Benchmark the scan/index crossover (§5.1); set the index policy from the result | **DONE 2026-09.** `scripts/bench-slot-lookup.ts` committed and its results recorded in §5.1. The measurement fired D48(a)'s own revisit trigger (§5.1a) and supersedes §6 ruling 3; §6a proposes the replacement policy and awaits ratification. No behaviour change |
 | **E3** | `bindings` becomes derived from `entries` (moved here from E1), and the §6a policy is implemented: build lazily on first lookup when size > 8 | **DONE 2026-09.** Suite 1202/1202. `SlotView` replaces the stored map; measured on the real implementation, **93.4%** of 4.24M lookups are served by a scan averaging **3.63** entries and 268 indexes are built. Per-file wall clock within noise of main (§5.2) |
-| **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | Suite green; array demos are the oracle |
-| **E5** | Delete `materializeView`, `viewMaterialized`, `__length`, W6 and `isMetaSlotKey`. Closes B-104(b) and B-104(f) | Counts to zero; boundary lint at baseline |
+| **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | **DONE 2026-09.** Suite 1202/1202. `dense`, `materializeView`, `viewMaterialized`, `slotCountBits`, `__length`, `isDense` and **W6** all deleted — E5's list arrived with the region rather than after it. Two things the plan did not anticipate: §5.3 (the positional flag) and §5.4 (the string-key protocol had consumers) |
+| **E5** | ~~Delete `materializeView`, `viewMaterialized`, `__length`, W6~~ **done at E4** — they went with the region. E5 is now only `isMetaSlotKey`, whose last key (`__length`) is gone. Closes **B-104(b)**; B-104(f) closed at E4 | Counts to zero; boundary lint at baseline |
 | **E6** | `concepts.md` §12 (structure roles), §16 (dense region), §17 (the legacy view) and IC-2 updated; deltas 17 and 22 closed | doc-ref lint; spine delta rows read `—` |
 
 **Completion test**: `dense` 0, `__length` 0, `isMetaSlotKey` 0, `bindingList`
 0 as a separate store, and `concepts.md` §16 and §17 retired the way §10 was.
+
+The host-plane audit (§5.5) raised three follow-on items. Only the first is
+this plan's business — `positional` is E4's own surface — and it is proposed
+as a chunk after E6 rather than a reopening of E4. The other two (`immutable`,
+and scope as a `ValueKind`) belong to the backlog and the decision register
+respectively, and wait on a ruling.
 
 ## 8. What this plan is not
 
@@ -411,4 +580,6 @@ what the specification says a composite is and what the implementation makes
 it — plus one measured defect (§2.1) that the change removes by construction.
 
 It is **not** a scope redesign. Scopes keep their parent chain, their
-predicates and their mutability. Only where their index lives changes.
+predicates and their mutability. Only where their index lives changes. §5.5
+records an argument for making Scope a `ValueKind`, which would be exactly such
+a redesign; it is stated there so it is not lost, and it is not carried here.
