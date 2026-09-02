@@ -104,9 +104,14 @@ Everything else in the landing checklist is unchanged for every lane.
 
 > This gate policy is **deviation D-1** against W-001 (two delivery modes,
 > human-gated), recorded 2026-09-01 in
-> [docs/classification.md](classification.md#deviation-register). An
-> amendment adding the sequence mode is drafted; B-131 retires the
-> deviation when it is adopted.
+> [docs/classification.md](classification.md#deviation-register).
+> Methodology v1.5.0 released the sequence mode with allegro as its
+> evidencing instance, so the mode itself is now the rule. The deviation
+> stays open because the released rule adds a fourth stop condition this
+> policy does not state: a chunk whose landing summary carries **asks** —
+> anything requested of the maintainer — stops the sequence, and asks are
+> never rolled up across chunks. B-131 retires D-1 once the policy states
+> it, which needs the Tier-0 change to PROCESS §3.
 
 **Before starting in any lane** (PROCESS §7): check open PRs for
 overlapping work. Sessions run in separate containers with separate
@@ -2263,9 +2268,34 @@ that prevents it.
   - **Why**: D-1 records a contradiction between the declared per-lane
     practice and W-001's per-chunk gate. The amendment is the accommodation;
     the deviation is the interim.
-  - **When**: blocked on the amendment being released and adopted. The
-    PROCESS half needs a Tier-0 PR.
+  - **When**: no longer blocked on the release — methodology v1.5.0
+    carries the amendment and this project migrated to it 2026-09-02.
+    What remains is stating the released rule's fourth stop condition in
+    the practice: a chunk whose landing summary carries asks stops the
+    sequence, and asks are never rolled up across chunks. Only the human
+    maintainer pre-ratifies; a delegating agent may not. Both belong in
+    PROCESS §3 and the lane gate policy, so this needs a Tier-0 PR and
+    the maintainer's sign-off.
   - **Pointer**: methodology [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated).
+
+- [ ] **B-133** · T-docs · **Seven standing form-audit violations, none
+  owned.**
+  - **What**: `mtool audit form` at the declared level reports seven
+    violations, unchanged by the 1.5.0 migration. Three are spurious —
+    `mtool`'s deviation parser reads each field bullet of D-1's fielded
+    entry as a separate deviation and flags the ones that do not name a
+    rule; the defect is filed in methodology-tools. The other four are
+    real: two dangling links (`docs/CHANGELOG.md:1492`,
+    `docs/design/concepts.md:2300`) and two plan Status lines outside
+    K-007's `draft → active → (superseded | closed)` lifecycle
+    (`docs/plans/metadata-on-values.md`,
+    `docs/plans/parallel-lanes-process-delta.md`).
+  - **Why**: they were standing unowned, which is what W-005 (root
+    causes, or tracked risks — never unowned known issues) forbids. The
+    four real ones are small and local; the three spurious ones clear
+    when the tool is fixed.
+  - **When**: the four real ones anytime; the parser fix is upstream.
+  - **Pointer**: found at the methodology 1.5.0 migration, 2026-09-02.
 
 - [ ] **B-132** · L0 · **Parse-time contexts are plain literals using the
   retired `Context` kind.**
