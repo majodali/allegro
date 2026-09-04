@@ -659,13 +659,14 @@ function matchSubPattern(
   if (isPatternPrim(subPattern, "when_struct_destruct")) {
     const innerCtx = value;
     if (innerCtx.kind !== ValueKind.Structure) return null;
-    return extractFields(innerCtx as StructureValue, (subPattern as any).args, evalFn, ctx, value);
+    return extractFields(innerCtx as StructureValue, (subPattern as ExpressionValue).args, evalFn, ctx, value);
   }
 
   // Nested type destruct
   if (isPatternPrim(subPattern, "when_type_destruct")) {
-    const typeValue = (subPattern as any).args[0];
-    const fieldSpecs = (subPattern as any).args.slice(1);
+    const subArgs = (subPattern as ExpressionValue).args;
+    const typeValue = subArgs[0];
+    const fieldSpecs = subArgs.slice(1);
     const valTypeName = getTypeName(value);
     const patTypeName = typeValue.kind === ValueKind.Structure
       ? bitsToString((getName(typeValue as StructureValue) ?? stringToBits("")) as BitsValue)
@@ -938,7 +939,7 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     // Evaluate guard if present
     const evalGuard = evalFn!(armGuard, matchCtx);
     const guardP = evalGuard;
-    if (guardP.kind === ValueKind.ComposedFunction && (guardP as any).params?.length > 0) {
+    if (guardP.kind === ValueKind.ComposedFunction && guardP.params?.length > 0) {
       // Guard is a function — apply with extracted values
       const guardResult = evalFn!(makeExpr(evalGuard, extractedValues), matchCtx);
       const guardRP = guardResult;
@@ -2082,7 +2083,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const effectVarNames = new Set<string>();
     if (genericParams) {
       for (const gp of genericParams) {
-        if (gp.kind && gp.kind.kind === ValueKind.Symbol && (gp.kind as any).name === "Effect") {
+        if (gp.kind && gp.kind.kind === ValueKind.Symbol && gp.kind.name === "Effect") {
           effectVarNames.add(gp.name);
         }
       }
@@ -2104,7 +2105,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       // kinded generic-param declaration. Set the declared reference; PE's
       // Param-call branch surfaces the bare variable name in inferred sets.
       if (pt.kind === ValueKind.Symbol) {
-        const symName = (pt as any).name as string;
+        const symName = pt.name as string;
         if (effectVarNames.has(symName)) {
           params[i].effectVar = symName;
         }
@@ -2121,7 +2122,7 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       for (let i = 0; i + 1 < pePairs.length; i += 2) {
         const paramRef = pePairs[i];
         if (paramRef.kind !== ValueKind.Param) continue;
-        const paramName = (paramRef as any)._name as string | undefined;
+        const paramName = paramRef._name as string | undefined;
         if (!paramName) continue;
         const idx = (cFn.params as any[]).findIndex(p => p._name === paramName);
         if (idx < 0) continue;
@@ -3731,7 +3732,7 @@ function eqExprSides(propExpr: Value): { l: Value; r: Value } | null {
   if (!propExpr || propExpr.kind !== ValueKind.Expression) return null;
   const fn = (propExpr as ExpressionValue).fn;
   if (fn.kind !== ValueKind.PrimitiveFunction) return null;
-  const n = (fn as any).name as string;
+  const n = fn.name as string;
   if (n !== "bits_eq" && n !== "typed_eq") return null;
   const a = (propExpr as ExpressionValue).args;
   if (a.length !== 2) return null;

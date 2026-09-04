@@ -507,14 +507,30 @@ are property accesses. Classified against `src/types.ts`:
   `position`, `args`, `fn`, `_name`, `effectBound`, `effectVar`, `kind`.
   These are narrowing casts written as `any`, and each is mechanically
   replaceable with the real type.
-- **185 reach a field declared nowhere.** `genericParams` (19) on
-  ComposedFunction, `abstractDomain` (14), `inferredEffects` (9),
-  `localMemberScope` (7), `_tailPosition` (6), `ownerShape` (5),
-  `memberNameIndex` (5), `hasPrivateMembers` (5), `grammarValue` (5),
-  `decreasesMetric` (4), `compileMode` (4), `grammarFragment`,
-  `grammarHandle`, `memberPrivilege`, and a long tail. Of the top counts only
-  `attribute` (39) is not an L0 value at all — it is `grammar-ext.ts`'s
-  phrase-builder API.
+- **185 reach a field declared nowhere in `types.ts`.** `genericParams` (19),
+  `abstractDomain` (14), `inferredEffects` (9), `localMemberScope` (7),
+  `_tailPosition` (6), `ownerShape` (5), `memberNameIndex` (5),
+  `hasPrivateMembers` (5), `grammarValue` (5), `decreasesMetric` (4),
+  `compileMode` (4), `grammarFragment`, `grammarHandle`, `memberPrivilege`,
+  and a long tail. Of the top counts only `attribute` (39) is not an L0 value
+  at all — it is `grammar-ext.ts`'s phrase-builder API.
+
+**Correction, from executing B-137's mechanical half.** Two of those counts
+were misclassified in both directions, and fixing them changes the picture.
+`effectBound` and `grammarFragment` ARE declared in `types.ts` — on
+`ParamValue` and `Extension` — but the sites counted as declared read them off
+a `Structure`. Same name, different owner: those are expandos.
+
+Recounting the 185 against `src/slots.ts` as well as `types.ts`: **79 reach a
+property that IS declared, in the SLOT_REGISTRY, as a `js-property`
+storage** — `genericParams`, `abstractDomain`, `inferredEffects`,
+`grammarValue`, `compileMode`, `decreasesMetric` among them. Only **106** are
+declared in neither place.
+
+So the host plane already has a partial census; what it lacks is a TypeScript
+declaration. That narrows B-135's job considerably — for 79 of these the
+question is not *what is this property* but *why does the registry know and
+the type not*.
 
 So §5.5's *seven host-plane fields on `Structure`* was an undercount of the
 plane, not of the class. The declared host plane is a small, reviewed subset

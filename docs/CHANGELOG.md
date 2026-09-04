@@ -4,6 +4,67 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-137 (mechanical half): the compiler takes over 75 weak casts
+
+The maintainer's target at the B-120 E4 gate was *eliminate ALL weak typing
+(`as any` etc.) in the L0 host implementation*. This lands the half the
+compiler can verify. In `src/` excluding the generated `parser.ts` and the
+test harness: **`as any` 316 -> 250**, **`as unknown as` 22 -> 13**. Suite
+1202/1202, typecheck clean, no behaviour change.
+
+### One structural fix does nine of them
+
+`Structure` (the class) and `StructureValue` (the interface) are the same
+object, and nothing said so. Adding `implements StructureValue` to the class
+makes the compiler check the correspondence it had been asserting: the six
+`ctx as unknown as Structure` bridges in `structure.ts` collapse to single
+casts, and the three factories in `types.ts` (`makeStructure`,
+`makeDenseArray`, `withMeta`'s Structure case) return their `Structure`
+directly with no cast at all.
+
+### The rest is the compiler enumerating, not a search
+
+The method was the one E1 and E3 used: make the change and let `tsc` list the
+sites rather than guessing which ones are safe. Dropping `(x as any).prop`
+to `x.prop` for the fourteen properties declared in `types.ts` left **69**
+casts gone outright — a kind guard was already narrowing the receiver at every
+one of those sites, so the cast had been suppressing a check that would have
+passed. Twelve did not compile, and each of the twelve was informative rather
+than a nuisance.
+
+### What the twelve failures taught, and the census correction they forced
+
+**Eight were misclassified.** `effectBound` and `grammarFragment` are declared
+in `types.ts` — on `ParamValue` and `Extension` respectively — but the sites
+that failed read them off a `Structure`. Same name, different owner: those are
+host-plane expandos, and they belong to B-135's census, not to this chunk.
+They are restored as `as any` deliberately.
+
+That prompted a recount, and the census in
+`docs/plans/entry-sequence-composite.md` §5.7 is corrected: of the 185
+accesses reported as reaching a field declared nowhere, **79 reach a property
+that IS declared — in `src/slots.ts`'s SLOT_REGISTRY, as a `js-property`
+storage**, `genericParams`, `abstractDomain` and `inferredEffects` among them.
+Only **106** are declared in neither place. The host plane already has a
+partial census; what it does not have is a TypeScript declaration.
+
+**Three showed a guard that cannot be a type predicate.** Making
+`isPatternPrim(v, name)` return `v is ExpressionValue` narrowed three later
+call sites to `never`, because a FALSE result from a name-parameterised guard
+does not mean "not an Expression" — and the first guard in `matchSubPattern`
+therefore excluded Expression from every guard after it. The predicate stays
+`boolean`; the three sites cast to `ExpressionValue` at the point of use.
+
+**One was a real narrowing cast** that had been written as `any`
+(`grammar2/builder.ts`, a slot count read as `BitsValue`).
+
+### What is left, and why it is not this chunk
+
+The remaining 250 `as any` are B-135's: removing one means deciding where the
+property belongs. `structure.ts`'s two `undefined as unknown as` constructor
+initializers also stay — they exist so every structure shares one hidden
+class, which is a representation decision, not a typing lapse.
+
 ## 2026-09 — B-120 E4: the dense role collapses into the entry sequence
 
 An array is its entries, every key null. The `dense` array, `materializeView`,

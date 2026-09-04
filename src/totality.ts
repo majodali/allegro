@@ -62,14 +62,14 @@ const ATTACH_NAMES = new Set([
 
 function collapseOneFunction(cfn: ComposedFunctionValue): void {
   let getCur: () => Value = () => cfn.body;
-  let setCur: (v: Value) => void = (v) => { (cfn as any).body = v; };
+  let setCur: (v: Value) => void = (v) => { cfn.body = v; };
   for (let guard = 0; guard < 24; guard++) {
     const cur = getCur();
     if (cur.kind !== ValueKind.Expression) return;
     const e = cur as ExpressionValue;
     const fn = e.fn;
     if (fn.kind !== ValueKind.PrimitiveFunction) return;
-    const name = (fn as any).name as string;
+    const name = fn.name as string;
     if (name === "type_check") {
       if (e.args.length < 1 || e.args[0].kind !== ValueKind.Expression) return;
       getCur = () => e.args[0];
@@ -191,7 +191,7 @@ function peelFunctionAst(v: Value): {
   if (v.kind !== ValueKind.Expression) return null;
   const target = (v as ExpressionValue).fn;
   if (target.kind !== ValueKind.PrimitiveFunction) return null;
-  if ((target as any).name !== "typed_function") return null;
+  if (target.name !== "typed_function") return null;
   const args = (v as ExpressionValue).args;
   if (args.length < 3) return null;
   // args[0] = inner function (maybe nested typed_function), args[1] = paramCount,
@@ -264,14 +264,14 @@ function walkForWhen(
 
   if (v.kind === ValueKind.Expression) {
     const fn = (v as ExpressionValue).fn;
-    if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "eval_when") {
+    if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "eval_when") {
       // Top of a chain. Flatten by walking else-branch thunks.
       const subject = (v as ExpressionValue).args[0];
       const cases: ChainCase[] = [];
       let cur: Value = v;
       while (cur.kind === ValueKind.Expression) {
         const cfn = (cur as ExpressionValue).fn;
-        if (cfn.kind !== ValueKind.PrimitiveFunction || (cfn as any).name !== "eval_when") break;
+        if (cfn.kind !== ValueKind.PrimitiveFunction || cfn.name !== "eval_when") break;
         // B-121 C5: annotated because `dataOf`'s declared `Value` return was
         // acting as an inference barrier here. Without it, narrowing `cur`
         // inside the loop depends on the assignment `cur = elseFn.body`, which
@@ -297,7 +297,7 @@ function walkForWhen(
       cur = v;
       while (cur.kind === ValueKind.Expression) {
         const cfn = (cur as ExpressionValue).fn;
-        if (cfn.kind !== ValueKind.PrimitiveFunction || (cfn as any).name !== "eval_when") break;
+        if (cfn.kind !== ValueKind.PrimitiveFunction || cfn.name !== "eval_when") break;
         const args: Value[] = (cur as ExpressionValue).args;   // see above
         const thenFn: Value = args[3];
         if (thenFn.kind === ValueKind.ComposedFunction) {
@@ -324,7 +324,7 @@ function walkForWhen(
 function isWhenNoMatch(v: Value): boolean {
   if (v.kind !== ValueKind.Expression) return false;
   const fn = (v as ExpressionValue).fn;
-  return fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "when_no_match";
+  return fn.kind === ValueKind.PrimitiveFunction && fn.name === "when_no_match";
 }
 
 /** Resolve a subject expression to its static type name, when known.
@@ -344,7 +344,7 @@ function resolveSubjectTypeName(
   const t = metaReadRaw(subject as Value, "type");
   if (t) return resolveTypeName(t, typeLookup);
   if (subject.kind === ValueKind.Param) {
-    const pos = (subject as any).position as number;
+    const pos = subject.position as number;
     const pt = paramTypeAsts[pos];
     if (!pt) return null;
     return resolveTypeName(pt, typeLookup);
@@ -361,7 +361,7 @@ function resolveTypeName(t: Value, typeLookup: TypeLookup | undefined): string |
   // Symbol — look up against extensions (`Bool` etc.).
   if (t.kind === ValueKind.Symbol) {
     if (!typeLookup) return null;
-    const resolved = typeLookup((t as any).name as string);
+    const resolved = typeLookup(t.name as string);
     if (!resolved) return null;
     return resolveTypeName(resolved, typeLookup);
   }
@@ -428,7 +428,7 @@ function hasWildcardOrBinding(cases: ChainCase[]): boolean {
     // Wildcard marker: `when_wildcard()` expression.
     if (p.kind === ValueKind.Expression) {
       const fn = (p as ExpressionValue).fn;
-      if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "when_wildcard") return true;
+      if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "when_wildcard") return true;
     }
     // Bind-to-name: pattern is a bare Symbol like `is n`. Matches anything.
     if (p.kind === ValueKind.Symbol) return true;
@@ -734,7 +734,7 @@ function renderTerminationCounterexample(
   scc: Set<string>,
 ): string | undefined {
   // Collect param names from the caller for naming.
-  const paramNames = cfn.params.map(p => (p as any)._name as string | undefined ?? "_");
+  const paramNames = cfn.params.map(p => p._name as string | undefined ?? "_");
   const sampleArgs = paramNames.join(", ");
 
   if (scc.size > 1) {
@@ -757,7 +757,7 @@ function renderTerminationCounterexample(
   // HOF edge.
   const recv = first.receiver;
   const recvDesc = recv.kind === ValueKind.Param
-    ? ((recv as any)._name ?? "arr")
+    ? (recv._name ?? "arr")
     : "<receiver>";
   return `${bindingName}(${sampleArgs}) calls ${recvDesc}.${first.method}(${bindingName}) — receiver is not smaller, recursion loops`;
 }
@@ -775,14 +775,14 @@ function renderMetricCounterexample(
   let metricDesc = "<metric>";
   const mp = metric;
   if (mp.kind === ValueKind.Param) {
-    metricDesc = (mp as any)._name ?? `param${(mp as any).position}`;
+    metricDesc = mp._name ?? `param${mp.position}`;
   } else if (mp.kind === ValueKind.Expression) {
     const fn = (mp as ExpressionValue).fn;
-    if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
+    if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "typed_array") {
       metricDesc = `[${(mp as ExpressionValue).args
         .map(a => {
           const p = a;
-          if (p.kind === ValueKind.Param) return (p as any)._name ?? `param${(p as any).position}`;
+          if (p.kind === ValueKind.Param) return p._name ?? `param${p.position}`;
           return "_";
         })
         .join(", ")}]`;
@@ -811,7 +811,7 @@ function matchStdlibHof(
   if (outerFn.kind !== ValueKind.Expression) return null;
   const dispFn = (outerFn as ExpressionValue).fn;
   if (dispFn.kind !== ValueKind.PrimitiveFunction) return null;
-  if ((dispFn as any).name !== "type_dispatch") return null;
+  if (dispFn.name !== "type_dispatch") return null;
   const dispArgs = (outerFn as ExpressionValue).args;
   if (dispArgs.length !== 2) return null;
   const methodVal = dispArgs[1];
@@ -837,13 +837,13 @@ function collectCalleeNames(v: Value, out: Set<string>, seen?: Set<Value>): void
   if (v.kind === ValueKind.Expression) {
     const e = v as ExpressionValue;
     const fn = e.fn;
-    if (fn.kind === ValueKind.Symbol) out.add((fn as any).name);
+    if (fn.kind === ValueKind.Symbol) out.add(fn.name);
     // Stage 5: HOF callback positions.
     const hof = matchStdlibHof(e);
     if (hof) {
       for (const a of hof.args) {
         const ap = a;
-        if (ap.kind === ValueKind.Symbol) out.add((ap as any).name);
+        if (ap.kind === ValueKind.Symbol) out.add(ap.name);
       }
     }
     collectCalleeNames(e.fn, out, seen);
@@ -867,7 +867,7 @@ function findCallsToCycle(
     const e = body as ExpressionValue;
     const fn = e.fn;
     if (fn.kind === ValueKind.Symbol) {
-      const name = (fn as any).name as string;
+      const name = fn.name as string;
       if (cycle.has(name)) out.push({ kind: "direct", callee: name, call: e });
     }
     // Stage 5: HOF callback positions.
@@ -876,7 +876,7 @@ function findCallsToCycle(
       for (const a of hof.args) {
         const ap = a;
         if (ap.kind === ValueKind.Symbol) {
-          const name = (ap as any).name as string;
+          const name = ap.name as string;
           if (cycle.has(name)) {
             out.push({ kind: "hof", callee: name, method: hof.method, receiver: hof.receiver });
           }
@@ -901,7 +901,7 @@ function isHofReceiverStructurallySmaller(receiver: Value): boolean {
   if (p.kind !== ValueKind.Expression) return false;
   const inner = (p as ExpressionValue).fn;
   if (inner.kind !== ValueKind.PrimitiveFunction) return false;
-  if ((inner as any).name !== "type_dispatch") return false;
+  if (inner.name !== "type_dispatch") return false;
   const args = (p as ExpressionValue).args;
   if (args.length !== 2) return false;
   const recvArg = args[0];
@@ -915,7 +915,7 @@ function whyHofCallNotDecreasing(site: CallSite & { kind: "hof" }): string | nul
   if (isHofReceiverStructurallySmaller(site.receiver)) return null;
   const recv = site.receiver;
   const recvDesc = recv.kind === ValueKind.Param
-    ? `param \`${(recv as any)._name ?? `param${(recv as any).position}`}\``
+    ? `param \`${recv._name ?? `param${recv.position}`}\``
     : "the receiver";
   return `HOF-mediated recursive call via \`.${site.method}\`: ${recvDesc} is not structurally smaller than any parameter (consider a \`decreases\` clause or \`partial\`)`;
 }
@@ -992,8 +992,8 @@ function checkUserMetric(
 
   // Shape 1: bare Param.
   if (metric.kind === ValueKind.Param) {
-    const pos = (metric as any).position as number;
-    const name = (metric as any)._name ?? `param${pos}`;
+    const pos = metric.position as number;
+    const name = metric._name ?? `param${pos}`;
     for (const call of calls) {
       if (pos >= call.args.length) continue;
       const decrease = recognizeParamMinusK(call.args[pos]);
@@ -1011,7 +1011,7 @@ function checkUserMetric(
   // Shape 2: typed_array of params → lexicographic.
   if (metric.kind === ValueKind.Expression) {
     const fn = (metric as ExpressionValue).fn;
-    if (fn.kind === ValueKind.PrimitiveFunction && (fn as any).name === "typed_array") {
+    if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "typed_array") {
       const meta = (metric as ExpressionValue).args;
       // For each call, walk through meta left-to-right. The metric
       // strictly decreases if SOME component strictly decreases AND ALL
@@ -1044,10 +1044,10 @@ function findLexDecreasePosition(meta: Value[], call: ExpressionValue): number {
     for (let j = 0; j < i; j++) {
       const c = meta[j];
       if (c.kind !== ValueKind.Param) { earlierStable = false; break; }
-      const pos = (c as any).position as number;
+      const pos = c.position as number;
       if (pos >= call.args.length) { earlierStable = false; break; }
       const argP = call.args[pos];
-      if (argP.kind !== ValueKind.Param || (argP as any).position !== pos) {
+      if (argP.kind !== ValueKind.Param || argP.position !== pos) {
         earlierStable = false; break;
       }
     }
@@ -1056,7 +1056,7 @@ function findLexDecreasePosition(meta: Value[], call: ExpressionValue): number {
     // Component i should strictly decrease.
     const c = meta[i];
     if (c.kind !== ValueKind.Param) continue;
-    const pos = (c as any).position as number;
+    const pos = c.position as number;
     if (pos >= call.args.length) continue;
     const decrease = recognizeParamMinusK(call.args[pos]);
     if (decrease && decrease.pos === pos) return i;
@@ -1114,7 +1114,7 @@ function recognizeParamMinusK(v: Value): { pos: number; name: string } | null {
   if (v.kind !== ValueKind.Expression) return null;
   const fn = (v as ExpressionValue).fn;
   if (fn.kind !== ValueKind.PrimitiveFunction) return null;
-  const fnName = (fn as any).name as string;
+  const fnName = fn.name as string;
   if (fnName !== "bits_sub" && fnName !== "typed_sub") return null;
   const args = (v as ExpressionValue).args;
   if (args.length !== 2) return null;
@@ -1125,8 +1125,8 @@ function recognizeParamMinusK(v: Value): { pos: number; name: string } | null {
   const k = (right as BitsValue).data;
   if (k <= 0n) return null;
   return {
-    pos:  (left as any).position,
-    name: (left as any)._name ?? `param${(left as any).position}`,
+    pos:  left.position,
+    name: left._name ?? `param${left.position}`,
   };
 }
 
@@ -1144,7 +1144,7 @@ function typeHasNonNegativeLowerBound(
   seen.add(t);
   let cur: Value = t;
   if (cur.kind === ValueKind.Symbol) {
-    const name = (cur as any).name as string;
+    const name = cur.name as string;
     const resolved = typeLookup?.(name);
     if (!resolved) return false;
     return typeHasNonNegativeLowerBound(resolved, typeLookup, seen);

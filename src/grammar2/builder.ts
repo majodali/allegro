@@ -84,7 +84,7 @@ function arrayArg(v: Value, primName: string): Value[] {
   if (!lengthV) {
     throw new AllegroError(`${primName}: value is not an Array (no length slot)`);
   }
-  const length = Number(((lengthV as any).data ?? 0n) as bigint);
+  const length = Number((lengthV as BitsValue).data ?? 0n);
   const out: Value[] = [];
   for (let i = 0; i < length; i++) {
     const ev = indexGet(ctx, i);
