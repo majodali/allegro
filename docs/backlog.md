@@ -2167,8 +2167,10 @@ that prevents it.
     exactly that), *where does this symbol flow* (so a predicate's callers
     are found by binding, not by name), and *which property accesses reach a
     field* (so `.primary` through an `any` cast becomes visible — the
-    boundary lint cannot see one today, `totality.ts:173` is the instance,
-    and B-104 owes the count)
+    boundary lint cannot see one today; `totality.ts:173` was the instance and
+    was fixed at B-121 C2, but the blind spot is unchanged, and **B-137**
+    has since counted **305** property accesses through `any` casts that the
+    lint cannot see)
   - **It is the enforcement substrate too.** The boundary lint is a regex
     over string literals, which is why B-104 chunk 1 had to widen it three
     times to describe patterns it could not distinguish structurally
@@ -2283,7 +2285,9 @@ that prevents it.
     one write path. These contexts cannot use it, and the W4 boundary
     invariant would fail them if the walker ever reached one.
   - **When**: not urgent — they are parse-time and are converted before
-    evaluation. Related to B-119 (`Context` names three things).
+    evaluation. Related to B-119 (`Context` names three things), and clarified
+    by **B-136**: once the scope has its own type, these are visibly a third
+    thing rather than an implied one.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §2.2.
 
 - [ ] **B-133** · L0 · **`Structure.positional` is a storage bit answering a
@@ -2354,8 +2358,70 @@ that prevents it.
     policing). Generalises **B-126**, whose subject — `param.owner` is a
     two-state flag wearing a pointer's type — is the same failure on a
     different type.
-  - **Not in scope**: whether Scope should become an Allegretto `ValueKind`.
-    That is a D25 revisit and is under discussion with the maintainer; the
-    argument for it is recorded at the pointer below and is deliberately not
-    filed here.
-  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
+  - **The plane is an order of magnitude larger than its declaration.** A
+    second survey (2026-09) classified all 305 `as any` property accesses in
+    `src/` against `src/types.ts`: **185 reach a field declared nowhere** —
+    `genericParams` (19), `abstractDomain` (14), `inferredEffects` (9),
+    `localMemberScope` (7), `_tailPosition` (6), `ownerShape` (5),
+    `memberNameIndex` (5), `hasPrivateMembers` (5), `grammarValue` (5),
+    `decreasesMetric` (4), `compileMode` (4), and a long tail. So the census
+    comes before the rule; the seven declared fields on `Structure` are a
+    reviewed subset of a much larger undeclared plane. **B-137** removes the
+    casts; this item decides what may stay.
+  - **Not in scope**: Scope's representation, now **D49** / **B-136**.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5 and §5.7.
+
+- [ ] **B-136** · L0 · **Scope leaves `Value` (D49).**
+  - **What**: give the evaluation environment its own host representation.
+    `EvalFn` and `PrimitiveFnImpl` type their ctx on it; the slot store
+    arrives by composition rather than by sharing `Structure`; `parent`,
+    `isScope`, `scopePredicates`, `memberPrivilege`, `compileMode` and the
+    `scopeHostRead` host keys move onto it and become declared fields.
+    `assertNotScope`, `deriveWithMeta`'s plane rejection and the three walker
+    skip-branches (`resolveDataSlots`, `hasPendingFutureSlot`,
+    `collectSymbolRefs`) are deleted — off the `Value` union they are
+    unrepresentable rather than checked.
+  - **Why**: D49. A scope is not a value: it has no position so metadata is
+    meaningless on it, it is mutable where values are not, and no scope ever
+    reaches user code as a value — there is no `scope_new` primitive and
+    nothing returns a ctx as an Allegro result.
+  - **When**: not started, and it wants its own plan first (D49 is ruled, not
+    executed). The change is a wide, mechanical signature edit that the
+    compiler enumerates, which is the shape B-120 E1 and E3 both showed works.
+    Take it after **B-133**/**B-134**, whose edits to `structure.ts` it
+    otherwise collides with.
+  - **Related**: clarifies **B-132** — `parser-helpers.ts`'s parse-time
+    contexts are neither a `Structure` nor a scope, and naming the scope type
+    makes that third thing visible rather than implied. **B-119** (`Context`
+    names three things) is the same subject.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.6;
+    [D49](decisions.md).
+
+- [ ] **B-137** · L0 · **Eliminate weak typing in the L0 host
+  implementation.** Maintainer target set at B-120 E4 (2026-09): *we want to
+  eliminate ALL weak typing (`as any` etc.) in the L0 host implementation.*
+  - **What**: `src/` (excluding the generated `parser.ts`) carries **399**
+    `as any`, **43** `as unknown as` double casts and **225** bare `: any`
+    annotations outside catch clauses. There are no `@ts-ignore` or
+    `@ts-expect-error` suppressions.
+  - **The mechanical half, ready now**: of 305 `as any` property accesses,
+    **120 reach a field that IS declared** on a narrower type — `name` (29),
+    `effectBound` (17), `data` (16), `_name` (12), `position` (10), `args`
+    (10), `fn`, `effectVar`, `kind`. Each is a narrowing cast written as
+    `any`; replacing it with the real type is a local edit the compiler
+    checks.
+  - **One structural fix, verified**: `Structure` (the class) and
+    `StructureValue` (the interface) are the same object, bridged by six
+    `as unknown as Structure` double casts in `structure.ts`. Adding
+    `implements StructureValue` to the class typechecks clean and collapses
+    every one of them to a single cast. Probed and reverted 2026-09.
+  - **The other half is not mechanical**: the remaining **185** accesses reach
+    fields declared nowhere, so removing the cast means deciding where the
+    field belongs. That is **B-135**, and this item should not silently
+    declare 185 host properties as a side effect of deleting casts.
+  - **Why it matters beyond tidiness**: B-127's row already records that the
+    boundary lint cannot see a property access through an `any` cast. Every
+    one of these is a hole in the enforcement B-128 is meant to add.
+  - **When**: the mechanical half and the `implements` fix are ready and
+    independent. The undeclared half waits on B-135's rule.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.7.

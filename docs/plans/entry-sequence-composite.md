@@ -429,15 +429,108 @@ independently of all three, and the flag it introduced is no worse than the
    `positionalCount`, move the two shape tests, demote the flag to a private
    derived cache. → **B-133**.
 2. `immutable` — delete, or give it a reader. D22 is unaffected. → **B-134**.
-3. Scope as a kind — a **D25 revisit**, and the largest of the three. Not
-   filed: under discussion with the maintainer (2026-09). The argument for it
-   is above and stops there.
+3. Scope — **ruled 2026-09 as D49**: a scope leaves `Value` entirely and
+   becomes a non-value L0 host construct. → **B-136**. §5.6 records the
+   argument.
 
 The maintainer generalised the audit at the same gate — *we may want to define
 some tighter rules to validate host-plane properties and design across all L0
 types* — which is **B-135**. The plane turns out to exist on almost every
 representation (`Binding` carries four such fields, `ParamValue` five,
-`PrimitiveFunctionValue` three) with no stated rule for what may live there.
+`PrimitiveFunctionValue` three) with no stated rule for what may live there,
+and a second survey (§5.7) found it is far larger than the declared fields:
+**185** property accesses through `as any` reach a field declared nowhere.
+
+### 5.6 Scope is not a value — the argument behind D49
+
+The question was posed as *value versus non-value L0 construct*. Three options
+were on the table: keep Scope as a role of `Structure` (the D25 status quo),
+make it `ValueKind.Scope` (a kind in the tower, non-denotable, on the `Param`
+precedent), or take it out of `Value` entirely with its own host type. The
+maintainer ruled the third.
+
+**Two of the three original motivations for scope-as-value already shipped
+without it.** The design intent recorded at the gate was that extensions could
+define custom scope kinds — packages, namespaces, dynamic scoping — and that
+member access would be mediated by *(member key, owner, calling scope)*. The
+second exists today: `assertMemberAccessible(type, fieldName, ctx, desc)` is
+that signature, and `typePrivilegedCtx` plants the kernel-minted privilege
+layer the check walks. D42's *evidence is possession* is its executed form.
+The scope is threaded implicitly down the evaluation chain rather than reified
+as something user code holds — which is the only difference, and it is the
+difference V-R2 already required: *the mediation context is an opaque,
+kernel-minted evidence capsule … never the raw scope*.
+
+**What survives is the extensibility motivation**, and the maintainer's ruling
+sets it aside as unjustified for now: no use case demands custom scope
+behaviour, and the feature is confusing and forgery-prone. If one arises, the
+expected route is extending the Scope host type with optional functionality,
+not readmitting Scope to `Value`.
+
+**The arguments against valuehood, in the order they carry weight:**
+
+- **The code already spends effort undoing it.** `assertNotScope` is a runtime
+  guard; `deriveWithMeta` throws a plane rejection; `resolveDataSlots`,
+  `hasPendingFutureSlot` and `collectSymbolRefs` each branch to skip scopes.
+  Five sites whose whole job is saying *this is not really a value*. Off the
+  `Value` union they become unrepresentable rather than checked.
+- **Metadata is meaningless on a scope.** D48(b) put `meta` on every kind, and
+  metadata is a property of a value *in a position*. A scope has no position.
+- **Mutability.** D22 says born-immutable and scopes are the standing
+  carve-out — a value category with one mutable member.
+- **Cost on every data structure.** Scopes need `parent`, `isScope`,
+  `scopePredicates`, `memberPrivilege`, `compileMode` and host-key expandos
+  (`futureManager`, read through `scopeHostRead`) — six scope-only concerns on
+  the class every record, array and type instance also pays for, three of them
+  undeclared.
+- **Code generation**, the concern that opened the audit: a generator emitting
+  for a structure should not have to ask *but is this one a scope?*
+
+**The fact that settled it.** No scope ever reaches user code as a value.
+There is no `scope_new` or `scope_extend` primitive; nothing returns a ctx as
+an Allegro result. Scope-as-value pays every cost of valuehood and collects
+the one benefit — extensibility — that the ruling declines.
+
+**What D49 does not disturb.** D25's substance stands apart from its
+representation clause: a scope is a distinct protocol (parent-chain
+resolution, forward chaining, the facts plane), and the `Context` kind-name
+stays retired. Only *shared substrate, distinct role* is superseded.
+
+### 5.7 The host plane is larger than its declaration, by an order of magnitude
+
+The maintainer set the target at the same gate: *eliminate ALL weak typing
+(`as any` etc.) in the L0 host implementation*. A scan of `src/` (excluding
+the generated `parser.ts`) found **399** `as any` occurrences, of which 305
+are property accesses. Classified against `src/types.ts`:
+
+- **120 reach a field that IS declared** on a narrower type — `name`, `data`,
+  `position`, `args`, `fn`, `_name`, `effectBound`, `effectVar`, `kind`.
+  These are narrowing casts written as `any`, and each is mechanically
+  replaceable with the real type.
+- **185 reach a field declared nowhere.** `genericParams` (19) on
+  ComposedFunction, `abstractDomain` (14), `inferredEffects` (9),
+  `localMemberScope` (7), `_tailPosition` (6), `ownerShape` (5),
+  `memberNameIndex` (5), `hasPrivateMembers` (5), `grammarValue` (5),
+  `decreasesMetric` (4), `compileMode` (4), `grammarFragment`,
+  `grammarHandle`, `memberPrivilege`, and a long tail. Of the top counts only
+  `attribute` (39) is not an L0 value at all — it is `grammar-ext.ts`'s
+  phrase-builder API.
+
+So §5.5's *seven host-plane fields on `Structure`* was an undercount of the
+plane, not of the class. The declared host plane is a small, reviewed subset
+of a much larger undeclared one that exists only in `as any` expressions,
+which is why B-135 needs the census before it can state a rule.
+
+**One structural finding, verified.** `Structure` (the class) and
+`StructureValue` (the interface) are the same object, and `structure.ts`
+bridges them with six `as unknown as Structure` double casts. Adding
+`implements StructureValue` to the class typechecks clean, and every double
+cast then collapses to a single one. Probed and reverted — it belongs to
+B-137, not here.
+
+Two other forms are worth the census: **43** `as unknown as` double casts, and
+**225** bare `: any` annotations outside catch clauses. There are no
+`@ts-ignore` or `@ts-expect-error` suppressions anywhere in `src/`.
 
 ## 6. Rulings — taken 2026-09-01
 
