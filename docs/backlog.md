@@ -2139,6 +2139,9 @@ that prevents it.
   - **Not urgent, and not C2's.** Nothing is wrong at runtime; the risk is a
     reader's model. Best taken after B-121 lands, when the clone sites are
     settled and the change is a small one rather than a moving target
+  - **Generalised by B-135** (2026-09): this is one instance of a host-plane
+    property whose declared meaning exceeds its real one. Whatever rule B-135
+    states should decide this item rather than the reverse
 
 - [ ] **B-127** · T-tooling · **Code analysis is grep-based, and grep cannot
   see the questions that matter.** Raised by the maintainer at B-121 C2
@@ -2164,8 +2167,10 @@ that prevents it.
     exactly that), *where does this symbol flow* (so a predicate's callers
     are found by binding, not by name), and *which property accesses reach a
     field* (so `.primary` through an `any` cast becomes visible — the
-    boundary lint cannot see one today, `totality.ts:173` is the instance,
-    and B-104 owes the count)
+    boundary lint cannot see one today; `totality.ts:173` was the instance and
+    was fixed at B-121 C2, but the blind spot is unchanged, and **B-137**
+    has since counted **305** property accesses through `any` casts that the
+    lint cannot see)
   - **It is the enforcement substrate too.** The boundary lint is a regex
     over string literals, which is why B-104 chunk 1 had to widen it three
     times to describe patterns it could not distinguish structurally
@@ -2224,6 +2229,10 @@ that prevents it.
     enforced. Best evidence for whether it works: re-run C2's survey
     afterwards and see whether the answer is a short list rather than a class
     of things nobody could search for
+  - **B-135 supplies the host plane's half of (c)**: a plane question with one
+    spelling needs the plane to have a stated content rule first.
+    `Structure.memberPrivilege`, written and read through `as any` and
+    declared nowhere, is what an unpoliced host plane looks like today
 
 
 - [ ] **B-129** · T-docs · **Editorial pass: bring the registers to P-006
@@ -2276,5 +2285,143 @@ that prevents it.
     one write path. These contexts cannot use it, and the W4 boundary
     invariant would fail them if the walker ever reached one.
   - **When**: not urgent — they are parse-time and are converted before
-    evaluation. Related to B-119 (`Context` names three things).
+    evaluation. Related to B-119 (`Context` names three things), and clarified
+    by **B-136**: once the scope has its own type, these are visibly a third
+    thing rather than an implied one.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §2.2.
+
+- [ ] **B-133** · L0 · **`Structure.positional` is a storage bit answering a
+  type question.**
+  - **What**: split `getSlotCount` into an always-answering
+    `positionalCount(ctx): number`; move the two callers that use its
+    `undefined` as an is-this-an-Array test (`grammar2/builder.ts`,
+    `types-std.ts`'s *Array-like Context* branch) onto a shape check that does
+    not read storage; demote `positional` to a private, unexported, derived
+    cache with the same status as `_view`.
+  - **Why**: the field never leaves `structure.ts`, but its effect does —
+    `undefined` is overloaded as a shape test, and 2 of 13 callers use it as
+    one. The other 11 already know they hold an array, which is the case for
+    the maintainer's two-getters route. `positionalCount` then answers `0` for
+    an empty array and an empty record alike, which is correct for both, so
+    the array/record distinction leaves L0 for the type.
+  - **When**: ready. Small and self-contained; no decision-register change.
+    One diagnostic is lost — `grammar2/builder.ts` stops rejecting a record
+    passed where an array is expected — and that is a type error L2 should
+    catch, not something a storage bit should pay for. **Blocked on nothing**,
+    but the L1-has-no-type-system tension it exposes belongs to B-112.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
+
+- [ ] **B-134** · L0 · **`Structure.immutable` is declared state with no
+  reader, and it is wrong.**
+  - **What**: delete the field, or give it a reader. It is written once (the
+    constructor, always `true`), read once (a copy in `deriveWithMeta`), and
+    branched on nowhere.
+  - **Why**: its documented contract is false in the field. The header says
+    evaluation scopes are mutable, but `scopeNew` goes through
+    `makeStructure`, so **every scope carries `immutable: true`** and has since
+    C4.1 with no consequence. A field that has been wrong on every scope that
+    long is not carrying information. D22 is unaffected either way — the
+    boundary battery is what enforces it, not this bit.
+  - **When**: ready, and cheap. Sequence after B-133 so the two host-plane
+    edits to `structure.ts` do not collide.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
+
+- [ ] **B-135** · L0 · **Nothing says what may live on an L0 type's host
+  plane.** Raised by the maintainer at B-120 E4 (2026-09): *we may want to
+  define some tighter rules to validate host-plane properties and design
+  across all L0 types.*
+  - **What**: a stated rule for the host plane — what a property there may
+    answer, what it may not, and a check that holds it. Then an audit of every
+    L0 type against it.
+  - **Why**: the plane exists on almost every representation and has no test.
+    `Structure` carries seven such fields, `Binding` four (`visibility`,
+    `incompleteDeps`, `isComplete`, `cell`), `ParamValue` five,
+    `PrimitiveFunctionValue` three (`lazy`, `effects`, `sourceAware`),
+    `ExpressionValue` one (`memo`), `SymbolValue` one (`fqn`). Without a rule
+    the register drifts three ways at once, and each way already has an
+    instance: a property that answers a **type** question from storage
+    (B-133), a property with **no reader at all** (B-134, and
+    `ParamValue.predicates`, reserved and unused at runtime), and a property
+    that is simply **undeclared** — `Structure.memberPrivilege` is written and
+    read through `as any` and appears in no interface.
+  - **The counterexample the rule has to accommodate**: `Binding.visibility`
+    is a deliberate, ruled instance of exactly this pattern (D42/V-R4 —
+    visibility is a property of the binding, never of the value). The plane is
+    not the problem; the absence of a test is.
+  - **The code-generation stake**, which is why the maintainer raised it: a
+    generator that must read a host property to know what a value means is
+    modelling the interpreter's private state through a side channel outside
+    both the value and its type. One derived from the representation reads
+    what the specification says the value *is*.
+  - **When**: after B-133 and B-134 supply two worked instances, and alongside
+    B-112 (which owes the plane interfaces) and B-128 (which owes the
+    policing). Generalises **B-126**, whose subject — `param.owner` is a
+    two-state flag wearing a pointer's type — is the same failure on a
+    different type.
+  - **The plane is an order of magnitude larger than its declaration.** A
+    second survey (2026-09) classified all 305 `as any` property accesses in
+    `src/` against `src/types.ts`: **185 reach a field declared nowhere** —
+    `genericParams` (19), `abstractDomain` (14), `inferredEffects` (9),
+    `localMemberScope` (7), `_tailPosition` (6), `ownerShape` (5),
+    `memberNameIndex` (5), `hasPrivateMembers` (5), `grammarValue` (5),
+    `decreasesMetric` (4), `compileMode` (4), and a long tail. So the census
+    comes before the rule; the seven declared fields on `Structure` are a
+    reviewed subset of a much larger undeclared plane. **B-137** removes the
+    casts; this item decides what may stay.
+  - **Not in scope**: Scope's representation, now **D49** / **B-136**.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5 and §5.7.
+
+- [ ] **B-136** · L0 · **Scope leaves `Value` (D49).**
+  - **What**: give the evaluation environment its own host representation.
+    `EvalFn` and `PrimitiveFnImpl` type their ctx on it; the slot store
+    arrives by composition rather than by sharing `Structure`; `parent`,
+    `isScope`, `scopePredicates`, `memberPrivilege`, `compileMode` and the
+    `scopeHostRead` host keys move onto it and become declared fields.
+    `assertNotScope`, `deriveWithMeta`'s plane rejection and the three walker
+    skip-branches (`resolveDataSlots`, `hasPendingFutureSlot`,
+    `collectSymbolRefs`) are deleted — off the `Value` union they are
+    unrepresentable rather than checked.
+  - **Why**: D49. A scope is not a value: it has no position so metadata is
+    meaningless on it, it is mutable where values are not, and no scope ever
+    reaches user code as a value — there is no `scope_new` primitive and
+    nothing returns a ctx as an Allegro result.
+  - **When**: not started, and it wants its own plan first (D49 is ruled, not
+    executed). The change is a wide, mechanical signature edit that the
+    compiler enumerates, which is the shape B-120 E1 and E3 both showed works.
+    Take it after **B-133**/**B-134**, whose edits to `structure.ts` it
+    otherwise collides with.
+  - **Related**: clarifies **B-132** — `parser-helpers.ts`'s parse-time
+    contexts are neither a `Structure` nor a scope, and naming the scope type
+    makes that third thing visible rather than implied. **B-119** (`Context`
+    names three things) is the same subject.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.6;
+    [D49](decisions.md).
+
+- [ ] **B-137** · L0 · **Eliminate weak typing in the L0 host
+  implementation.** Maintainer target set at B-120 E4 (2026-09): *we want to
+  eliminate ALL weak typing (`as any` etc.) in the L0 host implementation.*
+  - **What**: `src/` (excluding the generated `parser.ts`) carries **399**
+    `as any`, **43** `as unknown as` double casts and **225** bare `: any`
+    annotations outside catch clauses. There are no `@ts-ignore` or
+    `@ts-expect-error` suppressions.
+  - **The mechanical half, ready now**: of 305 `as any` property accesses,
+    **120 reach a field that IS declared** on a narrower type — `name` (29),
+    `effectBound` (17), `data` (16), `_name` (12), `position` (10), `args`
+    (10), `fn`, `effectVar`, `kind`. Each is a narrowing cast written as
+    `any`; replacing it with the real type is a local edit the compiler
+    checks.
+  - **One structural fix, verified**: `Structure` (the class) and
+    `StructureValue` (the interface) are the same object, bridged by six
+    `as unknown as Structure` double casts in `structure.ts`. Adding
+    `implements StructureValue` to the class typechecks clean and collapses
+    every one of them to a single cast. Probed and reverted 2026-09.
+  - **The other half is not mechanical**: the remaining **185** accesses reach
+    fields declared nowhere, so removing the cast means deciding where the
+    field belongs. That is **B-135**, and this item should not silently
+    declare 185 host properties as a side effect of deleting casts.
+  - **Why it matters beyond tidiness**: B-127's row already records that the
+    boundary lint cannot see a property access through an `any` cast. Every
+    one of these is a hole in the enforcement B-128 is meant to add.
+  - **When**: the mechanical half and the `implements` fix are ready and
+    independent. The undeclared half waits on B-135's rule.
+  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.7.
