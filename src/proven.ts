@@ -48,7 +48,7 @@ export interface ProvenFinding {
 function resolveTypeContext(t: Value, evalCtx: StructureValue): StructureValue | null {
   let cur: Value = t;
   if (cur.kind === ValueKind.Symbol) {
-    const name = (cur as any).name as string;
+    const name = cur.name as string;
     // C2.3b: chain-aware — type names (Int, Bool, user refinements) may
     // live on any layer of the root scope chain, not the source layer.
     const b = scopeLookup(evalCtx, name);
@@ -135,7 +135,7 @@ function substParams(
     case ValueKind.Param: {
       const p = v as ParamValue;
       // Match by MEMBERSHIP (or unowned) and position — see `ownsParam`.
-      if ((ownsParam(cfn, p) || (p as any).owner == null) && posMap.has(p.position)) {
+      if ((ownsParam(cfn, p) || p.owner == null) && posMap.has(p.position)) {
         return posMap.get(p.position)!;
       }
       return v;
@@ -162,7 +162,7 @@ function substParams(
 
 /** Render a Param's source name for predicate display. */
 function paramName(p: ParamValue): string {
-  return (p as any)._name ?? `param${p.position}`;
+  return p._name ?? `param${p.position}`;
 }
 
 /** Render a predicate's structural shape for display when source isn't

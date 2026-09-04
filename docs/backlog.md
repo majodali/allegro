@@ -2368,6 +2368,14 @@ that prevents it.
     comes before the rule; the seven declared fields on `Structure` are a
     reviewed subset of a much larger undeclared plane. **B-137** removes the
     casts; this item decides what may stay.
+  - **CORRECTION (2026-09, from B-137's mechanical half)**: 79 of those 185
+    reach a property that IS declared — in `src/slots.ts`'s SLOT_REGISTRY, as
+    a `js-property` storage (`genericParams`, `abstractDomain`,
+    `inferredEffects`, `grammarValue`, `compileMode`, `decreasesMetric` among
+    them). Only **106** are declared in neither place. The plane already has a
+    partial census; what it lacks is a TypeScript declaration, so for those 79
+    the question is not *what is this property* but *why does the registry
+    know and the type not*.
   - **Not in scope**: Scope's representation, now **D49** / **B-136**.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5 and §5.7.
 
@@ -2400,28 +2408,26 @@ that prevents it.
 - [ ] **B-137** · L0 · **Eliminate weak typing in the L0 host
   implementation.** Maintainer target set at B-120 E4 (2026-09): *we want to
   eliminate ALL weak typing (`as any` etc.) in the L0 host implementation.*
-  - **What**: `src/` (excluding the generated `parser.ts`) carries **399**
-    `as any`, **43** `as unknown as` double casts and **225** bare `: any`
-    annotations outside catch clauses. There are no `@ts-ignore` or
-    `@ts-expect-error` suppressions.
-  - **The mechanical half, ready now**: of 305 `as any` property accesses,
-    **120 reach a field that IS declared** on a narrower type — `name` (29),
-    `effectBound` (17), `data` (16), `_name` (12), `position` (10), `args`
-    (10), `fn`, `effectVar`, `kind`. Each is a narrowing cast written as
-    `any`; replacing it with the real type is a local edit the compiler
-    checks.
-  - **One structural fix, verified**: `Structure` (the class) and
-    `StructureValue` (the interface) are the same object, bridged by six
-    `as unknown as Structure` double casts in `structure.ts`. Adding
-    `implements StructureValue` to the class typechecks clean and collapses
-    every one of them to a single cast. Probed and reverted 2026-09.
-  - **The other half is not mechanical**: the remaining **185** accesses reach
-    fields declared nowhere, so removing the cast means deciding where the
-    field belongs. That is **B-135**, and this item should not silently
-    declare 185 host properties as a side effect of deleting casts.
-  - **Why it matters beyond tidiness**: B-127's row already records that the
-    boundary lint cannot see a property access through an `any` cast. Every
-    one of these is a hole in the enforcement B-128 is meant to add.
-  - **When**: the mechanical half and the `implements` fix are ready and
-    independent. The undeclared half waits on B-135's rule.
+  - **Mechanical half LANDED 2026-09.** Implementation files (excluding the
+    generated `parser.ts` and the test harness): `as any` **316 → 250**,
+    `as unknown as` **22 → 13**. Suite 1202/1202. `Structure implements
+    StructureValue` collapsed six double casts and let three `types.ts`
+    factories drop theirs entirely; 69 more casts went because a kind guard
+    was already narrowing the receiver. See CHANGELOG.
+  - **What remains**: the 250 surviving `as any`, **225** bare `: any`
+    annotations outside catch clauses, and **13** `as unknown as`. There are
+    no `@ts-ignore` or `@ts-expect-error` suppressions anywhere.
+  - **The remainder is not mechanical**, and this is the reason it was split:
+    every surviving property access reaches a field that `types.ts` does not
+    declare, so removing the cast means deciding where the property belongs.
+    That is **B-135**, and this item must not silently declare a hundred-odd
+    host properties as a side effect of deleting casts.
+  - **Two exclusions to keep**: `structure.ts`'s two `undefined as unknown as`
+    constructor initializers exist so every structure shares one hidden class
+    — a representation decision, not a typing lapse. And `catch (e: any)` is
+    a TypeScript requirement, not weak typing of a value.
+  - **Why it matters beyond tidiness**: B-127's row records that the boundary
+    lint cannot see a property access through an `any` cast. Every survivor is
+    a hole in the enforcement B-128 is meant to add.
+  - **When**: the rest waits on B-135's rule.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.7.

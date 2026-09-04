@@ -132,7 +132,7 @@ export function resolveSymbols(
 
   // Layer 1: Primitives
   for (const [name, prim] of Object.entries(primitives)) {
-    if (typed && (prim as any).kind === ValueKind.PrimitiveFunction) {
+    if (typed && prim.kind === ValueKind.PrimitiveFunction) {
       resolutionMap.set(name, wrapAsUntypedFunction(prim as Value));
     } else {
       resolutionMap.set(name, prim as Value);
@@ -229,7 +229,7 @@ function patchNamedParams(
 
   if (value.kind === ValueKind.Expression) {
     if (value.fn.kind === ValueKind.Symbol && value.fn.name === name) {
-      (value as any).fn = binding.value;
+      value.fn = binding.value;
     } else {
       patchNamedParams(value.fn, name, binding, seen);
     }
@@ -279,7 +279,7 @@ function resolveNamedParams(
       return value;
 
     case ValueKind.PrimitiveFunction: {
-      if ((value as any).fn === null) {
+      if (value.fn === null) {
         const real = primitives[value.name];
         if (real) return real;
       }
@@ -360,7 +360,7 @@ function resolveNamedParamsInner(
       return value;
 
     case ValueKind.PrimitiveFunction: {
-      if ((value as any).fn === null) {
+      if (value.fn === null) {
         const real = primitives[value.name];
         if (real) return real;
       }
@@ -709,7 +709,7 @@ export function buildEvalCtx(
   // In typed/standard mode, wrap function primitives as UntypedFunction
   const primLayer = scopeNew();
   for (const [name, prim] of Object.entries(primitives)) {
-    if (typed && (prim as any).kind === ValueKind.PrimitiveFunction) {
+    if (typed && prim.kind === ValueKind.PrimitiveFunction) {
       addTo(primLayer, name, wrapAsUntypedFunction(prim as Value));
     } else {
       addTo(primLayer, name, prim as Value);

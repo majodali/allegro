@@ -79,7 +79,7 @@ import { ValueKind, makeInt } from "./types.js";
 /** The one host representation behind every composite value. All fields
  *  are declared up front so every structure shares a single hidden class
  *  (the I1 motivation), whichever role it plays. */
-export class Structure {
+export class Structure implements StructureValue {
   // C7.1 (D15/D46): ONE kind. B-121 C4 deleted the CARRIER configuration —
   // `primary`, its constructor initializer, the two empty-view branches on
   // the binding getters, `isCarrier` and `newCarrierStructure`. A composite
@@ -274,7 +274,7 @@ export function newDenseStructure(elements: Value[]): Structure {
  *  unconstructible. Scopes are evaluator state, not data — the channel
  *  plane never attaches to them (C2.1 plane rejection). */
 export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): Structure {
-  const src = ctx as unknown as Structure;
+  const src = ctx as Structure;
   if (src.isScope) {
     throw new Error("deriveWithMeta: channels cannot attach to an evaluation scope (plane rejection)");
   }
@@ -306,7 +306,7 @@ export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): S
 /** The i-th positional entry's value. O(1) on a wholly-positional structure,
  *  which is what an array is; a subsequence walk otherwise. */
 export function denseIndexGet(ctx: StructureValue, i: number): Value | undefined {
-  const s = ctx as unknown as Structure;
+  const s = ctx as Structure;
   const es = s.entries;
   if (s.positional === true) return es[i]?.value;
   let n = 0;
@@ -320,14 +320,14 @@ export function denseIndexGet(ctx: StructureValue, i: number): Value | undefined
  *  An EMPTY array still answers 0 — which is why the flag exists rather than
  *  the count being inferred from the entries. */
 export function denseSlotCount(ctx: StructureValue): Value | undefined {
-  const s = ctx as unknown as Structure;
+  const s = ctx as Structure;
   if (s.positional !== true) return undefined;
   return makeInt(s.entries.length);
 }
 
 /** All values of a positional structure. */
 export function denseElements(ctx: StructureValue): Value[] {
-  const s = ctx as unknown as Structure;
+  const s = ctx as Structure;
   const es = s.entries;
   const out: Value[] = [];
   for (let i = 0; i < es.length; i++) if (es[i].key === null) out.push(es[i].value as Value);
@@ -374,7 +374,7 @@ export function isStructure(v: unknown): v is Structure {
  * cannot recur.
  */
 export function putEntry(ctx: StructureValue, entry: Binding): void {
-  const s = ctx as unknown as Structure;
+  const s = ctx as Structure;
   const es = s.entries;
   if (entry.key !== null) {
     // A keyed write ends the positional guarantee: index `i` is no longer
@@ -396,7 +396,7 @@ export function setEntry(ctx: StructureValue, key: string, value: Value | undefi
 
 /** Remove the entry under `key`. Returns whether one went. */
 export function removeEntry(ctx: StructureValue, key: string): boolean {
-  const s = ctx as unknown as Structure;
+  const s = ctx as Structure;
   const es = s.bindingList;
   for (let i = 0; i < es.length; i++) {
     if (es[i].key === key) { es.splice(i, 1); s.invalidateView(); return true; }

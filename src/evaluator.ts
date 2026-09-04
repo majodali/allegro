@@ -233,8 +233,8 @@ function evaluateExpr(
   // the e-effect when precompiling the body's residual `Param(g)(x)` call.
   let residualEffects: Set<string> | null = null;
   if (fn.kind === ValueKind.Param) {
-    const evar = (fn as any).effectVar as string | undefined;
-    const bound = (fn as any).effectBound as Set<string> | undefined;
+    const evar = fn.effectVar as string | undefined;
+    const bound = fn.effectBound as Set<string> | undefined;
     if (evar !== undefined) {
       // C7.2c: declared effect variable — the variable's bare name rides
       // the inferred set (matches an `effects e` declaration directly);
@@ -962,8 +962,8 @@ function checkArgType(
       const actCtx = actualArgs as StructureValue;
       const expLenV = getSlotCount(expCtx);
       const actLenV = getSlotCount(actCtx);
-      const expLen = Number(expLenV?.kind === ValueKind.Bits ? (expLenV as any).data : 0n);
-      const actLen = Number(actLenV?.kind === ValueKind.Bits ? (actLenV as any).data : 0n);
+      const expLen = Number(expLenV?.kind === ValueKind.Bits ? expLenV.data : 0n);
+      const actLen = Number(actLenV?.kind === ValueKind.Bits ? actLenV.data : 0n);
       for (let j = 0; j < Math.min(expLen, actLen); j++) {
         const expArg = indexGet(expCtx, j);
         const actArg = indexGet(actCtx, j);
@@ -1056,8 +1056,8 @@ export function precompileFunction(
       // calls this param. Without this, polymorphic functions would lose
       // their declared effect variables during precompile.
       const innerParam = makeParamHelper(param.position, param._name);
-      if (param.effectBound) (innerParam as any).effectBound = param.effectBound;
-      if (param.effectVar !== undefined) (innerParam as any).effectVar = param.effectVar;
+      if (param.effectBound) innerParam.effectBound = param.effectBound;
+      if (param.effectVar !== undefined) innerParam.effectVar = param.effectVar;
       const placeholder = withMeta(innerParam, meta);
       placeholders.push(placeholder);
     } else {
@@ -1066,8 +1066,8 @@ export function precompileFunction(
       // type annotation still propagate (C7.2c: declared effect variables
       // referencing genericParams entries).
       const bare = makeParamHelper(param.position, param._name);
-      if (param.effectBound) (bare as any).effectBound = param.effectBound;
-      if (param.effectVar !== undefined) (bare as any).effectVar = param.effectVar;
+      if (param.effectBound) bare.effectBound = param.effectBound;
+      if (param.effectVar !== undefined) bare.effectVar = param.effectVar;
       placeholders.push(bare);
     }
   }

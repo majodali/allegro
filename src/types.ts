@@ -358,7 +358,7 @@ export function makeComposedFn(params: ParamValue[], body: Value): ComposedFunct
 // the legacy interfaces field-for-field; the physical layout migrates
 // inside structure.ts from now on.
 export function makeStructure(): StructureValue {
-  return newRecordStructure() as unknown as StructureValue;
+  return newRecordStructure();
 }
 
 /**
@@ -406,7 +406,7 @@ export function withMeta(v: Value, meta?: Metadata): Value {
   const m = meta ?? new Map<string, Value>();
   switch (v.kind) {
     case ValueKind.Structure:
-      return deriveWithMeta(v as StructureValue, m) as unknown as StructureValue;
+      return deriveWithMeta(v as StructureValue, m);
     case ValueKind.Bits:
       return { kind: ValueKind.Bits, length: v.length, data: v.data, meta: m };
     case ValueKind.Expression:
@@ -447,7 +447,7 @@ export function internedSymbolMetaWarnings(): number { return internedSymbolMeta
  *  element array is adopted. Element reads go through slots.ts `indexGet`;
  *  the legacy bindings view materializes lazily for stragglers. */
 export function makeDenseArray(elements: Value[]): StructureValue {
-  return newDenseStructure(elements) as unknown as StructureValue;
+  return newDenseStructure(elements);
 }
 
 // --- Utilities ---

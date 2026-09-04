@@ -3659,8 +3659,8 @@ export function buildGenericType(
     }
     if (a.kind === ValueKind.Bits) return `v:${(a as BitsValue).data}`;
     // Params and Symbols (type variables) — unique per name
-    if (a.kind === ValueKind.Param) return `param:${(a as any)._name ?? idx}`;
-    if (a.kind === ValueKind.Symbol) return `sym:${(a as any).name}`;
+    if (a.kind === ValueKind.Param) return `param:${a._name ?? idx}`;
+    if (a.kind === ValueKind.Symbol) return `sym:${a.name}`;
     return `unk:${idx}`;
   }
 
@@ -4001,7 +4001,7 @@ export function unifyTypes(
 ): TypeBindings {
   // If expected is a type variable (Symbol or unresolved Param)
   if (expectedType.kind === ValueKind.Symbol) {
-    const varName = (expectedType as any).name;
+    const varName = expectedType.name;
     if (!varName) return bindings;
     const existing = bindings.get(varName);
     if (existing) {
@@ -4019,7 +4019,7 @@ export function unifyTypes(
   }
   // Legacy: Param as type variable
   if (expectedType.kind === ValueKind.Param) {
-    const varName = (expectedType as any)._name;
+    const varName = expectedType._name;
     if (!varName) return bindings; // positional param, can't unify
     const existing = bindings.get(varName);
     if (existing) {
@@ -4094,12 +4094,12 @@ export function unifyTypes(
  */
 export function resolveTypeWithBindings(typeExpr: Value, bindings: TypeBindings): Value {
   if (typeExpr.kind === ValueKind.Symbol) {
-    const varName = (typeExpr as any).name;
+    const varName = typeExpr.name;
     if (varName && bindings.has(varName)) return bindings.get(varName)!;
     return typeExpr;
   }
   if (typeExpr.kind === ValueKind.Param) {
-    const varName = (typeExpr as any)._name;
+    const varName = typeExpr._name;
     if (varName && bindings.has(varName)) {
       return bindings.get(varName)!;
     }

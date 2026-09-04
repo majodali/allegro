@@ -161,7 +161,7 @@ function asFunction(v: Value): ComposedFunctionValue | null {
   if (p.kind === ValueKind.Expression) {
     const target = p.fn;
     if (target.kind === ValueKind.PrimitiveFunction
-        && (target as any).name === "typed_function"
+        && target.name === "typed_function"
         && p.args.length >= 1) {
       return asFunction(p.args[0]);
     }

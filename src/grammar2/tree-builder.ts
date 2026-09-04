@@ -766,7 +766,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // Extract the predicate expression (P) and lift it into a one-param
       // lambda `(_) => P`. buildFn walks the body and converts Symbol("_")
       // into a Param so the runtime check binds `_` to the result value.
-      const predExpr = (s.value as any).args[0];
+      const predExpr = s.value.args[0];
       const lambda = buildFn(["_"], predExpr);
       ensuresLambdas.push(lambda);
       continue;
@@ -775,7 +775,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // Single arg: a typed_array of Symbol(label) values produced by the
       // grammar's `labels:ident ** ","` repetition. Keep it as-is; the
       // wrapper code below collects all declarations into one labels array.
-      const labelsArg = (s.value as any).args[0];
+      const labelsArg = s.value.args[0];
       declaredEffects.push(labelsArg);
       continue;
     }
@@ -783,7 +783,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // Stage D — Surface C `param_effects name: eff`. Args: [paramRef,
       // effSym]. The paramRef is already a Param value (the lambda's
       // paramMap converted the matched ident at template substitution).
-      const margs = (s.value as any).args as any[];
+      const margs = s.value.args as any[];
       if (margs.length >= 2) {
         paramEffects.push({ paramRef: margs[0], effSym: margs[1] });
       }
@@ -799,7 +799,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
     if (s.key === null && isPrimitiveCall(s.value, "decreases_decl_marker")) {
       // Phase E Stage 3 — user-supplied termination metric. The arg is the
       // metric expression. Last writer wins if multiple clauses appear.
-      const margs = (s.value as any).args as any[];
+      const margs = s.value.args as any[];
       if (margs.length >= 1) decreasesMetric = margs[0];
       continue;
     }
@@ -817,7 +817,7 @@ function buildBlockExpr(tree: ParseTree, paramMap: Map<string, any>): any {
       // Phase F7 — `proven <prop>`. The arg is the predicate expression
       // (which references the function's Params in scope). Multiple
       // `proven` clauses accumulate as independent theorems to check.
-      const margs = (s.value as any).args as any[];
+      const margs = s.value.args as any[];
       if (margs.length >= 1) provenPredicates.push(margs[0]);
       continue;
     }
