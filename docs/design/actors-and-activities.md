@@ -327,6 +327,82 @@ not conceptual tidiness: **an activity earns its own name only if we would
 write a functional test for it that we would not write for its sibling.**
 Anything finer is a component of an activity, not an activity.
 
+### 4.2 Interactions, and actor references as payload
+
+An activity is a set of related **interactions**, and each interaction passes
+information from one actor to another. The pattern is not fixed: an
+interaction may be an event, a request/response pair, or anything else the
+system needs.
+
+**The payload may itself be an actor reference** — a reference to an instance
+of an actor type. Actors may be created, retrieved or acquired within an
+activity; a reference can be used to invoke the actor it names; and a
+reference may be stored inside another actor.
+
+That clause is often decorative in a system model. In Allegro it is the
+authority design, stated in the model's own vocabulary.
+
+#### 4.2.1 D42 and D24 are actor references, exactly
+
+- **D42 — evidence is possession.** *Authorization is what the requesting
+  context HOLDS, never principal identity.* An actor reference held by an
+  actor is the authorization. Nothing else is consulted.
+- **V-R2 — the mediation context is a minted capsule, never the raw scope.**
+  The capsule is a reference to an actor whose whole interface is
+  `holds(name)`. Handing over an attenuated reference instead of the real one
+  is the model's standard move.
+- **D24 — a capability is a first-class delegable token realized as a
+  PrimitiveFunction closure; attenuation is wrapping.** Wrapping a reference
+  in an actor that forwards a narrowed interface *is* attenuation. And its
+  three declared properties — non-serializable, print-redacted, identity-equal
+  only — are precisely the constraints that keep an actor reference
+  unforgeable and un-fabricable.
+- **`typePrivilegedCtx`** creates an actor (a privilege layer) inside an
+  activity and returns a reference to it, which is then stored in the scope
+  chain — creation, reference-passing and reference-storage in one call.
+
+So **Allegro's mechanism for storing an actor reference inside a value is the
+PrimitiveFunction closure**, branded `channelWriterFor` and checked by
+`channel_attenuate`. The forgery battery is the test suite for reference
+integrity.
+
+#### 4.2.2 Why this sharpens D49 rather than complicating it
+
+A Scope is an actor reference passed implicitly in every evaluation
+interaction. V-R2 already forbids handing the raw one to UserCode. If scopes
+were values, an actor reference would be storable in user data and passable to
+any actor — which is the forgery concern, now stated in one line: **an actor
+reference must never enter the payload of an interaction with an untrusted
+actor except in attenuated form.** D49 keeps scopes out of `Value` for exactly
+that reason, arrived at independently.
+
+#### 4.2.3 The distinction that explains the metadata plane
+
+Metadata is **information**, so it propagates by a declared table — viral,
+union, computed, positional, drop. A channel writer is an **actor reference**,
+so it does none of those things: it is non-serializable, print-redacted and
+identity-equal only.
+
+The two travel through the same substrate and behave nothing alike, and the
+model says why in one word. That is a good sign for it, because the difference
+was previously carried by convention and a brand check.
+
+#### 4.2.4 Not every interaction here is request/response
+
+Allegro has genuinely event-shaped interactions, and a model that assumed
+call/return would misdescribe them:
+
+- **Completion cascade** — a future resolving is Environment → Engine as an
+  event. `resolveCell` writes a binding in place and the dependency registry
+  wakes the dependents; nobody called anything.
+- **Forward chaining** — a residual becomes evaluable when a symbol it
+  references resolves.
+- **Compilation notifications** — a non-exhaustive match over a finite type is
+  an info notification (CE-R8), not a return value.
+
+Support for arbitrary interaction patterns is therefore load-bearing rather
+than a generality the model happens to allow.
+
 ## 5. The exercise — four crossings we already understand
 
 Each is written the same way: the actors, the question, the interface as it
@@ -356,6 +432,12 @@ This is the maintainer's original design intent — *`get_member` called with
 the member key, the owner and the calling scope* — already built. The scope
 travels implicitly down the evaluation chain rather than as an argument, which
 V-R2 requires: the mediation context is a minted capsule, never the raw scope.
+
+In §4.2's terms the activity does all three reference operations at once:
+`typePrivilegedCtx` **creates** a privilege-layer actor, **returns a
+reference** to it, and the evaluation **stores** that reference in the scope
+chain, where `scopeHoldsPrivilege` later walks for it. The evidence tested is
+possession of a reference, which is D42 restated.
 
 **Gap**: the interface is four functions with no name for the activity, so its
 supporting state leaked. `hasPrivateMembers`, `ownerShape`, `memberNameIndex`
@@ -538,6 +620,21 @@ battery.
    specifies a system down to its functions and types, expressed as a DSL and
    emitting the program, is what L3 Vivace is for — recorded as a direction,
    not a claim.
+10. **Actor references as interaction payload land on the authority design**
+   (§4.2). The clause is decorative in most system models; here D42 *is*
+   possession of an actor reference, V-R2's capsule *is* an attenuated one,
+   D24's *attenuation = wrapping* is the standard move, and the
+   PrimitiveFunction closure is how Allegro stores a reference inside a value.
+   D24's three properties — non-serializable, print-redacted, identity-equal
+   only — are precisely the constraints that keep a reference unforgeable.
+11. **It separates the metadata plane from the capability plane in one word**
+   (§4.2.3): metadata is *information* and propagates by table; a channel
+   writer is a *reference* and does none of it. That difference was previously
+   carried by convention and a brand check.
+12. **Arbitrary interaction patterns are load-bearing, not generality**
+   (§4.2.4). The completion cascade, forward chaining and compilation
+   notifications are events; a call/return-only model would misdescribe all
+   three.
 
 So: **three of four crossings are real, one is not, and one carries a design
 question the model resolves.** The more useful result is 1 and 2 — the model
