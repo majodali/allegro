@@ -579,6 +579,170 @@ unresolved argument; a `drop` field does not; an unregistered field cannot be
 originated without the writer capability. All three exist in the boundary
 battery.
 
+## 5a. The rest of the inventory
+
+### 5a.1 Consolidation first
+
+§4's 38 names were a scope measurement, deliberately unrefined. Applying
+§4.1's two rules before working them gives **31 activities**. The collapse is
+smaller than expected, because most names were already at the right grain —
+one redundancy accounts for most of it.
+
+| Collapsed | Into | Why |
+|---|---|---|
+| Parse source · Admit expression DAG | **Admit program** (by source form) | Same test: the same program admitted either way must evaluate the same |
+| Resolve import | Load module | An interaction inside it; no test of one that is not a test of the other |
+| Register grammar extension · Register body form | **Register extension** (by kind) | One registration surface, two payloads |
+| Apply function · Emit residual | Evaluate expression | PE Rules 1 and 2 *are* evaluation's behaviour |
+| Attach metadata · Propagate metadata | **Metadata plane** (§5.4) | One activity, two verbs |
+| Check annotation · refinement · contract · effect declaration | **Check declared constraint** (by constraint kind) | §4.1 predicted this; it is the single largest redundancy |
+| Grant privilege · Check reachability | Dispatch member access (§5.1) | Its two interactions |
+| Submit candidate | Check candidate | Its initiating interaction |
+| Render verdict | Report compilation | Presentation, not a distinct behaviour |
+
+Two names were deliberately **not** collapsed. *Check totality* and *Check
+exhaustiveness* look like one parameterized activity and are not: CE-R8 gives
+them different severities — a failed termination check halts, a non-exhaustive
+match over a finite type is an info notification — so each has a functional
+test the other does not. *Mint capability* and *Attenuate capability* likewise
+differ: attenuation has a test (an attenuated writer refuses an out-of-scope
+field) that minting does not.
+
+### 5a.2 The remaining 27, with verdicts
+
+Vocabulary: **sound** (interface exists and is named) · **implicit**
+(behaviour right, interface unnamed) · **gap** (interface missing or wrong) ·
+**not built**.
+
+**Admission**
+
+- **Admit program** — UserCode → Parser → Engine. `evalSource` is the one
+  entry point. **Implicit**: the text path and the DAG path are not stated as
+  one activity with two source forms, and B-132 is the symptom — the parser
+  mints a *third* context representation that is neither `Structure` nor
+  Scope.
+- **Load module** — UserCode → Module loader → Type system. `ModuleConfig`,
+  `ModuleLoaderOptions`, `buildModuleObject`. **Gap, and a specific one**:
+  `layers.md` *rules* that the loading mechanism is L1 while typed module
+  objects and encapsulation are L2 — and `buildModuleObject` sits in
+  `src/modules.ts`, the L1 file, doing the L2 half. A ruled boundary with no
+  interface is a ruling that only review enforces.
+- **Register extension** — UserModule → Grammar registry. The `register_*`
+  primitives. **Sound**: the primitive set is the interface, and each has a
+  functional test.
+
+**Evaluation**
+
+- **Evaluate expression** — Engine, self-initiated and from Parser and Type
+  system. `EvalFn = (value, ctx) => Value`. **Sound in shape**, and its one
+  defect is already owned: `ctx` is typed `StructureValue`, which D49/B-136
+  corrects.
+- **Resolve symbol** — Engine → Scope. `scopeLookup`. **Sound.**
+- **Extend scope** — Engine, Type system → Scope. `scopeExtend`,
+  `scopeAssume`, `scopePrivilegeExtend`. **Sound**: three creation verbs,
+  each with its own test, each returning a reference to a new Scope actor
+  (§4.2).
+- **Construct value** — Type system → Kernel. The `__construct` slot,
+  `resolveDataSlots`, the invariant check. **Gap**: CE-R8 rules that a
+  construction-path invariant failure yields an error *value* while a contract
+  failure *halts*, and the split is deliberate — but the interface does not
+  express it. One path throws and one returns, through a surface whose
+  signature says neither.
+- **Resolve future** — Environment → Engine, as an event. `FutureManager`,
+  `resolveCell`, the dependency registry. **Sound**, and the system's clearest
+  non-request/response interaction (§4.2.4).
+
+**Policy**
+
+- **Declare type** — UserCode → Type system → Kernel. The kind recipe and the
+  meta-protocol registry. **Implicit**: the registry is the nearest thing to
+  an interface, and B-135 is what its absence costs.
+- **Check declared constraint** — Type system → UserCode's value. Four code
+  paths sharing a severity model (a failed check halts, CE-R1) and no surface.
+  **Gap**: the parameterization §4.1 predicted is not expressed anywhere.
+- **Infer effects** — Effect system → Engine. **Gap**, and see below.
+- **Check totality** — Totality analyzer → Engine. **Gap**, and see below.
+- **Check exhaustiveness** — Totality analyzer → Engine. **Implicit**, and
+  notable for its interaction pattern: CE-R8 makes the outcome an info
+  *notification*, so this activity's result is an event rather than a return.
+- **Register law** — Type system → Law registry. `lawObligationRecords()`.
+  **Sound**, with one property worth naming: the registry is process-global
+  and scoped per compilation by `boundTypeFilter`. In §4.2's terms a global
+  actor is handed a filter rather than being asked a scoped question.
+
+**Authority**
+
+- **Mint capability** — Kernel. `registerMetaField(spec, minted)` returns a
+  writer. **Sound**, and among the best-formed surfaces in the system; the
+  forgery battery is its test suite.
+- **Attenuate capability** — holder → Kernel. `channel_attenuate`,
+  brand-checked against `channelWriterFor`. **Sound** (D24).
+
+**Proof**
+
+- **Emit obligations** — Proof kernel → ExternalAgent. `extractObligations`,
+  `makeObligation`, `serializeObligation`. **Sound.**
+- **Check candidate** — ExternalAgent → Proof kernel. `parseVerdict`,
+  `buildVerdict`. **Sound.**
+- **Record authorship** — Proof kernel → ledger. `makeAuthorship`. **Sound.**
+
+All three share the property that makes them the exercise's **second
+calibration point**: PCP is the only interface in the system that is
+*serialized and versioned* (`pcp/1`, with a stated forward-compatibility
+rule). An interface that must survive a process boundary cannot be implicit,
+which is why these three are the best-specified activities Allegro has — and
+an argument that the model's value rises with the cost of getting the
+interface wrong.
+
+**Environment**
+
+- **Perform effect** — Engine → Environment. The effect-labelled primitives
+  (`print`, `delay`, `fetch`) plus the declared label set. **Implicit**: the
+  label names the capability, but there is no Environment interface object.
+  Swapping Node for the browser sandbox substitutes primitives rather than
+  supplying a different implementation of a stated interface — T1 holds in
+  spirit and nothing states it.
+- **Acquire host capability** — **Gap**: the current mechanism is
+  `futureManager` planted as a host expando on the root scope and read by a
+  chain walk, which is §5.3's crossing wearing a different hat.
+
+**Introspection**
+
+- **Inspect value** — ExternalAgent → Engine. `summarizeValue`,
+  `summarizeModule`, `renderModuleSummary`. **Implicit**, and it reads
+  `grammarValue` and `abstractDomain` through `as any` — §5.3's crossing
+  again.
+- **Report compilation** — Engine → ExternalAgent. `CompilationReport`,
+  `Notification`, `safetyGradeFor`. **Sound.**
+
+**Build** — Configure build · Run build phase · Generate target code ·
+Package. **All four not built.** There is no codegen, emit or package source
+in `src/`; T-build and T-backend are tracks with design and no
+implementation. The model can name the actors and has nothing to check.
+
+### 5a.3 The pattern the pass found
+
+Four entries came back marked separately — three **gap**, one **implicit** —
+for what looks like four reasons and is one. *Infer effects*, *Check
+totality*, *Acquire host capability* and *Inspect value* all store or read
+their result as **host state on the analysed value** instead of returning it
+across an interface: `inferredEffects` (9 accesses), `partial` and
+`decreasesMetric`, `futureManager`, `abstractDomain` (14).
+
+That is §5.3's crossing, so with it the cause covers **five of the
+thirty-one**. **An analyzer that writes its conclusion onto its subject has no
+interface, because there is no message.** The host-plane plan's Option B is
+the fix for all five at once, which is a stronger argument for it than §5.3
+alone made.
+
+The complementary observation is where the well-formed activities cluster.
+The metadata plane (§5.4), capability minting and attenuation, and all three
+proof activities are **sound** — and every one of them either crosses a trust
+boundary or crosses a process boundary. **Allegro's interfaces are well
+specified exactly where getting them wrong would be visibly unsafe, and
+implicit everywhere else.** That is not a criticism of the code; it is a
+statement of where the model has something to add.
+
 ## 6. What the exercise found
 
 1. **The model needed a definition of *actor* before it could be trusted**
@@ -636,15 +800,43 @@ battery.
    notifications are events; a call/return-only model would misdescribe all
    three.
 
-So: **three of four crossings are real, one is not, and one carries a design
-question the model resolves.** The more useful result is 1 and 2 — the model
-was asked two questions about its own boundaries and answered both by refusing
-something, including something it had itself proposed. That is the evidence
-for widening the exercise or dropping it.
+13. **The full pass consolidates 38 names to 31** (§5a.1) — a smaller
+   collapse than expected, because most names were already at the right grain.
+   The four Check activities were the single largest redundancy, as §4.1
+   predicted; two apparent redundancies were deliberately *not* collapsed
+   because CE-R8 gives them different severities.
+14. **Four separately-marked entries turn out to have one cause** (§5a.3).
+   *Infer effects*, *Check totality*, *Acquire host capability* and *Inspect
+   value* all write or read their result as host state on the analysed value
+   rather than returning it across an interface. **An analyzer that writes its
+   conclusion onto its subject has no interface, because there is no
+   message.** With §5.3 that is five of the thirty-one, and Option B fixes
+   them together.
+15. **The well-formed activities cluster where they must.** The metadata
+   plane, capability minting and attenuation, and all three proof activities
+   are sound — and every one crosses either a trust boundary or a process
+   boundary. PCP is the only *serialized and versioned* interface in the
+   system (`pcp/1`), and it is the best-specified. **Allegro's interfaces are
+   well specified exactly where getting them wrong would be visibly unsafe,
+   and implicit everywhere else** — which is where the model has something to
+   add.
+
+Tally over all 31 activities: **13 sound, 6 implicit, 8 gap, 4 not built**
+(the build track). `Read host state` counts as a gap at the Engine's boundary
+per §5.3's split; the four worked crossings contribute one sound (§5.4), one
+implicit (§5.1) and two gaps (§5.2, §5.3).
+
+So: **three of the four worked crossings are real, one is not, and one carries
+a design question the model resolves.** The more useful results are 1, 2 and
+14 — the model was asked three questions about its own boundaries and answered
+each by refusing or merging something, including things it had itself
+proposed. That is the evidence for adopting it.
 
 ## 7. Open questions
 
-1. **Adopt, extend, or drop.** Four activities is a sample, not a proof.
+1. **Adopt, extend, or drop.** No longer a sample: all 31 activities are
+   worked (§5, §5a). The evidence is a tally, one structural finding that
+   explains a third of the register (§5a.3), and three self-corrections.
 2. **Relationship to `concept-spine.md`.** That plan is active and defines
    concepts in dependency order. Actors and activities are structure rather
    than definitions, so this document cites the spine rather than duplicating
@@ -663,3 +855,9 @@ for widening the exercise or dropping it.
 6. **Which level-2 entries survive their evidence.** §3.8 names them from
    the code's shape; only four are placed by this document's evidence, and
    the rest owe the same check the parser got.
+7. **Whether the eight gaps become backlog items now**, or wait for the
+   model's adoption ruling. Four already have owners — §5a.3's cluster is
+   B-135/B-137, and *Validate argument shape* is B-133. The other four are
+   unfiled: *Load module*'s unenforced L1/L2 ruling, *Construct value*'s two
+   outcomes under one signature, *Check declared constraint*'s missing
+   surface, and the absent Environment interface.
