@@ -23,7 +23,7 @@ this session's defects have lived:
 
 `grammar2/builder.ts` is the clearest case, and it is not a layering
 violation: L1 may depend on L0. It needs to validate a user-supplied
-argument's shape, there is no participant to ask, so it reads an L0 storage
+argument's shape, there is no actor to ask, so it reads an L0 storage
 bit and interprets it as a type test. **A missing activity interface is
 invisible to a dependency spine.**
 
@@ -39,17 +39,96 @@ what participant-neutrality asserts.
 
 ## 3. Actors
 
-| Actor | What distinguishes it | Where it lives |
-|---|---|---|
-| **Kernel** | Holds authority nobody else can hold — the constructor brand, channel writers, the evidence capsule, privilege layers | `src/` (D21, D42, V-R2) |
-| **Engine** | Applies rules; grants nothing. Evaluator, PE, representation | `src/` |
-| **L1 substrate** | Grammar, parser, module loading | `src/grammar2/`, `src/modules.ts` |
-| **L2 Standard** | Types, effects, laws, totality, contracts | `src/types-std.ts` + `lib/*.alg` |
-| **Author** | Supplies the program. VISION's participants collapse here | `.alg` files, or a directly-constructed expression DAG |
-| **External agent** | Reads system state, and/or submits candidates the kernel checks | CLI subcommands, IDEs, LLM workers, SMT (`pcp/`) |
-| **Environment** | Supplies effects; swappable (Node CLI, browser sandbox) | T-host |
+### 3.1 What counts as an actor
 
-### 3.1 Why Tool and External prover are one actor
+The first draft had no definition, and the parser is what exposed it: it was
+excluded on the grounds that the **Admit** activity also accepts a
+directly-constructed DAG with no parse step. That is an argument about the
+activity having two realizations. It says nothing about the parser.
+
+**An actor is a party to a crossing whose role is stated independently of its
+implementation.** Three tests, all required:
+
+- **T1 — Role/implementation separability.** What it must do is statable
+  without saying how, and its implementation could be replaced wholesale
+  without changing what any other actor must do.
+- **T2 — It initiates.** It appears as the *initiator* of at least one
+  activity. Something only ever called is a component of the caller's
+  activity, not a party to a crossing.
+- **T3 — Encapsulation is wanted.** Something behind its interface is state
+  or strategy other actors should not reach. Otherwise the interface is
+  documentation, not a boundary.
+
+Three things are explicitly **not** tests:
+
+- **Statefulness.** A pure function can be an actor. Encapsulating one behind
+  an interface is a design choice about who may see the strategy, not about
+  whether it holds state.
+- **Externality.** Kernel and Engine are both in-process.
+- **Size.** A narrow role is still a role.
+
+**Promotion rule**: an actor is named only with evidence in the code for all
+three tests. Conceptual plausibility is how a taxonomy grows past usefulness.
+
+### 3.2 The parser is an actor
+
+It passes all three, and the evidence is not close:
+
+- **T1**: `layers.md` already anticipates the replacement — the standard
+  parser is L1 today and *"may eventually be re-defined at L3 using Vivace's
+  parser generator"*. A role whose replacement is already a planned milestone
+  is a role separable from its implementation by construction.
+- **T2**: mid-parse it calls `makeExpr` **85** times, `makeSymbol` 17,
+  `makeComposedFn` 17, `makeStructure` 5. It initiates into the Engine and
+  Kernel while running, which is precisely a crossing rather than a step
+  inside one.
+- **T3**: its grammar tables, its error recovery and its intermediate tree
+  are all things no other actor should reach — and B-132 is what happens
+  without the boundary, `parser-helpers.ts` minting its own contexts outside
+  the representation.
+
+### 3.3 The correction this forces: layers are not actors
+
+Applying the tests to the first draft's own table finds the real defect.
+**"L1 substrate" and "L2 Standard" are layers wearing actor names.** A layer is
+a dependency band; it does not initiate anything, because it is not a thing.
+Promoting the parser without decomposing them would have been inconsistent.
+
+The tests decompose both. Strongest candidates, each still owing the same
+evidence the parser just supplied:
+
+- from L1 — **Parser** (confirmed above), **Module loader** (the loading
+  mechanism is L1 by ruling while typed module objects are L2, so the role is
+  already stated separately from its collaborator), **Grammar registry**
+- from L2 — **Type system** (T2 confirmed: it initiates into the evaluator at
+  `types-std.ts:1122`, `1469`, `1636`), **Effect system**, **Totality
+  analyzer**, **Proof kernel** (`pcp.ts` already names it *the Allegro
+  verification kernel*, distinct from the authority Kernel)
+
+That takes the list from seven names to roughly a dozen — for the right
+reason. It is not the taxonomy growing; it is two placeholders being replaced
+by the actors they were standing in for.
+
+### 3.4 The actor list
+
+Marked by evidence, not by plausibility.
+
+| Actor | What distinguishes it | Status |
+|---|---|---|
+| **Kernel** | Holds authority nobody else can — constructor brand, channel writers, evidence capsule, privilege layers (D21, D42, V-R2) | confirmed |
+| **Engine** | Applies rules, grants nothing. Evaluator, PE, representation | confirmed |
+| **Parser** | Source text → expression DAG; replaceable per `layers.md` | confirmed §3.2 |
+| **Type system** | Declares types, checks annotations and refinements, dispatches members | T2 confirmed |
+| **Module loader** | Extension loading, dependency resolution, caching | candidate |
+| **Grammar registry** | Runtime grammar extension and fragment merging | candidate |
+| **Effect system** | Infers and checks effect declarations | candidate |
+| **Totality analyzer** | Termination, decrease metrics, exhaustiveness | candidate |
+| **Proof kernel** | Emits obligations, checks candidates, records authorship | candidate |
+| **Author** | Supplies the program. VISION's participants collapse here | confirmed (T2 at the system boundary, not in-process) |
+| **External agent** | Reads system state, and/or submits candidates the kernel checks | confirmed §3.5 |
+| **Environment** | Supplies effects and initiates completions; swappable | confirmed |
+
+### 3.5 Why Tool and External prover are one actor
 
 They differ by **relationship, not identity**, so the distinction belongs on
 the activity axis and not this one. The same program does both: an LLM worker
@@ -69,11 +148,18 @@ So the actor is untrusted in both, and consequential in only one. That is a
 per-activity property, which is the model working as intended on its first
 question: one actor, two activities, two interfaces.
 
-### 3.2 The parser is not an actor
+### 3.6 What the tests exclude
 
-It is a *component* of the **Admit** activity between Author and Engine. The
-same activity admits a directly-constructed expression DAG with no parse step
-at all, which is what makes the parser a component rather than a party.
+The definition is only worth having if it refuses things. It refuses:
+
+- **`putEntry`, `SlotView`, `collapseBodyMetadata`** — fail T1. Their role is
+  not separable from the representation; they *are* the how.
+- **The propagation table** — fails T2. It is data the Engine consults, never
+  a party.
+- **`slots.ts`** — fails T2 and T3. It is an *interface on* the Engine, not an
+  actor behind one. This matters: it is a second, independent reason §5.3 is
+  not an activity, since an Engine reading its own representation has the same
+  actor on both sides of the supposed crossing.
 
 ## 4. The activity inventory — names only
 
@@ -229,9 +315,18 @@ the model is why.
 observable behaviour. Its test is structural: a reintroduced `as any` over a
 registered host property fails the boundary lint. By the maintainer's own
 criterion (*activities should only define behaviour we would write functional
-tests to cover*), **this may not be an activity at all** — it may be a
-representation rule dressed as one. Recorded as the exercise's first negative
-result.
+tests to cover*), **this is not an activity** — it is a representation rule
+dressed as one.
+
+§3.6 supplies the second, independent reason, and it is the stronger of the
+two: `slots.ts` fails the actor tests. It never initiates and there is nothing
+behind it that is not the Engine's own representation, so it is an *interface
+on* the Engine rather than an actor behind one — and an Engine reading its own
+representation has the same actor on both sides of the supposed crossing.
+
+Both reasons land in the same place, which is why the §5.3 design conclusion
+survives its own demotion: the host plane still needs an interface, and that
+interface still is not the value. What it does not need is an activity.
 
 ---
 
@@ -274,19 +369,31 @@ battery.
 
 ## 6. What the exercise found
 
-1. **Tool and External prover are one actor in two activities** (§3.1). The
-   first question the model was asked, it answered by collapsing the taxonomy
-   rather than growing it.
-2. **§5.2 is a genuine missing interface**, and the model distinguishes two
+1. **The model needed a definition of *actor* before it could be trusted**
+   (§3.1), and the first draft did not have one — which is why the parser was
+   wrongly excluded on an argument about the *activity* rather than about the
+   parser. Three tests now: role/implementation separability, initiation, and
+   wanted encapsulation. Statefulness, externality and size are explicitly
+   not tests.
+2. **The definition immediately refused the draft's own table.** *L1
+   substrate* and *L2 Standard* are layers wearing actor names (§3.3). Layers
+   do not initiate, so they cannot be actors — and applying the tests replaces
+   two placeholders with the actors they were standing in for.
+3. **Tool and External prover are one actor in two activities** (§3.5) — the
+   taxonomy collapsing rather than growing.
+4. **§5.2 is a genuine missing interface**, and the model distinguishes two
    fixes that look like one: removing the cast, and removing the need.
-3. **§5.3 may not be an activity.** It fails the functional-test criterion.
-   That is the model doing its job — a taxonomy that cannot reject a candidate
-   is not a model.
-4. **§5.4 needs nothing**, which makes it the calibration point.
+5. **§5.3 is not an activity**, now for two independent reasons: it fails the
+   functional-test criterion, and `slots.ts` fails the actor tests (§3.6), so
+   an Engine reading its own representation has the same actor on both sides
+   of the supposed crossing.
+6. **§5.4 needs nothing**, which makes it the calibration point.
 
 So: **three of four crossings are real, one is not, and one carries a design
-question the model resolves.** That is the evidence for widening the exercise
-or dropping it.
+question the model resolves.** The more useful result is 1 and 2 — the model
+was asked two questions about its own boundaries and answered both by refusing
+something, including something it had itself proposed. That is the evidence
+for widening the exercise or dropping it.
 
 ## 7. Open questions
 
