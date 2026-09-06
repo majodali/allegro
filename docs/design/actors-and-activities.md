@@ -125,7 +125,9 @@ by the actors they were standing in for.
 
 ### 3.4 The actor list
 
-Marked by evidence, not by plausibility.
+Marked by evidence, not by plausibility. §3.8 supersedes this table for
+*kind* (singleton vs type) and for level-2 decomposition; this one records
+what the evidence supports.
 
 | Actor | What distinguishes it | Status |
 |---|---|---|
@@ -138,8 +140,8 @@ Marked by evidence, not by plausibility.
 | **Effect system** | Infers and checks effect declarations | candidate |
 | **Totality analyzer** | Termination, decrease metrics, exhaustiveness | candidate |
 | **Proof kernel** | Emits obligations, checks candidates, records authorship | candidate |
-| **Author** | Supplies the program. VISION's participants collapse here | confirmed (T2(a) at the system boundary, not in-process) |
-| **External agent** | Reads system state, and/or submits candidates the kernel checks | confirmed §3.5 |
+| **UserCode** | Supplies the program. VISION's participants collapse here. A **type**, not a singleton — the first draft's *Author* was a singleton standing in for one (§3.7) | confirmed (T2(a) at the system boundary, not in-process) |
+| **ExternalAgent** | Reads system state, and/or submits candidates the kernel checks. Also a **type** | confirmed §3.5 |
 | **Environment** | Supplies effects and initiates completions; swappable | confirmed |
 
 ### 3.5 Why Tool and External prover are one actor
@@ -174,28 +176,112 @@ The definition is only worth having if it refuses things. It refuses:
 - **`collapseBodyMetadata`** — passes T2(c) on complexity but fails the
   granularity rule. Nothing depends on its contract separately from the
   compile pipeline's, so it is a component of that pipeline.
-- **`slots.ts`** — fails T1, subtly and importantly. Its role cannot be
-  stated without naming the Engine's representation, because its role *is* to
-  be the Engine's interface. An interface **on** an actor is not an actor
-  behind one. This is the second, independent reason §5.3 is not an activity:
-  an Engine reading its own representation has the same actor on both sides
-  of the supposed crossing.
+- **`slots.ts`** — **superseded by §3.7.1.** This entry said it fails T1
+  because its role cannot be stated without naming the Engine's
+  representation. That description is right and the conclusion was wrong: it
+  is a *pure interface actor* of the Engine, a category the flat model did not
+  have.
 
-**And one admission the loosened T2 makes, which is worth surfacing rather
-than hiding.** `SlotView` was excluded in the first draft. Under the revised
-tests it qualifies: its role is stated — *a by-name view over the entry
-sequence* — its index policy is explicitly *below the specification*
-(D48(a)), it holds a cached index across calls (T2(b)), it chooses between a
-scan and a map at a measured threshold (T2(c)), and the granularity rule
-passes because W7 and the 200-vs-200,000 scaling test are tests of its
-contract that are not tests of `Structure`.
+**And one admission the loosened T2 makes.** `SlotView` was excluded in the
+first draft. Under the revised tests it qualifies: its role is stated — *a
+by-name view over the entry sequence* — its index policy is explicitly *below
+the specification* (D48(a)), it holds a cached index across calls (T2(b)), it
+chooses between a scan and a map at a measured threshold (T2(c)), and the
+granularity rule passes because W7 and the 200-vs-200,000 scaling test are
+tests of its contract that are not tests of `Structure`.
 
-That is the loosening working as intended — *an implementation choice that
-does not define the role* is exactly what B-120 E2 and E3 measured and pinned.
-It is also the model's grain becoming finer, which the maintainer should rule
-on: **is a small internal actor like `SlotView` in scope, or does the model
-stop at crossings between named subsystems?** The granularity rule admits it;
-the exercise's four activities never mention it.
+That raised a grain question, **now answered in §3.7**: the grain is
+unlimited in principle and bounded at two levels in practice, and `SlotView`
+is an internal actor of the Engine rather than a system-level one.
+
+### 3.7 Actors are types, and they decompose
+
+Two properties settle §3.6's open grain question and change the model's shape.
+
+**Actors are types; most are singletons.** Kernel, Engine and Parser happen to
+have one instance each, which is why the first draft could get away with
+treating actors as things rather than kinds. Others are plainly not singletons
+— **UserCode** and **UserModule** are types with many instances, and so is
+**ExternalAgent**. The first draft's *Author* was a singleton standing in for a
+type, which is the same error as *L1 substrate* standing in for a layer.
+
+Allegro makes this unusually literal. A **Type** in Allegro is a value that
+receives member-dispatch messages and encapsulates its member set — so
+`Type` is an actor type with many instances, and each declared type is one
+of them.
+
+**Actors decompose, and the decomposition is private.** An actor contains
+internal actors and internal activities; everything but its interfaces is
+implementation detail of the outer actor. Two kinds of thing sit at the
+boundary:
+
+- **encapsulated internal actors** — they have substance of their own;
+- **pure interface actors** — they hold nothing and pass messages to and from
+  internal activities.
+
+**Internal state is modelled as state-carrying actors**, which may be as
+simple as a persistent value. There is no separate "state" category: a value
+is the degenerate state-carrying actor.
+
+In principle this recurses until every function and type is specified. In
+practice the maintainer decomposes **two levels** — enough to map the major
+components and their functional behaviour — and this exercise does the same.
+
+#### 3.7.1 What this does to `SlotView` and `slots.ts`
+
+Both are now placed, and one of them reverses a call in §3.6.
+
+**`SlotView` is an internal actor of the Engine**, encapsulated: it carries
+the cached index (state), it chooses scan-versus-map at a measured threshold
+(strategy), and its policy is *below the specification* by ruling (D48(a)).
+Included in the hierarchy per the maintainer's direction, at level 2.
+
+**`slots.ts` is a pure interface actor of the Engine** — not, as §3.6 said, a
+failure of T1. It holds nothing and passes messages to internal activities,
+which is exactly the second kind of boundary thing. The earlier reasoning
+("its role cannot be stated without naming the Engine's representation")
+described a pure interface actor correctly and then concluded it was not an
+actor at all, because the flat model had no category for one.
+
+#### 3.7.2 Two convergences worth recording
+
+**Scope.** D49 rules that a scope leaves `Value` and becomes a non-value host
+construct. In this model a scope is *internal state-carrying actor*, the
+category the maintainer describes — arrived at from a different direction and
+agreeing. That D49's argument and the actor model's category independently
+place a scope outside the value tower is the strongest evidence either has.
+
+**Vivace.** A model that specifies a system down to its functions and types,
+expressed as a DSL or a data representation and possibly rendered
+graphically, is a domain model — and L3 Vivace is *the domain-model layer*.
+So the actor/activity model is a candidate Vivace domain, and the maintainer's
+"fulfilling the role of UserCode" is precisely what an L3 DSL does: it emits
+the program. Recorded as a **direction, not a claim** — Vivace is at
+hypothesis stage and this is internal (release-track principle 17).
+
+### 3.8 The hierarchy, two levels
+
+Level 1 is the system's actors. Level 2 decomposes the two carrying this
+exercise's evidence; the rest are named without decomposition and owe theirs.
+
+| Level 1 actor | Kind | Level 2 |
+|---|---|---|
+| **Kernel** | singleton | Capability minter · Evidence capsule (type) · Privilege layer (type) |
+| **Engine** | singleton | **Structure** (type) · **Scope** (type, state-carrying) · **SlotView** (type, internal to Structure) · **Expression DAG** (type) · PE rule set · Metadata plane · Propagation table · `slots.ts` (pure interface) |
+| **Parser** | singleton | Lexer · Grammar table · Tree builder · Fragment merger |
+| **Type system** | singleton | **Type** (type) · Member set (type) · Refinement checker · Member dispatcher |
+| **Module loader** | singleton | **UserModule** (type) · Dependency resolver · Cache |
+| **Grammar registry** | singleton | **Grammar fragment** (type) · Merger |
+| **Effect system** | singleton | **EffectSet** (type) · Inference walker · Declaration checker |
+| **Totality analyzer** | singleton | Decrease-metric checker · Exhaustiveness checker |
+| **Proof kernel** | singleton | **Obligation** (type) · **Verdict** (type) · Candidate checker · Authorship ledger |
+| **UserCode** | **type** | — |
+| **UserModule** | **type** | (owned by Module loader above) |
+| **ExternalAgent** | **type** | — |
+| **Environment** | singleton per host | Capability table · Completion source |
+
+Level 2 entries are candidates except `SlotView`, `Structure`, `Scope` and
+`slots.ts`, which this document's evidence already places.
 
 ## 4. The activity inventory — names only
 
@@ -251,8 +337,8 @@ already know the answers to is the point — it tests the model, not the code.
 
 ### 5.1 Dispatch member access
 
-**Actors**: L2 Standard (initiator) → Kernel (responder), with Author's code
-as the subject and the calling scope as evidence.
+**Actors**: Type system (initiator) → Kernel (responder), with UserCode as
+the subject and the calling Scope as evidence.
 
 **Question**: given a member key, an owning type, and the calling scope, does
 this access resolve — and to what?
@@ -286,7 +372,8 @@ evidence that this activity is real.
 
 ### 5.2 Validate argument shape
 
-**Actors**: L1 substrate (initiator) → L2 Standard (responder).
+**Actors**: Parser and Grammar registry (initiators) → Type system
+(responder).
 
 **Question**: is this user-supplied value the shape I require?
 
@@ -324,8 +411,9 @@ whether the value arrives from `.alg` source or a constructed DAG.
 
 ### 5.3 Read host state
 
-**Actors**: Engine, L1 and L2 (initiators) → Engine-as-representation-owner
-(responder).
+**Actors**: Type system, Parser, Effect system, Totality analyzer
+(initiators) → Engine (responder), via its `slots.ts` interface actor. Plus
+the Engine reading its own representation, which §3.7 places one level down.
 
 **Question**: what does the engine privately know about this value?
 
@@ -347,29 +435,35 @@ The model answers it. If reading host state is an activity between actors, it
 has an interface, and the interface is not the value. That is Option B, and
 the model is why.
 
-**Functional test**: no behavioural test can cover this — the activity has no
-observable behaviour. Its test is structural: a reintroduced `as any` over a
-registered host property fails the boundary lint. By the maintainer's own
-criterion (*activities should only define behaviour we would write functional
-tests to cover*), **this is not an activity** — it is a representation rule
-dressed as one.
+**Functional test — and the hierarchy splits this activity in two.** The
+earlier verdict was a flat "not an activity", on two grounds that §3.7 now
+revises.
 
-§3.6 supplies the second, independent reason, and it is the stronger of the
-two: `slots.ts` fails the actor tests. It never initiates and there is nothing
-behind it that is not the Engine's own representation, so it is an *interface
-on* the Engine rather than an actor behind one — and an Engine reading its own
-representation has the same actor on both sides of the supposed crossing.
+- **Engine reading its own representation** is an *internal* activity. No
+  functional test can cover it, it has no observable behaviour of its own, and
+  both parties are the Engine. It stays inside the Engine's decomposition,
+  where `slots.ts` is the pure interface actor and `SlotView` an encapsulated
+  one.
+- **Type system, Parser, Effect system and Totality analyzer reading Engine
+  state is a genuine crossing** at the Engine's boundary. Most of the 81
+  accesses are these — `types-std.ts`, `totality.ts`, `effects.ts`,
+  `grammar2/` — and their behaviour *is* observable through the caller: a
+  refinement checked against the wrong abstract domain fails a refinement
+  test.
 
-Both reasons land in the same place, which is why the §5.3 design conclusion
-survives its own demotion: the host plane still needs an interface, and that
-interface still is not the value. What it does not need is an activity.
+So the flat model was forcing one name onto two things at different levels,
+and answering for the internal one. **The crossing is an activity; the
+internal read is not.** That is the hierarchy earning its keep on its first
+application, and it is a better result than the demotion it replaces.
 
----
+The design conclusion is unchanged and now better founded: the host plane
+needs an interface at the Engine's boundary, and that interface is not the
+value. Option B.
 
 ### 5.4 Attach and propagate metadata
 
-**Actors**: Kernel (writer of minted fields) and L2 (writer of registered
-fields) → Engine (propagator).
+**Actors**: Kernel (writer of minted fields) and Type system / Effect system
+(writers of registered fields) → Engine (propagator).
 
 **Question**: what does this value carry, and what happens to it at each PE
 hop?
@@ -428,10 +522,22 @@ battery.
    its own representation has the same actor on both sides of the supposed
    crossing.
 6. **§5.4 needs nothing**, which makes it the calibration point.
-7. **The loosened T2 admits `SlotView`** (§3.6), which the first draft
-   excluded. That is the rule working — its index policy is *below the
-   specification* by ruling — but it moves the model's grain finer than the
-   four activities reach, and needs a ruling.
+7. **The model is hierarchical and its actors are types** (§3.7, maintainer,
+   2026-09). Actors decompose into internal actors and internal activities;
+   the decomposition is private but for the interfaces; internal state is a
+   state-carrying actor, possibly just a persistent value; and an actor's
+   boundary holds both encapsulated internal actors and pure interface actors.
+   Practice stops at two levels.
+8. **That reversed one call and improved another.** `slots.ts` is a *pure
+   interface actor* of the Engine, not — as §3.6 concluded — a failure of T1;
+   the flat model simply had no category for it. And §5.3 was one name over
+   two things at different levels: the crossing at the Engine's boundary is an
+   activity, the Engine reading its own representation is not.
+9. **Two convergences** (§3.7.2). A Scope is exactly *internal state-carrying
+   actor*, which is D49's conclusion reached independently. And a model that
+   specifies a system down to its functions and types, expressed as a DSL and
+   emitting the program, is what L3 Vivace is for — recorded as a direction,
+   not a claim.
 
 So: **three of four crossings are real, one is not, and one carries a design
 question the model resolves.** The more useful result is 1 and 2 — the model
@@ -454,7 +560,9 @@ for widening the exercise or dropping it.
 4. **Where the interfaces would live** if adopted — per-actor modules, or
    declarations checked by the boundary battery the way the plane invariants
    are.
-5. **How fine the grain goes** (§3.6). The granularity rule admits `SlotView`;
-   whether small internal actors are in scope, or the model stops at crossings
-   between named subsystems, changes the size of the model by an order of
-   magnitude.
+5. ~~How fine the grain goes.~~ **SETTLED 2026-09** (§3.7): unlimited in
+   principle, two levels in practice. `SlotView` and its like are in, as
+   internal actors.
+6. **Which level-2 entries survive their evidence.** §3.8 names them from
+   the code's shape; only four are placed by this document's evidence, and
+   the rest owe the same check the parser got.
