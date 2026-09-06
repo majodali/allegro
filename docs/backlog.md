@@ -2376,8 +2376,16 @@ that prevents it.
     partial census; what it lacks is a TypeScript declaration, so for those 79
     the question is not *what is this property* but *why does the registry
     know and the type not*.
+  - **The census half now has a plan**: `docs/plans/host-plane-declaration.md`
+    chunk H0 registers the ~13 L0 host properties the SLOT_REGISTRY does not
+    know (`localMemberScope`, `_tailPosition`, `hasPrivateMembers`,
+    `memberNameIndex`, `ownerShape`, `predicate`, `obligationMismatch`,
+    `memberPrivilege`, `total`, `assumeTerminates`, `extendsChain`,
+    `verified`). That is judgment work and belongs to this item; the rule it
+    serves still does not exist.
   - **Not in scope**: Scope's representation, now **D49** / **B-136**.
-  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5 and §5.7.
+  - **Pointer**: `docs/plans/host-plane-declaration.md`;
+    `docs/plans/entry-sequence-composite.md` §5.5 and §5.7.
 
 - [ ] **B-136** · L0 · **Scope leaves `Value` (D49).**
   - **What**: give the evaluation environment its own host representation.
@@ -2429,5 +2437,9 @@ that prevents it.
   - **Why it matters beyond tidiness**: B-127's row records that the boundary
     lint cannot see a property access through an `any` cast. Every survivor is
     a hole in the enforcement B-128 is meant to add.
-  - **When**: the rest waits on B-135's rule.
-  - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.7.
+  - **When**: the rest waits on B-135's rule. The route for the registered
+    majority is `docs/plans/host-plane-declaration.md` (draft) — 81 of the
+    survivors reach a property the SLOT_REGISTRY already knows, so generating
+    the declarations removes them without a judgment call each.
+  - **Pointer**: `docs/plans/host-plane-declaration.md`;
+    `docs/plans/entry-sequence-composite.md` §5.7.
