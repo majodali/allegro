@@ -25,6 +25,7 @@ every section is tagged with its implementation status:
 | Location | Layer / scope | Documents |
 |---|---|---|
 | `concepts.md` | **Definitional spine** | Every salient concept in dependency order (definition / rationale / as-implemented / delta). **Read this first.** T0–T1 written; T2–T5 pending (`docs/plans/concept-spine.md`) |
+| `actors-and-activities.md` | Cross-cutting structure | **Draft exercise, not settled design** — actors, the activity inventory, and four worked crossings testing whether the model earns its keep. Cites `layers.md` for dependencies and `concepts.md` for definitions; supersedes neither |
 | `layers.md` | The spine | Layer model, capability tracks, milestone register |
 | `implementation-map.md` | File-level spine | Per-file map of src/ + trees, the evalSource pipeline, async runtime surface |
 | `allegretto/` | **L0** base language | `structures.md` (v2 design — draft pending sign-off); planned: `architecture.md` |
