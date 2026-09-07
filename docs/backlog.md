@@ -2443,3 +2443,73 @@ that prevents it.
     the declarations removes them without a judgment call each.
   - **Pointer**: `docs/plans/host-plane-declaration.md`;
     `docs/plans/entry-sequence-composite.md` §5.7.
+
+- [ ] **B-138** · L1 · L2 · **The ruled L1/L2 module boundary has no
+  interface.**
+  - **What**: `layers.md` rules the module system split — *the loading
+    mechanism (extensions, dependency resolution, caching) is L1; typed module
+    objects, export surfaces and encapsulation are L2*. `buildModuleObject`
+    builds the typed module object, with its per-field getters and its
+    export-filtered surface, and it lives in `src/modules.ts` — the L1 file.
+  - **Why**: a ruled boundary that only review enforces is a convention, which
+    is B-128's whole subject. The ruling is not in doubt; its expression is
+    missing.
+  - **When**: after the actor model is adopted or dropped — this is one of the
+    four gaps that motivated the ruling, not a defect with independent
+    urgency. Sequence with **B-112** (which owes the plane interfaces) since
+    both are "state the boundary as a type".
+  - **Pointer**: `docs/design/actors-and-activities.md` §5a.2 (Admission);
+    `docs/design/layers.md` §1, *Module system (split)*.
+
+- [ ] **B-139** · L0 · L2 · **`Construct value` has two outcomes and one
+  signature.**
+  - **What**: CE-R8 and CT-R2 rule that a construction-path invariant failure
+    yields an error **value** while a contract failure **halts** — a
+    constructor has a value to produce and a statement-form contract does not.
+    The split is deliberate and justified. The construction surface does not
+    express it: one path throws and one returns, through a signature that says
+    neither.
+  - **Why**: a caller cannot tell from the interface which it will get, so the
+    distinction is carried by knowing the rulings. It is also the surface
+    T-R2's per-project severity knobs will have to move, and a knob over an
+    unstated contract is worse than one over a stated contract.
+  - **When**: not urgent — the behaviour is correct and tested. Best taken
+    with **B-099** (T-R2's severity config), which is the work that will need
+    the outcome to be nameable.
+  - **Pointer**: `docs/design/actors-and-activities.md` §5a.2 (Evaluation);
+    [CE-R8 and CT-R2](decisions.md).
+
+- [ ] **B-140** · L2 · **`Check declared constraint` is four code paths and no
+  surface.**
+  - **What**: annotation, refinement, contract and effect-declaration checks
+    share a severity model — a failed check halts (CE-R1) — and share no
+    interface. They live in three files with three shapes:
+    `checkArgType` (`evaluator.ts`), `checkRefinementPredicate`
+    (`primitives.ts`), `checkEffectsDeclarations` (`effects.ts`).
+  - **Why**: the actor-model pass predicted this consolidation from the
+    outside (one parameterized activity, by constraint kind) before looking at
+    the code, and then found four unrelated shapes. A shared surface is what
+    would let the severity model be stated once instead of four times.
+  - **When**: after the actor model's adoption ruling. Interacts with
+    **B-099**/T-R2, which configures exactly these severities.
+  - **Pointer**: `docs/design/actors-and-activities.md` §4.1 and §5a.2
+    (Policy).
+
+- [ ] **B-141** · T-host · **There is no Environment interface; host swapping
+  is interception.**
+  - **What**: the Node CLI and the browser sandbox differ by *capturing*
+    `print` output (`web/allegro-web.ts`'s `onOutput`) and by substituting
+    `Extension[]`, not by supplying a different implementation of a stated
+    Environment interface. The effect label names the capability (`io`, `net`,
+    `time`); nothing names the provider.
+  - **Why**: the effect system's whole point is that a computation declares
+    what it needs from its host. The provider side of that contract is
+    unstated, so `T-host`'s "env-provided capabilities" are a track heading
+    rather than a surface. `futureManager` — planted as a host expando on the
+    root scope and read by a chain walk — is the same gap in its acquisition
+    half, and is one of B-135's registered properties.
+  - **When**: with the T-host track, and not before **B-136**: the scope is
+    where the capability is currently planted, so the Scope host type should
+    exist first.
+  - **Pointer**: `docs/design/actors-and-activities.md` §5a.2 (Environment);
+    `docs/design/layers.md` §2, T-host.

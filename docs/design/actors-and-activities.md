@@ -855,9 +855,11 @@ proposed. That is the evidence for adopting it.
 6. **Which level-2 entries survive their evidence.** §3.8 names them from
    the code's shape; only four are placed by this document's evidence, and
    the rest owe the same check the parser got.
-7. **Whether the eight gaps become backlog items now**, or wait for the
-   model's adoption ruling. Four already have owners — §5a.3's cluster is
-   B-135/B-137, and *Validate argument shape* is B-133. The other four are
-   unfiled: *Load module*'s unenforced L1/L2 ruling, *Construct value*'s two
-   outcomes under one signature, *Check declared constraint*'s missing
-   surface, and the absent Environment interface.
+7. ~~Whether the eight gaps become backlog items now.~~ **SETTLED 2026-09**:
+   all eight are filed. §5a.3's cluster is **B-135**/**B-137**, *Validate
+   argument shape* is **B-133**, and the four the exercise found are
+   **B-138** (the unenforced L1/L2 module ruling), **B-139** (*Construct
+   value*'s two outcomes under one signature), **B-140** (*Check declared
+   constraint*'s missing surface) and **B-141** (the absent Environment
+   interface). Each is sequenced behind the adoption ruling, since the model
+   is what found them.
