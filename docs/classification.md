@@ -6,11 +6,11 @@ field definitions and omission defaults per the methodology
 [vocabulary](https://github.com/majodali/methodology/blob/main/docs/vocabulary.md).
 
 - **C-tier**: C2 — serious project, pre-users
-- **Pinned methodology version**: 1.4.0 (compliance target; migrated
-  from 1.2.0 on 2026-09-01. All eight amendments across v1.3.0 and
-  v1.4.0 ship migration-note `none` or `none mandatory`, so the pin
-  bump plus the Workflow reword below is the whole migration. No
-  deviations — owner ruling, 2026-09-01.)
+- **Pinned methodology version**: 1.5.0 (compliance target;
+  migrated from 1.4.0 on 2026-09-02 — v1.5.0 carries one migration
+  note: a project with an Agent bootstrap copies W-008's prescribed
+  block into it verbatim, done in `CLAUDE.md` in the same commit. The
+  other five amendments ship migration-note `none`.)
 - **S-level**: S0 — public code only
 - **Type**: `language/tool platform`
 - **Target**: `static site` (allegrolang.org — landing page, sandbox,
@@ -50,10 +50,19 @@ sequence without stopping between chunks.**
   declared practice since 2026-08 and was missed at the v1.4.0 migration
   assessment; W-001 did not change in v1.3.0 or v1.4.0, so the gap predates
   that migration.
-- **Disposition**: temporary. An amendment to W-001 adding the
-  pre-ratified sequence mode is drafted, with allegro as its evidencing
-  instance. This entry retires when that amendment is released and adopted
-  — tracked as **B-131**.
+- **Disposition**: temporary. W-001 (two delivery modes, human-gated)
+  gained the pre-ratified sequence mode in methodology v1.5.0, with
+  allegro as its evidencing instance, so this entry is no longer blocked
+  on the amendment. The released W-001 text is stricter than the
+  practice recorded above in two ways, so the entry does not retire at the
+  1.5.0 migration: a chunk's landing summary carrying **asks** — anything
+  requested of the human — is a stop condition, and asks are never rolled
+  up across chunks (owner ruling, 2026-09-01); and only the human owner
+  pre-ratifies, so a delegating agent may not pre-ratify a sequence it
+  dispatches. This project's gate policy states three stop conditions and
+  not the asks stop. It retires once the practice states all four, which
+  needs a Tier-0 change to `docs/PROCESS.md` §3 and so the maintainer's
+  sign-off — tracked as **B-131**.
 
 *(W-006 is adopted in full — owner ruling at the chunk-1 gate, 2026-08:
 agent work uses single-use, outcome-named branches, deleted after merge.
