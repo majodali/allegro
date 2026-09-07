@@ -57,15 +57,29 @@ in a memory file.
    chunk, summarize what changed, stop. Don't chain multiple chunks without
    confirmation. "Great work" without "next" means discuss before
    continuing.
-   **Per-lane exception (2026-08).** Lanes declared "pre-ratified" in
-   `docs/backlog.md` §"Parallel lanes" run a maintainer-approved chunk
-   SEQUENCE: the chunk list is agreed once at the start of the arc, and
-   the lane lands the chunks in order without stopping between each.
-   Stop-and-summarize still applies at the end of the sequence, and
-   immediately at any point where the work diverges from the agreed list
-   — a chunk that turns out to need a decision is a stop, not a judgment
-   call. Lanes not declared pre-ratified keep the per-chunk gate above.
-   The landing checklist (§5) is unchanged for every lane.
+   **Pre-ratified sequences (2026-08; conformed to W-001 at the v1.5.0
+   migration).** Lanes declared "pre-ratified" in `docs/backlog.md`
+   §"Parallel lanes" run a maintainer-approved chunk SEQUENCE: the chunk
+   list is agreed once at the start of the arc, and the lane lands the
+   chunks in order without stopping between each. The approval is still
+   explicit and still precedes the first chunk; it moves from per-chunk to
+   per-sequence, and is not removed. **Only the maintainer pre-ratifies**
+   — an agent never pre-ratifies a sequence, neither its own nor one it
+   dispatches. Lanes not declared pre-ratified keep the per-chunk gate
+   above.
+
+   A sequence STOPS, summarizes and waits when any of these occurs:
+   - **a check fails** — the §5 gate, in any part;
+   - **the scope changes** — the work diverges from the agreed chunk list;
+   - **a chunk needs a decision** that is the maintainer's to make;
+   - **a chunk's landing summary carries asks** — anything requested of
+     the maintainer, a decision or an action.
+
+   A chunk needing a decision is a stop, not a judgment call. Asks are
+   never rolled up across chunks, and pre-ratification never waives the
+   asks stop. Each chunk is still summarized as it lands (§5); only the
+   wait between chunks that ask nothing is removed. The landing checklist
+   (§5) is unchanged for every lane.
 
    **The PR is the gate (2026-09).** A merged PR is the maintainer's
    approval. Nothing else is.
