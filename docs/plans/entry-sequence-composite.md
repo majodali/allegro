@@ -119,7 +119,7 @@ so an index built for one can never go stale.
 | The dense role | An array is `entries` with every key null. The role becomes a representation, which its level tag always said it was |
 | `materializeView` and the legacy view | There is one store; nothing to materialize. Measured at 0 uses |
 | `__length` | Length is `entries.length`. This closes **B-104(f)** |
-| `isMetaSlotKey` | `__length` is the only key it ever answers true for. This closes **B-104(b)** — the last dunder |
+| `isMetaSlotKey` | `__length` is the only key it ever answers true for. Closes the PARTITION half of **B-104(b)** — E5 replaced it with `isMetaProtocolSlot`; the rename of the slot keys themselves stays with B-104 (§5.6) |
 | The **W6** dense-view-coherence invariant | Its subject is the disagreement between the view and the dense region |
 | The four binding write disciplines | One store has one discipline |
 
@@ -548,6 +548,45 @@ Two other forms are worth the census: **43** `as unknown as` double casts, and
 **225** bare `: any` annotations outside catch clauses. There are no
 `@ts-ignore` or `@ts-expect-error` suppressions anywhere in `src/`.
 
+### 5.6 What E5 measured, and the one thing it did not close
+
+`isMetaSlotKey(key) = key.startsWith("__")` was the partition between engine
+slots and user fields in one shared bindings map. Eleven call sites read it.
+Before deleting any, the predicate was instrumented and the full suite run.
+
+**748 distinct binding keys reached it; none began with `__`.** So every
+skip-guard — `if (isMetaSlotKey(key)) continue;` in `types-std.ts` (×4),
+`primitives.ts` (×1) and a refinement-key filter — was a no-op at every
+observed call. They are deleted.
+
+Two sites were not no-ops and did not get deleted:
+
+- **`types-std.ts`'s member-dispatch fallback** inverts the test
+  (`if (!isMetaSlotKey(name)) return null;`), so a dead predicate would make
+  the whole fallback unreachable. It is reachable: `x.__getMember` parses and
+  reaches `type_dispatch`, verified directly — the suite simply never does
+  it. It now reads `isMetaProtocolSlot(name)`, **declared membership in a
+  closed set** rather than a prefix over arbitrary keys. That is the
+  replacement B-104(b) demanded before the prefix could go, and it is
+  narrower: the future-cell families were never dispatchable.
+- **`runtime.ts`'s source attachment** short-circuits behind `complete`, so
+  the probe never reached it with a cell key. Its keys are the only dunder
+  families a scope carries, so it names them: `isFutureBindingName` and
+  `isBareBindingName`.
+
+**What E5 did not close.** The guards could go because nothing walks a type
+structure's entries as fields. That is still a property of how members are
+written rather than an invariant anything checks — the same circumstantial
+exemption `slots.ts`'s write-discipline block recorded, now re-measured after
+`__length`'s deletion. Enforcing it is **B-104**'s. E5 replaced the partition;
+it did not add the check that would make the replacement safe against a future
+writer.
+
+**Two superseded comment blocks were corrected rather than marked** (K-010's
+converse, new in methodology v1.5.0): `slots.ts`'s write-discipline block
+still described the two-store representation E1 and E3 deleted, and the
+`__length` registry row still described the slot as retained.
+
 ## 6. Rulings — taken 2026-09-01
 
 All five recommendations accepted by the maintainer as written.
@@ -673,7 +712,7 @@ Provisional — the maintainer sets the boundaries (W-001).
 | **E2** | Benchmark the scan/index crossover (§5.1); set the index policy from the result | **DONE 2026-09.** `scripts/bench-slot-lookup.ts` committed and its results recorded in §5.1. The measurement fired D48(a)'s own revisit trigger (§5.1a) and supersedes §6 ruling 3; §6a proposes the replacement policy and awaits ratification. No behaviour change |
 | **E3** | `bindings` becomes derived from `entries` (moved here from E1), and the §6a policy is implemented: build lazily on first lookup when size > 8 | **DONE 2026-09.** Suite 1202/1202. `SlotView` replaces the stored map; measured on the real implementation, **93.4%** of 4.24M lookups are served by a scan averaging **3.63** entries and 268 indexes are built. Per-file wall clock within noise of main (§5.2) |
 | **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | **DONE 2026-09.** Suite 1202/1202. `dense`, `materializeView`, `viewMaterialized`, `slotCountBits`, `__length`, `isDense` and **W6** all deleted — E5's list arrived with the region rather than after it. Two things the plan did not anticipate: §5.3 (the positional flag) and §5.4 (the string-key protocol had consumers) |
-| **E5** | ~~Delete `materializeView`, `viewMaterialized`, `__length`, W6~~ **done at E4** — they went with the region. E5 is now only `isMetaSlotKey`, whose last key (`__length`) is gone. Closes **B-104(b)**; B-104(f) closed at E4 | Counts to zero; boundary lint at baseline |
+| **E5** | ~~Delete `materializeView`, `viewMaterialized`, `__length`, W6~~ **done at E4** — they went with the region. E5 is `isMetaSlotKey`, whose last key (`__length`) is gone | **DONE 2026-09.** Suite 1202/1202. Deleted and replaced by `isMetaProtocolSlot` (declared membership). Measured before deleting: the field-walk sites see **748 distinct binding keys and zero `__`-prefixed** across 1202 tests, so all ten skip-guards were no-ops. Closes the partition half of **B-104(b)**; §5.6 records what it did not close |
 | **E6** | `concepts.md` §12 (structure roles), §16 (dense region), §17 (the legacy view) and IC-2 updated; deltas 17 and 22 closed | doc-ref lint; spine delta rows read `—` |
 
 **Completion test**: `dense` 0, `__length` 0, `isMetaSlotKey` 0, `bindingList`

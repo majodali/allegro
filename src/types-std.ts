@@ -26,7 +26,7 @@ import {
   setGenericBackLink, setProposition,
   setEffectBound, setAbstractDomain,
   writeShape, carryShape, removeName, removeRefines, removeShapeSlot, kernelFieldWriter, assertNotIntegrityKey,
-  removeConstruct, metaReadRaw, cloneMeta, SLOT_KEYS, isMetaSlotKey, typeShape, getFallbackMember,
+  removeConstruct, metaReadRaw, cloneMeta, SLOT_KEYS, isMetaProtocolSlot, typeShape, getFallbackMember,
   equalityShape, asStructure, registerMetaField,
 } from "./slots.js";
 
@@ -175,7 +175,7 @@ export function typeMethod(type: StructureValue, name: string): Value | null {
   // non-slot binding on a type Context is no longer name-reachable
   // through dispatch; members come from __members, policy hooks from
   // registered slots. (Pre-V2 any stray binding leaked through.)
-  if (!isMetaSlotKey(name)) return null;
+  if (!isMetaProtocolSlot(name)) return null;
   const binding = type.bindings.get(name);
   if (!binding || binding.value === undefined) return null;
   return binding.value;
@@ -926,7 +926,6 @@ function buildRecordType(
   // descriptors, never fields or methods.
   const laws: { name: string; body: Value }[] = [];
   for (const [key, binding] of (fieldCtx as StructureValue).bindings) {
-    if (isMetaSlotKey(key)) continue;
     if (binding.value) {
       // B-097 V3 (D43/V-R5): unwrap modifier combinators — the attrs
       // ride the declaration into the descriptor.
@@ -1222,7 +1221,6 @@ function buildInterfaceType(
   const declaredMembers: { name: string; type: Value; attrs?: MemberAttrs }[] = [];
   const declaredLaws: { name: string; body: Value }[] = [];
   for (const [key, binding] of (specCtx as StructureValue).bindings) {
-    if (isMetaSlotKey(key)) continue;
     if (binding.value) {
       const mods = specModifiers(binding.value);
       const declValue = mods ? mods.inner : binding.value;
@@ -1346,7 +1344,6 @@ export function resolveDataSlots(
   let updates: Map<string, Value> | null = null;
   for (const [key, b] of instCtx.bindings) {
     if (b.value === undefined || isResolved(b.value)) continue;
-    if (isMetaSlotKey(key)) continue;
     // B-028 F4 (`cellRefsOnly`, set by the completion cascade and io):
     // outside the construction path, only slots that actually reference
     // a future/import CELL are evaluated — quoted-AST data (a grammar
@@ -2164,7 +2161,6 @@ function namedFieldsOf(c: StructureValue): Map<string, Value> {
   const out = new Map<string, Value>();
   for (const [k, bnd] of c.bindings) {
     if (bnd.value === undefined) continue;
-    if (isMetaSlotKey(k)) continue;
     if (/^\d+$/.test(k)) continue;
     out.set(k, bnd.value);
   }
@@ -3313,7 +3309,7 @@ setConstruct(RefinementKind, makePrimitive("Refinement.__construct", (args, ctx,
     // sampled tier).
     const refinementLaws: { name: string; body: Value }[] = [];
     for (const [k, b] of (first as StructureValue).bindings) {
-      if (isMetaSlotKey(k) || RESERVED_REFINEMENT_KEYS.has(k)) continue;
+      if (RESERVED_REFINEMENT_KEYS.has(k)) continue;
       if (!b.value) continue;
       if (k.startsWith("law_")) {
         const body = forAllBody(b.value);
