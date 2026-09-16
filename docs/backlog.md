@@ -325,7 +325,7 @@ that prevents it.
   converted); single declared hidden class for both roles + scope fields
   (~7% faster than the replaced literals); role fixed at construction;
   D22 immutable bit declared (scope/future-cell/construction carve-outs
-  asserted); W4 structure-kind + W5 role-transparency corpus invariants +
+  asserted; the bit itself deleted unread at B-134, 2026-09); W4 structure-kind + W5 role-transparency corpus invariants +
   3 boundary tests (roles, hostile channel-named data keys, monotonic
   cell resolution). Physical plane separation + shape-ref field follow
   inside structure.ts at C4.3/C5
@@ -2300,6 +2300,27 @@ that prevents it.
     failed-check and asks stops rather than deleting anything.
   - **Pointer**: methodology [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated).
 
+- [ ] **B-143** · L0 · **D22 is declared, not enforced.**
+  - **What**: build the enforcement the immutable bit was a placeholder for —
+    a structure that has finished construction refuses an in-place write, and
+    deep immutability is checkable rather than asserted by review.
+  - **Why**: D22's text names an O(1) deep-immutability check. C4.1 landed a
+    stored bit as declared state and deferred enforcement to a C4.3 that never
+    ran; B-134 deleted the bit unread, which changes nothing about the gap it
+    was standing in. Today the rule is held by the boundary battery, by
+    `structure.ts`'s in-place rule, and by review.
+  - **The hard part is not the check**: nothing marks a structure as
+    finished. Construction-phase population is a standing D22 carve-out, so
+    enforcement needs a notion of *escaped* before it can refuse anything —
+    which is exactly what the in-place rule states in prose (*write in place
+    only while the value is provably unshared*).
+  - **When**: D22 says the O(1) deep check becomes load-bearing when
+    mutability lands, so this is gated on the linear-types/mutability track
+    rather than urgent. Filed because deleting the bit must not leave the gap
+    unowned (W-005).
+  - **Pointer**: [D22](decisions.md); `src/structure.ts` header (the in-place
+    rule); `docs/design/allegretto/structures.md` §2.
+
 - [ ] **B-142** · T-docs · **Seven standing form-audit violations, none
   owned.**
   - **What**: `mtool audit form` at the declared level reports seven
@@ -2355,19 +2376,19 @@ that prevents it.
     bindings, so the diagnostic is narrowed rather than lost.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
 
-- [ ] **B-134** · L0 · **`Structure.immutable` is declared state with no
-  reader, and it is wrong.**
-  - **What**: delete the field, or give it a reader. It is written once (the
-    constructor, always `true`), read once (a copy in `deriveWithMeta`), and
-    branched on nowhere.
-  - **Why**: its documented contract is false in the field. The header says
-    evaluation scopes are mutable, but `scopeNew` goes through
-    `makeStructure`, so **every scope carries `immutable: true`** and has since
-    C4.1 with no consequence. A field that has been wrong on every scope that
-    long is not carrying information. D22 is unaffected either way — the
-    boundary battery is what enforces it, not this bit.
-  - **When**: ready, and cheap. Sequence after B-133 so the two host-plane
-    edits to `structure.ts` do not collide.
+- [x] **B-134** · L0 · **LANDED 2026-09 — the immutable bit is deleted.**
+  - **What landed**: `Structure.immutable` is gone — one write (the
+    constructor, always `true`), one read (a copy in `deriveWithMeta`), zero
+    branches. The constructor takes no argument. Suite 1203/1203.
+  - **Why delete rather than give it a reader**: the only candidate reader is
+    `deriveWithMeta`'s soundness argument for sharing the entry array, and an
+    assert there is vacuous while the bit is always true. A real reader means
+    refusing writes to a finished structure, and nothing marks a structure
+    finished — that is **B-143**, not a field.
+  - **D22's execution state corrected**, not superseded: born-immutability and
+    the carve-outs are executed; the BIT never was. `docs/design/allegretto/
+    structures.md`, `implementation-map.md` and the decision register all said
+    the bit checked deep immutability O(1); none of them was true.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
 
 - [ ] **B-135** · L0 · **Nothing says what may live on an L0 type's host
