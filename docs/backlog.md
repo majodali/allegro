@@ -2339,25 +2339,20 @@ that prevents it.
     thing rather than an implied one.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §2.2.
 
-- [ ] **B-133** · L0 · **`Structure.positional` is a storage bit answering a
-  type question.**
-  - **What**: split `getSlotCount` into an always-answering
-    `positionalCount(ctx): number`; move the two callers that use its
-    `undefined` as an is-this-an-Array test (`grammar2/builder.ts`,
-    `types-std.ts`'s *Array-like Context* branch) onto a shape check that does
-    not read storage; demote `positional` to a private, unexported, derived
-    cache with the same status as `_view`.
-  - **Why**: the field never leaves `structure.ts`, but its effect does —
-    `undefined` is overloaded as a shape test, and 2 of 13 callers use it as
-    one. The other 11 already know they hold an array, which is the case for
-    the maintainer's two-getters route. `positionalCount` then answers `0` for
-    an empty array and an empty record alike, which is correct for both, so
-    the array/record distinction leaves L0 for the type.
-  - **When**: ready. Small and self-contained; no decision-register change.
-    One diagnostic is lost — `grammar2/builder.ts` stops rejecting a record
-    passed where an array is expected — and that is a type error L2 should
-    catch, not something a storage bit should pay for. **Blocked on nothing**,
-    but the L1-has-no-type-system tension it exposes belongs to B-112.
+- [x] **B-133** · L0 · **LANDED 2026-09 — `positional` is a derived cache, not
+  a type indicator.**
+  - **What landed**: `getSlotCount` always answers (`positionalCount`, 0 for a
+    record and 0 for an empty array, which is true for both); the two callers
+    that read its `undefined` as *this is not an Array* now ask a structural
+    question instead — whether the value carries KEYED entries; and
+    `Structure.positional` became `private _positional`, computed as
+    `entries.every(e => e.key === null)` and cached, with the same status as
+    `_view`. Suite 1203/1203. See CHANGELOG.
+  - **The behaviour change, as filed**: an empty record and an empty array are
+    the same entry sequence and are no longer distinguishable at L0. The
+    generic-type cache keys them alike and `grammar2/builder.ts` reads an
+    empty record as an empty array. It still rejects a record that carries
+    bindings, so the diagnostic is narrowed rather than lost.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
 
 - [ ] **B-134** · L0 · **`Structure.immutable` is declared state with no

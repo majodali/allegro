@@ -13,7 +13,7 @@
 // substitution templates.
 // =============================================================================
 
-import { getSlotCount, indexGet } from "../slots.js";
+import { slotCount, indexGet } from "../slots.js";
 import {
   Grammar, Rule, makeGrammar, addProduction,
   lit, nonterm, seq, alt, rep, opt, regex as ruleRegex,
@@ -774,7 +774,7 @@ function getArrayField(ctx: StructureValue, key: string): Value[] {
   if (arr.kind !== ValueKind.Structure) {
     throw new Error(`EBNF object: field '${key}' not an array`);
   }
-  const len  = Number(((getSlotCount(arr) as any)?.data) ?? 0n);
+  const len  = slotCount(arr);
   const out: Value[] = [];
   for (let i = 0; i < len; i++) {
     const v = indexGet(arr, i);

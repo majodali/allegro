@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, carryMeta} from "./slots.js";
+import { getName, getMembers, slotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, carryMeta} from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue, ComposedFunctionValue,
@@ -127,8 +127,7 @@ export function formatValue(v: Value): string {
         if (typeName === "Array") {
           // Display array elements
           const ctx = data as StructureValue;
-          const lenV = getSlotCount(ctx);
-          const len = lenV ? Number((lenV as BitsValue).data) : 0;
+          const len = slotCount(ctx);
           const elems: string[] = [];
           for (let i = 0; i < len && i < 10; i++) {
             const ev = indexGet(ctx, i);
@@ -1257,8 +1256,7 @@ function arrayHandlesFromValue(v: Value, fnName: string): number[] {
     throw new AllegroError(`${fnName}: expected Array of handles`);
   }
   const ctx = p as StructureValue;
-  const lenB = getSlotCount(ctx);
-  const len = lenB?.kind === ValueKind.Bits ? Number((lenB as BitsValue).data) : 0;
+  const len = slotCount(ctx);
   const handles: number[] = [];
   for (let i = 0; i < len; i++) {
     const itemV = indexGet(ctx, i);

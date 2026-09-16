@@ -4,6 +4,48 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-133: `positional` becomes a derived cache
+
+The last residue of B-120, and the answer to the question that opened the
+host-plane audit: the maintainer's challenge to `Structure.positional` at the
+E4 gate. Suite **1203/1203** (one test added), typecheck clean.
+
+### The count always answers
+
+`getSlotCount` returned `Value | undefined`, where `undefined` meant *not
+wholly positional*. Eleven of its thirteen callers already knew they held an
+array and wrote `?? makeInt(0)`; **two read the `undefined` as a type test**.
+It now returns the positional-entry count for any structure — **0 for a
+record, and 0 for an empty array, which is the true answer for both** — and
+the eleven lose their fallback. `slotCount` is the same number for host-side
+callers doing arithmetic.
+
+### The two type tests ask structural questions instead
+
+`grammar2/builder.ts` threw *"value is not an Array (no length slot)"*. It now
+rejects a value that carries **keyed** entries, which an array never does.
+`types-std.ts`'s generic-type cache branched on the same `undefined` to decide
+whether to key a Context as an array; it now branches on whether the Context
+has bindings.
+
+### The bit is now a cache
+
+`Structure.positional` is `private _positional`: `entries.every(e => e.key ===
+null)`, computed on first use and remembered, cleared by a keyed write and by
+a removal that might restore the property. It has exactly `_view`'s status —
+derived, private, unobservable — and no module outside `structure.ts` can read
+it. The O(1) index path is unchanged, still pinned by the
+200-vs-200,000-element scaling test.
+
+### The behaviour change, stated because it was accepted in advance
+
+An empty record and an empty array are the same entry sequence, and L0 no
+longer distinguishes them. The generic-type cache keys them alike, and
+`grammar2/builder.ts` reads an empty record as an empty array rather than
+refusing it. That diagnostic is narrowed, not lost — a record carrying
+bindings is still refused — and **whether a value IS an array is the type's
+question**, which is what the audit concluded and what this chunk executes.
+
 ## 2026-09 — B-120 E6: the spine catches up, and B-120 closes
 
 The last chunk. `docs/design/concepts.md` now describes the composite that

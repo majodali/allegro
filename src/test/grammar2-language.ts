@@ -18,7 +18,7 @@ import { resolveSymbols, buildEvalCtx, resolvePrimitives, typeLiterals } from ".
 import { parse as g2parse } from "../grammar2/engine.js";
 import { getGrammarWithFragments as g2getGrammarWithFragments } from "../grammar2/fragments.js";
 import { getTypeName } from "../types-std.js";
-import { getName, metaOf, getSlotCount } from "../slots.js";
+import { getName, metaOf, slotCount } from "../slots.js";
 import { testsDir } from "./alg-files.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -1533,7 +1533,7 @@ grammar2_set_start(g, "pattern")
   // Expected: 5 "ok", then 3 "err".
   const p = r! as any;
   // p is the Array Context with __length and numeric bindings.
-  const len = Number((getSlotCount(p) as any).data);
+  const len = slotCount(p);
   eq(len, 8);
   const results: string[] = [];
   for (let i = 0; i < len; i++) {
