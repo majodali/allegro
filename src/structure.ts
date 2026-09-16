@@ -2,7 +2,7 @@
 // Structure — the unified host representation (structures Phase 4, C4.1–C4.2 / B-019–B-020)
 //
 // Design (docs/design/allegretto/structures.md §2, I1): an instance is
-// (shape ref, flat slot storage, metadata storage, immutable bit, optional
+// (shape ref, flat slot storage, metadata storage, optional
 // dense region). C4.1 landed the KIND: every composite value is an
 // instance of ONE host class, constructed exclusively through the
 // types.ts factories (`withMeta` / `makeStructure` / `makeDenseArray`
@@ -41,9 +41,8 @@
 // The one binding-plane/metadata straggler is `__length` on a
 // materialized dense view — B-104(f), gated on B-108.
 //
-// Immutable bit (D22): structures are born-immutable BY DEFAULT; the bit
-// is DECLARED state at C4.1, with the standing carve-outs enforced by the
-// boundary battery rather than by freezing (enforcement tightens at C4.3):
+// Immutability (D22): structures are born-immutable BY DEFAULT, with three
+// standing carve-outs:
 //   - evaluation scopes are mutable evaluator state (not data — plane
 //     split, C2.1);
 //   - future cells are single-assignment monotonic (D33) — a pending
@@ -52,6 +51,20 @@
 //   - construction-phase population (addBinding after makeStructure) is
 //     the grandfathered builder idiom until construction protocols
 //     migrate (C6 recipe).
+//
+// **There is no immutable bit (B-134, 2026-09).** D22's text names "an O(1)
+// immutable bit", and C4.1 landed one as DECLARED state, with enforcement
+// deferred to a C4.3 that never came. Nothing ever branched on it: one
+// write (this constructor, always `true`), one read (a copy in
+// `deriveWithMeta`). Worse, it was FALSE where it mattered — `scopeNew`
+// goes through `makeStructure`, so every scope carried `immutable: true`
+// while the comment above says scopes are mutable, and no consequence
+// followed because nothing looked.
+//
+// What enforces D22 is the boundary battery and the in-place rule below,
+// and that was already true while the bit existed. Restoring a bit means
+// building the enforcement the bit was a placeholder for; it is a real
+// arc, not a field.
 //
 // THE IN-PLACE RULE (B-121 C7, plan §3.4). The carve-out above is an
 // instance of a general rule, stated here because it was previously an
@@ -120,12 +133,7 @@ export class Structure implements StructureValue {
   isScope?: boolean;
   scopePredicates?: Map<string, unknown>;
 
-  // --- C4.1 substrate ---
-  /** D22: born-immutable by default. Scopes (evaluation state) are
-   *  mutable; future cells are the sanctioned monotonic exception. */
-  immutable: boolean;
-
-  constructor(immutable: boolean) {
+  constructor() {
     this.kind = ValueKind.Structure;
     this.meta = undefined as unknown as Map<string, Value>;
     this.entries = undefined as unknown as Binding[];
@@ -134,7 +142,6 @@ export class Structure implements StructureValue {
     this.parent = undefined;
     this.isScope = undefined;
     this.scopePredicates = undefined;
-    this.immutable = immutable;
   }
 
   /** The by-name view over `entries` — DERIVED, not stored (B-120 E3).
@@ -264,10 +271,11 @@ export class SlotView implements ReadonlyMap<string, Binding> {
 }
 
 /** Construct the Context role. Scopes are mutable evaluator state; data
- *  contexts carry the immutable bit (population-during-construction is
- *  the grandfathered builder idiom until the C6 recipe). */
+ *  contexts are immutable once construction finishes
+ *  (population-during-construction is the grandfathered builder idiom until
+ *  the C6 recipe). Neither fact is stored — see the header. */
 export function newRecordStructure(): Structure {
-  const s = new Structure(true);
+  const s = new Structure();
   s.entries = [];
   return s;
 }
@@ -279,7 +287,7 @@ export function newDenseStructure(elements: Value[]): Structure {
   // B-120 E4: an array IS the entry sequence, with every key null. The dense
   // role is gone — it was a second storage shape for the one case the
   // sequence always described, and D48(a)'s level tag said so all along.
-  const s = new Structure(true);
+  const s = new Structure();
   const entries: Binding[] = new Array(elements.length);
   for (let i = 0; i < elements.length; i++) entries[i] = { key: null, value: elements[i] };
   s.entries = entries;
@@ -299,7 +307,7 @@ export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): S
   if (src.isScope) {
     throw new Error("deriveWithMeta: channels cannot attach to an evaluation scope (plane rejection)");
   }
-  const s = new Structure(src.immutable);
+  const s = new Structure();
   // Shares the entry array by reference — sound because data contexts are
   // immutable (D22). The derived view is per-structure and rebuilds.
   s.entries = src.entries;

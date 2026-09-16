@@ -72,9 +72,9 @@ exclusively through the `withMetadata`/`makeStructure` factory shims
 (six bypass sites converted; the W4 boundary invariant fails any future
 stray literal). One declared hidden class for all structures (measurably
 faster than the per-shape literals it replaced); role fixed at
-construction; D17 role-transparency (W5) and the D22 immutable bit (with
-the scope + future-cell + construction-phase carve-outs) asserted by the
-battery. Still pending: physical plane separation + shape ref field
+construction; D17 role-transparency (W5) asserted by the battery. (The D22
+immutable bit landed here as declared state and was deleted unread at
+**B-134**; its carve-outs stand and the battery is what asserts them.) Still pending: physical plane separation + shape ref field
 (inside structure.ts, with C4.3's transparency cutover), symbol keys
 (C5).*
 
@@ -209,11 +209,19 @@ structure storage otherwise) — see §13/S4.
 **Immutability.** Structures are **immutable by default** (D22) — born
 immutable; there is no `seal` operation (D21; D13 retired). Deep
 immutability holds: immutable values reference only immutable values,
-checked O(1) via an immutable bit, **with one carve-out** — an unresolved
+**with one carve-out** — an unresolved
 future cell counts as immutable (single-assignment/monotonic; the cell's
 identity is its eventual value), so structures may hold pending futures
 without violating the invariant (§10). Transient→immutable finalization is
 deferred to the linear-types/mutability track.
+
+**There is no immutable bit (B-134, 2026-09).** D22's text names an O(1)
+construction check via a stored bit, and C4.1 landed one as *declared* state
+with enforcement deferred. Nothing ever branched on it, and it was false on
+every scope. The property is enforced by the boundary battery and by the
+in-place rule in `src/structure.ts`; the O(1) deep-immutability check D22
+describes becomes load-bearing only when mutability lands, and building it is
+**B-143**.
 
 **Base ops.** `struct_new`, `struct_get(key)`, `struct_with` (copy-on-write
 derive), `struct_slots` (D27).

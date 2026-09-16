@@ -4,6 +4,40 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-134: the immutable bit is deleted
+
+`Structure.immutable` is gone. One write (the constructor, always `true`), one
+read (a copy in `deriveWithMeta`), zero branches anywhere. Suite 1203/1203.
+
+### Why it could go unread, and why that is the finding
+
+D22's text names *deep immutability via an O(1) immutable bit*. C4.1 landed
+one as **declared state**, with enforcement deferred to a C4.3 that never ran.
+So the field recorded an intention, and nothing consulted it.
+
+It was also **false where it mattered**. `scopeNew` goes through
+`makeStructure`, so every evaluation scope carried `immutable: true` while the
+comment three lines above said scopes are mutable. That contradiction sat in
+`structure.ts` from C4.1 until now without a single consequence — which is the
+proof that the bit was carrying no information.
+
+### Delete rather than give it a reader
+
+The only candidate reader is `deriveWithMeta`'s argument for sharing the entry
+array by reference, and an assert there is vacuous while the bit is always
+true. A real reader refuses writes to a finished structure — and **nothing
+marks a structure finished**. Construction-phase population is a standing D22
+carve-out, so enforcement needs a notion of *escaped* first, which is what the
+in-place rule states in prose. That is an arc, not a field: **B-143**.
+
+### D22's execution state corrected, not superseded
+
+Born-immutability and the carve-outs are executed. The bit never was. Three
+places said otherwise and now do not: the decision register,
+`docs/design/allegretto/structures.md` §2, and `implementation-map.md`'s
+`structure.ts` row. D22 itself stands unchanged — what was wrong was the claim
+that it had been implemented the way its text describes.
+
 ## 2026-09 — B-133: `positional` becomes a derived cache
 
 The last residue of B-120, and the answer to the question that opened the

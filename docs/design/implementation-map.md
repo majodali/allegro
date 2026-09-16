@@ -12,7 +12,7 @@
 | File | Layer | Role |
 |---|---|---|
 | `src/types.ts` | L0 | Value types + constructors, Extension interface, string/float↔bits; `withMetadata`/`makeStructure` construction shims (the W4 boundary) |
-| `src/structure.ts` | L0 | The unified Structure class behind records/carriers/scopes — one hidden class, role fixed at construction, D22 immutable bit |
+| `src/structure.ts` | L0 | The unified Structure class behind records and scopes — one hidden class, role fixed at construction, the entry sequence and its derived `SlotView` index. D22 immutability is a rule the boundary battery enforces, not a stored bit (B-134) |
 | `src/scope.ts` | L0 | Scope protocol: chain layering (O(1) extend), lookup, facts plane, future cells, flatten |
 | `src/slots.ts` | L0 | Slot & channel registry (D39 table as code) + typed accessors; sanctioned direct-access site |
 | `src/symbols.ts` | L0 | Symbol interning (FQN identity, D20/D29), kernel scope, base-name projection |
