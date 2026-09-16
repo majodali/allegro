@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, isMetaSlotKey, carryMeta} from "./slots.js";
+import { getName, getMembers, getSlotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, carryMeta} from "./slots.js";
 import type { LawBackingRec } from "./slots.js";
 import {
   Value, ValueKind, BitsValue, StructureValue, ComposedFunctionValue,
@@ -1078,7 +1078,6 @@ function hasPendingFutureSlot(v: Value, ctx: StructureValue): boolean {
   if (instCtx.isScope) return false;
   for (const [key, b] of instCtx.bindings) {
     if (b.value === undefined || isResolved(b.value)) continue;
-    if (isMetaSlotKey(key)) continue;
     if (refsPendingCell(b.value, ctx)) return true;
   }
   return false;

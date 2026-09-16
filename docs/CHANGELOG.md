@@ -4,6 +4,53 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-120 E5: `isMetaSlotKey` is deleted
+
+The partition test between engine slots and user fields in one shared bindings
+map — `key.startsWith("__")` — is gone, and with it ten skip-guards that were
+doing nothing. Suite 1202/1202, typecheck clean.
+
+### Measured before deleting, not after
+
+The predicate was instrumented and the full suite run. **748 distinct binding
+keys reached it; none began with `__`.** Every `if (isMetaSlotKey(key))
+continue;` was a no-op at every observed call, so all ten are deleted.
+
+The first attempt at this measurement was wrong and worth recording:
+`scripts/test-shards.mjs` captures each shard's stderr into a buffer it only
+parses for result lines, so a stderr probe reports zero whether or not it
+fired. The probe was rewritten to append to a file, and re-verified by
+confirming it records a known hit before being trusted.
+
+### Two sites were not no-ops
+
+**Member dispatch** inverts the test — `if (!isMetaSlotKey(name)) return
+null;` — so a dead predicate would make B-097 V-R1's fallback unreachable
+rather than unchanged. It is reachable: `x.__getMember` parses and reaches
+`type_dispatch`, checked directly; the suite simply never does it. It now
+reads `isMetaProtocolSlot`, **declared membership in a closed set** instead of
+a prefix over arbitrary keys. That is the replacement B-104(b) required before
+the prefix could go.
+
+**Source attachment** in `runtime.ts` short-circuits behind `complete`, so the
+probe never reached it with a cell key. Its keys are the only dunder families
+a scope carries, so it names them: `isFutureBindingName` / `isBareBindingName`.
+
+### What this does not close
+
+The guards could go because nothing walks a type structure's entries as
+fields. That remains a property of how members are written rather than an
+invariant anything checks — **B-104** owns enforcing it. E5 replaced the
+partition; it did not add the check that keeps the replacement sound against a
+future writer. `src/slots.ts` states this with the measurement.
+
+### Two superseded comment blocks corrected rather than marked
+
+K-010's converse (methodology v1.5.0). `slots.ts`'s binding-write-discipline
+block still described the two-store representation E1 and E3 deleted, together
+with three disciplines whose subject no longer exists. The `__length` registry
+row still described the slot as retained, three chunks after E4 deleted it.
+
 ## 2026-09 — Deviation D-1 retired; the sequence mode is the rule
 
 Methodology v1.5.0 released the pre-ratified chunk-sequence mode with allegro

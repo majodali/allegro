@@ -983,20 +983,32 @@ that prevents it.
     the same time: a prefix row matching nothing is not inert, it
     pre-approves every future `__grammar*` binding and hides it from
     the W3 completeness walk
-  - **(b) Binding-plane meta slots — a design decision. ← THE REMAINING WORK.** `__name`,
-    `__members`, `__refines`, `__construct`, `__getMember`, `__interface`,
-    `__wraps`, `__union`, `__predicate`, `__args`, `__generic`, `__type`,
-    `__discharged`, `__length`, `__compileMode`, plus the synthetic
+  - **(b) Binding-plane meta slots — THE PARTITION IS GONE (B-120 E5,
+    2026-09); the rename is what remains.** `__name`, `__members`,
+    `__refines`, `__construct`, `__getMember`, `__interface`, `__wraps`,
+    `__predicate`, `__args`, `__generic`, `__discharged`, plus the synthetic
     binding-name families (`__future_N`, `__bare_N`, `__anon_N`, `__el_N`,
-    `__inline_grammar_N`, `__start__`, `__error__`). These live in the
-    SAME `bindings` map as user fields, and `isMetaSlotKey(key) =
-    key.startsWith("__")` is the partition test between the two — read by
-    `types-std.ts` (member dispatch narrowing, spec walks, refinement key
-    filters), `runtime.ts` (source attachment), `primitives.ts` (pending
-    future scan) and the registry-completeness walk in
-    `boundary-tests.ts`. Dropping the prefix requires REPLACING that
-    partition, not renaming past it — separate storage plane, registry
-    membership, or interned keys. Needs a ruling before any code moves.
+    `__inline_grammar_N`, `__start__`, `__error__`). These live in the SAME
+    `bindings` map as user fields, and `isMetaSlotKey(key) =
+    key.startsWith("__")` was the partition test between the two. **It is
+    deleted.** E5 measured it across 1202 tests: the field-walk sites saw
+    **748 distinct binding keys and not one `__`-prefixed key**, so every
+    skip-guard was a no-op and went. The one consumer that needed the test —
+    B-097 V-R1's member-dispatch narrowing — now uses `isMetaProtocolSlot`,
+    declared membership in a closed set rather than a naming convention.
+    `runtime.ts`'s source attachment names the two cell families directly
+    (`isFutureBindingName` / `isBareBindingName`).
+    - **The ruling this item demanded is no longer needed.** "Dropping the
+      prefix requires REPLACING that partition, not renaming past it" was
+      right, and the replacement landed. What is left is the rename itself,
+      which is B-104's main item and depends on nothing here.
+    - **One property is still unenforced**, and it is why the guards could go:
+      nothing walks a type structure's entries as fields. That is how members
+      are written, not an invariant anything checks. `src/slots.ts` states it
+      with the measurement; enforcing it belongs to this item.
+    - Historical: the three candidate answers below were the options when a
+      ruling was still owed. Kept as the record of what was considered.
+
     Three candidate answers, with the recommendation first:
     1. **A fourth plane on `Structure`** — a `meta` map beside
        `components` / `bindings` / `dense`. `isMetaSlotKey` stops being a

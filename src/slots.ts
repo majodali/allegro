@@ -131,7 +131,7 @@ export const SLOT_REGISTRY: SlotRegistration[] = [
   { name: "source", storages: ["metadata-field"], owner: "source channel", disposition: "metadata-field", target: "source", notes: "documented in CLAUDE.md; currently unused in code" },
 
   // --- Base concepts, not slots -----------------------------------------------------
-  { name: "__length", storages: ["context-binding"], owner: "Array", disposition: "base-concept", target: "numeric-structure slot count (D18)", notes: "B-104 chunk 2 audit — RETAINED, correcting the audit's own recommendation. Its one arbitrary writer (makeUnionType) is gone with unions, but the slot is NOT debris: `materializeView` emits it as part of the C4.2 legacy-view compatibility contract, pinned by the W6 dense-view-coherence invariant and by boundary tests asserting the view carries it. `denseSlotCount` is authoritative for dense structures and falls back to this binding for non-dense numeric ones. It is also the ONLY key isMetaSlotKey ever returns true for (1197 tests, 296 hits, nothing else) — so the partition test's entire remaining job is hiding this one derived slot from field walks" },
+  { name: "__length", storages: ["context-binding"], owner: "Array", disposition: "base-concept", target: "numeric-structure slot count (D18)", notes: "B-104 chunk 2 audit — RETAINED, correcting the audit's own recommendation. Its one arbitrary writer (makeUnionType) is gone with unions, but the slot is NOT debris: `materializeView` emits it as part of the C4.2 legacy-view compatibility contract, pinned by the W6 dense-view-coherence invariant and by boundary tests asserting the view carries it. `denseSlotCount` is authoritative for dense structures and falls back to this binding for non-dense numeric ones. It was also the ONLY key isMetaSlotKey ever returned true for (1197 tests, 296 hits, nothing else), so deleting it left the partition test with no job — B-104(b), taken at B-120 E5. DELETED at B-120 E4 with the dense region; this row is the audit record" },
   { name: "__future_", storages: ["binding-name-prefix"], owner: "futures", disposition: "base-concept", target: "future cells (D33)", prefix: true },
   { name: "__bare_", storages: ["binding-name-prefix"], owner: "futures", disposition: "base-concept", target: "future cells (D33)", prefix: true },
 
@@ -213,8 +213,8 @@ export function slotRegistration(key: string): SlotRegistration | undefined {
 //
 // `__length` goes with it: an array's length is its entry count, read through
 // `getSlotCount`, not a derived binding the view had to emit. That closes
-// **B-104(f)** — and leaves `isMetaSlotKey` with no key it ever fires on,
-// which is **B-104(b)**, taken at E5.
+// **B-104(f)**, and left `isMetaSlotKey` with no key it fires on — **B-104(b)**,
+// taken at E5, which replaced it with `isMetaProtocolSlot`.
 
 function slotRead(ctx: StructureValue, name: string): Value | undefined {
   return ctx.bindings.get(name)?.value as Value | undefined;
@@ -223,30 +223,23 @@ function slotRead(ctx: StructureValue, name: string): Value | undefined {
 /* ---------------------------------------------------------------------------
  * THE BINDING WRITE DISCIPLINE (B-107(e); concepts.md §13)
  *
- * A structure holds its bindings twice, and the two copies are NOT aliases:
- * `slotWrite` and types-std's `addBinding` each construct TWO separate
- * `Binding` objects for one key — one in `bindings` (the lookup index) and
- * one in `bindingList` (the ordered enumeration view). Every write
- * discipline in the codebase follows from that single fact:
+ * SUPERSEDED BY B-120 E1/E3, and rewritten here rather than marked. This
+ * block described a structure holding its bindings TWICE — `slotWrite` and
+ * types-std's `addBinding` each constructing two separate `Binding` objects
+ * for one key — and the three disciplines that kept the copies in step.
  *
- *   1. A WRITE goes to BOTH, or the two views disagree. This is the default
- *      and it is what `slotWrite` / `addBinding` do.
- *   2. An IN-PLACE MUTATION of a binding's `value` reaches only the view
- *      whose object it mutated. `renameInPlace` deliberately mutates the
- *      map's copy alone; the list's copy goes stale.
- *   3. A DELETE must mirror the write that created the entry, or a stale
- *      list entry survives the removal. `removeConstruct` mirrors;
- *      `removeName` and `removeRefines` do not, by design.
+ * There is one store. `entries` is authoritative and `bindings` is a derived
+ * view over it, so a write reaches both by construction and a removal cannot
+ * leave a stale entry behind. The three disciplines are retired with their
+ * subject: (1) is now unconditional, and (2) and (3) described hazards that
+ * required a second copy to exist.
  *
- * (2) and (3) are safe TODAY for a reason that is not local to them: every
- * key they touch is a `__*` slot on a TYPE structure, and nothing walks a
- * type structure's `bindingList` as fields — measured, and the same finding
- * that showed `isMetaSlotKey` fires on exactly one key across the suite
- * (`__length`, B-104(f)). The exemption is circumstantial, not structural:
- * anything that starts enumerating type structures, or any of these keys
- * migrating to a user-visible name under B-104, removes it. Do not add a
- * fourth discipline — use (1) unless one of the two recorded reasons
- * applies, and say which.
+ * What the old (2)/(3) exemption rested on is worth keeping, because it is
+ * still only circumstantial: nothing walks a type structure's entries as
+ * FIELDS. B-120 E5 re-measured it after `__length` was deleted — across 1202
+ * tests the field-walk sites saw **748 distinct binding keys and not one
+ * `__`-prefixed key**. That is a property of how members are written, not an
+ * invariant anything checks, and **B-104** owns the enforcement half.
  * ------------------------------------------------------------------------- */
 function slotWrite(ctx: StructureValue, key: string, value: Value): void {
   setEntry(ctx, key, value);
@@ -559,22 +552,29 @@ export const HOST_KEYS = {
 } as const;
 
 /**
- * The "skip meta slots when copying user-visible bindings" test.
+ * The meta-protocol slots a type Context may expose BY NAME through member
+ * dispatch (B-097 V-R1's narrowing: members come from `__members`, policy
+ * hooks from registered slots, and a raw non-slot binding is not
+ * name-reachable).
  *
- * THE PROPERTY THIS TEST RESTS ON (concepts.md §30, delta 30 — stated here
- * at C9; still unenforced): **the type-structure namespace is closed.** A
- * type structure's own bindings map holds engine slots only — a user field
- * named `name` is routed into `__members` under an FQN key and never lands
- * beside `__name`. That is why the `__*` partition was never load-bearing,
- * and why instrumenting this predicate across the whole suite returned true
- * for exactly one key (`__length`, 296 times; B-104(f)). It is currently an
- * accident of how members are written rather than an invariant anything
- * checks — the enforcement half belongs with B-104's retirement of the
- * partition, since a replacement that does not preserve this property would
- * be unsound and nothing would say so.
+ * B-120 E5 replaces `isMetaSlotKey` — `key.startsWith("__")` — with declared
+ * membership. The prefix test was a partition over arbitrary user keys; this
+ * is a closed set, so retiring the `__` convention (B-104) no longer has to
+ * wait on it. Membership is listed rather than filtered on the prefix, which
+ * is the point: the set is a declaration, not a naming convention.
+ *
+ * Narrower than the predicate it replaces, deliberately: the future-cell
+ * binding-name prefixes (`__future_`, `__bare_`) are scope bookkeeping, never
+ * meta-protocol slots, and were never dispatchable.
  */
-export function isMetaSlotKey(key: string): boolean {
-  return key.startsWith("__");
+const META_PROTOCOL_SLOTS: ReadonlySet<string> = new Set<string>([
+  SLOT_KEYS.name, SLOT_KEYS.members, SLOT_KEYS.refines, SLOT_KEYS.construct,
+  SLOT_KEYS.getMember, SLOT_KEYS.interface, SLOT_KEYS.wraps,
+  SLOT_KEYS.predicate, SLOT_KEYS.args, SLOT_KEYS.generic, SLOT_KEYS.discharged,
+]);
+
+export function isMetaProtocolSlot(name: string): boolean {
+  return META_PROTOCOL_SLOTS.has(name);
 }
 
 // Removal helpers — one store, so a removal cannot leave a stale entry
