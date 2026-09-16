@@ -4,6 +4,44 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — Deviation D-1 retired; the sequence mode is the rule
+
+Methodology v1.5.0 released the pre-ratified chunk-sequence mode with allegro
+as its evidencing instance, so the practice D-1 recorded as a deviation is now
+the rule. Retiring it took one Tier-0 change and three register edits.
+
+### PROCESS §3 states all four stop conditions
+
+The released W-001 lists four; §3 listed two. A reader following §3 would not
+have stopped where the binding rule requires, so §3 gains **a failed check**
+and **a chunk whose landing summary carries asks** — anything requested of the
+maintainer, a decision or an action. Asks are never rolled up across chunks,
+and pre-ratification never waives the asks stop. Also added from the released
+text: only the maintainer pre-ratifies, an agent never does, neither its own
+sequence nor one it dispatches. The heading drops "exception": the mode is no
+longer an exception to anything.
+
+### The register edits
+
+`docs/classification.md` records no deviations. `CLAUDE.md` reads
+`Deviations: none`. `docs/backlog.md` §"Parallel lanes" states the four stop
+conditions in place of the deviation note, and **B-131 is closed**.
+
+### Two corrections found while doing it
+
+**B-131's own row was wrong about its second half.** It said the work included
+dropping a deviation note from PROCESS §3; PROCESS carried no D-1 or W-001
+reference at all. The real defect was the opposite — §3 stated the mode more
+narrowly than the rule it implements — so the fix added text rather than
+removing it.
+
+**Two backlog entries carried B-133.** The `Structure.positional` item (10
+citations across the plan, the actor model doc and four sibling rows) and a
+form-audit item filed at the 1.5.0 migration (no citations). The uncited one
+is renumbered **B-142**; a duplicate ID breaks the register's own rule that
+IDs never change meaning. Three of its seven violations also clear on their
+own, since they were an `mtool` parser artefact of D-1's fielded entry.
+
 ## 2026-09 — B-137 (mechanical half): the compiler takes over 75 weak casts
 
 The maintainer's target at the B-120 E4 gate was *eliminate ALL weak typing

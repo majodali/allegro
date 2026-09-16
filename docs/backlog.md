@@ -102,16 +102,17 @@ an arc, and the lane lands them in order without stopping between each.
 **Lane D keeps the per-chunk gate** (PROCESS §3): land, summarize, stop.
 Everything else in the landing checklist is unchanged for every lane.
 
-> This gate policy is **deviation D-1** against W-001 (two delivery modes,
-> human-gated), recorded 2026-09-01 in
-> [docs/classification.md](classification.md#deviation-register).
-> Methodology v1.5.0 released the sequence mode with allegro as its
-> evidencing instance, so the mode itself is now the rule. The deviation
-> stays open because the released rule adds a fourth stop condition this
-> policy does not state: a chunk whose landing summary carries **asks** —
-> anything requested of the maintainer — stops the sequence, and asks are
-> never rolled up across chunks. B-131 retires D-1 once the policy states
-> it, which needs the Tier-0 change to PROCESS §3.
+> This gate policy conforms to
+> [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated)
+> as released in methodology v1.5.0, with allegro as the amendment's
+> evidencing instance. It was **deviation D-1** from 2026-09-01 until
+> 2026-09-05, when PROCESS §3 took on the released rule's remaining two
+> stop conditions. **A sequence stops on all four**: a failed check, a
+> scope change, a chunk needing a maintainer decision, and a chunk whose
+> landing summary carries **asks** — anything requested of the maintainer.
+> Asks are never rolled up across chunks. Only the maintainer
+> pre-ratifies; an agent never does. See PROCESS §3 for the statement that
+> binds; B-131 is closed.
 
 **Before starting in any lane** (PROCESS §7): check open PRs for
 overlapping work. Sessions run in separate containers with separate
@@ -2268,26 +2269,21 @@ that prevents it.
   - **Pointer**: methodology [style guide](https://github.com/majodali/methodology/blob/main/docs/style.md)
     and [P-001–P-005 (prose \& presentation)](https://github.com/majodali/methodology/blob/main/docs/rules/prose.md).
 
-- [ ] **B-131** · T-docs · **Retire deviation D-1 when the W-001 amendment is
-  adopted.**
-  - **What**: delete the D-1 entry from
-    [docs/classification.md](classification.md#deviation-register) and drop
-    the deviation note from `docs/PROCESS.md` §3, once a methodology release
-    carries the pre-ratified sequence mode and this project migrates to it.
-  - **Why**: D-1 records a contradiction between the declared per-lane
-    practice and W-001's per-chunk gate. The amendment is the accommodation;
-    the deviation is the interim.
-  - **When**: no longer blocked on the release — methodology v1.5.0
-    carries the amendment and this project migrated to it 2026-09-02.
-    What remains is stating the released rule's fourth stop condition in
-    the practice: a chunk whose landing summary carries asks stops the
-    sequence, and asks are never rolled up across chunks. Only the human
-    maintainer pre-ratifies; a delegating agent may not. Both belong in
-    PROCESS §3 and the lane gate policy, so this needs a Tier-0 PR and
-    the maintainer's sign-off.
+- [x] **B-131** · T-docs · **CLOSED 2026-09-05 — deviation D-1 retired.**
+  - **What landed**: `docs/PROCESS.md` §3 now states all four of the
+    released W-001's stop conditions (Tier-0 PR, maintainer-approved), the
+    D-1 entry is gone from
+    [docs/classification.md](classification.md#deviation-register), and
+    `CLAUDE.md` reads `Deviations: none`.
+  - **Correction to this row as written**: it said the second half was to
+    "drop the deviation note from `docs/PROCESS.md` §3". There was no such
+    note — PROCESS carried no D-1 or W-001 reference at all. What §3 needed
+    was the opposite: it *stated the sequence mode more narrowly than the
+    rule*, carrying two of four stop conditions, so the fix was adding the
+    failed-check and asks stops rather than deleting anything.
   - **Pointer**: methodology [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated).
 
-- [ ] **B-133** · T-docs · **Seven standing form-audit violations, none
+- [ ] **B-142** · T-docs · **Seven standing form-audit violations, none
   owned.**
   - **What**: `mtool audit form` at the declared level reports seven
     violations, unchanged by the 1.5.0 migration. Three are spurious —
@@ -2303,7 +2299,13 @@ that prevents it.
     causes, or tracked risks — never unowned known issues) forbids. The
     four real ones are small and local; the three spurious ones clear
     when the tool is fixed.
-  - **When**: the four real ones anytime; the parser fix is upstream.
+  - **When**: the four real ones anytime; the parser fix is upstream. The
+    three spurious ones **clear on their own** — D-1 retired 2026-09-05,
+    so the fielded entry the parser mis-reads no longer exists.
+  - **ID note**: filed as B-133 at the 1.5.0 migration, which collided with
+    the B-133 already merged for `Structure.positional`. Renumbered to
+    B-142, the next free ID, because this entry had no citations and the
+    other had ten.
   - **Pointer**: found at the methodology 1.5.0 migration, 2026-09-02.
 
 - [ ] **B-132** · L0 · **Parse-time contexts are plain literals using the

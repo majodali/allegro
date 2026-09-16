@@ -8,7 +8,7 @@ document lifecycles and workflows. Read it before any work; nothing
 in this file or under `.claude/` overrides it.
 
 Classification: C2 / S0 / language-tool-platform / static-site
-Deviations: D-1 (W-001, the per-chunk gate — see docs/classification.md)
+Deviations: none
 
 Everything authoritative lives under `docs/` (K-001). This file only
 bootstraps a session: commands, invariants, pointers. A reader who
