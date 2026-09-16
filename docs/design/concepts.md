@@ -462,10 +462,11 @@ used, and nothing recorded which.
 ### IC-2 — Structure indexing: map-first
 *Realises SC-5, SC-6.*
 
-The composite is a string-keyed map plus an ordered list view; arrays are a
-numeric-keyed special case with a dense region; channels are a second map.
+The composite *was* a string-keyed map plus an ordered list view, with arrays
+a numeric-keyed special case holding a dense region and channels a second map.
+Option E replaced it; the table below is the record of the choice.
 
-| | **A · map-first** (current) | **B · sequence-first** | **C · two representations** | **E · one entry-sequence** |
+| | **A · map-first** (was current; superseded by E, executed 2026-09) | **B · sequence-first** | **C · two representations** | **E · one entry-sequence** |
 |---|---|---|---|---|
 | Deepest composite | string-keyed map | ordered sequence | MultiValue + Context | sequence of `(key?, value)` |
 | Positional data | special case + materialized legacy view | native | special case | native (entries with no key) |
@@ -528,7 +529,27 @@ invariant with it.
 > IC-2 records as the criterion that should have applied.
 > *Revisit if:* a measured workload puts large by-name lookup on the DATA
 > path rather than the scope path — which is the assumption E rests on.
-> **Owner: B-120.** Not yet designed in detail; the arc gets its own plan.
+> **Owner: B-120 — EXECUTED 2026-09**, chunks E1–E6, plan
+> `docs/plans/entry-sequence-composite.md`.
+
+> ### What landed, and the two places execution corrected the ruling
+>
+> `entries` is the store and `bindings` is a derived view over it. The dense
+> role, the materialized legacy view, `__length`, `isDense`, the **W6**
+> invariant and `isMetaSlotKey` are all deleted (§16, §17, §22 retired).
+>
+> **The index policy is not the one this ruling implied.** IC-2 assumed
+> scopes keep an index and data structures do not. E2 measured the crossover
+> and E3 measured the implementation: **93.4% of 4.24M lookups are served by
+> a scan averaging 3.63 entries**, and only **0.3%** of lookups are on scopes
+> at all. So the split is by SIZE, not by role — an index is built lazily on
+> first lookup past 8 entries, whatever the structure is. D48(a)'s conclusion
+> survives; its stated reason does not.
+>
+> **An empty array and an empty record are the same entry sequence.** The
+> ruling did not anticipate needing to tell them apart. One host-plane bit,
+> `Structure.positional`, does — and the maintainer's challenge to it is what
+> opened the host-plane audit (**B-133**, **B-135**).
 
 ### IC-3 — Metadata storage: channels by wrapping
 *Realises R3.*
@@ -1318,36 +1339,39 @@ What a Structure is made of, and the three roles it plays.
 
 ## 12. Structure roles
 
-> **Level: IMPLEMENTATION** — choices **IC-1**, **IC-2**. SC-5 says *one composite kind*; the four roles are how this host realises it, and the gap between those two sentences is IC-1's whole finding.
+> **Level: IMPLEMENTATION** — choice **IC-2**. SC-5 says *one composite kind*; the roles are how this host realises it. **B-120 E4 deleted the dense role and IC-1 dissolved with it** (D48(d)), so the gap IC-1 recorded is closed: role is no longer read from field presence.
 
-**Definition.** A Structure plays exactly one of three roles, chosen at
-construction:
+**Definition.** A Structure plays one of two roles, chosen at construction:
 
 | Role | What it is | Storage |
 |---|---|---|
-| **Record** | A data value with named parts — records, types, proofs, module objects | binding map + list |
-| **Dense** | A numeric-keyed data value — arrays | a plain element array (§16) |
-| **Scope** | Evaluation environment, not data (§15) | binding map + parent link |
+| **Record** | A data value with named parts — records, arrays, types, proofs, module objects | the entry sequence (§13) |
+| **Scope** | Evaluation environment, not data (§15) | the entry sequence + parent link |
 
-B-121 removed a fourth, orthogonal configuration — the **carrier**, a
-record-role Structure with an empty data plane standing in for a non-composite
-value (§10, retired). With it gone, a Structure's role is its whole story.
+Two roles have been removed, and neither left a replacement concept behind.
+B-121 removed the **carrier** — a record-role Structure with an empty data
+plane standing in for a non-composite value (§10, retired). B-120 E4 removed
+the **dense** role: an array is a record whose entries all carry a null key,
+so the role became a representation and then stopped being one (§16, retired).
 
 **Rationale.** Role is fixed at construction so that no value changes what it
-is under you, and so the host can keep one hidden class across all of them.
-The record/scope split is a **plane split**: scopes are evaluator state and
+is under you, and so the host keeps one hidden class across both. The
+record/scope split is a **plane split**: scopes are evaluator state and
 mutable; data structures are born immutable (D22). Each rejects the other's
 operations.
 
-**As implemented.** `src/structure.ts` — `newContextStructure`,
-`newDenseStructure`. Role is read from field
-presence (`dense`, `isScope`, `primary`) rather than stored as a tag.
+**As implemented.** `src/structure.ts` — `newRecordStructure`,
+`newDenseStructure` (which now builds a record whose entries are unkeyed).
+The only role tag left is `isScope`; `dense` and `primary` are both deleted.
 
-**Delta.** — *(closed at C9. The header described **two** planes ("channel
-plane → components, slot/data plane → bindings") where there are four, and
-said `__*` meta-slots "remain here until C5 re-keys them" — C5 did not, and
-B-104 is doing it two milestones later. Now names all four and points the
-host-plane row at `StructureHostFields`.)*
+**Forward.** **D49** rules that a scope leaves `Value` entirely and becomes a
+non-value host construct, which would leave this entry with one role and no
+table. Ruled, not executed — owner **B-136**.
+
+**Delta.** — *(closed at C9. The header described **two** planes where there
+are four, and said `__*` meta-slots "remain here until C5 re-keys them" — C5
+did not. Now names all four and points the host-plane row at
+`StructureHostFields`.)*
 
 ## 13. Binding
 
@@ -1434,51 +1458,66 @@ that the declaration contradicted. They are **correctly placed** — only the
 declaration was wrong; host-plane data that belongs on the metadata plane is
 B-118.)*
 
-## 16. Dense region
+## 16. Dense region — RETIRED (B-120 E4, 2026-09)
 
-> **Level: IMPLEMENTATION** — choice **IC-2**. Invisible from the specification in principle; visible in practice, which is §17's delta. **D48(a): under option E the dense region stops being a ROLE and becomes a representation below the specification — which is what this level tag always said it was. Owner B-120.**
+> **The concept no longer exists.** Retired rather than renumbered: the
+> section numbers here are stable identifiers, the way §10, §19b and §33b are.
+> This marker is what §16 means now.
 
-**Definition.** A Structure in the *dense* role stores its elements in a
-plain array rather than as per-element bindings. Its slot count is the array
-length. This is the representation of arrays (D18: an array is a
-numeric-keyed structure).
+A *dense region* was a second storage shape for the one case the entry
+sequence already described. A Structure in the dense role stored its elements
+in a plain `Value[]` rather than as per-element bindings, and its slot count
+was the array length.
 
-**Rationale.** Numeric keys through a string-keyed map cost a Binding object
-and a decimal string per element. The dense region removes both while keeping
-arrays the *same kind* as every other composite — the saving is
-representational, not conceptual.
+**Why it is gone.** D48(a) ruled that the composite is a sequence of
+optionally-keyed entries, and an array is exactly that sequence with every key
+null. The level tag on this entry always said the dense region was *below the
+specification*; option E made the specification able to express it, so the
+separate representation had nothing left to buy.
 
-**As implemented.** `dense?: Value[]` on `Structure`; `denseIndexGet`,
-`denseSlotCount`, `denseElements` in `src/structure.ts`; accessors
-`indexGet` / `getSlotCount` / `elementsOf` in `src/slots.ts`, which never
-materialize the legacy view.
+**What went with it.** `dense`, `materializeView`, `viewMaterialized`,
+`slotCountBits`, the `__length` slot, `isDense`, the **W6** dense-view
+coherence invariant, and the string-key read protocol by which an array's
+elements were reachable as `bindings.get("0")`. The current story is §9
+(Structure) and §13 (Binding).
 
-**Delta.** —
+**One host-plane bit survives, and it is not this concept.** An empty array
+and an empty record are otherwise the same object, so `Structure.positional`
+records whether the entries are wholly unkeyed. It replaces the dense
+**array**, not the dense **role** — and the maintainer's challenge to it at
+the E4 gate is what opened the host-plane audit. Owner **B-133**, which
+demotes it to a derived cache; the analysis is
+`docs/plans/entry-sequence-composite.md` §5.5.
 
-## 17. The legacy view
+## 17. The legacy view — RETIRED (B-120 E4, 2026-09)
 
-> **Level: IMPLEMENTATION** — choice **IC-2**. Pure compatibility scaffolding; nothing in the specification requires it. **D48(a) DELETES it**: with no dense role there is no view to materialize, and `__length` and the W6 coherence invariant go with it. Owner B-120, which therefore closes B-104(f) — the last dunder.
+> **The concept no longer exists.** Retired rather than renumbered, per §10.
+> This marker is what §17 means now.
 
-**Definition.** A dense Structure can still be read through the binding map
-and list. That view is **materialized lazily** on first such access, then
-cached, and contains one binding per element under its decimal key plus a
-`__length` binding holding the count.
+The *legacy view* was compatibility scaffolding: a dense Structure could still
+be read through the binding map and list, materialized lazily on first such
+access and then cached, holding one binding per element under its decimal key
+plus a `__length` binding for the count. The W6 invariant asserted that the
+view and the dense region agreed.
 
-**Rationale.** Compatibility: reflection, destructuring and generic walkers
-predate the dense region and address elements by string key. Materializing on
-demand keeps them working without slowing the paths that use the accessors.
-The W6 invariant asserts view/dense coherence wherever a view exists.
+**Why it is gone.** It had no users. B-120 E2 measured the corpus: **0 of 166**
+dense structures ever materialized a view, so W6 was vacuous and the
+scaffolding was maintaining a compatibility contract nobody exercised. It went
+with the dense region at E4.
 
-**As implemented.** `materializeView` in `src/structure.ts`; `viewMaterialized`
-reports whether it has happened; boundary tests pin both the `__length` entry
-and the list length.
+**What E3 got wrong about it, since the correction is the useful part.** E3
+concluded the string-key protocol had no consumer, citing that 0-of-166 figure
+and the absence of any `.alg` source indexing an array by string. Both facts
+were true and the conclusion was wrong: the corpus walk covered `tests/*.alg`
+and not the TypeScript harness, which read analyzer output positionally in
+three places. Nine tests failed at E4. **A measurement's scope is part of its
+claim.**
 
-**Delta.** `__length` is the **only** key `isMetaSlotKey` ever returns true
-for — measured across the full suite: 296 hits, and no other key once. So the
-entire remaining job of the engine/user-field partition test is hiding this
-one derived slot from field walks. That is a strong hint the right fix is to
-make the walks dense-aware rather than to keep a name-prefix predicate, but
-it is T2's call, not this entry's. Tracked at **B-104(f)**.
+**Delta.** — *(closed at B-120 E5. This entry recorded that `__length` was the
+sole remaining job of the engine/user partition test. `__length` went at E4,
+and E5 deleted the predicate after re-measuring: across 1202 tests the
+field-walk sites saw **748 distinct binding keys and not one `__`-prefixed**.
+See §22.)*
 
 ---
 
@@ -1657,7 +1696,7 @@ disagree: `source` is in the list but is registered **without**
 
 ## 22. Meta slot
 
-> **Level: IMPLEMENTATION** — realises the binding plane. Dissolving.
+> **Level: IMPLEMENTATION** — realises the binding plane. **The partition is gone (B-120 E5); the names remain.**
 
 **Definition.** A *meta slot* is a binding the engine owns rather than the
 user, historically marked by a `__` name prefix. (Distinct from a metadata
@@ -1665,16 +1704,28 @@ field: a meta slot lives on the BINDING plane, §18.)
 
 **Rationale (historical).** The prefix partitioned one shared bindings map
 between engine metadata and user fields. That partition was real when type
-Contexts and instances shared a namespace; it is not now.
+Contexts and instances shared a namespace; it stopped being real once members
+moved to FQN keys inside `__members`, and B-120 E5 deleted the predicate that
+expressed it.
 
-**As implemented.** `isMetaSlotKey(key) = key.startsWith("__")`, five guard
-sites, and `SLOT_REGISTRY` in `src/slots.ts`.
+**As implemented.** `SLOT_KEYS` and `SLOT_REGISTRY` in `src/slots.ts` — the
+slots themselves, still `__`-prefixed. The predicate
+`isMetaSlotKey(key) = key.startsWith("__")` is **deleted**. Its one live
+consumer, B-097 V-R1's member-dispatch narrowing, now reads
+`isMetaProtocolSlot` — declared membership in a closed set rather than a
+prefix over arbitrary keys — and `runtime.ts`'s source attachment names the
+two cell families directly (`isFutureBindingName`, `isBareBindingName`).
 
-**Delta.** Measured across the full suite, the predicate returns true for
-**exactly one key** — `__length`, 296 times, nothing else. Type Contexts hold
-only meta, instances hold only user fields, `__members` is FQN-keyed: the two
-populations never meet. The concept is a compatibility artifact of the dense
-legacy view (§17), not a plane distinction. **→ B-104(b)/(f).**
+**Delta.** — *(closed at B-120 E5. The entry recorded that the predicate fired
+on exactly one key, `__length`. E4 deleted that key and E5 re-measured before
+deleting the predicate: **748 distinct binding keys reached it across 1202
+tests and none began with `__`**, so all ten skip-guards were no-ops. What
+remains is renaming the slots themselves, which never depended on this
+concept — **B-104**.)*
+
+**Still unenforced.** The guards could go because nothing walks a type
+structure's entries as fields. That is a property of how members are written,
+not an invariant anything checks — delta 30, below, and **B-104** owns it.
 
 ## 23. The layer boundary
 
@@ -1755,11 +1806,11 @@ one the code currently bypasses.
 | **Host** | the host only | direct field access | the host | direct field access ⚠ *declared on the value interface, §18* |
 | **Layer → base** | the base, for semantics it must not know | **install**, never import | the layer | `installChannelMerge` and hooks like it ⚠ *27 upward imports, §23* |
 
-**Disposition of the engine/meta-slot row.** It does **not** disappear when
-`__length` does. `__length` is the last key the *partition test* fires on
-(§22), so removing it retires `isMetaSlotKey` — but the *interface* is the
-accessor layer over engine-owned bindings, and that persists as long as such
-bindings exist.
+**Disposition of the engine/meta-slot row.** It did **not** disappear when
+`__length` did. `__length` was the last key the partition test fired on, so
+deleting it retired `isMetaSlotKey` (B-120 E4/E5, §22) — but the *interface*
+is the accessor layer over engine-owned bindings, and that persists as long as
+such bindings exist.
 
 It should nonetheless **shrink to zero**, and D39 already says how:
 **14** registered slots are dispositioned as declared **members**. The proof
@@ -2576,18 +2627,18 @@ still open. **→ B-057.**
 | 12 | ~~`structure.ts` documents two planes; there are four~~ **CLOSED C9** | B-107(c) |
 | 13 | ~~Three binding write disciplines, no stated rule~~ **CLOSED C9** — the rule is stated, and the reason there are four is that the map and the list are **not aliases** | B-107(e) |
 | 15 | ~~Host-plane fields declared on the value interface they are said not to be part of~~ **CLOSED C9** | B-107(f) |
-| 17 | `__length` is the sole remaining job of the partition test — **now owned and decided: D48(a) deletes it with the dense role** | B-120 → B-104(f) |
+| 17 | ~~`__length` is the sole remaining job of the partition test~~ **CLOSED B-120 E4/E5** — `__length` went with the dense region, and the partition test went after it | B-120; B-104(f) closed |
 | 18 | ~~The host plane is declared inside the value interface — a plane contradicted by its own type~~ **CLOSED C9** (`StructureHostFields`) | B-107(f) |
 | 19 | ~~The base registers eleven L2 fields itself~~ **CLOSED 2026-08 (C3)**: five remain, of which two (`error`, `source`) are Allegretto's own — verified under `--base` — and three await B-111. The by-name special-cases in `metaReadRaw`/`buildWriter` remain | B-109(a) done; special-cases → B-112(c) |
 | 21 | ~~Integrity enforced by hardcoded name list, not the registered flag; the two disagree about `source`~~ **CLOSED 2026-08** — the guard reads the registry, `source` carries the flag, and the bare-name check that conflated the binding and metadata planes is gone | B-109(b)(c) |
-| 22 | The meta-slot partition fires on one key in the whole suite — **that key is `__length`, which D48(a) removes** | B-120 → B-104(b)(f) |
+| 22 | ~~The meta-slot partition fires on one key in the whole suite~~ **CLOSED B-120 E5** — re-measured after `__length`'s deletion (748 distinct keys, zero `__`-prefixed) and the predicate deleted; the slot RENAME is what remains | B-120; rename → B-104 |
 | 23 | **L0 imports 27 symbols from L2**; `checkArgType` lives in the evaluator | B-110 |
 | 19b | One word and one registry for two concepts — fields, a projection, a capability, a dead entry and an unused one, undifferentiated | B-111 |
 | 24 | **Four plane interfaces are owed**: dispatch hook, check hook, projection hook, channel registration. Every other T2 delta is an instance of one being absent | B-112 |
 | 27 | The TailCall forwarding obligation is convention-enforced; a wrapper that forgets is a silent cliff | B-113 |
 | 28 | Completion confluence is not guaranteed by construction — the B-028 arrival-order bug was fixed, not precluded | B-114 |
 | 29 | L2 post-passes are hardcoded into the base pipeline — §23's violation in its other form | B-110 |
-| 30 | The type-Context namespace is closed by construction but nothing **enforces** it — *stated* at C9, enforcement outstanding | B-104(f) |
+| 30 | The type-Context namespace is closed by construction but nothing **enforces** it — *stated* at C9, **re-measured at B-120 E5** (748 distinct binding keys reached the field walks, none `__`-prefixed), enforcement still outstanding and now the only thing standing between the deleted partition and a future writer | B-104 |
 | 32 | The `shape` projection is hardcoded in `channelReadRaw` rather than installed | B-112(c) |
 | 34 | `knowledge` is a registered field that nothing ever stores — a channel, not a field | B-111 |
 | 33b | The `structuralSubtypeof` branch tests the marker *and* anonymity; anonymity always carried the distinction | B-104(g) |

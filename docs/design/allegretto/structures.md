@@ -1064,7 +1064,8 @@ refinement types get `predicate`/`domain`; GenericType gets
 Proof gets `proposition`/`reason`/`counterexample`/`lhs`/`rhs`; Effect gets
 `kind` — **or** a channel (`__type` → shape, `__discharged` → discharged,
 `__inferredEffects` → effects, value-side predicate sets → knowledge) —
-**or** a base concept (`__length` → numeric-structure slot count;
+**or** a base concept (`__length` → numeric-structure slot count, EXECUTED at
+B-120 E4: an array's length is its entry count, read through `getSlotCount`;
 `__future_N` → real future cells). Host-engine internals stay host-side.
 **No new `__*` slot may be introduced**; new meta-slots are declared
 members or registered channels from day one. The full disposition table is
@@ -1194,8 +1195,10 @@ current representation → (2) visibility/enforcement through accessors →
 (3) representation swap. Steps 1–2 are valuable standalone; the channel
 plane can land as the accessor layer's read/write shim.
 
-**Representation** (I1): instance = (shape ref, flat slot storage, channel
-storage, optional dense region); typed structures use the type AS the
+**Representation** (I1): instance = (shape ref, an ordered sequence of
+optionally-keyed entries, channel storage) — the *optional dense region* this
+line used to name was deleted at B-120 E4 (D48(a)), because an array is that
+sequence with every key null; typed structures use the type AS the
 shape; untyped structures get transitional inferred shapes. Propagation
 rules live on the shape. PE payoff: known type ⇒ known shape ⇒ slot access
 compiles to offsets (feeds codegen).

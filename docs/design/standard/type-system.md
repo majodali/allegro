@@ -116,8 +116,8 @@ ratified decisions are V-R1–V-R8 in `docs/plans/visibility.md`.
 Types and rich values communicate through string-keyed Context bindings —
 still `__`-prefixed on the BINDING plane: `__name`, `__members`,
 `__construct`, `__getMember`, `__interface`, `__predicate`, `__refines`,
-`__wraps`, `__args`, `__generic`, `__discharged`, `__length`. (`__type` and
-`__union` have since left — see below.)
+`__wraps`, `__args`, `__generic`, `__discharged`. (`__type`, `__union` and
+`__length` have since left — see below.)
 
 **Maintainer direction (2026-06):** the `__` prefix is an accreted artifact
 — it gestures at privacy and clash-avoidance but provides neither.
@@ -147,13 +147,16 @@ prefix had been hiding:
   to give them a dedicated `meta` plane was **withdrawn** on this
   evidence: these slots become ordinary bindings on a kernel-only
   Context.
-- **What `isMetaSlotKey` is actually for.** `__length`, and nothing else.
-  `materializeView` emits it into the legacy map view of a dense
-  structure (the C4.2 compatibility contract, held by the W6
-  dense-view-coherence invariant), where it sits beside numeric element
-  keys — the one genuinely mixed Context left, now that unions are
-  retired. Whatever replaces the predicate needs to cover that case and
-  no other.
+- **`isMetaSlotKey` is DELETED (B-120 E5, 2026-09).** Its one subject was
+  `__length`, which `materializeView` emitted into the legacy map view of a
+  dense structure; B-120 E4 deleted the dense region, the view and the slot
+  together. E5 then re-measured before removing the predicate: across 1202
+  tests the field-walk sites saw **748 distinct binding keys and not one
+  `__`-prefixed**, so all ten skip-guards were no-ops. The one consumer that
+  needed a test — V-R1's member-dispatch narrowing — now reads
+  `isMetaProtocolSlot`, declared membership in a closed set rather than a
+  prefix over arbitrary keys. **The partition is replaced; the slot names
+  below are what B-104 still has to rename.**
 - **Moved rather than renamed (B-104 chunk 3).** `__type` now lives on the
   component plane as `type`, uniformly for every value. The shape-vs-knowledge
   split survives untouched because it was never two storages — `shape` is
