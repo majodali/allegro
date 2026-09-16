@@ -4,6 +4,61 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-120 E6: the spine catches up, and B-120 closes
+
+The last chunk. `docs/design/concepts.md` now describes the composite that
+exists, and **B-120 is closed** — all six chunks landed, completion test met:
+`dense` 0, `__length` 0, `isMetaSlotKey` 0, `bindingList` no longer a separate
+store.
+
+### Two concepts retired in place, per §10
+
+**§16 Dense region** and **§17 The legacy view** keep their numbers and become
+markers, the way §10 Carrier did — the numbers are stable identifiers other
+entries cite. §16 records that the dense region was a second storage shape for
+the one case the entry sequence already described. §17 records that it had no
+users: 0 of 166 dense structures ever materialized a view, so W6 was vacuous.
+
+§17 also keeps E3's mistake, because the correction is the useful part: E3
+concluded the string-key protocol had no consumer from a corpus walk that
+covered `tests/*.alg` and not the TypeScript harness. **A measurement's scope
+is part of its claim.**
+
+### §12 has two roles, and IC-2 is EXECUTED
+
+Structure roles are Record and Scope. The dense role is gone, so IC-1 — *roles
+are read from field presence* — dissolved with it, which is what D48(d)
+predicted. A forward pointer notes D49 would leave one role and no table.
+
+IC-2 gains a *what landed* block naming **two places execution corrected the
+ruling**. The index policy is not the one the ruling implied: it assumed
+scopes index and data structures do not, and measurement put **93.4% of 4.24M
+lookups on a scan averaging 3.63 entries** with only **0.3%** on scopes at
+all — so the split is by size, not by role. And an empty array and an empty
+record are the same entry sequence, which the ruling did not anticipate; the
+one host bit that tells them apart is what opened the host-plane audit.
+
+### Deltas 17 and 22 closed; 30 re-measured
+
+Delta 30 — the type-Context namespace is closed by construction and nothing
+enforces it — is the residue, now carrying E5's measurement and owned by
+B-104. It is the only thing standing between the deleted partition and a
+future writer.
+
+### Drift the earlier chunks should have fixed
+
+E6's scope was `concepts.md`. Four present-tense claims about deleted code
+were sitting in three other design docs: `type-system.md`'s section headed
+*What `isMetaSlotKey` is actually for*, `structures.md`'s I1 line still
+reading *"optional dense region"*, and `core-types.md`'s `Array` entry
+describing the lazily-materialized string-key view as current. All corrected
+rather than marked (K-010's converse).
+
+The miss is the arc's own shape: the change landed, the gate was green, and
+the documents describing the thing were not in the diff. **A doc-ref lint
+catches dangling links; nothing catches a paragraph that still describes
+deleted code.**
+
 ## 2026-09 — B-120 E5: `isMetaSlotKey` is deleted
 
 The partition test between engine slots and user fields in one shared bindings

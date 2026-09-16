@@ -1,6 +1,9 @@
 # The entry-sequence composite — one storage, an index below the spec
 
-> Status: **active** — §6 ruled 2026-09-01; chunk E1 has its go-ahead.
+> Status: **closed → B-120** — all six chunks landed 2026-09; §6 ruled
+> 2026-09-01. The completion test in §7 is met: `dense` 0, `__length` 0,
+> `isMetaSlotKey` 0, `bindingList` no longer a separate store, and
+> `concepts.md` §16 and §17 retired the way §10 was.
 > Owner: **B-120**. Ruled at **D48(a)** (B-108, 2026-08); the *whether* is
 > settled, this plan is the *how*.
 > Outcome (K-007): a Structure is an ordered sequence of optionally-keyed
@@ -713,7 +716,7 @@ Provisional — the maintainer sets the boundaries (W-001).
 | **E3** | `bindings` becomes derived from `entries` (moved here from E1), and the §6a policy is implemented: build lazily on first lookup when size > 8 | **DONE 2026-09.** Suite 1202/1202. `SlotView` replaces the stored map; measured on the real implementation, **93.4%** of 4.24M lookups are served by a scan averaging **3.63** entries and 268 indexes are built. Per-file wall clock within noise of main (§5.2) |
 | **E4** | The dense role collapses into `entries`. `newDenseStructure` becomes a sequence with null keys; `denseIndexGet` / `denseSlotCount` / `denseElements` lose their dead fallbacks | **DONE 2026-09.** Suite 1202/1202. `dense`, `materializeView`, `viewMaterialized`, `slotCountBits`, `__length`, `isDense` and **W6** all deleted — E5's list arrived with the region rather than after it. Two things the plan did not anticipate: §5.3 (the positional flag) and §5.4 (the string-key protocol had consumers) |
 | **E5** | ~~Delete `materializeView`, `viewMaterialized`, `__length`, W6~~ **done at E4** — they went with the region. E5 is `isMetaSlotKey`, whose last key (`__length`) is gone | **DONE 2026-09.** Suite 1202/1202. Deleted and replaced by `isMetaProtocolSlot` (declared membership). Measured before deleting: the field-walk sites see **748 distinct binding keys and zero `__`-prefixed** across 1202 tests, so all ten skip-guards were no-ops. Closes the partition half of **B-104(b)**; §5.6 records what it did not close |
-| **E6** | `concepts.md` §12 (structure roles), §16 (dense region), §17 (the legacy view) and IC-2 updated; deltas 17 and 22 closed | doc-ref lint; spine delta rows read `—` |
+| **E6** | `concepts.md` §12 (structure roles), §16 (dense region), §17 (the legacy view) and IC-2 updated; deltas 17 and 22 closed | **DONE 2026-09.** §16 and §17 retired in place per §10; §12 is two roles; §22 records the partition's replacement; IC-2 marked EXECUTED with the two places execution corrected the ruling. Deltas 17 and 22 closed, 30 re-measured. Four stale present-tense claims in three OTHER design docs fixed — §5.7 |
 
 **Completion test**: `dense` 0, `__length` 0, `isMetaSlotKey` 0, `bindingList`
 0 as a separate store, and `concepts.md` §16 and §17 retired the way §10 was.
@@ -723,6 +726,26 @@ this plan's business — `positional` is E4's own surface — and it is proposed
 as a chunk after E6 rather than a reopening of E4. The other two (`immutable`,
 and scope as a `ValueKind`) belong to the backlog and the decision register
 respectively, and wait on a ruling.
+
+### 5.7 E6 found drift the earlier chunks should have fixed
+
+E6's scope was `concepts.md`. Four present-tense claims about deleted code
+were sitting in three other design docs, all of them E4/E5's to have fixed
+under W-003 (documentation moves in the same commit as the work):
+
+- `standard/type-system.md` — a section headed *What `isMetaSlotKey` is
+  actually for*, plus `__length` listed among the live binding-plane slots.
+- `allegretto/structures.md` — the I1 representation line still reading
+  *"optional dense region"*, and `__length` listed as an unexecuted
+  disposition.
+- `standard/core-types.md` — the `Array` entry describing the dense region
+  and its lazily-materialized string-key view as current.
+
+All four are corrected rather than marked (K-010's converse). The miss is
+worth recording because it is the same shape as the arc's other findings: the
+change was made, the gate was green, and the documents that described the
+thing were not in the diff. A doc-ref lint catches dangling *links*; nothing
+catches a paragraph that still describes deleted code.
 
 ## 8. What this plan is not
 

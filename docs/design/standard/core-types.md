@@ -15,7 +15,7 @@
 - **Float** — IEEE 754 double. Arithmetic, comparison, toString, sqrt, pow, abs, floor, ceil, round, sin, cos, tan, log, log2, log10, exp.
 - **String** — UTF-8 encoded Bits. Concat (+), length, slice, indexOf, trim, startsWith, endsWith, includes, split, replace (all by default, optional count), toUpperCase, toLowerCase, charAt, repeat, toCharCodes, toString.
 - **Bool** — Int(0/1) with Bool type. Provided as `true`/`false` context bindings.
-- **Array** — Generic type `Array[T]`. Numeric-keyed structure — elements live in the Structure's dense region (C4.2: plain JS array, sole storage; legacy string-key bindings view materializes lazily; element access via slots.ts `indexGet`). length, get, map, filter, reduce, concat, slice. Element type inferred from contents. map/filter/reduce are Allegro ComposedFunctions (recursive, built via AST construction); length/get/concat/slice are primitives.
+- **Array** — Generic type `Array[T]`. Numeric-keyed structure — an array IS the Structure's entry sequence with every key null (B-120 E4, D48(a); the dense region and its lazily-materialized string-key view are both deleted). Element access via slots.ts `indexGet`; length via `getSlotCount`. length, get, map, filter, reduce, concat, slice. Element type inferred from contents. map/filter/reduce are Allegro ComposedFunctions (recursive, built via AST construction); length/get/concat/slice are primitives.
 - **Object** — Typed Context. Field access via dot, keys, values, get.
 - **Function** — Generic type `Function[ParamTypes, ReturnType]`. Attached to typed function definitions. Supports type variable unification at call sites.
 - **UntypedFunction** — Wraps base language primitives entering standard context. Every value in standard mode has a type.
