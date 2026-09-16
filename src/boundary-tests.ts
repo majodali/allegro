@@ -1454,6 +1454,27 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(arrCtx.bindingList.every((e) => e.key === null), true, "every array entry is unkeyed");
   });
 
+  test("positional count always answers (B-133): a record is 0, not 'not an array'", () => {
+    const { evalCtx } = evalSource(
+      "arr = [1, 2, 3]\nempty = []\nrec = { a: 1, b: 2 }",
+      undefined, [createTypeSystem()], undefined, true);
+    const get = (n: string) => evalCtx.bindings.get(n)!.value! as unknown as StructureValue;
+
+    // The count is total. `getSlotCount` used to return `undefined` for
+    // anything not wholly positional, and two callers read that as *this is
+    // not an Array* — a type question answered from storage.
+    eq(getSlotCount(get("arr")) !== undefined, true, "an array answers");
+    eq(Number((getSlotCount(get("arr")) as BitsValue).data), 3, "three positional entries");
+    eq(Number((getSlotCount(get("empty")) as BitsValue).data), 0, "an empty array answers 0");
+    eq(Number((getSlotCount(get("rec")) as BitsValue).data), 0, "a RECORD answers 0 — it holds no positional entries");
+
+    // The distinction the flag used to carry has left L0: an empty array and
+    // an empty record are the same entry sequence, and both answer 0.
+    // Whether a value IS an array is the type's question now.
+    eq(get("rec").bindingList.some((e) => e.key !== null), true, "a record carries keyed entries");
+    eq(get("empty").bindingList.length, 0, "an empty array carries none");
+  });
+
   test("dense region (C4.2): O(1) index access — scaling test", () => {
     const small = makeArray(Array.from({ length: 200 }, (_, i) => makeInt(i))) as StructureValue;
     const big = makeArray(Array.from({ length: 200_000 }, (_, i) => makeInt(i))) as StructureValue;

@@ -20,7 +20,7 @@ import { putEntry, removeEntry } from "./structure.js";
 import {
   getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
   getGenericArgs, getGenericBackLink,
-  getSlotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf,
+  getSlotCount, slotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf,
   setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface,
   setWraps, setPredicate, setGenericArgs,
   setGenericBackLink, setProposition,
@@ -2913,7 +2913,7 @@ function arrayElements(ctx: StructureValue): Value[] {
 // Inline primitives for use inside ComposedFunctions (no circular import)
 const arrLengthPrim = makePrimitive("arr_length", (args) => {
   const ctx = args[0] as StructureValue;
-  return withType(getSlotCount(ctx) ?? makeInt(0), IntType);
+  return withType(getSlotCount(ctx), IntType);
 });
 const arrGetPrim = makePrimitive("arr_get", (args) => {
   const ctx = args[0] as StructureValue;
@@ -3083,7 +3083,7 @@ const reduceAllegro = buildReduceFn();
 const arrayMethods: Record<string, PrimitiveFnImpl> = {
   length: (args) => {
     const ctx = args[0] as StructureValue;
-    return getSlotCount(ctx) ?? makeInt(0);
+    return getSlotCount(ctx);
   },
   get: (args) => {
     const ctx = args[0] as StructureValue;
@@ -3639,10 +3639,14 @@ export function buildGenericType(
         }
         return typeName;
       }
-      // Array-like Context (used as param types list)
-      const lenV = getSlotCount(ctx);
-      if (lenV?.kind === ValueKind.Bits) {
-        const len = Number((lenV as BitsValue).data);
+      // Array-like Context (used as param types list). B-133: this branched
+      // on `getSlotCount` returning a value, which meant *wholly positional*.
+      // The structural question is whether the Context carries keyed entries.
+      // An EMPTY record and an empty array are the same entry sequence and
+      // now key alike — the one collision the bit used to hide, and the
+      // reason the array/record distinction belongs to the type.
+      if (ctx.bindings.size === 0) {
+        const len = slotCount(ctx);
         const elems: string[] = [];
         for (let i = 0; i < len; i++) {
           const ev = indexGet(ctx, i);
@@ -3759,8 +3763,7 @@ function getGenericParamCount(generic: StructureValue): number {
   if (!paramsV) return 0;
   const paramsCtx = paramsV;
   if (paramsCtx.kind !== ValueKind.Structure) return 0;
-  const lenV = getSlotCount(paramsCtx as StructureValue);
-  return lenV ? Number((lenV as BitsValue).data) : 0;
+  return slotCount(paramsCtx as StructureValue);
 }
 
 /**

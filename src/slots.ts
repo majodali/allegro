@@ -21,8 +21,9 @@ import {
   StructureValue,
   AllegroError,
   withMeta,
+  makeInt,
 } from "./types.js";
-import { denseIndexGet, denseSlotCount, denseElements, setEntry, removeEntry } from "./structure.js";
+import { denseIndexGet, positionalCount, denseElements, setEntry, removeEntry } from "./structure.js";
 
 // --- Registry ------------------------------------------------------------------
 
@@ -286,7 +287,14 @@ export function getEffectBound(ctx: StructureValue): any { return (ctx as any).e
 // C4.2: slot count and element reads are dense-aware — the dense region
 // is authoritative when present; the `__length` slot / string-keyed map
 // remain the fallback for non-dense numeric contexts.
-export function getSlotCount(ctx: StructureValue): Value | undefined { return denseSlotCount(ctx); }
+/** B-133: the positional-entry count, ALWAYS answered. Was
+ *  `Value | undefined`, where `undefined` meant "not wholly positional" and
+ *  two callers read it as "not an Array". */
+export function getSlotCount(ctx: StructureValue): Value { return makeInt(positionalCount(ctx)); }
+
+/** The same count as a plain number, for host-side callers that do arithmetic
+ *  on it rather than handing it back to Allegro. */
+export function slotCount(ctx: StructureValue): number { return positionalCount(ctx); }
 /** O(1) numeric element read (D18: arrays are numeric-keyed structures). */
 export function indexGet(ctx: StructureValue, i: number): Value | undefined { return denseIndexGet(ctx, i); }
 /** All elements of a numeric-keyed structure (dense fast path). */

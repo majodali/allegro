@@ -99,17 +99,21 @@ export class Structure implements StructureValue {
    *  nothing (B-120 E2 measurement). */
   private _view?: SlotView;
 
-  /** Host plane: these entries are POSITIONAL — every one unkeyed, so index
-   *  `i` is `entries[i]` and the slot count is `entries.length`. Set by
-   *  `newDenseStructure`; cleared the moment a keyed entry is written, which
-   *  drops positional reads onto the general subsequence path.
+  /** DERIVED CACHE (B-133): true when every entry is unkeyed, so index `i`
+   *  is `entries[i]` and the positional count is `entries.length`.
    *
-   *  B-120 E4: this replaces the `dense` array. The dense ROLE — a second
-   *  storage shape with its own accessors and a materialized legacy view —
-   *  is what D48(a) deletes. The QUESTION it answered, *are these entries
-   *  positional?*, survives as one host-plane bit, the way `isScope` does.
-   *  Without it an empty array and an empty record are the same object. */
-  positional?: boolean;
+   *  B-120 E4 introduced this as a host-plane BIT answering *is this an
+   *  array?*, and the maintainer's challenge to it at that gate opened the
+   *  host-plane audit. B-133 demotes it: it is `entries.every(e => e.key ===
+   *  null)`, cached, and it is `private` for the same reason `_view` is —
+   *  nothing outside this module may read it, because it answers a question
+   *  about STORAGE that callers kept using as a question about TYPE.
+   *
+   *  `positionalCount` is the public surface, and it always answers. The
+   *  array/record distinction left L0 with the bit: an empty array and an
+   *  empty record both hold zero positional entries, which is the true
+   *  answer for both. */
+  private _positional?: boolean;
 
   // --- Scope-role fields (C2.1/C2.2; host-plane, never value slots) ---
   parent?: StructureValue;
@@ -126,7 +130,7 @@ export class Structure implements StructureValue {
     this.meta = undefined as unknown as Map<string, Value>;
     this.entries = undefined as unknown as Binding[];
     this._view = undefined;
-    this.positional = undefined;
+    this._positional = undefined;
     this.parent = undefined;
     this.isScope = undefined;
     this.scopePredicates = undefined;
@@ -149,6 +153,23 @@ export class Structure implements StructureValue {
 
   /** Invalidate the derived view after a write to `entries`. */
   invalidateView(): void { this._view?.invalidate(); }
+
+  /** Are all entries unkeyed? Computed once and cached; `putEntry` clears the
+   *  cache when a keyed write makes the answer false. */
+  isPositional(): boolean {
+    let p = this._positional;
+    if (p === undefined) {
+      p = true;
+      for (let i = 0; i < this.entries.length; i++) {
+        if (this.entries[i].key !== null) { p = false; break; }
+      }
+      this._positional = p;
+    }
+    return p;
+  }
+  setPositional(v: boolean): void { this._positional = v; }
+  clearPositional(): void { this._positional = undefined; }
+  carryPositional(src: Structure): void { this._positional = src._positional; }
 }
 
 /**
@@ -262,7 +283,7 @@ export function newDenseStructure(elements: Value[]): Structure {
   const entries: Binding[] = new Array(elements.length);
   for (let i = 0; i < elements.length; i++) entries[i] = { key: null, value: elements[i] };
   s.entries = entries;
-  s.positional = true;
+  s.setPositional(true);
   return s;
 }
 
@@ -282,7 +303,7 @@ export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): S
   // Shares the entry array by reference — sound because data contexts are
   // immutable (D22). The derived view is per-structure and rebuilds.
   s.entries = src.entries;
-  s.positional = src.positional;   // metadata does not stop an array being one
+  s.carryPositional(src);   // metadata does not stop an array being one
   // The given map is AUTHORITATIVE — it becomes the derived structure's
   // entire channel plane. Writers pre-clone via cloneMeta (total, so
   // a flattened source's channels are in the clone) and then set/delete;
@@ -303,12 +324,12 @@ export function deriveWithMeta(ctx: StructureValue, meta: Map<string, Value>): S
 // `__length` goes with them. An array's length is `entries.length`; it was
 // only ever a derived slot the materialized view had to emit.
 
-/** The i-th positional entry's value. O(1) on a wholly-positional structure,
+/** The i-th positional entry's value. O(1) when every entry is unkeyed,
  *  which is what an array is; a subsequence walk otherwise. */
 export function denseIndexGet(ctx: StructureValue, i: number): Value | undefined {
   const s = ctx as Structure;
   const es = s.entries;
-  if (s.positional === true) return es[i]?.value;
+  if (s.isPositional()) return es[i]?.value;
   let n = 0;
   for (let j = 0; j < es.length; j++) {
     if (es[j].key === null && n++ === i) return es[j].value;
@@ -316,13 +337,21 @@ export function denseIndexGet(ctx: StructureValue, i: number): Value | undefined
   return undefined;
 }
 
-/** Slot count for a positional structure, or undefined when it is not one.
- *  An EMPTY array still answers 0 — which is why the flag exists rather than
- *  the count being inferred from the entries. */
-export function denseSlotCount(ctx: StructureValue): Value | undefined {
+/** How many entries carry no key. **Always answers** — 0 for a record, and 0
+ *  for an empty array, which is the true count for both.
+ *
+ *  B-133 replaces `denseSlotCount`, which returned `undefined` for anything
+ *  not wholly positional. Two of its thirteen callers read that `undefined`
+ *  as *this is not an Array* — a type question answered from storage, which
+ *  is what made `positional` a type indicator. A count that always answers
+ *  cannot be misread that way, and the eleven callers that already knew they
+ *  held an array lose their `?? 0` fallback. */
+export function positionalCount(ctx: StructureValue): number {
   const s = ctx as Structure;
-  if (s.positional !== true) return undefined;
-  return makeInt(s.entries.length);
+  if (s.isPositional()) return s.entries.length;
+  let n = 0;
+  for (let i = 0; i < s.entries.length; i++) if (s.entries[i].key === null) n++;
+  return n;
 }
 
 /** All values of a positional structure. */
@@ -379,7 +408,7 @@ export function putEntry(ctx: StructureValue, entry: Binding): void {
   if (entry.key !== null) {
     // A keyed write ends the positional guarantee: index `i` is no longer
     // `entries[i]`, so positional reads take the subsequence path.
-    s.positional = undefined;
+    s.clearPositional();
     for (let i = 0; i < es.length; i++) {
       if (es[i].key === entry.key) { es[i] = entry; s.invalidateView(); return; }
     }
@@ -399,7 +428,16 @@ export function removeEntry(ctx: StructureValue, key: string): boolean {
   const s = ctx as Structure;
   const es = s.bindingList;
   for (let i = 0; i < es.length; i++) {
-    if (es[i].key === key) { es.splice(i, 1); s.invalidateView(); return true; }
+    if (es[i].key === key) {
+      es.splice(i, 1);
+      s.invalidateView();
+      // B-133: removing the last keyed entry can make the structure
+      // positional again. The cache is only a fast path — a stale `false`
+      // stays correct and merely takes the subsequence walk — but leaving it
+      // would pessimise the structure permanently for no reason.
+      s.clearPositional();
+      return true;
+    }
   }
   return false;
 }

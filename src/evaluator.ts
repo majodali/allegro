@@ -15,7 +15,7 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getRefines, getGenericArgs, getSlotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource, carryMeta} from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, slotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource, carryMeta} from "./slots.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
@@ -960,10 +960,8 @@ function checkArgType(
     if (expectedArgs?.kind === ValueKind.Structure && actualArgs?.kind === ValueKind.Structure) {
       const expCtx = expectedArgs as StructureValue;
       const actCtx = actualArgs as StructureValue;
-      const expLenV = getSlotCount(expCtx);
-      const actLenV = getSlotCount(actCtx);
-      const expLen = Number(expLenV?.kind === ValueKind.Bits ? expLenV.data : 0n);
-      const actLen = Number(actLenV?.kind === ValueKind.Bits ? actLenV.data : 0n);
+      const expLen = slotCount(expCtx);
+      const actLen = slotCount(actCtx);
       for (let j = 0; j < Math.min(expLen, actLen); j++) {
         const expArg = indexGet(expCtx, j);
         const actArg = indexGet(actCtx, j);

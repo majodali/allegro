@@ -13,7 +13,7 @@
 //   - error     → an error MultiValue with message + inner tree
 // =============================================================================
 
-import { getSlotCount, indexGet } from "../slots.js";
+import { slotCount, indexGet } from "../slots.js";
 import {
   Rule, Grammar, Guard, Production,
   lit, cls, regex, eof, empty, fail, indent as indentTerm,
@@ -80,11 +80,16 @@ function arrayArg(v: Value, primName: string): Value[] {
     throw new AllegroError(`${primName}: expected Array, got ${p.kind}`);
   }
   const ctx = p as StructureValue;
-  const lengthV = getSlotCount(ctx);
-  if (!lengthV) {
-    throw new AllegroError(`${primName}: value is not an Array (no length slot)`);
+  // B-133: this read `getSlotCount(ctx) === undefined` as *not an Array* — a
+  // type question answered from storage. The honest structural question is
+  // whether the value carries KEYED entries, which an array never does.
+  // A record with no bindings at all is still indistinguishable from an
+  // empty array here, and that is the point: the distinction belongs to the
+  // type, not to L0.
+  if (ctx.bindings.size > 0) {
+    throw new AllegroError(`${primName}: expected Array, got a keyed structure`);
   }
-  const length = Number((lengthV as BitsValue).data ?? 0n);
+  const length = slotCount(ctx);
   const out: Value[] = [];
   for (let i = 0; i < length; i++) {
     const ev = indexGet(ctx, i);

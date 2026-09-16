@@ -17,7 +17,7 @@ import { assertClean as g2assertClean } from "../grammar2/analyzer.js";
 import { grammarToAllegro } from "../grammar2/to-allegro.js";
 import { evaluate } from "../evaluator.js";
 import { makeExpr } from "../types.js";
-import { getSlotCount } from "../slots.js";
+import { slotCount } from "../slots.js";
 import * as g2 from "../grammar2/types.js";
 import * as fs from "fs";
 import { indexGet } from "../slots.js";
@@ -354,7 +354,7 @@ function callAllegroFn2(fnName: string, grammar: g2.Grammar, nullable: any): any
 function extractErrorList(result: any): { code?: string; message?: string; production?: string }[] {
   const p = result;
   if (p.kind !== ValueKind.Structure) return [];
-  const len = Number((getSlotCount(p) as any)?.data ?? 0n);
+  const len = slotCount(p);
   const out: { code?: string; message?: string; production?: string }[] = [];
   for (let i = 0; i < len; i++) {
     const entry = indexGet(p, i);   // B-120 E4: positional, not string-keyed
@@ -378,7 +378,7 @@ function extractErrorList(result: any): { code?: string; message?: string; produ
 function extractStringList(result: any): string[] {
   const p = result;
   if (p.kind !== ValueKind.Structure) return [];
-  const len = Number((getSlotCount(p) as any)?.data ?? 0n);
+  const len = slotCount(p);
   const out: string[] = [];
   for (let i = 0; i < len; i++) {
     const entry = indexGet(p, i);   // B-120 E4: positional, not string-keyed

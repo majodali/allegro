@@ -1481,13 +1481,15 @@ coherence invariant, and the string-key read protocol by which an array's
 elements were reachable as `bindings.get("0")`. The current story is §9
 (Structure) and §13 (Binding).
 
-**One host-plane bit survives, and it is not this concept.** An empty array
-and an empty record are otherwise the same object, so `Structure.positional`
-records whether the entries are wholly unkeyed. It replaces the dense
-**array**, not the dense **role** — and the maintainer's challenge to it at
-the E4 gate is what opened the host-plane audit. Owner **B-133**, which
-demotes it to a derived cache; the analysis is
-`docs/plans/entry-sequence-composite.md` §5.5.
+**A host-plane bit survived E4 and was demoted at B-133.** `positional`
+recorded whether the entries were wholly unkeyed, so an empty array and an
+empty record could be told apart. The maintainer's challenge to it at the E4
+gate opened the host-plane audit, and B-133 settled it: the field is now a
+`private` derived cache — `entries.every(e => e.key === null)`, computed and
+remembered, with the same status as the `_view` index — and the count that
+reads it always answers. **Nothing at L0 distinguishes an empty array from an
+empty record any more, because nothing at L0 should**: that is the type's
+question. Analysis: `docs/plans/entry-sequence-composite.md` §5.5.
 
 ## 17. The legacy view — RETIRED (B-120 E4, 2026-09)
 
