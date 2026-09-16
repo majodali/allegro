@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, isMetaSlotKey, withSource, carryMeta} from "./slots.js";
+import { metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, withSource, carryMeta} from "./slots.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
@@ -1371,7 +1371,11 @@ export function evalSource(
       // their attachment is the chunk-2+ audit. Residuals are skipped:
       // forward chaining REPLACES them on completion, dropping anything
       // attached here.
-      const storedVal = (complete && !isMetaSlotKey(b.key)
+      // B-120 E5: `!isMetaSlotKey(b.key)` named the cell-binding families by
+      // their `__` prefix. Named directly instead — these are the only two
+      // dunder families a scope's binding names ever carry.
+      const storedVal = (complete
+          && !isFutureBindingName(b.key) && !isBareBindingName(b.key)
           && val.kind !== ValueKind.Structure)
         ? withSource(val, b.value)
         : val;
