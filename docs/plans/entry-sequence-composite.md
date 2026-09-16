@@ -535,6 +535,15 @@ declaration. That narrows B-135's job considerably — for 79 of these the
 question is not *what is this property* but *why does the registry know and
 the type not*.
 
+**CORRECTION (B-127, 2026-09): every count in this section is a regex count,
+and regex counts are low.** `scripts/analyze/index.ts any-props` reports
+**721** property accesses on an `any` receiver in the implementation files,
+against the 305 counted here. The regex matched the literal `(x as any).prop`
+form and could not see that **`any` propagates**: one cast assigned to a local
+makes every later access through that local unchecked as well. The
+declared-versus-registered split above still holds for the sites the regex
+found; the population is 4.5× larger than it says.
+
 So §5.5's *seven host-plane fields on `Structure`* was an undercount of the
 plane, not of the class. The declared host plane is a small, reviewed subset
 of a much larger undeclared one that exists only in `as any` expressions,

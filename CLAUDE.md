@@ -61,6 +61,8 @@ npx tsx src/index.ts file.alg       # run a file  (--base for Allegretto)
 npx tsx src/index.ts inspect|verify|obligations|propose|prove <file>  # → docs/getting-started.md
 npm run bench                       # H-arc benchmark corpus
 npx tsx scripts/bench-slot-lookup.ts  # B-120: slot scan vs index crossover
+npx tsx scripts/analyze/index.ts <cmd> # B-127: binder-aware survey (props |
+                                    #   any-props | kind-tests | refs)
 npm run build:web                   # web bundle; deploy.sh is OWNER-RUN only
 npm run check-deployed              # audit live site vs origin/main (needs site egress)
 ```
@@ -104,7 +106,18 @@ evaluator/runtime set; this is the complete session list):
   `// @ts-nocheck` — do not annotate it.
 - `bench/`, `pcp/`, `scripts/` live OUTSIDE tsconfig's rootDir — run
   via tsx, validated by the suite; TS6059 from tsc is sanctioned and
-  `scripts/typecheck.sh` is the only correct typecheck invocation.
+  `scripts/typecheck.sh` is the only correct typecheck invocation. It calls
+  `node node_modules/typescript/lib/tsc.js` explicitly, never `npx tsc`:
+  npx resolves through `node_modules/.bin`, where any package shipping a
+  `tsc` bin shadows the gate's compiler (B-127).
+- TWO TypeScript packages, on purpose. `typescript` (7.x) is the GATE
+  compiler. `ts-compiler` is TypeScript 5 alias-installed for
+  `scripts/analyze/` — TS 7's package no longer exports `createProgram`,
+  and the analyzer must not be able to change what gates the build.
+- **Surveys use `scripts/analyze/`, not grep** (B-127). A regex cannot see
+  a predicate standing in for the question, a callee's unnamed side effect,
+  or an `any` receiver — and `any` PROPAGATES, so counting casts undercounts
+  the unchecked surface several-fold.
 - Eager primitives receive FULL values (metadata intact) — never strip
   an argument, or you drop every field it carries. `lazy` is
   evaluation-control only. The propagation table governs metadata —

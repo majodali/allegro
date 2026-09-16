@@ -27,6 +27,8 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "esbuild": "^0.28.0",
-    "tsx": "^4.23.12"
+    "ts-compiler": "npm:typescript@^5.9.3",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
   }
 }
