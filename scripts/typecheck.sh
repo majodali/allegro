@@ -9,7 +9,11 @@
 # family, so CI catches real type errors without fighting the convention.
 set -uo pipefail
 
-out=$(npx tsc --noEmit 2>&1)
+# B-127: invoke the compiler EXPLICITLY. `npx tsc` resolves through
+# node_modules/.bin, where any package shipping a `tsc` bin can shadow the
+# one meant to gate the build — which is exactly what happened when the
+# analyzer's TypeScript 5 was alias-installed alongside the project's 7.
+out=$(node node_modules/typescript/lib/tsc.js --noEmit 2>&1)
 bad=$(echo "$out" | grep -E 'error TS' | grep -v 'error TS6059' || true)
 sanctioned=$(echo "$out" | grep -c 'error TS6059' || true)
 

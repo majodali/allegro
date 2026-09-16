@@ -4,6 +4,59 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-127: surveys stop being regexes
+
+`scripts/analyze/` — four analyses over `ts.createProgram`, answering
+questions a pattern over characters cannot. Suite 1203/1203, typecheck clean.
+
+    props <name>        accesses to a field, with the receiver's STATIC type
+    any-props           accesses whose receiver is `any`
+    kind-tests [Kind]   `x.kind === ValueKind.K`, with the static type of `x`
+    refs <name>         references by SYMBOL identity, not by spelling
+
+### Validated against known answers before being trusted
+
+`.primary` returns **0**, matching B-121's deletion. `refs
+isMetaProtocolSlot` returns **3** real sites where grep returns 4 — the
+fourth is a doc comment. `kind-tests Structure` returns **152** sites and
+flags **6** whose subject is already a single type, which is exactly the
+judgement call B-121 C2 had to make by eye for 23 of its 38 risk sites.
+
+### The finding: `any` propagates, and the regex census was 4.5× low
+
+The implementation carries **721** property accesses on an `any` receiver,
+over ~93 distinct properties. **B-137's regex census reported 159** for the
+same scope.
+
+The gap is not sloppiness in the pattern. It is that a regex counts *casts*
+while the compiler counts *unchecked accesses*, and one cast produces many:
+
+    const dom = (typeCtx as any).abstractDomain;   // the regex sees this
+    dom.kind ... dom.lo ... dom.hi                 // and none of these
+
+`docs/backlog.md` B-137 and `entry-sequence-composite.md` §5.7 both carried
+the regex numbers as authoritative. Both now carry the correction — the
+declared-versus-registered split still holds for the sites the regex found,
+but the population is several times larger.
+
+### Two infrastructure facts found on the way
+
+**The project had no pinned TypeScript.** `scripts/typecheck.sh` ran
+`npx tsc`, which with no local install fetches the latest — so the gate
+compiled against an unpinned compiler.
+
+**`npx tsc` resolves through `node_modules/.bin`**, where any package shipping
+a `tsc` bin shadows the intended one. Alias-installing TypeScript 5 for the
+analyzer silently moved the gate from 7.0.2 to 5.9.3, which I noticed only by
+checking `npx tsc --version` afterwards. Both compilers agree on this codebase
+— clean, 5 sanctioned TS6059 — but the gate should not be decided by link
+order, so it now invokes `node node_modules/typescript/lib/tsc.js` explicitly.
+
+**Two TypeScript packages, on purpose.** `typescript` 7.x gates the build;
+TypeScript 7's package no longer exports `createProgram`, so the analyzer uses
+TypeScript 5 alias-installed as `ts-compiler`. Keeping them separate means the
+analyzer cannot change what gates the build.
+
 ## 2026-09 — B-134: the immutable bit is deleted
 
 `Structure.immutable` is gone. One write (the constructor, always `true`), one

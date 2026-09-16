@@ -2166,46 +2166,31 @@ that prevents it.
     property whose declared meaning exceeds its real one. Whatever rule B-135
     states should decide this item rather than the reverse
 
-- [ ] **B-127** · T-tooling · **Code analysis is grep-based, and grep cannot
-  see the questions that matter.** Raised by the maintainer at B-121 C2
-  (2026-08): *we need to use a language's parser at minimum to reach the
-  hard-to-get-to issues.*
-  - **The evidence is a measured miss rate.** The C2 survey classified **182**
-    `ValueKind.Structure` comparison sites and predicted 15 breakages. It was
-    accurate about what it covered and it validated itself against the first
-    attempt's failures. It also missed **two entire classes**, because both
-    are invisible to a regex over source text:
-    - *A named predicate standing in for the question.* Six sites asked
-      "does this value carry metadata?" as `isCarrier(v)`,
-      `carriesViralField`'s kind guard, or `kind === Structure && primary !==
-      undefined`. No occurrence of the searched token
-    - *A function with a side effect nobody named.* `dataOf` peeled a carrier
-      AND, as a consequence, stripped metadata. Five sites depended on the
-      second behaviour. Nothing in the source says so; it is a property of
-      what the callee returns
-  - **What a parser buys, concretely.** The TypeScript compiler API answers
-    all three of the questions the survey had to guess at: *what is the
-    static type of this expression* (so "is this subject definitionally a
-    Structure?" stops being a judgement call — 23 of the 38 risk sites were
-    exactly that), *where does this symbol flow* (so a predicate's callers
-    are found by binding, not by name), and *which property accesses reach a
-    field* (so `.primary` through an `any` cast becomes visible — the
-    boundary lint cannot see one today; `totality.ts:173` was the instance and
-    was fixed at B-121 C2, but the blind spot is unchanged, and **B-137**
-    has since counted **305** property accesses through `any` casts that the
-    lint cannot see)
-  - **It is the enforcement substrate too.** The boundary lint is a regex
-    over string literals, which is why B-104 chunk 1 had to widen it three
-    times to describe patterns it could not distinguish structurally
-    (a synthesized template key, a property access, a diagnostic name), and
-    why those three sit in a `ratchetOnly` baseline instead of hard-failing.
-    A binder-aware check states each as what it is. **B-128 depends on this**
-  - **Scope, roughly.** A `scripts/analyze/` entry point over
-    `ts.createProgram`, with the queries above as the first three checks. Not
-    a linter framework — the suite is the gate, and these are analyses run
-    when a change needs a survey. First real customer: C5's `dataOf` deletion
-    (902 occurrences), where "does this call site need the peel?" is a
-    type question and grep cannot answer it
+- [x] **B-127** · T-tooling · **LANDED 2026-09 — `scripts/analyze/`, a
+  binder-aware survey tool.**
+  - **What landed**: four commands over `ts.createProgram` —
+    `props <name>` (every access to a field, with the receiver's STATIC
+    type), `any-props` (every access whose receiver is `any`),
+    `kind-tests [Kind]` (every `x.kind === ValueKind.K`, with the static type
+    of `x`, flagging tests the type already guarantees), and `refs <name>`
+    (references by SYMBOL identity, not spelling). `--json`, `--include=`,
+    `--exclude=`. See CHANGELOG.
+  - **Validated against known answers before being trusted**: `.primary` 0
+    (B-121 deleted it), `isMetaProtocolSlot` 3 real sites where grep says 4
+    (the fourth is a doc comment), `kind-tests Structure` 152 sites of which
+    6 have a subject that is already a single type.
+  - **The finding that justifies the item**: the implementation carries
+    **721** property accesses on an `any` receiver over ~93 distinct
+    properties. The regex census in B-137 found **159**. `any` PROPAGATES —
+    `(typeCtx as any).abstractDomain` assigns to `dom`, and `dom.kind`,
+    `dom.lo`, `dom.hi` are then all unchecked — so counting CASTS undercounts
+    the unchecked surface **4.5×**.
+  - **Two infrastructure facts found on the way**: the project had no pinned
+    TypeScript (`npx tsc` fetched latest), and `npx tsc` resolves through
+    `node_modules/.bin` where any package shipping a `tsc` bin shadows the
+    gate's compiler. `scripts/typecheck.sh` now invokes the compiler
+    explicitly.
+  - **B-128 can now be built on this.**
 
 - [ ] **B-128** · L0 · T-tooling · **Layer separation is stated but not
   policed, so code relies on representation without knowing it.** Raised by
@@ -2487,9 +2472,15 @@ that prevents it.
     StructureValue` collapsed six double casts and let three `types.ts`
     factories drop theirs entirely; 69 more casts went because a kind guard
     was already narrowing the receiver. See CHANGELOG.
-  - **What remains**: the 250 surviving `as any`, **225** bare `: any`
-    annotations outside catch clauses, and **13** `as unknown as`. There are
-    no `@ts-ignore` or `@ts-expect-error` suppressions anywhere.
+  - **What remains — RECOUNTED at B-127, and the first count was wrong.**
+    The regex census reported 250 surviving `as any` and 305 property
+    accesses. `scripts/analyze/index.ts any-props` reports **721** property
+    accesses on an `any` receiver in the implementation files, over ~93
+    distinct properties. The regex saw only the literal `(x as any).prop`
+    form; it could not see that **`any` propagates** — one cast assigned to a
+    local makes every access through that local unchecked too. Also
+    outstanding: **225** bare `: any` annotations outside catch clauses and
+    **13** `as unknown as`. No `@ts-ignore` or `@ts-expect-error` anywhere.
   - **The remainder is not mechanical**, and this is the reason it was split:
     every surviving property access reaches a field that `types.ts` does not
     declare, so removing the cast means deciding where the property belongs.
