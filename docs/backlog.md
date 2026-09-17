@@ -2190,7 +2190,10 @@ that prevents it.
     `node_modules/.bin` where any package shipping a `tsc` bin shadows the
     gate's compiler. `scripts/typecheck.sh` now invokes the compiler
     explicitly.
-  - **B-128 can now be built on this.**
+  - **This unblocks B-128's part (a) only.** The B-127 report said "B-128 can
+    now be built on this", which overstated it: B-128's (b) and (c) need
+    B-112's interfaces, as B-128's own sequencing line says. Corrected
+    2026-09 at the maintainer's catch.
 
 - [ ] **B-128** · L0 · T-tooling · **Layer separation is stated but not
   policed, so code relies on representation without knowing it.** Raised by
@@ -2250,7 +2253,8 @@ that prevents it.
     for storage because **the interface had no word for what they meant**.
     Policing without supplying the missing vocabulary just moves the problem
   - **Sequencing**: B-127 **landed** and supplies the analysis; **(a) landed
-    on it**. (b) and (c) still want B-112's interfaces — (b) because making
+    on it**. **B-128 was not "unblocked" by B-127** — that claim was made in
+    the B-127 report and is wrong; only (a) was. (b) and (c) still want B-112's interfaces — (b) because making
     the representation unreachable needs somewhere else to reach, and (c)
     because one spelling per plane question needs the question to have a
     word. This item stays open on those two. Best evidence for whether it works: re-run C2's survey
@@ -2324,6 +2328,32 @@ that prevents it.
     unowned (W-005).
   - **Pointer**: [D22](decisions.md); `src/structure.ts` header (the in-place
     rule); `docs/design/allegretto/structures.md` §2.
+
+- [ ] **B-144** · T-docs · T-tooling · **"What's next" has no check, so a
+  blocked item can be recommended as ready.** Raised by the maintainer,
+  2026-09, after B-128 was proposed as unblocked while B-112 — named as its
+  dependency in its own row — was still open.
+  - **What went wrong**: the backlog is one dependency-ordered list whose
+    dependencies live in PROSE, inside the rows. Reading a row tells you its
+    blockers; reading the list does not. So a "what's next" recommendation is
+    a memory exercise, and it failed exactly where the register already had
+    the answer written down.
+  - **What**: make blockers machine-readable and check them. The smallest
+    version is a `Blocked-by:` field on any row that has one, plus a script
+    that lists ready items — no blockers, or all blockers closed — and
+    refuses to call an item ready when a blocker is open. B-127's analyzer
+    is not the right tool (this is markdown, not TypeScript), but its lesson
+    is: state the relation as data, then check it.
+  - **Why it matters more than it looks**: the maintainer does not review
+    the backlog thoroughly often, so the agent's recommendation IS the
+    process. An unchecked recommendation is the one place where being
+    confidently wrong costs a whole chunk.
+  - **Related**: **B-129** rewrites the registers to P-006's row shape, which
+    is the natural moment to add the field — doing both at once avoids
+    touching every row twice.
+  - **Not just tooling**: the same gap explains why the four form-audit
+    violations in **B-142** sat unowned. A ready-list that nobody can query
+    is a list nobody reads.
 
 - [ ] **B-142** · T-docs · **Seven standing form-audit violations, none
   owned.**

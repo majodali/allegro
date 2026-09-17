@@ -64,7 +64,8 @@ npx tsx scripts/bench-slot-lookup.ts  # B-120: slot scan vs index crossover
 npx tsx scripts/analyze/index.ts <cmd> # B-127: binder-aware survey (props |
                                     #   any-props | kind-tests | refs)
 npm run lint:planes                 # B-128(a): storage plane reached only
-                                    #   through the accessor layer
+                                    #   through the accessor layer — IN THE
+                                    #   GATE (once per run, not per shard)
 npm run build:web                   # web bundle; deploy.sh is OWNER-RUN only
 npm run check-deployed              # audit live site vs origin/main (needs site egress)
 ```
@@ -126,7 +127,9 @@ evaluator/runtime set; this is the complete session list):
   ratcheted at its committed count in `scripts/analyze/plane-baseline.json`
   and may only fall. `.bindings` is NOT policed: since B-120 E3 it is the
   derived read-only view, which is the sanctioned way to read the slot plane
-  by name.
+  by name. It runs in the gate: once in `scripts/test-shards.mjs` after the
+  shards, and once in `npm test` via `src/test/tooling.ts` (skipped when
+  sharded — it inspects the whole program, so one answer is enough).
 - Eager primitives receive FULL values (metadata intact) — never strip
   an argument, or you drop every field it carries. `lazy` is
   evaluation-control only. The propagation table governs metadata —
