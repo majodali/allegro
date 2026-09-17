@@ -1503,6 +1503,13 @@ that prevents it.
 
 - [ ] **B-112** · L0 · **The four owed plane interfaces.** Raised by the
   concept spine (S2f); `concepts.md` §24 carries the interface table.
+  **PLAN: [docs/plans/plane-interfaces.md](plans/plane-interfaces.md)**
+  (draft, 2026-09) — scoped to the four hooks on measurement: delta 23's
+  *27 upward symbols* is **131 imported / 98 distinct**, of which only **4**
+  are checkers. The plan's §6 files five other populations (type vocabulary
+  ~25, knowledge propagation ~18, member dispatch ~9, diagnostics ~8,
+  base→layer injection 3) to be worked AFTER rung 3, and §3 carries six
+  provisional principles with a re-analysis trigger.
   Supersedes the open "what capability does the evaluator need" question in
   B-110 by naming it. A plane interface is the sanctioned route to a plane;
   reaching one any other way is a plane violation whatever it computes
