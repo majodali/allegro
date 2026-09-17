@@ -2214,11 +2214,28 @@ that prevents it.
     stopped unioning. The suite caught them only because behavioural tests
     happened to cover those paths
   - **What "police" has to mean here**, since the planes are not modules:
-    - **(a) The read surface is already the interface** — `slots.ts` is the
-      accessor layer and the boundary lint already forbids `"__"` literals
-      outside it. Extend the same treatment to *storage* access: `.primary`,
-      `.meta`, `.bindings` and `kind === ValueKind.Structure` are reachable
-      from anywhere today
+    - **(a) The read surface is already the interface — LANDED 2026-09**
+      (`npm run lint:planes`, `scripts/analyze/plane-lint.ts`). A
+      binder-aware check: `Structure.meta` and `Structure.entries` are CLOSED
+      outside `src/structure.ts` and `src/slots.ts`, `.bindingList` is
+      ratcheted at 22 and may only fall. Verified to FAIL on a reintroduced
+      `.meta` reach before being trusted.
+      - **The surface was smaller than this row assumed**, and only the
+        binder could say so. `.primary` is deleted (B-121). `.meta` is
+        already **0** outside the accessor layer. `.entries` is **0 on a
+        Structure** — of the 21 `.entries` accesses out there, 13 are
+        `Object.entries` and the rest are Maps, so a regex would have
+        reported 21 violations and every one would be false. Only
+        `.bindingList` is genuinely open, at 22, seventeen of them in
+        `runtime.ts`.
+      - **`.bindings` is deliberately not policed.** This row listed it as
+        storage, which was true before B-120 E3 and is not now: it is the
+        derived read-only view, the sanctioned way to read the slot plane by
+        name. Policing it would forbid the interface.
+      - **`kind === ValueKind.Structure` is not yet policed** — 152 sites,
+        and `scripts/analyze/index.ts kind-tests` can already classify them,
+        but which are plane questions in disguise needs B-112's vocabulary
+        before a rule can be stated. That is the counterexample below.
     - **(b) Make the representation unreachable rather than discouraged.**
       The strongest version is that no module outside the accessor layer can
       name the storage at all — which the host language can express (private
@@ -2232,9 +2249,11 @@ that prevents it.
     express it. The lesson cuts both ways: some of the eleven sites reached
     for storage because **the interface had no word for what they meant**.
     Policing without supplying the missing vocabulary just moves the problem
-  - **Sequencing**: B-112 supplies the interfaces, B-127 supplies the
-    analysis a structural check needs, this item makes the separation
-    enforced. Best evidence for whether it works: re-run C2's survey
+  - **Sequencing**: B-127 **landed** and supplies the analysis; **(a) landed
+    on it**. (b) and (c) still want B-112's interfaces — (b) because making
+    the representation unreachable needs somewhere else to reach, and (c)
+    because one spelling per plane question needs the question to have a
+    word. This item stays open on those two. Best evidence for whether it works: re-run C2's survey
     afterwards and see whether the answer is a short list rather than a class
     of things nobody could search for
   - **B-135 supplies the host plane's half of (c)**: a plane question with one
