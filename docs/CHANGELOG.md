@@ -38,6 +38,18 @@ now: `bindings` is the derived, read-only view declared on `StructureValue` —
 the sanctioned way to read the slot plane by name. Policing it would forbid
 the interface rather than the reach past it.
 
+### It runs in the gate
+
+Maintainer ruling, 2026-09: *yes, we need to live with it.* Once per run, not
+per shard. `scripts/test-shards.mjs` runs it after the shards;
+`src/test/tooling.ts` runs it for the sequential `npm test` and skips it when
+sharded. The check inspects the whole program, so one answer is enough and
+three Program builds would buy nothing.
+
+The maintainer's reason for accepting the cost is worth recording: a gate that
+only ran tests for changed code would make this free, and the project is not
+there yet.
+
 ### What (a) does not cover
 
 `kind === ValueKind.Structure` has **152** sites, and
