@@ -2190,7 +2190,10 @@ that prevents it.
     `node_modules/.bin` where any package shipping a `tsc` bin shadows the
     gate's compiler. `scripts/typecheck.sh` now invokes the compiler
     explicitly.
-  - **B-128 can now be built on this.**
+  - **This unblocks B-128's part (a) only.** The B-127 report said "B-128 can
+    now be built on this", which overstated it: B-128's (b) and (c) need
+    B-112's interfaces, as B-128's own sequencing line says. Corrected
+    2026-09 at the maintainer's catch.
 
 - [ ] **B-128** · L0 · T-tooling · **Layer separation is stated but not
   policed, so code relies on representation without knowing it.** Raised by
@@ -2214,11 +2217,28 @@ that prevents it.
     stopped unioning. The suite caught them only because behavioural tests
     happened to cover those paths
   - **What "police" has to mean here**, since the planes are not modules:
-    - **(a) The read surface is already the interface** — `slots.ts` is the
-      accessor layer and the boundary lint already forbids `"__"` literals
-      outside it. Extend the same treatment to *storage* access: `.primary`,
-      `.meta`, `.bindings` and `kind === ValueKind.Structure` are reachable
-      from anywhere today
+    - **(a) The read surface is already the interface — LANDED 2026-09**
+      (`npm run lint:planes`, `scripts/analyze/plane-lint.ts`). A
+      binder-aware check: `Structure.meta` and `Structure.entries` are CLOSED
+      outside `src/structure.ts` and `src/slots.ts`, `.bindingList` is
+      ratcheted at 22 and may only fall. Verified to FAIL on a reintroduced
+      `.meta` reach before being trusted.
+      - **The surface was smaller than this row assumed**, and only the
+        binder could say so. `.primary` is deleted (B-121). `.meta` is
+        already **0** outside the accessor layer. `.entries` is **0 on a
+        Structure** — of the 21 `.entries` accesses out there, 13 are
+        `Object.entries` and the rest are Maps, so a regex would have
+        reported 21 violations and every one would be false. Only
+        `.bindingList` is genuinely open, at 22, seventeen of them in
+        `runtime.ts`.
+      - **`.bindings` is deliberately not policed.** This row listed it as
+        storage, which was true before B-120 E3 and is not now: it is the
+        derived read-only view, the sanctioned way to read the slot plane by
+        name. Policing it would forbid the interface.
+      - **`kind === ValueKind.Structure` is not yet policed** — 152 sites,
+        and `scripts/analyze/index.ts kind-tests` can already classify them,
+        but which are plane questions in disguise needs B-112's vocabulary
+        before a rule can be stated. That is the counterexample below.
     - **(b) Make the representation unreachable rather than discouraged.**
       The strongest version is that no module outside the accessor layer can
       name the storage at all — which the host language can express (private
@@ -2232,9 +2252,12 @@ that prevents it.
     express it. The lesson cuts both ways: some of the eleven sites reached
     for storage because **the interface had no word for what they meant**.
     Policing without supplying the missing vocabulary just moves the problem
-  - **Sequencing**: B-112 supplies the interfaces, B-127 supplies the
-    analysis a structural check needs, this item makes the separation
-    enforced. Best evidence for whether it works: re-run C2's survey
+  - **Sequencing**: B-127 **landed** and supplies the analysis; **(a) landed
+    on it**. **B-128 was not "unblocked" by B-127** — that claim was made in
+    the B-127 report and is wrong; only (a) was. (b) and (c) still want B-112's interfaces — (b) because making
+    the representation unreachable needs somewhere else to reach, and (c)
+    because one spelling per plane question needs the question to have a
+    word. This item stays open on those two. Best evidence for whether it works: re-run C2's survey
     afterwards and see whether the answer is a short list rather than a class
     of things nobody could search for
   - **B-135 supplies the host plane's half of (c)**: a plane question with one
@@ -2305,6 +2328,32 @@ that prevents it.
     unowned (W-005).
   - **Pointer**: [D22](decisions.md); `src/structure.ts` header (the in-place
     rule); `docs/design/allegretto/structures.md` §2.
+
+- [ ] **B-144** · T-docs · T-tooling · **"What's next" has no check, so a
+  blocked item can be recommended as ready.** Raised by the maintainer,
+  2026-09, after B-128 was proposed as unblocked while B-112 — named as its
+  dependency in its own row — was still open.
+  - **What went wrong**: the backlog is one dependency-ordered list whose
+    dependencies live in PROSE, inside the rows. Reading a row tells you its
+    blockers; reading the list does not. So a "what's next" recommendation is
+    a memory exercise, and it failed exactly where the register already had
+    the answer written down.
+  - **What**: make blockers machine-readable and check them. The smallest
+    version is a `Blocked-by:` field on any row that has one, plus a script
+    that lists ready items — no blockers, or all blockers closed — and
+    refuses to call an item ready when a blocker is open. B-127's analyzer
+    is not the right tool (this is markdown, not TypeScript), but its lesson
+    is: state the relation as data, then check it.
+  - **Why it matters more than it looks**: the maintainer does not review
+    the backlog thoroughly often, so the agent's recommendation IS the
+    process. An unchecked recommendation is the one place where being
+    confidently wrong costs a whole chunk.
+  - **Related**: **B-129** rewrites the registers to P-006's row shape, which
+    is the natural moment to add the field — doing both at once avoids
+    touching every row twice.
+  - **Not just tooling**: the same gap explains why the four form-audit
+    violations in **B-142** sat unowned. A ready-list that nobody can query
+    is a list nobody reads.
 
 - [ ] **B-142** · T-docs · **Seven standing form-audit violations, none
   owned.**

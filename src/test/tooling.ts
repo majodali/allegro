@@ -5,13 +5,14 @@
 // run at import time; src/test/index.ts imports this module in suite order.
 // =============================================================================
 
-import { test, asyncTest, eq } from "./harness.js";
+import { test, asyncTest, eq, SHARD } from "./harness.js";
 import { CORPUS, WRONG_SENTINEL_TERM } from "../../bench/manifest.js";
 import { runBenchmark, stripProof } from "../../bench/harness.js";
 import { lintDocRefs } from "../../scripts/doc-ref-lint.js";
 import { assessDeployment, parseStamp } from "../../scripts/check-deployed.js";
 import * as fs from "fs";
 import * as path from "path";
+import { execFileSync } from "node:child_process";
 import * as nodePath from "path";
 import type { LlmClient as BenchLlmClient } from "../../pcp/llm-worker.js";
 
@@ -101,6 +102,31 @@ export function runDocLintTests(): void {
     const findings = lintDocRefs(nodePath.resolve(import.meta.dirname, "../.."));
     const rendered = findings.map((f) => `${f.file}:${f.line} → ${f.ref}`).join("; ");
     eq(rendered, "", "dangling doc references");
+  });
+}
+
+/** B-128(a): the storage plane is reached only through the accessor layer.
+ *
+ *  Spawned rather than imported: the check builds a TypeScript Program via
+ *  `ts-compiler`, which the suite has no other reason to load. SKIPPED when
+ *  sharded — it inspects the whole program, so running it once per shard
+ *  would cost three Program builds for one answer, and
+ *  `scripts/test-shards.mjs` runs it once after the shards instead. */
+export function runPlaneLintTests(): void {
+  if (SHARD !== null) return;
+  test("plane lint (B-128a): storage reached only through the accessor layer", () => {
+    let out = "";
+    let failed = false;
+    try {
+      out = execFileSync("npx", ["tsx", "scripts/analyze/plane-lint.ts"], {
+        cwd: path.resolve(import.meta.dirname, "../.."),
+        encoding: "utf8",
+      });
+    } catch (e) {
+      failed = true;
+      out = String((e as { stdout?: string }).stdout ?? e);
+    }
+    eq(failed ? out.trim() : "", "", "plane-lint violations");
   });
 }
 

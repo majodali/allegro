@@ -4,6 +4,61 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-09 — B-128(a): the storage plane is policed
+
+`npm run lint:planes` — a binder-aware check that the Structure storage is
+reached only through the accessor layer (`src/structure.ts`, `src/slots.ts`).
+Built on B-127. Suite 1203/1203, typecheck clean.
+
+    .meta         CLOSED  — 0 outside the accessor layer, any hit fails
+    .entries      CLOSED  — 0 on a Structure, any hit fails
+    .bindingList  ratchet — 22, committed, may only fall
+
+**Verified to fail before being trusted.** A `.meta` reach was reintroduced in
+`src/scope.ts`; the check reported it with file and line, and removing it
+returned the check to green.
+
+### The surface was smaller than B-128's row assumed, and only the binder could say so
+
+The row named `.primary`, `.meta`, `.bindings` and `kind ===
+ValueKind.Structure` as *reachable from anywhere today*. Measured:
+
+- `.primary` is deleted (B-121).
+- `.meta` is **already 0** outside the accessor layer — B-121 closed it, which
+  is the proof the discipline is reachable rather than aspirational.
+- `.entries` is **0 on a Structure**. There are 21 `.entries` accesses outside
+  the accessor layer; 13 are `Object.entries` and the rest are Maps. **A regex
+  would have reported 21 violations and every one would be false.**
+- `.bindingList` is the only open one, at **22**, seventeen in `runtime.ts`.
+
+### `.bindings` is deliberately not policed
+
+B-128's row listed it as storage. That was true before B-120 E3 and is not
+now: `bindings` is the derived, read-only view declared on `StructureValue` —
+the sanctioned way to read the slot plane by name. Policing it would forbid
+the interface rather than the reach past it.
+
+### It runs in the gate
+
+Maintainer ruling, 2026-09: *yes, we need to live with it.* Once per run, not
+per shard. `scripts/test-shards.mjs` runs it after the shards;
+`src/test/tooling.ts` runs it for the sequential `npm test` and skips it when
+sharded. The check inspects the whole program, so one answer is enough and
+three Program builds would buy nothing.
+
+The maintainer's reason for accepting the cost is worth recording: a gate that
+only ran tests for changed code would make this free, and the project is not
+there yet.
+
+### What (a) does not cover
+
+`kind === ValueKind.Structure` has **152** sites, and
+`scripts/analyze/index.ts kind-tests` can already classify them by the
+subject's static type. Which of them are plane questions in disguise cannot be
+ruled until B-112 supplies the vocabulary — which is B-128's own recorded
+counterexample: `unifyTypes`'s `isCarrier` reached for storage because the
+interface had no word for what it meant. Parts (b) and (c) stay open on B-112.
+
 ## 2026-09 — B-127: surveys stop being regexes
 
 `scripts/analyze/` — four analyses over `ts.createProgram`, answering

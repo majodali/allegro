@@ -22,7 +22,7 @@
 //         ALLEGRO_TEST_SHARDS=6 node scripts/test-shards.mjs
 // Default shard count: min(4, cpus - 1), at least 2.
 
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import { cpus } from "node:os";
 import { readFileSync } from "node:fs";
 
@@ -120,6 +120,21 @@ if (corpusReports === 0) {
   gateFailed = true;
 } else {
   console.log(`Corpus coverage: ${corpusWalked} .alg files walked across ${corpusReports} shards (>= ${CORPUS_MIN})`);
+}
+
+// B-128(a): the plane lint inspects the WHOLE program, so a shard cannot
+// run it meaningfully and three shards would pay for one answer. It runs
+// once, here. (The sequential `npm test` runs it via src/test/tooling.ts,
+// which skips it when sharded for the same reason.)
+try {
+  const planeOut = execSync("npx tsx scripts/analyze/plane-lint.ts", {
+    cwd: new URL("..", import.meta.url).pathname, encoding: "utf-8",
+  });
+  const last = planeOut.trim().split("\n").pop();
+  console.log(`Plane lint: ${last}`);
+} catch (e) {
+  console.error("plane lint FAILED:\n" + String(e.stdout ?? e));
+  gateFailed = true;
 }
 
 console.log(gateFailed ? "GATE: FAILED" : "GATE: PASSED");
