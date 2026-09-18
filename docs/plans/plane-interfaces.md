@@ -173,13 +173,20 @@ Five populations remain. Each is a distinct question with a distinct answer
 shape, and none is served by extending the hook mechanism. **Worked after rung
 3**, per the sequence ratified 2026-09.
 
-| Scope | Question | Distinct symbols | Principle that separates it |
-|---|---|---|---|
-| **Type vocabulary** | How does a base primitive name a type it must not know? | ~25 | P3 — carrying, not deciding |
-| **Knowledge propagation** | The evaluator does abstract interpretation over L2 knowledge | ~18 | P1 — `propagateSetForPrimitive` is L2 semantics running in L0's loop, not referenced from it |
-| **Member dispatch & visibility** | An interface exists; it is imported rather than installed | ~9 | P2 — direction only |
-| **Diagnostics & reporting** | L0 renders L2 findings as text | ~8 | P1 — the finding is a symbol, the rendering is a meaning |
-| **Base→layer injection** | Is the reverse direction legitimate, and in what shape? | 3 | none — P2 does not cover it |
+| Scope | Question | Distinct | Principle | Activities | Item |
+|---|---|---|---|---|---|
+| **Type vocabulary** | How does a base primitive name a type it must not know? | ~25 | P3 — carrying, not deciding | Construct value · Declare type · Evaluate expression | **B-145** |
+| **Knowledge propagation** | The evaluator does abstract interpretation over L2 knowledge | ~18 | P1 — L2 semantics run IN L0's loop, not referenced from it | Evaluate expression · Check declared constraint · Attach/propagate metadata | **B-146** |
+| **Diagnostics & reporting** | L0 renders L2 findings as text | ~8 | P1 — the finding is a symbol, the rendering is a meaning | Report compilation · Emit obligations | **B-147** |
+| **The law-instantiation flag** | A phase-scoped mutable global wearing a hook's shape | 1 | none — it is a defect, not a boundary | Register law | **B-148** |
+
+**Member dispatch is no longer a scope** (§7.3, ruled). Dispatch is hook (a),
+its visibility gate is hook (b), and the four descriptor-shape predicates are
+P6's — filed inside B-145 because that is where P6's population lives.
+
+**Base→layer injection is no longer a scope either**, pending ruling 2: §7.2
+recommends folding the two real probes into this plan, leaving only the flag
+(B-148).
 
 **Type vocabulary is the largest and the one to watch.** It touches every
 primitive, and P3 says it cannot ride this plan's mechanism. If rung 3's pilot
@@ -193,15 +200,95 @@ first overlaps hook (a); the second is small but blocks a general form, since
 a plan that names one direction and leaves three instances of the other
 unnamed has not finished describing the boundary.
 
-## 7. Rulings needed before chunk 1
+## 7. Rulings — taken 2026-09
 
-1. **One check hook or three?** §4.1 recommends one, called per registered
-   field, on P1's argument.
-2. **Does base→layer injection fold in** (§6, row 5), or get its own item? It
-   is three symbols and one missing word.
-3. **Does member dispatch fold into hook (a)** (§6, row 3), or stay filed?
-4. **Are the five scopes filed as backlog items now**, with their principle
-   citations, or when their turn comes?
+**1. One check per registered field.** Ruled correct. §7.1 records the
+question it raised, which changes the hook's signature.
+
+**2. Base→layer injection** — §7.2 answers what the instances are and what
+they serve; the fold-in question stands.
+
+**3. Member dispatch is hook (a).** Ruled. §7.3 records why it was ever a
+question, and what does not fold in with it.
+
+**4. File the out-of-scope populations now**, with the activities they belong
+to. Done — §6, and B-145 through B-148.
+
+### 7.1 The checks are NOT independent, so a hook takes a READER
+
+The maintainer's question — *do any metadata fields depend on other fields?* —
+has a measured answer: **yes, in both directions that matter.**
+
+- **A field derives from another field.** `domainOf(v)` reads the
+  `predicates` field first (`metaOf(v).get(PREDICATES_FIELD)`) and falls back
+  to `domain` only when there is no predicate set. So `domain` is a derived
+  reading of `predicates` within one channel, not a peer of it.
+- **One field's CHECK reads other fields.** `checkArgType` — the check for
+  `type` — reads the expected type's effect bound and the argument's
+  `effects`, then its refinement predicate and the argument's
+  `predicates`/`domain`. Checking `type` consults two other channels.
+
+So *one check per registered field* is right about the **loop** and wrong
+about **isolation**: a field's check cannot be handed only its own value.
+
+The consequence for the signature is small and worth stating now rather than
+discovering at chunk 1. A check hook takes **(expected, actual, read)** where
+`read` is a total reader over registered fields — the same surface `metaOf`
+already provides. The base still holds no meaning (P1): it owns the loop and
+the reader, and each field's check decides. What the base must NOT do is order
+the loop by a dependency it knows about, because that would encode which field
+derives from which — so **the reader must be usable from any check, and no
+check may depend on running after another.** `domain`-from-`predicates` is
+safe under that rule because it is a read, not an ordering.
+
+### 7.2 Base→layer injection: three symbols, one job
+
+All three converge on **`assertPureForEquality`** in `types-std.ts`:
+
+- `setEffectsInspector` — L2 asks *what effects does this function have?*
+- `setDivergenceProbe` — L2 asks *may it diverge?* (CE-R7)
+- `setLawInstantiationSuspended` — not a hook; a flag that switches the whole
+  gate off for a phase.
+
+Its three callers are `define: 'eq' implementation`, `Refinement: 'eq'
+implementation`, and `Coercion.declare`. So the whole population serves one
+job: **deciding whether a function is pure and total enough to instantiate an
+equality law** (E-R5, CE-R7).
+
+**Activity**: *Register law*, needing facts from *Infer effects* and *Check
+totality*.
+
+This is the mirror image of §5a.3 in `actors-and-activities.md`, and worth
+naming as such: there, analyzers write their conclusions onto the subject
+instead of returning them; here, the consumer reaches back for a conclusion it
+cannot compute. Both are the same missing thing — **an analysis result has no
+interface** — seen from opposite ends.
+
+**Recommendation**: fold in. Not because it is a hook, but because leaving it
+out would let this plan claim to have described the boundary while three
+instances of the opposite direction stay unnamed. The cheap version is one
+name for the relation and one shape for the two real probes; the flag is a
+separate defect (a phase-scoped global) and should be filed, not fixed here.
+
+### 7.3 Why member dispatch was a question, and what does not fold in
+
+It should not have been, for dispatch itself: *a channel installs how to
+dispatch on my field* is exactly member dispatch on `type`, and hook (a) is
+its home. The maintainer is right.
+
+What made it look separable is that the nine symbols are three different
+things:
+
+| Symbols | What it is | Home |
+|---|---|---|
+| `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` | dispatch proper | **hook (a)** |
+| `assertMemberReachable`, `assertMemberAvailable` | a gate ON dispatch | **hook (b)** — it is a check |
+| `isFieldDescriptor`, `isMethodDescriptor`, `isGetterDescriptor`, `isPrivateDescriptor` | L2's DESCRIPTOR SHAPE, read in `primitives.ts` | **neither — P6** |
+
+The last row is the one to keep in view. Those four predicates exist because
+L0 branches on what *kind* of member descriptor it found, which is L2's
+representation crossing the boundary as a shared shape. Hook (a) does not
+remove them; P6 does, and P6's answer is M9. **Filed as part of B-145.**
 
 ## 8. What this plan is not
 
