@@ -2362,6 +2362,83 @@ that prevents it.
     violations in **B-142** sat unowned. A ready-list that nobody can query
     is a list nobody reads.
 
+- [ ] **B-145** · L0 · L2 · **Type vocabulary: a base primitive names a type
+  it must not know.** Filed from `docs/plans/plane-interfaces.md` §6 — the
+  largest of the four populations B-112 does not cover.
+  - **What**: ~25 distinct symbols, including 13 type constants (`IntType`,
+    `BoolType`, `ArrayType`, `AnyType`, `FunctionType`, …) and the
+    constructors and accessors around them (`withType`, `makeArray`,
+    `getType`, `getTypeName`). `primitives.ts` takes 54 symbols from
+    `types-std` in total; this is most of them.
+  - **Activities** (`docs/design/actors-and-activities.md` §4): **Construct
+    value**, **Declare type**, and **Evaluate expression** — a primitive
+    produces a result and something must say what type it is.
+  - **Why it is not B-112's**: principle **P3** — a base that must DECIDE
+    needs a hook, a base that must CARRY needs only a handle. Stamping *this
+    result is an Int* is carrying. Extending B-112's hook mechanism to it
+    would give the base a decision it does not make.
+  - **Also here**: the four descriptor-shape predicates from the plan's §7.3
+    (`isFieldDescriptor`, `isMethodDescriptor`, `isGetterDescriptor`,
+    `isPrivateDescriptor`). They are L2's descriptor representation read in
+    `primitives.ts` — **P6**, not dispatch, so hook (a) does not remove them.
+  - **When**: after rung 3 (sequence ratified 2026-09). **Watch item**: if
+    the rung-3 pilot needs new plane crossings — *solution finding over a
+    constraint substrate* plausibly does — this stops being deferrable and
+    becomes rung 3's blocker. That is the assumption the sequence rests on.
+  - **Pointer**: `docs/plans/plane-interfaces.md` §6.
+
+- [ ] **B-146** · L0 · L2 · **Knowledge propagation: the evaluator does
+  abstract interpretation over knowledge it must not understand.**
+  - **What**: ~18 distinct symbols — `propagateSetForPrimitive`, `domainOf`,
+    `domainFromPredicate`, `impliesDomain`, `entailsPredicate`,
+    `predicatesOf`, `mergePredicateSets`, `withPredicates`,
+    `deriveBranchPredicates`, `counterexampleFor`, `occurrenceBoundOf`,
+    `clearOccurrenceBound`, `applyBoundaryBound`, plus the `AbstractDomain` /
+    `PredicateSet` / `EffectsDomain` types.
+  - **Activities**: **Evaluate expression** (PE Rule 1 propagates knowledge
+    across a hop), **Check declared constraint**, **Attach/propagate
+    metadata**.
+  - **Why it is the one that will resist**: `propagateSetForPrimitive` is not
+    a reference to L2 semantics, it is L2 semantics *executing inside L0's
+    loop* — the evaluator computes a primitive's effect on a predicate set. A
+    hook may not be enough, because the base is not asking a question, it is
+    running the layer's interpreter.
+  - **Related**: the plan's §7.1 finding — `domain` is a derived reading of
+    `predicates`, not a peer of it — belongs to this cluster's design.
+  - **When**: after rung 3.
+  - **Pointer**: `docs/plans/plane-interfaces.md` §6.
+
+- [ ] **B-147** · L0 · L2 · **Diagnostics: L0 renders L2 findings as text.**
+  - **What**: ~8 symbols — `formatProofFinding`, `formatProvenFinding`,
+    `formatMismatch`, `describeFailedProof`, plus the finding TYPES
+    (`ProofFinding`, `DivObligation`, `DivergenceResult`,
+    `NOTIF_TOTALITY_NEEDS_ANNOTATION`) that `runtime.ts` imports to assemble
+    a `CompilationReport`.
+  - **Activities**: **Report compilation** and **Emit obligations**.
+  - **Why it is separable**: principle **P1** — the finding is a symbol, the
+    rendering is a meaning. L0 should emit structured findings that L2
+    renders, not import L2's renderers. Note the actor-model pass graded
+    *Report compilation* **sound**: the interface (`CompilationReport`,
+    `Notification`) already exists, and this is L0 reaching past it anyway.
+  - **When**: after rung 3. Cheapest of the four, and the one whose interface
+    already exists.
+  - **Pointer**: `docs/plans/plane-interfaces.md` §6.
+
+- [ ] **B-148** · L2 · **`setLawInstantiationSuspended` is a phase-scoped
+  mutable global.**
+  - **What**: a module-level `let` in `types-std.ts`, toggled true/false
+    around a critical section in `runtime.ts`, read by `assertPureForEquality`
+    and law instantiation. Not a hook, not an interface — a flag.
+  - **Activity**: **Register law**.
+  - **Why it is filed separately**: the plan's §7.2 found that the three
+    base→layer injection points serve one job — deciding whether a function
+    is pure and total enough to instantiate an equality law (E-R5, CE-R7).
+    Two of them are real probes and are B-112's to name. This one is a
+    different defect wearing the same shape, and folding it into an interface
+    would dignify it.
+  - **When**: with or after B-112, whichever names the probes.
+  - **Pointer**: `docs/plans/plane-interfaces.md` §7.2.
+
 - [ ] **B-142** · T-docs · **Seven standing form-audit violations, none
   owned.**
   - **What**: `mtool audit form` at the declared level reports seven
