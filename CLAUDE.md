@@ -42,6 +42,7 @@ cache — amend it upstream, never here.
 - **Process, lifecycle, quality guidelines, agent rules:** `docs/PROCESS.md` (Tier 0)
 - **Classification & binding:** `docs/classification.md` · **Decisions:** `docs/decisions.md` (D1–D47, E-R, U-R, R-R, chunk rulings)
 - **Architecture spine:** `docs/design/layers.md` (L0–L3 + tracks + milestones) · layer index `docs/design/README.md`
+- **Unit DAG (D50/D51):** `docs/design/units.md` — which unit holds which decision, what it may import, which files are still mixed; manifest `scripts/analyze/units.json`. Read the unit's row before moving code in or out of a file
 - **File-level map + evalSource pipeline:** `docs/design/implementation-map.md`
 - **Durable design truth per area:** `docs/design/` (structures, type system, core types, effects, pattern matching, grammar, modules)
 - **Plans:** `docs/plans/` — read `README.md` (manifest) first
@@ -62,7 +63,8 @@ npx tsx src/index.ts inspect|verify|obligations|propose|prove <file>  # → docs
 npm run bench                       # H-arc benchmark corpus
 npx tsx scripts/bench-slot-lookup.ts  # B-120: slot scan vs index crossover
 npx tsx scripts/analyze/index.ts <cmd> # B-127: binder-aware survey (props |
-                                    #   any-props | kind-tests | refs)
+                                    #   any-props | kind-tests | refs |
+                                    #   units — the D50 unit DAG measured)
 npm run lint:planes                 # B-128(a): storage plane reached only
                                     #   through the accessor layer — IN THE
                                     #   GATE (once per run, not per shard)
@@ -164,7 +166,13 @@ evaluator/runtime set; this is the complete session list):
   non-exhaustive match over a finite type is an info notification —
   promoting either to a halt is a maintainer decision, not assumed.
 - Boundary lint ratchet: no `"__"`-prefixed string literals outside
-  the accessor layer; use `src/slots.ts` accessors / `isMetaSlotKey`.
+  the accessor layer; use `src/slots.ts` accessors / `isMetaProtocolSlot`
+  (`isMetaSlotKey` was deleted at B-120 E5).
+- Unit order (D50): a file's unit is in `scripts/analyze/units.json`; an
+  import that the DAG does not permit is a violation, and a kind
+  comparison outside a kind unit, the assembly or the evaluator breaks
+  the discriminator rule (`docs/design/units.md` §3.2) — both reported by
+  `scripts/analyze/index.ts units`, ratcheted once B-149 lands.
   B-104 chunk 1 widened it — a dunder now also counts as a synthesized
   template key (`` `__future_${n}` ``), a property access, or a
   primitive's diagnostic name. Those three patterns are `ratchetOnly`

@@ -27,6 +27,7 @@ every section is tagged with its implementation status:
 | `concepts.md` | **Definitional spine** | Every salient concept in dependency order (definition / rationale / as-implemented / delta). **Read this first.** T0–T1 written; T2–T5 pending (`docs/plans/concept-spine.md`) |
 | `actors-and-activities.md` | Cross-cutting structure | **Draft exercise, not settled design** — actors, the activity inventory, and four worked crossings testing whether the model earns its keep. Cites `layers.md` for dependencies and `concepts.md` for definitions; supersedes neither |
 | `layers.md` | The spine | Layer model, capability tracks, milestone register |
+| `units.md` | **Unit DAG** (D50/D51) | The implementation as the smallest independent units in a narrow DAG: decisions per unit, today's files mapped, the `Value` contract/kinds/assembly split, actors↔units misalignments, the move ledger. Measured by `scripts/analyze/index.ts units` |
 | `implementation-map.md` | File-level spine | Per-file map of src/ + trees, the evalSource pipeline, async runtime surface |
 | `allegretto/` | **L0** base language | `structures.md` (v2 design — draft pending sign-off); planned: `architecture.md` |
 | `extension/` | **L1** extension substrate | `grammar.md`, `modules.md` (loading + module objects). Formalism spec stays at `../grammar-formalism.md` (referenced by Tier-0 PROCESS and by source code) |

@@ -2308,6 +2308,24 @@ that prevents it.
     failed-check and asks stops rather than deleting anything.
   - **Pointer**: methodology [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated).
 
+- [ ] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.**
+  - **What**: commit baselines for the `units` analyzer command
+    (`scripts/analyze/index.ts units`) — permitted-edge violations and the
+    discriminator count — as ratchets that may only fall, and run it once per
+    gate the way `lint:planes` runs (B-128(a)). Then, as splits land, move
+    the baseline down and the mixed-file list toward empty.
+  - **Why**: D50 says the order is checkable, and the report measured it on
+    day one: 142 import edges, 26 permitted, **1 violation** (`scope →
+    refinements`, a real L0→L2 edge — `units.md` M12), 115 unresolved
+    because one end is one of the **7 mixed files**; **434** direct kind
+    comparisons outside the units the discriminator rule allows. Without a
+    ratchet the numbers only climb.
+  - **Blocked-by**: nothing. Takes one chunk; the probe lesson from
+    B-128(a) applies — reintroduce a known-bad edge and watch it fail
+    before trusting the check.
+  - **Pointer**: [D50](decisions.md), [D51](decisions.md);
+    `docs/design/units.md` §7–§8; `scripts/analyze/units.json`.
+
 - [ ] **B-143** · L0 · **D22 is declared, not enforced.**
   - **What**: build the enforcement the immutable bit was a placeholder for —
     a structure that has finished construction refuses an in-place write, and

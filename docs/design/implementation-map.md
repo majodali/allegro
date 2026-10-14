@@ -5,7 +5,9 @@
 > (vocabulary: `layers.md`), one-line role. Created at the K-002 slim
 > (B-095 chunk 3), replacing the bootstrap's per-file inventory.
 > Update when files are added/renamed (PROCESS §5 landing checklist —
-> design docs). Missing here = missing from review.
+> design docs). Missing here = missing from review. The finer map — which
+> **unit** each file holds, and which files are still mixed — is
+> `units.md` §4 (D50), kept as data in `scripts/analyze/units.json`.
 
 ## src/ — the interpreter
 

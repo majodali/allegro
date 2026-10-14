@@ -15,7 +15,7 @@ execution state and its backlog owner — acceptance and implementation
 are distinct facts.
 
 **Going forward**: new decisions continue the D-series here (next free
-number: D50), entered at ratification time with reasoning in a design
+number: D52), entered at ratification time with reasoning in a design
 note under `docs/design/`. Plan-scoped ruling families (the `X-R`
 pattern) may still be minted inside plans; they are indexed here when
 their plan's gate passes.
@@ -27,7 +27,7 @@ decisions; and "Phase D1/D2" in `docs/design/standard/effects.md` and
 the provability plans are roadmap phases. Neither series is indexed
 here.
 
-## D-series — core design decisions (D1–D49)
+## D-series — core design decisions (D1–D51)
 
 Origin: the structured-values-unification decision log
 (`docs/plans/archive/structured-values-unification.md`, frozen —
@@ -86,6 +86,8 @@ record.
 - **D47** — The source channel, ASTs as channel payload: six sub-decisions — Expression+span payload, demand-driven attachment, `drop` propagation, kernel-private writer / free reads, effectful observation (`observe`), `source of x` surface — accepted, 2026-08 (executed, B-094 chunks 1+2; amended at chunk 2: the what-migrates prediction corrected — the lazy-workaround class is empty in the kernel, payoff prospective) — reasoning: `docs/design/allegretto/structures.md` §3.1
 - **D48** — The Allegretto composite, ruled as one question (B-108): **(a) IC-2 → option E** — the composite is a sequence of optionally-keyed entries; the dense region and the materialized legacy view become representation below the specification, taking `__length` and the W6 invariant with them, and a scope keeps its by-name index because a scope is not data; **(b) IC-3 → the alternative** — metadata is a `meta` field on every representation kind rather than on a carrier that wraps the value, deleting the carrier concept, `primary`, `isCarrier`, W1 and the `dataOf` indirection; **(c) construction lifecycle** — factories take metadata so a value that will carry it is built with it, and the four operations currently sharing the name `withMetadata` (create / derive / map / stamp) get four names; **(d) IC-1 dissolves** rather than being decided, because (a) and (b) delete the roles it would have tagged; **SC-5 upheld** — one composite kind was never the thing in doubt — accepted, 2026-08 (ruled, NOT executed — owners **B-120** (a) and **B-121** (b)(c); each arc gets its own plan before code) — reasoning: `docs/design/concepts.md` §3 (IC-1, IC-2, IC-3, IC-3a) and the B-108 measurement record
 - **D49** — Scope leaves `Value`: the evaluation environment becomes a non-value L0 host construct with its own representation, not a role of `Structure` — `EvalFn`/`PrimitiveFnImpl` type their ctx on it, the slot store arrives by composition, and `assertNotScope`, `deriveWithMeta`'s plane rejection and the three walker skip-branches become unrepresentable rather than checked. Custom scope kinds stay closed (no use case, and forgery-prone — V-R2 already forbids handing user code a raw scope); if one arises the route is optional functionality on the host type, not readmission to `Value`. Supersedes D25's *shared substrate / role* clause only — accepted, 2026-09 (ruled, NOT executed — owner **B-136**; the arc gets its own plan before code) — reasoning: `docs/plans/entry-sequence-composite.md` §5.6
+- **D50** — The implementation is organized as **units in a narrow DAG**: each unit holds one decision (or one inseparable group), depends only on named units below it with every dependency an import edge, has one home, and is replaceable without editing what it does not name. Layers become bands of units; actors are implemented by sets of units. Specification first: the DAG is stated and measured now, and each physical move happens when its unit is next touched, never as a campaign — accepted, 2026-10 (specified; moves owed per unit, enforcement **B-149**) — reasoning: `docs/design/units.md` §1–§2, §7
+- **D51** — `Value` is a **contract, seven kind units, and one assembly**: the contract declares the open kind registry, the literal tag and the operations every kind supplies (`clone`, traversal, resolution, print) and names no kind; each kind registers itself by declaration merging and exports its tag, interface, factories, guard and ops; the assembly closes the set per build and holds the ops table and the walkers — it is the fork point, not a language extension mechanism. The `meta` slot is **not** in the contract: the `metadata` unit mixes it in by the same augmentation and owns the field registry, propagation and construction-with-metadata (D48(c) kept by stamping in place while unshared). `v.kind` stays, under the discriminator rule: guards import the kind, walkers use the traversal protocol, only the evaluator dispatches on kind and names only participating kinds — accepted, 2026-10 (specified, probed on TS 7.0.2; the move rides the first chunk that edits the `Value` union) — reasoning: `docs/design/units.md` §3
 
 ## E-R series — equality and laws (plan rulings, ratified 2026-08)
 
