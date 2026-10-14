@@ -40,7 +40,7 @@ cache — amend it upstream, never here.
 
 - **Vision, thesis, design principles:** `docs/VISION.md` (Tier 0 — never edit without maintainer sign-off)
 - **Process, lifecycle, quality guidelines, agent rules:** `docs/PROCESS.md` (Tier 0)
-- **Classification & binding:** `docs/classification.md` · **Decisions:** `docs/decisions.md` (D1–D47, E-R, U-R, R-R, chunk rulings)
+- **Classification & binding:** `docs/classification.md` · **Decisions:** `docs/decisions.md` (D1–D51, E-R, U-R, R-R, chunk rulings)
 - **Architecture spine:** `docs/design/layers.md` (L0–L3 + tracks + milestones) · layer index `docs/design/README.md`
 - **Unit DAG (D50/D51):** `docs/design/units.md` — which unit holds which decision, what it may import, which files are still mixed; manifest `scripts/analyze/units.json`. Read the unit's row before moving code in or out of a file
 - **File-level map + evalSource pipeline:** `docs/design/implementation-map.md`
@@ -168,11 +168,6 @@ evaluator/runtime set; this is the complete session list):
 - Boundary lint ratchet: no `"__"`-prefixed string literals outside
   the accessor layer; use `src/slots.ts` accessors / `isMetaProtocolSlot`
   (`isMetaSlotKey` was deleted at B-120 E5).
-- Unit order (D50): a file's unit is in `scripts/analyze/units.json`; an
-  import that the DAG does not permit is a violation, and a kind
-  comparison outside a kind unit, the assembly or the evaluator breaks
-  the discriminator rule (`docs/design/units.md` §3.2) — both reported by
-  `scripts/analyze/index.ts units`, ratcheted once B-149 lands.
   B-104 chunk 1 widened it — a dunder now also counts as a synthesized
   template key (`` `__future_${n}` ``), a property access, or a
   primitive's diagnostic name. Those three patterns are `ratchetOnly`
@@ -180,10 +175,15 @@ evaluator/runtime set; this is the complete session list):
   until B-104 drives them to zero, then they hard-fail like the rest.
 - The `__*` prefix is being RETIRED (B-104). Host-plane properties are
   already plain names — do not reintroduce a dunder on a JS expando.
-  The binding-plane slots still carry it because
-  `isMetaSlotKey(key) = key.startsWith("__")` is the partition test
-  between engine metadata and user fields in one shared bindings map;
-  that partition needs replacing before those names can change.
+  The binding-plane slots still carry it by name only: since B-120 E5
+  the partition between engine metadata and user fields is the
+  registered set (`isMetaProtocolSlot`), not the prefix, so the names
+  can change when B-104 reaches them.
+- Unit order (D50): a file's unit is in `scripts/analyze/units.json`; an
+  import that the DAG does not permit is a violation, and a kind
+  comparison outside a kind unit, the assembly or the evaluator breaks
+  the discriminator rule (`docs/design/units.md` §3.2) — both reported by
+  `scripts/analyze/index.ts units`, ratcheted once B-149 lands.
 - Commit messages with backticks: write to a file, `git commit -F` —
   inline `-m` backticks get shell-expanded.
 
