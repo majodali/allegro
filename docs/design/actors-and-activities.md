@@ -848,7 +848,10 @@ proposed. That is the evidence for adopting it.
    raises the bar on §3.1 — the definition has to hold outside this project.
 4. **Where the interfaces would live** if adopted — per-actor modules, or
    declarations checked by the boundary battery the way the plane invariants
-   are.
+   are. **Partly answered by D50 (2026-10)**: `units.md` §6 maps each actor
+   to the units that implement it and records thirteen misalignments
+   (M1–M13); an actor's interface is the union of its units' exports, and
+   the unit DAG is what the binder checks.
 5. ~~How fine the grain goes.~~ **SETTLED 2026-09** (§3.7): unlimited in
    principle, two levels in practice. `SlotView` and its like are in, as
    internal actors.

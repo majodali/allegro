@@ -4,6 +4,37 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — D50/D51: the implementation as units in a narrow DAG, specified and measured
+
+`docs/design/units.md` — the organizing principle below the layer spine:
+thirty-five units, each holding named decisions, ordered in a DAG, with
+today's files mapped onto them and a ledger of the moves owed. Specification
+only; no source moved. Suite green, typecheck clean.
+
+**The `Value` definition (D51)** is the foundation: a contract naming no kind,
+seven kind units registering by declaration merging, one assembly that closes
+the set per build. `meta` is mixed in by the metadata unit, not declared by
+the contract. Three probes on TypeScript 7.0.2 back it: a deleted kind leaves
+the build green, a stale arm fails by name, and a kind unit cannot name
+`meta` below the metadata unit.
+
+**Measured, not asserted.** `npx tsx scripts/analyze/index.ts units` reads
+`scripts/analyze/units.json` and reports every import edge against the DAG.
+Day one: 142 edges, 26 permitted, 1 violation, 115 unresolved across 7
+mixed files, 434 kind comparisons outside the allowed units. The violation
+is a finding — `scope.ts` imports `mergePredicateSets` from
+`refinements.ts`, an L0→L2 edge the layer README forbids ("fact payloads are
+opaque to base ops") that no file-grain check could see (M12). The report
+also overruled the draft once: the grammar registry sits *below* the tree
+builder, not above it. The report does not fail yet; **B-149** makes it a
+ratchet.
+
+**Actors and units reconciled** (§6): thirteen misalignments, M1–M13, each
+with the reading taken. M11 is the one that matters now: the evaluator holds
+three Type-system activities, and B-112's four hooks are exactly that unit
+boundary — which is why this landed before B-112 chunk 1, and why B-112's
+done-condition is now a graph property.
+
 ## 2026-09 — B-128(a): the storage plane is policed
 
 `npm run lint:planes` — a binder-aware check that the Structure storage is
