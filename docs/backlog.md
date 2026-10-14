@@ -2387,7 +2387,12 @@ that prevents it.
     `BoolType`, `ArrayType`, `AnyType`, `FunctionType`, …) and the
     constructors and accessors around them (`withType`, `makeArray`,
     `getType`, `getTypeName`). `primitives.ts` takes 54 symbols from
-    `types-std` in total; this is most of them.
+    `types-std` in total; this is most of them. **Plus the L1 grammar
+    files** (`units.md` M13, 2026-10): `grammar2/builder.ts`,
+    `grammar2/to-allegro.ts` and `grammar-ext.ts` import `makeArray`,
+    `makeObject`, `withType`, `StringType`, `IntType`, `ErrorType` and
+    `noneSingleton` — an L1→L2 edge the `units` report will show as a
+    violation once `core-types` splits out of `types-std.ts`.
   - **Activities** (`docs/design/actors-and-activities.md` §4): **Construct
     value**, **Declare type**, and **Evaluate expression** — a primitive
     produces a result and something must say what type it is.

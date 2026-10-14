@@ -1,11 +1,15 @@
 # Plane interfaces — the base holds the symbol, the layer installs the meaning
 
-> Status: **draft** — awaiting the §7 rulings.
+> Status: **draft** — §7 rulings 1, 3, 4 taken; ruling 2 and the §8 chunk
+> sequence await ratification. **Reviewed against `docs/design/units.md`
+> (D50/D51) 2026-10 — §9 records what the review changed.**
 > Owner: **B-112**. Raised by the concept spine (S2f); `concepts.md` §24
 > carries the interface table, and every T2 delta is an instance of an absent
 > interface.
 > Outcome (K-007): the four owed hooks exist, are capability-gated, and share
-> one form. The five other upward-import populations are filed, not worked.
+> one form; the `evaluator` unit (`units.md` §4.1 row 13) imports nothing from
+> L2, and `src/evaluator.ts` is no longer a mixed file. The five other
+> upward-import populations are filed, not worked.
 
 ## 1. Why, stated precisely
 
@@ -23,6 +27,17 @@ over it — so the risk C2 measured is live *while* the pilot is built, not
 before it.
 
 That is the whole justification. This plan deliberately does not claim more.
+
+**One thing was added after D50 (2026-10), and it is a target rather than a
+claim.** `units.md` §6.1 M11 finds that the evaluator holds three Type-system
+activities — *Check declared constraint* (`checkArgType`), *Dispatch member
+access* (`PRIM_TO_METHOD` and the `typeMethod` family) and *Infer* (precompile's
+type inference) — inside the Engine's unit, and that the four hooks here are
+exactly that unit boundary. So this plan has a done-condition the binder can
+read: the `evaluator` unit's permitted dependencies are `scope`, the five
+participating kinds, `metadata` and `capability` (`units.md` §4.1), and today
+`src/evaluator.ts` imports `refinements`, `effects` and `types-std` as well.
+When those three edges are gone the plan is done; while any remains it is not.
 
 ## 2. The measurement
 
@@ -52,6 +67,15 @@ Classified by what the symbol IS, because the classes want different answers:
 delta is an instance of an absent interface*, which may hold — but the four
 named interfaces do not cover the absent-interface population. §6 files the
 rest.
+
+**At unit grain (2026-10).** `scripts/analyze/units.json` assigns
+`src/evaluator.ts` to `mixed(evaluator | metadata | type-core)`: the
+evaluator proper, the propagation machinery (`viralScan`, `mergeOverMeta`,
+which belong to the `metadata` unit), and the three Type-system activities
+above. Every edge out of a mixed file is *unresolved* in the `units` report,
+so the file's 45 L2-symbol uses are invisible as violations today. This
+plan's exit turns the entry into `evaluator` and lets the report pass
+judgement — which is the measurable form of §1's justification.
 
 ### 2.1 The pattern already exists, once, ungated
 
@@ -118,6 +142,18 @@ hierarchy that is also a type hierarchy, some of it written in Allegro rather
 than TypeScript. That is bootstrapping-era work (**M9**) and is deliberately
 not attempted here.
 
+**How D50/D51 bear on the six (2026-10).** P2 is now a graph property:
+`units.md` §5 states that every L2 unit reaches L0 through `metadata` and
+`capability`, never through a kind's representation, and the `units` report
+is what checks it. P6 gets its L0 half answered by D51 — the `value`
+contract's types (`ValueBase`, `KindOps`) are the *sanctioned* shared types,
+and what P6 forbids is an L2 representation type crossing down. The clearest
+instance is one the report found rather than the survey: `scope.ts` imports
+`PredicateSet` and `mergePredicateSets` from `refinements.ts` (`units.md`
+M12), and `scopeAssume` types its facts parameter as L2's `PredicateSet`
+while the storage underneath is already `Map<string, unknown>`. P6's L2 half
+(descriptor shapes, type constants) is unchanged — still M9.
+
 ### 3.1 What decides whether the principles held
 
 B-128's own criterion: **re-run B-121 C2's survey after this plan lands.** If
@@ -140,6 +176,19 @@ installs *how to check a value against my field*.
 Channels install their projections.
 
 **(d) Channel registration** — B-111.
+
+**(e) Facts-plane merge** — added 2026-10 from `units.md` M12. The scope
+combines fact layers along its chain (`scopeFactsFor`) and does so by
+importing `mergePredicateSets`, so L0 decides how L2 knowledge combines. P3
+says deciding needs a hook, and the hook already exists in shape:
+`installFieldMerge` (§2.1) is a merge the layer installs and the base
+applies. Today only `effects` registers one; `predicates` does not, which is
+why the scope reached for the function by name. **Recommendation: fold (e)
+into (d)'s form rather than add a fifth mechanism** — a channel registers its
+merge once, and both the metadata plane (`fieldMerge`) and the facts plane
+read it. The scope then holds the symbol and no meaning (P1), `scopeAssume`
+takes `Map<string, unknown>` (P6), and the L0 README's *fact payloads are
+opaque to base ops* becomes true rather than stated.
 
 ### 4.1 Both concrete targets are messier than one hook each
 
@@ -165,7 +214,16 @@ and are the check that the vocabulary was sufficient.
 
 The measurement is re-run after each chunk with
 `scripts/analyze/index.ts refs`, not by grep — B-127 measured the cost of the
-alternative at 4.5×.
+alternative at 4.5×. Since D50 the same run includes
+`scripts/analyze/index.ts units`: each chunk that un-mixes a file changes its
+`units.json` entry in the same commit, and the report's violation list is
+the chunk's verdict. A hook that lands while its file stays mixed has not
+landed — the report cannot see it.
+
+**Every hook must be seen to fail before it is trusted** (B-128(a)'s probe
+lesson, and B-121 C2's: eleven silent breaks). An uninstalled hook is an
+error at the call site, never a silent pass, and each chunk's suite entry
+exercises that path.
 
 ## 6. Out of scope, filed not worked
 
@@ -175,7 +233,7 @@ shape, and none is served by extending the hook mechanism. **Worked after rung
 
 | Scope | Question | Distinct | Principle | Activities | Item |
 |---|---|---|---|---|---|
-| **Type vocabulary** | How does a base primitive name a type it must not know? | ~25 | P3 — carrying, not deciding | Construct value · Declare type · Evaluate expression | **B-145** |
+| **Type vocabulary** | How does a base primitive name a type it must not know? | ~25, plus the three L1 grammar files (`units.md` M13: `builder.ts`, `to-allegro.ts`, `grammar-ext.ts` build typed arrays, objects and strings — an L1→L2 edge the report will show once `core-types` splits) | P3 — carrying, not deciding | Construct value · Declare type · Evaluate expression | **B-145** |
 | **Knowledge propagation** | The evaluator does abstract interpretation over L2 knowledge | ~18 | P1 — L2 semantics run IN L0's loop, not referenced from it | Evaluate expression · Check declared constraint · Attach/propagate metadata | **B-146** |
 | **Diagnostics & reporting** | L0 renders L2 findings as text | ~8 | P1 — the finding is a symbol, the rendering is a meaning | Report compilation · Emit obligations | **B-147** |
 | **The law-instantiation flag** | A phase-scoped mutable global wearing a hook's shape | 1 | none — it is a defect, not a boundary | Register law | **B-148** |
@@ -270,6 +328,19 @@ instances of the opposite direction stay unnamed. The cheap version is one
 name for the relation and one shape for the two real probes; the flag is a
 separate defect (a phase-scoped global) and should be filed, not fixed here.
 
+**Checked against the unit DAG (2026-10): the DAG does not dissolve the
+probes, it explains them.** The consumer is `equality-laws` (`units.md` row
+26). The effects inspector is filled from `primitives.ts:1894` — the type
+primitives (row 32), which sit *above* it — and the divergence probe from
+`runtime.ts:1213` with the pipeline's `divCfns`, the result of an analysis
+that runs in the pipeline (row 33), the top of the DAG. So a lower unit is
+asking a higher one for an analysis result, which no import can express
+without inverting the order. That is precisely §5a.3's *an analysis result
+has no interface*, and it confirms fold-in as a gated install rather than a
+plain import: the pipeline installs *what this function's effects are* and
+*whether it may diverge* through the same registration form as (d), and the
+law gate reads them as symbols. The flag (B-148) stays a flag.
+
 ### 7.3 Why member dispatch was a question, and what does not fold in
 
 It should not have been, for dispatch itself: *a channel installs how to
@@ -290,7 +361,67 @@ L0 branches on what *kind* of member descriptor it found, which is L2's
 representation crossing the boundary as a shared shape. Hook (a) does not
 remove them; P6 does, and P6's answer is M9. **Filed as part of B-145.**
 
-## 8. What this plan is not
+## 8. Chunks — proposed 2026-10, awaiting ratification
+
+Each chunk is one hook and the callers it moves, plus the unit move the hook
+makes natural (`units.md` §7: a move rides the chunk that touches its file).
+Order is by what unblocks the most: the `slots.ts` split first, because three
+units and the facts merge all wait on it.
+
+| # | Chunk | Hook | Unit moves (`units.json` changes) | Exit measured by |
+|---|---|---|---|---|
+| **C1** | **Split `slots.ts`** three ways (`units.md` M5): structure accessors → `structure`; field registry + propagation table → `metadata`; writer capabilities + `installFieldMerge` → `capability`. Gate `installFieldMerge` (P4) while it moves. Register the `predicates` merge from `refinements.ts`; `scopeFactsFor` reads it; `scopeAssume` takes `Map<string, unknown>` | (e), via (d)'s form | `src/slots.ts` leaves the mixed list; `plane-lint`'s accessor layer becomes unit 8's files; `scope → refinements` violation gone | `units`: 6 mixed files, 0 violations; plane lint green |
+| **C2** | **Check hook** — `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)` (§7.1); `type-core`, `refinements` and `effects` install theirs. `checkArgType` leaves `evaluator.ts` | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` → 0 outside the installers; uninstalled-check test fails loud |
+| **C3** | **Dispatch hook** — `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate (`assertMemberReachable`/`Available`) rides (b) | (a) | `evaluator.ts` loses `normalizeType` and the member family | `refs PRIM_TO_METHOD` → 0 in the evaluator |
+| **C4** | **Projection hook** — `typeShape` leaves `slots.ts`' successor and is installed by `type-core` (§4.1) | (c) | `metadata` unit holds no refinement-chain reading | `refs typeShape` → installer only |
+| **C5** | **Analysis probes** (ruling 2, if folded) — `setEffectsInspector` and `setDivergenceProbe` become one gated install through (d)'s form; `assertPureForEquality` reads symbols | §7.2 | none owed | the two `set*` names gone; B-148's flag untouched |
+| **Exit** | `src/evaluator.ts` entry → `evaluator`; its propagation half (`viralScan`, `mergeOverMeta`) → `metadata` in the same commit | — | `evaluator.ts` un-mixed | `units`: the `evaluator` unit has no L2 edge; §3.1's survey re-run; B-128(b)/(c) unblocked |
+
+**(d) itself is B-111**, a separate item. If B-111 lands first, C1's
+registration uses its channel form; if not, C1 uses the field registry and
+B-111 lifts it. Either order works; the plan does not sequence B-111.
+
+### 8.1 Verification
+
+Per chunk: `scripts/typecheck.sh`, the full sharded suite with plane lint,
+doc-ref lint, and the `units` report with its `units.json` edit in the same
+commit. Each hook has a suite entry that removes the install and asserts the
+error. C1 also re-runs `npx tsx scripts/bench-slot-lookup.ts`, since it moves
+the accessor layer the index sits under. The exit re-runs B-121 C2's survey
+(§3.1).
+
+### 8.2 Doc-update checklist
+
+- `docs/design/units.md` §4 status rows 8, 10, 11, 13 and the §8 day-one
+  numbers (K-010: corrected, not annotated); M5, M11, M12 marked closed.
+- `docs/design/concepts.md` §24 interface table — the four rows gain a
+  mechanism; delta 32 closes at C4.
+- `docs/design/allegretto/README.md` invariants — *fact payloads opaque to
+  base ops* becomes enforced at C1.
+- `docs/design/implementation-map.md` — new files from the C1 split.
+- `docs/backlog.md` — B-112 progress, B-128(b)/(c) unblocked at exit,
+  B-111 cross-reference, B-149 baseline lowered.
+- `docs/CHANGELOG.md` per chunk; this plan's status and the manifest row.
+
+## 9. Review against `units.md` — record (2026-10)
+
+What the review changed, so a reader of the merged plan can see which parts
+predate D50:
+
+1. **A done-condition** (§1): the `evaluator` unit's import set, read by the
+   binder.
+2. **A fifth hook, folded into the fourth's form** (§4 (e)): the facts-plane
+   merge, from M12 — the one violation the day-one report found.
+3. **Ruling 2 confirmed by the DAG** (§7.2): the probes cross *upward* to the
+   pipeline, so they are installs, not imports.
+4. **M13 added to B-145's population** (§6).
+5. **The chunk sequence** (§8), which the draft owed and which now follows
+   the unit moves rather than the other way round.
+
+What the review did not change: the four hooks, the six principles, the five
+out-of-scope populations, and rulings 1, 3, 4.
+
+## 10. What this plan is not
 
 It is **not** the upward-import fix. It addresses 4 of 98 distinct symbols and
 says so in §2; the other 94 are §6's, and calling this plan "the layer rework"
