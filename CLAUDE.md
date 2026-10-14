@@ -41,6 +41,7 @@ cache — amend it upstream, never here.
 - **Vision, thesis, design principles:** `docs/VISION.md` (Tier 0 — never edit without maintainer sign-off)
 - **Process, lifecycle, quality guidelines, agent rules:** `docs/PROCESS.md` (Tier 0)
 - **Classification & binding:** `docs/classification.md` · **Decisions:** `docs/decisions.md` (D1–D51, E-R, U-R, R-R, chunk rulings)
+- **Architecture vocabulary:** `docs/design/architecture-vocabulary.md` — layer, track, plane, plane interface, actor, unit: what each answers and how they relate. Read before a doc that uses more than one
 - **Architecture spine:** `docs/design/layers.md` (L0–L3 + tracks + milestones) · layer index `docs/design/README.md`
 - **Unit DAG (D50/D51):** `docs/design/units.md` — which unit holds which decision, what it may import, which files are still mixed; manifest `scripts/analyze/units.json`. Read the unit's row before moving code in or out of a file
 - **File-level map + evalSource pipeline:** `docs/design/implementation-map.md`
