@@ -4,6 +4,44 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — Architecture vocabulary; the B-112 plan rewritten for a new reader
+
+`docs/design/architecture-vocabulary.md` (new, Tier 1) defines the six
+abstractions the design documents use (layer, track, plane with field and
+channel, plane interface, actor and activity, unit), says which question
+each answers, how they relate, and records that "capability" carries three
+senses. Each definition is by citation to its existing site; nothing is
+restated.
+
+`docs/plans/plane-interfaces.md` (B-112, still draft) rewritten after the
+maintainer's review found it unreadable outside the conversation that
+produced it: a terms table, the problem stated as requirement, challenge
+and pattern (dependency inversion by registration, capability-gated), six
+principles each with a standard name and a test, every identifier named on
+first use, and a change record. No ruling, hook or chunk changed in
+substance. It also carries the 2026-10 review against `units.md`: a
+done-condition on the `evaluator` unit's imports, a fifth hook (the facts
+merge, M12) folded into channel registration's form, ruling 2 checked
+against the DAG, and the proposed chunk sequence C1 to C5.
+
+`docs/plans/documentation-standards-delta.md` (draft proposal for
+`majodali/methodology`): five P- rules, a two-pass authoring process with
+promotion from report to documentation, four lints, and (§6, 2026-10-16)
+a documentation architecture: declared document types with content rules,
+five types the methodology lacks, and the project model as the horizon
+under an instances-first constraint.
+
+`docs/documentation-census.md` (new, Tier 2 register, 2026-10-16): all
+fifty documents typed and checked. Fifteen types by purpose and reader,
+eight of which the methodology names. Findings by class: six unpromoted
+design docs and plans; `concepts.md` mixing model, analyses and unratified
+proposals; three K-010 findings (`PROCESS.md` §5's stale commands,
+`grammar-formalism.md`'s "not implemented" status, the L0 README's facts
+invariant); four narrative registers; eight closed plans not archived;
+bare identifiers in about forty documents. Priority 1 for migration:
+`PROCESS.md` §5 (maintainer sign-off), `concepts.md`, `units.md`,
+`grammar-formalism.md`. Documentation only.
+
 ## 2026-10 — D50/D51: the implementation as units in a narrow DAG, specified and measured
 
 `docs/design/units.md` — the organizing principle below the layer spine:
