@@ -221,3 +221,5 @@ evaluator/runtime set; this is the complete session list):
 - What landed → `docs/CHANGELOG.md` · v1 feature dispositions →
   `V1-INVENTORY.md`
 - Active plans → `docs/plans/README.md` · decisions → `docs/decisions.md`
+- Document types, reader-facing findings and migration order →
+  `docs/documentation-census.md`

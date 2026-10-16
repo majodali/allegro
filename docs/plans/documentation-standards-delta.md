@@ -5,8 +5,10 @@
 > and one working-agreement rule; to be taken up by `majodali/methodology`,
 > not adopted here.
 > Evidence: the B-112 plan `docs/plans/plane-interfaces.md` before its
-> 2026-10 rewrite, and the five documents that defined the project's
-> architectural abstractions without distinguishing them.
+> 2026-10 rewrite; the five documents that defined the project's
+> architectural abstractions without distinguishing them; and the census
+> of all fifty project documents in `docs/documentation-census.md`
+> (2026-10-16), which §6 draws on.
 
 ## 1. What is being proposed
 
@@ -49,6 +51,15 @@ outside it.
 The maintainer's framing: the documents had been working as reporting for
 review, and were about to become permanent documentation that no one new
 to the project could understand.
+
+**The census generalises the finding.** `docs/documentation-census.md`
+types all fifty documents and logs findings per document. Six design
+documents and active plans are written as reports and unpromoted; two
+documents mix kinds under one type; three active documents carry false
+status or commands (K-010); four registers hold narrative rows (P-006);
+eight closed plans are not archived (K-007); about forty of fifty cite
+identifiers bare (P-004); forty-two have no reader statement. The
+existing rules hold in about ten of fifty documents.
 
 ## 3. Proposed rules
 
@@ -180,7 +191,98 @@ The checks are cheap and the false-positive rate is low because the
 patterns are narrow. They do not replace the comprehension pass; they
 make its mechanical part unskippable.
 
-## 6. What this does not propose
+## 6. Documentation architecture: document types with content rules
+
+Added 2026-10-16 after the census in `docs/documentation-census.md`. The
+methodology's vocabulary already defines artifact types (Classification,
+Register, Plan, Design note, Specification, Runbook), content types
+(Entry, Requirement, Rationale, Status line) and relationship types
+(`traces-to`, `implements`, `supersedes`, `defines / instance-of` and
+five more). What it lacks is the link between them: nothing says what a
+Design note must contain, what a Plan may not, or which relationships each
+must carry. The census shows the cost. Fifty documents fall into fifteen
+types by purpose and reader; the methodology names eight of them; and the
+project's own Tier scheme, an authority attribute, has been standing in
+for type.
+
+### 6.1 Proposed rule: a document declares its type, and the type's content rules bind
+
+*Statement.* Every governed document MUST declare its document type in
+its header. Each type MUST be defined once, in the methodology's
+vocabulary or in the project's custom definitions, with: purpose, reader,
+required content types, forbidden content, the designations it may hold,
+and the relationships it must carry. Authority (who may change the
+document) is a separate designation and never a type.
+
+*Rationale.* The B-112 plan's defects and the census's findings have one
+cause: a document written as one kind and read as another. A declared
+type gives the reader the contract and gives the form audit something to
+check.
+
+### 6.2 The document types, drawn from instances
+
+Types the methodology has, with content rules proposed:
+
+| Type | Required content | Forbidden content | Relationships |
+|---|---|---|---|
+| **Register** | header declaring row shape; uniform rows: what, when, status, pointer | reasoning; narrative | each row `traces-to` or points to a design note or plan |
+| **Plan** | status line (K-007 transitions only); reader; terms used; problem statement; settled decisions; out of scope; chunks; verification; documents to update | design truth that outlives the plan (promote it) | `implements` a backlog item; `traces-to` design notes |
+| **Design note** | status tags per section; reader; terms used or cited; problem statement per designed mechanism; as-implemented pointer | plan content (chunks, sequencing); landing history | `defines` concepts; `traces-to` decisions; `verifies` by named tests |
+| **Specification** | the behaviour, stated to be implemented against; implementation status that is true | stale status | `implements` by named code; `verifies` by named tests |
+
+Types the census found that the methodology lacks:
+
+| Type | Purpose | Required content | Instances |
+|---|---|---|---|
+| **Vocabulary** | the abstractions a project's documents are written in, distinguished and related | one definition site per term by citation; which question each answers; relations; overloaded words with the term to prefer | `docs/design/architecture-vocabulary.md` |
+| **Conceptual model** | every salient concept in dependency order, levelled, with as-implemented and delta (the companion proposal `conceptual-model-methodology-delta.md` defines the entry shape) | the entry shape for every entry, including the foundations | `docs/design/concepts.md`, whose Part 0 breaks its own shape |
+| **Study** | an exercise testing whether a model earns its keep before adoption | a statement that it is not settled design; the question; the evidence; the open rulings | `docs/design/actors-and-activities.md` |
+| **Record** | a closed plan's chunk log, a landing report, an analysis pass: history kept for its evidence | a header saying it is history (which exempts it from supersession marking entry by entry) | eight closed plans in `docs/plans/`; `concepts.md` Part 0 §6 to §8; every CHANGELOG entry |
+| **Boundary contract** | what a layer or component provides, may depend on, and forbids | provides; may depend on; not in this layer; invariants with their enforcement | five layer READMEs |
+
+The **record** type is the one that unblocks the most. K-007 says closed
+plans move to the archive once promoted, and eight have not because
+"kept for chunk records" has no type to move to. With a record type, the
+rule becomes: a closed plan's durable content is promoted to design notes,
+its chunk log is re-typed as a record, and records live in the archive.
+
+### 6.3 Content types to add
+
+Each is a section shape the comprehension pass (§4) produces, so the
+rules in §3 have a named target:
+
+| Content type | Fields | Rule it serves |
+|---|---|---|
+| **Reader statement** | who; what they are assumed to know; where that is defined | P-007 |
+| **Terms table** | term; meaning here; definition site | P-008 |
+| **Problem statement** | requirement; challenge; approach and displaced alternatives | P-011 |
+| **Measurement** | question; what each outcome would mean; method; result | P-010 |
+| **Principle** | statement; standard name; test; example | P-009 |
+| **Change record** | per pass: date, what changed, what did not | the two-pass process, so a reader can tell which parts predate which review |
+
+### 6.4 The project model is the horizon, with one constraint
+
+The style guide names the owner's formal project-model horizon. The
+census shows what the model would hold: the concept types the project's
+content is made of (requirement, specification choice, implementation
+choice, decision, component with layer, unit, actor and plane as its
+kinds, interface, plan, chunk, measurement, finding) and the typed
+relationships among them. This proposal does not define it. It asks for
+one constraint when the methodology does: **a type is minted only when it
+has at least one existing instance**, so Article 6 (every rule earns its
+keep) holds for the model as it does for the rules. The census is the
+instance list.
+
+### 6.5 What the census found about the rules that already exist
+
+Four rules the methodology already has (P-004 citations carry names,
+P-006 registers hold uniform rows, K-007 plans are current, K-010
+superseded content is marked) hold in about ten of fifty documents. Two
+of those four have been in force since v1.4.0. A rule without a check
+does not survive the session that writes the document; the lints in §5
+are therefore part of this proposal, not an optional appendix.
+
+## 7. What this does not propose
 
 It does not propose that reports be written as documentation. W-008's
 three-part report is the right shape for review and should stay.
@@ -194,7 +296,7 @@ It does not propose a glossary per document. One vocabulary document per
 project for cross-cutting abstractions, and a terms table only in a
 document whose terms are its own.
 
-## 7. Open questions for the methodology
+## 8. Open questions for the methodology
 
 1. Whether P-011's problem statement is a P- rule (presentation) or a K-
    rule (knowledge), since it governs content as much as form.
@@ -205,3 +307,8 @@ document whose terms are its own.
    the conversation history is an acceptable stranger.
 4. Whether the lints in §5 belong in the methodology's skeletons so every
    governed project gets them, or stay per project.
+5. Whether the document types in §6.2 are standard types or custom
+   definitions under Article 7, and whether a project's authority tiers
+   become a standard designation.
+6. Where a record lives: the archive, as §6.2 proposes, or a
+   `docs/records/` home so the archive stays for superseded content only.

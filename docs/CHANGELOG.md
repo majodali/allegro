@@ -26,7 +26,21 @@ against the DAG, and the proposed chunk sequence C1 to C5.
 
 `docs/plans/documentation-standards-delta.md` (draft proposal for
 `majodali/methodology`): five P- rules, a two-pass authoring process with
-promotion from report to documentation, and four lints. Documentation only.
+promotion from report to documentation, four lints, and (§6, 2026-10-16)
+a documentation architecture: declared document types with content rules,
+five types the methodology lacks, and the project model as the horizon
+under an instances-first constraint.
+
+`docs/documentation-census.md` (new, Tier 2 register, 2026-10-16): all
+fifty documents typed and checked. Fifteen types by purpose and reader,
+eight of which the methodology names. Findings by class: six unpromoted
+design docs and plans; `concepts.md` mixing model, analyses and unratified
+proposals; three K-010 findings (`PROCESS.md` §5's stale commands,
+`grammar-formalism.md`'s "not implemented" status, the L0 README's facts
+invariant); four narrative registers; eight closed plans not archived;
+bare identifiers in about forty documents. Priority 1 for migration:
+`PROCESS.md` §5 (maintainer sign-off), `concepts.md`, `units.md`,
+`grammar-formalism.md`. Documentation only.
 
 ## 2026-10 — D50/D51: the implementation as units in a narrow DAG, specified and measured
 
