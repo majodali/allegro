@@ -1,0 +1,532 @@
+# Plane interfaces: installing Allegro Standard's behaviour into Allegretto (B-112)
+
+> Status: **draft**. Rulings 1, 3 and 4 in §8 (rulings) are taken; ruling
+> 2 and the chunk sequence in §9 (chunks) await ratification.
+> Owner: **B-112** (the four owed plane interfaces).
+> Reviewed against `docs/design/units.md` (units in a narrow DAG, D50)
+> 2026-10, and rewritten for a reader new to the project 2026-10; §11
+> (change record) lists what each pass changed.
+> Outcome: the hooks in §6 exist, each is capability-gated, and all share
+> one registration form. The `evaluator` unit imports nothing from Allegro
+> Standard. The other upward-dependency populations are filed as backlog
+> items and not worked here.
+
+## 1. Purpose and reader
+
+This plan defines how the base language, Allegretto, runs behaviour that
+belongs to the typed language built on it, Allegro Standard, without
+depending on it. The mechanism is a set of **hooks**: named slots the base
+declares, which the typed layer fills when it loads.
+
+The reader is assumed to know what a layer, a plane and a unit are.
+`docs/design/architecture-vocabulary.md` defines all three in two pages and
+should be read first. §2 (terms) below defines only the terms this plan
+adds.
+
+## 2. Terms used in this plan
+
+| Term | Meaning here |
+|---|---|
+| **The base** | Allegretto, layer L0: the value kinds, the evaluator, partial evaluation and the base primitives. Defined in `docs/design/layers.md` §1 (the layer spine). |
+| **The layer** | Any layer above L0. In this plan almost always L2, Allegro Standard: the type system, refinements, effects, proofs. |
+| **Symbol** | A name or token the base can store, compare and pass along without interpreting. The string `"effects"` is a symbol to the base. |
+| **Meaning** | The behaviour or data semantics associated with a symbol. What it means to merge two effect sets, or to check a value against a type, is meaning. |
+| **Hook** | A named slot the base declares and calls, whose implementation a layer registers when it loads. The base defines the interface; the layer supplies the implementation. |
+| **Install** | A layer registering an implementation into a hook, at module load time. |
+| **Handle** | An opaque value the base is handed and passes along unchanged. A type constant is a handle to the base. |
+| **Metadata field** | One named slot on a value's metadata plane, with a propagation rule and a writer. `concepts.md` §19 (metadata field). |
+| **Writer capability** | The authority to set a field, realised as a closure that only the registrant holds. `concepts.md` §21 (writer capability); decisions D23 (writes are gated, reads free) and D24 (the capability is a delegable closure). |
+| **Plane interface** | The sanctioned route by which code reaches a plane. `concepts.md` §24 (plane interfaces). A hook is the plane interface that crosses a layer boundary. |
+| **Unit** | The smallest body of code holding one decision, with its imports as its dependencies. `docs/design/units.md` §2. |
+
+## 3. The problem this plan solves
+
+### 3.1 Two requirements that pull against each other
+
+Requirement **R2** (partial evaluation is the mechanism by which layers
+are added, `concepts.md` §1) says that type checking, effect checking and
+proof discharge are not separate passes. They happen *by evaluating*: the
+evaluator runs the program as far as it can, and a check that cannot
+complete becomes a residual value. So the evaluator must perform
+type-directed dispatch and argument checking during evaluation.
+
+Requirement **R6** (the base does not know about the layers, `concepts.md`
+§1) says no concept of Allegro Standard may appear in Allegretto. The base
+may not know what a type is.
+
+Together: the evaluator must run type behaviour it may not know. That is
+the architectural challenge.
+
+### 3.2 The design pattern: dependency inversion by registration
+
+The standard answer is dependency inversion. The lower module declares the
+interface it needs; the higher module implements it; something wires the
+two together at startup. In Allegro the wiring is **registration at load
+time**: the base exports a registration function, and the layer calls it
+when its module initialises. Control flows upward (the base calls the
+layer's code) while the dependency arrow points downward (the layer
+imports the base, never the reverse). This is the plugin pattern, and it
+is how the base already handles one case today (§4.2).
+
+Two Allegro-specific constraints shape it:
+
+- **The base keeps only symbols.** The base stores the field name and the
+  registered implementation. It never inspects what the implementation
+  does. This is the same discipline the propagation rules already follow
+  (SC-7, propagation is drawn from a fixed inspectable vocabulary,
+  `concepts.md` §20): the base applies a rule by name and the layer
+  supplies the semantics.
+- **Registration is gated.** A registered type-check decides what passes.
+  Whoever can register it holds authority, so registration requires the
+  same unforgeable token that writing a field requires. Otherwise any
+  module could redefine what type checking means, which is the forgery
+  the writer capability exists to prevent (R12, metadata origination is
+  capability-controlled).
+
+### 3.3 What this plan buys, stated without overstatement
+
+This plan does not get the project's thesis tested sooner. The next
+thesis test is rung 3 of the demo ladder (`docs/plans/release-track.md`
+§5), which is blocked on other work.
+
+What it buys is the ability to reason about findings, especially
+unexpected ones. The evidence is B-121 chunk C2 (metadata on values):
+eleven call sites broke on a change that altered no interface, every
+failure was silent, and two whole classes of them were invisible to the
+survey meant to find them. Rung 3 adds new L0 and L2 surface, so that risk
+is live while the pilot is built.
+
+Since D50 (units in a narrow DAG) there is also a target the tooling can
+read. `units.md` §6.1 M11 finds that the evaluator holds three activities
+that belong to the Type system: checking an argument against a declared
+type, dispatching a member access, and inferring types during
+precompilation. The hooks in this plan are exactly that boundary. The
+plan is done when `src/evaluator.ts` imports nothing from the L2 units
+(§4.4).
+
+## 4. Current state, measured
+
+### 4.1 How much of the base's dependency on L2 is deciding, and how much is carrying
+
+The question: of everything the base imports from the typed layer, how
+much requires the base to *decide* something (which needs a hook) and how
+much only requires it to *carry* a value through (which needs a handle)?
+
+Method: the import clauses of the seven L0 files (`types.ts`,
+`structure.ts`, `slots.ts`, `scope.ts`, `evaluator.ts`, `primitives.ts`,
+`runtime.ts`) were parsed against the six L2 modules and each imported
+symbol classified by what it is.
+
+Result: **131 imported symbols, 98 distinct**. `primitives.ts` alone
+takes 54 from `types-std.ts`.
+
+| Class | Distinct | Examples | What it means for the base |
+|---|---|---|---|
+| Operations | 23 | `unifyTypes`, `impliesDomain`, `propagateSetForPrimitive` | the base calls L2 logic |
+| Constructors and transforms | 19 | `withType`, `makeArray`, `normalizeType` | the base builds typed values |
+| Type constants | 13 | `IntType`, `BoolType`, `ArrayType` | the base names types |
+| Accessors and projections | 13 | `getType`, `domainOf`, `predicatesOf` | the base reads L2 fields through L2 aliases |
+| TypeScript types | 10 | `PredicateSet`, `AbstractDomain`, `EffectSet` | the base destructures L2 representations |
+| Predicates | 9 | `isGenericType`, `isPrivateDescriptor` | the base branches on L2 shapes |
+| **Checkers** | **4** | `checkExhaustiveness`, `checkEffectsDeclarations` | the base runs L2 checks |
+| Formatters | 4 | `formatProofFinding`, `describeFailedProof` | the base renders L2 findings |
+| Injection points | 3 | `setDivergenceProbe`, `setEffectsInspector` | L2 asks the base for results (§4.3) |
+
+What the table shows: only the four checkers and the dispatch inside the
+evaluator are *deciding*. The hooks in §6 address those. The other classes
+are carrying, rendering, or shared representation, and each needs a
+different answer. §7 (out of scope) files them.
+
+### 4.2 The pattern already exists once, without gating
+
+`installFieldMerge` in `src/slots.ts` is a hook. The base holds a map from
+field name to merge function and knows the string `"effects"`.
+`src/effects.ts` installs the merge for effect sets when it loads. The
+base reads it back by name when the propagation rule `union` applies.
+Its own comment gives the reason: the base cannot import the encodings
+without a cycle.
+
+This is the form the plan prescribes, working today. It falls short of the
+bar in one way: **any module may call it**, so any module may decide what
+merging effects means. §3.2's gating constraint is not met.
+
+### 4.3 The reverse direction: the layer asking the base for analysis results
+
+Three symbols looked like further hooks and are not. `setDivergenceProbe`,
+`setEffectsInspector` and `setLawInstantiationSuspended` are declared in
+`types-std.ts` (L2) and filled from `runtime.ts` and `primitives.ts`. They
+run the other way: the typed layer asks for results that only the
+evaluator and the pipeline can compute. The third is not a hook at all but
+a flag toggled around a critical section. §8.2 (ruling 2) says what to do
+with them.
+
+### 4.4 The same state at unit grain
+
+`scripts/analyze/units.json` assigns `src/evaluator.ts` to three units at
+once: `evaluator`, `metadata` (the propagation code `viralScan` and
+`mergeOverMeta`) and `type-core` (the three Type-system activities). While
+a file is mixed, every import edge out of it is *unresolved* in the
+`units` report rather than a verdict, so the file's 45 uses of L2 symbols
+are invisible as violations. The exit of this plan assigns the file to
+`evaluator` alone and moves the propagation code to the `metadata` unit,
+after which the report can pass judgement.
+
+## 5. Principles
+
+Six working principles, accepted as provisional (maintainer, 2026-09).
+They are not promoted to `layers.md`; §5.1 states what decides their fate.
+Each is stated, given its standard name where one exists, and given a
+test.
+
+### 5.1 P1: the base stores symbols and never interprets them
+
+*Statement.* The base may hold a field name, a rule name or a registered
+implementation. It may not contain code that depends on what those mean.
+
+*Standard name.* Opaque token.
+
+*Test.* Delete the layer. Does the base still compile and run, with the
+hook unfilled? If the base needed the meaning, it will not.
+
+*Example.* `slots.ts` holds `"effects"` and a merge function it never
+reads into. It does not know an effect set is a set.
+
+### 5.2 P2: the layer installs; the base never imports
+
+*Statement.* Direction is not symmetric. An import makes the base depend
+on the layer *existing*. An install makes the layer depend on the base's
+*interface*, which is the direction R6 permits.
+
+*Standard name.* Dependency inversion, realised by registration at load
+time (the plugin pattern).
+
+*Test.* The unit DAG. `units.md` §5 states this as a graph property: every
+L2 unit reaches L0 through the `metadata` and `capability` units and
+never through a kind's representation. The `units` report checks it. All
+131 imports in §4.1 point the wrong way; `installFieldMerge` is the only
+thing pointing the right way.
+
+### 5.3 P3: carrying needs a handle; deciding needs a hook
+
+*Statement.* When the base must pass a layer's value through unchanged, it
+needs only an opaque handle it was given at registration. When the base
+must choose behaviour based on a layer's value, it needs an installed
+implementation.
+
+*Standard name.* Separation of data from behaviour; strategy pattern for
+the deciding case.
+
+*Test.* Does the base branch on the value? Stamping *this result is an
+Int* does not branch; it stores a handle. Checking *does this argument
+satisfy the parameter's type* branches on the answer.
+
+*Why it matters.* This is the line between §6 (hooks) and the type
+vocabulary population in §7. Extending the hook mechanism to carrying
+would give the base a decision it does not make.
+
+### 5.4 P4: registration is gated by the writer capability
+
+*Statement.* Installing into a hook requires the same unforgeable token
+that writing the corresponding field requires. If any module can install
+the check hook, any module can decide what type checking means.
+
+*Standard name.* Capability-based security, applied to registration.
+Decisions D23 (channel writes are capability-gated, reads free) and D24
+(the capability is a first-class delegable closure; attenuation is
+wrapping) already apply it to field writes.
+
+*Test.* Attempt the install from a module that does not hold the writer.
+It must be refused with an error, not ignored.
+
+### 5.5 P5: define the interface before enforcing it
+
+*Statement.* The sanctioned route lands before any lint forbids the
+unsanctioned ones. A lint without the missing interface relocates the
+reach rather than removing it.
+
+*Standard name.* Vocabulary before policing.
+
+*Evidence.* B-128 (layer separation is not policed) records the
+counterexample: `unifyTypes` reached for storage because the interface
+had no word for what it meant. This is why B-128's parts (b) and (c) wait
+on this plan and not the reverse.
+
+### 5.6 P6: a shared TypeScript type is a shared representation
+
+*Statement.* Ten of the 98 imported symbols are TypeScript types. They
+erase at runtime, so they look free. They let the base destructure the
+layer's representation, which is the dependency the planes exist to
+prevent.
+
+*Standard name.* Representation leakage through shared types.
+
+*Status.* Accepted with a recorded tension (maintainer, 2026-09). There is
+no way around it with TypeScript alone, and it makes the interfaces
+porous. The diagnosis is that these are a semantic dependency, concepts
+built on simpler concepts, wearing an architectural mask. The fix is a
+semantic hierarchy that is also a type hierarchy, some of it written in
+Allegro rather than TypeScript. That is bootstrapping-era work (milestone
+M9, self-hosted parser and type system) and is not attempted here.
+
+*Under D51 (the `Value` contract).* The L0 half has an answer: the
+`value` contract's own types (`ValueBase`, `KindOps`) are the sanctioned
+shared types, and what P6 forbids is an L2 representation type crossing
+downward. The clearest instance is `scope.ts` importing `PredicateSet`
+and `mergePredicateSets` from `refinements.ts` (`units.md` M12), while the
+storage under it is already typed `Map<string, unknown>`.
+
+### 5.7 What decides whether the principles held
+
+Re-run the survey from B-121 chunk C2 after this plan lands. If the
+answer is a short list rather than a class of things nobody could search
+for, the principles held. If not, they were wrong and the survey says
+where. A provisional rule with no trigger becomes permanent by default;
+this clause prevents that.
+
+## 6. In scope: the hooks
+
+Each hook has the same form: the base declares a slot keyed by field name,
+the layer installs under P4's gate, the base calls with opaque values.
+
+| Hook | What the base needs | Who installs | Today |
+|---|---|---|---|
+| **(a) Dispatch** | type-directed member dispatch during evaluation, without knowing what a type is | `type-core` installs *how to dispatch on my field* | `PRIM_TO_METHOD` and the `typeMethod` family inside `evaluator.ts` |
+| **(b) Check** | checking an argument against a declared constraint | each channel installs *how to check a value against my field*, one check per registered field, called with a reader (§8.1) | `checkArgType`, 150 lines in `evaluator.ts` doing three jobs |
+| **(c) Projection** | a computed view of a field, such as `shape` over `type` | each channel installs its projections | `typeShape` in `slots.ts` reads refinement-chain fields directly |
+| **(d) Channel registration** | one registration that names a channel's fields, rules, semantics and owner | the owning layer | eleven undifferentiated field registrations performed by the base; owned by **B-111** (field versus channel: one registry for two concepts) |
+| **(e) Facts merge** | combining fact layers along the scope chain | `refinements` installs the `predicates` merge | `scopeFactsFor` imports `mergePredicateSets`; found by the `units` report (`units.md` M12), added 2026-10 |
+
+Hook (e) should not be a fifth mechanism. It is (d)'s registration read by
+a second consumer: a channel registers its merge once, the metadata plane
+reads it for the `union` rule, and the facts plane reads it along the
+chain. Then the scope holds a symbol and no meaning (P1), `scopeAssume`
+takes `Map<string, unknown>` (P6), and the L0 boundary contract's claim
+that fact payloads are opaque to base operations becomes true.
+
+### 6.1 The two concrete targets are messier than one hook each
+
+`checkArgType` does three jobs: discharging an effect bound
+(`getEffectBound` with `impliesDomain`), checking a refinement
+(`getPredicate`, `getRefines`), and structural type checking. So *a
+channel installs how to check against my field* is at least three
+installs. Ruling 1 (§8) takes the reading that matches P1: one hook,
+called once per registered field, using the loop the propagation table
+already has.
+
+`typeShape` lives in `slots.ts` and reads the `predicate`, `refines` and
+`members` fields directly. That is L0's accessor layer encoding L2's
+refinement-chain semantics, and it is the cleanest single test of hook
+(c): thirteen lines with one caller shape.
+
+## 7. Out of scope: filed, not worked
+
+Four populations remain after the hooks. Each is a distinct question with
+a distinct answer, and none is served by extending the hook mechanism.
+They are worked after rung 3, per the sequence ratified 2026-09.
+
+| Population | The question | Size | Why not a hook | Backlog item |
+|---|---|---|---|---|
+| **Type vocabulary** | How does a base primitive name a type it must not know, when it builds a result? | about 25 symbols, plus three L1 grammar files that build typed arrays, objects and strings (`units.md` M13) | P3: this is carrying. The primitive needs a handle it was given at registration. | **B-145** |
+| **Knowledge propagation** | The evaluator performs abstract interpretation over L2 knowledge (domains, predicates) | about 18 | P1: L2 semantics run inside L0's loop, not referenced from it; the answer is an installed interpreter, which is larger than a hook | **B-146** |
+| **Diagnostics and reporting** | L0 renders L2 findings as text | about 8 | P1: the finding is a symbol; rendering is a meaning the layer owns | **B-147** |
+| **The law-instantiation flag** | A phase-scoped mutable global that switches a gate off | 1 | it is a defect, not a boundary | **B-148** |
+
+Type vocabulary is the one to watch. It touches every primitive. If rung
+3's pilot needs new plane crossings, and solution finding over a
+constraint substrate plausibly does, it stops being deferrable and
+becomes rung 3's blocker. That is the assumption the sequence rests on,
+and it should be discovered from the pilot rather than predicted here.
+
+Two populations that were scopes in the first draft are not any more.
+Member dispatch is hook (a) (ruling 3). Base-to-layer injection is
+ruling 2.
+
+## 8. Rulings
+
+Three were taken 2026-09; one is open.
+
+| # | Question | Ruling |
+|---|---|---|
+| 1 | Is the check hook one hook or three? | **One hook, called per registered field** (taken). §8.1 records the consequence for its signature. |
+| 2 | Do the base-to-layer probes (§4.3) fold into this plan? | **Open.** §8.2 recommends folding them in as a gated install. |
+| 3 | Does member dispatch fold into hook (a)? | **Yes** (taken). §8.3 records what does not fold in with it. |
+| 4 | Are the out-of-scope populations filed now? | **Yes** (taken). §7 and B-145 through B-148. |
+
+### 8.1 Ruling 1: field checks are not independent, so a check takes a reader
+
+The question raised: do any metadata fields depend on other fields? The
+measured answer is yes, in both directions that matter.
+
+- A field derives from another. `domainOf(v)` reads the `predicates` field
+  first and falls back to `domain` only when there is no predicate set.
+  So `domain` is a derived reading of `predicates`, not a peer.
+- One field's check reads other fields. `checkArgType`, the check for
+  `type`, reads the expected type's effect bound and the argument's
+  `effects`, then its refinement predicate and the argument's
+  `predicates` or `domain`. Checking `type` consults two other channels.
+
+Consequence for the signature: a check hook takes `(expected, actual,
+read)`, where `read` is a total reader over registered fields, the same
+surface `metaOf` provides. The base still holds no meaning: it owns the
+loop and the reader, and each field's check decides. What the base must
+not do is order the loop by a dependency it knows about, because that
+would encode which field derives from which. So the reader must be
+usable from any check, and no check may depend on running after another.
+
+### 8.2 Ruling 2: the probes are a lower unit asking a higher one for results
+
+All three probe symbols converge on `assertPureForEquality` in
+`types-std.ts`:
+
+- `setEffectsInspector`: the typed layer asks *what effects does this
+  function have?*
+- `setDivergenceProbe`: it asks *may this function diverge?* (ruling
+  CE-R7: an equality or coercion whose termination is undischarged fails
+  the purity gate).
+- `setLawInstantiationSuspended`: not a hook; a flag that switches the
+  gate off for a phase.
+
+The callers are the equality implementations of `define` and
+`Refinement`, and `Coercion.declare`. So the whole population serves one
+job: deciding whether a function is pure and total enough to instantiate
+an equality law (ruling E-R5: an `equals` implementation must infer an
+empty effect set; CE-R7 extends that to termination). In actor terms this is
+the activity *Register law* needing facts from *Infer effects* and
+*Check totality*.
+
+Checked against the unit DAG (2026-10): the consumer is the
+`equality-laws` unit (`units.md` row 26). The effects inspector is filled
+from `primitives.ts:1894`, the type primitives (row 32), which sit above
+it. The divergence probe is filled from `runtime.ts:1213` with the
+pipeline's set of diverging functions, the result of an analysis that
+runs in the pipeline (row 33), the top of the DAG. A lower unit is asking
+a higher one for an analysis result. No import can express that without
+inverting the order, so the probes cannot become plain imports.
+
+This is the mirror image of `actors-and-activities.md` §5a.3: there,
+analyzers write conclusions onto the subject instead of returning them;
+here, a consumer reaches back for a conclusion it cannot compute. Both
+are the same missing thing, an analysis result with no interface.
+
+*Recommendation:* fold in. The two real probes become one gated install
+through (d)'s registration form: the pipeline installs *what this
+function's effects are* and *whether it may diverge*, and the law gate
+reads them as symbols. The flag is a separate defect and stays filed as
+B-148.
+
+### 8.3 Ruling 3: member dispatch is hook (a), and what does not fold in
+
+The nine symbols that made member dispatch look separable are three
+different things:
+
+| Symbols | What it is | Home |
+|---|---|---|
+| `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` | dispatch proper | hook (a) |
+| `assertMemberReachable`, `assertMemberAvailable` | a gate on dispatch | hook (b), because it is a check |
+| `isFieldDescriptor`, `isMethodDescriptor`, `isGetterDescriptor`, `isPrivateDescriptor` | L2's descriptor shape, read in `primitives.ts` | neither: P6 |
+
+The last row stays in view. Those four predicates exist because L0
+branches on what kind of member descriptor it found, which is L2's
+representation crossing the boundary as a shared shape. Hook (a) does not
+remove them; P6 does, and P6's answer is M9. Filed inside B-145.
+
+## 9. Chunks (proposed 2026-10, awaiting ratification)
+
+Each chunk lands one hook and moves its callers, plus the unit move the
+hook makes natural (`units.md` §7: a move rides the chunk that touches its
+file). Order is by what unblocks the most. The `slots.ts` split goes first
+because three units and the facts merge all wait on it.
+
+| # | Chunk | Hook | Unit moves (`units.json` edits) | Exit measured by |
+|---|---|---|---|---|
+| **C1** | Split `slots.ts` three ways (`units.md` M5): structure accessors to `structure`; field registry and propagation table to `metadata`; writer capabilities and `installFieldMerge` to `capability`. Gate `installFieldMerge` (P4) while it moves. Register the `predicates` merge from `refinements.ts`; `scopeFactsFor` reads it; `scopeAssume` takes `Map<string, unknown>` | (e) via (d)'s form | `src/slots.ts` leaves the mixed list; the plane lint's accessor layer becomes the `structure` unit's files; the `scope → refinements` violation is gone | `units`: 6 mixed files, 0 violations; plane lint green |
+| **C2** | Check hook: `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)`; `type-core`, `refinements` and `effects` install theirs | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` finds no caller outside the installers; the uninstalled-check test fails loudly |
+| **C3** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b) | (a) | `evaluator.ts` loses `normalizeType` and the member family | `refs PRIM_TO_METHOD` finds nothing in the evaluator |
+| **C4** | Projection hook: `typeShape` leaves the `metadata` unit and is installed by `type-core` | (c) | the `metadata` unit holds no refinement-chain reading | `refs typeShape` finds the installer only |
+| **C5** | Analysis probes, if ruling 2 folds: `setEffectsInspector` and `setDivergenceProbe` become one gated install through (d)'s form | §8.2 | none owed | the two `set*` names are gone; B-148's flag untouched |
+| **Exit** | `src/evaluator.ts` assigned to `evaluator`; its propagation half (`viralScan`, `mergeOverMeta`) moved to `metadata` in the same commit | | `evaluator.ts` un-mixed | `units`: the `evaluator` unit has no L2 edge; §5.7's survey re-run; B-128 (b) and (c) unblocked |
+
+Hook (d) is B-111 (field versus channel registration), a separate item.
+If B-111 lands first, C1's registration uses its channel form; if not, C1
+uses the field registry and B-111 lifts it later. Either order works; this
+plan does not sequence B-111.
+
+### 9.1 Verification
+
+Per chunk: `scripts/typecheck.sh`; the full sharded suite with the plane
+lint; the doc-ref lint; the `units` report with its `units.json` edit in
+the same commit. Each hook has a suite entry that removes the install and
+asserts the error: an uninstalled hook must fail at the call site, never
+pass silently (the lesson of B-121 C2's eleven silent breaks and of
+B-128(a)'s probe). C1 also re-runs `scripts/bench-slot-lookup.ts`, since
+it moves the accessor layer the slot index sits under. The exit re-runs
+the B-121 C2 survey (§5.7).
+
+### 9.2 Documents to update on landing
+
+- `docs/design/units.md` §4 status rows for units 8, 10, 11 and 13, and
+  the §8 day-one numbers, corrected in place; M5, M11 and M12 marked
+  closed.
+- `docs/design/concepts.md` §24 (plane interfaces): the interface table
+  rows gain a mechanism; delta 32 closes at C4.
+- `docs/design/allegretto/README.md` invariants: *fact payloads opaque to
+  base ops* becomes enforced at C1.
+- `docs/design/implementation-map.md`: the new files from the C1 split.
+- `docs/backlog.md`: B-112 progress; B-128 (b) and (c) unblocked at
+  exit; B-111 cross-reference; the baseline of B-149 (the unit DAG joins
+  the gate) lowered.
+- `docs/CHANGELOG.md` per chunk; this plan's status and its manifest row.
+
+## 10. Relationship to the unit DAG
+
+`units.md` is the specification of which code may import which. This plan
+is one of its moves: the one that takes the evaluator to its unit. The
+relationship runs both ways.
+
+- The DAG gives this plan its done-condition (§3.3) and its per-chunk
+  verdict (§9).
+- This plan gives the DAG two of its first closed misalignments (M5, the
+  three-way `slots.ts` split; M11, the Type-system activities in the
+  evaluator) and the mechanism for a third (M12, the facts merge).
+- Where the two disagreed, the measurement won. The first draft of the
+  DAG placed the grammar registry above the tree builder; the `units`
+  report showed the builder reads the registry, so the registry sits
+  below. That is recorded in `units.md` §4.2.
+
+## 11. Change record
+
+**2026-10, rewrite for a new reader.** The maintainer's review found that
+the document assumed its reader had followed the conversation that
+produced it: section titles written for effect, principles stated as
+slogans, identifiers cited without their names, and five architectural
+abstractions used without being distinguished. This revision adds §1
+(purpose and reader), §2 (terms), §3 (the problem, as requirement,
+challenge and pattern), restates each principle with a standard name and
+a test, names every cited identifier on first use, and moves the
+cross-document definitions to `docs/design/architecture-vocabulary.md`.
+No ruling, hook, principle or chunk changed in substance. The companion
+proposal for the methodology is `docs/plans/documentation-standards-delta.md`.
+
+**2026-10, review against `units.md`.** Added the done-condition (§3.3),
+the measurement at unit grain (§4.4), hook (e) (§6), the DAG check in
+ruling 2 (§8.2), M13 in the type-vocabulary population (§7), and the
+chunk sequence (§9).
+
+**2026-09, rulings.** Rulings 1, 3 and 4 taken; B-145 through B-148
+filed; §8.1 through §8.3 written.
+
+**2026-09, first draft.** Measurement, six principles, four hooks, five
+out-of-scope populations.
+
+## 12. What this plan is not
+
+It is not the upward-import fix. It addresses the deciding cases, 4 of 98
+distinct symbols plus the dispatch inside the evaluator. The other
+populations are §7's, and calling this plan "the layer rework" would
+overstate it by an order of magnitude.
+
+It is not a lint. P5 puts the interface first, and B-128 owns the
+enforcement.
+
+It is not P6's answer. The semantic hierarchy that would dissolve the
+shared-type tension is M9 work, recorded in §5.6 and left there.
