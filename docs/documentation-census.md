@@ -65,7 +65,7 @@ Approximate bare-identifier counts are in the findings as "~N bare IDs".
 | `CLAUDE.md` | Agent bootstrap | agent | bootstrap | n/a | 224 lines against K-002's guideline of about 200. ~15 bare IDs, acceptable for a pointer document whose reader has the registers open. | 3 |
 | `V1-INVENTORY.md` | Register | maintainer | Tier 2 | n/a | 44% of sentences over 35 words; rows are narrative (P-006). Six headers with em-dashes. | 3 |
 | `docs/VISION.md` | Constitution | everyone | Tier 0 | no | No reader statement. Otherwise clean. Any change needs maintainer sign-off. | 4 |
-| `docs/PROCESS.md` | Constitution | everyone | Tier 0 | no | **Stale commands in §5 (landing checklist)**: `npx tsc --noEmit` and `npx tsx src/test.ts`. The sanctioned typecheck is `scripts/typecheck.sh` and the suite is `src/test/`. This is a K-010 finding (false content in an active document); it is reported here, not edited, because Tier 0 needs sign-off. | **1** |
+| `docs/PROCESS.md` | Constitution | everyone | Tier 0 | no | Stale commands in §5 (landing checklist), `npx tsc --noEmit` and `npx tsx src/test.ts`: **fixed 2026-10-19** with maintainer sign-off. §10 (enforcement and tooling) said CI was still to be added and listed `tsc --noEmit`; CI exists (`.github/workflows/ci.yml`) and runs the typecheck script and the sharded suite: fixed in the same PR, flagged as beyond the §5 sign-off. No reader statement remains the open finding. | 2 |
 | `docs/classification.md` | Binding | auditors | binding | n/a | None. | 4 |
 
 ### 2.2 Registers
@@ -148,7 +148,7 @@ archive is where records live.
 |---|---|---|---|
 | Written as a report, not promoted | 3 design docs, 3 active plans | `units.md`, `concepts.md` Part 0, `host-plane-declaration.md` | this census; rewrite rides the next chunk that touches each |
 | Mixed document kinds under one type | 2 | `concepts.md` (model + analyses + proposals); `actors-and-activities.md` (study, acceptable) | `concepts.md` revision, next chunk of the concept-spine plan |
-| Stale or false content in an active document (K-010) | 3 | `PROCESS.md` §5 commands; `grammar-formalism.md` status; `allegretto/README.md` facts invariant | maintainer (Tier 0); grammar doc editorial; B-112 C1 |
+| Stale or false content in an active document (K-010) | 3 | `PROCESS.md` §5 commands (fixed 2026-10-19); `grammar-formalism.md` status; `allegretto/README.md` facts invariant | done; grammar doc editorial; B-112 C1 |
 | Register rows that are narrative (P-006) | 4 | backlog, decisions, plans manifest, v1 inventory | B-129 for the backlog; the rest editorial |
 | Closed plans not archived (K-007) | 8 | §2.4 | needs a record type or an archive rule |
 | Status vocabulary outside K-007 | 4 | `COMPLETE`, `approved and applied`, `closed → B-120`, `draft proposal` | editorial once the vocabulary is ruled |
