@@ -4,6 +4,16 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — PROCESS §5 and §10: stale commands corrected (Tier 0, maintainer sign-off)
+
+The landing checklist cited `npx tsc --noEmit` and `npx tsx src/test.ts`;
+it now cites `bash scripts/typecheck.sh` and `npm test` / `npm run
+test:shards`, which are what the gate and CI actually run. §10 no longer
+says CI is to be added: `.github/workflows/ci.yml` runs the typecheck
+script and the sharded suite with the plane lint, and the doc-ref lint runs
+inside the suite. First K-010 finding from `docs/documentation-census.md`
+closed. Documentation only.
+
 ## 2026-10 — Architecture vocabulary; the B-112 plan rewritten for a new reader
 
 `docs/design/architecture-vocabulary.md` (new, Tier 1) defines the six

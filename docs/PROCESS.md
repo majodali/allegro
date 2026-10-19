@@ -247,8 +247,9 @@ and invalidates) is the maintainer's primary sandbox, not just marketing.
 
 ## 10. Enforcement & tooling
 
-- **CI** (to be added — tracked as debt): `tsc --noEmit`, the full test
-  suite, and a doc-reference lint (every `docs/…`, `docs/plans/…`,
+- **CI** (`.github/workflows/ci.yml`): `bash scripts/typecheck.sh`, then
+  `npm run test:shards`, which runs the full suite, the plane lint and
+  the doc-reference lint (every `docs/…`, `docs/plans/…`,
   `.claude/memory/…` path mentioned in tracked docs must resolve — dangling
   references are how this project lost its thesis document for months).
 - Git identity in remote sessions: `Claude <noreply@anthropic.com>` for
