@@ -1,10 +1,22 @@
 # Allegro Grammar Formalism — Design Spec (Phase 0)
 
-**Status:** Draft for review. Not implemented.
-**Scope:** Defines the grammar model Allegro will use going forward — replacing the
-current Pratt + Earley hybrid. Covers the formalism, extension semantics, static
-analysis requirements, parse semantics, and error handling. Does NOT cover
-implementation (engine, generator, migration — those are later phases).
+**Status:** Implemented. `src/grammar2/` is the Allegro parser built to this
+formalism: the scannerless engine (`engine.ts`: memoization, left recursion by
+Warth iteration, stateful indent terminals, farthest-advance errors), the
+static analyzer (`analyzer.ts`), the Allegro grammar as a value
+(`base-grammar.ts`), tree building, and fragment merging for runtime
+extension (`docs/design/implementation-map.md`). The former Pratt + Earley
+hybrid is replaced; the generated Earley parser (`src/parser.ts`) is retained
+for the standalone `grammar_*` DSLs only. Gaps still open against this
+specification are listed in `docs/design/extension/grammar.md` §3 (design
+goals): `@error` productions with `@sync` panic recovery, the SAMELINE
+terminal, FIRST-set analysis completion, and full GLL where Warth iteration
+falls short. Status corrected 2026-10-19 from "Draft for review. Not
+implemented" (a K-010 finding in `docs/documentation-census.md`).
+**Scope:** Defines the grammar model: the formalism, extension semantics,
+static analysis requirements, parse semantics, and error handling. Does NOT
+cover the engine's implementation, which `docs/design/extension/grammar.md`
+records.
 
 ## 1. Goals and constraints
 
@@ -528,7 +540,7 @@ as shipped in runtime-extension Phases 6/6b/7 (decision record:
 `docs/design/extension/grammar.md` §4; demos: `lib/pow.alg`,
 `lib/match_expr.alg`, `lib/units.alg`).
 
-- **Grammar 2 formalism (new, Phase 1 in progress)** — scannerless formalism described in `docs/grammar-formalism.md`. Will replace Pratt + Earley in Phase 2. Rule union (Terminal/NonTerm/Seq/Alt/Rep/Opt/Guarded), named productions, symbolic precedence, stateful indent terminals, grammar-value extension via `Operation` deltas, user-defined `@error` productions with `@sync` panic recovery. Phase 1 status: types + engine + Allegro primitives (`grammar2_*`) + tests covering the §10.3 regex DSL. Not yet: analyzer, indent engine, left recursion via full GLL, migration of existing Allegro grammar.
+- **Grammar 2 formalism (shipped)** — the scannerless formalism this document specifies, implemented in `src/grammar2/` and now the Allegro parser; Pratt + Earley is replaced. Rule union (Terminal/NonTerm/Seq/Alt/Rep/Opt/Guarded), named productions, symbolic precedence, stateful indent terminals, grammar-value extension via `Operation` deltas, the analyzer, and the Allegro primitives (`grammar2_*`) with tests covering the §10.3 regex DSL. Still open: user-defined `@error` productions with `@sync` panic recovery, the SAMELINE terminal, FIRST-set completion, and full GLL where Warth iteration falls short (`docs/design/extension/grammar.md` §3). This bullet said "Phase 1 in progress" until 2026-10-19.
 - **Runtime grammar extension** (Phase 6 + 6b): modules declare syntax additions in a `grammar { … }` block:
   - **Operators** (Phase 6): `infix S prec(X) left/right/none => (l,r) => ast`, `prefix S at(X) => …`, `postfix S at(X) => …`, `expr_prefix KW => …`. Precedence clauses accept named levels (`prec(pow)`), positional constraints (`above(mul) below(unary)`, single or combined), and operator-symbol lookup (`at("*")`). Anonymous levels get gensym'd names. Level insertion in `src/grammar2/fragments.ts` splices new productions into the stratified stack via surgery on the base grammar (LEVELS array in `base-grammar.ts`).
   - **User rules + multi-token forms** (Phase 6b): `rule NAME = ebnf_body => template` adds/replaces a production; `rule NAME += …` appends an alternative. `expr_form parts => template` adds a new multi-token expression alternative (e.g. `match x with p => e | …`); `stmt_form parts => template` adds a new statement alternative. EBNF inside rule bodies supports `"lit"`, `/regex/`, ident refs, `s:rule` labels, `a*`/`a+`/`a?` postfix, `a ** sep` sep-rep, `(a | b)` grouping. Labels bind positionally to the template's params; `substituteParams` injects matched sub-ASTs at parse time. Whitespace between seq items and around rep separators is auto-interleaved.

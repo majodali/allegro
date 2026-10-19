@@ -4,6 +4,17 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — grammar-formalism.md: status corrected from "not implemented" to implemented
+
+The specification's header said "Draft for review. Not implemented" and its
+§6.4 bullet said "Phase 1 in progress", while `src/grammar2/` has been the
+Allegro parser built to it, with the analyzer and indent engine shipped and
+Pratt + Earley replaced. Both now say so, name the retained Earley parser's
+one remaining role, and list the four gaps still open per
+`docs/design/extension/grammar.md` §3. Second K-010 finding from
+`docs/documentation-census.md` closed; the third waits on B-112 C1.
+Documentation only.
+
 ## 2026-10 — PROCESS §5 and §10: stale commands corrected (Tier 0, maintainer sign-off)
 
 The landing checklist cited `npx tsc --noEmit` and `npx tsx src/test.ts`;

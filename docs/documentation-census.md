@@ -139,7 +139,7 @@ archive is where records live.
 | `docs/getting-started.md` | Consumable (tutorial) | language user | Tier 2 | n/a | Clean. | 4 |
 | `docs/language-reference.md` | Consumable (reference) | language user | Tier 2 | n/a | ~11 bare IDs in a user document; a user has no decision register. | 3 |
 | `docs/proving-in-allegro.md` | Consumable (explanation) | language user, LLM worker | Tier 2 | n/a | Clean; loaded at runtime by the PCP worker. | 4 |
-| `docs/grammar-formalism.md` | Specification | implementer | Tier 2 | no | **Stale status**: "Draft for review. Not implemented." The grammar2 engine implements it and `layers.md` cites it as the formalism. K-010 finding. 1,014 lines. | **1** |
+| `docs/grammar-formalism.md` | Specification | implementer | Tier 2 | no | Stale status "Draft for review. Not implemented" and a §6.4 bullet saying "Phase 1 in progress": **fixed 2026-10-19**; the header now names the implementation, what replaced what, and the four open gaps per `docs/design/extension/grammar.md` §3. Remaining: no reader statement; 1,014 lines; the shipped error and warning codes are not yet synced into §6 and §7 (tracked in the backlog's revalidation register). | 3 |
 | `docs/messaging.md` | Consumable (copy source) | website author | Tier 2 | n/a | Clean; has a reader statement. | 4 |
 
 ## 3. Findings by class
@@ -148,7 +148,7 @@ archive is where records live.
 |---|---|---|---|
 | Written as a report, not promoted | 3 design docs, 3 active plans | `units.md`, `concepts.md` Part 0, `host-plane-declaration.md` | this census; rewrite rides the next chunk that touches each |
 | Mixed document kinds under one type | 2 | `concepts.md` (model + analyses + proposals); `actors-and-activities.md` (study, acceptable) | `concepts.md` revision, next chunk of the concept-spine plan |
-| Stale or false content in an active document (K-010) | 3 | `PROCESS.md` §5 commands (fixed 2026-10-19); `grammar-formalism.md` status; `allegretto/README.md` facts invariant | done; grammar doc editorial; B-112 C1 |
+| Stale or false content in an active document (K-010) | 3 | `PROCESS.md` §5 commands (fixed 2026-10-19); `grammar-formalism.md` status (fixed 2026-10-19); `allegretto/README.md` facts invariant | done; done; B-112 C1 |
 | Register rows that are narrative (P-006) | 4 | backlog, decisions, plans manifest, v1 inventory | B-129 for the backlog; the rest editorial |
 | Closed plans not archived (K-007) | 8 | §2.4 | needs a record type or an archive rule |
 | Status vocabulary outside K-007 | 4 | `COMPLETE`, `approved and applied`, `closed → B-120`, `draft proposal` | editorial once the vocabulary is ruled |
