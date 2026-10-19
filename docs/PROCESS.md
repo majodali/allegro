@@ -126,8 +126,10 @@ fragmentation mechanism this process exists to kill.
 
 Before every commit that lands functionality:
 
-- [ ] `npx tsc --noEmit` clean
-- [ ] `npx tsx src/test.ts` — all tests pass
+- [ ] `bash scripts/typecheck.sh` clean (the sanctioned typecheck; it
+      calls the gate compiler explicitly, never `npx tsc`)
+- [ ] `npm test` or `npm run test:shards` — all tests pass (the suite is
+      `src/test/`; the sharded form is what CI runs)
 - [ ] New behavior covered by tests; user-visible features get a demo
       `tests/*.alg` with `// expect:` comments
 - [ ] `docs/CHANGELOG.md` entry (what landed, key decisions, deviations)
