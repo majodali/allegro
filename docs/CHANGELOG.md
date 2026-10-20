@@ -4,6 +4,32 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — concepts.md Part 0 revised: the model separated from its analyses
+
+`docs/design/concepts.md` Part 0 (foundations) now holds only the model, in
+the four-part entry shape the header promises: every requirement,
+specification choice and implementation choice carries Level, Definition,
+Rationale, As implemented and Delta. §1.0 states the status of all twenty
+requirement IDs in one table (eight live, one criterion, one derived, five
+candidates, four merged, one sufficiency claim, one withdrawn), so a reader
+no longer reconstructs the live set from three revision passes. SC-6 (scopes
+are values) is marked superseded by D49 with B-136 as owner, which it was
+not. SC-7 (the fixed propagation vocabulary) and SC-8 (specified aborts, the
+S2d classification as a specification) are entered as proposed items instead
+of living inside the analyses. Part 0 falls from about 1,000 lines to
+about 730, and none of the remainder is analysis.
+
+`docs/design/concepts-analyses.md` (new, Tier 1 record) holds the moved
+text verbatim: the two known tensions, the S2c cohesion pass, the S2d abort
+classification and metadata merge, and the B-108 measured rulings on IC-1,
+IC-2 and IC-3. It is the first instance of the record type the
+documentation-standards proposal asks for. Cross-references in the spine's
+T2 and T5 entries, the backlog's B-110 row and D48's pointer updated.
+
+**One ask carried, not closed**: the requirement set remains proposed, not
+ratified as a set. Part 0 §1.0 and §4 say so once instead of in three
+places. Documentation only; doc-ref lint clean.
+
 ## 2026-10 — grammar-formalism.md: status corrected from "not implemented" to implemented
 
 The specification's header said "Draft for review. Not implemented" and its

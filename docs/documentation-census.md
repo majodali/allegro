@@ -83,7 +83,8 @@ Approximate bare-identifier counts are in the findings as "~N bare IDs".
 
 | Document | Type | Reader | Authority | Promoted | Findings | Priority |
 |---|---|---|---|---|---|---|
-| `docs/design/concepts.md` | Conceptual model | learner | Tier 1 | partly | **Three kinds of content under one type.** T0 to T5 entries follow the declared four-part shape. Part 0 §1 to §3 (requirements, specification choices, implementation choices) do not: they carry alternatives tables and criteria, not as-implemented and delta. Part 0 §6 to §8 (cohesion pass, abort classification, metadata merge) are analysis records that revise the requirement set in place, so a new reader cannot tell which of R1 to R14 are live without reading the revisions; "Proposed SC-7" sits unratified inside the model. 2,968 lines; ~89 bare IDs; 35 em-dash headers. Has a reader statement. The revision the maintainer anticipated: separate the model (entries) from the analyses that produced it, and state the live requirement set once. | **1** |
+| `docs/design/concepts.md` | Conceptual model | learner | Tier 1 | partly | Part 0 **revised 2026-10-20**: the analysis passes moved verbatim to `concepts-analyses.md`; every R, SC and IC entry now has the four-part shape; §1.0 states the status of all twenty requirement IDs in one table; SC-6 marked superseded by D49; SC-7 and SC-8 entered as proposed specification items. Remaining: the requirement set is still unratified as a set (an ask, not a defect); T0 to T5 entries keep their ~80 bare IDs and em-dash headers; 2,694 lines. | 2 |
+| `docs/design/concepts-analyses.md` | Record | reader wanting the argument | Tier 1 (history) | n/a | New 2026-10-20; the first instance of the record type the standards proposal §6.2 asks for. Header declares it history, which exempts it from supersession marking entry by entry. | 4 |
 | `docs/design/architecture-vocabulary.md` | Vocabulary | design-doc reader | Tier 1 | yes | None found. Reviewed by the maintainer 2026-10. | 4 |
 | `docs/design/layers.md` | Spine | code locator | Tier 1 | no | No reader statement; ~10 bare IDs; milestone table mixes status prose into cells. | 2 |
 | `docs/design/implementation-map.md` | Spine (map) | code locator | Tier 1 | n/a | Register-shaped; clean. | 4 |
@@ -147,7 +148,7 @@ archive is where records live.
 | Class | Count | Examples | Owner |
 |---|---|---|---|
 | Written as a report, not promoted | 3 design docs, 3 active plans | `units.md`, `concepts.md` Part 0, `host-plane-declaration.md` | this census; rewrite rides the next chunk that touches each |
-| Mixed document kinds under one type | 2 | `concepts.md` (model + analyses + proposals); `actors-and-activities.md` (study, acceptable) | `concepts.md` revision, next chunk of the concept-spine plan |
+| Mixed document kinds under one type | 2 | `concepts.md` (model + analyses + proposals; **separated 2026-10-20**); `actors-and-activities.md` (study, acceptable) | done |
 | Stale or false content in an active document (K-010) | 3 | `PROCESS.md` §5 commands (fixed 2026-10-19); `grammar-formalism.md` status (fixed 2026-10-19); `allegretto/README.md` facts invariant | done; done; B-112 C1 |
 | Register rows that are narrative (P-006) | 4 | backlog, decisions, plans manifest, v1 inventory | B-129 for the backlog; the rest editorial |
 | Closed plans not archived (K-007) | 8 | §2.4 | needs a record type or an archive rule |

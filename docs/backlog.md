@@ -1472,8 +1472,9 @@ that prevents it.
     and a user's argument error are indistinguishable, so a tool cannot report
     "this is an interpreter bug" separately from "your program is wrong", and
     the S2d classification had to be done by reading 117 call sites. The abort
-    classes in `concepts.md` §7 are the vocabulary; the mechanism should carry
-    which one. Specification-level, and separable from (a)–(c)
+    classes in `concepts.md` Part 0 SC-8 (specified aborts; the classification
+    itself is `docs/design/concepts-analyses.md` §3) are the vocabulary; the
+    mechanism should carry which one. Specification-level, and separable from (a)–(c)
 
 - [ ] **B-111** · L0 · **Field vs channel — one word and one registry for two
   concepts.** Raised by the concept spine (S2f, maintainer terminology). The
