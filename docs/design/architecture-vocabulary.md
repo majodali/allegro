@@ -37,9 +37,9 @@ substrate (grammar, parsing, module loading), L2 Allegro Standard (types,
 effects, proofs and the rest of the typed language), and L3 Vivace (domain
 models). A layer may depend only on layers below it.
 
-Source: `layers.md` §1 (the layer spine). Enforced today by the boundary
-battery in `src/boundary-tests.ts` and, since D50 (units in a narrow
-DAG), by the unit order (§2.6).
+Source: [`layers.md` §1 (the layer spine)](layers.md#def-layer). Enforced
+today by the boundary battery in `src/boundary-tests.ts` and, since D50
+(units in a narrow DAG), by the unit order (§2.6).
 
 ### 2.2 Track
 
@@ -48,9 +48,9 @@ such as the build pipeline, tooling, host environments or code
 generation. A track consumes the public surface of any layer and is never
 a dependency of a layer.
 
-Source: `layers.md` §2 (capability tracks). The word *capability* in
-"capability track" means a thing the platform can do, not an authority
-token (§3).
+Source: [`layers.md` §2 (capability tracks)](layers.md#def-track). The word
+*capability* in "capability track" means a thing the platform can do, not
+an authority token (§3).
 
 ### 2.3 Plane, field and channel
 
@@ -70,8 +70,11 @@ rules, their writer, and the layer-side code that interprets them. Typing
 is a channel; effect analysis is a channel. A field is storage; a channel
 is a feature built on storage.
 
-Sources: `concepts.md` §18 (plane), §19 (metadata field), §19b
-(channel), §20 (propagation), §21 (writer capability).
+Sources: [`concepts.md` §18 (plane)](concepts.md#def-plane), [§19
+(metadata field)](concepts.md#def-metadata-field), [§19b
+(channel)](concepts.md#def-channel), [§20
+(propagation)](concepts.md#def-propagation), [§21 (writer
+capability)](concepts.md#def-writer-capability).
 
 ### 2.4 Plane interface
 
@@ -80,7 +83,8 @@ plane, as producer or consumer. Reaching a plane any other way, such as
 a direct field read, an import from a higher layer, or a hardcoded field
 name, is a plane violation even when it computes the right answer.
 
-The interface table in `concepts.md` §24 lists one row per plane and
+The interface table in [`concepts.md` §24 (plane
+interfaces)](concepts.md#def-plane-interfaces) lists one row per plane and
 consumer. Most rows are ordinary accessors. One row is different: the
 route by which a **layer gives the base behaviour the base must not
 know**, such as how to check a value against a type. That route is a
@@ -107,8 +111,10 @@ An **activity** is a set of related interactions between actors that
 functional tests would cover as one behaviour. *Dispatch member access*
 and *Attach and propagate metadata* are activities.
 
-Source: `actors-and-activities.md` §3.1 (what counts as an actor), §3.7
-(actors are types, and they decompose), §4 (the activity inventory).
+Source: [`actors-and-activities.md` §3.1 (what counts as an
+actor)](actors-and-activities.md#def-actor), §3.7 (actors are types, and
+they decompose), [§4 (the activity
+inventory)](actors-and-activities.md#def-activity).
 That document is a draft exercise; its adoption is an open ruling.
 
 ### 2.6 Unit
@@ -119,8 +125,9 @@ home on disk, and can be replaced without editing what does not name it.
 Units form a narrow directed acyclic graph. `bits`, `scope`, `evaluator`
 and `type-core` are units.
 
-Source: `units.md` §2 (what a unit is) and §4 (the DAG). Ratified as D50
-(units in a narrow DAG). Measured by `scripts/analyze/index.ts units`.
+Source: [`units.md` §2 (what a unit is)](units.md#def-unit) and §4 (the
+DAG). Ratified as D50 (units in a narrow DAG). Measured by
+`scripts/analyze/index.ts units`.
 
 ## 3. The word "capability" has three senses
 

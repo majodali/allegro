@@ -2316,6 +2316,21 @@ that prevents it.
     failed-check and asks stops rather than deleting anything.
   - **Pointer**: methodology [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated).
 
+- [ ] **B-150** · T-docs · T-tooling · **The document lints join the gate.**
+  - **What**: `npm run lint:docs` (`scripts/doc-lint.ts`, D52 Phase 0)
+    runs report-only. Gate the `anchors` check (deterministic: every
+    anchored link resolves) in `src/test/tooling.ts` beside the doc-ref
+    lint; ratchet `order` at zero forward references; commit a baseline
+    for `ids` (bare first-use identifiers, about 1,140 on day one) that
+    may only fall, with the heuristic's limits stated.
+  - **Why**: the census showed P-004 (citations carry names) held in about
+    ten of fifty documents without a check. The standards proposal §5 says
+    the lints are not optional.
+  - **Blocked-by**: nothing; one chunk. Probe each check with a known-bad
+    link before trusting it (the B-128(a) lesson).
+  - **Pointer**: [D52](decisions.md); `docs/plans/documentation-book.md`
+    §4.2; `docs/plans/documentation-standards-delta.md` §5.
+
 - [ ] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.**
   - **What**: commit baselines for the `units` analyzer command
     (`scripts/analyze/index.ts units`) — permitted-edge violations and the

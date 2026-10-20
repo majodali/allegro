@@ -34,10 +34,10 @@ adds.
 | **Hook** | A named slot the base declares and calls, whose implementation a layer registers when it loads. The base defines the interface; the layer supplies the implementation. |
 | **Install** | A layer registering an implementation into a hook, at module load time. |
 | **Handle** | An opaque value the base is handed and passes along unchanged. A type constant is a handle to the base. |
-| **Metadata field** | One named slot on a value's metadata plane, with a propagation rule and a writer. `concepts.md` §19 (metadata field). |
-| **Writer capability** | The authority to set a field, realised as a closure that only the registrant holds. `concepts.md` §21 (writer capability); decisions D23 (writes are gated, reads free) and D24 (the capability is a delegable closure). |
-| **Plane interface** | The sanctioned route by which code reaches a plane. `concepts.md` §24 (plane interfaces). A hook is the plane interface that crosses a layer boundary. |
-| **Unit** | The smallest body of code holding one decision, with its imports as its dependencies. `docs/design/units.md` §2. |
+| **Metadata field** | One named slot on a value's metadata plane, with a propagation rule and a writer. [`concepts.md` §19 (metadata field)](../design/concepts.md#def-metadata-field). |
+| **Writer capability** | The authority to set a field, realised as a closure that only the registrant holds. [`concepts.md` §21 (writer capability)](../design/concepts.md#def-writer-capability); decisions D23 (writes are gated, reads free) and D24 (the capability is a delegable closure). |
+| **Plane interface** | The sanctioned route by which code reaches a plane. [`concepts.md` §24 (plane interfaces)](../design/concepts.md#def-plane-interfaces). A hook is the plane interface that crosses a layer boundary. |
+| **Unit** | The smallest body of code holding one decision, with its imports as its dependencies. [`docs/design/units.md` §2 (what a unit is)](../design/units.md#def-unit). |
 
 ## 3. The problem this plan solves
 

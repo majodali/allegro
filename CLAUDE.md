@@ -41,6 +41,7 @@ cache — amend it upstream, never here.
 - **Vision, thesis, design principles:** `docs/VISION.md` (Tier 0 — never edit without maintainer sign-off)
 - **Process, lifecycle, quality guidelines, agent rules:** `docs/PROCESS.md` (Tier 0)
 - **Classification & binding:** `docs/classification.md` · **Decisions:** `docs/decisions.md` (D1–D51, E-R, U-R, R-R, chunk rulings)
+- **Reading order (D52, the book):** `docs/reading-order.json` is the order; `docs/design/README.md` is the table of contents. A document may define a term using only terms defined earlier; a term's definition site carries a `def-` anchor and every other first use links to it
 - **Architecture vocabulary:** `docs/design/architecture-vocabulary.md` — layer, track, plane, plane interface, actor, unit: what each answers and how they relate. Read before a doc that uses more than one
 - **Architecture spine:** `docs/design/layers.md` (L0–L3 + tracks + milestones) · layer index `docs/design/README.md`
 - **Unit DAG (D50/D51):** `docs/design/units.md` — which unit holds which decision, what it may import, which files are still mixed; manifest `scripts/analyze/units.json`. Read the unit's row before moving code in or out of a file
@@ -69,6 +70,9 @@ npx tsx scripts/analyze/index.ts <cmd> # B-127: binder-aware survey (props |
 npm run lint:planes                 # B-128(a): storage plane reached only
                                     #   through the accessor layer — IN THE
                                     #   GATE (once per run, not per shard)
+npm run lint:docs                   # D52: anchored links resolve, no forward
+                                    #   references in the reading order, bare
+                                    #   identifiers — report-only until B-150
 npm run build:web                   # web bundle; deploy.sh is OWNER-RUN only
 npm run check-deployed              # audit live site vs origin/main (needs site egress)
 ```

@@ -7,6 +7,7 @@
 > Maintainer rulings 2026-07 (parser placement, module split, provability
 > clustering, build-pipeline-as-track) are incorporated.
 
+<a id="def-layer"></a>
 ## 1. The layer spine
 
 Four layers with **strict one-way dependencies** — each layer may depend
@@ -42,6 +43,7 @@ harness (`structures-implementation` Phase 0).
   (L0: PE phases + phase-gate semantics; L1: extension pre-loading, `use`
   scanning; L2: typed configuration surfaces; L3: domain build steps).
 
+<a id="def-track"></a>
 ## 2. Capability tracks
 
 Tracks are cross-cutting deliverables. Each declares which layers it

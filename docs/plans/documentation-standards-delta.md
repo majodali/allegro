@@ -273,7 +273,53 @@ has at least one existing instance**, so Article 6 (every rule earns its
 keep) holds for the model as it does for the rules. The census is the
 instance list.
 
-### 6.5 What the census found about the rules that already exist
+### 6.5 A project may declare a reading order, and it is checkable
+
+Added 2026-10 after the maintainer's book proposal (D52).
+
+*Statement.* A project MAY declare a reading order over its design
+documents and conceptual model, as data. Where one is declared, the order
+MUST be dependency order: a document may define a term using only terms
+defined in documents earlier in the order. A document that is an
+introduction or a glossary MAY be marked as looking ahead and is then
+exempt as the source of a forward reference, never as the target.
+Registers, records and plans are outside the order.
+
+*Mechanics.* Each term has one definition site carrying a stable explicit
+anchor (`<a id="def-…"></a>`); every other use links to it on first use in
+a document (this is P-008's "cited everywhere" made concrete). A lint
+resolves every anchored link and reports a link from an earlier document
+to a `def-` anchor in a later one. Allegro's instance:
+`docs/reading-order.json` and `scripts/doc-lint.ts`.
+
+*Rationale.* The conceptual-model proposal already requires dependency
+order inside one document. A reading order extends the same constraint
+across documents, which is what turns a folder of interconnected
+documents into something that can be read in sequence, and it is checkable
+for the same reason the unit DAG is: the relation is data.
+
+### 6.6 The book is a collection type, not a document type
+
+*Statement.* A **book** is an ordered collection of a project's design
+notes, specification and conceptual model, declared by a reading order
+(§6.5). It is not a new document type: each chapter keeps its own type and
+that type's content rules, and the authority designation applies per
+chapter. The book carries reasoning and current state, including each
+entry's delta against the code; it carries no history. Registers remain
+authoritative and are rendered as appendices; records and plans are
+outside it.
+
+*Rationale.* Allegro's instance (D52, `docs/plans/documentation-book.md`)
+showed that the alternative, a book as a single document type, would
+either duplicate the content rules of the types it contains or exempt
+chapters from them. A collection type adds one thing, the order, and
+leaves everything else as it is.
+
+*Amendment to the companion proposal.* The conceptual-model proposal's
+"a single dependency-ordered document" becomes "a single
+dependency-ordered sequence, which may be a book's chapters".
+
+### 6.7 What the census found about the rules that already exist
 
 Four rules the methodology already has (P-004 citations carry names,
 P-006 registers hold uniform rows, K-007 plans are current, K-010
