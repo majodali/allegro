@@ -4,6 +4,36 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — D52: the documentation as a book in dependency order, Phase 0
+
+The maintainer's proposal, ratified in discussion: the documentation
+becomes ordered chapters following vision → requirements → specification
+→ implementation and then the unit DAG, with the thesis test as Part III,
+rendered later. Phase 0 lands the order and the links without moving a
+file.
+
+- `docs/reading-order.json`: the order as data, three parts plus
+  appendices; planned chapters carry `status: planned` and the units they
+  will cover; introductions and the glossary are marked `lookahead`.
+- `docs/design/README.md` is now the table of contents in that order.
+- Term anchors: 64 definition sites carry `<a id="def-…">` (every tier
+  entry and Part 0 entry of the spine; layer, track, unit, actor,
+  activity). The vocabulary and the B-112 plan's terms table link to them.
+- `scripts/doc-lint.ts` (`npm run lint:docs`): `anchors` (every anchored
+  link resolves), `order` (no link to a definition in a later chapter from
+  an earlier one), `ids` (bare first-use identifiers, heuristic). Day one:
+  anchors 0, order 0, bare identifiers about 1,140. Report-only; **B-150**
+  files the gate.
+- `docs/plans/documentation-book.md` (active): the settled decisions, the
+  four phases, the anchor convention. D52 entered, next free D53.
+- The standards proposal gains §6.5 (a declared reading order, checkable)
+  and §6.6 (a book is a collection type over existing document types); the
+  conceptual-model proposal's "one document" becomes "one sequence, which
+  may be a book's chapters".
+
+Suite green with the new package script; doc-ref lint clean. Documentation
+and out-of-gate tooling only.
+
 ## 2026-10 — concepts.md Part 0 revised: the model separated from its analyses
 
 `docs/design/concepts.md` Part 0 (foundations) now holds only the model, in

@@ -131,6 +131,7 @@ compares statements to each other rather than to the code.
 | R19 | Planes are separated | **candidate** | record §3, abort class B |
 | R20 | An ill-formed application is rejected | **candidate** | record §3, abort class F |
 
+<a id="def-r1"></a>
 ### R1 — Allegretto is the simplest base language that can carry Allegro
 
 **Level.** Criterion (relabelled from requirement at the cohesion pass,
@@ -151,6 +152,7 @@ in the document and the least like a requirement.
 
 **Delta.** —
 
+<a id="def-r2"></a>
 ### R2 — Partial evaluation is the mechanism by which layers are added
 
 **Level.** Requirement.
@@ -172,6 +174,7 @@ the same evaluator at compile time. §25 (partial evaluation).
 **Delta.** The evaluator also performs type checking the layer should
 install (R6's delta); that is R6's finding, not R2's.
 
+<a id="def-r3-prime"></a>
 ### R3′ — Metadata channels are independent
 
 **Level.** Requirement, proposed at S2d (record §4.1) as the merge of R3,
@@ -200,6 +203,7 @@ without reading field meaning.
 by name (§19's delta, B-109(a)). The mechanism honours R3′; the wiring does
 not.
 
+<a id="def-r4"></a>
 ### R4 — Evaluation is total over unresolved information
 
 **Level.** Requirement.
@@ -227,6 +231,7 @@ re-evaluates on completion (§28).
 base) is not an R4 violation but an R6 one (record §3.1); it is B-112's
 subject.
 
+<a id="def-r6"></a>
 ### R6 — The base does not know about the layers
 
 **Level.** Requirement.
@@ -250,6 +255,7 @@ imports 27 symbols from L2 and implements type checking (record §3.1;
 at module init and special-cases three by name (record §1.1; **B-109**);
 `scope.ts` imports the predicate-set merge (`units.md` M12; B-112 hook (e)).
 
+<a id="def-r8"></a>
 ### R8 — There is one value universe
 
 **Level.** Requirement. Derivation corrected at the cohesion pass (record
@@ -271,6 +277,7 @@ makes it a contract plus seven kind units plus an assembly).
 of the universe by D49 (SC-6's delta). R8 is unaffected: a scope was never
 something the evaluator *meets* as an input.
 
+<a id="def-r9"></a>
 ### R9 — The language surface is extensible
 
 **Level.** Requirement.
@@ -288,6 +295,7 @@ kernel feature no other stack could have.
 
 **Delta.** —
 
+<a id="def-r10"></a>
 ### R10 — Evaluation is resumable on new information
 
 **Level.** Derived (record §2.1 F7): loading is late arrival (R14) and R2
@@ -307,6 +315,7 @@ at that instant would be permanently residual.
 **Delta.** Arrival order is not guaranteed not to matter: candidate R16
 and **B-114**.
 
+<a id="def-r12"></a>
 ### R12 — Metadata origination is capability-controlled
 
 **Level.** Requirement. *Subject: Allegretto for the mechanism; Allegro for
@@ -331,6 +340,7 @@ fabricating rules on integrity fields are a decidable subset (record §4.2).
 list disagrees with the registry about `source` (§21's delta; record §1.2;
 **B-109(b)(c)**).
 
+<a id="def-r14"></a>
 ### R14 — Code is organised into separately-loadable units
 
 **Level.** Requirement.
@@ -778,6 +788,7 @@ and `args` mean the same memo is correct).
 What a value is, before anything has been said *about* it. This tier is
 Allegretto with no type system present at all.
 
+<a id="def-value"></a>
 ## 1. Value
 
 > **Level: Specification** — satisfies R1, R4, R8.
@@ -797,6 +808,7 @@ seven kind interfaces.
 
 **Delta.** —
 
+<a id="def-representation-kind"></a>
 ## 2. Representation kind
 
 > **Level: Specification** — satisfies R1, R6, R8. Choice: **SC-1**.
@@ -821,6 +833,7 @@ plain field so the evaluator's hot switch stays monomorphic.
 placeholder" — there are seven, and Param is one of them; it predated both
 `Symbol` and the Context→Structure renaming.)*
 
+<a id="def-bits"></a>
 ## 3. Bits
 
 > **Level: Specification** — satisfies R1, R6. Choice: **SC-2**.
@@ -841,6 +854,7 @@ rather than kernel ones.
 
 **Delta.** —
 
+<a id="def-symbol"></a>
 ## 4. Symbol
 
 > **Level: Specification** — satisfies R2, R6, R14. Choices: **SC-4** (identity), **IC-4** (interning).
@@ -865,6 +879,7 @@ resolution in `resolveSymbols` (`src/runtime.ts`). The presence or absence of
 
 **Delta.** —
 
+<a id="def-param"></a>
 ## 5. Param
 
 > **Level: Specification** — satisfies R2.
@@ -888,6 +903,7 @@ has **no runtime reader** — a test asserts it stays empty. A reserved field
 that nothing writes and nothing reads is indistinguishable from a dead one;
 the reservation belongs in prose. **→ B-107.**
 
+<a id="def-expression"></a>
 ## 6. Expression
 
 > **Level: Specification** — satisfies R2, R4, R8. Choices: **SC-3** (expressions are values), **IC-6** (memoization).
@@ -907,6 +923,7 @@ as results instead of needing a separate IR.
 
 **Delta.** —
 
+<a id="def-composedfunction"></a>
 ## 7. ComposedFunction
 
 > **Level: Specification** — satisfies R2.
@@ -929,6 +946,7 @@ it. It is invisible in the interface above, so the declared shape of a
 function value understates what a function value holds. Defining the **host
 plane** (T2 §9) is the fix; recording it here so the T2 entry has a caller.
 
+<a id="def-primitivefunction"></a>
 ## 8. PrimitiveFunction
 
 > **Level: Specification** — satisfies R2, R5, R11.
@@ -950,6 +968,7 @@ is `primitives` in `src/primitives.ts`.
 
 **Delta.** —
 
+<a id="def-structure"></a>
 ## 9. Structure
 
 > **Level: Specification** — satisfies R1, R3, R8. Choice: **SC-5** (one composite kind). Implementation: **IC-1**, **IC-2**.
@@ -979,6 +998,7 @@ through the `src/types.ts` factories (`makeStructure`, `withMetadata`,
 done by alias. The alias is deleted and the interface is `StructureValue`
 at all 703 sites; `makeContext` → `makeStructure` at 101.)*
 
+<a id="def-carrier"></a>
 ## 10. Carrier — RETIRED (B-121, 2026-08)
 
 > **The concept no longer exists.** Retired rather than renumbered: the
@@ -1016,6 +1036,7 @@ separation stated but not policed — and behind **B-127**, since two whole
 classes were invisible to a regex over source text. Full record:
 `docs/plans/metadata-on-values.md` §5.1a–§5.1g.
 
+<a id="def-data-plane"></a>
 ## 11. Data plane
 
 > **Level: Specification** — satisfies R3, R5. D48(b) did not change this entry; it made the entry *literal*.
@@ -1066,6 +1087,7 @@ cases.)*
 
 What a Structure is made of, and the three roles it plays.
 
+<a id="def-structure-roles"></a>
 ## 12. Structure roles
 
 > **Level: IMPLEMENTATION** — choice **IC-2**. SC-5 says *one composite kind*; the roles are how this host realises it. **B-120 E4 deleted the dense role and IC-1 dissolved with it** (D48(d)), so the gap IC-1 recorded is closed: role is no longer read from field presence.
@@ -1102,6 +1124,7 @@ are four, and said `__*` meta-slots "remain here until C5 re-keys them" — C5
 did not. Now names all four and points the host-plane row at
 `StructureHostFields`.)*
 
+<a id="def-binding"></a>
 ## 13. Binding
 
 > **Level: Specification** — satisfies R1.
@@ -1134,6 +1157,7 @@ the map-only paths are safe today — nothing enumerates a type structure's
 `bindingList` as fields — and that the exemption is circumstantial rather
 than structural.*)*
 
+<a id="def-binding-attributes"></a>
 ## 14. Binding attributes
 
 > **Level: Specification** — satisfies R2, **R10**. (`cell`, `isComplete`, `incompleteDeps` are the binding-level form of R10: information arriving later, tracked where it is waited on.)
@@ -1160,6 +1184,7 @@ binding-name families should follow rather than encoding state in a name
 
 **Delta.** —
 
+<a id="def-scope"></a>
 ## 15. Scope
 
 > **Level: Specification** — satisfies R2, R8. Choices: **SC-6** (scopes are values), **IC-5** (chain layering).
@@ -1187,6 +1212,7 @@ that the declaration contradicted. They are **correctly placed** — only the
 declaration was wrong; host-plane data that belongs on the metadata plane is
 B-118.)*
 
+<a id="def-dense-region"></a>
 ## 16. Dense region — RETIRED (B-120 E4, 2026-09)
 
 > **The concept no longer exists.** Retired rather than renumbered: the
@@ -1220,6 +1246,7 @@ reads it always answers. **Nothing at L0 distinguishes an empty array from an
 empty record any more, because nothing at L0 should**: that is the type's
 question. Analysis: `docs/plans/entry-sequence-composite.md` §5.5.
 
+<a id="def-the-legacy-view"></a>
 ## 17. The legacy view — RETIRED (B-120 E4, 2026-09)
 
 > **The concept no longer exists.** Retired rather than renumbered, per §10.
@@ -1261,6 +1288,7 @@ information about a value lives, and the four are not interchangeable: which
 plane a thing belongs on determines who may write it, what happens to it
 under evaluation, and whether Allegro can see it at all.
 
+<a id="def-plane"></a>
 ## 18. Plane
 
 > **Level: Specification** — satisfies R3′, R8, R12.
@@ -1301,6 +1329,7 @@ convention. `StructureHostFields` now declares it. Note the scope: this fixes
 the DECLARATION. Host-plane residents that belong on another plane are
 B-118, and that item exists because this entry made the two separable.)*
 
+<a id="def-metadata-field"></a>
 ## 19. Metadata field
 
 > **Level: Specification** — satisfies R3′, R12. *Renamed at S2f from
@@ -1327,6 +1356,7 @@ special-cases three by name. R6 says the owning layer should register its
 own. **→ B-109(a).** Naming: the implementation calls fields "channels"
 throughout — see §19b's delta.
 
+<a id="def-channel"></a>
 ## 19b. Channel
 
 > **Level: Specification** — satisfies R2, R3′. *New at S2f (maintainer).*
@@ -1375,6 +1405,7 @@ change; **B-109(a)** — moving registration to the layers — is the natural
 moment to do it, since a layer registering its own capability is exactly a
 channel registration. **→ B-111.**
 
+<a id="def-propagation"></a>
 ## 20. Propagation
 
 > **Level: Specification** — **SC-7**, satisfies R3′; criterion R12.
@@ -1403,6 +1434,7 @@ and `unionChannels()` are cached filters over the registry;
 
 **Delta.** — *(the mechanism is correct; its wiring is §19's delta)*
 
+<a id="def-writer-capability"></a>
 ## 21. Writer capability
 
 > **Level: Specification** — satisfies R12.
@@ -1426,6 +1458,7 @@ cannot survive the layer registering its own channels. The two sources
 disagree: `source` is in the list but is registered **without**
 `integrity: true`. **→ B-109(b)/(c).**
 
+<a id="def-meta-slot"></a>
 ## 22. Meta slot
 
 > **Level: IMPLEMENTATION** — realises the binding plane. **The partition is gone (B-120 E5); the names remain.**
@@ -1459,6 +1492,7 @@ concept — **B-104**.)*
 structure's entries as fields. That is a property of how members are written,
 not an invariant anything checks — delta 30, below, and **B-104** owns it.
 
+<a id="def-the-layer-boundary"></a>
 ## 23. The layer boundary
 
 > **Level: Specification** — satisfies R6. **This entry absorbs B-110.**
@@ -1506,6 +1540,7 @@ other channel.
 
 **Delta. → B-110**, now scoped by this entry rather than left open-ended.
 
+<a id="def-plane-interfaces"></a>
 ## 24. Plane interfaces
 
 > **Level: Specification** — satisfies R3′, R6, R12. *Elevated to a
@@ -1598,6 +1633,7 @@ question in B-110 by naming it.
 How a program becomes a result, or a residual. This tier is R2 and R4 made
 concrete.
 
+<a id="def-partial-evaluation"></a>
 ## 25. Partial evaluation
 
 > **Level: Specification** — satisfies R2, R4.
@@ -1625,6 +1661,7 @@ onto residuals runs through the propagation table (§20).
 **Delta.** — *(Rule 1 and Rule 2 are implemented as specified; the evaluator's
 delta is §23, which is about what it imports, not what it computes.)*
 
+<a id="def-resolved-unresolved-residual"></a>
 ## 26. Resolved, unresolved, residual
 
 > **Level: Specification** — satisfies R4.
@@ -1643,6 +1680,7 @@ interpreter that fails.
 
 **Delta.** — 
 
+<a id="def-tail-calls"></a>
 ## 27. Tail calls
 
 > **Level: IMPLEMENTATION** — realises R4 under a host constraint.
@@ -1664,6 +1702,7 @@ recurring-lesson note in `PROCESS.md` §6 — nothing checks it. A wrapper that
 forgets is a silent performance cliff, not an error. Candidate for a boundary
 invariant. **→ B-113.**
 
+<a id="def-future-cell-and-completion"></a>
 ## 28. Future cell and completion
 
 > **Level: Specification** — satisfies R10.
@@ -1692,6 +1731,7 @@ resolved before another — fixed by completion replacement, but nothing
 (determinism) with no specification item and no test that would catch a
 recurrence. **→ B-114.**
 
+<a id="def-the-evalsource-pipeline"></a>
 ## 29. The evalSource pipeline
 
 > **Level: IMPLEMENTATION** — realises R2, R9, R14.
@@ -1723,6 +1763,7 @@ fix shape (§24). **→ B-110** (scope note).
 Where Allegro Standard begins. Everything here is built **on** T0–T3 and
 none of it is known to the base — or should not be (§23).
 
+<a id="def-type"></a>
 ## 30. Type
 
 > **Level: Specification** — satisfies R2, R3′. *L2 concept; the base knows
@@ -1749,6 +1790,7 @@ with a kind check.
 measured and the reason the dunder partition was unnecessary; it deserves to
 be an invariant rather than an accident. **→ B-107.**
 
+<a id="def-kind-and-meta-type"></a>
 ## 31. Kind and meta-type
 
 > **Level: Specification** — satisfies R2.
@@ -1769,6 +1811,7 @@ rules.
 
 **Delta.** — 
 
+<a id="def-shape"></a>
 ## 32. Shape
 
 > **Level: Specification** — satisfies R2. **Distinct from §34.**
@@ -1814,6 +1857,7 @@ field but stores nothing — it is a **projection** of `type` (§19b).
 **Delta.** The projection is hardcoded in `channelReadRaw` rather than
 installed by the typing channel. **→ B-112(c).**
 
+<a id="def-member-and-member-symbol"></a>
 ## 33. Member and member symbol
 
 > **Level: Specification** — satisfies R6, R14. Choice: **SC-4**.
@@ -1836,6 +1880,7 @@ the nominal chain-walk used to produce.
 
 **Delta.** — 
 
+<a id="def-declared-and-loose-conformance"></a>
 ## 33b. Declared and loose conformance
 
 > **Level: Specification** — satisfies R6, R14. *Added at S3b (maintainer):
@@ -1888,6 +1933,7 @@ it matches by base name rather than by drawn symbols. Two independent facts
 about the same type. Saying it without §33b defined was the reason it read as
 a contradiction.
 
+<a id="def-knowledge"></a>
 ## 34. Knowledge
 
 > **Level: Specification** — satisfies R2, R3′. **Distinct from §32.**
@@ -1914,6 +1960,7 @@ stores one** — it is a channel (capability) whose storage is three other
 fields plus the refinement layers (§19b). The registry cannot express that.
 **→ B-111.**
 
+<a id="def-abstract-domain"></a>
 ## 34b. Abstract domain
 
 > **Level: Specification** — satisfies R2. *Added at S4b (maintainer): the
@@ -1947,6 +1994,7 @@ rule was never applied: it is derived-and-cached, which argues host plane, but
 nothing states that and it makes `knowledge` a capability whose fields span
 two planes. **→ B-111.**
 
+<a id="def-refinement"></a>
 ## 35. Refinement
 
 > **Level: Specification** — satisfies R2.
@@ -1966,6 +2014,7 @@ and PE discharges it by evaluating the predicate against what it knows.
 
 **Delta.** — 
 
+<a id="def-interface"></a>
 ## 36. Interface
 
 > **Level: Specification** — satisfies R6, R14. **Resolves B-104(g).**
@@ -2069,6 +2118,7 @@ reject the body or state that it is a declaration. **→ B-116.**
 
 **→ B-104(g)**, now specified rather than open.
 
+<a id="def-generic"></a>
 ## 37. Generic
 
 > **Level: Specification** — satisfies R2.
@@ -2096,6 +2146,7 @@ the underlying ComposedFunction; `__args`/`__generic` on applied concretes.
 language surface** — deferred consciously at C7.2 ruling R1, still deferred.
 Recorded so the deferral stays visible. **→ B-107.**
 
+<a id="def-identity"></a>
 ## 38. Identity: distinct, structural wrap, equality shape
 
 > **Level: Specification** — satisfies R2. Choice: **SC-4**.
@@ -2122,6 +2173,7 @@ produced the `~Printable` confusion (§36).
 
 **Delta.** — 
 
+<a id="def-law-and-coercion"></a>
 ## 39. Law and coercion
 
 > **Level: Specification** — satisfies R2; Allegro-side of R12.
@@ -2152,6 +2204,7 @@ What Allegro claims, and how those claims are discharged. Everything here
 rests on R2: an obligation is discharged by **evaluating** it, not by a
 separate proof engine.
 
+<a id="def-effect"></a>
 ## 40. Effect
 
 > **Level: Specification** — satisfies R2, R3′.
@@ -2173,6 +2226,7 @@ the R11 pattern working (§20).
 
 **Delta.** — 
 
+<a id="def-declared-and-inferred-effects"></a>
 ## 41. Declared and inferred effects
 
 > **Level: Specification** — satisfies R2; CE-R1.
@@ -2196,6 +2250,7 @@ the metadata plane's rules and to anything reflecting on a function. That is
 probably right — it is derived, not carried — but nothing says so, and §18's
 placement rule was never applied to it. **→ B-107.**
 
+<a id="def-totality"></a>
 ## 42. Totality
 
 > **Level: Specification** — satisfies R2; T-R series.
@@ -2217,6 +2272,7 @@ would force one severity on both.
 **Delta.** Both are **post-passes hardcoded into the base pipeline** (§29) —
 L2 analyses in the L0/L1 stage list. **→ B-110.**
 
+<a id="def-divergence-and-discharge-tiers"></a>
 ## 43. Divergence and discharge tiers
 
 > **Level: Specification** — satisfies R2; D31/D34.
@@ -2243,6 +2299,7 @@ recursive calls) was **broadened on measurement without a soundness review**
 — it now keys on SCC cycle membership. Recorded at the time as pending.
 **→ B-100.**
 
+<a id="def-proof-and-discharge"></a>
 ## 44. Proof and discharge
 
 > **Level: Specification** — satisfies R2, R12.
@@ -2267,6 +2324,7 @@ plane** — it registers with `bindingKey: "__discharged"` while every other
 field moved to `components` at B-104 chunk 3. It is also the one whose
 integrity flag and guard list disagree (§21). **→ B-104, B-109.**
 
+<a id="def-obligation-verdict-and-the-assumption-ledger"></a>
 ## 45. Obligation, verdict, and the assumption ledger
 
 > **Level: Specification** — satisfies R2, R12. **Where sufficiency gap S1
@@ -2319,6 +2377,7 @@ is a much better account of §46 than "somebody forgot".
 **Candidate R15 is withdrawn.** The finding is an implementation delta and a
 significant one. **→ B-117.**
 
+<a id="def-contract"></a>
 ## 46. Contract
 
 > **Level: Specification** — satisfies R2; CT-R series.

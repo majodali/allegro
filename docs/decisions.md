@@ -15,7 +15,7 @@ execution state and its backlog owner — acceptance and implementation
 are distinct facts.
 
 **Going forward**: new decisions continue the D-series here (next free
-number: D52), entered at ratification time with reasoning in a design
+number: D53), entered at ratification time with reasoning in a design
 note under `docs/design/`. Plan-scoped ruling families (the `X-R`
 pattern) may still be minted inside plans; they are indexed here when
 their plan's gate passes.
@@ -27,7 +27,7 @@ decisions; and "Phase D1/D2" in `docs/design/standard/effects.md` and
 the provability plans are roadmap phases. Neither series is indexed
 here.
 
-## D-series — core design decisions (D1–D51)
+## D-series — core design decisions (D1–D52)
 
 Origin: the structured-values-unification decision log
 (`docs/plans/archive/structured-values-unification.md`, frozen —
@@ -88,6 +88,7 @@ record.
 - **D49** — Scope leaves `Value`: the evaluation environment becomes a non-value L0 host construct with its own representation, not a role of `Structure` — `EvalFn`/`PrimitiveFnImpl` type their ctx on it, the slot store arrives by composition, and `assertNotScope`, `deriveWithMeta`'s plane rejection and the three walker skip-branches become unrepresentable rather than checked. Custom scope kinds stay closed (no use case, and forgery-prone — V-R2 already forbids handing user code a raw scope); if one arises the route is optional functionality on the host type, not readmission to `Value`. Supersedes D25's *shared substrate / role* clause only — accepted, 2026-09 (ruled, NOT executed — owner **B-136**; the arc gets its own plan before code) — reasoning: `docs/plans/entry-sequence-composite.md` §5.6
 - **D50** — The implementation is organized as **units in a narrow DAG**: each unit holds one decision (or one inseparable group), depends only on named units below it with every dependency an import edge, has one home, and is replaceable without editing what it does not name. Layers become bands of units; actors are implemented by sets of units. Specification first: the DAG is stated and measured now, and each physical move happens when its unit is next touched, never as a campaign — accepted, 2026-10 (specified; moves owed per unit, enforcement **B-149**) — reasoning: `docs/design/units.md` §1–§2, §7
 - **D51** — `Value` is a **contract, seven kind units, and one assembly**: the contract declares the open kind registry, the literal tag and the operations every kind supplies (`clone`, traversal, resolution, print) and names no kind; each kind registers itself by declaration merging and exports its tag, interface, factories, guard and ops; the assembly closes the set per build and holds the ops table and the walkers — it is the fork point, not a language extension mechanism. The `meta` slot is **not** in the contract: the `metadata` unit mixes it in by the same augmentation and owns the field registry, propagation and construction-with-metadata (D48(c) kept by stamping in place while unshared). `v.kind` stays, under the discriminator rule: guards import the kind, walkers use the traversal protocol, only the evaluator dispatches on kind and names only participating kinds — accepted, 2026-10 (specified, probed on TS 7.0.2; the move rides the first chunk that edits the `Value` union) — reasoning: `docs/design/units.md` §3
+- **D52** — The documentation is a **book in dependency order**: ordered chapters following the vision → requirements → specification → implementation flow and then the unit DAG, with the thesis test as its own part; the order is data (`docs/reading-order.json`) and a chapter may define a term using only terms defined in earlier chapters, checked by `scripts/doc-lint.ts order`. Every term has one definition site carrying a `def-` anchor and every other use links to it. The book is reasoning and current state (including each entry's delta); the registers keep their authority (K-003, K-004) and are not derived from it; records and plans stay outside it; rendering (TOC, search, executable examples) comes after the content. Phased: 0 order and links (now), I the foundation chapters, II one chapter per unit band in step with the unit moves, III rendering — accepted, 2026-10 (Phase 0 executed; the rest ride their owners) — reasoning: `docs/plans/documentation-book.md`
 
 ## E-R series — equality and laws (plan rulings, ratified 2026-08)
 

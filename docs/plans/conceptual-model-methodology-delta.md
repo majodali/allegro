@@ -8,7 +8,9 @@
 ## 1. What is being proposed
 
 That every project bound to the methodology maintain a **conceptual model**:
-a single dependency-ordered document defining every salient concept, in which
+a single dependency-ordered document (or, since D52 and
+`documentation-standards-delta.md` §6.6, a single dependency-ordered
+sequence of a book's chapters) defining every salient concept, in which
 each entry is explicitly one of **requirement**, **specification**, or
 **implementation**, traces upward to what justifies it, and records the
 **delta** between what it says and what the code does.

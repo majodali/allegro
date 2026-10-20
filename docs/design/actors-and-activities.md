@@ -39,6 +39,7 @@ what participant-neutrality asserts.
 
 ## 3. Actors
 
+<a id="def-actor"></a>
 ### 3.1 What counts as an actor
 
 The first draft had no definition, and the parser is what exposed it: it was
@@ -283,6 +284,7 @@ exercise's evidence; the rest are named without decomposition and owe theirs.
 Level 2 entries are candidates except `SlotView`, `Structure`, `Scope` and
 `slots.ts`, which this document's evidence already places.
 
+<a id="def-activity"></a>
 ## 4. The activity inventory — names only
 
 A first cut for scope, deliberately unrefined. Several of these will collapse

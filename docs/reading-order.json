@@ -1,0 +1,68 @@
+{
+  "_": "The reading order of the project's documentation: the book's chapters before the book exists (docs/plans/documentation-book.md, Phase 0; D52). Dependency order, not didactic order: a chapter may define a term using only terms defined in earlier chapters. `scripts/doc-lint.ts order` checks links to `#def-` anchors against this order. `lookahead: true` exempts a chapter that is a lookup aid or an introduction and may point forward by design. `status: planned` marks a chapter that does not exist yet. Registers and records are appendices, outside the order check.",
+  "parts": [
+    {
+      "part": "I",
+      "title": "Foundations: vision, process, requirements, architecture",
+      "chapters": [
+        { "doc": "README.md", "title": "Introduction", "lookahead": true },
+        { "doc": "docs/getting-started.md", "title": "Getting started", "lookahead": true },
+        { "doc": "docs/language-reference.md", "title": "Language reference, by example", "lookahead": true },
+        { "doc": "docs/VISION.md", "title": "Vision and principles", "authority": "Tier 0" },
+        { "doc": "docs/PROCESS.md", "title": "Process and engineering guide", "authority": "Tier 0" },
+        { "doc": "docs/design/architecture-vocabulary.md", "title": "Architecture vocabulary", "lookahead": true },
+        { "doc": "docs/design/layers.md", "title": "Layers, tracks and milestones" },
+        { "doc": "docs/design/units.md", "title": "Units: the implementation as a narrow DAG" },
+        { "doc": "docs/design/implementation-map.md", "title": "Implementation map" },
+        { "doc": "docs/design/actors-and-activities.md", "title": "Actors and activities (study)" },
+        { "doc": "docs/design/concepts.md", "title": "Concepts: requirements, specification and implementation choices, and the definitional spine" }
+      ]
+    },
+    {
+      "part": "II",
+      "title": "The units, in dependency order",
+      "chapters": [
+        { "doc": "docs/design/allegretto/README.md", "title": "L0 Allegretto: boundary contract" },
+        { "doc": "docs/design/allegretto/structures.md", "title": "Structures, scopes and channels" },
+        { "doc": null, "title": "Value, the kinds and the assembly (units 1 to 9)", "status": "planned", "units": ["value", "bits", "symbol", "param", "primitive-function", "expression", "composed-function", "structure", "kinds"] },
+        { "doc": null, "title": "Metadata and capability (units 10 and 11)", "status": "planned", "units": ["metadata", "capability"] },
+        { "doc": null, "title": "Scope and the evaluator (units 12 and 13)", "status": "planned", "units": ["scope", "evaluator"] },
+        { "doc": null, "title": "Futures and the base primitives (units 14 and 15)", "status": "planned", "units": ["futures", "base-primitives"] },
+        { "doc": "docs/design/extension/README.md", "title": "L1 extension substrate: boundary contract" },
+        { "doc": "docs/grammar-formalism.md", "title": "The grammar formalism" },
+        { "doc": "docs/design/extension/grammar.md", "title": "Grammar and parser" },
+        { "doc": "docs/design/extension/modules.md", "title": "Module loading and module objects" },
+        { "doc": "docs/design/standard/README.md", "title": "L2 Allegro Standard: boundary contract" },
+        { "doc": "docs/design/standard/type-system.md", "title": "The type system" },
+        { "doc": "docs/design/standard/core-types.md", "title": "Core types" },
+        { "doc": "docs/design/standard/effects.md", "title": "Effects" },
+        { "doc": "docs/design/standard/pattern-matching.md", "title": "Pattern matching" },
+        { "doc": "docs/design/standard/totality.md", "title": "Totality and termination" },
+        { "doc": "docs/design/standard/contracts.md", "title": "Contracts and invariants" },
+        { "doc": "docs/design/vivace/README.md", "title": "L3 Vivace: boundary contract" },
+        { "doc": "docs/design/platform/README.md", "title": "Capability tracks" }
+      ]
+    },
+    {
+      "part": "III",
+      "title": "The thesis test",
+      "chapters": [
+        { "doc": "docs/proving-in-allegro.md", "title": "Proving in Allegro" },
+        { "doc": null, "title": "The demo ladder and the rung-3 pilot", "status": "planned", "note": "today's content is the release-track plan, which is intent, not state" }
+      ]
+    },
+    {
+      "part": "Appendices",
+      "title": "Registers and records (outside the order check)",
+      "chapters": [
+        { "doc": "docs/decisions.md", "title": "Decision register", "register": true },
+        { "doc": "docs/backlog.md", "title": "Backlog", "register": true },
+        { "doc": "docs/CHANGELOG.md", "title": "Changelog", "register": true },
+        { "doc": "docs/documentation-census.md", "title": "Documentation census", "register": true },
+        { "doc": "docs/audits.md", "title": "Audit log", "register": true },
+        { "doc": "V1-INVENTORY.md", "title": "V1 feature inventory", "register": true },
+        { "doc": "docs/design/concepts-analyses.md", "title": "Concept spine: the analysis record", "record": true }
+      ]
+    }
+  ]
+}

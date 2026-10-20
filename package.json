@@ -19,7 +19,8 @@
     "generate-parser": "tsx grammar/generate-parser.ts",
     "build:web": "esbuild web/allegro-web.ts --bundle --outfile=web/dist/allegro.js --format=iife --global-name=AllegroBundle --platform=browser",
     "start": "tsx src/index.ts",
-    "lint:planes": "tsx scripts/analyze/plane-lint.ts"
+    "lint:planes": "tsx scripts/analyze/plane-lint.ts",
+    "lint:docs": "tsx scripts/doc-lint.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.0",
