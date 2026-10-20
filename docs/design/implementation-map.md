@@ -2,7 +2,10 @@
 
 > Tier 1, sibling of `layers.md`: the file-level projection of the
 > layer spine. One row per source file — path, layer/track tag
-> (vocabulary: `layers.md`), one-line role. Created at the K-002 slim
+> (vocabulary: `layers.md`), one-line role. **Reader**: someone locating
+> a file's role or layer; the unit a file holds is in `units.md` §4.
+> Created when the bootstrap was slimmed under methodology rule
+> K-002 (the agent bootstrap is a pointer, not a record)
 > (B-095 chunk 3), replacing the bootstrap's per-file inventory.
 > Update when files are added/renamed (PROCESS §5 landing checklist —
 > design docs). Missing here = missing from review. The finer map — which
@@ -135,5 +138,6 @@ evaluator treats as unresolved symbols, producing residuals; Promise
 resolution cascades re-evaluation via `applyPhase`. `print` defers on
 unresolved args; bare expressions with futures are tracked via
 synthetic `__bare_N` bindings. Web sandboxes use `evalAllegroAsync`
-with streaming output. (Design: `structures.md` §10, D33; a fuller
+with streaming output. (Design: `structures.md` §10, D33 (future cells
+as bindings); a fuller
 `allegretto/architecture.md` remains planned.)

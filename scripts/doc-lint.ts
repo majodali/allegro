@@ -131,16 +131,27 @@ function lintIds(files: string[]): Finding[] {
   const out: Finding[] = [];
   for (const file of files) {
     const lines = fs.readFileSync(path.join(ROOT, file), "utf-8").split("\n");
+    // An ID the document itself defines, as a table row's first cell or a
+    // bold definition (`**M1** — …`), is never bare in that document.
+    const defined = new Set<string>();
+    for (const text of lines) {
+      const row = text.match(/^\|\s*\*{0,2}((?:D|R|SC|IC|B|W|K|P|M|Q|S|CE-R|E-R|V-R|T-R|CT-R|U-R|R-R)-?\d+[a-z′]?)\*{0,2}\s*\|/);
+      if (row) defined.add(row[1]);
+      for (const d of text.matchAll(/\*\*((?:D|R|SC|IC|B|W|K|P|M|Q|S|CE-R|E-R|V-R|T-R|CT-R|U-R|R-R)-?\d+[a-z′]?)(?:\*\*)?\s*[—:]/g)) defined.add(d[1]);
+      for (const d of text.matchAll(/^#{1,6}\s+((?:D|R|SC|IC|B|W|K|P|M|Q|S|CE-R|E-R|V-R|T-R|CT-R|U-R|R-R)-?\d+[a-z′]?)\s*[—:]/g)) defined.add(d[1]);
+    }
     const seen = new Set<string>();
     lines.forEach((text, i) => {
-      if (/^\s*(\||```)/.test(text)) return;             // table rows and code carry IDs as data
+      if (/^\s*(>\s*)?(\||```)/.test(text)) return;      // table rows (also inside blockquotes) and code carry IDs as data
       for (const m of text.matchAll(ID)) {
         const id = m[1];
-        if (seen.has(id)) continue;
+        if (seen.has(id) || defined.has(id) || defined.has(id.replace(/′$/, ""))) continue;
         seen.add(id);
         const after = text.slice(m.index! + id.length, m.index! + id.length + 4);
         const before = text.slice(Math.max(0, m.index! - 2), m.index!);
-        const named = /^\*{0,2}\s*\(/.test(after) || /^\]\(/.test(after) || before.endsWith("[") || before.endsWith("(");
+        // Named: `ID (name)`, `[ID (name)](link)`, or a definition site `**ID** — Name` / `ID: Name`.
+        const named = /^′?\*{0,2}\s*\(/.test(after) || /^\]\(/.test(after) || before.endsWith("[") || before.endsWith("(")
+          || /^′?\*{0,2}\s*[—:]/.test(after);
         if (!named) out.push({ check: "ids", file, line: i + 1, text: text.trim().slice(0, 90), note: `first use of ${id} carries no name` });
       }
     });

@@ -4,7 +4,8 @@
 > design documents use, says which question each one answers, and states
 > how they relate. Each term has one definition site elsewhere; this
 > document cites it and does not restate reasoning. Written 2026-10 after
-> the B-112 plan review found that the abstractions were defined in five
+> the review of the plan for B-112 (plane interfaces) found that the
+> abstractions were defined in five
 > documents and distinguished in none.
 
 ## 1. Why six abstractions exist
@@ -38,8 +39,8 @@ effects, proofs and the rest of the typed language), and L3 Vivace (domain
 models). A layer may depend only on layers below it.
 
 Source: [`layers.md` §1 (the layer spine)](layers.md#def-layer). Enforced
-today by the boundary battery in `src/boundary-tests.ts` and, since D50
-(units in a narrow DAG), by the unit order (§2.6).
+today by the boundary battery in `src/boundary-tests.ts` and, since
+D50 (units in a narrow DAG), by the unit order (§2.6).
 
 ### 2.2 Track
 
@@ -152,7 +153,8 @@ second sense only.
   introspection tooling and the CLI are units in the track band of
   `units.md` §4.4.
 - **An actor is implemented by a set of units.** `units.md` §6 maps each
-  actor to its units and records where the two disagree (M1 to M13). A
+  actor to its units and records where the two disagree (the thirteen
+misalignments of its §6.1). A
   unit may instead implement an activity, as the compile pipeline does.
 - **Planes are a property of values, not of code.** Every unit that
   touches a value sees the same four planes. A unit may read a plane only

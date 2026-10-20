@@ -6,7 +6,7 @@
 > deep treatment lives; this is what makes them legible.
 >
 > Plan: `docs/plans/concept-spine.md`. Status: **Part 0 + T0–T5 written**
-> (S1, S2a–S2f, S3, S3b, S4, S4b, S5); Part 0 revised 2026-10-20 to the entry
+> (the concept-spine plan's chunks, all landed); Part 0 revised 2026-10-20 to the entry
 > shape, its analysis passes moved to `concepts-analyses.md` (the record).
 > Status tags per `README.md`.
 >
@@ -99,7 +99,8 @@ compares statements to each other rather than to the code.
 
 > **Level: Requirement.** *Subject: Allegretto* unless stated. **Status of
 > the set: proposed, in use, not ratified.** Fourteen were proposed in
-> 2026-08; the cohesion pass (record §2) and the S2d merge (record §4)
+> 2026-08; the cohesion pass (record §2) and the merge taken at plan chunk
+> S2d (record §4)
 > reduced them to the eight live requirements below plus one criterion, one
 > derived statement and five candidates. Every entry in T0 to T5 cites this
 > set. Ratification as a set is a maintainer ruling that has not been taken;
@@ -177,8 +178,10 @@ install (R6's delta); that is R6's finding, not R2's.
 <a id="def-r3-prime"></a>
 ### R3′ — Metadata channels are independent
 
-**Level.** Requirement, proposed at S2d (record §4.1) as the merge of R3,
-R5, R11 and R13. In use by every T2 to T5 entry.
+**Level.** Requirement, proposed at plan chunk S2d (record §4.1) as the
+merge of R3 (channels processed orthogonally), R5 (metadata survives
+evaluation), R11 (propagation declared, not coded) and R13 (channels can
+merge). In use by every T2 to T5 entry.
 
 **Definition.** A value may carry named information about itself. Each
 channel's handling is independent of every other: an operation's treatment
@@ -218,7 +221,7 @@ compile/run distinction Allegro dissolves would come back.
 **Scope.** This requirement is about unresolved information only. Aborts
 (an interpreter assertion, a capability denial, a depth bound, an ill-formed
 application) are not "getting stuck"; they are specified separately (SC-8)
-under their own candidate requirements. A first draft of S2c read the
+under their own candidate requirements. A first draft of the cohesion pass read the
 base's 117 throws as evidence that R4 was over-broad; the maintainer
 corrected that at S2d: inconsistent behaviour is evidence of inconsistency,
 not of a different requirement (record §2.2 C4, §3.3).
@@ -228,8 +231,9 @@ an unresolved Symbol, Param or Expression; the forward-chaining loop
 re-evaluates on completion (§28).
 
 **Delta.** Class E of the abort classification (type errors thrown by the
-base) is not an R4 violation but an R6 one (record §3.1); it is B-112's
-subject.
+base) is not a violation of this requirement but of R6 (the base does not
+know about the layers; record §3.1); it is the subject of B-112 (the four
+owed plane interfaces).
 
 <a id="def-r6"></a>
 ### R6 — The base does not know about the layers
@@ -251,15 +255,16 @@ the metadata plane; it must not know that one field is called `type`.
 
 **Delta.** Violated today in three places, each owned: the evaluator
 imports 27 symbols from L2 and implements type checking (record §3.1;
-**B-112**, with `units.md` M11); `slots.ts` registers eleven L2 field names
+**B-112**, with `units.md` misalignment M11 (the evaluator holds Type-system activities)); `slots.ts` registers eleven L2 field names
 at module init and special-cases three by name (record §1.1; **B-109**);
-`scope.ts` imports the predicate-set merge (`units.md` M12; B-112 hook (e)).
+`scope.ts` imports the predicate-set merge (`units.md` misalignment M12 (the scope imports `refinements`); B-112 hook (e)).
 
 <a id="def-r8"></a>
 ### R8 — There is one value universe
 
 **Level.** Requirement. Derivation corrected at the cohesion pass (record
-§2.1 F6): it follows from R1 + R9, not from R4.
+§2.1, finding F6): it follows from R1 (the simplicity criterion) and
+R9 (the language surface is extensible), not from R4 (evaluation is total).
 
 **Definition.** Everything the evaluator can meet is a Value. There is no
 second category: no statement, declaration, or type that is not itself a
@@ -270,10 +275,11 @@ cannot produce a language construct that is not a value. R4's totality is
 then meaningful over one space. What the value kinds are is a separate,
 weaker question (SC-1).
 
-**As implemented.** `type Value` in `src/types.ts` (the closed union; D51
-makes it a contract plus seven kind units plus an assembly).
+**As implemented.** `type Value` in `src/types.ts` (the closed union;
+D51 (`Value` as a contract, seven kinds and an assembly) splits it so).
 
-**Delta.** The evaluation environment was a Value by SC-6 and is ruled out
+**Delta.** The evaluation environment was a Value by SC-6 (scopes are
+values) and is ruled out
 of the universe by D49 (SC-6's delta). R8 is unaffected: a scope was never
 something the evaluator *meets* as an input.
 
@@ -312,8 +318,9 @@ at that instant would be permanently residual.
 **As implemented.** Future cells and the completion cascade (§28;
 `src/futures.ts`, `applyPhase` in `src/runtime.ts`).
 
-**Delta.** Arrival order is not guaranteed not to matter: candidate R16
-and **B-114**.
+**Delta.** Arrival order is not guaranteed not to matter: candidate
+R16 (determinism) and **B-114** (completion confluence is not guaranteed
+by construction).
 
 <a id="def-r12"></a>
 ### R12 — Metadata origination is capability-controlled
@@ -332,7 +339,8 @@ not if trust is carried by holding the closure that writes it. Which
 channels need protection is a layer decision, so the base must not enumerate
 them.
 
-**As implemented.** Writer capabilities (§21; D23, D24); one-shot
+**As implemented.** Writer capabilities (§21; D23 (writes are gated and
+reads free) and D24 (the capability is a delegable closure)); one-shot
 registration; the fixed propagation vocabulary (SC-7) exists so that
 fabricating rules on integrity fields are a decidable subset (record §4.2).
 
@@ -355,10 +363,13 @@ principal case, and the visibility boundary is what makes a unit's internals
 refactorable.
 
 **As implemented.** `src/modules.ts` (loader), `src/use-scanner.ts`; export
-partition and visibility at B-097 (D41 to D43).
+partition and visibility at B-097 (the mediated-member arc: D41 (the
+member protocol), D42 (evidence is possession), D43 (modifiers are
+declared attributes)).
 
 **Delta.** The L1 loading half and the L2 module-object half share one file
-and no ruling enforces the split: **B-138**.
+and no ruling enforces the split: **B-138** (the unenforced L1/L2 module
+ruling).
 
 ### Candidates R16 to R20
 
@@ -435,7 +446,7 @@ knowing its semantics.
 in the pipeline.
 
 **Delta.** `typeLiterals` (raw Bits to Int or String) is the type system's
-rule executed inside the pipeline (`units.md` M3). Not a violation of SC-2;
+rule executed inside the pipeline (`units.md` misalignment M3 (`typeLiterals` is in the pipeline)). Not a violation of this entry;
 a placement finding.
 
 ### SC-3 — Expressions are values
@@ -455,7 +466,7 @@ computation" admits alternatives even if "pending computation is a value"
 does not.
 
 **As implemented.** `ExpressionValue` (T0 §6); residuals are Expressions
-carrying their own metadata since B-121.
+carrying their own metadata since B-121 (metadata on values).
 
 **Delta.** —
 
@@ -471,7 +482,8 @@ symbols.
 | Name-string comparison | Conformance becomes a spelling question; D44 removed exactly this class of false positive |
 | Opaque gensym identity | Loses the human-readable projection printing, errors and loose matching rely on |
 
-**Rationale.** Conformance must be an identity question. D44 is evidence the
+**Rationale.** Conformance must be an identity question. D44 (declared
+inheritance dissolves into conformance) is evidence the
 alternative was tried and failed.
 
 **As implemented.** `SymbolValue.fqn`; interning in `src/symbols.ts`
@@ -481,8 +493,9 @@ alternative was tried and failed.
 
 ### SC-5 — One composite kind rather than two
 
-**Level.** Specification; satisfies R1, R3′. D1, completed D46; upheld at
-B-108 (D48).
+**Level.** Specification; satisfies R1, R3′. D1 (unify MultiValue and
+Context into Structure), completed by D46 (MultiValue retirement); upheld
+at B-108 (D48, the composite ruled as one question).
 
 **Definition.** MultiValue and Context were condensed into one Structure.
 
@@ -492,11 +505,13 @@ B-108 (D48).
 | Three (add a sequence kind) | IC-2 option E makes a sequence the composite's own shape instead |
 
 **Rationale.** Kind-count minimality under R1. This is the specification
-half of a choice whose implementation half was IC-1, and separating them is
+half of a choice whose implementation half was IC-1 (roles read from field
+presence), and separating them is
 what made the maintainer's doubt answerable: reducing the kind count was a
 specification win, and what it cost was at the implementation level, where
 four configurations replaced two kinds. B-108 upheld SC-5 and ruled the
-cost away (IC-1 dissolved, IC-2 option E, IC-3 the alternative). The
+cost away: IC-1 dissolved, IC-2 (the composite's storage) took option E,
+IC-3 (metadata storage) took the alternative. The
 measurements are in the record §5.
 
 **As implemented.** `StructureValue` (T0 §9); one role left, record (§12).
@@ -507,7 +522,7 @@ measurements are in the record §5.
 
 **Level.** Specification; satisfied R8, R2. **Superseded by D49** (2026-09):
 the evaluation environment leaves `Value` and becomes a non-value host
-construct. Owner **B-136**; not executed.
+construct. Owner **B-136** (Scope leaves `Value`); not executed.
 
 **Definition (as it stood).** An evaluation environment is an ordinary
 Structure, introspectable like any other, distinguished by role rather than
@@ -518,7 +533,8 @@ by kind.
 | Environments outside the value universe | "Violates R8; reflection over scope becomes a special API" | No scope ever reaches user code as a value, so R8 is not engaged; introspection is a property of scopes you hold (V-R2), not of scope valuehood |
 
 **Rationale for the supersession.** A scope has no position, so metadata is
-meaningless on it; it is mutable where values are not (the D22 carve-out
+meaningless on it; it is mutable where values are not (the carve-out from
+D22 (immutability by derivation)
 this entry used to record); and the substrate sharing made five sites exist
 only to undo it. Decided in `docs/plans/entry-sequence-composite.md` §5.6.
 
@@ -558,7 +574,8 @@ no merge and the scope imports one directly (`units.md` M12).
 ### SC-8 — Specified aborts
 
 **Level.** Specification, proposed at S2d (record §3); satisfies R12 and
-candidates R18, R19, R20. **Not ratified**; stated here because the
+candidates R18 (resource bounds), R19 (planes are separated) and R20 (an
+ill-formed application is rejected). **Not ratified**; stated here because the
 maintainer ruled that if Allegretto aborts, that behaviour is a
 specification supported by a requirement, and the classification exists.
 
@@ -596,10 +613,19 @@ tell an interpreter bug from a user error: **B-110(d)**.
 > the delta. A choice with no recorded alternatives cannot later be
 > evaluated.
 >
-> *Renumbered at S2b.* The former IC-1 (Bits) is now SC-2; the former IC-2
-> split into SC-5 (kind count) and IC-1 (role configuration); former IC-3
-> became IC-2, IC-4 became IC-3, IC-5 became SC-4 and IC-4, IC-6 became
-> IC-5, IC-7 became SC-3 and IC-6.
+> *Renumbered at S2b (a concept-spine plan chunk).* The IDs before that
+> chunk map to the current ones as follows (for readers of the older
+> records):
+>
+> | Former | Now |
+> |---|---|
+> | IC-1 (Bits) | SC-2 |
+> | IC-2 | SC-5 (kind count) and IC-1 (role configuration) |
+> | IC-3 | IC-2 |
+> | IC-4 | IC-3 |
+> | IC-5 | SC-4 and IC-4 |
+> | IC-6 | IC-5 |
+> | IC-7 | SC-3 and IC-6 |
 
 ### IC-1 — Structure's roles are read from field presence
 
@@ -642,7 +668,8 @@ whatever the structure's role.
 | C · two representations | One extra kind |
 | **E · one entry sequence** | Both map and list; the index is invisible above the specification |
 
-**Rationale.** Spec-to-implementation distance under R7, the criterion IC-2
+**Rationale.** Spec-to-implementation distance under R7 (Allegretto is
+replaceable), the criterion IC-2
 had recorded as the one that should apply. The deciding measurement (data
 structures average 4.6 slots; name lookup is rare next to the carrier
 indirection it was optimising) is in the record §5.2.
@@ -652,7 +679,8 @@ indirection it was optimising) is in the record §5.2.
 corrected the ruling: the index splits by size, not by role (93.4% of 4.24M
 lookups are served by a scan averaging 3.63 entries), and an empty array
 needed one host-plane bit the ruling did not anticipate, which opened the
-host-plane audit (B-133, B-135).
+host-plane audit (B-133 (the positional bit) and B-135 (what may live on
+the host plane)).
 
 **Delta.** —
 

@@ -2,7 +2,9 @@
 
 > Tier 2 consumable (like `getting-started.md`). The complete surface
 > syntax of the base language and Allegro Standard, by example. Lifted
-> from the session bootstrap during the K-002 slim (B-095 chunk 3);
+> from the session bootstrap when it was slimmed to a pointer under
+> methodology rule K-002 (the bootstrap is a pointer), during
+> B-095 (methodology adoption);
 > semantics and design rationale live in `docs/design/` — this file is
 > the syntax quick-reference. Every construct here is exercised by the
 > literate demos in `tests/*.alg` (validated via `// expect:` comments)
@@ -155,7 +157,7 @@ head(arr: Array[Int]): Int => arr[0]
 nums.map(x: Int => x * 2)
 (x: Int, y: Int): Int => x + y
 
-// Interfaces (DECLARED conformance — C5.2c/D30)
+// Interfaces (declared conformance)
 Printable = Interface.define({toString: Function})
 42 instanceof Printable           // false — Int never DREW Printable's symbols
 HasXY = Interface.define({x: Int, y: Int})
@@ -164,7 +166,7 @@ Point(1, 2) instanceof HasXY      // true — declared conformance
 is_printable(v: ~Printable) => true      // ~T is the loose duck-typing path
 is_printable(42)                  // true — matches by base name
 
-// Private members (B-097, D41–D43) — the combinator surface
+// Private members — the combinator surface
 Vault = Type.define({
   owner:  String,
   secret: private(Int),                   // private field
@@ -233,7 +235,7 @@ describe(n) =>
   | 2 => "two"
   | 3 => "three"
 
-// Async & completion (B-028, D31–D34) — futures are typed, reads never block
+// Async & completion — futures are typed, reads never block
 x = delay(100)            // Future[Int] while pending; resolves to 0 after 100ms
 y = x + 1                 // flows as a residual — completes when x lands
 print(y)                  // io DEFERS until the value (and its slots) resolve

@@ -1,23 +1,38 @@
-# Units — the implementation as a narrow DAG
+# Units: the implementation as a narrow DAG
 
-> Tier 1 design doc. The organizing principle for the implementation,
-> below the layer spine (`layers.md`) and above the file map
-> (`implementation-map.md`): the code is divided into the smallest
-> independent **units**, each holding the decisions that are its own,
-> ordered in a narrow directed acyclic graph. Ratified 2026-10 as **D50**;
-> the `Value` definition it rests on is **D51**. Specification first —
-> the physical moves happen when a unit is next touched (§7). Measured by
+> Tier 1 design doc. The organizing principle for the implementation:
+> the code is divided into the smallest independent **units**, each
+> holding the decisions that are its own, ordered in a narrow directed
+> acyclic graph (a DAG). It sits below the layer spine
+> ([`layers.md`](layers.md#def-layer)) and above the file map
+> (`implementation-map.md`). Ratified 2026-10 as D50 (units in a narrow
+> DAG); the `Value` definition it rests on is D51 (`Value` as a contract,
+> seven kinds and an assembly). Specification first: the physical moves
+> happen when a unit is next touched (§7). Measured by
 > `npx tsx scripts/analyze/index.ts units` against the manifest in
 > `scripts/analyze/units.json`.
+>
+> **Reader.** Someone deciding where code belongs, or what a piece of
+> code may depend on. Assumes the six architectural abstractions in
+> `architecture-vocabulary.md` and the four layers in `layers.md`. Terms
+> defined here: *unit* (§2), *contract*, *kind unit*, *assembly* (§3),
+> *mixed file* and *move* (§4, §7), *misalignment* (§6).
 
-## 1. Why units, and why now
+## 1. The problem: decisions have no single home
 
-The layer spine says *dependencies point downward only* across four
-layers. It cannot say where a single decision lives, because a layer is
-too coarse to hold one: `primitives.ts` is 4,464 lines across three
-layers, `types-std.ts` is 4,617 lines holding at least six separable
-decisions, and `runtime.ts` imports eighteen project modules.
-Three questions the project keeps asking have no answer at that grain:
+**Requirement.** Allegro is meant to be forkable and didactic (VISION §1,
+the programmable-platform bet): a reader should be able to learn the
+evaluator without reading `Bits`, and replace `Bits` without touching the
+evaluator. Every design decision should therefore have one place in the
+code where it lives, and every dependency between decisions should be
+visible.
+
+**Challenge.** The layer spine says *dependencies point downward only*
+across four layers. A layer is too coarse to hold one decision:
+`primitives.ts` is 4,464 lines across three layers, `types-std.ts` is
+4,617 lines holding at least six separable decisions, and `runtime.ts`
+imports eighteen project modules. Three questions have no answer at that
+grain:
 
 - **Where does this decision live?** The concept spine (`concepts.md`)
   traces each choice to a requirement, but a reader still cannot find the
@@ -27,29 +42,33 @@ Three questions the project keeps asking have no answer at that grain:
   `Structure`? Does metadata depend on `Bits`?" are answerable only by
   reading. The import graph at file grain says `evaluator` imports
   `types`, which is every kind at once.
-- **Can someone fork this?** VISION's bet is a *programmable* platform, and
-  the implementation is meant to be didactic — a reader should be able to
-  learn Allegretto's evaluator without reading `Bits`, and replace `Bits`
-  without touching the evaluator. Today both require editing a hub.
+- **Can someone fork this?** Today both halves of the requirement above
+  need an edit to a hub file.
 
-A unit answers all three by construction: it holds one decision or one
-cohesive group, it depends only on units below it, and the dependency is
-an **import edge** the binder can see. The B-121 C2 lesson applies —
-eleven silent breaks came from reaching past an interface at a
-representation detail — and the B-127/B-128 tooling is what makes the
-order *checkable* rather than aspirational.
+The cost of leaving this unanswered was measured once. B-121 (metadata on
+values), at its chunk C2, broke eleven call sites with a change that altered no
+interface, every failure silent, because code had reached past an
+interface at a representation detail that no map named.
 
-**Why now.** B-112 is about to move the type system's activities out of
-the evaluator behind four hooks. Without a stated target, B-112 moves
-code from one mixed file to another. With one, B-112 is the chunk that
-takes `evaluator.ts` to its unit (§6, M11), and its done-condition is
-measurable: the `evaluator` unit imports nothing above L0.
+**Approach.** A **unit** (§2) answers all three questions by
+construction: it holds one decision or one inseparable group, it depends
+only on units below it, and each dependency is an import edge the
+TypeScript binder can see. B-127 (the binder-aware analyzer) and B-128(a)
+(the plane lint) are what make the order checkable rather than
+aspirational.
 
-**Why not linear.** A total order would force arbitrary choices (`bits`
-before `symbol`?) that encode no decision. The DAG is *narrow*: each unit
-names the few it needs, and unrelated units are incomparable. That is the
-form in which "the evaluator does not depend on `Bits`" is a fact rather
-than an accident of ordering.
+**Why a DAG and not a list.** A total order would force arbitrary choices
+(`bits` before `symbol`?) that encode no decision. The DAG is *narrow*:
+each unit names the few units it needs, and unrelated units are
+incomparable. That is the form in which "the evaluator does not depend on
+`Bits`" is a fact rather than an accident of ordering.
+
+**Why now.** B-112 (the four owed plane interfaces) is about to move the
+type system's activities out of the evaluator behind hooks. Without a
+stated target, B-112 moves code from one mixed file to another. With one,
+B-112 is the chunk that takes `evaluator.ts` to its unit (§6, misalignment
+M11), and its done-condition is measurable: the `evaluator` unit imports
+nothing above L0.
 
 **Cost.** Specification first is cheap: this document, a manifest, and a
 report. The physical moves are not cheap, and they are *not* scheduled as
@@ -88,8 +107,9 @@ Two things a unit is *not*:
 dependency sets or hold decisions that could be revised independently.
 Do not split for size alone. `core-types` holds ten types in one unit
 because they share one dependency set and one decision (D-series
-core-type rulings); `bits` and `structure` are separate because SC-2 and
-SC-5 are independent choices with different dependents.
+core-type rulings); `bits` and `structure` are separate because
+SC-2 (Bits is the only scalar) and SC-5 (one composite kind) are
+independent choices with different dependents.
 
 ## 3. `Value` — contract, kinds, assembly (D51)
 
@@ -103,8 +123,9 @@ today sit in one file. The split is:
 | **`kinds`** (assembly) | the seven imports; `ValueKind` as a `const` object re-exporting the tags; the `KIND_OPS` table; the generic walkers built on `children`/`rebuild` | every kind. **This is the fork point** |
 
 **Why an assembly rather than an open extension point.** `Value` is not
-an extension mechanism of the *language* — R9 and R14 are the language's
-extension points. It is a way to structure foundational definitions so
+an extension mechanism of the *language* — R9 (the language surface is
+extensible) and R14 (code is organised into separately-loadable units)
+are the language's extension points. It is a way to structure foundational definitions so
 that each is independent. So the set of kinds is closed per build, the
 compiler checks exhaustiveness against it, and a fork edits one file.
 Probed on TypeScript 7.0.2 (2026-10): deleting a kind unit and every
@@ -222,7 +243,8 @@ column is §7's ledger, corrected in place as moves land (K-010).
 Not a unit: **the host plane.** Host state is declared on the unit that
 owns it (`expression` owns `memo`, `structure` owns its two bits, `scope`
 owns its chain). The registry that would generate the declarations
-(`host-plane-declaration.md`, B-135/B-137) is then per-unit data, and that
+(`host-plane-declaration.md`; B-135 (what may live on the host plane) and
+B-137 (the casts that reach it)) is then per-unit data, and that
 plan's §6 ruling — declare on the value interface or on a separate
 host-plane interface — is taken per unit. Under this document the first
 reading is the natural one.
@@ -281,7 +303,8 @@ moves land:
 
 - **The evaluator does not depend on `bits` or `structure`.** Evaluation
   distinguishes Symbol, Expression and application; the rest is inert.
-  `structure` leaves its dependency set when D49 lands (B-136), because
+  `structure` leaves its dependency set when D49 (Scope leaves `Value`)
+lands through B-136 (its owner), because
   the environment the evaluator threads is a `scope`.
 - **Metadata does not depend on any kind.** It depends on `kinds` — the
   assembly — for the ops table, and on nothing in particular.
@@ -326,12 +349,14 @@ reading this document takes. None is settled here; each is either a
 backlog owner's or a ruling's.
 
 - **M1 — Kernel is not contiguous.** Capability minting is L0 (11); the
-  evidence capsule and privilege layers (V-R2, D42) are L2, inside
+  evidence capsule and privilege layers (V-R2 (the mediation context is a
+  minted capsule) and D42 (evidence is possession)) are L2, inside
   `type-core`. Either the Kernel decomposes per layer — a level-2 *Kernel
   (L0)* and *Kernel (L2)* — or the capsule is the Type system's and only
   minting is the Kernel's. The second reading matches the actor model's
   own test (authority nobody else can hold): the capsule is an
-  *attenuated* capability, D24's wrapping, and attenuation is a
+  *attenuated* capability, the wrapping of D24 (the capability is a
+  delegable closure), and attenuation is a
   Type-system activity over a Kernel-minted reference. Reading taken:
   Kernel = unit 11.
 - **M2 — The proof kernel's field is registered in the type system's
@@ -380,7 +405,8 @@ backlog owner's or a ruling's.
   The L0 README says fact payloads are opaque to base ops; this edge says
   they are not. It is the facts-plane instance of P3 (decide → hook, carry
   → handle): the layer installs the merge, the scope applies it — the same
-  shape as `installFieldMerge`. Owner: B-112's hook family, or B-146
+  shape as `installFieldMerge`. Owner: the hook family of B-112, or
+  B-146 (knowledge propagation)
   (knowledge propagation) if the hooks are ruled too narrow. Until then
   the edge is in B-149's baseline as a known violation, not an accepted
   one.
