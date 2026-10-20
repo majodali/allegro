@@ -25,6 +25,7 @@ every section is tagged with its implementation status:
 | Location | Layer / scope | Documents |
 |---|---|---|
 | `architecture-vocabulary.md` | **The six abstractions, distinguished** | Layer, track, plane (with field and channel), plane interface, actor and activity, unit: one definition each by citation, which question each answers, how they relate, and the three senses of "capability". **Read before any design doc that uses more than one of them** |
+| `concepts-analyses.md` | **Record** (history) | The analysis passes and measured rulings that produced Part 0 of the spine in 2026-08 (cohesion pass, abort classification, metadata merge, the B-108 measurements), moved out verbatim 2026-10-20. Read for the argument; the outcomes are in `concepts.md` Part 0 |
 | `concepts.md` | **Definitional spine** | Every salient concept in dependency order (definition / rationale / as-implemented / delta). **Read this first.** T0–T1 written; T2–T5 pending (`docs/plans/concept-spine.md`) |
 | `actors-and-activities.md` | Cross-cutting structure | **Draft exercise, not settled design** — actors, the activity inventory, and four worked crossings testing whether the model earns its keep. Cites `layers.md` for dependencies and `concepts.md` for definitions; supersedes neither |
 | `layers.md` | The spine | Layer model, capability tracks, milestone register |
