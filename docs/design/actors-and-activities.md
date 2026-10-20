@@ -96,7 +96,8 @@ It passes both, and on every ground T2 offers:
   inside one.
 - **T2(b) and (c) as well**, which is why it is not a marginal case: it holds
   grammar tables and an intermediate tree across calls, and its error recovery
-  and precedence resolution are strategy no caller should depend on. B-132 is
+  and precedence resolution are strategy no caller should depend on.
+  B-132 (parse-time contexts are neither structures nor scopes) is
   what the missing boundary already costs — `parser-helpers.ts` minting its
   own contexts outside the representation.
 
@@ -188,7 +189,8 @@ first draft. Under the revised tests it qualifies: its role is stated — *a
 by-name view over the entry sequence* — its index policy is explicitly *below
 the specification* (D48(a)), it holds a cached index across calls (T2(b)), it
 chooses between a scan and a map at a measured threshold (T2(c)), and the
-granularity rule passes because W7 and the 200-vs-200,000 scaling test are
+granularity rule passes because W7 (the slot-view coherence invariant) and
+the 200-vs-200,000 scaling test are
 tests of its contract that are not tests of `Structure`.
 
 That raised a grain question, **now answered in §3.7**: the grain is
@@ -246,7 +248,7 @@ actor at all, because the flat model had no category for one.
 
 #### 3.7.2 Two convergences worth recording
 
-**Scope.** D49 rules that a scope leaves `Value` and becomes a non-value host
+**Scope.** D49 (Scope leaves `Value`) rules that a scope becomes a non-value host
 construct. In this model a scope is *internal state-carrying actor*, the
 category the maintainer describes — arrived at from a different direction and
 agreeing. That D49's argument and the actor model's category independently
@@ -344,7 +346,7 @@ reference may be stored inside another actor.
 That clause is often decorative in a system model. In Allegro it is the
 authority design, stated in the model's own vocabulary.
 
-#### 4.2.1 D42 and D24 are actor references, exactly
+#### 4.2.1 D42 (evidence is possession) and D24 (the capability is a closure) are actor references, exactly
 
 - **D42 — evidence is possession.** *Authorization is what the requesting
   context HOLDS, never principal identity.* An actor reference held by an
@@ -637,7 +639,8 @@ Vocabulary: **sound** (interface exists and is named) · **implicit**
 
 - **Evaluate expression** — Engine, self-initiated and from Parser and Type
   system. `EvalFn = (value, ctx) => Value`. **Sound in shape**, and its one
-  defect is already owned: `ctx` is typed `StructureValue`, which D49/B-136
+  defect is already owned: `ctx` is typed `StructureValue`, which D49 and
+  its owner B-136 (Scope leaves `Value`)
   corrects.
 - **Resolve symbol** — Engine → Scope. `scopeLookup`. **Sound.**
 - **Extend scope** — Engine, Type system → Scope. `scopeExtend`,
@@ -658,9 +661,11 @@ Vocabulary: **sound** (interface exists and is named) · **implicit**
 
 - **Declare type** — UserCode → Type system → Kernel. The kind recipe and the
   meta-protocol registry. **Implicit**: the registry is the nearest thing to
-  an interface, and B-135 is what its absence costs.
+  an interface, and B-135 (what may live on the host plane) is what its
+  absence costs.
 - **Check declared constraint** — Type system → UserCode's value. Four code
-  paths sharing a severity model (a failed check halts, CE-R1) and no surface.
+  paths sharing a severity model (a failed check halts, per CE-R1 (a
+  declaration is a contract)) and no surface.
   **Gap**: the parameterization §4.1 predicted is not expressed anywhere.
 - **Infer effects** — Effect system → Engine. **Gap**, and see below.
 - **Check totality** — Totality analyzer → Engine. **Gap**, and see below.
@@ -852,7 +857,8 @@ proposed. That is the evidence for adopting it.
    declarations checked by the boundary battery the way the plane invariants
    are. **Partly answered by D50 (2026-10)**: `units.md` §6 maps each actor
    to the units that implement it and records thirteen misalignments
-   (M1–M13); an actor's interface is the union of its units' exports, and
+   (the thirteen misalignments of its §6.1); an actor's interface is the
+   union of its units' exports, and
    the unit DAG is what the binder checks.
 5. ~~How fine the grain goes.~~ **SETTLED 2026-09** (§3.7): unlimited in
    principle, two levels in practice. `SlotView` and its like are in, as

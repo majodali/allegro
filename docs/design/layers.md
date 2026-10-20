@@ -6,6 +6,10 @@
 > layer's **boundary contract** lives in its `docs/design/<layer>/README.md`.
 > Maintainer rulings 2026-07 (parser placement, module split, provability
 > clustering, build-pipeline-as-track) are incorporated.
+>
+> **Reader.** Someone placing a piece of work or code in a layer or track,
+> or looking up a milestone. Assumes `architecture-vocabulary.md`. The
+> finer grain, which unit holds which decision, is `units.md`.
 
 <a id="def-layer"></a>
 ## 1. The layer spine
@@ -80,7 +84,8 @@ minimum a design doc (or folder) under `docs/design/`.
 | M9 | **Self-hosted parser + type system** | T-bootstrap | aspirational | `platform/` |
 | M10 | **Package ecosystem** | T-ecosystem | aspirational | `platform/` |
 
-**Mapping from the old BACKLOG milestones:** "Allegro Standard complete" →
+**Mapping from the old BACKLOG milestones** (milestone IDs are the
+table's above): "Allegro Standard complete" →
 M3+M4 (split per ruling 3). "DSL ready" → M2 (mechanism; largely shipped
 in v1, revalidate) + M5 (first real domain use). "Multi-phase build
 pipeline" → M6. "Tracing and debugging" → M7. "Standard library" → folded

@@ -4,6 +4,28 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — D52 Phase 1a: Part I readable in order
+
+The readability pass over the book's Part I (`docs/reading-order.json`):
+every non-Tier-0 chapter has a reader statement and every first-use
+identifier carries its name or a plain-words citation. `units.md`, the
+census's priority-1 case, now states its reader and terms and puts the
+problem (requirement, challenge, approach) before the mechanism; the
+language reference no longer cites decision IDs to a language user; the
+actors study, the layer spine, the implementation map, the vocabulary and
+the spine's Part 0 are named through. `scripts/doc-lint.ts ids` learned
+three things from the pass: an identifier a document defines itself is
+never bare there; `ID — name` counts as named; blockquote tables are data.
+Bare identifiers: Part I zero outside Tier 0; corpus 802 (was about 1,140).
+
+**Phase 1b, the folder, is blocked on Tier 0.** `PROCESS.md` §1 names the
+paths of the Tier-0 and Tier-1 documents, so moving them into `docs/book/`
+contradicts a Tier-0 statement; a dedicated flagged proposal carries the
+amendment. Two Tier-0 findings reported, not edited: `VISION.md` line 220
+cites backlog IDs bare, and `PROCESS.md` §6's naming rule forbids primes
+while the spine's R3′ carries one. Documentation and lint tooling only;
+doc-ref lint and anchor lint clean.
+
 ## 2026-10 — D52: the documentation as a book in dependency order, Phase 0
 
 The maintainer's proposal, ratified in discussion: the documentation

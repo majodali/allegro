@@ -77,9 +77,28 @@ Agreed in discussion, 2026-10, and recorded as D52:
 | Phase | What | When | Done when |
 |---|---|---|---|
 | **0. Order and links** | `docs/reading-order.json` declares the order; `docs/design/README.md` is the table of contents in that order; every definition site carries a `def-` anchor; first uses elsewhere link to it; `scripts/doc-lint.ts` checks anchors, forward references and bare identifiers | **Landed 2026-10** | anchors resolve; order check reports zero forward references; the lints run |
-| **1. Part I** | Assemble vision, process, requirements (Part 0 of the spine), vocabulary, layers and the DAG as the foundation chapters; link pass; tombstone stubs where paths move | After Phase 0, before B-112 C1 | Part I readable in order with no forward references |
+| **1. Part I** | Assemble vision, process, requirements (Part 0 of the spine), vocabulary, layers and the DAG as the foundation chapters; link pass; tombstone stubs where paths move | After Phase 0, before B-112 C1. **Split 2026-10-21**: the link and readability pass landed first (1a); the folder move (1b) waits on a Tier-0 amendment, because `PROCESS.md` §1 names the paths of the Tier-0 and Tier-1 documents and relocating them contradicts a Tier-0 statement (PROCESS §2: surface, do not resolve) | Part I readable in order with no forward references |
 | **2. Part II, chapter by chapter** | Each unit band's chapter is written when its code moves (`units.md` §7): `metadata` and `capability` with the `slots.ts` split (B-112 C1); `evaluator` at B-112's exit; `scope` at B-136; the kinds with the `Value` split. A chapter takes definitions from the spine, reasoning from the area design note, examples from the `.alg` demos, and links to source and tests | In step with the unit moves | the spine's entries for that band live in the chapter; the manifest row has a `doc` |
 | **3. Rendering** | The book as HTML on the website: TOC, search, term links, executable examples, registers as appendices, links into source | Once Part I and the L0 chapters exist | the website loop (PROCESS §9) |
+
+### 4.0 Phase 1a, landed 2026-10-21: the Part I readability pass
+
+Every Part I document except the two Tier-0 ones was given a reader
+statement where it lacked one and had every first-use identifier named
+(P-004) or its citation reworded. `units.md` was the priority-1 case from
+the census: its header now states its reader and terms, and §1 states the
+problem (requirement, challenge, approach) before the mechanism. The
+`ids` lint learned three things from the pass: an identifier a document
+defines itself (a table row or a bold definition) is never bare there;
+`ID — name` and `ID: name` count as named; table rows inside blockquotes
+are data. Part I bare identifiers after the pass: zero outside the Tier-0
+documents, which are reported, not edited (`VISION.md` line 220 cites
+backlog IDs bare).
+
+**Phase 1b, the folder.** `docs/book/` cannot be created by moving the
+Tier-0 and Tier-1 documents until `PROCESS.md` §1 (the documentation map)
+stops naming their paths. A dedicated, flagged Tier-0 proposal carries
+that amendment; the moves and tombstones follow its merge.
 
 ### 4.1 The term-anchor convention (Phase 0)
 
