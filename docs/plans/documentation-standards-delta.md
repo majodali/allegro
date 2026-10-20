@@ -86,7 +86,7 @@ distinguishes them and says which question each answers.
 *Rationale.* Allegro had six abstractions defined in five documents. Each
 definition was sound; the relations between them existed only in the
 maintainer's head. The vocabulary document
-(`docs/design/architecture-vocabulary.md`) took two pages and resolved it.
+(`docs/book/architecture-vocabulary.md`) took two pages and resolved it.
 
 *Overloads are findings.* A word used in more than one sense across the
 corpus (Allegro's "capability" has three) MUST be listed in the vocabulary
@@ -153,7 +153,7 @@ written in two passes with a check between them:
 
 A document is **promoted** from report to documentation when the
 comprehension pass has run. A plan's `draft` status means pass 1; `active`
-requires promotion. A design document under `docs/design/` is never merged
+requires promotion. A design document under `docs/book/` is never merged
 unpromoted.
 
 *Rationale.* Trying to write for the new reader during the semantic pass
@@ -234,9 +234,9 @@ Types the census found that the methodology lacks:
 
 | Type | Purpose | Required content | Instances |
 |---|---|---|---|
-| **Vocabulary** | the abstractions a project's documents are written in, distinguished and related | one definition site per term by citation; which question each answers; relations; overloaded words with the term to prefer | `docs/design/architecture-vocabulary.md` |
-| **Conceptual model** | every salient concept in dependency order, levelled, with as-implemented and delta (the companion proposal `conceptual-model-methodology-delta.md` defines the entry shape) | the entry shape for every entry, including the foundations | `docs/design/concepts.md`, whose Part 0 breaks its own shape |
-| **Study** | an exercise testing whether a model earns its keep before adoption | a statement that it is not settled design; the question; the evidence; the open rulings | `docs/design/actors-and-activities.md` |
+| **Vocabulary** | the abstractions a project's documents are written in, distinguished and related | one definition site per term by citation; which question each answers; relations; overloaded words with the term to prefer | `docs/book/architecture-vocabulary.md` |
+| **Conceptual model** | every salient concept in dependency order, levelled, with as-implemented and delta (the companion proposal `conceptual-model-methodology-delta.md` defines the entry shape) | the entry shape for every entry, including the foundations | `docs/book/concepts.md`, whose Part 0 breaks its own shape |
+| **Study** | an exercise testing whether a model earns its keep before adoption | a statement that it is not settled design; the question; the evidence; the open rulings | `docs/book/actors-and-activities.md` |
 | **Record** | a closed plan's chunk log, a landing report, an analysis pass: history kept for its evidence | a header saying it is history (which exempts it from supersession marking entry by entry) | eight closed plans in `docs/plans/`; `concepts.md` Part 0 §6 to §8; every CHANGELOG entry |
 | **Boundary contract** | what a layer or component provides, may depend on, and forbids | provides; may depend on; not in this layer; invariants with their enforcement | five layer READMEs |
 

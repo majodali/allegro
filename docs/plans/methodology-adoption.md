@@ -92,7 +92,7 @@ zero-reference pointer stubs deleted; 8 files remain (4 session/user/
 external context, 3 marked pointer stubs, index) under a new A6
 non-authoritative banner in MEMORY.md. Two staleness bugs fixed en
 route: CLAUDE.md's deferred-MI bullet contradicted the D44 line above
-it (deleted), and `docs/design/standard/type-system.md` §2 still
+it (deleted), and `docs/book/standard/type-system.md` §2 still
 described the pre-D44 `__extends` name-walk and dissolved MI design
 (D44 supersession notes added). Side-fixes: VISION.md's dangling
 "§Vivace Usability Research" anchor; B-072 gains the recorded
@@ -105,14 +105,14 @@ seven fact-clusters existing ONLY in CLAUDE.md (and that the
 CHANGELOG's own stub promise — v1-era history migration — was never
 executed). **3a (promotions, additive)  ✅ merged (PR #8)**: the ✅ v1-era
 per-phase record migrated verbatim into `docs/CHANGELOG.md`; new docs
-`docs/design/standard/core-types.md`,
-`docs/design/extension/modules.md`,
-`docs/design/implementation-map.md` (corrected per-file map +
+`docs/book/standard/core-types.md`,
+`docs/book/extension/modules.md`,
+`docs/book/implementation-map.md` (corrected per-file map +
 evalSource pipeline + async runtime surface),
-`docs/language-reference.md` (syntax by example);
-`docs/design/standard/type-system.md` gains §Generics, §Function
+`docs/book/language-reference.md` (syntax by example);
+`docs/book/standard/type-system.md` gains §Generics, §Function
 types and unification, §Member descriptor shapes;
-`docs/grammar-formalism.md` gains §6.4 (shipped `grammar { … }`
+`docs/book/grammar-formalism.md` gains §6.4 (shipped `grammar { … }`
 surface); platform README holds the T-build fragments. **3b (the slim
 itself, the sub-gate)  [this PR]**: CLAUDE.md rewritten to a 135-line
 pointer bootstrap

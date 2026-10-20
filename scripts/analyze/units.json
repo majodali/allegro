@@ -1,5 +1,5 @@
 {
-  "_": "docs/design/units.md §4 as data. `units` lists each unit's DIRECT dependencies (transitive closure is permitted). `files` maps a source file to its unit, or to a list when the file is still mixed (§4's Today column) — an edge touching a mixed file is reported as unresolved, not as a violation.",
+  "_": "docs/book/units.md §4 as data. `units` lists each unit's DIRECT dependencies (transitive closure is permitted). `files` maps a source file to its unit, or to a list when the file is still mixed (§4's Today column) — an edge touching a mixed file is reported as unresolved, not as a violation.",
   "units": {
     "value":              { "layer": "L0", "deps": [] },
     "bits":               { "layer": "L0", "deps": ["value"] },

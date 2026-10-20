@@ -1,7 +1,7 @@
 // =============================================================================
 // Allegro Grammar 2 — Static Analyzer
 //
-// Implements the required checks from docs/grammar-formalism.md §7:
+// Implements the required checks from docs/book/grammar-formalism.md §7:
 //   - Reachability: every production must be reachable from start
 //   - Defined-ness: every NonTerm(name) must resolve to a production
 //   - Nullability: which productions can derive the empty string

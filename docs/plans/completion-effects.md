@@ -9,7 +9,7 @@ PRs #24, #25, #26, and the F4 release PR; riders routed per §6)
 > totality ∧ liveness), D32 (triggered construction guard), D33
 > (futures — remainder), D34 (discharge tiers for completion effects)**
 > — maintainer-ratified 2026-07, design in
-> `docs/design/allegretto/structures.md` §10. D35 (resource budgets)
+> `docs/book/allegretto/structures.md` §10. D35 (resource budgets)
 > stays deferred by its own terms. It verifies the design against the
 > post-B-097 codebase, sharpens what the record leaves open into
 > decision points (§3), and sequences the chunks (§4).

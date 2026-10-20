@@ -41,15 +41,15 @@ cache — amend it upstream, never here.
 - **Vision, thesis, design principles:** `docs/VISION.md` (Tier 0 — never edit without maintainer sign-off)
 - **Process, lifecycle, quality guidelines, agent rules:** `docs/PROCESS.md` (Tier 0)
 - **Classification & binding:** `docs/classification.md` · **Decisions:** `docs/decisions.md` (D1–D51, E-R, U-R, R-R, chunk rulings)
-- **Reading order (D52, the book):** `docs/reading-order.json` is the order; `docs/design/README.md` is the table of contents. A document may define a term using only terms defined earlier; a term's definition site carries a `def-` anchor and every other first use links to it
-- **Architecture vocabulary:** `docs/design/architecture-vocabulary.md` — layer, track, plane, plane interface, actor, unit: what each answers and how they relate. Read before a doc that uses more than one
-- **Architecture spine:** `docs/design/layers.md` (L0–L3 + tracks + milestones) · layer index `docs/design/README.md`
-- **Unit DAG (D50/D51):** `docs/design/units.md` — which unit holds which decision, what it may import, which files are still mixed; manifest `scripts/analyze/units.json`. Read the unit's row before moving code in or out of a file
-- **File-level map + evalSource pipeline:** `docs/design/implementation-map.md`
-- **Durable design truth per area:** `docs/design/` (structures, type system, core types, effects, pattern matching, grammar, modules)
+- **Reading order (D52, the book):** `docs/reading-order.json` is the order; `docs/book/README.md` is the table of contents. A document may define a term using only terms defined earlier; a term's definition site carries a `def-` anchor and every other first use links to it
+- **Architecture vocabulary:** `docs/book/architecture-vocabulary.md` — layer, track, plane, plane interface, actor, unit: what each answers and how they relate. Read before a doc that uses more than one
+- **Architecture spine:** `docs/book/layers.md` (L0–L3 + tracks + milestones) · layer index `docs/book/README.md`
+- **Unit DAG (D50/D51):** `docs/book/units.md` — which unit holds which decision, what it may import, which files are still mixed; manifest `scripts/analyze/units.json`. Read the unit's row before moving code in or out of a file
+- **File-level map + evalSource pipeline:** `docs/book/implementation-map.md`
+- **Durable design truth per area:** `docs/book/` (structures, type system, core types, effects, pattern matching, grammar, modules)
 - **Plans:** `docs/plans/` — read `README.md` (manifest) first
 - **What's next:** `docs/backlog.md` · **What landed:** `docs/CHANGELOG.md` (incl. the migrated v1-era record) · **v1 dispositions:** `V1-INVENTORY.md`
-- **Consumables:** `docs/getting-started.md`, `docs/language-reference.md` (syntax by example), `docs/grammar-formalism.md`, `docs/proving-in-allegro.md`
+- **Consumables:** `docs/book/getting-started.md`, `docs/book/language-reference.md` (syntax by example), `docs/book/grammar-formalism.md`, `docs/book/proving-in-allegro.md`
 
 ## Build, run, test
 
@@ -61,7 +61,7 @@ ALLEGRO_TEST_TRACE=1 npm test       # per-test progress to stderr (hang/slowness
 bash scripts/typecheck.sh           # sanctioned typecheck (TS6059 rootDir convention ignored)
 npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file  (--base for Allegretto)
-npx tsx src/index.ts inspect|verify|obligations|propose|prove <file>  # → docs/getting-started.md
+npx tsx src/index.ts inspect|verify|obligations|propose|prove <file>  # → docs/book/getting-started.md
 npm run bench                       # H-arc benchmark corpus
 npx tsx scripts/bench-slot-lookup.ts  # B-120: slot scan vs index crossover
 npx tsx scripts/analyze/index.ts <cmd> # B-127: binder-aware survey (props |
@@ -94,7 +94,7 @@ provability + safety via PE-as-discharge with participant-neutral
 - **L0 Allegretto** — values/structures/scopes, evaluator, primitives (syntax-free specification)
 - **L1 Extension substrate** — grammar2 parser + runtime grammar extension, module loading
 - **L2 Allegro Standard** — type system, refinements, effects, laws, proofs, totality, contracts
-- **L3 Vivace** — domain models (pilot stage) · plus capability TRACKS (build, tooling, host, backend) — `docs/design/layers.md`
+- **L3 Vivace** — domain models (pilot stage) · plus capability TRACKS (build, tooling, host, backend) — `docs/book/layers.md`
 - Dependencies point downward only. Partial evaluation is the
   compilation model: PE Rule 1 (unresolved arg → residual with
   propagated channels), Rule 2 (lazy primitives with unresolved
@@ -102,7 +102,7 @@ provability + safety via PE-as-discharge with participant-neutral
 - Where code lives: `src/` (+`src/grammar2/`), `lib/` (stdlib +
   grammar/body-form modules), `tests/` (literate demos), `bench/`,
   `pcp/`, `demos/`, `web/`+`website/`, `scripts/` — per-file roles in
-  `docs/design/implementation-map.md`.
+  `docs/book/implementation-map.md`.
 
 ## Conventions & invariants (the gotcha list)
 
@@ -159,7 +159,7 @@ evaluator/runtime set; this is the complete session list):
   time (`collapseBodyMetadata`) — analyzers read properties, never add
   a bespoke peeler (PROCESS §6).
 - No new meta-property without registering it in the meta-protocol
-  registry (`docs/design/standard/type-system.md` §4). No new `__*`
+  registry (`docs/book/standard/type-system.md` §4). No new `__*`
   slots ever (D39; registry is `src/slots.ts`).
 - No implicit fallback in typed operators — a missing type method is
   an error. Every Standard-mode value has a type.
@@ -187,7 +187,7 @@ evaluator/runtime set; this is the complete session list):
 - Unit order (D50): a file's unit is in `scripts/analyze/units.json`; an
   import that the DAG does not permit is a violation, and a kind
   comparison outside a kind unit, the assembly or the evaluator breaks
-  the discriminator rule (`docs/design/units.md` §3.2) — both reported by
+  the discriminator rule (`docs/book/units.md` §3.2) — both reported by
   `scripts/analyze/index.ts units`, ratcheted once B-149 lands.
 - Commit messages with backticks: write to a file, `git commit -F` —
   inline `-m` backticks get shell-expanded.

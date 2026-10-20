@@ -14,7 +14,7 @@ example — is an owner decision at the arc gate.)
 > the RATIFICATION PASS deliverable for executing **D41 (mediated
 > member protocol), D42 (evidence is possession), D43 (modifiers as
 > declared member attributes)** — maintainer-ratified 2026-07, design
-> in `docs/design/allegretto/structures.md` §5/§6/§13, full rationale
+> in `docs/book/allegretto/structures.md` §5/§6/§13, full rationale
 > in the archived decision log (rows D41–D43). It verifies that design
 > against the post-C7.2/E4/B-094 codebase, sharpens what the record
 > leaves open into decision points (§3), and sequences the chunks

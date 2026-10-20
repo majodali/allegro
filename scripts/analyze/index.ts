@@ -24,7 +24,7 @@
 //                       definitionally a Structure?" stops being a judgement
 //   refs <name>         references to a declaration, resolved by SYMBOL
 //                       identity rather than by spelling
-//   units               docs/design/units.md measured: every import edge
+//   units               docs/book/units.md measured: every import edge
 //                       between assigned files checked against the unit
 //                       DAG in units.json; mixed files listed as the owed
 //                       splits; direct `.kind ===` comparisons counted
@@ -193,7 +193,7 @@ function references(program: ts.Program, opts: Options, name: string): Hit[] {
   return out;
 }
 
-// --- units: the DAG in docs/design/units.md, measured ---------------------------
+// --- units: the DAG in docs/book/units.md, measured ---------------------------
 
 interface UnitManifest {
   units: Record<string, { layer: string; deps: string[] }>;
@@ -301,7 +301,7 @@ function unitsReport(program: ts.Program, opts: Options): UnitsReport {
 function reportUnits(r: UnitsReport, opts: Options): void {
   if (opts.json) { console.log(JSON.stringify(r, null, 2)); return; }
   const ok = r.edges.filter((e) => e.verdict === "ok").length;
-  console.log(`units — docs/design/units.md measured\n`);
+  console.log(`units — docs/book/units.md measured\n`);
   console.log(`  import edges between assigned files: ${r.edges.length}`);
   console.log(`    ok          ${ok}`);
   console.log(`    violation   ${r.violations.length}`);

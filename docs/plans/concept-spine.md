@@ -33,13 +33,13 @@ concepts badly, and the gap is measurable rather than a matter of taste.
   survives as a live type name with 25 uses, and `makeMultiValue` is the
   sanctioned constructor named in CLAUDE.md's invariant list.
 - **Concept coverage.** `src/` exports **136** named types, interfaces,
-  classes and enums. **43** are named anywhere under `docs/design/` — even
+  classes and enums. **43** are named anywhere under `docs/book/` — even
   counting bare forms (`Bits` for `BitsValue`). **93 are not defined
   anywhere.** Among them: `ExpressionValue`, `ComposedFunctionValue`,
   `ParamValue`, `PrimitiveFunctionValue` — four of the seven representation
   kinds the architecture summary is built on.
 - **Doc mass is concentrated, not distributed.** 3,306 lines across
-  `docs/design/`, of which `allegretto/structures.md` is 1,330 (40%).
+  `docs/book/`, of which `allegretto/structures.md` is 1,330 (40%).
   `core-types.md` is 37 lines; `pattern-matching.md` is 56;
   `platform/README.md` is 23. There is no evaluator doc, no partial-
   evaluation doc, and `allegretto/architecture.md` is referenced by
@@ -231,7 +231,7 @@ being written to justify a rename already in flight.
 
 | Chunk | Delivers |
 |---|---|
-| **S1** | ~~Spine skeleton + entry format + T0/T1~~ **DONE 2026-08** — `docs/design/concepts.md`, 17 entries, **9 deltas** raised (→ B-107, and three routed to T2). The format survives its own test: it produced defect reports on the tier we understand best, including one the ordering constraint forced into the open (carrier ↔ data plane are mutually referential in prose; broken by defining the carrier structurally and the data plane as the accessor over it) |
+| **S1** | ~~Spine skeleton + entry format + T0/T1~~ **DONE 2026-08** — `docs/book/concepts.md`, 17 entries, **9 deltas** raised (→ B-107, and three routed to T2). The format survives its own test: it produced defect reports on the tier we understand best, including one the ordering constraint forced into the open (carrier ↔ data plane are mutually referential in prose; broken by defining the carrier structurally and the data plane as the accessor over it) |
 | **S2a** | ~~Part 0 · Foundations~~ **DONE 2026-08** (maintainer direction) — the requirement/specification/implementation stratification + the alternatives test + two-way traceability; requirements **R1–R7** (three from the maintainer, four surfaced here); the **implementation-choice register IC-1…IC-7** with alternatives, criterion and revisit trigger; every T0–T1 entry level-tagged. Finding: **4 of 17 entries were Implementation written as Specification**. Raised **B-108** (composite review) and the methodology proposal `conceptual-model-methodology-delta.md` |
 | **S2b** | ~~Level split + requirement completion~~ **DONE 2026-08** — specification choices (SC-1…SC-6) separated from implementation choices (IC-1…IC-6) per maintainer ruling; **R8–R14** added; requirements gained a **subject**, which relocated *discharge* and the *knowledge lattice* to Allegro with weaker base counterparts; both standing objections (propagation vs R6, integrity vs externalisation) answered and found to be **implementation violations** → **B-109**. Cohesion explicitly deferred with a stated method |
 | **S2c** | ~~Requirement-set cohesion~~ **DONE 2026-08** — all three checks found something. **7 of 14** requirements do not survive as requirements (derived, conflated, or not requirements at all); **2** real conflicts, including R4 stating something the base contradicts 117 times; **3** capabilities Allegro needs that nothing enables (candidates R15–R17: program-level aggregation, determinism, the host boundary). Two method amendments fed back into the methodology proposal |
@@ -291,7 +291,7 @@ Recorded now so S5 does not have to rediscover them.
 | `__interface` and the meta-type disagree about `~Printable` | B-104(g); probed directly |
 | `applyBoundaryBound`'s interface guard has **zero** suite coverage | Instrumented: 0 hits in 1197 tests; fires immediately on a written case |
 | The `shapeAwareSubtypeof` interface check is redundant with its name check | Instrumented: 42 interface encounters, 0 decisive |
-| 93 of 136 exported concepts undefined in `docs/design/` | Measured, bare forms allowed |
+| 93 of 136 exported concepts undefined in `docs/book/` | Measured, bare forms allowed |
 | No evaluator or partial-evaluation design doc exists | `implementation-map.md` calls `allegretto/architecture.md` "planned" |
 | `doc-ref-lint` scanned TRACKED files only, so a new doc's references were invisible until after commit | Found by this plan's own CI failure — a local run passed, CI did not. Fixed here; the boundary lint had already made the opposite (correct) call for `src/` |
 

@@ -3,7 +3,7 @@
 > Status: **draft**. Rulings 1, 3 and 4 in §8 (rulings) are taken; ruling
 > 2 and the chunk sequence in §9 (chunks) await ratification.
 > Owner: **B-112** (the four owed plane interfaces).
-> Reviewed against `docs/design/units.md` (units in a narrow DAG, D50)
+> Reviewed against `docs/book/units.md` (units in a narrow DAG, D50)
 > 2026-10, and rewritten for a reader new to the project 2026-10; §11
 > (change record) lists what each pass changed.
 > Outcome: the hooks in §6 exist, each is capability-gated, and all share
@@ -19,7 +19,7 @@ depending on it. The mechanism is a set of **hooks**: named slots the base
 declares, which the typed layer fills when it loads.
 
 The reader is assumed to know what a layer, a plane and a unit are.
-`docs/design/architecture-vocabulary.md` defines all three in two pages and
+`docs/book/architecture-vocabulary.md` defines all three in two pages and
 should be read first. §2 (terms) below defines only the terms this plan
 adds.
 
@@ -27,17 +27,17 @@ adds.
 
 | Term | Meaning here |
 |---|---|
-| **The base** | Allegretto, layer L0: the value kinds, the evaluator, partial evaluation and the base primitives. Defined in `docs/design/layers.md` §1 (the layer spine). |
+| **The base** | Allegretto, layer L0: the value kinds, the evaluator, partial evaluation and the base primitives. Defined in `docs/book/layers.md` §1 (the layer spine). |
 | **The layer** | Any layer above L0. In this plan almost always L2, Allegro Standard: the type system, refinements, effects, proofs. |
 | **Symbol** | A name or token the base can store, compare and pass along without interpreting. The string `"effects"` is a symbol to the base. |
 | **Meaning** | The behaviour or data semantics associated with a symbol. What it means to merge two effect sets, or to check a value against a type, is meaning. |
 | **Hook** | A named slot the base declares and calls, whose implementation a layer registers when it loads. The base defines the interface; the layer supplies the implementation. |
 | **Install** | A layer registering an implementation into a hook, at module load time. |
 | **Handle** | An opaque value the base is handed and passes along unchanged. A type constant is a handle to the base. |
-| **Metadata field** | One named slot on a value's metadata plane, with a propagation rule and a writer. [`concepts.md` §19 (metadata field)](../design/concepts.md#def-metadata-field). |
-| **Writer capability** | The authority to set a field, realised as a closure that only the registrant holds. [`concepts.md` §21 (writer capability)](../design/concepts.md#def-writer-capability); decisions D23 (writes are gated, reads free) and D24 (the capability is a delegable closure). |
-| **Plane interface** | The sanctioned route by which code reaches a plane. [`concepts.md` §24 (plane interfaces)](../design/concepts.md#def-plane-interfaces). A hook is the plane interface that crosses a layer boundary. |
-| **Unit** | The smallest body of code holding one decision, with its imports as its dependencies. [`docs/design/units.md` §2 (what a unit is)](../design/units.md#def-unit). |
+| **Metadata field** | One named slot on a value's metadata plane, with a propagation rule and a writer. [`concepts.md` §19 (metadata field)](../book/concepts.md#def-metadata-field). |
+| **Writer capability** | The authority to set a field, realised as a closure that only the registrant holds. [`concepts.md` §21 (writer capability)](../book/concepts.md#def-writer-capability); decisions D23 (writes are gated, reads free) and D24 (the capability is a delegable closure). |
+| **Plane interface** | The sanctioned route by which code reaches a plane. [`concepts.md` §24 (plane interfaces)](../book/concepts.md#def-plane-interfaces). A hook is the plane interface that crosses a layer boundary. |
+| **Unit** | The smallest body of code holding one decision, with its imports as its dependencies. [`docs/book/units.md` §2 (what a unit is)](../book/units.md#def-unit). |
 
 ## 3. The problem this plan solves
 
@@ -464,14 +464,14 @@ the B-121 C2 survey (§5.7).
 
 ### 9.2 Documents to update on landing
 
-- `docs/design/units.md` §4 status rows for units 8, 10, 11 and 13, and
+- `docs/book/units.md` §4 status rows for units 8, 10, 11 and 13, and
   the §8 day-one numbers, corrected in place; M5, M11 and M12 marked
   closed.
-- `docs/design/concepts.md` §24 (plane interfaces): the interface table
+- `docs/book/concepts.md` §24 (plane interfaces): the interface table
   rows gain a mechanism; delta 32 closes at C4.
-- `docs/design/allegretto/README.md` invariants: *fact payloads opaque to
+- `docs/book/allegretto/README.md` invariants: *fact payloads opaque to
   base ops* becomes enforced at C1.
-- `docs/design/implementation-map.md`: the new files from the C1 split.
+- `docs/book/implementation-map.md`: the new files from the C1 split.
 - `docs/backlog.md`: B-112 progress; B-128 (b) and (c) unblocked at
   exit; B-111 cross-reference; the baseline of B-149 (the unit DAG joins
   the gate) lowered.
@@ -503,7 +503,7 @@ abstractions used without being distinguished. This revision adds §1
 (purpose and reader), §2 (terms), §3 (the problem, as requirement,
 challenge and pattern), restates each principle with a standard name and
 a test, names every cited identifier on first use, and moves the
-cross-document definitions to `docs/design/architecture-vocabulary.md`.
+cross-document definitions to `docs/book/architecture-vocabulary.md`.
 No ruling, hook, principle or chunk changed in substance. The companion
 proposal for the methodology is `docs/plans/documentation-standards-delta.md`.
 

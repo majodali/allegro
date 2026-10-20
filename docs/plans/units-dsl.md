@@ -203,7 +203,7 @@ U1 does not start until §5 is ratified.
   `x = 3` onto the next line's identifier); (2) expr_form alternatives
   splice at the FRONT of expr_atom (PEG-committed choice made
   number-led forms dead code at the old before-ident position). Both
-  recorded in docs/design/extension/grammar.md §4. Hazard battery
+  recorded in docs/book/extension/grammar.md §4. Hazard battery
   green: cross-line non-glue, keywords after numbers, calls/arrays/
   parens untouched, sugar composes with algebra + refinements + the
   domain error. Fallback never needed. U3 (laws + physics theorems)

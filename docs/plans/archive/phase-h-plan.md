@@ -168,7 +168,7 @@ dependencies beyond what's already in the repo.
 
 **Bytes.** ~600 lines combined: H4a ~400 (LLM API integration, prompt
 construction, retry orchestration), H4b ~200 (file management, simple
-TUI). System primer doc extracted to `docs/proving-in-allegro.md`
+TUI). System primer doc extracted to `docs/book/proving-in-allegro.md`
 (~participant-neutral; consumed by both LLM prompt cache and humans
 learning the F-arc surface).
 

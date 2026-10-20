@@ -5,7 +5,7 @@
 //
 // Scope: tracked AND untracked-but-not-ignored *.md files, excluding
 // `docs/plans/archive/` (history — its references are frozen) and
-// node_modules. Glob-ish mentions (`docs/design/*.md`), ellipses
+// node_modules. Glob-ish mentions (`docs/book/*.md`), ellipses
 // (`docs/…`), and placeholders (`<layer>`) never match the path pattern,
 // so prose stays lintable.
 //

@@ -60,7 +60,7 @@ npx tsx src/index.ts verify first.alg    # theorems, law tiers, the
 
 ## Guided tour
 
-- **[Getting started](docs/getting-started.md)** — install to first
+- **[Getting started](docs/book/getting-started.md)** — install to first
   verified program.
 - **[`demos/rung1/`](demos/rung1/)** — five runnable scenes: proof
   discharge, counterexamples, effects refusal, laws + the admitted
@@ -69,9 +69,9 @@ npx tsx src/index.ts verify first.alg    # theorems, law tiers, the
   it" block and captured transcripts.
 - **[allegrolang.org](https://allegrolang.org)** — live sandbox: every
   example editable and runnable in the browser.
-- **[Proving in Allegro](docs/proving-in-allegro.md)** — the proving
+- **[Proving in Allegro](docs/book/proving-in-allegro.md)** — the proving
   guide (also the LLM prover's system primer).
-- **[Vision](docs/VISION.md)** and **[design docs](docs/design/)** —
+- **[Vision](docs/VISION.md)** and **[design docs](docs/book/)** —
   why it's built this way.
 
 ## Status, honestly

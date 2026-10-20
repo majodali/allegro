@@ -1,8 +1,8 @@
 # Allegro — Backlog
 
 > Tier 2. **One list, implementation order.** Layer/track tags and
-> milestones (M1–M10) are defined in `docs/design/layers.md`; boundary
-> contracts live in each layer's `docs/design/<layer>/README.md`. Items
+> milestones (M1–M10) are defined in `docs/book/layers.md`; boundary
+> contracts live in each layer's `docs/book/<layer>/README.md`. Items
 > carry stable IDs (`B-###`) — reference them from commits, plans, and
 > CHANGELOG entries; IDs never change meaning even when the list reorders.
 > The **head** is sequenced; the **tail** is banded by layer/track in
@@ -19,7 +19,7 @@
 > **Revalidation-register items** (tagged `[reval]`) carry v1 design whose
 > only record is an archived plan (`docs/plans/archive/README.md` has
 > the triage record). Working one means: read the archived source,
-> revalidate against `docs/design/allegretto/structures.md` and the code,
+> revalidate against `docs/book/allegretto/structures.md` and the code,
 > then incorporate into the named target doc or discard with a note here.
 
 ## Sequenced head
@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08), then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/design/standard/*.md`; touches no `src/` |
+| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08), then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/standard/*.md`; touches no `src/` |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
@@ -126,20 +126,20 @@ that prevents it.
   (`src/boundary-tests.ts` + `src/boundary-baseline.json`); perf hard
   threshold still a pending maintainer decision (warn-only at 2×)
 - [x] **B-002** · L0 · docs: inline the D39 slot-disposition, B8 primitive
-  audit, and B10 forgery tables into `docs/design/allegretto/structures.md`
+  audit, and B10 forgery tables into `docs/book/allegretto/structures.md`
   as appendices; then archive `structured-values-unification.md`. Landed
   2026-08 — Appendices A–C added; decision log moved to
   `docs/plans/archive/structured-values-unification.md` (triage row in
   `archive/README.md`)
 - [x] **B-003** · L1 · `[reval]` docs: sync shipped extension error codes +
-  base-chain semantics into `docs/grammar-formalism.md` §6–7 (decisions:
-  `docs/design/extension/grammar.md` §4; source:
+  base-chain semantics into `docs/book/grammar-formalism.md` §6–7 (decisions:
+  `docs/book/extension/grammar.md` §4; source:
   `docs/plans/archive/dappled-cascading-cantor.md`). Landed 2026-08:
   §6.2 base-chain compatibility, §6.2 `use` activation surface, new §7.5
   shipped-diagnostic-codes inventory
 - [x] **B-004** · L2 · `[reval]` docs: effects nits — silent-capture
   rationale for explicit `[e: Effect]` into
-  `docs/design/standard/effects.md` §2; `applyComposed` tracing hypothesis
+  `docs/book/standard/effects.md` §2; `applyComposed` tracing hypothesis
   (archive: polyphonic-tracing-plotkin P9) filed or dropped. Landed
   2026-08: rationale added to §2 Declaration surfaces (incl. shipped
   opaque-auto-promotion deviation from the plan); P9 recorded in §6 as
@@ -226,7 +226,7 @@ that prevents it.
   never a throw); `Binding.isUse` deleted with all literal sites;
   chain-aware `__futureManager`/proven-type lookups; 6 boundary tests
 - [x] **B-014** · L2 · `[reval]` Contracts design revalidation —
-  COMPLETE 2026-08 (`docs/design/standard/contracts.md`; CT-R1–CT-R6
+  COMPLETE 2026-08 (`docs/book/standard/contracts.md`; CT-R1–CT-R6
   maintainer-ratified as recommended, indexed in the decision
   register). Original scope: predicate-set model, branch
   refinement, assert/requires/ensures lowering, sink-based checks,
@@ -235,7 +235,7 @@ that prevents it.
   `docs/plans/archive/lucid-discharging-lambek.md`,
   `docs/plans/archive/crystal-proving-curry.md` §Phase C; substrate:
   structures.md §4/§6) — natural slot: with Phases 2–3.
-  **Doc delivered 2026-08** (`docs/design/standard/contracts.md`, lane
+  **Doc delivered 2026-08** (`docs/book/standard/contracts.md`, lane
   A): the predicate model restated as the D36 knowledge lattice (two
   carriers, meet at the check), the lowering chain recorded as it
   shipped (marker prims → tree-builder contract preprocessor, not the
@@ -302,7 +302,7 @@ that prevents it.
   congruence + equality-ignores-knowledge boundary tests (D37
   groundwork); demo + sandbox example
 - [x] **B-018** · L2 · `[reval]` Totality design revalidation —
-  COMPLETE 2026-08 (`docs/design/standard/totality.md`; T-R1–T-R6
+  COMPLETE 2026-08 (`docs/book/standard/totality.md`; T-R1–T-R6
   maintainer-ratified as recommended, indexed in the decision
   register). **Doc delivered 2026-08**:
   the reval of `phase-e-totality-plan.md` against the post-B-028 system
@@ -530,14 +530,14 @@ that prevents it.
   B-018's analyzer-rework bundle or mint at next totality-perf pass;
   nested-slot completion replacement (recorded §10 residue)
 - [ ] **B-029** · L2 · `[reval]` PCP protocol design revalidation →
-  `pcp.md` in `docs/design/standard/`: schemas, multi-prover authorship,
+  `pcp.md` in `docs/book/standard/`: schemas, multi-prover authorship,
   trivial-pass prevention, hints, catalog (H5), budgets/escalation (H7),
   benchmark methodology (source:
   `docs/plans/archive/phase-h-plan.md`; shipping shape `src/pcp.ts`)
 - [ ] **B-030** · L2 · M3 sweep: disposition every remaining `TBD` in
   `V1-INVENTORY.md`; re-verify canaries (provable.alg theorems, bench
   corpus, stdlib effects tags)
-- [x] **B-031** · L2 · docs: revise `docs/proving-in-allegro.md` to the
+- [x] **B-031** · L2 · docs: revise `docs/book/proving-in-allegro.md` to the
   v2 surface (it is the PCP LLM worker's system primer — must track the
   shipping kernel); re-baseline `bench/`. Landed 2026-08 at the
   Tranche A closeout (primer verified current against the v2 kernel
@@ -560,7 +560,7 @@ that prevents it.
   left recursion, precedence analyzer, remaining stratified-grammar
   migration
 - [ ] **B-034** · Alt-order de-significance + label-directed tree-builder
-  (the §2 corrections in `docs/design/extension/grammar.md`) — the parser
+  (the §2 corrections in `docs/book/extension/grammar.md`) — the parser
   design discussion track
 - [ ] **B-035** · Earley parser retirement in favor of `grammar2_*`
 - [ ] **B-036** · Parse error recovery (`@error` productions + `@sync`)
@@ -600,7 +600,7 @@ that prevents it.
   revalidate against v2 before scheduling
 - [ ] **B-052** · F6 Lean export: proof terms → Lean, refinements →
   subtypes, verified-substrate `Allegro.lean` → `proofs.md` in
-  `docs/design/standard/` (source:
+  `docs/book/standard/` (source:
   `docs/plans/archive/phase-f-plan.md` §F6)
 - [ ] **B-053** · Phase G expansion: provable stdlib rewrite (sort/search
   + algebraic theorems on map/filter/reduce)
@@ -610,7 +610,7 @@ that prevents it.
 - [ ] **B-055** · PCP H6 multi-strategy parallel prover orchestration
 - [ ] **B-056** · PCP H7 effort budgets, escalation, reproducibility
 - [ ] **B-057** · Phase C polish. **Scope SETTLED at B-014 (2026-08,
-  CT-R gate passed)** — `docs/design/standard/contracts.md` §10:
+  CT-R gate passed)** — `docs/book/standard/contracts.md` §10:
   (a) relocate an UNDISCHARGED `requires` check to the call site, which
   also supplies the call-site origin missing from counterexamples
   (CT-R1 — discharge itself is already call-site-sensitive via PE, so
@@ -755,7 +755,7 @@ that prevents it.
   roll-up (transitive proof backing sets + Verdict ledger block +
   inspect rests-on; D2 register row → delivered); theorem-dropped-
   under-fragment-grammar soundness fix + regressions; sandbox
-  walkthrough presets (both copies); `docs/getting-started.md`;
+  walkthrough presets (both copies); `docs/book/getting-started.md`;
   `proving-in-allegro.md` E3/E4 laws+gate section. **Slice 3 (close-
   out) landed 2026-08**: README.md (repo front page from the
   skeleton), package.json metadata (0.1.0, CC0-1.0, private,
@@ -841,7 +841,7 @@ that prevents it.
 ### L3 — Vivace (M5)
 
 - [ ] **B-079** · `[reval]` Planning DSL revalidation → `planning-dsl.md`
-  in `docs/design/vivace/`: outcome-DAG model, 12 conventions, rejections,
+  in `docs/book/vivace/`: outcome-DAG model, 12 conventions, rejections,
   `SoftwareRelease` example; Shape 1/2 + pilot roster proposed into
   VISION §4 (Tier 0 — propose, don't land). Source:
   `docs/plans/archive/project-1-planning-dsl-design.md`.
@@ -910,11 +910,11 @@ that prevents it.
   budget with a HONEST diagnostic), so that no input can turn an
   engine limit into a wrong answer about the user's program. Related:
   D35's fuel/budget framing may be the right shape.
-  Sources: `docs/design/standard/totality.md` §3/§7/§8,
+  Sources: `docs/book/standard/totality.md` §3/§7/§8,
   `src/evaluator.ts` (`setInlineCutoff`, MAX_DEPTH), `src/runtime.ts`
   (analysis-before-precompile ordering), CHANGELOG 2026-08 perf entry
 - [ ] **B-099** · Project severity configuration — the T-R2 surface
-  (ratified 2026-08, `docs/design/standard/totality.md` §5/§8;
+  (ratified 2026-08, `docs/book/standard/totality.md` §5/§8;
   subsumes **B-058**, the v1-era statement of the same surface). ONE
   per-project config declaration (shape open — likely a manifest read
   at session start, not a body form) providing: per-notification-kind
@@ -935,7 +935,7 @@ that prevents it.
   knobs belong to this same surface — the construction-path knob above
   is a contracts knob, and v1's global `--strict` flag (never built, and
   not to be) is superseded here rather than revived
-  (`docs/design/standard/contracts.md` §6/§7)
+  (`docs/book/standard/contracts.md` §6/§7)
 
 - [ ] **B-103** · T-tooling · CI: assert the suite's REGISTRATION COUNT,
   not just that it passes. The lane-B split lost nine tests to a bad cut
@@ -1154,7 +1154,7 @@ that prevents it.
     ruling R6 kept `makeUnionType` outside member storage with dispatch
     via direct bindings, deferring `__union` → `Type.variants` to a
     re-derivation that never happened
-  - `docs/grammar-formalism.md` already noted the feature's real problem
+  - `docs/book/grammar-formalism.md` already noted the feature's real problem
     in passing: "`Int | String` style unions, but pattern-matching
     ergonomics are awkward". Whether unions come back at all is open —
     variant types reached through `define` may be the better surface
@@ -1279,7 +1279,7 @@ that prevents it.
     hold one metadata field.
   - **Execution**: NOT started. → **B-120** (option E) and **B-121** (metadata
     field + lifecycle). Each is an arc, not a chunk, and gets a plan first.
-  - Full measurement record and reasoning: `docs/design/concepts.md` §3
+  - Full measurement record and reasoning: `docs/book/concepts.md` §3
     (IC-1, IC-2, IC-3, IC-3a) and "What B-108 settled (D48)"
   - *Original item text follows, kept as the record of what was asked.* Raised by the concept spine (S2a) at
   maintainer direction; the three choices interact and cannot be judged
@@ -1473,7 +1473,7 @@ that prevents it.
     "this is an interpreter bug" separately from "your program is wrong", and
     the S2d classification had to be done by reading 117 call sites. The abort
     classes in `concepts.md` Part 0 SC-8 (specified aborts; the classification
-    itself is `docs/design/concepts-analyses.md` §3) are the vocabulary; the
+    itself is `docs/records/concepts-analyses.md` §3) are the vocabulary; the
     mechanism should carry which one. Specification-level, and separable from (a)–(c)
 
 - [ ] **B-111** · L0 · **Field vs channel — one word and one registry for two
@@ -2022,7 +2022,7 @@ that prevents it.
     they need rewriting against whatever write path survives — PROCESS §6
     applies, and the tests should be reviewed individually the way B-121's
     ruling 3 treats W1/W5
-  - **Public surface**: none. These names appear only in `docs/design/`,
+  - **Public surface**: none. These names appear only in `docs/book/`,
     `docs/decisions.md` and the untracked `web/dist` bundle — not in
     `language-reference.md`, `getting-started.md`, the README or the website
   - **(d) CORRECTION, 2026-08 (B-125): deleting `mv_set` closed the
@@ -2292,7 +2292,7 @@ that prevents it.
 
 - [ ] **B-130** · T-docs · **Editorial pass: P-001–P-005 across the Tier-1
   design corpus.**
-  - **What**: `docs/design/concepts.md`, `docs/design/layers.md` and the
+  - **What**: `docs/book/concepts.md`, `docs/book/layers.md` and the
     area docs — headers that state their contents (P-005), citations
     carrying names (P-004), bold as structure only (P-003), one idea per
     sentence (P-002), sections readable from a link (P-001).
@@ -2347,7 +2347,7 @@ that prevents it.
     B-128(a) applies — reintroduce a known-bad edge and watch it fail
     before trusting the check.
   - **Pointer**: [D50](decisions.md), [D51](decisions.md);
-    `docs/design/units.md` §7–§8; `scripts/analyze/units.json`.
+    `docs/book/units.md` §7–§8; `scripts/analyze/units.json`.
 
 - [ ] **B-143** · L0 · **D22 is declared, not enforced.**
   - **What**: build the enforcement the immutable bit was a placeholder for —
@@ -2368,7 +2368,7 @@ that prevents it.
     rather than urgent. Filed because deleting the bit must not leave the gap
     unowned (W-005).
   - **Pointer**: [D22](decisions.md); `src/structure.ts` header (the in-place
-    rule); `docs/design/allegretto/structures.md` §2.
+    rule); `docs/book/allegretto/structures.md` §2.
 
 - [ ] **B-144** · T-docs · T-tooling · **"What's next" has no check, so a
   blocked item can be recommended as ready.** Raised by the maintainer,
@@ -2409,7 +2409,7 @@ that prevents it.
     `makeObject`, `withType`, `StringType`, `IntType`, `ErrorType` and
     `noneSingleton` — an L1→L2 edge the `units` report will show as a
     violation once `core-types` splits out of `types-std.ts`.
-  - **Activities** (`docs/design/actors-and-activities.md` §4): **Construct
+  - **Activities** (`docs/book/actors-and-activities.md` §4): **Construct
     value**, **Declare type**, and **Evaluate expression** — a primitive
     produces a result and something must say what type it is.
   - **Why it is not B-112's**: principle **P3** — a base that must DECIDE
@@ -2486,7 +2486,7 @@ that prevents it.
     entry as a separate deviation and flags the ones that do not name a
     rule; the defect is filed in methodology-tools. The other four are
     real: two dangling links (`docs/CHANGELOG.md:1492`,
-    `docs/design/concepts.md:2300`) and two plan Status lines outside
+    `docs/book/concepts.md:2300`) and two plan Status lines outside
     K-007's `draft → active → (superseded | closed)` lifecycle
     (`docs/plans/metadata-on-values.md`,
     `docs/plans/parallel-lanes-process-delta.md`).
@@ -2543,7 +2543,7 @@ that prevents it.
     refusing writes to a finished structure, and nothing marks a structure
     finished — that is **B-143**, not a field.
   - **D22's execution state corrected**, not superseded: born-immutability and
-    the carve-outs are executed; the BIT never was. `docs/design/allegretto/
+    the carve-outs are executed; the BIT never was. `docs/book/allegretto/
     structures.md`, `implementation-map.md` and the decision register all said
     the bit checked deep immutability O(1); none of them was true.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
@@ -2686,8 +2686,8 @@ that prevents it.
     four gaps that motivated the ruling, not a defect with independent
     urgency. Sequence with **B-112** (which owes the plane interfaces) since
     both are "state the boundary as a type".
-  - **Pointer**: `docs/design/actors-and-activities.md` §5a.2 (Admission);
-    `docs/design/layers.md` §1, *Module system (split)*.
+  - **Pointer**: `docs/book/actors-and-activities.md` §5a.2 (Admission);
+    `docs/book/layers.md` §1, *Module system (split)*.
 
 - [ ] **B-139** · L0 · L2 · **`Construct value` has two outcomes and one
   signature.**
@@ -2704,7 +2704,7 @@ that prevents it.
   - **When**: not urgent — the behaviour is correct and tested. Best taken
     with **B-099** (T-R2's severity config), which is the work that will need
     the outcome to be nameable.
-  - **Pointer**: `docs/design/actors-and-activities.md` §5a.2 (Evaluation);
+  - **Pointer**: `docs/book/actors-and-activities.md` §5a.2 (Evaluation);
     [CE-R8 and CT-R2](decisions.md).
 
 - [ ] **B-140** · L2 · **`Check declared constraint` is four code paths and no
@@ -2720,7 +2720,7 @@ that prevents it.
     would let the severity model be stated once instead of four times.
   - **When**: after the actor model's adoption ruling. Interacts with
     **B-099**/T-R2, which configures exactly these severities.
-  - **Pointer**: `docs/design/actors-and-activities.md` §4.1 and §5a.2
+  - **Pointer**: `docs/book/actors-and-activities.md` §4.1 and §5a.2
     (Policy).
 
 - [ ] **B-141** · T-host · **There is no Environment interface; host swapping
@@ -2739,5 +2739,5 @@ that prevents it.
   - **When**: with the T-host track, and not before **B-136**: the scope is
     where the capability is currently planted, so the Scope host type should
     exist first.
-  - **Pointer**: `docs/design/actors-and-activities.md` §5a.2 (Environment);
-    `docs/design/layers.md` §2, T-host.
+  - **Pointer**: `docs/book/actors-and-activities.md` §5a.2 (Environment);
+    `docs/book/layers.md` §2, T-host.
