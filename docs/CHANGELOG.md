@@ -4,6 +4,12 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — PROCESS: the book's chapters are at `docs/book/` (Tier 0, maintainer sign-off)
+
+The eight sites that said "`docs/design/` today" after PR #75, and §6's
+registry pointer, now name `docs/book/` and `docs/records/`. The Tier-0
+rows are unchanged. Documentation only.
+
 ## 2026-10 — D52 Phase 1b: the book folder
 
 The chapters now live in `docs/book/`: the former `docs/design/` tree
