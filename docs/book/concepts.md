@@ -112,20 +112,15 @@ compares statements to each other rather than to the code.
 |---|---|---|---|
 | **R1** | Allegretto is the simplest base that can carry Allegro | **criterion**, not a requirement | record §2.1 F5 |
 | **R2** | Partial evaluation is the mechanism by which layers are added | **live** | — |
-| R3 | Values carry metadata, channels processed orthogonally | merged into R3′ | record §4.1 |
-| **R3′** | Metadata channels are independent | **live** (proposed S2d) | record §4.1 |
+| **R3** | Metadata channels are independent | **live** (proposed at the S2d merge) | record §4.1 |
 | **R4** | Evaluation is total over unresolved information | **live**; aborts specified separately (SC-8) | record §3.3 |
-| R5 | Metadata survives evaluation | merged into R3′ | record §4.1 |
 | **R6** | The base does not know about the layers | **live** | — |
 | R7 | Allegretto is replaceable | the **sufficiency claim**, not a requirement | record §2.1 F1 |
 | **R8** | There is one value universe | **live**; derives from R1 + R9, not R4 | record §2.1 F6 |
 | **R9** | The language surface is extensible | **live** | — |
 | R10 | Evaluation is resumable on new information | **derived** from R2 + R14; kept as a named consequence | record §2.1 F7 |
-| R11 | Propagation is declared, not coded | specification: **SC-7** | record §4.2 |
 | **R12** | Metadata origination is capability-controlled | **live** | — |
-| R13 | Channels can carry mergeable information | specification: `union` in SC-7's vocabulary | record §4.2 |
 | **R14** | Code is organised into separately-loadable units | **live** | — |
-| R15 | Program-level aggregation | **withdrawn** at S4b (§45) | §45 |
 | R16 | Evaluation is deterministic | **candidate** | record §2.3 S2; §28; B-114 |
 | R17 | The host boundary is a stated surface | **candidate** | record §2.3 S3; B-141 |
 | R18 | Resource bounds are specified | **candidate** | record §3, abort class D |
@@ -175,13 +170,13 @@ the same evaluator at compile time. §25 (partial evaluation).
 **Delta.** The evaluator also performs type checking the layer should
 install (R6's delta); that is R6's finding, not R2's.
 
-<a id="def-r3-prime"></a>
-### R3′ — Metadata channels are independent
+<a id="def-r3"></a>
+### R3 — Metadata channels are independent
 
-**Level.** Requirement, proposed at plan chunk S2d (record §4.1) as the
-merge of R3 (channels processed orthogonally), R5 (metadata survives
-evaluation), R11 (propagation declared, not coded) and R13 (channels can
-merge). In use by every T2 to T5 entry.
+**Level.** Requirement, proposed at plan chunk S2d (record §4.1), where
+four earlier statements about metadata were merged into this one. In use
+by every T2 to T5 entry. Identifiers retired by that merge are listed in
+the record §0.
 
 **Definition.** A value may carry named information about itself. Each
 channel's handling is independent of every other: an operation's treatment
@@ -192,7 +187,7 @@ operation.
 
 **Rationale.** Without this, every layer would thread its own information
 through every operation by hand, and layers would not compose. The
-non-interference clause is what the old R5 could not say: under a `drop`
+non-interference clause is what a survival-only statement could not say: under a `drop`
 rule nothing survives by design, and what matters is that no operation
 drops a channel it has never heard of. Where channels are stored (on the
 value or in a side table) is a specification choice, not part of the
@@ -203,7 +198,7 @@ requirement (record §2.1 F4).
 without reading field meaning.
 
 **Delta.** The base registers eleven fields itself and special-cases three
-by name (§19's delta, B-109(a)). The mechanism honours R3′; the wiring does
+by name (§19's delta, B-109(a)). The mechanism honours R3; the wiring does
 not.
 
 <a id="def-r4"></a>
@@ -393,7 +388,7 @@ R6 violations.
 | Allegro requirement | Its Allegretto counterpart |
 |---|---|
 | **Discharge**: an obligation is discharged by evaluating it, and what did not discharge remains visible as a stated obligation | **R2 + R4**: evaluation runs as far as it can and yields a residual otherwise. The base knows nothing of "obligation" |
-| **Knowledge lattice**: one monotonic lattice over imputed bound, domains and predicates, meeting at each use | **R3′ + SC-7's `union`**: channels can carry mergeable information. The base supplies merge; the lattice is the layer's |
+| **Knowledge lattice**: one monotonic lattice over imputed bound, domains and predicates, meeting at each use | **R3 + SC-7's `union`**: channels can carry mergeable information. The base supplies merge; the lattice is the layer's |
 
 ## 2. Specification choices
 
@@ -435,7 +430,7 @@ assembly; the set stays seven.
 | Alternative | Why not |
 |---|---|
 | A fixed set of primitives | Violates R6: the base would know a numeric tower, and Allegro could not redefine it |
-| Tagged scalars (value plus kind tag) | The tag is a degenerate type channel; R3′ already provides one |
+| Tagged scalars (value plus kind tag) | The tag is a degenerate type channel; R3 already provides one |
 
 **Rationale.** Minimality under R1, layer-ignorance under R6. Revisit if a
 numeric or textual operation cannot be expressed at L2 without the base
@@ -493,7 +488,7 @@ alternative was tried and failed.
 
 ### SC-5 — One composite kind rather than two
 
-**Level.** Specification; satisfies R1, R3′. D1 (unify MultiValue and
+**Level.** Specification; satisfies R1, R3. D1 (unify MultiValue and
 Context into Structure), completed by D46 (MultiValue retirement); upheld
 at B-108 (D48, the composite ruled as one question).
 
@@ -545,7 +540,7 @@ Candidate R19 (planes are separated) is what the supersession satisfies.
 
 ### SC-7 — Propagation is drawn from a fixed, inspectable vocabulary
 
-**Level.** Specification; satisfies R3′; criterion R12 enforceability.
+**Level.** Specification; satisfies R3; criterion R12 enforceability.
 Proposed at S2d (record §4.2); in use by §20 (propagation).
 
 **Definition.** A field's propagation rule is one of `viral`, `union`,
@@ -555,13 +550,13 @@ installed by the field's owner.
 
 | Alternative | Trade |
 |---|---|
-| Arbitrary propagation closures registered per field | Satisfies R3′ and R6 equally, but R12 becomes unenforceable: a closure is not inspectable, so the base cannot refuse a fabricating rule on an integrity field |
+| Arbitrary propagation closures registered per field | Satisfies R3 and R6 equally, but R12 becomes unenforceable: a closure is not inspectable, so the base cannot refuse a fabricating rule on an integrity field |
 
 **Rationale.** The integrity check (`registerChannel` refuses `viral` or
 `union` on an integrity field) is decidable only over symbols. Revisit if a
 layer needs a discipline the vocabulary cannot express; extend the
 vocabulary rather than open it to closures. `union` is in the vocabulary
-because effect sets union and knowledge meets (the former R13).
+because effect sets union and knowledge meets.
 
 **As implemented.** `PropagationRule` in `src/slots.ts`;
 `installFieldMerge` is how a field supplies `union` semantics; one caller
@@ -686,7 +681,7 @@ the host plane)).
 
 ### IC-3 — Metadata is a field on every value
 
-**Level.** Implementation; realises R3′. **Ruled at B-108 (D48(b));
+**Level.** Implementation; realises R3. **Ruled at B-108 (D48(b));
 executed at B-121 (2026-08).** The prior choice, channels by wrapping in a
 carrier Structure, is retired (§10).
 
@@ -793,7 +788,8 @@ and `args` mean the same memo is correct).
 
 - **Ratification.** R1 to R20 are proposed, not ratified as a set. The
   cohesion pass found what it found (record §2); the maintainer's S2d
-  rulings reshaped R3 to R13 into R3′ and SC-7 (record §4). Every entry
+  rulings merged four metadata statements into R3 and SC-7 (record §4);
+  the identifiers that retired are listed in the record §0. Every entry
   below cites the set as it stands in §1.0. The ask stands: ratify the set,
   or amend it, so the status column can say *ratified*.
 - **Candidates have no entries.** R16 to R20 are stated in one table with
@@ -977,7 +973,7 @@ plane** (T2 §9) is the fix; recording it here so the T2 entry has a caller.
 <a id="def-primitivefunction"></a>
 ## 8. PrimitiveFunction
 
-> **Level: Specification** — satisfies R2, R5, R11.
+> **Level: Specification** — satisfies R2, R3.
 
 **Definition.** A *PrimitiveFunction* is a function implemented by the host
 rather than in Allegretto. Beyond its implementation it carries three
@@ -1067,7 +1063,7 @@ classes were invisible to a regex over source text. Full record:
 <a id="def-data-plane"></a>
 ## 11. Data plane
 
-> **Level: Specification** — satisfies R3, R5. D48(b) did not change this entry; it made the entry *literal*.
+> **Level: Specification** — satisfies R3. D48(b) did not change this entry; it made the entry *literal*.
 
 **Definition.** The *data plane* of a value is the value it ultimately
 denotes, ignoring anything carried alongside. **It is the value.** A
@@ -1319,7 +1315,7 @@ under evaluation, and whether Allegro can see it at all.
 <a id="def-plane"></a>
 ## 18. Plane
 
-> **Level: Specification** — satisfies R3′, R8, R12.
+> **Level: Specification** — satisfies R3, R8, R12.
 
 **Definition.** A *plane* is one of four storage regions a value's
 information can occupy, distinguished by **who may write it** and **what
@@ -1332,7 +1328,7 @@ evaluation does to it**:
 | **Metadata** | Information *about* the value, in named **fields** | the field's registered writer | per the field's declared rule (SC-7) | yes, through field reads |
 | **Host** | Interpreter bookkeeping | the host, freely | nothing — it is not part of the value | **no** |
 
-**Rationale.** The planes are what make R3′ possible: an operation can carry
+**Rationale.** The planes are what make R3 possible: an operation can carry
 a metadata field it has never heard of precisely because the metadata plane is
 separate from the data it is operating on. They are also the answer to "where
 should this new thing go?", which is the question nobody could answer for
@@ -1360,7 +1356,7 @@ B-118, and that item exists because this entry made the two separable.)*
 <a id="def-metadata-field"></a>
 ## 19. Metadata field
 
-> **Level: Specification** — satisfies R3′, R12. *Renamed at S2f from
+> **Level: Specification** — satisfies R3, R12. *Renamed at S2f from
 > "channel", which was two concepts sharing a word — see §19b.*
 
 **Definition.** A *field* is one named slot of the metadata plane, with a
@@ -1387,7 +1383,7 @@ throughout — see §19b's delta.
 <a id="def-channel"></a>
 ## 19b. Channel
 
-> **Level: Specification** — satisfies R2, R3′. *New at S2f (maintainer).*
+> **Level: Specification** — satisfies R2, R3. *New at S2f (maintainer).*
 
 **Definition.** A *channel* is the whole apparatus by which one capability
 rides values through partial evaluation: **one or more metadata fields**,
@@ -1395,7 +1391,7 @@ their propagation rules, their writer, and the layer-side semantics that
 interpret them. Typing is a channel. Effect analysis is a channel. Proof
 discharge is a channel. A field is storage; a channel is a capability.
 
-**Rationale.** R2 says layers are added by partial evaluation, and R3′ says
+**Rationale.** R2 says layers are added by partial evaluation, and R3 says
 their information rides on values independently. A *channel* is what one such
 layer's participation actually consists of — which is more than a slot, and
 is why the two need different words. The distinction is not cosmetic: a
@@ -1436,7 +1432,7 @@ channel registration. **→ B-111.**
 <a id="def-propagation"></a>
 ## 20. Propagation
 
-> **Level: Specification** — **SC-7**, satisfies R3′; criterion R12.
+> **Level: Specification** — **SC-7**, satisfies R3; criterion R12.
 
 **Definition.** A field's *propagation rule* says what an operation does
 with that field, drawn from a **fixed, inspectable vocabulary**: `viral`
@@ -1540,7 +1536,7 @@ the same file.**
 
 - *Correct:* `evaluator.ts` propagates channels through the plane interface —
   `viralChannels()`, `channelSpec(k)?.rule === "union"`, `channelMerge(k)`.
-  Layer-ignorant, exactly as R3′/SC-7 intend.
+  Layer-ignorant, exactly as R3/SC-7 intend.
 - *Incorrect:* it also imports **27 symbols** from three L2 modules
   (`types-std`, `refinements`, `effects`), and `checkArgType` — which calls
   `getType`, reads `typeContextName`, **evaluates refinement predicates**,
@@ -1571,7 +1567,7 @@ other channel.
 <a id="def-plane-interfaces"></a>
 ## 24. Plane interfaces
 
-> **Level: Specification** — satisfies R3′, R6, R12. *Elevated to a
+> **Level: Specification** — satisfies R3, R6, R12. *Elevated to a
 > first-class concern at S2f (maintainer): the interfaces between planes and
 > their producers and consumers are a central design feature, not an
 > implementation detail of §18.*
@@ -1794,7 +1790,7 @@ none of it is known to the base — or should not be (§23).
 <a id="def-type"></a>
 ## 30. Type
 
-> **Level: Specification** — satisfies R2, R3′. *L2 concept; the base knows
+> **Level: Specification** — satisfies R2, R3. *L2 concept; the base knows
 > only the metadata field it rides on.*
 
 **Definition.** A *type* is a value that constrains other values. It is an
@@ -1964,7 +1960,7 @@ a contradiction.
 <a id="def-knowledge"></a>
 ## 34. Knowledge
 
-> **Level: Specification** — satisfies R2, R3′. **Distinct from §32.**
+> **Level: Specification** — satisfies R2, R3. **Distinct from §32.**
 
 **Definition.** *Knowledge* is everything established **about** a value that
 does not change what it is: an imputed refinement bound, abstract domains,
@@ -2235,7 +2231,7 @@ separate proof engine.
 <a id="def-effect"></a>
 ## 40. Effect
 
-> **Level: Specification** — satisfies R2, R3′.
+> **Level: Specification** — satisfies R2, R3.
 
 **Definition.** An *effect* is a label naming something a computation does
 beyond producing a value — `io`, `time`, `net`, `div`. A value carries the
@@ -2250,7 +2246,7 @@ labels is R6: Allegretto knows *that* effects union, never *what* `io` means.
 
 **As implemented.** `EffectSet` in `src/effects.ts`; `withEffects`/`effectsOf`;
 `installChannelMerge("effects", …)` supplies the union — the one instance of
-the R11 pattern working (§20).
+declared propagation (SC-7) working (§20).
 
 **Delta.** — 
 
@@ -2375,14 +2371,15 @@ structurally different from everything in T2.
 
 **Delta — restated at S4b; the first version was wrong.**
 
-S4 claimed this as a **requirement gap** (candidate R15): the requirement set
+S4 claimed this as a **requirement gap** (candidate R15, since withdrawn;
+the record §0 lists it): the requirement set
 is per-value, the verdict is program-level, therefore nothing enables it. The
 maintainer's counter is correct and better: **a program is a value**, and
 accumulating metadata across an expression *is what channel operations
 already do*. Effects union upward; errors are viral; `div` is an effect and
 so unions too. On that model the verdict simply **is** the top-level value's
 accumulated metadata, and it is each channel's job to define an accumulation
-that reaches it. No new requirement is needed — R3′ plus SC-7's `union`
+that reaches it. No new requirement is needed — R3 plus SC-7's `union`
 already say it.
 
 So the gap is not in the requirements. It is that **the implementation does
@@ -2577,7 +2574,7 @@ is program-level, so I claimed the per-value requirement set could not enable
 it. But **a program is a value**, and accumulation across an expression is
 already what channel operations do. The verdict *should* be the top-level
 value's accumulated metadata, with each channel defining an accumulation that
-reaches it — R3′ and SC-7's `union` already say so. **R15 withdrawn.** The
+reaches it — R3 and SC-7's `union` already say so. **R15 withdrawn.** The
 real finding is an implementation delta with direct evidence: `buildVerdict`
 walks bindings out-of-band, and the `warnings` field — registered `union`,
 exactly the accumulating discipline — is **unused**. And it *explains* §46:
