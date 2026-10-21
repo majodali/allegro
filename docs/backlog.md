@@ -853,20 +853,23 @@ that prevents it.
   imperative/mixed) as extensions
 - [ ] **B-081** · Counterexample legibility — domain-specific failure
   rendering layer (foundational; coupled to the AI iteration loop; see
-  `docs/VISION.md` §4). v1 rendering-hook sketch (`T.onFailure`)
+  `docs/book/vision.md` §4). v1 rendering-hook sketch (`T.onFailure`)
   preserved at branch `archive/v1-references` (parent b838a89) —
   pre-rework, reference only
 - [ ] **B-082** · Model composition patterns (cross-domain predicates,
-  arbitration, multi-domain [impl, proof] explosion risk)
+  arbitration, multi-domain [impl, proof] explosion risk), as described in
+  Vision §4 (the Vivace hypothesis; one of the seven gaps)
 - [ ] **B-083** · AI iteration loop — usable failure modes (residuals the
   agent can't discharge; surfacing; time-boxing; shared artifact with
-  B-081)
+  B-081), as described in Vision §4 (one of the seven gaps)
 - [ ] **B-084** · Constraint-set completeness — organizational process
-  research (external interviews; longest critical path)
+  research (external interviews; longest critical path), as described in
+  Vision §4 (one of the seven gaps)
 - [ ] **B-085** · Bootstrap economics — Vivace value vs. domain-model
-  maturity (roadmap question)
+  maturity (roadmap question), as described in Vision §4 (one of the seven
+  gaps)
 - [ ] **B-086** · Escape-hatch awareness tooling ("you're cycling on this
-  rule — options"); posture per `docs/VISION.md` §5 principle 4
+  rule — options"); posture per `docs/book/vision.md` §5 principle 4
 - [ ] **B-098** · Predicate/domain propagation onto residuals —
   (renumbered from a duplicate "B-087" at the 2026-08 backlog groom:
   the ID was minted twice — 2026-07 for the totality-analyzer
@@ -2099,7 +2102,7 @@ that prevents it.
     claim from *"we tested the attacks we thought of"* to *"we tested every
     combination the registries admit"*, which is bounded and checkable but
     still not a proof. The project's own thesis names the end state — the
-    property stated in Allegro and discharged, not tested (`docs/VISION.md`
+    property stated in Allegro and discharged, not tested (`docs/book/vision.md`
     §1–§2, and the Vivace formal model in `concept-spine.md` §4a)
   - **First deliverable**, before any generated test: the guard × path table
     itself, as evidence. It is the same move the concept spine made — write
@@ -2303,13 +2306,13 @@ that prevents it.
     and [P-001–P-005 (prose \& presentation)](https://github.com/majodali/methodology/blob/main/docs/rules/prose.md).
 
 - [x] **B-131** · T-docs · **CLOSED 2026-09-05 — deviation D-1 retired.**
-  - **What landed**: `docs/PROCESS.md` §3 now states all four of the
+  - **What landed**: `docs/book/process.md` §3 now states all four of the
     released W-001's stop conditions (Tier-0 PR, maintainer-approved), the
     D-1 entry is gone from
     [docs/classification.md](classification.md#deviation-register), and
     `CLAUDE.md` reads `Deviations: none`.
   - **Correction to this row as written**: it said the second half was to
-    "drop the deviation note from `docs/PROCESS.md` §3". There was no such
+    "drop the deviation note from `docs/book/process.md` §3". There was no such
     note — PROCESS carried no D-1 or W-001 reference at all. What §3 needed
     was the opposite: it *stated the sequence mode more narrowly than the
     rule*, carrying two of four stop conditions, so the fix was adding the

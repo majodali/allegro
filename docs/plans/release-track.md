@@ -7,7 +7,7 @@
 > differentiator map with its claims register, the demo ladder, and the
 > derivation order for website / demos / public docs. The DURABLE parts
 > (the three-move cohesion frame, substrate/surfaces terminology, the
-> claims discipline) live in `docs/VISION.md` §1a/§5 — this plan holds
+> claims discipline) live in `docs/book/vision.md` §1a/§5 — this plan holds
 > everything that changes as work lands. Maintainer ratifies §7's
 > decision points before content derivation starts.
 >

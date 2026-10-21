@@ -1,6 +1,6 @@
 # Plans manifest
 
-Per `docs/PROCESS.md` §4: agents read this manifest before starting feature
+Per `docs/book/process.md` §4: agents read this manifest before starting feature
 work. Plans are outcome-named (K-007) and carry a Status line with the
 K-007 transitions: `draft → active → (superseded by X, because Y |
 closed → Backlog entry)`. "Closed" plans kept below retain record value

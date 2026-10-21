@@ -87,7 +87,7 @@ against VISION §2/§4/§5, PROCESS §3–§9, design/standard/*,
 design/extension/grammar.md) — zero promotions needed. The real K-001
 exposure was five live citations pointing INTO `.claude/`
 (CLAUDE.md ×3, proving-in-allegro.md, bench/README.md) — all
-retargeted to `docs/VISION.md` §2 or deleted. Outcome: 13
+retargeted to `docs/book/vision.md` §2 or deleted. Outcome: 13
 zero-reference pointer stubs deleted; 8 files remain (4 session/user/
 external context, 3 marked pointer stubs, index) under a new A6
 non-authoritative banner in MEMORY.md. Two staleness bugs fixed en
