@@ -17,18 +17,9 @@ import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemb
 import { scopePrivilegeExtend, scopeHoldsPrivilege, scopeLookup } from "./scope.js";
 import { effectsOf as fnEffectsOf } from "./effects.js";
 import { putEntry, removeEntry } from "./structure.js";
-import {
-  getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate,
-  getGenericArgs, getGenericBackLink,
-  getSlotCount, slotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf,
-  setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface,
-  setWraps, setPredicate, setGenericArgs,
-  setGenericBackLink, setProposition,
-  setEffectBound, setAbstractDomain,
-  writeShape, carryShape, removeName, removeRefines, removeShapeSlot, kernelFieldWriter, assertNotIntegrityKey,
-  removeConstruct, metaReadRaw, cloneMeta, SLOT_KEYS, isMetaProtocolSlot, typeShape, getFallbackMember,
-  equalityShape, asStructure, registerMetaField,
-} from "./slots.js";
+import { getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate, getGenericArgs, getGenericBackLink, getSlotCount, slotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf, setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface, setWraps, setPredicate, setGenericArgs, setGenericBackLink, setProposition, setEffectBound, setAbstractDomain, removeName, removeRefines, removeConstruct, SLOT_KEYS, isMetaProtocolSlot, typeShape, getFallbackMember, equalityShape, asStructure } from "./slot-accessors.js";
+import { writeShape, carryShape, removeShapeSlot, metaReadRaw, cloneMeta } from "./metadata.js";
+import { kernelFieldWriter, assertNotIntegrityKey, registerMetaField } from "./capability.js";
 
 
 // --- Constants ---

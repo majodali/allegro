@@ -13,7 +13,7 @@ import { bitsToString, BitsValue, makeInt, makeStructure, makeExpr, ValueKind, V
 import { applyPhase } from "../runtime.js";
 import { evaluate } from "../evaluator.js";
 import { getTypeName } from "../types-std.js";
-import { metaOf } from "../slots.js";
+import { metaOf } from "../metadata.js";
 import { extractGrammarFragment } from "../primitives.js";
 import { primNames, typeNames, fileTest, testsDir } from "./alg-files.js";
 import { putEntry } from "../structure.js";

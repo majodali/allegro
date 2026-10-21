@@ -194,7 +194,7 @@ value or in a side table) is a specification choice, not part of the
 requirement (record §2.1 F4).
 
 **As implemented.** The metadata plane (§18), fields with declared rules
-(§19, §20), the propagation table in `src/slots.ts` applied by the evaluator
+(§19, §20), the propagation table in `src/metadata.ts` applied by the evaluator
 without reading field meaning.
 
 **Delta.** The base registers eleven fields itself and special-cases three
@@ -250,9 +250,9 @@ the metadata plane; it must not know that one field is called `type`.
 
 **Delta.** Violated today in three places, each owned: the evaluator
 imports 27 symbols from L2 and implements type checking (record §3.1;
-**B-112**, with `units.md` misalignment M11 (the evaluator holds Type-system activities)); `slots.ts` registers eleven L2 field names
-at module init and special-cases three by name (record §1.1; **B-109**);
-`scope.ts` imports the predicate-set merge (`units.md` misalignment M12 (the scope imports `refinements`); B-112 hook (e)).
+**B-112**, with `units.md` misalignment M11 (the evaluator holds Type-system activities)); the base registered eleven L2 field names
+at module init and special-cases three by name (record §1.1; **B-109**, the registrations moved to their owners; `src/capability.ts` holds the base's own).
+The third, `scope.ts` importing the predicate-set merge (`units.md` misalignment M12 (the scope imports `refinements`)), closed at B-112 chunk C1: the scope applies an installed facts merge (hook (e)).
 
 <a id="def-r8"></a>
 ### R8 — There is one value universe
@@ -558,8 +558,8 @@ layer needs a discipline the vocabulary cannot express; extend the
 vocabulary rather than open it to closures. `union` is in the vocabulary
 because effect sets union and knowledge meets.
 
-**As implemented.** `PropagationRule` in `src/slots.ts`;
-`installFieldMerge` is how a field supplies `union` semantics; one caller
+**As implemented.** `PropagationRule` in `src/metadata.ts`;
+`installFieldMerge` (`src/capability.ts`, gated on the field's writer) is how a field supplies `union` semantics; one caller
 (`src/effects.ts`).
 
 **Delta.** `installFieldMerge` is ungated, so any module may decide what
@@ -1371,7 +1371,7 @@ knowing which fields matter: authority is *the closure*, not the name, so
 the base would have to maintain — and would have to be told to maintain,
 violating R6.
 
-**As implemented.** `registerChannel(spec)` in `src/slots.ts` returns a
+**As implemented.** `registerChannel(spec)` in `src/capability.ts` returns a
 `ChannelWriter`; `channelReadRaw(v, name)` reads; `channelSpec(name)` returns
 the registration; storage is the `components` map. `kernelChannelWriter` is
 the kernel's acquisition path, lint-restricted to two modules.
@@ -1452,7 +1452,7 @@ over an inspectable symbol; over a closure it is unwritable, and R12 degrades
 from enforced to hoped-for. See Part 0 SC-7 and, for the argument,
 `docs/records/concepts-analyses.md` §4.2.
 
-**As implemented.** `PropagationRule` in `src/slots.ts`; `viralChannels()`
+**As implemented.** `PropagationRule` in `src/metadata.ts`; `viralChannels()`
 and `unionChannels()` are cached filters over the registry;
 `installChannelMerge(name, fn)` is how a channel supplies `union` semantics —
 `src/effects.ts` is the one caller, and the pattern to generalise.
@@ -1498,7 +1498,7 @@ Contexts and instances shared a namespace; it stopped being real once members
 moved to FQN keys inside `__members`, and B-120 E5 deleted the predicate that
 expressed it.
 
-**As implemented.** `SLOT_KEYS` and `SLOT_REGISTRY` in `src/slots.ts` — the
+**As implemented.** `SLOT_KEYS` and `SLOT_REGISTRY` in `src/slot-accessors.ts` — the
 slots themselves, still `__`-prefixed. The predicate
 `isMetaSlotKey(key) = key.startsWith("__")` is **deleted**. Its one live
 consumer, B-097 V-R1's member-dispatch narrowing, now reads
@@ -1591,7 +1591,7 @@ one the code currently bypasses.
 | **Data** | Allegretto / Allegro code | **none** — a value *is* its data | construction | the representation constructors |
 | **Data** | the host | **none since B-121** — the host's view and the language's are the same view now that no wrapper stands between them. Whether a plane with no reader is a plane properly policed is held open at §11's delta | the host | the representation constructors |
 | **Binding** | user code | member dispatch | construction | `makeStructure` + the binding writers |
-| **Binding** | engine (meta slots) | `src/slots.ts` accessors | kernel | the same accessors ⚠ *four write disciplines, §13; and see the disposition note below* |
+| **Binding** | engine (meta slots) | `src/slot-accessors.ts` accessors | kernel | the same accessors ⚠ *four write disciplines, §13; and see the disposition note below* |
 | **Metadata** | anyone | `channelReadRaw(v, field)` — free (D23) | field owner | the writer closure from registration |
 | **Metadata** | the evaluator | the propagation table: `channelSpec(f)?.rule`, `viralChannels()`, `channelMerge(f)` | — | — |
 | **Metadata** | user-reachable construction | refused unless the writer is held (`assertNotIntegrityKey`) | — | — ⚠ *enforced by name list, §21* |
@@ -1806,7 +1806,7 @@ returning an ordinary value. It is also what makes PE-as-discharge possible
 (R2) — a type check is an evaluation, not a separate pass.
 
 **As implemented.** `src/types-std.ts`; type Contexts built by `makeStructure`
-plus the `src/slots.ts` writers; `getType(v)` is `channelReadRaw(v, "type")`
+plus the `src/capability.ts` writers; `getType(v)` is `channelReadRaw(v, "type")`
 with a kind check.
 
 **Delta.** The **type Context namespace is closed** — a user field named
@@ -1875,7 +1875,7 @@ The mechanism already supports the second case (`preserveOps`, `mixin`,
 sets and therefore being shapes). The document, not the code, was the thing
 that made refinements sound second-class.
 
-**As implemented.** `typeShape(t)` in `src/slots.ts`, walking `__refines`
+**As implemented.** `typeShape(t)` in `src/slot-accessors.ts`, walking `__refines`
 while `__members` is the same object. `shape` is registered as a metadata
 field but stores nothing — it is a **projection** of `type` (§19b).
 
@@ -2194,7 +2194,7 @@ matching, equality — and each gets its own walk. Collapsing them is what
 produced the `~Printable` confusion (§36).
 
 **As implemented.** `buildDistinctType`, `structuralWrap`, `equalityShape` in
-`src/slots.ts`.
+`src/slot-accessors.ts`.
 
 **Delta.** — 
 

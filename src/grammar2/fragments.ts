@@ -13,7 +13,7 @@
 // substitution templates.
 // =============================================================================
 
-import { slotCount, indexGet } from "../slots.js";
+import { slotCount, indexGet } from "../slot-accessors.js";
 import {
   Grammar, Rule, makeGrammar, addProduction,
   lit, nonterm, seq, alt, rep, opt, regex as ruleRegex,

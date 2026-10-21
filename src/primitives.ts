@@ -1,7 +1,9 @@
 // Allegretto - Primitive Functions
 
-import { getName, getMembers, slotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasShapeSlot, hasDischarged, metaReadRaw, metaOf, cloneMeta, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, kernelFieldWriter, registerMetaField, metaFieldList, assertNotIntegrityKey, typeShape, indexGet, PRESERVED_FN_META_KEYS, FIELD_WRITER_BRAND, HOST_KEYS, viralFields, sourceOf, SOURCE_FIELD, carryMeta} from "./slots.js";
-import type { LawBackingRec } from "./slots.js";
+import { getName, getMembers, slotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasDischarged, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, typeShape, indexGet, HOST_KEYS } from "./slot-accessors.js";
+import { hasShapeSlot, metaReadRaw, metaOf, cloneMeta, metaFieldList, PRESERVED_FN_META_KEYS, viralFields, sourceOf, SOURCE_FIELD, carryMeta } from "./metadata.js";
+import { kernelFieldWriter, registerMetaField, assertNotIntegrityKey, FIELD_WRITER_BRAND } from "./capability.js";
+import type { LawBackingRec } from "./slot-accessors.js";
 import {
   Value, ValueKind, BitsValue, StructureValue, ComposedFunctionValue,
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue, ParamValue,
@@ -503,7 +505,7 @@ const mv_get: PrimitiveFnImpl = (args) => {
 const channel_register_impl: PrimitiveFnImpl = (args) => {
   const name = bitsToString(asBits(args[0], "channel_register"));
   const rule = bitsToString(asBits(args[1], "channel_register"));
-  const writer = registerMetaField({ name, rule: rule as import("./slots.js").PropagationRule }, true);
+  const writer = registerMetaField({ name, rule: rule as import("./metadata.js").PropagationRule }, true);
   const prim = makePrimitive(`<channel:${name} writer>`, (wargs) => {
     if (wargs.length !== 2) throw new AllegroError(`channel writer '${name}': expected (value, fieldValue)`);
     return writer.write(wargs[0], wargs[1]);
@@ -3164,7 +3166,7 @@ const assert_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       let effectiveSet = _predicatesOf(binding.value);
       {
         // C2.2: chain-merged facts (branch layers + earlier same-scope asserts).
-        const scoped = scopeFactsFor(ctx!, name);
+        const scoped = scopeFactsFor(ctx!, name) as _PredicateSet | undefined;
         if (scoped) {
           effectiveSet = effectiveSet ? _mergePredicateSets(effectiveSet, scoped) : scoped;
         }
@@ -3324,7 +3326,7 @@ const requires_stmt_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       let effectiveSet = _predicatesOf(binding.value);
       {
         // C2.2: chain-merged facts (branch layers + earlier same-scope asserts).
-        const scoped = scopeFactsFor(ctx!, name);
+        const scoped = scopeFactsFor(ctx!, name) as _PredicateSet | undefined;
         if (scoped) {
           effectiveSet = effectiveSet ? _mergePredicateSets(effectiveSet, scoped) : scoped;
         }

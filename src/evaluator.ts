@@ -15,7 +15,8 @@ import {
 } from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet, AbstractDomain, EffectsDomain, impliesDomain } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, getPredicate, getRefines, getGenericArgs, slotCount, getEffectBound, metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, typeShape, indexGet, PRESERVED_FN_META_KEYS, withSource, carryMeta} from "./slots.js";
+import { getConstruct, getPredicate, getRefines, getGenericArgs, slotCount, getEffectBound, typeShape, indexGet } from "./slot-accessors.js";
+import { metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, PRESERVED_FN_META_KEYS, withSource, carryMeta } from "./metadata.js";
 import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;

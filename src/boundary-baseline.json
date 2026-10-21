@@ -1,11 +1,20 @@
 {
-  "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet — regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3.",
+  "note": "Boundary-test baseline (structures-implementation Phase 0). `lint` counts are a one-way ratchet \u2014 regenerate with `npx tsx src/boundary-tests.ts --write-baseline` after a migration chunk reduces them; increases fail the suite. `hardFail` flips at C1.3.",
   "hardFail": true,
   "allowedFiles": [
-    "src/slots.ts",
+    "src/slot-accessors.ts",
+    "src/metadata.ts",
+    "src/capability.ts",
     "src/structure.ts"
   ],
   "lint": {
+    "src/metadata.ts": {
+      "meta-direct": 16
+    },
+    "src/slot-accessors.ts": {
+      "dunder-string-literal": 67,
+      "bindings-get-dunder": 4
+    },
     "src/futures.ts": {
       "dunder-template-key": 1
     },
@@ -18,15 +27,8 @@
     "src/runtime.ts": {
       "dunder-template-key": 1
     },
-    "src/slots.ts": {
-      "components-direct": 12,
-      "dunder-string-literal": 73,
-      "bindings-get-dunder": 8,
-      "kernel-writer-acquisition": 1
-    },
     "src/structure.ts": {
-      "components-direct": 3,
-      "dunder-string-literal": 1,
+      "meta-direct": 2,
       "scope-facts-direct": 1
     },
     "src/test/alg-files.ts": {
@@ -56,7 +58,7 @@
     "7"
   ],
   "perf": {
-    "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan §5).",
+    "machineNote": "Recorded on the dev container; coarse floor only. Hard threshold pending maintainer decision (plan \u00a75).",
     "warnFactor": 2,
     "workloadsMs": {
       "basics": 540,

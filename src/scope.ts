@@ -25,8 +25,7 @@ import {
   AllegroError,
   makeStructure,
 } from "./types.js";
-import { hasShapeSlot } from "./slots.js";
-import { PredicateSet, mergePredicateSets } from "./refinements.js";
+import { hasShapeSlot, metaFieldEntry, MetaFieldWriter } from "./metadata.js";
 import { putEntry } from "./structure.js";
 
 /** Create a fresh scope, optionally layered over a parent scope. */
@@ -103,27 +102,59 @@ export function scopeCompileMode(scope: StructureValue): boolean {
 // adding facts for the REST of its own scope) writes to the scope's own
 // map — that is the layer's own state, not a parent mutation.
 
-/** Push an immutable fact layer over `parent`. O(1) in parent size. */
-export function scopeAssume(parent: StructureValue, facts: Map<string, PredicateSet>): StructureValue {
+// B-112 C1 (hook (e), M12 closed): the scope unit carries facts and never
+// decides what they mean. A fact is opaque here — the layer that owns the
+// `predicates` field installs the merge, proving ownership with the field's
+// writer (P4), exactly as a field merge is installed into the metadata plane.
+// Scope imports the metadata unit for the registry only; it does not import
+// the owner. Deviation recorded in the plan: today's facts are host
+// `PredicateSet` objects rather than encoded Values, so the installed facts
+// merge is a separate function from the field's Value-merge (B-146 unifies).
+type FactsMerge = (outer: unknown, inner: unknown) => unknown;
+let FACTS_MERGE: { channel: string; merge: FactsMerge } | null = null;
+
+/** Install the merge that `scopeFactsFor` applies across layers. Gated:
+ *  `writer` must be the registered writer of its field (the owner's
+ *  capability), and the merge installs once — a second installer, even the
+ *  same one, is a wiring error. */
+export function installFactsMerge(writer: MetaFieldWriter, merge: FactsMerge): void {
+  const e = metaFieldEntry(writer.channel);
+  if (e === undefined || e.writer !== writer) {
+    throw new AllegroError(`installFactsMerge: the facts merge may be installed only by the holder of the '${writer.channel}' writer (P4)`);
+  }
+  if (FACTS_MERGE !== null) {
+    throw new AllegroError(`installFactsMerge: a facts merge is already installed (for '${FACTS_MERGE.channel}')`);
+  }
+  FACTS_MERGE = { channel: writer.channel, merge };
+}
+
+/** Push an immutable fact layer over `parent`. O(1) in parent size. The
+ *  facts are opaque to this unit; their meaning is the installer's. */
+export function scopeAssume(parent: StructureValue, facts: Map<string, unknown>): StructureValue {
   const child = scopeNew(parent);
-  child.scopePredicates = facts as Map<string, unknown>;
+  child.scopePredicates = facts;
   return child;
 }
 
 /** Merged fact set for `name` across all layers (rootmost first; nearer
- *  layers refine). Undefined when no layer carries facts for the name. */
-export function scopeFactsFor(scope: StructureValue, name: string): PredicateSet | undefined {
-  let leafToRoot: PredicateSet[] | null = null;
+ *  layers refine). Undefined when no layer carries facts for the name.
+ *  Merging two layers needs the installed merge; a single layer answers
+ *  as itself. */
+export function scopeFactsFor(scope: StructureValue, name: string): unknown {
+  let leafToRoot: unknown[] | null = null;
   let cur: StructureValue | undefined = scope;
   while (cur) {
-    const sp = cur.scopePredicates?.get(name) as PredicateSet | undefined;
+    const sp = cur.scopePredicates?.get(name);
     if (sp !== undefined) (leafToRoot ??= []).push(sp);
     cur = cur.parent;
   }
   if (!leafToRoot) return undefined;
   let acc = leafToRoot[leafToRoot.length - 1];
+  if (leafToRoot.length > 1 && FACTS_MERGE === null) {
+    throw new AllegroError(`scopeFactsFor: facts for '${name}' span ${leafToRoot.length} layers and no facts merge is installed`);
+  }
   for (let i = leafToRoot.length - 2; i >= 0; i--) {
-    acc = mergePredicateSets(acc, leafToRoot[i]);
+    acc = FACTS_MERGE!.merge(acc, leafToRoot[i]);
   }
   return acc;
 }

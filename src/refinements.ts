@@ -20,7 +20,10 @@
 // See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { cloneMeta, metaOf, metaReadRaw, typeShape, getAbstractDomain, registerMetaField } from "./slots.js";
+import { cloneMeta, metaOf, metaReadRaw } from "./metadata.js";
+import { typeShape, getAbstractDomain } from "./slot-accessors.js";
+import { registerMetaField } from "./capability.js";
+import { installFactsMerge } from "./scope.js";
 import {
   Value, ValueKind, BitsValue, StructureValue,
   withMeta, makeStructure, makeInt, isResolved,
@@ -35,9 +38,15 @@ import {
 // occurrence bound (C3.2 / D36) — set when an annotation boundary is crossed,
 // consumed by the member-AVAILABILITY gate — and is `drop` because a bound
 // constrains the occurrence it was stamped on, never a result derived from it.
-registerMetaField({ name: "predicates", rule: "computed" });
+const predicatesWriter = registerMetaField({ name: "predicates", rule: "computed" });
 registerMetaField({ name: "domain", rule: "computed" });
 registerMetaField({ name: "bound", rule: "drop" });
+
+// B-112 C1 (hook (e), M12): the scope unit carries facts opaquely; this
+// layer, as holder of the `predicates` writer, installs how layered facts
+// merge. Installed at module scope for the same one-shot reason as above.
+installFactsMerge(predicatesWriter, (outer, inner) =>
+  mergePredicateSets(outer as PredicateSet, inner as PredicateSet));
 
 // =============================================================================
 // Abstract-domain representation

@@ -17,10 +17,10 @@ import { assertClean as g2assertClean } from "../grammar2/analyzer.js";
 import { grammarToAllegro } from "../grammar2/to-allegro.js";
 import { evaluate } from "../evaluator.js";
 import { makeExpr } from "../types.js";
-import { slotCount } from "../slots.js";
+import { slotCount } from "../slot-accessors.js";
 import * as g2 from "../grammar2/types.js";
 import * as fs from "fs";
-import { indexGet } from "../slots.js";
+import { indexGet } from "../slot-accessors.js";
 
 // == Grammar 2 (Phase 1) — new formalism + engine ==
 //

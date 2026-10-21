@@ -10,7 +10,7 @@ import { typeExt } from "./fixtures.js";
 import { getTypeName } from "../types-std.js";
 import { evalSource as runtimeEval, Extension, applyPhase } from "../runtime.js";
 import { createFutureManager } from "../futures.js";
-import { metaReadRaw } from "../slots.js";
+import { metaReadRaw } from "../metadata.js";
 import { formatValue, extractGrammarFragment } from "../primitives.js";
 import { primNames, typeNames } from "./alg-files.js";
 import { Value, ValueKind, BitsValue, StructureValue, makeInt, bitsToString, isResolved } from "../types.js";

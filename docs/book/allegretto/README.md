@@ -34,7 +34,11 @@ in L1–L3 or any track.
   §10).
 - Channel origination requires the writer capability; propagation is
   evaluator-performed and authority-free (structures.md §3).
-- Fact payloads and channel payloads are opaque to base ops.
+- Fact payloads and channel payloads are opaque to base ops. For facts
+  this is enforced since chunk C1 of B-112 (the four owed plane
+  interfaces): the scope carries facts as
+  `unknown` and merges layers only through an installed, writer-gated
+  merge (`installFactsMerge`, `src/scope.ts`).
 
 Enforced by `src/boundary-tests.ts` (structures-implementation Phase 0).
 

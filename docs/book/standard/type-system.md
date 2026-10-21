@@ -183,7 +183,7 @@ prefix had been hiding:
 `docs/book/allegretto/structures.md`; the questions this section
 enumerated resolved as follows:
 
-- **central registry** → becomes code: `src/slots.ts`, the D39
+- **central registry** → becomes code: `src/slot-accessors.ts`, the D39
   slot-disposition table as the registry, with a completeness walker
   enforcing it mechanically (chunk C1.1 / backlog B-006);
 - **replacement naming scheme** → declared **symbol-keyed members** on the

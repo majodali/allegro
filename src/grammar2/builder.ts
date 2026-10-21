@@ -13,7 +13,7 @@
 //   - error     → an error MultiValue with message + inner tree
 // =============================================================================
 
-import { slotCount, indexGet } from "../slots.js";
+import { slotCount, indexGet } from "../slot-accessors.js";
 import {
   Rule, Grammar, Guard, Production,
   lit, cls, regex, eof, empty, fail, indent as indentTerm,

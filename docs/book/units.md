@@ -231,10 +231,10 @@ column is §7's ledger, corrected in place as moves land (K-010).
 | 5 | **`primitive-function`** | host functions as values (SC-1 row 2); `lazy`/`sourceAware` declarations; D24 closures as unforgeable references | `value` | `types.ts` (part) | owed |
 | 6 | **`expression`** | SC-3 expressions are values; IC-6 memo | `value` | `types.ts` (part) | owed |
 | 7 | **`composed-function`** | params + body; the clone helpers every path must use (PROCESS §6) | `value`, `param` | `types.ts` (part), `runtime.ts` (clone helpers) | owed |
-| 8 | **`structure`** | SC-5 one composite; D46; IC-1 roles by field presence; IC-2/D48(a) entry sequence with `SlotView` below the spec; B-133/B-134 host bits | `value` | `structure.ts`, `types.ts` (`StructureValue`), `slots.ts` (accessors, lines 201–656) | partial — `structure.ts` is the unit; its accessor surface is still inside `slots.ts` |
+| 8 | **`structure`** | SC-5 one composite; D46; IC-1 roles by field presence; IC-2/D48(a) entry sequence with `SlotView` below the spec; B-133/B-134 host bits | `value` | `structure.ts`, `slot-accessors.ts` (the D39 slot registry and typed accessors), `types.ts` (`StructureValue`) | partial — the representation and its accessor surface are in place; `StructureValue` still sits in `types.ts` |
 | 9 | **`kinds`** | the closed set per build (SC-1); the walkers | 2–8 | `types.ts` (`Value`, `withMeta` arms, `isResolved`), the ten walker switches (§3.2) | owed |
-| 10 | **`metadata`** | D48(b)(c) slot and construction; R3 non-interference; SC-7 propagation vocabulary; D39 field registry as code; the propagation table | `kinds` | `slots.ts` (registry 28–200, fields 792–917, table 917–), `types.ts` (`withMeta`, `Metadata`), `evaluator.ts` (`viralScan`, `mergeOverMeta`) | owed |
-| 11 | **`capability`** | R12 authority is a capability; D21 constructor brand; D23 free reads; D24 attenuation by wrapping; `installFieldMerge` (the one layer→base instance) | `metadata`, `primitive-function` | `slots.ts` 656–792, `primitives.ts` "Channel plane" 495–563 | owed |
+| 10 | **`metadata`** | D48(b)(c) slot and construction; R3 non-interference; SC-7 propagation vocabulary; D39 field registry as code; the propagation table | `kinds` | `metadata.ts` (field registry, propagation vocabulary, free reads, carry idioms, merge table), `types.ts` (`withMeta`, `Metadata`), `evaluator.ts` (`viralScan`, `mergeOverMeta`) | partial — `metadata.ts` is the unit; `withMeta` and the two evaluator helpers are still elsewhere |
+| 11 | **`capability`** | R12 authority is a capability; D21 constructor brand; D23 free reads; D24 attenuation by wrapping; `installFieldMerge` (the one layer→base instance) | `metadata`, `primitive-function` | `capability.ts` (writers, registration, the gated `installFieldMerge`, the base's own fields), `primitives.ts` "Channel plane" 495–563 | partial — `capability.ts` is the unit; the Allegro-facing channel primitives are still in `primitives.ts` |
 | 12 | **`scope`** | D49 scope is not a value; IC-5 parent chain; the facts plane as opaque payload; future cells as bindings (D33) | `structure`, `symbol`, `metadata` | `scope.ts` (+ shares `Structure`) | owed → **B-136** executes it |
 | 13 | **`evaluator`** | R2 PE as the mechanism; R4 totality; PE Rule 1 and Rule 2; application and substitution; TCO; the D22 carve-out for scope; **the four B-112 hooks as its install surface** | `scope`, `expression`, `composed-function`, `primitive-function`, `param`, `symbol`, `metadata`, `capability` | `evaluator.ts` minus `checkArgType`, `PRIM_TO_METHOD`, `precompileFunction`'s type inference | owed → **B-112** executes it |
 | 14 | **`futures`** | R10 resumable evaluation; D33 future cells; the completion cascade; B-114's confluence question | `evaluator`, `scope` | `futures.ts`, `runtime.ts` (`DependencyRegistry`, `applyPhase`), `primitives.ts` async 1116–1197 | owed |
@@ -309,9 +309,10 @@ lands through B-136 (its owner), because
 - **Metadata does not depend on any kind.** It depends on `kinds` — the
   assembly — for the ops table, and on nothing in particular.
 - **`refinements` and `effects` are L0-clean today.** Both import only
-  `slots.ts` and `types.ts`. They sit *below* `type-core`, which uses
-  them. That reverses the intuition that the type system is the root of
-  L2.
+  `metadata`, `capability` and `types.ts`; `refinements` also imports
+  `scope`, to install the facts merge. They sit *below* `type-core`,
+  which uses them. That reverses the intuition that the type system is
+  the root of L2.
 - **The grammar engine depends on nothing of Allegretto.** It is a value
   parser; what makes it L1 is `tree-builder`.
 - **Every L2 unit reaches L0 through `metadata` and `capability`**, never
@@ -369,11 +370,13 @@ backlog owner's or a ruling's.
   an evaluation step, or substitution belongs in `composed-function`
   (where `subst` is a per-kind operation). Investigate on the move;
   likely the second.
-- **M5 — `slots.ts` is three units.** The actor model names it a pure
-  interface actor of the Engine. It is three interfaces: the structure
-  accessors (8), the field registry and propagation table (10), and the
-  capability mechanism (11). The split is the first move §7 schedules,
-  because it unblocks three units at once.
+- **M5 — `slots.ts` was three units.** Closed by B-112 chunk C1. The
+  actor model named it a pure interface actor of the Engine; it was three
+  interfaces, now three files: `slot-accessors.ts` (8, the structure
+  accessors), `metadata.ts` (10, the field registry and propagation
+  table) and `capability.ts` (11, the capability mechanism). The storage
+  lint's accessor layer is `structure.ts`, `slot-accessors.ts` and
+  `metadata.ts`.
 - **M6 — `primitives.ts` is six units.** 15, part of 19, 27, 29, 32, and
   the async part of 14. Split per section; the section comments already
   mark the boundaries.
@@ -399,17 +402,20 @@ backlog owner's or a ruling's.
   system — inside the Engine's unit. B-112's four hooks are exactly this
   boundary. This is the strongest alignment the two models produce, and
   the reason this document precedes B-112 chunk 1.
-- **M12 — `scope` imports `refinements`.** Found by the report, not by
-  reading: `scopeFactsFor` merges predicate sets along the chain with
-  `mergePredicateSets`, so L0's scope knows how to combine L2 knowledge.
-  The L0 README says fact payloads are opaque to base ops; this edge says
-  they are not. It is the facts-plane instance of P3 (decide → hook, carry
-  → handle): the layer installs the merge, the scope applies it — the same
-  shape as `installFieldMerge`. Owner: the hook family of B-112, or
-  B-146 (knowledge propagation)
-  (knowledge propagation) if the hooks are ruled too narrow. Until then
-  the edge is in B-149's baseline as a known violation, not an accepted
-  one.
+- **M12 — `scope` imported `refinements`.** Closed by B-112 chunk C1.
+  Found by the report, not by reading: `scopeFactsFor` merged predicate
+  sets along the chain with `mergePredicateSets`, so L0's scope knew how
+  to combine L2 knowledge, while the L0 README says fact payloads are
+  opaque to base ops. It was the facts-plane instance of P3 (decide →
+  hook, carry → handle), and that is how it closed: `scope.ts` exposes
+  `installFactsMerge`, gated on the `predicates` writer exactly as
+  `installFieldMerge` is gated (P4); `refinements.ts` installs
+  `mergePredicateSets` through it; `scopeFactsFor` returns an opaque
+  fact and applies the installed merge. The edge now runs the permitted
+  way, `refinements` → `scope`. One deviation stands: a fact is a host
+  `PredicateSet`, not an encoded Value, so the facts merge is a second
+  function beside the `predicates` field's Value-merge. B-146 (knowledge
+  propagation) decides whether the two become one.
 - **M13 — L1 grammar units build typed values.** `builder.ts`,
   `to-allegro.ts` and `grammar-ext.ts` import `makeArray`, `makeObject`,
   `withType`, `StringType`, `IntType`, `ErrorType` and `noneSingleton`
@@ -430,7 +436,7 @@ remains.
 
 | Move | Carried by | Produces |
 |---|---|---|
-| `slots.ts` → 8 / 10 / 11 (M5) | the first chunk that edits `slots.ts` after this lands; B-112 chunk 1 is the likely one | three units in place; `plane-lint`'s accessor layer becomes unit 8's files |
+| `slots.ts` → 8 / 10 / 11 (M5) | **done** — B-112 chunk C1 | `slot-accessors.ts`, `metadata.ts`, `capability.ts`; `plane-lint`'s accessor layer names the first two |
 | `evaluator.ts` → 13 (M11) | **B-112** | the done-condition in §5 |
 | `scope.ts` → 12 | **B-136** | D49 executed |
 | `types.ts` → 1–9 (§3) | the first chunk that edits the `Value` union, or B-136 if it comes first | the contract, seven kinds, the assembly, metadata's mixin |
@@ -464,21 +470,22 @@ files as the owed splits; and counts direct `.kind ===` comparisons
 outside the units the discriminator rule allows. Baselines are committed
 when B-149 lands; until then the command reports and does not fail.
 
-Day one (2026-10-14, at this document's landing):
+At 2026-10-21 (after B-112 chunk C1, the `slots.ts` split):
 
-    import edges between assigned files   142
-      ok                                   26
-      violation                             1   scope → refinements (M12)
-      unresolved                          115   one end is a mixed file
-    mixed files (owed splits)               7   types, slots, evaluator,
-                                                primitives, runtime,
-                                                modules, types-std
-    discriminator rule                    434   outside allowed units;
+    import edges between assigned files   162
+      ok                                   51
+      violation                             0
+      unresolved                          111   one end is a mixed file
+    mixed files (owed splits)               6   types, evaluator, primitives,
+                                                runtime, modules, types-std
+    discriminator rule                    437   outside allowed units;
                                                 155 primitives, 145 types-std,
                                                 64 totality, 19 introspect, …
 
-The 115 unresolved edges are the real measure of the work owed: each
-becomes a verdict when its mixed end splits.
+The 111 unresolved edges are the real measure of the work owed: each
+becomes a verdict when its mixed end splits. The split raised the edge
+count because one file's internal references became imports between
+three; that is the count becoming visible, not growing.
 
 ## 9. What this document is not
 

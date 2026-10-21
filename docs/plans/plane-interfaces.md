@@ -457,7 +457,7 @@ branches on what kind of member descriptor it found, which is L2's
 representation crossing the boundary as a shared shape. Hook (a) does not
 remove them; P6 does, and P6's answer is M9. Filed inside B-145.
 
-## 9. Chunks (proposed 2026-10, awaiting ratification)
+## 9. Chunks (ratified 2026-10-21 with the plan as a whole)
 
 Each chunk lands one hook and moves its callers, plus the unit move the
 hook makes natural (`units.md` §7: a move rides the chunk that touches its
@@ -466,7 +466,7 @@ because three units and the facts merge all wait on it.
 
 | # | Chunk | Hook | Unit moves (`units.json` edits) | Exit measured by |
 |---|---|---|---|---|
-| **C1** | Split `slots.ts` three ways (`units.md` M5): structure accessors to `structure`; field registry and propagation table to `metadata`; writer capabilities and `installFieldMerge` to `capability`. Gate `installFieldMerge` (P4) while it moves. Register the `predicates` merge from `refinements.ts`; `scopeFactsFor` reads it; `scopeAssume` takes `Map<string, unknown>` | (e) via (d)'s form | `src/slots.ts` leaves the mixed list; the plane lint's accessor layer becomes the `structure` unit's files; the `scope → refinements` violation is gone | `units`: 6 mixed files, 0 violations; plane lint green |
+| **C1** ✅ **landed 2026-10-21** | Split `slots.ts` three ways (`units.md` M5): structure accessors to `structure` (`src/slot-accessors.ts`); field registry and propagation table to `metadata` (`src/metadata.ts`); writer capabilities and `installFieldMerge` to `capability` (`src/capability.ts`). Gate `installFieldMerge` (P4) while it moves. Register the `predicates` merge from `refinements.ts`; `scopeFactsFor` reads it; `scopeAssume` takes `Map<string, unknown>` | (e) via (d)'s form | `src/slots.ts` leaves the mixed list; the plane lint's accessor layer becomes the `structure` unit's files; the `scope → refinements` violation is gone | `units`: 6 mixed files, 0 violations; plane lint green — **met**; see §9.3 for the two deviations |
 | **C2** | Check hook: `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)`; `type-core`, `refinements` and `effects` install theirs | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` finds no caller outside the installers; the uninstalled-check test fails loudly |
 | **C3** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b) | (a) | `evaluator.ts` loses `normalizeType` and the member family | `refs PRIM_TO_METHOD` finds nothing in the evaluator |
 | **C4** | Projection hook: `typeShape` leaves the `metadata` unit and is installed by `type-core` | (c) | the `metadata` unit holds no refinement-chain reading | `refs typeShape` finds the installer only |
@@ -504,6 +504,37 @@ the B-121 C2 survey (§5.7).
   the gate) lowered.
 - `docs/CHANGELOG.md` per chunk; this plan's status and its manifest row.
 
+### 9.3 C1 as landed, and its deviations
+
+C1 landed as the row says, with the plane lint's accessor layer set to
+`structure.ts`, `slot-accessors.ts` and `metadata.ts` (the metadata unit
+holds the free reads over `meta`, so it names the storage too). The
+`units` report after it: 162 edges, 51 ok, 0 violations, 111 unresolved,
+6 mixed files. Two deviations from the plan's words:
+
+1. **Hook (e)'s payload is a host object, not a Value.** A fact in the
+   scope's facts plane is a `PredicateSet`, the host class, not an
+   encoded Value as the `effects` field's payload is. So the facts merge
+   is a second function installed beside the `predicates` field's merge
+   (`installFactsMerge` in `src/scope.ts`, gated on the same writer the
+   same way), not the field merge read back through the propagation
+   table as "(e) via (d)'s form" implied. The gate is the plan's; the
+   table is not shared. B-146 (knowledge propagation) owns the question
+   of whether facts become Values, and with it whether the two merges
+   become one.
+2. **The uninstalled-merge error is not exercised by the suite.** §9.1
+   asks each hook for a test that removes the install and asserts the
+   error. The facts merge is installed once, at `refinements.ts` module
+   init, and a second install is refused by design, so there is no
+   runtime moment at which the suite can observe `scopeFactsFor` with two
+   layers and no merge. The suite asserts the two refusals instead
+   (foreign writer; second install). The error path is three lines and
+   reads as stated.
+
+Also found on the way: the committed `src/boundary-baseline.json` named
+rules the lint no longer has (`components-direct`); the regeneration
+corrected it, and every count fell or held.
+
 ## 10. Relationship to the unit DAG
 
 `units.md` is the specification of which code may import which. This plan
@@ -521,6 +552,10 @@ relationship runs both ways.
   below. That is recorded in `units.md` §4.2.
 
 ## 11. Change record
+
+**2026-10-21, C1 landed.** The plan ratified as a whole, ruling 2 taking
+option (a). §9's heading and C1 row updated; §9.3 added with the two
+deviations.
 
 **2026-10, rewrite for a new reader.** The maintainer's review found that
 the document assumed its reader had followed the conversation that

@@ -18,12 +18,13 @@ import { resolveSymbols, buildEvalCtx, resolvePrimitives, typeLiterals } from ".
 import { parse as g2parse } from "../grammar2/engine.js";
 import { getGrammarWithFragments as g2getGrammarWithFragments } from "../grammar2/fragments.js";
 import { getTypeName } from "../types-std.js";
-import { getName, metaOf, slotCount } from "../slots.js";
+import { getName, slotCount } from "../slot-accessors.js";
+import { metaOf } from "../metadata.js";
 import { testsDir } from "./alg-files.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as g2 from "../grammar2/types.js";
-import { indexGet } from "../slots.js";
+import { indexGet } from "../slot-accessors.js";
 
 // --- Phase 6 step 3: grammar { … } block parsing ---
 //

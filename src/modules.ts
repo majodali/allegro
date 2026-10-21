@@ -4,7 +4,8 @@
 // =============================================================================
 
 import { evalSource, Extension } from "./runtime.js";
-import { cloneMeta, setName, setFallbackMember, isBareBindingName, isFutureBindingName, metaOf, carryMeta} from "./slots.js";
+import { cloneMeta, metaOf, carryMeta } from "./metadata.js";
+import { setName, setFallbackMember, isBareBindingName, isFutureBindingName } from "./slot-accessors.js";
 import { remapParams } from "./evaluator.js";
 import { Value, ValueKind, StructureValue, BitsValue, ComposedFunctionValue, ParamValue, PrimitiveFnImpl, makePrimitive, makeStructure, makeExpr, withMeta, stringToBits, bitsToString, AllegroError} from "./types.js";
 import { withType } from "./types-std.js";

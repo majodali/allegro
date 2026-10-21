@@ -11,8 +11,9 @@
 // See docs/plans/crystal-proving-curry.md for the broader plan.
 // =============================================================================
 
-import { metaReadRaw, backingsOf } from "./slots.js";
-import type { LawBackingRec } from "./slots.js";
+import { metaReadRaw } from "./metadata.js";
+import { backingsOf } from "./slot-accessors.js";
+import type { LawBackingRec } from "./slot-accessors.js";
 import {
   Value, ValueKind, StructureValue, ComposedFunctionValue,
   BitsValue, PrimitiveFunctionValue, ParamValue,

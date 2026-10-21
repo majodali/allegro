@@ -23,8 +23,8 @@
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
 import type { StructureValue, BitsValue } from "./types.js";
-import { SLOT_KEYS, backingsOf } from "./slots.js";
-import type { LawBackingRec } from "./slots.js";
+import { SLOT_KEYS, backingsOf } from "./slot-accessors.js";
+import type { LawBackingRec } from "./slot-accessors.js";
 import { ValueKind, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
 import { lawObligationRecords, coercionObligationRecords } from "./types-std.js";
