@@ -4,6 +4,29 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — D52 Phase 1b: the book folder
+
+The chapters now live in `docs/book/`: the former `docs/design/` tree
+(the table of contents, the vocabulary, the spines, the study, the
+spine, and the five layer folders) plus the four top-level chapters
+(`grammar-formalism.md`, `proving-in-allegro.md`, `getting-started.md`,
+`language-reference.md`). The record `concepts-analyses.md` lives in
+`docs/records/`. Every old path carries a tombstone stub, so history
+(the changelog, closed plans) and external links keep resolving; the
+doc-ref lint is clean without rewriting a line of history.
+
+Current-intent pointers follow the move: `docs/reading-order.json`,
+CLAUDE.md, the decision and backlog registers, the census, the plans
+manifest and the active plans, source comments, and the PCP worker's
+primer loader (`pcp/llm-worker.ts` reads `docs/book/proving-in-allegro.md`).
+Moved with `git mv`, so blame and history are intact.
+
+**Tier-0 follow-up reported, not edited**: `docs/PROCESS.md` §1 and four
+prose sites say "`docs/design/` today", which is now false; the registry
+pointer in §6 names `docs/design/standard/type-system.md`, which resolves
+through its stub. One-line fixes for a signed-off PR. Suite green;
+typecheck clean.
+
 ## 2026-10 — D52 Phase 1a: Part I readable in order
 
 The readability pass over the book's Part I (`docs/reading-order.json`):

@@ -3,7 +3,7 @@
 > Status: **draft proposal** (awaiting maintainer sign-off, then submission
 > upstream to `majodali/methodology`)
 > Scope: a new methodology practice, not an Allegro-local convention.
-> Evidence: `docs/plans/concept-spine.md` §1 and `docs/design/concepts.md`.
+> Evidence: `docs/plans/concept-spine.md` §1 and `docs/book/concepts.md`.
 
 ## 1. What is being proposed
 
@@ -183,7 +183,7 @@ written as flowing argument cannot.
 2. **Does an unowned delta block a landing?** Suggestion: yes for entries the
    change touches, no globally — otherwise the first adoption blocks
    everything.
-3. **Where does the document live?** In the pilot, `docs/design/concepts.md`,
+3. **Where does the document live?** In the pilot, `docs/book/concepts.md`,
    registered as the read-this-first Tier-1 document.
 4. **Does the decision register absorb the implementation-choice register, or
    stay separate?** They overlap: a D-number records a ruling, an IC-number

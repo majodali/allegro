@@ -14,7 +14,7 @@
 > `docs/backlog.md` and `CLAUDE.md` "What's Next"), migrating to
 > `docs/CHANGELOG.md` per PROCESS.
 
-Layer/track tags per `docs/design/layers.md`. Chunk refs per
+Layer/track tags per `docs/book/layers.md`. Chunk refs per
 `docs/plans/structures-implementation.md`; register refs per
 `docs/backlog.md` §revalidation register.
 
@@ -37,7 +37,7 @@ Layer/track tags per `docs/design/layers.md`. Chunk refs per
 | Feature | Verdict | Notes |
 |---|---|---|
 | Grammar 2 formalism Phases 1–5 (engine, base grammar, analyzer, .alg analyzer port) | keep | Revalidate only primitive renames from the base-surface audit |
-| Runtime grammar extension Phases 1/6/6b/7 (`grammar {…}`, `use`, EBNF rules, hygiene, conflict codes) | keep | Decisions recorded in `docs/design/extension/grammar.md` §4; formalism sync registered |
+| Runtime grammar extension Phases 1/6/6b/7 (`grammar {…}`, `use`, EBNF rules, hygiene, conflict codes) | keep | Decisions recorded in `docs/book/extension/grammar.md` §4; formalism sync registered |
 | Earley parser retained for standalone grammars | keep | Retirement is a banded backlog item |
 | Lexer/hybrid-parser retirement (grammar2 cutover) | keep | Historical |
 | Module loader (resolution, caching, circular detection) + lib-loader pipeline unification | keep | Becomes the formalized L1 loading contract (`modules.md` planned) |

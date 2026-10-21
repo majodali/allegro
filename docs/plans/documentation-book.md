@@ -3,7 +3,7 @@
 > Status: **active** — Phase 0 approved and landed 2026-10; Phases 1 to 3
 > ride their owners. Owner: **D52** (the documentation book); backlog
 > **B-150** (the document lints join the gate).
-> Design docs touched: `docs/design/README.md` (now the table of
+> Design docs touched: `docs/book/README.md` (now the table of
 > contents), every definition site that gained a `def-` anchor.
 > Related: `docs/plans/documentation-standards-delta.md` §6.5 and §6.6
 > (the methodology additions this plan instantiates);
@@ -12,8 +12,8 @@
 ## 1. Context
 
 The reader of this plan is the maintainer and the agent sessions that will
-write chapters. It assumes `docs/design/architecture-vocabulary.md` (the
-six abstractions) and `docs/design/units.md` §2 (what a unit is).
+write chapters. It assumes `docs/book/architecture-vocabulary.md` (the
+six abstractions) and `docs/book/units.md` §2 (what a unit is).
 
 The census found fifty documents in uncertain reading order across several
 folders, most written as reports to a reader who had followed the
@@ -44,7 +44,7 @@ Agreed in discussion, 2026-10, and recorded as D52:
    fine; derivation of a register's status from the book is not.
 3. **The book carries no history, but it carries deltas.** It is `active`
    in the methodology's sense: contradictions found in it are corrected,
-   not marked; records (`docs/design/concepts-analyses.md` is the first)
+   not marked; records (`docs/records/concepts-analyses.md` is the first)
    and the changelog hold history. Each entry's *As implemented* and
    *Delta* rows are current state and stay in the book, so it never
    describes a target as if it were the code.
@@ -76,7 +76,7 @@ Agreed in discussion, 2026-10, and recorded as D52:
 
 | Phase | What | When | Done when |
 |---|---|---|---|
-| **0. Order and links** | `docs/reading-order.json` declares the order; `docs/design/README.md` is the table of contents in that order; every definition site carries a `def-` anchor; first uses elsewhere link to it; `scripts/doc-lint.ts` checks anchors, forward references and bare identifiers | **Landed 2026-10** | anchors resolve; order check reports zero forward references; the lints run |
+| **0. Order and links** | `docs/reading-order.json` declares the order; `docs/book/README.md` is the table of contents in that order; every definition site carries a `def-` anchor; first uses elsewhere link to it; `scripts/doc-lint.ts` checks anchors, forward references and bare identifiers | **Landed 2026-10** | anchors resolve; order check reports zero forward references; the lints run |
 | **1. Part I** | Assemble vision, process, requirements (Part 0 of the spine), vocabulary, layers and the DAG as the foundation chapters; link pass; tombstone stubs where paths move | After Phase 0, before B-112 C1. **Split 2026-10-21**: the link and readability pass landed first (1a); the folder move (1b) waits on a Tier-0 amendment, because `PROCESS.md` §1 names the paths of the Tier-0 and Tier-1 documents and relocating them contradicts a Tier-0 statement (PROCESS §2: surface, do not resolve) | Part I readable in order with no forward references |
 | **2. Part II, chapter by chapter** | Each unit band's chapter is written when its code moves (`units.md` §7): `metadata` and `capability` with the `slots.ts` split (B-112 C1); `evaluator` at B-112's exit; `scope` at B-136; the kinds with the `Value` split. A chapter takes definitions from the spine, reasoning from the area design note, examples from the `.alg` demos, and links to source and tests | In step with the unit moves | the spine's entries for that band live in the chapter; the manifest row has a `doc` |
 | **3. Rendering** | The book as HTML on the website: TOC, search, term links, executable examples, registers as appendices, links into source | Once Part I and the L0 chapters exist | the website loop (PROCESS §9) |
@@ -95,10 +95,14 @@ are data. Part I bare identifiers after the pass: zero outside the Tier-0
 documents, which are reported, not edited (`VISION.md` line 220 cites
 backlog IDs bare).
 
-**Phase 1b, the folder.** `docs/book/` cannot be created by moving the
-Tier-0 and Tier-1 documents until `PROCESS.md` §1 (the documentation map)
-stops naming their paths. A dedicated, flagged Tier-0 proposal carries
-that amendment; the moves and tombstones follow its merge.
+**Phase 1b, the folder, landed 2026-10-21** after the Tier-0 amendment
+(PR #75) made the reading order the authority on where Tier-1 documents
+live. `docs/book/` holds the former `docs/design/` tree and the four
+top-level chapters; `docs/records/` holds the record. Tombstone stubs
+stand at every old path. The two Tier-0 documents stay at `docs/`; the
+reading order points at them. Open from the Tier-0 PR's questions:
+whether the constitution moves into the book, the R3′ naming exception,
+and `VISION.md` line 220.
 
 ### 4.1 The term-anchor convention (Phase 0)
 
@@ -139,7 +143,7 @@ already pins by `// expect:` comments.
 
 ## 6. Documents to update on landing
 
-- Phase 0: this plan; `docs/design/README.md`; D52; B-150;
+- Phase 0: this plan; `docs/book/README.md`; D52; B-150;
   `docs/plans/documentation-standards-delta.md` §6.5 and §6.6; CHANGELOG;
   CLAUDE.md commands and pointer.
 - Phase 1: `docs/reading-order.json` rows gain `doc` values; tombstones;

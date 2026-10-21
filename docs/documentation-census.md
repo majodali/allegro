@@ -77,33 +77,33 @@ Approximate bare-identifier counts are in the findings as "~N bare IDs".
 | `docs/CHANGELOG.md` | Register | maintainer, agents | Tier 2 | n/a | 5,698 lines of landing reports kept as entries; 121 em-dash headers; ~208 bare IDs. Entries are reports (W-008 shape), not rows. The style guide exempts a register kept as history entry-by-entry when its header says so; the header does not. | 3 |
 | `docs/audits.md` | Register | auditors | Tier 2 | n/a | None. | 4 |
 | `docs/plans/README.md` | Register (manifest) | agents | Tier 2 | n/a | Rows of 60 to 150 words; 51% long sentences; ~61 bare IDs. Status vocabulary inconsistent across rows: `closed`, `closed → B-120`, `COMPLETE`, `draft proposal`, `approved and applied`, against K-007's four transitions. | 2 |
-| `docs/design/README.md` | Register (index) | agents | Tier 1 | n/a | Status convention defined here is used by 9 of 20 design documents. | 3 |
+| `docs/book/README.md` | Register (index) | agents | Tier 1 | n/a | Status convention defined here is used by 9 of 20 design documents. | 3 |
 
 ### 2.3 Design documents
 
 | Document | Type | Reader | Authority | Promoted | Findings | Priority |
 |---|---|---|---|---|---|---|
-| `docs/design/concepts.md` | Conceptual model | learner | Tier 1 | partly | Part 0 **revised 2026-10-20**: the analysis passes moved verbatim to `concepts-analyses.md`; every R, SC and IC entry now has the four-part shape; §1.0 states the status of all twenty requirement IDs in one table; SC-6 marked superseded by D49; SC-7 and SC-8 entered as proposed specification items. Remaining: the requirement set is still unratified as a set (an ask, not a defect); T0 to T5 entries keep their ~80 bare IDs and em-dash headers; 2,694 lines. | 2 |
-| `docs/design/concepts-analyses.md` | Record | reader wanting the argument | Tier 1 (history) | n/a | New 2026-10-20; the first instance of the record type the standards proposal §6.2 asks for. Header declares it history, which exempts it from supersession marking entry by entry. | 4 |
-| `docs/design/architecture-vocabulary.md` | Vocabulary | design-doc reader | Tier 1 | yes | None found. Reviewed by the maintainer 2026-10. | 4 |
-| `docs/design/layers.md` | Spine | code locator | Tier 1 | partly (2026-10-21) | Reader statement added; identifiers named. Remaining: milestone table mixes status prose into cells. | 3 |
-| `docs/design/implementation-map.md` | Spine (map) | code locator | Tier 1 | n/a | Register-shaped; reader statement added 2026-10-21. | 4 |
-| `docs/design/units.md` | Spine | code locator | Tier 1 | **yes (2026-10-21)** | Reader statement and terms added; §1 restated as requirement, challenge, approach; every first-use identifier named. Remaining: six em-dash headers. | 4 |
-| `docs/design/actors-and-activities.md` | Study | maintainer | Tier 1 (draft) | no | Correctly labelled a draft exercise. Mixes a model proposal (§3), an inventory (§4, §5a), worked crossings (§5) and findings (§6). Identifiers named 2026-10-21. Fine for a study; if adopted, the model part becomes a design note and the rest a record. | 3 |
-| `docs/design/allegretto/README.md` | Boundary contract | layer changer | Tier 1 | n/a | Clean. Its invariant "fact payloads opaque to base ops" is false today (`units.md` M12); fixed by B-112 C1. | 3 |
-| `docs/design/allegretto/structures.md` | Area design note | area changer | Tier 1 | no | 1,367 lines; ~82 bare IDs; 27% long sentences; title says "design decisions" but the body is the v2 design plus three appendices of executed tables. Status tags present. | 2 |
-| `docs/design/extension/README.md` | Boundary contract | layer changer | Tier 1 | n/a | Clean. | 4 |
-| `docs/design/extension/grammar.md` | Area design note | area changer | Tier 1 | no | Short; defers to `grammar-formalism.md`. | 4 |
-| `docs/design/extension/modules.md` | Area design note | area changer | Tier 1 | no | ~6 bare IDs; otherwise clean. | 4 |
-| `docs/design/standard/README.md` | Boundary contract | layer changer | Tier 1 | n/a | ~9 bare IDs in a 54-line contract. | 3 |
-| `docs/design/standard/contracts.md` | Area design note | area changer | Tier 1 | no | ~22 bare IDs; CT-R rulings cited by ID. | 3 |
-| `docs/design/standard/core-types.md` | Area design note | area changer | Tier 1 | n/a | Roster; clean. | 4 |
-| `docs/design/standard/effects.md` | Area design note | area changer | Tier 1 | no | ~7 bare IDs. | 3 |
-| `docs/design/standard/pattern-matching.md` | Area design note | area changer | Tier 1 | no | Clean; short. | 4 |
-| `docs/design/standard/totality.md` | Area design note | area changer | Tier 1 | no | ~19 bare IDs; T-R rulings by ID. | 3 |
-| `docs/design/standard/type-system.md` | Area design note | area changer | Tier 1 | no | ~20 bare IDs. Holds the meta-property registry (§4) that CLAUDE.md cites as an invariant. | 2 |
-| `docs/design/platform/README.md` | Boundary contract | track reader | Tier 1 | n/a | Placeholder listing planned documents; ~5 bare IDs. | 4 |
-| `docs/design/vivace/README.md` | Boundary contract | layer changer | Tier 1 | n/a | Placeholder; clean. | 4 |
+| `docs/book/concepts.md` | Conceptual model | learner | Tier 1 | partly | Part 0 **revised 2026-10-20**: the analysis passes moved verbatim to `concepts-analyses.md`; every R, SC and IC entry now has the four-part shape; §1.0 states the status of all twenty requirement IDs in one table; SC-6 marked superseded by D49; SC-7 and SC-8 entered as proposed specification items. Remaining: the requirement set is still unratified as a set (an ask, not a defect); T0 to T5 entries keep their ~80 bare IDs and em-dash headers; 2,694 lines. | 2 |
+| `docs/records/concepts-analyses.md` | Record | reader wanting the argument | Tier 1 (history) | n/a | New 2026-10-20; the first instance of the record type the standards proposal §6.2 asks for. Header declares it history, which exempts it from supersession marking entry by entry. | 4 |
+| `docs/book/architecture-vocabulary.md` | Vocabulary | design-doc reader | Tier 1 | yes | None found. Reviewed by the maintainer 2026-10. | 4 |
+| `docs/book/layers.md` | Spine | code locator | Tier 1 | partly (2026-10-21) | Reader statement added; identifiers named. Remaining: milestone table mixes status prose into cells. | 3 |
+| `docs/book/implementation-map.md` | Spine (map) | code locator | Tier 1 | n/a | Register-shaped; reader statement added 2026-10-21. | 4 |
+| `docs/book/units.md` | Spine | code locator | Tier 1 | **yes (2026-10-21)** | Reader statement and terms added; §1 restated as requirement, challenge, approach; every first-use identifier named. Remaining: six em-dash headers. | 4 |
+| `docs/book/actors-and-activities.md` | Study | maintainer | Tier 1 (draft) | no | Correctly labelled a draft exercise. Mixes a model proposal (§3), an inventory (§4, §5a), worked crossings (§5) and findings (§6). Identifiers named 2026-10-21. Fine for a study; if adopted, the model part becomes a design note and the rest a record. | 3 |
+| `docs/book/allegretto/README.md` | Boundary contract | layer changer | Tier 1 | n/a | Clean. Its invariant "fact payloads opaque to base ops" is false today (`units.md` M12); fixed by B-112 C1. | 3 |
+| `docs/book/allegretto/structures.md` | Area design note | area changer | Tier 1 | no | 1,367 lines; ~82 bare IDs; 27% long sentences; title says "design decisions" but the body is the v2 design plus three appendices of executed tables. Status tags present. | 2 |
+| `docs/book/extension/README.md` | Boundary contract | layer changer | Tier 1 | n/a | Clean. | 4 |
+| `docs/book/extension/grammar.md` | Area design note | area changer | Tier 1 | no | Short; defers to `grammar-formalism.md`. | 4 |
+| `docs/book/extension/modules.md` | Area design note | area changer | Tier 1 | no | ~6 bare IDs; otherwise clean. | 4 |
+| `docs/book/standard/README.md` | Boundary contract | layer changer | Tier 1 | n/a | ~9 bare IDs in a 54-line contract. | 3 |
+| `docs/book/standard/contracts.md` | Area design note | area changer | Tier 1 | no | ~22 bare IDs; CT-R rulings cited by ID. | 3 |
+| `docs/book/standard/core-types.md` | Area design note | area changer | Tier 1 | n/a | Roster; clean. | 4 |
+| `docs/book/standard/effects.md` | Area design note | area changer | Tier 1 | no | ~7 bare IDs. | 3 |
+| `docs/book/standard/pattern-matching.md` | Area design note | area changer | Tier 1 | no | Clean; short. | 4 |
+| `docs/book/standard/totality.md` | Area design note | area changer | Tier 1 | no | ~19 bare IDs; T-R rulings by ID. | 3 |
+| `docs/book/standard/type-system.md` | Area design note | area changer | Tier 1 | no | ~20 bare IDs. Holds the meta-property registry (§4) that CLAUDE.md cites as an invariant. | 2 |
+| `docs/book/platform/README.md` | Boundary contract | track reader | Tier 1 | n/a | Placeholder listing planned documents; ~5 bare IDs. | 4 |
+| `docs/book/vivace/README.md` | Boundary contract | layer changer | Tier 1 | n/a | Placeholder; clean. | 4 |
 
 ### 2.4 Plans
 
@@ -137,10 +137,10 @@ archive is where records live.
 
 | Document | Type | Reader | Authority | Promoted | Findings | Priority |
 |---|---|---|---|---|---|---|
-| `docs/getting-started.md` | Consumable (tutorial) | language user | Tier 2 | n/a | Clean. | 4 |
-| `docs/language-reference.md` | Consumable (reference) | language user | Tier 2 | n/a | Decision and backlog IDs removed from the user-facing comments 2026-10-21. | 4 |
-| `docs/proving-in-allegro.md` | Consumable (explanation) | language user, LLM worker | Tier 2 | n/a | Clean; loaded at runtime by the PCP worker. | 4 |
-| `docs/grammar-formalism.md` | Specification | implementer | Tier 2 | no | Stale status "Draft for review. Not implemented" and a §6.4 bullet saying "Phase 1 in progress": **fixed 2026-10-19**; the header now names the implementation, what replaced what, and the four open gaps per `docs/design/extension/grammar.md` §3. Remaining: no reader statement; 1,014 lines; the shipped error and warning codes are not yet synced into §6 and §7 (tracked in the backlog's revalidation register). | 3 |
+| `docs/book/getting-started.md` | Consumable (tutorial) | language user | Tier 2 | n/a | Clean. | 4 |
+| `docs/book/language-reference.md` | Consumable (reference) | language user | Tier 2 | n/a | Decision and backlog IDs removed from the user-facing comments 2026-10-21. | 4 |
+| `docs/book/proving-in-allegro.md` | Consumable (explanation) | language user, LLM worker | Tier 2 | n/a | Clean; loaded at runtime by the PCP worker. | 4 |
+| `docs/book/grammar-formalism.md` | Specification | implementer | Tier 2 | no | Stale status "Draft for review. Not implemented" and a §6.4 bullet saying "Phase 1 in progress": **fixed 2026-10-19**; the header now names the implementation, what replaced what, and the four open gaps per `docs/book/extension/grammar.md` §3. Remaining: no reader statement; 1,014 lines; the shipped error and warning codes are not yet synced into §6 and §7 (tracked in the backlog's revalidation register). | 3 |
 | `docs/messaging.md` | Consumable (copy source) | website author | Tier 2 | n/a | Clean; has a reader statement. | 4 |
 
 ## 3. Findings by class

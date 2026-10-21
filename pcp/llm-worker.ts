@@ -22,7 +22,7 @@
 //   - Orchestration: `runLlmWorker(...)` ties them together.
 //
 // Output contract from the LLM is documented in
-// `docs/proving-in-allegro.md` (the participant-neutral primer): one
+// `docs/book/proving-in-allegro.md` (the participant-neutral primer): one
 // fenced ```allegro code block per pending obligation, containing
 // ONLY the proof term (no `theorem` declaration, no `by` keyword).
 // The worker splices each term into the corresponding theorem's `by`
@@ -391,13 +391,13 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
   };
 }
 
-/** Load the participant-neutral primer from `docs/proving-in-allegro.md`
+/** Load the participant-neutral primer from `docs/book/proving-in-allegro.md`
  *  — same text humans read, same text the LLM gets in its system prompt.
  *  Looks up relative to the cwd or an explicit repo root. */
 export function loadPrimer(repoRoot?: string): string {
   const candidates = [
-    repoRoot && path.join(repoRoot, "docs", "proving-in-allegro.md"),
-    path.join(process.cwd(), "docs", "proving-in-allegro.md"),
+    repoRoot && path.join(repoRoot, "docs", "book", "proving-in-allegro.md"),
+    path.join(process.cwd(), "docs", "book", "proving-in-allegro.md"),
   ].filter(Boolean) as string[];
   for (const c of candidates) {
     if (fs.existsSync(c)) return fs.readFileSync(c, "utf-8");

@@ -4,7 +4,7 @@
 > (Phases 0–7 + chunk C7.2 landed; M1 exited 2026-08 — see
 > `docs/CHANGELOG.md`). Kept as the chunk record (§4) and
 > conscious-delta log (§6) until content promotion.
-> Design: `docs/design/allegretto/structures.md` (decision log D1–D46,
+> Design: `docs/book/allegretto/structures.md` (decision log D1–D46,
 > archived: `archive/structured-values-unification.md`).
 > Related backlog: items B-001…B-031 (sequenced head) mirror this plan's
 > phases; absorbed items noted in §7.
@@ -295,7 +295,7 @@ condition changes.
 
 ## 2. Settled decisions
 
-All in `docs/design/allegretto/structures.md`; not re-litigated here. The plan-relevant
+All in `docs/book/allegretto/structures.md`; not re-litigated here. The plan-relevant
 ones:
 
 - **Sequencing** (I2): accessor layer + slot registry first (valuable
@@ -774,12 +774,12 @@ carry over as-is. The rebuilt BACKLOG mirrors this plan's phases as its
 
 ## 8. Doc-update checklist
 
-- `docs/design/allegretto/structures.md`: status tags flip per section as phases land
+- `docs/book/allegretto/structures.md`: status tags flip per section as phases land
   ([designed] → [partial] → [implemented]); deviations recorded same-commit.
-- `docs/design/standard/type-system.md`: meta-property registry updated per C1.1
+- `docs/book/standard/type-system.md`: meta-property registry updated per C1.1
   (the registry module becomes its implementation); shape/knowledge section
   after Phase 3; kind recipe after Phase 6.
-- `docs/design/standard/effects.md`: effect-channel + Effect-re-derivation deltas
+- `docs/book/standard/effects.md`: effect-channel + Effect-re-derivation deltas
   (C1.5, C6.2).
 - `docs/CHANGELOG.md`: entry per chunk. `docs/backlog.md`: rebuilt on plan
   approval, then ticked per chunk.

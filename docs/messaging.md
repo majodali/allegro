@@ -122,5 +122,5 @@ them before we do or we lose them.
 - `website/index.html` — hero + intro rebuilt on this skeleton; laws +
   prover-loop sections added; refinement syntax updated to `&`.
 - `demos/` — rung-1 runnable scripts + transcripts (this package).
-- `docs/proving-in-allegro.md` — audited as the public primer.
+- `docs/book/proving-in-allegro.md` — audited as the public primer.
 - README / getting-started — next slice (B-091 step 4–5).

@@ -2,7 +2,7 @@
 // Allegro Grammar 2 — Types
 //
 // Type definitions for the Phase 0 grammar formalism. See
-// docs/grammar-formalism.md for the spec.
+// docs/book/grammar-formalism.md for the spec.
 //
 // Everything here is structural — these TS types mirror the shape of the
 // Allegro Context values that users will work with. Primitives in builder.ts

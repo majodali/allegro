@@ -482,7 +482,7 @@ function matchTerminal(state: ParseState, rule: Terminal, pos: number): MatchRes
 
 // --- Indent directives ---
 //
-// Semantics (per docs/grammar-formalism.md §5, with concrete pos-consumption
+// Semantics (per docs/book/grammar-formalism.md §5, with concrete pos-consumption
 // rules):
 //
 //   NEWLINE : at \n; consumes \n + horizontal ws + any blank lines. Succeeds
