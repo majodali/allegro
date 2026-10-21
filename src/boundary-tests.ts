@@ -139,7 +139,7 @@ const LINT_PATTERNS: LintPattern[] = [
   { name: "retired-peel-call", regex: /\b(?:primaryOf|dataOf)\s*\(/g },
   // C1.4: TS-kernel writer acquisition is restricted to the two proof-kernel
   // modules — anywhere else, acquiring the discharged writer fails the suite.
-  { name: "kernel-writer-acquisition", regex: /\bkernelChannelWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
+  { name: "kernel-writer-acquisition", regex: /\bkernelFieldWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
   // C2.2: fact payloads are opaque outside the scope module — reads via
   // scopeFactsFor, layer pushes via scopeAssume, own-layer writes via
   // scopeOwnFacts. Direct .scopePredicates access anywhere else fails.

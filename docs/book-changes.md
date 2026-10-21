@@ -16,6 +16,7 @@
 
 | Date | Kind | Subject | From → to | Pointer |
 |---|---|---|---|---|
+| 2026-10-21 | move | the definition sites of *metadata field*, *channel*, *propagation* and *writer capability* | `docs/book/concepts.md` §19, §19b, §20, §21 (anchors `def-metadata-field`, `def-channel`, `def-propagation`, `def-writer-capability`) → `docs/book/allegretto/metadata-and-capability.md` §3 to §6, the same anchors; the spine keeps the four numbered headings as pointers | PR (the chapter) |
 | 2026-10-21 | move | the constitution | `docs/VISION.md`, `docs/PROCESS.md` → `docs/book/vision.md`, `docs/book/process.md` (chapters I.4, I.5); stubs at the old paths | PR #78 |
 | 2026-10-21 | rename | requirement R3′ | R3′ (the merged metadata requirement's working name since 2026-08) → **R3**; anchor `def-r3-prime` → `def-r3`. Rule: `docs/book/process.md` §6, flat numbering, never primes | PR #79 |
 | 2026-10-21 | remove | requirement IDs R5, R11, R13, R15 from Part 0 §1.0 | listed as merged or withdrawn → no longer listed; **free for reuse** | PR #79; this log holds what they were (rows below) |

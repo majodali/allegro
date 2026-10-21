@@ -4,6 +4,39 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — The book's first Part II chapter: `allegretto/metadata-and-capability.md` (units 10 and 11)
+
+D52 Phase 2 begins with the band whose code moved at B-112 C1. The
+chapter is the design truth for the `metadata` and `capability` units:
+the metadata plane on every value, the field registry and who registers
+what (a twelve-row table pinned by the "field ownership" boundary test),
+channels as a set of fields plus the module that owns them, the
+propagation vocabulary and the two evaluator paths that apply it, writer
+capabilities with the four surfaces that mint or guard them and the
+forgery scenarios A to G that pin them, the two gated installs
+(`installFieldMerge`, `installFactsMerge`), and the base's own `source`
+and `error` fields. Every section carries a status tag and a current
+delta with an owner (B-111 for the three ownerless registrations, B-112
+for the projection and the two propagation paths, B-146 for the facts
+merge, and `positional` as vocabulary without a path).
+
+The four definition sites moved out of the spine: `concepts.md` §19,
+§19b, §20 and §21 are pointers now and the anchors `def-metadata-field`,
+`def-channel`, `def-propagation` and `def-writer-capability` live in the
+chapter (`docs/book-changes.md` row). The spine's stale identifiers from
+the channel-era naming (`channelReadRaw`, `registerChannel`,
+`installChannelMerge` and six more) are renamed to the code's; R3, R12
+and SC-7 carry current deltas; §24's name-list warning is closed.
+Examples are `tests/metadata-channels-demo.alg`, a new suite-pinned demo
+registered in `src/test/language.ts` (registration, free reads,
+attenuation, same-pass re-registration, viral and drop propagation).
+Found on the way: the boundary lint's `kernel-writer-acquisition` rule
+still named `kernelChannelWriter`, so the kernel-only acquisition
+discipline was unenforced since the rename; it names `kernelFieldWriter`
+now, with the same two excluded files and no hits outside them. Reading
+order, TOC (II.4), `units.md` rows 10 and 11, census, book plan and
+manifest updated. Suite 1203 distinct tests.
+
 ## 2026-10 — B-112 C1: `slots.ts` split three ways; merge installation is capability-gated; the scope's facts plane is opaque
 
 First chunk of the ratified plane-interfaces plan
