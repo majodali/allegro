@@ -4,7 +4,8 @@
 // =============================================================================
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
-import { metaReadRaw, cloneMeta, hasShapeSlot, getName, renameInPlace, bumpMetaEpoch, isBareBindingName, isFutureBindingName, withSource, carryMeta} from "./slots.js";
+import { metaReadRaw, cloneMeta, hasShapeSlot, bumpMetaEpoch, withSource, carryMeta } from "./metadata.js";
+import { getName, renameInPlace, isBareBindingName, isFutureBindingName } from "./slot-accessors.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";

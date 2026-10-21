@@ -8,11 +8,11 @@
 import { test, eq, throws } from "./harness.js";
 import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
-import { sourceOf as _sourceOf, withSource as _withSource, metaOf as _metaViewD47 } from "../slots.js";
+import { sourceOf as _sourceOf, withSource as _withSource, metaOf as _metaViewD47 } from "../metadata.js";
 import { renderExprSource } from "../primitives.js";
 import { BitsValue, bitsToString, Value, makePrimitive } from "../types.js";
 import { getTypeName, protocolEqualsBool, KERNEL_EQUALS_CERTIFICATE, coercionObligationRecords, lawObligationRecords, typeMemberDescriptor, EquatableType, isLawDescriptor, isFieldDescriptor } from "../types-std.js";
-import { metaReadRaw } from "../slots.js";
+import { metaReadRaw } from "../metadata.js";
 import { buildVerdict, extractObligations, formatVerdict } from "../pcp.js";
 import { renderModuleSummary, summarizeModule } from "../introspect.js";
 import { effectsOf } from "../effects.js";

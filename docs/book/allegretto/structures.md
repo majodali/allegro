@@ -65,7 +65,7 @@ contexts store elements in a plain JS array as the SOLE storage (no
 per-element Bindings, no string keys; count = dense.length); the legacy
 bindings view materializes lazily for stragglers (W6 asserts coherence;
 slot probes answer dense structures without materializing); element
-access via slots.ts `indexGet`/`elementsOf`, O(1) by scaling test.
+access via `slot-accessors.ts` `indexGet`/`elementsOf`, O(1) by scaling test.
 C4.1 details: every MultiValue and Context
 is an instance of one host class (`src/structure.ts`), constructed
 exclusively through the `withMetadata`/`makeStructure` factory shims
@@ -179,7 +179,7 @@ DELETED (it is now everyone's default) and the D3 lazy/eager
 arg-asymmetry is gone: `lazy` is purely an evaluation-control choice
 (receive arg ASTs + evalFn). `primaryOf` is RETIRED as a name — `dataOf`
 is the one data-plane accessor, defined in types.ts and re-exported
-through slots.ts. The propagation table alone governs channels (D28).
+through the accessor layer. The propagation table alone governs channels (D28).
 A typed scalar remains a `ValueKind.MultiValue`-tagged Structure (per
 ruling R6 the tag now simply means "transparent scalar structure";
 retirement expected with the C6 kind recipe). The physical plane
@@ -674,7 +674,7 @@ is simply re-checked).
 (`protocolEquals`, `src/types-std.ts`), shared by the evaluator's
 `bits_eq`/`bits_neq` dispatch and the `typed_eq` path; the E2 coercion
 lookup slots between them. The equality shape (`equalityShape`,
-`src/slots.ts`) walks the FULL `__refines` chain — past preserve-lifted
+`src/slot-accessors.ts`) walks the FULL `__refines` chain — past preserve-lifted
 layers too, unlike dispatch's `typeShape` — so operator-lifting
 refinements never separate equal values; `distinct` mints no refines
 edge and so falls to step 3. Kernel structural equals is the same-shape
@@ -1078,7 +1078,7 @@ B-120 E4: an array's length is its entry count, read through `getSlotCount`;
 **No new `__*` slot may be introduced**; new meta-slots are declared
 members or registered channels from day one. The full disposition table is
 in the plan doc (D39); as of C1.1 it is also **code** —
-`src/slots.ts` — and mechanically enforced by the boundary harness.
+`src/slot-accessors.ts` — and mechanically enforced by the boundary harness.
 
 *D39 addendum (maintainer-ratified 2026-07)* — three slots present in code
 but absent from D39's original table: **`effectBound`** → member on the
@@ -1282,7 +1282,7 @@ PROCESS §6 before modification, I3):
 
 ## Appendix A — D39 slot disposition (executed; the table is code)
 
-The authoritative disposition table is **`src/slots.ts` `SLOT_REGISTRY`** —
+The authoritative disposition table is **`src/slot-accessors.ts` `SLOT_REGISTRY`** —
 it has been executable since C1.1 (the W3 corpus invariant fails any
 unregistered `__*` key) and each row was updated in place as its
 disposition EXECUTED. Post-C7.1 state of the original D39 inventory:

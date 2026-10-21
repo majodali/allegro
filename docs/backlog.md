@@ -1508,7 +1508,8 @@ that prevents it.
 - [ ] **B-112** · L0 · **The four owed plane interfaces.** Raised by the
   concept spine (S2f); `concepts.md` §24 carries the interface table.
   **PLAN: [docs/plans/plane-interfaces.md](plans/plane-interfaces.md)**
-  (draft, 2026-09) — scoped to the four hooks on measurement: delta 23's
+  (ratified as a whole 2026-10-21, ruling 2 option (a); **C1 landed
+  2026-10-21**, C2–C5 and the exit remain) — scoped to the four hooks on measurement: delta 23's
   *27 upward symbols* is **131 imported / 98 distinct**, of which only **4**
   are checkers. The plan's §6 files five other populations (type vocabulary
   ~25, knowledge propagation ~18, member dispatch ~9, diagnostics ~8,
@@ -1537,6 +1538,15 @@ that prevents it.
     `channelReadRaw` + the propagation table); four are conventions enforced
     by lint or by nothing; the layer→base row has one instance
     (`installChannelMerge`) and no general form
+  - **Progress.** C1 (2026-10-21): `src/slots.ts` split into
+    `src/slot-accessors.ts` (unit `structure`), `src/metadata.ts` (unit
+    `metadata`) and `src/capability.ts` (unit `capability`);
+    `installFieldMerge` takes the field's writer (P4); the scope's facts
+    plane is opaque and merges through `installFactsMerge`, installed by
+    `refinements.ts` with the `predicates` writer (hook (e); `units.md`
+    M5 and M12 closed). `units`: 0 violations, 6 mixed files. Two
+    deviations recorded in the plan §9.3 (facts are host objects, not
+    Values; the uninstalled-merge error is not suite-exercised).
 
 - [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
   Body wrappers (`type_check`, the `*_attach` family) must forward the

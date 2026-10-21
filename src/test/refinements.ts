@@ -19,7 +19,7 @@ import {
   entailsPredicate, predicatesOf,
 } from "../refinements.js";
 import { ValueKind, bitsToString, BitsValue } from "../types.js";
-import { metaReadRaw } from "../slots.js";
+import { metaReadRaw } from "../metadata.js";
 import { getType } from "../types-std.js";
 
 // --- Phase B: abstract-domain unit tests ---

@@ -4,6 +4,45 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-112 C1: `slots.ts` split three ways; merge installation is capability-gated; the scope's facts plane is opaque
+
+First chunk of the ratified plane-interfaces plan
+(`docs/plans/plane-interfaces.md` §9). `src/slots.ts` (962 lines, three
+units in one file — `units.md` M5) is deleted and its three interfaces
+are three files: `src/slot-accessors.ts` (unit `structure`: the D39 slot
+registry, typed accessors, stamps, `SLOT_KEYS`), `src/metadata.ts` (unit
+`metadata`: the field registry, propagation vocabulary, free reads, the
+carry idioms, the installed-merge table) and `src/capability.ts` (unit
+`capability`: writers, `registerMetaField`, the base's five own fields).
+Twenty-seven importers rewritten; no behaviour moved.
+
+Two interfaces changed shape. `installFieldMerge(writer, merge)` takes
+the field's writer and refuses any other object (P4: a field's merge is
+its owner's meaning); `effects.ts` installs with the writer it minted.
+The scope unit no longer imports `refinements` (M12, the one DAG
+violation): `scopeAssume` takes `Map<string, unknown>`, `scopeFactsFor`
+returns `unknown` and merges layers only through `installFactsMerge`,
+gated on the `predicates` writer and installed once by `refinements.ts`
+with `mergePredicateSets` — hook (e), the facts-plane instance of carry
+versus decide. Deviation: a fact is a host `PredicateSet`, not an encoded
+Value, so the facts merge is a second function beside the field merge
+until B-146 says otherwise (plan §9.3).
+
+Tooling: the plane lint's accessor layer is `structure.ts`,
+`slot-accessors.ts`, `metadata.ts`; `units.json` has the three new rows
+and `refinements`/`effects` gain their real `capability` and `scope`
+edges; the boundary baseline regenerated (every count fell or held; the
+stale `components-direct` rule name gone) with the three files as allowed
+dunder sites; the owners table pins the base's fields to `capability.ts`.
+One boundary test added (foreign writer refused by both installers; the
+holder's merge is the one served; the facts merge installs once).
+`units` report: 162 edges, 51 ok, 0 violations, 111 unresolved, 6 mixed
+files (was 142 / 26 / 1 / 115 / 7). Suite 1202 distinct tests, gate
+green. Docs: `units.md` rows 8/10/11, M5 and M12 closed, §8 remeasured;
+`implementation-map.md`; the L0 README invariant now enforced for facts;
+`concepts.md`, `structures.md`, `type-system.md`, the actors study and
+CLAUDE.md renamed the file; plan §9 status and §9.3; manifest row.
+
 ## 2026-10 — `docs/book-changes.md`: the book's structural change log replaces the retired-identifier table
 
 Maintainer ruling 2026-10-21: a retired-identifier list leaves numbering

@@ -18,8 +18,10 @@
 //   closed   — must be ZERO outside the accessor layer; any hit fails
 //   ratchet  — a committed count that may fall and must never rise
 //
-// The accessor layer is `src/structure.ts` (the representation) and
-// `src/slots.ts` (the read/write surface over it). Tests are exempt: the
+// The accessor layer is `src/structure.ts` (the representation),
+// `src/slot-accessors.ts` (the read/write surface over the binding plane) and
+// `src/metadata.ts` (the free reads over the metadata plane) — the three
+// files `src/slots.ts` split into at B-112 C1. Tests are exempt: the
 // boundary battery's job is to reach past interfaces and check what it finds.
 // =============================================================================
 
@@ -31,7 +33,7 @@ const ROOT = path.resolve(new URL("../..", import.meta.url).pathname);
 const BASELINE = path.join(ROOT, "scripts/analyze/plane-baseline.json");
 
 /** The accessor layer — the only modules that may name the storage. */
-const ACCESSOR_LAYER = ["src/structure.ts", "src/slots.ts"];
+const ACCESSOR_LAYER = ["src/structure.ts", "src/slot-accessors.ts", "src/metadata.ts"];
 
 /** Receivers we police. A field is storage only when it sits on one of these. */
 const STORAGE_TYPES = new Set(["Structure", "StructureValue"]);

@@ -21,7 +21,8 @@
 // type) is F7+ and likely requires either richer abstract-domain
 // machinery or an external SMT discharge.
 
-import { getName, metaReadRaw, metaOf } from "./slots.js";
+import { getName } from "./slot-accessors.js";
+import { metaReadRaw, metaOf } from "./metadata.js";
 import { scopeLookup } from "./scope.js";
 import {
   Value, ValueKind, StructureValue, ComposedFunctionValue, ExpressionValue,

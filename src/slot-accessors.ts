@@ -1,26 +1,26 @@
 // =============================================================================
-// Slot & channel registry + typed accessors — structures Phase 1 (C1.1 / B-006)
+// Slot registry + typed accessors over the binding plane — the `structure`
+// unit's accessor surface (docs/book/units.md §4.1 row 8; split out of
+// slots.ts at B-112 C1, 2026-10).
 //
-// The D39 disposition table as code (design: docs/design/allegretto/
+// The D39 disposition table as code (design: docs/book/allegretto/
 // structures.md §"Slot disposition" + Appendix A; decision log D39 archived
 // at docs/plans/archive/structured-values-unification.md). Every `__*` slot and
-// MultiValue component in the codebase is registered here with its owner,
+// host-plane property in the codebase is registered here with its owner,
 // disposition, and post-migration target. The boundary harness walks test-
 // corpus values and fails on any unregistered `__*` key — the "no new `__*`
-// slot" rule (D39) enforced mechanically from this chunk on.
+// slot" rule (D39) enforced mechanically.
 //
-// The typed accessors read the CURRENT representation (Context bindings,
-// MultiValue meta, JS expando properties). Call sites migrate to them
-// in C1.2/C1.3; the representation itself swaps under them in Phase 4 —
-// this module is the seam that makes that swap possible.
+// The typed accessors read and write engine-owned BINDING-plane slots on
+// type, proof and effect structures. They know nothing of the metadata
+// plane: `src/metadata.ts` owns that, and `src/capability.ts` owns the
+// authority to write it. This module imports only the representation.
 // =============================================================================
 
 import {
   Value,
   ValueKind,
   StructureValue,
-  AllegroError,
-  withMeta,
   makeInt,
 } from "./types.js";
 import { denseIndexGet, positionalCount, denseElements, setEntry, removeEntry } from "./structure.js";
@@ -357,51 +357,6 @@ export function equalityShape(t: StructureValue): StructureValue {
   return cur;
 }
 
-// --- Channel plane (read side) ------------------------------------------------------
-
-/** Raw channel read on a value: MultiValue component lookup, plus the
- *  `discharged` Context-binding channel that still predates the component
- *  plane. Free of any authority, per D23 (reads are free).
- *
- *  C3.1: `shape` reads the computed dispatch shape (refinement layers
- *  walked off — identity for every non-refined type, including the
- *  meta-type reads on type values); `type` stays the raw stored view.
- *  Both answer from ONE stored value; the split is this computation, not
- *  two storages (B-104 chunk 3). */
-export function metaReadRaw(v: Value, channel: string): Value | undefined {
-  // C4.3b + B-104 chunk 3: the channel plane is universal, and `type` is
-  // now on it for EVERY value — carriers, flattened records and bare type
-  // Contexts alike. Contexts without channels have `meta` undefined
-  // (lazy — plain contexts and scopes pay nothing).
-  const comps = v.meta as Map<string, Value> | undefined;
-  if (comps !== undefined) {
-    const comp = comps.get(channel);
-    if (comp !== undefined) return comp as Value;
-  }
-  if (channel === "shape") {
-    // One storage, two reads: `shape` is `type` with member-transparent
-    // refinement layers walked off. A non-Structure raw (or none) answers
-    // as itself — typeShape only applies to type Contexts.
-    let raw = comps?.get("type") as Value | undefined;
-    if (raw === undefined) {
-      const ctx = asStructure(v);
-      raw = ctx ? ctx.meta?.get("type") as Value | undefined : undefined;
-    }
-    if (raw?.kind === ValueKind.Structure) return typeShape(raw as StructureValue);
-    return raw;
-  }
-  if (channel === "type") {
-    // A transparent scalar carrier answers through its primary's plane.
-    const ctx = asStructure(v);
-    return ctx ? ctx.meta?.get("type") as Value | undefined : undefined;
-  }
-  if (channel === "discharged") {
-    const c = asStructure(v);
-    if (c) return slotRead(c, "__discharged");
-  }
-  return undefined;
-}
-
 // --- Write-side shims (C1.2) --------------------------------------------------------
 
 // Type fields
@@ -447,32 +402,13 @@ export function setEffectBound(ctx: StructureValue, d: unknown): void { (ctx as 
 
 // Base concepts
 
-// Channel-plane writes. `writeShape` remains a plain shim (shape-dispatch
-// integrity is C3.1's concern); the discharged channel is capability-gated
-// below (C1.4) — its raw writers are module-private.
-//
-// B-104 chunk 3: shape is stored on the metadata plane, written IN PLACE.
-// It cannot route through the registered field writer: `buildWriter` derives
-// a NEW value via `withMeta`, and type Contexts are identity-sensitive
-// (memoized generics, law registries, and the `typeShape(stored) ===
-// typeShape(expected)` reference test in types-std).
-//
-// B-121 C7: this is the sanctioned case of THE IN-PLACE RULE, which
-// `structure.ts` states in full — *write in place only while the value is
-// provably unshared; after it escapes, derive*. The licence here is the
-// second clause of that rule rather than an exception to it: all 24 call
-// sites mint a fresh Context and stamp it before it escapes, so no other
-// position can be holding the value when this runs.
-export function writeShape(ctx: StructureValue, v: Value): void {
-  if (ctx.meta === undefined) ctx.meta = new Map<string, Value>();
-  (ctx.meta as Map<string, Value>).set("type", v);
-}
-function writeDischarged(ctx: StructureValue, v: Value): void { slotWrite(ctx, "__discharged", v); }
 
 // Presence checks
 export function hasName(ctx: StructureValue): boolean { return ctx.bindings.has("__name"); }
-export function hasShapeSlot(ctx: StructureValue): boolean { return ctx.meta?.has("type") === true; }
 export function hasDischarged(ctx: StructureValue): boolean { return ctx.bindings.has("__discharged"); }
+/** The `discharged` field's binding-plane storage, read for the metadata
+ *  plane's benefit (`metaReadRaw`); the write is the capability's. */
+export function readDischargedSlot(ctx: StructureValue): Value | undefined { return slotRead(ctx, "__discharged"); }
 
 // B-120 E1: these were SET-ONLY writes — the map, deliberately not the list —
 // which is where the measured "map holds entries the list lacks" class came
@@ -484,6 +420,11 @@ export function hasDischarged(ctx: StructureValue): boolean { return ctx.binding
 function slotSet(ctx: StructureValue, key: string, value: Value): void {
   setEntry(ctx, key, value);
 }
+/** A binding-plane field's STORAGE write — the chokepoint the capability
+ *  layer's writer closures call for fields that predate the metadata plane
+ *  (`discharged`). Not a user surface: origination authority is checked by
+ *  the caller, which holds the writer. */
+export function stampBindingSlot(ctx: StructureValue, key: string, value: Value): void { slotSet(ctx, key, value); }
 export function stampProposition(ctx: StructureValue, v: Value): void { slotSet(ctx, "proposition", v); }
 function stampDischarged(ctx: StructureValue, v: Value): void { slotSet(ctx, "__discharged", v); }
 export function stampProofReason(ctx: StructureValue, v: Value): void { slotSet(ctx, "reason", v); }
@@ -588,375 +529,6 @@ export function isMetaProtocolSlot(name: string): boolean {
 // Removal helpers — one store, so a removal cannot leave a stale entry
 // behind. Discipline (3) is retired: there is no second view to mirror.
 export function removeRefines(ctx: StructureValue): void { removeEntry(ctx, "__refines"); }
-export function removeShapeSlot(ctx: StructureValue): void { ctx.meta?.delete("type"); }
 export function removeConstruct(ctx: StructureValue): void {
   removeEntry(ctx, "__construct");
-}
-
-// --- Data plane -----------------------------------------------------------------------
-
-/** Data-plane read (C4.3c: `primaryOf` retired — this is THE accessor).
- *  Identity for flattened Contexts and every non-scalar; unwraps the
- *  `primary` of a transparent scalar structure. */
-
-// --- Component plane (MultiValue) -------------------------------------------------------
-
-/** Read-only view over a value's meta. C4.3b: the channel plane is
- *  universal — flattened Contexts (typed records/arrays) carry meta
- *  directly; values without a channel plane view as empty. */
-export function metaOf(v: Value): ReadonlyMap<string, Value> {
-  const comps = v.meta as Map<string, Value> | undefined;
-  return comps !== undefined ? comps : EMPTY_META;
-}
-const EMPTY_META: ReadonlyMap<string, Value> = new Map();
-
-/** Mutable copy of a value's meta — the standard "carry meta
- *  forward onto a derived value" idiom. Empty map for channel-less values. */
-export function cloneMeta(v: Value): Map<string, Value> {
-  const comps = v.meta as Map<string, Value> | undefined;
-  return comps !== undefined ? new Map(comps) : new Map();
-}
-
-/**
- * Carry `from`'s metadata onto a value derived from it, and return the
- * derived value.
- *
- * This is the "map" case (B-121 plan §3.2): a NEW datum that must keep the OLD
- * metadata. It was not an obligation before B-121, because metadata lived on
- * the carrier WRAPPING a function rather than on the function itself — so a
- * hand-written function clone never had to think about it. Once metadata is on
- * the value, all seven such clones drop it silently, and the suite reports
- * that as `type_check: value has no type` from somewhere else entirely.
- *
- * Use this rather than writing `meta: x.meta` by hand: the failure mode of
- * forgetting is silence, the same shape as the TailCall sentinel (B-113) and
- * the ComposedFunction clone helper. It lives here, in the accessor layer,
- * because reading `.meta` directly is exactly what the boundary lint forbids
- * everywhere else.
- */
-export function carryMeta<T extends Value>(from: Value, to: T): T {
-  const m = (from as { meta?: Map<string, Value> }).meta;
-  if (m !== undefined) (to as { meta?: Map<string, Value> }).meta = m;
-  return to;
-}
-
-/** B-104 chunk 3: carry the shape from one type Context to a derived one.
- *
- *  Three type-cloning paths (`structuralWrap`, `preserveOps`,
- *  `buildMethodLayer`) used to inherit the meta-type for free, because the
- *  shape was a BINDING and they copy bindings. With shape on the component
- *  plane that inheritance is silent no longer — those clones would come out
- *  untyped. This is the explicit replacement; paths that re-stamp their own
- *  shape (`buildRefinedType`, `buildDistinctType`) do not need it. */
-export function carryShape(from: StructureValue, to: StructureValue): void {
-  const raw = from.meta?.get("type") as Value | undefined;
-  if (raw !== undefined) writeShape(to, raw);
-}
-
-// --- Channel registry + writer capabilities (C1.4, per D21–D24) -----------------------
-//
-// Registration is one-shot per channel name and returns the channel's write
-// operation as a closure (D24: the capability IS the closure — delegable,
-// attenuable, unconstructible from Allegretto). Reads are free (D23).
-// Integrity channels may only register non-fabricating propagation rules
-// (`drop` / `computed`) — `viral`/`union` on an authority channel is
-// forgery vector C (D23). Propagation rules are RECORDED here and consulted
-// by the C1.5 propagation table.
-
-export type PropagationRule = "viral" | "union" | "computed" | "positional" | "drop";
-
-export interface MetaFieldSpec {
-  name: string;
-  rule: PropagationRule;
-  /** Origination requires the writer capability. */
-  integrity?: boolean;
-  /** S3 policy attribute — recorded, not yet enforced (default public). */
-  readVisibility?: "public";
-  /** Binding-plane storage key, for channels predating the component plane. */
-  bindingKey?: string;
-}
-
-/** A held write capability for one channel. For binding-plane channels the
- *  write mutates the target Context (origination on a fresh kernel value);
- *  for component-plane channels it returns a new MultiValue. */
-export interface MetaFieldWriter {
-  channel: string;
-  write(target: Value, fieldValue: Value): Value;
-}
-
-interface MetaFieldEntry {
-  spec: MetaFieldSpec;
-  writer: MetaFieldWriter;
-  /** evalSource pass in which an Allegro-minted channel was registered.
-   *  The evaluation loop legitimately re-evaluates top-level bindings
-   *  within one pass (fixpoint), so re-registration with an identical spec
-   *  in the SAME epoch returns the held writer; any later pass throws —
-   *  the capability belongs to whoever registered first. Kernel channels
-   *  use epoch -1: they never re-issue. */
-  epoch: number;
-  minted: boolean;
-}
-
-const META_FIELD_TABLE = new Map<string, MetaFieldEntry>();
-let metaEpoch = 0;
-
-/** Called at the start of each evalSource pass (see runtime.ts). */
-export function bumpMetaEpoch(): void { metaEpoch++; }
-
-function buildWriter(spec: MetaFieldSpec): MetaFieldWriter {
-  return {
-    channel: spec.name,
-    write(target: Value, fieldValue: Value): Value {
-      if (spec.bindingKey) {
-        if (target.kind !== ValueKind.Structure) {
-          throw new AllegroError(`channel '${spec.name}': binding-plane write target must be a Context`);
-        }
-        if (spec.name === "discharged") stampDischarged(target as StructureValue, fieldValue);
-        else slotSet(target as StructureValue, spec.bindingKey, fieldValue);
-        return target;
-      }
-      const comps = cloneMeta(target);
-      comps.set(spec.name, fieldValue);
-      // withMeta handles all three shapes: carrier primaries
-      // re-wrap (W1), record primaries derive, leaves take the carrier.
-      return withMeta(target, comps) as Value;
-    },
-  };
-}
-
-let _viralCache: string[] | null = null;
-/** Component-plane channels with viral propagation (first occurrence wins,
- *  carried onto the result residual). Cached; registration invalidates. */
-export function viralFields(): string[] {
-  if (!_viralCache) {
-    _viralCache = [...META_FIELD_TABLE.values()]
-      .filter((e) => e.spec.rule === "viral" && !e.spec.bindingKey)
-      .map((e) => e.spec.name);
-  }
-  return _viralCache;
-}
-
-let _unionCache: string[] | null = null;
-/** Component-plane channels with union propagation (arg channels merged
- *  onto the result via the installed merge). */
-export function unionFields(): string[] {
-  if (!_unionCache) {
-    _unionCache = [...META_FIELD_TABLE.values()]
-      .filter((e) => e.spec.rule === "union" && !e.spec.bindingKey)
-      .map((e) => e.spec.name);
-  }
-  return _unionCache;
-}
-
-function invalidatePropagationCaches(): void {
-  _viralCache = null;
-  _unionCache = null;
-}
-
-/** One-shot channel registration → writer capability. Throws on duplicate
- *  names (re-registration is forgery vector F) and on fabricating rules for
- *  integrity channels (forgery vector C). */
-export function registerMetaField(spec: MetaFieldSpec, minted = false): MetaFieldWriter {
-  const existing = META_FIELD_TABLE.get(spec.name);
-  if (existing) {
-    // Same-pass re-evaluation of the SAME Allegro registration site: hand
-    // back the held writer. Anything else is forgery vector F.
-    if (existing.minted && minted && existing.epoch === metaEpoch && existing.spec.rule === spec.rule) {
-      return existing.writer;
-    }
-    throw new AllegroError(`channel '${spec.name}' is already registered — the writer capability is held by its owner`);
-  }
-  if (spec.integrity && (spec.rule === "viral" || spec.rule === "union")) {
-    throw new AllegroError(`channel '${spec.name}': integrity channels may not register fabricating propagation rules (viral/union) — D23`);
-  }
-  const writer = buildWriter(spec);
-  META_FIELD_TABLE.set(spec.name, { spec, writer, epoch: minted ? metaEpoch : -1, minted });
-  invalidatePropagationCaches();
-  return writer;
-}
-
-export function metaFieldSpec(name: string): MetaFieldSpec | undefined {
-  return META_FIELD_TABLE.get(name)?.spec;
-}
-
-/** TS-kernel writer acquisition. Discipline is the boundary lint: call sites
- *  outside the kernel modules (types-std.ts, primitives.ts) fail the suite.
- *  The writer is never exposed to Allegro — extension bindings do not
- *  include it, and Allegretto cannot construct a host closure (D24). */
-export function kernelFieldWriter(name: string): MetaFieldWriter {
-  const e = META_FIELD_TABLE.get(name);
-  if (!e) throw new AllegroError(`no such channel: '${name}'`);
-  return e.writer;
-}
-
-// --- Field registration: what the BASE owns ------------------------------------
-//
-// B-109(a) / concept-campaign C3 (2026-08). The base used to register eleven
-// fields at module init, including the layers' own. R6/R11 say the base owns
-// the MECHANISM and each layer owns ITS fields — so a field survives here only
-// if the base concept it serves survives in Allegretto.
-//
-// That test was run rather than argued: `make_error("boom")` and `source of x`
-// both work under `--base`, so `error` and `source` are Allegretto's own and
-// stay. The six L2 fields moved to their owners:
-//
-//   shape, type   → src/types-std.ts    (the type system)
-//   effects       → src/effects.ts      (the effects extension)
-//   predicates,
-//   domain, bound → src/refinements.ts  (refinement knowledge)
-//   discharged    → src/proofs.ts       (the proof kernel)
-//
-// Three have NO owner to move to, and each is a B-111 finding rather than a
-// relocation: `knowledge` is a capability whose storage is other fields and
-// which nothing ever writes; `warnings` is registered `union` and unused
-// (B-117 intends to reach for it when the verdict accumulates); `exported`
-// was retired at B-097 V1 when visibility became a property of the Binding.
-// They stay registered here, wrongly, until B-111 says what they are.
-
-// D47 (B-094): drop — a derived value was not produced by the recorded
-// expression, so propagating source would fabricate provenance. Kernel-
-// originated (evaluator attachment only); reads via `source of` are
-// observe-tagged (§3.1). Integrity added at B-109(c) — it had been in the old
-// hardcoded name list while registered WITHOUT the flag, two sources of truth
-// disagreeing about one field.
-registerMetaField({ name: "source", rule: "drop", integrity: true });
-registerMetaField({ name: "error", rule: "viral" });
-
-// --- Fields with no owner yet (B-111) ------------------------------------------
-// C3.1 (D36): `knowledge` is the canonical knowledge lattice — but nothing
-// ever stores a `knowledge` value. Its physical storage IS `predicates` /
-// `domain` plus the refinement layers of the stored type, and it is read
-// through refinements.ts `knowledgeOf`. A capability, not a field.
-registerMetaField({ name: "knowledge", rule: "computed" });
-// Registered `union` — precisely the accumulating discipline the verdict
-// needs — and never written. B-117.
-registerMetaField({ name: "warnings", rule: "union" });
-// Retired at B-097 V1 (D42/V-R4): visibility became a property of the BINDING,
-// never of the value. The registration outlived the concept.
-registerMetaField({ name: "exported", rule: "drop" });
-
-/** Binding keys that only a channel writer may originate. User-reachable
- *  construction paths (object literals, mv_set) consult this. `source` is
- *  D47(d): forged provenance would let a doctored source channel display a
- *  different claim than the one checked — kernel-originated only. */
-/**
- * Gate for user-reachable construction paths: throws if the key would
- * originate an integrity field without holding its writer.
- *
- * B-109(b)(c) (2026-08): authority is now read from the REGISTRY rather than
- * from a hardcoded name list. The old list was a second source of truth and
- * the two disagreed — `source` was in the list but registered WITHOUT
- * `integrity: true`.
- *
- * It also checked BARE FIELD NAMES, which conflated two planes. An object
- * literal writes the BINDING plane; it cannot originate a metadata field at
- * all — `{type: "widget"}` gives the record a `type` slot while `type of` it
- * still answers `Object`. So the bare-name check defended nothing and cost
- * users the field names `discharged` and `source`. What it must still refuse
- * is a binding-plane key that a field uses as its STORAGE (`__discharged`),
- * which is a real origination path, and those come from the registry too.
- */
-function integrityBindingKeys(): Set<string> {
-  const keys = new Set<string>();
-  for (const entry of META_FIELD_TABLE.values()) {
-    if (entry.spec.integrity && entry.spec.bindingKey) keys.add(entry.spec.bindingKey);
-  }
-  return keys;
-}
-
-export function assertNotIntegrityKey(key: string, site: string): void {
-  if (integrityBindingKeys().has(key)) {
-    throw new AllegroError(
-      `${site}: cannot originate integrity channel '${key.replace(/^__/, "")}' — origination requires the channel writer (D21–D24)`
-    );
-  }
-}
-
-// --- Source channel (D47, B-094 chunk 1) --------------------------------------
-//
-// The `source` component carries the ORIGINATING Expression AST of a value —
-// attached by the evaluator only (kernel-originated, D47(d)): at call sites
-// of source-aware primitives, and on resolved top-level bindings whose data
-// is not a Structure (Structure bindings — types, records, proofs — carry
-// channels directly and are identity-sensitive; their attachment is the
-// chunk-2+ audit). Rule `drop` (D47(c)); reads go through `source of`
-// (`source_get`, observe-tagged, D47(e)) and render TEXT — the raw AST as a
-// first-class user value needs an inert quote carrier, deferred until user
-// meta-functions land.
-
-export const SOURCE_FIELD = "source";
-
-/** Kernel-internal: attach the originating AST to a value. Not exposed as a
- *  primitive — origination authority stays with the evaluator. */
-export function withSource(v: Value, ast: Value): Value {
-  const comps = cloneMeta(v);
-  comps.set(SOURCE_FIELD, ast);
-  return withMeta(v, comps) as Value;
-}
-
-/** Kernel-internal read of the source channel (free for kernel use; the
- *  LANGUAGE-level read is `source_get`, which carries the observe tag). */
-export function sourceOf(v: Value): Value | undefined {
-  return metaOf(v).get(SOURCE_FIELD);
-}
-
-/** Host-internal function-metadata properties preserved across
- *  ComposedFunction clones (subst/remapParams) — the C1.5b collapsed
- *  body-form metadata plus the PE effects stash. */
-export const PRESERVED_FN_META_KEYS = [
-  "partial", "decreasesMetric", "declaredEffectsAst",
-  "paramEffectPairs", "provenClauses", "inferredEffects",
-  // B-028 F3: the completion-discharge clauses (CE-R3).
-  "total", "assumeTerminates",
-] as const;
-
-/** Brand for Allegro-level channel-writer PrimitiveFunctions (host-internal
- *  js-property; registered in SLOT_REGISTRY). Attenuation checks it. */
-export const FIELD_WRITER_BRAND = "channelWriterFor";
-
-// --- Propagation table (C1.5) ---------------------------------------------------
-//
-// The evaluator consults these instead of hand-rolling per-channel code.
-// `viral` and `union` are fully generic; `computed` channels keep bespoke
-// domain logic at the annotated evaluator sites (that is what "computed"
-// means); `drop` channels never propagate — verified by forgery test C.
-//
-// MAINTAINER RULING (2026-08, C4.3a — activating the divergences deferred
-// at C1.5): the principled rules are now live —
-//  - effects on MultiValue re-evaluation merge by UNION via the installed
-//    channel merge (was inner-shadows-outer).
-//  - error virality rides EVERY hop of a residual chain, including the
-//    unresolved-application and type_dispatch residual paths (was dropped
-//    after the first hop — see differential fixtures `err-viral-chain`,
-//    `err-through-method`).
-//  - an error-carrying `if` condition propagates the error
-//    (`err-in-if-cond`; was silently taking the else branch).
-
-/** Union-merge behavior per channel, installed at module init by the
- *  channel's owner (e.g. effects.ts) — slots.ts cannot import the encodings
- *  without a cycle. */
-const FIELD_MERGES = new Map<string, (a: Value, b: Value) => Value>();
-export function installFieldMerge(name: string, merge: (a: Value, b: Value) => Value): void {
-  FIELD_MERGES.set(name, merge);
-}
-export function fieldMerge(name: string): ((a: Value, b: Value) => Value) | undefined {
-  return FIELD_MERGES.get(name);
-}
-
-
-
-/** List the channels present on a value (component keys + binding-plane channels).
- *  C4.3b: the channel plane is universal — flattened Contexts report their
- *  component keys alongside the legacy binding-plane channels. */
-export function metaFieldList(v: Value): string[] {
-  const out: string[] = [];
-  const comps = v.meta as Map<string, Value> | undefined;
-  if (comps !== undefined) {
-    out.push(...comps.keys());
-  }
-  if (v.kind === ValueKind.Structure) {
-    const ctx = v as StructureValue;
-    if (ctx.bindings.has("__discharged") && !out.includes("discharged")) out.push("discharged");
-  }
-  return out;
 }

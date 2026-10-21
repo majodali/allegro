@@ -18,8 +18,10 @@
 |---|---|---|
 | `src/types.ts` | L0 | Value types + constructors, Extension interface, string/float↔bits; `withMetadata`/`makeStructure` construction shims (the W4 boundary) |
 | `src/structure.ts` | L0 | The unified Structure class behind records and scopes — one hidden class, role fixed at construction, the entry sequence and its derived `SlotView` index. D22 immutability is a rule the boundary battery enforces, not a stored bit (B-134) |
-| `src/scope.ts` | L0 | Scope protocol: chain layering (O(1) extend), lookup, facts plane, future cells, flatten |
-| `src/slots.ts` | L0 | Slot & channel registry (D39 table as code) + typed accessors; sanctioned direct-access site |
+| `src/scope.ts` | L0 | Scope protocol: chain layering (O(1) extend), lookup, facts plane (opaque facts; the merge is installed through `installFactsMerge`, gated on the `predicates` writer), future cells, flatten |
+| `src/slot-accessors.ts` | L0 | Slot registry (D39 table as code) + typed accessors over the binding plane; sanctioned direct-access site (unit `structure`) |
+| `src/metadata.ts` | L0 | Metadata plane: field registry, propagation vocabulary (SC-7), free reads (D23), carry/clone idioms, the installed-merge table (unit `metadata`) |
+| `src/capability.ts` | L0 | Writer capabilities: field registration mints a writer (D21–D24), the gated `installFieldMerge` (P4), the base's own fields `source`/`error`/`knowledge`/`warnings`/`exported` (unit `capability`) |
 | `src/symbols.ts` | L0 | Symbol interning (FQN identity, D20/D29), kernel scope, base-name projection |
 | `src/evaluator.ts` | L0 | Recursive evaluator: PE Rules 1+2, propagation table, type-directed dispatch (`PRIM_TO_METHOD`), TCO, closures, unification at call sites |
 | `src/primitives.ts` | L0/L2 | All primitives: bits/expression/structure ops, type system ops, proof constructors + `proof_check`, grammar combinators, lazy print |

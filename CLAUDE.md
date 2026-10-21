@@ -130,7 +130,8 @@ evaluator/runtime set; this is the complete session list):
   the unchecked surface several-fold.
 - **The storage plane is policed** (`npm run lint:planes`, B-128(a)).
   `Structure.meta` and `Structure.entries` are CLOSED outside
-  `src/structure.ts` and `src/slots.ts` — any hit fails. `.bindingList` is
+  `src/structure.ts`, `src/slot-accessors.ts` and `src/metadata.ts` — any
+  hit fails. `.bindingList` is
   ratcheted at its committed count in `scripts/analyze/plane-baseline.json`
   and may only fall. `.bindings` is NOT policed: since B-120 E3 it is the
   derived read-only view, which is the sanctioned way to read the slot plane
@@ -160,7 +161,7 @@ evaluator/runtime set; this is the complete session list):
   a bespoke peeler (PROCESS §6).
 - No new meta-property without registering it in the meta-protocol
   registry (`docs/book/standard/type-system.md` §4). No new `__*`
-  slots ever (D39; registry is `src/slots.ts`).
+  slots ever (D39; registry is `src/slot-accessors.ts`).
 - No implicit fallback in typed operators — a missing type method is
   an error. Every Standard-mode value has a type.
 - Failed proof, undeclared effect (`div` included — a declaration is a
@@ -171,7 +172,7 @@ evaluator/runtime set; this is the complete session list):
   non-exhaustive match over a finite type is an info notification —
   promoting either to a halt is a maintainer decision, not assumed.
 - Boundary lint ratchet: no `"__"`-prefixed string literals outside
-  the accessor layer; use `src/slots.ts` accessors / `isMetaProtocolSlot`
+  the accessor layer; use `src/slot-accessors.ts` accessors / `isMetaProtocolSlot`
   (`isMetaSlotKey` was deleted at B-120 E5).
   B-104 chunk 1 widened it — a dunder now also counts as a synthesized
   template key (`` `__future_${n}` ``), a property access, or a

@@ -21,7 +21,7 @@ import { Value, makeParam, BitsValue, ValueKind, bitsToString, makeInt } from ".
 import { summarizeValue as _summarizeValueChunk3, summarizeValue } from "../introspect.js";
 import { formatDomain, intersectDomains, joinDomains, impliesDomain, PredicateSet, entailsPredicate } from "../refinements.js";
 import { pureEffect, opaqueEffect } from "../types-std.js";
-import { getName } from "../slots.js";
+import { getName } from "../slot-accessors.js";
 
 // --- Phase D1: effect types ---
 

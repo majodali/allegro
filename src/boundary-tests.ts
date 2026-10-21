@@ -32,13 +32,15 @@ import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
-import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, metaReadRaw, metaOf, cloneMeta, SLOT_REGISTRY, SLOT_KEYS, viralFields, unionFields, registerMetaField, typeShape, metaFieldSpec, isInterfaceType as isInterfaceTypeSlots , elementsOf} from "./slots.js";
+import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, SLOT_REGISTRY, SLOT_KEYS, typeShape, isInterfaceType as isInterfaceTypeSlots, elementsOf } from "./slot-accessors.js";
+import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, fieldMerge } from "./metadata.js";
+import { registerMetaField, installFieldMerge } from "./capability.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { withMeta } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
 import { bitsToString, BitsValue } from "./types.js";
 import { formatValue } from "./primitives.js";
-import { scopeNew, scopeExtend, scopeLookup, assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeAllBindings, makeCell, isPendingCell } from "./scope.js";
+import { scopeNew, scopeExtend, scopeLookup, assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeAllBindings, makeCell, isPendingCell, installFactsMerge } from "./scope.js";
 import { applyPhase } from "./runtime.js";
 import { createFutureManager } from "./futures.js";
 import { primitives } from "./primitives.js";
@@ -50,7 +52,7 @@ import { evaluate } from "./evaluator.js";
 import { makeSymbol } from "./types.js";
 import { Structure, isStructure } from "./structure.js";
 import { registerScopeSymbol, markExported, symbolFqn, symbolToWire, symbolFromWire, isRegisteredSymbol, internCount, projectBaseName, BaseNameCandidate, MAIN_SCOPE_FQN, KERNEL_SCOPE_FQN, kernelMemberFqn, typeMemberScopeFqn } from "./symbols.js";
-import { indexGet, getSlotCount, setName, setFallbackMember } from "./slots.js";
+import { indexGet, getSlotCount, setName, setFallbackMember } from "./slot-accessors.js";
 import { putEntry } from "./structure.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -338,7 +340,7 @@ export interface InvariantViolation {
  *  W2: a resolved `type` field's data is a Context — checked on EVERY kind
  *  since B-121 C4, because metadata is no longer a Structure's privilege.
  *  W3 (C1.1): every `__*` Context-binding key and every metadata field key
- *  is covered by the slot registry (`src/slots.ts`) — the D39 "no new `__*`
+ *  is covered by the slot registry (`src/slot-accessors.ts`) — the D39 "no new `__*`
  *  slot" rule enforced mechanically. Also kind-independent since C4.
  *  W4: every Context is an instance of the unified Structure class.
  *  W6: a dense structure's materialized view agrees with its dense region.
@@ -906,13 +908,14 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // serves survives in Allegretto — run rather than argued: `make_error`
     // and `source of` both work under `--base`.
     //
-    // This pins the split so a field cannot drift back into `slots.ts`
-    // without the move being a visible, deliberate change.
+    // This pins the split so a field cannot drift back into the base
+    // (`capability.ts` since B-112 C1) without the move being a visible,
+    // deliberate change.
     const owners: Record<string, string> = {
       // base — Allegretto's own
-      source: "slots.ts", error: "slots.ts",
+      source: "capability.ts", error: "capability.ts",
       // no owner yet — B-111 says what these are before they can move
-      knowledge: "slots.ts", warnings: "slots.ts", exported: "slots.ts",
+      knowledge: "capability.ts", warnings: "capability.ts", exported: "capability.ts",
       // moved to their owning layer at C3
       type: "types-std.ts", shape: "types-std.ts", discharged: "types-std.ts",
       effects: "effects.ts",
@@ -938,6 +941,44 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const lit = attack('p = {__discharged: 1}');
     eq(lit.threw?.includes("integrity channel") ?? false, true,
       `the integrity gate is armed at evaluation time: ${lit.threw}`);
+  });
+
+  test("merge installation is capability-gated (B-112 C1, P4): field merge and facts merge", () => {
+    // A field's merge is its owner's meaning. Before C1 any module could
+    // install a merge for any field by name; now the installer proves
+    // ownership with the field's writer. The same gate guards the scope
+    // unit's facts merge (hook (e), M12): scope carries facts opaquely and
+    // only the holder of the `predicates` writer may say how layers merge.
+    const probe = registerMetaField({ name: "merge_gate_probe", rule: "union" });
+    // A writer that is NOT the registered one for its channel — the shape is
+    // right, the identity is wrong. Forging the object is the whole attack.
+    const forged = { channel: "effects", write: (t: Value) => t };
+    let threw: string | null = null;
+    try { installFieldMerge(forged, (a) => a); } catch (e) { threw = String(e); }
+    eq(threw?.includes("holder of its writer") ?? false, true,
+      `a foreign writer cannot install a field merge: ${threw}`);
+    const forgedProbe = { channel: "merge_gate_probe", write: (t: Value) => t };
+    threw = null;
+    try { installFieldMerge(forgedProbe, (a) => a); } catch (e) { threw = String(e); }
+    eq(threw?.includes("holder of its writer") ?? false, true,
+      `nor a look-alike of a fresh registration: ${threw}`);
+    // The real holder may, and the installed merge is the one the table serves.
+    eq(fieldMerge("merge_gate_probe"), undefined, "nothing installed yet");
+    const mine = (a: Value, _b: Value) => a;
+    installFieldMerge(probe, mine);
+    eq(fieldMerge("merge_gate_probe") === mine, true, "the holder's merge is installed");
+    // Facts merge: a foreign writer is refused, and the holder's merge is
+    // already in place (refinements installed it at layer init — the facts
+    // test above merged two layers through it), so a second install is
+    // refused too: the merge is installed once, by its owner.
+    threw = null;
+    try { installFactsMerge(forged, (a) => a); } catch (e) { threw = String(e); }
+    eq(threw?.includes("holder of the 'effects' writer") ?? false, true,
+      `a foreign writer cannot install the facts merge: ${threw}`);
+    threw = null;
+    try { installFactsMerge(probe, (a) => a); } catch (e) { threw = String(e); }
+    eq(threw?.includes("already installed") ?? false, true,
+      `the facts merge installs once: ${threw}`);
   });
 
   test("forgery G (B-125): the metadata write surface is exactly the minted writers", () => {
@@ -1095,19 +1136,22 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const factB = new PredicateSet([makePredicate(effectsDomain(new Set(["b"])))]);
     const branchA = scopeAssume(parent, new Map([["x", factA]]));
     const branchB = scopeAssume(parent, new Map([["x", factB]]));
+    // B-112 C1: the scope unit carries facts opaquely; the test reads them
+    // back as what refinements installed.
+    const facts = (s: StructureValue, n: string) => scopeFactsFor(s, n) as PredicateSet | undefined;
     // Sibling branches are isolated; the parent never gains facts.
-    eq([...scopeFactsFor(branchA, "x")!.effectiveEffects()!.labels].join(","), "a");
-    eq([...scopeFactsFor(branchB, "x")!.effectiveEffects()!.labels].join(","), "b");
-    eq(scopeFactsFor(parent, "x"), undefined, "branch exit discards — parent untouched");
+    eq([...facts(branchA, "x")!.effectiveEffects()!.labels].join(","), "a");
+    eq([...facts(branchB, "x")!.effectiveEffects()!.labels].join(","), "b");
+    eq(facts(parent, "x"), undefined, "branch exit discards — parent untouched");
     // Chain merge: a nested layer refines, outer facts still visible.
     const factC = new PredicateSet([makePredicate(effectsDomain(new Set(["c"])))]);
     const nested = scopeAssume(branchA, new Map([["x", factC]]));
-    const merged = [...scopeFactsFor(nested, "x")!.effectiveEffects()!.labels].sort().join(",");
+    const merged = [...facts(nested, "x")!.effectiveEffects()!.labels].sort().join(",");
     eq(merged, "a,c", "nested layer merges with outer facts");
     // Own-layer accumulation (assert semantics) never touches the parent.
     scopeOwnFacts(branchA).set("y", factB);
-    eq(scopeFactsFor(parent, "y"), undefined);
-    eq([...scopeFactsFor(branchA, "y")!.effectiveEffects()!.labels].join(","), "b");
+    eq(facts(parent, "y"), undefined);
+    eq([...facts(branchA, "y")!.effectiveEffects()!.labels].join(","), "b");
   });
 
   // --- Resolution unification (C2.3b) ----------------------------------------

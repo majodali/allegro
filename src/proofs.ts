@@ -18,7 +18,8 @@
 // constructors; they reuse this same failed-Proof shape so `checkProofs`
 // stays the single surfacing point.
 
-import { metaReadRaw, SLOT_KEYS } from "./slots.js";
+import { metaReadRaw } from "./metadata.js";
+import { SLOT_KEYS } from "./slot-accessors.js";
 import {
   Value, ValueKind, StructureValue, BitsValue,
   bitsToString,

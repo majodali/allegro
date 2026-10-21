@@ -11,7 +11,8 @@
 // to `info` severity so adoption is non-breaking. Per-project config promotes
 // them to `error` once a project's source is clean.
 
-import { metaReadRaw, getName } from "./slots.js";
+import { metaReadRaw } from "./metadata.js";
+import { getName } from "./slot-accessors.js";
 import {
   Value, ValueKind, ComposedFunctionValue, ExpressionValue,
   StructureValue, BitsValue,

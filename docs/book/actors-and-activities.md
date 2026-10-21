@@ -240,7 +240,10 @@ the cached index (state), it chooses scan-versus-map at a measured threshold
 Included in the hierarchy per the maintainer's direction, at level 2.
 
 **`slots.ts` is a pure interface actor of the Engine** — not, as §3.6 said, a
-failure of T1. It holds nothing and passes messages to internal activities,
+failure of T1. (The file is three since chunk C1 of B-112 (the four owed
+plane interfaces): `slot-accessors.ts`, `metadata.ts` and `capability.ts`,
+one per unit the interface served; `units.md` misalignment M5 (`slots.ts`
+was three units). The analysis below reads unchanged with that substitution.) It holds nothing and passes messages to internal activities,
 which is exactly the second kind of boundary thing. The earlier reasoning
 ("its role cannot be stated without naming the Engine's representation")
 described a pure interface actor correctly and then concluded it was not an

@@ -14,7 +14,7 @@ import { isDischargedProof as _isDischargedProof, formatProofFinding } from "../
 import * as fs from "fs";
 import * as path from "path";
 import { Value, BitsValue, bitsToString } from "../types.js";
-import { metaReadRaw } from "../slots.js";
+import { metaReadRaw } from "../metadata.js";
 import { lawObligationRecords } from "../types-std.js";
 import { buildVerdict, formatVerdict } from "../pcp.js";
 
