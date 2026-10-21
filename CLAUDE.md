@@ -227,3 +227,5 @@ evaluator/runtime set; this is the complete session list):
 - Active plans → `docs/plans/README.md` · decisions → `docs/decisions.md`
 - Document types, reader-facing findings and migration order →
   `docs/documentation-census.md`
+- Identifiers renamed, merged, removed or renumbered; chapters moved →
+  `docs/book-changes.md` (removed identifiers are free for reuse)

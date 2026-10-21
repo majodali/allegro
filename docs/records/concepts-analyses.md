@@ -13,40 +13,18 @@
 >
 > What each pass concluded is stated once, in `docs/book/concepts.md` Part 0 §1.0
 > (the set at a glance) and in the entries' status lines. Read this
-> document when you need the argument, not the outcome.
+> document when you need the argument, not the outcome. Identifiers the
+> passes merged, reclassified or withdrew are logged in
+> `docs/book-changes.md`; in the verbatim text below, **R3′ is today's R3**
+> (renamed 2026-10-21 under PROCESS §6's naming rule).
 
 | Section here | Was | Taken at | What it is |
 |---|---|---|---|
-| §0 | new 2026-10-21 | — | Retired identifiers: what each was, what replaced it, and when |
 | §1 | Part 0 §4 | S2b | Two objections to the requirement set, both resolved as implementation violations (B-109) |
 | §2 | Part 0 §6 | S2c | The cohesion pass over R1 to R14: derivability, pairwise conflict, sufficiency |
 | §3 | Part 0 §7 | S2d | The abort classification: 117 base throws in six classes |
 | §4 | Part 0 §8 | S2d | The metadata merge: R3, R5, R11, R13 into R3′; the fixed vocabulary as SC-7 |
 | §5 | inside Part 0 §3 | B-108 | The measured rulings on IC-1, IC-2 and IC-3 (D48) |
-
----
-
-# 0. Retired identifiers
-
-The book carries only live identifiers (D52: book content depends on no
-history that is not in the book). An identifier that was proposed and then
-merged, reclassified, withdrawn or renamed is listed here, so an older
-citation can be followed. In the verbatim text below, **R3′ is today's
-R3**: the merged requirement was named R3′ from the S2d merge until
-2026-10-21, when PROCESS §6's naming rule (flat sequence numbering, never
-primes) was applied to the book and the merged requirement took the
-number of the statement it replaced.
-
-| ID as cited | Was | Became | When | Where |
-|---|---|---|---|---|
-| R3 (original) | Values carry metadata, and each channel is processed orthogonally | merged into the requirement now numbered R3 (metadata channels are independent) | S2d, 2026-08 | §4.1 |
-| R3′ | the merge's working name | renamed R3 | 2026-10-21 | this table |
-| R5 | Metadata survives evaluation | merged into R3; its survival clause became non-interference | S2d | §4.1; §2.2 C5 |
-| R7 | Allegretto is replaceable | reclassified as the sufficiency claim, not a requirement | S2c | §2.1 F1 |
-| R11 | Propagation is declared, not coded | became specification choice SC-7 | S2d | §4.2 |
-| R13 | Channels can carry mergeable information | became `union` in SC-7's vocabulary | S2d | §4.2; §2.1 F3 |
-| R15 | Program-level aggregation | withdrawn: a program is a value, and channel operations already aggregate | S4b | `docs/book/concepts.md` §45 |
-| IC-1 to IC-7 (pre-S2b) | the implementation-choice numbering before S2b | renumbered; the mapping is in `docs/book/concepts.md` Part 0 §3's note | S2b | — |
 
 ---
 

@@ -47,7 +47,13 @@ Agreed in discussion, 2026-10, and recorded as D52:
    not marked; records (`docs/records/concepts-analyses.md` is the first)
    and the changelog hold history. Each entry's *As implemented* and
    *Delta* rows are current state and stay in the book, so it never
-   describes a target as if it were the code.
+   describes a target as if it were the code. **A structural change log**
+   (`docs/book-changes.md`, an appendix) records every non-monotonic
+   change to the book's content with a date: identifiers renamed, merged,
+   removed or renumbered, chapters moved or split. Removed identifiers
+   are free for reuse, so the numbering stays dense (maintainer ruling
+   2026-10-21, replacing an earlier retired-identifier list that would
+   have left gaps).
 4. **Plans stay out.** A plan is intent; the book is state. Book, backlog
    and plans remain three things.
 5. **Ordered, not numbered.** Chapters have stable slugs; numbers are
