@@ -14,8 +14,8 @@ never duplicate content — duplication is how documentation rots.
 |---|---|---|---|
 | 0 | `docs/VISION.md` | Goals, thesis, design principles | Rare; maintainer sign-off; dedicated PR |
 | 0 | `docs/PROCESS.md` | This document | Rare; maintainer sign-off; dedicated PR |
-| 1 | **The book's chapters**: every document `docs/reading-order.json` lists outside its appendices (D52). Today under `docs/design/` plus the top-level `docs/grammar-formalism.md` and `docs/proving-in-allegro.md`; the table of contents is `docs/design/README.md` | Durable design truth: the conceptual model, the architecture spines, the area design notes, the grammar formalism, the proving primer (consumed by humans and the PCP LLM worker) | With the implementing/deciding change, same PR |
-| 1 | **Records**: analysis passes and chunk logs kept for their evidence, listed as appendices in `docs/reading-order.json` (today `docs/design/concepts-analyses.md`) | History, never current intent; a record's header says so | Written once; never edited after the fact |
+| 1 | **The book's chapters**: every document `docs/reading-order.json` lists outside its appendices (D52), under `docs/book/`; the table of contents is `docs/book/README.md` | Durable design truth: the conceptual model, the architecture spines, the area design notes, the grammar formalism, the proving primer (consumed by humans and the PCP LLM worker) | With the implementing/deciding change, same PR |
+| 1 | **Records**: analysis passes and chunk logs kept for their evidence, listed as appendices in `docs/reading-order.json`, under `docs/records/` | History, never current intent; a record's header says so | Written once; never edited after the fact |
 | 2 | `docs/backlog.md` | What's next, debt register, research questions | Freely, before every commit that affects it |
 | 2 | `docs/CHANGELOG.md` | What landed, when, with what design notes | Append per landed chunk |
 | 2 | `docs/plans/*.md` | Implementation plans (transient; see §4) | Freely; lifecycle below |
@@ -25,7 +25,7 @@ never duplicate content — duplication is how documentation rots.
 Three content types, three homes:
 
 - **Design rationale & decisions** (durable) → the book's chapters
-  (`docs/reading-order.json`; `docs/design/` today)
+  (`docs/reading-order.json`; `docs/book/`)
 - **Implementation plans** (transient) → `docs/plans/`
 - **Status & history** (append-only) → `docs/CHANGELOG.md` +
   `docs/backlog.md`; records of how a design was arrived at → the
@@ -50,7 +50,7 @@ in a memory file.
 
 1. **Design discussion first.** For anything non-trivial, the design is
    discussed and the outcome recorded as a delta to the relevant
-   book chapter (`docs/design/` today; or a new one) *before* implementation. Discussion is
+   book chapter (`docs/book/`; or a new one) *before* implementation. Discussion is
    part of the work, not overhead.
 2. **Plan, then chunks.** Larger features get a plan doc (§4). The
    maintainer decides chunk boundaries — don't start chunk 1 without an
@@ -136,7 +136,7 @@ Before every commit that lands functionality:
       `tests/*.alg` with `// expect:` comments
 - [ ] `docs/CHANGELOG.md` entry (what landed, key decisions, deviations)
 - [ ] `docs/backlog.md` updated (items ticked/moved; new debt or follow-ons filed)
-- [ ] the book's chapters (`docs/design/*` today) updated if the design or its implemented/designed
+- [ ] the book's chapters (`docs/book/`) updated if the design or its implemented/designed
       status changed
 - [ ] `CLAUDE.md` updated **only** if commands, invariants, or the
       architecture map changed
@@ -181,7 +181,7 @@ gotcha list lives in `CLAUDE.md`):
   forward TailCall sentinels and be peelable by the shared
   `findAttachWrapper` helper — never add a bespoke peeler.
 - **No new meta-property on type/value Contexts without registering it** in
-  the meta-protocol registry in `docs/design/standard/type-system.md` (name, owner,
+  the meta-protocol registry in `docs/book/standard/type-system.md` (name, owner,
   contract, lifecycle). The `__`-prefix convention is an accreted artifact
   under revision — follow the registry's current guidance.
 
@@ -195,7 +195,7 @@ gotcha list lives in `CLAUDE.md`):
 ## 7. Agent operating rules
 
 - Start from `CLAUDE.md`; follow its pointers. Read the plans manifest
-  before starting feature work; read the relevant book chapter (`docs/design/` today) before
+  before starting feature work; read the relevant book chapter (`docs/book/`) before
   changing an area.
 - Respect the lifecycle (§3): plan-first for new features, stay-close for
   current work, stop between chunks.
@@ -226,7 +226,7 @@ repo), and narrative state pointers.
 **The promotion rule: before writing a memory file, consider whether the
 content has a more permanent home.**
 
-- Design decisions → the book's chapters (`docs/design/` today; or propose for `docs/VISION.md`)
+- Design decisions → the book's chapters (`docs/book/`; or propose for `docs/VISION.md`)
 - Process rules and feedback about how to work → propose for
   `docs/PROCESS.md`
 - Status and history → `docs/CHANGELOG.md` / `docs/backlog.md`
