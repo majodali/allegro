@@ -33,7 +33,10 @@ attenuation, same-pass re-registration, viral and drop propagation).
 Found on the way: the boundary lint's `kernel-writer-acquisition` rule
 still named `kernelChannelWriter`, so the kernel-only acquisition
 discipline was unenforced since the rename; it names `kernelFieldWriter`
-now, with the same two excluded files and no hits outside them. Reading
+now, with the same two excluded files and no hits outside them. The
+registry-completeness walk (W3) over the demo corpus met its first
+Allegro-minted fields and now accepts a key the live field table holds as
+minted; kernel fields must still appear in the static slot registry. Reading
 order, TOC (II.4), `units.md` rows 10 and 11, census, book plan and
 manifest updated. Suite 1203 distinct tests.
 
