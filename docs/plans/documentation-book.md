@@ -110,7 +110,7 @@ chapters I.4 and I.5, with stubs at `docs/VISION.md` and
 - A term has **one definition site**. The site is a heading preceded by
   `<a id="def-<slug>"></a>` on its own line. The slug is the term in
   lowercase with hyphens (`def-plane`, `def-metadata-field`); a Part 0
-  entry uses its ID (`def-r2`, `def-sc-7`, `def-ic-3a`; `def-r3-prime`).
+  entry uses its ID (`def-r2`, `def-sc-7`, `def-ic-3a`).
 - Every **other** use of the term links to the site on first use in a
   document: `[plane](design/concepts.md#def-plane)`. A glossary
   (`architecture-vocabulary.md`) links to the sites too; it is never the

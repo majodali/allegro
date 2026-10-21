@@ -4,6 +4,23 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — R3′ renamed R3; the book carries only live identifiers
+
+Maintainer ruling 2026-10-21: book content must be consistent and depend
+on no history that is not in the book, and PROCESS §6's naming rule
+(flat sequence numbering, never primes) applies. The merged metadata
+requirement, R3′ since the S2d merge, is now **R3**, taking the number
+of the statement it replaced; its anchor is `def-r3`. Part 0 §1.0 lists
+only live, criterion, derived and candidate identifiers; the merged (R5,
+R11, R13), reclassified (R7 stays, as the sufficiency claim) and
+withdrawn (R15) rows move to a new **retired-identifier table**,
+`docs/records/concepts-analyses.md` §0, which also records the rename.
+Two T0 entries that still cited retired IDs ("satisfies R2, R5, R11";
+"satisfies R3, R5") now cite R3. The record's verbatim text keeps R3′
+with a note that it is today's R3. The standards proposal's record type
+gains the retired-identifier table as required content. Documentation
+only; anchor and doc-ref lints clean.
+
 ## 2026-10 — The constitution joins the book (Tier 0, maintainer ruling 2026-10-21)
 
 `docs/VISION.md` and `docs/PROCESS.md` move to `docs/book/vision.md` and
