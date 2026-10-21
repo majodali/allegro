@@ -348,7 +348,7 @@ Three were taken 2026-09; one is open.
 | # | Question | Ruling |
 |---|---|---|
 | 1 | Is the check hook one hook or three? | **One hook, called per registered field** (taken). §8.1 records the consequence for its signature. |
-| 2 | Do the base-to-layer probes (§4.3) fold into this plan? | **Open.** §8.2 recommends folding them in as a gated install. |
+| 2 | What happens to the two base-to-layer probes, `setEffectsInspector` and `setDivergenceProbe` (§4.3): are they replaced by a gated install in this plan (chunk C5), left as they are and filed, or something else? | **Open.** §8.2 states the three options and recommends the first. |
 | 3 | Does member dispatch fold into hook (a)? | **Yes** (taken). §8.3 records what does not fold in with it. |
 | 4 | Are the out-of-scope populations filed now? | **Yes** (taken). §7 and B-145 through B-148. |
 
@@ -373,10 +373,26 @@ not do is order the loop by a dependency it knows about, because that
 would encode which field derives from which. So the reader must be
 usable from any check, and no check may depend on running after another.
 
-### 8.2 Ruling 2: the probes are a lower unit asking a higher one for results
+### 8.2 Ruling 2: what to do with the two probes
 
-All three probe symbols converge on `assertPureForEquality` in
-`types-std.ts`:
+**The question.** Two functions in `types-std.ts`, `setEffectsInspector`
+and `setDivergenceProbe`, let code above the type system hand it a
+callback it later uses to decide whether a function may instantiate an
+equality law. They are the opposite direction from the hooks in §6: there
+the base declares a slot and a layer fills it; here a layer declares a
+slot and the pipeline fills it. The plan must say one of three things
+about them:
+
+| Option | What it means | Consequence |
+|---|---|---|
+| **(a) Replace them with a gated install, in this plan** | The pipeline registers *what this function's effects are* and *whether it may diverge* through the same capability-gated registration form as hook (d); the law gate reads the registered facts as symbols. The two `set*` functions and their nullable module-level state go away. | One more chunk (C5); the plan then describes every crossing of the layer boundary in one form |
+| **(b) Leave them as they are and file a backlog item** | The plan covers the base-declares-slot direction only; the reverse direction is named as out of scope. | Smaller plan; two ungated injection points stay, and the plan's claim to describe the boundary is weaker |
+| **(c) Replace them with ordinary imports** | The type system imports the effect inference and the divergence analysis directly. | **Not possible**: in the unit DAG the consumer (`equality-laws`, row 26) sits below both producers (`type-primitives`, row 32; `pipeline`, row 33). An import would invert the order |
+
+**Recommendation: (a).** The rest of this section is the evidence.
+
+**What the probes are.** All three injection symbols converge on
+`assertPureForEquality` in `types-std.ts`:
 
 - `setEffectsInspector`: the typed layer asks *what effects does this
   function have?*
@@ -408,11 +424,22 @@ analyzers write conclusions onto the subject instead of returning them;
 here, a consumer reaches back for a conclusion it cannot compute. Both
 are the same missing thing, an analysis result with no interface.
 
-*Recommendation:* fold in. The two real probes become one gated install
-through (d)'s registration form: the pipeline installs *what this
-function's effects are* and *whether it may diverge*, and the law gate
-reads them as symbols. The flag is a separate defect and stays filed as
-B-148.
+**Why (a) and not (b).** Leaving the probes would let this plan claim to
+have described the layer boundary while two crossings in the opposite
+direction stay unnamed and ungated: any module can call `setEffectsInspector`
+today and thereby decide what counts as pure. Under (a) the two become
+one registration in the form the plan already prescribes, so the
+boundary has one shape in both directions. The flag
+(`setLawInstantiationSuspended`) is not a crossing but a phase-scoped
+global, and stays filed as B-148 whichever option is taken.
+
+**What (a) lands, concretely (chunk C5).** A registration `installAnalysis`
+(name provisional) taking a capability token, an analysis name (`effects`,
+`divergence`) and the function that answers it; the pipeline calls it
+once per compilation after the analyses have run; `assertPureForEquality`
+reads the two answers through the registry by name and errors if either is
+uninstalled. The two `set*` exports and their module-level `let` state are
+deleted.
 
 ### 8.3 Ruling 3: member dispatch is hook (a), and what does not fold in
 
@@ -443,7 +470,7 @@ because three units and the facts merge all wait on it.
 | **C2** | Check hook: `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)`; `type-core`, `refinements` and `effects` install theirs | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` finds no caller outside the installers; the uninstalled-check test fails loudly |
 | **C3** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b) | (a) | `evaluator.ts` loses `normalizeType` and the member family | `refs PRIM_TO_METHOD` finds nothing in the evaluator |
 | **C4** | Projection hook: `typeShape` leaves the `metadata` unit and is installed by `type-core` | (c) | the `metadata` unit holds no refinement-chain reading | `refs typeShape` finds the installer only |
-| **C5** | Analysis probes, if ruling 2 folds: `setEffectsInspector` and `setDivergenceProbe` become one gated install through (d)'s form | §8.2 | none owed | the two `set*` names are gone; B-148's flag untouched |
+| **C5** | Analysis probes, if ruling 2 takes option (a): `setEffectsInspector` and `setDivergenceProbe` become one gated registration (`installAnalysis`, §8.2) the pipeline fills and the law gate reads by name | §8.2 | none owed | the two `set*` names are gone; an uninstalled analysis is an error at the gate; B-148's flag untouched |
 | **Exit** | `src/evaluator.ts` assigned to `evaluator`; its propagation half (`viralScan`, `mergeOverMeta`) moved to `metadata` in the same commit | | `evaluator.ts` un-mixed | `units`: the `evaluator` unit has no L2 edge; §5.7's survey re-run; B-128 (b) and (c) unblocked |
 
 Hook (d) is B-111 (field versus channel registration), a separate item.
