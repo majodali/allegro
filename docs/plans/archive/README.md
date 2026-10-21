@@ -23,7 +23,7 @@ or **discarded**.
 
 | Plan | V1 role | Triage outcome |
 |---|---|---|
-| `crystal-proving-curry.md` | Provability arc strategy A–J | Thesis/principles already in `docs/VISION.md` §2/§5. Phase C contract machinery → **register: contracts** — **CONSUMED 2026-08 (B-014)**: §Phase C revalidated into `docs/book/standard/contracts.md` (see its §9 disposition table). Remaining roadmap (D2–D5, I, J) → **register: roadmap revalidation** (B-051), still open. |
+| `crystal-proving-curry.md` | Provability arc strategy A–J | Thesis/principles already in `docs/book/vision.md` §2/§5. Phase C contract machinery → **register: contracts** — **CONSUMED 2026-08 (B-014)**: §Phase C revalidated into `docs/book/standard/contracts.md` (see its §9 disposition table). Remaining roadmap (D2–D5, I, J) → **register: roadmap revalidation** (B-051), still open. |
 | `lucid-discharging-lambek.md` | Phase C contracts/invariants | Entire contract-system design (predicate sets, branch refinement, assert/requires/ensures lowering, sink-based checks, invariant inheritance) → **register: contracts** — **CONSUMED 2026-08 (B-014)**: durable content promoted to `docs/book/standard/contracts.md`, per-chunk disposition recorded in its §9. Sequencing discarded. |
 | `phase-h-plan.md` | PCP protocol H1–H7 | Protocol design (schemas, trivial-pass prevention, hints, catalog, budgets) → **register: PCP**. Implemented shape lives in `src/pcp.ts` + `docs/book/proving-in-allegro.md`. Sequencing discarded. |
 | `phase-f-plan.md` | Proof terms F1–F7 | Surface fully promoted to `docs/book/proving-in-allegro.md` earlier. F6 Lean-export mapping → **register: roadmap revalidation**. Rest discarded. |

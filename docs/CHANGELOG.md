@@ -4,6 +4,21 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — The constitution joins the book (Tier 0, maintainer ruling 2026-10-21)
+
+`docs/VISION.md` and `docs/PROCESS.md` move to `docs/book/vision.md` and
+`docs/book/process.md` (chapters I.4 and I.5), with tombstone stubs at
+the old paths for external links. The maintainer's reason: the two should
+be edited for book inclusion rather than do double duty. PROCESS §1's two
+Tier-0 rows name the new paths; every current-intent reference follows
+(CLAUDE.md, the classification, the registers, the plans manifest and
+active plans, the book's own cross-references, the reading order).
+
+Vision §4 no longer cites backlog IDs: the seven gaps are "open work; the
+backlog carries each as an item", and B-082 to B-085 now say "as described
+in Vision §4" (B-081 and B-086 already cited it). Documentation only;
+doc-ref lint clean.
+
 ## 2026-10 — PROCESS: the book's chapters are at `docs/book/` (Tier 0, maintainer sign-off)
 
 The eight sites that said "`docs/design/` today" after PR #75, and §6's

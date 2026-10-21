@@ -7,7 +7,7 @@ The order is dependency order, declared as data in
 terms defined earlier, and `npm run lint:docs` checks links to definition
 anchors against it. Documents marked *lookahead* are introductions or
 glossaries and may point forward by design. Updated in the same PR as the
-change that alters the design (`docs/PROCESS.md` §3, deviation rule).
+change that alters the design (`docs/book/process.md` §3, deviation rule).
 Each layer folder's README is that layer's **boundary contract**: what it
 provides, what it may depend on, and the invariants the boundary tests
 enforce.
@@ -39,8 +39,8 @@ A term has one definition site, a heading preceded by
 | I.1 | `../../README.md` (*lookahead*) | Introduction |
 | I.2 | `getting-started.md` (*lookahead*) | First program to first verified program |
 | I.3 | `language-reference.md` (*lookahead*) | Surface syntax by example |
-| I.4 | `../VISION.md` (Tier 0) | Thesis, design principles |
-| I.5 | `../PROCESS.md` (Tier 0) | Lifecycle, quality guidelines, agent rules |
+| I.4 | `vision.md` (Tier 0) | Thesis, design principles |
+| I.5 | `process.md` (Tier 0) | Lifecycle, quality guidelines, agent rules |
 | I.6 | `architecture-vocabulary.md` (*lookahead*) | The six abstractions (layer, track, plane with field and channel, plane interface, actor and activity, unit), which question each answers, how they relate, the three senses of "capability" |
 | I.7 | `layers.md` | Layer model, capability tracks, milestone register |
 | I.8 | `units.md` | The implementation as the smallest independent units in a narrow DAG (D50/D51): decisions per unit, today's files mapped, the `Value` contract/kinds/assembly split, actors↔units misalignments, the move ledger. Measured by `scripts/analyze/index.ts units` |

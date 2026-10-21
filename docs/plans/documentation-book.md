@@ -99,10 +99,11 @@ backlog IDs bare).
 (PR #75) made the reading order the authority on where Tier-1 documents
 live. `docs/book/` holds the former `docs/design/` tree and the four
 top-level chapters; `docs/records/` holds the record. Tombstone stubs
-stand at every old path. The two Tier-0 documents stay at `docs/`; the
-reading order points at them. Open from the Tier-0 PR's questions:
-whether the constitution moves into the book, the R3′ naming exception,
-and `VISION.md` line 220.
+stand at every old path. The two Tier-0 documents followed on
+2026-10-21 (maintainer ruling: edited for book inclusion rather than
+doing double duty): `docs/book/vision.md` and `docs/book/process.md`,
+chapters I.4 and I.5, with stubs at `docs/VISION.md` and
+`docs/PROCESS.md`.
 
 ### 4.1 The term-anchor convention (Phase 0)
 

@@ -1,7 +1,7 @@
 # Proposed PROCESS delta — parallel lanes & the per-lane gate
 
 Status: **approved and applied 2026-08** (maintainer sign-off in
-session). Both edits below are now live in `docs/PROCESS.md`; this doc
+session). Both edits below are now live in `docs/book/process.md`; this doc
 is kept as the record of what was proposed and why, and closes here.
 
 The maintainer also recorded intent to evaluate this as a candidate

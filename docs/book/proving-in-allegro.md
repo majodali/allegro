@@ -6,7 +6,7 @@ suitable both for a human learning the F-arc and for an LLM prover
 that needs to produce candidate proof terms the kernel will accept.
 
 The primer is intentionally compact. For deeper background see
-`docs/VISION.md` §2 (the bet behind the arc) and the
+`docs/book/vision.md` §2 (the bet behind the arc) and the
 Phase F1–F7 entries in `docs/CHANGELOG.md` §v1 era (each feature's
 full implementation contract).
 

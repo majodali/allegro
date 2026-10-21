@@ -30,4 +30,4 @@ appears.
 
 - `planning-dsl.md` (planned, revalidation-gated — BACKLOG register;
   source: `docs/plans/archive/project-1-planning-dsl-design.md`)
-- Vision-level framing: `docs/VISION.md` §4 (Tier 0)
+- Vision-level framing: `docs/book/vision.md` §4 (Tier 0)

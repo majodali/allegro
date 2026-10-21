@@ -38,8 +38,8 @@ cache — amend it upstream, never here.
 
 ## Documentation map (read first)
 
-- **Vision, thesis, design principles:** `docs/VISION.md` (Tier 0 — never edit without maintainer sign-off)
-- **Process, lifecycle, quality guidelines, agent rules:** `docs/PROCESS.md` (Tier 0)
+- **Vision, thesis, design principles:** `docs/book/vision.md` (Tier 0 — never edit without maintainer sign-off)
+- **Process, lifecycle, quality guidelines, agent rules:** `docs/book/process.md` (Tier 0)
 - **Classification & binding:** `docs/classification.md` · **Decisions:** `docs/decisions.md` (D1–D51, E-R, U-R, R-R, chunk rulings)
 - **Reading order (D52, the book):** `docs/reading-order.json` is the order; `docs/book/README.md` is the table of contents. A document may define a term using only terms defined earlier; a term's definition site carries a `def-` anchor and every other first use links to it
 - **Architecture vocabulary:** `docs/book/architecture-vocabulary.md` — layer, track, plane, plane interface, actor, unit: what each answers and how they relate. Read before a doc that uses more than one
@@ -78,7 +78,7 @@ npm run check-deployed              # audit live site vs origin/main (needs site
 ```
 
 `basics.alg` output and every `tests/*.alg` demo are suite-pinned via
-`// expect:` comments (`docs/PROCESS.md` §5) — the suite is the oracle.
+`// expect:` comments (`docs/book/process.md` §5) — the suite is the oracle.
 
 ## What Allegro is
 
@@ -87,7 +87,7 @@ representation kinds, expression DAGs, partial-evaluation evaluator) →
 **Allegro Standard** (typed language as a curated extension stack) →
 **Vivace** (domain-model layer, hypothesis stage). The defining bet:
 provability + safety via PE-as-discharge with participant-neutral
-[impl, proof] pairs — `docs/VISION.md` §1–§2.
+[impl, proof] pairs — `docs/book/vision.md` §1–§2.
 
 ## Architecture at a glance
 

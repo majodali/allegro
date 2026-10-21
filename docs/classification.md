@@ -32,7 +32,7 @@ field definitions and omission defaults per the methodology
 No deviations recorded. **D-1** (W-001, the per-chunk gate) was recorded
 2026-09-01 and **retired 2026-09-05**: methodology v1.5.0 released the
 pre-ratified sequence mode with allegro as its evidencing instance, and
-`docs/PROCESS.md` §3 now states all four of the released rule's stop
+`docs/book/process.md` §3 now states all four of the released rule's stop
 conditions — the two it already carried, plus a failed check and a chunk
 whose landing summary carries asks. The practice and the rule agree, so
 there is nothing left to deviate from. Owner: B-131, closed.
