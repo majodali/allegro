@@ -175,8 +175,8 @@ install (R6's delta); that is R6's finding, not R2's.
 
 **Level.** Requirement, proposed at plan chunk S2d (record §4.1), where
 four earlier statements about metadata were merged into this one. In use
-by every T2 to T5 entry. Identifiers retired by that merge are listed in
-the record §0.
+by every T2 to T5 entry. The identifiers that merge removed are logged in
+`docs/book-changes.md`.
 
 **Definition.** A value may carry named information about itself. Each
 channel's handling is independent of every other: an operation's treatment
@@ -789,7 +789,8 @@ and `args` mean the same memo is correct).
 - **Ratification.** R1 to R20 are proposed, not ratified as a set. The
   cohesion pass found what it found (record §2); the maintainer's S2d
   rulings merged four metadata statements into R3 and SC-7 (record §4);
-  the identifiers that retired are listed in the record §0. Every entry
+  the identifiers that were removed are logged in `docs/book-changes.md`
+  and are free for reuse. Every entry
   below cites the set as it stands in §1.0. The ask stands: ratify the set,
   or amend it, so the status column can say *ratified*.
 - **Candidates have no entries.** R16 to R20 are stated in one table with
@@ -2372,7 +2373,7 @@ structurally different from everything in T2.
 **Delta — restated at S4b; the first version was wrong.**
 
 S4 claimed this as a **requirement gap** (candidate R15, since withdrawn;
-the record §0 lists it): the requirement set
+`docs/book-changes.md` logs it): the requirement set
 is per-value, the verdict is program-level, therefore nothing enables it. The
 maintainer's counter is correct and better: **a program is a value**, and
 accumulating metadata across an expression *is what channel operations

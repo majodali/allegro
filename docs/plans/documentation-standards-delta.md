@@ -237,7 +237,8 @@ Types the census found that the methodology lacks:
 | **Vocabulary** | the abstractions a project's documents are written in, distinguished and related | one definition site per term by citation; which question each answers; relations; overloaded words with the term to prefer | `docs/book/architecture-vocabulary.md` |
 | **Conceptual model** | every salient concept in dependency order, levelled, with as-implemented and delta (the companion proposal `conceptual-model-methodology-delta.md` defines the entry shape) | the entry shape for every entry, including the foundations | `docs/book/concepts.md`, whose Part 0 breaks its own shape |
 | **Study** | an exercise testing whether a model earns its keep before adoption | a statement that it is not settled design; the question; the evidence; the open rulings | `docs/book/actors-and-activities.md` |
-| **Record** | a closed plan's chunk log, a landing report, an analysis pass: history kept for its evidence | a header saying it is history (which exempts it from supersession marking entry by entry); where the record is a conceptual model's, a **retired-identifier table** (ID as cited, what it was, what it became, when), because a book carries only live identifiers and the changelog does not capture renames and merges | eight closed plans in `docs/plans/`; `docs/records/concepts-analyses.md` (its §0 is the first retired-identifier table); every CHANGELOG entry |
+| **Record** | a closed plan's chunk log, a landing report, an analysis pass: history kept for its evidence | a header saying it is history (which exempts it from supersession marking entry by entry) | eight closed plans in `docs/plans/`; `docs/records/concepts-analyses.md`; every CHANGELOG entry |
+| **Structural change log** | a register logging every non-monotonic structural change to a book's content: identifiers renamed, merged, removed, renumbered or reclassified; chapters moved, split or merged | date, kind, subject, from → to, pointer; newest first. Removed identifiers are free for reuse, so numbering stays dense (maintainer ruling 2026-10-21: a retired-identifier list leaves gaps and an inconsistent book; a dated log does not) | `docs/book-changes.md` |
 | **Boundary contract** | what a layer or component provides, may depend on, and forbids | provides; may depend on; not in this layer; invariants with their enforcement | five layer READMEs |
 
 The **record** type is the one that unblocks the most. K-007 says closed
@@ -305,7 +306,9 @@ notes, specification and conceptual model, declared by a reading order
 (§6.5). It is not a new document type: each chapter keeps its own type and
 that type's content rules, and the authority designation applies per
 chapter. The book carries reasoning and current state, including each
-entry's delta against the code; it carries no history. Registers remain
+entry's delta against the code; it carries no history. A structural
+change log (§6.2) accompanies it as an appendix, so an older citation can
+be followed and a removed identifier reused. Registers remain
 authoritative and are rendered as appendices; records and plans are
 outside it.
 

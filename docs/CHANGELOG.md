@@ -4,6 +4,22 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — `docs/book-changes.md`: the book's structural change log replaces the retired-identifier table
+
+Maintainer ruling 2026-10-21: a retired-identifier list leaves numbering
+gaps and an inconsistent book; log every non-monotonic structural change
+with a date instead, and let removed identifiers be reused. The new Tier 2
+register logs renames, merges, removals, renumberings, reclassifications,
+moves and splits (newest first; row shape in its header), seeded with the
+thirteen changes since 2026-08: the constitution move, R3′ → R3, the four
+removed requirement IDs now free, the chapter moves, the Part 0 split,
+SC-6's supersession, the S4b withdrawal, the S2d merge, the S2c
+reclassifications, the S2b renumbering, the field/channel rename and the
+`Context` retirement. The record's §0 is removed; the standards proposal's
+record type loses the table and gains a **structural change log** row; the
+book plan's settled decision 3 says so. Reading order, CLAUDE.md pointer and
+census row added. Documentation only.
+
 ## 2026-10 — R3′ renamed R3; the book carries only live identifiers
 
 Maintainer ruling 2026-10-21: book content must be consistent and depend

@@ -76,6 +76,7 @@ Approximate bare-identifier counts are in the findings as "~N bare IDs".
 | `docs/decisions.md` | Register | everyone | Tier 2 | n/a | K-004 says one line per entry; D41 to D51 run 60 to 160 words with reasoning inline. 51% long sentences. ~67 bare of 144 IDs. | 2 |
 | `docs/CHANGELOG.md` | Register | maintainer, agents | Tier 2 | n/a | 5,698 lines of landing reports kept as entries; 121 em-dash headers; ~208 bare IDs. Entries are reports (W-008 shape), not rows. The style guide exempts a register kept as history entry-by-entry when its header says so; the header does not. | 3 |
 | `docs/audits.md` | Register | auditors | Tier 2 | n/a | None. | 4 |
+| `docs/book-changes.md` | Register (book change log) | a reader with an older citation | Tier 2 | n/a | New 2026-10-21: every non-monotonic structural change to the book, dated; removed identifiers free for reuse. | 4 |
 | `docs/plans/README.md` | Register (manifest) | agents | Tier 2 | n/a | Rows of 60 to 150 words; 51% long sentences; ~61 bare IDs. Status vocabulary inconsistent across rows: `closed`, `closed → B-120`, `COMPLETE`, `draft proposal`, `approved and applied`, against K-007's four transitions. | 2 |
 | `docs/book/README.md` | Register (index) | agents | Tier 1 | n/a | Status convention defined here is used by 9 of 20 design documents. | 3 |
 

@@ -59,6 +59,7 @@
         { "doc": "docs/backlog.md", "title": "Backlog", "register": true },
         { "doc": "docs/CHANGELOG.md", "title": "Changelog", "register": true },
         { "doc": "docs/documentation-census.md", "title": "Documentation census", "register": true },
+        { "doc": "docs/book-changes.md", "title": "Book change log (non-monotonic structural changes)", "register": true },
         { "doc": "docs/audits.md", "title": "Audit log", "register": true },
         { "doc": "V1-INVENTORY.md", "title": "V1 feature inventory", "register": true },
         { "doc": "docs/records/concepts-analyses.md", "title": "Concept spine: the analysis record", "record": true }
