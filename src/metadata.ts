@@ -306,6 +306,43 @@ export function fieldMerge(name: string): ((a: Value, b: Value) => Value) | unde
   return FIELD_MERGES.get(name);
 }
 
+// --- Check hook (B-112 C2, hook (b)) ------------------------------------------
+//
+// Checking an argument against a declared constraint is a DECISION the base
+// must not make (P3): it holds the loop and the reader, each field's owner
+// installs the check. Ruling 1 (plan §8.1): checks are not independent, so a
+// check takes a total reader over fields and may consult any of them; the
+// base never orders the loop by a dependency it knows about, so no check may
+// rely on running after another.
+
+/** What the base knows about the site: the argument's position, the
+ *  parameter it binds (an opaque handle — a check may read host-plane
+ *  bits the layer stamped on it), and an evaluator bound to the site's
+ *  context when one exists (a check that must evaluate — a refinement
+ *  predicate — uses it; without it the check is best-effort). */
+export interface CheckSite {
+  argIndex: number;
+  param?: Value;
+  evaluate?: (expr: Value) => Value;
+}
+export type FieldReader = (v: Value, field: string) => Value | undefined;
+/** A field's installed check. Throws to reject; returns to accept. */
+export type FieldCheck = (expected: StructureValue, actual: Value, read: FieldReader, site: CheckSite) => void;
+
+const FIELD_CHECKS = new Map<string, FieldCheck>();
+/** Only `src/capability.ts` calls this, through the gated `installFieldCheck`. */
+export function defineFieldCheck(name: string, check: FieldCheck): void {
+  FIELD_CHECKS.set(name, check);
+}
+export function fieldCheck(name: string): FieldCheck | undefined {
+  return FIELD_CHECKS.get(name);
+}
+/** The installed checks, in registration order. The evaluator runs every
+ *  one at a typed call site; the base does not know which field matters. */
+export function fieldChecks(): IterableIterator<[string, FieldCheck]> {
+  return FIELD_CHECKS.entries();
+}
+
 /** List the fields present on a value (metadata keys + binding-plane fields).
  *  C4.3b: the metadata plane is universal — flattened Contexts report their
  *  keys alongside the legacy binding-plane fields. */

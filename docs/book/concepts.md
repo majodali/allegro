@@ -1428,11 +1428,11 @@ the same file.**
 - *Correct:* `evaluator.ts` propagates channels through the plane interface —
   `viralFields()`, `metaFieldSpec(k)?.rule === "union"`, `fieldMerge(k)`.
   Layer-ignorant, exactly as R3/SC-7 intend.
-- *Incorrect:* it also imports **27 symbols** from three L2 modules
-  (`types-std`, `refinements`, `effects`), and `checkArgType` — which calls
-  `getType`, reads `typeContextName`, **evaluates refinement predicates**,
-  dispatches through an `instanceof` binding and throws `Type error` — lives
-  in `evaluator.ts` itself. `scope.ts` imports `PredicateSet`;
+- *Incorrect:* it also imports **21 symbols** from three L2 modules
+  (`types-std`, `refinements`, `effects`): member dispatch and visibility,
+  call-site unification, the `type` alias, and effect and predicate
+  propagation on residuals. Argument checking left it at B-112 C2: the
+  evaluator runs installed field checks and decides nothing.
   `futures.ts` imports `withType`, `ErrorType`, `StringType`.
 
 This violates the project's own stated invariant (`CLAUDE.md`:
@@ -1513,9 +1513,11 @@ owes:
    a type is. So a channel installs *how to dispatch on my field*, and the
    evaluator calls it with an opaque field value. This is §23's decomposition
    made concrete, and it is the interface B-110 is really about.
-2. **A check hook.** `checkArgType` currently lives in the evaluator. Under
-   the same shape, a channel installs *how to check a value against my
-   field*, and the evaluator calls it without knowing the answer is a "type".
+2. **A check hook — landed (B-112 C2).** A channel installs *how to check
+   a value against my field* through the gated `installFieldCheck`, and
+   the evaluator runs every installed check with a free reader without
+   knowing the answer is a "type" (`allegretto/metadata-and-capability.md`
+   §7).
 3. **A projection hook.** `shape` is a computed projection of the `type`
    field (§19b), and the projection is hardcoded in `metaReadRaw`. A
    channel should install its own projections.

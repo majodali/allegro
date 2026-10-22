@@ -396,12 +396,14 @@ backlog owner's or a ruling's.
   (B-141). The unit DAG says where it would go: a `host` unit between
   `futures` and `base-primitives`, which the primitives import and the
   CLI and web bundle each supply.
-- **M11 — The evaluator holds Type-system activities.** `checkArgType`,
-  `PRIM_TO_METHOD` dispatch, and precompile's inference are *Check
-  declared constraint*, *Dispatch member access* and *Infer* — all Type
-  system — inside the Engine's unit. B-112's four hooks are exactly this
-  boundary. This is the strongest alignment the two models produce, and
-  the reason this document precedes B-112 chunk 1.
+- **M11 — The evaluator holds Type-system activities.** `PRIM_TO_METHOD`
+  dispatch and precompile's inference are *Dispatch member access* and
+  *Infer* — Type system — inside the Engine's unit; *Check declared
+  constraint* left it at B-112 chunk C2 (the evaluator runs installed
+  field checks and decides nothing). Call-site unification is a fourth
+  such activity the plan did not list (plan §9.4). B-112's hooks are
+  exactly this boundary. This is the strongest alignment the two models
+  produce, and the reason this document precedes B-112 chunk 1.
 - **M12 — `scope` imported `refinements`.** Closed by B-112 chunk C1.
   Found by the report, not by reading: `scopeFactsFor` merged predicate
   sets along the chain with `mergePredicateSets`, so L0's scope knew how

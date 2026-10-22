@@ -4,6 +4,39 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-112 C2: the check hook; argument checking is installed, not imported
+
+Hook (b) of the ratified plane-interfaces plan. The base holds a check
+table (`src/metadata.ts`: `FieldCheck`, `FieldReader`, `CheckSite`,
+`fieldChecks`) and a gated install (`src/capability.ts`
+`installFieldCheck`, P4: the installer holds the field's writer). The
+evaluator's 150-line `checkArgType` is gone; `checkArg` runs every
+installed check at a typed call site with `metaReadRaw` as the reader and
+an evaluator bound to the site's context, hands the Param over as an
+opaque handle, and throws if no check is installed at all. `types-std.ts`
+installs the `type` check with the `type` writer (structure, generics,
+futures and refinement predicates, the predicate evaluated through the
+site); `effects.ts` installs the `effects` check with its writer (the
+effect bound on an effect type, and the Surface C `param_effects` bound
+read off the Param), which also takes the call site's Surface C block out
+of the evaluator. Messages byte-identical. The `effects` unit gains a
+`structure` edge for `getEffectBound`.
+
+Measured: `refs checkArgType` finds only the installer; evaluator L2
+imports 27 → 21 (`impliesDomain`, `EffectsDomain`, `AbstractDomain`,
+`normalizeType`, `typeContextName`, `futureElementType`,
+`typeNameOnRefinesChain` and five accessors gone). `units`: 162 edges,
+52 ok, 0 violations, 110 unresolved. Two installers, not the plan's
+three: `checkArgType` never read the argument's `predicates`, it
+evaluated the expected type's predicate, and refined types are types
+(plan §9.4, correcting ruling 1's measured claim). Finding for a ruling:
+call-site unification (`unifyTypes` and four companions) is a deciding
+activity no chunk or population names. One boundary test added (foreign
+writer refused; both kernel checks installed; a check for a field the
+base never heard of runs at a typed call site). W3 strengthened per the
+maintainer's review of #83: a minted field is accepted only when minted
+in the current pass. Suite 1204 distinct tests.
+
 ## 2026-10 — The book's first Part II chapter: `allegretto/metadata-and-capability.md` (units 10 and 11)
 
 D52 Phase 2 begins with the band whose code moved at B-112 C1. The

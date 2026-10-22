@@ -1509,7 +1509,7 @@ that prevents it.
   concept spine (S2f); `concepts.md` §24 carries the interface table.
   **PLAN: [docs/plans/plane-interfaces.md](plans/plane-interfaces.md)**
   (ratified as a whole 2026-10-21, ruling 2 option (a); **C1 landed
-  2026-10-21**, C2–C5 and the exit remain) — scoped to the four hooks on measurement: delta 23's
+  2026-10-21, C2 landed 2026-10-22**, C3–C5 and the exit remain) — scoped to the four hooks on measurement: delta 23's
   *27 upward symbols* is **131 imported / 98 distinct**, of which only **4**
   are checkers. The plan's §6 files five other populations (type vocabulary
   ~25, knowledge propagation ~18, member dispatch ~9, diagnostics ~8,
@@ -1547,6 +1547,13 @@ that prevents it.
     M5 and M12 closed). `units`: 0 violations, 6 mixed files. Two
     deviations recorded in the plan §9.3 (facts are host objects, not
     Values; the uninstalled-merge error is not suite-exercised).
+  - **Progress.** C2 (2026-10-22): hook (b). `checkArgType` left the
+    evaluator; `type-core` and `effects` install their checks through the
+    gated `installFieldCheck`, and the evaluator's `checkArg` runs every
+    installed check with a free reader. Evaluator L2 imports 27 → 21; the
+    rest are dispatch (C3), propagation (exit, B-146), the `type` alias
+    (B-145) and **call-site unification, which no chunk or population
+    names — needs a ruling** (plan §9.4).
 
 - [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
   Body wrappers (`type_check`, the `*_attach` family) must forward the

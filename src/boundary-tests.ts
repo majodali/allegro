@@ -33,12 +33,12 @@ import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
 import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, SLOT_REGISTRY, SLOT_KEYS, typeShape, isInterfaceType as isInterfaceTypeSlots, elementsOf } from "./slot-accessors.js";
-import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge } from "./metadata.js";
-import { registerMetaField, installFieldMerge } from "./capability.js";
+import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge, fieldCheck, currentMetaEpoch } from "./metadata.js";
+import { registerMetaField, installFieldMerge, installFieldCheck } from "./capability.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { withMeta } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
-import { bitsToString, BitsValue } from "./types.js";
+import { bitsToString, BitsValue, AllegroError } from "./types.js";
 import { formatValue } from "./primitives.js";
 import { scopeNew, scopeExtend, scopeLookup, assertNotScope, scopeAssume, scopeFactsFor, scopeOwnFacts, scopeAllBindings, makeCell, isPendingCell, installFactsMerge } from "./scope.js";
 import { applyPhase } from "./runtime.js";
@@ -379,9 +379,15 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
     // A field Allegro minted through `channel_register` is registered in the
     // live field table rather than the static slot registry — that IS the
     // sanctioned way a new field comes to exist (D23/D24), so the walk
-    // accepts a minted entry. A kernel field must still be in SLOT_REGISTRY.
+    // accepts a minted entry — but only one minted in the CURRENT pass:
+    // registrations are sealed across passes, so without the epoch test a
+    // key that bypassed registration would pass W3 whenever an earlier
+    // program in the process had minted the same name. A kernel field must
+    // still be in SLOT_REGISTRY.
     for (const key of meta.keys()) {
-      if (!isRegisteredFieldName(key) && !metaFieldEntry(key)?.minted) {
+      const entry = metaFieldEntry(key);
+      const mintedHere = entry !== undefined && entry.minted && entry.epoch === currentMetaEpoch();
+      if (!isRegisteredFieldName(key) && !mintedHere) {
         out.push({ invariant: "W3 registry-completeness", detail: `unregistered metadata field key "${key}" on a ${v.kind}`, program });
       }
     }
@@ -983,6 +989,41 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     try { installFactsMerge(probe, (a) => a); } catch (e) { threw = String(e); }
     eq(threw?.includes("already installed") ?? false, true,
       `the facts merge installs once: ${threw}`);
+  });
+
+  test("check installation is capability-gated (B-112 C2, hook (b)): the base runs installed checks and decides nothing", () => {
+    // The gate: a look-alike writer is refused; the two kernel checks are
+    // installed by their owners at layer init.
+    const forged = { channel: "type", write: (t: Value) => t };
+    let threw: string | null = null;
+    try { installFieldCheck(forged, () => {}); } catch (e) { threw = String(e); }
+    eq(threw?.includes("holder of its writer") ?? false, true,
+      `a foreign writer cannot install a field check: ${threw}`);
+    eq(fieldCheck("type") !== undefined, true, "type-core installed the `type` check");
+    eq(fieldCheck("effects") !== undefined, true, "effects installed the `effects` check");
+
+    // The loop is generic: a field the base has never heard of installs a
+    // check, and a typed call site runs it. The evaluator does not know the
+    // field exists; it runs every installed check with a free reader.
+    const probe = registerMetaField({ name: "check_probe", rule: "drop" });
+    installFieldCheck(probe, (_expected, actual, read, site) => {
+      if (read(actual, "check_probe") !== undefined) {
+        throw new AllegroError(`check_probe: argument ${site.argIndex} carries the probe`);
+      }
+    });
+    const r = attack("f = (x: Int) => x");
+    eq(r.threw, null, `typed identity compiles: ${r.threw}`);
+    const f = r.evalCtx!.bindings.get("f")!.value as Value;
+    const plain = withType(makeInt(1), IntType);
+    const marked = probe.write(plain, makeInt(1));
+    eq(bitsToString(evaluate(makeExpr(f, [plain]), r.evalCtx!) as BitsValue) !== undefined, true, "a plain typed argument passes every check");
+    threw = null;
+    try { evaluate(makeExpr(f, [marked]), r.evalCtx!); } catch (e) { threw = String(e); }
+    eq(threw?.includes("carries the probe") ?? false, true,
+      `the installed check ran at the call site: ${threw}`);
+    // Replace the probe's check with one that accepts, so later tests in
+    // this process are not affected: the holder may re-install.
+    installFieldCheck(probe, () => {});
   });
 
   test("forgery G (B-125): the metadata write surface is exactly the minted writers", () => {

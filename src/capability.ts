@@ -23,12 +23,12 @@ import {
   StructureValue,
 } from "./types.js";
 import {
-  MetaFieldSpec, MetaFieldWriter, defineMetaField, metaFieldEntry, metaFieldEntries,
-  currentMetaEpoch, cloneMeta, defineFieldMerge,
+  MetaFieldSpec, MetaFieldWriter, FieldCheck, defineMetaField, metaFieldEntry, metaFieldEntries,
+  currentMetaEpoch, cloneMeta, defineFieldMerge, defineFieldCheck,
 } from "./metadata.js";
 import { stampBindingSlot } from "./slot-accessors.js";
 
-export type { MetaFieldSpec, MetaFieldWriter } from "./metadata.js";
+export type { MetaFieldSpec, MetaFieldWriter, FieldCheck, FieldReader, CheckSite } from "./metadata.js";
 
 function buildWriter(spec: MetaFieldSpec): MetaFieldWriter {
   return {
@@ -98,6 +98,18 @@ export function installFieldMerge(writer: MetaFieldWriter, merge: (a: Value, b: 
     throw new AllegroError(`installFieldMerge: the merge for '${writer.channel}' may be installed only by the holder of its writer (P4)`);
   }
   defineFieldMerge(writer.channel, merge);
+}
+
+/** Install the check for a field (B-112 C2, hook (b)): how an argument is
+ *  checked against a declared constraint that names this field. GATED the
+ *  same way as the merge (P4): the installer holds the writer, or any
+ *  module could decide what type checking means. The base runs every
+ *  installed check at a typed call site and knows none of their meanings. */
+export function installFieldCheck(writer: MetaFieldWriter, check: FieldCheck): void {
+  if (!holdsWriterFor(writer, writer.channel)) {
+    throw new AllegroError(`installFieldCheck: the check for '${writer.channel}' may be installed only by the holder of its writer (P4)`);
+  }
+  defineFieldCheck(writer.channel, check);
 }
 
 // --- Field registration: what the BASE owns ------------------------------------
