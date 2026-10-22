@@ -5,7 +5,7 @@
 // =============================================================================
 
 import {
-  Value, ValueKind, BitsValue, StructureValue, PrimitiveFnImpl, PrimitiveFunctionValue,
+  Value, ValueKind, BitsValue, StructureValue, PrimitiveFnImpl, PrimitiveFunctionValue, Binding,
   ComposedFunctionValue, EvalFn,
   makeInt, makeFloat, bitsToFloat, makeBits, makePrimitive, makeExpr, makeStructure, withMeta, makeDenseArray,
   makeComposedFn, makeParam,
@@ -14,12 +14,12 @@ import {
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
 import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
-import { scopePrivilegeExtend, scopeHoldsPrivilege, scopeLookup } from "./scope.js";
+import { scopePrivilegeExtend, scopeHoldsPrivilege, scopeLookup, scopeExtend } from "./scope.js";
 import { effectsOf as fnEffectsOf } from "./effects.js";
 import { putEntry, removeEntry } from "./structure.js";
 import { getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate, getGenericArgs, getGenericBackLink, getSlotCount, slotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf, setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface, setWraps, setPredicate, setGenericArgs, setGenericBackLink, setProposition, setEffectBound, setAbstractDomain, removeName, removeRefines, removeConstruct, SLOT_KEYS, isMetaProtocolSlot, typeShape, getFallbackMember, equalityShape, asStructure } from "./slot-accessors.js";
 import { writeShape, carryShape, removeShapeSlot, metaReadRaw, cloneMeta } from "./metadata.js";
-import { kernelFieldWriter, assertNotIntegrityKey, registerMetaField, installFieldCheck, FieldReader, CheckSite } from "./capability.js";
+import { kernelFieldWriter, assertNotIntegrityKey, registerMetaField, installFieldCheck, installDispatch, FieldReader, CheckSite, CallSite, CallBinding } from "./capability.js";
 
 
 // --- Constants ---
@@ -3479,6 +3479,144 @@ registerMetaField({ name: "shape", rule: "computed" });
 // effect bound on an effect type is the effects channel's check, installed
 // from `src/effects.ts`; this one steps aside for it.
 installFieldCheck(typeWriter, (expected, actual, read, site) => checkArgType(actual, expected, read, site));
+
+// --- Type-directed dispatch (B-112 C3, hook (a)) --------------------------------
+//
+// Installed with the `type` writer (P4). The evaluator runs the installed
+// dispatchers at every primitive application and every composed call and
+// knows nothing of what they decide. Two entry points:
+//
+//   primitive — the residual's type when an operand is unresolved; the
+//     equality protocol on `==`/`!=`; operator dispatch through the typed
+//     operand's method, behind the availability (V-R1) and reachability
+//     (D41) gates; user-defined operator members with the type's privilege.
+//     Returns null to decline, and the base calls the primitive.
+//   call — maintainer ruling 2026-10-22: binding a callee's declared
+//     constraints to its arguments is the same activity seen from the
+//     call. Type-variable unification, the per-argument checks (through
+//     the base's check loop), the boundary bound (D36) and the inferred
+//     return type. Returns null for an untyped callee.
+
+/** Base primitive names → type method names, for operator dispatch. */
+const PRIM_TO_METHOD = new Map<string, string>([
+  ["bits_add", "add"], ["bits_sub", "sub"], ["bits_mul", "mul"],
+  ["bits_div", "div"], ["bits_mod", "mod"],
+  ["bits_eq", "eq"], ["bits_neq", "neq"], ["bits_lt", "lt"], ["bits_gt", "gt"],
+  ["bits_lte", "lte"], ["bits_gte", "gte"],
+]);
+
+installDispatch(typeWriter, {
+  primitive(fn, evalArgs, ctx, evalFn, residual) {
+    if (evalArgs[0] === undefined) return null;
+    const typeComp = metaReadRaw(evalArgs[0], "type");
+    if (residual !== null) {
+      // Even though args aren't fully resolved, their type meta may be
+      // known: propagate the left operand's type as the residual's type.
+      // For comparisons this is imprecise (should be Bool), but the correct
+      // type is determined when the expression fully evaluates.
+      if (typeComp && typeComp.kind === ValueKind.Structure && PRIM_TO_METHOD.has(fn.name)) {
+        return withMeta(residual, new Map([["type", typeComp]]));
+      }
+      return null;
+    }
+    // E1 (B-027, §7/D37): `==` and `!=` resolve through the EQUALITY
+    // PROTOCOL when both operands are typed — shape resolution (equality
+    // shape = full refinement-peel; distinct types don't unify), custom
+    // `equals` dispatch, kernel structural equals for structures. Total:
+    // typed Bool out, never a host crash, on any kind pair. Declines
+    // (null) for untyped operands — base-mode bits_eq semantics keep.
+    if (fn.name === "bits_eq" || fn.name === "bits_neq") {
+      const r = protocolEquals(evalArgs[0], evalArgs[1], fn.name === "bits_neq", ctx, evalFn);
+      if (r) return r;
+    }
+    // Type-directed dispatch: if the first arg has a type with a matching
+    // method, dispatch through the type instead of calling the base
+    // primitive directly. This enables operator overloading (e.g., String +
+    // String = concatenation).
+    if (!typeComp || typeComp.kind !== ValueKind.Structure) return null;
+    const methodName = PRIM_TO_METHOD.get(fn.name);
+    if (!methodName) return null;
+    // B-097 V2 (V-R1): operator dispatch goes through the SAME availability
+    // gate as dot access. An occurrence bound that lacks the operator member
+    // denies, exactly as `x.add` would (conscious delta 3).
+    assertMemberAvailable(evalArgs[0], methodName, typeComp as StructureValue);
+    // C3.1 (D36): dispatch reads the SHAPE. Member-transparent refinement
+    // layers share the parent's member set, so walking them off never
+    // changes which method runs; preserveOps/mixin layers mint their own
+    // members and ARE shapes (their overrides run).
+    const opShape = typeShape(typeComp as StructureValue);
+    // B-097 V3 (D41 stage 3): kernel mediation covers operators too — `a + b`
+    // on a type whose `add` is private denies outside the defining scope,
+    // exactly as `a.add` would.
+    assertMemberReachable(opShape, methodName, ctx);
+    const method = typeMethod(opShape, methodName);
+    if (method?.kind === ValueKind.PrimitiveFunction) {
+      const result = (method as PrimitiveFunctionValue).fn(evalArgs, ctx, evalFn);
+      // If the method already returned a typed value, use it as-is — methods
+      // know their return types (comparisons return Bool). An untyped Bits
+      // result takes the operand's type.
+      if (metaReadRaw(result, "type") !== undefined) return result;
+      if (result.kind === ValueKind.Bits) return withMeta(result, new Map([["type", typeComp]]));
+      return result;
+    }
+    // B-092 U1: USER-DEFINED types get operator overloading too — a
+    // `Type.define` spec's method impls are ComposedFunctions. Dispatch the
+    // same way type_dispatch does for method members: self is the first
+    // parameter, full values (channels intact). B-097 V3: a composed
+    // operator member is the type's own code — its body runs with the
+    // type's member privilege planted.
+    if (method?.kind === ValueKind.ComposedFunction) {
+      return evalFn(makeExpr(method, evalArgs), typePrivilegedCtx(opShape, ctx));
+    }
+    return null;
+  },
+  call(fn, fnRaw, evalArgs, ctx, site: CallSite): CallBinding | null {
+    const fnType = getType(fnRaw);
+    if (!fnType || getTypeName(fnRaw) !== "Function") return null;
+    const paramTypes = getFunctionParamTypes(fnType);
+    if (!paramTypes) return null;
+    const returnTypeExpr = getFunctionReturnType(fnType);
+    const bindings: TypeBindings = new Map();
+    for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
+      unifyTypes(getType(evalArgs[i]), paramTypes[i], bindings);
+    }
+    let enrichedCtx = ctx;
+    let inferredReturnType: Value | null = null;
+    if (bindings.size > 0) {
+      // C2.1: O(1) child layer over the call ctx. Compile-mode reads are
+      // chain-aware (scopeCompileMode), so no flag copying.
+      enrichedCtx = scopeExtend(
+        ctx,
+        [...bindings].map(([varName, typeVal]) => [varName, { key: varName, value: typeVal }] as [string, Binding]),
+      );
+      if (returnTypeExpr && (returnTypeExpr.kind === ValueKind.Param || returnTypeExpr.kind === ValueKind.Symbol)) {
+        inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
+      }
+    }
+    // Call-site checking: every installed field check, against the param
+    // type with type variables resolved; then C3.2 (D36): the annotation
+    // is a knowledge upper-bound — stamp (widening) or reset (own-shape)
+    // the occurrence bound on the value substituted into the body.
+    const args = evalArgs.slice();
+    for (let i = 0; i < Math.min(args.length, paramTypes.length); i++) {
+      const resolved = resolveTypeWithBindings(paramTypes[i], bindings);
+      if (resolved.kind !== ValueKind.Structure) continue; // unresolved type var
+      site.check(args[i], resolved as StructureValue, i,
+        i < fn.params.length ? (fn.params[i] as unknown as Value) : undefined, enrichedCtx);
+      args[i] = applyBoundaryBound(args[i], resolved as StructureValue);
+    }
+    return {
+      ctx: enrichedCtx,
+      args,
+      result: (r) => {
+        if (inferredReturnType && inferredReturnType.kind === ValueKind.Structure && !getType(r)) {
+          return withType(r, inferredReturnType as StructureValue);
+        }
+        return r;
+      },
+    };
+  },
+});
 
 /**
  * Check that an argument value matches the expected parameter type. Handles

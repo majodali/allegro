@@ -19,6 +19,9 @@ import {
   Value,
   ValueKind,
   StructureValue,
+  PrimitiveFunctionValue,
+  ComposedFunctionValue,
+  EvalFn,
   withMeta,
 } from "./types.js";
 import { asStructure, typeShape, readDischargedSlot, hasDischarged } from "./slot-accessors.js";
@@ -341,6 +344,55 @@ export function fieldCheck(name: string): FieldCheck | undefined {
  *  one at a typed call site; the base does not know which field matters. */
 export function fieldChecks(): IterableIterator<[string, FieldCheck]> {
   return FIELD_CHECKS.entries();
+}
+
+// --- Dispatch hook (B-112 C3, hook (a)) -----------------------------------------
+//
+// Type-directed dispatch during evaluation is a DECISION the base must not
+// make (R2 says it must happen BY evaluating; R6 says the base must not know
+// what a type is). A channel installs how to dispatch on its field, gated
+// by the field's writer (P4). Ruling (maintainer, 2026-10-22): call-site
+// unification rides the same install, because binding a callee's declared
+// constraints to its arguments is the same activity seen from the call.
+
+/** What the base gives a call binding: the check loop, so the installer
+ *  can run every installed field check against the constraint it resolved
+ *  for each argument without owning the loop. */
+export interface CallSite {
+  check(arg: Value, expected: StructureValue, argIndex: number, param: Value | undefined, ctx: StructureValue): void;
+}
+/** What a call binding gives back: the context the body evaluates in, the
+ *  arguments as substituted, and a finisher applied to the body's result. */
+export interface CallBinding {
+  ctx: StructureValue;
+  args: Value[];
+  result(r: Value): Value;
+}
+export interface DispatchInstall {
+  /** A primitive application. `residual` is non-null when some argument is
+   *  unresolved and the base is about to return that residual: the
+   *  dispatcher may type it. Otherwise the arguments are resolved and the
+   *  dispatcher may answer instead of the primitive. Return null to decline;
+   *  the base then proceeds as if nothing were installed. */
+  primitive(fn: PrimitiveFunctionValue, args: Value[], ctx: StructureValue, evalFn: EvalFn, residual: Value | null): Value | null;
+  /** A composed-function call. Return null when the callee declares no
+   *  constraint this dispatcher knows. */
+  call(fn: ComposedFunctionValue, fnRaw: Value, args: Value[], ctx: StructureValue, site: CallSite): CallBinding | null;
+}
+
+const DISPATCHERS = new Map<string, DispatchInstall>();
+/** Only `src/capability.ts` calls this, through the gated `installDispatch`. */
+export function defineDispatch(name: string, d: DispatchInstall): void {
+  DISPATCHERS.set(name, d);
+}
+export function dispatchFor(name: string): DispatchInstall | undefined {
+  return DISPATCHERS.get(name);
+}
+/** The installed dispatchers, in registration order. With none installed
+ *  (Allegretto alone) every primitive runs as itself: declining is the
+ *  base's own behaviour, not an error. */
+export function dispatchers(): IterableIterator<[string, DispatchInstall]> {
+  return DISPATCHERS.entries();
 }
 
 /** List the fields present on a value (metadata keys + binding-plane fields).

@@ -468,7 +468,7 @@ because three units and the facts merge all wait on it.
 |---|---|---|---|---|
 | **C1** ✅ **landed 2026-10-21** | Split `slots.ts` three ways (`units.md` M5): structure accessors to `structure` (`src/slot-accessors.ts`); field registry and propagation table to `metadata` (`src/metadata.ts`); writer capabilities and `installFieldMerge` to `capability` (`src/capability.ts`). Gate `installFieldMerge` (P4) while it moves. Register the `predicates` merge from `refinements.ts`; `scopeFactsFor` reads it; `scopeAssume` takes `Map<string, unknown>` | (e) via (d)'s form | `src/slots.ts` leaves the mixed list; the plane lint's accessor layer becomes the `structure` unit's files; the `scope → refinements` violation is gone | `units`: 6 mixed files, 0 violations; plane lint green — **met**; see §9.3 for the two deviations |
 | **C2** ✅ **landed 2026-10-22** | Check hook: `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)`; `type-core`, `refinements` and `effects` install theirs | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` finds no caller outside the installers — **met**; the uninstalled-check error exists and is not suite-exercised; the import-loss condition is **partly** met, see §9.3 |
-| **C3** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b) | (a) | `evaluator.ts` loses `normalizeType` and the member family | `refs PRIM_TO_METHOD` finds nothing in the evaluator |
+| **C3** ✅ **landed 2026-10-22** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b); **call-site unification rides this install** (maintainer ruling 2026-10-22) | (a) | `evaluator.ts` loses `normalizeType` and the member family — **and its whole `types-std` import** | `refs PRIM_TO_METHOD` finds nothing in the evaluator — **met**; see §9.5 |
 | **C4** | Projection hook: `typeShape` leaves the `metadata` unit and is installed by `type-core` | (c) | the `metadata` unit holds no refinement-chain reading | `refs typeShape` finds the installer only |
 | **C5** | Analysis probes, if ruling 2 takes option (a): `setEffectsInspector` and `setDivergenceProbe` become one gated registration (`installAnalysis`, §8.2) the pipeline fills and the law gate reads by name | §8.2 | none owed | the two `set*` names are gone; an uninstalled analysis is an error at the gate; B-148's flag untouched |
 | **Exit** | `src/evaluator.ts` assigned to `evaluator`; its propagation half (`viralScan`, `mergeOverMeta`) moved to `metadata` in the same commit | | `evaluator.ts` un-mixed | `units`: the `evaluator` unit has no L2 edge; §5.7's survey re-run; B-128 (b) and (c) unblocked |
@@ -586,6 +586,48 @@ opaque handle). Error messages are byte-identical. `units`: 162 edges,
    two kernel installs, and that a check for a field the base has never
    heard of runs at a typed call site.
 
+### 9.5 C3 as landed, and what remains
+
+The base holds a dispatch table (`src/metadata.ts`: `DispatchInstall` with
+two entry points, `CallSite`, `CallBinding`, `dispatchers`) and a gated
+install (`src/capability.ts` `installDispatch`, P4). At a primitive
+application the evaluator runs the installed dispatchers twice over:
+with the residual when an argument is unresolved (the dispatcher may
+type it), and with resolved arguments (the dispatcher may answer instead
+of the primitive). At a composed call it runs each dispatcher's `call`,
+handing over the check loop, and takes back the context, the substituted
+arguments and a finisher for the result. With nothing installed every
+primitive runs as itself and every call binds nothing, which is
+Allegretto's own semantics, so there is no uninstalled error here, by
+design. `src/types-std.ts` installs both with the `type` writer: the
+`PRIM_TO_METHOD` table, the equality protocol, operator dispatch behind
+the availability and reachability gates, user-defined operator members
+with the type's privilege; and unification, the per-argument checks, the
+boundary bound and the inferred return type. Nothing in the moved code
+changed except its home.
+
+Measured: `refs` finds no `PRIM_TO_METHOD`, `typeMethod`, `unifyTypes` or
+`protocolEquals` in the evaluator; `src/evaluator.ts` imports nothing
+from `types-std.ts`; its L2 imports are 7 (from 21): `withPredicates`,
+`propagateSetForPrimitive`, `PredicateSet` from `refinements` and
+`effectsOf`, `withEffects`, `unionEffectSets`, `EffectSet` from
+`effects`, all propagation on residuals and results — the exit's and
+B-146's. `units`: 161 edges, 52 ok, 0 violations, 109 unresolved.
+
+What remains of type-system knowledge inside `evaluator.ts`, and why
+the manifest row keeps `type-core` for now: `precompileFunction` builds
+each placeholder with the declared `type` and seeds a `domain` field from
+the type's abstract domain so that knowledge propagation fires during
+precompile, and the post-call path stamps an untyped `Bits` result with
+its operand's `type`. Both are carrying by field name (hook (c), B-145,
+and the knowledge population, B-146), not dispatch. The exit decides the
+row when `viralScan` and `mergeOverMeta` move.
+
+Also found on the way: the plan's C2 row expected the evaluator to keep
+`getType` for precompile's inferred return type. It does not: the base
+reads the `type` field freely, as `viralScan` already did, and
+interprets nothing.
+
 ## 10. Relationship to the unit DAG
 
 `units.md` is the specification of which code may import which. This plan
@@ -603,6 +645,9 @@ relationship runs both ways.
   below. That is recorded in `units.md` §4.2.
 
 ## 11. Change record
+
+**2026-10-22, C3 landed.** Call-site unification ruled onto the dispatch
+install; §9's C3 row updated; §9.5 added.
 
 **2026-10-22, C2 landed.** §9's C2 row updated; §9.4 added with four
 deviations and findings, one of which (call-site unification) asks for a

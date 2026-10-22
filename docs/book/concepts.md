@@ -1428,12 +1428,13 @@ the same file.**
 - *Correct:* `evaluator.ts` propagates channels through the plane interface —
   `viralFields()`, `metaFieldSpec(k)?.rule === "union"`, `fieldMerge(k)`.
   Layer-ignorant, exactly as R3/SC-7 intend.
-- *Incorrect:* it also imports **21 symbols** from three L2 modules
-  (`types-std`, `refinements`, `effects`): member dispatch and visibility,
-  call-site unification, the `type` alias, and effect and predicate
-  propagation on residuals. Argument checking left it at B-112 C2: the
-  evaluator runs installed field checks and decides nothing.
-  `futures.ts` imports `withType`, `ErrorType`, `StringType`.
+- *Incorrect:* it also imports **7 symbols** from two L2 modules
+  (`refinements`, `effects`): effect and predicate propagation on
+  residuals and results. Argument checking left it at B-112 C2 and
+  type-directed dispatch with call-site unification at C3: the evaluator
+  runs installed checks and dispatchers, decides nothing, and imports
+  nothing from `types-std`. `futures.ts` imports `withType`, `ErrorType`,
+  `StringType`.
 
 This violates the project's own stated invariant (`CLAUDE.md`:
 *"Dependencies point downward only"*).
@@ -1508,11 +1509,13 @@ table that is not yet a mechanism — `installFieldMerge` is one instance of
 a pattern that has no general form. The interfaces the specification still
 owes:
 
-1. **A dispatch hook.** The evaluator needs type-directed dispatch during
-   evaluation (R2 — discharge happens *by* evaluating) and must not know what
-   a type is. So a channel installs *how to dispatch on my field*, and the
-   evaluator calls it with an opaque field value. This is §23's decomposition
-   made concrete, and it is the interface B-110 is really about.
+1. **A dispatch hook — landed (B-112 C3).** The evaluator needs
+   type-directed dispatch during evaluation (R2 — discharge happens *by*
+   evaluating) and must not know what a type is. The type channel installs
+   *how to dispatch on my field* through the gated `installDispatch`, at
+   primitive applications and at composed calls (where call-site
+   unification rides the same install), and the evaluator runs it with
+   opaque values (`allegretto/metadata-and-capability.md` §7).
 2. **A check hook — landed (B-112 C2).** A channel installs *how to check
    a value against my field* through the gated `installFieldCheck`, and
    the evaluator runs every installed check with a free reader without

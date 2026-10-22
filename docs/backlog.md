@@ -1509,7 +1509,7 @@ that prevents it.
   concept spine (S2f); `concepts.md` §24 carries the interface table.
   **PLAN: [docs/plans/plane-interfaces.md](plans/plane-interfaces.md)**
   (ratified as a whole 2026-10-21, ruling 2 option (a); **C1 landed
-  2026-10-21, C2 landed 2026-10-22**, C3–C5 and the exit remain) — scoped to the four hooks on measurement: delta 23's
+  2026-10-21, C2 and C3 landed 2026-10-22**, C4, C5 and the exit remain) — scoped to the four hooks on measurement: delta 23's
   *27 upward symbols* is **131 imported / 98 distinct**, of which only **4**
   are checkers. The plan's §6 files five other populations (type vocabulary
   ~25, knowledge propagation ~18, member dispatch ~9, diagnostics ~8,
@@ -1554,6 +1554,13 @@ that prevents it.
     rest are dispatch (C3), propagation (exit, B-146), the `type` alias
     (B-145) and **call-site unification, which no chunk or population
     names — needs a ruling** (plan §9.4).
+  - **Progress.** C3 (2026-10-22): hook (a). Unification ruled onto the
+    dispatch install. `PRIM_TO_METHOD`, the equality protocol, operator
+    dispatch with its gates, and call-site binding (unification, checks,
+    boundary bound, inferred return type) left the evaluator for
+    `types-std.ts` through the gated `installDispatch`. The evaluator
+    imports nothing from `types-std.ts`; its L2 imports are 7, all
+    propagation (the exit, B-146). Plan §9.5.
 
 - [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
   Body wrappers (`type_check`, the `*_attach` family) must forward the

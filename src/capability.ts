@@ -23,12 +23,12 @@ import {
   StructureValue,
 } from "./types.js";
 import {
-  MetaFieldSpec, MetaFieldWriter, FieldCheck, defineMetaField, metaFieldEntry, metaFieldEntries,
-  currentMetaEpoch, cloneMeta, defineFieldMerge, defineFieldCheck,
+  MetaFieldSpec, MetaFieldWriter, FieldCheck, DispatchInstall, defineMetaField, metaFieldEntry, metaFieldEntries,
+  currentMetaEpoch, cloneMeta, defineFieldMerge, defineFieldCheck, defineDispatch,
 } from "./metadata.js";
 import { stampBindingSlot } from "./slot-accessors.js";
 
-export type { MetaFieldSpec, MetaFieldWriter, FieldCheck, FieldReader, CheckSite } from "./metadata.js";
+export type { MetaFieldSpec, MetaFieldWriter, FieldCheck, FieldReader, CheckSite, DispatchInstall, CallSite, CallBinding } from "./metadata.js";
 
 function buildWriter(spec: MetaFieldSpec): MetaFieldWriter {
   return {
@@ -110,6 +110,17 @@ export function installFieldCheck(writer: MetaFieldWriter, check: FieldCheck): v
     throw new AllegroError(`installFieldCheck: the check for '${writer.channel}' may be installed only by the holder of its writer (P4)`);
   }
   defineFieldCheck(writer.channel, check);
+}
+
+/** Install how the evaluator dispatches on a field (B-112 C3, hook (a)):
+ *  operator and equality dispatch at primitive application, and the
+ *  binding of a callee's declared constraints at a composed call. GATED
+ *  (P4) like the merge and the check. */
+export function installDispatch(writer: MetaFieldWriter, d: DispatchInstall): void {
+  if (!holdsWriterFor(writer, writer.channel)) {
+    throw new AllegroError(`installDispatch: dispatch on '${writer.channel}' may be installed only by the holder of its writer (P4)`);
+  }
+  defineDispatch(writer.channel, d);
 }
 
 // --- Field registration: what the BASE owns ------------------------------------

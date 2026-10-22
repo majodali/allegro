@@ -4,6 +4,38 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-112 C3: the dispatch hook; the evaluator imports nothing from the type system
+
+Hook (a) of the ratified plane-interfaces plan, with call-site
+unification ruled onto the same install (maintainer, 2026-10-22). The
+base holds a dispatch table (`src/metadata.ts`: `DispatchInstall` with
+`primitive` and `call` entry points, `CallSite`, `CallBinding`,
+`dispatchers`) and a gated install (`src/capability.ts`
+`installDispatch`, P4: capability-gated registration). The evaluator runs the installed dispatchers at a
+primitive application — with the residual when an argument is
+unresolved, with the arguments when resolved — and at a composed call,
+where it hands over the check loop and takes back the context, the
+substituted arguments and a result finisher. A dispatcher declines with
+null and the base proceeds as Allegretto: no uninstalled error, by
+design. `types-std.ts` installs both with the `type` writer: the
+`PRIM_TO_METHOD` table, the equality protocol, operator dispatch behind
+the availability and reachability gates, user-defined operator members
+with the type's privilege; unification, the per-argument checks through
+the base's loop, the boundary bound, the inferred return type. Moved
+code is unchanged except its home; precompile's inferred return type is
+read as the free `type` field rather than through `getType`.
+
+Measured: `refs` finds no `PRIM_TO_METHOD`, `typeMethod`, `unifyTypes`
+or `protocolEquals` in the evaluator; `src/evaluator.ts` has no
+`types-std` import; its L2 imports are 7 (from 21), all propagation on
+residuals (the exit; B-146, knowledge propagation). `units`: 161 edges, 52 ok, 0 violations,
+109 unresolved. The manifest row keeps `type-core` for precompile's
+placeholder seeding and the post-call `type` stamp, carrying by field
+name (plan §9.5). One boundary test added (foreign writer refused;
+type-core's dispatch installed; a dispatcher for a field the base never
+heard of answers an operator application on an untyped operand carrying
+it; an operand without it falls through). Suite 1205 distinct tests.
+
 ## 2026-10 — B-112 C2: the check hook; argument checking is installed, not imported
 
 Hook (b) of the ratified plane-interfaces plan. The base holds a check

@@ -358,7 +358,7 @@ reflection and no item owns for fields.
 
 The base holds symbols; a layer installs what they mean. That is
 the plane-interfaces plan's principle P2 (the layer installs, the base
-never imports), and this unit holds its first three instances. All are
+never imports), and this unit holds its first four instances. All are
 gated by the same rule, its principle P4 (capability-gated
 registration): an install is authority, so the installer proves
 ownership by holding the field's writer. The gate is identity
@@ -384,6 +384,17 @@ structurally similar object is not the capability (D24).
   (structure, generics, futures, refinement predicates); `src/effects.ts`
   installs the `effects` check (the effect bound on an effect type or on
   the parameter).
+- **`installDispatch(writer, dispatch)`** in `src/capability.ts` defines
+  how the evaluator dispatches on the writer's field: at a primitive
+  application (the dispatcher may type a residual whose operand is
+  unresolved, or answer instead of the primitive) and at a composed call
+  (the dispatcher binds the callee's declared constraints to the
+  arguments, running the base's check loop, and returns the context, the
+  substituted arguments and a result finisher). A dispatcher declines
+  with null and the base proceeds as Allegretto, so nothing installed is
+  not an error. `src/types-std.ts` installs both entry points: operator
+  and equality dispatch behind the member gates, and call-site
+  unification.
 - **`installFactsMerge(writer, merge)`** in `src/scope.ts` is the same
   gate guarding one install into the scope unit: how facts about a name
   combine across scope layers. `src/refinements.ts` installs it with the
@@ -393,10 +404,12 @@ structurally similar object is not the capability (D24).
   registry and never the owner.
 
 The boundary battery pins the gates ("merge installation is
-capability-gated", "check installation is capability-gated"): a foreign
-writer is refused by each installer, the holder's merge is the one
-served, the facts merge installs once, and a check for a field the base
-has never heard of runs at a typed call site.
+capability-gated", "check installation is capability-gated", "dispatch
+installation is capability-gated"): a foreign writer is refused by each
+installer, the holder's merge is the one served, the facts merge installs
+once, a check for a field the base has never heard of runs at a typed
+call site, and a dispatcher for such a field answers an operator
+application.
 
 **Delta.** A fact is a host `PredicateSet` object, not an encoded value,
 so the facts merge is a second function beside the `predicates` field's
@@ -433,9 +446,9 @@ observe-tagged (D47(e)) and renders the expression as text.
 | What | Where |
 |---|---|
 | The registry, the vocabulary, the free reads, the carry idioms, the merge table | `src/metadata.ts` |
-| Writers, registration, the integrity gate, `installFieldMerge`, `installFieldCheck`, the base's fields | `src/capability.ts` |
+| Writers, registration, the integrity gate, `installFieldMerge`, `installFieldCheck`, `installDispatch`, the base's fields | `src/capability.ts` |
 | The `meta` slot and `withMeta` | `src/types.ts` (owed to this unit by the `types.ts` split) |
-| The table applied: `viralScan`, `mergeOverMeta`, the linkage assertion; the check loop `checkArg` | `src/evaluator.ts` (the first three owed to this unit at B-112's exit) |
+| The table applied: `viralScan`, `mergeOverMeta`, the linkage assertion; the check loop `checkArg`; the dispatcher loops | `src/evaluator.ts` (the first three owed to this unit at B-112's exit) |
 | The Allegro surface: `channel_register`, `channel_read`, `channel_list`, `channel_attenuate` | `src/primitives.ts`, "Channel plane" |
 | Forgery scenarios A to G, field ownership, the two gates, the differential propagation fixtures | `src/boundary-tests.ts` |
 | The examples above, pinned by `// expect:` | `tests/metadata-channels-demo.alg` |
