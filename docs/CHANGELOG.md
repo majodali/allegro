@@ -4,6 +4,35 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-112 C4: the projection hook; the base's read path names no field
+
+Hook (c) of the ratified plane-interfaces plan. The base holds a
+projection table (`src/metadata.ts`: `Projection`, `projection`) and a
+gated install (`src/capability.ts` `installProjection`, P4: a projection
+reads as a field, so its gate is that field's writer). `metaReadRaw`
+answers from three sources in order and names none: the value's own
+`meta`; a registered field still stored on the binding plane, found
+through its registration's `bindingKey` and read through the new generic
+accessor `readBindingSlot`; an installed projection. Its three
+name-specific branches are gone (`shape` by calling `typeShape`,
+`discharged` by name, and a dead carrier-era `type` fallback);
+`metaFieldList` lists binding-plane fields through the same
+registration. `types-std.ts` installs the `shape` projection with the
+`shape` writer it now holds.
+
+`typeShape` and `equalityShape` moved from `src/slot-accessors.ts` to
+`src/refinements.ts`: a refinement chain is that unit's structure,
+`type-core` imports the walks from below, and the accessor layer encodes
+no L2 semantics any more (the defect plan §6.1 named). The plan's exit
+measure for C4 ("`refs typeShape` finds the installer only") is
+therefore not met as worded and should not be: the walk's eighteen
+callers are the type system's and knowledge's own modules and none is
+L0 (plan §9.6). `units`: 161 edges, 52 ok, 0 violations. One boundary
+test added (foreign writer refused; the `shape` projection installed and
+nothing storing `shape`; a projection for fields the base never heard of
+reads through the free reader; `discharged` read and listed through its
+`bindingKey`). Suite 1206 distinct tests.
+
 ## 2026-10 — B-112 C3: the dispatch hook; the evaluator imports nothing from the type system
 
 Hook (a) of the ratified plane-interfaces plan, with call-site

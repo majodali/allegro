@@ -469,7 +469,7 @@ because three units and the facts merge all wait on it.
 | **C1** ✅ **landed 2026-10-21** | Split `slots.ts` three ways (`units.md` M5): structure accessors to `structure` (`src/slot-accessors.ts`); field registry and propagation table to `metadata` (`src/metadata.ts`); writer capabilities and `installFieldMerge` to `capability` (`src/capability.ts`). Gate `installFieldMerge` (P4) while it moves. Register the `predicates` merge from `refinements.ts`; `scopeFactsFor` reads it; `scopeAssume` takes `Map<string, unknown>` | (e) via (d)'s form | `src/slots.ts` leaves the mixed list; the plane lint's accessor layer becomes the `structure` unit's files; the `scope → refinements` violation is gone | `units`: 6 mixed files, 0 violations; plane lint green — **met**; see §9.3 for the two deviations |
 | **C2** ✅ **landed 2026-10-22** | Check hook: `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)`; `type-core`, `refinements` and `effects` install theirs | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` finds no caller outside the installers — **met**; the uninstalled-check error exists and is not suite-exercised; the import-loss condition is **partly** met, see §9.3 |
 | **C3** ✅ **landed 2026-10-22** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b); **call-site unification rides this install** (maintainer ruling 2026-10-22) | (a) | `evaluator.ts` loses `normalizeType` and the member family — **and its whole `types-std` import** | `refs PRIM_TO_METHOD` finds nothing in the evaluator — **met**; see §9.5 |
-| **C4** | Projection hook: `typeShape` leaves the `metadata` unit and is installed by `type-core` | (c) | the `metadata` unit holds no refinement-chain reading | `refs typeShape` finds the installer only |
+| **C4** ✅ **landed 2026-10-22** | Projection hook: `typeShape` leaves the `metadata` unit and is installed by `type-core` | (c) | the `metadata` unit holds no refinement-chain reading — **met**; the base names no field in its read path at all | `refs typeShape` finds the installer only — **not met as worded**, see §9.6: the walk's callers are the type system's and knowledge's own modules, which is the point |
 | **C5** | Analysis probes, if ruling 2 takes option (a): `setEffectsInspector` and `setDivergenceProbe` become one gated registration (`installAnalysis`, §8.2) the pipeline fills and the law gate reads by name | §8.2 | none owed | the two `set*` names are gone; an uninstalled analysis is an error at the gate; B-148's flag untouched |
 | **Exit** | `src/evaluator.ts` assigned to `evaluator`; its propagation half (`viralScan`, `mergeOverMeta`) moved to `metadata` in the same commit | | `evaluator.ts` un-mixed | `units`: the `evaluator` unit has no L2 edge; §5.7's survey re-run; B-128 (b) and (c) unblocked |
 
@@ -628,6 +628,41 @@ Also found on the way: the plan's C2 row expected the evaluator to keep
 reads the `type` field freely, as `viralScan` already did, and
 interprets nothing.
 
+### 9.6 C4 as landed, and one correction to the row
+
+The base holds a projection table (`src/metadata.ts`: `Projection`,
+`projection`) and a gated install (`src/capability.ts`
+`installProjection`, P4: a projection reads as a field, so installing one
+is writing that field's meaning, and the gate is that field's writer).
+`metaReadRaw` answers from three sources in order and names none of
+them: the value's own `meta`; a registered field whose storage is still a
+binding-plane slot, found through its registration's `bindingKey` and
+read through a generic accessor (`readBindingSlot`); an installed
+projection. The two name-specific branches the chapter recorded (`shape`
+computed by calling `typeShape`; `discharged` read by name) are gone, and
+so is a dead third one (`type` through `asStructure`, a carrier-era
+fallback). `metaFieldList` lists binding-plane fields through the same
+registration. `src/types-std.ts` installs the `shape` projection with the
+`shape` writer it now holds.
+
+`typeShape` and `equalityShape` moved from `src/slot-accessors.ts` to
+`src/refinements.ts`, not to `type-core`: a refinement chain is the
+`refinements` unit's structure, `type-core` sits above it in the DAG and
+imports the walks, and `knowledgeOf` in the same file was already a
+caller. Leaving them in the accessor layer would have kept L2's
+refinement-chain semantics in L0's accessor layer, which §6.1 names as
+the defect. So the row's exit measure, "`refs typeShape` finds the
+installer only", is not met as worded and should not be: the walk has
+seven callers in `types-std.ts`, seven in `primitives.ts` and four in
+`refinements.ts`, all the type system's and knowledge's own modules, and
+none in L0. The measure that holds is the row's second: no L0 unit reads
+the refinement chain. `units`: 161 edges, 52 ok, 0 violations, 109
+unresolved.
+
+`shape` stays registered as a field (the writer is what gates the
+install); whether a projection has a registration of its own is B-111's
+question and is not pre-empted here.
+
 ## 10. Relationship to the unit DAG
 
 `units.md` is the specification of which code may import which. This plan
@@ -645,6 +680,9 @@ relationship runs both ways.
   below. That is recorded in `units.md` §4.2.
 
 ## 11. Change record
+
+**2026-10-22, C4 landed.** §9's C4 row updated; §9.6 added, with the
+correction that the walk belongs to `refinements`, not `type-core`.
 
 **2026-10-22, C3 landed.** Call-site unification ruled onto the dispatch
 install; §9's C3 row updated; §9.5 added.

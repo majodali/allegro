@@ -21,7 +21,7 @@
 // =============================================================================
 
 import { cloneMeta, metaOf, metaReadRaw } from "./metadata.js";
-import { typeShape, getAbstractDomain } from "./slot-accessors.js";
+import { getAbstractDomain, getPredicate, getRefines, getMembers, asStructure } from "./slot-accessors.js";
 import { registerMetaField } from "./capability.js";
 import { installFactsMerge } from "./scope.js";
 import {
@@ -749,6 +749,52 @@ export function clearOccurrenceBound(v: Value): Value {
   const comps = cloneMeta(v);
   comps.delete(BOUND_FIELD);
   return withMeta(v, comps);
+}
+
+// --- Shape: where a refinement chain stops being knowledge (C3.1, D36) ---------
+//
+// A refinement layer that only narrows (a predicate over its parent, sharing
+// the parent's member set by reference) is KNOWLEDGE: dispatch never changes
+// across it. A layer that mints its own member set — `preserveOps` (lifted
+// operators), `mixin`, `extend` — is a SHAPE: its overrides must dispatch
+// (Liskov). Walking past a transparent layer never changes dispatch results.
+// Moved here from the accessor layer at B-112 C4: the chain is this unit's
+// structure, and the `shape` read the type system exposes is a projection it
+// installs over this walk (`src/types-std.ts`).
+
+/** The dispatch shape of a type Context: walk `__refines` past
+ *  member-transparent refinement layers. Identity on non-refined types. */
+export function typeShape(t: StructureValue): StructureValue {
+  let cur = t;
+  for (let guard = 0; guard < 64; guard++) {
+    if (getPredicate(cur) === undefined) return cur;
+    const parent = asStructure(getRefines(cur));
+    if (!parent) return cur;
+    const ownMembers = getMembers(cur);
+    const parentMembers = getMembers(parent);
+    if (ownMembers !== undefined && ownMembers !== parentMembers) return cur;
+    cur = parent;
+  }
+  return cur;
+}
+
+/** E1 (B-027, §7/D37): the EQUALITY shape — walk the FULL `__refines`
+ *  chain to the representation root, past preserve-lifted and method-layer
+ *  refinements too (unlike `typeShape`, which stops at layers that mint
+ *  their own member sets, because their overrides must run for dispatch).
+ *  Refinements are knowledge and never separate equal values —
+ *  `PositiveInt(5) == 5` even when PositiveInt lifts operators. `distinct`
+ *  types mint NO refines edge (buildDistinctType skips the slot), so they
+ *  stay their own equality shape: unequal to the parent until a coercion
+ *  is declared (E2). */
+export function equalityShape(t: StructureValue): StructureValue {
+  let cur = typeShape(t);
+  for (let guard = 0; guard < 64; guard++) {
+    const parent = asStructure(getRefines(cur));
+    if (!parent) return cur;
+    cur = typeShape(parent);
+  }
+  return cur;
 }
 
 /** The intrinsic knowledge riding a value, or null when it carries none. */
