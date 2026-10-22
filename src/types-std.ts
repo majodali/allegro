@@ -19,7 +19,7 @@ import { effectsOf as fnEffectsOf } from "./effects.js";
 import { putEntry, removeEntry } from "./structure.js";
 import { getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate, getGenericArgs, getGenericBackLink, getSlotCount, slotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf, setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface, setWraps, setPredicate, setGenericArgs, setGenericBackLink, setProposition, setEffectBound, setAbstractDomain, removeName, removeRefines, removeConstruct, SLOT_KEYS, isMetaProtocolSlot, typeShape, getFallbackMember, equalityShape, asStructure } from "./slot-accessors.js";
 import { writeShape, carryShape, removeShapeSlot, metaReadRaw, cloneMeta } from "./metadata.js";
-import { kernelFieldWriter, assertNotIntegrityKey, registerMetaField } from "./capability.js";
+import { kernelFieldWriter, assertNotIntegrityKey, registerMetaField, installFieldCheck, FieldReader, CheckSite } from "./capability.js";
 
 
 // --- Constants ---
@@ -3460,7 +3460,7 @@ export const UntypedFunctionType: StructureValue = buildType("UntypedFunction", 
 //
 // Module-level, NOT inside `createTypeSystem()` — that is called once per
 // evaluation and registration is one-shot.
-registerMetaField({ name: "type", rule: "computed", integrity: true });
+const typeWriter = registerMetaField({ name: "type", rule: "computed", integrity: true });
 // `shape` is the type system's too: a member-transparent projection of `type`
 // with refinement layers walked off (§32). It is registered as a field for now
 // and is not one — nothing stores a `shape` value; `metaReadRaw` computes it
@@ -3469,6 +3469,146 @@ registerMetaField({ name: "type", rule: "computed", integrity: true });
 // the capability is never acquired, because writes go through the in-place
 // `writeShape` rather than through a writer.
 registerMetaField({ name: "shape", rule: "computed" });
+
+// --- The `type` check (B-112 C2, hook (b)) ------------------------------------
+//
+// Installed into the base with the `type` writer (P4). The evaluator runs it
+// at every typed call site with a free reader and a site-bound evaluator; it
+// decides structure, generic arguments, futures and refinement predicates —
+// everything "does this argument satisfy the parameter's type" means. The
+// effect bound on an effect type is the effects channel's check, installed
+// from `src/effects.ts`; this one steps aside for it.
+installFieldCheck(typeWriter, (expected, actual, read, site) => checkArgType(actual, expected, read, site));
+
+/**
+ * Check that an argument value matches the expected parameter type. Handles
+ * named types, unions, structural, generic type args — mirrors
+ * type_check_impl but without lazy evaluation. Throws on rejection.
+ */
+function checkArgType(arg: Value, expectedType: StructureValue, read: FieldReader, site: CheckSite): void {
+  const argIndex = site.argIndex;
+  // Normalize bare generics to Generic[Any]
+  const expected = normalizeType(expectedType);
+
+  // An effect type (an `effectBound` stamped at construction by `buildEffect`)
+  // is checked by the effects channel's installed check; `opaque` has no
+  // bound and anything passes. Nothing structural applies to it.
+  if (getEffectBound(expected) !== undefined) return;
+
+  // Refinement type handling: if expected is a refined type, check the value
+  // against the refinement's BASE (via __refines chain), then evaluate the predicate.
+  // This allows a plain Int to satisfy PositiveInt if the predicate passes.
+  const refinementPredicate = getPredicate(expected);
+  if (refinementPredicate) {
+    const base = getRefines(expected);
+    if (base?.kind === ValueKind.Structure) {
+      // Recurse on the base type (unwraps nested refinements)
+      checkArgType(arg, base as StructureValue, read, site);
+      // Base check passed — evaluate the predicate (unless same refined type)
+      const argType0 = getType(arg);
+      if (argType0 !== expected && site.evaluate) {
+        const p = site.evaluate(makeExpr(refinementPredicate, [arg]));
+        if (p.kind === ValueKind.Bits && p.data === 0n) {
+          const name = typeContextName(expected) ?? "<refined>";
+          throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}`);
+        }
+      }
+      return;
+    }
+  }
+
+  const expectedName = typeContextName(expected);
+  if (!expectedName || expectedName === "Any") return;
+
+  const argType = getType(arg);
+  if (!argType) return; // untyped arg — skip
+
+  // B-028 F2 (CE-R5, D11): a Future[T]-typed argument checks the
+  // knowledge that HAS landed — its element type T — and defers the
+  // rest with the value. Future[String] where Int is expected is a real
+  // type error NOW; Future[Int] where Int (or a refinement of Int) is
+  // expected flows into the body as a residual per PE Rule 1 — never a
+  // premature throw at the boundary. The refinement predicate, which
+  // needs the value, defers with it (checked at construction/annotation
+  // sites when the value lands).
+  const futEl = futureElementType(argType);
+  if (futEl) {
+    const elName = typeContextName(futEl);
+    if (!elName || elName === "Any") return; // untyped future — defer entirely
+    if (typeNameOnRefinesChain(expected, elName)) return; // shape fits — defer
+    throw new AllegroError(
+      `Type error: argument ${argIndex} expected ${expectedName}, got Future[${elName}] — ` +
+      `the pending value's type cannot satisfy ${expectedName}`);
+  }
+
+  // Helper: evaluate refinement predicate on arg if expected type has one.
+  // Short-circuits when argType is reference-equal to expected (same refined type).
+  const checkRefinement = (): void => {
+    const predicate = getPredicate(expected);
+    if (!predicate) return;
+    if (argType === expected) return; // same refined type — predicate already holds
+    if (!site.evaluate) return; // no eval context — best-effort skip
+    const p = site.evaluate(makeExpr(predicate, [arg]));
+    if (p.kind === ValueKind.Bits && p.data === 0n) {
+      throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`);
+    }
+    // If unresolved, best-effort accept (partial evaluation will retry)
+  };
+
+  const actualName = typeContextName(argType);
+  if (actualName === expectedName) {
+    // Names match — also check type args for generics (Array[Int] vs Array[String])
+    const expectedArgs = getGenericArgs(expected);
+    const actualArgs = getGenericArgs(argType);
+    if (expectedArgs?.kind === ValueKind.Structure && actualArgs?.kind === ValueKind.Structure) {
+      const expCtx = expectedArgs as StructureValue;
+      const actCtx = actualArgs as StructureValue;
+      const expLen = slotCount(expCtx);
+      const actLen = slotCount(actCtx);
+      for (let j = 0; j < Math.min(expLen, actLen); j++) {
+        const expArg = indexGet(expCtx, j);
+        const actArg = indexGet(actCtx, j);
+        if (expArg?.kind === ValueKind.Structure && actArg?.kind === ValueKind.Structure) {
+          const expArgName = typeContextName(expArg);
+          const actArgName = typeContextName(actArg);
+          if (expArgName && actArgName && expArgName !== "Any" && actArgName !== "Any" && expArgName !== actArgName) {
+            throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}[${expArgName}], got ${expectedName}[${actArgName}]`);
+          }
+        }
+      }
+    }
+    checkRefinement();
+    return;
+  }
+
+  // Check using the expected type's own instanceof (direct binding, e.g., UnionType)
+  const directInstanceof = expected.bindings.get("instanceof")?.value;
+  if (directInstanceof?.kind === ValueKind.PrimitiveFunction) {
+    const checkP = directInstanceof.fn([arg], undefined as any, undefined as any);
+    if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
+      throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
+    }
+    checkRefinement();
+    return;
+  }
+
+  // Use meta-type instanceof (Type's shape-aware check: nominal if both named, structural otherwise)
+  const typeType = read(expected, "shape") as StructureValue | undefined;
+  if (typeType) {
+    const instanceofMethod = typeMethod(typeType, "instanceof");
+    if (instanceofMethod?.kind === ValueKind.PrimitiveFunction) {
+      const checkP = instanceofMethod.fn([expected, arg], undefined as any, undefined as any);
+      if (checkP.kind === ValueKind.Bits && checkP.data === 0n) {
+        throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
+      }
+      checkRefinement();
+      return;
+    }
+  }
+
+  // Name mismatch with no instanceof to check
+  throw new AllegroError(`Type error: argument ${argIndex} expected ${expectedName}, got ${actualName}`);
+}
 
 // None type — represents the absence of a value
 const noneMethods: Record<string, PrimitiveFnImpl> = {

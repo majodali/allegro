@@ -25,10 +25,11 @@
 // =============================================================================
 
 import { metaOf, cloneMeta } from "./metadata.js";
-import { installFieldMerge, registerMetaField } from "./capability.js";
+import { installFieldMerge, installFieldCheck, registerMetaField } from "./capability.js";
+import { getEffectBound, getName } from "./slot-accessors.js";
 import {
   Value, ValueKind, ComposedFunctionValue, StructureValue,
-  withMeta, makeStructure,
+  withMeta, makeStructure, AllegroError, bitsToString,
 } from "./types.js";
 
 // =============================================================================
@@ -272,6 +273,48 @@ const effectsWriter = registerMetaField({ name: "effects", rule: "union" });
 installFieldMerge(effectsWriter, (a: Value, b: Value) => {
   const merged = effectUnion(decodeEffects(a) ?? new Set(), decodeEffects(b) ?? new Set());
   return encodeEffects(merged);
+});
+
+// --- The `effects` check (B-112 C2, hook (b)) ---------------------------------
+//
+// Installed with the writer this module minted (P4). Two sources of a bound,
+// one discharge: an effect TYPE carries `effectBound` (stamped by
+// `buildEffect`); a `param_effects f: pure` declaration stamps the bound on
+// the Param itself (Surface C), consulted only when the type carries none.
+// Either way: the argument's effects (PE-populated; absent means pure) must
+// sit inside the bound. The type channel's check steps aside for an effect
+// type, so this is the only check that applies to it.
+installFieldCheck(effectsWriter, (expected, actual, _read, site) => {
+  const argEff = (): EffectSet => effectsOf(actual) ?? new Set<string>();
+  const within = (actualSet: EffectSet, bound: EffectSet): boolean => {
+    for (const l of actualSet) if (!bound.has(l)) return false;
+    return true;
+  };
+  const typeBound = getEffectBound(expected) as { kind: string; labels: EffectSet } | undefined;
+  if (typeBound !== undefined) {
+    if (typeBound.kind !== "effects") return; // `opaque`: no bound — anything passes
+    const got = argEff();
+    if (!within(got, typeBound.labels)) {
+      const nameV = getName(expected);
+      const expectedName = nameV?.kind === ValueKind.Bits ? bitsToString(nameV) : "<effect>";
+      const actualLabels = [...got].sort().join(", ") || "pure";
+      throw new AllegroError(
+        `Type error: argument ${site.argIndex} expected effect bound \`${expectedName}\`, got effects \`${actualLabels}\``,
+      );
+    }
+    return;
+  }
+  const paramBound = site.param ? (site.param as any).effectBound as EffectSet | undefined : undefined;
+  if (paramBound) {
+    const got = argEff();
+    if (!within(got, paramBound)) {
+      const want = [...paramBound].sort().join(", ") || "pure";
+      const gotText = [...got].sort().join(", ") || "pure";
+      throw new AllegroError(
+        `Type error: argument ${site.argIndex} expected effect bound \`${want}\` (from param_effects), got effects \`${gotText}\``,
+      );
+    }
+  }
 });
 
 function encodeEffects(eff: EffectSet): Value {

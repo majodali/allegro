@@ -467,7 +467,7 @@ because three units and the facts merge all wait on it.
 | # | Chunk | Hook | Unit moves (`units.json` edits) | Exit measured by |
 |---|---|---|---|---|
 | **C1** ✅ **landed 2026-10-21** | Split `slots.ts` three ways (`units.md` M5): structure accessors to `structure` (`src/slot-accessors.ts`); field registry and propagation table to `metadata` (`src/metadata.ts`); writer capabilities and `installFieldMerge` to `capability` (`src/capability.ts`). Gate `installFieldMerge` (P4) while it moves. Register the `predicates` merge from `refinements.ts`; `scopeFactsFor` reads it; `scopeAssume` takes `Map<string, unknown>` | (e) via (d)'s form | `src/slots.ts` leaves the mixed list; the plane lint's accessor layer becomes the `structure` unit's files; the `scope → refinements` violation is gone | `units`: 6 mixed files, 0 violations; plane lint green — **met**; see §9.3 for the two deviations |
-| **C2** | Check hook: `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)`; `type-core`, `refinements` and `effects` install theirs | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` finds no caller outside the installers; the uninstalled-check test fails loudly |
+| **C2** ✅ **landed 2026-10-22** | Check hook: `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)`; `type-core`, `refinements` and `effects` install theirs | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` finds no caller outside the installers — **met**; the uninstalled-check error exists and is not suite-exercised; the import-loss condition is **partly** met, see §9.3 |
 | **C3** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b) | (a) | `evaluator.ts` loses `normalizeType` and the member family | `refs PRIM_TO_METHOD` finds nothing in the evaluator |
 | **C4** | Projection hook: `typeShape` leaves the `metadata` unit and is installed by `type-core` | (c) | the `metadata` unit holds no refinement-chain reading | `refs typeShape` finds the installer only |
 | **C5** | Analysis probes, if ruling 2 takes option (a): `setEffectsInspector` and `setDivergenceProbe` become one gated registration (`installAnalysis`, §8.2) the pipeline fills and the law gate reads by name | §8.2 | none owed | the two `set*` names are gone; an uninstalled analysis is an error at the gate; B-148's flag untouched |
@@ -535,6 +535,57 @@ Also found on the way: the committed `src/boundary-baseline.json` named
 rules the lint no longer has (`components-direct`); the regeneration
 corrected it, and every count fell or held.
 
+### 9.4 C2 as landed, and its deviations
+
+The base holds a check table (`src/metadata.ts`: `FieldCheck`,
+`FieldReader`, `CheckSite`, `fieldChecks`) and a gated install
+(`src/capability.ts` `installFieldCheck`, P4). The evaluator's
+`checkArg` runs every installed check at a typed call site with
+`metaReadRaw` as the reader and an evaluator bound to the site's context,
+and throws if no check is installed at all. `src/types-std.ts` installs
+the `type` check with the `type` writer (structure, generics, futures,
+refinement predicates, moved from the evaluator unchanged except that the
+predicate is evaluated through the site); `src/effects.ts` installs the
+`effects` check with its writer (the effect bound on an effect type, and
+the Surface C bound stamped on the Param, which the site hands over as an
+opaque handle). Error messages are byte-identical. `units`: 162 edges,
+52 ok, 0 violations, 110 unresolved. Deviations and findings:
+
+1. **Two installers, not three.** The plan's row names `refinements` as
+   an installer. Reading the code, `checkArgType` never read the
+   argument's `predicates` or `domain` fields; it evaluated the expected
+   type's refinement predicate, which is a slot of the type Context.
+   Refined types are types, so that is the `type` check's job and
+   `type-core` installs it. Ruling 1's measured claim about which fields
+   the check consults is corrected to: the expected type's effect bound
+   and the argument's `effects` (one other channel, not two).
+2. **The import-loss condition is partly met.** The evaluator lost
+   `impliesDomain`, `EffectsDomain`, `AbstractDomain`, `normalizeType`,
+   `typeContextName`, `futureElementType`, `typeNameOnRefinesChain` and
+   five accessor imports. It still imports 14 symbols from `types-std`,
+   3 from `refinements` and 4 from `effects` (21, from 27). They belong
+   to populations this chunk does not own: dispatch (`typeMethod`, C3),
+   propagation of effects and predicates on residuals (`withEffects`,
+   `withPredicates`, `propagateSetForPrimitive`, the exit and B-146),
+   the `type` field read through its L2 alias (`getType`, `withType`,
+   B-145), member visibility (`assertMember*`, `typePrivilegedCtx`,
+   C3), and **call-site unification** (`unifyTypes`,
+   `resolveTypeWithBindings`, `applyBoundaryBound`,
+   `getFunctionParamTypes`, `getFunctionReturnType`). The last is a
+   deciding activity (type-variable binding at the call) that no row of
+   §9 names and no population of §7 files. It needs a ruling: a fourth
+   hook, or part of C3's dispatch install, or B-145. Not decided here.
+3. **`effects` imports the `structure` unit.** The effects check reads
+   the effect bound through `getEffectBound` in `src/slot-accessors.ts`,
+   so the `effects` unit gains a `structure` edge (`units.json`). The
+   alternative, reaching the host-plane bit directly, is what the
+   accessor layer exists to prevent.
+4. **The uninstalled-check error is not suite-exercised**, for the same
+   reason as C1's facts merge: the installers run at module init and
+   cannot be undone in-process. The suite asserts the gate's refusal, the
+   two kernel installs, and that a check for a field the base has never
+   heard of runs at a typed call site.
+
 ## 10. Relationship to the unit DAG
 
 `units.md` is the specification of which code may import which. This plan
@@ -552,6 +603,10 @@ relationship runs both ways.
   below. That is recorded in `units.md` §4.2.
 
 ## 11. Change record
+
+**2026-10-22, C2 landed.** §9's C2 row updated; §9.4 added with four
+deviations and findings, one of which (call-site unification) asks for a
+ruling.
 
 **2026-10-21, C1 landed.** The plan ratified as a whole, ruling 2 taking
 option (a). §9's heading and C1 row updated; §9.3 added with the two

@@ -24,7 +24,7 @@
     "module-loading":     { "layer": "L1", "deps": ["evaluator", "futures", "tree-builder"] },
 
     "refinements":        { "layer": "L2", "deps": ["metadata", "kinds", "capability", "scope"] },
-    "effects":            { "layer": "L2", "deps": ["metadata", "kinds", "capability"] },
+    "effects":            { "layer": "L2", "deps": ["metadata", "kinds", "capability", "structure"] },
     "type-core":          { "layer": "L2", "deps": ["capability", "scope", "refinements", "effects"] },
     "core-types":         { "layer": "L2", "deps": ["type-core"] },
     "generics":           { "layer": "L2", "deps": ["type-core", "core-types"] },

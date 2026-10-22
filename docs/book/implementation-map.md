@@ -23,7 +23,7 @@
 | `src/metadata.ts` | L0 | Metadata plane: field registry, propagation vocabulary (SC-7), free reads (D23), carry/clone idioms, the installed-merge table (unit `metadata`) |
 | `src/capability.ts` | L0 | Writer capabilities: field registration mints a writer (D21–D24), the gated `installFieldMerge` (P4), the base's own fields `source`/`error`/`knowledge`/`warnings`/`exported` (unit `capability`) |
 | `src/symbols.ts` | L0 | Symbol interning (FQN identity, D20/D29), kernel scope, base-name projection |
-| `src/evaluator.ts` | L0 | Recursive evaluator: PE Rules 1+2, propagation table, type-directed dispatch (`PRIM_TO_METHOD`), TCO, closures, unification at call sites |
+| `src/evaluator.ts` | L0 | Recursive evaluator: PE Rules 1+2, propagation table, type-directed dispatch (`PRIM_TO_METHOD`), TCO, closures, unification at call sites, installed field checks at typed call sites (B-112 hook (b)) |
 | `src/primitives.ts` | L0/L2 | All primitives: bits/expression/structure ops, type system ops, proof constructors + `proof_check`, grammar combinators, lazy print |
 | `src/runtime.ts` | L0/L1 | `evalSource` pipeline (below), symbol resolution, precompile, `CompilationReport` + notifications |
 | `src/refinements.ts` | L2 | Abstract domains + predicate sets: `domainFromPredicate`, lattice ops, propagation, `knowledgeOf` |
