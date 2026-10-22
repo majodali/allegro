@@ -100,17 +100,17 @@ print(channel_read(42, "audit"))    // none
 print(channel_list(42))             // [type]
 ```
 
-Two reads are not plain lookups, and both are the typed layer's business
-living in the base for now. `shape` is a projection of `type` with the
-member-transparent refinement layers walked off, computed by
-`typeShape` from the one stored value rather than stored twice; and
-`discharged` is stored on the binding plane of a Structure under a
-registered slot key (`bindingKey`) rather than in `meta`, because the
-proof kernel predates the universal `meta` slot. `metaReadRaw` knows
-both by name. The projection moves to an installed hook at chunk C4 of
-B-112 (the four owed plane interfaces); the binding-plane storage is an
-item of B-104 (retiring the `__*` slot names). Until then the base reads
-two field names it should not know.
+Two reads are not plain lookups, and `metaReadRaw` serves both without
+naming a field. `shape` is a projection of `type` with the
+member-transparent refinement layers walked off, computed on read rather
+than stored twice: the type system installs it (§7) and the base serves
+the name. `discharged` is stored on the binding plane of a Structure
+under a registered slot key rather than in `meta`, because the proof
+kernel predates the universal `meta` slot: the base finds it through its
+registration's `bindingKey` and reads it through the accessor layer. The
+read order is the value's own `meta`, then a registered binding-plane
+slot, then an installed projection. The binding-plane storage itself is
+an item of B-104 (retiring the `__*` slot names).
 
 <a id="def-metadata-field"></a>
 ## 3. Metadata field [implemented]
@@ -153,7 +153,7 @@ its fields (R6), so a field is registered where its concept lives:
 | `source` | `drop` | yes | `src/capability.ts` | provenance (§8) |
 | `error` | `viral` | | `src/capability.ts` | error propagation (§8) |
 | `type` | `computed` | yes | `src/types-std.ts` | typing |
-| `shape` | `computed` | | `src/types-std.ts` | typing, as a projection of `type` |
+| `shape` | `computed` | | `src/types-std.ts` | typing, as an installed projection of `type` (§7); nothing stores it |
 | `discharged` | `drop` | yes | `src/types-std.ts`, stored under a binding-plane key | proof |
 | `effects` | `union` | | `src/effects.ts` | effect analysis; installs the merge |
 | `predicates` | `computed` | | `src/refinements.ts` | knowledge; installs the facts merge (§7) |
@@ -240,7 +240,7 @@ than opening it to closures.
 `viralFields()` and `unionFields()` are cached filters over the registry,
 invalidated by registration. The evaluator applies the table in two
 places, both in `src/evaluator.ts` and both owed to this unit at
-B-112's exit: `viralScan` carries the first viral field found on any
+the exit of B-112 (the four owed plane interfaces): `viralScan` carries the first viral field found on any
 argument onto an application's residual (and the argument's `type` with
 it), and the unresolved-application path does the same for the callee;
 `mergeOverMeta` merges the fields a value carries onto the value it
@@ -358,7 +358,7 @@ reflection and no item owns for fields.
 
 The base holds symbols; a layer installs what they mean. That is
 the plane-interfaces plan's principle P2 (the layer installs, the base
-never imports), and this unit holds its first four instances. All are
+never imports), and this unit holds its first five instances. All are
 gated by the same rule, its principle P4 (capability-gated
 registration): an install is authority, so the installer proves
 ownership by holding the field's writer. The gate is identity
@@ -395,6 +395,12 @@ structurally similar object is not the capability (D24).
   not an error. `src/types-std.ts` installs both entry points: operator
   and equality dispatch behind the member gates, and call-site
   unification.
+- **`installProjection(writer, project)`** in `src/capability.ts` defines
+  how the writer's field is computed on read when nothing stores it. A
+  projection receives the value and the free reader, so it can be built
+  from any field. `src/types-std.ts` installs `shape` over `type`, using
+  the refinement-chain walk `typeShape` that lives in `src/refinements.ts`
+  (where knowledge ends and shape begins is that unit's line).
 - **`installFactsMerge(writer, merge)`** in `src/scope.ts` is the same
   gate guarding one install into the scope unit: how facts about a name
   combine across scope layers. `src/refinements.ts` installs it with the
@@ -405,11 +411,12 @@ structurally similar object is not the capability (D24).
 
 The boundary battery pins the gates ("merge installation is
 capability-gated", "check installation is capability-gated", "dispatch
-installation is capability-gated"): a foreign writer is refused by each
-installer, the holder's merge is the one served, the facts merge installs
-once, a check for a field the base has never heard of runs at a typed
-call site, and a dispatcher for such a field answers an operator
-application.
+installation is capability-gated", "projection installation is
+capability-gated"): a foreign writer is refused by each installer, the
+holder's merge is the one served, the facts merge installs once, a check
+for a field the base has never heard of runs at a typed call site, a
+dispatcher for such a field answers an operator application, and a
+projection for such fields reads through the free reader.
 
 **Delta.** A fact is a host `PredicateSet` object, not an encoded value,
 so the facts merge is a second function beside the `predicates` field's
@@ -446,7 +453,7 @@ observe-tagged (D47(e)) and renders the expression as text.
 | What | Where |
 |---|---|
 | The registry, the vocabulary, the free reads, the carry idioms, the merge table | `src/metadata.ts` |
-| Writers, registration, the integrity gate, `installFieldMerge`, `installFieldCheck`, `installDispatch`, the base's fields | `src/capability.ts` |
+| Writers, registration, the integrity gate, `installFieldMerge`, `installFieldCheck`, `installDispatch`, `installProjection`, the base's fields | `src/capability.ts` |
 | The `meta` slot and `withMeta` | `src/types.ts` (owed to this unit by the `types.ts` split) |
 | The table applied: `viralScan`, `mergeOverMeta`, the linkage assertion; the check loop `checkArg`; the dispatcher loops | `src/evaluator.ts` (the first three owed to this unit at B-112's exit) |
 | The Allegro surface: `channel_register`, `channel_read`, `channel_list`, `channel_attenuate` | `src/primitives.ts`, "Channel plane" |

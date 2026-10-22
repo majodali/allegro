@@ -1,6 +1,6 @@
 // Allegretto - Primitive Functions
 
-import { getName, getMembers, slotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasDischarged, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, typeShape, indexGet, HOST_KEYS } from "./slot-accessors.js";
+import { getName, getMembers, slotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasDischarged, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, indexGet, HOST_KEYS } from "./slot-accessors.js";
 import { hasShapeSlot, metaReadRaw, metaOf, cloneMeta, metaFieldList, PRESERVED_FN_META_KEYS, viralFields, sourceOf, SOURCE_FIELD, carryMeta } from "./metadata.js";
 import { kernelFieldWriter, registerMetaField, assertNotIntegrityKey, FIELD_WRITER_BRAND } from "./capability.js";
 import type { LawBackingRec } from "./slot-accessors.js";
@@ -1921,7 +1921,7 @@ _setEffectsInspector((fnValue, ctx) => {
 import {
   domainOf as _domainOf, impliesDomain as _impliesDomain,
   AbstractDomain as _AbstractDomain, EffectsDomain as _EffectsDomain,
-  domainFromPredicate,
+  domainFromPredicate, typeShape,
   predicatesOf as _predicatesOf, withPredicates as _withPredicates,
   PredicateSet as _PredicateSet, entailsPredicate as _entailsPredicate,
   mergePredicateSets as _mergePredicateSets,

@@ -1509,7 +1509,7 @@ that prevents it.
   concept spine (S2f); `concepts.md` §24 carries the interface table.
   **PLAN: [docs/plans/plane-interfaces.md](plans/plane-interfaces.md)**
   (ratified as a whole 2026-10-21, ruling 2 option (a); **C1 landed
-  2026-10-21, C2 and C3 landed 2026-10-22**, C4, C5 and the exit remain) — scoped to the four hooks on measurement: delta 23's
+  2026-10-21, C2 to C4 landed 2026-10-22**, C5 and the exit remain) — scoped to the four hooks on measurement: delta 23's
   *27 upward symbols* is **131 imported / 98 distinct**, of which only **4**
   are checkers. The plan's §6 files five other populations (type vocabulary
   ~25, knowledge propagation ~18, member dispatch ~9, diagnostics ~8,
@@ -1561,6 +1561,12 @@ that prevents it.
     `types-std.ts` through the gated `installDispatch`. The evaluator
     imports nothing from `types-std.ts`; its L2 imports are 7, all
     propagation (the exit, B-146). Plan §9.5.
+  - **Progress.** C4 (2026-10-22): hook (c). `shape` is an installed
+    projection (`installProjection`, gated on the `shape` writer);
+    `metaReadRaw` names no field (own `meta`, then a registered
+    `bindingKey` slot through a generic accessor, then a projection);
+    `typeShape`/`equalityShape` moved from the accessor layer to
+    `refinements.ts`, where the chain they walk lives. Plan §9.6.
 
 - [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
   Body wrappers (`type_check`, the `*_attach` family) must forward the

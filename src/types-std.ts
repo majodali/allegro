@@ -12,14 +12,14 @@ import {
   stringToBits, bitsToString, AllegroError, isResolved,
   Extension,
 } from "./types.js";
-import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound } from "./refinements.js";
+import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound, typeShape, equalityShape } from "./refinements.js";
 import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
 import { scopePrivilegeExtend, scopeHoldsPrivilege, scopeLookup, scopeExtend } from "./scope.js";
 import { effectsOf as fnEffectsOf } from "./effects.js";
 import { putEntry, removeEntry } from "./structure.js";
-import { getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate, getGenericArgs, getGenericBackLink, getSlotCount, slotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf, setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface, setWraps, setPredicate, setGenericArgs, setGenericBackLink, setProposition, setEffectBound, setAbstractDomain, removeName, removeRefines, removeConstruct, SLOT_KEYS, isMetaProtocolSlot, typeShape, getFallbackMember, equalityShape, asStructure } from "./slot-accessors.js";
+import { getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate, getGenericArgs, getGenericBackLink, getSlotCount, slotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf, setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface, setWraps, setPredicate, setGenericArgs, setGenericBackLink, setProposition, setEffectBound, setAbstractDomain, removeName, removeRefines, removeConstruct, SLOT_KEYS, isMetaProtocolSlot, getFallbackMember, asStructure } from "./slot-accessors.js";
 import { writeShape, carryShape, removeShapeSlot, metaReadRaw, cloneMeta } from "./metadata.js";
-import { kernelFieldWriter, assertNotIntegrityKey, registerMetaField, installFieldCheck, installDispatch, FieldReader, CheckSite, CallSite, CallBinding } from "./capability.js";
+import { kernelFieldWriter, assertNotIntegrityKey, registerMetaField, installFieldCheck, installDispatch, installProjection, FieldReader, CheckSite, CallSite, CallBinding } from "./capability.js";
 
 
 // --- Constants ---
@@ -3462,13 +3462,21 @@ export const UntypedFunctionType: StructureValue = buildType("UntypedFunction", 
 // evaluation and registration is one-shot.
 const typeWriter = registerMetaField({ name: "type", rule: "computed", integrity: true });
 // `shape` is the type system's too: a member-transparent projection of `type`
-// with refinement layers walked off (§32). It is registered as a field for now
-// and is not one — nothing stores a `shape` value; `metaReadRaw` computes it
-// from `type` on read. B-111/B-112(c) turn it into an installed projection;
-// until then it lives with its owner rather than in the base. Not integrity:
-// the capability is never acquired, because writes go through the in-place
-// `writeShape` rather than through a writer.
-registerMetaField({ name: "shape", rule: "computed" });
+// with refinement layers walked off (§32). Nothing stores a `shape` value: it
+// is an installed PROJECTION (B-112 C4, hook (c)) — the base serves the name
+// and this layer says what it computes from. It stays registered as a field
+// until B-111 says what a projection's registration is; the writer is held
+// only to gate the install. Not integrity: writes to the underlying `type`
+// go through the in-place `writeShape`, never through a writer.
+const shapeWriter = registerMetaField({ name: "shape", rule: "computed" });
+installProjection(shapeWriter, (v, read) => {
+  // One storage, two reads: `shape` is `type` with member-transparent
+  // refinement layers walked off. A non-Structure raw (or none) answers as
+  // itself — typeShape only applies to type Contexts.
+  const raw = read(v, "type");
+  if (raw?.kind === ValueKind.Structure) return typeShape(raw as StructureValue);
+  return raw;
+});
 
 // --- The `type` check (B-112 C2, hook (b)) ------------------------------------
 //

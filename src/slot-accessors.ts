@@ -322,39 +322,22 @@ export function isBareBindingName(name: string): boolean { return name.startsWit
 // copied direct bindings); it defines where shape ends and knowledge
 // begins.
 
-/** The dispatch shape of a type Context: walk `__refines` past
- *  member-transparent refinement layers. Identity on non-refined types. */
-export function typeShape(t: StructureValue): StructureValue {
-  let cur = t;
-  for (let guard = 0; guard < 64; guard++) {
-    if (slotRead(cur, "__predicate") === undefined) return cur;
-    const parent = asStructure(slotRead(cur, "__refines"));
-    if (!parent) return cur;
-    const ownMembers = slotRead(cur, "__members");
-    const parentMembers = slotRead(parent, "__members");
-    if (ownMembers !== undefined && ownMembers !== parentMembers) return cur;
-    cur = parent;
-  }
-  return cur;
-}
+// `typeShape` and `equalityShape`, the two walks over the refinement chain
+// that the comment above describes, live in `src/refinements.ts` since
+// B-112 C4: a refinement chain is that unit's structure, and the accessor
+// layer encodes no L2 semantics. The `shape` read is an installed
+// projection (`src/metadata.ts`, `installProjection`).
 
-/** E1 (B-027, §7/D37): the EQUALITY shape — walk the FULL `__refines`
- *  chain to the representation root, past preserve-lifted and method-layer
- *  refinements too (unlike `typeShape`, which stops at layers that mint
- *  their own member sets, because their overrides must run for dispatch).
- *  Refinements are knowledge and never separate equal values —
- *  `PositiveInt(5) == 5` even when PositiveInt lifts operators. `distinct`
- *  types mint NO refines edge (buildDistinctType skips the slot), so they
- *  stay their own equality shape: unequal to the parent until a coercion
- *  is declared (E2). */
-export function equalityShape(t: StructureValue): StructureValue {
-  let cur = typeShape(t);
-  for (let guard = 0; guard < 64; guard++) {
-    const parent = asStructure(slotRead(cur, "__refines"));
-    if (!parent) return cur;
-    cur = typeShape(parent);
-  }
-  return cur;
+/** Read a registered binding-plane slot by its key — the storage of a
+ *  metadata field that still lives on the binding plane (`bindingKey`
+ *  in its registration). Generic on purpose: the metadata unit reads
+ *  such a field through this without naming it (B-112 C4). */
+export function readBindingSlot(ctx: StructureValue, key: string): Value | undefined {
+  if (!isRegisteredSlotKey(key)) throw new Error(`readBindingSlot: '${key}' is not a registered slot`);
+  return slotRead(ctx, key);
+}
+export function hasBindingSlot(ctx: StructureValue, key: string): boolean {
+  return ctx.bindings.has(key);
 }
 
 // --- Write-side shims (C1.2) --------------------------------------------------------

@@ -23,12 +23,12 @@ import {
   StructureValue,
 } from "./types.js";
 import {
-  MetaFieldSpec, MetaFieldWriter, FieldCheck, DispatchInstall, defineMetaField, metaFieldEntry, metaFieldEntries,
-  currentMetaEpoch, cloneMeta, defineFieldMerge, defineFieldCheck, defineDispatch,
+  MetaFieldSpec, MetaFieldWriter, FieldCheck, DispatchInstall, Projection, defineMetaField, metaFieldEntry, metaFieldEntries,
+  currentMetaEpoch, cloneMeta, defineFieldMerge, defineFieldCheck, defineDispatch, defineProjection,
 } from "./metadata.js";
 import { stampBindingSlot } from "./slot-accessors.js";
 
-export type { MetaFieldSpec, MetaFieldWriter, FieldCheck, FieldReader, CheckSite, DispatchInstall, CallSite, CallBinding } from "./metadata.js";
+export type { MetaFieldSpec, MetaFieldWriter, FieldCheck, FieldReader, CheckSite, DispatchInstall, CallSite, CallBinding, Projection } from "./metadata.js";
 
 function buildWriter(spec: MetaFieldSpec): MetaFieldWriter {
   return {
@@ -121,6 +121,18 @@ export function installDispatch(writer: MetaFieldWriter, d: DispatchInstall): vo
     throw new AllegroError(`installDispatch: dispatch on '${writer.channel}' may be installed only by the holder of its writer (P4)`);
   }
   defineDispatch(writer.channel, d);
+}
+
+/** Install a projection (B-112 C4, hook (c)): how the field named by the
+ *  writer is COMPUTED on read when nothing stores it. A projection reads as
+ *  a field, so installing one is writing that field's meaning — GATED (P4)
+ *  on the field's own writer. The base serves it by name from
+ *  `metaReadRaw` and knows nothing of what it computes from. */
+export function installProjection(writer: MetaFieldWriter, project: Projection): void {
+  if (!holdsWriterFor(writer, writer.channel)) {
+    throw new AllegroError(`installProjection: the projection '${writer.channel}' may be installed only by the holder of its writer (P4)`);
+  }
+  defineProjection(writer.channel, project);
 }
 
 // --- Field registration: what the BASE owns ------------------------------------

@@ -24,7 +24,7 @@ import {
   EvalFn,
   withMeta,
 } from "./types.js";
-import { asStructure, typeShape, readDischargedSlot, hasDischarged } from "./slot-accessors.js";
+import { asStructure, readBindingSlot, hasBindingSlot } from "./slot-accessors.js";
 
 // --- Field registry (the table; minting is capability.ts) -----------------------
 
@@ -121,46 +121,48 @@ function invalidatePropagationCaches(): void {
 
 // --- Channel plane (read side) ------------------------------------------------------
 
-/** Raw channel read on a value: MultiValue component lookup, plus the
- *  `discharged` Context-binding channel that still predates the component
- *  plane. Free of any authority, per D23 (reads are free).
- *
- *  C3.1: `shape` reads the computed dispatch shape (refinement layers
- *  walked off — identity for every non-refined type, including the
- *  meta-type reads on type values); `type` stays the raw stored view.
- *  Both answer from ONE stored value; the split is this computation, not
- *  two storages (B-104 chunk 3). */
+// --- Projection hook (B-112 C4, hook (c)) ---------------------------------------
+//
+// A projection is a field read that is COMPUTED from other fields rather
+// than stored: `shape` is `type` with member-transparent refinement layers
+// walked off. What a projection means is its channel's, so it is installed
+// (gated on the projected field's writer, P4) and the base reads it by name
+// without knowing how it is computed.
+
+export type Projection = (v: Value, read: (v: Value, field: string) => Value | undefined) => Value | undefined;
+const PROJECTIONS = new Map<string, Projection>();
+/** Only `src/capability.ts` calls this, through the gated `installProjection`. */
+export function defineProjection(name: string, project: Projection): void {
+  PROJECTIONS.set(name, project);
+}
+export function projection(name: string): Projection | undefined {
+  return PROJECTIONS.get(name);
+}
+
+/** Raw field read on a value. Free of any authority, per D23 (reads are
+ *  free). Three sources, in order: the value's own `meta`; a registered
+ *  field whose storage is still a binding-plane slot (`bindingKey`), read
+ *  through the accessor layer; an installed projection. The base names no
+ *  field here (B-112 C4): `shape` is the type system's projection over
+ *  `type`, and the one binding-plane field is found through its
+ *  registration. */
 export function metaReadRaw(v: Value, channel: string): Value | undefined {
-  // C4.3b + B-104 chunk 3: the channel plane is universal, and `type` is
-  // now on it for EVERY value — carriers, flattened records and bare type
-  // Contexts alike. Contexts without channels have `meta` undefined
-  // (lazy — plain contexts and scopes pay nothing).
+  // C4.3b + B-104 chunk 3: the channel plane is universal — every kind
+  // carries `meta`; values carrying nothing have it undefined (lazy — plain
+  // contexts and scopes pay nothing).
   const comps = v.meta as Map<string, Value> | undefined;
   if (comps !== undefined) {
     const comp = comps.get(channel);
     if (comp !== undefined) return comp as Value;
   }
-  if (channel === "shape") {
-    // One storage, two reads: `shape` is `type` with member-transparent
-    // refinement layers walked off. A non-Structure raw (or none) answers
-    // as itself — typeShape only applies to type Contexts.
-    let raw = comps?.get("type") as Value | undefined;
-    if (raw === undefined) {
-      const ctx = asStructure(v);
-      raw = ctx ? ctx.meta?.get("type") as Value | undefined : undefined;
-    }
-    if (raw?.kind === ValueKind.Structure) return typeShape(raw as StructureValue);
-    return raw;
-  }
-  if (channel === "type") {
-    // A transparent scalar carrier answers through its primary's plane.
-    const ctx = asStructure(v);
-    return ctx ? ctx.meta?.get("type") as Value | undefined : undefined;
-  }
-  if (channel === "discharged") {
+  const bindingKey = META_FIELD_TABLE.get(channel)?.spec.bindingKey;
+  if (bindingKey !== undefined) {
     const c = asStructure(v);
-    if (c) return readDischargedSlot(c);
+    if (c) return readBindingSlot(c, bindingKey);
+    return undefined;
   }
+  const project = PROJECTIONS.get(channel);
+  if (project !== undefined) return project(v, metaReadRaw);
   return undefined;
 }
 
@@ -406,7 +408,10 @@ export function metaFieldList(v: Value): string[] {
   }
   if (v.kind === ValueKind.Structure) {
     const ctx = v as StructureValue;
-    if (hasDischarged(ctx) && !out.includes("discharged")) out.push("discharged");
+    for (const entry of META_FIELD_TABLE.values()) {
+      const key = entry.spec.bindingKey;
+      if (key !== undefined && hasBindingSlot(ctx, key) && !out.includes(entry.spec.name)) out.push(entry.spec.name);
+    }
   }
   return out;
 }
