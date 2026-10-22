@@ -236,7 +236,7 @@ column is §7's ledger, corrected in place as moves land (K-010).
 | 10 | **`metadata`** | D48(b)(c) slot and construction; R3 non-interference; SC-7 propagation vocabulary; D39 field registry as code; the propagation table | `kinds` | `metadata.ts` (field registry, propagation vocabulary, free reads, carry idioms, merge table), `types.ts` (`withMeta`, `Metadata`), `evaluator.ts` (`viralScan`, `mergeOverMeta`) | partial — `metadata.ts` is the unit; `withMeta` and the two evaluator helpers are still elsewhere. Chapter: `allegretto/metadata-and-capability.md` |
 | 11 | **`capability`** | R12 authority is a capability; D21 constructor brand; D23 free reads; D24 attenuation by wrapping; `installFieldMerge` (the one layer→base instance) | `metadata`, `primitive-function` | `capability.ts` (writers, registration, the gated `installFieldMerge`, the base's own fields), `primitives.ts` "Channel plane" 495–563 | partial — `capability.ts` is the unit; the Allegro-facing channel primitives are still in `primitives.ts`. Chapter: `allegretto/metadata-and-capability.md` |
 | 12 | **`scope`** | D49 scope is not a value; IC-5 parent chain; the facts plane as opaque payload; future cells as bindings (D33) | `structure`, `symbol`, `metadata` | `scope.ts` (+ shares `Structure`) | owed → **B-136** executes it |
-| 13 | **`evaluator`** | R2 PE as the mechanism; R4 totality; PE Rule 1 and Rule 2; application and substitution; TCO; the D22 carve-out for scope; **the four B-112 hooks as its install surface** | `scope`, `expression`, `composed-function`, `primitive-function`, `param`, `symbol`, `metadata`, `capability` | `evaluator.ts` minus `checkArgType`, `PRIM_TO_METHOD`, `precompileFunction`'s type inference | owed → **B-112** executes it |
+| 13 | **`evaluator`** | R2 PE as the mechanism; R4 totality; PE Rule 1 and Rule 2; application and substitution; TCO; the D22 carve-out for scope; **the four B-112 hooks as its install surface** | `scope`, `expression`, `composed-function`, `primitive-function`, `param`, `symbol`, `metadata`, `capability` | `evaluator.ts` minus `precompileFunction`'s placeholder seeding and the post-call `type` stamp (carrying by field name; B-145, B-146) | owed → **B-112** executes it |
 | 14 | **`futures`** | R10 resumable evaluation; D33 future cells; the completion cascade; B-114's confluence question | `evaluator`, `scope` | `futures.ts`, `runtime.ts` (`DependencyRegistry`, `applyPhase`), `primitives.ts` async 1116–1197 | owed |
 | 15 | **`base-primitives`** | the ~40 Allegretto primitives (structures.md §11): bits, expression, structure ops, `eval_if`/`eval_when`, `make_error`, `print`, identity, source read (D47) | `kinds`, `evaluator`, `futures` | `primitives.ts` 23–1197 | owed |
 
@@ -396,14 +396,15 @@ backlog owner's or a ruling's.
   (B-141). The unit DAG says where it would go: a `host` unit between
   `futures` and `base-primitives`, which the primitives import and the
   CLI and web bundle each supply.
-- **M11 — The evaluator holds Type-system activities.** `PRIM_TO_METHOD`
-  dispatch and precompile's inference are *Dispatch member access* and
-  *Infer* — Type system — inside the Engine's unit; *Check declared
-  constraint* left it at B-112 chunk C2 (the evaluator runs installed
-  field checks and decides nothing). Call-site unification is a fourth
-  such activity the plan did not list (plan §9.4). B-112's hooks are
-  exactly this boundary. This is the strongest alignment the two models
-  produce, and the reason this document precedes B-112 chunk 1.
+- **M11 — The evaluator held Type-system activities.** *Check declared
+  constraint* left it at B-112 chunk C2 and *Dispatch member access*,
+  with call-site unification, at chunk C3: the evaluator runs installed
+  checks and dispatchers and decides nothing, and imports nothing from
+  `types-std.ts`. What remains is *Infer* as precompile's placeholder
+  seeding and the post-call `type` stamp, both carrying by field name
+  (B-145, B-146; plan §9.5). B-112's hooks are exactly this boundary. This
+  is the strongest alignment the two models produce, and the reason this
+  document precedes B-112 chunk 1.
 - **M12 — `scope` imported `refinements`.** Closed by B-112 chunk C1.
   Found by the report, not by reading: `scopeFactsFor` merged predicate
   sets along the chain with `mergePredicateSets`, so L0's scope knew how

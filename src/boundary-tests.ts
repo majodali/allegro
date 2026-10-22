@@ -33,8 +33,8 @@ import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
 import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, SLOT_REGISTRY, SLOT_KEYS, typeShape, isInterfaceType as isInterfaceTypeSlots, elementsOf } from "./slot-accessors.js";
-import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge, fieldCheck, currentMetaEpoch } from "./metadata.js";
-import { registerMetaField, installFieldMerge, installFieldCheck } from "./capability.js";
+import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge, fieldCheck, dispatchFor, currentMetaEpoch } from "./metadata.js";
+import { registerMetaField, installFieldMerge, installFieldCheck, installDispatch } from "./capability.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { withMeta } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
@@ -1024,6 +1024,37 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     // Replace the probe's check with one that accepts, so later tests in
     // this process are not affected: the holder may re-install.
     installFieldCheck(probe, () => {});
+  });
+
+  test("dispatch installation is capability-gated (B-112 C3, hook (a)): the base dispatches on what is installed", () => {
+    const forged = { channel: "type", write: (t: Value) => t };
+    let threw: string | null = null;
+    try { installDispatch(forged, { primitive: () => null, call: () => null }); } catch (e) { threw = String(e); }
+    eq(threw?.includes("holder of its writer") ?? false, true,
+      `a foreign writer cannot install dispatch: ${threw}`);
+    eq(dispatchFor("type") !== undefined, true, "type-core installed dispatch on `type`");
+
+    // A field the base has never heard of installs a dispatcher, and an
+    // operator application on a value carrying that field is answered by
+    // it. The operand is UNTYPED so the type channel's dispatcher declines
+    // first (registration order) and the probe's turn comes.
+    const probe = registerMetaField({ name: "dispatch_probe", rule: "drop" });
+    installDispatch(probe, {
+      primitive: (fn, args, _ctx, _evalFn, residual) =>
+        residual === null && fn.name === "bits_add" && metaReadRaw(args[0], "dispatch_probe") !== undefined
+          ? makeInt(99) : null,
+      call: () => null,
+    });
+    const r = attack("g = (a, b) => a + b");
+    eq(r.threw, null, `untyped add compiles: ${r.threw}`);
+    const g = r.evalCtx!.bindings.get("g")!.value as Value;
+    const marked = probe.write(makeInt(1), makeInt(1));
+    const answered = evaluate(makeExpr(g, [marked, makeInt(1)]), r.evalCtx!) as BitsValue;
+    eq(answered.data, 99n, "the installed dispatcher answered the primitive application");
+    const plain = evaluate(makeExpr(g, [makeInt(1), makeInt(1)]), r.evalCtx!) as BitsValue;
+    eq(plain.data, 2n, "an operand without the field falls through to the primitive");
+    // The holder may re-install; leave a declining dispatcher behind.
+    installDispatch(probe, { primitive: () => null, call: () => null });
   });
 
   test("forgery G (B-125): the metadata write surface is exactly the minted writers", () => {

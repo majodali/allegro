@@ -5,18 +5,11 @@ import {
   ComposedFunctionValue, ParamValue,
   AllegroError, isResolved, makeExpr, withMeta, makeStructure,
   DepCollector, ownsParam, Metadata} from "./types.js";
-import {
-  getType, getTypeName, withType, typeMethod, applyBoundaryBound, getFunctionParamTypes, getFunctionReturnType,
-  unifyTypes, resolveTypeWithBindings, TypeBindings,
-  protocolEquals,
-  assertMemberAvailable,
-  assertMemberReachable, typePrivilegedCtx,
-} from "./types-std.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
-import { getConstruct, typeShape } from "./slot-accessors.js";
-import { metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, fieldChecks, CheckSite, PRESERVED_FN_META_KEYS, withSource, carryMeta } from "./metadata.js";
-import { scopeLookup, scopeExtend, scopeCompileMode, scopeFactsFor } from "./scope.js";
+import { getConstruct } from "./slot-accessors.js";
+import { metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, fieldChecks, CheckSite, dispatchers, CallBinding, PRESERVED_FN_META_KEYS, withSource, carryMeta } from "./metadata.js";
+import { scopeLookup, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
 
@@ -95,14 +88,6 @@ export function markTailCalls(body: Value, seen?: Set<Value>): void {
     }
   }
 }
-
-// Map base primitive names to type method names for type-directed dispatch
-const PRIM_TO_METHOD = new Map<string, string>([
-  ["bits_add", "add"], ["bits_sub", "sub"], ["bits_mul", "mul"],
-  ["bits_div", "div"], ["bits_mod", "mod"],
-  ["bits_eq", "eq"], ["bits_neq", "neq"], ["bits_lt", "lt"], ["bits_gt", "gt"],
-  ["bits_lte", "lte"], ["bits_gte", "gte"],
-]);
 
 // --- Core evaluation ---
 
@@ -379,22 +364,12 @@ function applyPrimitive(
   if (viralHit) return attachEff(viralHit);
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
-    // Even though args aren't fully resolved, their type meta
-    // may be known. Use type-level dispatch to infer the result type.
-    // B-121 C2: the kind guard meant "carries a type", which held only while
-    // typing a scalar wrapped it. Read the field directly; `typeComp` is then
-    // checked for being a Structure, which it genuinely is — a type IS one.
-    if (evalArgs[0] !== undefined) {
-      const typeComp = metaReadRaw(evalArgs[0], "type");
-      if (typeComp && typeComp.kind === ValueKind.Structure) {
-        const methodName = PRIM_TO_METHOD.get(fn.name);
-        if (methodName) {
-          // Propagate left operand's type as the residual's type.
-          // For comparisons this is imprecise (should be Bool), but the
-          // correct type will be determined when the expression fully evaluates.
-          return attachEff(withMeta(residual, new Map([["type", typeComp]])));
-        }
-      }
+    // B-112 C3 (hook (a)): a residual's type is the dispatcher's to infer —
+    // the base knows neither which primitives have typed methods nor what
+    // the result type would be. First installed dispatcher to answer wins.
+    for (const [, d] of dispatchers()) {
+      const typed = d.primitive(fn, evalArgs, ctx, evalFn, residual);
+      if (typed !== null) return attachEff(typed);
     }
     return attachEff(residual);
   }
@@ -405,74 +380,18 @@ function applyPrimitive(
   // downstream operations inherit the proof context.
   const propagatedSet = propagateSetForPrimitive(fn.name, evalArgs);
 
-  // E1 (B-027, §7/D37): `==` and `!=` resolve through the EQUALITY
-  // PROTOCOL when both operands are typed — shape resolution (equality
-  // shape = full refinement-peel; distinct types don't unify), custom
-  // `equals` dispatch, kernel structural equals for structures. Total:
-  // typed Bool out, never a host crash, on any kind pair. Declines
-  // (null) for untyped operands — base-mode bits_eq semantics keep.
-  if (fn.name === "bits_eq" || fn.name === "bits_neq") {
-    const r = protocolEquals(evalArgs[0], evalArgs[1], fn.name === "bits_neq", ctx, evalFn);
-    if (r) {
-      const out = attachEff(r);
+  // B-112 C3 (hook (a)): type-directed dispatch — the equality protocol
+  // on `==`/`!=`, operator dispatch through a typed operand's method, the
+  // availability and reachability gates, user-defined operator members —
+  // is installed by the type channel and run here without the base knowing
+  // what a type is. A dispatcher that declines returns null and the base
+  // calls the primitive. With nothing installed (Allegretto alone) every
+  // primitive runs as itself, which is the base's own semantics.
+  for (const [, d] of dispatchers()) {
+    const answered = d.primitive(fn, evalArgs, ctx, evalFn, null);
+    if (answered !== null) {
+      const out = attachEff(answered);
       return propagatedSet ? withPredicates(out, propagatedSet) : out;
-    }
-  }
-
-  // Type-directed dispatch: if the first arg has a type with a matching method,
-  // dispatch through the type instead of calling the base primitive directly.
-  // This enables operator overloading (e.g., String + String = concatenation).
-  // B-121 C2: same correction — "carries a type" is a metadata question, and
-  // operator dispatch on a typed SCALAR is exactly the case the kind test
-  // used to catch only because the scalar had become a Structure.
-  if (evalArgs[0] !== undefined) {
-    const typeComp = metaReadRaw(evalArgs[0], "type");
-    if (typeComp && typeComp.kind === ValueKind.Structure) {
-      const methodName = PRIM_TO_METHOD.get(fn.name);
-      if (methodName) {
-        // B-097 V2 (V-R1): operator dispatch goes through the SAME
-        // availability gate as dot access — the formerly deferred C3.2
-        // item. An occurrence bound that lacks the operator member
-        // denies, exactly as `x.add` would (conscious delta 3).
-        assertMemberAvailable(evalArgs[0], methodName, typeComp as StructureValue);
-        // C3.1 (D36): dispatch reads the SHAPE. Member-transparent
-        // refinement layers share the parent's member set, so walking them
-        // off never changes which method runs; preserveOps/mixin layers
-        // mint their own members and ARE shapes (their overrides run).
-        const opShape = typeShape(typeComp as StructureValue);
-        // B-097 V3 (D41 stage 3): kernel mediation covers operators too —
-        // `a + b` on a type whose `add` is private denies outside the
-        // defining scope, exactly as `a.add` would.
-        assertMemberReachable(opShape, methodName, ctx);
-        const method = typeMethod(opShape, methodName);
-        if (method?.kind === ValueKind.PrimitiveFunction) {
-          const result = (method as import("./types.js").PrimitiveFunctionValue).fn(evalArgs, ctx, evalFn);
-          // If the method already returned a typed value, use it as-is —
-          // methods know their return types (comparisons return Bool).
-          // B-121 C2: was `result.kind === Structure`, i.e. "is a carrier",
-          // stand-in for "is typed". Asking directly is also more correct: an
-          // untyped record used to take the already-typed branch.
-          let out: Value;
-          if (metaReadRaw(result, "type") !== undefined) out = result;
-          else if (result.kind === ValueKind.Bits) out = withMeta(result, new Map([["type", typeComp]]));
-          else                                     out = result;
-          out = attachEff(out);
-          return propagatedSet ? withPredicates(out, propagatedSet) : out;
-        }
-        // B-092 U1: USER-DEFINED types get operator overloading too — a
-        // `Type.define` spec's method impls are ComposedFunctions, and
-        // this path previously handled only host-primitive methods, so
-        // `q1 + q2` on a record type fell through to raw bits_add.
-        // Dispatch the same way type_dispatch does for method members:
-        // self is the first parameter, full values (channels intact).
-        const mData = method != null ? method : undefined;
-        if (mData?.kind === ValueKind.ComposedFunction) {
-          // B-097 V3: a composed operator member is the type's own code —
-          // its body runs with the type's member privilege planted.
-          const out = attachEff(evalFn(makeExpr(mData, evalArgs), typePrivilegedCtx(opShape, ctx)));
-          return propagatedSet ? withPredicates(out, propagatedSet) : out;
-        }
-      }
     }
   }
 
@@ -586,57 +505,24 @@ function applyComposed(
     const viralHit = viralScan(evalArgs, currentFn as unknown as Value);
     if (viralHit) return viralHit;
 
-    // Type variable unification
+    // B-112 C3 (hook (a), maintainer ruling 2026-10-22): binding a callee's
+    // declared constraints to its arguments — type-variable unification,
+    // the per-argument checks, the boundary bound, the inferred return
+    // type — is the type channel's and is installed. The base hands over
+    // the check loop and takes back the context the body evaluates in,
+    // the arguments as substituted, and a finisher for the result. A
+    // callee declaring nothing binds nothing.
     let enrichedCtx = ctx;
-    let inferredReturnType: Value | null = null;
-    // B-121 C2: was `isCarrier(currentFnRaw)` — "is a carrier" standing in
-    // for "carries a type". A typed function is now a ComposedFunction with
-    // `meta`, not a wrapper, so the guard stopped firing and this whole block
-    // — type-variable unification AND call-site argument checking — was
-    // skipped. Annotations silently stopped rejecting. The `fnType` test on
-    // the next line already asks the real question.
+    let binding: CallBinding | null = null;
     if (currentFnRaw) {
-      const fnType = getType(currentFnRaw);
-      const _fnTypeName = fnType ? getTypeName(currentFnRaw) : null;
-      if (fnType && _fnTypeName === "Function") {
-        const paramTypes = getFunctionParamTypes(fnType);
-        const returnTypeExpr = getFunctionReturnType(fnType);
-        if (paramTypes) {
-          const bindings: TypeBindings = new Map();
-          for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
-            const argType = getType(evalArgs[i]);
-            unifyTypes(argType, paramTypes[i], bindings);
-          }
-          if (bindings.size > 0) {
-            // C2.1: O(1) child layer over the call ctx — replaces the
-            // former flatten-copy of every inherited binding. Compile-mode
-            // reads are chain-aware (scopeCompileMode), so no flag copying.
-            enrichedCtx = scopeExtend(
-              ctx,
-              [...bindings].map(([varName, typeVal]) =>
-                [varName, { key: varName, value: typeVal }] as [string, import("./types.js").Binding]
-              ),
-            );
-            if (returnTypeExpr && (returnTypeExpr.kind === ValueKind.Param || returnTypeExpr.kind === ValueKind.Symbol)) {
-              inferredReturnType = resolveTypeWithBindings(returnTypeExpr, bindings);
-            }
-          }
-          // Call-site type checking: verify args match param types
-          // (after unification, so type variables are resolved)
-          for (let i = 0; i < Math.min(evalArgs.length, paramTypes.length); i++) {
-            const resolvedParamType = resolveTypeWithBindings(paramTypes[i], bindings);
-            if (resolvedParamType.kind !== ValueKind.Structure) continue; // unresolved type var
-            checkArg(
-              evalArgs[i], resolvedParamType as StructureValue, i,
-              i < currentFn.params.length ? (currentFn.params[i] as unknown as Value) : undefined,
-              enrichedCtx, depth, depCollector,
-            );
-            // C3.2 (D36): the annotation is a knowledge upper-bound — the
-            // param crossing is an abstraction boundary. Stamp (widening)
-            // or reset (own-shape) the occurrence bound on the value that
-            // gets substituted into the body.
-            evalArgs[i] = applyBoundaryBound(evalArgs[i], resolvedParamType as StructureValue);
-          }
+      for (const [, d] of dispatchers()) {
+        const b = d.call(currentFn, currentFnRaw, evalArgs, enrichedCtx, {
+          check: (arg, expected, argIndex, param, c) => checkArg(arg, expected, argIndex, param, c, depth, depCollector),
+        });
+        if (b) {
+          enrichedCtx = b.ctx;
+          for (let i = 0; i < b.args.length; i++) evalArgs[i] = b.args[i];
+          binding = b;
         }
       }
     }
@@ -679,15 +565,7 @@ function applyComposed(
       continue tco_loop;
     }
 
-    // Apply inferred return type
-    if (inferredReturnType && inferredReturnType.kind === ValueKind.Structure) {
-      const currentType = getType(result);
-      if (!currentType) {
-        result = withType(result, inferredReturnType as StructureValue);
-      }
-    }
-
-    return result;
+    return binding ? binding.result(result) : result;
   }
 }
 
@@ -956,7 +834,11 @@ export function precompileFunction(
       result = evaluate(next, ctx, 0);
     }
     const finalValue = result as Value;
-    const inferredType = getType(finalValue);
+    // The base reads the field it carries and interprets nothing: a type
+    // is whatever Structure the `type` field holds (hook (c)/B-145 own
+    // the name; `viralScan` reads it the same way).
+    const inferredTypeRaw = metaReadRaw(finalValue, "type");
+    const inferredType = inferredTypeRaw?.kind === ValueKind.Structure ? (inferredTypeRaw as StructureValue) : null;
     // Stage F1: read the body's accumulated effects from the result's
     // `effects` component (set by applyPrimitive's PE propagation) and
     // stash on the ComposedFunction so typed_function_impl can attach the
