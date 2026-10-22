@@ -33,7 +33,7 @@ import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
 import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, SLOT_REGISTRY, SLOT_KEYS, typeShape, isInterfaceType as isInterfaceTypeSlots, elementsOf } from "./slot-accessors.js";
-import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, fieldMerge } from "./metadata.js";
+import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge } from "./metadata.js";
 import { registerMetaField, installFieldMerge } from "./capability.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { withMeta } from "./types.js";
@@ -139,7 +139,7 @@ const LINT_PATTERNS: LintPattern[] = [
   { name: "retired-peel-call", regex: /\b(?:primaryOf|dataOf)\s*\(/g },
   // C1.4: TS-kernel writer acquisition is restricted to the two proof-kernel
   // modules — anywhere else, acquiring the discharged writer fails the suite.
-  { name: "kernel-writer-acquisition", regex: /\bkernelChannelWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
+  { name: "kernel-writer-acquisition", regex: /\bkernelFieldWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
   // C2.2: fact payloads are opaque outside the scope module — reads via
   // scopeFactsFor, layer pushes via scopeAssume, own-layer writes via
   // scopeOwnFacts. Direct .scopePredicates access anywhere else fails.
@@ -376,8 +376,12 @@ export function checkValueInvariants(v: Value | null | undefined, program: strin
       }
     }
     // W3 (C1.1, D39): every metadata field key is covered by the registry.
+    // A field Allegro minted through `channel_register` is registered in the
+    // live field table rather than the static slot registry — that IS the
+    // sanctioned way a new field comes to exist (D23/D24), so the walk
+    // accepts a minted entry. A kernel field must still be in SLOT_REGISTRY.
     for (const key of meta.keys()) {
-      if (!isRegisteredFieldName(key)) {
+      if (!isRegisteredFieldName(key) && !metaFieldEntry(key)?.minted) {
         out.push({ invariant: "W3 registry-completeness", detail: `unregistered metadata field key "${key}" on a ${v.kind}`, program });
       }
     }

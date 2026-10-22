@@ -54,7 +54,9 @@ A term has one definition site, a heading preceded by
 |---|---|---|
 | II.1 | `allegretto/README.md` | L0 boundary contract |
 | II.2 | `allegretto/structures.md` | Structures, scopes, channels, symbols, kinds: the v2 design |
-| II.3–6 | *planned* | One chapter per L0 unit band: the kinds and the assembly; metadata and capability; scope and the evaluator; futures and the base primitives. Written when each band's code moves (`units.md` §7); until then the spine's T0 to T3 entries are the text |
+| II.3 | *planned* | The kinds and the assembly (units 1 to 9); written when the `Value` union splits (`units.md` §7); until then the spine's T0 and T1 entries are the text |
+| II.4 | `allegretto/metadata-and-capability.md` | The `metadata` and `capability` units: the metadata plane on every value, fields, channels, propagation, writer capabilities, installed meaning, the base's own fields. Definition site of *metadata field*, *channel*, *propagation* and *writer capability* |
+| II.5–6 | *planned* | Scope and the evaluator (units 12 and 13, at B-136 and B-112's exit); futures and the base primitives (units 14 and 15). Until then the spine's T2 and T3 entries are the text |
 | II.7 | `extension/README.md` | L1 boundary contract |
 | II.8 | `grammar-formalism.md` | The grammar formalism (specification; implemented by `src/grammar2/`) |
 | II.9 | `extension/grammar.md` | Grammar and parser: design decisions and goals |

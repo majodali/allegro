@@ -197,9 +197,11 @@ requirement (record §2.1 F4).
 (§19, §20), the propagation table in `src/metadata.ts` applied by the evaluator
 without reading field meaning.
 
-**Delta.** The base registers eleven fields itself and special-cases three
-by name (§19's delta, B-109(a)). The mechanism honours R3; the wiring does
-not.
+**Delta.** Three registrations have no owner (`knowledge`, `warnings`,
+`exported`; `allegretto/metadata-and-capability.md` §3; **B-111**, field
+versus channel registration), and the propagation table is applied by two
+evaluator paths that are not yet one mechanism (its §5; **B-112**, the
+four owed plane interfaces).
 
 <a id="def-r4"></a>
 ### R4 — Evaluation is total over unresolved information
@@ -339,9 +341,7 @@ reads free) and D24 (the capability is a delegable closure)); one-shot
 registration; the fixed propagation vocabulary (SC-7) exists so that
 fabricating rules on integrity fields are a decidable subset (record §4.2).
 
-**Delta.** The base enforces integrity by a hardcoded name list, and the
-list disagrees with the registry about `source` (§21's delta; record §1.2;
-**B-109(b)(c)**).
+**Delta.** —
 
 <a id="def-r14"></a>
 ### R14 — Code is organised into separately-loadable units
@@ -552,7 +552,7 @@ installed by the field's owner.
 |---|---|
 | Arbitrary propagation closures registered per field | Satisfies R3 and R6 equally, but R12 becomes unenforceable: a closure is not inspectable, so the base cannot refuse a fabricating rule on an integrity field |
 
-**Rationale.** The integrity check (`registerChannel` refuses `viral` or
+**Rationale.** The integrity check (`registerMetaField` refuses `viral` or
 `union` on an integrity field) is decidable only over symbols. Revisit if a
 layer needs a discipline the vocabulary cannot express; extend the
 vocabulary rather than open it to closures. `union` is in the vocabulary
@@ -562,9 +562,8 @@ because effect sets union and knowledge meets.
 `installFieldMerge` (`src/capability.ts`, gated on the field's writer) is how a field supplies `union` semantics; one caller
 (`src/effects.ts`).
 
-**Delta.** `installFieldMerge` is ungated, so any module may decide what
-merging `effects` means (B-112 plan §4.2). The `predicates` field registers
-no merge and the scope imports one directly (`units.md` M12).
+**Delta.** `positional` is vocabulary without a path
+(`allegretto/metadata-and-capability.md` §5).
 
 ### SC-8 — Specified aborts
 
@@ -1354,134 +1353,25 @@ convention. `StructureHostFields` now declares it. Note the scope: this fixes
 the DECLARATION. Host-plane residents that belong on another plane are
 B-118, and that item exists because this entry made the two separable.)*
 
-<a id="def-metadata-field"></a>
 ## 19. Metadata field
 
-> **Level: Specification** — satisfies R3, R12. *Renamed at S2f from
-> "channel", which was two concepts sharing a word — see §19b.*
+**Defined in** [`allegretto/metadata-and-capability.md` §3](allegretto/metadata-and-capability.md), the chapter for the
+`metadata` and `capability` units, which is the definition site.
 
-**Definition.** A *field* is one named slot of the metadata plane, with a
-**declared propagation rule** and a **writer capability**. Registration is
-one-shot: the first registrant receives the writer as a closure and no one
-else can obtain it. Reads are free.
-
-**Rationale.** One-shot registration is what makes R12 work without the base
-knowing which fields matter: authority is *the closure*, not the name, so
-"who may write `discharged`" is answered by possession rather than by a list
-the base would have to maintain — and would have to be told to maintain,
-violating R6.
-
-**As implemented.** `registerChannel(spec)` in `src/capability.ts` returns a
-`ChannelWriter`; `channelReadRaw(v, name)` reads; `channelSpec(name)` returns
-the registration; storage is the `components` map. `kernelChannelWriter` is
-the kernel's acquisition path, lint-restricted to two modules.
-
-**Delta.** The base **registers eleven fields itself** at module init and
-special-cases three by name. R6 says the owning layer should register its
-own. **→ B-109(a).** Naming: the implementation calls fields "channels"
-throughout — see §19b's delta.
-
-<a id="def-channel"></a>
 ## 19b. Channel
 
-> **Level: Specification** — satisfies R2, R3. *New at S2f (maintainer).*
+**Defined in** [`allegretto/metadata-and-capability.md` §4](allegretto/metadata-and-capability.md), the chapter for the
+`metadata` and `capability` units, which is the definition site.
 
-**Definition.** A *channel* is the whole apparatus by which one capability
-rides values through partial evaluation: **one or more metadata fields**,
-their propagation rules, their writer, and the layer-side semantics that
-interpret them. Typing is a channel. Effect analysis is a channel. Proof
-discharge is a channel. A field is storage; a channel is a capability.
-
-**Rationale.** R2 says layers are added by partial evaluation, and R3 says
-their information rides on values independently. A *channel* is what one such
-layer's participation actually consists of — which is more than a slot, and
-is why the two need different words. The distinction is not cosmetic: a
-capability may need several fields (knowledge needs three), and a field may
-be read through more than one projection (`shape` is a projection of `type`).
-
-**As implemented — the distinction already exists and has no name.** Eleven
-things are registered in one registry as though they were the same kind of
-thing. They are not:
-
-| Registered | Actually is | Channel |
-|---|---|---|
-| `type` | a stored field | typing |
-| `shape` | a **projection** of the `type` field (refinement layers walked off) — no storage of its own | typing |
-| `predicates` | a stored field | knowledge |
-| `domain` | a stored field | knowledge |
-| `bound` | a stored field | knowledge |
-| `knowledge` | a **capability with no field at all** — nothing ever stores a `knowledge` component; its own comment says its storage *is* `predicates`/`domain` plus the refinement layers | knowledge |
-| `effects` | a stored field | effect analysis |
-| `error` | a stored field | error propagation |
-| `discharged` | a stored field (binding-plane) | proof |
-| `source` | a stored field | provenance |
-| `warnings` | a field, currently unused | diagnostics |
-| `exported` | a **retired** field — B-097 V1 moved export-ness to `Binding.visibility` | — |
-
-So the registry holds **fields, one projection, one capability, one dead
-entry and one unused entry**, undifferentiated. `knowledge` is the proof: it
-is registered exactly like `predicates` and is not the same kind of thing at
-all.
-
-**Delta.** The code has one word and one registry for two concepts. Renaming
-`registerChannel` → field registration and introducing a channel-level
-registration (which fields, which semantics, which layer owns it) is the
-change; **B-109(a)** — moving registration to the layers — is the natural
-moment to do it, since a layer registering its own capability is exactly a
-channel registration. **→ B-111.**
-
-<a id="def-propagation"></a>
 ## 20. Propagation
 
-> **Level: Specification** — **SC-7**, satisfies R3; criterion R12.
+**Defined in** [`allegretto/metadata-and-capability.md` §5](allegretto/metadata-and-capability.md), the chapter for the
+`metadata` and `capability` units, which is the definition site.
 
-**Definition.** A field's *propagation rule* says what an operation does
-with that field, drawn from a **fixed, inspectable vocabulary**: `viral`
-(present on any argument ⇒ present on the result), `union` (arguments'
-values combined by the channel's installed merge), `computed` (the channel's
-owner derives it), `positional`, `drop` (never carried forward). The base
-applies the rule without knowing what the channel means; the *semantics* a
-rule needs are installed by the channel's owner.
-
-**Rationale.** The vocabulary is fixed rather than open — a channel cannot
-register an arbitrary propagation closure — and the reason is R12, not
-convenience. `registerChannel` refuses a `viral` or `union` rule on an
-integrity field, because those **fabricate**: they place a value on a
-result that no holder of the writer put there. That check is decidable only
-over an inspectable symbol; over a closure it is unwritable, and R12 degrades
-from enforced to hoped-for. See Part 0 SC-7 and, for the argument,
-`docs/records/concepts-analyses.md` §4.2.
-
-**As implemented.** `PropagationRule` in `src/metadata.ts`; `viralChannels()`
-and `unionChannels()` are cached filters over the registry;
-`installChannelMerge(name, fn)` is how a channel supplies `union` semantics —
-`src/effects.ts` is the one caller, and the pattern to generalise.
-
-**Delta.** — *(the mechanism is correct; its wiring is §19's delta)*
-
-<a id="def-writer-capability"></a>
 ## 21. Writer capability
 
-> **Level: Specification** — satisfies R12.
-
-**Definition.** The authority to *originate* a field value is a closure
-handed to whoever registered the field. Reads require nothing (D23).
-Origination on a user-reachable construction path is refused unless the
-writer is held.
-
-**Rationale.** Metadata that anything can write cannot be evidence. Denial is
-an **abort, not an error value** (Part 0 SC-8, class C) — an error value would
-be forgeable, since the forger chooses what to do with it.
-
-**As implemented.** `ChannelWriter` closures; `assertNotIntegrityKey` guards
-object literals and `mv_set`; forgery scenarios A–F in the boundary battery.
-
-**Delta.** Integrity is enforced by a **hardcoded name list**
-(`INTEGRITY_CHANNEL_NAMES = ["discharged", "source"]`) rather than by the
-registered `integrity` flag — protection by name, which is the one form that
-cannot survive the layer registering its own channels. The two sources
-disagree: `source` is in the list but is registered **without**
-`integrity: true`. **→ B-109(b)/(c).**
+**Defined in** [`allegretto/metadata-and-capability.md` §6](allegretto/metadata-and-capability.md), the chapter for the
+`metadata` and `capability` units, which is the definition site.
 
 <a id="def-meta-slot"></a>
 ## 22. Meta slot
@@ -1527,7 +1417,7 @@ base by **installing** it against a plane interface; the base never imports
 the layer.
 
 **Rationale.** R6, and it is the same discipline as §20's
-`installChannelMerge`: the base holds an inspectable symbol, the layer
+`installFieldMerge`: the base holds an inspectable symbol, the layer
 installs what it means. That is what makes Allegro an extension stack rather
 than a privileged layer (R1).
 
@@ -1536,7 +1426,7 @@ evaluator does this **correctly for channels and incorrectly for types, in
 the same file.**
 
 - *Correct:* `evaluator.ts` propagates channels through the plane interface —
-  `viralChannels()`, `channelSpec(k)?.rule === "union"`, `channelMerge(k)`.
+  `viralFields()`, `metaFieldSpec(k)?.rule === "union"`, `fieldMerge(k)`.
   Layer-ignorant, exactly as R3/SC-7 intend.
 - *Incorrect:* it also imports **27 symbols** from three L2 modules
   (`types-std`, `refinements`, `effects`), and `checkArgType` — which calls
@@ -1549,13 +1439,13 @@ This violates the project's own stated invariant (`CLAUDE.md`:
 *"Dependencies point downward only"*).
 
 **The decomposition that makes it tractable**, found by reading rather than
-assumed: `getType(v)` is **literally `channelReadRaw(v, "type")`** plus a kind
+assumed: `getType(v)` is **literally `metaReadRaw(v, "type")`** plus a kind
 check — an L2 alias for an L0 call. So the two halves separate cleanly:
 
 | Half | Nature | Disposition |
 |---|---|---|
 | **Reading** the type off a value | Already layer-ignorant — a channel named `type` is opaque to the base | Use the plane interface directly; the L2 import is gratuitous |
-| **Interpreting** it — `typeMethod` (FQN member lookup), `unifyTypes`, `applyBoundaryBound`, refinement-predicate evaluation, `assertMemberAvailable` | Genuinely L2 semantics | **Installed, not imported** — the `installChannelMerge` shape |
+| **Interpreting** it — `typeMethod` (FQN member lookup), `unifyTypes`, `applyBoundaryBound`, refinement-predicate evaluation, `assertMemberAvailable` | Genuinely L2 semantics | **Installed, not imported** — the `installFieldMerge` shape |
 
 Type-directed dispatch *is* genuinely needed during evaluation — that is R2,
 since discharge happens by evaluating — so the fix was never "delete the
@@ -1592,11 +1482,11 @@ one the code currently bypasses.
 | **Data** | the host | **none since B-121** — the host's view and the language's are the same view now that no wrapper stands between them. Whether a plane with no reader is a plane properly policed is held open at §11's delta | the host | the representation constructors |
 | **Binding** | user code | member dispatch | construction | `makeStructure` + the binding writers |
 | **Binding** | engine (meta slots) | `src/slot-accessors.ts` accessors | kernel | the same accessors ⚠ *four write disciplines, §13; and see the disposition note below* |
-| **Metadata** | anyone | `channelReadRaw(v, field)` — free (D23) | field owner | the writer closure from registration |
-| **Metadata** | the evaluator | the propagation table: `channelSpec(f)?.rule`, `viralChannels()`, `channelMerge(f)` | — | — |
-| **Metadata** | user-reachable construction | refused unless the writer is held (`assertNotIntegrityKey`) | — | — ⚠ *enforced by name list, §21* |
+| **Metadata** | anyone | `metaReadRaw(v, field)` — free (D23) | field owner | the writer closure from registration |
+| **Metadata** | the evaluator | the propagation table: `metaFieldSpec(f)?.rule`, `viralFields()`, `fieldMerge(f)` | — | — |
+| **Metadata** | user-reachable construction | refused unless the writer is held (`assertNotIntegrityKey`, reading the registry) | — | — |
 | **Host** | the host only | direct field access | the host | direct field access ⚠ *declared on the value interface, §18* |
-| **Layer → base** | the base, for semantics it must not know | **install**, never import | the layer | `installChannelMerge` and hooks like it ⚠ *27 upward imports, §23* |
+| **Layer → base** | the base, for semantics it must not know | **install**, never import | the layer | `installFieldMerge` and hooks like it ⚠ *27 upward imports, §23* |
 
 **Disposition of the engine/meta-slot row.** It did **not** disappear when
 `__length` did. `__length` was the last key the partition test fired on, so
@@ -1614,7 +1504,7 @@ above it and the concept "engine meta slot" stops existing. That is the end
 state; the ⚠ is a defect in the interface meanwhile, independent of it.
 
 **The last row is the one that matters.** It is the only interface in the
-table that is not yet a mechanism — `installChannelMerge` is one instance of
+table that is not yet a mechanism — `installFieldMerge` is one instance of
 a pattern that has no general form. The interfaces the specification still
 owes:
 
@@ -1627,7 +1517,7 @@ owes:
    the same shape, a channel installs *how to check a value against my
    field*, and the evaluator calls it without knowing the answer is a "type".
 3. **A projection hook.** `shape` is a computed projection of the `type`
-   field (§19b), and the projection is hardcoded in `channelReadRaw`. A
+   field (§19b), and the projection is hardcoded in `metaReadRaw`. A
    channel should install its own projections.
 4. **A field-registration interface for channels** (§19b) — one registration
    that says *these fields, these rules, this semantics, this owner*, rather
@@ -1642,7 +1532,7 @@ be the authority would lose the same property, so the hooks must be
 capability-gated the way writers are.
 
 **As implemented.** One of the eight rows has a real mechanism
-(`channelReadRaw` + the propagation table); the two Data rows now need none.
+(`metaReadRaw` + the propagation table); the two Data rows now need none.
 Four rows are conventions enforced by lint or by nothing. The layer→base row
 has one instance and no general form.
 
@@ -1806,7 +1696,7 @@ returning an ordinary value. It is also what makes PE-as-discharge possible
 (R2) — a type check is an evaluation, not a separate pass.
 
 **As implemented.** `src/types-std.ts`; type Contexts built by `makeStructure`
-plus the `src/capability.ts` writers; `getType(v)` is `channelReadRaw(v, "type")`
+plus the `src/capability.ts` writers; `getType(v)` is `metaReadRaw(v, "type")`
 with a kind check.
 
 **Delta.** The **type Context namespace is closed** — a user field named
@@ -1879,7 +1769,7 @@ that made refinements sound second-class.
 while `__members` is the same object. `shape` is registered as a metadata
 field but stores nothing — it is a **projection** of `type` (§19b).
 
-**Delta.** The projection is hardcoded in `channelReadRaw` rather than
+**Delta.** The projection is hardcoded in `metaReadRaw` rather than
 installed by the typing channel. **→ B-112(c).**
 
 <a id="def-member-and-member-symbol"></a>
@@ -2246,7 +2136,7 @@ same machinery that carries every other field. That the base defines no
 labels is R6: Allegretto knows *that* effects union, never *what* `io` means.
 
 **As implemented.** `EffectSet` in `src/effects.ts`; `withEffects`/`effectsOf`;
-`installChannelMerge("effects", …)` supplies the union — the one instance of
+`installFieldMerge("effects", …)` supplies the union — the one instance of
 declared propagation (SC-7) working (§20).
 
 **Delta.** — 
@@ -2346,8 +2236,8 @@ bindings, and `discharged` is the integrity field.
 
 **Delta.** `discharged` is the **last metadata field still on the binding
 plane** — it registers with `bindingKey: "__discharged"` while every other
-field moved to `components` at B-104 chunk 3. It is also the one whose
-integrity flag and guard list disagree (§21). **→ B-104, B-109.**
+field lives in `meta` (`allegretto/metadata-and-capability.md` §2). **→
+B-104** (retiring the `__*` slot names).
 
 <a id="def-obligation-verdict-and-the-assumption-ledger"></a>
 ## 45. Obligation, verdict, and the assumption ledger
@@ -2456,7 +2346,7 @@ still open. **→ B-057.**
 | 28 | Completion confluence is not guaranteed by construction — the B-028 arrival-order bug was fixed, not precluded | B-114 |
 | 29 | L2 post-passes are hardcoded into the base pipeline — §23's violation in its other form | B-110 |
 | 30 | The type-Context namespace is closed by construction but nothing **enforces** it — *stated* at C9, **re-measured at B-120 E5** (748 distinct binding keys reached the field walks, none `__`-prefixed), enforcement still outstanding and now the only thing standing between the deleted partition and a future writer | B-104 |
-| 32 | The `shape` projection is hardcoded in `channelReadRaw` rather than installed | B-112(c) |
+| 32 | The `shape` projection is hardcoded in `metaReadRaw` rather than installed | B-112(c) |
 | 34 | `knowledge` is a registered field that nothing ever stores — a channel, not a field | B-111 |
 | 33b | The `structuralSubtypeof` branch tests the marker *and* anonymity; anonymity always carried the distinction | B-104(g) |
 | 36 | **`__interface` does two jobs with one bit**; its **three** readers want different facts | B-104(g) — now specified |
@@ -2737,17 +2627,17 @@ four *named* defects (§18, §19, §21, §22) plus one that is larger than any o
 them: **§23, the L0→L2 dependency**.
 
 The useful part is the contrast §23 draws. `evaluator.ts` propagates channels
-through the plane interface — `viralChannels()`, `channelSpec(k)?.rule`,
-`channelMerge(k)`, entirely layer-ignorant — **and in the same file** imports
+through the plane interface — `viralFields()`, `metaFieldSpec(k)?.rule`,
+`fieldMerge(k)`, entirely layer-ignorant — **and in the same file** imports
 27 L2 symbols and hosts `checkArgType`. The discipline is not missing; the
 type system simply bypasses it. That is why B-110 belongs here rather than as
 a separate arc: it is not a new problem, it is §18's plane rule not being
 applied to one subsystem.
 
 And the decomposition falls out of the plane framing: `getType(v)` is
-`channelReadRaw(v, "type")` with a kind check, so *reading* a type is already
+`metaReadRaw(v, "type")` with a kind check, so *reading* a type is already
 an L0 operation and only *interpreting* it is L2. The fix is a dispatch hook
-the layer installs — the shape `installChannelMerge` already has.
+the layer installs — the shape `installFieldMerge` already has.
 
 ### What the level tags revealed (S2a)
 

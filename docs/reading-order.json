@@ -25,7 +25,7 @@
         { "doc": "docs/book/allegretto/README.md", "title": "L0 Allegretto: boundary contract" },
         { "doc": "docs/book/allegretto/structures.md", "title": "Structures, scopes and channels" },
         { "doc": null, "title": "Value, the kinds and the assembly (units 1 to 9)", "status": "planned", "units": ["value", "bits", "symbol", "param", "primitive-function", "expression", "composed-function", "structure", "kinds"] },
-        { "doc": null, "title": "Metadata and capability (units 10 and 11)", "status": "planned", "units": ["metadata", "capability"] },
+        { "doc": "docs/book/allegretto/metadata-and-capability.md", "title": "Metadata and capability (units 10 and 11)", "units": ["metadata", "capability"] },
         { "doc": null, "title": "Scope and the evaluator (units 12 and 13)", "status": "planned", "units": ["scope", "evaluator"] },
         { "doc": null, "title": "Futures and the base primitives (units 14 and 15)", "status": "planned", "units": ["futures", "base-primitives"] },
         { "doc": "docs/book/extension/README.md", "title": "L1 extension substrate: boundary contract" },

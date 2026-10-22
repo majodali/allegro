@@ -578,4 +578,8 @@ fileTest(path.join(testsDir, "effects-demo.alg"));
 fileTest(path.join(testsDir, "effects-surface-c-demo.alg"));
 fileTest(path.join(testsDir, "fn-type-demo.alg"));
 fileTest(path.join(testsDir, "hof-effect-propagation-demo.alg"));
+// The metadata-and-capability chapter's examples (docs/book/allegretto/
+// metadata-and-capability.md): registration, free reads, attenuation,
+// same-pass re-registration, viral and drop propagation.
+fileTest(path.join(testsDir, "metadata-channels-demo.alg"));
 

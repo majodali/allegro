@@ -71,11 +71,13 @@ rules, their writer, and the layer-side code that interprets them. Typing
 is a channel; effect analysis is a channel. A field is storage; a channel
 is a feature built on storage.
 
-Sources: [`concepts.md` §18 (plane)](concepts.md#def-plane), [§19
-(metadata field)](concepts.md#def-metadata-field), [§19b
-(channel)](concepts.md#def-channel), [§20
-(propagation)](concepts.md#def-propagation), [§21 (writer
-capability)](concepts.md#def-writer-capability).
+Sources: [`concepts.md` §18 (plane)](concepts.md#def-plane); in
+`allegretto/metadata-and-capability.md`, [§3 (metadata
+field)](allegretto/metadata-and-capability.md#def-metadata-field), [§4
+(channel)](allegretto/metadata-and-capability.md#def-channel), [§5
+(propagation)](allegretto/metadata-and-capability.md#def-propagation) and
+[§6 (writer
+capability)](allegretto/metadata-and-capability.md#def-writer-capability).
 
 ### 2.4 Plane interface
 
