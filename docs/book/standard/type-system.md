@@ -161,8 +161,9 @@ prefix had been hiding:
   component plane as `type`, uniformly for every value. The shape-vs-knowledge
   split survives untouched because it was never two storages — `shape` is
   `type` with member-transparent refinement layers walked off, computed at
-  read time by `typeShape` over `__refines`/`__members`/`__predicate`, all of
-  which remain binding-plane. Writes are IN PLACE: the registered channel
+  read time by `typeShape` (`src/refinements.ts`) over
+  `__refines`/`__members`/`__predicate`, all of which remain binding-plane,
+  and served as the installed `shape` projection (B-112 C4). Writes are IN PLACE: the registered channel
   writer derives a new value, and type Contexts are identity-sensitive.
   Three clone paths (`structuralWrap`, `preserveOps`, `buildMethodLayer`)
   had been inheriting the meta-type implicitly through their bindings copy

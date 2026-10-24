@@ -32,9 +32,9 @@ import { evalSource, Extension } from "./runtime.js";
 import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
-import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, SLOT_REGISTRY, SLOT_KEYS, typeShape, isInterfaceType as isInterfaceTypeSlots, elementsOf } from "./slot-accessors.js";
-import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge, fieldCheck, dispatchFor, currentMetaEpoch } from "./metadata.js";
-import { registerMetaField, installFieldMerge, installFieldCheck, installDispatch } from "./capability.js";
+import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, SLOT_REGISTRY, SLOT_KEYS, isInterfaceType as isInterfaceTypeSlots, elementsOf } from "./slot-accessors.js";
+import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge, fieldCheck, dispatchFor, projection, metaFieldList, currentMetaEpoch } from "./metadata.js";
+import { registerMetaField, installFieldMerge, installFieldCheck, installDispatch, installProjection } from "./capability.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { withMeta } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
@@ -45,7 +45,7 @@ import { applyPhase } from "./runtime.js";
 import { createFutureManager } from "./futures.js";
 import { primitives } from "./primitives.js";
 import { stringToBits } from "./types.js";
-import { PredicateSet, makePredicate, effectsDomain } from "./refinements.js";
+import { PredicateSet, makePredicate, effectsDomain, typeShape } from "./refinements.js";
 import { makeInt } from "./types.js";
 import { effectsOf, withEffects } from "./effects.js";
 import { evaluate } from "./evaluator.js";
@@ -1055,6 +1055,41 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     eq(plain.data, 2n, "an operand without the field falls through to the primitive");
     // The holder may re-install; leave a declining dispatcher behind.
     installDispatch(probe, { primitive: () => null, call: () => null });
+  });
+
+  test("projection installation is capability-gated (B-112 C4, hook (c)): the base serves projections it does not compute", () => {
+    const forged = { channel: "shape", write: (t: Value) => t };
+    let threw: string | null = null;
+    try { installProjection(forged, () => undefined); } catch (e) { threw = String(e); }
+    eq(threw?.includes("holder of its writer") ?? false, true,
+      `a foreign writer cannot install a projection: ${threw}`);
+    eq(projection("shape") !== undefined, true, "type-core installed the `shape` projection");
+    // `shape` is computed, never stored: a typed value answers it through
+    // the projection and carries no such key.
+    const typed = withType(makeInt(1), IntType);
+    eq(metaReadRaw(typed, "shape") === IntType, true, "shape of a plain Int is Int, by projection");
+    eq(metaOf(typed).has("shape"), false, "and nothing stores it");
+    // A projection for fields the base has never heard of: `view_probe`
+    // reads as `src_probe`'s value. Two writers, one gate each.
+    const src = registerMetaField({ name: "src_probe", rule: "drop" });
+    const view = registerMetaField({ name: "view_probe", rule: "drop" });
+    threw = null;
+    try { installProjection(src, () => undefined); } catch (e) { threw = String(e); }
+    eq(threw, null, `the holder of src_probe may install src_probe's own projection: ${threw}`);
+    // (A projection that reads its own name would recurse without end —
+    // a stored value answers first, an absent one asks the projection
+    // again. The base adds no re-entrancy guard: it is a wiring error.)
+    installProjection(view, (v, read) => read(v, "src_probe"));
+    const marked = src.write(makeInt(1), makeInt(7));
+    eq((metaReadRaw(marked, "view_probe") as BitsValue).data, 7n, "the projection reads through the free reader");
+    eq(metaReadRaw(makeInt(1), "view_probe"), undefined, "and answers nothing where its source is absent");
+    // The one binding-plane field is read through its registration, not by
+    // name: `discharged` on a checked proof answers through `bindingKey`.
+    const t = attack("theorem t: 1 + 1 == 2");
+    eq(t.threw, null, `theorem compiles: ${t.threw}`);
+    const proof = t.evalCtx!.bindings.get("t")!.value as Value;
+    eq(metaReadRaw(proof, "discharged") !== undefined, true, "discharged reads through its bindingKey");
+    eq(metaFieldList(proof).includes("discharged"), true, "and is listed through the same registration");
   });
 
   test("forgery G (B-125): the metadata write surface is exactly the minted writers", () => {

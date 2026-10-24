@@ -674,7 +674,7 @@ is simply re-checked).
 (`protocolEquals`, `src/types-std.ts`), shared by the evaluator's
 `bits_eq`/`bits_neq` dispatch and the `typed_eq` path; the E2 coercion
 lookup slots between them. The equality shape (`equalityShape`,
-`src/slot-accessors.ts`) walks the FULL `__refines` chain — past preserve-lifted
+`src/refinements.ts`) walks the FULL `__refines` chain — past preserve-lifted
 layers too, unlike dispatch's `typeShape` — so operator-lifting
 refinements never separate equal values; `distinct` mints no refines
 edge and so falls to step 3. Kernel structural equals is the same-shape

@@ -1521,9 +1521,11 @@ owes:
    the evaluator runs every installed check with a free reader without
    knowing the answer is a "type" (`allegretto/metadata-and-capability.md`
    §7).
-3. **A projection hook.** `shape` is a computed projection of the `type`
-   field (§19b), and the projection is hardcoded in `metaReadRaw`. A
-   channel should install its own projections.
+3. **A projection hook — landed (B-112 C4).** `shape` is a computed
+   projection of the `type` field (§19b), installed by the type channel
+   through the gated `installProjection` and served by name from
+   `metaReadRaw`, whose read path names no field
+   (`allegretto/metadata-and-capability.md` §7).
 4. **A field-registration interface for channels** (§19b) — one registration
    that says *these fields, these rules, this semantics, this owner*, rather
    than eleven undifferentiated field registrations performed by the base.
@@ -1770,9 +1772,11 @@ The mechanism already supports the second case (`preserveOps`, `mixin`,
 sets and therefore being shapes). The document, not the code, was the thing
 that made refinements sound second-class.
 
-**As implemented.** `typeShape(t)` in `src/slot-accessors.ts`, walking `__refines`
-while `__members` is the same object. `shape` is registered as a metadata
-field but stores nothing — it is a **projection** of `type` (§19b).
+**As implemented.** `typeShape(t)` in `src/refinements.ts`, walking `__refines`
+while `__members` is the same object. `shape` stores nothing — it is a
+**projection** of `type` (§19b), installed by the type system through
+`installProjection` and served by name from `metaReadRaw`
+(`allegretto/metadata-and-capability.md` §7).
 
 **Delta.** The projection is hardcoded in `metaReadRaw` rather than
 installed by the typing channel. **→ B-112(c).**
@@ -2088,8 +2092,8 @@ Recorded so the deferral stays visible. **→ B-107.**
 matching, equality — and each gets its own walk. Collapsing them is what
 produced the `~Printable` confusion (§36).
 
-**As implemented.** `buildDistinctType`, `structuralWrap`, `equalityShape` in
-`src/slot-accessors.ts`.
+**As implemented.** `buildDistinctType` and `structuralWrap` in
+`src/slot-accessors.ts`; `equalityShape` in `src/refinements.ts`.
 
 **Delta.** — 
 
