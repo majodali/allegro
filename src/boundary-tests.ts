@@ -33,8 +33,8 @@ import { createTypeSystem } from "./types-std.js";
 import { Value, ValueKind, StructureValue, makePrimitive, makeExpr, makeStructure } from "./types.js";
 import { ModuleLoader } from "./modules.js";
 import { isRegisteredSlotKey, isRegisteredFieldName, asStructure, getName, getMembers, getProposition, getRefines, SLOT_REGISTRY, SLOT_KEYS, isInterfaceType as isInterfaceTypeSlots, elementsOf } from "./slot-accessors.js";
-import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge, fieldCheck, dispatchFor, projection, metaFieldList, currentMetaEpoch } from "./metadata.js";
-import { registerMetaField, installFieldMerge, installFieldCheck, installDispatch, installProjection } from "./capability.js";
+import { metaReadRaw, metaOf, cloneMeta, viralFields, unionFields, metaFieldSpec, metaFieldEntry, fieldMerge, fieldCheck, dispatchFor, projection, analysisOf, metaFieldList, currentMetaEpoch } from "./metadata.js";
+import { registerMetaField, installFieldMerge, installFieldCheck, installDispatch, installProjection, installAnalysis } from "./capability.js";
 import { withType, getType, typeMethod, typeMemberDescriptor, makeArray, IntType, Type as TypeMeta, structuralWrap as structuralWrapTS, RefinementKind as RefinementKindTS } from "./types-std.js";
 import { withMeta } from "./types.js";
 import { knowledgeOf, knowledgeDomain, meetKnowledge, withPredicates, occurrenceBoundOf, Knowledge, IntervalDomain } from "./refinements.js";
@@ -139,7 +139,7 @@ const LINT_PATTERNS: LintPattern[] = [
   { name: "retired-peel-call", regex: /\b(?:primaryOf|dataOf)\s*\(/g },
   // C1.4: TS-kernel writer acquisition is restricted to the two proof-kernel
   // modules — anywhere else, acquiring the discharged writer fails the suite.
-  { name: "kernel-writer-acquisition", regex: /\bkernelFieldWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts"] },
+  { name: "kernel-writer-acquisition", regex: /\bkernelFieldWriter\s*\(/g, excludeFiles: ["src/types-std.ts", "src/primitives.ts", "src/runtime.ts"] },
   // C2.2: fact payloads are opaque outside the scope module — reads via
   // scopeFactsFor, layer pushes via scopeAssume, own-layer writes via
   // scopeOwnFacts. Direct .scopePredicates access anywhere else fails.
@@ -1090,6 +1090,20 @@ export async function runBoundaryTests({ test, eq, corpus }: Hooks): Promise<voi
     const proof = t.evalCtx!.bindings.get("t")!.value as Value;
     eq(metaReadRaw(proof, "discharged") !== undefined, true, "discharged reads through its bindingKey");
     eq(metaFieldList(proof).includes("discharged"), true, "and is listed through the same registration");
+  });
+
+  test("analysis installation is capability-gated (B-112 C5, ruling 2): the gate reads installed answers by name", () => {
+    const forged = { channel: "effects", write: (t: Value) => t };
+    let threw: string | null = null;
+    try { installAnalysis(forged, "inferred", () => null); } catch (e) { threw = String(e); }
+    eq(threw?.includes("holder of the 'effects' writer") ?? false, true,
+      `a foreign writer cannot install an analysis: ${threw}`);
+    eq(analysisOf("effects", "inferred") !== undefined, true, "the type primitives installed effects:inferred at layer init");
+    // The pipeline installs `diverges` once per typed compilation; after
+    // any typed compilation in this process it is present.
+    attack("x = 1");
+    eq(analysisOf("effects", "diverges") !== undefined, true, "the pipeline installed effects:diverges");
+    eq(analysisOf("effects", "no_such_question"), undefined, "an unasked question has no answer");
   });
 
   test("forgery G (B-125): the metadata write surface is exactly the minted writers", () => {

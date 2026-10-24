@@ -5,6 +5,7 @@
 
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { metaReadRaw, cloneMeta, hasShapeSlot, bumpMetaEpoch, withSource, carryMeta } from "./metadata.js";
+import { installAnalysis, kernelFieldWriter } from "./capability.js";
 import { getName, renameInPlace, isBareBindingName, isFutureBindingName } from "./slot-accessors.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
@@ -21,7 +22,7 @@ import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOT
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
 import { registerScopeSymbol, MAIN_SCOPE_FQN, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
-import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended, setDivergenceProbe, resolveDataSlots } from "./types-std.js";
+import { withType, IntType, StringType, wrapAsUntypedFunction, getType, getTypeName, getFunctionParamTypes, getFunctionReturnType, stabilizeTypeMemberScope, setLawInstantiationSuspended, resolveDataSlots } from "./types-std.js";
 import { putEntry } from "./structure.js";
 
 // Re-export Extension for backward compatibility
@@ -975,6 +976,12 @@ export function evalSource(
   // New pass: Allegro-minted channel registrations from prior passes are
   // sealed (see MetaFieldEntry.epoch in slots.ts).
   bumpMetaEpoch();
+  // B-112 C5: every pass answers `effects:diverges`. Until the typed
+  // path's divergence analysis has run (below), and for the whole of an
+  // untyped pass, the answer is "not analysed" (null) — the purity gates
+  // skip the divergence check and nothing else. A pass that never
+  // installs would leave a stale answer from an earlier compilation.
+  installAnalysis(kernelFieldWriter("effects"), "diverges", () => null);
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
@@ -1211,7 +1218,10 @@ export function evalSource(
       const cfn = divR!.stampTargets.get(name);
       if (cfn) divCfns.add(cfn as unknown as Value);
     }
-    setDivergenceProbe((fnValue: Value) => divCfns.has(fnValue));
+    // B-112 C5: installed as the `effects:diverges` analysis, once per
+    // typed compilation, gated on the effects writer (the pipeline is
+    // kernel code and acquires it the kernel's way).
+    installAnalysis(kernelFieldWriter("effects"), "diverges", (fnValue: Value) => divCfns.has(fnValue));
 
     // Phase D1: check effect declarations against inferred sets — now
     // INCLUDING div (CE-R1: a declaration is a contract; `effects pure`

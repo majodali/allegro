@@ -17,9 +17,11 @@ const MAX_DEPTH = 10000;
 // per typed compilation from runtime.ts once the call-graph SCCs are
 // known; answers, by function identity, whether a callee participates in
 // a recursion cycle — self-recursive or mutual — regardless of its D34
-// discharge tier. Mirrors the `setDivergenceProbe` pattern: no new value
-// slot, no new `__*` property, and absent (null) it is simply the
-// pre-T-R6 behavior.
+// discharge tier. No new value slot, no new `__*` property, and absent
+// (null) it is simply the pre-T-R6 behavior. B-112 C5 turned the two
+// analogous probes in types-std into gated `installAnalysis` answers; this
+// one is the same pattern (plan §9.7, finding 4) and should follow when
+// the code is next touched.
 let inlineCutoff: ((fn: Value) => boolean) | null = null;
 
 /** Register the inlining cutoff (called per typed compilation). Pass

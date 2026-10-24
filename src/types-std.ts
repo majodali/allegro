@@ -18,7 +18,7 @@ import { scopePrivilegeExtend, scopeHoldsPrivilege, scopeLookup, scopeExtend } f
 import { effectsOf as fnEffectsOf } from "./effects.js";
 import { putEntry, removeEntry } from "./structure.js";
 import { getName, getMembers, getRefines, getConstruct, getInterfaceMarker, getPredicate, getGenericArgs, getGenericBackLink, getSlotCount, slotCount, getAbstractDomain, getEffectLabels, setEffectLabels, getEffectBound, indexGet, elementsOf, setName, setMembers, setRefines, setConstruct, setFallbackMember, markInterface, setWraps, setPredicate, setGenericArgs, setGenericBackLink, setProposition, setEffectBound, setAbstractDomain, removeName, removeRefines, removeConstruct, SLOT_KEYS, isMetaProtocolSlot, getFallbackMember, asStructure } from "./slot-accessors.js";
-import { writeShape, carryShape, removeShapeSlot, metaReadRaw, cloneMeta } from "./metadata.js";
+import { writeShape, carryShape, removeShapeSlot, metaReadRaw, cloneMeta, analysisOf, currentMetaEpoch } from "./metadata.js";
 import { kernelFieldWriter, assertNotIntegrityKey, registerMetaField, installFieldCheck, installDispatch, installProjection, FieldReader, CheckSite, CallSite, CallBinding } from "./capability.js";
 
 
@@ -2487,27 +2487,42 @@ export function equalityLawBacking(t: StructureValue, lawName: string):
 // inspector is injected from primitives.ts (it needs the evaluator's
 // precompile, which this module can't import).
 
-let effectsInspector: ((fn: Value, ctx?: StructureValue) => Set<string> | null) | null = null;
-
-/** Register the effect-inference hook (called once from primitives.ts). */
-export function setEffectsInspector(f: (fn: Value, ctx?: StructureValue) => Set<string> | null): void {
-  effectsInspector = f;
-}
-
-// B-028 F3 (CE-R7): the divergence probe — injected per compilation from
-// runtime.ts once div analysis has run; answers by function identity
-// whether an implementation's inferred set includes `div`.
-let divergenceProbe: ((fn: Value) => boolean) | null = null;
-
-/** Register the divergence hook (called per typed compilation). */
-export function setDivergenceProbe(f: (fn: Value) => boolean): void {
-  divergenceProbe = f;
+// B-112 C5 (ruling 2, option (a)): the two probes that used to be filled
+// here — an effects inspector from primitives.ts and a divergence probe
+// from runtime.ts, each a nullable module-level callback any module could
+// set — are installed analyses now, gated on the `effects` writer and read
+// by name. Once a compilation pass has begun, a gate that finds no answer
+// installed errors rather than passing: an uninstalled analysis is a
+// wiring fault, not purity. Before any pass (epoch 0) the gates are
+// reached only by the kernel's own construction — the built-in refined
+// types at module init, whose predicates are host primitives — and no
+// producer can exist yet, so they stand down, as they did before C5.
+// `diverges` answers null for "not analysed in this pass" (an untyped
+// compilation installs that answer), which skips the divergence check
+// and nothing else.
+function effectsAnalyses(what: string): {
+  inferred: (fn: Value, ctx?: StructureValue) => Set<string> | null;
+  diverges: (fn: Value) => boolean | null;
+} | null {
+  if (currentMetaEpoch() === 0) return null;
+  const inferred = analysisOf("effects", "inferred");
+  const diverges = analysisOf("effects", "diverges");
+  if (!inferred || !diverges) {
+    throw new AllegroError(
+      `${what}: the purity gate needs the 'effects' analyses installed ` +
+      `(inferred: ${inferred ? "yes" : "NO"}, diverges: ${diverges ? "yes" : "NO"}) — B-112 C5`);
+  }
+  return {
+    inferred: inferred as (fn: Value, ctx?: StructureValue) => Set<string> | null,
+    diverges: diverges as (fn: Value) => boolean | null,
+  };
 }
 
 function assertPureForEquality(fnValue: Value, what: string, ctx?: StructureValue): void {
   if (lawInstantiationSuspended) return;
-  if (!effectsInspector) return;
-  const eff = effectsInspector(fnValue, ctx);
+  const an = effectsAnalyses(what);
+  if (!an) return;
+  const eff = an.inferred(fnValue, ctx);
   if (eff && eff.size > 0) {
     throw new AllegroError(
       `${what} must be pure and knowledge-independent (E-R5) — inferred effects: ` +
@@ -2516,7 +2531,7 @@ function assertPureForEquality(fnValue: Value, what: string, ctx?: StructureValu
   // B-028 F3 (CE-R7): the purity gates see div — an implementation whose
   // termination is undischarged cannot serve as an equality or coercion
   // (mechanical, the same E-R5 pattern; D34's spectrum discharges it).
-  if (divergenceProbe && divergenceProbe(fnValue)) {
+  if (an.diverges(fnValue) === true) {
     throw new AllegroError(
       `${what} must be total (E-R5/CE-R7) — the implementation may diverge; ` +
       `discharge with \`decreases\` or \`assume terminates\``);
@@ -2544,8 +2559,9 @@ function assertInvariantTotal(predicate: Value, ctx?: StructureValue): void {
       `, so the construction guard could hang; discharge with ` +
       `\`decreases\` or \`assume terminates\``);
   };
-  if (divergenceProbe && divergenceProbe(predicate)) refuse();
-  const via = divCarrierCalledBy(predicate, ctx);
+  const an = effectsAnalyses("invariant predicate");
+  if (an && an.diverges(predicate) === true) refuse();
+  const via = divCarrierCalledBy(predicate, ctx, an ? an.diverges : () => null);
   if (via !== null) refuse(via);
 }
 
@@ -2553,7 +2569,7 @@ function assertInvariantTotal(predicate: Value, ctx?: StructureValue): void {
  *  predicate's body, resolve each in scope, and answer with the first
  *  whose function value carries div (identity probe, effect channel, or
  *  inferred-set stash). Null = no diverging callee found. */
-function divCarrierCalledBy(predicate: Value, ctx?: StructureValue): string | null {
+function divCarrierCalledBy(predicate: Value, ctx: StructureValue | undefined, diverges: (fn: Value) => boolean | null): string | null {
   if (!ctx) return null;
   const p = predicate;
   if (p.kind !== ValueKind.ComposedFunction) return null;
@@ -2577,7 +2593,7 @@ function divCarrierCalledBy(predicate: Value, ctx?: StructureValue): string | nu
     if (!v) continue;
     const d = v;
     if (d.kind !== ValueKind.ComposedFunction && d.kind !== ValueKind.PrimitiveFunction) continue;
-    if (divergenceProbe && divergenceProbe(v)) return name;
+    if (diverges(v) === true) return name;
     const eff = fnEffectsOf(v);
     if (eff?.has("div")) return name;
   }
