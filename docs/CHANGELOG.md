@@ -4,6 +4,30 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-112 exit: the propagation rules move to the metadata unit; the evaluator is one unit and its two L2 edges are visible
+
+The last row of the plane-interfaces plan. `viralScan` and
+`mergeOverMeta` are `viralOnto` and `mergeOverMeta` in `src/metadata.ts`
+(presence and an installed merge: the two rules the base applies without
+meaning); the evaluator's three application sites call them, and the
+duplicate viral loop on the unresolved-application path is gone.
+`src/evaluator.ts` is assigned to the `evaluator` unit alone in
+`units.json`, so the `units` report passes judgement on its edges for
+the first time: 162 edges, 57 ok, **2 violations** (`evaluator →
+refinements`, `evaluator → effects`), 103 unresolved, 5 mixed files.
+The two violations are the effect and knowledge inference the evaluator
+still performs inside its loop, the population plan §7 filed as B-146
+and sequenced after rung 3; the hooks were never meant to remove them,
+and the plan's done-condition (§3.3) is therefore not met and is owed to
+B-146, whose item now names the effects path explicitly (plan §9.8).
+The `proofs` unit's real edge to `evaluator` is recorded in the
+manifest. The §5.7 survey re-run: `kind === Structure` sites 152 → 166,
+`meta` accesses 15 and all sanctioned; B-128 (b) and (c) unblocked with
+the two violations as the ratchet's known baseline. Docs: plan exit row,
+§9.8 and change record; `units.md` row 13, §5, §8, M11; the metadata
+chapter §5 and §9; `concepts.md` §23; implementation map; backlog B-112,
+B-128, B-146; plans manifest.
+
 ## 2026-10 — B-112 C5: the two analysis probes become one gated install
 
 Ruling 2 option (a) of the ratified plane-interfaces plan. The base

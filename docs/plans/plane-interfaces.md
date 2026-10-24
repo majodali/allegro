@@ -471,7 +471,7 @@ because three units and the facts merge all wait on it.
 | **C3** ✅ **landed 2026-10-22** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b); **call-site unification rides this install** (maintainer ruling 2026-10-22) | (a) | `evaluator.ts` loses `normalizeType` and the member family — **and its whole `types-std` import** | `refs PRIM_TO_METHOD` finds nothing in the evaluator — **met**; see §9.5 |
 | **C4** ✅ **landed 2026-10-22** | Projection hook: the `shape` read leaves the base and is installed by `type-core`; the walk `typeShape` it uses leaves the accessor layer for `refinements` (§9.6, corrected 2026-10-24) | (c) | the `metadata` unit holds no refinement-chain reading — **met**; the base's read path names no field | no L0 file references `typeShape`; `metaReadRaw` has no branch on a field name — **met**. (The row originally said "`refs typeShape` finds the installer only", which measured a helper's callers in the layers rather than the base; §9.6) |
 | **C5** ✅ **landed 2026-10-24** | Analysis probes, ruling 2 option (a): `setEffectsInspector` and `setDivergenceProbe` become one gated registration (`installAnalysis`, §8.2) the pipeline fills and the law gate reads by name | §8.2 | none owed | the two `set*` names are gone — **met**; an uninstalled analysis is an error at the gate — **met once a pass has begun**, see §9.7; B-148's flag untouched — **met** |
-| **Exit** | `src/evaluator.ts` assigned to `evaluator`; its propagation half (`viralScan`, `mergeOverMeta`) moved to `metadata` in the same commit | | `evaluator.ts` un-mixed | `units`: the `evaluator` unit has no L2 edge; §5.7's survey re-run; B-128 (b) and (c) unblocked |
+| **Exit** ✅ **landed 2026-10-24** | `src/evaluator.ts` assigned to `evaluator`; its propagation half (`viralScan`, `mergeOverMeta`) moved to `metadata` in the same commit | | `evaluator.ts` un-mixed — **met** | `units`: the `evaluator` unit has no L2 edge — **not met: two edges remain, now visible as violations and owned by B-146** (§9.8); §5.7's survey re-run — **done**, §9.8; B-128 (b) and (c) unblocked — **yes**, with the two edges as their known baseline |
 
 Hook (d) is B-111 (field versus channel registration), a separate item.
 If B-111 lands first, C1's registration uses its channel form; if not, C1
@@ -734,6 +734,81 @@ Deviations and findings:
    totality, gated on an owner to be named) when the exit or B-148 next
    touches that code. The comment now cites the install.
 
+### 9.8 The exit as landed: what the report now says
+
+`viralScan` and `mergeOverMeta` are `viralOnto` and `mergeOverMeta` in
+`src/metadata.ts`: the two rules the base can apply without meaning,
+presence and an installed merge, reading the registry and nothing else.
+The evaluator's three call sites (primitive application, composed
+application, the unresolved-application residual) call them.
+`src/evaluator.ts` is assigned to the `evaluator` unit alone in
+`units.json`, so the report passes judgement on its edges for the first
+time. The `proofs` unit's real edge to `evaluator` (`proven.ts` imports
+`evaluate`) is recorded in the manifest, where it was missing.
+
+    import edges between assigned files   162
+      ok                                   57
+      violation                             2   evaluator → refinements
+                                                evaluator → effects
+      unresolved                          103
+    mixed files (owed splits)               5   types, primitives, runtime,
+                                                modules, types-std
+
+**The done-condition is not met, and this is the honest end state of
+the plan's scope.** §3.3 says the plan is done when the evaluator
+imports nothing from the L2 units. It imports seven symbols from two:
+`withPredicates`, `propagateSetForPrimitive`, `PredicateSet`
+(refinements) and `effectsOf`, `withEffects`, `unionEffectSets`,
+`EffectSet` (effects). Both edges are one population, the one §7 filed
+as **knowledge propagation (B-146)** and sequenced after rung 3: the
+evaluator performs L2 inference inside its loop. For effects that is
+the whole inference path (the primitive's static tags, the Param's
+bound and effect variable, the `opaque` label, the precompile stash),
+L2 labels the base constructs, not merely a field it carries; the
+generic `union` rule cannot replace it because the base cannot encode an
+effect set. For knowledge it is the abstract interpretation over domains
+at primitive application and the facts read at symbol lookup. The hooks
+in §6 were never going to remove these; §7 said so. What changed is
+that the report now shows them as the two violations they are, instead
+of hiding them inside a mixed file, which is what §4.4 asked for.
+
+**B-146 should take the effects path explicitly.** Its text names
+domains and predicates; effect inference is the same class of thing
+(an L2 analysis running inside L0's loop whose answer is an installed
+interpreter) and is the larger of the two edges. Recorded in the
+backlog item.
+
+**The survey (§5.7), re-run.** B-121 C2's survey classified kind tests
+standing in for plane questions; B-128 (a) measured 152
+`kind === ValueKind.Structure` sites in 2026-09. Today, through
+`scripts/analyze/index.ts`:
+
+    kind-tests Structure    166 sites
+    kind-tests (all)       1016 sites
+    any-props              1101 sites
+    props meta               15 sites (all in the accessor layer; the plane lint holds it at 0 outside)
+
+The answer to §5.7's question is mixed. The storage plane is a short
+list: `meta` has fifteen accesses, all sanctioned, and the lint keeps it
+there. The representation tests are not: 166 kind comparisons against
+`Structure` is more than 2026-09's 152, because the chunks since (B-120,
+B-121, the hooks) added guards faster than they removed them, and the
+discriminator rule's count stands at 437 outside the allowed units. So
+the principles held where an interface existed to hold them (the
+metadata plane, the installs) and did not where the question still has
+no word (B-128 (c): *is this a Structure* standing in for *does this
+have bindings*, *is this a type*, *is this a scope*). That is B-128 (b)
+and (c)'s work, and it is unblocked: the installs give the
+representation somewhere else to be reached from, and the two
+violations above are the known baseline the ratchet (B-149) starts
+from.
+
+**Not done here, and why.** `precompileFunction` still seeds a `domain`
+field from a type's abstract domain and the post-call path still stamps
+`type` by name (B-145, B-146); `setInlineCutoff` is still an ungated
+injection (§9.7); two base sections of `primitives.ts` still apply the
+visibility gate (§9.6). Each is named where its owner will find it.
+
 ## 10. Relationship to the unit DAG
 
 `units.md` is the specification of which code may import which. This plan
@@ -751,6 +826,11 @@ relationship runs both ways.
   below. That is recorded in `units.md` §4.2.
 
 ## 11. Change record
+
+**2026-10-24, exit landed.** The plan's chunks are all landed. §9's
+exit row updated; §9.8 added: the two remaining evaluator edges are
+violations the report shows and B-146 owns; the §5.7 survey re-run and
+answered; B-128 (b) and (c) unblocked.
 
 **2026-10-24, C5 landed.** §9's C5 row updated; §9.7 added, with the
 stand-down before the first pass and the fourth injection point found.

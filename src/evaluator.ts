@@ -8,7 +8,7 @@ import {
 import { propagateSetForPrimitive, withPredicates, PredicateSet } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 import { getConstruct } from "./slot-accessors.js";
-import { metaReadRaw, cloneMeta, metaOf, viralFields, metaFieldSpec, fieldMerge, fieldChecks, CheckSite, dispatchers, CallBinding, PRESERVED_FN_META_KEYS, withSource, carryMeta } from "./metadata.js";
+import { metaReadRaw, cloneMeta, metaOf, metaFieldSpec, fieldChecks, CheckSite, dispatchers, CallBinding, viralOnto, mergeOverMeta, PRESERVED_FN_META_KEYS, withSource, carryMeta } from "./metadata.js";
 import { scopeLookup, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
@@ -92,32 +92,6 @@ export function markTailCalls(body: Value, seen?: Set<Value>): void {
 }
 
 // --- Core evaluation ---
-
-/** Lay an outer value's metadata under the metadata of what it evaluated to.
- *
- *  Re-evaluation FLATTENS rather than nests: the result's own (fresh) fields
- *  shadow the outer (stale) ones, because resolved type info should replace a
- *  partial-eval guess. C4.3a (R3) exempts union-rule fields (effects), which
- *  merge through the registry-installed merge instead — effects observed
- *  before re-evaluation are facts, not guesses.
- *
- *  B-121 C2: every kind carries metadata now, so this is no longer the
- *  carrier-Structure case's private business. Symbols and Expressions carry
- *  their own fields and re-evaluate to something else, so they merge here too.
- */
-function mergeOverMeta(outer: Metadata, inner: Value): Value {
-  // B-121 C6: the two exits were `withMeta(inner, outer)` and the same call
-  // over the peeled inner value. They differed only while `dataOf` peeled a
-  // carrier — the derive/stamp distinction §3.2 found to be one operation
-  // hidden by the peel — so they are now the same line. C5 deleted the peel.
-  for (const [k, v] of metaOf(inner)) {
-    const prev = outer.get(k);
-    const mergeFn = prev !== undefined && metaFieldSpec(k)?.rule === "union"
-      ? fieldMerge(k) : undefined;
-    outer.set(k, mergeFn ? mergeFn(prev!, v) : v);
-  }
-  return withMeta(inner, outer);
-}
 
 export function evaluate(
   value: Value, ctx: StructureValue, depth: number = 0, depCollector?: DepCollector,
@@ -256,24 +230,10 @@ function evaluateExpr(
   // C4.3a (R1): viral channels ride the unresolved-application residual too.
   // An error-carrying callee (e.g. the result of dispatching a method on an
   // error value — err-through-method) or argument propagates instead of
-  // being dropped at the application hop. First hit wins, matching viralScan.
-  for (const cand of [fnRaw, ...evalArgs]) {
-    // B-121 C2: the kind guard here meant "might carry metadata", which was
-    // true only while a typed scalar was a carrier. `metaReadRaw` is total —
-    // it answers `undefined` for a value carrying nothing — so the guard was
-    // redundant even before, and dropping it is what keeps error virality
-    // working once a typed Bits is a Bits.
-    for (const chan of viralFields()) {
-      const comp = metaReadRaw(cand, chan);
-      if (comp) {
-        const meta = new Map<string, Value>([[chan, comp]]);
-        const typeComp = metaReadRaw(cand, "type");
-        if (typeComp) meta.set("type", typeComp);
-        const out = withMeta(residual, meta);
-        return residualEffects ? withEffects(out, residualEffects) : out;
-      }
-    }
-  }
+  // being dropped at the application hop. First hit wins (`viralOnto`, the
+  // propagation table's rule, in the metadata unit since B-112's exit).
+  const viral = viralOnto([fnRaw, ...evalArgs], residual);
+  if (viral) return residualEffects ? withEffects(viral, residualEffects) : viral;
   return residualEffects ? withEffects(residual, residualEffects) : residual;
 }
 
@@ -362,7 +322,7 @@ function applyPrimitive(
   // channel rides every hop of a residual chain instead of being lost after
   // the first (the legacy first-hop-only behavior was a bug, not a policy —
   // see differential fixtures err-viral-chain / err-through-method).
-  const viralHit = viralScan(evalArgs, fn);
+  const viralHit = viralOnto(evalArgs, makeExpr(fn, evalArgs));
   if (viralHit) return attachEff(viralHit);
   if (!evalArgs.every(isResolved)) {
     const residual = makeExpr(fn, evalArgs);
@@ -438,40 +398,17 @@ function applyPrimitive(
 }
 
 
-// --- C1.5 propagation table: generic viral scan ---
-//
-// Consults the channel registry: any component-plane channel registered
-// `viral` short-circuits the primitive when present on an arg — first arg
-// wins, the channel (plus the arg's shape) is carried onto the residual.
-// Today `error` is the only viral channel, so behavior is byte-identical
-// to the former hand-rolled loop (differential fixtures pin it); a newly
-// registered viral channel gets this path with zero evaluator changes.
-// Table linkage for the grandfathered/bespoke rules lives in
-// assertPropagationTableLinkage below.
-function viralScan(evalArgs: Value[], residualFn: Value): Value | null {
-  const viral = viralFields();
-  for (const arg of evalArgs) {
-    // B-121 C2: guard dropped — see the same pattern above. `metaReadRaw` is
-    // total, so asking every argument costs nothing and asking only
-    // Structures silently stopped propagating from typed scalars.
-    for (const chan of viral) {
-      const comp = metaReadRaw(arg, chan);
-      if (comp) {
-        const meta = new Map<string, Value>([[chan, comp]]);
-        const typeComp = metaReadRaw(arg, "type");
-        if (typeComp) meta.set("type", typeComp);
-        return makeExpr(residualFn, evalArgs, meta);
-      }
-    }
-  }
-  return null;
-}
-
-// The rules the evaluator still implements bespoke (shape/knowledge:
-// `computed` — domain logic IS the rule; effects: `union`, grandfathered on
-// its dedicated path until C4.3; discharged: `drop` — never propagates,
-// verified by forgery test C). If the registry drifts from what this file
-// implements, fail loudly at startup.
+// The rules this file still implements BESPOKE after B-112's exit, pinned
+// against the registry so the two cannot drift silently: `effects` is
+// `union` but rides its own inference path here (the primitive's static
+// tags, Param bounds, the precompile stash — L2 labels the base constructs);
+// `predicates`/`domain` are `computed` through refinements'
+// `propagateSetForPrimitive`; `shape` is `computed` by the installed
+// projection; `discharged` is `drop` and nothing carries it (forgery test
+// C). The generic rules, `viral` and `union`-over-metadata, live in the
+// metadata unit (`viralOnto`, `mergeOverMeta`). The bespoke `effects` and
+// knowledge paths are the evaluator's two remaining L2 edges and are owned
+// by B-146 (knowledge propagation; plan §9.8).
 (function assertPropagationTableLinkage() {
   const expect: [string, string][] = [
     ["error", "viral"], ["effects", "union"], ["shape", "computed"],
@@ -504,7 +441,7 @@ function applyComposed(
     const evalArgs = currentArgs.map(a => evaluate(a, ctx, depth + 1, depCollector));
 
     // Viral channels (propagation table): today just `error` — see viralScan.
-    const viralHit = viralScan(evalArgs, currentFn as unknown as Value);
+    const viralHit = viralOnto(evalArgs, makeExpr(currentFn as unknown as Value, evalArgs));
     if (viralHit) return viralHit;
 
     // B-112 C3 (hook (a), maintainer ruling 2026-10-22): binding a callee's

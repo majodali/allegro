@@ -1429,12 +1429,14 @@ the same file.**
   `viralFields()`, `metaFieldSpec(k)?.rule === "union"`, `fieldMerge(k)`.
   Layer-ignorant, exactly as R3/SC-7 intend.
 - *Incorrect:* it also imports **7 symbols** from two L2 modules
-  (`refinements`, `effects`): effect and predicate propagation on
-  residuals and results. Argument checking left it at B-112 C2 and
-  type-directed dispatch with call-site unification at C3: the evaluator
-  runs installed checks and dispatchers, decides nothing, and imports
-  nothing from `types-std`. `futures.ts` imports `withType`, `ErrorType`,
-  `StringType`.
+  (`refinements`, `effects`): the effect and knowledge inference it
+  performs inside its loop. Since B-112's exit the file is assigned to
+  the `evaluator` unit alone and the `units` report shows those two
+  edges as violations; **B-146** (knowledge propagation) owns them.
+  Argument checking left at B-112 C2 and type-directed dispatch with
+  call-site unification at C3: the evaluator runs installed checks and
+  dispatchers, decides nothing, and imports nothing from `types-std`.
+  `futures.ts` imports `withType`, `ErrorType`, `StringType`.
 
 This violates the project's own stated invariant (`CLAUDE.md`:
 *"Dependencies point downward only"*).

@@ -238,11 +238,11 @@ than opening it to closures.
 
 **As implemented.** `PropagationRule` in `src/metadata.ts`;
 `viralFields()` and `unionFields()` are cached filters over the registry,
-invalidated by registration. The evaluator applies the table in two
-places, both in `src/evaluator.ts` and both owed to this unit at
-the exit of B-112 (the four owed plane interfaces): `viralScan` carries the first viral field found on any
-argument onto an application's residual (and the argument's `type` with
-it), and the unresolved-application path does the same for the callee;
+invalidated by registration. The two generic rules are this unit's,
+in `src/metadata.ts`, and the evaluator calls them at its three
+application sites: `viralOnto` carries the first viral field found on
+the callee or any argument onto the residual (and that candidate's
+`type` with it, a name B-145 (type vocabulary) owns);
 `mergeOverMeta` merges the fields a value carries onto the value it
 re-evaluates to, applying the installed merge where the rule is `union`
 and letting the inner value's field win otherwise. `drop` needs no code:
@@ -267,14 +267,17 @@ print(channel_read(n + 1, "note"))                 // none   — drop
 
 - The rule and the path are not yet one mechanism. `union` is applied
   generically only when a field-carrying value re-evaluates
-  (`mergeOverMeta`); the `effects` field rides its own dedicated path
-  through primitive application, so a user-registered `union` field
-  written on a leaf does not survive `v + 1` the way `effects` does.
-  `assertPropagationTableLinkage` in the evaluator pins six fields by
-  name so that the registry and the bespoke paths cannot drift apart
-  silently. **B-112**'s exit moves `viralScan` and `mergeOverMeta` into
-  this unit, and the generalisation of the `union` path is that chunk's
-  question.
+  (`mergeOverMeta`); the `effects` field rides its own inference path
+  inside the evaluator (the primitive's static tags, a parameter's bound,
+  the precompile stash), so a user-registered `union` field written on a
+  leaf does not survive `v + 1` the way `effects` does, and the generic
+  rule cannot take the path over because the base cannot encode an
+  effect set. `assertPropagationTableLinkage` in the evaluator pins the
+  bespoke paths against the registry so the two cannot drift apart
+  silently. That path and the knowledge interpretation beside it are the
+  evaluator's two remaining imports from Allegro Standard, visible as
+  violations in the `units` report and owned by **B-146** (knowledge
+  propagation).
 - `positional` is vocabulary without a path. It stays until a field
   needs it; the alternative, removing it, is a maintainer decision.
 - The `computed` rule's "annotated sites" are the evaluator's L2
@@ -468,7 +471,8 @@ observe-tagged (D47(e)) and renders the expression as text.
 | The registry, the vocabulary, the free reads, the carry idioms, the merge table | `src/metadata.ts` |
 | Writers, registration, the integrity gate, `installFieldMerge`, `installFieldCheck`, `installDispatch`, `installProjection`, `installAnalysis`, the base's fields | `src/capability.ts` |
 | The `meta` slot and `withMeta` | `src/types.ts` (owed to this unit by the `types.ts` split) |
-| The table applied: `viralScan`, `mergeOverMeta`, the linkage assertion; the check loop `checkArg`; the dispatcher loops | `src/evaluator.ts` (the first three owed to this unit at B-112's exit) |
+| The two generic rules applied, `viralOnto` and `mergeOverMeta` | `src/metadata.ts` |
+| The linkage assertion; the check loop `checkArg`; the dispatcher loops; the bespoke `effects` and knowledge paths (B-146) | `src/evaluator.ts` |
 | The Allegro surface: `channel_register`, `channel_read`, `channel_list`, `channel_attenuate` | `src/primitives.ts`, "Channel plane" |
 | Forgery scenarios A to G, field ownership, the two gates, the differential propagation fixtures | `src/boundary-tests.ts` |
 | The examples above, pinned by `// expect:` | `tests/metadata-channels-demo.alg` |
