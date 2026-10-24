@@ -2,7 +2,7 @@
 
 import { getName, getMembers, slotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasDischarged, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, indexGet, HOST_KEYS } from "./slot-accessors.js";
 import { hasShapeSlot, metaReadRaw, metaOf, cloneMeta, metaFieldList, PRESERVED_FN_META_KEYS, viralFields, sourceOf, SOURCE_FIELD, carryMeta } from "./metadata.js";
-import { kernelFieldWriter, registerMetaField, assertNotIntegrityKey, FIELD_WRITER_BRAND } from "./capability.js";
+import { kernelFieldWriter, registerMetaField, assertNotIntegrityKey, installAnalysis, FIELD_WRITER_BRAND } from "./capability.js";
 import type { LawBackingRec } from "./slot-accessors.js";
 import {
   Value, ValueKind, BitsValue, StructureValue, ComposedFunctionValue,
@@ -1864,7 +1864,6 @@ import {
   Effect as _Effect, effectUnion as _effectUnion, isEffectInstance as _isEffectInstance,
   makeProof as _makeProof, isProof as _isProof, Proof as _Proof,
   protocolEquals,
-  setEffectsInspector as _setEffectsInspector,
   equalityLawBacking as _equalityLawBacking,
 } from "./types-std.js";
 import { isResolved } from "./types.js";
@@ -1891,9 +1890,10 @@ const _precompileInProgress = new WeakSet<ComposedFunctionValue>();
 
 // E3 (E-R5): the purity/knowledge-independence inspector for `eq`
 // implementations and coercion fns. types-std can't import the evaluator
-// (import direction), so the hook is injected here: effects component
-// first, then the precompile stash, then an on-demand precompile.
-_setEffectsInspector((fnValue, ctx) => {
+// (import direction), so the answer is INSTALLED here (B-112 C5: the
+// `effects:inferred` analysis, gated on the effects writer): effects
+// component first, then the precompile stash, then an on-demand precompile.
+installAnalysis(kernelFieldWriter("effects"), "inferred", (fnValue, ctx) => {
   const eff = _effectsOf(fnValue);
   if (eff) return new Set(eff);
   const d = fnValue;

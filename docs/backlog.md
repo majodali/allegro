@@ -1509,7 +1509,7 @@ that prevents it.
   concept spine (S2f); `concepts.md` §24 carries the interface table.
   **PLAN: [docs/plans/plane-interfaces.md](plans/plane-interfaces.md)**
   (ratified as a whole 2026-10-21, ruling 2 option (a); **C1 landed
-  2026-10-21, C2 to C4 landed 2026-10-22**, C5 and the exit remain) — scoped to the four hooks on measurement: delta 23's
+  2026-10-21, C2 to C4 landed 2026-10-22, C5 landed 2026-10-24**; the exit remains) — scoped to the four hooks on measurement: delta 23's
   *27 upward symbols* is **131 imported / 98 distinct**, of which only **4**
   are checkers. The plan's §6 files five other populations (type vocabulary
   ~25, knowledge propagation ~18, member dispatch ~9, diagnostics ~8,
@@ -1567,6 +1567,13 @@ that prevents it.
     `bindingKey` slot through a generic accessor, then a projection);
     `typeShape`/`equalityShape` moved from the accessor layer to
     `refinements.ts`, where the chain they walk lives. Plan §9.6.
+  - **Progress.** C5 (2026-10-24): ruling 2 option (a). `installAnalysis`
+    (gated on the `effects` writer, keyed `channel:question`) replaces
+    `setEffectsInspector` and `setDivergenceProbe`; the purity and
+    invariant gates read `effects:inferred` and `effects:diverges` by
+    name and error if missing once a pass has begun. Found:
+    `setInlineCutoff` in the evaluator is a fourth injection point of the
+    same shape (plan §9.7). Remaining: the exit.
 
 - [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
   Body wrappers (`type_check`, the `*_attach` family) must forward the

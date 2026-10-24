@@ -469,8 +469,8 @@ because three units and the facts merge all wait on it.
 | **C1** ✅ **landed 2026-10-21** | Split `slots.ts` three ways (`units.md` M5): structure accessors to `structure` (`src/slot-accessors.ts`); field registry and propagation table to `metadata` (`src/metadata.ts`); writer capabilities and `installFieldMerge` to `capability` (`src/capability.ts`). Gate `installFieldMerge` (P4) while it moves. Register the `predicates` merge from `refinements.ts`; `scopeFactsFor` reads it; `scopeAssume` takes `Map<string, unknown>` | (e) via (d)'s form | `src/slots.ts` leaves the mixed list; the plane lint's accessor layer becomes the `structure` unit's files; the `scope → refinements` violation is gone | `units`: 6 mixed files, 0 violations; plane lint green — **met**; see §9.3 for the two deviations |
 | **C2** ✅ **landed 2026-10-22** | Check hook: `checkArgType` becomes a loop over registered fields calling each field's installed check with `(expected, actual, read)`; `type-core`, `refinements` and `effects` install theirs | (b) | `evaluator.ts` loses its `refinements` and `effects` imports | `refs checkArgType` finds no caller outside the installers — **met**; the uninstalled-check error exists and is not suite-exercised; the import-loss condition is **partly** met, see §9.3 |
 | **C3** ✅ **landed 2026-10-22** | Dispatch hook: `PRIM_TO_METHOD`, `typeMethod`, `typeMemberDescriptor`, `typePrivilegedCtx` installed by `type-core`; the visibility gate rides (b); **call-site unification rides this install** (maintainer ruling 2026-10-22) | (a) | `evaluator.ts` loses `normalizeType` and the member family — **and its whole `types-std` import** | `refs PRIM_TO_METHOD` finds nothing in the evaluator — **met**; see §9.5 |
-| **C4** ✅ **landed 2026-10-22** | Projection hook: `typeShape` leaves the `metadata` unit and is installed by `type-core` | (c) | the `metadata` unit holds no refinement-chain reading — **met**; the base names no field in its read path at all | `refs typeShape` finds the installer only — **not met as worded**, see §9.6: the walk's callers are the type system's and knowledge's own modules, which is the point |
-| **C5** | Analysis probes, if ruling 2 takes option (a): `setEffectsInspector` and `setDivergenceProbe` become one gated registration (`installAnalysis`, §8.2) the pipeline fills and the law gate reads by name | §8.2 | none owed | the two `set*` names are gone; an uninstalled analysis is an error at the gate; B-148's flag untouched |
+| **C4** ✅ **landed 2026-10-22** | Projection hook: the `shape` read leaves the base and is installed by `type-core`; the walk `typeShape` it uses leaves the accessor layer for `refinements` (§9.6, corrected 2026-10-24) | (c) | the `metadata` unit holds no refinement-chain reading — **met**; the base's read path names no field | no L0 file references `typeShape`; `metaReadRaw` has no branch on a field name — **met**. (The row originally said "`refs typeShape` finds the installer only", which measured a helper's callers in the layers rather than the base; §9.6) |
+| **C5** ✅ **landed 2026-10-24** | Analysis probes, ruling 2 option (a): `setEffectsInspector` and `setDivergenceProbe` become one gated registration (`installAnalysis`, §8.2) the pipeline fills and the law gate reads by name | §8.2 | none owed | the two `set*` names are gone — **met**; an uninstalled analysis is an error at the gate — **met once a pass has begun**, see §9.7; B-148's flag untouched — **met** |
 | **Exit** | `src/evaluator.ts` assigned to `evaluator`; its propagation half (`viralScan`, `mergeOverMeta`) moved to `metadata` in the same commit | | `evaluator.ts` un-mixed | `units`: the `evaluator` unit has no L2 edge; §5.7's survey re-run; B-128 (b) and (c) unblocked |
 
 Hook (d) is B-111 (field versus channel registration), a separate item.
@@ -663,6 +663,77 @@ unresolved.
 install); whether a projection has a registration of its own is B-111's
 question and is not pre-empted here.
 
+**The row's mistake, stated plainly (2026-10-24).** The row conflated
+two things: the *projection* `shape`, a field read computed on demand,
+which is the hook; and the *walk* `typeShape`, a function from a type
+Context to a type Context that decides where knowledge ends and shape
+begins, which the projection calls and which eighteen other sites in the
+typed layers call on type Contexts directly (operator dispatch, the
+equality protocol, `type_dispatch`, `instanceof`, `knowledgeOf`). A
+measure counting the walk's callers could never reach one, and it
+measured the wrong side: a hook's exit is a property of the base. The
+measure now on the row is the one every other row already uses.
+
+**What the old measure would have flagged, and still stands.** Two of
+the walk's callers sit in base sections of `src/primitives.ts`: the
+context-listing primitive (`CONTEXT` section) and the `when` pattern
+matcher (`EVAL_WHEN`), both applying the member-privacy gate of B-097 (visibility)
+stage V3 (`getType`, `typeShape`, `scopeHoldsPrivilege`,
+`assertMemberReachable`). That is L2 visibility inside L0 primitive
+sections, the same shape as the dispatch gates ruling 3 assigned to hook
+(b). The `units` report cannot see it because `primitives.ts` is a mixed
+file. It belongs to whichever chunk next touches those sections, or to
+the `primitives.ts` split (`units.md` M6 (`primitives.ts` is six units)); it is named here so that it is
+not lost.
+
+### 9.7 C5 as landed, and its deviations
+
+The base holds an analysis table (`src/metadata.ts`: `Analysis`,
+`analysisOf(channel, question)`) and a gated install
+(`src/capability.ts` `installAnalysis(writer, question, answer)`, P4: an
+analysis is a question about a field, so its gate is that field's
+writer, and the key is `channel:question`). Two questions exist, both
+about `effects`: `inferred` (installed once at the type primitives'
+module init, with the writer acquired the kernel's way) and `diverges`
+(installed by the pipeline). The gates in `types-std.ts`
+(`assertPureForEquality`, `assertInvariantTotal`, the callee sweep) read
+both by name through one helper and error if either is missing. The two
+`set*` exports and their nullable module-level state are deleted; `refs`
+finds neither. `units`: 162 edges, 52 ok, 0 violations, 110 unresolved.
+Deviations and findings:
+
+1. **The gates stand down before any pass.** The ruling says an
+   uninstalled analysis is an error at the gate. Run literally, that
+   fails at module init: `types-std.ts` builds the kernel's own refined
+   types while loading, each through the invariant-totality gate, and no
+   producer can have installed anything yet (the type primitives load
+   after it, the pipeline later still). Those predicates are host
+   primitives, which cannot diverge. So the helper answers "no gate"
+   while the metadata epoch is 0 (no `evalSource` pass has begun), which
+   is exactly the window the old nullable probes covered by being null,
+   and errors from the first pass on.
+2. **`diverges` answers null for "not analysed in this pass".** The
+   pipeline installs `() => null` at the start of every pass and the real
+   identity set after the typed path's divergence analysis. A null skips
+   the divergence check only; `inferred` is never null. Before C5 an
+   untyped pass left the previous typed pass's closure in place, a stale
+   answer that happened to be harmless; now every pass states what it
+   knows.
+3. **`src/runtime.ts` joins the kernel-writer allow-list.** The
+   `kernel-writer-acquisition` lint names the files that may call
+   `kernelFieldWriter`; the pipeline needs the `effects` writer to
+   install `diverges`, and is kernel code (it already bumps the epoch
+   and attaches `source`). Three files now, from two.
+4. **Found on the way: a fourth injection point.** `setInlineCutoff` in
+   `src/evaluator.ts` is the same pattern ruling 2 named — a nullable
+   module-level callback the pipeline fills per typed compilation (the
+   T-R6 (the recursion inlining cutoff) recursion-cycle test), ungated, with a comment that cited the
+   divergence probe as its model. It runs base-to-pipeline rather than
+   layer-to-pipeline, and the ruling did not name it, so it stays. It
+   should become an installed analysis in the same form (a question about
+   totality, gated on an owner to be named) when the exit or B-148 next
+   touches that code. The comment now cites the install.
+
 ## 10. Relationship to the unit DAG
 
 `units.md` is the specification of which code may import which. This plan
@@ -680,6 +751,13 @@ relationship runs both ways.
   below. That is recorded in `units.md` §4.2.
 
 ## 11. Change record
+
+**2026-10-24, C5 landed.** §9's C5 row updated; §9.7 added, with the
+stand-down before the first pass and the fourth injection point found.
+
+**2026-10-24, C4 row corrected.** The row's exit measure replaced by
+one on the base; §9.6 states the conflation and names the two base
+sections of `primitives.ts` that still apply L2 visibility.
 
 **2026-10-22, C4 landed.** §9's C4 row updated; §9.6 added, with the
 correction that the walk belongs to `refinements`, not `type-core`.
@@ -709,7 +787,7 @@ proposal for the methodology is `docs/plans/documentation-standards-delta.md`.
 
 **2026-10, review against `units.md`.** Added the done-condition (§3.3),
 the measurement at unit grain (§4.4), hook (e) (§6), the DAG check in
-ruling 2 (§8.2), M13 in the type-vocabulary population (§7), and the
+ruling 2 (§8.2), M13 (the L1 grammar files that build typed values) in the type-vocabulary population (§7), and the
 chunk sequence (§9).
 
 **2026-09, rulings.** Rulings 1, 3 and 4 taken; B-145 through B-148

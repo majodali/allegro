@@ -1487,7 +1487,7 @@ one the code currently bypasses.
 | **Metadata** | the evaluator | the propagation table: `metaFieldSpec(f)?.rule`, `viralFields()`, `fieldMerge(f)` | — | — |
 | **Metadata** | user-reachable construction | refused unless the writer is held (`assertNotIntegrityKey`, reading the registry) | — | — |
 | **Host** | the host only | direct field access | the host | direct field access ⚠ *declared on the value interface, §18* |
-| **Layer → base** | the base, for semantics it must not know | **install**, never import | the layer | `installFieldMerge` and hooks like it ⚠ *27 upward imports, §23* |
+| **Layer → base** | the base, for semantics it must not know | **install**, never import | the layer | `installFieldMerge`, `installFieldCheck`, `installDispatch`, `installProjection`, and `installAnalysis` for the reverse crossing (a lower unit reading an analysis a higher one computed), all gated on the field's writer (`allegretto/metadata-and-capability.md` §7) ⚠ *7 upward imports remain in the evaluator, all propagation, §23* |
 
 **Disposition of the engine/meta-slot row.** It did **not** disappear when
 `__length` did. `__length` was the last key the partition test fired on, so

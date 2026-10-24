@@ -397,6 +397,30 @@ export function dispatchers(): IterableIterator<[string, DispatchInstall]> {
   return DISPATCHERS.entries();
 }
 
+// --- Analysis hook (B-112 C5, ruling 2 option (a)) ------------------------------
+//
+// The reverse crossing: a unit low in the DAG (the equality-law gate in
+// type-core) needs the RESULT of an analysis that only a higher unit can
+// compute (effect inference in the type primitives; divergence in the
+// pipeline). No import can express that without inverting the order, so
+// the producer INSTALLS the answer under a question about a field, gated
+// on that field's writer (P4), and the consumer reads it by name. Two
+// questions exist today, both about `effects`: `inferred` (what effects
+// does this function have?) and `diverges` (may it diverge?).
+
+export type Analysis = (fn: Value, ctx?: StructureValue) => unknown;
+const ANALYSES = new Map<string, Analysis>();
+/** Only `src/capability.ts` calls this, through the gated `installAnalysis`. */
+export function defineAnalysis(channel: string, question: string, answer: Analysis): void {
+  ANALYSES.set(`${channel}:${question}`, answer);
+}
+/** The installed answer to `question` about `channel`'s field, or
+ *  undefined when no producer has installed one. A consumer that needs
+ *  the answer errors on undefined rather than guessing. */
+export function analysisOf(channel: string, question: string): Analysis | undefined {
+  return ANALYSES.get(`${channel}:${question}`);
+}
+
 /** List the fields present on a value (metadata keys + binding-plane fields).
  *  C4.3b: the metadata plane is universal — flattened Contexts report their
  *  keys alongside the legacy binding-plane fields. */

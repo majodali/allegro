@@ -4,6 +4,31 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-112 C5: the two analysis probes become one gated install
+
+Ruling 2 option (a) of the ratified plane-interfaces plan. The base
+holds an analysis table (`src/metadata.ts`: `Analysis`,
+`analysisOf(channel, question)`) and a gated install
+(`src/capability.ts` `installAnalysis(writer, question, answer)`, keyed
+`channel:question`, P4 (capability-gated registration) on the field's writer). The type primitives
+install `effects:inferred` at module init; the pipeline installs
+`effects:diverges` at the start of every pass (answering null, "not
+analysed") and again with the real identity set after the typed path's
+divergence analysis. The equality-law, coercion and invariant gates in
+`types-std.ts` read both by name and error if either is missing once a
+pass has begun; before any pass (epoch 0) they stand down, because the
+kernel builds its own refined types at module load, through the invariant
+gate, before any producer exists (plan §9.7). `setEffectsInspector`,
+`setDivergenceProbe` and their nullable module-level state are deleted;
+`src/runtime.ts` joins the kernel-writer allow-list. Found:
+`setInlineCutoff` in the evaluator is a fourth injection point of the
+same shape, not named by the ruling, left for the exit or B-148 (the
+law-instantiation flag). One
+boundary test added. The C4 plan row's exit measure corrected to one on
+the base (§9.6, 2026-10-24), with the two base sections of
+`primitives.ts` that still apply L2 visibility named there. Suite 1207
+distinct tests.
+
 ## 2026-10 — B-112 C4: the projection hook; the base's read path names no field
 
 Hook (c) of the ratified plane-interfaces plan. The base holds a

@@ -23,12 +23,12 @@ import {
   StructureValue,
 } from "./types.js";
 import {
-  MetaFieldSpec, MetaFieldWriter, FieldCheck, DispatchInstall, Projection, defineMetaField, metaFieldEntry, metaFieldEntries,
-  currentMetaEpoch, cloneMeta, defineFieldMerge, defineFieldCheck, defineDispatch, defineProjection,
+  MetaFieldSpec, MetaFieldWriter, FieldCheck, DispatchInstall, Projection, Analysis, defineMetaField, metaFieldEntry, metaFieldEntries,
+  currentMetaEpoch, cloneMeta, defineFieldMerge, defineFieldCheck, defineDispatch, defineProjection, defineAnalysis,
 } from "./metadata.js";
 import { stampBindingSlot } from "./slot-accessors.js";
 
-export type { MetaFieldSpec, MetaFieldWriter, FieldCheck, FieldReader, CheckSite, DispatchInstall, CallSite, CallBinding, Projection } from "./metadata.js";
+export type { MetaFieldSpec, MetaFieldWriter, FieldCheck, FieldReader, CheckSite, DispatchInstall, CallSite, CallBinding, Projection, Analysis } from "./metadata.js";
 
 function buildWriter(spec: MetaFieldSpec): MetaFieldWriter {
   return {
@@ -133,6 +133,19 @@ export function installProjection(writer: MetaFieldWriter, project: Projection):
     throw new AllegroError(`installProjection: the projection '${writer.channel}' may be installed only by the holder of its writer (P4)`);
   }
   defineProjection(writer.channel, project);
+}
+
+/** Install the answer to a question about a field (B-112 C5): what a
+ *  producer above the consumer has analysed, read back by name. GATED
+ *  (P4) on the field's writer: an analysis of `effects` is the effects
+ *  channel's to answer, so the installer proves it holds that authority.
+ *  Re-installing is the holder's right (the pipeline answers `diverges`
+ *  once per compilation). */
+export function installAnalysis(writer: MetaFieldWriter, question: string, answer: Analysis): void {
+  if (!holdsWriterFor(writer, writer.channel)) {
+    throw new AllegroError(`installAnalysis: '${writer.channel}:${question}' may be installed only by the holder of the '${writer.channel}' writer (P4)`);
+  }
+  defineAnalysis(writer.channel, question, answer);
 }
 
 // --- Field registration: what the BASE owns ------------------------------------
