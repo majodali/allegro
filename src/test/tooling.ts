@@ -130,6 +130,29 @@ export function runPlaneLintTests(): void {
   });
 }
 
+/** B-149: the unit DAG (docs/book/units.md) holds at its committed
+ *  baseline — no new edge the DAG forbids, no new mixed file, no rise in
+ *  kind comparisons outside the allowed units, no file without a unit.
+ *  Spawned and sharding-skipped for the same reasons as the plane lint;
+ *  `scripts/test-shards.mjs` runs it once after the shards. */
+export function runUnitsLintTests(): void {
+  if (SHARD !== null) return;
+  test("units lint (B-149): the unit DAG holds at its baseline", () => {
+    let out = "";
+    let failed = false;
+    try {
+      out = execFileSync("npx", ["tsx", "scripts/analyze/index.ts", "units", "--check"], {
+        cwd: path.resolve(import.meta.dirname, "../.."),
+        encoding: "utf8",
+      });
+    } catch (e) {
+      failed = true;
+      out = String((e as { stdout?: string }).stdout ?? e);
+    }
+    eq(failed ? out.trim() : "", "", "units-lint violations");
+  });
+}
+
 // --- B-096: deployed-version verification — pure verdict logic (no network) ---
 
 

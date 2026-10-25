@@ -2381,7 +2381,11 @@ that prevents it.
   - **Pointer**: [D52](decisions.md); `docs/plans/documentation-book.md`
     §4.2; `docs/plans/documentation-standards-delta.md` §5.
 
-- [ ] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.**
+- [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
+  2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
+  --check`) holds `scripts/analyze/units-baseline.json` — 2 violations
+  (B-146's), 5 mixed files, discriminator 458 — in both gate paths;
+  probed against a lowered baseline and a stray file before being trusted.
   - **What**: commit baselines for the `units` analyzer command
     (`scripts/analyze/index.ts units`) — permitted-edge violations and the
     discriminator count — as ratchets that may only fall, and run it once per
@@ -2477,6 +2481,7 @@ that prevents it.
   - **Pointer**: `docs/plans/plane-interfaces.md` §6.
 
 - [ ] **B-146** · L0 · L2 · **Knowledge propagation: the evaluator does
+  abstract interpretation over knowledge it must not understand.**
   - **Scope note (B-112's exit, 2026-10-24).** The evaluator's two
     remaining L2 edges are this item's: `refinements` (abstract domains
     and predicates at primitive application; facts at symbol lookup) and
@@ -2484,7 +2489,6 @@ that prevents it.
     a Param's bound and effect variable, the `opaque` label, the precompile
     stash). Effect inference is the same class as knowledge propagation
     and the larger edge; take it explicitly. Plan §9.8.
-  abstract interpretation over knowledge it must not understand.**
   - **What**: ~18 distinct symbols — `propagateSetForPrimitive`, `domainOf`,
     `domainFromPredicate`, `impliesDomain`, `entailsPredicate`,
     `predicatesOf`, `mergePredicateSets`, `withPredicates`,

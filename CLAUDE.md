@@ -70,6 +70,10 @@ npx tsx scripts/analyze/index.ts <cmd> # B-127: binder-aware survey (props |
 npm run lint:planes                 # B-128(a): storage plane reached only
                                     #   through the accessor layer — IN THE
                                     #   GATE (once per run, not per shard)
+npm run lint:units                  # B-149: the unit DAG holds at its
+                                    #   baseline (scripts/analyze/
+                                    #   units-baseline.json) — IN THE GATE,
+                                    #   once per run like lint:planes
 npm run lint:docs                   # D52: anchored links resolve, no forward
                                     #   references in the reading order, bare
                                     #   identifiers — report-only until B-150
@@ -189,7 +193,10 @@ evaluator/runtime set; this is the complete session list):
   import that the DAG does not permit is a violation, and a kind
   comparison outside a kind unit, the assembly or the evaluator breaks
   the discriminator rule (`docs/book/units.md` §3.2) — both reported by
-  `scripts/analyze/index.ts units`, ratcheted once B-149 lands.
+  `scripts/analyze/index.ts units` and ratcheted by `npm run lint:units`
+  (B-149): no new forbidden edge, no new mixed file, no rise in the
+  discriminator count, no file without a unit; lower the baseline with
+  `units --update-baseline` after a split lands, never raise it.
 - Commit messages with backticks: write to a file, `git commit -F` —
   inline `-m` backticks get shell-expanded.
 

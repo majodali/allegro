@@ -451,10 +451,11 @@ remains.
 | `types-std.ts` → 23–26 | per band, when touched; B-145 (type vocabulary) is the likely first | |
 
 **Enforcement** is a ratchet in `scripts/analyze/` (the `units` command,
-§8): edges that violate §4's order are counted against a committed
-baseline and may only fall. It joins the gate once the baseline exists —
-filed as **B-149**. The discriminator rule (§3.2) is a second ratchet in
-the same command.
+§8): edges that violate §4's order are held at a committed baseline
+(`scripts/analyze/units-baseline.json`) and may only fall; so are the
+mixed files and the discriminator rule's count (§3.2), and a file with
+no unit is refused outright. `npm run lint:units` runs it once per gate
+(B-149).
 
 **What a move must not do:** weaken a test (PROCESS §6), change a public
 surface, or reorder a decision. A move is a rename and a cut along a
@@ -473,8 +474,11 @@ The manifest `scripts/analyze/units.json` maps each source file to a unit
 each unit's permitted dependencies. The report says, per import edge
 between two assigned files, whether the DAG permits it; lists the mixed
 files as the owed splits; and counts direct `.kind ===` comparisons
-outside the units the discriminator rule allows. Baselines are committed
-when B-149 lands; until then the command reports and does not fail.
+outside the units the discriminator rule allows. `units --check` holds
+all of that at `scripts/analyze/units-baseline.json` and fails the gate on
+a new forbidden edge, a new mixed file, a rise in the discriminator count
+or a file without a unit; `units --update-baseline` lowers the baseline
+after a split lands.
 
 At 2026-10-24 (after B-112's exit; `evaluator.ts` assigned to one unit):
 
@@ -485,15 +489,19 @@ At 2026-10-24 (after B-112's exit; `evaluator.ts` assigned to one unit):
       unresolved                          103   one end is a mixed file
     mixed files (owed splits)               5   types, primitives, runtime,
                                                 modules, types-std
-    discriminator rule                    437   outside allowed units;
-                                                155 primitives, 145 types-std,
+    discriminator rule                    458   outside allowed units;
+                                                166 types-std, 155 primitives,
                                                 64 totality, 19 introspect, …
 
 The 103 unresolved edges are the real measure of the work owed: each
 becomes a verdict when its mixed end splits. The two violations are
 verdicts the evaluator's split made visible: the effect and knowledge
 inference it performs inside its loop, which the hooks were never meant
-to remove (plan §7) and B-146 owns.
+to remove (plan §7) and B-146 owns. The discriminator count rose from
+437 at B-112 C1 to 458 for the same reason: the checks and dispatch that
+moved out of the evaluator (an allowed unit) into `types-std.ts` carried
+twenty-one kind comparisons with them, which the rule now counts. They
+were never permitted by §3.2; they were hidden. The ratchet starts here.
 
 ## 9. What this document is not
 

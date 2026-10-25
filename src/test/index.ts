@@ -44,7 +44,7 @@ import "./tooling.js";             // benchmark, doc-ref lint, check-deployed
 import { runModuleTests } from "./modules.js";
 import { runAsyncTests } from "./async-futures.js";
 import { runH4aAsyncTests } from "./pcp.js";
-import { runBenchmarkTests, runDocLintTests, runCheckDeployedTests, runPlaneLintTests } from "./tooling.js";
+import { runBenchmarkTests, runDocLintTests, runCheckDeployedTests, runPlaneLintTests, runUnitsLintTests } from "./tooling.js";
 
 // --- Run and report ----------------------------------------------------------
 
@@ -55,6 +55,7 @@ timedSection("modules", runModuleTests)
   .then(() => timedSection("benchmark", runBenchmarkTests))
   .then(() => timedSection("doc-lint", async () => runDocLintTests()))
   .then(() => timedSection("plane-lint", async () => runPlaneLintTests()))
+  .then(() => timedSection("units-lint", async () => runUnitsLintTests()))
   .then(() => timedSection("check-deployed", async () => runCheckDeployedTests()))
   .then(() => timedSection("boundary", async () => runBoundaryTests({
     test,

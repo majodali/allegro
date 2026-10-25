@@ -24,7 +24,8 @@
 //                       definitionally a Structure?" stops being a judgement
 //   refs <name>         references to a declaration, resolved by SYMBOL
 //                       identity rather than by spelling
-//   units               docs/book/units.md measured: every import edge
+//   units [--check | --update-baseline]
+//                       docs/book/units.md measured: every import edge
 //                       between assigned files checked against the unit
 //                       DAG in units.json; mixed files listed as the owed
 //                       splits; direct `.kind ===` comparisons counted
@@ -324,16 +325,94 @@ function reportUnits(r: UnitsReport, opts: Options): void {
   }
 }
 
+// --- units: the ratchet (B-149) -------------------------------------------------
+//
+// `units --check` holds the report at a committed baseline, the way the plane
+// lint does (B-128(a)). Three ratchets that may only fall and one closed rule:
+//   violations        each edge the DAG does not permit must already be in the
+//                     baseline; a new one fails
+//   mixed files       each mixed file must already be in the baseline; a new
+//                     one fails (a split that lands un-mixes a file and the
+//                     baseline is then lowered by hand, never raised)
+//   discriminator     the count of kind comparisons outside allowed units may
+//                     not rise
+//   unassigned        CLOSED — every file under src/ (outside tests) has a
+//                     unit in units.json; a new file without one fails
+// A fall is reported with the hint to lock it in; it never fails. Run with
+// `--update-baseline` to rewrite the baseline from the current report.
+
+const UNITS_BASELINE = path.join(ROOT, "scripts/analyze/units-baseline.json");
+
+interface UnitsBaseline {
+  note: string;
+  violations: string[];
+  mixedFiles: string[];
+  discriminatorTotal: number;
+}
+
+const edgeKey = (e: Edge): string => `${e.fromUnit} → ${e.toUnit} (${e.from} → ${e.to})`;
+
+function baselineFrom(r: UnitsReport): UnitsBaseline {
+  return {
+    note: "B-149 ratchet for `scripts/analyze/index.ts units --check`: violations and mixed files are sets a new entry may not join; discriminatorTotal may only fall; unassigned files are refused outright. Rewrite with --update-baseline after a split lands, never to admit a new entry.",
+    violations: r.violations.map(edgeKey).sort(),
+    mixedFiles: Object.keys(r.mixed).sort(),
+    discriminatorTotal: r.discriminatorTotal,
+  };
+}
+
+function checkUnits(r: UnitsReport): boolean {
+  if (!fs.existsSync(UNITS_BASELINE)) {
+    console.log("units-lint: no baseline — run `units --update-baseline` first");
+    return false;
+  }
+  const base: UnitsBaseline = JSON.parse(fs.readFileSync(UNITS_BASELINE, "utf8"));
+  const now = baselineFrom(r);
+  let failed = false;
+  const fail = (msg: string): void => { failed = true; console.log(`FAIL  ${msg}`); };
+
+  const baseV = new Set(base.violations);
+  const newV = now.violations.filter((v) => !baseV.has(v));
+  for (const v of newV) fail(`new edge the DAG does not permit: ${v}`);
+  const nowV = new Set(now.violations);
+  const gone = base.violations.filter((v) => !nowV.has(v));
+  console.log(`${newV.length ? "      " : "ok    "}violations ${now.violations.length} (baseline ${baseV.size})${gone.length ? ` — ${gone.length} gone; run --update-baseline to lock it in` : ""}`);
+
+  const baseM = new Set(base.mixedFiles);
+  const newM = now.mixedFiles.filter((f) => !baseM.has(f));
+  for (const f of newM) fail(`new mixed file: ${f} — a file joins units.json as one unit, not several`);
+  const nowM = new Set(now.mixedFiles);
+  const unmixed = base.mixedFiles.filter((f) => !nowM.has(f));
+  console.log(`${newM.length ? "      " : "ok    "}mixed files ${now.mixedFiles.length} (baseline ${baseM.size})${unmixed.length ? ` — ${unmixed.length} un-mixed; run --update-baseline to lock it in` : ""}`);
+
+  if (now.discriminatorTotal > base.discriminatorTotal) {
+    fail(`discriminator count rose from ${base.discriminatorTotal} to ${now.discriminatorTotal} — the ratchet only falls`);
+  } else {
+    console.log(`ok    discriminator ${now.discriminatorTotal} (baseline ${base.discriminatorTotal})${now.discriminatorTotal < base.discriminatorTotal ? " — fell; run --update-baseline to lock it in" : ""}`);
+  }
+
+  if (r.unassigned.length) {
+    for (const f of r.unassigned) fail(`unassigned file: ${f} — give it a unit in scripts/analyze/units.json`);
+  } else {
+    console.log("ok    unassigned 0 — closed");
+  }
+
+  console.log(failed ? "\nunits-lint FAILED" : "\nunits-lint: the unit DAG holds at its baseline (docs/book/units.md §8)");
+  return !failed;
+}
+
 // --- cli ----------------------------------------------------------------------
 
-interface Options { include: string[]; exclude: string[]; json: boolean }
+interface Options { include: string[]; exclude: string[]; json: boolean; check: boolean; updateBaseline: boolean }
 
 function parseArgs(argv: string[]): { cmd: string; rest: string[]; opts: Options } {
-  const opts: Options = { include: [], exclude: [], json: false };
+  const opts: Options = { include: [], exclude: [], json: false, check: false, updateBaseline: false };
   const rest: string[] = [];
   let cmd = "";
   for (const a of argv) {
     if (a === "--json") opts.json = true;
+    else if (a === "--check") opts.check = true;
+    else if (a === "--update-baseline") opts.updateBaseline = true;
     else if (a.startsWith("--include=")) opts.include.push(a.slice(10));
     else if (a.startsWith("--exclude=")) opts.exclude.push(a.slice(10));
     else if (!cmd) cmd = a;
@@ -386,9 +465,18 @@ function main(): void {
       report(`references to ${rest[0]}`, references(program, opts, rest[0]), opts);
       break;
     }
-    case "units":
-      reportUnits(unitsReport(program, opts), opts);
+    case "units": {
+      const r = unitsReport(program, opts);
+      if (opts.updateBaseline) {
+        fs.writeFileSync(UNITS_BASELINE, JSON.stringify(baselineFrom(r), null, 2) + "\n");
+        console.log(`units: baseline written — ${r.violations.length} violations, ${Object.keys(r.mixed).length} mixed files, discriminator ${r.discriminatorTotal}`);
+      } else if (opts.check) {
+        if (!checkUnits(r)) process.exit(1);
+      } else {
+        reportUnits(r, opts);
+      }
       break;
+    }
     default:
       throw new Error(`unknown command: ${cmd}`);
   }

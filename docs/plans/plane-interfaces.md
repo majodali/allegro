@@ -793,7 +793,9 @@ list: `meta` has fifteen accesses, all sanctioned, and the lint keeps it
 there. The representation tests are not: 166 kind comparisons against
 `Structure` is more than 2026-09's 152, because the chunks since (B-120,
 B-121, the hooks) added guards faster than they removed them, and the
-discriminator rule's count stands at 437 outside the allowed units. So
+discriminator rule's count stands at 458 outside the allowed units (437
+at C1; the twenty-one comparisons that moved from the evaluator into
+`types-std.ts` with the checks and dispatch now count, as they should). So
 the principles held where an interface existed to hold them (the
 metadata plane, the installs) and did not where the question still has
 no word (B-128 (c): *is this a Structure* standing in for *does this
