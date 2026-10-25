@@ -236,7 +236,7 @@ column is §7's ledger, corrected in place as moves land (K-010).
 | 10 | **`metadata`** | D48(b)(c) slot and construction; R3 non-interference; SC-7 propagation vocabulary; D39 field registry as code; the propagation table | `kinds` | `metadata.ts` (field registry, propagation vocabulary, free reads, carry idioms, merge table), `types.ts` (`withMeta`, `Metadata`), `evaluator.ts` (`viralScan`, `mergeOverMeta`) | partial — `metadata.ts` is the unit; `withMeta` and the two evaluator helpers are still elsewhere. Chapter: `allegretto/metadata-and-capability.md` |
 | 11 | **`capability`** | R12 authority is a capability; D21 constructor brand; D23 free reads; D24 attenuation by wrapping; `installFieldMerge` (the one layer→base instance) | `metadata`, `primitive-function` | `capability.ts` (writers, registration, the gated `installFieldMerge`, the base's own fields), `primitives.ts` "Channel plane" 495–563 | partial — `capability.ts` is the unit; the Allegro-facing channel primitives are still in `primitives.ts`. Chapter: `allegretto/metadata-and-capability.md` |
 | 12 | **`scope`** | D49 scope is not a value; IC-5 parent chain; the facts plane as opaque payload; future cells as bindings (D33) | `structure`, `symbol`, `metadata` | `scope.ts` (+ shares `Structure`) | owed → **B-136** executes it |
-| 13 | **`evaluator`** | R2 PE as the mechanism; R4 totality; PE Rule 1 and Rule 2; application and substitution; TCO; the D22 carve-out for scope; **the four B-112 hooks as its install surface** | `scope`, `expression`, `composed-function`, `primitive-function`, `param`, `symbol`, `metadata`, `capability` | `evaluator.ts` minus `precompileFunction`'s placeholder seeding and the post-call `type` stamp (carrying by field name; B-145, B-146) | owed → **B-112** executes it |
+| 13 | **`evaluator`** | R2 PE as the mechanism; R4 totality; PE Rule 1 and Rule 2; application and substitution; TCO; the D22 carve-out for scope; **the four B-112 hooks as its install surface** | `scope`, `expression`, `composed-function`, `primitive-function`, `param`, `symbol`, `metadata`, `capability` | `evaluator.ts` (assigned to this unit alone since B-112's exit) | in place, with two edges the DAG does not permit, to `refinements` and `effects`: the effect and knowledge inference the evaluator still performs inside its loop, owned by **B-146** (knowledge propagation). Precompile's placeholder seeding and the post-call `type` stamp are carrying by field name (B-145) |
 | 14 | **`futures`** | R10 resumable evaluation; D33 future cells; the completion cascade; B-114's confluence question | `evaluator`, `scope` | `futures.ts`, `runtime.ts` (`DependencyRegistry`, `applyPhase`), `primitives.ts` async 1116–1197 | owed |
 | 15 | **`base-primitives`** | the ~40 Allegretto primitives (structures.md §11): bits, expression, structure ops, `eval_if`/`eval_when`, `make_error`, `print`, identity, source read (D47) | `kinds`, `evaluator`, `futures` | `primitives.ts` 23–1197 | owed |
 
@@ -319,7 +319,9 @@ lands through B-136 (its owner), because
   through a kind's representation. That is P2 (layers install, base never
   imports) stated as a graph property.
 - **B-112's done-condition**: the `evaluator` unit has no import from
-  §4.3. Today it has three (`refinements`, `effects`, `types-std`).
+  §4.3. After B-112's exit it has two (`refinements`, `effects`), both
+  the inference population B-146 owns, and the report shows them as
+  violations rather than hiding them in a mixed file.
 
 ## 6. Actors and units
 
@@ -396,15 +398,16 @@ backlog owner's or a ruling's.
   (B-141). The unit DAG says where it would go: a `host` unit between
   `futures` and `base-primitives`, which the primitives import and the
   CLI and web bundle each supply.
-- **M11 — The evaluator held Type-system activities.** *Check declared
-  constraint* left it at B-112 chunk C2 and *Dispatch member access*,
-  with call-site unification, at chunk C3: the evaluator runs installed
-  checks and dispatchers and decides nothing, and imports nothing from
-  `types-std.ts`. What remains is *Infer* as precompile's placeholder
-  seeding and the post-call `type` stamp, both carrying by field name
-  (B-145, B-146; plan §9.5). B-112's hooks are exactly this boundary. This
-  is the strongest alignment the two models produce, and the reason this
-  document precedes B-112 chunk 1.
+- **M11 — The evaluator held Type-system activities.** Closed by B-112:
+  *Check declared constraint* left it at chunk C2 and *Dispatch member
+  access*, with call-site unification, at chunk C3; the evaluator runs
+  installed checks and dispatchers, decides nothing, and imports nothing
+  from `types-std.ts`. What remains in the file is not a Type-system
+  activity but inference the Effects and Knowledge activities perform
+  inside the Engine's loop (the two edges §4 row 13 names; B-146), plus
+  carrying by field name (B-145). B-112's hooks were exactly this
+  boundary. This is the strongest alignment the two models produce, and
+  the reason this document precedes B-112 chunk 1.
 - **M12 — `scope` imported `refinements`.** Closed by B-112 chunk C1.
   Found by the report, not by reading: `scopeFactsFor` merged predicate
   sets along the chain with `mergePredicateSets`, so L0's scope knew how
@@ -473,22 +476,24 @@ files as the owed splits; and counts direct `.kind ===` comparisons
 outside the units the discriminator rule allows. Baselines are committed
 when B-149 lands; until then the command reports and does not fail.
 
-At 2026-10-21 (after B-112 chunk C1, the `slots.ts` split):
+At 2026-10-24 (after B-112's exit; `evaluator.ts` assigned to one unit):
 
     import edges between assigned files   162
-      ok                                   51
-      violation                             0
-      unresolved                          111   one end is a mixed file
-    mixed files (owed splits)               6   types, evaluator, primitives,
-                                                runtime, modules, types-std
+      ok                                   57
+      violation                             2   evaluator → refinements,
+                                                evaluator → effects (B-146)
+      unresolved                          103   one end is a mixed file
+    mixed files (owed splits)               5   types, primitives, runtime,
+                                                modules, types-std
     discriminator rule                    437   outside allowed units;
                                                 155 primitives, 145 types-std,
                                                 64 totality, 19 introspect, …
 
-The 111 unresolved edges are the real measure of the work owed: each
-becomes a verdict when its mixed end splits. The split raised the edge
-count because one file's internal references became imports between
-three; that is the count becoming visible, not growing.
+The 103 unresolved edges are the real measure of the work owed: each
+becomes a verdict when its mixed end splits. The two violations are
+verdicts the evaluator's split made visible: the effect and knowledge
+inference it performs inside its loop, which the hooks were never meant
+to remove (plan §7) and B-146 owns.
 
 ## 9. What this document is not
 

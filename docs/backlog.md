@@ -1508,8 +1508,7 @@ that prevents it.
 - [ ] **B-112** · L0 · **The four owed plane interfaces.** Raised by the
   concept spine (S2f); `concepts.md` §24 carries the interface table.
   **PLAN: [docs/plans/plane-interfaces.md](plans/plane-interfaces.md)**
-  (ratified as a whole 2026-10-21, ruling 2 option (a); **C1 landed
-  2026-10-21, C2 to C4 landed 2026-10-22, C5 landed 2026-10-24**; the exit remains) — scoped to the four hooks on measurement: delta 23's
+  (ratified as a whole 2026-10-21, ruling 2 option (a); **all chunks and the exit landed, 2026-10-21 to 2026-10-24**; the done-condition's two remaining edges are B-146's, plan §9.8) — scoped to the four hooks on measurement: delta 23's
   *27 upward symbols* is **131 imported / 98 distinct**, of which only **4**
   are checkers. The plan's §6 files five other populations (type vocabulary
   ~25, knowledge propagation ~18, member dispatch ~9, diagnostics ~8,
@@ -1573,7 +1572,15 @@ that prevents it.
     invariant gates read `effects:inferred` and `effects:diverges` by
     name and error if missing once a pass has begun. Found:
     `setInlineCutoff` in the evaluator is a fourth injection point of the
-    same shape (plan §9.7). Remaining: the exit.
+    same shape (plan §9.7).
+  - **Progress.** Exit (2026-10-24): `viralOnto` and `mergeOverMeta` in
+    the metadata unit; `evaluator.ts` assigned to `evaluator` alone;
+    `units`: 162 edges, 57 ok, **2 violations** (evaluator → refinements,
+    evaluator → effects: the effect and knowledge inference inside the
+    loop, B-146), 103 unresolved, 5 mixed files. The §5.7 survey re-run:
+    `kind === Structure` sites 152 → 166, the storage plane at 15 sanctioned
+    accesses. **B-128 (b) and (c) are unblocked**; the two violations are
+    the ratchet's (B-149) known baseline.
 
 - [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
   Body wrappers (`type_check`, the `*_attach` family) must forward the
@@ -2302,12 +2309,15 @@ that prevents it.
     Policing without supplying the missing vocabulary just moves the problem
   - **Sequencing**: B-127 **landed** and supplies the analysis; **(a) landed
     on it**. **B-128 was not "unblocked" by B-127** — that claim was made in
-    the B-127 report and is wrong; only (a) was. (b) and (c) still want B-112's interfaces — (b) because making
-    the representation unreachable needs somewhere else to reach, and (c)
-    because one spelling per plane question needs the question to have a
-    word. This item stays open on those two. Best evidence for whether it works: re-run C2's survey
-    afterwards and see whether the answer is a short list rather than a class
-    of things nobody could search for
+    the B-127 report and is wrong; only (a) was. (b) and (c) wanted B-112's
+    interfaces — (b) because making the representation unreachable needs
+    somewhere else to reach, and (c) because one spelling per plane question
+    needs the question to have a word. **B-112 landed 2026-10-24 and (b)
+    and (c) are unblocked.** C2's survey, re-run at B-112's exit (plan
+    §9.8): the storage plane is a short list (`meta` at 15 sanctioned
+    accesses, the lint holding 0 outside), the representation tests are
+    not (`kind === Structure` 152 → 166) — (c)'s work, with the words the
+    installs now supply
   - **B-135 supplies the host plane's half of (c)**: a plane question with one
     spelling needs the plane to have a stated content rule first.
     `Structure.memberPrivilege`, written and read through `as any` and
@@ -2467,6 +2477,13 @@ that prevents it.
   - **Pointer**: `docs/plans/plane-interfaces.md` §6.
 
 - [ ] **B-146** · L0 · L2 · **Knowledge propagation: the evaluator does
+  - **Scope note (B-112's exit, 2026-10-24).** The evaluator's two
+    remaining L2 edges are this item's: `refinements` (abstract domains
+    and predicates at primitive application; facts at symbol lookup) and
+    `effects` (the whole effect-inference path: a primitive's static tags,
+    a Param's bound and effect variable, the `opaque` label, the precompile
+    stash). Effect inference is the same class as knowledge propagation
+    and the larger edge; take it explicitly. Plan §9.8.
   abstract interpretation over knowledge it must not understand.**
   - **What**: ~18 distinct symbols — `propagateSetForPrimitive`, `domainOf`,
     `domainFromPredicate`, `impliesDomain`, `entailsPredicate`,

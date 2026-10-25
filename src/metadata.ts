@@ -311,6 +311,61 @@ export function fieldMerge(name: string): ((a: Value, b: Value) => Value) | unde
   return FIELD_MERGES.get(name);
 }
 
+// --- The table applied: the two generic rules (B-112 exit) ----------------------
+//
+// `viral` and `union` are the rules the base can apply WITHOUT meaning:
+// presence and an installed merge. They lived in the evaluator until B-112's
+// exit; they belong here because they read the registry and nothing else.
+// `computed` and `drop` need no generic code: an owner derives the one at
+// the sites it annotates, and nothing carries the other.
+
+/** `viral`: the first viral field found on any candidate (callee first,
+ *  then arguments in order) rides the residual — and so does the
+ *  candidate's `type`, so an error-carrying residual stays typed. Null
+ *  when no candidate carries a viral field. Today `error` is the only
+ *  viral field; a newly registered one gets this path with no evaluator
+ *  change (the differential fixtures pin the behaviour).
+ *
+ *  Naming `type` here is the base carrying a field it does not interpret,
+ *  by name; the name is B-145's (type vocabulary) to retire. */
+export function viralOnto(candidates: (Value | undefined)[], residual: Value): Value | null {
+  const viral = viralFields();
+  for (const cand of candidates) {
+    if (cand === undefined) continue;
+    // `metaReadRaw` is total — a value carrying nothing answers undefined —
+    // so every candidate is asked (B-121 C2: asking only Structures silently
+    // stopped propagating from typed scalars).
+    for (const chan of viral) {
+      const comp = metaReadRaw(cand, chan);
+      if (comp) {
+        const meta = new Map<string, Value>([[chan, comp]]);
+        const typeComp = metaReadRaw(cand, "type");
+        if (typeComp) meta.set("type", typeComp);
+        return withMeta(residual, meta);
+      }
+    }
+  }
+  return null;
+}
+
+/** `union` over metadata: lay an outer value's metadata under the metadata
+ *  of what it evaluated to. Re-evaluation FLATTENS rather than nests: the
+ *  result's own (fresh) fields shadow the outer (stale) ones, because
+ *  resolved information should replace a partial-evaluation guess — except
+ *  a `union` field, which merges through its installed merge: what was
+ *  observed before re-evaluation is a fact, not a guess (C4.3a, R3). Every
+ *  kind carries metadata (B-121 C2), so Symbols and Expressions that
+ *  re-evaluate to something else merge here too. */
+export function mergeOverMeta(outer: Map<string, Value>, inner: Value): Value {
+  for (const [k, v] of metaOf(inner)) {
+    const prev = outer.get(k);
+    const mergeFn = prev !== undefined && metaFieldSpec(k)?.rule === "union"
+      ? fieldMerge(k) : undefined;
+    outer.set(k, mergeFn ? mergeFn(prev!, v) : v);
+  }
+  return withMeta(inner, outer);
+}
+
 // --- Check hook (B-112 C2, hook (b)) ------------------------------------------
 //
 // Checking an argument against a declared constraint is a DECISION the base
