@@ -585,4 +585,7 @@ fileTest(path.join(testsDir, "metadata-channels-demo.alg"));
 // The planning DSL, library core (B-151 stage A1): the BuildPipeline
 // sub-plan of docs/book/vivace/planning-dsl.md §5 built through the API.
 fileTest(path.join(testsDir, "planning-core-demo.alg"));
+// Stage A2: the full SoftwareRelease checked, five broken plans refused in
+// planning vocabulary, both enforcement shapes (error value; annotation).
+fileTest(path.join(testsDir, "planning-checks-demo.alg"));
 

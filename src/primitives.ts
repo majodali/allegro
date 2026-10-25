@@ -2188,10 +2188,14 @@ const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(right)) {
     return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, right]);
   }
-  // Unwrap thunk
+  // Unwrap the thunk by APPLYING it, never by evaluating its body: a call
+  // in tail position of the body is marked as a tail call, and evaluating
+  // the body directly hands back the TailCall sentinel instead of a value,
+  // which read as "not false" here (B-151 A2 finding: `p && f(x)` was true
+  // whatever f answered; `p || f(x)` was false whatever f answered).
   let rightVal = right;
   if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
-    rightVal = evalFn!(right.body, ctx!);
+    rightVal = evalFn!(makeExpr(right, []), ctx!);
   }
   const rightP = rightVal;
   if (rightP.kind === ValueKind.Bits && rightP.data === 0n) {
@@ -2281,9 +2285,10 @@ const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(right)) {
     return makeExpr(makePrimitive("typed_or", typed_or_impl, true), [left, right]);
   }
+  // Apply the thunk rather than evaluating its body — see typed_and.
   let rightVal = right;
   if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
-    rightVal = evalFn!(right.body, ctx!);
+    rightVal = evalFn!(makeExpr(right, []), ctx!);
   }
   const rightP = rightVal;
   if (rightP.kind === ValueKind.Bits && rightP.data !== 0n) {

@@ -52,3 +52,19 @@ print(check(5))
 
 print(check(15))
 // expect: no
+
+// Short-circuit with a function CALL on the right (B-151 A2 finding):
+// the thunk is applied, not evaluated as a body, so a tail-position call
+// answers as a value rather than as a tail-call sentinel.
+is_b(x) => x == "b"
+print(("a" != "b") && is_b("a"))
+// expect: false
+
+print(true && is_b("b"))
+// expect: true
+
+print(false || is_b("b"))
+// expect: true
+
+print(false || is_b("a"))
+// expect: false

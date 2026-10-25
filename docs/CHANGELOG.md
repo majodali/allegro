@@ -4,6 +4,40 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 A2: the planning DSL's wiring and graph checks; `&&`/`||` fixed with a call on the right
+
+Stage A2 of the rung-3 plan. `lib/planning.alg` derives the edges
+(convention 5: an outcome flows into every input of the same type among
+the siblings; the scope's inputs are sources) and checks the graph:
+wiring completeness and ambiguity; type compatibility (a constrained
+input needs its producer to carry the same fixture); acyclicity (edges
+derived, nodes eliminated until none can be, the rest is the cycle);
+outcomes (each declared outcome produced by exactly one node; every node
+outcome consumed or declared). The checks recurse into every composite
+and into a borrowed plan. `check_plan` answers findings in planning
+vocabulary; `validate` yields an error value carrying the first;
+`WellFormedPlan = Plan & well_formed(_)` halts on annotation.
+`tests/planning-checks-demo.alg` builds the whole `SoftwareRelease`
+worked example (14 nodes, 10 leaves), checks it clean both ways, and
+refuses five plans each broken in one way. Two readings settled by the
+example and recorded in the chapter §7: a fixture on a declared outcome
+is a promise, not a producer requirement; every node outcome is consumed
+or declared.
+
+Substrate findings. (1) The invariant-totality gate (D32/CE-R7) refuses a
+refinement predicate whose callees may diverge; the library's tree walks
+are `assume terminates` (no verified `decreases` metric describes a walk
+into a child list). Correct behaviour, recorded for analyzer authors.
+(2) **`&&` and `||` were wrong when the right operand was a call**:
+`p && f(x)` was true and `p || f(x)` was false whatever `f` answered,
+because `typed_and`/`typed_or` unwrapped the right-hand thunk by
+evaluating its body, which hands back the TailCall sentinel for a call
+in tail position. They apply the thunk now (`src/primitives.ts`); four
+lines appended to `tests/logical.alg` pin it. (3) A kernel fault on one
+call shape, "`type_dispatch` has unresolved stub" — **B-152** filed with
+the minimal pair; the library routes around it in two named places.
+Suite 1209 distinct tests.
+
 ## 2026-10 — Vision §4 names the pilots (Tier 0, maintainer sign-off 2026-10-25)
 
 Ruling R4 of `docs/plans/planning-pilot.md`: `docs/book/vision.md` §4

@@ -862,7 +862,31 @@ that prevents it.
   - **Progress.** A1 (2026-10-25): `lib/planning.alg` types,
     constructors, builders, queries, renderings; `tests/planning-core-demo.alg`
     suite-pinned. Substrate finding fixed on the way: `Array.length` was
-    an untyped number. Next: A2, wiring derivation and the graph checks
+    an untyped number.
+  - **Progress.** A2 (2026-10-25): wiring derivation and the four graph
+    checks, applied into composites and borrowed plans; `validate` (error
+    value) and `WellFormedPlan` (annotation halt);
+    `tests/planning-checks-demo.alg` suite-pinned. Findings: `&&`/`||`
+    wrong with a call on the right (fixed); a kernel fault on one call
+    shape (**B-152**, worked around). Next: A3, typed measures and the
+    budget check (R1, R2)
+- [ ] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
+  stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
+  `use planning` for the records: a function that binds
+  `prods = ns.filter(n => ports_have(n.outcomes, o.type)).map(n => n.name)`
+  locally and then evaluates
+  `if prods.length == 0 then [] else pair(prods[0], find_node_in(ns, prods[0]).outcomes)`
+  fails; the same function with `prods` computed by a named helper
+  (`prods = names_producing(ns, o.type)`), or with `k = prods[0]` bound
+  first, or with `.name` in place of the array-valued `.outcomes`, works.
+  Not a parse error; the unresolved primitive is the dot-access
+  `type_dispatch` reached under evaluation. Suspects, unverified: the
+  cloning of a lambda-bearing expression at the local binding (a stub
+  placeholder copied before `resolvePrimitives` ran) or Expression memo
+  sharing (IC-6). **Blocked-by**: nothing. The library carries the
+  workaround at `names_producing` and `compatibility_with`; remove it
+  when this closes. **Pointer**: `lib/planning.alg`;
+  `docs/plans/planning-pilot.md` §8 (A2)
 - [ ] **B-080** · Vivace DSL candidates (post-pilot roster): logic
   programming, constraint programming, data modeling, numerical methods,
   software-systems modeling, workflow/process, automatic reasoning, UI
