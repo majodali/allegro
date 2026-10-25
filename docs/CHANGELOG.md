@@ -4,6 +4,31 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 A1: the planning DSL's library core, and `Array.length` typed
+
+Stage A1 of the rung-3 plan (`docs/plans/planning-pilot.md`), the
+primitive version: `lib/planning.alg` as plain Allegro, loaded with
+`use planning`. The types are records (`Fixture`, `Port`, `Estimate`,
+`Retry`, `Handler`, `PlanNode`, `Plan`); one record serves leaf,
+composite and `uses` nodes, told apart by what they carry; constructors
+(`leaf`, `composite`, `uses`, `plan`, `handler`, `retry`, `est`, `port`,
+`port_where`, `fixture`) and immutable `with_*` builders; queries over the
+graph (`node_count`, `leaf_count`, `node_names`, `find_node`,
+`handler_count`); one-line renderings. `tests/planning-core-demo.alg`
+builds the worked example's `BuildPipeline` sub-plan by hand, then a
+`SoftwareRelease` skeleton with a `uses` node and a composite, and pins
+22 lines: renderings, queries, handler fields, structural equality of
+plans, `instanceof`. Registered in `src/test/language.ts`.
+
+Substrate finding, fixed in the chunk: `Array.length` returned an
+untyped `Bits`, so `xs.length.toString()` and any interpolation of a count
+failed with "'toString' not found on Bits", against the invariant that
+every Standard-mode value has a type. `arrayMethods.length` in
+`src/types-std.ts` now returns a typed `Int`. The plan's rulings R1 to R4
+(measures, durations, solution finding, the Vision amendment) taken as
+recommended by the maintainer the same day. Suite 1208
+distinct tests.
+
 ## 2026-10 — B-079: the planning DSL revalidated into the book; the rung-3 plan
 
 The archived v1 design (`docs/plans/archive/project-1-planning-dsl-design.md`)

@@ -60,7 +60,7 @@ From the chapter (B-079) and the rulings above:
 
 | Stage | Chunk | What lands | Exit measured by |
 |---|---|---|---|
-| **A. The library** | A1 | `lib/planning.alg`: the types (Plan, PlanNode, Input, Outcome, Estimate, Budget, Handler) as `Type.define` records; construction through the library's API; a demo `tests/planning-core-demo.alg` building `BuildPipeline` by hand | the demo is suite-pinned; the types print and compare |
+| **A. The library** | A1 ✅ **landed 2026-10-25** | `lib/planning.alg`: the types (Plan, PlanNode, Port, Fixture, Estimate, Retry, Handler) as `Type.define` records; construction through the library's API; a demo `tests/planning-core-demo.alg` building `BuildPipeline` by hand | the demo is suite-pinned; the types print and compare — **met** |
 | | A2 | Wiring derivation and the graph checks: acyclicity, wiring completeness, type compatibility, composite resolution; each failure an error value in domain terms | demo lines for each check passing and each check refusing a deliberately broken plan |
 | | A3 | Estimates and budgets: durations through the units DSL (R2), effort and money per R1; rollup with retry upper bounds; the budget check | `SoftwareRelease` built through the API with its budget discharged; a budget-exceeding variant refused |
 | | A4 | Failure handlers: `on <FailureType>` graphs, handler validity, re-escalation as a graph property | both handlers of the worked example checked |
@@ -112,6 +112,19 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-25 — A1 landed.** `lib/planning.alg` (types, constructors,
+  builders, queries, renderings) and `tests/planning-core-demo.alg`
+  (the `BuildPipeline` sub-plan by hand, 22 pinned lines). Rulings R1 to
+  R4 taken as recommended the same day. One substrate finding, fixed in
+  the chunk: `Array.length` returned an untyped number
+  (`xs.length.toString()` failed), against the invariant that every
+  Standard-mode value has a type; it is typed `Int` now. Design notes:
+  one record for all three node kinds, told apart by what they carry
+  (`node_kind`); `uses` copies the borrowed plan's ports onto the node;
+  a port's fixture is a named predicate so that renderings can say
+  `[valid_semver]`; records are immutable, so the `with_*` builders return
+  copies.
 
 - **2026-10-25 — B-079 landed.** The archived design revalidated into
   `docs/book/vivace/planning-dsl.md`; this plan created; B-151 filed

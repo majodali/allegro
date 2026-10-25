@@ -349,7 +349,7 @@ Re-checked against the code at 2026-10-25:
 
 | The pilot needs | Today | Where |
 |---|---|---|
-| Record types with methods and laws | `Type.define({...}, Interface)`; the units DSL's `Quantity` is the model | `lib/units.alg`, `../standard/type-system.md` §3 |
+| Record types with methods and laws | `Type.define({...}, Interface)`; the units DSL's `Quantity` is the model; the planning types (`Plan`, `PlanNode`, `Port`, `Fixture`, `Estimate`, `Retry`, `Handler`) exist since stage A1 | `lib/planning.alg`, `lib/units.alg`, `../standard/type-system.md` §3 |
 | Constraints on values | refinement types (`Int & p`), `Refinement.define`, guarded construction (`Type.define({...}) & _.field >= 0`, D32) | `../standard/core-types.md`, `../standard/contracts.md` |
 | Grammar extension from a library | `grammar { rule … expr_form … stmt_form … }`, activated by `use NAME`; libraries and top-level files share one pipeline | `../extension/grammar.md` §4, `lib/units.alg`, `lib/proven.alg` |
 | Offside-rule blocks | the formalism's `NEWLINE`/`INDENT`/`DEDENT`/`SAMELINE` terminals exist in the engine; **no library fragment uses them yet** | `../grammar-formalism.md` §5 |
@@ -439,10 +439,19 @@ Carried from the archived design, with two added by the revalidation:
   choices that satisfy budget and reachability) before any primitive is
   built.
 
-## 9. Status and pointers [designed]
+## 9. Status and pointers [partial]
 
-The language is designed and not built. `lib/planning.alg` does not
-exist; the archived design's scaffolding list is the plan's stage A.
+Stage A1 is built: `lib/planning.alg` holds the types as records, the
+constructors (`leaf`, `composite`, `uses`, `plan`, the `with_*` builders,
+`handler`, `retry`, `est`, `port`, `port_where`, `fixture`), the queries
+(`node_count`, `leaf_count`, `node_names`, `find_node`, `handler_count`)
+and the one-line renderings; `tests/planning-core-demo.alg` builds the
+`BuildPipeline` sub-plan of §5 by hand and is suite-pinned. Plans are
+values: two plans built the same way are equal, and `instanceof` names
+their types. Stage A1 surfaced one substrate gap, fixed on the way:
+`Array.length` returned an untyped number, so a count could not be
+rendered. Not yet built: the graph checks (A2), typed measures (A3),
+handlers as checked graphs (A4), the surface (B).
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),
