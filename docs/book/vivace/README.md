@@ -28,6 +28,7 @@ appears.
 
 ## Documents
 
-- `planning-dsl.md` (planned, revalidation-gated — BACKLOG register;
-  source: `docs/plans/archive/project-1-planning-dsl-design.md`)
+- `planning-dsl.md` — the planning DSL, the first pilot (B-079
+  revalidation of `docs/plans/archive/project-1-planning-dsl-design.md`,
+  2026-10-25); work plan `docs/plans/planning-pilot.md`
 - Vision-level framing: `docs/book/vision.md` §4 (Tier 0)

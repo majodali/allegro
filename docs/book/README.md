@@ -68,8 +68,9 @@ A term has one definition site, a heading preceded by
 | II.15 | `standard/pattern-matching.md` | Pattern matching |
 | II.16 | `standard/totality.md` | Totality and termination |
 | II.17 | `standard/contracts.md` | Contracts and invariants |
-| II.18 | `vivace/README.md` | L3 boundary contract; planned, revalidation-gated: `planning-dsl.md` |
-| II.19 | `platform/README.md` | Capability tracks; planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
+| II.18 | `vivace/README.md` | L3 boundary contract |
+| II.19 | `vivace/planning-dsl.md` | The planning DSL, the first Vivace pilot (rung 3): the outcome-graph model, the twelve conventions, the rejections, the `SoftwareRelease` example, what Allegro provides today, the well-formedness checks. Definition site of *plan*, *plan node*, *wiring*, *failure handler* |
+| II.20 | `platform/README.md` | Capability tracks; planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
 
 Planned under L2, revalidation-gated (backlog register): `standard/proofs.md`,
 `standard/pcp.md`.

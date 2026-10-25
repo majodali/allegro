@@ -4,6 +4,29 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-079: the planning DSL revalidated into the book; the rung-3 plan
+
+The archived v1 design (`docs/plans/archive/project-1-planning-dsl-design.md`)
+is revalidated against `structures.md` and the code at 2026-10-25 into
+`docs/book/vivace/planning-dsl.md`: the outcome-graph model (plan, plan
+node, wiring, estimates and budgets, failure handlers), the twelve
+conventions each with a revalidation note, the rejections, the
+`SoftwareRelease` example, a checked table of what Allegro provides today
+and three findings (effort and money are not SI measures; the surface is
+the first offside-rule fragment, and the engine's indent terminals are
+unused by any library; well-formedness has two enforcement shapes, error
+value at construction and halt at annotation), the six graph checks, and
+the open questions. `docs/plans/planning-pilot.md` is created: stages A
+(library first, the primitive version), B (surface), C (B-081
+legibility, delayed by ruling), D (solution finding, defined from A's
+constraints), E (packaging); rulings R1 to R4 (measures, durations,
+solution finding, the Vision amendment) asked; the Vision §4
+pilot-roster text drafted in §7 for the maintainer to land or decline,
+not landed. B-151 (the planning pilot) filed for the stages; B-079
+closed; the archive row
+marked incorporated; reading order, TOC (II.19), the L3 README, the
+plans manifest and the census updated. Documentation only.
+
 ## 2026-10 — B-149: the unit DAG joins the gate
 
 `scripts/analyze/index.ts units --check` (`npm run lint:units`) holds the
