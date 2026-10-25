@@ -54,7 +54,7 @@ From the chapter (B-079) and the rulings above:
 | **R1** | How are effort (person-hours) and money measured? The units DSL encodes SI dimensions only | (a) planning-local `Effort` and `Money` types, refinement-typed numbers with their own arithmetic; (b) generalise `lib/units.alg` to named base dimensions beyond SI; (c) represent all three measures as plain numbers in the first stage | **(a)** now. (b) is a units design question that the physics pilot may want anyway; take it there. (c) loses the dimensional error the rung-2 bridge exists to show |
 | **R2** | Wall-clock durations: the units DSL's time dimension, or planning-local? | (a) reuse `lib/units.alg` (`30 min` is already a quantity); (b) planning-local `Duration` | **(a)**: it is the bridge from rung 2, and it costs nothing |
 | **R3** | What does solution finding mean for a plan? | decided at stage D from the pilot's own constraints, not now | defer, as Vision §4 directs ("don't over-design ahead of evidence") |
-| **R4** | Vision §4 amendment (Tier 0): name the pilot roster and the Shape 1 / Shape 2 staging | land §7's text, amend it, or decline | land it, since the rung is being built against it |
+| **R4** | Vision §4 amendment (Tier 0): name the pilot roster and the Shape 1 / Shape 2 staging | land §7's text, amend it, or decline | land it, since the rung is being built against it — **taken 2026-10-25, landed in `docs/book/vision.md` §4** (the maintainer noted the text becomes obsolete once the pilots have run) |
 
 ## 4. Stages and chunks
 

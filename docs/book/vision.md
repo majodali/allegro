@@ -214,6 +214,16 @@ design hypothesis (work-in-progress, not settled):
   **transitive assurance** — importing a library imports its assurance, not
   just its license and CVE list.
 
+**The pilots.** Three domain pilots test the hypothesis, chosen to be
+different so that they surface different gaps: a project planning
+workflow (a self-contained DSL with rich structural constraints), a
+software system model (several interconnected DSLs), and physics
+simulations (logic and processing intensive, over the units substrate).
+Each starts as *Shape 1*, specification and verification in Allegro with
+execution external, and may later become *Shape 2*, in which Allegro runs
+the model. Shape 1 is sufficient to test every claim above except
+execution, which is a separable concern.
+
 Seven known-unsolved gaps (counterexample legibility, model composition, the
 AI iteration loop, proof portability, organizational constraint-completeness
 process, bootstrap economics, escape-hatch discoverability) are open work;
