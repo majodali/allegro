@@ -137,5 +137,17 @@ try {
   gateFailed = true;
 }
 
+// B-149: the unit DAG's ratchet, once per gate for the same reason.
+try {
+  const unitsOut = execSync("npx tsx scripts/analyze/index.ts units --check", {
+    cwd: new URL("..", import.meta.url).pathname, encoding: "utf-8",
+  });
+  const last = unitsOut.trim().split("\n").pop();
+  console.log(`Units lint: ${last}`);
+} catch (e) {
+  console.error("units lint FAILED:\n" + String(e.stdout ?? e));
+  gateFailed = true;
+}
+
 console.log(gateFailed ? "GATE: FAILED" : "GATE: PASSED");
 process.exit(gateFailed ? 1 : 0);

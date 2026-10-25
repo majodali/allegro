@@ -1,0 +1,15 @@
+{
+  "note": "B-149 ratchet for `scripts/analyze/index.ts units --check`: violations and mixed files are sets a new entry may not join; discriminatorTotal may only fall; unassigned files are refused outright. Rewrite with --update-baseline after a split lands, never to admit a new entry.",
+  "violations": [
+    "evaluator → effects (src/evaluator.ts → src/effects.ts)",
+    "evaluator → refinements (src/evaluator.ts → src/refinements.ts)"
+  ],
+  "mixedFiles": [
+    "src/modules.ts",
+    "src/primitives.ts",
+    "src/runtime.ts",
+    "src/types-std.ts",
+    "src/types.ts"
+  ],
+  "discriminatorTotal": 458
+}

@@ -4,6 +4,28 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-149: the unit DAG joins the gate
+
+`scripts/analyze/index.ts units --check` (`npm run lint:units`) holds the
+report at `scripts/analyze/units-baseline.json`: the set of edges the DAG
+does not permit and the set of mixed files may not gain an entry, the
+discriminator count may not rise, and a file under `src/` with no unit in
+`units.json` is refused outright. A fall is reported with the hint to
+lock it in through `units --update-baseline`; it never fails. Wired the
+way the plane lint is (B-128(a)): once in `scripts/test-shards.mjs` after
+the shards, once in `npm test` through `src/test/tooling.ts`, skipped
+when sharded. Probed before being trusted: a lowered baseline fails on
+all three ratchets, a stray `src/` file fails the closed rule. Baseline
+at landing: 2 violations (`evaluator → refinements`, `evaluator →
+effects`; B-146's), 5 mixed files, discriminator 458. The count is 458,
+not the 437 the C1 report recorded and later entries repeated: the
+checks and dispatch that moved out of the evaluator (an allowed unit)
+into `types-std.ts` at C2 and C3 carried twenty-one kind comparisons the
+rule now counts; `units.md` §8 and plan §9.8 corrected. Also: the B-146
+backlog entry's scope note, which C5 had placed inside the item's wrapped
+title, is moved under it. CLAUDE.md commands and the D50 invariant
+updated.
+
 ## 2026-10 — B-112 exit: the propagation rules move to the metadata unit; the evaluator is one unit and its two L2 edges are visible
 
 The last row of the plane-interfaces plan. `viralScan` and
