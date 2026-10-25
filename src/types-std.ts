@@ -3090,7 +3090,10 @@ const reduceAllegro = buildReduceFn();
 const arrayMethods: Record<string, PrimitiveFnImpl> = {
   length: (args) => {
     const ctx = args[0] as StructureValue;
-    return getSlotCount(ctx);
+    // B-151 A1 finding: the count came back as an untyped Bits, so
+    // `xs.length.toString()` failed with "'toString' not found on Bits" —
+    // every Standard-mode value has a type (CLAUDE.md invariant).
+    return withType(getSlotCount(ctx), IntType);
   },
   get: (args) => {
     const ctx = args[0] as StructureValue;

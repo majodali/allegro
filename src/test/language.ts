@@ -582,4 +582,7 @@ fileTest(path.join(testsDir, "hof-effect-propagation-demo.alg"));
 // metadata-and-capability.md): registration, free reads, attenuation,
 // same-pass re-registration, viral and drop propagation.
 fileTest(path.join(testsDir, "metadata-channels-demo.alg"));
+// The planning DSL, library core (B-151 stage A1): the BuildPipeline
+// sub-plan of docs/book/vivace/planning-dsl.md §5 built through the API.
+fileTest(path.join(testsDir, "planning-core-demo.alg"));
 

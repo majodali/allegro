@@ -109,7 +109,7 @@ passes every other gate.
 
 | Path | Role |
 |---|---|
-| `lib/` | Standard library + grammar/body-form modules (roster: `extension/modules.md`) |
+| `lib/` | Standard library + grammar/body-form modules (roster: `extension/modules.md`); `lib/planning.alg` is the planning DSL's library core (rung 3, `vivace/planning-dsl.md`) |
 | `tests/*.alg` | Literate demos, suite-validated via `// expect:` comments |
 | `demos/rung1`, `demos/rung2` | Release-ladder demo packages (suite-registered) |
 | `grammar/` | Grammar fixture corpus |
