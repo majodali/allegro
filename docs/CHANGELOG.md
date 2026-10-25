@@ -4,6 +4,16 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — Vision §4 names the pilots (Tier 0, maintainer sign-off 2026-10-25)
+
+Ruling R4 of `docs/plans/planning-pilot.md`: `docs/book/vision.md` §4
+gains one paragraph, "The pilots", naming the three domain pilots (a
+project planning workflow, a software system model, physics simulations)
+and the Shape 1 / Shape 2 staging (specify and verify first, execute
+later), the text proposed in the plan's §7 and signed off as recommended.
+The maintainer noted that the paragraph becomes obsolete once the pilots
+have run; until then it is what rung 3 is built against. Tier-0 change,
+in its own PR.
 ## 2026-10 — B-151 A1: the planning DSL's library core, and `Array.length` typed
 
 Stage A1 of the rung-3 plan (`docs/plans/planning-pilot.md`), the
