@@ -847,8 +847,7 @@ that prevents it.
   `docs/plans/archive/project-1-planning-dsl-design.md`. **LANDED
   2026-10-25**: chapter `docs/book/vivace/planning-dsl.md`; plan
   `docs/plans/planning-pilot.md` (stages A–E, rulings R1–R4, the Vision
-  §4 text in its §7 for the maintainer); the pilot's build is **B-151**
-  (the planning pilot)
+  §4 text in its §7 for the maintainer); the pilot's build is **B-151** (the planning pilot)
 - [ ] **B-151** · L3 · **The planning pilot (rung 3): build the DSL,
   library first.** Plan `docs/plans/planning-pilot.md`. Stage A
   (`lib/planning.alg`: types, wiring and graph checks, estimates and
@@ -857,9 +856,13 @@ that prevents it.
   first such fragment in `lib/`; cross-file `uses`), stage C (B-081
   renderer hook, delayed by ruling until A has run), stage D (solution
   finding, defined from A's constraints), stage E (B-093 packaging).
-  **Blocked-by**: rulings R1 (effort and money) and R2 (durations) for
-  stage A3; nothing for A1–A2. Sequenced ahead of B-146, B-145, B-111,
-  B-136 (maintainer, 2026-10-25)
+  Rulings R1 to R4 taken as recommended 2026-10-25. Sequenced ahead of
+  B-146 (knowledge propagation), B-145 (type vocabulary), B-111 (field
+  versus channel) and B-136 (scope leaves `Value`) (maintainer, 2026-10-25).
+  - **Progress.** A1 (2026-10-25): `lib/planning.alg` types,
+    constructors, builders, queries, renderings; `tests/planning-core-demo.alg`
+    suite-pinned. Substrate finding fixed on the way: `Array.length` was
+    an untyped number. Next: A2, wiring derivation and the graph checks
 - [ ] **B-080** · Vivace DSL candidates (post-pilot roster): logic
   programming, constraint programming, data modeling, numerical methods,
   software-systems modeling, workflow/process, automatic reasoning, UI
