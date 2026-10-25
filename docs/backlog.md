@@ -840,12 +840,26 @@ that prevents it.
 
 ### L3 — Vivace (M5)
 
-- [ ] **B-079** · `[reval]` Planning DSL revalidation → `planning-dsl.md`
+- [x] **B-079** · `[reval]` Planning DSL revalidation → `planning-dsl.md`
   in `docs/book/vivace/`: outcome-DAG model, 12 conventions, rejections,
   `SoftwareRelease` example; Shape 1/2 + pilot roster proposed into
   VISION §4 (Tier 0 — propose, don't land). Source:
-  `docs/plans/archive/project-1-planning-dsl-design.md`.
-  `lib/planning.alg` stays paused until then
+  `docs/plans/archive/project-1-planning-dsl-design.md`. **LANDED
+  2026-10-25**: chapter `docs/book/vivace/planning-dsl.md`; plan
+  `docs/plans/planning-pilot.md` (stages A–E, rulings R1–R4, the Vision
+  §4 text in its §7 for the maintainer); the pilot's build is **B-151**
+  (the planning pilot)
+- [ ] **B-151** · L3 · **The planning pilot (rung 3): build the DSL,
+  library first.** Plan `docs/plans/planning-pilot.md`. Stage A
+  (`lib/planning.alg`: types, wiring and graph checks, estimates and
+  budgets with durations from the units DSL, failure handlers; demos
+  suite-pinned), stage B (the `plan NAME:` offside-rule grammar — the
+  first such fragment in `lib/`; cross-file `uses`), stage C (B-081
+  renderer hook, delayed by ruling until A has run), stage D (solution
+  finding, defined from A's constraints), stage E (B-093 packaging).
+  **Blocked-by**: rulings R1 (effort and money) and R2 (durations) for
+  stage A3; nothing for A1–A2. Sequenced ahead of B-146, B-145, B-111,
+  B-136 (maintainer, 2026-10-25)
 - [ ] **B-080** · Vivace DSL candidates (post-pilot roster): logic
   programming, constraint programming, data modeling, numerical methods,
   software-systems modeling, workflow/process, automatic reasoning, UI
