@@ -18,7 +18,7 @@ build_pipeline = plan_with_handler(
   plan("BuildPipeline",
        [port("SourceCommit"), port("ReleaseVersion")],
        [port_where("BuildArtifacts", signed)],
-       [leaf("Compile", [port("SourceCommit")], [port("CompiledBinaries")]),
+       [with_failure(leaf("Compile", [port("SourceCommit")], [port("CompiledBinaries")]), "CompilationError"),
         leaf("Package", [port("CompiledBinaries"), port("ReleaseVersion")], [port_where("PackagedArtifacts", tagged)]),
         leaf("Sign", [port("PackagedArtifacts")], [port("BuildArtifacts")])]),
   handler_retry(handler("CompilationError", [
@@ -36,7 +36,7 @@ test = composite("Test", [port("BuildArtifacts")], [port("ValidatedBuild")], [
 production = with_handler(
   composite("Production", [port("ValidatedStaging")], [port("DeployedRelease")], [
     leaf("BlueDeploy", [port("ValidatedStaging")], [port("BlueEnvironmentReady")]),
-    with_retry(leaf("HealthCheck", [port("BlueEnvironmentReady")], [port_where("BlueHealthy", capable)]), retry_backoff(5, "30s")),
+    with_retry(with_failure(leaf("HealthCheck", [port("BlueEnvironmentReady")], [port_where("BlueHealthy", capable)]), "HealthCheckFailed"), retry_backoff(5, "30s")),
     with_instructions(leaf("Cutover", [port("BlueHealthy")], [port("DeployedRelease")]),
       "Switch load balancer to route 100% of traffic to blue.")]),
   handler("HealthCheckFailed", [

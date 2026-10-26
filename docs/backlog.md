@@ -874,8 +874,14 @@ that prevents it.
     rollup with retry upper bounds, the budget check at the plan and at
     composites; `tests/planning-budget-demo.alg` suite-pinned. Finding
     fixed: a local binding of an `if`/`when` whose chosen branch was a
-    call held the tail-call sentinel (`src/evaluator.ts`). Next: A4,
-    handlers as checked graphs, including what they add to the rollup
+    call held the tail-call sentinel (`src/evaluator.ts`).
+  - **Progress.** A4 (2026-10-26): failures declared on nodes
+    (`with_failure`), escalation as a graph property (`escalations`,
+    `unhandled_failures`), handler validity (`check_handlers`), the bound
+    with handlers (`rollup_bound`) verified by the budget check;
+    `tests/planning-handlers-demo.alg` suite-pinned. Stage A complete.
+    Next: stage B1 (the surface), the `plan NAME:` offside-rule grammar,
+    the first such fragment in `lib/`
 - [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds

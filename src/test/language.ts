@@ -592,4 +592,9 @@ fileTest(path.join(testsDir, "planning-checks-demo.alg"));
 // effort and money), the rollup with retry upper bounds, budgets discharged
 // and refused at the plan and at a composite, wrong measures refused.
 fileTest(path.join(testsDir, "planning-budget-demo.alg"));
+// Stage A4: failures declared on nodes, escalation as a graph property,
+// both handlers of the worked example checked as graphs, the bound with
+// handlers; handlers refused (unreachable, not producing the outcome,
+// consuming what the failing node would have produced).
+fileTest(path.join(testsDir, "planning-handlers-demo.alg"));
 

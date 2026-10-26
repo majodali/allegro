@@ -9,8 +9,10 @@
 // renderings a demo pins. Stage A2 adds wiring derivation and the graph
 // checks (§7). Stage A3 types the measures (duration from the units DSL,
 // planning-local effort and money), rolls estimates up with retry upper
-// bounds and checks budgets. No surface syntax (stage B). Everything here
-// is ordinary Allegro, loaded with `use planning`.
+// bounds and checks budgets. Stage A4 declares failures on nodes, computes
+// escalation as a graph property, checks handlers as graphs and verifies
+// budgets against the bound that includes them. No surface syntax (stage
+// B). Everything here is ordinary Allegro, loaded with `use planning`.
 //
 // Every walk over the node tree is `assume terminates`: a plan is a finite
 // tree, but no `decreases` metric the analyzer verifies describes a walk
@@ -220,29 +222,36 @@ PlanNode = Type.define({
   nodes: Array,
   handlers: Array,
   graph: Any,
-  budget: Any
+  budget: Any,
+  fails: Array
 })
 
 leaf(name, inputs, outcomes) =>
-  PlanNode(name, inputs, outcomes, none, none, none, [], [], none, none)
+  PlanNode(name, inputs, outcomes, none, none, none, [], [], none, none, [])
 
 composite(name, inputs, outcomes, nodes) =>
-  PlanNode(name, inputs, outcomes, none, none, none, nodes, [], none, none)
+  PlanNode(name, inputs, outcomes, none, none, none, nodes, [], none, none, [])
 
 // `Build: uses BuildPipeline` — the node's ports are the plan's.
 uses(name, p) =>
-  PlanNode(name, p.inputs, p.outcomes, none, none, none, [], [], p, none)
+  PlanNode(name, p.inputs, p.outcomes, none, none, none, [], [], p, none, [])
 
 // Builders: records are immutable, so each returns a copy with one field set.
 with_estimate(n, e) => set_estimate(n, as_estimate(e))
 set_estimate(n, e) =>
-  PlanNode(n.name, n.inputs, n.outcomes, e, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget)
+  PlanNode(n.name, n.inputs, n.outcomes, e, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails)
 with_instructions(n, text) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, text, n.retry, n.nodes, n.handlers, n.graph, n.budget)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, text, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails)
 with_retry(n, r) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, r, n.nodes, n.handlers, n.graph, n.budget)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, r, n.nodes, n.handlers, n.graph, n.budget, n.fails)
 with_handler(n, h) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers.concat([h]), n.graph, n.budget)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers.concat([h]), n.graph, n.budget, n.fails)
+
+// A node declares the failure types it can raise (stage A4): the failure
+// is part of the leaf's contract, as its estimate is, and a handler is
+// checked against what is declared beneath it.
+with_failure(n, f) =>
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails.concat([f]))
 
 as_estimate(e) =>
   if e instanceof Estimate then e
@@ -278,7 +287,7 @@ with_budget(x, b) => set_budget(x, as_budget(b))
 set_budget(x, b) =>
   if x instanceof Plan
     then Plan(x.name, x.inputs, x.outcomes, x.nodes, b, x.handlers)
-    else PlanNode(x.name, x.inputs, x.outcomes, x.estimate, x.instructions, x.retry, x.nodes, x.handlers, x.graph, b)
+    else PlanNode(x.name, x.inputs, x.outcomes, x.estimate, x.instructions, x.retry, x.nodes, x.handlers, x.graph, b, x.fails)
 
 plan_with_handler(p, h) => Plan(p.name, p.inputs, p.outcomes, p.nodes, p.budget, p.handlers.concat([h]))
 
@@ -445,14 +454,137 @@ check_outcomes(scope, avail, nodes, declared) =>
   dangling = nodes.reduce((acc, n) => acc.concat(n.outcomes.reduce((a2, o) => a2.concat(dangling_for(scope, nodes, declared, n, o)), [])), [])
   missing.concat(dangling)
 
+// --- Failures, escalation and handler validity (§2.5, §7) — stage A4 ----------
+//
+// A failure raised by a node propagates to the nearest enclosing scope
+// with a handler for its type; a handler is an alternate graph that runs
+// in that scope with what the scope had when the failure occurred, and it
+// must produce the scope's declared outcomes. Three readings:
+//   - what a handler's graph may consume is the scope's inputs plus the
+//     outcomes of the nodes upstream of every node that raises its failure
+//     type (those had been produced when the failure occurred);
+//   - a failure raised inside a handler's graph escalates past that scope
+//     (a recovery does not recover itself);
+//   - a failure that no scope handles escalates to the plan's caller; that
+//     is not a finding, it is a property of the plan (`unhandled_failures`,
+//     `escalations`), since a plan may fail by design.
+
+dedupe(xs) => xs.reduce((acc, x) => if contains(acc, x) then acc else acc.concat([x]), [])
+
+intersect(a, b) => a.filter(x => contains(b, x))
+
+handler_names(hs) => hs.map(h => h.failure)
+
+// The failure types a node raises to its scope: a leaf's own less those its
+// handlers catch; for a composite, what escapes its inner graph; for a
+// borrowed plan, that plan's unhandled failures.
+raises_of(n) =>
+  assume terminates
+  if is_uses(n) then unhandled_failures(n.graph) else escaping(n.fails, n.nodes, n.handlers)
+
+escaping(own, nodes, handlers) =>
+  assume terminates
+  raised = own.concat(nodes.reduce((acc, n) => acc.concat(raises_of(n)), []))
+  caught = handler_names(handlers)
+  from_handlers = handlers.reduce((acc, h) => acc.concat(h.nodes.reduce((a2, m) => a2.concat(raises_of(m)), [])), [])
+  dedupe(raised.filter(f => !contains(caught, f)).concat(from_handlers))
+
+unhandled_failures(p) =>
+  assume terminates
+  escaping([], p.nodes, p.handlers)
+
+// Escalation as a graph property: for every declared failure, the scope
+// that handles it or the plan's caller. A chain is the enclosing scopes,
+// innermost first, each with the failure types it catches.
+catcher(chain, f) =>
+  chain.reduce((acc, s) =>
+    when acc
+      is none then (if contains(s.caught, f) then s.scope else none)
+      is _ then acc,
+    none)
+
+// (The arm binds `handled_in`, not `s`: with `use units` in scope a bare
+// `s` in a pattern is the unit second, matched as a literal.)
+escalation_line(f, node, chain, root) =>
+  when catcher(chain, f)
+    is none then "{f} raised by {node} escalates to the caller of {root}"
+    is handled_in then "{f} raised by {node} is handled in {handled_in}"
+
+scope_link(name, handlers) => [{scope: name, caught: handler_names(handlers)}]
+
+escalations_in(nodes, chain, root) =>
+  assume terminates
+  nodes.reduce((acc, n) => acc.concat(escalations_of(n, chain, root)), [])
+
+escalations_of(n, chain, root) =>
+  assume terminates
+  inner = scope_link(n.name, n.handlers).concat(chain)
+  own = n.fails.map(f => escalation_line(f, n.name, inner, root))
+  beneath = if is_uses(n)
+    then escalations_in(n.graph.nodes, scope_link(n.graph.name, n.graph.handlers).concat(inner), root)
+    else escalations_in(n.nodes, inner, root)
+  borrowed_recovery = if is_uses(n)
+    then n.graph.handlers.reduce((acc, h) => acc.concat(escalations_in(h.nodes, inner, root)), [])
+    else []
+  recovery = n.handlers.reduce((acc, h) => acc.concat(escalations_in(h.nodes, chain, root)), [])
+  own.concat(beneath).concat(borrowed_recovery).concat(recovery)
+
+escalations(p) =>
+  assume terminates
+  link = scope_link(p.name, p.handlers)
+  escalations_in(p.nodes, link, p.name)
+    .concat(p.handlers.reduce((acc, h) => acc.concat(escalations_in(h.nodes, [], p.name)), []))
+
+// The nodes of a scope that raise `f`, and what had been produced when one
+// of them failed: the outcomes of the nodes upstream of every raiser.
+raisers(nodes, f) => nodes.filter(n => contains(raises_of(n), f)).map(n => n.name)
+
+grow(set, edges) =>
+  assume terminates
+  more = dedupe(edges.filter(e => contains(set, e.to) && !contains(set, e.from)).map(e => e.from))
+  if more.length == 0 then set else grow(set.concat(more), edges)
+
+upstream_of(name, edges) => grow([name], edges).filter(x => x != name)
+
+common_upstream(rs, edges) =>
+  if rs.length == 0
+    then []
+    else rs.slice(1).reduce((acc, r) => intersect(acc, upstream_of(r, edges)), upstream_of(rs[0], edges))
+
+outcomes_of_named(nodes, names) =>
+  nodes.filter(n => contains(names, n.name)).reduce((acc, n) => acc.concat(n.outcomes), [])
+
+handler_avail(avail, nodes, f) =>
+  avail.concat(outcomes_of_named(nodes, common_upstream(raisers(nodes, f), scope_edges(avail, nodes))))
+
+// A handler is checked as a scope of its own: wired from what is available
+// at the failure, acyclic, compatible, producing the enclosing scope's
+// declared outcomes (re-escalation is what happens when it fails at run
+// time, not a shape the check accepts), and only for a failure some node
+// beneath the scope declares.
+handler_scope_name(scope, h) => "{scope}/on {h.failure}"
+
+check_handler(scope, avail, nodes, declared, h) =>
+  assume terminates
+  unreachable = if raisers(nodes, h.failure).length == 0
+    then [finding("handlers", scope, "", "handler on {h.failure} in {scope}: no node beneath {scope} raises {h.failure}")]
+    else []
+  unreachable.concat(check_scope(handler_scope_name(scope, h), handler_avail(avail, nodes, h.failure), h.nodes, declared, none, []))
+
+check_handlers(scope, avail, nodes, declared, handlers) =>
+  assume terminates
+  handlers.reduce((acc, h) => acc.concat(check_handler(scope, avail, nodes, declared, h)), [])
+
 // --- The rollup (convention 8) and the budget check (§7) — stage A3 --------------
 //
 // A leaf contributes its estimate; a composite the rollup of its inner
 // graph; a `uses` node the rollup of the borrowed plan. A node with a retry
 // policy contributes max_attempts times that (convention 12): the rollup is
 // an UPPER BOUND, not an expectation. Durations add serially, so the bound
-// assumes no two nodes run at once. Handlers are alternate graphs; what
-// they add to the bound is settled with handler validity at stage A4.
+// assumes no two nodes run at once. `rollup` is the main graph; the BOUND
+// (`rollup_bound`, stage A4) adds every handler's graph at its own retry,
+// since a budget is a promise about the worst case, and the budget check
+// verifies the bound.
 
 measure_add(a, b) =>
   when a
@@ -493,6 +625,32 @@ rollup_of(nodes) =>
 
 rollup(p) => rollup_of(p.nodes)
 
+// The bound: the main graph plus each handler's graph at the handler's
+// retry, at every scope.
+handler_attempts(h) => when h.retry is none then 1 is r then r.max_attempts
+
+own_bound(n) =>
+  assume terminates
+  if is_uses(n)
+    then bound_of(n.graph.nodes, n.graph.handlers)
+    else if is_composite(n)
+      then bound_of(n.nodes, n.handlers)
+      else est_add(node_estimate(n), handlers_bound(n.handlers))
+
+node_bound(n) =>
+  assume terminates
+  est_scale(own_bound(n), attempts(n))
+
+handlers_bound(handlers) =>
+  assume terminates
+  handlers.reduce((acc, h) => est_add(acc, est_scale(bound_of(h.nodes, []), handler_attempts(h))), no_estimate)
+
+bound_of(nodes, handlers) =>
+  assume terminates
+  est_add(nodes.reduce((acc, n) => est_add(acc, node_bound(n)), no_estimate), handlers_bound(handlers))
+
+rollup_bound(p) => bound_of(p.nodes, p.handlers)
+
 // A budget measure left `none` is unconstrained; a rollup measure that is
 // `none` (nothing beneath estimates it) is within any budget.
 exceeds(used, limit) => when used is none then false is _ then used.gt(limit)
@@ -509,27 +667,29 @@ budget_findings(scope, r, b) =>
     .concat(measure_check(scope, "effort", r.effort, b.effort))
     .concat(measure_check(scope, "money", r.money, b.money))
 
-check_budget(scope, nodes, bgt) =>
-  when bgt is none then [] is b then budget_findings(scope, rollup_of(nodes), b)
+check_budget(scope, nodes, handlers, bgt) =>
+  when bgt is none then [] is b then budget_findings(scope, bound_of(nodes, handlers), b)
 
-// A scope's findings, then each composite's internal graph (convention 6
-// applies the same checks inside) and each borrowed plan's own.
-check_scope(scope, avail, nodes, declared, bgt) =>
+// A scope's findings, then its handlers' graphs, then each composite's
+// internal graph (convention 6 applies the same checks inside) and each
+// borrowed plan's own.
+check_scope(scope, avail, nodes, declared, bgt, handlers) =>
   assume terminates
   own = check_wiring(scope, avail, nodes)
     .concat(check_compatibility(scope, avail, nodes))
     .concat(check_acyclic(scope, avail, nodes))
     .concat(check_outcomes(scope, avail, nodes, declared))
-    .concat(check_budget(scope, nodes, bgt))
+    .concat(check_budget(scope, nodes, handlers, bgt))
+    .concat(check_handlers(scope, avail, nodes, declared, handlers))
   nodes.reduce((acc, n) =>
     if is_composite(n)
-      then acc.concat(check_scope(n.name, n.inputs, n.nodes, n.outcomes, n.budget))
+      then acc.concat(check_scope(n.name, n.inputs, n.nodes, n.outcomes, n.budget, n.handlers))
       else if is_uses(n) then acc.concat(check_plan(n.graph)) else acc,
     own)
 
 check_plan(p) =>
   assume terminates
-  check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget)
+  check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers)
 
 plan_errors(p) => check_plan(p).map(f => f.message)
 
