@@ -63,7 +63,7 @@ From the chapter (B-079) and the rulings above:
 | **A. The library** | A1 ✅ **landed 2026-10-25** | `lib/planning.alg`: the types (Plan, PlanNode, Port, Fixture, Estimate, Retry, Handler) as `Type.define` records; construction through the library's API; a demo `tests/planning-core-demo.alg` building `BuildPipeline` by hand | the demo is suite-pinned; the types print and compare — **met** |
 | | A2 ✅ **landed 2026-10-25** | Wiring derivation and the graph checks: acyclicity, wiring completeness, type compatibility, composite resolution; each failure an error value in domain terms | demo lines for each check passing and each check refusing a deliberately broken plan — **met** (`tests/planning-checks-demo.alg`: the worked example clean, five broken plans refused) |
 | | A3 ✅ **landed 2026-10-26** | Estimates and budgets: durations through the units DSL (R2), effort and money per R1; rollup with retry upper bounds; the budget check | `SoftwareRelease` built through the API with its budget discharged; a budget-exceeding variant refused — **met** (`tests/planning-budget-demo.alg`: the example with every estimate, budget discharged; refused at the plan, at a composite, over money, and for wrong measures) |
-| | A4 | Failure handlers: `on <FailureType>` graphs, handler validity, re-escalation as a graph property | both handlers of the worked example checked |
+| | A4 ✅ **landed 2026-10-26** | Failure handlers: `on <FailureType>` graphs, handler validity, re-escalation as a graph property | both handlers of the worked example checked — **met** (`tests/planning-handlers-demo.alg`: both handlers clean, escalation rendered, the bound with handlers, three handlers refused) |
 | **B. The surface** | B1 | The grammar fragment: `plan NAME:` with offside blocks, `inputs:`/`outcomes:`, bracket constraints, `estimate:`, `budget:`, `retry:`, `on`, `uses`; the statement form expands to an annotated binding (halts on failure) | `tests/planning-release-demo.alg` is the worked example verbatim, suite-pinned; the first offside-rule fragment works or the engine gap is named |
 | | B2 | Cross-file `uses` through `import`; the archived item 4 | the worked example split across two files |
 | **C. Legibility** | C1 | B-081 slice: the renderer hook, now with evidence of what the messages must say | the demo's refusals read in planning vocabulary |
@@ -112,6 +112,30 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-26 — A4 landed; stage A complete.** A node declares the
+  failure types it can raise (`with_failure`; the `fails` key joins
+  convention 4's reserved keywords for stage B). Escalation is computed
+  as a graph property (`escalations`, `unhandled_failures`): a failure
+  goes to the nearest enclosing scope with a handler for its type, a
+  borrowed plan's unhandled failures are the `uses` node's, a failure
+  inside a handler's graph escalates past the scope it recovers, and a
+  failure no scope handles leaves the plan without being a finding.
+  Handler validity (`check_handlers`): each handler is checked as a scope
+  of its own, wired from the scope's inputs plus the outcomes upstream of
+  every raiser, producing the scope's declared outcomes, and refused when
+  no node beneath the scope declares its failure. The bound
+  (`rollup_bound`) adds each handler's graph at the handler's retry and
+  the budget check verifies the bound; `rollup` stays the main graph.
+  Four readings recorded in the chapter §7. `tests/planning-handlers-demo.alg`
+  (18 pinned lines). The A2 and A3 demos declare `CompilationError` on
+  `Compile` and `HealthCheckFailed` on `HealthCheck` (construction only);
+  three A3 pins changed because the budget now checks the bound: 8.75
+  became 24 person-hours twice and `Deploy`'s 160 min became 165
+  (flagged in the PR). No substrate finding; the two fixed faults of A3
+  and B-152 were both exercised by the new code (`escalation_line` binds
+  its arm as `handled_in`, since a bare `s` in a pattern is the units
+  DSL's second under `use units`).
 
 - **2026-10-26 — B-152 closed (bounded chunk, by ruling).** The
   maintainer asked whether to pause for B-152 (the kernel fault on one

@@ -4,6 +4,32 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 (the planning pilot) A4: the planning DSL's failures and handlers; stage A complete
+
+Stage A4 of the rung-3 plan, the last chunk of the library stage. A node
+declares the failure types it can raise (`with_failure`; the `fails` key
+joins convention 4's reserved keywords). Escalation is a property of the
+graph: `escalations` says, for every declared failure, the scope that
+handles it or that it escalates to the plan's caller; `unhandled_failures`
+lists what leaves the plan. A borrowed plan's unhandled failures are the
+`uses` node's; a failure inside a handler's graph escalates past the
+scope it recovers; a failure no scope handles is not a finding. Handler
+validity (`check_handlers`) checks each handler as a scope of its own:
+wired from the scope's inputs plus the outcomes upstream of every node
+that raises its failure (what had been produced when the failure
+occurred), compatible, acyclic, producing the scope's declared outcomes,
+and refused when no node beneath the scope declares its failure. The
+bound (`rollup_bound`) adds each handler's graph at the handler's retry
+at every scope and the budget check verifies the bound; `rollup` stays
+the main graph. `tests/planning-handlers-demo.alg` checks both handlers
+of the worked example clean, renders the escalations, shows 440 min and
+8.75 person-hours for the main graph against 1345 min and 24
+person-hours for the bound, catches a failure one scope up, and refuses
+three handlers each wrong in one way. The A2 and A3 demos declare the two
+failures (construction only); three A3 pins changed because the budget
+checks the bound. Four readings recorded in the chapter §7. Suite 1210
+distinct tests plus two pinned demo files.
+
 ## 2026-10 — B-152: a primitive stub shared under two expressions resolves under both
 
 The bounded chunk the maintainer ruled after B-151 (the planning pilot)

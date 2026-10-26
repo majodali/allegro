@@ -46,7 +46,7 @@ build_pipeline = plan_with_handler(
   plan("BuildPipeline",
        [port("SourceCommit"), port("ReleaseVersion")],
        [port_where("BuildArtifacts", signed)],
-       [with_estimate(leaf("Compile", [port("SourceCommit")], [port("CompiledBinaries")]), est(30 min, person_hours(1), none)),
+       [with_failure(with_estimate(leaf("Compile", [port("SourceCommit")], [port("CompiledBinaries")]), est(30 min, person_hours(1), none)), "CompilationError"),
         with_estimate(leaf("Package", [port("CompiledBinaries"), port("ReleaseVersion")], [port_where("PackagedArtifacts", tagged)]), est(15 min, person_hours(0.5), none)),
         with_estimate(leaf("Sign", [port("PackagedArtifacts")], [port("BuildArtifacts")]), est(5 min, person_hours(0.25), none))]),
   handler_retry(handler("CompilationError", [
@@ -67,7 +67,7 @@ test = composite("Test", [port("BuildArtifacts")], [port("ValidatedBuild")], [
 production = with_handler(
   composite("Production", [port("ValidatedStaging")], [port("DeployedRelease")], [
     with_estimate(leaf("BlueDeploy", [port("ValidatedStaging")], [port("BlueEnvironmentReady")]), est(15 min, person_hours(0.5), none)),
-    with_retry(with_estimate(leaf("HealthCheck", [port("BlueEnvironmentReady")], [port_where("BlueHealthy", capable)]), est(10 min, person_hours(0.25), none)), retry_backoff(5, 30 s)),
+    with_retry(with_failure(with_estimate(leaf("HealthCheck", [port("BlueEnvironmentReady")], [port_where("BlueHealthy", capable)]), est(10 min, person_hours(0.25), none)), "HealthCheckFailed"), retry_backoff(5, 30 s)),
     with_instructions(with_estimate(leaf("Cutover", [port("BlueHealthy")], [port("DeployedRelease")]), est(5 min, person_hours(0.25), none)),
       "Switch load balancer to route 100% of traffic to blue.")]),
   handler("HealthCheckFailed", [
@@ -111,21 +111,25 @@ print(ok.name)
 // expect: SoftwareRelease
 
 // --- Budgets refused ----------------------------------------------------------
-// At the plan: the worked example under a budget it exceeds.
+// At the plan: the worked example under a budget it exceeds. The budget is
+// checked against the BOUND (stage A4): the main graph's 8.75 person-hours
+// plus the handlers' graphs at their retry (15 for the CompilationError
+// recovery at three attempts, 0.25 for the rollback).
 tight = with_budget(release_plan(deploy), effort_budget(person_hours(8)))
 print(plan_errors(tight))
-// expect: [budget of SoftwareRelease: effort 8.75 person-hours exceeds 8 person-hours]
+// expect: [budget of SoftwareRelease: effort 24 person-hours exceeds 8 person-hours]
 
 print(error of validate(tight))
-// expect: SoftwareRelease is not well-formed: budget of SoftwareRelease: effort 8.75 person-hours exceeds 8 person-hours
+// expect: SoftwareRelease is not well-formed: budget of SoftwareRelease: effort 24 person-hours exceeds 8 person-hours
 
 print(tight instanceof WellFormedPlan)
 // expect: false
 
-// At a composite, in a different unit of the same dimension.
+// At a composite, in a different unit of the same dimension (160 min of
+// main graph, 5 min of rollback).
 rushed = release_plan(with_budget(deploy, duration_budget(2 h)))
 print(plan_errors(rushed))
-// expect: [budget of Deploy: duration 160 min exceeds 2 h]
+// expect: [budget of Deploy: duration 165 min exceeds 2 h]
 
 // Money rolls up the same way, with the currency carried.
 hire = with_budget(

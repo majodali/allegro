@@ -157,7 +157,11 @@ what today's code has to say about it.
 4. **Reserved lowercase keywords inside a plan body:** `inputs`,
    `outcomes`, `estimate`, `instructions`, `budget`, `on`, `retry`,
    `uses`. Capitalised identifiers are nodes; lowercase identifiers are
-   configuration keys.
+   configuration keys. *Revalidation (stage A4):* one key is added,
+   `fails`, by which a node declares the failure types it can raise. A
+   handler is checked against what is declared beneath it (§7), so the
+   declaration is part of a leaf's contract, as its estimate is. The
+   stage-B surface carries it; in the library it is `with_failure`.
 5. **Type-only wiring by default** (§2.3). Assigned names only when
    ambiguous.
 6. **Composite outcomes resolve by name and type.** A composite's
@@ -459,10 +463,47 @@ here:
   what they add is settled with handler validity at stage A4, where
   their semantics are decided.
 
-A budget finding reads "budget of `Deploy`: duration 160 min exceeds
+A budget finding reads "budget of `Deploy`: duration 165 min exceeds
 2 h": the comparison is dimensional, through the units DSL, so a budget
-in hours checks a rollup in minutes. Handler graphs are checked at stage
-A4.
+in hours checks a rollup in minutes.
+
+Stage A4 built handler validity and settled what handlers add to the
+bound. A node declares the failure types it can raise (`with_failure`;
+the `fails` key, convention 4). A failure propagates to the nearest
+enclosing scope with a handler for its type; `escalations` renders that
+as a property of the graph ("`HealthCheckFailed` raised by `HealthCheck`
+is handled in `Production`"; "`ReviewRejected` raised by
+`ReleaseReview` escalates to the caller of `SoftwareRelease`"), and
+`unhandled_failures` lists what leaves the plan. A handler's graph is
+checked as a scope of its own, with the scope's declared outcomes as its
+outcomes: wired, compatible, acyclic, and producing every declared
+outcome. Four readings, settled by the worked example:
+
+- **What a handler may consume** is the scope's inputs plus the outcomes
+  of the nodes upstream of every node that raises its failure type:
+  those had been produced when the failure occurred. `Rollback` consumes
+  `BlueEnvironmentReady`, produced by `BlueDeploy` before `HealthCheck`
+  failed; a rollback that consumed `BlueHealthy`, which the failing node
+  would have produced, is refused.
+- **A handler must be able to produce the scope's outcomes.**
+  Re-escalation is what happens at run time when the handler's own graph
+  fails, not a shape the check accepts: a handler whose graph produces
+  something else is refused in the outcome vocabulary of §7.
+- **A handler for a failure no node beneath the scope declares is
+  refused.** It can never run.
+- **A failure that no scope handles escalates to the plan's caller, and
+  that is not a finding**: a plan may fail by design, and the chapter's
+  own `Rollback` says so in its instructions. A failure raised inside a
+  handler's graph escalates past the scope it recovers; a recovery does
+  not recover itself.
+
+A handler is an alternate path, so the bound a budget promises must
+include it: `rollup_bound` adds every handler's graph at the handler's
+retry, at every scope, and the budget check verifies the bound, while
+`rollup` stays the main graph. For the worked example the main graph is
+440 min and 8.75 person-hours; with the `CompilationError` recovery at
+three attempts and the rollback, the bound is 1345 min and 24
+person-hours, within the declared 200.
 
 Two enforcement shapes, both existing:
 
@@ -512,30 +553,34 @@ Carried from the archived design, with two added by the revalidation:
 
 ## 9. Status and pointers [partial]
 
-Stages A1 to A3 are built. `lib/planning.alg` holds the types as
-records, the constructors (`leaf`, `composite`, `uses`, `plan`, the
-`with_*` builders, `handler`, `retry`, `est`, `budget`, `port`,
-`port_where`, `fixture`), the measures (`person_hours`, `money`; durations
-from `lib/units.alg`), the queries (`node_count`, `leaf_count`,
-`node_names`, `find_node`, `handler_count`, `rollup`), the one-line
+Stage A, the library, is built (A1 to A4). `lib/planning.alg` holds the
+types as records, the constructors (`leaf`, `composite`, `uses`, `plan`,
+the `with_*` builders including `with_failure`, `handler`, `retry`, `est`,
+`budget`, `port`, `port_where`, `fixture`), the measures (`person_hours`,
+`money`; durations from `lib/units.alg`), the queries (`node_count`,
+`leaf_count`, `node_names`, `find_node`, `handler_count`, `rollup`,
+`rollup_bound`, `unhandled_failures`, `escalations`), the one-line
 renderings, and the checks: wiring derivation (`producers_of`,
 `scope_edges`), the four graph checks, the budget check (`check_budget`),
-`check_plan`, `plan_errors`, `well_formed`, `validate` and the
-`WellFormedPlan` type. `tests/planning-core-demo.alg` builds the
-`BuildPipeline` sub-plan of §5 by hand; `tests/planning-checks-demo.alg`
-builds the whole worked example, checks it clean through both enforcement
-shapes, and refuses five plans each broken in one way;
-`tests/planning-budget-demo.alg` builds it with every estimate and retry,
-discharges its budget, and refuses it under a tighter one, a composite
-under a duration budget, a plan over a money budget, and wrong measures
-at the point they are written. Plans are values: two plans built the same
-way are equal, and `instanceof` names their types. The stages surfaced
-four substrate findings (§6): `Array.length` untyped (fixed, A1),
-short-circuit operators wrong with a call on the right (fixed, A2), a
-kernel fault on one call shape (B-152, fixed in its own chunk after A3),
-and a local binding of a branching expression holding a pending call
-(fixed, A3). Not yet built: handlers as checked graphs (A4), the surface
-(B).
+handler validity (`check_handlers`), `check_plan`, `plan_errors`,
+`well_formed`, `validate` and the `WellFormedPlan` type.
+`tests/planning-core-demo.alg` builds the `BuildPipeline` sub-plan of §5
+by hand; `tests/planning-checks-demo.alg` builds the whole worked example,
+checks it clean through both enforcement shapes, and refuses five plans
+each broken in one way; `tests/planning-budget-demo.alg` builds it with
+every estimate and retry, discharges its budget, and refuses it under a
+tighter one, a composite under a duration budget, a plan over a money
+budget, and wrong measures at the point they are written;
+`tests/planning-handlers-demo.alg` checks both handlers as graphs,
+renders every failure's escalation, shows the bound with handlers, and
+refuses three handlers each wrong in one way. Plans are values: two plans
+built the same way are equal, and `instanceof` names their types. The
+stages surfaced four substrate findings (§6): `Array.length` untyped
+(fixed, A1), short-circuit operators wrong with a call on the right
+(fixed, A2), a kernel fault on one call shape (B-152, fixed in its own
+chunk after A3), and a local binding of a branching expression holding a
+pending call (fixed, A3). Not yet built: the surface (B), the renderer
+(C), solution finding (D).
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),
