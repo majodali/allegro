@@ -4,6 +4,24 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 (the planning pilot) B2: cross-file `uses` through `import`; stage B complete
+
+Stage B2 of the rung-3 plan. The `uses` target in the surface is any
+expression, so `Build: uses build_pipeline.BuildPipeline` borrows a plan
+from an imported module. `tests/lib/build_pipeline.alg` declares
+`BuildPipeline` as a module of its own (its `use` headers, fixtures and
+`plan` statement); `tests/planning-split-demo.alg` imports it and
+declares `SoftwareRelease` against it, with the same counts, rollup,
+bound and escalations as the one-file demo (8 pinned lines). The module
+system needed no change: `import` resolves `lib/` beside the file
+first, a module runs through the same pipeline as a file, and an open
+module exposes its bindings. The test harness loads a demo file's
+imports from `tests/lib/` the same local-first way
+(`src/test/alg-files.ts`), through `buildModuleObject`, so the demo is
+suite-pinned. The archived design's open item 4 (cross-file plan
+references) closes in the chapter. Suite 1213 distinct tests plus one
+pinned demo file.
+
 ## 2026-10 — B-151 (the planning pilot) B1: the `plan NAME:` surface, the first offside-rule fragment in lib/
 
 Stage B1 of the rung-3 plan. `planning_grammar` in `lib/planning.alg`

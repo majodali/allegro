@@ -65,7 +65,7 @@ From the chapter (B-079) and the rulings above:
 | | A3 ✅ **landed 2026-10-26** | Estimates and budgets: durations through the units DSL (R2), effort and money per R1; rollup with retry upper bounds; the budget check | `SoftwareRelease` built through the API with its budget discharged; a budget-exceeding variant refused — **met** (`tests/planning-budget-demo.alg`: the example with every estimate, budget discharged; refused at the plan, at a composite, over money, and for wrong measures) |
 | | A4 ✅ **landed 2026-10-26** | Failure handlers: `on <FailureType>` graphs, handler validity, re-escalation as a graph property | both handlers of the worked example checked — **met** (`tests/planning-handlers-demo.alg`: both handlers clean, escalation rendered, the bound with handlers, three handlers refused) |
 | **B. The surface** | B1 ✅ **landed 2026-10-26** | The grammar fragment: `plan NAME:` with offside blocks, `inputs:`/`outcomes:`, bracket constraints, `estimate:`, `budget:`, `retry:`, `fails:`, `instructions:`, `on`, `uses`; the statement form expands to an annotated binding (halts on failure) | `tests/planning-release-demo.alg` is the worked example verbatim, suite-pinned; the first offside-rule fragment works or the engine gap is named — **met**: it works, after three engine gaps were closed in the chunk (chunk log) |
-| | B2 | Cross-file `uses` through `import`; the archived item 4 | the worked example split across two files |
+| | B2 ✅ **landed 2026-10-26** | Cross-file `uses` through `import`; the archived item 4 | the worked example split across two files — **met** (`tests/planning-split-demo.alg` borrows `tests/lib/build_pipeline.alg`; no engine work) |
 | **C. Legibility** | C1 | B-081 slice: the renderer hook, now with evidence of what the messages must say | the demo's refusals read in planning vocabulary |
 | **D. Solution finding** | D1 | Define it from stage A's constraints (R3): the smallest primitive that finds assignments satisfying budget and reachability over residuals | one solved plan in the demo |
 | **E. Packaging** | — | B-093: the public story, the claims register, `demos/rung3`, the website loop | owner's deploy |
@@ -112,6 +112,21 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-26 — B2 (cross-file `uses`) landed; stage B complete.** The
+  `uses` target is any expression now (`target:expr`), so `Build: uses
+  build_pipeline.BuildPipeline` borrows a plan from an imported module.
+  `tests/lib/build_pipeline.alg` is `BuildPipeline` as a module (its
+  `use` headers, its fixtures, its `plan` statement);
+  `tests/planning-split-demo.alg` imports it and declares
+  `SoftwareRelease` against it (8 pinned lines: the borrowed plan is the
+  module's checked binding; the using plan has the same counts, rollup,
+  bound and escalations as the one-file version). The module system
+  needed nothing: `import` resolves `lib/` beside the file first, a
+  module goes through the same pipeline as a file, and an open module
+  (no `export`) exposes its bindings. The harness gained the same
+  local-first import loading for demo files (`src/test/alg-files.ts`),
+  so the demo is suite-pinned. The archived item 4 closes.
 
 - **2026-10-26 — B1 landed: the surface.** `planning_grammar` in
   `lib/planning.alg`, the first offside-rule fragment in `lib/`: `plan

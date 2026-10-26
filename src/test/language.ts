@@ -601,6 +601,10 @@ fileTest(path.join(testsDir, "planning-handlers-demo.alg"));
 // `plan NAME:` offside-rule fragment, the first in lib/; each statement
 // declares a WellFormedPlan binding.
 fileTest(path.join(testsDir, "planning-release-demo.alg"));
+// Stage B2: cross-file `uses`. BuildPipeline is declared in
+// tests/lib/build_pipeline.alg and borrowed through `import` (the harness
+// loads a demo's imports from tests/lib/ as the CLI loads <dir>/lib/).
+fileTest(path.join(testsDir, "planning-split-demo.alg"));
 
 // The statement form's enforcement shape (chapter §7): `plan NAME:` declares
 // NAME as a WellFormedPlan, so a plan that does not check HALTS the build
