@@ -146,9 +146,10 @@ what today's code has to say about it.
    `:` and an indented block is a node. `node`, `step`, `action` and
    `sub-plan` were tried and each had a downside; the empty keyword
    won. *Revalidation:* this makes the surface offside-rule syntax. The
-   grammar formalism carries the stateful terminals for it (§6), and
-   no library fragment has used them yet, so the surface is staged
-   after the library (plan, stage B).
+   grammar formalism carries the stateful terminals for it (§6); the
+   surface was staged after the library (plan, stage B) and built at
+   stage B1 (the surface) as the first offside-rule fragment in `lib/`
+   (`planning_grammar` in `lib/planning.alg`).
 3. **Bracket form for constraints.** `[predicate]` after an identifier
    in an `inputs:` or `outcomes:` block constrains the value.
    *Revalidation:* a bracket constraint is a refinement over the
@@ -225,6 +226,7 @@ plan BuildPipeline:
     inputs:   SourceCommit
     outcomes: CompiledBinaries
     estimate: 30 min, 1 person-hour
+    fails:    CompilationError
 
   Package:
     inputs:   CompiledBinaries, ReleaseVersion
@@ -321,6 +323,7 @@ plan SoftwareRelease:
         outcomes: BlueHealthy [ traffic_handling_capable ]
         retry:    max 5 attempts, 30s backoff
         estimate: 10 min, 0.25 person-hours
+        fails:    HealthCheckFailed
 
       Cutover:
         inputs:   BlueHealthy
@@ -339,8 +342,11 @@ plan SoftwareRelease:
             Raise DeploymentFailure to caller.
 ```
 
-What a reader should be able to check by eye, and the kernel will
-check mechanically (§7): every input of every node is produced by an
+The two `fails:` lines were added at stage A4 (convention 4): the
+handlers are checked against them. `tests/planning-release-demo.alg` is
+this text, verbatim, built and checked through the surface. What a
+reader should be able to check by eye, and the kernel will check
+mechanically (§7): every input of every node is produced by an
 earlier outcome or by the plan's inputs; `Validate` is the explicit
 fan-in; `Build`'s outcomes are `BuildPipeline`'s; the `HealthCheck`
 retry contributes five times its estimate to the budget rollup; both
@@ -356,7 +362,7 @@ Re-checked against the code at 2026-10-25:
 | Record types with methods and laws | `Type.define({...}, Interface)`; the units DSL's `Quantity` is the model; the planning types (`Plan`, `PlanNode`, `Port`, `Fixture`, `Estimate`, `Retry`, `Handler`) exist since stage A1 | `lib/planning.alg`, `lib/units.alg`, `../standard/type-system.md` §3 |
 | Constraints on values | refinement types (`Int & p`), `Refinement.define`, guarded construction (`Type.define({...}) & _.field >= 0`, D32) | `../standard/core-types.md`, `../standard/contracts.md` |
 | Grammar extension from a library | `grammar { rule … expr_form … stmt_form … }`, activated by `use NAME`; libraries and top-level files share one pipeline | `../extension/grammar.md` §4, `lib/units.alg`, `lib/proven.alg` |
-| Offside-rule blocks | the formalism's `NEWLINE`/`INDENT`/`DEDENT`/`SAMELINE` terminals exist in the engine; **no library fragment uses them yet** | `../grammar-formalism.md` §5 |
+| Offside-rule blocks | the formalism's `NEWLINE`/`INDENT`/`DEDENT` terminals exist in the engine and, since stage B1, are reachable from a library's `grammar { }` by name; `planning_grammar` is the first fragment to use them (`SAMELINE` is still unimplemented and unneeded) | `../grammar-formalism.md` §5, `../extension/grammar.md` §4 |
 | Custom analyzers in Allegro | the planning checks are one (`check_plan`, stage A2), a pure library over the plan value in the manner of `lib/grammar-analyzer.alg`; failures are error values with domain text (`validate`), or halts through the `WellFormedPlan` annotation. A refinement predicate's callees must be total: every walk over the node tree is `assume terminates`, because no verified `decreases` metric describes a walk into a child list | `lib/planning.alg`, `lib/grammar-analyzer.alg`; `../process.md` §6 on CE-R8; `../standard/totality.md` |
 | Quantities for estimates and budgets | durations are the units DSL's `Duration` (R2: `30 min` with `use units`); effort and money are the planning library's `Effort` (`person_hours(n)`) and `Money` (`money(n, currency)`) (R1), records with their own arithmetic in the manner of `Quantity`, so a mismatch is an error in planning vocabulary; the rollup and the budget check exist since stage A3 | `lib/units.alg` (rung 2, B-092), `lib/planning.alg` |
 | Compile-time checks inside libraries | proofs, effects, exhaustiveness and termination fire in libraries as in user code | `../extension/modules.md` |
@@ -379,11 +385,16 @@ while building the checks:
   is the bridge from rung 2. `est(3 m, …)` is refused as "a duration is a
   time quantity such as 30 min, not a length quantity (3 m)".
 - **The surface syntax is the first offside-rule fragment.** The
-  engine has the terminals; no `grammar { … }` block in `lib/` uses
-  them, and `use grammar { … }` literal blocks inside libraries are
-  rejected today (`../extension/modules.md`, known limit). So the
-  grammar is a stage of its own, after the library has proved the
-  model, and may surface engine work.
+  engine had the terminals; no `grammar { … }` block in `lib/` used
+  them. Built at stage B1; it surfaced three engine gaps, each closed
+  in the chunk: the EBNF mini-grammar had no way to name a layout
+  terminal (now `INDENT`, `NEWLINE`, `DEDENT` by name, treated as
+  explicit whitespace by the interleave); a statement form could not
+  declare a binding (now `binding_decl(name, value, type)`, the
+  expansion `plan NAME:` uses); and a label's matched text was a bare
+  Bits, typed by its length, so an eight-byte node name read as an
+  integer (now a string literal). One more, a template's `none` arriving
+  pre-typed in the consumer's tree, is in the changelog.
 - **Well-formedness has two enforcement shapes available**, and the
   pilot uses both (§7).
 - **Short-circuit `&&` and `||` were wrong when the right operand was a
@@ -395,8 +406,8 @@ while building the checks:
 - **A kernel fault on one shape of call.** A function that binds the
   result of an inline filter-then-map chain locally and then uses the
   binding more than once, under a method call, an index and a lambda,
-  failed with "`type_dispatch` has unresolved stub". Filed as **B-152**
-  (the kernel fault on one call shape) with the minimal pair and fixed
+  failed with "`type_dispatch` has unresolved stub". Filed as
+  **B-152** (the kernel fault on one call shape) with the pair and fixed
   in a bounded chunk after stage A3: the parser leaves primitive stubs
   that `resolvePrimitives` replaces, and it skipped a stub it had already
   seen under another parent, although a local binding substituted into
@@ -516,9 +527,9 @@ Two enforcement shapes, both existing:
 - **Annotation.** A binding annotated with the well-formed plan type
   (`SoftwareRelease: WellFormedPlan = …`) **halts** compilation on
   failure, as every failed refinement annotation does. The `plan`
-  statement form of stage B expands to such a binding, so a plan file
-  that does not check does not build, which is the behaviour Vision §4
-  promises.
+  statement form (stage B1) expands to exactly such a binding, so a plan
+  file that does not check does not build, which is the behaviour Vision
+  §4 promises.
 
 Until the renderer hook lands (B-081, deferred by the maintainer's
 ruling of 2026-10-25), the message a halt shows is the kernel's
@@ -553,7 +564,10 @@ Carried from the archived design, with two added by the revalidation:
 
 ## 9. Status and pointers [partial]
 
-Stage A, the library, is built (A1 to A4). `lib/planning.alg` holds the
+Stage A, the library, is built (A1 to A4), and B1, the surface:
+`planning_grammar` in `lib/planning.alg` is the `plan NAME:` form of §5,
+and `tests/planning-release-demo.alg` is the worked example verbatim
+through it. `lib/planning.alg` holds the
 types as records, the constructors (`leaf`, `composite`, `uses`, `plan`,
 the `with_*` builders including `with_failure`, `handler`, `retry`, `est`,
 `budget`, `port`, `port_where`, `fixture`), the measures (`person_hours`,
@@ -579,8 +593,8 @@ stages surfaced four substrate findings (§6): `Array.length` untyped
 (fixed, A1), short-circuit operators wrong with a call on the right
 (fixed, A2), a kernel fault on one call shape (B-152, fixed in its own
 chunk after A3), and a local binding of a branching expression holding a
-pending call (fixed, A3). Not yet built: the surface (B), the renderer
-(C), solution finding (D).
+pending call (fixed, A3). Not yet built: cross-file `uses` (B2), the
+renderer (C), solution finding (D).
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),

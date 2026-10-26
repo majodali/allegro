@@ -15,7 +15,7 @@ import { evaluate } from "../evaluator.js";
 import { getTypeName } from "../types-std.js";
 import { metaOf } from "../metadata.js";
 import { extractGrammarFragment } from "../primitives.js";
-import { primNames, typeNames, fileTest, testsDir } from "./alg-files.js";
+import { primNames, typeNames, fileTest, testsDir, libExtensions } from "./alg-files.js";
 import { putEntry } from "../structure.js";
 
 // == Guard Clauses (and) ==
@@ -597,4 +597,40 @@ fileTest(path.join(testsDir, "planning-budget-demo.alg"));
 // handlers; handlers refused (unreachable, not producing the outcome,
 // consuming what the failing node would have produced).
 fileTest(path.join(testsDir, "planning-handlers-demo.alg"));
+// Stage B1: the surface. The chapter's worked example verbatim through the
+// `plan NAME:` offside-rule fragment, the first in lib/; each statement
+// declares a WellFormedPlan binding.
+fileTest(path.join(testsDir, "planning-release-demo.alg"));
+
+// The statement form's enforcement shape (chapter §7): `plan NAME:` declares
+// NAME as a WellFormedPlan, so a plan that does not check HALTS the build
+// with the refinement's message. The demo files can only pin plans that
+// build; this is the refusal.
+test("plan statement: a plan that does not check halts the build", () => {
+  const exts = [typeExt, ...libExtensions(["units", "planning"])];
+  const src = [
+    "plan Broken:",
+    "  inputs:   In",
+    "  outcomes: Out",
+    "",
+    "  Work:",
+    "    inputs:   Missing",
+    "    outcomes: Out",
+    "",
+    "print(Broken.name)",
+    "",
+  ].join("\n");
+  let message = "";
+  try {
+    runtimeEval(src, undefined, exts, undefined, true);
+  } catch (e: any) {
+    message = String(e?.message ?? e);
+  }
+  eq(message.includes("refinement predicate failed for WellFormedPlan"), true,
+    `the plan statement halts on a plan that does not check (got: ${message || "no error"})`);
+
+  // The same source with the input produced builds and binds the name.
+  const ok = runtimeEval(src.replace("inputs:   Missing", "inputs:   In"), undefined, exts, undefined, true);
+  eq(ok.evalCtx.bindings.get("Broken") !== undefined, true, "the plan statement declares the binding");
+});
 

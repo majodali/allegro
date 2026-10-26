@@ -880,8 +880,13 @@ that prevents it.
     `unhandled_failures`), handler validity (`check_handlers`), the bound
     with handlers (`rollup_bound`) verified by the budget check;
     `tests/planning-handlers-demo.alg` suite-pinned. Stage A complete.
-    Next: stage B1 (the surface), the `plan NAME:` offside-rule grammar,
-    the first such fragment in `lib/`
+  - **Progress.** B1 (2026-10-26): the surface, `planning_grammar` in
+    `lib/planning.alg`, the first offside-rule fragment in `lib/`;
+    `tests/planning-release-demo.alg` is the chapter's worked example
+    verbatim. Four engine gaps closed in the chunk (layout terminals in
+    user EBNF; `binding_decl` for statement forms; matched text as a
+    string literal; pre-typed template literals). Next: B2 (cross-file
+    `uses` through `import`)
 - [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds

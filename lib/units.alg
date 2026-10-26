@@ -209,6 +209,11 @@ minute = Unit("min", time_dim, 60.0)
 min    = minute
 hour   = Unit("h",   time_dim, 3600.0)
 h      = hour
+// Plural spellings, for prose-like quantities (`3 hours`, `20 minutes`);
+// the same units, so they render as `h` and `min`.
+hours   = hour
+minutes = minute
+seconds = s
 kg = Unit("kg", mass_dim, 1.0)
 g  = Unit("g",  mass_dim, 0.001)
 

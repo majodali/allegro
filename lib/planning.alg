@@ -11,8 +11,10 @@
 // planning-local effort and money), rolls estimates up with retry upper
 // bounds and checks budgets. Stage A4 declares failures on nodes, computes
 // escalation as a graph property, checks handlers as graphs and verifies
-// budgets against the bound that includes them. No surface syntax (stage
-// B). Everything here is ordinary Allegro, loaded with `use planning`.
+// budgets against the bound that includes them. Stage B1 adds the surface,
+// `plan NAME:` as an offside-rule grammar fragment at the end of this file.
+// Everything here is ordinary Allegro, loaded with `use planning`; `use
+// units` alongside it gives the quantity literals the surface reads.
 //
 // Every walk over the node tree is `assume terminates`: a plan is a finite
 // tree, but no `decreases` metric the analyzer verifies describes a walk
@@ -722,3 +724,105 @@ budget_show(b) =>
   when b
     is none then "no budget"
     is _ then "budget duration {measure_show(b.duration)}, effort {measure_show(b.effort)}, money {measure_show(b.money)}"
+
+// --- The surface (§3, stage B1): `plan NAME:` as an offside-rule fragment -----
+//
+// The first indentation-delimited grammar in `lib/`. Blocks open with
+// INDENT after a `:` and close with DEDENT; items are NEWLINE-separated;
+// `hws` sits wherever the next thing is a layout terminal, so the newline
+// is left for it to match. Every lowercase key is convention 4's; a
+// capitalised name is a node; `[ fixture ]` names a predicate in the
+// consumer's scope; a `uses` target is a plan binding in the consumer's
+// scope. Each item lowers to a tagged record and the builders below fold
+// the records into the library's values, so the surface adds no second
+// model. The statement form declares the binding through `binding_decl`
+// with the `WellFormedPlan` type, so a plan that does not check does not
+// build (chapter §7).
+
+item(k, v) => {k: k, v: v}
+
+items_of(items, k) => items.filter(i => i.k == k).map(i => i.v)
+
+first_or(items, k, d) =>
+  xs = items_of(items, k)
+  if xs.length == 0 then d else xs[0]
+
+measure_duration(d) => {m: "duration", v: d}
+measure_effort(e) => {m: "effort", v: e}
+measure_money(x) => {m: "money", v: x}
+
+measure_or(ms, which) =>
+  xs = ms.filter(x => x.m == which).map(x => x.v)
+  if xs.length == 0 then none else xs[0]
+
+est_of(ms) => est(measure_or(ms, "duration"), measure_or(ms, "effort"), measure_or(ms, "money"))
+budget_of(ms) => budget(measure_or(ms, "duration"), measure_or(ms, "effort"), measure_or(ms, "money"))
+
+apply_item(n, i) =>
+  when i.k
+    is "estimate" then with_estimate(n, est_of(i.v))
+    is "retry" then with_retry(n, i.v)
+    is "instructions" then with_instructions(n, join(i.v.map(l => l.trim()), " "))
+    is "fails" then i.v.reduce((acc, f) => with_failure(acc, f), n)
+    is "handler" then with_handler(n, i.v)
+    is "budget" then with_budget(n, budget_of(i.v))
+    is _ then n
+
+build_node(name, items) =>
+  kids = items_of(items, "node")
+  base = if kids.length == 0
+    then leaf(name, first_or(items, "inputs", []), first_or(items, "outcomes", []))
+    else composite(name, first_or(items, "inputs", []), first_or(items, "outcomes", []), kids)
+  items.reduce((acc, i) => apply_item(acc, i), base)
+
+build_handler(failure, items) =>
+  h = handler(failure, items_of(items, "node"))
+  when first_or(items, "retry", none) is none then h is r then handler_retry(h, r)
+
+build_plan(name, items) =>
+  base = plan(name, first_or(items, "inputs", []), first_or(items, "outcomes", []), items_of(items, "node"))
+  with_handlers = items_of(items, "handler").reduce((acc, h) => plan_with_handler(acc, h), base)
+  when first_or(items, "budget", none) is none then with_handlers is b then with_budget(with_handlers, budget_of(b))
+
+planning_grammar = grammar {
+  rule pname = txt:/[A-Z][A-Za-z0-9_]*/ => txt => txt
+  rule pname_list = names:pname ** "," => names => names
+
+  rule port_item = t:pname hws "[" f:ident "]" => (t, f) => port_where(t, f)
+  rule port_item += t:pname => t => port(t)
+  rule port_lines = p:port_item hws NEWLINE rest:port_lines => (p, rest) => [p].concat(rest)
+  rule port_lines += p:port_item => p => [p]
+  rule port_inline = p:port_item ** "," => p => p
+  rule ports = hws INDENT ps:port_lines DEDENT => ps => ps
+  rule ports += ps:port_inline => ps => ps
+
+  rule effort_lit = n:float hws "person-hours" => n => person_hours(n)
+  rule effort_lit += n:number hws "person-hours" => n => person_hours(n)
+  rule effort_lit += n:float hws "person-hour" => n => person_hours(n)
+  rule effort_lit += n:number hws "person-hour" => n => person_hours(n)
+  rule measure = e:effort_lit => e => measure_effort(e)
+  rule measure += d:expr => d => measure_duration(d)
+  rule measures = m:measure ** "," => m => m
+
+  rule retry_spec = "max" n:number "attempts" "," b:expr "backoff" => (n, b) => retry_backoff(n, b)
+  rule retry_spec += "max" n:number "attempts" => n => retry(n)
+
+  rule text_lines = l:/[^\n]+/ hws NEWLINE rest:text_lines => (l, rest) => [l].concat(rest)
+  rule text_lines += l:/[^\n]+/ => l => [l]
+
+  rule node_item = "inputs:" hws ps:ports => ps => item("inputs", ps)
+  rule node_item += "outcomes:" hws ps:ports => ps => item("outcomes", ps)
+  rule node_item += "estimate:" hws ms:measures => ms => item("estimate", ms)
+  rule node_item += "budget:" hws ms:measures => ms => item("budget", ms)
+  rule node_item += "retry:" hws r:retry_spec => r => item("retry", r)
+  rule node_item += "fails:" hws fs:pname_list => fs => item("fails", fs)
+  rule node_item += "instructions:" hws INDENT ls:text_lines DEDENT => ls => item("instructions", ls)
+  rule node_item += "on" hws hf:pname hws ":" hws INDENT hitems:node_items DEDENT => (hf, hitems) => item("handler", build_handler(hf, hitems))
+  rule node_item += un:pname hws ":" hws "uses" hws target:ident => (un, target) => item("node", uses(un, target))
+  rule node_item += nn:pname hws ":" hws INDENT nitems:node_items DEDENT => (nn, nitems) => item("node", build_node(nn, nitems))
+  rule node_items = i:node_item hws NEWLINE rest:node_items => (i, rest) => [i].concat(rest)
+  rule node_items += i:node_item => i => [i]
+
+  stmt_form "plan" hws pn:pname hws ":" hws INDENT pitems:node_items DEDENT
+    => (pn, pitems) => binding_decl(pn, build_plan(pn, pitems), WellFormedPlan)
+}

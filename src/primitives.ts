@@ -3626,6 +3626,15 @@ const proven_decl_marker_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
   return noneSingleton;
 };
 
+// B-151 B1: `binding_decl(name, value[, type])` — the marker by which a
+// statement form declares a binding. The tree builder consumes it at parse
+// time (`buildStmt`); it is registered so that a library grammar's template
+// resolves the name hygienically. Reaching evaluation means a form used it
+// somewhere other than as a whole statement.
+const binding_decl_impl: PrimitiveFnImpl = (_args, _ctx, _evalFn) => {
+  throw new AllegroError("binding_decl: a statement form's binding marker was evaluated; it must be the whole expansion of a statement form");
+};
+
 const proven_attach_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length < 1) {
     throw new AllegroError(`proven_attach: expected at least 1 arg (body), got ${args.length}`);
@@ -4434,6 +4443,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   assume_terminates_attach: makePrimitive("assume_terminates_attach", assume_terminates_attach_impl, true),
   // Phase F7: `proven` clause marker + passthrough wrapper.
   proven_decl_marker: makePrimitive("proven_decl_marker", proven_decl_marker_impl, true),
+  binding_decl: makePrimitive("binding_decl", binding_decl_impl, true),
   proven_attach: makePrimitive("proven_attach", proven_attach_impl, true),
   // Phase F1: proof by partial evaluation. Lazy on the proposition arg.
   proof_by_eval: makePrimitive("proof_by_eval", proof_by_eval_impl, true),

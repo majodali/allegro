@@ -31,8 +31,11 @@ appears.
 - `planning-dsl.md` — the planning DSL, the first pilot (B-079
   revalidation of `docs/plans/archive/project-1-planning-dsl-design.md`,
   2026-10-25); work plan `docs/plans/planning-pilot.md`; library
-  `lib/planning.alg` (stage A, A1 to A4), demos `tests/planning-core-demo.alg`
-  (the types), `tests/planning-checks-demo.alg` (the graph checks),
+  `lib/planning.alg` (stage A, A1 to A4; B1 (the surface)), demos
+  `tests/planning-core-demo.alg` (the types),
+  `tests/planning-checks-demo.alg` (the graph checks),
   `tests/planning-budget-demo.alg` (measures, rollup, budgets),
-  `tests/planning-handlers-demo.alg` (failures, escalation, handlers)
+  `tests/planning-handlers-demo.alg` (failures, escalation, handlers),
+  `tests/planning-release-demo.alg` (the worked example through the
+  `plan NAME:` surface)
 - Vision-level framing: `docs/book/vision.md` §4 (Tier 0)

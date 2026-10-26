@@ -271,3 +271,51 @@ print(a.id)               // → 7, once construction succeeds
 // if the invariant fails when the field lands, every projection
 // completes as the construction error — never a partial value
 ```
+
+## Domain surfaces (Vivace)
+
+A library can carry an offside-rule grammar. The planning DSL's `plan`
+statement (`docs/book/vivace/planning-dsl.md`) is the first; it declares
+its name as a well-formed plan, so a plan that does not check halts the
+build:
+
+```
+use units
+use planning
+
+valid_semver = fixture("valid_semver", v => true)
+
+plan Release:
+  inputs:   SourceCommit, ReleaseVersion [ valid_semver ]
+  outcomes: DeployedRelease
+  budget:   40 person-hours
+
+  Build:
+    inputs:   SourceCommit, ReleaseVersion
+    outcomes: Artifacts
+    estimate: 30 min, 1 person-hour
+    fails:    CompilationError
+    retry:    max 3 attempts, 30s backoff
+
+  Deploy:
+    inputs:   Artifacts
+    outcomes: DeployedRelease
+    estimate: 1 hour, 2 person-hours
+    instructions:
+      Switch the load balancer to the new environment.
+
+  on CompilationError:
+    Fix:
+      inputs:   SourceCommit
+      outcomes: DeployedRelease
+
+print(plan_show(Release))           // plan Release: … ; 2 nodes, 2 leaves, 1 handlers
+print(estimate_show(rollup(Release)))
+```
+
+Keys are convention 4's (`inputs`, `outcomes`, `estimate`, `budget`,
+`retry`, `fails`, `instructions`, `on`, `uses`); a capitalised name is a
+node; `[ name ]` is a fixture bound in scope; `Name: uses Other` borrows
+a plan bound earlier. The library builds the same values the API builds
+(`plan`, `leaf`, `composite`, `with_estimate`, …), and the checks are the
+same.

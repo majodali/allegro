@@ -101,6 +101,24 @@ is tracked in the BACKLOG revalidation register.
   per atom. (The previous position — before the `ident` fallthrough —
   made number-led forms dead code; keyword-led forms like `match` are
   unaffected either way.)
+- **Layout terminals are reachable from user EBNF by name (B-151, the
+  planning pilot, at B1 (the surface), 2026-10).** `INDENT`, `NEWLINE` and `DEDENT` in a `rule`/`expr_form`/
+  `stmt_form` body are the formalism's stateful terminals
+  (`grammar-formalism.md` §5), not productions. The whitespace
+  interleave treats them as explicit, so no `ws_any` is inserted beside
+  them; write `hws` before one when horizontal whitespace or a comment
+  may precede the newline (`"inputs:" hws INDENT …`). The planning DSL's
+  `plan NAME:` is the first offside-rule fragment in `lib/`.
+- **A statement form may declare a binding (B-151 B1).** A `stmt_form`
+  whose expansion is `binding_decl(name, value[, type])` becomes a
+  binding of `name` (an identifier part, or the matched text of a regex
+  part), with the optional type checked as `name: type = value` is, so
+  the declaration halts when the check fails. The marker is consumed at
+  parse time by the tree builder.
+- **A label's matched text is a string literal (B-151 B1).** A labeled
+  regex or literal part with no expression beneath it builds as
+  `typed_string`, as a quoted literal does. It was a bare Bits typed by
+  its length, so an eight-byte match read as an Int.
 
 ---
 
