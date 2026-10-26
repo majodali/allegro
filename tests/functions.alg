@@ -67,3 +67,18 @@ print(via_when(5))
 top = if true then pick(41) else 0
 print(bump(top))
 // expect: 42
+
+// A local binding used more than once, where the uses include a method
+// call, an index and a lambda: every use resolves (B-152: a primitive stub
+// shared under two expressions was resolved under one and left under the
+// other).
+Item = Type.define({ name: String, parts: Array })
+pair(a, b) => [a, b]
+first_with_parts(items) =>
+  names = items.filter(i => i.parts.length > 0).map(i => i.name)
+  if names.length == 0 then [] else pair(names[0], items.filter(i => i.name == names[0])[0].parts)
+found = first_with_parts([Item("a", [1, 2]), Item("b", [])])
+print(found[0])
+// expect: a
+print(found[1])
+// expect: [1, 2]

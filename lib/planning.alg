@@ -383,13 +383,7 @@ compatibility_for(scope, avail, nodes, n, p) =>
   prods = producers_of(avail, nodes, n, p)
   if prods.length != 1 || !port_constrained(p)
     then []
-    else compatibility_with(scope, avail, nodes, n, p, prods[0])
-
-// (`producer` is bound once rather than written twice: a call carrying the
-// same indexed subexpression in two arguments, one of them under a field
-// read of an array, hits a kernel fault — B-152, reproducer in the item.)
-compatibility_with(scope, avail, nodes, n, p, producer) =>
-  compatibility_against(scope, n, p, producer, producer_port(avail, nodes, producer, p.type))
+    else compatibility_against(scope, n, p, prods[0], producer_port(avail, nodes, prods[0], p.type))
 
 compatibility_against(scope, n, p, producer, src) =>
   if fixture_name(src) == fixture_name(p)
@@ -430,14 +424,8 @@ check_acyclic(scope, avail, nodes) =>
 //    producing node: the worked example declares
 //    `BuildArtifacts [signed_and_version_stamped]` over a `Sign` node that
 //    promises nothing, and that is the convention, not an error.
-// (`names_producing` is a named function rather than an inline
-// filter-then-map chain for the same reason `declared_with` exists: the
-// inline chain bound locally and then indexed as a call argument hits the
-// B-152 kernel fault.)
-names_producing(nodes, t) => nodes.filter(n => ports_have(n.outcomes, t)).map(n => n.name)
-
 declared_for(scope, nodes, o) =>
-  prods = names_producing(nodes, o.type)
+  prods = nodes.filter(n => ports_have(n.outcomes, o.type)).map(n => n.name)
   if prods.length == 0
     then [finding("outcomes", scope, "", "outcome {o.type} of {scope} is declared but no node produces it")]
     else if prods.length > 1

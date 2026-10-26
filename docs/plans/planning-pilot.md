@@ -113,6 +113,20 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 
 ## 8. Chunk log
 
+- **2026-10-26 — B-152 closed (bounded chunk, by ruling).** The
+  maintainer asked whether to pause for B-152 (the kernel fault on one
+  call shape) and ruled a bounded diagnosis chunk before A4. Cause:
+  `resolvePrimitives` checked its `seen` set before resolving a parser
+  stub, and one stub object sits under several expressions once the
+  block builder substitutes a local binding into its use sites and
+  rebuilds the enclosing expressions around the new argument; the
+  second parent kept the stub and evaluation failed. A nine-line
+  library-free reproducer showed eight shared stubs. The fix is the
+  order of the two checks; pinned in `tests/functions.alg`;
+  `names_producing` and `compatibility_with` removed from
+  `lib/planning.alg`, their call sites back in the natural shape. The
+  chunk stayed within its bound: diagnosis, one-line fix, pin, cleanup.
+
 - **2026-10-26 — A3 landed.** The measures: `Effort` (`person_hours`)
   and `Money` (`money(n, currency)`) as planning-local records with their
   own arithmetic (R1); durations are `lib/units.alg`'s `Duration` (R2),

@@ -77,14 +77,28 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
  * This walks a value tree and replaces them with real primitives.
  */
 export function resolvePrimitives(v: any, seen: Set<any> = new Set()): Value {
-  if (!v || typeof v !== "object" || seen.has(v)) return v;
-  seen.add(v);
+  if (!v || typeof v !== "object") return v;
 
+  // A stub is resolved BEFORE the seen check. The check guards the walk
+  // against cycles and repeated subtrees, which are rewritten in place and
+  // so are safe to skip; a stub is not rewritten in place, it is REPLACED
+  // in its parent, so every parent must see it. One stub object can sit
+  // under several parents: the block builder substitutes a local binding's
+  // value into each use site and rebuilds the enclosing expressions around
+  // the new argument while keeping their `fn` objects (`substName`), so a
+  // binding used more than once leaves one stub under two Expressions.
+  // With the check first, the second parent got the stub back unchanged
+  // and evaluation failed with "type_dispatch has unresolved stub"
+  // (B-152: eight shared stubs in a nine-line reproducer, pinned in
+  // tests/functions.alg).
   if (v.kind === "PrimitiveFunction" && v.fn === null) {
     const real = primitives[v.name];
     if (real) return real;
     throw new Error(`Unknown primitive: ${v.name}`);
   }
+
+  if (seen.has(v)) return v;
+  seen.add(v);
 
   if (v.kind === "Expression") {
     v.fn = resolvePrimitives(v.fn, seen);
