@@ -12,6 +12,7 @@
 // =============================================================================
 
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
+import { scanUses } from "../use-scanner.js";
 import { extractGrammarFragment, asGrammarValue } from "../primitives.js";
 import { primitives as primRegistry } from "../primitives.js";
 import { Value } from "../types.js";
@@ -122,10 +123,23 @@ export function runAlgFile(filePath: string, extensions?: Extension[]): void {
   const uniqModuleNames = [...new Set(grammarNames)];
   if (uniqModuleNames.length > 0) {
     const libDir = path.resolve("lib");
-    for (const id of uniqModuleNames) {
-      const modPath = path.join(libDir, `${id}.alg`);
-      const modSource = fs.readFileSync(modPath, "utf-8");
-      const modResult = runtimeEval(modSource, undefined, [typeExt], undefined, true);
+    // A library may itself open with `use X` (lib/planning.alg uses the
+    // totality forms; B-151 A2). The runtime ModuleLoader resolves such
+    // chains; this harness evaluates libraries directly, so it resolves
+    // them the same way: scan the library's header, load what it uses
+    // first (once per name), and evaluate its body with those extensions.
+    const loaded = new Map<string, Extension>();
+    const loadLib = (id: string, chain: string[]): Extension => {
+      const have = loaded.get(id);
+      if (have) return have;
+      if (chain.includes(id)) throw new Error(`use cycle: ${[...chain, id].join(" -> ")}`);
+      const modSource = fs.readFileSync(path.join(libDir, `${id}.alg`), "utf-8");
+      const scan = scanUses(modSource);
+      const depNames = [...new Set(scan.directives
+        .map(d => d.kind === "module" ? d.name! : d.kind === "member" ? d.moduleName! : null)
+        .filter((x): x is string => x !== null))];
+      const deps = depNames.map(dep => loadLib(dep, [...chain, id]));
+      const modResult = runtimeEval(modSource.slice(scan.headerEnd), undefined, [typeExt, ...deps], undefined, true);
       const frag = extractGrammarFragment(modResult.evalCtx);
       const bindings: Record<string, Value> = {};
       for (const [key, b] of modResult.evalCtx.bindings) {
@@ -133,6 +147,13 @@ export function runAlgFile(filePath: string, extensions?: Extension[]): void {
           bindings[key] = b.value;
         }
       }
+      const ext: Extension = { name: id, bindings, grammarFragment: frag };
+      loaded.set(id, ext);
+      return ext;
+    };
+    for (const id of uniqModuleNames) {
+      const ext = loadLib(id, []);
+      const bindings = { ...ext.bindings };
       // `use NAME.MEMBER` — narrow to the named Grammar binding(s).
       const mems = memberRefs.filter(m => m.module === id);
       if (mems.length > 0) {
@@ -144,7 +165,7 @@ export function runAlgFile(filePath: string, extensions?: Extension[]): void {
           }
         }
       }
-      grammarExts.push({ name: id, bindings, grammarFragment: frag });
+      grammarExts.push({ name: id, bindings, grammarFragment: ext.grammarFragment });
     }
   }
   // Evaluate inline literal `grammar { … }` blocks in a bootstrap context.

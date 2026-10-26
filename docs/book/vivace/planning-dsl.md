@@ -353,14 +353,15 @@ Re-checked against the code at 2026-10-25:
 | Constraints on values | refinement types (`Int & p`), `Refinement.define`, guarded construction (`Type.define({...}) & _.field >= 0`, D32) | `../standard/core-types.md`, `../standard/contracts.md` |
 | Grammar extension from a library | `grammar { rule … expr_form … stmt_form … }`, activated by `use NAME`; libraries and top-level files share one pipeline | `../extension/grammar.md` §4, `lib/units.alg`, `lib/proven.alg` |
 | Offside-rule blocks | the formalism's `NEWLINE`/`INDENT`/`DEDENT`/`SAMELINE` terminals exist in the engine; **no library fragment uses them yet** | `../grammar-formalism.md` §5 |
-| Custom analyzers in Allegro | the pattern exists: a pure library over a value (`lib/grammar-analyzer.alg`); failures are error values with domain text, or halts through a refinement annotation | `lib/grammar-analyzer.alg`; `../process.md` §6 on CE-R8 |
+| Custom analyzers in Allegro | the planning checks are one (`check_plan`, stage A2), a pure library over the plan value in the manner of `lib/grammar-analyzer.alg`; failures are error values with domain text (`validate`), or halts through the `WellFormedPlan` annotation. A refinement predicate's callees must be total: every walk over the node tree is `assume terminates`, because no verified `decreases` metric describes a walk into a child list | `lib/planning.alg`, `lib/grammar-analyzer.alg`; `../process.md` §6 on CE-R8; `../standard/totality.md` |
 | Quantities for estimates and budgets | the units DSL: dimensions as data, refinement-typed quantities, operator dispatch, domain-vocabulary errors; **SI dimensions only** | `lib/units.alg` (rung 2, B-092) |
 | Compile-time checks inside libraries | proofs, effects, exhaustiveness and termination fire in libraries as in user code | `../extension/modules.md` |
 | Cross-file references | `import NAME` with local-then-system resolution; `use NAME.MEMBER` | `../extension/modules.md` |
 | Domain-specific failure rendering | **not present**; failures carry the analyzer's message string | B-081, deferred by ruling (plan) |
 | Solution finding | **not present** | plan, stage D |
 
-Three findings from the check:
+Five findings from the check, the last two made by stage A2 while
+building the checks:
 
 - **Estimates are quantities, and two of the three measures are not
   SI.** Wall-clock duration is the units DSL's time dimension. Effort
@@ -378,7 +379,20 @@ Three findings from the check:
   grammar is a stage of its own, after the library has proved the
   model, and may surface engine work.
 - **Well-formedness has two enforcement shapes available**, and the
-  pilot should use both (§7).
+  pilot uses both (§7).
+- **Short-circuit `&&` and `||` were wrong when the right operand was a
+  call.** `p && f(x)` was true whatever `f` answered and `p || f(x)` was
+  false whatever `f` answered, because the operators unwrapped the
+  right-hand thunk by evaluating its body, which hands back the tail-call
+  sentinel for a call in tail position. Fixed in stage A2 (they apply the
+  thunk); pinned in `tests/logical.alg`.
+- **A kernel fault on one shape of call.** A function that binds the
+  result of an inline filter-then-map chain locally and then passes an
+  indexed element of it as one argument of a call whose other argument
+  reads an array field off a call result fails with "`type_dispatch` has
+  unresolved stub". Routing the chain through a named function avoids
+  it. Filed as **B-152** with the minimal pair; the library carries the
+  workaround and says so where it does.
 
 ## 7. Well-formedness: what is checked and how [designed]
 
@@ -392,6 +406,26 @@ The checks, each a property of the graph:
 | Composite resolution | a composite's declared outcomes are exactly what its internal graph produces (convention 6); a `uses` node's inputs are available at the site |
 | Budget | for every budget, the rollup of estimates beneath it, with retry upper bounds (convention 12), does not exceed it |
 | Handler validity | a handler's graph produces the outcome of the composite it sits in; its failure type is declared |
+
+Stage A2 built the first four and applies them to the plan's graph, to
+every composite's internal graph (convention 6) and to a borrowed plan's
+own (convention 10); `check_plan` answers a list of findings, each naming
+the scope, the node and what is wrong, in planning vocabulary. Two
+readings were settled on the way, both by the worked example:
+
+- **A fixture on a declared outcome is a promise, not a structural
+  requirement on the producer.** `BuildPipeline` declares
+  `BuildArtifacts [signed_and_version_stamped]` over a `Sign` node that
+  promises nothing. The promise is established when the outcome is
+  produced (Shape 2). A fixture on an **input**, by contrast, is a
+  requirement: its producer must carry the same fixture, or the edge is
+  incompatible.
+- **Every node outcome is consumed or declared.** An outcome a sibling
+  does not consume and the scope does not declare is reported; the
+  example has none, and a plan that wants a side outcome declares it.
+
+The budget check is stage A3 (it needs typed measures); handler graphs
+are checked at stage A4.
 
 Two enforcement shapes, both existing:
 
@@ -441,16 +475,22 @@ Carried from the archived design, with two added by the revalidation:
 
 ## 9. Status and pointers [partial]
 
-Stage A1 is built: `lib/planning.alg` holds the types as records, the
-constructors (`leaf`, `composite`, `uses`, `plan`, the `with_*` builders,
-`handler`, `retry`, `est`, `port`, `port_where`, `fixture`), the queries
-(`node_count`, `leaf_count`, `node_names`, `find_node`, `handler_count`)
-and the one-line renderings; `tests/planning-core-demo.alg` builds the
-`BuildPipeline` sub-plan of §5 by hand and is suite-pinned. Plans are
-values: two plans built the same way are equal, and `instanceof` names
-their types. Stage A1 surfaced one substrate gap, fixed on the way:
-`Array.length` returned an untyped number, so a count could not be
-rendered. Not yet built: the graph checks (A2), typed measures (A3),
+Stages A1 and A2 are built. `lib/planning.alg` holds the types as
+records, the constructors (`leaf`, `composite`, `uses`, `plan`, the
+`with_*` builders, `handler`, `retry`, `est`, `port`, `port_where`,
+`fixture`), the queries (`node_count`, `leaf_count`, `node_names`,
+`find_node`, `handler_count`), the one-line renderings, and the checks:
+wiring derivation (`producers_of`, `scope_edges`), the four graph checks,
+`check_plan`, `plan_errors`, `well_formed`, `validate` and the
+`WellFormedPlan` type. `tests/planning-core-demo.alg` builds the
+`BuildPipeline` sub-plan of §5 by hand; `tests/planning-checks-demo.alg`
+builds the whole worked example, checks it clean through both enforcement
+shapes, and refuses five plans each broken in one way. Plans are values:
+two plans built the same way are equal, and `instanceof` names their
+types. The stages surfaced three substrate findings (§6): `Array.length`
+untyped (fixed, A1), short-circuit operators wrong with a call on the
+right (fixed, A2), and a kernel fault on one call shape (B-152, worked
+around). Not yet built: typed measures and the budget check (A3),
 handlers as checked graphs (A4), the surface (B).
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this

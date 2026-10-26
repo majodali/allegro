@@ -61,7 +61,7 @@ From the chapter (B-079) and the rulings above:
 | Stage | Chunk | What lands | Exit measured by |
 |---|---|---|---|
 | **A. The library** | A1 ✅ **landed 2026-10-25** | `lib/planning.alg`: the types (Plan, PlanNode, Port, Fixture, Estimate, Retry, Handler) as `Type.define` records; construction through the library's API; a demo `tests/planning-core-demo.alg` building `BuildPipeline` by hand | the demo is suite-pinned; the types print and compare — **met** |
-| | A2 | Wiring derivation and the graph checks: acyclicity, wiring completeness, type compatibility, composite resolution; each failure an error value in domain terms | demo lines for each check passing and each check refusing a deliberately broken plan |
+| | A2 ✅ **landed 2026-10-25** | Wiring derivation and the graph checks: acyclicity, wiring completeness, type compatibility, composite resolution; each failure an error value in domain terms | demo lines for each check passing and each check refusing a deliberately broken plan — **met** (`tests/planning-checks-demo.alg`: the worked example clean, five broken plans refused) |
 | | A3 | Estimates and budgets: durations through the units DSL (R2), effort and money per R1; rollup with retry upper bounds; the budget check | `SoftwareRelease` built through the API with its budget discharged; a budget-exceeding variant refused |
 | | A4 | Failure handlers: `on <FailureType>` graphs, handler validity, re-escalation as a graph property | both handlers of the worked example checked |
 | **B. The surface** | B1 | The grammar fragment: `plan NAME:` with offside blocks, `inputs:`/`outcomes:`, bracket constraints, `estimate:`, `budget:`, `retry:`, `on`, `uses`; the statement form expands to an annotated binding (halts on failure) | `tests/planning-release-demo.alg` is the worked example verbatim, suite-pinned; the first offside-rule fragment works or the engine gap is named |
@@ -112,6 +112,24 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-25 — A2 landed.** Wiring derivation (`producers_of`,
+  `scope_edges`), the four checks (`check_wiring`, `check_compatibility`,
+  `check_acyclic`, `check_outcomes`), recursion into composites and
+  borrowed plans (`check_scope`, `check_plan`), `plan_errors`,
+  `well_formed`, `validate` (error value) and `WellFormedPlan`
+  (annotation halt). Two readings settled by the worked example and
+  recorded in the chapter §7: a fixture on a declared outcome is a
+  promise, not a producer requirement; every node outcome is consumed or
+  declared. Three substrate findings: (1) the invariant-totality gate
+  (D32/CE-R7) refuses a refinement predicate whose callees may diverge,
+  so every tree walk in the library is `assume terminates` — correct
+  behaviour, worth knowing before writing analyzers; (2) `&&`/`||` were
+  wrong when the right operand was a call (tail-call sentinel read as a
+  value) — fixed in `src/primitives.ts`, pinned in `tests/logical.alg`;
+  (3) a kernel fault on one call shape — **B-152**, worked around in the
+  library with the two places marked. Lambda bodies are one expression:
+  each per-input judgement is a named function and the folds concatenate.
 
 - **2026-10-25 — A1 landed.** `lib/planning.alg` (types, constructors,
   builders, queries, renderings) and `tests/planning-core-demo.alg`
