@@ -180,9 +180,13 @@ what today's code has to say about it.
     `BuildPipeline` the internal graph of node `Build`. Its inputs must
     be available at the site; its outcomes become the node's.
     *Revalidation:* within one file this is a binding reference. Across
-    files it is the module system's `import` (`../extension/modules.md`),
-    whose fitness for plan declarations is the open item the archived
-    design numbered 4 (§8).
+    files it is the module system's `import` (`../extension/modules.md`):
+    `Build: uses build_pipeline.BuildPipeline` borrows a plan declared
+    in `lib/build_pipeline.alg` beside the using file, which the module
+    system resolves local-first. Confirmed at B2 (cross-file `uses`;
+    `tests/planning-split-demo.alg`): a module carries its `use` headers
+    and its `plan` statements, the borrowed plan arrives checked, and
+    its handler and estimates come with it. The archived item 4 closes.
 11. **Predicate fixtures are snake_case identifiers.** `[all_tests_pass]`,
     `[valid_semver]` name ordinary predicate functions defined in a
     planning library, in the manner of behaviour-driven test fixtures:
@@ -552,9 +556,9 @@ Carried from the archived design, with two added by the revalidation:
   until a pilot needs them; performer is probably metadata.
 - **Failure-context access from handlers.** Whether a handler's graph
   can read what failed. Today it only runs an alternate path.
-- **Cross-file plan references.** `uses` across files rides `import`;
-  whether a plan declaration imports cleanly is to be confirmed when
-  the first multi-file plan is written (the archived item 4).
+- *Closed at stage B2:* **cross-file plan references.** `uses` across
+  files rides `import`, and a plan declaration imports cleanly
+  (convention 10, revalidation).
 - *Added:* **non-SI measures** (§6: effort and money).
 - *Added:* **what solution finding means for a plan.** The ladder
   names it; nothing defines it. The plan's stage D lets the pilot's
@@ -593,7 +597,9 @@ stages surfaced four substrate findings (§6): `Array.length` untyped
 (fixed, A1), short-circuit operators wrong with a call on the right
 (fixed, A2), a kernel fault on one call shape (B-152, fixed in its own
 chunk after A3), and a local binding of a branching expression holding a
-pending call (fixed, A3). Not yet built: cross-file `uses` (B2), the
+pending call (fixed, A3). Stage B is complete:
+`tests/planning-split-demo.alg` borrows `BuildPipeline` from
+`tests/lib/build_pipeline.alg` through `import`. Not yet built: the
 renderer (C), solution finding (D).
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this

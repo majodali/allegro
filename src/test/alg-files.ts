@@ -12,6 +12,7 @@
 // =============================================================================
 
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
+import { buildModuleObject } from "../modules.js";
 import { scanUses } from "../use-scanner.js";
 import { extractGrammarFragment, asGrammarValue } from "../primitives.js";
 import { primitives as primRegistry } from "../primitives.js";
@@ -196,13 +197,54 @@ export function runAlgFile(filePath: string, extensions?: Extension[]): void {
   // Strip the header from the source before evaluation.
   const cleanSource = source.slice(headerEnd);
 
+  // `import NAME` statements: the CLI resolves `lib/NAME.alg` beside the
+  // file first, then the system lib/, and hands the module in as an
+  // extension carrying a typed module object. The harness does the same
+  // for a demo (B-151 B2: tests/planning-split-demo.alg borrows a plan
+  // from tests/lib/build_pipeline.alg). A module runs through the same
+  // evaluation as a library, with its own `use` headers resolved.
+  const importNames = [...cleanSource.matchAll(/^import\s+([A-Za-z_][A-Za-z_0-9]*)\s*$/gm)].map(m => m[1]);
+  const providedNames = new Set<string>();
+  for (const ext of [...grammarExts, ...(extensions ?? [])]) {
+    for (const name of Object.keys(ext.bindings)) providedNames.add(name);
+    if (ext.moduleObject) providedNames.add(ext.name);
+  }
+  const importExts: Extension[] = [];
+  if (importNames.some(n => !providedNames.has(n))) {
+    const loadLib = libLoader();
+    for (const name of importNames) {
+      if (providedNames.has(name)) continue;
+      const local = path.join(path.dirname(filePath), "lib", `${name}.alg`);
+      const modPath = fs.existsSync(local) ? local : path.join(path.resolve("lib"), `${name}.alg`);
+      const modSource = fs.readFileSync(modPath, "utf-8");
+      const scan = scanUses(modSource);
+      const depNames = [...new Set(scan.directives
+        .map(d => d.kind === "module" ? d.name! : d.kind === "member" ? d.moduleName! : null)
+        .filter((x): x is string => x !== null))];
+      const deps = depNames.map(dep => loadLib(dep, []));
+      const depBound = new Set<string>();
+      for (const d of deps) for (const k of Object.keys(d.bindings)) depBound.add(k);
+      const modResult = runtimeEval(modSource.slice(scan.headerEnd), undefined, [typeExt, ...deps], undefined, true);
+      const bindings: Record<string, Value> = {};
+      const exported = new Set<string>();
+      for (const [key, b] of modResult.evalCtx.bindings) {
+        if (b.value === undefined || primNames.has(key) || typeNames.has(key) || depBound.has(key)) continue;
+        bindings[key] = b.value;
+        if ((b as any).visibility === "exported") exported.add(key);
+      }
+      // Open-module policy (modules.md): no `export` means every binding.
+      const visible = exported.size > 0 ? exported : new Set(Object.keys(bindings));
+      importExts.push({ name, bindings: {}, moduleObject: buildModuleObject(name, bindings, visible) });
+    }
+  }
+
   // Capture print output
   const printed: string[] = [];
   const origLog = console.log;
   console.log = (msg: any) => printed.push(String(msg));
 
   try {
-    const exts = [typeExt, ...grammarExts, ...(extensions ?? [])];
+    const exts = [typeExt, ...grammarExts, ...importExts, ...(extensions ?? [])];
     const { value: fileValue, evalCtx: fileCtx } = runtimeEval(cleanSource, undefined, exts, undefined, true);
     // Registry-completeness piggyback: walk this file's values for the
     // boundary harness HERE (memory traversal, ~ms) instead of re-evaluating

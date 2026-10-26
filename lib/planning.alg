@@ -818,7 +818,7 @@ planning_grammar = grammar {
   rule node_item += "fails:" hws fs:pname_list => fs => item("fails", fs)
   rule node_item += "instructions:" hws INDENT ls:text_lines DEDENT => ls => item("instructions", ls)
   rule node_item += "on" hws hf:pname hws ":" hws INDENT hitems:node_items DEDENT => (hf, hitems) => item("handler", build_handler(hf, hitems))
-  rule node_item += un:pname hws ":" hws "uses" hws target:ident => (un, target) => item("node", uses(un, target))
+  rule node_item += un:pname hws ":" hws "uses" hws target:expr => (un, target) => item("node", uses(un, target))
   rule node_item += nn:pname hws ":" hws INDENT nitems:node_items DEDENT => (nn, nitems) => item("node", build_node(nn, nitems))
   rule node_items = i:node_item hws NEWLINE rest:node_items => (i, rest) => [i].concat(rest)
   rule node_items += i:node_item => i => [i]
