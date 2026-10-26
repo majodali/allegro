@@ -3,6 +3,9 @@
 // docs/book/vivace/planning-dsl.md §5, built by hand through the library's
 // API: no surface syntax yet (stage B), no graph checks yet (stage A2).
 // A plan is a graph of OUTCOMES; dependencies are derived from wiring.
+// (Estimates are typed since stage A3: durations from the units DSL,
+// effort in person-hours.)
+use units
 use planning
 
 // --- Fixtures: convention 11 — a readable name backed by a predicate -----
@@ -12,13 +15,13 @@ tagged = fixture("tagged_with_version", a => true)
 // --- Leaves: typed inputs and outcomes, an estimate ----------------------
 compile = with_estimate(
   leaf("Compile", [port("SourceCommit")], [port("CompiledBinaries")]),
-  est(30, 1, none))
+  est(30 min, person_hours(1), none))
 package = with_estimate(
   leaf("Package", [port("CompiledBinaries"), port("ReleaseVersion")], [port_where("PackagedArtifacts", tagged)]),
-  est(15, 0.5, none))
+  est(15 min, person_hours(0.5), none))
 sign = with_estimate(
   leaf("Sign", [port("PackagedArtifacts")], [port("BuildArtifacts")]),
-  est(5, 0.25, none))
+  est(5 min, person_hours(0.25), none))
 
 // --- A failure handler: an alternate graph producing the same outcome ----
 diagnose  = leaf("Diagnose", [port("SourceCommit")], [port("Diagnosis")])
@@ -47,7 +50,7 @@ print(node_names(build_pipeline))
 // expect: [Compile, Package, Sign]
 
 print(estimate_show(compile.estimate))
-// expect: duration 30, effort 1, money none
+// expect: duration 30 min, effort 1 person-hours, money none
 
 print(estimate_show(diagnose.estimate))
 // expect: no estimate

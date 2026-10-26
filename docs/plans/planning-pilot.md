@@ -62,7 +62,7 @@ From the chapter (B-079) and the rulings above:
 |---|---|---|---|
 | **A. The library** | A1 ✅ **landed 2026-10-25** | `lib/planning.alg`: the types (Plan, PlanNode, Port, Fixture, Estimate, Retry, Handler) as `Type.define` records; construction through the library's API; a demo `tests/planning-core-demo.alg` building `BuildPipeline` by hand | the demo is suite-pinned; the types print and compare — **met** |
 | | A2 ✅ **landed 2026-10-25** | Wiring derivation and the graph checks: acyclicity, wiring completeness, type compatibility, composite resolution; each failure an error value in domain terms | demo lines for each check passing and each check refusing a deliberately broken plan — **met** (`tests/planning-checks-demo.alg`: the worked example clean, five broken plans refused) |
-| | A3 | Estimates and budgets: durations through the units DSL (R2), effort and money per R1; rollup with retry upper bounds; the budget check | `SoftwareRelease` built through the API with its budget discharged; a budget-exceeding variant refused |
+| | A3 ✅ **landed 2026-10-26** | Estimates and budgets: durations through the units DSL (R2), effort and money per R1; rollup with retry upper bounds; the budget check | `SoftwareRelease` built through the API with its budget discharged; a budget-exceeding variant refused — **met** (`tests/planning-budget-demo.alg`: the example with every estimate, budget discharged; refused at the plan, at a composite, over money, and for wrong measures) |
 | | A4 | Failure handlers: `on <FailureType>` graphs, handler validity, re-escalation as a graph property | both handlers of the worked example checked |
 | **B. The surface** | B1 | The grammar fragment: `plan NAME:` with offside blocks, `inputs:`/`outcomes:`, bracket constraints, `estimate:`, `budget:`, `retry:`, `on`, `uses`; the statement form expands to an annotated binding (halts on failure) | `tests/planning-release-demo.alg` is the worked example verbatim, suite-pinned; the first offside-rule fragment works or the engine gap is named |
 | | B2 | Cross-file `uses` through `import`; the archived item 4 | the worked example split across two files |
@@ -112,6 +112,35 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-26 — A3 landed.** The measures: `Effort` (`person_hours`)
+  and `Money` (`money(n, currency)`) as planning-local records with their
+  own arithmetic (R1); durations are `lib/units.alg`'s `Duration` (R2),
+  so `lib/planning.alg` now says `use units`. `est` and `budget` guard
+  each measure and refuse a wrong one in the units DSL's vocabulary. The
+  rollup (`rollup`, `node_rollup`): leaves, composites, borrowed plans,
+  retry at `max_attempts` times; `check_budget` joins `check_scope`, at
+  the plan and at any composite (`with_budget` serves both). Three
+  readings recorded in the chapter §7: an omitted measure contributes
+  nothing; durations add serially; handlers stay outside the bound until
+  A4. `tests/planning-budget-demo.alg` (23 pinned lines). The A1 demo's
+  estimates became typed, so its one `estimate_show` pin changed from
+  `duration 30, effort 1, money none` to `duration 30 min, effort 1
+  person-hours, money none` (flagged in the PR). One substrate finding,
+  fixed: a local binding of an `if`/`when` whose chosen branch was a call
+  held the tail-call sentinel; `evaluateExpr` (`src/evaluator.ts`) now
+  runs a sentinel that would leave an expression not in tail position,
+  and the marking descends through the body wrappers to a branching
+  expression (never to a bare call). Two attempts were dropped on the
+  way, each caught by the suite: stopping the marking of branch thunks
+  hung the typed recursive functions of
+  `tests/totality-termination-demo.alg` at precompile; marking a bare
+  call under the wrapper spun precompile's tail-call loop on
+  `bad(n: Int): Int => bad(n)`.
+  Pinned in `tests/functions.alg`. B-152 (the kernel fault on one call
+  shape) was checked against the fix: distinct, still open. `own_rollup`
+  was split out of `node_rollup` while the fault stood and stays as a
+  named function because it reads well.
 
 - **2026-10-25 — A2 landed.** Wiring derivation (`producers_of`,
   `scope_edges`), the four checks (`check_wiring`, `check_compatibility`,

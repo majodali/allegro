@@ -354,24 +354,26 @@ Re-checked against the code at 2026-10-25:
 | Grammar extension from a library | `grammar { rule … expr_form … stmt_form … }`, activated by `use NAME`; libraries and top-level files share one pipeline | `../extension/grammar.md` §4, `lib/units.alg`, `lib/proven.alg` |
 | Offside-rule blocks | the formalism's `NEWLINE`/`INDENT`/`DEDENT`/`SAMELINE` terminals exist in the engine; **no library fragment uses them yet** | `../grammar-formalism.md` §5 |
 | Custom analyzers in Allegro | the planning checks are one (`check_plan`, stage A2), a pure library over the plan value in the manner of `lib/grammar-analyzer.alg`; failures are error values with domain text (`validate`), or halts through the `WellFormedPlan` annotation. A refinement predicate's callees must be total: every walk over the node tree is `assume terminates`, because no verified `decreases` metric describes a walk into a child list | `lib/planning.alg`, `lib/grammar-analyzer.alg`; `../process.md` §6 on CE-R8; `../standard/totality.md` |
-| Quantities for estimates and budgets | the units DSL: dimensions as data, refinement-typed quantities, operator dispatch, domain-vocabulary errors; **SI dimensions only** | `lib/units.alg` (rung 2, B-092) |
+| Quantities for estimates and budgets | durations are the units DSL's `Duration` (R2: `30 min` with `use units`); effort and money are the planning library's `Effort` (`person_hours(n)`) and `Money` (`money(n, currency)`) (R1), records with their own arithmetic in the manner of `Quantity`, so a mismatch is an error in planning vocabulary; the rollup and the budget check exist since stage A3 | `lib/units.alg` (rung 2, B-092), `lib/planning.alg` |
 | Compile-time checks inside libraries | proofs, effects, exhaustiveness and termination fire in libraries as in user code | `../extension/modules.md` |
 | Cross-file references | `import NAME` with local-then-system resolution; `use NAME.MEMBER` | `../extension/modules.md` |
 | Domain-specific failure rendering | **not present**; failures carry the analyzer's message string | B-081, deferred by ruling (plan) |
 | Solution finding | **not present** | plan, stage D |
 
-Five findings from the check, the last two made by stage A2 while
-building the checks:
+Six findings from the check, the last three made by stages A2 and A3
+while building the checks:
 
 - **Estimates are quantities, and two of the three measures are not
   SI.** Wall-clock duration is the units DSL's time dimension. Effort
   (person-hours) and money are not among the seven SI base dimensions
-  the library encodes, so the pilot needs either planning-local
-  `Effort` and `Money` types (refinement-typed numbers with their own
-  arithmetic) or a generalisation of the units library to named base
-  dimensions. The plan asks for a ruling; the recommendation is
-  planning-local types first, because the generalisation is a units
-  design question and not a planning one.
+  the library encodes, so the pilot needed either planning-local
+  `Effort` and `Money` types or a generalisation of the units library to
+  named base dimensions. Ruled and built at stage A3, R1 (planning-local
+  measures) and R2 (durations through the units DSL):
+  planning-local types, because the generalisation is a units design
+  question and not a planning one; durations reuse the units DSL, which
+  is the bridge from rung 2. `est(3 m, …)` is refused as "a duration is a
+  time quantity such as 30 min, not a length quantity (3 m)".
 - **The surface syntax is the first offside-rule fragment.** The
   engine has the terminals; no `grammar { … }` block in `lib/` uses
   them, and `use grammar { … }` literal blocks inside libraries are
@@ -393,6 +395,18 @@ building the checks:
   unresolved stub". Routing the chain through a named function avoids
   it. Filed as **B-152** with the minimal pair; the library carries the
   workaround and says so where it does.
+- **A local binding of an `if` or `when` whose chosen branch was a call
+  held a pending call, not a value.** `y = if c then f(x) else 0` bound
+  the evaluator's tail-call sentinel as `y`, and every later use of `y`
+  crashed the evaluator. The tail-call marking marks every branch thunk's
+  body as a tail position, and `if` and `when` evaluate that body in
+  place, so a branching expression that was not itself in tail position
+  passed the sentinel on as its value. Fixed at stage A3 in the evaluator
+  (`src/evaluator.ts`): a sentinel may leave an expression only when that
+  expression is in tail position, and the marking descends through the
+  body wrappers so a typed function's `if` keeps its tail-call
+  optimisation. Pinned in `tests/functions.alg`. Distinct from B-152,
+  which reproduces with the fix in place.
 
 ## 7. Well-formedness: what is checked and how [designed]
 
@@ -424,8 +438,27 @@ readings were settled on the way, both by the worked example:
   does not consume and the scope does not declare is reported; the
   example has none, and a plan that wants a side outcome declares it.
 
-The budget check is stage A3 (it needs typed measures); handler graphs
-are checked at stage A4.
+Stage A3 built the budget check over typed measures. The rollup
+(`rollup`, `node_rollup`) is an upper bound: a leaf contributes its
+estimate, a composite the rollup of its inner graph, a `uses` node the
+rollup of the borrowed plan, and a node with a retry policy
+`max_attempts` times that (convention 12). Three readings, recorded
+here:
+
+- **A measure an estimate leaves out contributes nothing.** The worked
+  example estimates `Test`'s leaves in duration only; its effort rollup
+  is the sum of the leaves that state one. A budget measure left out is
+  unconstrained.
+- **Durations add serially.** The bound assumes no two nodes run at
+  once; a scheduler that overlaps them only tightens it.
+- **Handlers are outside the bound for now.** They are alternate graphs;
+  what they add is settled with handler validity at stage A4, where
+  their semantics are decided.
+
+A budget finding reads "budget of `Deploy`: duration 160 min exceeds
+2 h": the comparison is dimensional, through the units DSL, so a budget
+in hours checks a rollup in minutes. Handler graphs are checked at stage
+A4.
 
 Two enforcement shapes, both existing:
 
@@ -475,23 +508,29 @@ Carried from the archived design, with two added by the revalidation:
 
 ## 9. Status and pointers [partial]
 
-Stages A1 and A2 are built. `lib/planning.alg` holds the types as
+Stages A1 to A3 are built. `lib/planning.alg` holds the types as
 records, the constructors (`leaf`, `composite`, `uses`, `plan`, the
-`with_*` builders, `handler`, `retry`, `est`, `port`, `port_where`,
-`fixture`), the queries (`node_count`, `leaf_count`, `node_names`,
-`find_node`, `handler_count`), the one-line renderings, and the checks:
-wiring derivation (`producers_of`, `scope_edges`), the four graph checks,
+`with_*` builders, `handler`, `retry`, `est`, `budget`, `port`,
+`port_where`, `fixture`), the measures (`person_hours`, `money`; durations
+from `lib/units.alg`), the queries (`node_count`, `leaf_count`,
+`node_names`, `find_node`, `handler_count`, `rollup`), the one-line
+renderings, and the checks: wiring derivation (`producers_of`,
+`scope_edges`), the four graph checks, the budget check (`check_budget`),
 `check_plan`, `plan_errors`, `well_formed`, `validate` and the
 `WellFormedPlan` type. `tests/planning-core-demo.alg` builds the
 `BuildPipeline` sub-plan of §5 by hand; `tests/planning-checks-demo.alg`
 builds the whole worked example, checks it clean through both enforcement
-shapes, and refuses five plans each broken in one way. Plans are values:
-two plans built the same way are equal, and `instanceof` names their
-types. The stages surfaced three substrate findings (§6): `Array.length`
-untyped (fixed, A1), short-circuit operators wrong with a call on the
-right (fixed, A2), and a kernel fault on one call shape (B-152, worked
-around). Not yet built: typed measures and the budget check (A3),
-handlers as checked graphs (A4), the surface (B).
+shapes, and refuses five plans each broken in one way;
+`tests/planning-budget-demo.alg` builds it with every estimate and retry,
+discharges its budget, and refuses it under a tighter one, a composite
+under a duration budget, a plan over a money budget, and wrong measures
+at the point they are written. Plans are values: two plans built the same
+way are equal, and `instanceof` names their types. The stages surfaced
+four substrate findings (§6): `Array.length` untyped (fixed, A1),
+short-circuit operators wrong with a call on the right (fixed, A2), a
+kernel fault on one call shape (B-152, worked around), and a local binding
+of a branching expression holding a pending call (fixed, A3). Not yet
+built: handlers as checked graphs (A4), the surface (B).
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),

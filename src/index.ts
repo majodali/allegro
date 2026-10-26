@@ -265,6 +265,7 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
     }
   } catch (e: any) {
     console.error(`Error in ${filename}: ${e.message}`);
+    if (process.env.ALLEGRO_STACK) console.error(e.stack);
     process.exit(1);
   }
 }

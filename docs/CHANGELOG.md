@@ -4,6 +4,54 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 A3: the planning DSL's measures, rollup and budget check; a local `if` binding no longer holds a pending call
+
+Stage A3 of the rung-3 plan. `lib/planning.alg` types the measures:
+durations are the units DSL's `Duration` (R2; the library says `use
+units`), effort and money are planning-local `Effort` (`person_hours`) and
+`Money` (`money(n, currency)`) (R1), records with their own arithmetic in
+the manner of `Quantity`, so `+` and `*` dispatch and a mismatch is an
+error in planning words ("cannot add money to effort"). `est` and
+`budget` guard every measure: `est(3 m, …)` is refused as "a duration is
+a time quantity such as 30 min, not a length quantity (3 m)". The rollup
+(`rollup`, `node_rollup`) is an upper bound: leaves, composites, borrowed
+plans, a retried node at `max_attempts` times its estimate (convention
+12); `check_budget` joins the scope checks at the plan and at any
+composite (`with_budget` serves both). Readings recorded in the chapter
+§7: an omitted measure contributes nothing; durations add serially;
+handlers stay outside the bound until A4. `tests/planning-budget-demo.alg`
+builds the worked example with every estimate (rollup 440 min, 8.75
+person-hours against a 200 person-hour budget), discharges it, and
+refuses it at 8 person-hours, `Deploy` under a 2 h budget (160 min, the
+comparison dimensional), a plan over a money budget, and wrong measures.
+The A1 demo's estimates became typed; its one `estimate_show` pin
+changed accordingly.
+
+Substrate finding, fixed. **A local binding of an `if` or `when` whose
+chosen branch was a call held the tail-call sentinel**: `y = if c then
+f(x) else 0` bound the sentinel as `y` and any later use of `y` crashed
+the evaluator ("Cannot read properties of undefined (reading 'kind')").
+The tail-call marking marks every branch thunk's body as a tail
+position, and `eval_if`/`eval_when` evaluate that body in place, so a
+branching expression that is not itself in tail position handed the
+sentinel back as its value. The marking cannot simply stop (it is what
+keeps a typed recursive function's precompile from unfolding forever; a
+first attempt at that hung `tests/totality-termination-demo.alg`), so the
+fix is the invariant at the escape point: `evaluateExpr`
+(`src/evaluator.ts`) runs a sentinel that would leave an expression not
+in tail position, and `markTailCalls` now descends through the body
+wrappers (`type_check`, `ensures_check`, `seq`, the `*_attach`
+passthroughs) so the `if` under a typed function's return check carries
+the mark and keeps the 100k-deep TCO through the wrapper. Only a
+branching expression takes the mark through a wrapper, never a bare
+call: marked, `bad(n: Int): Int => bad(n)` spun precompile's tail-call
+loop to its bound on every pass, where the inline cutoff residualizes
+the speculative call at once. Pinned in
+`tests/functions.alg` (binding, `when`, top level); the TCO test still
+passes. B-152 was re-run against the fix and is a distinct fault; it
+stays open. `ALLEGRO_STACK=1` makes the file runner print the JS stack of
+a kernel fault.
+
 ## 2026-10 — B-151 A2: the planning DSL's wiring and graph checks; `&&`/`||` fixed with a call on the right
 
 Stage A2 of the rung-3 plan. `lib/planning.alg` derives the edges

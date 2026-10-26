@@ -588,4 +588,8 @@ fileTest(path.join(testsDir, "planning-core-demo.alg"));
 // Stage A2: the full SoftwareRelease checked, five broken plans refused in
 // planning vocabulary, both enforcement shapes (error value; annotation).
 fileTest(path.join(testsDir, "planning-checks-demo.alg"));
+// Stage A3: typed measures (durations from the units DSL, planning-local
+// effort and money), the rollup with retry upper bounds, budgets discharged
+// and refused at the plan and at a composite, wrong measures refused.
+fileTest(path.join(testsDir, "planning-budget-demo.alg"));
 

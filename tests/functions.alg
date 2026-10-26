@@ -48,3 +48,22 @@ print(abs(-42))
 // expect: 42
 print(abs(7))
 // expect: 7
+
+// A local binding of an `if` or `when` whose chosen branch is a call: the
+// branch is not in tail position, so the binding holds the call's VALUE and
+// later uses of it read a value, not a pending call.
+pick(q) => q
+bump(v) => v + 1
+via_if(q) =>
+  y = if q > 1 then pick(q) else 0
+  bump(y)
+print(via_if(5))
+// expect: 6
+via_when(q) =>
+  y = when q is 5 then pick(q) is _ then 0
+  bump(y)
+print(via_when(5))
+// expect: 6
+top = if true then pick(41) else 0
+print(bump(top))
+// expect: 42
