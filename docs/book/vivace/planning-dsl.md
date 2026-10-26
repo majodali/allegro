@@ -389,12 +389,16 @@ while building the checks:
   sentinel for a call in tail position. Fixed in stage A2 (they apply the
   thunk); pinned in `tests/logical.alg`.
 - **A kernel fault on one shape of call.** A function that binds the
-  result of an inline filter-then-map chain locally and then passes an
-  indexed element of it as one argument of a call whose other argument
-  reads an array field off a call result fails with "`type_dispatch` has
-  unresolved stub". Routing the chain through a named function avoids
-  it. Filed as **B-152** with the minimal pair; the library carries the
-  workaround and says so where it does.
+  result of an inline filter-then-map chain locally and then uses the
+  binding more than once, under a method call, an index and a lambda,
+  failed with "`type_dispatch` has unresolved stub". Filed as **B-152**
+  (the kernel fault on one call shape) with the minimal pair and fixed
+  in a bounded chunk after stage A3: the parser leaves primitive stubs
+  that `resolvePrimitives` replaces, and it skipped a stub it had already
+  seen under another parent, although a local binding substituted into
+  several use sites puts one stub under several expressions. The stub is
+  resolved before the seen check now; pinned in `tests/functions.alg`;
+  the library's workarounds are gone.
 - **A local binding of an `if` or `when` whose chosen branch was a call
   held a pending call, not a value.** `y = if c then f(x) else 0` bound
   the evaluator's tail-call sentinel as `y`, and every later use of `y`
@@ -528,9 +532,10 @@ at the point they are written. Plans are values: two plans built the same
 way are equal, and `instanceof` names their types. The stages surfaced
 four substrate findings (§6): `Array.length` untyped (fixed, A1),
 short-circuit operators wrong with a call on the right (fixed, A2), a
-kernel fault on one call shape (B-152, worked around), and a local binding
-of a branching expression holding a pending call (fixed, A3). Not yet
-built: handlers as checked graphs (A4), the surface (B).
+kernel fault on one call shape (B-152, fixed in its own chunk after A3),
+and a local binding of a branching expression holding a pending call
+(fixed, A3). Not yet built: handlers as checked graphs (A4), the surface
+(B).
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),

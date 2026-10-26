@@ -4,6 +4,28 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-152: a primitive stub shared under two expressions resolves under both
+
+The bounded chunk the maintainer ruled after B-151 (the planning pilot)
+stage A3. The parser leaves
+primitive stubs (`fn: null`) that `resolvePrimitives` (`src/runtime.ts`)
+replaces while walking a binding's value with a `seen` set against
+cycles. The set was consulted before the stub case, so a stub object
+reached a second time under a different parent came back unchanged and
+evaluation failed with "`type_dispatch` has unresolved stub". A stub
+sits under more than one Expression whenever the block builder
+substitutes a local binding into several use sites: `substName` rebuilds
+each enclosing expression around the new argument and keeps its `fn`
+object. A nine-line library-free reproducer, a record type and a local
+binding used under a method call, an index and a lambda, had eight
+shared stubs. The stub is now resolved before the `seen` check (a stub is
+replaced in its parent, not rewritten in place, so every parent must see
+it). Pinned in `tests/functions.alg`. `lib/planning.alg` drops the two
+workarounds (`names_producing`, `compatibility_with`); their call sites
+are back in the shape that failed. Neither suspect recorded in the item
+(cloning at the binding, IC-6 (expression memo sharing)) was the cause. Suite 1210
+distinct tests plus one pinned demo file.
+
 ## 2026-10 — B-151 A3: the planning DSL's measures, rollup and budget check; a local `if` binding no longer holds a pending call
 
 Stage A3 of the rung-3 plan. `lib/planning.alg` types the measures:

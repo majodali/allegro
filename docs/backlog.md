@@ -868,7 +868,7 @@ that prevents it.
     value) and `WellFormedPlan` (annotation halt);
     `tests/planning-checks-demo.alg` suite-pinned. Findings: `&&`/`||`
     wrong with a call on the right (fixed); a kernel fault on one call
-    shape (**B-152**, worked around).
+    shape (**B-152**, worked around; fixed 2026-10-26).
   - **Progress.** A3 (2026-10-26): typed measures (`Effort`, `Money`
     planning-local per R1; durations from `lib/units.alg` per R2), the
     rollup with retry upper bounds, the budget check at the plan and at
@@ -876,24 +876,25 @@ that prevents it.
     fixed: a local binding of an `if`/`when` whose chosen branch was a
     call held the tail-call sentinel (`src/evaluator.ts`). Next: A4,
     handlers as checked graphs, including what they add to the rollup
-- [ ] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
+- [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds
   `prods = ns.filter(n => ports_have(n.outcomes, o.type)).map(n => n.name)`
   locally and then evaluates
   `if prods.length == 0 then [] else pair(prods[0], find_node_in(ns, prods[0]).outcomes)`
-  fails; the same function with `prods` computed by a named helper
-  (`prods = names_producing(ns, o.type)`), or with `k = prods[0]` bound
-  first, or with `.name` in place of the array-valued `.outcomes`, works.
-  Not a parse error; the unresolved primitive is the dot-access
-  `type_dispatch` reached under evaluation. Suspects, unverified: the
-  cloning of a lambda-bearing expression at the local binding (a stub
-  placeholder copied before `resolvePrimitives` ran) or Expression memo
-  sharing (IC-6). Not the tail-call sentinel leak fixed at B-151 A3: the
-  pair reproduces with that fix in place. **Blocked-by**: nothing. The library carries the
-  workaround at `names_producing` and `compatibility_with`; remove it
-  when this closes. **Pointer**: `lib/planning.alg`;
-  `docs/plans/planning-pilot.md` §8 (A2)
+  fails; the same function with `prods` computed by a named helper, or
+  with `k = prods[0]` bound first, works. **LANDED 2026-10-26** (the
+  bounded chunk the maintainer ruled after A3). Cause: `resolvePrimitives`
+  (`src/runtime.ts`) checked its `seen` set before resolving a parser
+  stub, and a stub object can sit under more than one Expression (the
+  block builder substitutes a local binding's value into each use site
+  and `substName` rebuilds the enclosing expressions around the new
+  argument while keeping their `fn` objects), so the second parent kept
+  the stub. A nine-line library-free reproducer had eight shared stubs.
+  The stub is now resolved before the `seen` check; pinned in
+  `tests/functions.alg`; the library's two workarounds are removed.
+  Neither suspect (cloning at the binding, IC-6 memo sharing) was it.
+  **Pointer**: `docs/plans/planning-pilot.md` §8
 - [ ] **B-080** · Vivace DSL candidates (post-pilot roster): logic
   programming, constraint programming, data modeling, numerical methods,
   software-systems modeling, workflow/process, automatic reasoning, UI
