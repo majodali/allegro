@@ -7,8 +7,10 @@
 // Stage A1 is the primitive version: the types as plain records, the
 // constructors a plan is built through, the queries and the one-line
 // renderings a demo pins. Stage A2 adds wiring derivation and the graph
-// checks (§7). No surface syntax (stage B), no typed estimates (stage A3).
-// Everything here is ordinary Allegro, loaded with `use planning`.
+// checks (§7). Stage A3 types the measures (duration from the units DSL,
+// planning-local effort and money), rolls estimates up with retry upper
+// bounds and checks budgets. No surface syntax (stage B). Everything here
+// is ordinary Allegro, loaded with `use planning`.
 //
 // Every walk over the node tree is `assume terminates`: a plan is a finite
 // tree, but no `decreases` metric the analyzer verifies describes a walk
@@ -16,6 +18,7 @@
 // refinement predicate whose callees may diverge. The admissions are
 // recorded in the ledger, as every `assume` is.
 use totality
+use units
 
 // --- List helpers (Array has map / filter / reduce / concat / slice) ------
 
@@ -48,15 +51,143 @@ port_show(p) =>
 
 ports_show(ps) => join(ps.map(port_show), ", ")
 
-// --- Estimates and retry (shapes only; stage A3 types the measures) --------
+// --- Measures (stage A3; rulings R1 and R2) -----------------------------------
+//
+// A wall-clock duration is the units DSL's `Duration` (R2): `30 min` with
+// `use units` in scope, or `qty(30, min)`. Effort (person-hours) and money
+// are not SI dimensions, so they are planning-local types (R1), built in
+// the manner of the units DSL's `Quantity`: a record with its own
+// arithmetic, so that `+` and `*` dispatch to it and a mismatch is an error
+// in planning vocabulary rather than a number quietly added to a number.
+
+to_float(v) => when v is n and n instanceof Int then n.toFloat() is n then n
+
+measure_name(v) =>
+  when v
+    is x and x instanceof Effort then "effort"
+    is x and x instanceof Money then "money"
+    is x and x instanceof Quantity then "a {dim_name(x.dim)} quantity ({x.toString()})"
+    is x and x instanceof Int then "a bare number"
+    is x and x instanceof Float then "a bare number"
+    is _ then "that value"
+
+effort_add(self, other) =>
+  if other instanceof Effort
+    then Effort(self.hours + other.hours)
+    else error "cannot add {measure_name(other)} to effort: effort is measured in person-hours"
+
+effort_mul(self, k) =>
+  when k
+    is n and n instanceof Int then Effort(self.hours * n.toFloat())
+    is n and n instanceof Float then Effort(self.hours * n)
+    is _ then error "effort can only be scaled by a number"
+
+effort_lt(self, other) =>
+  if other instanceof Effort then self.hours < other.hours
+  else error "cannot compare effort with {measure_name(other)}"
+
+effort_gt(self, other) =>
+  if other instanceof Effort then self.hours > other.hours
+  else error "cannot compare effort with {measure_name(other)}"
+
+effort_show(self) => "{self.hours} person-hours"
+
+Effort = Type.define({
+  hours: Float,
+  add: effort_add,
+  mul: effort_mul,
+  lt: effort_lt,
+  gt: effort_gt,
+  toString: effort_show
+})
+
+person_hours(n) => Effort(to_float(n))
+
+money_add(self, other) =>
+  if !(other instanceof Money)
+    then error "cannot add {measure_name(other)} to money"
+    else if self.currency == other.currency
+      then Money(self.amount + other.amount, self.currency)
+      else error "cannot add {other.currency} to {self.currency}: one currency per plan"
+
+money_mul(self, k) =>
+  when k
+    is n and n instanceof Int then Money(self.amount * n.toFloat(), self.currency)
+    is n and n instanceof Float then Money(self.amount * n, self.currency)
+    is _ then error "money can only be scaled by a number"
+
+money_lt(self, other) =>
+  if other instanceof Money && other.currency == self.currency then self.amount < other.amount
+  else error "cannot compare {self.currency} with {measure_name(other)}"
+
+money_gt(self, other) =>
+  if other instanceof Money && other.currency == self.currency then self.amount > other.amount
+  else error "cannot compare {self.currency} with {measure_name(other)}"
+
+money_show(self) => "{self.amount} {self.currency}"
+
+Money = Type.define({
+  amount: Float,
+  currency: String,
+  add: money_add,
+  mul: money_mul,
+  lt: money_lt,
+  gt: money_gt,
+  toString: money_show
+})
+
+money(n, currency) => Money(to_float(n), currency)
+
+// Each measure of an estimate or a budget is optional (`none`); a present
+// one must be of its type. `est(30 m, …)` (metres) is refused in the units
+// DSL's own vocabulary: the dimensional error the rung-2 bridge exists for.
+as_duration(d) =>
+  when d
+    is none then d
+    is x and x instanceof Duration then d
+    is _ then error "a duration is a time quantity such as 30 min, not {measure_name(d)}"
+
+as_effort(e) =>
+  when e
+    is none then e
+    is x and x instanceof Effort then e
+    is _ then error "effort is measured in person-hours (person_hours(n)), not {measure_name(e)}"
+
+as_money(m) =>
+  when m
+    is none then m
+    is x and x instanceof Money then m
+    is _ then error "money is built with money(n, currency), not {measure_name(m)}"
+
+measure_show(v) => when v is none then "none" is _ then v.toString()
+
+// --- Estimates, budgets and retry -------------------------------------------------
 //
 // Convention 8: estimates roll up from leaves, budgets are verified at
 // composites and at the plan. Convention 12: retry is explicit, and the
-// rollup takes estimate × max_attempts as the node's upper bound.
+// rollup takes estimate × max_attempts as the node's upper bound. An
+// estimate and a budget have the same three measures; a measure an
+// estimate leaves out contributes nothing to the rollup, and a measure a
+// budget leaves out is unconstrained.
 
 Estimate = Type.define({ duration: Any, effort: Any, money: Any })
 
-est(duration, effort, money) => Estimate(duration, effort, money)
+// (The guarded measures pass through a plain function on their way to the
+// constructor: an error value among a CALL's arguments propagates as the
+// call's result, while a constructor would store it in the field.)
+est(duration, effort, money) => make_estimate(as_duration(duration), as_effort(effort), as_money(money))
+make_estimate(d, e, m) => Estimate(d, e, m)
+
+no_estimate = Estimate(none, none, none)
+
+Budget = Type.define({ duration: Any, effort: Any, money: Any })
+
+budget(duration, effort, money) => make_budget(as_duration(duration), as_effort(effort), as_money(money))
+make_budget(d, e, m) => Budget(d, e, m)
+
+duration_budget(d) => budget(d, none, none)
+effort_budget(e) => budget(none, e, none)
+money_budget(m) => budget(none, none, m)
 
 Retry = Type.define({ max_attempts: Int, backoff: Any })
 
@@ -88,28 +219,38 @@ PlanNode = Type.define({
   retry: Any,
   nodes: Array,
   handlers: Array,
-  graph: Any
+  graph: Any,
+  budget: Any
 })
 
 leaf(name, inputs, outcomes) =>
-  PlanNode(name, inputs, outcomes, none, none, none, [], [], none)
+  PlanNode(name, inputs, outcomes, none, none, none, [], [], none, none)
 
 composite(name, inputs, outcomes, nodes) =>
-  PlanNode(name, inputs, outcomes, none, none, none, nodes, [], none)
+  PlanNode(name, inputs, outcomes, none, none, none, nodes, [], none, none)
 
 // `Build: uses BuildPipeline` — the node's ports are the plan's.
 uses(name, p) =>
-  PlanNode(name, p.inputs, p.outcomes, none, none, none, [], [], p)
+  PlanNode(name, p.inputs, p.outcomes, none, none, none, [], [], p, none)
 
 // Builders: records are immutable, so each returns a copy with one field set.
-with_estimate(n, e) =>
-  PlanNode(n.name, n.inputs, n.outcomes, e, n.instructions, n.retry, n.nodes, n.handlers, n.graph)
+with_estimate(n, e) => set_estimate(n, as_estimate(e))
+set_estimate(n, e) =>
+  PlanNode(n.name, n.inputs, n.outcomes, e, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget)
 with_instructions(n, text) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, text, n.retry, n.nodes, n.handlers, n.graph)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, text, n.retry, n.nodes, n.handlers, n.graph, n.budget)
 with_retry(n, r) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, r, n.nodes, n.handlers, n.graph)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, r, n.nodes, n.handlers, n.graph, n.budget)
 with_handler(n, h) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers.concat([h]), n.graph)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers.concat([h]), n.graph, n.budget)
+
+as_estimate(e) =>
+  if e instanceof Estimate then e
+  else error "an estimate is built with est(duration, effort, money), not {measure_name(e)}"
+
+as_budget(b) =>
+  if b instanceof Budget then b
+  else error "a budget is built with budget(duration, effort, money), not {measure_name(b)}"
 
 is_uses(n) => when n.graph is none then false is _ then true
 is_composite(n) => n.nodes.length > 0
@@ -131,7 +272,14 @@ Plan = Type.define({
 
 plan(name, inputs, outcomes, nodes) => Plan(name, inputs, outcomes, nodes, none, [])
 
-with_budget(p, b) => Plan(p.name, p.inputs, p.outcomes, p.nodes, b, p.handlers)
+// A budget sits on the plan or on a composite (convention 8), so one
+// builder serves both.
+with_budget(x, b) => set_budget(x, as_budget(b))
+set_budget(x, b) =>
+  if x instanceof Plan
+    then Plan(x.name, x.inputs, x.outcomes, x.nodes, b, x.handlers)
+    else PlanNode(x.name, x.inputs, x.outcomes, x.estimate, x.instructions, x.retry, x.nodes, x.handlers, x.graph, b)
+
 plan_with_handler(p, h) => Plan(p.name, p.inputs, p.outcomes, p.nodes, p.budget, p.handlers.concat([h]))
 
 // --- Queries over the graph ----------------------------------------------------
@@ -309,23 +457,91 @@ check_outcomes(scope, avail, nodes, declared) =>
   dangling = nodes.reduce((acc, n) => acc.concat(n.outcomes.reduce((a2, o) => a2.concat(dangling_for(scope, nodes, declared, n, o)), [])), [])
   missing.concat(dangling)
 
+// --- The rollup (convention 8) and the budget check (§7) — stage A3 --------------
+//
+// A leaf contributes its estimate; a composite the rollup of its inner
+// graph; a `uses` node the rollup of the borrowed plan. A node with a retry
+// policy contributes max_attempts times that (convention 12): the rollup is
+// an UPPER BOUND, not an expectation. Durations add serially, so the bound
+// assumes no two nodes run at once. Handlers are alternate graphs; what
+// they add to the bound is settled with handler validity at stage A4.
+
+measure_add(a, b) =>
+  when a
+    is none then b
+    is _ then (when b is none then a is _ then a + b)
+
+measure_scale(a, k) => when a is none then none is _ then a * k
+
+est_add(a, b) =>
+  Estimate(measure_add(a.duration, b.duration), measure_add(a.effort, b.effort), measure_add(a.money, b.money))
+
+est_scale(e, k) =>
+  Estimate(measure_scale(e.duration, k), measure_scale(e.effort, k), measure_scale(e.money, k))
+
+attempts(n) => when n.retry is none then 1 is r then r.max_attempts
+
+node_estimate(n) => when n.estimate is none then no_estimate is e then e
+
+// (`own_rollup` was split out of `node_rollup` when a local binding of this
+// `if` held a pending call instead of a value — a tail-call sentinel leak
+// fixed at stage A3 in the evaluator, pinned in tests/functions.alg. The
+// split stays because the node's own contribution is worth a name.)
+own_rollup(n) =>
+  assume terminates
+  if is_uses(n)
+    then rollup_of(n.graph.nodes)
+    else if is_composite(n)
+      then rollup_of(n.nodes)
+      else node_estimate(n)
+
+node_rollup(n) =>
+  assume terminates
+  est_scale(own_rollup(n), attempts(n))
+
+rollup_of(nodes) =>
+  assume terminates
+  nodes.reduce((acc, n) => est_add(acc, node_rollup(n)), no_estimate)
+
+rollup(p) => rollup_of(p.nodes)
+
+// A budget measure left `none` is unconstrained; a rollup measure that is
+// `none` (nothing beneath estimates it) is within any budget.
+exceeds(used, limit) => when used is none then false is _ then used.gt(limit)
+
+measure_check(scope, label, used, limit) =>
+  when limit
+    is none then []
+    is _ then (if exceeds(used, limit)
+                 then [finding("budget", scope, "", "budget of {scope}: {label} {measure_show(used)} exceeds {measure_show(limit)}")]
+                 else [])
+
+budget_findings(scope, r, b) =>
+  measure_check(scope, "duration", r.duration, b.duration)
+    .concat(measure_check(scope, "effort", r.effort, b.effort))
+    .concat(measure_check(scope, "money", r.money, b.money))
+
+check_budget(scope, nodes, bgt) =>
+  when bgt is none then [] is b then budget_findings(scope, rollup_of(nodes), b)
+
 // A scope's findings, then each composite's internal graph (convention 6
 // applies the same checks inside) and each borrowed plan's own.
-check_scope(scope, avail, nodes, declared) =>
+check_scope(scope, avail, nodes, declared, bgt) =>
   assume terminates
   own = check_wiring(scope, avail, nodes)
     .concat(check_compatibility(scope, avail, nodes))
     .concat(check_acyclic(scope, avail, nodes))
     .concat(check_outcomes(scope, avail, nodes, declared))
+    .concat(check_budget(scope, nodes, bgt))
   nodes.reduce((acc, n) =>
     if is_composite(n)
-      then acc.concat(check_scope(n.name, n.inputs, n.nodes, n.outcomes))
+      then acc.concat(check_scope(n.name, n.inputs, n.nodes, n.outcomes, n.budget))
       else if is_uses(n) then acc.concat(check_plan(n.graph)) else acc,
     own)
 
 check_plan(p) =>
   assume terminates
-  check_scope(p.name, p.inputs, p.nodes, p.outcomes)
+  check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget)
 
 plan_errors(p) => check_plan(p).map(f => f.message)
 
@@ -352,4 +568,9 @@ plan_show(p) =>
 estimate_show(e) =>
   when e
     is none then "no estimate"
-    is _ then "duration {e.duration}, effort {e.effort}, money {e.money}"
+    is _ then "duration {measure_show(e.duration)}, effort {measure_show(e.effort)}, money {measure_show(e.money)}"
+
+budget_show(b) =>
+  when b
+    is none then "no budget"
+    is _ then "budget duration {measure_show(b.duration)}, effort {measure_show(b.effort)}, money {measure_show(b.money)}"

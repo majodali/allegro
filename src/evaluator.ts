@@ -68,6 +68,27 @@ export function markTailCalls(body: Value, seen?: Set<Value>): void {
     (body as any)._tailPosition = true;
 
     const fn = body.fn;
+    // A body wrapper's result IS the body's result: the wrapped expression
+    // is in tail position too. The wrappers forward a TailCall sentinel
+    // (type_check, ensures_check) or return their last argument's value
+    // (seq, the *_attach passthroughs), so marking through them records
+    // what already happens at runtime. B-151 A3: evaluateExpr now resolves
+    // a sentinel that would escape an expression NOT in tail position, so
+    // the `if` under a typed function's `type_check` has to carry the mark
+    // itself, or the 100k-deep TCO through the wrapper is lost.
+    // Only a branching expression (or a further wrapper) takes the mark
+    // through a wrapper, never a bare call: `bad(n: Int): Int => bad(n)`
+    // marked under its `type_check` would hand precompile a sentinel on
+    // every pass and spin its tail-call loop to the bound, where today the
+    // inline cutoff residualizes the speculative call at once.
+    if (fn.kind === ValueKind.PrimitiveFunction) {
+      const idx = forwardedArgIndex(fn.name, body.args.length);
+      const inner = idx !== null ? body.args[idx] : null;
+      if (inner && inner.kind === ValueKind.Expression && inner.fn.kind === ValueKind.PrimitiveFunction &&
+          (isBranchingPrimitive(inner) || forwardedArgIndex(inner.fn.name, inner.args.length) !== null)) {
+        markTailCalls(inner, seen);
+      }
+    }
     // eval_if: args[1] and args[2] are thunks; their bodies are in tail position
     if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "eval_if" && body.args.length === 3) {
       for (const branchIdx of [1, 2]) {
@@ -89,6 +110,36 @@ export function markTailCalls(body: Value, seen?: Set<Value>): void {
       }
     }
   }
+}
+
+/** Which argument of a body wrapper is the body whose value the wrapper
+ *  hands back unchanged: the first for the check and attach wrappers, the
+ *  last for `seq`. Null for anything else. */
+function forwardedArgIndex(name: string, argCount: number): number | null {
+  if (argCount === 0) return null;
+  switch (name) {
+    case "type_check":
+    case "ensures_check":
+    case "effects_attach":
+    case "param_effects_attach":
+    case "partial_attach":
+    case "decreases_attach":
+    case "total_attach":
+    case "assume_terminates_attach":
+    case "proven_attach":
+      return 0;
+    case "seq":
+      return argCount - 1;
+    default:
+      return null;
+  }
+}
+
+function isBranchingPrimitive(expr: ExpressionValue): boolean {
+  const fn = expr.fn;
+  if (fn.kind !== ValueKind.PrimitiveFunction) return false;
+  return (fn.name === "eval_if" && expr.args.length === 3) ||
+         (fn.name === "eval_when" && expr.args.length === 5);
 }
 
 // --- Core evaluation ---
@@ -158,7 +209,20 @@ function evaluateExpr(
   const fn = fnRaw;
 
   if (fn.kind === ValueKind.PrimitiveFunction) {
-    return applyPrimitive(fn, expr.args, ctx, depth, depCollector);
+    const result = applyPrimitive(fn, expr.args, ctx, depth, depCollector);
+    // A TailCall sentinel may leave an expression only when that expression
+    // is itself in tail position, where the enclosing applyComposed loop
+    // consumes it. `if` and `when` evaluate a branch thunk's BODY in place,
+    // and markTailCalls marks every thunk body as a tail position (the mark
+    // is what stops a typed recursive function's precompile from unfolding
+    // forever), so a branching expression that is NOT in tail position —
+    // `y = if c then f(x) else 0`, `print(if c then f(x) else 0)` — handed
+    // the sentinel back as a value and every use of it crashed the
+    // evaluator (B-151 A3 finding). Run the call here instead.
+    if (isTailCall(result) && !(expr as any)._tailPosition) {
+      return applyComposed(result.fn, result.args, ctx, depth, result.fnRaw, depCollector);
+    }
+    return result;
   }
 
   if (fn.kind === ValueKind.ComposedFunction) {

@@ -868,8 +868,14 @@ that prevents it.
     value) and `WellFormedPlan` (annotation halt);
     `tests/planning-checks-demo.alg` suite-pinned. Findings: `&&`/`||`
     wrong with a call on the right (fixed); a kernel fault on one call
-    shape (**B-152**, worked around). Next: A3, typed measures and the
-    budget check (R1, R2)
+    shape (**B-152**, worked around).
+  - **Progress.** A3 (2026-10-26): typed measures (`Effort`, `Money`
+    planning-local per R1; durations from `lib/units.alg` per R2), the
+    rollup with retry upper bounds, the budget check at the plan and at
+    composites; `tests/planning-budget-demo.alg` suite-pinned. Finding
+    fixed: a local binding of an `if`/`when` whose chosen branch was a
+    call held the tail-call sentinel (`src/evaluator.ts`). Next: A4,
+    handlers as checked graphs, including what they add to the rollup
 - [ ] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds
@@ -883,7 +889,8 @@ that prevents it.
   `type_dispatch` reached under evaluation. Suspects, unverified: the
   cloning of a lambda-bearing expression at the local binding (a stub
   placeholder copied before `resolvePrimitives` ran) or Expression memo
-  sharing (IC-6). **Blocked-by**: nothing. The library carries the
+  sharing (IC-6). Not the tail-call sentinel leak fixed at B-151 A3: the
+  pair reproduces with that fix in place. **Blocked-by**: nothing. The library carries the
   workaround at `names_producing` and `compatibility_with`; remove it
   when this closes. **Pointer**: `lib/planning.alg`;
   `docs/plans/planning-pilot.md` §8 (A2)

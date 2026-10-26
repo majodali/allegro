@@ -56,7 +56,7 @@ release = with_budget(
         test,
         leaf("ReleaseReview", [port("ValidatedBuild"), port("ReleaseApproval")], [port("ApprovedRelease")]),
         deploy]),
-  200)
+  effort_budget(person_hours(200)))
 
 print(plan_show(release))
 // expect: plan SoftwareRelease: SourceCommit, ReleaseVersion [valid_semver], ReleaseApproval -> DeployedRelease [version_matches_release_version]; 14 nodes, 10 leaves, 1 handlers

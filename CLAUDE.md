@@ -58,6 +58,7 @@ npm test                            # full suite, sequential (src/test/; 1197 at
 npm run test:shards                 # same gate, sharded across processes (~2min) — CI uses this
 ALLEGRO_TEST_FILTER=pat npm test    # dev tier — targeted runs (now filters async tests too)
 ALLEGRO_TEST_TRACE=1 npm test       # per-test progress to stderr (hang/slowness triage)
+ALLEGRO_STACK=1 npx tsx src/index.ts f.alg  # file runner prints the JS stack of a kernel fault
 bash scripts/typecheck.sh           # sanctioned typecheck (TS6059 rootDir convention ignored)
 npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file  (--base for Allegretto)
