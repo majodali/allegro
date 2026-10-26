@@ -30,6 +30,49 @@ export const testsDir = path.resolve("tests");
 export const typeNames = new Set(["Int", "Float", "String", "Bool", "Array", "Object", "true", "false"]);
 
 /**
+ * A loader for `lib/NAME.alg` as an Extension, with one cache per loader.
+ * A library may itself open with `use X` (lib/planning.alg uses the
+ * totality forms and the units DSL; B-151 A2, A3). The runtime ModuleLoader
+ * resolves such chains; this harness evaluates libraries directly, so it
+ * resolves them the same way: scan the library's header, load what it uses
+ * first (once per name), and evaluate its body with those extensions.
+ */
+export function libLoader(): (id: string, chain: string[]) => Extension {
+  const libDir = path.resolve("lib");
+  const loaded = new Map<string, Extension>();
+  const loadLib = (id: string, chain: string[]): Extension => {
+    const have = loaded.get(id);
+    if (have) return have;
+    if (chain.includes(id)) throw new Error(`use cycle: ${[...chain, id].join(" -> ")}`);
+    const modSource = fs.readFileSync(path.join(libDir, `${id}.alg`), "utf-8");
+    const scan = scanUses(modSource);
+    const depNames = [...new Set(scan.directives
+      .map(d => d.kind === "module" ? d.name! : d.kind === "member" ? d.moduleName! : null)
+      .filter((x): x is string => x !== null))];
+    const deps = depNames.map(dep => loadLib(dep, [...chain, id]));
+    const modResult = runtimeEval(modSource.slice(scan.headerEnd), undefined, [typeExt, ...deps], undefined, true);
+    const frag = extractGrammarFragment(modResult.evalCtx);
+    const bindings: Record<string, Value> = {};
+    for (const [key, b] of modResult.evalCtx.bindings) {
+      if (b.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
+        bindings[key] = b.value;
+      }
+    }
+    const ext: Extension = { name: id, bindings, grammarFragment: frag };
+    loaded.set(id, ext);
+    return ext;
+  };
+  return loadLib;
+}
+
+/** The extensions a source needs for `use NAME` headers, in order: what a
+ *  test passes to `runtimeEval` to run inline Allegro under libraries. */
+export function libExtensions(names: string[]): Extension[] {
+  const loadLib = libLoader();
+  return names.map(n => loadLib(n, []));
+}
+
+/**
  * Run an .alg file in Allegro Standard mode.
  * Captures print output and validates against "// expect: ..." comments.
  * Handles `use NAME` (and the back-compat-free pre-scanner) by loading
@@ -122,35 +165,7 @@ export function runAlgFile(filePath: string, extensions?: Extension[]): void {
   let grammarExts: Extension[] = [];
   const uniqModuleNames = [...new Set(grammarNames)];
   if (uniqModuleNames.length > 0) {
-    const libDir = path.resolve("lib");
-    // A library may itself open with `use X` (lib/planning.alg uses the
-    // totality forms; B-151 A2). The runtime ModuleLoader resolves such
-    // chains; this harness evaluates libraries directly, so it resolves
-    // them the same way: scan the library's header, load what it uses
-    // first (once per name), and evaluate its body with those extensions.
-    const loaded = new Map<string, Extension>();
-    const loadLib = (id: string, chain: string[]): Extension => {
-      const have = loaded.get(id);
-      if (have) return have;
-      if (chain.includes(id)) throw new Error(`use cycle: ${[...chain, id].join(" -> ")}`);
-      const modSource = fs.readFileSync(path.join(libDir, `${id}.alg`), "utf-8");
-      const scan = scanUses(modSource);
-      const depNames = [...new Set(scan.directives
-        .map(d => d.kind === "module" ? d.name! : d.kind === "member" ? d.moduleName! : null)
-        .filter((x): x is string => x !== null))];
-      const deps = depNames.map(dep => loadLib(dep, [...chain, id]));
-      const modResult = runtimeEval(modSource.slice(scan.headerEnd), undefined, [typeExt, ...deps], undefined, true);
-      const frag = extractGrammarFragment(modResult.evalCtx);
-      const bindings: Record<string, Value> = {};
-      for (const [key, b] of modResult.evalCtx.bindings) {
-        if (b.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
-          bindings[key] = b.value;
-        }
-      }
-      const ext: Extension = { name: id, bindings, grammarFragment: frag };
-      loaded.set(id, ext);
-      return ext;
-    };
+    const loadLib = libLoader();
     for (const id of uniqModuleNames) {
       const ext = loadLib(id, []);
       const bindings = { ...ext.bindings };

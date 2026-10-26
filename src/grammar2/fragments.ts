@@ -16,7 +16,7 @@
 import { slotCount, indexGet } from "../slot-accessors.js";
 import {
   Grammar, Rule, makeGrammar, addProduction,
-  lit, nonterm, seq, alt, rep, opt, regex as ruleRegex,
+  lit, nonterm, seq, alt, rep, opt, regex as ruleRegex, indent as indentTerm,
 } from "./types.js";
 import { buildBaseGrammar, BASE_LEVEL_NAMES, BASE_OPERATORS_TO_LEVEL } from "./base-grammar.js";
 import type { GrammarFragment, Value, StructureValue, BitsValue } from "../types.js";
@@ -637,8 +637,18 @@ function ebnfObjectToRule(v: Value, labels: string[]): Rule {
       return lit(getStringField(ctx, "text"));
     case "regex":
       return ruleRegex(new RegExp(getStringField(ctx, "pattern")));
-    case "nonterm":
-      return nonterm(getStringField(ctx, "name"));
+    case "nonterm": {
+      // B-151 B1: the layout terminals are reachable from user EBNF by
+      // their formalism names (grammar-formalism.md §5), so a library can
+      // write an offside-rule fragment: `"plan" n:name ":" hws INDENT
+      // items DEDENT`. They are terminals, not productions, and the
+      // whitespace interleave treats them as explicit (below): a `ws_any`
+      // inserted before INDENT or NEWLINE would consume the newline they
+      // match on.
+      const name = getStringField(ctx, "name");
+      if (name === "INDENT" || name === "NEWLINE" || name === "DEDENT") return indentTerm(name);
+      return nonterm(name);
+    }
     case "seq": {
       // User EBNF sequences get `ws_any` interleaved between items so the
       // written form `"match" s:expr "with" …` accepts real whitespace
@@ -734,6 +744,7 @@ function applyReplaceAlt(g: Grammar, name: string, selector: string, replacement
 const WS_PRODUCTION_NAMES = new Set(["hws", "ws", "ws_req", "ws_any"]);
 
 function isExplicitWs(r: Rule): boolean {
+  if (r.kind === "terminal" && r.match.kind === "indent") return true;
   return r.kind === "nonterm" && WS_PRODUCTION_NAMES.has(r.name);
 }
 

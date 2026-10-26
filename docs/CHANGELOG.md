@@ -4,6 +4,41 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 (the planning pilot) B1: the `plan NAME:` surface, the first offside-rule fragment in lib/
+
+Stage B1 of the rung-3 plan. `planning_grammar` in `lib/planning.alg`
+carries the chapter's §5 syntax as a `stmt_form` over INDENT/NEWLINE/
+DEDENT blocks: `inputs:`/`outcomes:` inline or as a block, `[ fixture ]`
+constraints naming predicates in scope, `estimate:`/`budget:` measures
+(`30 min` through the units sugar, `1 person-hour`, `0.5 person-hours`),
+`retry: max N attempts[, Q backoff]`, `fails:`, `instructions:` text
+blocks, `on NAME:` handlers, `Name: uses Other`, nested node blocks.
+Items lower to tagged records folded by `build_node`/`build_handler`/
+`build_plan` into the library's own values; the statement expands to
+`binding_decl(name, build_plan(…), WellFormedPlan)`, so a plan that does
+not check halts the build. `tests/planning-release-demo.alg` is the
+worked example verbatim (13 pinned lines; both plans built, bound,
+checked, rolled up); a harness test pins the halt.
+
+Engine, four small additions, each a gap the fragment hit. (1) The EBNF
+mini-grammar can name the layout terminals: `INDENT`, `NEWLINE`,
+`DEDENT` in a rule body are the formalism's stateful terminals, treated
+as explicit whitespace by the interleave (`src/grammar2/fragments.ts`).
+(2) A statement form may declare a binding: an expansion
+`binding_decl(name, value[, type])` becomes a binding, type-checked as
+`name: type = value` (`src/grammar2/tree-builder.ts`; the marker is a
+registered primitive so a library template resolves it hygienically).
+(3) A label's matched text builds as a `typed_string` literal; it was a
+bare Bits typed by its length, and the eight-byte node name `Validate`
+came out as an Int. (4) `typeLiterals` (`src/runtime.ts`) leaves a
+literal that already carries a type alone: a template's free `none` is
+resolved to its value at definition time and arrived in the consumer's
+tree pre-typed, and re-stamping it as Int was refused. `lib/units.alg`
+gains the plural spellings `hours`, `minutes`, `seconds`. The harness's
+library loader is exported (`libLoader`, `libExtensions` in
+`src/test/alg-files.ts`) for inline tests under libraries. Suite 1211
+distinct tests plus one pinned demo file and one harness test.
+
 ## 2026-10 — B-151 (the planning pilot) A4: the planning DSL's failures and handlers; stage A complete
 
 Stage A4 of the rung-3 plan, the last chunk of the library stage. A node

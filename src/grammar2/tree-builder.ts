@@ -16,7 +16,7 @@ import {
   makeInt, makeBits, stringToBits, makeParam, makeSymbol, makeExpr,
   makeComposedFn, makeStructure, prim, bind, buildFn, substName,
 } from "../parser-helpers.js";
-import { makeFloat } from "../types.js";
+import { makeFloat, bitsToString } from "../types.js";
 import { getUserOp } from "./fragments.js";
 import { substituteParams } from "../evaluator.js";
 
@@ -1664,6 +1664,30 @@ export function buildStmt(tree: ParseTree, outerParamMap: Map<string, any> = new
 
   // Bare expression (the stmt's whole tree is an expression). Rebuild as expr.
   const value = buildExpr(tree, outerParamMap);
+
+  // B-151 B1: a statement form may DECLARE A BINDING by expanding to the
+  // marker `binding_decl(name, value[, type])`. The name is the matched
+  // text (a string from a regex part) or an identifier (a Symbol); the
+  // optional type wraps the value exactly as `name: type = value` does, so
+  // the declaration halts compilation when the check fails. The marker
+  // never reaches evaluation from here; it is a primitive only so that a
+  // library template resolves it hygienically.
+  if (isPrimitiveCall(value, "binding_decl")) {
+    const margs = value.args as any[];
+    if (margs.length < 2 || margs.length > 3) {
+      throw new Error(`binding_decl: expected (name, value[, type]), got ${margs.length} args`);
+    }
+    const nameV = margs[0];
+    let key: string;
+    if (nameV?.kind === "Symbol") key = nameV.name;
+    else if (nameV?.kind === "Bits") key = bitsToString(nameV);
+    else if (isPrimitiveCall(nameV, "typed_string") && nameV.args[0]?.kind === "Bits") key = bitsToString(nameV.args[0]);
+    else throw new Error("binding_decl: the name must be an identifier or the matched text");
+    let bound = margs[1];
+    if (margs.length === 3) bound = makeExpr(prim("type_check_binding"), [bound, margs[2]]);
+    return { key, value: bound };
+  }
+
   return { key: null, value };
 }
 
@@ -2207,7 +2231,7 @@ function findLabeledBranch(children: ParseTree[], label: string): { tree: ParseT
  * raw text.
  */
 function buildExprFromLabeled(tree: ParseTree, paramMap: Map<string, any>, isRep: boolean = false): any {
-  if (tree.kind !== "branch") return stringToBits(tree.kind === "leaf" ? tree.text : "");
+  if (tree.kind !== "branch") return matchedText(tree.kind === "leaf" ? tree.text : "");
 
   // Collect all expression-tagged descendants in order. Walk recursively but
   // don't descend into an expression-tagged branch's children (those belong
@@ -2228,7 +2252,15 @@ function buildExprFromLabeled(tree: ParseTree, paramMap: Map<string, any>, isRep
   if (items.length  >  1) {
     return makeExpr(prim("typed_array"), items);
   }
-  return stringToBits(textOf(tree));
+  return matchedText(textOf(tree));
+}
+
+/** The matched text of a label with no expression beneath it (a regex or
+ *  literal part), as a STRING literal: the same `typed_string` wrapper a
+ *  quoted literal gets. A bare Bits would be typed by its length, and an
+ *  eight-byte match such as `Validate` came out as an Int (B-151 B1). */
+function matchedText(text: string): any {
+  return makeExpr(prim("typed_string"), [stringToBits(text)]);
 }
 
 function findLastExprBranch(children: ParseTree[]): ParseTree | null {

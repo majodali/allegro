@@ -43,6 +43,13 @@ export function typeLiterals(v: Value, seen?: Set<Value>): Value {
 
   switch (v.kind) {
     case ValueKind.Bits:
+      // A literal that already carries a type is not a bare literal: a
+      // grammar template's free symbols are resolved hygienically to their
+      // VALUES at definition time, so `none` (a None-typed Bits) arrives
+      // in the consumer's tree already typed, and re-stamping it as Int
+      // was refused by withType (B-151 B1, the planning surface's
+      // templates say `none`).
+      if (getType(v)) return v;
       if (v.length === 64) return withType(v, IntType);
       return withType(v, StringType);
     case ValueKind.Expression: {

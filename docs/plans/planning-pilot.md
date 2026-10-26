@@ -64,7 +64,7 @@ From the chapter (B-079) and the rulings above:
 | | A2 ✅ **landed 2026-10-25** | Wiring derivation and the graph checks: acyclicity, wiring completeness, type compatibility, composite resolution; each failure an error value in domain terms | demo lines for each check passing and each check refusing a deliberately broken plan — **met** (`tests/planning-checks-demo.alg`: the worked example clean, five broken plans refused) |
 | | A3 ✅ **landed 2026-10-26** | Estimates and budgets: durations through the units DSL (R2), effort and money per R1; rollup with retry upper bounds; the budget check | `SoftwareRelease` built through the API with its budget discharged; a budget-exceeding variant refused — **met** (`tests/planning-budget-demo.alg`: the example with every estimate, budget discharged; refused at the plan, at a composite, over money, and for wrong measures) |
 | | A4 ✅ **landed 2026-10-26** | Failure handlers: `on <FailureType>` graphs, handler validity, re-escalation as a graph property | both handlers of the worked example checked — **met** (`tests/planning-handlers-demo.alg`: both handlers clean, escalation rendered, the bound with handlers, three handlers refused) |
-| **B. The surface** | B1 | The grammar fragment: `plan NAME:` with offside blocks, `inputs:`/`outcomes:`, bracket constraints, `estimate:`, `budget:`, `retry:`, `on`, `uses`; the statement form expands to an annotated binding (halts on failure) | `tests/planning-release-demo.alg` is the worked example verbatim, suite-pinned; the first offside-rule fragment works or the engine gap is named |
+| **B. The surface** | B1 ✅ **landed 2026-10-26** | The grammar fragment: `plan NAME:` with offside blocks, `inputs:`/`outcomes:`, bracket constraints, `estimate:`, `budget:`, `retry:`, `fails:`, `instructions:`, `on`, `uses`; the statement form expands to an annotated binding (halts on failure) | `tests/planning-release-demo.alg` is the worked example verbatim, suite-pinned; the first offside-rule fragment works or the engine gap is named — **met**: it works, after three engine gaps were closed in the chunk (chunk log) |
 | | B2 | Cross-file `uses` through `import`; the archived item 4 | the worked example split across two files |
 | **C. Legibility** | C1 | B-081 slice: the renderer hook, now with evidence of what the messages must say | the demo's refusals read in planning vocabulary |
 | **D. Solution finding** | D1 | Define it from stage A's constraints (R3): the smallest primitive that finds assignments satisfying budget and reachability over residuals | one solved plan in the demo |
@@ -112,6 +112,37 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-26 — B1 landed: the surface.** `planning_grammar` in
+  `lib/planning.alg`, the first offside-rule fragment in `lib/`: `plan
+  NAME:` opens an INDENT block of NEWLINE-separated items; `inputs:` and
+  `outcomes:` take an inline list or a block of lines; `[ fixture ]`
+  names a predicate in the consumer's scope; `estimate:` and `budget:`
+  take measures (`30 min` through the units sugar, `1 person-hour` and
+  `0.5 person-hours` as effort); `retry:` takes `max N attempts[, Q
+  backoff]`; `fails:` a list of names; `instructions:` a block of text
+  lines; `on NAME:` a handler block; `Name: uses Other` a borrowed plan;
+  `Name:` a node block, a composite when it holds nodes. Each item lowers
+  to a tagged record and `build_node`/`build_handler`/`build_plan` fold
+  them into the library's own values, so the surface adds no second
+  model. The statement form expands to `binding_decl(name, build_plan(…),
+  WellFormedPlan)`: a plan that does not check halts the build (the
+  negative case is a harness test, since a demo file can only pin plans
+  that build). `tests/planning-release-demo.alg` is the chapter's §5
+  text verbatim (13 pinned lines). Engine gaps, each closed in the
+  chunk: (1) the EBNF mini-grammar could not name a layout terminal, now
+  `INDENT`/`NEWLINE`/`DEDENT` by name, explicit for the whitespace
+  interleave; (2) a statement form could not declare a binding, now
+  `binding_decl`; (3) a label's matched text was a bare Bits typed by
+  length, so `Validate` read as an Int, now a string literal; (4) a
+  template's `none` arrives in the consumer's tree already typed and the
+  literal-typing pass refused to re-stamp it, now skipped. Library
+  findings: labels must be unique across nested rules (the deep label
+  search finds the innermost first); a `**` list's separator is wrapped
+  in newline-eating whitespace, so NEWLINE-separated lists are written as
+  right-recursive rules. `lib/units.alg` gains `hours`, `minutes`,
+  `seconds`. The grammar analyzer runs on every `use` (it is in the
+  pipeline), so the fragment is analyzed by every demo.
 
 - **2026-10-26 — A4 landed; stage A complete.** A node declares the
   failure types it can raise (`with_failure`; the `fails` key joins
