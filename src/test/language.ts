@@ -609,6 +609,11 @@ fileTest(path.join(testsDir, "planning-split-demo.alg"));
 // Deploy as choices; solved under three budgets; the counterexample names
 // the cheapest resolution; options and recoveries refused.
 fileTest(path.join(testsDir, "planning-solve-demo.alg"));
+// Stage D2: completion from a catalog. An order with its last step
+// missing, completed from leaves, a choice and a borrowed plan; solved
+// under a deadline; refused at a dead end, at the depth, over the budget
+// and for an unsound completion; a gap on the input side.
+fileTest(path.join(testsDir, "planning-complete-demo.alg"));
 
 // The statement form's enforcement shape (chapter §7): `plan NAME:` declares
 // NAME as a WellFormedPlan, so a plan that does not check HALTS the build

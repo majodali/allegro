@@ -896,8 +896,17 @@ that prevents it.
     `tests/planning-solve-demo.alg` suite-pinned. Two kernel findings
     fixed: a library's `when` pattern variable captured by the calling
     file's binding of the same name; a local binding's expression shared
-    across its use sites leaking a tail-call sentinel. Next: D2 (a larger
-    search) or stage C (the renderer), for the maintainer to say
+    across its use sites leaking a tail-call sentinel.
+  - **Progress.** D2 (2026-10-27): completion from a catalog (chapter
+    §2.8, convention 14): the gap is the wiring or outcome finding, the
+    catalog a library value, `solve_from` completes to a depth and then
+    resolves; the enumeration checks the template once;
+    `tests/planning-complete-demo.alg` suite-pinned. The kernel's
+    residuals weighed and not taken (chapter §7). Finding filed, not
+    fixed: a library is loaded once per importing module, **B-155**
+    (library load per module).
+    Next: stage C (the renderer) or D3 (branch-and-bound, a catalog
+    surface), for the maintainer to say
 - [ ] **B-153** (re-evaluation per reference) · L0 · **A top-level
   binding is re-evaluated at every reference.** Found by B-151 D1. Five bindings each referencing the
   previous (`d`, `c = …d…`, `b = …c…`, …) evaluate `d`'s expression six
@@ -919,6 +928,19 @@ that prevents it.
   literal whose unit resolves to a non-`Unit` value is an error in units
   vocabulary; or unit idents resolve against the units module first.
   **Blocked-by**: nothing. **Pointer**: `lib/units.alg` (`units_grammar`)
+- [ ] **B-155** (library load per module) · L1 · **A library is loaded
+  once per module that uses it.** Found by B-151 D2. A demo that `use`s
+  the planning library loads it in about 68 s; a demo that also
+  `import`s a module which itself `use`s the library pays that again
+  (about 138 s for `use planning` plus `import build_pipeline`, measured
+  2026-10-27), since the imported module is built in its own scope with
+  the library evaluated afresh. The search a demo runs costs a fraction
+  of a second; the load is what a demo spends its seconds on. Cost, not
+  correctness; compounds with B-153. Options: cache a loaded library's
+  module object by name for the run; or share the library's bindings
+  across the importing scopes. **Blocked-by**: nothing. **Pointer**:
+  `src/test/alg-files.ts` (`libExtensions`), `src/index.ts` (the file
+  runner's `import`), `docs/plans/planning-pilot.md` §8 (D2)
 - [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds

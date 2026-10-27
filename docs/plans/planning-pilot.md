@@ -68,7 +68,8 @@ From the chapter (B-079) and the rulings above:
 | | B2 ✅ **landed 2026-10-26** | Cross-file `uses` through `import`; the archived item 4 | the worked example split across two files — **met** (`tests/planning-split-demo.alg` borrows `tests/lib/build_pipeline.alg`; no engine work) |
 | **C. Legibility** | C1 | B-081 slice: the renderer hook, now with evidence of what the messages must say | the demo's refusals read in planning vocabulary |
 | **D. Solution finding** | D1 ✅ **landed 2026-10-26** | Define it from stage A's constraints (R3): choices with options (convention 13), templates, `solve` by enumeration with the bound as objective, counterexamples naming the cheapest resolution | one solved plan in the demo — **met** (`tests/planning-solve-demo.alg`: the worked example solved under three budgets, refused under a fourth, unsound choices refused) |
-| | D2 | A larger search: the kernel's residuals and interval domains over a template, or completion from a catalog (the AI-loop shape); decided on D1's evidence | — |
+| | D2 ✅ **landed 2026-10-27** | A larger search, decided on D1's evidence (maintainer, 2026-10-27, three rulings): completion from a catalog (the AI-loop shape; chapter §2.8, convention 14), the gap being the existing wiring or outcome finding, library first with chaining to a depth; the enumeration checks the template once; the kernel's residuals weighed and not taken (chapter §7) | a plan with a gap completed from a catalog and solved — **met** (`tests/planning-complete-demo.alg`: an order completed from leaves, a choice and a borrowed plan; solved under a deadline; refused at a dead end, at the depth, over the budget, and for an unsound completion) |
+| | D3 | Branch-and-bound over partial resolutions, when a template outgrows enumeration; a surface form for catalogs | not before a pilot plan needs either |
 | **E. Packaging** | — | B-093: the public story, the claims register, `demos/rung3`, the website loop | owner's deploy |
 
 Stage A is the primitive version the maintainer asked for. Stages are
@@ -113,6 +114,33 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-27 — D2 (completion from a catalog) landed.** The second
+  search, on the three rulings of 2026-10-27: completion rather than the
+  kernel's residuals; the gap is the wiring or outcome finding itself,
+  no marker; a catalog is a library value (a list of nodes and plans),
+  completion chains backward to a depth. `lib/planning.alg`: `gaps`,
+  `gaps_show`, `catalog`, `fillers`, `completions`,
+  `completions_within`, `solve_from`, `solve_from_within`, `complete`;
+  `Solution` gained the completion steps, and `solution_show` opens with
+  them ("`Delivered` from `LastMile`, `Shipped` from `Ship`, `Labelled`
+  from `Label`; `Label` via `PrintLabel`"). The enumeration now checks
+  the template once (`template_findings`, `option_table`,
+  `resolved_findings`): a candidate re-checks only the budgets and
+  handlers of the scopes above its picks, same semantics as D1
+  (solution finding).
+  `tests/planning-complete-demo.alg` (19 pinned lines): an order with
+  its last step missing, completed from a catalog of leaves, a choice
+  and a borrowed plan (two completions; the three-step chain wins on
+  effort), solved under a deadline (the courier), refused at a dead end,
+  at the depth, over the budget, and for a catalog node with a dangling
+  outcome; a gap on the input side; a solved plan completes to itself.
+  Measured, not assumed: the earlier figure of seconds per candidate was
+  wrong. The planning library loads in about 68 s, and a demo that
+  `import`s a module which itself uses the library loads it a second
+  time (another 70 s; B-155 (library load per module)); the enumeration costs a fraction of
+  a second per candidate, halved by the once-only check at 64
+  resolutions. No kernel work; no surface change.
 
 - **2026-10-26 — D1 (solution finding) landed.** `choice(name, options)`
   and `with_options`; `options:` in the surface (an option without ports

@@ -835,24 +835,83 @@ better(a, b) =>
   else if effort_or_zero(b).lt(effort_or_zero(a)) then false
   else duration_or_zero(a).lt(duration_or_zero(b))
 
-Candidate = Type.define({ plan: Any, decisions: Array, bound: Any, findings: Array, errors: Array })
+// What a resolution can change. Options carry the choice's ports, so the
+// wiring, compatibility, cycle and outcome checks of every scope above a
+// choice read the same for every resolution and run ONCE, over the
+// template (`template_findings`). Each option's own graph is checked once
+// too (`option_findings`) and charged to the resolutions that pick it.
+// What a candidate re-checks is only what the pick can change: the
+// budgets and the handlers of the scopes above it (`resolved_findings`).
+// Stage D2 split this out of a per-candidate `check_plan`, which cost
+// about as much as checking the plan once for every resolution.
+option_scope_findings(o) =>
+  assume terminates
+  if is_uses(o)
+    then check_plan(o.graph)
+    else if is_composite(o)
+      then check_scope(o.name, o.inputs, o.nodes, o.outcomes, o.budget, o.handlers)
+      else []
 
-candidate(p, decisions) =>
+option_record(c, o) => {choice: c.name, option: o.name, findings: option_scope_findings(o)}
+
+// One entry per option of every choice, with that option's own findings.
+option_table(p) =>
+  choices(p).reduce((acc, c) => acc.concat(c.options.map(o => option_record(c, o))), [])
+
+option_findings_for(table, decisions) =>
+  decisions.reduce((acc, d) =>
+    acc.concat(table.filter(r => r.choice == d.choice && r.option == d.option).reduce((a2, r) => a2.concat(r.findings), [])),
+    [])
+
+template_findings(p) =>
+  check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers)
+
+resolved_findings(scope, avail, nodes, declared, bgt, handlers) =>
+  assume terminates
+  own = check_budget(scope, nodes, handlers, bgt).concat(check_handlers(scope, avail, nodes, declared, handlers))
+  nodes.reduce((acc, n) =>
+    if is_composite(n)
+      then acc.concat(resolved_findings(n.name, n.inputs, n.nodes, n.outcomes, n.budget, n.handlers))
+      else acc,
+    own)
+
+check_resolved(p) => resolved_findings(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers)
+
+Candidate = Type.define({ plan: Any, decisions: Array, added: Array, bound: Any, findings: Array, errors: Array })
+
+// A candidate: one resolution of a template, with the completion steps
+// that produced the template (stage D2; none for a plan as written) and
+// any findings the whole template already carries.
+candidate_of(p, decisions, added, table, carried) =>
   solved = resolve(p, decisions)
-  found = check_plan(solved)
-  Candidate(solved, decisions, rollup_bound(solved), found, found.map(f => f.message))
+  found = carried.concat(check_resolved(solved)).concat(option_findings_for(table, decisions))
+  Candidate(solved, decisions, added, rollup_bound(solved), found, found.map(f => f.message))
 
-candidates(p) => resolutions(p).map(r => candidate(p, r))
+candidates_of(p, added, carried) =>
+  table = option_table(p)
+  resolutions(p).map(r => candidate_of(p, r, added, table, carried))
+
+candidate(p, decisions) => candidate_of(p, decisions, [], option_table(p), [])
+
+candidates(p) => candidates_of(p, [], [])
 
 best_of(cs) =>
   cs.slice(1).reduce((acc, c) => if better(c.bound, acc.bound) then c else acc, cs[0])
 
 decisions_show(ds) => join(ds.map(d => "{d.choice} via {d.option}"), ", ")
 
-Solution = Type.define({ plan: Any, decisions: Array, bound: Any })
+Solution = Type.define({ plan: Any, decisions: Array, added: Array, bound: Any })
+
+// The decisions, after the completion steps when there are any.
+steps_show(added) => join(added.map(a => "{a.gap.port.type} from {a.node}"), ", ")
+
+choices_made_show(added, decisions) =>
+  if added.length == 0
+    then decisions_show(decisions)
+    else join([steps_show(added), decisions_show(decisions)].filter(x => x != ""), "; ")
 
 solution_show(s) =>
-  "{decisions_show(s.decisions)}; bound effort {measure_show(s.bound.effort)}, duration {measure_show(s.bound.duration)}"
+  "{choices_made_show(s.added, s.decisions)}; bound effort {measure_show(s.bound.effort)}, duration {measure_show(s.bound.duration)}"
 
 // The counterexample when no resolution passes: the cheapest resolution
 // and why it fails, in planning vocabulary. When the budget is all that
@@ -871,18 +930,23 @@ only_budget_fails(c) => c.findings.filter(f => f.check != "budget").length == 0
 
 has_budget(p) => when p.budget is none then false is _ then true
 
-infeasible_message(p, cs) =>
+// `opening` names what was searched: "no choice of Test and Deploy" for a
+// template, "no completion of Fulfil from the catalog" at stage D2.
+no_candidate_message(p, cs, opening) =>
   cheapest = best_of(cs)
-  names = join(choices(p).map(c => c.name), " and ")
+  made = choices_made_show(cheapest.added, cheapest.decisions)
   if only_budget_fails(cheapest) && has_budget(p)
-    then "no choice of {names} fits the budget of {p.name}; the cheapest, {decisions_show(cheapest.decisions)}, is {over_budget_show(cheapest.bound, p.budget)}"
-    else "no choice of {names} is well-formed for {p.name}; the cheapest, {decisions_show(cheapest.decisions)}, fails: {cheapest.errors[0]}"
+    then "{opening} fits the budget of {p.name}; the cheapest, {made}, is {over_budget_show(cheapest.bound, p.budget)}"
+    else "{opening} is well-formed for {p.name}; the cheapest, {made}, fails: {cheapest.errors[0]}"
+
+infeasible_message(p, cs) =>
+  no_candidate_message(p, cs, "no choice of {join(choices(p).map(c => c.name), " and ")}")
 
 // A template's checks: the choices' own soundness, the structural checks
 // over the template (budgets held back), and feasibility.
 check_template(p) =>
   assume terminates
-  structural = check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers)
+  structural = template_findings(p)
   if structural.length > 0 then structural else feasibility(p)
 
 feasibility(p) =>
@@ -894,7 +958,7 @@ feasibility(p) =>
 // Solve: the best well-formed resolution, or an error value carrying the
 // counterexample. A plan with no choices is its own solution.
 solve(p) =>
-  structural = choice_findings(p).concat(check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers))
+  structural = choice_findings(p).concat(template_findings(p))
   if structural.length > 0
     then error "{p.name} is not well-formed: {structural[0].message}"
     else solve_sound(p)
@@ -906,7 +970,125 @@ solve_sound(p) =>
     then error infeasible_message(p, cs)
     else solution_of(best_of(feasible))
 
-solution_of(c) => Solution(c.plan, c.decisions, c.bound)
+solution_of(c) => Solution(c.plan, c.decisions, c.added, c.bound)
+
+// --- Completion from a catalog (§7, stage D2) --------------------------------------
+//
+// The second search. A GAP is what the wiring and outcome checks already
+// name: an input of a node that nothing in the scope produces, or a
+// declared outcome no node produces. A CATALOG is a list of nodes the
+// plan may draw on (a plan in it is borrowed, as `uses` borrows). To
+// COMPLETE a plan is to fill each gap of the plan's own scope with a
+// catalog node that produces the missing port, chained backward when that
+// node opens gaps of its own, within a depth (the catalog's size unless
+// the caller says). A completion is a plan like any other: checked by the
+// same checks, solved over its choices by the same search, ranked by the
+// same objective. The gap is the query and the catalog the space; no
+// syntax marks either. A gap inside a composite stays a finding.
+
+Gap = Type.define({ port: Any, by: String })
+
+// The gaps of a scope, consumers first (in node order), then the declared
+// outcomes nothing produces; `by` is "" for a declared outcome.
+input_gaps(avail, nodes) =>
+  nodes.reduce((acc, n) =>
+    acc.concat(n.inputs.filter(q => producers_of(avail, nodes, n, q).length == 0).map(q => Gap(q, n.name))),
+    [])
+
+outcome_gaps(nodes, declared) =>
+  declared.filter(o => nodes.filter(n => ports_have(n.outcomes, o.type)).length == 0).map(o => Gap(o, ""))
+
+gaps(p) => input_gaps(p.inputs, p.nodes).concat(outcome_gaps(p.nodes, p.outcomes))
+
+gap_show(g) => if g.by == "" then "{g.port.type}, which the plan declares" else "{g.port.type}, which {g.by} needs"
+
+gaps_show(p) => gaps(p).map(gap_show)
+
+// A catalog entry is a node; a plan is borrowed under its own name.
+catalog_entry(x) => if x instanceof Plan then uses(x.name, x) else x
+
+catalog(xs) => xs.map(catalog_entry)
+
+// The catalog nodes that fill a gap: those producing the port's type that
+// the plan does not already hold. A fixture on the port is for the
+// compatibility check, which judges the completed plan.
+fillers(cat, p, g) =>
+  held = p.nodes.map(n => n.name)
+  cat.filter(c => ports_have(c.outcomes, g.port.type) && !contains(held, c.name))
+
+add_node(p, n) => Plan(p.name, p.inputs, p.outcomes, p.nodes.concat([n]), p.budget, p.handlers)
+
+step(g, n) => {gap: g, node: n.name}
+
+// A completion: the plan with its steps when every gap is filled (`gap`
+// is none), or the gap at which the search stopped and whether the depth
+// ran out there.
+Completion = Type.define({ plan: Any, steps: Array, gap: Any, exhausted: Bool })
+
+done_completion(p, steps) => Completion(p, steps, none, false)
+dead_end(p, steps, g, exhausted) => Completion(p, steps, g, exhausted)
+
+completions_from(p, cat, steps, depth) =>
+  assume terminates
+  gs = gaps(p)
+  if gs.length == 0
+    then [done_completion(p, steps)]
+    else if depth == 0
+      then [dead_end(p, steps, gs[0], true)]
+      else fill_gap(p, cat, steps, depth, gs[0], fillers(cat, p, gs[0]))
+
+fill_gap(p, cat, steps, depth, g, fs) =>
+  assume terminates
+  if fs.length == 0
+    then [dead_end(p, steps, g, false)]
+    else fs.reduce((acc, n) => acc.concat(completions_from(add_node(p, n), cat, steps.concat([step(g, n)]), depth - 1)), [])
+
+completions_within(p, cat, depth) => completions_from(p, catalog(cat), [], depth)
+
+completions(p, cat) => completions_within(p, cat, cat.length)
+
+is_complete(c) => when c.gap is none then true is _ then false
+
+// The counterexample when no completion closes the gaps: the first dead
+// end, in planning vocabulary.
+dead_end_message(p, cs, depth) =>
+  d = cs[0]
+  within = if d.exhausted then " within {depth} steps" else ""
+  "no completion of {p.name} from the catalog{within}: nothing produces {gap_show(d.gap)}"
+
+// Every candidate of a completed template: its structural findings are
+// carried by each of its resolutions, so an unsound completion is a
+// candidate that fails, named in the counterexample like any other.
+completion_candidates(c) =>
+  carried = choice_findings(c.plan).concat(template_findings(c.plan))
+  candidates_of(c.plan, c.steps, carried)
+
+// Solve from a catalog: complete, then resolve. The best well-formed
+// resolution of any completion, or an error value carrying the
+// counterexample: the dead end, or the cheapest completion and why it
+// fails.
+solve_from(p, cat) => solve_from_within(p, cat, cat.length)
+
+solve_from_within(p, cat, depth) =>
+  unsound = choice_findings(p)
+  if unsound.length > 0
+    then error "{p.name} is not well-formed: {unsound[0].message}"
+    else solve_completions(p, completions_within(p, cat, depth), depth)
+
+solve_completions(p, cs, depth) =>
+  closed = cs.filter(is_complete)
+  if closed.length == 0
+    then error dead_end_message(p, cs, depth)
+    else solve_candidates(p, closed.reduce((acc, c) => acc.concat(completion_candidates(c)), []))
+
+solve_candidates(p, cs) =>
+  feasible = cs.filter(c => c.errors.length == 0)
+  if feasible.length == 0
+    then error no_candidate_message(p, cs, "no completion of {p.name} from the catalog")
+    else solution_of(best_of(feasible))
+
+// The completed plan alone, solved: for a caller who wants a plan.
+complete(p, cat) => solve_from(p, cat).plan
 
 // --- One-line renderings, for demos and for people ------------------------------
 

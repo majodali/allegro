@@ -4,6 +4,41 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 (the planning pilot) D2: completion from a catalog; the template checked once
+
+Stage D2 of the rung-3 plan, on three rulings of 2026-10-27: the
+second search is completion from a catalog, not the kernel's residuals;
+the gap is the wiring or outcome finding itself, with no marker; a
+catalog is a library value, and completion chains backward to a depth.
+A gap is an input nothing produces or a declared outcome no node
+produces; a catalog is a list of nodes and plans (a plan is borrowed as
+`uses` borrows); `solve_from(plan, catalog)` fills each gap of the
+plan's own scope with a catalog node that produces the missing port,
+chained when that node opens gaps of its own, then resolves the choices
+as `solve` does (`lib/planning.alg`: `gaps`, `gaps_show`, `catalog`,
+`fillers`, `completions`, `completions_within`, `solve_from`,
+`solve_from_within`, `complete`; chapter §2.8, convention 14). The
+completed plan is a plan like any other, checked by the same checks and
+ranked by the same objective; `Solution` carries the steps and
+`solution_show` opens with them. Counterexamples: the dead end, the
+depth, and the cheapest completion that fails with its steps and the
+measure it misses or its first finding.
+
+The enumeration checks the template once. Options carry the choice's
+ports, so the structural checks of every scope above a choice read the
+same for every resolution; they run once over the template
+(`template_findings`), each option's own graph is checked once and
+charged to the resolutions that pick it (`option_table`), and a
+candidate re-checks only the budgets and handlers above its picks
+(`resolved_findings`). Same semantics as stage D1 (solution finding), whose demo's 19 pins hold
+unchanged. Measured: the library's load (about 68 s, and once more per
+importing module, filed as B-155 (library load per module)) is what a demo spends its seconds on;
+the search costs a fraction of a second per candidate. The kernel's
+residuals and interval domains were weighed and not taken, with the
+reasons in the chapter's §7. `tests/planning-complete-demo.alg` (19
+pinned lines). No kernel work; no surface change. Test count: +1 file
+test.
+
 ## 2026-10 — B-151 (the planning pilot) D1: choices and solution finding; two kernel fixes
 
 Stage D1 of the rung-3 plan, ruled 2026-10-26 (R3: choice, not
