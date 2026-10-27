@@ -1,0 +1,10 @@
+$ # 01-model.alg with Compile's input changed to one nothing produces:
+$ allegro demos/rung3/01-model.alg
+
+Error in demos/rung3/01-model.alg: Type error: refinement predicate failed for WellFormedPlan: BuildPipeline is not well-formed: input Missing of Compile is not produced by any node of BuildPipeline or by its inputs
+
+# The build halts. `plan BuildPipeline:` declares the name as a
+# WellFormedPlan, and the model's own predicate says why it refused —
+# in planning vocabulary, every finding, nothing about the type system.
+# The same sentence is the error VALUE `validate` yields on the
+# library path; the statement form is the strict one.

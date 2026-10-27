@@ -741,7 +741,9 @@ budget and for an unsound completion; the enumeration now checks the
 template once. Stage C1 made the refusals explain themselves:
 `well_formed` answers an error value with every finding, and the `plan`
 statement's halt carries it (§7; the halt test in
-`src/test/language.ts`). Not yet built: the rest of B-081
+`src/test/language.ts`). Stage E1 packaged the rung: `demos/rung3/`
+holds two suite-validated scenes with their break-it halts, and the
+public story is `docs/messaging.md`'s rung-3 section. Not yet built: the rest of B-081
 (counterexample legibility) beyond the refusal sites, branch-and-bound
 when a template outgrows enumeration, a surface form for catalogs.
 The work plan, its stages, the rulings it asks for and its chunk log are

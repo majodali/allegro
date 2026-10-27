@@ -91,6 +91,11 @@ See `docs/book/proving-in-allegro.md` for the full proving guide.
 - `demos/rung1/` — five runnable scenes: discharge, counterexamples,
   effects, laws + the escape hatch, and the prover loop, each with a
   "break it" block and captured transcripts.
+- `demos/rung2/` — a provable DSL: units of measure as a library, with
+  physics that discharges and failures that speak physics.
+- `demos/rung3/` — a domain model: a project plan that checks itself as
+  it is declared, refuses in planning vocabulary, and is solved over
+  its choices and completed from a catalog.
 - [allegrolang.org](https://allegrolang.org) — the live sandbox: edit
   and run every example in the browser, with an Inspect button showing
   the semantic summary.

@@ -4,6 +4,27 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 (the planning pilot) E1: rung 3 packaged, slice 1 of B-093 (rung-3 packaging)
+
+The public story of the rung-3 pilot, derived from delivered material
+only. `demos/rung3/`: `01-model.alg` (the worked example through the
+`plan` form; rollup and bound; escalation; three refusals in planning
+vocabulary) and `02-solve.alg` (choices and `solve` under two budgets,
+the counterexample, completion from a catalog), both validated by the
+suite through their `// expect:` comments (`src/test/language.ts`),
+each with a break-it halt captured in `transcripts/`; a README that
+says what was built for planning, what was inherited, and what the
+rung does not show. The claims register (`docs/plans/release-track.md`)
+re-graded under D6 (models as live values): "model authoring surface +
+solution finding" hypothesis → demoable, "units/dimensions as
+refinements" hypothesis → delivered; D7 (the capstone) unchanged; §8
+"rung 3 landed". `docs/messaging.md`: the rung-3 story,
+the claim row with receipts, the not-claimed line (one model, pilot
+scale, Shape 1). README and `docs/book/getting-started.md` list the
+rung-2 and rung-3 demos. Slice 2 (the website loop: landing section,
+sandbox preset, `planning` in the web library registry) waits on a
+browser load-time measurement. Test count: +2 file tests.
+
 ## 2026-10 — B-151 (the planning pilot) C1: refusals explain themselves, the slice of B-081 (counterexample legibility)
 
 Stage C1 of the rung-3 plan, on the maintainer's reasoning of

@@ -67,6 +67,13 @@ npx tsx src/index.ts verify first.alg    # theorems, law tiers, the
   tier, and the participant-neutral prover loop
   (`allegro obligations` / `propose` / `prove`), each with a "break
   it" block and captured transcripts.
+- **[`demos/rung2/`](demos/rung2/)** — a provable DSL: units of measure
+  as a pure Allegro library, dimensional soundness as refinement
+  discharge, physics theorems, the ledger over quantities.
+- **[`demos/rung3/`](demos/rung3/)** — a domain model the kernel checks
+  and searches: a project plan as a graph of outcomes, checked as it is
+  declared, refused in planning vocabulary, solved over its choices and
+  completed from a catalog.
 - **[allegrolang.org](https://allegrolang.org)** — live sandbox: every
   example editable and runnable in the browser.
 - **[Proving in Allegro](docs/book/proving-in-allegro.md)** — the proving

@@ -1,0 +1,11 @@
+$ # 02-solve.alg with the release's budget tightened to a deadline no
+$ # resolution meets (budget: 20 h, 200 person-hours):
+$ allegro demos/rung3/02-solve.alg
+
+Error in demos/rung3/02-solve.alg: Type error: refinement predicate failed for WellFormedPlan: SoftwareRelease is not well-formed: no choice of Test and Deploy fits the budget of SoftwareRelease; the cheapest, Test via Quick, Deploy via Direct, is duration 1460 min against 20 h
+
+# A template is well-formed only if SOME resolution passes every check,
+# the budget included. None does, so the plan does not build, and the
+# counterexample names the cheapest resolution and the measure it
+# misses. Loosen the deadline to 21 h and the blue-green deploy fits:
+# the search moves there and the plan builds.
