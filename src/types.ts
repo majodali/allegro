@@ -501,6 +501,14 @@ export function bitsToString(b: BitsValue): string {
   return UTF8_DECODER.decode(bytes);
 }
 
+/** The text a String-shaped Bits carries; undefined for any other value
+ *  (B-151 C1: the refinement failure sites read the predicate's error
+ *  channel through this, so no site tests a kind of its own). */
+export function textOf(v: Value | undefined): string | undefined {
+  if (v === undefined || v.kind !== ValueKind.Bits) return undefined;
+  return bitsToString(v as BitsValue);
+}
+
 // --- Extension interface (here to avoid circular deps) ---
 
 export interface Extension {

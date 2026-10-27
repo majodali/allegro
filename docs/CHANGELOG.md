@@ -4,6 +4,39 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 (the planning pilot) C1: refusals explain themselves, the slice of B-081 (counterexample legibility)
+
+Stage C1 of the rung-3 plan, on the maintainer's reasoning of
+2026-10-27. The first proposal was an explainer attached to the
+Refinement kind through a registered slot; the maintainer's two
+objections (a new kernel slot, a hook broader than its use) led to the
+kernel's own channel instead. A refinement predicate that answers an
+**error value** instead of `false` has refused the value and said why,
+and the refusal sites now read that text through the registered `error`
+channel: a binding annotation halts with "Type error: refinement
+predicate failed for `Small`: 42 is not small: a small number is below
+10", a parameter annotation likewise, and guarded construction yields
+the text as its error value (`src/primitives.ts` `explained`,
+`src/types-std.ts` `explainedBy` and the two construction sites;
+`textOf` in `src/types.ts` reads the channel so the discriminator
+ratchet holds). A plain `false` keeps the kernel's message, domain
+rendering included. No new slot, no renderer registry: the explanation
+rides the predicate, so importing a type imports its words
+(`docs/book/standard/contracts.md` §7).
+
+`lib/planning.alg`: `well_formed` answers `not_well_formed(p, errs)`,
+the plan's name and every finding, and `validate` yields the same
+sentence; the `plan` statement halts with "… for `WellFormedPlan`:
+`Broken` is not well-formed: input `Missing` of `Work` is not produced
+by any node of `Broken` or by its inputs". One pin changed with
+discussion: `validate(unwired)` in `tests/planning-checks-demo.alg`
+names both findings. Tests: the halt test asserts the explanation; a
+new test covers the three refusal sites for a refined `Int` and a
+refined record, and that `false` keeps the domain-rendered message.
+Filed, not fixed: `false || error "x"` yields `false`, so a predicate
+explains itself with `if` (B-156 (short-circuit over an error value);
+the maintainer will discuss). Test count: +1.
+
 ## 2026-10 — B-151 (the planning pilot) D2: completion from a catalog; the template checked once
 
 Stage D2 of the rung-3 plan, on three rulings of 2026-10-27: the

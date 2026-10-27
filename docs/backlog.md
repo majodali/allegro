@@ -905,8 +905,13 @@ that prevents it.
     residuals weighed and not taken (chapter §7). Finding filed, not
     fixed: a library is loaded once per importing module, **B-155**
     (library load per module).
-    Next: stage C (the renderer) or D3 (branch-and-bound, a catalog
-    surface), for the maintainer to say
+  - **Progress.** C1 (2026-10-27): the refusals explain themselves.
+    `well_formed` answers an error value with the plan's name and every
+    finding; the kernel carries it into the `plan` statement's halt and
+    every other refinement refusal (B-081 progress above). Finding filed:
+    `||` does not pass an error value through, **B-156** (short-circuit
+    over an error value). Next: C2, D3 or stage E
+    (B-093 packaging), for the maintainer to say
 - [ ] **B-153** (re-evaluation per reference) · L0 · **A top-level
   binding is re-evaluated at every reference.** Found by B-151 D1. Five bindings each referencing the
   previous (`d`, `c = …d…`, `b = …c…`, …) evaluate `d`'s expression six
@@ -941,6 +946,19 @@ that prevents it.
   across the importing scopes. **Blocked-by**: nothing. **Pointer**:
   `src/test/alg-files.ts` (`libExtensions`), `src/index.ts` (the file
   runner's `import`), `docs/plans/planning-pilot.md` §8 (D2)
+- [ ] **B-156** (short-circuit over an error value) · L2 · **`false ||
+  error "x"` yields `false`, not the error value.** Found by B-151 C1:
+  a refinement predicate written `ok || error "why"` refuses without
+  its explanation, so a predicate explains itself with `if … else error`
+  (`lib/planning.alg`, `well_formed`). `typed_or` applies the thunk on
+  the right (fixed at A2) but reads its error value as a plain falsy
+  operand instead of letting the error channel propagate as every
+  other operator does (viral metadata, PROCESS §6); `&&` with an error
+  value on the right is the same question. The maintainer asked to
+  discuss (2026-10-27) before a semantics is chosen: propagate (the
+  operators join the viral rule) or keep the boolean reading and
+  document it. **Blocked-by**: the discussion. **Pointer**:
+  `src/primitives.ts` (`typed_or`, `typed_and`), `tests/logical.alg`
 - [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds
@@ -970,6 +988,15 @@ that prevents it.
   `docs/book/vision.md` §4). v1 rendering-hook sketch (`T.onFailure`)
   preserved at branch `archive/v1-references` (parent b838a89) —
   pre-rework, reference only
+  - **Progress.** The refusal sites (2026-10-27, B-151 C1): a
+    refinement predicate that answers an error value explains its
+    refusal, and the kernel carries the text into a binding annotation's
+    halt, a parameter annotation's halt and guarded construction's error
+    value (`docs/book/standard/contracts.md` §7). No registered slot, no
+    renderer registry: the explanation rides the predicate. Remaining
+    here: the `inspect` channel, the call-site origin (B-057), rendering
+    the refused value itself; a separate explainer for predicates one
+    does not own, if a model ever needs it (the plan's C2 row).
 - [ ] **B-082** · Model composition patterns (cross-domain predicates,
   arbitration, multi-domain [impl, proof] explosion risk), as described in
   Vision §4 (the Vivace hypothesis; one of the seven gaps)

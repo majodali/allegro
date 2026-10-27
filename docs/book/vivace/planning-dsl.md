@@ -425,7 +425,7 @@ Re-checked against the code at 2026-10-25:
 | Quantities for estimates and budgets | durations are the units DSL's `Duration` (R2: `30 min` with `use units`); effort and money are the planning library's `Effort` (`person_hours(n)`) and `Money` (`money(n, currency)`) (R1), records with their own arithmetic in the manner of `Quantity`, so a mismatch is an error in planning vocabulary; the rollup and the budget check exist since stage A3 | `lib/units.alg` (rung 2, B-092), `lib/planning.alg` |
 | Compile-time checks inside libraries | proofs, effects, exhaustiveness and termination fire in libraries as in user code | `../extension/modules.md` |
 | Cross-file references | `import NAME` with local-then-system resolution; `use NAME.MEMBER` | `../extension/modules.md` |
-| Domain-specific failure rendering | **not present**; failures carry the analyzer's message string | B-081, deferred by ruling (plan) |
+| Domain-specific failure rendering | **present since stage C1**: a refinement predicate that answers an error value explains the refusal in its own words at every refusal site, and `well_formed` does, so a `plan` statement that does not check halts with the findings in planning vocabulary | `../standard/contracts.md` §7 ("A predicate can say why"); B-081 (counterexample legibility) for what remains |
 | Solution finding | **not present** | plan, stage D |
 
 Six findings from the check, the last three made by stages A2 and A3
@@ -645,12 +645,24 @@ Two enforcement shapes, both existing:
   file that does not check does not build, which is the behaviour Vision
   §4 promises.
 
-Until the renderer hook lands (B-081, deferred by the maintainer's
-ruling of 2026-10-25), the message a halt shows is the kernel's
-refinement message wrapping the analyzer's text. That is accepted for
-the primitive version of the pilot: the point of the first stages is
-to learn whether the model holds under implementation, with the
-diagnostics as they are.
+Stage C1 (legibility, 2026-10-27) made the halt say what the analyzer
+found. The ruling of 2026-10-25 had deferred rendering until the
+primitive version had run, and until then a halt said only "Type error:
+refinement predicate failed for `WellFormedPlan`", the findings lost,
+because a predicate answers a boolean. The hook is the kernel's own
+channel for "no, and here is why": `well_formed` answers an **error
+value** naming the plan and every finding when the plan does not check,
+and the kernel carries that text into the refusal at every site
+(`../standard/contracts.md` §7): the `plan` statement halts with "Type
+error: refinement predicate failed for `WellFormedPlan`: `Broken` is not
+well-formed: input `Missing` of `Work` is not produced by any node of
+`Broken` or by its inputs", a parameter annotated `WellFormedPlan` halts
+the same way, and `validate` yields the same sentence as its error
+value. No registered slot and no renderer registry: the explanation
+lives in the predicate, so a model's assurance and its legibility travel
+together when its type is imported. What B-081 (counterexample
+legibility) still holds: the `inspect` channel, the call-site origin
+(B-057), and rendering the refused value itself.
 
 ## 8. Open questions [designed]
 
@@ -726,8 +738,12 @@ another. Stage D2 built completion from a catalog (§2.8, §7):
 missing from a catalog of leaves, a choice and a borrowed plan, solves it
 under a deadline, and refuses it at a dead end, at the depth, over the
 budget and for an unsound completion; the enumeration now checks the
-template once. Not yet built: the renderer (C), branch-and-bound when a
-template outgrows enumeration, a surface form for catalogs.
+template once. Stage C1 made the refusals explain themselves:
+`well_formed` answers an error value with every finding, and the `plan`
+statement's halt carries it (§7; the halt test in
+`src/test/language.ts`). Not yet built: the rest of B-081
+(counterexample legibility) beyond the refusal sites, branch-and-bound
+when a template outgrows enumeration, a surface form for catalogs.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),

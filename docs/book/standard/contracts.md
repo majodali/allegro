@@ -296,6 +296,24 @@ and the binding's known facts in the message; neither ships. Since
 relocation to call sites is what would supply the origin, the two are
 the same follow-on (B-057).
 
+**A predicate can say why in its own words** [implemented, 2026-10-27].
+A refinement predicate that answers an **error value** instead of
+`false` has refused the value, and its text is the message at every
+refusal site: a binding annotation halts with "Type error: refinement
+predicate failed for `Small`: 42 is not small: a small number is below
+10", a parameter annotation likewise ("argument 1 failed refinement
+predicate for `Small`: …"), and guarded construction yields the text as
+its error value in place of the domain rendering above. A plain `false`
+keeps the kernel's message. This is D11's shape applied to predicates
+(an operation on invalid input yields an error value, and a predicate is
+an operation), read through the registered `error` channel: no new slot,
+no renderer registry. It is the slice of B-081 (counterexample legibility)
+landed by the planning pilot's stage C1 (legibility): a domain model's
+refinement carries the model's words, so
+importing the type imports both (`../vivace/planning-dsl.md` §7). The
+predicate must say it with `if`: `false || error "…"` does not pass the
+error value through (backlog).
+
 **The visibility gap** [gap — CT-R6]. Contracts appear in `inspect`,
 and nowhere else. `verify` and `obligations` and the assumption ledger
 are built from theorems, law obligations, coercion obligations, div
