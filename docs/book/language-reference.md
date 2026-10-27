@@ -314,8 +314,28 @@ print(estimate_show(rollup(Release)))
 ```
 
 Keys are convention 4's (`inputs`, `outcomes`, `estimate`, `budget`,
-`retry`, `fails`, `instructions`, `on`, `uses`); a capitalised name is a
-node; `[ name ]` is a fixture bound in scope; `Name: uses Other` borrows
-a plan bound earlier. The library builds the same values the API builds
-(`plan`, `leaf`, `composite`, `with_estimate`, …), and the checks are the
-same.
+`retry`, `fails`, `instructions`, `on`, `uses`, `options`); a capitalised
+name is a node; `[ name ]` is a fixture bound in scope; `Name: uses
+Other` borrows a plan bound earlier. The library builds the same values
+the API builds (`plan`, `leaf`, `composite`, `with_estimate`, …), and
+the checks are the same.
+
+A node with `options:` is a choice, and a plan with choices is a
+template that `solve` resolves, best by the bound's effort and then its
+duration, within the budget:
+
+```
+  Deploy:
+    inputs:   Artifacts
+    outcomes: DeployedRelease
+    options:
+      BlueGreen:
+        estimate: 1 hour, 4 person-hours
+      Direct:
+        estimate: 6 hours, 1.5 person-hours
+
+best = solve(Release)
+print(solution_show(best))   // Deploy via Direct; bound effort …, duration …
+print(error of solve(with_budget(Release, duration_budget(3 h))))
+                             // no choice of Deploy fits the budget of Release; the cheapest, …
+```

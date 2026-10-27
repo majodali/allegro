@@ -192,9 +192,30 @@ export function buildFn(paramNames: string[], body: any) {
   return makeComposedFn(matched, newBody);
 }
 
+/**
+ * A fresh copy of an expression tree: every Expression node is rebuilt,
+ * everything else (Params, literals, structures, functions) is shared.
+ *
+ * A local binding's value is substituted into EACH of its use sites, and
+ * the sites are not alike: one may be the tail of the enclosing function
+ * (`then unsound`) and another an argument (`unsound.length`). Tail-call
+ * marking is a flag ON the expression object, and the tail-call sentinel a
+ * flagged call hands back is consumed only by an enclosing composed-function
+ * application. One object under both sites carried the mark into the
+ * argument position and the sentinel leaked as a value ("Cannot read
+ * properties of undefined (reading 'meta')"; B-151 D1). The same sharing
+ * put one primitive stub under two parents (B-152). Each site gets its own
+ * tree, so a flag set at one site stays there.
+ */
+export function cloneExprTree(v: any): any {
+  if (!v || typeof v !== 'object') return v;
+  if (v.kind === 'Expression') return makeExpr(cloneExprTree(v.fn), v.args.map(cloneExprTree));
+  return v;
+}
+
 export function substName(v: any, name: string, replacement: any): any {
-  if (v.kind === 'Symbol' && v.name === name) return replacement;
-  if (v.kind === 'Param' && v._name === name) return replacement;
+  if (v.kind === 'Symbol' && v.name === name) return cloneExprTree(replacement);
+  if (v.kind === 'Param' && v._name === name) return cloneExprTree(replacement);
   if (v.kind === 'Expression') {
     const nf = substName(v.fn, name, replacement);
     const na = v.args.map((a: any) => substName(a, name, replacement));

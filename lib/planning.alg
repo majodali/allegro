@@ -225,35 +225,47 @@ PlanNode = Type.define({
   handlers: Array,
   graph: Any,
   budget: Any,
-  fails: Array
+  fails: Array,
+  options: Array
 })
 
 leaf(name, inputs, outcomes) =>
-  PlanNode(name, inputs, outcomes, none, none, none, [], [], none, none, [])
+  PlanNode(name, inputs, outcomes, none, none, none, [], [], none, none, [], [])
 
 composite(name, inputs, outcomes, nodes) =>
-  PlanNode(name, inputs, outcomes, none, none, none, nodes, [], none, none, [])
+  PlanNode(name, inputs, outcomes, none, none, none, nodes, [], none, none, [], [])
 
 // `Build: uses BuildPipeline` — the node's ports are the plan's.
 uses(name, p) =>
-  PlanNode(name, p.inputs, p.outcomes, none, none, none, [], [], p, none, [])
+  PlanNode(name, p.inputs, p.outcomes, none, none, none, [], [], p, none, [], [])
+
+// A choice (stage D1, convention 13): a node that can be done one of
+// several ways. Each option is a node (a leaf or a composite) with the
+// choice's ports; the choice carries the first option's ports so that the
+// template wires like any node. A plan with open choices is a TEMPLATE:
+// `solve` picks the options, and the solved plan is a plan like any other.
+choice(name, options) =>
+  PlanNode(name, options[0].inputs, options[0].outcomes, none, none, none, [], [], none, none, [], options)
+
+with_options(n, options) =>
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails, options)
 
 // Builders: records are immutable, so each returns a copy with one field set.
 with_estimate(n, e) => set_estimate(n, as_estimate(e))
 set_estimate(n, e) =>
-  PlanNode(n.name, n.inputs, n.outcomes, e, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails)
+  PlanNode(n.name, n.inputs, n.outcomes, e, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails, n.options)
 with_instructions(n, text) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, text, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, text, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails, n.options)
 with_retry(n, r) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, r, n.nodes, n.handlers, n.graph, n.budget, n.fails)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, r, n.nodes, n.handlers, n.graph, n.budget, n.fails, n.options)
 with_handler(n, h) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers.concat([h]), n.graph, n.budget, n.fails)
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers.concat([h]), n.graph, n.budget, n.fails, n.options)
 
 // A node declares the failure types it can raise (stage A4): the failure
 // is part of the leaf's contract, as its estimate is, and a handler is
 // checked against what is declared beneath it.
 with_failure(n, f) =>
-  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails.concat([f]))
+  PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, n.nodes, n.handlers, n.graph, n.budget, n.fails.concat([f]), n.options)
 
 as_estimate(e) =>
   if e instanceof Estimate then e
@@ -264,11 +276,12 @@ as_budget(b) =>
   else error "a budget is built with budget(duration, effort, money), not {measure_name(b)}"
 
 is_uses(n) => when n.graph is none then false is _ then true
+is_choice(n) => n.options.length > 0
 is_composite(n) => n.nodes.length > 0
-is_leaf(n) => !is_composite(n) && !is_uses(n)
+is_leaf(n) => !is_composite(n) && !is_uses(n) && !is_choice(n)
 
 node_kind(n) =>
-  if is_uses(n) then "uses" else if is_composite(n) then "composite" else "leaf"
+  if is_choice(n) then "choice" else if is_uses(n) then "uses" else if is_composite(n) then "composite" else "leaf"
 
 // --- Plans (§2.1) ---------------------------------------------------------------
 
@@ -289,7 +302,7 @@ with_budget(x, b) => set_budget(x, as_budget(b))
 set_budget(x, b) =>
   if x instanceof Plan
     then Plan(x.name, x.inputs, x.outcomes, x.nodes, b, x.handlers)
-    else PlanNode(x.name, x.inputs, x.outcomes, x.estimate, x.instructions, x.retry, x.nodes, x.handlers, x.graph, b, x.fails)
+    else PlanNode(x.name, x.inputs, x.outcomes, x.estimate, x.instructions, x.retry, x.nodes, x.handlers, x.graph, b, x.fails, x.options)
 
 plan_with_handler(p, h) => Plan(p.name, p.inputs, p.outcomes, p.nodes, p.budget, p.handlers.concat([h]))
 
@@ -482,7 +495,9 @@ handler_names(hs) => hs.map(h => h.failure)
 // borrowed plan, that plan's unhandled failures.
 raises_of(n) =>
   assume terminates
-  if is_uses(n) then unhandled_failures(n.graph) else escaping(n.fails, n.nodes, n.handlers)
+  if is_choice(n)
+    then dedupe(n.options.reduce((acc, o) => acc.concat(raises_of(o)), []))
+    else if is_uses(n) then unhandled_failures(n.graph) else escaping(n.fails, n.nodes, n.handlers)
 
 escaping(own, nodes, handlers) =>
   assume terminates
@@ -611,11 +626,13 @@ node_estimate(n) => when n.estimate is none then no_estimate is e then e
 // split stays because the node's own contribution is worth a name.)
 own_rollup(n) =>
   assume terminates
-  if is_uses(n)
-    then rollup_of(n.graph.nodes)
-    else if is_composite(n)
-      then rollup_of(n.nodes)
-      else node_estimate(n)
+  if is_choice(n)
+    then error "{n.name} has open options; solve the plan first"
+    else if is_uses(n)
+      then rollup_of(n.graph.nodes)
+      else if is_composite(n)
+        then rollup_of(n.nodes)
+        else node_estimate(n)
 
 node_rollup(n) =>
   assume terminates
@@ -633,11 +650,13 @@ handler_attempts(h) => when h.retry is none then 1 is r then r.max_attempts
 
 own_bound(n) =>
   assume terminates
-  if is_uses(n)
-    then bound_of(n.graph.nodes, n.graph.handlers)
-    else if is_composite(n)
-      then bound_of(n.nodes, n.handlers)
-      else est_add(node_estimate(n), handlers_bound(n.handlers))
+  if is_choice(n)
+    then error "{n.name} has open options; solve the plan first"
+    else if is_uses(n)
+      then bound_of(n.graph.nodes, n.graph.handlers)
+      else if is_composite(n)
+        then bound_of(n.nodes, n.handlers)
+        else est_add(node_estimate(n), handlers_bound(n.handlers))
 
 node_bound(n) =>
   assume terminates
@@ -669,8 +688,12 @@ budget_findings(scope, r, b) =>
     .concat(measure_check(scope, "effort", r.effort, b.effort))
     .concat(measure_check(scope, "money", r.money, b.money))
 
+// A scope with open choices beneath it has no bound yet: its budget is
+// settled by the solver, over every resolution (check_template).
 check_budget(scope, nodes, handlers, bgt) =>
-  when bgt is none then [] is b then budget_findings(scope, bound_of(nodes, handlers), b)
+  when bgt
+    is none then []
+    is b then (if has_choices_in(nodes) then [] else budget_findings(scope, bound_of(nodes, handlers), b))
 
 // A scope's findings, then its handlers' graphs, then each composite's
 // internal graph (convention 6 applies the same checks inside) and each
@@ -691,7 +714,12 @@ check_scope(scope, avail, nodes, declared, bgt, handlers) =>
 
 check_plan(p) =>
   assume terminates
-  check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers)
+  unsound = choice_findings(p)
+  if unsound.length > 0
+    then unsound
+    else if has_choices_in(p.nodes)
+      then check_template(p)
+      else check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers)
 
 plan_errors(p) => check_plan(p).map(f => f.message)
 
@@ -706,6 +734,179 @@ validate(p) =>
 // Annotation-path enforcement: a binding or parameter annotated with this
 // type halts compilation when the plan is not well-formed.
 WellFormedPlan = Plan & well_formed(_)
+
+// --- Choices and solution finding (§7, stage D1; ruling R3) ------------------------
+//
+// Solution finding is search through the space the checks constrain. The
+// space is the choices: a plan with open choices is a template, and a
+// resolution picks one option at every choice. A template is well-formed
+// when it is structurally sound and SOME resolution passes every check,
+// the budget included; `solve` answers the best resolution by the
+// objective (the bound's effort, then its duration) with its decision
+// record, or a counterexample that names the cheapest resolution and why
+// it fails. Choices live in the main graph, at any depth; a borrowed plan
+// is solved before it is borrowed, and a handler's graph holds none.
+
+has_choices_in(nodes) =>
+  assume terminates
+  nodes.reduce((acc, n) => acc || is_choice(n) || has_choices_in(n.nodes), false)
+
+choices_in(nodes) =>
+  assume terminates
+  nodes.reduce((acc, n) =>
+    if is_choice(n) then acc.concat([n]) else acc.concat(choices_in(n.nodes)), [])
+
+choices(p) => choices_in(p.nodes)
+
+// Structural soundness of the choices themselves: every option carries
+// the choice's ports, and no choice sits in a handler or a borrowed plan.
+option_ports_agree(c, o) =>
+  ports_show(o.inputs) == ports_show(c.inputs) && ports_show(o.outcomes) == ports_show(c.outcomes)
+
+check_choice(scope, c) =>
+  c.options.reduce((acc, o) =>
+    if option_ports_agree(c, o)
+      then acc
+      else acc.concat([finding("choices", scope, c.name, "option {o.name} of {c.name} has ports {ports_show(o.inputs)} -> {ports_show(o.outcomes)}, not the choice's {ports_show(c.inputs)} -> {ports_show(c.outcomes)}")]),
+    [])
+
+check_choices_in(scope, nodes) =>
+  assume terminates
+  nodes.reduce((acc, n) =>
+    if is_choice(n)
+      then acc.concat(check_choice(scope, n))
+      else if is_uses(n) && has_choices_in(n.graph.nodes)
+        then acc.concat([finding("choices", scope, n.name, "{n.name} borrows {n.graph.name}, which has open options; solve it first")])
+        else acc.concat(check_choices_in(n.name, n.nodes)).concat(handler_choice_findings(n.name, n.handlers)),
+    [])
+
+handler_choice_findings(scope, handlers) =>
+  handlers.reduce((acc, h) =>
+    if has_choices_in(h.nodes)
+      then acc.concat([finding("choices", scope, "", "handler on {h.failure} in {scope} has open options; a recovery is not a choice")])
+      else acc,
+    [])
+
+// The choices' soundness over a whole plan: the main graph and the plan's
+// own handlers.
+choice_findings(p) => check_choices_in(p.name, p.nodes).concat(handler_choice_findings(p.name, p.handlers))
+
+// A decision picks one option of one choice by name; a resolution is one
+// decision per choice. Resolving replaces the choice by its option under
+// the choice's name, so the solved plan reads as the author wrote it.
+decision(choice_name, option_name) => {choice: choice_name, option: option_name}
+
+resolve_node(n, decisions) =>
+  assume terminates
+  if is_choice(n)
+    then pick_option(n, decisions.filter(d => d.choice == n.name)[0].option)
+    else PlanNode(n.name, n.inputs, n.outcomes, n.estimate, n.instructions, n.retry, resolve_nodes(n.nodes, decisions), n.handlers, n.graph, n.budget, n.fails, [])
+
+pick_option(c, option_name) =>
+  o = c.options.filter(x => x.name == option_name)[0]
+  PlanNode(c.name, o.inputs, o.outcomes, o.estimate, o.instructions, o.retry, o.nodes, o.handlers, o.graph, o.budget, o.fails, [])
+
+resolve_nodes(nodes, decisions) =>
+  assume terminates
+  nodes.map(n => resolve_node(n, decisions))
+
+resolve(p, decisions) =>
+  Plan(p.name, p.inputs, p.outcomes, resolve_nodes(p.nodes, decisions), p.budget, p.handlers)
+
+// Every resolution: the product of the options over the choices.
+resolutions_over(cs) =>
+  assume terminates
+  if cs.length == 0
+    then [[]]
+    else extend_resolutions(cs[0], resolutions_over(cs.slice(1)))
+
+extend_resolutions(c, rest) =>
+  c.options.reduce((acc, o) => acc.concat(rest.map(r => [decision(c.name, o.name)].concat(r))), [])
+
+resolutions(p) => resolutions_over(choices(p))
+
+// The objective: the bound's effort, then its duration; a measure nobody
+// estimates counts as nothing.
+effort_or_zero(e) => when e.effort is none then person_hours(0) is x then x
+duration_or_zero(e) => when e.duration is none then qty(0, minute) is x then x
+
+better(a, b) =>
+  if effort_or_zero(a).lt(effort_or_zero(b)) then true
+  else if effort_or_zero(b).lt(effort_or_zero(a)) then false
+  else duration_or_zero(a).lt(duration_or_zero(b))
+
+Candidate = Type.define({ plan: Any, decisions: Array, bound: Any, findings: Array, errors: Array })
+
+candidate(p, decisions) =>
+  solved = resolve(p, decisions)
+  found = check_plan(solved)
+  Candidate(solved, decisions, rollup_bound(solved), found, found.map(f => f.message))
+
+candidates(p) => resolutions(p).map(r => candidate(p, r))
+
+best_of(cs) =>
+  cs.slice(1).reduce((acc, c) => if better(c.bound, acc.bound) then c else acc, cs[0])
+
+decisions_show(ds) => join(ds.map(d => "{d.choice} via {d.option}"), ", ")
+
+Solution = Type.define({ plan: Any, decisions: Array, bound: Any })
+
+solution_show(s) =>
+  "{decisions_show(s.decisions)}; bound effort {measure_show(s.bound.effort)}, duration {measure_show(s.bound.duration)}"
+
+// The counterexample when no resolution passes: the cheapest resolution
+// and why it fails, in planning vocabulary. When the budget is all that
+// fails, the measures are named against their limits.
+over_budget_show(bound, b) =>
+  join([measure_over(bound.duration, b.duration, "duration"),
+        measure_over(bound.effort, b.effort, "effort"),
+        measure_over(bound.money, b.money, "money")].filter(x => x != ""), ", ")
+
+measure_over(used, limit, label) =>
+  when limit
+    is none then ""
+    is _ then (if exceeds(used, limit) then "{label} {measure_show(used)} against {measure_show(limit)}" else "")
+
+only_budget_fails(c) => c.findings.filter(f => f.check != "budget").length == 0
+
+has_budget(p) => when p.budget is none then false is _ then true
+
+infeasible_message(p, cs) =>
+  cheapest = best_of(cs)
+  names = join(choices(p).map(c => c.name), " and ")
+  if only_budget_fails(cheapest) && has_budget(p)
+    then "no choice of {names} fits the budget of {p.name}; the cheapest, {decisions_show(cheapest.decisions)}, is {over_budget_show(cheapest.bound, p.budget)}"
+    else "no choice of {names} is well-formed for {p.name}; the cheapest, {decisions_show(cheapest.decisions)}, fails: {cheapest.errors[0]}"
+
+// A template's checks: the choices' own soundness, the structural checks
+// over the template (budgets held back), and feasibility.
+check_template(p) =>
+  assume terminates
+  structural = check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers)
+  if structural.length > 0 then structural else feasibility(p)
+
+feasibility(p) =>
+  cs = candidates(p)
+  if cs.filter(c => c.errors.length == 0).length > 0
+    then []
+    else [finding("solve", p.name, "", infeasible_message(p, cs))]
+
+// Solve: the best well-formed resolution, or an error value carrying the
+// counterexample. A plan with no choices is its own solution.
+solve(p) =>
+  structural = choice_findings(p).concat(check_scope(p.name, p.inputs, p.nodes, p.outcomes, p.budget, p.handlers))
+  if structural.length > 0
+    then error "{p.name} is not well-formed: {structural[0].message}"
+    else solve_sound(p)
+
+solve_sound(p) =>
+  cs = candidates(p)
+  feasible = cs.filter(c => c.errors.length == 0)
+  if feasible.length == 0
+    then error infeasible_message(p, cs)
+    else solution_of(best_of(feasible))
+
+solution_of(c) => Solution(c.plan, c.decisions, c.bound)
 
 // --- One-line renderings, for demos and for people ------------------------------
 
@@ -773,7 +974,16 @@ build_node(name, items) =>
   base = if kids.length == 0
     then leaf(name, first_or(items, "inputs", []), first_or(items, "outcomes", []))
     else composite(name, first_or(items, "inputs", []), first_or(items, "outcomes", []), kids)
-  items.reduce((acc, i) => apply_item(acc, i), base)
+  with_opts = items.reduce((acc, i) => apply_item(acc, i), base)
+  opts = first_or(items, "options", [])
+  if opts.length == 0 then with_opts else with_options(with_opts, opts.map(o => option_with_ports(o, with_opts)))
+
+// An option written without ports takes the choice's (convention 13).
+option_with_ports(o, c) =>
+  PlanNode(o.name,
+    (if o.inputs.length == 0 then c.inputs else o.inputs),
+    (if o.outcomes.length == 0 then c.outcomes else o.outcomes),
+    o.estimate, o.instructions, o.retry, o.nodes, o.handlers, o.graph, o.budget, o.fails, o.options)
 
 build_handler(failure, items) =>
   h = handler(failure, items_of(items, "node"))
@@ -817,6 +1027,7 @@ planning_grammar = grammar {
   rule node_item += "retry:" hws r:retry_spec => r => item("retry", r)
   rule node_item += "fails:" hws fs:pname_list => fs => item("fails", fs)
   rule node_item += "instructions:" hws INDENT ls:text_lines DEDENT => ls => item("instructions", ls)
+  rule node_item += "options:" hws INDENT oitems:node_items DEDENT => oitems => item("options", items_of(oitems, "node"))
   rule node_item += "on" hws hf:pname hws ":" hws INDENT hitems:node_items DEDENT => (hf, hitems) => item("handler", build_handler(hf, hitems))
   rule node_item += un:pname hws ":" hws "uses" hws target:expr => (un, target) => item("node", uses(un, target))
   rule node_item += nn:pname hws ":" hws INDENT nitems:node_items DEDENT => (nn, nitems) => item("node", build_node(nn, nitems))

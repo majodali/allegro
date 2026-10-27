@@ -605,6 +605,10 @@ fileTest(path.join(testsDir, "planning-release-demo.alg"));
 // tests/lib/build_pipeline.alg and borrowed through `import` (the harness
 // loads a demo's imports from tests/lib/ as the CLI loads <dir>/lib/).
 fileTest(path.join(testsDir, "planning-split-demo.alg"));
+// Stage D1: choices and solution finding. The worked example with Test and
+// Deploy as choices; solved under three budgets; the counterexample names
+// the cheapest resolution; options and recoveries refused.
+fileTest(path.join(testsDir, "planning-solve-demo.alg"));
 
 // The statement form's enforcement shape (chapter §7): `plan NAME:` declares
 // NAME as a WellFormedPlan, so a plan that does not check HALTS the build

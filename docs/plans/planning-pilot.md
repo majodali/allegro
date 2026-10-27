@@ -53,7 +53,7 @@ From the chapter (B-079) and the rulings above:
 |---|---|---|---|
 | **R1** | How are effort (person-hours) and money measured? The units DSL encodes SI dimensions only | (a) planning-local `Effort` and `Money` types, refinement-typed numbers with their own arithmetic; (b) generalise `lib/units.alg` to named base dimensions beyond SI; (c) represent all three measures as plain numbers in the first stage | **(a)** now. (b) is a units design question that the physics pilot may want anyway; take it there. (c) loses the dimensional error the rung-2 bridge exists to show |
 | **R2** | Wall-clock durations: the units DSL's time dimension, or planning-local? | (a) reuse `lib/units.alg` (`30 min` is already a quantity); (b) planning-local `Duration` | **(a)**: it is the bridge from rung 2, and it costs nothing |
-| **R3** | What does solution finding mean for a plan? | decided at stage D from the pilot's own constraints, not now | defer, as Vision §4 directs ("don't over-design ahead of evidence") |
+| **R3** | What does solution finding mean for a plan? | decided at stage D from the pilot's own constraints, not now | defer, as Vision §4 directs ("don't over-design ahead of evidence") — **taken 2026-10-26**: choice, not inference. A node with options; a template; search over the resolutions for the best that passes every check, budget included (chapter §2.7, §7). Scheduling, completion from a catalog and retry tuning weighed and deferred; library enumeration first, kernel residuals considered at D2 |
 | **R4** | Vision §4 amendment (Tier 0): name the pilot roster and the Shape 1 / Shape 2 staging | land §7's text, amend it, or decline | land it, since the rung is being built against it — **taken 2026-10-25, landed in `docs/book/vision.md` §4** (the maintainer noted the text becomes obsolete once the pilots have run) |
 
 ## 4. Stages and chunks
@@ -67,7 +67,8 @@ From the chapter (B-079) and the rulings above:
 | **B. The surface** | B1 ✅ **landed 2026-10-26** | The grammar fragment: `plan NAME:` with offside blocks, `inputs:`/`outcomes:`, bracket constraints, `estimate:`, `budget:`, `retry:`, `fails:`, `instructions:`, `on`, `uses`; the statement form expands to an annotated binding (halts on failure) | `tests/planning-release-demo.alg` is the worked example verbatim, suite-pinned; the first offside-rule fragment works or the engine gap is named — **met**: it works, after three engine gaps were closed in the chunk (chunk log) |
 | | B2 ✅ **landed 2026-10-26** | Cross-file `uses` through `import`; the archived item 4 | the worked example split across two files — **met** (`tests/planning-split-demo.alg` borrows `tests/lib/build_pipeline.alg`; no engine work) |
 | **C. Legibility** | C1 | B-081 slice: the renderer hook, now with evidence of what the messages must say | the demo's refusals read in planning vocabulary |
-| **D. Solution finding** | D1 | Define it from stage A's constraints (R3): the smallest primitive that finds assignments satisfying budget and reachability over residuals | one solved plan in the demo |
+| **D. Solution finding** | D1 ✅ **landed 2026-10-26** | Define it from stage A's constraints (R3): choices with options (convention 13), templates, `solve` by enumeration with the bound as objective, counterexamples naming the cheapest resolution | one solved plan in the demo — **met** (`tests/planning-solve-demo.alg`: the worked example solved under three budgets, refused under a fourth, unsound choices refused) |
+| | D2 | A larger search: the kernel's residuals and interval domains over a template, or completion from a catalog (the AI-loop shape); decided on D1's evidence | — |
 | **E. Packaging** | — | B-093: the public story, the claims register, `demos/rung3`, the website loop | owner's deploy |
 
 Stage A is the primitive version the maintainer asked for. Stages are
@@ -112,6 +113,46 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-26 — D1 (solution finding) landed.** `choice(name, options)`
+  and `with_options`; `options:` in the surface (an option without ports
+  takes the choice's; a composite option is a node block with inner
+  nodes). A plan with open choices is a template: `choices`,
+  `resolutions`, `candidates`; `check_plan` on a template checks the
+  choices' soundness (`check_choice`, `choice_findings`), the structure,
+  and feasibility over every resolution, with budgets on scopes that
+  hold open choices held back for the solver; `solve` answers a
+  `Solution` (plan, decisions, bound) or the counterexample
+  (`infeasible_message`: the cheapest resolution against the measures
+  it misses). `tests/planning-solve-demo.alg` (19 pinned lines): the
+  worked example with `Test` (thorough or quick) and `Deploy`
+  (blue-green or direct) as choices, solved at 200 person-hours (quick
+  and direct, 20.75 person-hours, 1460 min), under a 23 h deadline
+  (quick and blue-green, since direct is slow), refused under 21 h and
+  under 20 person-hours, and three unsound choices refused. Two kernel
+  findings, both fixed in the chunk and pinned: (1) `eval_when`
+  evaluated a Symbol pattern through the dynamic scope, so a library's
+  `is x and x instanceof Duration` read the calling file's `x`, and when
+  that `x` was the value being built the match recursed without bound
+  (`x = e` after `e = est(30 min, …)` crashed). A pattern name is still
+  looked up dynamically when the module can see it (same-file names,
+  forward references, type names), which two existing tests pin; so the
+  resolver now marks a pattern name the module CANNOT see as a binder
+  (`markPatternBinders`, the `when_bind` marker) before any consumer
+  scope exists (pinned in `tests/units-core.alg`); (2) the block builder
+  substituted a local binding's expression into every use site as one
+  object, so the tail-call mark set at a tail site (`then unsound`)
+  leaked a pending call at an argument site (`unsound.length`); each
+  site gets its own copy now (`cloneExprTree`, pinned in
+  `tests/functions.alg`). Two footguns recorded, not fixed: a binding
+  named like a unit (`s = solve(…)`) is what a quantity literal
+  (`30s backoff`) in the same file resolves to, by the units DSL's
+  consumer-scope rule, and the result was an unbounded recursion rather
+  than an error (backlog); and a top-level binding is re-evaluated at
+  every reference, so a plan referenced ten times is built ten times,
+  which is why the demo binds `best = solve(…)` once (backlog). New dev
+  aid: `ALLEGRO_TRACE_DEPTH=<step>` names the Allegro functions on a
+  runaway recursion's chain.
 
 - **2026-10-26 — B2 (cross-file `uses`) landed; stage B complete.** The
   `uses` target is any expression now (`target:expr`), so `Build: uses

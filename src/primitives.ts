@@ -847,7 +847,16 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // subject's name inside the arm via an O(1) scope shadow layer.
   let narrowedSubject: Value | null = null;
 
-  if (isPatternPrim(pattern, "when_wildcard")) {
+  if (isPatternPrim(pattern, "when_bind")) {
+    // A pattern name that is bound nowhere in its own module, marked a
+    // BINDER at resolution (`markPatternBinders`) so that a binding of the
+    // same name in the CALLING file cannot capture it (B-151 D1: a
+    // library's `is x and x instanceof Duration` read the consumer's `x`).
+    // It binds the subject, as an unresolved Symbol pattern does below.
+    matched = true;
+    extractedValues = [subject];
+
+  } else if (isPatternPrim(pattern, "when_wildcard")) {
     matched = true;
 
   } else if (isPatternPrim(pattern, "when_type_destruct")) {
@@ -1025,6 +1034,12 @@ const make_error_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   meta.set("error", errorValue);
   meta.set("type", ErrorType);
   return makeInt(0, meta);
+};
+
+const when_bind_impl: PrimitiveFnImpl = () => {
+  // Marker — the resolver places it where a pattern name is a binder;
+  // eval_when matches it as the wildcard does and binds the subject.
+  return makeExpr(makePrimitive("when_bind", when_bind_impl), []);
 };
 
 const when_wildcard_impl: PrimitiveFnImpl = () => {
@@ -4343,6 +4358,7 @@ export const primitives: Record<string, PrimitiveFunctionValue> = {
   make_error: makePrimitive("make_error", make_error_impl, true),
   eval_when: eval_when_value,
   when_wildcard: makePrimitive("when_wildcard", when_wildcard_impl),
+  when_bind: makePrimitive("when_bind", when_bind_impl),
   when_type_destruct: makePrimitive("when_type_destruct", when_type_destruct_impl),
   when_struct_destruct: makePrimitive("when_struct_destruct", when_struct_destruct_impl),
   when_no_match: makePrimitive("when_no_match", when_no_match_impl, true),

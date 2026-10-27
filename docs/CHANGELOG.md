@@ -4,6 +4,49 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-151 (the planning pilot) D1: choices and solution finding; two kernel fixes
+
+Stage D1 of the rung-3 plan, ruled 2026-10-26 (R3: choice, not
+inference). A choice is a node with options (convention 13; `options:`
+in the surface), a plan with open choices a template, and `solve` the
+search over its resolutions for the best one that passes every check,
+the budget included, by the bound's effort and then its duration
+(`lib/planning.alg`: `choice`, `with_options`, `choices`,
+`resolutions`, `candidates`, `check_choice`, `check_template`,
+`feasibility`, `solve`, `Solution`, `solution_show`). The chosen option
+takes the choice's name and brings its own graph, handlers included; a
+template is well-formed when some resolution is; the counterexample
+names the cheapest resolution and the measure it misses.
+`tests/planning-solve-demo.alg` solves the worked example with `Test`
+and `Deploy` as choices under three budgets, refuses it under a fourth,
+and refuses three unsound choices (19 pinned lines).
+
+Two kernel findings, fixed and pinned. (1) **A library's pattern
+variable was captured by the calling file.** `eval_when` evaluated a
+Symbol pattern through the dynamic scope, so `is x and x instanceof
+Duration` in `lib/planning.alg` read the consumer's `x`; with `x = e`
+after `e = est(30 min, …)` the match recursed without bound. A pattern
+name the module can see stays dynamic, as two existing tests require
+(same-file names and forward references resolve at run time); a name
+the module cannot see is a binder, and the resolver marks it as one
+(`markPatternBinders` in `src/evaluator.ts`, the `when_bind` marker in
+`src/primitives.ts`, recognised by the exhaustiveness analysis) before
+any consumer scope exists (pinned in `tests/units-core.alg`). (2) **A local
+binding's expression was one object under every use site.** The block
+builder substituted the same expression into each site, so the
+tail-call mark set at a tail site (`then unsound`) was present at an
+argument site (`unsound.length`) and a pending call leaked there as a
+value. `substName` inserts a fresh copy of the expression tree at every
+site (`cloneExprTree`, `src/parser-helpers.ts`; pinned in
+`tests/functions.alg`). The same sharing was the mechanism of B-152 (the
+kernel fault on one call shape). New dev
+aid `ALLEGRO_TRACE_DEPTH=<step>` (`src/evaluator.ts`): the Allegro
+function applied each time the evaluation depth passes another step,
+which is how both were found. Two footguns recorded as B-153 (a
+top-level binding is re-evaluated at every reference) and B-154 (a
+binding named like a unit rebinds a file's quantity literals). Suite
+1214 distinct tests plus one pinned demo file.
+
 ## 2026-10 — B-151 (the planning pilot) B2: cross-file `uses` through `import`; stage B complete
 
 Stage B2 of the rung-3 plan. The `uses` target in the surface is any

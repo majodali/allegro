@@ -1,5 +1,6 @@
 // Allegretto - Evaluator
 
+import { renderExprSource, primitives } from "./primitives.js";
 import {
   Value, ValueKind, ExpressionValue, StructureValue,
   ComposedFunctionValue, ParamValue,
@@ -12,6 +13,15 @@ import { metaReadRaw, cloneMeta, metaOf, metaFieldSpec, fieldChecks, CheckSite, 
 import { scopeLookup, scopeCompileMode, scopeFactsFor } from "./scope.js";
 
 const MAX_DEPTH = 10000;
+
+// ALLEGRO_TRACE_DEPTH=1: print the body of the composed function being
+// applied each time the evaluation depth first passes another 500 levels,
+// so a runaway recursion names the Allegro functions on its chain (the JS
+// stack only names the evaluator). B-151 D1 found a cross-module pattern
+// capture this way.
+const TRACE_DEPTH = typeof process !== "undefined" && !!process.env?.ALLEGRO_TRACE_DEPTH;
+const TRACE_STEP = Math.max(1, Number(process.env?.ALLEGRO_TRACE_DEPTH) || 500);
+let traceWaterline = TRACE_STEP;
 
 // B-018 T-R6 (broadened): the recursion inlining cutoff hook. Injected
 // per typed compilation from runtime.ts once the call-graph SCCs are
@@ -140,6 +150,45 @@ function isBranchingPrimitive(expr: ExpressionValue): boolean {
   if (fn.kind !== ValueKind.PrimitiveFunction) return false;
   return (fn.name === "eval_if" && expr.args.length === 3) ||
          (fn.name === "eval_when" && expr.args.length === 5);
+}
+
+/**
+ * Mark the binders among a scope's `when` patterns (B-151 D1).
+ *
+ * A pattern written as a bare name is either a binder (`is x then …`) or a
+ * reference to a value in scope (`is none`, `is Dog`, `is limit`), and the
+ * two are told apart at run time by looking the name up in the EVALUATION
+ * scope. For a library that scope is the calling file's, so a binding of
+ * the same name there captured the library's binder: `is x and x
+ * instanceof Duration` read the consumer's `x`, and when that `x` was the
+ * value being built the match recursed without bound. The resolver knows
+ * every name the module can see (`known`); a pattern name it cannot see is
+ * a binder, and is marked as one here, before any consumer scope exists.
+ * A name the module CAN see stays a Symbol and resolves at run time as
+ * before (same-file names, including forward references, are dynamic).
+ */
+export function markPatternBinders(value: Value, known: Set<string>, seen: Set<Value> = new Set()): void {
+  if (!value || typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+  switch (value.kind) {
+    case ValueKind.Expression: {
+      const fn = value.fn;
+      if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "eval_when" && value.args.length === 5) {
+        const pat = value.args[1];
+        if (pat.kind === ValueKind.Symbol && !known.has(pat.name)) {
+          value.args[1] = makeExpr(primitives["when_bind"] as Value, []);
+        }
+      }
+      markPatternBinders(value.fn, known, seen);
+      for (const a of value.args) markPatternBinders(a, known, seen);
+      return;
+    }
+    case ValueKind.ComposedFunction:
+      markPatternBinders(value.body, known, seen);
+      return;
+    default:
+      return;
+  }
 }
 
 // --- Core evaluation ---
@@ -556,6 +605,12 @@ function applyComposed(
       return calleeEffects ? withEffects(residual, calleeEffects) : residual;
     }
 
+    if (TRACE_DEPTH && depth >= traceWaterline) {
+      traceWaterline = depth + TRACE_STEP;
+      let body = "<unrenderable>";
+      try { body = renderExprSource(currentFn.body).slice(0, 120).replace(/\n/g, " "); } catch { /* diagnostic only */ }
+      console.error(`[evaluation depth ${depth}] ${body}`);
+    }
     const substituted = substituteParams(currentFn, evalArgs);
     let result: Value | TailCall = evaluate(substituted, enrichedCtx, depth + 1, depCollector);
 
