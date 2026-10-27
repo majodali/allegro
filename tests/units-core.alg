@@ -56,3 +56,10 @@ print(g0 instanceof Acceleration)     // expect: true
 f = qty(2, kg).mul(g0)
 print(f.to(N).toString())             // expect: 19.6 N
 print(f.to(N) instanceof Force)       // expect: true
+
+// A library's pattern variable is its own. `q_mul` matches its operand
+// with `is o and o instanceof Int`; a binding named `o` in the using file
+// does not capture that name (the pattern bound the file's `o` as a
+// literal before, and the match failed).
+o = 1
+print(qty(2, m).mul(3).toString())    // expect: 6 m

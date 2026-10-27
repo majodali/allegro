@@ -8,7 +8,7 @@ import { metaReadRaw, cloneMeta, hasShapeSlot, bumpMetaEpoch, withSource, carryM
 import { installAnalysis, kernelFieldWriter } from "./capability.js";
 import { getName, renameInPlace, isBareBindingName, isFutureBindingName } from "./slot-accessors.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
-import { markTailCalls, precompileFunction, remapParams, setInlineCutoff } from "./evaluator.js";
+import { markTailCalls, precompileFunction, remapParams, setInlineCutoff, markPatternBinders } from "./evaluator.js";
 import { parse as grammar2Parse } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
 import { buildProgram } from "./grammar2/tree-builder.js";
@@ -210,8 +210,15 @@ export function resolveSymbols(
   const nonSourceMap = new Map(resolutionMap);
   for (const name of sourceNames) nonSourceMap.delete(name);
 
+  // Pattern binders (B-151 D1): a `when` pattern name the module cannot see
+  // is a binder, marked in this same pass so no consumer scope can capture
+  // it later. The literal names are known even where no binding carries them.
+  const knownNames = new Set(resolutionMap.keys());
+  for (const lit of ["none", "true", "false"]) knownNames.add(lit);
+
   for (const b of fileCtx.bindingList) {
     if (b.value !== undefined) {
+      markPatternBinders(b.value, knownNames);
       b.value = resolveNamedParams(b.value, nonSourceMap, null);
     }
   }

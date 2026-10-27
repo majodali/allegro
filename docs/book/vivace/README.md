@@ -38,5 +38,6 @@ appears.
   `tests/planning-handlers-demo.alg` (failures, escalation, handlers),
   `tests/planning-release-demo.alg` (the worked example through the
   `plan NAME:` surface), `tests/planning-split-demo.alg` with
-  `tests/lib/build_pipeline.alg` (the example across two files)
+  `tests/lib/build_pipeline.alg` (the example across two files),
+  `tests/planning-solve-demo.alg` (choices and solution finding)
 - Vision-level framing: `docs/book/vision.md` §4 (Tier 0)

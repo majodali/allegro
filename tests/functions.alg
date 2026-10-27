@@ -82,3 +82,15 @@ print(found[0])
 // expect: a
 print(found[1])
 // expect: [1, 2]
+
+// A local binding used both as an argument and as the function's result:
+// each use site holds its own copy of the bound expression, so the tail
+// position of one does not leak a pending call into the other.
+positives(xs) => xs.filter(x => x > 0)
+kept(xs) =>
+  ys = positives(xs)
+  if ys.length == 0 then ys else ys
+print(kept([-1, 2, 3]))
+// expect: [2, 3]
+print(kept([-1, -2]))
+// expect: []

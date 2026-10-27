@@ -889,9 +889,36 @@ that prevents it.
   - **Progress.** B2 (2026-10-26): cross-file `uses` through `import`;
     `tests/planning-split-demo.alg` borrows `tests/lib/build_pipeline.alg`.
     Stage B complete; the primitive version of the pilot has run end to
-    end. Next: stage C (the B-081 renderer slice), which the ruling of
-    2026-10-25 held until this point; or stage D (solution finding)
-    first, for the maintainer to say
+    end.
+  - **Progress.** D1 (2026-10-26): choices with options (convention
+    13), templates, `solve` by enumeration with the bound as objective,
+    counterexamples naming the cheapest resolution;
+    `tests/planning-solve-demo.alg` suite-pinned. Two kernel findings
+    fixed: a library's `when` pattern variable captured by the calling
+    file's binding of the same name; a local binding's expression shared
+    across its use sites leaking a tail-call sentinel. Next: D2 (a larger
+    search) or stage C (the renderer), for the maintainer to say
+- [ ] **B-153** (re-evaluation per reference) · L0 · **A top-level
+  binding is re-evaluated at every reference.** Found by B-151 D1. Five bindings each referencing the
+  previous (`d`, `c = …d…`, `b = …c…`, …) evaluate `d`'s expression six
+  times; a plan referenced ten times by a demo is built ten times, and
+  each build runs the plan's checks. Symbol resolution substitutes the
+  definition's expression, not its value, and the reactive registry does
+  not hand back a resolved cell's value on later references. Cost, not
+  correctness, but it compounds with the 40 s parse of `lib/planning.alg`
+  (the scannerless engine at about 1 ms per character) into minutes per
+  demo. **Blocked-by**: nothing. **Pointer**: `src/runtime.ts`
+  (`resolveSymbols`, the dependency registry);
+  `docs/plans/planning-pilot.md` §8 (D1)
+- [ ] **B-154** (unit-name shadowing) · L2 · **A binding named like a
+  unit silently rebinds the quantity literals of its file.** Found by B-151 D1: `s = solve(plan)`
+  made the plan's `30s backoff` read as `30 × (solve(plan))`, and the
+  recursion ran unbounded instead of failing. The units DSL resolves unit
+  identifiers in the consumer's scope by design (U-R2, so a file can
+  define units); the failure mode is the problem. Options: a quantity
+  literal whose unit resolves to a non-`Unit` value is an error in units
+  vocabulary; or unit idents resolve against the units module first.
+  **Blocked-by**: nothing. **Pointer**: `lib/units.alg` (`units_grammar`)
 - [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds

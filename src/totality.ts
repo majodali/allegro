@@ -426,10 +426,11 @@ function typeContextName(t: Value): string | null {
 function hasWildcardOrBinding(cases: ChainCase[]): boolean {
   for (const c of cases) {
     const p = c.pattern;
-    // Wildcard marker: `when_wildcard()` expression.
+    // Wildcard marker: `when_wildcard()` expression; binder marker:
+    // `when_bind()` (a bind-to-name pattern the resolver marked, B-151 D1).
     if (p.kind === ValueKind.Expression) {
       const fn = (p as ExpressionValue).fn;
-      if (fn.kind === ValueKind.PrimitiveFunction && fn.name === "when_wildcard") return true;
+      if (fn.kind === ValueKind.PrimitiveFunction && (fn.name === "when_wildcard" || fn.name === "when_bind")) return true;
     }
     // Bind-to-name: pattern is a bare Symbol like `is n`. Matches anything.
     if (p.kind === ValueKind.Symbol) return true;

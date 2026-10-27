@@ -134,6 +134,24 @@ or equipment across the graph), performer assignment and latitude
 grading (how strictly a leaf's instructions bind) are all absent from a
 valid plan and explicit when needed. None is designed yet (§8).
 
+<a id="def-choice"></a>
+### 2.7 Choice
+
+**Definition.** A *choice* is a node that can be done one of several
+ways: it carries *options*, each a node (a leaf or a composite) with the
+choice's ports. A plan with open choices is a *template*; a *resolution*
+picks one option at every choice, and the solved plan is a plan like any
+other. *Solution finding* is the search over the resolutions for one
+that passes every check, the budget included, best by an objective.
+
+**Rationale.** Vision §2 names solution finding as search through the
+space the claims constrain. A plan as the author writes it is fully
+specified and leaves nothing to find; the planning domain's natural
+open thing is an alternative. Choices keep the model one model: an
+option is an ordinary node, a template is checked by the checks of §7,
+and a solved plan needs nothing new. Ruled 2026-10-26 (R3, the
+solution-finding ruling, at stage D).
+
 ## 3. The conventions [designed]
 
 Twelve decisions, settled iteratively in the archived design and
@@ -195,6 +213,12 @@ what today's code has to say about it.
     attempts, 30s backoff` in the simple form; `iterate: until
     <condition>; max N; backoff Xs` in the richer form. The budget
     rollup takes `estimate × max_attempts` as the node's upper bound.
+13. **A choice declares its options under `options:`** (§2.7; added at
+    stage D1). Each option is a node block; an option written without
+    ports takes the choice's. A choice may sit anywhere in the main
+    graph; a borrowed plan is solved before it is borrowed, and a
+    recovery's graph holds no choice. `options` joins convention 4's
+    reserved keys.
 
 ## 4. What was tried and rejected [designed]
 
@@ -520,6 +544,28 @@ retry, at every scope, and the budget check verifies the bound, while
 three attempts and the rollback, the bound is 1345 min and 24
 person-hours, within the declared 200.
 
+Stage D1 built solution finding over choices (§2.7). A template is
+well-formed when its choices are sound (every option carries the
+choice's ports; no choice in a borrowed plan or a recovery), the
+structural checks pass over the template, and **some resolution passes
+every check, the budget included**; a budget on a scope with open
+choices beneath it is held back until the solver settles it. `solve`
+enumerates the resolutions, keeps the well-formed ones, and answers the
+best by the objective, the bound's effort and then its duration, as a
+`Solution`: the solved plan, the decisions ("`Test` via `Quick`,
+`Deploy` via `Direct`") and the bound. The chosen option takes the
+choice's name, so the solved plan reads as the author wrote it, and it
+brings its own graph, handlers included. When no resolution passes, the
+counterexample names the cheapest resolution and the measure it misses
+("no choice of `Test` and `Deploy` fits the budget of
+`SoftwareRelease`; the cheapest, `Test` via `Quick`, `Deploy` via
+`Direct`, is duration 1460 min against 21 h"), or its first finding when
+something other than the budget fails. Enumeration is the library's own
+and honest at the pilot's size: the worked example with two choices of
+two options has four resolutions. The kernel's residuals and interval
+domains are the elegant form for a larger space and are considered at
+stage D2 on this evidence.
+
 Two enforcement shapes, both existing:
 
 - **Construction.** The plan constructor validates and, on failure,
@@ -560,11 +606,11 @@ Carried from the archived design, with two added by the revalidation:
   files rides `import`, and a plan declaration imports cleanly
   (convention 10, revalidation).
 - *Added:* **non-SI measures** (§6: effort and money).
-- *Added:* **what solution finding means for a plan.** The ladder
-  names it; nothing defines it. The plan's stage D lets the pilot's
-  constraints say what is to be found (assignments of estimates or
-  choices that satisfy budget and reachability) before any primitive is
-  built.
+- *Closed at stage D1:* **what solution finding means for a plan.**
+  Search over the resolutions of a template's choices (§2.7) for the
+  best one that passes every check (§7). Scheduling under a resource
+  limit, completion from a catalog, and retry tuning were weighed and
+  deferred (the plan's §3, R3).
 
 ## 9. Status and pointers [partial]
 
@@ -599,8 +645,14 @@ stages surfaced four substrate findings (§6): `Array.length` untyped
 chunk after A3), and a local binding of a branching expression holding a
 pending call (fixed, A3). Stage B is complete:
 `tests/planning-split-demo.alg` borrows `BuildPipeline` from
-`tests/lib/build_pipeline.alg` through `import`. Not yet built: the
-renderer (C), solution finding (D).
+`tests/lib/build_pipeline.alg` through `import`. Stage D1 built choices
+and `solve` (§2.7, §7): `tests/planning-solve-demo.alg` solves the
+worked example with `Test` and `Deploy` as choices under three budgets
+and refuses unsound choices. Two more substrate findings, both fixed in
+that chunk: a library's `when` pattern variable was looked up in the
+calling file's scope, and a local binding's expression was shared
+between its use sites so a tail mark at one leaked a pending call at
+another. Not yet built: the renderer (C), a larger search (D2 (the next solution-finding chunk)).
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),
