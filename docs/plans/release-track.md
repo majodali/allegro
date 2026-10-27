@@ -200,11 +200,12 @@ forward-chaining + futures (reactivity), Vivace hypothesis (VISION §4).
 |---|---|
 | Constraint substrate (interval domains, entailment, propagation) | delivered (arithmetic scale) |
 | Reactive re-derivation as bindings resolve (futures/applyPhase) | delivered (language scale) |
-| Model authoring surface + solution finding | hypothesis (rung 3; B-079/B-080) |
+| Model authoring surface + solution finding | demoable (rung 3, 2026-10: one model, the planning DSL, as a pure Allegro library with an offside-rule grammar; graph checks, budgets, recoveries; two searches, choices and completion from a catalog; refusals in the model's vocabulary — `demos/rung3/`; pilot scale, Shape 1) |
 | Simulation runtime; live-model operation | hypothesis |
-| Units/dimensions as refinements | hypothesis (natural rung-2/3 bridge) |
+| Units/dimensions as refinements | delivered (rung 2; the planning DSL's durations ride it, rung 3) |
 
-To advance: rung-3 pilot design (after rung 2 informs the surface).
+To advance: a second model composed with the first (B-082), the AI loop
+over a model (B-083), Shape 2 (execution).
 
 ### D7 — Capstone: mixed-model solution finding with AI collaboration
 
@@ -379,3 +380,27 @@ against a private mental model.
   demos/rung2 + landing section + sandbox preset shipped;
   37-example site sweep clean. Next: rung 3 (B-093/B-079/B-080
   reval) per the ladder; deploy pass is the maintainer's.
+- 2026-10: **RUNG 3 LANDED** (B-151 (the planning pilot), every stage
+  from the library core to legibility; plan `planning-pilot.md`;
+  packaging slice 1 of B-093 (rung-3 packaging)). The hypothesis
+  test has a result at pilot scale: one domain model, a project plan
+  as a graph of outcomes, as a pure Allegro library with an
+  offside-rule grammar (`lib/planning.alg`); wiring derived and
+  checked, budgets against a worst-case bound, recoveries checked as
+  graphs; two searches (choices, completion from a catalog) with
+  counterexamples naming the cheapest candidate; every refusal in the
+  model's vocabulary, the `plan` statement's halt included (the
+  refinement predicate explains itself — the B-081 slice). D6 row
+  "model authoring surface + solution finding" re-graded demoable;
+  "units/dimensions as refinements" re-graded delivered (rung 2 built
+  it, rung 3 rides it). D7 stays hypothesis. `demos/rung3/` (two
+  suite-validated scenes + halt transcripts), messaging rows, README.
+  Along the way the rung forced six substrate fixes (sentinel leaks,
+  a shared parser stub, pattern-variable capture across modules, a
+  shared local-binding expression, layout terminals in user EBNF, the
+  `binding_decl` statement form) and recorded three cost items
+  (B-153 (re-evaluation per reference), B-155 (library load per
+  module), the 1 ms-per-character parse). Remaining for the packaging:
+  the website loop (landing section, sandbox preset, `planning` in
+  the web library registry — the browser load time to be measured
+  first); deploy pass is the maintainer's.

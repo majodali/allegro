@@ -615,6 +615,14 @@ fileTest(path.join(testsDir, "planning-solve-demo.alg"));
 // and for an unsound completion; a gap on the input side.
 fileTest(path.join(testsDir, "planning-complete-demo.alg"));
 
+// B-093 (stage E): the public rung-3 demo scenes are suite-validated like
+// the rung-1 and rung-2 ones (src/test/proofs.ts), so they cannot rot.
+// Each carries a commented "break it" block whose captured halt lives in
+// demos/rung3/transcripts/.
+const demosRung3Dir = path.resolve("demos", "rung3");
+fileTest(path.join(demosRung3Dir, "01-model.alg"));
+fileTest(path.join(demosRung3Dir, "02-solve.alg"));
+
 // The statement form's enforcement shape (chapter §7): `plan NAME:` declares
 // NAME as a WellFormedPlan, so a plan that does not check HALTS the build
 // with the refinement's message. The demo files can only pin plans that

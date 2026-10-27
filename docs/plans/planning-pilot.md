@@ -71,7 +71,8 @@ From the chapter (B-079) and the rulings above:
 | **D. Solution finding** | D1 ✅ **landed 2026-10-26** | Define it from stage A's constraints (R3): choices with options (convention 13), templates, `solve` by enumeration with the bound as objective, counterexamples naming the cheapest resolution | one solved plan in the demo — **met** (`tests/planning-solve-demo.alg`: the worked example solved under three budgets, refused under a fourth, unsound choices refused) |
 | | D2 ✅ **landed 2026-10-27** | A larger search, decided on D1's evidence (maintainer, 2026-10-27, three rulings): completion from a catalog (the AI-loop shape; chapter §2.8, convention 14), the gap being the existing wiring or outcome finding, library first with chaining to a depth; the enumeration checks the template once; the kernel's residuals weighed and not taken (chapter §7) | a plan with a gap completed from a catalog and solved — **met** (`tests/planning-complete-demo.alg`: an order completed from leaves, a choice and a borrowed plan; solved under a deadline; refused at a dead end, at the depth, over the budget, and for an unsound completion) |
 | | D3 | Branch-and-bound over partial resolutions, when a template outgrows enumeration; a surface form for catalogs | not before a pilot plan needs either |
-| **E. Packaging** | — | B-093: the public story, the claims register, `demos/rung3`, the website loop | owner's deploy |
+| **E. Packaging** | E1 ✅ **landed 2026-10-27** | B-093 slice 1: `demos/rung3` (two suite-validated scenes with break-it halt transcripts), the claims register re-graded (D6 rows), the messaging skeleton's rung-3 story and claim with receipts, README and getting-started | the public story derives from delivered material only, with what is not claimed said — **met** (`demos/rung3/README.md`, `docs/messaging.md`) |
+| | E2 | B-093 slice 2, the website loop: landing section, sandbox preset, `planning` in the web library registry; the browser load time measured first | owner's deploy |
 
 Stage A is the primitive version the maintainer asked for. Stages are
 ordered; chunks within a stage may merge if small. Each chunk follows
@@ -115,6 +116,27 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-27 — E1 (packaging, slice 1) landed.** The public story
+  derived from what is delivered, per the release track's claims
+  discipline. `demos/rung3/01-model.alg`: the worked example through
+  the `plan` form, the rollup and the bound, escalation, three
+  refusals in planning vocabulary (an unwired input, a bound over its
+  budget, a handler nothing raises); `02-solve.alg`: choices, `solve`
+  under two budgets, the counterexample, completion from a catalog;
+  both suite-validated (`src/test/language.ts`), each with a break-it
+  halt captured in `transcripts/` (the `plan` statement refusing an
+  unwired input; refusing a template no resolution brings within its
+  deadline). The claims register (`docs/plans/release-track.md`), under
+  D6 (models as live values): "model authoring surface + solution
+  finding" hypothesis → demoable, "units/dimensions as refinements"
+  hypothesis → delivered; D7 (the capstone) stays hypothesis; §8 "rung
+  3 landed". `docs/messaging.md`: the rung-3
+  story in three beats, the claim row with receipts, the not-claimed
+  line (one model, pilot scale, Shape 1). README and getting-started
+  gain the rung-2 and rung-3 tour entries. Not in this slice: the
+  website loop (E2), because `planning` is not in the web library
+  registry and its load time in the browser is unmeasured.
 
 - **2026-10-27 — C1 (legibility) landed.** The B-081 slice, on the
   maintainer's reasoning of 2026-10-27: not a registered slot on the

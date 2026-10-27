@@ -793,6 +793,20 @@ that prevents it.
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;
   rung 4 remains internal direction until then
+  - **Progress.** Slice 1 (2026-10-27, stage E1 of B-151 (the planning
+    pilot)): `demos/rung3/`
+    (two scenes suite-validated via `// expect:`, halt transcripts,
+    README); the claims register re-graded (`docs/plans/release-track.md`
+    D6: model authoring + solution finding → demoable; units as
+    refinements → delivered; §8 "rung 3 landed"); `docs/messaging.md`
+    rung-3 story, claim row with receipts, the not-claimed line; README
+    and getting-started tour entries. Remaining (slice 2, the website
+    loop): landing section, sandbox preset, `planning` in
+    `scripts/sync-web-libs.ts`'s registry with its nested `use units`
+    and `use totality`; measure the browser load time first (the
+    library parses in about 40 s on node: B-153 (re-evaluation per
+    reference), B-155 (library load per module)); deploy is the
+    maintainer's.
 
 ### Track M — methodology (2026-08)
 
@@ -910,8 +924,12 @@ that prevents it.
     finding; the kernel carries it into the `plan` statement's halt and
     every other refinement refusal (B-081 progress above). Finding filed:
     `||` does not pass an error value through, **B-156** (short-circuit
-    over an error value). Next: C2, D3 or stage E
-    (B-093 packaging), for the maintainer to say
+    over an error value).
+  - **Progress.** E1 (2026-10-27): packaging slice 1 — `demos/rung3/`,
+    the register re-graded, the messaging story and claim, README and
+    getting-started (B-093 progress above). Next: E2 (the website
+    loop), then C2 or D3 as a pilot plan demands, for the maintainer to
+    say
 - [ ] **B-153** (re-evaluation per reference) · L0 · **A top-level
   binding is re-evaluated at every reference.** Found by B-151 D1. Five bindings each referencing the
   previous (`d`, `c = …d…`, `b = …c…`, …) evaluate `d`'s expression six

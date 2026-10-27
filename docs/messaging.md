@@ -73,6 +73,32 @@ Everything Allegro does differently is a composition of three moves:
    renders `[resting on admitted 'trans' of 'Equatable']`. The system
    never upgrades your evidence for free.
 
+## The rung-3 story (what `demos/rung3/` shows)
+
+A domain model, not a program. The planning DSL is a pure Allegro
+library: a project plan is a graph of outcomes, and `plan NAME:`
+declares a value the kernel checks like any other.
+
+1. **The model is the artifact.** Inputs, outcomes with constraints,
+   estimates, a budget, declared failures and their recovery graphs —
+   written once, in the domain's own form. Dependencies are derived
+   from the wiring, never written.
+
+2. **It checks itself, and a plan that does not check does not build.**
+   Wiring complete and unambiguous, constraints compatible along every
+   edge, no cycles, every outcome produced, every recovery reachable
+   and wired, the worst-case bound within the budget. The refusal
+   reads in planning vocabulary — "input Missing of Compile is not
+   produced by any node of BuildPipeline or by its inputs" — because
+   the model's own predicate says why it refused.
+
+3. **It is searched.** A node with options makes the plan a template;
+   `solve` picks the resolution that passes every check and is
+   cheapest by effort, then duration, and a deadline moves the answer.
+   A gap is filled from a catalog of nodes, chained backward. When
+   nothing fits, the counterexample names the cheapest candidate and
+   the measure it misses.
+
 ## Claims we make publicly (with receipts)
 
 Each claim is stated at its evidence strength. Receipts are runnable.
@@ -88,6 +114,7 @@ Each claim is stated at its evidence strength. Receipts are runnable.
 | A module's behavioral envelope is inspectable: safety grade, contracts, effects, predicates per binding | `allegro inspect`; sandbox Inspect button |
 | The grammar is extensible at runtime — operators, rules, multi-token forms — with conflict detection at `use` time; extensions in `.alg` libraries get the entire kernel (proofs, effects, totality) | `lib/pow.alg`, `lib/match_expr.alg`, `lib/provable.alg` |
 | A flagship provable DSL exists: units-of-measure physics as a pure Allegro library — dimensional soundness is refinement discharge, failures speak physics, theorems PE-discharge in literal syntax (`theorem: 1 km == 1000 m`), and the gate/ledger work over quantities | `lib/units.alg`; `demos/rung2/`; `allegro verify demos/rung2/03-laws.alg` |
+| A domain model is a value the kernel checks and searches: the planning DSL (a project plan as a graph of outcomes) is a pure Allegro library with an offside-rule grammar; wiring, cycles, constraints, budgets and recoveries are checked, a plan that does not check does not build, every refusal reads in planning vocabulary, and solution finding picks options and fills gaps from a catalog under the budget, naming the cheapest candidate when nothing fits — one model, at pilot scale, as specification and checking (Shape 1) | `lib/planning.alg`; `demos/rung3/`; `tests/planning-*.alg` |
 
 ## What we do not claim (and say so)
 
@@ -105,6 +132,10 @@ them before we do or we lose them.
 - `prove_induction` verifies a bounded prefix plus the user-owned step
   contract; the tier system says exactly this — that's what *sampled*
   means.
+- One domain model, at pilot scale, as specification and checking
+  (Shape 1): nothing executes a plan; no second model is composed with
+  it; no AI agent runs the loop over it. Those are the next rungs'
+  questions, not claims.
 - No performance claims. No ecosystem claims.
 
 ## Voice rules
@@ -121,6 +152,9 @@ them before we do or we lose them.
 
 - `website/index.html` — hero + intro rebuilt on this skeleton; laws +
   prover-loop sections added; refinement syntax updated to `&`.
-- `demos/` — rung-1 runnable scripts + transcripts (this package).
+- `demos/` — rung-1 runnable scripts + transcripts (this package);
+  `demos/rung2/` (the provable DSL); `demos/rung3/` (the domain model,
+  slice 1 of B-093 (rung-3 packaging) — landing section and sandbox
+  preset are the next slice).
 - `docs/book/proving-in-allegro.md` — audited as the public primer.
 - README / getting-started — next slice (B-091 step 4–5).
