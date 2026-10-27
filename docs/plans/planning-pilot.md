@@ -66,7 +66,8 @@ From the chapter (B-079) and the rulings above:
 | | A4 ✅ **landed 2026-10-26** | Failure handlers: `on <FailureType>` graphs, handler validity, re-escalation as a graph property | both handlers of the worked example checked — **met** (`tests/planning-handlers-demo.alg`: both handlers clean, escalation rendered, the bound with handlers, three handlers refused) |
 | **B. The surface** | B1 ✅ **landed 2026-10-26** | The grammar fragment: `plan NAME:` with offside blocks, `inputs:`/`outcomes:`, bracket constraints, `estimate:`, `budget:`, `retry:`, `fails:`, `instructions:`, `on`, `uses`; the statement form expands to an annotated binding (halts on failure) | `tests/planning-release-demo.alg` is the worked example verbatim, suite-pinned; the first offside-rule fragment works or the engine gap is named — **met**: it works, after three engine gaps were closed in the chunk (chunk log) |
 | | B2 ✅ **landed 2026-10-26** | Cross-file `uses` through `import`; the archived item 4 | the worked example split across two files — **met** (`tests/planning-split-demo.alg` borrows `tests/lib/build_pipeline.alg`; no engine work) |
-| **C. Legibility** | C1 | B-081 slice: the renderer hook, now with evidence of what the messages must say | the demo's refusals read in planning vocabulary |
+| **C. Legibility** | C1 ✅ **landed 2026-10-27** | B-081 slice, decided on the pilot's evidence (maintainer, 2026-10-27): a refinement predicate that answers an error value explains its refusal, and the kernel carries the text into the refusal at every site; no registered slot, no renderer registry; `well_formed` explains itself with every finding | the demo's refusals read in planning vocabulary — **met**: the construction path did already, and the `plan` statement's halt now carries the findings (the halt test and the refinement test in `src/test/language.ts`) |
+| | C2 | The rest of B-081 as the pilot needs it: the `inspect` channel, the call-site origin (B-057), rendering the refused value | not before a demo needs one |
 | **D. Solution finding** | D1 ✅ **landed 2026-10-26** | Define it from stage A's constraints (R3): choices with options (convention 13), templates, `solve` by enumeration with the bound as objective, counterexamples naming the cheapest resolution | one solved plan in the demo — **met** (`tests/planning-solve-demo.alg`: the worked example solved under three budgets, refused under a fourth, unsound choices refused) |
 | | D2 ✅ **landed 2026-10-27** | A larger search, decided on D1's evidence (maintainer, 2026-10-27, three rulings): completion from a catalog (the AI-loop shape; chapter §2.8, convention 14), the gap being the existing wiring or outcome finding, library first with chaining to a depth; the enumeration checks the template once; the kernel's residuals weighed and not taken (chapter §7) | a plan with a gap completed from a catalog and solved — **met** (`tests/planning-complete-demo.alg`: an order completed from leaves, a choice and a borrowed plan; solved under a deadline; refused at a dead end, at the depth, over the budget, and for an unsound completion) |
 | | D3 | Branch-and-bound over partial resolutions, when a template outgrows enumeration; a surface form for catalogs | not before a pilot plan needs either |
@@ -114,6 +115,32 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-10-27 — C1 (legibility) landed.** The B-081 slice, on the
+  maintainer's reasoning of 2026-10-27: not a registered slot on the
+  Refinement kind (the first proposal) but the kernel's own channel for
+  "no, and here is why". A refinement predicate that answers an ERROR
+  VALUE instead of `false` has refused the value, and the refusal sites
+  read its text through the registered `error` channel: the binding and
+  parameter annotations append it to the kernel's message
+  (`src/primitives.ts`, `src/types-std.ts`), guarded construction yields
+  it as the error value, a plain `false` keeps today's text; `textOf`
+  in `src/types.ts` reads the channel so no refusal site tests a kind of
+  its own (the discriminator ratchet holds). `lib/planning.alg`:
+  `well_formed` answers `not_well_formed(p, errs)`, the plan's name and
+  EVERY finding, and `validate` yields the same sentence, so the `plan`
+  statement halts with "Type error: refinement predicate failed for
+  `WellFormedPlan`: `Broken` is not well-formed: input `Missing` of
+  `Work` is not produced by any node of `Broken` or by its inputs". One
+  pin changed with discussion: `tests/planning-checks-demo.alg`'s
+  `validate(unwired)` now names both findings, not the first. Tests: the
+  halt test asserts the explanation; a new kernel test covers the three
+  sites for a refined `Int` and a refined record, and that a plain
+  `false` keeps the domain-rendered message. Finding filed: `false ||
+  error "…"` does not pass the error value through, so a predicate
+  explains itself with `if` (B-156 (short-circuit over an error value);
+  the maintainer will discuss). What B-081 still holds is the plan's C2
+  row.
 
 - **2026-10-27 — D2 (completion from a catalog) landed.** The second
   search, on the three rulings of 2026-10-27: completion rather than the

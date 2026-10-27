@@ -94,7 +94,7 @@ print(unwired instanceof WellFormedPlan)
 
 refused = validate(unwired)
 print(error of refused)
-// expect: Unwired is not well-formed: input PackagedArtifacts of Sign is not produced by any node of Unwired or by its inputs
+// expect: Unwired is not well-formed: input PackagedArtifacts of Sign is not produced by any node of Unwired or by its inputs; outcome CompiledBinaries of Compile is neither consumed by a node of Unwired nor declared as its outcome
 
 // 2. A cycle: A needs what B produces and B needs what A produces.
 cyclic = plan("Cyclic", [], [port("X")], [

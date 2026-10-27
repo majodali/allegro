@@ -188,6 +188,13 @@ PositiveInt = Int & _ > 0
 PositiveInt(5)                    // → 5
 PositiveInt(0 - 1)                // → error(refinement check failed)
 
+// A predicate that answers an error value explains its refusal, at a
+// binding or parameter annotation (a halt) as at construction
+small(n) => if n < 10 then true else error "{n} is not small: a small number is below 10"
+Small = Int & small(_)
+Small(42)                         // → error(42 is not small: a small number is below 10)
+x: Small = 42                     // halts: Type error: refinement predicate failed for Small: 42 is not small: …
+
 // Compound predicates
 SmallPos = Int & _ > 0 && _ < 100
 SmallPos(50)                      // → 50

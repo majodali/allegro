@@ -723,13 +723,25 @@ check_plan(p) =>
 
 plan_errors(p) => check_plan(p).map(f => f.message)
 
-well_formed(p) => check_plan(p).length == 0
+// The refusal, in planning vocabulary: the plan's name and every finding.
+not_well_formed(p, errs) => error "{p.name} is not well-formed: {join(errs, "; ")}"
 
-// Construction-path enforcement (chapter §7): the plan, or an error value
-// carrying the first finding in planning vocabulary.
+// The well-formedness predicate explains itself (stage C1, the legibility
+// slice of B-081): a plan that checks answers true; one that does not
+// answers the ERROR VALUE above, and the kernel carries its text into the
+// refusal at every site, so the `plan` statement halts with "Type error:
+// refinement predicate failed for WellFormedPlan: Broken is not
+// well-formed: …" (chapter §7). (`if`, not `||`: the short-circuit
+// operators do not pass an error value through — backlog.)
+well_formed(p) =>
+  errs = plan_errors(p)
+  if errs.length == 0 then true else not_well_formed(p, errs)
+
+// Construction-path enforcement (chapter §7): the plan, or the same error
+// value.
 validate(p) =>
   errs = plan_errors(p)
-  if errs.length == 0 then p else error "{p.name} is not well-formed: {errs[0]}"
+  if errs.length == 0 then p else not_well_formed(p, errs)
 
 // Annotation-path enforcement: a binding or parameter annotated with this
 // type halts compilation when the plan is not well-formed.

@@ -9,7 +9,7 @@ import {
   PrimitiveFunctionValue, PrimitiveFnImpl, EvalFn, ExpressionValue, ParamValue,
   AllegroError, makeBits, makeInt, makeFloat, bitsToFloat, makePrimitive, makeExpr,
   makeParam, makeComposedFn, makeStructure, withMeta, makeSymbol,
-  stringToBits, bitsToString} from "./types.js";
+  stringToBits, bitsToString, textOf} from "./types.js";
 import { buildFn } from "./parser-helpers.js";
 import { fqnBaseName } from "./symbols.js";
 import { assertNotScope, scopeAssume, scopeExtend, scopeFactsFor, scopeOwnFacts, scopeLookup, scopeHostRead, scopeHoldsPrivilege, isPendingCell } from "./scope.js";
@@ -2575,7 +2575,7 @@ function checkRefinementPredicate(
   actualType: StructureValue | null,
   ctx: StructureValue,
   evalFn: (v: Value, ctx: StructureValue) => Value,
-): { ok: boolean | null; residual?: Value } {
+): { ok: boolean | null; residual?: Value; why?: string } {
   const predicate = getPredicate(expectedCtx);
   if (!predicate) return { ok: true };
   // Short-circuit: same refined type by reference → predicate already holds
@@ -2598,10 +2598,22 @@ function checkRefinementPredicate(
   const result = evalFn(makeExpr(predicate, [v]), ctx);
   const p = result;
   if (p.kind === ValueKind.Bits) {
-    return { ok: (p as BitsValue).data !== 0n };
+    return { ok: (p as BitsValue).data !== 0n, why: explained(p) };
   }
   // Unresolved — residual
   return { ok: null, residual: result };
+}
+
+// B-151 C1 (the legibility slice of B-081): a refinement predicate that
+// answers an ERROR VALUE has refused the value and said why — D11's shape
+// applied to predicates. The refusal sites append that text to the
+// kernel's message, so a domain model's refinement explains itself in
+// the model's vocabulary (`lib/planning.alg`'s `well_formed`). A plain
+// `false` keeps today's message. The construction path (`src/types-std.ts`)
+// reads the same channel into its error value.
+function explained(p: Value): string {
+  const why = textOf(metaReadRaw(p, "error"));
+  return why === undefined ? "" : `: ${why}`;
 }
 
 // --- type_of / type_check ---
@@ -2722,7 +2734,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
         const result = evalFn!(makeExpr(refinementPredicate, [v]), ctx!);
         const p = result;
         if (p.kind === ValueKind.Bits && (p as BitsValue).data === 0n) {
-          throw new AllegroError(`Type error: refinement predicate failed for ${expectedName}`);
+          throw new AllegroError(`Type error: refinement predicate failed for ${expectedName}${explained(p)}`);
         }
         if (!(p.kind === ValueKind.Bits)) {
           // Predicate unresolved — return residual type_check.
@@ -2765,7 +2777,7 @@ const type_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
       // Check refinement predicate if present
       const predCheck = checkRefinementPredicate(v, expectedCtx, actualType, ctx!, evalFn!);
       if (predCheck.ok === false) {
-        throw new AllegroError(`Type error: refinement predicate failed for ${expectedName}`);
+        throw new AllegroError(`Type error: refinement predicate failed for ${expectedName}${predCheck.why ?? ""}`);
       }
       if (predCheck.ok === null) {
         // Unresolved predicate — return a residual type_check

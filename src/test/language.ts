@@ -641,9 +641,58 @@ test("plan statement: a plan that does not check halts the build", () => {
   }
   eq(message.includes("refinement predicate failed for WellFormedPlan"), true,
     `the plan statement halts on a plan that does not check (got: ${message || "no error"})`);
+  // B-151 C1: the halt carries the analyzer's findings in planning
+  // vocabulary — `well_formed` answers an error value, and the kernel
+  // appends its text.
+  eq(message.includes(": Broken is not well-formed: input Missing of Work is not produced by any node of Broken or by its inputs"), true,
+    `the halt explains itself in planning vocabulary (got: ${message})`);
 
   // The same source with the input produced builds and binds the name.
   const ok = runtimeEval(src.replace("inputs:   Missing", "inputs:   In"), undefined, exts, undefined, true);
   eq(ok.evalCtx.bindings.get("Broken") !== undefined, true, "the plan statement declares the binding");
+});
+
+// B-151 C1 (the legibility slice of B-081): a refinement predicate that
+// answers an ERROR VALUE instead of `false` has refused the value and said
+// why, and the kernel carries that text into the refusal at every site —
+// a binding annotation, a parameter annotation, and guarded construction
+// (an Int refinement and a refined record). A plain `false` keeps the
+// kernel's message unchanged.
+test("refinement: a predicate's error value explains the refusal at every site", () => {
+  const exts = [typeExt];
+  const lib = [
+    'small(n) => if n < 10 then true else error "{n} is not small: a small number is below 10"',
+    "Small = Int & small(_)",
+    "Plain = Int & _ < 10",
+  ];
+  const halt = (lines: string[]): string => {
+    try {
+      runtimeEval([...lib, ...lines].join("\n"), undefined, exts, undefined, true);
+      return "";
+    } catch (e: any) {
+      return String(e?.message ?? e);
+    }
+  };
+  const why = "42 is not small: a small number is below 10";
+  const binding = halt(["bad: Small = 42"]);
+  eq(binding.includes(`refinement predicate failed for Small: ${why}`), true,
+    `a binding annotation halts with the predicate's words (got: ${binding || "no error"})`);
+  const param = halt(["f(x: Small) => x", "f(42)"]);
+  eq(param.includes(`failed refinement predicate for Small: ${why}`), true,
+    `a parameter annotation halts with the predicate's words (got: ${param || "no error"})`);
+  const plain = halt(["bad: Plain = 42"]);
+  eq(plain.endsWith("refinement predicate failed for Plain"), true,
+    `a plain false keeps the kernel's message (got: ${plain || "no error"})`);
+  const built = runtimeEval([
+    ...lib,
+    "Box = Type.define({ v: Int }) & small(_.v)",
+    `int_ok = (error of Small(42)) == "${why}"`,
+    `box_ok = (error of Box(42)) == "${why}"`,
+    'plain_ok = (error of Plain(42)) == "refinement check failed: expected ≤ 9 (got 42)"',
+  ].join("\n"), undefined, exts, undefined, true);
+  const truth = (name: string): boolean => (built.evalCtx.bindings.get(name)!.value as any).data === 1n;
+  eq(truth("int_ok"), true, "guarded construction of a refined Int yields the predicate's words");
+  eq(truth("box_ok"), true, "guarded construction of a refined record yields the predicate's words");
+  eq(truth("plain_ok"), true, "a plain false keeps the domain-rendered message");
 });
 

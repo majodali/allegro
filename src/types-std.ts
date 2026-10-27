@@ -11,6 +11,7 @@ import {
   makeComposedFn, makeParam,
   stringToBits, bitsToString, AllegroError, isResolved,
   Extension,
+  textOf,
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound, typeShape, equalityShape } from "./refinements.js";
 import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
@@ -1383,6 +1384,15 @@ function referencesCell(v: Value, ctx: StructureValue, depth = 0): boolean {
 /**
  * Build a refined type: inherits parent, wraps constructor with predicate check.
  */
+// B-151 C1: a refinement predicate that answers an error value has said
+// why it refused; the parameter sites append that text (the annotation
+// sites' `explained` in primitives.ts; the construction sites read the
+// same channel into their error value).
+function explainedBy(p: Value): string {
+  const why = textOf(metaReadRaw(p, "error"));
+  return why === undefined ? "" : `: ${why}`;
+}
+
 export function buildRefinedType(parentType: StructureValue, predicate: Value, ctx?: StructureValue): StructureValue {
   const refinedType = makeStructure();
   // Copy all bindings from parent (except __members, handled separately)
@@ -1497,7 +1507,9 @@ export function buildRefinedType(parentType: StructureValue, predicate: Value, c
           };
           constraintDesc = `: expected ${formatDomain(dom)}`;
         }
-        const msg = `refinement check failed${constraintDesc}${cexDesc}`;
+        // B-151 C1: a predicate that answered an error value said why; its
+        // text is the error value's message (see `explained` in primitives.ts).
+        const msg = textOf(metaReadRaw(checkP, "error")) ?? `refinement check failed${constraintDesc}${cexDesc}`;
         const meta = new Map<string, Value>();
         meta.set("error", withType(stringToBits(msg), StringType));
         meta.set("type", ErrorType);
@@ -1653,7 +1665,7 @@ function buildPreserveOps(refinedType: StructureValue, opNames: string[]): Struc
           constraintDesc = `: expected ${fmt(dom)}`;
         }
         const meta = new Map<string, Value>();
-        meta.set("error", withType(stringToBits(`refinement check failed${constraintDesc}${cexDesc}`), StringType));
+        meta.set("error", withType(stringToBits(textOf(metaReadRaw(checkP, "error")) ?? `refinement check failed${constraintDesc}${cexDesc}`), StringType));
         meta.set("type", ErrorType);
         return makeInt(0, meta);
       }
@@ -3675,7 +3687,7 @@ function checkArgType(arg: Value, expectedType: StructureValue, read: FieldReade
         const p = site.evaluate(makeExpr(refinementPredicate, [arg]));
         if (p.kind === ValueKind.Bits && p.data === 0n) {
           const name = typeContextName(expected) ?? "<refined>";
-          throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}`);
+          throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${name}${explainedBy(p)}`);
         }
       }
       return;
@@ -3715,7 +3727,7 @@ function checkArgType(arg: Value, expectedType: StructureValue, read: FieldReade
     if (!site.evaluate) return; // no eval context — best-effort skip
     const p = site.evaluate(makeExpr(predicate, [arg]));
     if (p.kind === ValueKind.Bits && p.data === 0n) {
-      throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}`);
+      throw new AllegroError(`Type error: argument ${argIndex} failed refinement predicate for ${expectedName}${explainedBy(p)}`);
     }
     // If unresolved, best-effort accept (partial evaluation will retry)
   };
