@@ -152,6 +152,30 @@ option is an ordinary node, a template is checked by the checks of §7,
 and a solved plan needs nothing new. Ruled 2026-10-26 (R3, the
 solution-finding ruling, at stage D).
 
+<a id="def-catalog"></a>
+### 2.8 Catalog and completion
+
+**Definition.** A *gap* is what the checks of §7 already name: an input
+of a node that nothing in its scope produces, or a declared outcome no
+node produces. A *catalog* is a list of nodes a plan may draw on; a plan
+in a catalog is borrowed, as `uses` borrows. A *completion* of a plan
+fills each gap of the plan's own scope with a catalog node that produces
+the missing port, chained backward when that node opens gaps of its own,
+within a depth. A completion is a plan like any other: checked by the
+same checks, solved over its choices by the same search, ranked by the
+same objective.
+
+**Rationale.** The second search, stage D2 (completion from a
+catalog). A choice is a closed
+catalog at one point of the graph; a gap is an open one. Nothing marks
+either: the wiring and outcome findings are the queries, and the catalog
+is the space, so the author writes the plan they have and names what may
+fill it. This is the shape Vision §4 wants for the iteration loop
+(B-083, the AI iteration loop): a proposer adds entries to the catalog,
+and the checks say what still misses. Only the plan's own scope is
+completed; a gap inside a composite stays a finding, because the
+composite is the author's unit of design. Ruled 2026-10-27 at stage D2.
+
 ## 3. The conventions [designed]
 
 Twelve decisions, settled iteratively in the archived design and
@@ -219,6 +243,12 @@ what today's code has to say about it.
     graph; a borrowed plan is solved before it is borrowed, and a
     recovery's graph holds no choice. `options` joins convention 4's
     reserved keys.
+14. **A gap is a query; a catalog is the space** (§2.8; added at stage
+    D2). No syntax marks a gap: the plan as written is checked, and what
+    the wiring and outcome checks report is what `solve_from` fills from
+    the catalog the caller passes. A catalog is a value, a list of nodes
+    and plans, built in the library; a surface form for it waits for a
+    plan that needs one, as the `plan` form waited for stage A.
 
 ## 4. What was tried and rejected [designed]
 
@@ -562,9 +592,43 @@ counterexample names the cheapest resolution and the measure it misses
 `Direct`, is duration 1460 min against 21 h"), or its first finding when
 something other than the budget fails. Enumeration is the library's own
 and honest at the pilot's size: the worked example with two choices of
-two options has four resolutions. The kernel's residuals and interval
-domains are the elegant form for a larger space and are considered at
-stage D2 on this evidence.
+two options has four resolutions.
+
+Stage D2 added the second search, completion from a catalog (§2.8), and
+made the enumeration check only what a resolution can change. Options
+carry the choice's ports, so the wiring, compatibility, cycle and outcome
+checks of every scope above a choice read the same for every resolution:
+they run once, over the template, and each option's own graph is checked
+once and charged to the resolutions that pick it. A candidate re-checks
+only the budgets and the handlers of the scopes above its picks. The
+semantics are D1's exactly; the cost per resolution halved at the sizes
+measured, and the library's load time, not the search, is what a demo
+spends its seconds on. `solve_from(plan, catalog)` completes, then
+resolves: every completion that closes the gaps becomes a template, every
+resolution of every template a candidate, and the best well-formed one
+is the `Solution`, whose record now opens with the completion steps
+("`Delivered` from `LastMile`, `Shipped` from `Ship`, `Labelled` from
+`Label`; `Label` via `PrintLabel`"). A plan with no gaps completes to
+itself, so `solve_from` on a solved plan is `solve`. Three
+counterexamples: the dead end ("no completion of `Fulfil` from the
+catalog: nothing produces `Shipped`, which `LastMile` needs"), the depth
+("within 2 steps: nothing produces `Labelled`, which `Ship` needs"), and
+the cheapest completion that fails, named with its steps and the measure
+it misses or its first finding, as for a choice. A completion that the
+checks refuse (a catalog node whose extra outcome nothing consumes) is
+a candidate that fails, not a plan the search quietly drops.
+
+The kernel's residuals and interval domains were weighed at D2 and not
+taken. Leaving the choices unresolved and reading an interval off the
+residual rollup would need interval arithmetic over quantities (today's
+`IntervalDomain` in `src/refinements.ts` is over `Int` predicates on one
+parameter), predicate propagation onto residuals (B-098), and a surface
+that reads the knowledge back; and it would give a bound, not a
+selection: it can refute a template but cannot pick a resolution. The
+library computes the same bound directly, and branch-and-bound over
+partial resolutions is the library's next step if a template ever grows
+past the enumerable. Revisit when a Vivace model's constraint is a
+predicate the kernel already reasons about.
 
 Two enforcement shapes, both existing:
 
@@ -611,6 +675,11 @@ Carried from the archived design, with two added by the revalidation:
   best one that passes every check (§7). Scheduling under a resource
   limit, completion from a catalog, and retry tuning were weighed and
   deferred (the plan's §3, R3).
+- *Closed at stage D2:* **completion from a catalog** (§2.8, §7), and
+  **the kernel's residuals as the search** (§7: weighed, not taken; the
+  reasons are recorded there). Still open: branch-and-bound over partial
+  resolutions, when a template outgrows enumeration; a surface form for
+  catalogs; completion inside a composite.
 
 ## 9. Status and pointers [partial]
 
@@ -652,7 +721,13 @@ and refuses unsound choices. Two more substrate findings, both fixed in
 that chunk: a library's `when` pattern variable was looked up in the
 calling file's scope, and a local binding's expression was shared
 between its use sites so a tail mark at one leaked a pending call at
-another. Not yet built: the renderer (C), a larger search (D2 (the next solution-finding chunk)).
+another. Stage D2 built completion from a catalog (§2.8, §7):
+`tests/planning-complete-demo.alg` completes an order with its last step
+missing from a catalog of leaves, a choice and a borrowed plan, solves it
+under a deadline, and refuses it at a dead end, at the depth, over the
+budget and for an unsound completion; the enumeration now checks the
+template once. Not yet built: the renderer (C), branch-and-bound when a
+template outgrows enumeration, a surface form for catalogs.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),
