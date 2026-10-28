@@ -75,3 +75,31 @@ system — no module resolver.
 The deterministic baselines are pinned by tests in `src/test/tooling.ts`
 (`runBenchmarkTests`), so a regression in the proof kernel surfaces in the
 normal `npm test` run.
+
+## The load corpus (`load.ts`)
+
+A second, separate bench: how long a library takes to load, from
+B-157 (the performance stream), chunk P1 (instrumentation and the
+corpus); plan `docs/plans/fast-library-load.md`. The corpus is
+`lib/units.alg`, `lib/planning.alg`, `tests/planning-solve-demo.alg` and
+the two `demos/rung3/` scenes.
+
+```bash
+npm run bench:load                       # full runs: wall clock + parse counts (minutes)
+npm run lint:load                        # parse-only ratchet against load-baseline.json
+npx tsx bench/load.ts --check --update-baseline   # rewrite the baseline (to lower it)
+```
+
+- `npm run bench:load` runs each entry as the CLI does
+  (`node --import tsx src/index.ts FILE`) with `ALLEGRO_PARSE_STATS=1`,
+  and sums the engine's per-parse stats lines from stderr. It reports;
+  it gates nothing.
+- `npm run lint:load` parses only, in one process: each program's body
+  and every library it `use`s or `import`s, each library source once
+  across the corpus. A library is evaluated after its parse, because its
+  `grammar { }` values extend the grammar of the files that use it. The
+  counts gated are match attempts, memo writes, invalidation entries,
+  left-recursion iterations and the final memo size; any count above
+  `load-baseline.json` fails. Wall clock is printed and never gated. It
+  runs once per gate run (`scripts/test-shards.mjs`, and
+  `src/test/tooling.ts` `runLoadLintTests` when unsharded).

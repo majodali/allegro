@@ -241,14 +241,14 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
     // module — we pick the latter up from the extension's bindings.
     const g2Fragments = collectFragments(extensions);
 
-    const { parse: g2parse } = await import("./grammar2/engine.js");
+    const { parseSource } = await import("./grammar2/engine.js");
     const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
     const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
     const { buildProgram } = await import("./grammar2/tree-builder.js");
     const grammar = g2Fragments.length > 0
       ? getGrammarWithFragments(g2Fragments)
       : getBaseGrammar();
-    const result = g2parse(grammar, normalized);
+    const result = parseSource(grammar, normalized, `${filename} (import scan)`);
     if (!result.ok) {
       throw new Error(`Parse error at position ${result.error.position}: ${result.error.message}`);
     }
@@ -445,13 +445,13 @@ async function runInspect(filename: string, isStandard: boolean): Promise<void> 
   // references resolve cleanly. Mirror the runFile flow but skip evaluation
   // of program prints.
   if (isStandard) {
-    const { parse: g2parse } = await import("./grammar2/engine.js");
+    const { parseSource } = await import("./grammar2/engine.js");
     const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
     const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
     const { buildProgram } = await import("./grammar2/tree-builder.js");
     const g2Fragments = collectFragments(extensions);
     const grammar = g2Fragments.length > 0 ? getGrammarWithFragments(g2Fragments) : getBaseGrammar();
-    const result0 = g2parse(grammar, cleanSource.replace(/\r\n/g, "\n"));
+    const result0 = parseSource(grammar, cleanSource.replace(/\r\n/g, "\n"), `${filename} (import scan)`);
     if (result0.ok) {
       const fileCtx: any = buildProgram(result0.tree);
       if (fileCtx) {
@@ -511,13 +511,13 @@ async function pcpLoadAndEval(filename: string, isStandard: boolean) {
   const cleanSource = source.slice(headerEnd);
 
   if (isStandard) {
-    const { parse: g2parse } = await import("./grammar2/engine.js");
+    const { parseSource } = await import("./grammar2/engine.js");
     const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
     const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
     const { buildProgram } = await import("./grammar2/tree-builder.js");
     const g2Fragments = collectFragments(extensions);
     const grammar = g2Fragments.length > 0 ? getGrammarWithFragments(g2Fragments) : getBaseGrammar();
-    const result0 = g2parse(grammar, cleanSource.replace(/\r\n/g, "\n"));
+    const result0 = parseSource(grammar, cleanSource.replace(/\r\n/g, "\n"), `${filename} (import scan)`);
     if (result0.ok) {
       const fileCtx: any = buildProgram(result0.tree);
       if (fileCtx) {

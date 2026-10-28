@@ -73,7 +73,7 @@ import, and the index drives the async sections and the summary.
 | `grammar2-engine.ts` | Grammar 2 formalism, scannerless engine, analyzer |
 | `grammar2-language.ts` | Grammar blocks, rule surgery, Allegro through grammar2 |
 | `async-futures.ts` | B-028 F1–F4: the forward-chaining async surface |
-| `tooling.ts` | PCP benchmark, doc-ref lint, `check-deployed` verdict logic |
+| `tooling.ts` | PCP benchmark, doc-ref lint, the plane, units and load lints (unsharded runs), `check-deployed` verdict logic |
 
 Two conditions can only be judged where the whole-suite total is known,
 so `scripts/test-shards.mjs` owns them at the same thresholds: the
@@ -88,7 +88,7 @@ passes every other gate.
 | File | Role |
 |---|---|
 | `types.ts` | Rule union, Grammar/Production, deltas, constructor helpers |
-| `engine.ts` | Recursive scannerless parser: memoization, left recursion, indent terminals, farthest-advance errors |
+| `engine.ts` | Recursive scannerless parser: memoization, left recursion, indent terminals, farthest-advance errors; `ParseStats`, and `parseSource` (the runtime's parse, reporting under `ALLEGRO_PARSE_STATS=1`) |
 | `base-grammar.ts` | The Allegro grammar as a value (stratified precedence LEVELS) |
 | `tree-builder.ts` | ParseTree → Value trees; body-form marker extraction (`buildBlockExpr`) |
 | `fragments.ts` | `use`-time fragment merging, level insertion, user-op registry |
@@ -101,7 +101,7 @@ passes every other gate.
 
 | Path | Role |
 |---|---|
-| `bench/` | H-arc benchmark corpus + harness (`npm run bench`) |
+| `bench/` | H-arc benchmark corpus + harness (`npm run bench`); `load.ts`, the library-load corpus (`npm run bench:load`) and its parse-count ratchet against `load-baseline.json` (`npm run lint:load`, in the gate) |
 | `pcp/llm-worker.ts` | `allegro prove` LLM worker (Anthropic SDK; pure helpers tested SDK-free) |
 | `scripts/` | `typecheck.sh` (sanctioned typecheck), `doc-ref-lint.ts`, `sync-web-libs.ts`, `check-deployed.ts` (B-096 live-site audit) |
 

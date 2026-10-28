@@ -149,5 +149,19 @@ try {
   gateFailed = true;
 }
 
+// B-157 P1: the load ratchet — the engine's deterministic parse counts
+// over the load corpus may only fall. It parses whole libraries, so it
+// runs once per gate, here, like the two lints above.
+try {
+  const loadOut = execSync("npx tsx bench/load.ts --check", {
+    cwd: new URL("..", import.meta.url).pathname, encoding: "utf-8",
+  });
+  const last = loadOut.trim().split("\n").pop();
+  console.log(`Load lint: ${last}`);
+} catch (e) {
+  console.error("load lint FAILED:\n" + String(e.stdout ?? e));
+  gateFailed = true;
+}
+
 console.log(gateFailed ? "GATE: FAILED" : "GATE: PASSED");
 process.exit(gateFailed ? 1 : 0);

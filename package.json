@@ -15,12 +15,14 @@
     "test": "tsx src/test/index.ts",
     "test:shards": "node scripts/test-shards.mjs",
     "bench": "tsx bench/run.ts",
+    "bench:load": "tsx bench/load.ts",
     "check-deployed": "tsx scripts/check-deployed.ts",
     "generate-parser": "tsx grammar/generate-parser.ts",
     "build:web": "esbuild web/allegro-web.ts --bundle --outfile=web/dist/allegro.js --format=iife --global-name=AllegroBundle --platform=browser",
     "start": "tsx src/index.ts",
     "lint:planes": "tsx scripts/analyze/plane-lint.ts",
     "lint:units": "tsx scripts/analyze/index.ts units --check",
+    "lint:load": "tsx bench/load.ts --check",
     "lint:docs": "tsx scripts/doc-lint.ts"
   },
   "dependencies": {

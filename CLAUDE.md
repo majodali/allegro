@@ -66,6 +66,10 @@ npx tsx src/index.ts                # REPL (Allegro Standard — default)
 npx tsx src/index.ts file.alg       # run a file  (--base for Allegretto)
 npx tsx src/index.ts inspect|verify|obligations|propose|prove <file>  # → docs/book/getting-started.md
 npm run bench                       # H-arc benchmark corpus
+npm run bench:load                  # B-157 (the performance stream): load corpus,
+                                    #   full runs, wall clock + parse counts (minutes)
+ALLEGRO_PARSE_STATS=1 npx tsx src/index.ts f.alg  # one stderr line of engine
+                                    #   stats per program or library parse
 npx tsx scripts/bench-slot-lookup.ts  # B-120: slot scan vs index crossover
 npx tsx scripts/analyze/index.ts <cmd> # B-127: binder-aware survey (props |
                                     #   any-props | kind-tests | refs |
@@ -77,6 +81,9 @@ npm run lint:units                  # B-149: the unit DAG holds at its
                                     #   baseline (scripts/analyze/
                                     #   units-baseline.json) — IN THE GATE,
                                     #   once per run like lint:planes
+npm run lint:load                   # B-157: parse counts of the load corpus
+                                    #   at or below bench/load-baseline.json
+                                    #   — IN THE GATE, once per run (~2 min)
 npm run lint:docs                   # D52: anchored links resolve, no forward
                                     #   references in the reading order, bare
                                     #   identifiers — report-only until B-150

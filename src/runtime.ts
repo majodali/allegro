@@ -9,7 +9,7 @@ import { installAnalysis, kernelFieldWriter } from "./capability.js";
 import { getName, renameInPlace, isBareBindingName, isFutureBindingName } from "./slot-accessors.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff, markPatternBinders } from "./evaluator.js";
-import { parse as grammar2Parse } from "./grammar2/engine.js";
+import { parseSource } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
 import { buildProgram } from "./grammar2/tree-builder.js";
 import { getGrammarWithFragments } from "./grammar2/fragments.js";
@@ -1047,7 +1047,8 @@ export function evalSource(
     // an undeclared reserved set). `assertGrammarClean` throws on errors
     // with the full report in the message.
     assertGrammarClean(grammar);
-    const result = grammar2Parse(grammar, normalized);
+    // B-157 P1: `parseSource` is `parse` plus the ALLEGRO_PARSE_STATS switch.
+    const result = parseSource(grammar, normalized, moduleFqn ?? "<main>");
     if (!result.ok) {
       throw new Error(`Parse error at position ${result.error.position}: ${result.error.message}`);
     }
