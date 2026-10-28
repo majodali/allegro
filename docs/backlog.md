@@ -78,6 +78,7 @@ The grouping below comes from co-change measurement over the last 40
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
+| **P — performance stream** (added 2026-10-27) | B-157 (the performance stream): the grammar-2 engine's memo costs, B-155, the tokenizer ruling, cached parse artifacts; B-153 last or handed to lane D | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; the two runtime items (B-155 in the loader, B-153 in symbol resolution) are taken only when lane D is not in those files. Oracle: deterministic engine counts (`npm run lint:load`), every `// expect:` pin unchanged. The first candidate for autonomous delivery; its merge policy is the maintainer's ruling R3 in `docs/plans/fast-library-load.md` |
 
 **What lane B unlocks:** C and D may then run *as lanes in parallel
 with each other* (C touches new/track files, D the L2 monoliths — a
@@ -718,7 +719,29 @@ that prevents it.
 - [ ] **B-074** · Memoization as opt-in Standard feature (re-decide after
   Phase 4 representation data)
 - [ ] **B-075** · Parser constants / tokenizer layer if 1–2k-line corpus
-  demands (benchmark first)
+  demands (benchmark first) — the corpus exists since B-151 (the
+  planning pilot): `lib/planning.alg` is 1,233 lines; taken up by
+  **B-157** (the performance stream) below, where the tokenizer question
+  is ruling R4
+- [ ] **B-157** (the performance stream) · T-perf · L1 · **A library
+  loads in well under a second.** Plan `docs/plans/fast-library-load.md`
+  (draft 2026-10-27, awaiting ratification). Measured: the planning
+  library loads in 68 s, 87% of it in the grammar-2 engine and 68% of
+  the parse in the memo table (key strings, lookups, invalidation,
+  garbage); evaluation under a second; 1.1 ms per character, linear.
+  The stream takes the engine's memo costs (numeric keys, cheaper
+  entries, invalidation by generation), then loads a library once per
+  run (B-155 (library load per module)), then decides on B-075's
+  tokenizer and on cached parse artifacts with the numbers in hand;
+  B-153 (re-evaluation per reference) is sequenced last or handed to
+  the kernel-semantics stream. Oracle: deterministic engine counts
+  ratcheted by `npm run lint:load`, wall clock reported by `npm run
+  bench:load`, every `// expect:` pin unchanged. The first candidate
+  for autonomous delivery (lane P in the lane table). **Blocked-by**:
+  ratification of the plan's §5 sequence and rulings R1–R3.
+  **Pointer**: `src/grammar2/engine.ts` (`ruleKey`, `memoGet`,
+  `memoSet`, `clearPos`, `invalidateAtPos`), `src/test/alg-files.ts`
+  (`libExtensions`), `docs/plans/fast-library-load.md`
 
 ### T-bootstrap (M9)
 
