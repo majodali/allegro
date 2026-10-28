@@ -164,7 +164,7 @@ parse or user files.
 |---|---|---|---|
 | **P1** | `ALLEGRO_PARSE_STATS=1` prints the engine stats for a run; `npm run bench:load` with the corpus of §3 and `bench/load-baseline.json`; `npm run lint:load` ratchets the counts; the profile of §1 recorded in the plan's §7 with the stats numbers | the new lint runs and passes at its own baseline | S |
 | **P2** | M5: a library loads once per run (B-155 closed). **Landed 2026-10-28** (§7) | solve demo under 90 s; counts unchanged; suite green | S–M |
-| **P3** | M1: numeric memo keys | counts unchanged, clock falls, suite green | M |
+| **P3** | M1: numeric memo keys. **Landed 2026-10-28** (§7) | counts unchanged, clock falls, suite green | M |
 | **P4** | M3: fewer and cheaper entries | memo writes fall or allocation falls; suite green | M |
 | **P5** | M2: invalidation by generation; measured by the P1 stats before design | invalidation entries fall; grammar-2 left-recursion battery green | M |
 | **P6** | decision point: the §7 numbers against the §2 target; R4 taken (tokenizer or not); M7 taken or not | — (stops for the maintainer) | — |
@@ -327,4 +327,79 @@ a parser that changes a program's meaning has left the stream's scope.
   file with a `use` header). The full suite with every pin unchanged
   is the oracle that the corpus does not reach them. This is recorded,
   not fixed: deriving instead of writing in place on those two paths
-  is kernel work, outside this stream's files.
+  is kernel work, outside this stream's files. Filed as B-158 (in-place
+  write through a library alias), for a ruling on the fix.
+- 2026-10-28: **P3 landed** (M1: memo keys without strings). No parse
+  semantics change, no `// expect:` line changed, and every count in
+  `bench/load-baseline.json` is identical: none rose and none fell, so
+  the same attempts are made in the same order. The micro-run over
+  `lib/units.alg` also matched the counts the baseline does not gate
+  (memo hits and misses, seed returns, peak memo size). Three changes,
+  all in `ParseState` in `src/grammar2/engine.ts`:
+  - **The rule part of the key is a number.** `memoKey` replaces
+    `ruleKey`. A non-terminal's id is interned by name, so every
+    `NonTerm` object naming one production shares it, as the `nt:NAME`
+    string did; any other rule's id is per object, as `rN` was. One
+    counter serves both, so the two never collide. The ids live in a
+    per-parse `Map`; a `WeakMap` measured no faster.
+  - **The indent stack is interned in a trie.** The stack is now an
+    `IndentStack` node (its top, its parent and an id) instead of an
+    array. INDENT steps to the child for the new column and DEDENT to
+    the parent, so equal stacks are the same node and the id is fixed
+    when the node is made. Nothing joins a stack: the id is in step at
+    every assignment of `state.indentStack` by construction, since the
+    id is part of the value assigned. This differs from the plan's
+    sketch (a `Map` keyed on the joined stack, updated at push, pop and
+    restore) and was chosen because no assignment site can forget it.
+    One identity changes: a match that pushes and pops back now ends on
+    the node it started on, so `runDoMatch` no longer records an equal
+    but distinct array as a stack change. Every reader of a stack reads
+    its contents (top, depth, key), so nothing a parse decides changes.
+  - **The key is one small integer**: `ruleId * 1024 + stackId`. A parse
+    with more than 1,024 distinct stacks (none in the corpus: a source
+    opens at most 8, `lib/planning.alg` 2) gets negative keys of a disjoint form, so
+    keys stay unique; a new grammar-2 test parses 1,191 stacks to cover
+    that path. `clearPos` and `invalidateAtPos` compare numbers where
+    they compared strings, and keep the LR entries they kept. Keying
+    the outer table by an array instead of a `Map` was measured and not
+    taken: no gain.
+
+  `npm run bench:load`, before (`origin/main` at `4ae1ba0`) and after,
+  same sandbox, one run each:
+
+  | Entry | Wall clock before | after | Planning parse before | after |
+  |---|---|---|---|---|
+  | `lib/units.alg` | 14.2 s | 6.4 s | — | — |
+  | `lib/planning.alg` | 85.0 s | 38.5 s | 71.4 s | 32.6 s |
+  | `tests/planning-solve-demo.alg` | 100.2 s | 49.7 s | 70.0 s | 30.4 s |
+  | `demos/rung3/01-model.alg` | 79.2 s | 38.7 s | 64.1 s | 30.7 s |
+  | `demos/rung3/02-solve.alg` | 89.3 s | 46.4 s | 66.8 s | 31.0 s |
+
+  The planning parse falls from 64 to 71 s to 30 to 33 s, about 2.2
+  times faster; `units` parses in 6.0 s against 13.2 s. The load
+  ratchet's check (`npm run lint:load`) takes 48 s against 93 s.
+  The gate (`npm run test:shards`, 3 shards): 902.7 s wall clock
+  (1,796.9 s of work) before, 737.6 s (1,425.4 s of work) after. The
+  suite gains less than the parse because the planning load is one
+  part of its longest shard.
+
+  The CPU profile of the planning load (`use units`, `use planning`,
+  `print(1)`): 77.5 s sampled before, 35.9 s after. Self time after:
+
+  | Function (`src/grammar2/engine.ts`) | Share after | Seconds before | after |
+  |---|---|---|---|
+  | `clearPos` | 23.7% | 10.3 | 8.5 |
+  | `matchRule` (with `memoGet` inlined into it) | 22.5% | 19.9 | 8.1 |
+  | garbage collector | 14.6% | 9.2 | 5.2 |
+  | `memoSet` | 10.4% | 8.1 | 3.8 |
+  | `memoKey` (was `ruleKey`) | 6.0% | 13.3 | 2.2 |
+  | `runDoMatch` | 5.1% | 0.4 | 1.8 |
+  | `matchNonTerm`, `matchAlt`, `invalidateAtPos`, `matchSeq`, `matchTerminal` | 13.7% | 14.0 | 4.9 |
+
+  Where the time now goes: `clearPos` is the largest single cost, and
+  it is P5's target (M2, invalidation by generation); with `memoSet`
+  and the collector, the memo table's writes and clearing are about
+  half of the parse. Before, `memoGet` was its own 11.3 s; after, V8
+  inlines it into `matchRule`, so the `matchRule` row before is the
+  two summed. The profiler attributes inlined callees to their callers,
+  so the smaller rows move between functions from run to run.

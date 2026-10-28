@@ -4,6 +4,43 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream) P3 (numeric memo keys): memo keys without strings
+
+The stream's third chunk (`docs/plans/fast-library-load.md` §5 row P3,
+move M1 (memo keys without strings)). No parse semantics change, no
+`// expect:` line changed, and every count in `bench/load-baseline.json`
+is identical: none rose, none fell.
+
+- **One number per memo key.** `ParseState.memoKey` in
+  `src/grammar2/engine.ts` replaces `ruleKey`, which built a string
+  `nt:NAME:stack` or `rN:stack` for every lookup and write. The key is
+  now `ruleId * 1024 + stackId`. A non-terminal's id is interned by
+  name, any other rule's by object, from one counter, so the key's
+  identity is the string's. `clearPos` and `invalidateAtPos` compare the
+  numbers and keep the in-progress left-recursion entries as before.
+- **Indent stacks are interned.** The stack is an `IndentStack` node of
+  a per-parse trie (top, parent, id): INDENT steps to a child, DEDENT to
+  the parent, and equal stacks are one node. The id travels with the
+  node, so every assignment of `state.indentStack` keeps it in step and
+  no stack is joined. Deviation from the plan's sketch (a `Map` on the
+  joined stack, updated at push, pop and restore): the trie needs no
+  update site.
+- **More than 1,024 stacks** in one parse take a disjoint negative key
+  form; no corpus source opens more than 8.
+- **Measured** (`npm run bench:load`, before and after, same sandbox):
+  the planning parse 64–71 s to 30–33 s; `lib/planning.alg` run
+  85.0 s to 38.5 s; `tests/planning-solve-demo.alg` 100.2 s to 49.7 s.
+  `npm run lint:load` 93 s to 48 s. The gate: 902.7 s to 737.6 s
+  wall clock. Profile after: `clearPos` 23.7%, `matchRule` 22.5%, the
+  collector 14.6%, `memoSet` 10.4%, `memoKey` 6.0% (plan §7).
+
+Tests: +1 in `src/test/grammar2-language.ts` (a parse that opens 1,191
+distinct indent stacks, so its later blocks use the wide key form, and
+its misaligned twin fails). Docs: plan §5 and §7; backlog B-157
+progress, **B-158** (in-place write through a library alias) filed from
+the finding of P2 (a library loads once per run); plans manifest; `docs/book/extension/modules.md` (the
+pointer to B-158); `docs/book/implementation-map.md` (`engine.ts`).
+
 ## 2026-10 — B-157 (the performance stream) P2 (a library loads once per run): one library cache per process
 
 The stream's second chunk (`docs/plans/fast-library-load.md` §5 row P2,
