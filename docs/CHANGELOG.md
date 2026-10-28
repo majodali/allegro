@@ -4,6 +4,25 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream): plan drafted from measurement
+
+The first of the parallel streams the maintainer asked for on
+2026-10-27. `docs/plans/fast-library-load.md` (draft, awaiting
+ratification of its §5 chunk sequence and §6 rulings). Measured on
+`3675a3e`: startup 4 s; `use units` 13 s; `use planning` 68 s, of which
+87% is the grammar-2 engine (`src/grammar2/engine.ts`) and 68% of the
+parse is the memo table (`ruleKey` string building 16.6%, `memoGet`
+14.4%, `clearPos` 13.7%, the garbage collector 11.5%, `memoSet`
+11.4%); evaluation, totality and type checking under a second together;
+1.1 ms per character, linear in the source. The plan takes the memo
+costs first (numeric keys, cheaper entries, invalidation by
+generation), loads a library once per run (B-155 (library load per
+module)), and decides on B-075 (parser constants / tokenizer layer)'s
+tokenizer and on cached parse artifacts with the numbers in hand; its
+oracle is deterministic engine counts ratcheted in the gate, not wall
+clock. Backlog: B-157 filed under T-perf; lane P added to the lane
+table. Docs only; no code.
+
 ## 2026-10 — B-151 (the planning pilot) E1: rung 3 packaged, slice 1 of B-093 (rung-3 packaging)
 
 The public story of the rung-3 pilot, derived from delivered material
