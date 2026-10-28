@@ -12,11 +12,10 @@
 // =============================================================================
 
 import { evalSource as runtimeEval, Extension } from "../runtime.js";
-import { buildModuleObject } from "../modules.js";
-import { scanUses } from "../use-scanner.js";
-import { extractGrammarFragment, asGrammarValue } from "../primitives.js";
+import { ModuleLoader } from "../modules.js";
+import { scanImports } from "../use-scanner.js";
+import { asGrammarValue } from "../primitives.js";
 import { primitives as primRegistry } from "../primitives.js";
-import { Value } from "../types.js";
 import { checkValueInvariants, InvariantViolation } from "../boundary-tests.js";
 import { test, eq } from "./harness.js";
 import { typeExt } from "./fixtures.js";
@@ -31,46 +30,34 @@ export const testsDir = path.resolve("tests");
 export const typeNames = new Set(["Int", "Float", "String", "Bool", "Array", "Object", "true", "false"]);
 
 /**
- * A loader for `lib/NAME.alg` as an Extension, with one cache per loader.
- * A library may itself open with `use X` (lib/planning.alg uses the
- * totality forms and the units DSL; B-151 A2, A3). The runtime ModuleLoader
- * resolves such chains; this harness evaluates libraries directly, so it
- * resolves them the same way: scan the library's header, load what it uses
- * first (once per name), and evaluate its body with those extensions.
+ * The production module loader (`src/modules.ts`), synchronous, over the
+ * system `lib/` — or, given `localDir`, over `localDir/lib/` first, as the
+ * CLI resolves an `import`. Its loads go through the process's library
+ * cache (B-157 P2), so a library the suite has already loaded in this
+ * process is not parsed or evaluated again, whichever test asks.
  */
-export function libLoader(): (id: string, chain: string[]) => Extension {
-  const libDir = path.resolve("lib");
-  const loaded = new Map<string, Extension>();
-  const loadLib = (id: string, chain: string[]): Extension => {
-    const have = loaded.get(id);
-    if (have) return have;
-    if (chain.includes(id)) throw new Error(`use cycle: ${[...chain, id].join(" -> ")}`);
-    const modSource = fs.readFileSync(path.join(libDir, `${id}.alg`), "utf-8");
-    const scan = scanUses(modSource);
-    const depNames = [...new Set(scan.directives
-      .map(d => d.kind === "module" ? d.name! : d.kind === "member" ? d.moduleName! : null)
-      .filter((x): x is string => x !== null))];
-    const deps = depNames.map(dep => loadLib(dep, [...chain, id]));
-    const modResult = runtimeEval(modSource.slice(scan.headerEnd), undefined, [typeExt, ...deps], undefined, true);
-    const frag = extractGrammarFragment(modResult.evalCtx);
-    const bindings: Record<string, Value> = {};
-    for (const [key, b] of modResult.evalCtx.bindings) {
-      if (b.value !== undefined && !primNames.has(key) && !typeNames.has(key)) {
-        bindings[key] = b.value;
+export function libLoader(localDir?: string): ModuleLoader {
+  const systemLib = path.resolve("lib");
+  return new ModuleLoader({
+    modules: [],
+    resolve: (id) => {
+      if (localDir) {
+        const local = path.join(localDir, "lib", `${id}.alg`);
+        if (fs.existsSync(local)) return local;
       }
-    }
-    const ext: Extension = { name: id, bindings, grammarFragment: frag };
-    loaded.set(id, ext);
-    return ext;
-  };
-  return loadLib;
+      const system = path.join(systemLib, `${id}.alg`);
+      return fs.existsSync(system) ? system : null;
+    },
+    readFileSync: (p) => fs.readFileSync(p, "utf-8"),
+    extensions: [typeExt],
+  });
 }
 
 /** The extensions a source needs for `use NAME` headers, in order: what a
  *  test passes to `runtimeEval` to run inline Allegro under libraries. */
 export function libExtensions(names: string[]): Extension[] {
-  const loadLib = libLoader();
-  return names.map(n => loadLib(n, []));
+  const loader = libLoader();
+  return names.map(n => loader.loadModuleSync(n));
 }
 
 /**
@@ -166,9 +153,9 @@ export function runAlgFile(filePath: string, extensions?: Extension[]): void {
   let grammarExts: Extension[] = [];
   const uniqModuleNames = [...new Set(grammarNames)];
   if (uniqModuleNames.length > 0) {
-    const loadLib = libLoader();
+    const loader = libLoader();
     for (const id of uniqModuleNames) {
-      const ext = loadLib(id, []);
+      const ext = loader.loadModuleSync(id);
       const bindings = { ...ext.bindings };
       // `use NAME.MEMBER` — narrow to the named Grammar binding(s).
       const mems = memberRefs.filter(m => m.module === id);
@@ -201,9 +188,11 @@ export function runAlgFile(filePath: string, extensions?: Extension[]): void {
   // file first, then the system lib/, and hands the module in as an
   // extension carrying a typed module object. The harness does the same
   // for a demo (B-151 B2: tests/planning-split-demo.alg borrows a plan
-  // from tests/lib/build_pipeline.alg). A module runs through the same
-  // evaluation as a library, with its own `use` headers resolved.
-  const importNames = [...cleanSource.matchAll(/^import\s+([A-Za-z_][A-Za-z_0-9]*)\s*$/gm)].map(m => m[1]);
+  // from tests/lib/build_pipeline.alg). A module loads through the same
+  // loader as a library, with its own `use` headers resolved (and served
+  // from the process cache: B-157 P2); the demo sees it only as its module
+  // object.
+  const importNames = scanImports(cleanSource);
   const providedNames = new Set<string>();
   for (const ext of [...grammarExts, ...(extensions ?? [])]) {
     for (const name of Object.keys(ext.bindings)) providedNames.add(name);
@@ -211,30 +200,11 @@ export function runAlgFile(filePath: string, extensions?: Extension[]): void {
   }
   const importExts: Extension[] = [];
   if (importNames.some(n => !providedNames.has(n))) {
-    const loadLib = libLoader();
+    const loader = libLoader(path.dirname(filePath));
     for (const name of importNames) {
       if (providedNames.has(name)) continue;
-      const local = path.join(path.dirname(filePath), "lib", `${name}.alg`);
-      const modPath = fs.existsSync(local) ? local : path.join(path.resolve("lib"), `${name}.alg`);
-      const modSource = fs.readFileSync(modPath, "utf-8");
-      const scan = scanUses(modSource);
-      const depNames = [...new Set(scan.directives
-        .map(d => d.kind === "module" ? d.name! : d.kind === "member" ? d.moduleName! : null)
-        .filter((x): x is string => x !== null))];
-      const deps = depNames.map(dep => loadLib(dep, []));
-      const depBound = new Set<string>();
-      for (const d of deps) for (const k of Object.keys(d.bindings)) depBound.add(k);
-      const modResult = runtimeEval(modSource.slice(scan.headerEnd), undefined, [typeExt, ...deps], undefined, true);
-      const bindings: Record<string, Value> = {};
-      const exported = new Set<string>();
-      for (const [key, b] of modResult.evalCtx.bindings) {
-        if (b.value === undefined || primNames.has(key) || typeNames.has(key) || depBound.has(key)) continue;
-        bindings[key] = b.value;
-        if ((b as any).visibility === "exported") exported.add(key);
-      }
-      // Open-module policy (modules.md): no `export` means every binding.
-      const visible = exported.size > 0 ? exported : new Set(Object.keys(bindings));
-      importExts.push({ name, bindings: {}, moduleObject: buildModuleObject(name, bindings, visible) });
+      const ext = loader.loadModuleSync(name);
+      importExts.push({ name, bindings: {}, moduleObject: ext.moduleObject });
     }
   }
 

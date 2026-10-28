@@ -13,11 +13,11 @@ import * as path from "path";
 import * as readline from "readline";
 import { formatValue, asGrammarValue } from "./primitives.js";
 import { evalSource, Extension } from "./runtime.js";
-import { StructureValue, GrammarFragment, Value } from "./types.js";
+import { StructureValue, Value } from "./types.js";
 import { createTypeSystem } from "./types-std.js";
 import { ModuleLoader } from "./modules.js";
 import { createFutureManager, FutureManager } from "./futures.js";
-import { scanUses, UseDirective, UseScanResult } from "./use-scanner.js";
+import { scanUses, scanImports, UseDirective, UseScanResult } from "./use-scanner.js";
 
 // --- Standard mode setup ---
 
@@ -31,13 +31,13 @@ function getStdExtensions(): Extension[] {
 // --- Module loading ---
 
 /**
- * Load modules on demand for a parsed file context.
- * Only loads modules that are actually imported (bindings with value: undefined)
- * and not already provided by existing extensions.
+ * Load the modules a program body imports (`import NAME` statements, found
+ * by `scanImports` without parsing — B-157 P2: the body is parsed once, by
+ * `evalSource`), skipping names existing extensions already provide.
  * Convention: import math → lib/math.alg relative to source file.
  */
 async function loadImportedModules(
-  fileCtx: any,
+  body: string,
   sourceDir: string,
   existingExtensions: Extension[],
   futureManager?: import("./futures.js").FutureManager,
@@ -51,12 +51,7 @@ async function loadImportedModules(
     if (ext.moduleObject) existingNames.add(ext.name);
   }
 
-  const needed: string[] = [];
-  for (const b of fileCtx.bindingList) {
-    if (b.key !== null && b.value === undefined && !existingNames.has(b.key)) {
-      needed.push(b.key);
-    }
-  }
+  const needed = scanImports(body).filter(name => !existingNames.has(name));
 
   if (needed.length === 0) return [];
 
@@ -80,26 +75,6 @@ async function loadImportedModules(
   });
 
   return loader.loadAll();
-}
-
-/**
- * Collect grammar fragments contributed by extensions. Two sources:
- *   1. `ext.grammarFragment` — set by Phase 1 register_* primitives.
- *   2. `ext.bindings[name] = grammar { … }` — Phase 6 Grammar values
- *      produced by the new syntax. We scan bindings for any value that
- *      `asGrammarValue` recognises.
- */
-function collectFragments(extensions: Extension[]): GrammarFragment[] {
-  const out: GrammarFragment[] = [];
-  for (const ext of extensions) {
-    if (ext.grammarFragment) out.push(ext.grammarFragment);
-    const bindings = ext.bindings ?? {};
-    for (const key of Object.keys(bindings)) {
-      const data = asGrammarValue(bindings[key]);
-      if (data) out.push(data.fragment);
-    }
-  }
-  return out;
 }
 
 /**
@@ -232,32 +207,11 @@ async function runFile(source: string, filename: string, standard: boolean): Pro
     //    forms) from the source before the main parse.
     const cleanSource = source.slice(headerEnd);
 
-    // Standard mode: parse first to discover imports, then load on demand.
-    const normalized = cleanSource.replace(/\r\n/g, "\n");
-
-    // Gather any grammar fragments from loaded modules. An extension can
-    // contribute fragments from both the Phase 1 register_* path (attached
-    // as `grammarFragment`) AND Phase 6 `grammar { … }` values bound in the
-    // module — we pick the latter up from the extension's bindings.
-    const g2Fragments = collectFragments(extensions);
-
-    const { parseSource } = await import("./grammar2/engine.js");
-    const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
-    const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
-    const { buildProgram } = await import("./grammar2/tree-builder.js");
-    const grammar = g2Fragments.length > 0
-      ? getGrammarWithFragments(g2Fragments)
-      : getBaseGrammar();
-    const result = parseSource(grammar, normalized, `${filename} (import scan)`);
-    if (!result.ok) {
-      throw new Error(`Parse error at position ${result.error.position}: ${result.error.message}`);
-    }
-    const fileCtx: any = buildProgram(result.tree);
-
-    if (fileCtx) {
-      const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions, fm);
-      extensions = [...extensions, ...moduleExts];
-    }
+    // Standard mode: load the modules the body imports, then parse and
+    // evaluate it once (B-157 P2: the imports are found by a text scan,
+    // not by a second parse of the body).
+    const moduleExts = await loadImportedModules(cleanSource, sourceDir, extensions, fm);
+    extensions = [...extensions, ...moduleExts];
 
     evalSource(cleanSource, undefined, extensions, undefined, true, fm);
     if (fm.hasPending()) {
@@ -445,20 +399,8 @@ async function runInspect(filename: string, isStandard: boolean): Promise<void> 
   // references resolve cleanly. Mirror the runFile flow but skip evaluation
   // of program prints.
   if (isStandard) {
-    const { parseSource } = await import("./grammar2/engine.js");
-    const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
-    const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
-    const { buildProgram } = await import("./grammar2/tree-builder.js");
-    const g2Fragments = collectFragments(extensions);
-    const grammar = g2Fragments.length > 0 ? getGrammarWithFragments(g2Fragments) : getBaseGrammar();
-    const result0 = parseSource(grammar, cleanSource.replace(/\r\n/g, "\n"), `${filename} (import scan)`);
-    if (result0.ok) {
-      const fileCtx: any = buildProgram(result0.tree);
-      if (fileCtx) {
-        const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);
-        extensions = [...extensions, ...moduleExts];
-      }
-    }
+    const moduleExts = await loadImportedModules(cleanSource, sourceDir, extensions);
+    extensions = [...extensions, ...moduleExts];
   }
 
   // Swallow print output during inspect — we want the summary, not program I/O.
@@ -511,20 +453,8 @@ async function pcpLoadAndEval(filename: string, isStandard: boolean) {
   const cleanSource = source.slice(headerEnd);
 
   if (isStandard) {
-    const { parseSource } = await import("./grammar2/engine.js");
-    const { getBaseGrammar } = await import("./grammar2/base-grammar.js");
-    const { getGrammarWithFragments } = await import("./grammar2/fragments.js");
-    const { buildProgram } = await import("./grammar2/tree-builder.js");
-    const g2Fragments = collectFragments(extensions);
-    const grammar = g2Fragments.length > 0 ? getGrammarWithFragments(g2Fragments) : getBaseGrammar();
-    const result0 = parseSource(grammar, cleanSource.replace(/\r\n/g, "\n"), `${filename} (import scan)`);
-    if (result0.ok) {
-      const fileCtx: any = buildProgram(result0.tree);
-      if (fileCtx) {
-        const moduleExts = await loadImportedModules(fileCtx, sourceDir, extensions);
-        extensions = [...extensions, ...moduleExts];
-      }
-    }
+    const moduleExts = await loadImportedModules(cleanSource, sourceDir, extensions);
+    extensions = [...extensions, ...moduleExts];
   }
 
   // Suppress program prints — the PCP commands surface structured data,

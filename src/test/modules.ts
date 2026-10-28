@@ -10,7 +10,9 @@ import { typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
 import * as path from "path";
 import * as fs from "fs";
-import { ModuleLoader } from "../modules.js";
+import { ModuleLoader, forgetLibrary } from "../modules.js";
+import { scanImports } from "../use-scanner.js";
+import { libExtensions } from "./alg-files.js";
 import { evalNumExt, evalStd } from "./fixtures.js";
 import { exportedSymbols, symbolFromWire } from "../symbols.js";
 import { Extension } from "../runtime.js";
@@ -66,6 +68,9 @@ export async function runModuleTests(): Promise<void> {
     eq(shout1 !== null, true, "exported symbol rebinds over the wire");
     eq(symbolFromWire("/mock/fqnlib.alg::whisper"), null, "private symbol resolves to nothing (D42)");
     // Reload with a FRESH loader instance: same FQN ⇒ the identical symbol.
+    // B-157 P2: the process cache would answer a second load of the same
+    // file without evaluating it; forget it so the reload is genuine.
+    forgetLibrary("/mock/fqnlib.alg");
     await new ModuleLoader(config).loadAll();
     eq(symbolFromWire("/mock/fqnlib.alg::shout") === shout1, true,
       "same FQN is the same object across module reload");
@@ -119,6 +124,91 @@ export async function runModuleTests(): Promise<void> {
     });
     await loader.loadAll();
     eq(readCount, 1, "shared module should only be read once");
+  });
+
+  // B-157 P2: one library cache per process, keyed by path and content.
+  await asyncTest("module: P2 — a second loader returns the same Extension", async () => {
+    let reads = 0;
+    const mk = () => new ModuleLoader({
+      modules: [{ id: "p2shared" }],
+      resolve: (id) => id === "p2shared" ? "/mock/p2shared.alg" : null,
+      readFile: async () => { reads++; return "p2_answer = 42\n"; },
+      extensions: [typeExt],
+    });
+    const [first] = await mk().loadAll();
+    const [second] = await mk().loadAll();
+    eq(second === first, true, "the process cache answers a second loader with the first load's Extension");
+    eq(reads, 2, "each loader reads the file (the content is part of the key)");
+    const sync = new ModuleLoader({
+      modules: [],
+      resolve: (id) => id === "p2shared" ? "/mock/p2shared.alg" : null,
+      readFileSync: () => "p2_answer = 42\n",
+      extensions: [typeExt],
+    }).loadModuleSync("p2shared");
+    eq(sync === first, true, "the synchronous load reads the same cache");
+  });
+
+  await asyncTest("module: P2 — an edited file is a new key, never a stale hit", async () => {
+    const at = (source: string) => new ModuleLoader({
+      modules: [{ id: "p2edit" }],
+      resolve: (id) => id === "p2edit" ? "/mock/p2edit.alg" : null,
+      readFile: async () => source,
+      extensions: [typeExt],
+    }).loadAll();
+    const [before] = await at("p2_value = 1\n");
+    const [after] = await at("p2_value = 2\n");
+    eq(after !== before, true, "new text, new load");
+    eq(evalNumExt("p2_value", [after]), 2, "the edited file's value is served");
+    const [again] = await at("p2_value = 1\n");
+    eq(again === before, true, "the original text still answers its own load");
+  });
+
+  await asyncTest("module: P2 — the same name in two directories is two keys", async () => {
+    const at = (dir: string) => new ModuleLoader({
+      modules: [{ id: "p2dup" }],
+      resolve: (id) => id === "p2dup" ? `/mock/${dir}/p2dup.alg` : null,
+      readFile: async () => "p2_dup = 7\n",
+      extensions: [typeExt],
+    }).loadAll();
+    const [a] = await at("one");
+    const [b] = await at("two");
+    eq(a !== b, true, "the resolved path is part of the key");
+  });
+
+  await asyncTest("module: P2 — the harness and the CLI loader share one cache", async () => {
+    const [harness] = libExtensions(["totality"]);
+    const [again] = libExtensions(["totality"]);
+    eq(again === harness, true, "a second harness load of a library is the first");
+    const [cli] = await new ModuleLoader({
+      modules: [{ id: "totality" }],
+      resolve: (id) => {
+        const p = path.join(path.resolve("lib"), `${id}.alg`);
+        return fs.existsSync(p) ? p : null;
+      },
+      readFile: async (p) => fs.readFileSync(p, "utf-8"),
+      extensions: [typeExt],
+    }).loadAll();
+    eq(cli === harness, true, "an async ModuleLoader over the same file is served the same Extension");
+  });
+
+  await asyncTest("module: P2 — scanImports finds the top-level imports a parse would", async () => {
+    const body = [
+      "import alpha",
+      "import beta   // trailing comment",
+      "x = \"multi-line string",
+      "import not_a_statement",
+      "\"",
+      "/* a block comment",
+      "import not_either",
+      "*/",
+      "f(n) =>",
+      "  import nested_is_not_top_level",
+      "  n",
+      "important = 1",
+      "import gamma",
+      "",
+    ].join("\n");
+    eq(scanImports(body).join(","), "alpha,beta,gamma", "column-0 imports outside strings and comments");
   });
 
   await asyncTest("module: unknown module ID", async () => {

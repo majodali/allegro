@@ -725,7 +725,9 @@ that prevents it.
   is ruling R4
 - [ ] **B-157** (the performance stream) · T-perf · L1 · **A library
   loads in well under a second.** Plan `docs/plans/fast-library-load.md`
-  (active 2026-10-28; P1 (instrumentation and the corpus) landed). Measured: the planning
+  (active 2026-10-28; P1 (instrumentation and the corpus) and P2 (a
+  library loads once per run, closing B-155 (library load per module))
+  landed). Measured: the planning
   library loads in 68 s, 87% of it in the grammar-2 engine and 68% of
   the parse in the memo table (key strings, lookups, invalidation,
   garbage); evaluation under a second; 1.1 ms per character, linear.
@@ -742,6 +744,13 @@ that prevents it.
   **Pointer**: `src/grammar2/engine.ts` (`ruleKey`, `memoGet`,
   `memoSet`, `clearPos`, `invalidateAtPos`), `src/test/alg-files.ts`
   (`libExtensions`), `docs/plans/fast-library-load.md`
+  - **Progress.** P2 (a library loads once per run, 2026-10-28): one
+    library cache per process in `src/modules.ts`, keyed by path and
+    content and shared by the CLI's loaders and the test harness; the
+    file runner finds its imports by `scanImports` instead of a second
+    parse. The solve demo runs in 95.6 s, down from 180.5 s, with 5
+    parses instead of 9; the gate 917 s, down from 1,056 s. Load-ratchet counts
+    unchanged. B-155 closed. Next: P3 (numeric memo keys).
 
 ### T-bootstrap (M9)
 
@@ -974,8 +983,12 @@ that prevents it.
   literal whose unit resolves to a non-`Unit` value is an error in units
   vocabulary; or unit idents resolve against the units module first.
   **Blocked-by**: nothing. **Pointer**: `lib/units.alg` (`units_grammar`)
-- [ ] **B-155** (library load per module) · L1 · **A library is loaded
-  once per module that uses it.** Found by B-151 D2. A demo that `use`s
+- [x] **B-155** (library load per module) · L1 · **A library is loaded
+  once per module that uses it.** Landed 2026-10-28 by B-157 P2 (a
+  library loads once per run): one library cache per process in
+  `src/modules.ts`, keyed by path and content, read by the CLI's loaders
+  and the test harness alike; the file runner no longer parses its
+  program twice. Found by B-151 D2. A demo that `use`s
   the planning library loads it in about 68 s; a demo that also
   `import`s a module which itself `use`s the library pays that again
   (about 138 s for `use planning` plus `import build_pipeline`, measured

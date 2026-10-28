@@ -98,6 +98,63 @@ export function scanUses(source: string): UseScanResult {
   return { directives, headerEnd: i };
 }
 
+/**
+ * The module names a source body's top-level `import NAME` statements name,
+ * in source order, without parsing it (B-157 P2: the file runner parses its
+ * program once, in `evalSource`, instead of once more to find its imports).
+ *
+ * A top-level statement starts at column 0, so an import is a line that
+ * begins `import`, then horizontal whitespace, an identifier, and nothing
+ * else but whitespace or a comment. Lines inside a string literal (strings
+ * may span lines) or a block comment are skipped, so the scan answers what
+ * the parser's `import_stmt` answers for the bindings it leaves undefined.
+ */
+export function scanImports(body: string): string[] {
+  const names: string[] = [];
+  const n = body.length;
+  let i = 0;
+  let lineStart = true;
+  while (i < n) {
+    if (lineStart && body.startsWith("import", i)) {
+      const m = /^import[ \t]+([A-Za-z_][A-Za-z_0-9]*)/.exec(body.slice(i, i + 256));
+      if (m) {
+        let j = i + m[0].length;
+        while (j < n) {
+          if (body[j] === " " || body[j] === "\t" || body[j] === "\r") { j++; continue; }
+          if (body.startsWith("/*", j)) {
+            const end = body.indexOf("*/", j + 2);
+            if (end < 0 || body.slice(j, end).includes("\n")) break;
+            j = end + 2;
+            continue;
+          }
+          break;
+        }
+        if (j >= n || body[j] === "\n" || body.startsWith("//", j)) names.push(m[1]);
+      }
+    }
+    lineStart = false;
+    const c = body[i];
+    if (c === "\n") { lineStart = true; i++; continue; }
+    if (c === '"') {
+      i++;
+      while (i < n && body[i] !== '"') i += body[i] === "\\" ? 2 : 1;
+      i++;
+      continue;
+    }
+    if (body.startsWith("//", i)) {
+      while (i < n && body[i] !== "\n") i++;
+      continue;
+    }
+    if (body.startsWith("/*", i)) {
+      const end = body.indexOf("*/", i + 2);
+      i = end < 0 ? n : end + 2;
+      continue;
+    }
+    i++;
+  }
+  return names;
+}
+
 /** Advance past whitespace, line comments, and block comments. */
 export function skipWsComments(src: string, from: number): number {
   let i = from;

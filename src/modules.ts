@@ -26,13 +26,21 @@ export interface ModuleConfig {
 /** Async file reader — browser-compatible (fetch) or Node (fs.promises). */
 export type FileReader = (path: string) => Promise<string>;
 
+/** Synchronous file reader — what `loadModuleSync` needs (Node `fs`). */
+export type SyncFileReader = (path: string) => string;
+
 /** Maps a module ID to a file path, or null if not found. */
 export type ModuleResolver = (moduleId: string) => string | null;
 
 export interface ModuleLoaderOptions {
   modules: ModuleConfig[];
   resolve: ModuleResolver;
-  readFile: FileReader;
+  /** At least one reader is given. `loadModule` (async) prefers this one
+   *  and reads every source of the load's closure before evaluating. */
+  readFile?: FileReader;
+  /** B-157 P2: a synchronous reader, so `loadModuleSync` can load without
+   *  an async prefetch (the test harness, which runs synchronously). */
+  readFileSync?: SyncFileReader;
   /** Standard extensions (type system, etc.) to make available in modules */
   extensions?: Extension[];
   /** B-028 F2 (CE-R6): the session's FutureManager, threaded into module
@@ -177,20 +185,77 @@ export function buildModuleObject(
   return withType(ctx, moduleType);
 }
 
+// --- The process's library cache (B-157 P2) ---
+//
+// A module file is loaded once per process, whichever loader asks: every
+// `ModuleLoader` instance (the CLI makes one for `use` and one for `import`;
+// the test harness makes one per call) reads and writes this one map, so a
+// second load of the same file returns the same Extension — bindings,
+// grammar fragment and module object.
+//
+// The key is the resolved path plus a hash of the file's text, and a hit
+// also compares the text itself: an edited file is a new key, never a stale
+// hit, and two files of the same name in different directories are two keys.
+// The Extension a key holds is the one its first load built, under that
+// load's base extensions and future manager; see docs/book/extension/
+// modules.md ("Loaded once per process") for what sharing it assumes.
+
+const libraryCache = new Map<string, { source: string; ext: Extension }>();
+
+/** A 53-bit string hash (cyrb53): pure JS, so the loader stays
+ *  browser-compatible. Collisions are harmless — a hit compares the text. */
+function contentHash(source: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < source.length; i++) {
+    const c = source.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, "0") + (h1 >>> 0).toString(16).padStart(8, "0");
+}
+
+function libraryKey(resolvedPath: string, source: string): string {
+  return `${resolvedPath}#${contentHash(source)}`;
+}
+
+function cachedLibrary(resolvedPath: string, source: string): Extension | undefined {
+  const hit = libraryCache.get(libraryKey(resolvedPath, source));
+  return hit && hit.source === source ? hit.ext : undefined;
+}
+
+/** Drop every cached load of the file at `resolvedPath`, so the next load
+ *  evaluates it afresh. For tests that exercise a genuine reload. */
+export function forgetLibrary(resolvedPath: string): void {
+  const prefix = `${resolvedPath}#`;
+  for (const key of [...libraryCache.keys()]) {
+    if (key.startsWith(prefix)) libraryCache.delete(key);
+  }
+}
+
 // --- Module Loader ---
 
 export class ModuleLoader {
-  private cache = new Map<string, Extension>();
   private configs: Map<string, ModuleConfig>;
   private resolve: ModuleResolver;
-  private readFile: FileReader;
+  private readFile?: FileReader;
+  private readFileSync?: SyncFileReader;
+  /** Each source this loader has read, by resolved path: one read per file
+   *  per loader, and the text the process cache is keyed on. */
+  private sources = new Map<string, string>();
   private extensions: Extension[];
   private futureManager?: import("./futures.js").FutureManager;
 
   constructor(options: ModuleLoaderOptions) {
+    if (!options.readFile && !options.readFileSync) {
+      throw new Error("ModuleLoader: a readFile or readFileSync option is required");
+    }
     this.configs = new Map(options.modules.map(m => [m.id, m]));
     this.resolve = options.resolve;
     this.readFile = options.readFile;
+    this.readFileSync = options.readFileSync;
     this.extensions = options.extensions ?? [];
     this.futureManager = options.futureManager;
   }
@@ -220,13 +285,58 @@ export class ModuleLoader {
    * @param loading  Set of module IDs currently being loaded (circular dep detection)
    */
   async loadModule(id: string, loading: Set<string>): Promise<Extension> {
-    // 1. Check cache
+    // Read every source the load can reach first (the async half), then
+    // load synchronously from what was read: one loading procedure, shared
+    // with `loadModuleSync`.
+    if (this.readFile) await this.prefetch(id, new Set());
+    return this.loadModuleSync(id, loading);
+  }
+
+  /** Read the sources of `id`, its configured deps and its `use`s, into
+   *  `this.sources`. Unresolvable ids are skipped: `loadModuleSync` reports
+   *  them where the load reaches them. */
+  private async prefetch(id: string, seen: Set<string>): Promise<void> {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const resolvedPath = this.resolve(id);
+    if (resolvedPath === null) return;
+    let source = this.sources.get(resolvedPath);
+    if (source === undefined) {
+      source = await this.readFile!(resolvedPath);
+      this.sources.set(resolvedPath, source);
+    }
+    for (const depId of this.configs.get(id)?.deps ?? []) await this.prefetch(depId, seen);
+    for (const d of scanUses(source).directives) {
+      if (d.kind === "module") await this.prefetch(d.name!, seen);
+      else if (d.kind === "member") await this.prefetch(d.moduleName!, seen);
+    }
+  }
+
+  private sourceOf(resolvedPath: string): string {
+    let source = this.sources.get(resolvedPath);
+    if (source === undefined) {
+      if (!this.readFileSync) {
+        throw new Error(`Module loader: '${resolvedPath}' was not read (loadModuleSync needs a readFileSync option)`);
+      }
+      source = this.readFileSync(resolvedPath);
+      this.sources.set(resolvedPath, source);
+    }
+    return source;
+  }
+
+  /**
+   * Load a single module and its dependencies synchronously. The process
+   * cache answers a file already loaded with the same text.
+   */
+  loadModuleSync(id: string, loading: Set<string> = new Set()): Extension {
+    // 1. Resolve and read; check the process cache (path + content).
     const resolvedPath = this.resolve(id);
     if (resolvedPath === null) {
       throw new Error(`Module '${id}': could not resolve to a file path`);
     }
+    const source = this.sourceOf(resolvedPath);
 
-    const cached = this.cache.get(resolvedPath);
+    const cached = cachedLibrary(resolvedPath, source);
     if (cached) return cached;
 
     // 2. Circular dependency check
@@ -241,12 +351,9 @@ export class ModuleLoader {
     const depExtensions: Extension[] = [];
 
     for (const depId of deps) {
-      const depExt = await this.loadModule(depId, loading);
+      const depExt = this.loadModuleSync(depId, loading);
       depExtensions.push(depExt);
     }
-
-    // 4. Read module source.
-    const source = await this.readFile(resolvedPath);
 
     // 4a. Pre-scan for `use` directives. Lib files use the same `use NAME`
     //     syntax as top-level files; without this, body-form modules like
@@ -277,7 +384,7 @@ export class ModuleLoader {
 
     const useExtensions: Extension[] = [];
     for (const useName of nestedUseModules) {
-      const useExt = await this.loadModule(useName, loading);
+      const useExt = this.loadModuleSync(useName, loading);
       useExtensions.push(useExt);
     }
 
@@ -297,7 +404,10 @@ export class ModuleLoader {
     //     UntypedFunction wrappers. Consumers (top-level files) see the
     //     wrapped values via the module type's __getMember.
     const cleanSource = source.slice(scan.headerEnd);
-    const allExtensions = [...this.extensions, ...depExtensions, ...useExtensions];
+    // B-157 P2: a library the loader's own extensions already carry (the
+    // CLI's `import` loader holds the program's `use`d libraries) comes back
+    // from the cache as the SAME Extension; it is listed once, not twice.
+    const allExtensions = [...new Set([...this.extensions, ...depExtensions, ...useExtensions])];
     let evalCtx: StructureValue;
     try {
       const result = evalSource(
@@ -380,7 +490,7 @@ export class ModuleLoader {
       moduleObject: moduleObj,
       grammarFragment,
     };
-    this.cache.set(resolvedPath, ext);
+    libraryCache.set(libraryKey(resolvedPath, source), { source, ext });
     loading.delete(id);
     return ext;
   }
