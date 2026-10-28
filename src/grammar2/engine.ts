@@ -81,7 +81,9 @@ export function parse(grammar: Grammar, input: string, options?: ParseOptions): 
   }
   if (state.stats) {
     state.stats.durationMs    = Date.now() - t0;
-    state.stats.finalMemoSize = state.memo.size;
+    // Entries, as `peakMemoSize` counts them (B-157 P1; `memo.size` is the
+    // number of position buckets, not of entries).
+    state.stats.finalMemoSize = state.memoSize();
     out.stats = state.stats;
   }
   return out;
@@ -96,6 +98,9 @@ export function parse(grammar: Grammar, input: string, options?: ParseOptions): 
 export interface ParseStats {
   /** Total matchRule calls (counts every re-entry, including cache hits). */
   matchRuleCalls:      number;
+  /** Memo table writes: every new entry, every overwrite (a failed attempt's
+   *  `null`, a settled left-recursion result). */
+  memoWrites:          number;
   /** Cache hits (result returned without recomputation). */
   memoHits:            number;
   /** Cache misses (new entry created and doMatch ran). */
@@ -122,7 +127,7 @@ export interface ParseStats {
 
 function newStats(): ParseStats {
   return {
-    matchRuleCalls: 0, memoHits: 0, memoMisses: 0,
+    matchRuleCalls: 0, memoWrites: 0, memoHits: 0, memoMisses: 0,
     lrSeedReturns: 0, lrIterations: 0,
     invalidationCount: 0, invalidationRounds: 0,
     peakMemoSize: 0, finalMemoSize: 0,
@@ -130,6 +135,65 @@ function newStats(): ParseStats {
     lrIterationsByName: new Map(),
     durationMs: 0,
   };
+}
+
+// --- Runtime parse reporting (B-157 P1) ---
+//
+// The runtime parses program and library source through `parseSource`, never
+// `parse` directly, so one switch instruments every such parse. With the
+// switch off and no sink installed it is exactly `parse(grammar, input)`.
+
+/** One runtime parse's stats, as the switch prints them and a sink receives
+ *  them. `source` is the module file path, or a caller-chosen label. */
+export interface ParseReport {
+  source: string;
+  chars:  number;
+  ok:     boolean;
+  stats:  ParseStats;
+}
+
+export type ParseStatsSink = (report: ParseReport) => void;
+
+let parseStatsSink: ParseStatsSink | null = null;
+
+/** Install a sink that receives every runtime parse's report (the load
+ *  ratchet, `bench/load.ts --check`, uses it). Returns the previous sink so
+ *  a caller can restore it; `null` removes the sink. */
+export function setParseStatsSink(sink: ParseStatsSink | null): ParseStatsSink | null {
+  const previous = parseStatsSink;
+  parseStatsSink = sink;
+  return previous;
+}
+
+/** `ALLEGRO_PARSE_STATS=1` (any value but empty or `0`). Read per parse;
+ *  guarded so the engine stays browser-compatible. */
+function parseStatsSwitchOn(): boolean {
+  if (typeof process === "undefined") return false;
+  const v = process.env?.ALLEGRO_PARSE_STATS;
+  return v !== undefined && v !== "" && v !== "0";
+}
+
+/** The one-line summary the switch prints to stderr. Fields are
+ *  `key=value` so `bench/load.ts` can read them back. */
+export function formatParseReport(r: ParseReport): string {
+  const s = r.stats;
+  return `parse-stats source=${r.source} chars=${r.chars} ok=${r.ok} ms=${s.durationMs}` +
+    ` attempts=${s.matchRuleCalls} memoWrites=${s.memoWrites}` +
+    ` invRounds=${s.invalidationRounds} invEntries=${s.invalidationCount}` +
+    ` lrIters=${s.lrIterations} memoFinal=${s.finalMemoSize}`;
+}
+
+/** Parse program or library source on the runtime's behalf. Collects stats
+ *  only when the switch is on or a sink is installed; the parse itself is
+ *  the same either way. */
+export function parseSource(grammar: Grammar, input: string, source: string): ParseResult {
+  const switchOn = parseStatsSwitchOn();
+  if (!switchOn && parseStatsSink === null) return parse(grammar, input);
+  const result = parse(grammar, input, { stats: true });
+  const report: ParseReport = { source, chars: input.length, ok: result.ok, stats: result.stats! };
+  if (switchOn) console.error(formatParseReport(report));
+  if (parseStatsSink !== null) parseStatsSink(report);
+  return result;
 }
 
 // --- Internal state ---
@@ -193,6 +257,7 @@ class ParseState {
     const had = bucket.has(key);
     bucket.set(key, entry);
     if (!had) this._memoSize++;
+    if (this.stats) this.stats.memoWrites++;
   }
 
   memoSize(): number { return this._memoSize; }

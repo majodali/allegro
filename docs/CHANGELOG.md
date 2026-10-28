@@ -4,6 +4,47 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream) P1 (instrumentation and the corpus): the load corpus and its ratchet
+
+The stream's first chunk, after the maintainer ratified the plan on
+2026-10-28 (`docs/plans/fast-library-load.md` now **active**; rulings
+R1 (counts, not time) and R2 (the target as a direction) taken as
+recommended, R3 (merge policy) taken as merge-on-green, R4 (the
+tokenizer question) taken as in scope, decided at the plan's decision
+chunk). Instrumentation only; no parse semantics change and no
+`// expect:` line changed.
+
+- **The stats switch.** `ALLEGRO_PARSE_STATS=1` prints one stderr line
+  per program or library parse: source, characters, milliseconds,
+  match attempts, memo writes, invalidation rounds and entries,
+  left-recursion iterations, final memo size. The runtime's parse sites
+  (`evalSource` in `src/runtime.ts`, the import scans in `src/index.ts`)
+  call `parseSource` in `src/grammar2/engine.ts`, which is `parse` when
+  the switch is off and no sink is installed. `ParseStats` gains
+  `memoWrites`; `finalMemoSize` now counts entries, as `peakMemoSize`
+  does, not position buckets.
+- **`npm run bench:load`** (`bench/load.ts`) runs `lib/units.alg`,
+  `lib/planning.alg`, `tests/planning-solve-demo.alg` and the two
+  `demos/rung3/` scenes as the CLI does and reports wall clock and the
+  summed counts. In the sandbox: 30 s, 191 s, 226 s, 103 s, 111 s;
+  parsing is 93% to over 99% of each.
+- **`npm run lint:load`** (`bench/load.ts --check`) parses each corpus
+  source once, in one process, and fails when a count rises above
+  `bench/load-baseline.json` (planning: 118.9 M match attempts,
+  165.6 M memo writes, 89.3 M invalidation entries, 1.67 M
+  left-recursion iterations). It runs once per gate:
+  `scripts/test-shards.mjs` after the shards, and `src/test/tooling.ts`
+  `runLoadLintTests` in the unsharded suite. About 110 s in the sandbox.
+- **Found by the numbers** (plan §7): the file runner parses its own
+  file twice (once to find its imports, once in `evalSource`), and
+  B-155 (library load per module) re-parses each library under an
+  already-extended grammar.
+
+Docs: plan status, §6 and §7; backlog B-157 unblocked and lane P's
+merge policy recorded; plans manifest; `CLAUDE.md` commands;
+`bench/README.md`; `docs/book/implementation-map.md`. Test count: +1
+(the load lint, unsharded runs only).
+
 ## 2026-10 — B-157 (the performance stream): plan drafted from measurement
 
 The first of the parallel streams the maintainer asked for on

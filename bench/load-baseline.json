@@ -1,0 +1,68 @@
+{
+  "_": "B-157 (the performance stream) P1: the load ratchet's baseline, written by `npm run lint:load -- --update-baseline`. Per corpus source, the engine's deterministic parse counts; `npm run lint:load` fails when any rises. Lower it after a chunk lands; never raise it to pass. docs/plans/fast-library-load.md §3.",
+  "gated": [
+    "matchAttempts",
+    "memoWrites",
+    "invalidationEntries",
+    "lrIterations",
+    "finalMemoSize"
+  ],
+  "sources": {
+    "lib/units.alg": {
+      "chars": 9960,
+      "matchAttempts": 20810680,
+      "memoWrites": 28539694,
+      "invalidationEntries": 15568878,
+      "lrIterations": 328068,
+      "finalMemoSize": 91262
+    },
+    "lib/totality.alg": {
+      "chars": 2467,
+      "matchAttempts": 399154,
+      "memoWrites": 510900,
+      "invalidationEntries": 281878,
+      "lrIterations": 6134,
+      "finalMemoSize": 3458
+    },
+    "lib/planning.alg": {
+      "chars": 52260,
+      "matchAttempts": 118920325,
+      "memoWrites": 165600140,
+      "invalidationEntries": 89346505,
+      "lrIterations": 1665399,
+      "finalMemoSize": 448002
+    },
+    "tests/planning-solve-demo.alg": {
+      "chars": 7317,
+      "matchAttempts": 8250119,
+      "memoWrites": 11365469,
+      "invalidationEntries": 6178458,
+      "lrIterations": 121234,
+      "finalMemoSize": 35489
+    },
+    "tests/lib/build_pipeline.alg": {
+      "chars": 1078,
+      "matchAttempts": 441837,
+      "memoWrites": 553041,
+      "invalidationEntries": 315638,
+      "lrIterations": 7666,
+      "finalMemoSize": 4831
+    },
+    "demos/rung3/01-model.alg": {
+      "chars": 6902,
+      "matchAttempts": 4387360,
+      "memoWrites": 5943027,
+      "invalidationEntries": 3258684,
+      "lrIterations": 65725,
+      "finalMemoSize": 24696
+    },
+    "demos/rung3/02-solve.alg": {
+      "chars": 7999,
+      "matchAttempts": 9578533,
+      "memoWrites": 13110220,
+      "invalidationEntries": 7164634,
+      "lrIterations": 141380,
+      "finalMemoSize": 42504
+    }
+  }
+}

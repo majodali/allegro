@@ -1,9 +1,9 @@
 # Fast library load — the performance stream
 
-> **Status: draft** (2026-10-27) — awaiting ratification of the chunk
-> sequence in §5 and the rulings in §6. On ratification the stream runs
+> **Status: active** (2026-10-28) — the maintainer ratified the chunk
+> sequence in §5 and the rulings in §6 on 2026-10-28. The stream runs
 > as a pre-ratified sequence (W-001, `process.md` §3) under the merge
-> policy the maintainer sets for autonomous streams.
+> policy of R3: merge-on-green.
 >
 > **Reader**: someone who knows the project's layers and the gate but
 > has not read the parser engine. Terms: a *library* is a `lib/*.alg`
@@ -174,22 +174,25 @@ The sequence stops on W-001's four conditions and on one more that is
 this stream's own: **any changed `// expect:` line stops it**, because
 a parser that changes a program's meaning has left the stream's scope.
 
-## 6. Rulings requested
+## 6. Rulings (taken 2026-10-28)
 
 - **R1 — the oracle is counts, not time.** Wall clock is reported in
   the bench and discussed in §7; the gate ratchets deterministic engine
-  counts. Recommended as written in §3.
+  counts. Recommended as written in §3. **Taken** as recommended.
 - **R2 — the target.** "Well under a second to parse the planning
   library" is the number the plan aims at; §7 records what each chunk
   reaches, and P6 decides whether M7 is needed. Recommended: accept the
-  target as a direction, not a gate.
+  target as a direction, not a gate. **Taken** as recommended.
 - **R3 — the stream's merge policy.** This plan is the first autonomous
   stream; the maintainer's choice between merge-on-green and
   batch-reviewed merges applies here first (the backlog's lane table
-  carries the choice once made).
+  carries the choice once made). **Taken: merge-on-green.** The
+  orchestrating agent merges the stream's PRs once the gate is green
+  and it has read the diff.
 - **R4 — the tokenizer question**, only at P6, with the P1 numbers in
   hand: whether B-075's lexical layer is in scope, since it amends the
-  scannerless formalism.
+  scannerless formalism. **Taken**: a scanner/tokenizer layer is in
+  scope; whether to build it is decided at P6 with P1's numbers.
 
 ## 7. Status log
 
@@ -197,3 +200,54 @@ a parser that changes a program's meaning has left the stream's scope.
   pilot's demos, the CPU profile). The stream is the first of the
   parallel streams the maintainer asked for on 2026-10-27 (the
   backlog's lane table, row P). Nothing landed yet.
+- 2026-10-28: ratified (§5 sequence; §6 rulings taken). **P1 landed.**
+  `ALLEGRO_PARSE_STATS=1` prints one stderr line per program or library
+  parse (`parseSource` in `src/grammar2/engine.ts`, which also gains a
+  `memoWrites` count and a `finalMemoSize` that counts entries, not
+  position buckets); `npm run bench:load` and `npm run lint:load`
+  (`bench/load.ts`); the ratchet runs once per gate. Numbers below are
+  from the agent's sandbox, which runs about 1.4 times slower than the
+  machine of §1 (planning parses in 80 s there against about 60).
+
+  The baseline (`bench/load-baseline.json`), parse only, each source
+  once; counts are identical across runs:
+
+  | Source | Chars | Match attempts | Memo writes | Inv. entries | LR iterations | Final memo | Parse s |
+  |---|---|---|---|---|---|---|---|
+  | `lib/totality.alg` | 2,467 | 399,154 | 510,900 | 281,878 | 6,134 | 3,458 | 0.2 |
+  | `lib/units.alg` | 9,960 | 20,810,680 | 28,539,694 | 15,568,878 | 328,068 | 91,262 | 12.5 |
+  | `lib/planning.alg` | 52,260 | 118,920,325 | 165,600,140 | 89,346,505 | 1,665,399 | 448,002 | 79.6 |
+  | `tests/lib/build_pipeline.alg` | 1,078 | 441,837 | 553,041 | 315,638 | 7,666 | 4,831 | 0.3 |
+  | `tests/planning-solve-demo.alg` | 7,317 | 8,250,119 | 11,365,469 | 6,178,458 | 121,234 | 35,489 | 5.3 |
+  | `demos/rung3/01-model.alg` | 6,902 | 4,387,360 | 5,943,027 | 3,258,684 | 65,725 | 24,696 | 2.7 |
+  | `demos/rung3/02-solve.alg` | 7,999 | 9,578,533 | 13,110,220 | 7,164,634 | 141,380 | 42,504 | 5.8 |
+
+  The check takes 107 to 116 s in the sandbox, against the 90 s aimed
+  at; it should be near 80 s on the machine of §1.
+
+  `npm run bench:load`, full runs as the CLI does them:
+
+  | Entry | Wall clock | Parses | Parse time | Match attempts |
+  |---|---|---|---|---|
+  | `lib/units.alg` | 30.0 s | 2 | 29.3 s | 41,621,360 |
+  | `lib/planning.alg` | 190.7 s | 4 | 189.9 s | 259,050,484 |
+  | `tests/planning-solve-demo.alg` | 226.2 s | 9 | 210.8 s | 299,522,410 |
+  | `demos/rung3/01-model.alg` | 103.4 s | 5 | 101.1 s | 148,904,879 |
+  | `demos/rung3/02-solve.alg` | 111.1 s | 5 | 103.2 s | 159,287,225 |
+
+  What the numbers say:
+  - **Parsing is the whole cost.** Parse time is 93% to over 99% of
+    each run's wall clock.
+  - **About half of all memo writes are cleared again.** For planning,
+    165.6 M writes, 89.3 M entries cleared by invalidation, 1.39 writes
+    per match attempt, and 448 k entries left at the end. The clearing
+    is M2's target; M1 and M3 act on every write.
+  - **The file runner parses its own file twice.** `src/index.ts`
+    parses the program to find its `import`s, then `evalSource` parses
+    it again. A library run as a program pays its parse twice (planning
+    88 s, then 87 s). This is a cost the plan did not name; it is the
+    same kind of move as M5 (parse each source once per run).
+  - **B-155 (library load per module) measured.** The solve demo
+    parses `units`, `totality` and `planning` twice; the second load
+    happens under the grammar the first load extended, so its counts
+    differ (`units` 23,078,106 attempts against 20,810,680).

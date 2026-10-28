@@ -153,6 +153,29 @@ export function runUnitsLintTests(): void {
   });
 }
 
+/** B-157 P1: the load ratchet — the engine's deterministic parse counts
+ *  over the load corpus (`bench/load.ts --check`) stay at or below
+ *  `bench/load-baseline.json`. Spawned and sharding-skipped for the same
+ *  reasons as the plane lint; `scripts/test-shards.mjs` runs it once after
+ *  the shards. */
+export function runLoadLintTests(): void {
+  if (SHARD !== null) return;
+  test("load lint (B-157 P1): parse counts at or below the load baseline", () => {
+    let out = "";
+    let failed = false;
+    try {
+      out = execFileSync("npx", ["tsx", "bench/load.ts", "--check"], {
+        cwd: path.resolve(import.meta.dirname, "../.."),
+        encoding: "utf8",
+      });
+    } catch (e) {
+      failed = true;
+      out = String((e as { stdout?: string }).stdout ?? e);
+    }
+    eq(failed ? out.trim() : "", "", "load-lint violations");
+  });
+}
+
 // --- B-096: deployed-version verification — pure verdict logic (no network) ---
 
 
