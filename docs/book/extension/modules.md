@@ -16,6 +16,23 @@
   Modules are just extensions built from `.alg` files.
 - **ModuleLoader** (`src/modules.ts`) loads `.alg` files with
   dependency resolution, caching, and circular-dependency detection.
+- **Loaded once per process** (B-157 P2 (a library loads once per
+  run)): a module file's extension (its bindings, grammar fragment and
+  module object) is built by the first load in a process and shared by
+  every program and module that uses or imports the file afterwards,
+  whichever `ModuleLoader` instance asks: the file runner's `use` and
+  `import` loaders and the test harness read one cache. The cache is
+  keyed by the resolved path and the file's content, so an edited file
+  loads afresh and two files of one name in different directories stay
+  two modules. The extension served is the one the first load built,
+  under that load's base extensions and future manager. Sharing
+  assumes an evaluation that is handed a loaded module does not change
+  it. The in-place passes that reach a module's values from a consumer
+  (tail-position marks, body-metadata collapse) are idempotent. Two
+  writes are not: a consumer binding that is a top-level alias of a
+  module's function or type re-stamps that function's inferred effects
+  or re-keys that type's members. No program in the corpus binds such
+  an alias.
 - **Import syntax**: `import name` — declarative; module values are
   provided via extensions, not by an imperative load at the site.
 - **Resolution order**: local `lib/` first, then the system `lib/`

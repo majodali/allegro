@@ -4,6 +4,61 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream) P2 (a library loads once per run): one library cache per process
+
+The stream's second chunk (`docs/plans/fast-library-load.md` §5 row P2,
+move M5 (load a library once per run)). It closes B-155 (library load
+per module). No parse semantics change and no `// expect:` line
+changed.
+
+- **One library cache per process.** `src/modules.ts` keeps one map from
+  a module file's resolved path plus a hash of its text to the
+  extension its first load built: bindings, grammar fragment and module
+  object. A hit also compares the text, so an edited file loads afresh.
+  Every `ModuleLoader` instance reads and writes the map: the CLI's
+  `use` loader, its `import` loader, and the test harness. Loading is
+  one synchronous core, `loadModuleSync`; the async `loadModule` reads
+  the sources of the load first and then calls the core. A loader's
+  extension list holds each extension once, so a cached library that the
+  loader's context already carries is not listed twice. `forgetLibrary`
+  drops a file's entries, for a test that needs a genuine reload.
+- **The harness loads through the production loader.** `libLoader` and
+  `libExtensions` in `src/test/alg-files.ts` were their own copy of
+  library loading, with one cache per call. They are now the module
+  loader, synchronous, over the system `lib/` (and, for an `import`, the
+  file's own `lib/` first). The suite builds a library exactly as the
+  CLI does: export-filtered bindings, a module object, the file path as
+  its FQN scope (the defining scope of its symbols). Across a shard, the
+  planning library now loads once instead of about nine times.
+- **The file runner parses its program once.** `scanImports` in
+  `src/use-scanner.ts` finds the top-level `import NAME` lines without
+  parsing. `runFile`, `runInspect` and `pcpLoadAndEval` in `src/index.ts`
+  use it instead of the "import scan" parse, and the harness uses it
+  instead of its regular expression.
+- **Measured** (`npm run bench:load`, before and after, same sandbox):
+  `lib/units.alg` 22.2 s to 11.0 s; `lib/planning.alg` 142.1 s to
+  80.4 s; `tests/planning-solve-demo.alg` 180.5 s to 95.6 s, 9 parses to
+  5. Each corpus source is now parsed once per run. The gate:
+  1,056 s to 917 s wall clock, 2,742 s to 1,815 s of work across shards. `npm run lint:load` counts are unchanged, and so is
+  its baseline.
+- **The sharing assumption, checked** (plan §7). The in-place passes
+  that reach a loaded module's values (tail-position marks, body-metadata
+  collapse) are idempotent. Two writes are not: the effect stamping in
+  precompile and divergence, and the member re-keying of a type. Both
+  reach a shared value only through a top-level program alias of a
+  module's function or type, which no corpus program binds. Recorded in
+  `docs/book/extension/modules.md`, not fixed.
+
+Tests: +5 in `src/test/modules.ts` (the cache across loaders and across
+the sync and async paths; an edited file; one name in two directories;
+the harness and the CLI loader sharing an extension; `scanImports`). The
+C5.1 FQN reload test now calls `forgetLibrary` before its second load,
+so the reload it checks still happens. Docs: plan §5 and §7; backlog
+B-155 closed, B-157 progress; plans manifest;
+`docs/book/extension/modules.md` ("Loaded once per process");
+`docs/book/implementation-map.md` (`src/modules.ts`,
+`src/use-scanner.ts`, `alg-files.ts`).
+
 ## 2026-10 — B-157 (the performance stream) P1 (instrumentation and the corpus): the load corpus and its ratchet
 
 The stream's first chunk, after the maintainer ratified the plan on

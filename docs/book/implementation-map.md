@@ -34,8 +34,8 @@
 | `src/pcp.ts` | L2 | Proof Collaboration Protocol schemas (Obligation/Verdict/Authorship), verify/obligations builders, hints, TODO renderer |
 | `src/introspect.ts` | L2 | `ValueSummary`/`ModuleSummary`/`SafetyGrade` for `allegro inspect` + sandbox Inspect |
 | `src/types-std.ts` | L2 | The standard type system: ten core types, kind tower (Type/Refinement/Interface/Effect/Proof), generics, laws, coercions |
-| `src/modules.ts` | L1/L2 | ModuleLoader + `buildModuleObject` (see `extension/modules.md`) |
-| `src/use-scanner.ts` | L1 | `use` header pre-scan shared by file runner + lib loader |
+| `src/modules.ts` | L1/L2 | ModuleLoader (async and `loadModuleSync`) over the process's library cache, keyed by path and content (B-157 P2) + `buildModuleObject` (see `extension/modules.md`) |
+| `src/use-scanner.ts` | L1 | `use` header pre-scan shared by file runner + lib loader; `scanImports`, the `import NAME` line scan the file runner and the harness use instead of a second parse (B-157 P2) |
 | `src/futures.ts` | L0 | FutureManager: Promise → pending future cell → `applyPhase` cascade |
 | `src/index.ts` | T-build | CLI entry: file runner, REPL, `inspect`/`verify`/`obligations`/`propose`/`prove` subcommands |
 | `src/test/` | T-tooling | The suite (1197 tests at 2026-08) — per-area modules behind a thin index; roster below |
@@ -56,7 +56,7 @@ import, and the index drives the async sections and the summary.
 | `index.ts` | The index: area imports in suite order, async section chain, summary |
 | `harness.ts` | `test`/`asyncTest`/`eq`/`throws`, name-hash sharding (`ALLEGRO_TEST_SHARD`), `ALLEGRO_TEST_FILTER`, `ALLEGRO_TEST_TRACE`, timing, the summary + `SHARD-RESULT` line |
 | `fixtures.ts` | `evalSource`/`evalStr`/`evalNum`/`evalNumExt`/`evalStd`, `typeExt`, `mathExtension`, `makeCtxWith` |
-| `alg-files.ts` | `runAlgFile`/`fileTest`, the corpus walk accumulators feeding the boundary battery, `testsDir`/`primNames`/`typeNames` |
+| `alg-files.ts` | `runAlgFile`/`fileTest`, `libLoader`/`libExtensions` (the production loader, synchronous, so libraries come from the process cache), the corpus walk accumulators feeding the boundary battery, `testsDir`/`primNames`/`typeNames` |
 | `base.ts` | Allegretto: arithmetic, bindings, functions, closures, blocks, extensions |
 | `modules.ts` | Module loader: resolution, caching, cycles, export encapsulation |
 | `grammar-legacy.ts` | Earley combinator layer + standalone JSON parser |

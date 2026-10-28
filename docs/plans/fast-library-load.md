@@ -163,7 +163,7 @@ parse or user files.
 | Chunk | What lands | Oracle | Size |
 |---|---|---|---|
 | **P1** | `ALLEGRO_PARSE_STATS=1` prints the engine stats for a run; `npm run bench:load` with the corpus of §3 and `bench/load-baseline.json`; `npm run lint:load` ratchets the counts; the profile of §1 recorded in the plan's §7 with the stats numbers | the new lint runs and passes at its own baseline | S |
-| **P2** | M5: a library loads once per run (B-155 closed) | solve demo under 90 s; counts unchanged; suite green | S–M |
+| **P2** | M5: a library loads once per run (B-155 closed). **Landed 2026-10-28** (§7) | solve demo under 90 s; counts unchanged; suite green | S–M |
 | **P3** | M1: numeric memo keys | counts unchanged, clock falls, suite green | M |
 | **P4** | M3: fewer and cheaper entries | memo writes fall or allocation falls; suite green | M |
 | **P5** | M2: invalidation by generation; measured by the P1 stats before design | invalidation entries fall; grammar-2 left-recursion battery green | M |
@@ -251,3 +251,80 @@ a parser that changes a program's meaning has left the stream's scope.
     parses `units`, `totality` and `planning` twice; the second load
     happens under the grammar the first load extended, so its counts
     differ (`units` 23,078,106 attempts against 20,810,680).
+- 2026-10-28: **P2 landed** (M5: a library loads once per run; B-155
+  (library load per module) closed). Two changes, no parse semantics
+  change and no `// expect:` line changed:
+  - **One library cache per process** in `src/modules.ts`, keyed by the
+    resolved path plus a hash of the file's text (a hit also compares
+    the text). Every `ModuleLoader` instance reads and writes it. The
+    loading procedure is one synchronous core, `loadModuleSync`; the
+    async `loadModule` reads the load's sources first and then calls it.
+    The test harness (`libLoader`/`libExtensions` in
+    `src/test/alg-files.ts`) now loads through that loader instead of
+    its own copy, so the suite and the CLI build a library the same way
+    and share its extension.
+  - **The file runner parses its program once.** `scanImports` in
+    `src/use-scanner.ts` finds the top-level `import NAME` lines (column
+    0, outside strings and comments), so `runFile`, `runInspect` and
+    `pcpLoadAndEval` no longer parse the body to find them. The body's
+    one parse stays in `evalSource`, under the grammar it had before.
+
+  `npm run bench:load`, before (`origin/main` at `23abd88`) and after,
+  same sandbox, one run each:
+
+  | Entry | Wall clock before | after | Parses before | after |
+  |---|---|---|---|---|
+  | `lib/units.alg` | 22.2 s | 11.0 s | 2 | 1 |
+  | `lib/planning.alg` | 142.1 s | 80.4 s | 4 | 3 |
+  | `tests/planning-solve-demo.alg` | 180.5 s | 95.6 s | 9 | 5 |
+  | `demos/rung3/01-model.alg` | 87.3 s | 91.0 s | 5 | 4 |
+  | `demos/rung3/02-solve.alg` | 95.7 s | 97.0 s | 5 | 4 |
+
+  Each source is now parsed once per run. Each removed parse was either
+  the import scan or the solve demo's second `units`, `totality` and
+  `planning` loads. The rung-3 scenes save only their own import scan
+  (2.5 to 5 s), which is within run-to-run noise: the planning parse
+  alone varied from 66 to 74 s across these runs. The solve demo
+  misses the 90 s the §5 row aims at by about 6 s in this sandbox. The
+  sandbox is slower than the machine of §1, and what is left is one
+  parse of each source.
+
+  `npm run lint:load` reports every count at its baseline; no baseline
+  changed. The check already parsed each source once through one loader,
+  so the second load under an extended grammar was never in the
+  baseline.
+
+  The gate (`npm run test:shards`, 3 shards): 1,056 s wall clock
+  (2,742 s of work across the shards) before, 917 s (1,815 s of work)
+  after. The longest shard now holds the one planning load and most of
+  the planning demos. The before run was taken in an exported copy of
+  `origin/main`, outside a repository, where the boundary lint and the
+  doc-ref lint (both list tracked files) cannot run; every other test
+  passed.
+
+  **The sharing assumption.** A cached extension is handed to every
+  later evaluation in the process. Before P2 that already happened
+  within one run: `units` served both the `planning` load and the
+  program. P2 widens it to every program in the process, which matters
+  for the suite and for any long-lived host, not for a CLI run. The
+  in-place writes that can reach a loaded module's values from a
+  consumer are these:
+  - `markTailCalls` (`_tailPosition`) and `collapseBodyMetadata` reach
+    a module's functions through resolved references. Both are
+    idempotent: re-marking a tree sets the same marks, and a collapsed
+    body has no wrapper left to collapse.
+  - `precompileFunction` (`inferredEffects`) and the divergence stamp in
+    `evalSource` write onto the function a top-level program binding
+    holds. When that binding is an alias of a module's function
+    (`f = lib_f`), the write lands on the shared value and is not
+    idempotent: precompile overwrites.
+  - `stabilizeTypeMemberScope` re-keys the members of a type a top-level
+    program binding holds. On an alias of a module's type it re-keys
+    the shared type. `renameInPlace` fires only on an anonymous type,
+    which a module's named type is not.
+
+  No program in the corpus binds such an alias (checked over every
+  file with a `use` header). The full suite with every pin unchanged
+  is the oracle that the corpus does not reach them. This is recorded,
+  not fixed: deriving instead of writing in place on those two paths
+  is kernel work, outside this stream's files.
