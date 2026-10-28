@@ -4,6 +4,45 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream) P4 (fewer and cheaper entries): a failed attempt allocates and hashes less
+
+The stream's fourth chunk (`docs/plans/fast-library-load.md` §5 row P4,
+move M3 (fewer entries)). No parse semantics change, no `// expect:`
+line changed, and every count in `bench/load-baseline.json` is
+identical, memo writes included.
+
+- **One hash operation per memo write.** `matchRule` in
+  `src/grammar2/engine.ts` looks up the position's bucket once
+  (`ParseState.bucketAt`) and holds it for the attempt. `memoSet` takes
+  the bucket and an `added` flag in place of a `has` lookup; the flag is
+  known at each write, since the first write follows a miss and a
+  failure's `null` overwrites the in-progress entry `clearPos` keeps.
+  A missed and failed attempt does four hash operations instead of
+  eight. `memoGet` is gone.
+- **No array per failed attempt.** `ParseState.advance` takes the failed
+  rule, not a one-element array: 75.8 M arrays fewer for planning.
+- **No allocation before a match is known.** `matchTerminal` builds its
+  zero-width range only for `eof` and `empty`; `matchSeq` makes its
+  children array after the first item matches.
+- **Measured and left** (plan §7): `memoSet` by the size difference
+  (subsumed), a `Set` for the farthest rules, a free list of failed
+  entries, one hidden class for `MatchResult`: no gain. A flat memo
+  `Map` keyed by position and key was not built: `clearPos` needs one
+  position's entries, and the keys would leave V8's small-integer range.
+- **Measured** (`npm run bench:load`, before and after, same sandbox):
+  the planning parse 31–33 s to 27–31 s, about 12%; `lib/units.alg`
+  parse 5.9 s to 4.6 s. The gate: 774.6 s before, 789.2 s after, no
+  gain beyond run-to-run noise.
+  Profile after: `clearPos` 26.4%, `matchRule` 19.1%, the collector
+  15.1%, `memoSet` 14.0%, `memoKey` 5.3%. What `memoSet` still costs is
+  the map write itself, the bucket churn that invalidation causes, and
+  P5 (invalidation by generation) acts on it.
+
+Tests: none added; the grammar-2 battery and the gated counts are the
+oracle (`finalMemoSize`, identical for all 7 sources, checks the entry
+count `added` keeps). Docs: plan §5 and §7; backlog B-157 progress and
+pointer; plans manifest.
+
 ## 2026-10 — B-157 (the performance stream) P3 (numeric memo keys): memo keys without strings
 
 The stream's third chunk (`docs/plans/fast-library-load.md` §5 row P3,

@@ -726,8 +726,8 @@ that prevents it.
 - [ ] **B-157** (the performance stream) · T-perf · L1 · **A library
   loads in well under a second.** Plan `docs/plans/fast-library-load.md`
   (active 2026-10-28; P1 (instrumentation and the corpus), P2 (a
-  library loads once per run, closing B-155 (library load per module))
-  and P3 (numeric memo keys) landed). Measured: the planning
+  library loads once per run, closing B-155 (library load per module)),
+  P3 (numeric memo keys) and P4 (fewer and cheaper entries) landed). Measured: the planning
   library loads in 68 s, 87% of it in the grammar-2 engine and 68% of
   the parse in the memo table (key strings, lookups, invalidation,
   garbage); evaluation under a second; 1.1 ms per character, linear.
@@ -741,7 +741,7 @@ that prevents it.
   bench:load`, every `// expect:` pin unchanged. The first candidate
   for autonomous delivery (lane P in the lane table). **Blocked-by**:
   nothing.
-  **Pointer**: `src/grammar2/engine.ts` (`memoKey`, `memoGet`,
+  **Pointer**: `src/grammar2/engine.ts` (`memoKey`, `bucketAt`,
   `memoSet`, `clearPos`, `invalidateAtPos`), `src/test/alg-files.ts`
   (`libExtensions`), `docs/plans/fast-library-load.md`
   - **Progress.** P2 (a library loads once per run, 2026-10-28): one
@@ -758,6 +758,17 @@ that prevents it.
     71 s; the gate 737.6 s, down from 902.7 s. Every load-ratchet count
     identical. `clearPos` is now the largest cost (23.7%). Next: P4
     (fewer and cheaper entries).
+  - **Progress.** P4 (fewer and cheaper entries, 2026-10-28): a failed
+    match attempt allocates less and hashes less. `matchRule` holds the
+    position's bucket for the attempt, so a memo write is one hash
+    operation; a failure no longer builds an array for the
+    farthest-advance record; a terminal or sequence allocates nothing
+    before it matches. The planning parse runs in 27 to 31 s, down from
+    31 to 33 s; the gate unchanged within noise (789.2 s against
+    774.6 s). Every
+    load-ratchet count identical, memo writes included.
+    Next: P5 (invalidation by generation), which also owns the bucket
+    churn that is now most of `memoSet`'s cost.
 
 ### T-bootstrap (M9)
 
