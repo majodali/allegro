@@ -6,11 +6,10 @@ field definitions and omission defaults per the methodology
 [vocabulary](https://github.com/majodali/methodology/blob/main/docs/vocabulary.md).
 
 - **C-tier**: C2 — serious project, pre-users
-- **Pinned methodology version**: 1.5.0 (compliance target;
-  migrated from 1.4.0 on 2026-09-02 — v1.5.0 carries one migration
-  note: a project with an Agent bootstrap copies W-008's prescribed
-  block into it verbatim, done in `CLAUDE.md` in the same commit. The
-  other five amendments ship migration-note `none`.)
+- **Pinned methodology version**: 1.6.0 (compliance target; migrated
+  from 1.5.0 on 2026-10-28 — v1.6.0 carries one migration note, the
+  amended W-008 bootstrap block, which this repo's `CLAUDE.md` now
+  carries verbatim)
 - **S-level**: S0 — public code only
 - **Type**: `language/tool platform`
 - **Target**: `static site` (allegrolang.org — landing page, sandbox,
