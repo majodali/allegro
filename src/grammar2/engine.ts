@@ -198,6 +198,36 @@ export function parseSource(grammar: Grammar, input: string, source: string): Pa
 
 // --- Internal state ---
 
+/**
+ * An indent stack, interned (B-157 P3). Every distinct stack is one node of
+ * a trie rooted at `[0]`: pushing a column steps to a child, popping steps to
+ * the parent. Two stacks with the same levels are therefore the same node,
+ * and `id` identifies the stack's contents the way its joined levels did
+ * when the memo key was a string. A node is never mutated after creation
+ * except to add children.
+ */
+export interface IndentStack {
+  /** Column of the innermost open block (the top of the stack). */
+  readonly top:    number;
+  /** The stack with its top popped; `null` for the root `[0]`. */
+  readonly parent: IndentStack | null;
+  /** Unique within one parse; the memo key's stack part. */
+  readonly id:     number;
+  /** Interned pushes, by column. Created on the first push. */
+  children: Map<number, IndentStack> | null;
+}
+
+/**
+ * Memo keys (B-157 P3). The within-position key is one number: the rule's
+ * id and the indent stack's id. While the stack id is below `STACK_SLOTS`
+ * the key is `ruleId * STACK_SLOTS + stackId`, a small integer. A parse that
+ * creates more stacks than that (none in the corpus) gets negative keys,
+ * `-(ruleId * WIDE_STACK_SLOTS + stackId)`, which cannot meet the positive
+ * ones; the stack count is capped at `WIDE_STACK_SLOTS` so they stay unique.
+ */
+const STACK_SLOTS      = 1024;
+const WIDE_STACK_SLOTS = 1 << 22;
+
 class ParseState {
   grammar: Grammar;
   input:   string;
@@ -213,17 +243,22 @@ class ParseState {
    * Map<string, Entry> implementation made invalidation O(NM) per round
    * and O(N²M) total, which dominated parse time on anything non-trivial.
    */
-  memo: Map<number, Map<string, MemoEntry | null>> = new Map();
+  memo: Map<number, Map<number, MemoEntry | null>> = new Map();
   /** Total entries across all pos-buckets — tracked for stats. */
   private _memoSize: number = 0;
-  ruleIds: WeakMap<Rule, number> = new WeakMap();
-  nextRuleId: number = 1;
+  /** Rule ids. A non-terminal is identified by its NAME (every `NonTerm`
+   *  object naming one production shares one id); any other rule by the
+   *  object itself. One counter serves both, so the two never collide. */
+  private ruleIds: Map<Rule, number> = new Map();
+  private nameIds: Map<string, number> = new Map();
+  private nextRuleId: number = 0;
+  private nextStackId: number = 0;
 
   /**
    * Indent stack. Top of stack is the indent level of the currently-open
    * block. Starts as [0] (the document block is rooted at column 0).
    */
-  indentStack: number[] = [0];
+  indentStack: IndentStack;
 
   /** Optional stats collector — null means no instrumentation. */
   stats: ParseStats | null = null;
@@ -231,27 +266,27 @@ class ParseState {
   constructor(grammar: Grammar, input: string) {
     this.grammar = grammar;
     this.input   = input;
+    this.indentStack = this.newStack(0, null);
   }
 
   /**
-   * Build the within-position key for a (rule, indentStack) lookup. Does
-   * NOT include position (which is the outer map key).
+   * The within-position key for a (rule, indentStack) lookup. Does NOT
+   * include position (which is the outer map key).
    */
-  ruleKey(rule: Rule): string {
-    const baseKey = rule.kind === "nonterm"
-      ? `nt:${rule.name}`
-      : `r${this.ruleId(rule)}`;
-    // Stacks are typically 1–5 small integers — cheap to serialize.
-    return `${baseKey}:${this.indentStack.join(",")}`;
+  memoKey(rule: Rule): number {
+    let id = this.ruleIds.get(rule);
+    if (id === undefined) id = this.internRule(rule);
+    const sid = this.indentStack.id;
+    return sid < STACK_SLOTS ? id * STACK_SLOTS + sid : -(id * WIDE_STACK_SLOTS + sid);
   }
 
-  memoGet(pos: number, key: string): MemoEntry | null | undefined {
+  memoGet(pos: number, key: number): MemoEntry | null | undefined {
     const bucket = this.memo.get(pos);
     if (!bucket) return undefined;
     return bucket.get(key);
   }
 
-  memoSet(pos: number, key: string, entry: MemoEntry | null): void {
+  memoSet(pos: number, key: number, entry: MemoEntry | null): void {
     let bucket = this.memo.get(pos);
     if (!bucket) { bucket = new Map(); this.memo.set(pos, bucket); }
     const had = bucket.has(key);
@@ -263,7 +298,7 @@ class ParseState {
   memoSize(): number { return this._memoSize; }
 
   /** Delete entries at one position. Returns the number of entries removed. */
-  clearPos(pos: number, keepKey: string): number {
+  clearPos(pos: number, keepKey: number): number {
     const bucket = this.memo.get(pos);
     if (!bucket) return 0;
     let removed = 0;
@@ -277,13 +312,39 @@ class ParseState {
     return removed;
   }
 
-  private ruleId(rule: Rule): number {
-    let id = this.ruleIds.get(rule);
-    if (id === undefined) {
+  private internRule(rule: Rule): number {
+    let id: number | undefined;
+    if (rule.kind === "nonterm") {
+      id = this.nameIds.get(rule.name);
+      if (id === undefined) {
+        id = this.nextRuleId++;
+        this.nameIds.set(rule.name, id);
+      }
+    } else {
       id = this.nextRuleId++;
-      this.ruleIds.set(rule, id);
     }
+    this.ruleIds.set(rule, id);
     return id;
+  }
+
+  /** The current stack with `col` pushed, interned (INDENT). */
+  pushedStack(col: number): IndentStack {
+    const cur = this.indentStack;
+    let kids = cur.children;
+    if (kids === null) { kids = new Map(); cur.children = kids; }
+    let child = kids.get(col);
+    if (child === undefined) {
+      child = this.newStack(col, cur);
+      kids.set(col, child);
+    }
+    return child;
+  }
+
+  private newStack(top: number, parent: IndentStack | null): IndentStack {
+    if (this.nextStackId >= WIDE_STACK_SLOTS) {
+      throw new Error(`Indent stack limit (${WIDE_STACK_SLOTS} distinct stacks) exceeded`);
+    }
+    return { top, parent, id: this.nextStackId++, children: null };
   }
 
   advance(pos: number, activeRules: Rule[]): void {
@@ -308,7 +369,7 @@ export interface MatchResult {
    * INDENT (pushes a level), DEDENT (pops). NEWLINE does not modify the
    * stack directly — it's passive about block structure.
    */
-  newIndentStack?: number[];
+  newIndentStack?: IndentStack;
 }
 
 /**
@@ -335,7 +396,7 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
       state.stats.callsByNonTerm.set(rule.name, (state.stats.callsByNonTerm.get(rule.name) ?? 0) + 1);
     }
   }
-  const key = state.ruleKey(rule);
+  const key = state.memoKey(rule);
   const cached = state.memoGet(pos, key);
   if (cached !== undefined) {
     if (state.stats) state.stats.memoHits++;
@@ -425,7 +486,7 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
  * seeds remain the active "current answer" for their rules during inner
  * iteration.
  */
-function invalidateAtPos(state: ParseState, pos: number, keepKey: string): void {
+function invalidateAtPos(state: ParseState, pos: number, keepKey: number): void {
   if (state.stats) state.stats.invalidationRounds++;
   const removed = state.clearPos(pos, keepKey);
   if (state.stats) state.stats.invalidationCount += removed;
@@ -441,7 +502,7 @@ function invalidateAtPos(state: ParseState, pos: number, keepKey: string): void 
  * the time doMatch returns for a composite rule, state.indentStack already
  * reflects the cumulative post-state of all inner matches.
  */
-function runDoMatch(state: ParseState, rule: Rule, pos: number, snapshot: number[]): MatchResult | null {
+function runDoMatch(state: ParseState, rule: Rule, pos: number, snapshot: IndentStack): MatchResult | null {
   const result = doMatch(state, rule, pos);
   if (result === null) {
     state.indentStack = snapshot;
@@ -610,7 +671,7 @@ function columnOf(input: string, pos: number): number {
 }
 
 function matchIndentDirective(state: ParseState, directive: "NEWLINE" | "INDENT" | "DEDENT" | "SAMELINE" | "CONT_NL", pos: number): MatchResult | null {
-  const top = state.indentStack[state.indentStack.length - 1];
+  const top = state.indentStack.top;
   switch (directive) {
     case "NEWLINE": {
       if (state.input[pos] !== "\n") return null;
@@ -633,7 +694,7 @@ function matchIndentDirective(state: ParseState, directive: "NEWLINE" | "INDENT"
       if (state.input[pos] !== "\n") return null;
       const { pos: contentPos, col, error } = skipToNextContent(state.input, pos);
       if (error || col === Infinity || col <= top) return null;
-      const newStack = [...state.indentStack, col];
+      const newStack = state.pushedStack(col);
       return {
         tree: { kind: "leaf", text: state.input.slice(pos, contentPos), range: { start: pos, end: contentPos } },
         nextPos: contentPos,
@@ -644,11 +705,11 @@ function matchIndentDirective(state: ParseState, directive: "NEWLINE" | "INDENT"
       // Zero-width. Look ahead to the next content's column. If that column
       // is strictly less than top, this block is ending — pop one level.
       // (To pop multiple levels, grammar authors chain DEDENTs via Rep.)
-      if (state.indentStack.length <= 1) return null;
+      const newStack = state.indentStack.parent;
+      if (newStack === null) return null;
       const { col } = skipToNextContent(state.input, pos);
       // col === Infinity means EOF — treat as dedent for all levels.
       if (col !== Infinity && col >= top) return null;
-      const newStack = state.indentStack.slice(0, -1);
       return {
         tree: { kind: "leaf", text: "", range: { start: pos, end: pos } },
         nextPos: pos,

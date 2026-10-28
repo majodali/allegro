@@ -725,9 +725,9 @@ that prevents it.
   is ruling R4
 - [ ] **B-157** (the performance stream) · T-perf · L1 · **A library
   loads in well under a second.** Plan `docs/plans/fast-library-load.md`
-  (active 2026-10-28; P1 (instrumentation and the corpus) and P2 (a
+  (active 2026-10-28; P1 (instrumentation and the corpus), P2 (a
   library loads once per run, closing B-155 (library load per module))
-  landed). Measured: the planning
+  and P3 (numeric memo keys) landed). Measured: the planning
   library loads in 68 s, 87% of it in the grammar-2 engine and 68% of
   the parse in the memo table (key strings, lookups, invalidation,
   garbage); evaluation under a second; 1.1 ms per character, linear.
@@ -741,7 +741,7 @@ that prevents it.
   bench:load`, every `// expect:` pin unchanged. The first candidate
   for autonomous delivery (lane P in the lane table). **Blocked-by**:
   nothing.
-  **Pointer**: `src/grammar2/engine.ts` (`ruleKey`, `memoGet`,
+  **Pointer**: `src/grammar2/engine.ts` (`memoKey`, `memoGet`,
   `memoSet`, `clearPos`, `invalidateAtPos`), `src/test/alg-files.ts`
   (`libExtensions`), `docs/plans/fast-library-load.md`
   - **Progress.** P2 (a library loads once per run, 2026-10-28): one
@@ -751,6 +751,13 @@ that prevents it.
     parse. The solve demo runs in 95.6 s, down from 180.5 s, with 5
     parses instead of 9; the gate 917 s, down from 1,056 s. Load-ratchet counts
     unchanged. B-155 closed. Next: P3 (numeric memo keys).
+  - **Progress.** P3 (numeric memo keys, 2026-10-28): the memo key is one
+    small integer, a rule id (non-terminals interned by name) and an
+    indent-stack id from a trie of interned stacks; no string is built
+    per lookup. The planning parse runs in 30 to 33 s, down from 64 to
+    71 s; the gate 737.6 s, down from 902.7 s. Every load-ratchet count
+    identical. `clearPos` is now the largest cost (23.7%). Next: P4
+    (fewer and cheaper entries).
 
 ### T-bootstrap (M9)
 
@@ -1013,6 +1020,30 @@ that prevents it.
   operators join the viral rule) or keep the boolean reading and
   document it. **Blocked-by**: the discussion. **Pointer**:
   `src/primitives.ts` (`typed_or`, `typed_and`), `tests/logical.alg`
+- [ ] **B-158** (in-place write through a library alias) · L0 · **A
+  cached library value can be written in place through a top-level
+  alias.** Found by B-157 P2 (a library loads once per run). A library's
+  extension is built once per process and shared by every program that
+  uses it (`docs/book/extension/modules.md`, "Loaded once per process").
+  A program that binds a top-level alias of a library function or type
+  (`f = lib_f`) hands the shared value to two in-place writers that are
+  not idempotent: the inferred-effects write at precompile
+  (`precompileFunction` (precompile), with the divergence stamp in
+  `evalSource` (the program pipeline)), which overwrites the function's
+  effect set; and `stabilizeTypeMemberScope` (member re-keying), which
+  re-keys the type's local members onto the alias's scope. The hazard
+  predates P2 within one CLI run (`units` served both the `planning`
+  load and the program); P2 widened it to every program in a process,
+  which reaches the suite and any long-lived host. No corpus file binds
+  such an alias today. Options: make the two writes idempotent;
+  copy-on-alias at symbol resolution, which touches the path of
+  B-153 (re-evaluation per reference); or freeze a library's values after
+  load and derive instead of writing. **Blocked-by**: a maintainer ruling
+  on which option. **Pointer**: `src/evaluator.ts`
+  (`precompileFunction`), `src/runtime.ts` (`evalSource`: the divergence
+  stamp and the `stabilizeTypeMemberScope` call), `src/types-std.ts`
+  (`stabilizeTypeMemberScope`); `docs/plans/fast-library-load.md` §7
+  (the P2 entry)
 - [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds

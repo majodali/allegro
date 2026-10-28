@@ -32,7 +32,8 @@
   writes are not: a consumer binding that is a top-level alias of a
   module's function or type re-stamps that function's inferred effects
   or re-keys that type's members. No program in the corpus binds such
-  an alias.
+  an alias. The fix awaits a ruling: B-158 (in-place write through a
+  library alias).
 - **Import syntax**: `import name` — declarative; module values are
   provided via extensions, not by an imperative load at the site.
 - **Resolution order**: local `lib/` first, then the system `lib/`

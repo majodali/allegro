@@ -1419,6 +1419,48 @@ test("grammar2/engine: DEDENT pops a level", () => {
   g2ok(r);
 });
 
+// B-157 P3: the memo key is `ruleId * STACK_SLOTS + stackId` while fewer than
+// 1,024 distinct indent stacks exist, and a disjoint wide form after that.
+// This input opens 1,191 distinct stacks ([0], 34 of [0, a], 1,156 of
+// [0, a, a + b]), so its later blocks are keyed in the wide form; every
+// block's lines must still align with their own stack and no other.
+function nestedBlockGrammar(): g2.Grammar {
+  const g = g2.makeGrammar({ start: "items" });
+  g2.addProduction(g, { name: "items",
+    rule: g2.rep(g2.nonterm("item"), { min: 1, sep: g2.indent("NEWLINE") }),
+  });
+  g2.addProduction(g, { name: "item",
+    rule: g2.alt([
+      g2.seq([g2.lit("b"), g2.nonterm("block")]),
+      g2.regex(/[a-z]+/),
+    ]),
+  });
+  g2.addProduction(g, { name: "block",
+    rule: g2.seq([g2.indent("INDENT"), g2.nonterm("items"), g2.indent("DEDENT")]),
+  });
+  return g;
+}
+
+function nestedBlockSource(misalignLast: boolean): string {
+  const lines: string[] = [];
+  const at = (col: number, text: string) => lines.push(" ".repeat(col) + text);
+  for (let a = 1; a <= 34; a++) {
+    at(0, "b");
+    for (let b = 1; b <= 34; b++) {
+      at(a, "b");
+      at(a + b, "x");
+      at(a + b + (misalignLast && a === 34 && b === 34 ? 1 : 0), "y");
+    }
+  }
+  return lines.join("\n");
+}
+
+test("grammar2/engine: more than 1,024 distinct indent stacks keep their keys apart", () => {
+  const g = nestedBlockGrammar();
+  g2ok(g2parse(g, nestedBlockSource(false)));
+  g2fail(g2parse(g, nestedBlockSource(true)));
+});
+
 // --- Allegro-level integration: verify the primitives compose from Allegro code ---
 
 test("grammar2 primitives: literal match via Allegro", () => {
