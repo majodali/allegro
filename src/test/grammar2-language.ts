@@ -11,8 +11,9 @@ import { evalStd, evalNum, typeExt } from "./fixtures.js";
 import { evalSource as runtimeEval } from "../runtime.js";
 import { asGrammarValue } from "../primitives.js";
 import { Value, ValueKind, BitsValue, StructureValue, bitsToString } from "../types.js";
-import { buildBaseGrammar } from "../grammar2/base-grammar.js";
-import { buildProgram } from "../grammar2/tree-builder.js";
+import { buildBaseGrammar, buildLeftRecursiveBaseGrammar, LADDER_TAG } from "../grammar2/base-grammar.js";
+import { buildProgram, foldLadders } from "../grammar2/tree-builder.js";
+import { analyze as g2analyze } from "../grammar2/analyzer.js";
 import { evaluate as evalVal } from "../evaluator.js";
 import { resolveSymbols, buildEvalCtx, resolvePrimitives, typeLiterals } from "../runtime.js";
 import { parse as g2parse } from "../grammar2/engine.js";
@@ -1615,5 +1616,144 @@ test("grammar2 §10.3: regex DSL parses simple literal", () => {
   g2fail(g2parse(g, ""));           // min=1, empty fails
   g2fail(g2parse(g, "AB"));         // uppercase not in [a-z]
   g2fail(g2parse(g, "(abc"));       // unbalanced paren
+});
+
+// --- B-157 P7: the precedence ladder without left recursion ---
+//
+// The engine runs each left-recursive level as `tighter (OP tighter)*`
+// (`ladderLevels` in base-grammar.ts) and the tree builder folds the tails
+// back (`foldLadders`). The oracle here: for every input, the ladder grammar
+// accepts exactly when the specification (left-recursive) grammar does, and
+// the folded tree is the specification's tree, node for node and range for
+// range.
+
+function canonTree(t: g2.ParseTree): string {
+  switch (t.kind) {
+    case "leaf":  return `L(${JSON.stringify(t.text)},${t.range.start},${t.range.end})`;
+    case "none":  return `N(${t.range.start},${t.range.end})`;
+    case "error": return `E(${JSON.stringify(t.message)},${t.inner ? canonTree(t.inner) : ""})`;
+    case "branch":
+      return `B(${JSON.stringify(t.tag ?? null)},${t.range.start},${t.range.end},[` +
+        t.children.map(canonTree).join(",") + "])";
+  }
+}
+
+function sameAsSpecified(specified: g2.Grammar, laddered: g2.Grammar, inputs: string[]): void {
+  for (const input of inputs) {
+    const a = g2parse(specified, input);
+    const b = g2parse(laddered, input);
+    eq(b.ok, a.ok, `accepted alike: ${JSON.stringify(input)}`);
+    if (a.ok && b.ok) {
+      // Each merge registers its user operators afresh, so their tags differ
+      // only in the registry's sequence number.
+      const tags = (s: string) => s.replace(/user_op_\d+_/g, "user_op_N_");
+      eq(tags(canonTree(foldLadders(b.tree))), tags(canonTree(a.tree)),
+        `folded tree is the specified tree: ${JSON.stringify(input)}`);
+    }
+  }
+}
+
+const LADDER_INPUTS = [
+  "x = 1 + 2 * 3 - 4 / 2 % 3\n",
+  "x = 10 - 3 - 2 - 1\n",
+  "x = a < b && b <= c || d >= e && f > g\n",
+  "x = p or q and r or s\n",
+  "x = p orq\n",                          // `or` needs whitespace: not an operator here
+  "x = v instanceof Int && Int subtypeof Any\n",
+  "x = a == b != c\n",
+  "x = Int & _ > 0 && _ < 100\n",
+  "x = xs |> f |> g\n",
+  "x = type of v + error of w\n",
+  "x = error v\n",
+  "x = -a + !b * -c\n",
+  "x = f(a, b)(c).d.e[0][i + 1](x => x * 2)\n",
+  "x = xs\n  .map(f)\n  .filter(g)\n  [0]\n",
+  "x = a +\n  b *\n  c\n",
+  "f(n) =>\n  m = n * 2\n  m + 1\n",
+  "x = 1 +\n",                            // rejected by both
+  "x = (1 + ) * 2\n",                     // rejected by both
+  "x = a ++ b\n",                         // no such operator in the base grammar
+];
+
+test("B-157 P7: base levels run without left recursion", () => {
+  const report = g2analyze(buildBaseGrammar());
+  eq([...report.leftRec].join(","), "", "no left-recursive production in the base grammar");
+  const spec = g2analyze(buildLeftRecursiveBaseGrammar());
+  eq([...spec.leftRec].sort().join(","),
+    "expr_add,expr_amp,expr_and,expr_cmp,expr_eq,expr_mul,expr_or,expr_pipe,expr_post",
+    "the specification keeps its left-recursive levels");
+  const add = buildBaseGrammar().productions.get("expr_add")!.rule;
+  eq(add.kind === "seq" && add.attrs?.name === LADDER_TAG, true, "expr_add is a ladder");
+});
+
+test("B-157 P7: the base ladder parses as the specification does", () => {
+  sameAsSpecified(buildLeftRecursiveBaseGrammar(), buildBaseGrammar(), LADDER_INPUTS);
+});
+
+test("B-157 P7: user operators at a base level take the ladder shape", () => {
+  // `++` left and `^^` non-associative at `mul`, `<+>` right-associative at
+  // `add`: the left one becomes a tail, the other two FIRSTs of their level.
+  const src =
+    'gx = grammar {\n' +
+    '  infix "++" at(mul) left => (l, r) => l + r + 1\n' +
+    '  infix "^^" at(mul) none => (l, r) => l * r\n' +
+    '  infix "<+>" at(add) right => (l, r) => l - r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("gx")!.value!)!.fragment;
+  const laddered  = g2getGrammarWithFragments([frag]);
+  const specified = g2getGrammarWithFragments([frag], { ladder: false });
+  eq([...g2analyze(laddered).leftRec].join(","), "", "no left-recursive level left");
+  sameAsSpecified(specified, laddered, [
+    ...LADDER_INPUTS,
+    "x = a ++ b ++ c * d\n",
+    "x = a ^^ b * c\n",
+    "x = a * b ^^ c\n",
+    "x = a ^^ b ^^ c\n",
+    "x = a <+> b <+> c + d\n",
+    "x = a + b <+> c\n",
+  ]);
+});
+
+test("B-157 P7: a level reachable through a user form stays left-recursive", () => {
+  // An expr_form that starts with `expr` makes every level left-recursive
+  // through `expr_atom`; the rewrite cannot show the ladder parses alike, so
+  // it leaves the levels as specified and the engine grows them.
+  const src =
+    'gx = grammar {\n' +
+    '  expr_form s:expr "with" e:expr => (s, e) => s + e\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("gx")!.value!)!.fragment;
+  const laddered  = g2getGrammarWithFragments([frag]);
+  const specified = g2getGrammarWithFragments([frag], { ladder: false });
+  eq([...g2analyze(laddered).leftRec].includes("expr_add"), true, "expr_add left as specified");
+  sameAsSpecified(specified, laddered, ["x = a + b with c * d\n", "x = 1 - 2 - 3\n"]);
+});
+
+test("B-157 P7: a user operator folds left through the built program", () => {
+  const src =
+    'gx = grammar {\n' +
+    '  infix "++" at(mul) left => (l, r) => l * 10 + r\n' +
+    '}\n';
+  const { evalCtx } = runtimeEval(src, undefined, [typeExt], undefined, true);
+  const frag = asGrammarValue(evalCtx.bindings.get("gx")!.value!)!.fragment;
+  const r = g2parse(g2getGrammarWithFragments([frag]), "1 ++ 2 ++ 3\n");
+  g2ok(r);
+  const folded = foldLadders(r.tree);
+  eq(canonTree(folded).includes(LADDER_TAG), false, "no ladder node survives the fold");
+  // (1 ++ 2) ++ 3: the outer operator node's left child is the inner one.
+  const findOp = (t: g2.ParseTree): g2.ParseTree | null => {
+    if (t.kind !== "branch") return null;
+    if (t.tag?.startsWith("user_op_")) return t;
+    for (const c of t.children) { const f = findOp(c); if (f) return f; }
+    return null;
+  };
+  const outer = findOp(folded);
+  eq(outer !== null && outer.kind === "branch", true, "an operator node");
+  if (outer === null || outer.kind !== "branch") return;
+  const left = outer.children[0];
+  eq(left.kind === "branch" && left.tag === outer.tag, true, "left-nested");
+  eq(outer.range.end - outer.range.start, "1 ++ 2 ++ 3".length, "outer spans the chain");
 });
 

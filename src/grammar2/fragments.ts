@@ -18,9 +18,15 @@ import {
   Grammar, Rule, makeGrammar, addProduction,
   lit, nonterm, seq, alt, rep, opt, regex as ruleRegex, indent as indentTerm,
 } from "./types.js";
-import { buildBaseGrammar, BASE_LEVEL_NAMES, BASE_OPERATORS_TO_LEVEL } from "./base-grammar.js";
+import {
+  buildBaseGrammar, buildLeftRecursiveBaseGrammar, ladderLevels,
+  BASE_LEVEL_NAMES, BASE_OPERATORS_TO_LEVEL,
+} from "./base-grammar.js";
 import type { GrammarFragment, Value, StructureValue, BitsValue } from "../types.js";
 import { ValueKind, bitsToString } from "../types.js";
+
+// The tree builder folds ladder nodes; it reaches the tag through this unit.
+export { LADDER_TAG } from "./base-grammar.js";
 
 // --- User operation registry ---
 //
@@ -60,13 +66,19 @@ function registerUserOp(op: UserOp): string {
  * grammar; otherwise builds a fresh Grammar with user ops inserted at
  * specific precedence levels.
  */
-export function getGrammarWithFragments(fragments: GrammarFragment[]): Grammar {
+export function getGrammarWithFragments(
+  fragments: GrammarFragment[],
+  options?: { ladder?: boolean },
+): Grammar {
+  // `ladder: false` keeps every precedence level as specified (left-
+  // recursive), for the grammar-2 battery's check that the ladder parses
+  // alike (B-157 P7). The runtime never passes it.
+  const ladder = options?.ladder ?? true;
   if (fragments.length === 0) {
-    // No extensions — fall through to the shared/cached base grammar in
-    // base-grammar.ts. Callers that want a fresh grammar can pass [].
-    return buildBaseGrammar();
+    // No extensions — a fresh copy of the base grammar (base-grammar.ts).
+    return ladder ? buildBaseGrammar() : buildLeftRecursiveBaseGrammar();
   }
-  return buildExtendedGrammar(fragments);
+  return buildExtendedGrammar(fragments, ladder);
 }
 
 /**
@@ -274,7 +286,7 @@ function detectPrecedenceCycle(
   return null;
 }
 
-function buildExtendedGrammar(fragments: GrammarFragment[]): Grammar {
+function buildExtendedGrammar(fragments: GrammarFragment[], ladder: boolean): Grammar {
   // Validate cross-fragment consistency before mutating the grammar. Errors
   // throw with an aggregated message; warnings emit via console.warn so they
   // reach developers without halting the build.
@@ -287,8 +299,11 @@ function buildExtendedGrammar(fragments: GrammarFragment[]): Grammar {
     console.warn(w);
   }
 
-  // Start with a fresh base grammar.
-  const g = buildBaseGrammar();
+  // Start with a fresh base grammar in its specification form: every edit
+  // below addresses a level's alternatives as specified (left-recursive),
+  // and `ladderLevels` at the end rewrites the edited levels as the base
+  // grammar's are rewritten (B-157 P7).
+  const g = buildLeftRecursiveBaseGrammar();
 
   // --- Split entries into Phase 1 (bp set) vs Phase 6 (level set) ---
   //
@@ -357,6 +372,10 @@ function buildExtendedGrammar(fragments: GrammarFragment[]): Grammar {
   // Runs after operator handling so forms can reference any already-extended
   // productions (including user-level operators).
   applyUserRulesAndForms(g, fragments);
+
+  // The precedence ladder: user levels and user operators take the shape of
+  // the base levels, through the same rewrite.
+  if (ladder) ladderLevels(g);
 
   return g;
 }

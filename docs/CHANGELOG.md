@@ -4,6 +4,58 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream) P7 (the ladder without left recursion): precedence levels run as repetitions
+
+The stream's seventh chunk (`docs/plans/fast-library-load.md` §5 row
+P7, move M8 (the expression ladder without left recursion)), after the
+maintainer ratified the chunks P7 to P10 (B-153 or its hand-off)
+and the built-program oracle (plan §6, R5 (P7–P10 ratified)).
+No parse semantics change, no `// expect:` line changed, and the
+language accepted is the same.
+
+- **Specified left-recursively, run as a ladder.** `LEVELS` in
+  `src/grammar2/base-grammar.ts` still specifies each level as `self OP
+  tighter | … | tighter`. `ladderLevels` rewrites each left-recursive
+  `expr_*` level into the ordered choice over its non-recursive
+  alternatives of `first (tails before it)*`; for the base levels that
+  is `tighter (ws OP ws tighter)*`, and `expr_atom (call | dot |
+  bracket)*` for the postfix level. A level that another alternative
+  reaches without consuming input (a user `expr_form` starting with
+  `expr`) stays as specified. `buildBaseGrammar` is the specification
+  (`buildLeftRecursiveBaseGrammar`) plus the rewrite.
+- **User operators through the same rewrite.** `buildExtendedGrammar`
+  in `src/grammar2/fragments.ts` edits the specification (level
+  insertion, operator splicing, rule surgery by alternative name) and
+  calls `ladderLevels` last, so left-associative user operators become
+  tails and right or non-associative ones the level's other
+  alternatives. `getGrammarWithFragments` takes `{ ladder: false }` for
+  the battery's comparison.
+- **The tree builder folds back.** `foldLadders` in
+  `src/grammar2/tree-builder.ts` runs over the whole tree at the start of
+  `buildProgram` and rebuilds the left-nested operator nodes, children
+  and ranges, of the specification; no per-tag builder changed.
+- **Oracle.** Outputs and exit codes identical for all 68 `tests/*.alg`
+  and `demos/**/*.alg` files on both engines; the folded trees identical
+  to the old raw trees for all 128 runtime parses (84 distinct sources);
+  `inspect` identical on five files; parse errors identical on nine
+  malformed sources; the analyzer's left-recursive set for the base
+  grammar falls from nine levels to none.
+- **Measured.** Load ratchet baseline lowered: planning match attempts
+  38,205,561 → 649,616 (−98.3%), memo writes −95.9%, invalidation
+  entries and growth iterations to 0; every source falls by similar
+  shares; the final memo size (not gated) rises 3–19%. The planning
+  parse 3.51–3.57 s to 0.125–0.134 s. The gate: 322.8 s before,
+  313.2 s after (556.1 s and 535.3 s of work).
+
+Tests: five added to the grammar-2 battery (`src/test/grammar2-language.ts`:
+the ladder against the specification on base inputs and on left, right
+and non-associative user operators; the guard for a user form starting
+with `expr`; the analyzer's report); no assertion changed; the gate
+1,232 runs green. Docs: plan
+§4, §5, §6 (R5) and §7; `docs/book/grammar-formalism.md` §6.4;
+`docs/book/extension/grammar.md` §1; `docs/book/implementation-map.md`;
+backlog B-157 progress; plans manifest.
+
 ## 2026-10 — B-157 (the performance stream) P5 (dependency-tracked invalidation): a growth round removes only what read the seed
 
 The stream's fifth chunk (`docs/plans/fast-library-load.md` §5 row P5,

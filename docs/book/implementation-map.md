@@ -89,8 +89,8 @@ passes every other gate.
 |---|---|
 | `types.ts` | Rule union, Grammar/Production, deltas, constructor helpers |
 | `engine.ts` | Recursive scannerless parser: memoization (numeric keys: a rule id and an interned indent-stack id, `memoKey`), left recursion, indent terminals, farthest-advance errors; `ParseStats`, and `parseSource` (the runtime's parse, reporting under `ALLEGRO_PARSE_STATS=1`) |
-| `base-grammar.ts` | The Allegro grammar as a value (stratified precedence LEVELS) |
-| `tree-builder.ts` | ParseTree → Value trees; body-form marker extraction (`buildBlockExpr`) |
+| `base-grammar.ts` | The Allegro grammar as a value (stratified precedence LEVELS, specified left-recursively; `ladderLevels` runs them as repetitions) |
+| `tree-builder.ts` | ParseTree → Value trees (after `foldLadders` restores the left-nested operator nodes); body-form marker extraction (`buildBlockExpr`) |
 | `fragments.ts` | `use`-time fragment merging, level insertion, user-op registry |
 | `analyzer.ts` | Static grammar checks (reachability, nullability, left recursion, …) |
 | `builder.ts` | `grammar2_*` runtime primitives for standalone grammars |

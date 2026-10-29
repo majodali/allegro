@@ -17,8 +17,60 @@ import {
   makeComposedFn, makeStructure, prim, bind, buildFn, substName,
 } from "../parser-helpers.js";
 import { makeFloat, bitsToString } from "../types.js";
-import { getUserOp } from "./fragments.js";
+import { getUserOp, LADDER_TAG } from "./fragments.js";
 import { substituteParams } from "../evaluator.js";
+
+// --- The precedence ladder fold (B-157 P7) ---
+
+/**
+ * Restore the tree the precedence levels' specification produces. The
+ * engine runs a left-recursive level as a ladder (`ladderLevels` in
+ * `base-grammar.ts`): a `LADDER_TAG` node whose children are the first
+ * operand's tree and a repetition of tagged operator tails, each tail the
+ * specification's alternative without its leading `self`, e.g. `add` with
+ * `[ws, "+", ws, right]` or `call` with `[ws, "(", ws_any, args, ws_any,
+ * ")"]`. The fold rebuilds the left-nested nodes the specification gives:
+ * `add` with `[left, ws, "+", ws, right]`, the left operand being the fold
+ * so far, its range running from the left operand's start to the tail's
+ * end. A ladder with no tails is its first operand's tree. Every per-tag
+ * builder below therefore reads the child positions it always read.
+ *
+ * Applied once to the whole parse tree (`buildProgram`), so every walk that
+ * scans children for an expression tag sees the specification's shape too.
+ * Nodes without a ladder below them are returned as they are.
+ */
+export function foldLadders(tree: ParseTree): ParseTree {
+  if (tree.kind === "error") {
+    if (!tree.inner) return tree;
+    const inner = foldLadders(tree.inner);
+    return inner === tree.inner ? tree : { ...tree, inner };
+  }
+  if (tree.kind !== "branch") return tree;
+  if (tree.tag === LADDER_TAG) {
+    let acc = foldLadders(tree.children[0]);
+    const tails = tree.children[1];
+    if (tails !== undefined && tails.kind === "branch") {
+      for (const tail of tails.children) {
+        if (tail.kind !== "branch") throw new Error("foldLadders: a ladder tail is not a branch");
+        const children: ParseTree[] = [acc];
+        for (const c of tail.children) children.push(foldLadders(c));
+        acc = {
+          kind: "branch", tag: tail.tag, children,
+          range: { start: acc.range.start, end: tail.range.end },
+        };
+      }
+    }
+    return acc;
+  }
+  let children: ParseTree[] | null = null;
+  for (let i = 0; i < tree.children.length; i++) {
+    const c = tree.children[i];
+    const f = foldLadders(c);
+    if (f !== c && children === null) children = tree.children.slice(0, i);
+    if (children !== null) children.push(f);
+  }
+  return children === null ? tree : { ...tree, children };
+}
 
 // --- Helpers ---
 
@@ -2276,7 +2328,7 @@ function findLastExprBranch(children: ParseTree[]): ParseTree | null {
 }
 
 export function buildProgram(tree: ParseTree): any {
-  tree = peelUntilTag(tree);
+  tree = peelUntilTag(foldLadders(tree));
   const ctx = makeStructure();
 
   function addStmt(stmt: BuiltBinding): void {

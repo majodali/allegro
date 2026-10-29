@@ -165,7 +165,7 @@ repeated runs whatever the engine costs; it does not help the first
 parse or user files.
 
 **M8 — the expression ladder without left recursion** (added at P6,
-2026-10-29, from the per-rule counts). The base grammar encodes
+2026-10-29, from the per-rule counts). **Taken at P7** (§7). The base grammar encodes
 precedence as nine stratified productions, each left-recursive
 (`src/grammar2/base-grammar.ts`: "binary operators use LEFT RECURSION,
 handled by the engine's Warth iteration"). Every expression start
@@ -192,10 +192,10 @@ mechanism `expr_form` extensions use.
 | **P3** | M1: numeric memo keys. **Landed 2026-10-28** (§7) | counts unchanged, clock falls, suite green | M |
 | **P4** | M3: fewer and cheaper entries. **Landed 2026-10-28** (§7) | memo writes fall or allocation falls; suite green | M |
 | **P5** | M2: invalidation by generation; measured by the P1 stats before design. **Landed 2026-10-29** (§7) as dependency-tracked invalidation | invalidation entries fall; grammar-2 left-recursion battery green | M |
-| **P6** | decision point: the §7 numbers against the §2 target; R4 taken (tokenizer or not); M7 taken or not. **Decision requested 2026-10-29** (§7): the numbers, where the remaining attempts go, and the recommended order below | — (stops for the maintainer) | — |
-| **P7** (proposed) | M8 (§4): the expression precedence ladder without left recursion — each level `tighter (op tighter)*`, folded left by the tree builder; removes every growth iteration | built programs and outputs identical (the suite's pins), the grammar-2 battery, the user-operator fragments (`lib/pow.alg`, `lib/match_expr.alg`, the units literals); parse-tree shape may change, so the raw-tree comparison of P5 is not this chunk's oracle | M–L |
-| **P8** (proposed) | measure again; R4 applied: the scanner layer if the whitespace and lexical share still warrants it | counts fall; outputs identical; `grammar-formalism.md` §2 amended | L |
-| **P9** (proposed) | M7: cached parse artifacts by content hash (CLI and suite on disk; the web bundle pre-built) | repeated runs skip the parse; outputs identical | M |
+| **P6** | decision point: the §7 numbers against the §2 target; R4 taken (tokenizer or not); M7 taken or not. **Decided 2026-10-29** (§6 R5): P7–P10 below, in that order | — (stops for the maintainer) | — |
+| **P7** | M8 (§4): the expression precedence ladder without left recursion — each level `tighter (op tighter)*`, folded left by the tree builder; removes every growth iteration. **Landed 2026-10-29** (§7) | built programs and outputs identical (the suite's pins), the grammar-2 battery, the user-operator fragments (`lib/pow.alg`, `lib/match_expr.alg`, the units literals); parse-tree shape may change, so the raw-tree comparison of P5 is not this chunk's oracle | M–L |
+| **P8** | measure again; R4 applied: the scanner layer if the whitespace and lexical share still warrants it | counts fall; outputs identical; `grammar-formalism.md` §2 amended | L |
+| **P9** | M7: cached parse artifacts by content hash (CLI and suite on disk; the web bundle pre-built) | repeated runs skip the parse; outputs identical | M |
 | **P10** | M6 (B-153) or hand-off to the kernel-semantics stream | demo re-evaluation count falls | M |
 
 The sequence stops on W-001's four conditions and on one more that is
@@ -221,6 +221,10 @@ a parser that changes a program's meaning has left the stream's scope.
   hand: whether B-075's lexical layer is in scope, since it amends the
   scannerless formalism. **Taken**: a scanner/tokenizer layer is in
   scope; whether to build it is decided at P6 with P1's numbers.
+- **R5 — P7–P10 ratified and the built-program oracle confirmed,
+  2026-10-29.** The maintainer ratified the chunks P7 to P10 of §5 in
+  the order recommended at P6, and the oracle for P7: built programs and
+  outputs identical, not the raw parse tree.
 
 ## 7. Status log
 
@@ -676,3 +680,135 @@ a parser that changes a program's meaning has left the stream's scope.
   since the web bundle needs it regardless (P9 (cached parse
   artifacts)); then (D) (P10 (B-153)). The §5 table carries these as
   proposed rows.
+- 2026-10-29: P7–P10 ratified in that order and the built-program
+  oracle confirmed (§6 R5).
+- 2026-10-29: **P7 landed** (M8: the expression ladder without left
+  recursion). No parse semantics change, no `// expect:` line changed,
+  and the language accepted is the same. Three changes:
+  - **The levels are specified as before and run as ladders.** `LEVELS`
+    in `src/grammar2/base-grammar.ts` still writes each level
+    left-recursively; that specification is the form fragment merging
+    edits (level insertion, operator splicing, rule surgery by
+    alternative name). `ladderLevels` then rewrites every left-recursive
+    `expr_*` level: an alternative that starts with the level itself is a
+    *tail* (its items after that reference), any other a *first*, and the
+    level becomes the ordered choice over its firsts of `first (tails
+    before it)*`. For every base level the only first is the fallthrough,
+    so `expr_add` runs as `expr_mul (ws "+" ws expr_mul | ws "-" ws
+    expr_mul)*` and `expr_post` as `expr_atom (call | dot | bracket)*`.
+    The comment above `ladderLevels` argues why this parses as Warth
+    iteration does. The rewrite leaves a level as specified when a first
+    can reach the level without consuming input (left recursion through
+    another production, such as a user `expr_form` that starts with
+    `expr`), or when a tail is untagged.
+  - **User operators take the same shape through the same rewrite.**
+    `buildExtendedGrammar` in `src/grammar2/fragments.ts` starts from the
+    specification (`buildLeftRecursiveBaseGrammar`), applies every
+    fragment edit as before, and calls `ladderLevels` last. A left
+    associative user operator (`p6Infix` with `assoc` left, and the
+    Phase 1 `register_infix` levels) becomes a tail; a right or
+    non-associative one is a first of its level. `getGrammarWithFragments`
+    takes `{ ladder: false }` so the battery can compare the two forms.
+  - **The tree builder folds the ladder back.** `foldLadders` in
+    `src/grammar2/tree-builder.ts` runs once over the whole tree at the
+    start of `buildProgram`. A ladder node holds the first operand and
+    the repetition of tails; the fold rebuilds the left-nested nodes the
+    specification gives (`add` with `[left, ws, "+", ws, right]`, `call`
+    with `[callee, ws, "(", ws_any, args, ws_any, ")"]`), each range from
+    the left operand's start to the tail's end. A ladder with no tails is
+    its first operand's tree. Every per-tag builder and every walk that
+    scans children for an expression tag sees the old shape, so none of
+    them changed.
+
+  **The oracle.** (1) The full gate green with every pin unchanged. (2)
+  Every `tests/*.alg` and `demos/**/*.alg` (68 files) through the file
+  runner on both engines, `origin/main` at `b174d14` and this change:
+  every stdout and exit code identical. Beyond the brief, each runtime
+  parse's tree was serialised and hashed, raw on the old engine and after
+  `foldLadders` on the new: 128 parses of 84 distinct sources, every tree
+  identical, so the fold restores the old tree exactly. The one file that
+  exits 1 (`tests/proofs-proven-demo.alg`) does so in both, before any
+  parse, with the same output. (3) `npx tsx src/index.ts inspect` output
+  identical for `tests/planning-release-demo.alg`,
+  `tests/units-sugar.alg`, `tests/grammar-runtime.alg` (`use pow`),
+  `tests/match-demo.alg` (`match_expr`) and `tests/logical.alg`. (4) The
+  grammar-2 battery green with no assertion changed; five new tests
+  compare the ladder with the specification on 19 base inputs and on user
+  operators that are left, right and non-associative at base levels, and
+  check that a user form starting with `expr` keeps the levels as
+  specified. Nine malformed sources give the same parse error on both
+  engines.
+
+  The analyzer (`analyze` in `src/grammar2/analyzer.ts`) classified nine
+  base levels as left-recursive before (`expr_pipe`, `expr_or`,
+  `expr_amp`, `expr_and`, `expr_eq`, `expr_cmp`, `expr_add`, `expr_mul`,
+  `expr_post`) and none after, for the base grammar and for every library
+  combination the corpus uses (`pow`, `multi_grammar`, `match_expr`,
+  `units`, `totality`, `contracts`, `effects`, `units` with `totality`
+  and `planning`); each is clean under `assertGrammarClean` before and
+  after. The opt-in disjointness check (`analyzeWithDisjointnessCheck`,
+  not in the gate) reports seven more `W_ALT_OVERLAP` findings, 29
+  against 22 on the base grammar: each ladder's alternative of tails
+  starts with `ws`, and a level with left recursion was exempt from the
+  check.
+
+  The load ratchet (`npm run lint:load`), before (baseline) and after;
+  the baseline is lowered:
+
+  | Source | Match attempts | Memo writes | Inv. entries | LR iterations | Final memo |
+  |---|---|---|---|---|---|
+  | `lib/totality.alg` | 147,509 → 4,015 (−97.3%) | 94,511 → 6,191 (−93.4%) | 57,948 → 0 (−100%) | 6,134 → 0 (−100%) | 3,607 → 3,729 (+3.4%) |
+  | `lib/units.alg` | 7,650,981 → 134,246 (−98.2%) | 4,805,094 → 203,463 (−95.8%) | 3,027,529 → 0 (−100%) | 328,068 → 0 (−100%) | 100,489 → 119,518 (+18.9%) |
+  | `lib/planning.alg` | 38,205,561 → 649,616 (−98.3%) | 23,874,878 → 988,794 (−95.9%) | 15,088,187 → 0 (−100%) | 1,665,399 → 0 (−100%) | 492,172 → 576,677 (+17.2%) |
+  | `tests/lib/build_pipeline.alg` | 197,609 → 6,033 (−96.9%) | 130,049 → 8,675 (−93.3%) | 79,284 → 0 (−100%) | 7,666 → 0 (−100%) | 5,159 → 5,555 (+7.7%) |
+  | `tests/planning-solve-demo.alg` | 2,806,009 → 50,788 (−98.2%) | 1,757,945 → 75,588 (−95.7%) | 1,111,264 → 0 (−100%) | 121,234 → 0 (−100%) | 38,555 → 45,230 (+17.3%) |
+  | `demos/rung3/01-model.alg` | 1,578,540 → 33,647 (−97.9%) | 1,005,547 → 49,249 (−95.1%) | 629,004 → 0 (−100%) | 65,725 → 0 (−100%) | 26,647 → 30,342 (+13.9%) |
+  | `demos/rung3/02-solve.alg` | 3,344,653 → 60,692 (−98.2%) | 2,114,078 → 89,980 (−95.7%) | 1,333,810 → 0 (−100%) | 141,380 → 0 (−100%) | 46,044 → 54,048 (+17.4%) |
+
+  No left-recursive user rule is in the corpus, so the growth loop no
+  longer runs at all. The attempts fall far more than the 2 to 3 times
+  P6 expected: each growth round re-ran every rule its invalidation
+  round removed, and the levels nest, so one expression start paid for
+  the rounds of every level above it. With no rounds, about 89% of the
+  remaining attempts miss the memo. The final memo size rises 3 to 19%
+  (reported, not gated): the ladder's sequence, repetition and tail
+  rules are memoised at each position, and nothing removes them.
+
+  The clock, same sandbox as P6's entry. The planning parse through the
+  production loader, three runs each: 3.51 to 3.57 s before, 0.125 to
+  0.134 s after, about 27 times faster and under the §2 target of 1 s.
+  `npm run bench:load`, before and after, one run each:
+
+  | Entry | Wall clock before | after | Planning parse before | after |
+  |---|---|---|---|---|
+  | `lib/units.alg` | 1.4 s | 0.4 s | — | — |
+  | `lib/planning.alg` | 4.5 s | 0.6 s | 3.4 s | 0.1 s |
+  | `tests/planning-solve-demo.alg` | 10.9 s | 6.5 s | 3.4 s | 0.1 s |
+  | `demos/rung3/01-model.alg` | 5.3 s | 1.2 s | 3.4 s | 0.1 s |
+  | `demos/rung3/02-solve.alg` | 8.0 s | 3.8 s | 3.3 s | 0.1 s |
+
+  The gate (`npm run test:shards`, 3 shards): 322.8 s wall clock (556.1 s
+  of work) before, 313.2 s (535.3 s of work) after. The gate gains about
+  20 s of work: its parses were already a few seconds after P5, and its
+  longest shard spends its time evaluating, not parsing.
+
+  The CPU profile of the planning load (`use units`, `use planning`,
+  `print(1)`): 0.7 s sampled after, against 3.9 s after P5. The whole run
+  takes 0.76 s. Self time after:
+
+  | Function | Share | Seconds |
+  |---|---|---|
+  | garbage collector | 15.7% | 0.10 |
+  | module loading (`waitForWorker`, `makeSyncRequest`, `compileSourceTextModule`) | 21.4% | 0.15 |
+  | `matchRule` | 6.3% | 0.04 |
+  | `memoSet` | 3.5% | 0.02 |
+  | `matchTerminal`, `matchSeq`, `matchNonTerm` | 5.5% | 0.04 |
+  | `subst` (`src/evaluator.ts`) | 1.8% | 0.01 |
+  | `foldLadders` | 1.3% | 0.01 |
+
+  Where the time now goes: the parse is no longer the run's cost. The
+  engine's functions are about 15% of a 0.7 s run, below the TypeScript
+  module loading of the CLI's startup. What P8 (measure and the scanner)
+  measures is therefore a small remainder: whitespace is now 11% of the
+  planning parse's attempts (`ws` 55,702, `ws_req` 12,106, `ws_any`
+  3,890 of 649,616).
