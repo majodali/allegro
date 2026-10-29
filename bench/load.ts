@@ -15,8 +15,9 @@
 // corpus (one shared module loader). A library is evaluated after its parse
 // because its `grammar { }` values are what extend the grammar of the files
 // that use it. The deterministic counts of each parse are compared with
-// bench/load-baseline.json: any count above its baseline fails. Wall clock
-// is printed, never gated. `--update-baseline` rewrites the file; it is run
+// bench/load-baseline.json: any gated count (`GATED`) above its baseline
+// fails; the final memo size is recorded and printed, never gated (B-157 P5).
+// Wall clock is printed, never gated. `--update-baseline` rewrites the file; it is run
 // only to LOWER the baseline after a chunk lands (or when the corpus changes).
 
 import * as fs from "fs";
@@ -50,11 +51,16 @@ const CORPUS: { file: string; kind: "library" | "program" }[] = [
   { file: "demos/rung3/02-solve.alg",      kind: "program" },
 ];
 
-/** The counts the ratchet gates. All are deterministic for a given grammar
- *  and source; wall clock is not among them. */
-const GATED = ["matchAttempts", "memoWrites", "invalidationEntries", "lrIterations", "finalMemoSize"] as const;
-type Gated = typeof GATED[number];
-type Counts = Record<Gated, number>;
+/** The counts the ratchet gates: the engine's work. All are deterministic
+ *  for a given grammar and source; wall clock is not among them.
+ *  `lrIterations` is gated as an identity check on the growth loop. */
+const GATED = ["matchAttempts", "memoWrites", "invalidationEntries", "lrIterations"] as const;
+/** Counts recorded and printed but not gated. `finalMemoSize` is a
+ *  footprint, not work: a chunk that stops redoing work keeps more entries
+ *  (B-157 P5, dependency-tracked invalidation). */
+const REPORTED = ["finalMemoSize"] as const;
+type Counted = typeof GATED[number] | typeof REPORTED[number];
+type Counts = Record<Counted, number>;
 interface SourceRow extends Counts { chars: number; }
 
 function countsOf(r: ParseReport): Counts {
@@ -263,8 +269,9 @@ async function runCheck(update: boolean): Promise<number> {
     const sources: Record<string, SourceRow> = {};
     for (const [src, r] of rows) sources[src] = r;
     const doc = {
-      _: "B-157 (the performance stream) P1: the load ratchet's baseline, written by `npm run lint:load -- --update-baseline`. Per corpus source, the engine's deterministic parse counts; `npm run lint:load` fails when any rises. Lower it after a chunk lands; never raise it to pass. docs/plans/fast-library-load.md §3.",
+      _: "B-157 (the performance stream) P1: the load ratchet's baseline, written by `npm run lint:load -- --update-baseline`. Per corpus source, the engine's deterministic parse counts. Four are gated (match attempts, memo writes, invalidation entries, left-recursion iterations): `npm run lint:load` fails when any rises. The final memo size is recorded and reported, not gated (since P5). Lower it after a chunk lands; never raise it to pass. docs/plans/fast-library-load.md §3.",
       gated: GATED,
+      reported: REPORTED,
       sources,
     };
     fs.writeFileSync(BASELINE, JSON.stringify(doc, null, 2) + "\n");

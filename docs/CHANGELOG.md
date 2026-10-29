@@ -4,6 +4,44 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream) P5 (dependency-tracked invalidation): a growth round removes only what read the seed
+
+The stream's fifth chunk (`docs/plans/fast-library-load.md` §5 row P5,
+move M2 (invalidation that does not clear)). No parse semantics change,
+no `// expect:` line changed, the growth loop unchanged (`lrIterations`
+identical for all 7 load sources), and every parse tree identical over
+the 68 `tests/*.alg` and `demos/**/*.alg` files.
+
+- **Dependence is observed.** `MemoBucket` in `src/grammar2/engine.ts`
+  is a class holding the entries (`byKey`), a per-position count of
+  seed reads (`seedReads`) and the dependent keys (`dependents`).
+  `matchRule` counts a returned seed and a hit on a `dependent` entry;
+  an entry whose evaluation moved the count is marked `dependent`.
+- **Failures carry the mark.** A failed attempt is one of two shared
+  frozen entries, `FAILED` or `FAILED_DEPENDENT`, instead of `null`.
+- **A round removes only dependents.** `invalidateAtPos` calls
+  `clearDependents` (replacing `clearPos`). The soundness argument is
+  stated above `invalidateAtPos` and in `docs/book/extension/grammar.md`
+  §1: matching moves forward, so an entry at P can be stale after a
+  growth step at P only if it read a seed at P, directly or through a
+  marked entry.
+- **The load ratchet gates four counts.** `bench/load.ts --check` gates
+  match attempts, memo writes, invalidation entries and left-recursion
+  iterations; the final memo size is recorded and reported, not gated,
+  since keeping work means keeping entries (it rose 4–10%). Baseline
+  lowered: planning attempts −68%, memo writes −86%, invalidation
+  entries −83%; every source falls by similar shares (plan §7).
+- **Measured** (`npm run bench:load`, before and after, same sandbox):
+  the planning parse 14.5–14.9 s to 3.2–3.5 s; `lib/units.alg` 2.6 s to
+  0.7 s. The gate: 343.7 s before, 309.4 s after. Profile after:
+  `matchRule` 37.5%, `memoSet` 12.7%, the collector 7.1%, invalidation
+  7.2% (was `clearPos` at 25.8%).
+
+Tests: none added; the grammar-2 battery, the full suite (1,227 runs)
+and the corpus tree comparison are the oracle. Docs: plan §3, §4, §5
+and §7; `docs/book/extension/grammar.md` §1; backlog B-157 progress and
+pointer; plans manifest.
+
 ## 2026-10 — B-157 (the performance stream) P4 (fewer and cheaper entries): a failed attempt allocates and hashes less
 
 The stream's fourth chunk (`docs/plans/fast-library-load.md` §5 row P4,
