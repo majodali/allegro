@@ -15,6 +15,20 @@ stratified precedence levels. Runtime grammar extension merges user
 fragments (`grammar { … }` blocks activated by `use`) into the base via
 level insertion and rule surgery, with cross-fragment conflict validation.
 
+The precedence levels are specified left-recursively but do not run that
+way (B-157 P7 (the ladder without left recursion)). `LEVELS` in
+`src/grammar2/base-grammar.ts` writes each binary level as `self OP
+tighter | … | tighter`, and fragment merging edits that specification.
+`ladderLevels` then rewrites each left-recursive level into a repetition,
+`tighter (OP tighter)*`, and the postfix level into `atom (call | dot |
+bracket)*`, for the base grammar and for every merged grammar alike. The
+tree builder's `foldLadders` folds the repetition back into the
+left-nested operator nodes the specification gives, before any builder
+reads the tree, so the built program is unchanged. A level whose other
+alternatives reach it without consuming input stays as specified. The
+engine's left recursion, below, therefore serves user grammars and such
+levels; the base grammar no longer needs it.
+
 Left recursion grows a seed: when a rule re-enters itself at the same
 position P, the engine re-runs it with the last result as the seed until
 the match stops getting longer. Before each growth step an invalidation

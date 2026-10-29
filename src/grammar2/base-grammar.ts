@@ -5,10 +5,23 @@
 // value per the Phase 0 formalism. Replaces the hand-written Pratt +
 // recursive-descent parser (src/hybrid-parser.ts) once integrated.
 //
-// Precedence is encoded via stratified productions (expr_or → expr_and →
-// expr_eq → expr_cmp → expr_add → expr_mul → expr_unary → expr_post →
-// expr_atom), since the analyzer (Phase 3) is not yet available. Binary
-// operators use LEFT RECURSION, handled by the engine's Warth iteration.
+// Precedence is still encoded via stratified productions, one per level,
+// loosest first (expr_pipe → expr_or → expr_amp → expr_and → expr_eq →
+// expr_cmp → expr_add → expr_mul → expr_of → expr_unary → expr_post →
+// expr_atom).
+//
+// Each level is SPECIFIED left-recursively (`LEVELS` below: `self ws OP ws
+// tighter | … | tighter`), and that form is what fragment merging edits
+// (`fragments.ts`: level insertion, operator splicing, rule surgery by
+// alternative name). The grammar the engine runs is derived from it by
+// `ladderLevels` (B-157 P7, the ladder without left recursion): a binary
+// level becomes the repetition `tighter (ws OP ws tighter)*`, one match of
+// the tighter level and then tagged operator tails, and the postfix level
+// `atom (call | dot | bracket)*`. The tree builder folds the tails back to
+// the left (`foldLadders` in `tree-builder.ts`) into the left-nested
+// operator nodes the specification produces, so the built program is the
+// same. The engine's left-recursion support (Warth iteration) remains for
+// user grammars and for any level the rewrite leaves as specified.
 // =============================================================================
 
 import {
@@ -57,6 +70,11 @@ function leftBinary(selfName: string, tailName: string, ops: Array<{ op: string;
 //
 // Each level's production name is `expr_${level.name}`. `expr_atom` is the
 // innermost level and has no tighter neighbour.
+//
+// A level's `build` returns its SPECIFICATION: the alternatives in order,
+// with left associativity written as left recursion. `buildBaseGrammar`
+// rewrites each left-recursive level into its ladder (`ladderLevels`,
+// below); `fragments.ts` edits the specification first and rewrites after.
 
 interface LevelSpec {
   name:  string;
@@ -143,7 +161,8 @@ const LEVELS: LevelSpec[] = [
     ]) },
 
   // Level 8 — postfix: function calls, dot access, bracket indexing.
-  // Left-recursive so `f(x).y[0]` parses left-to-right as (((f)(x)).y)[0].
+  // Specified left-recursively so `f(x).y[0]` parses left-to-right as
+  // (((f)(x)).y)[0]; run as `atom (call | dot | bracket)*`.
   // `ws` before the opener allows multi-line chains (e.g. `xs\n  .map(f)`).
   // Bracketed contexts use `ws_any` so args/indices may span lines freely.
   { name: "post", build: (self, tighter) => alt([
@@ -216,7 +235,25 @@ export const BASE_OPERATORS_TO_LEVEL: Readonly<Record<string, string>> = {
 
 // --- Build the grammar ---
 
+/**
+ * The base grammar the engine runs: the specification
+ * (`buildLeftRecursiveBaseGrammar`) with each left-recursive precedence
+ * level rewritten into its ladder (`ladderLevels`).
+ */
 export function buildBaseGrammar(): Grammar {
+  const g = buildLeftRecursiveBaseGrammar();
+  ladderLevels(g);
+  return g;
+}
+
+/**
+ * The base grammar with every precedence level in its left-recursive
+ * specification form. This is the form fragment merging edits: level
+ * insertion reads a level's fallthrough, operator splicing inserts
+ * alternatives before it, and rule surgery addresses alternatives by name.
+ * The merger calls `ladderLevels` once its edits are done.
+ */
+export function buildLeftRecursiveBaseGrammar(): Grammar {
   const g = makeGrammar({ start: "program" });
 
   g.reserved.set("keywords", new Set([
@@ -370,7 +407,7 @@ export function buildBaseGrammar(): Grammar {
     attrs: { name: "string" },
   });
 
-  // --- Expression levels (left-recursive for binary operators) ---
+  // --- Expression levels (specified left-recursively; see `ladderLevels`) ---
   //
   // Construction is data-driven: LEVELS (module-level) supplies each level's
   // name and rule-builder. Top-level `expr` forwards to the loosest level;
@@ -1096,6 +1133,182 @@ function spaced_list(itemName: string, separator: string): Rule {
     min: 1,
     sep: seq([nonterm("ws"), lit(separator), nonterm("ws")]),
   });
+}
+
+// --- The ladder: precedence levels without left recursion (B-157 P7) ---
+//
+// A level specified as `self OP1 tighter | … | self OPk tighter | tighter`
+// grows a seed under the engine's Warth iteration: the fallthrough matches
+// first, and each round re-runs the level with the longer seed until no
+// operator alternative extends it. That is a growth round, with its
+// invalidation round, per operator at every expression start. The same
+// parse is `tighter (OP1 tighter | … | OPk tighter)*`: match the tighter
+// level once, then take operator tails while one matches.
+//
+// Why the two parse alike. Call an alternative that starts with `self` a
+// TAIL (its items after `self`), and any other alternative a FIRST. Under
+// Warth iteration a level at P first takes the earliest FIRST in order that
+// matches; the tails fail in that round, since no seed has grown yet. Each
+// growth round then tries the alternatives in order with the seed in hand:
+// a tail before the matching FIRST that matches extends the seed (a tail
+// consumes its operator, so the result is longer); if none does, that FIRST
+// matches again at its old length and the growth stops. Tails after the
+// matching FIRST are never reached. So the level is the ordered choice,
+// over its FIRSTs, of `FIRST (tails before it)*`. For every base level the
+// only FIRST is the fallthrough, which gives the ladder.
+//
+// This holds when no FIRST reaches `self` without consuming input. One that
+// did (left recursion through another production, say a user `expr_form`
+// that starts with `expr`) would grow the level through it, so `ladderRule`
+// then leaves the level as specified, for the engine to grow as before.
+
+/** Tag of a ladder node in the parse tree, whose children are the FIRST's
+ *  tree and the repetition of tails. A user label cannot produce it (labels
+ *  are identifiers), and the tree builder folds every such node away before
+ *  it dispatches (`foldLadders`). */
+export const LADDER_TAG = "$ladder";
+
+/**
+ * Rewrite each left-recursive precedence level (an `expr_*` production) of
+ * `g` into its ladder, in place. A level the rewrite cannot show to parse
+ * alike stays as specified (`ladderRule`).
+ */
+export function ladderLevels(g: Grammar): void {
+  const nullable = computeNullable(g);
+  for (const [name, prod] of [...g.productions]) {
+    if (!name.startsWith("expr_") || prod.attrs !== undefined) continue;
+    const rule = ladderRule(name, prod.rule, g, nullable);
+    if (rule !== null) g.productions.set(name, { name, rule });
+  }
+}
+
+/**
+ * The ladder of level `self` specified by `rule`, or null when the level has
+ * no tail or the rewrite would not parse alike (see above). A FIRST with
+ * tails before it becomes `seq([FIRST, rep(tails)])` tagged `LADDER_TAG`; a
+ * FIRST with none stays as it is.
+ */
+function ladderRule(self: string, rule: Rule, g: Grammar, nullable: Set<string>): Rule | null {
+  if (rule.kind !== "alt" || rule.attrs !== undefined) return null;
+  const tails:  Array<{ index: number; rule: Rule }> = [];
+  const firsts: Array<{ index: number; rule: Rule }> = [];
+  rule.options.forEach((option, index) => {
+    const head = option.kind === "seq" ? option.items[0] : undefined;
+    if (option.kind === "seq" && option.items.length > 1 && head !== undefined &&
+        head.kind === "nonterm" && head.name === self && head.attrs === undefined) {
+      tails.push({ index, rule: seq(option.items.slice(1), option.attrs) });
+    } else {
+      firsts.push({ index, rule: option });
+    }
+  });
+  if (tails.length === 0) return null;
+  // The fold names each operator node by its tail's tag.
+  if (tails.some(t => t.rule.attrs?.name === undefined)) return null;
+  for (const f of firsts) {
+    if (reachesAtStart(f.rule, self, g, nullable)) return null;
+  }
+  const ladders: Rule[] = [];
+  for (const f of firsts) {
+    const before = tails.filter(t => t.index < f.index).map(t => t.rule);
+    if (before.length === 0) { ladders.push(f.rule); continue; }
+    // A ladder that takes no tail folds to its FIRST's tree, which must
+    // carry the tag the level's tree had: a non-terminal's tree always has
+    // one (the engine names it), any other FIRST needs its own.
+    if (f.rule.kind !== "nonterm" && f.rule.attrs?.name === undefined) return null;
+    const item = before.length === 1 ? before[0] : alt(before);
+    ladders.push(seq([f.rule, rep(item)], { name: LADDER_TAG }));
+  }
+  return ladders.length === 1 ? ladders[0] : alt(ladders);
+}
+
+/** Whether `rule` can reach production `target` without consuming input. */
+function reachesAtStart(rule: Rule, target: string, g: Grammar, nullable: Set<string>): boolean {
+  const seen = new Set<string>();
+  const work: string[] = [];
+  const visit = (r: Rule): void => {
+    switch (r.kind) {
+      case "nonterm":
+        if (!seen.has(r.name)) { seen.add(r.name); work.push(r.name); }
+        return;
+      case "seq":
+        for (const item of r.items) {
+          visit(item);
+          if (!isNullable(item, nullable)) return;
+        }
+        return;
+      case "alt":
+        for (const option of r.options) visit(option);
+        return;
+      case "rep":
+        visit(r.item);
+        if (r.sep && isNullable(r.item, nullable)) visit(r.sep);
+        return;
+      case "opt":
+      case "guarded":
+        visit(r.item);
+        return;
+      case "terminal":
+        return;
+    }
+  };
+  visit(rule);
+  while (work.length > 0) {
+    const name = work.pop()!;
+    if (name === target) return true;
+    const prod = g.productions.get(name);
+    if (prod) visit(prod.rule);
+  }
+  return false;
+}
+
+/**
+ * The productions that can match without consuming input, as the engine
+ * matches them. Unlike the analyzer's nullability (`analyzer.ts`), which
+ * counts INDENT as nullable, INDENT, NEWLINE and CONT_NL consume: each
+ * matches only at a `\n` and takes it (`matchIndentDirective` in
+ * `engine.ts`). That distinction matters here: `expr_atom` starts with
+ * `block_expr`, whose INDENT would otherwise make every level look left-
+ * recursive through `stmt` and `expr`. Elsewhere it errs towards nullable
+ * (a regex that can match the empty string, DEDENT, SAMELINE), which only
+ * makes `reachesAtStart` more cautious.
+ */
+function computeNullable(g: Grammar): Set<string> {
+  const nullable = new Set<string>();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [name, prod] of g.productions) {
+      if (!nullable.has(name) && isNullable(prod.rule, nullable)) {
+        nullable.add(name);
+        changed = true;
+      }
+    }
+  }
+  return nullable;
+}
+
+function isNullable(r: Rule, nullable: Set<string>): boolean {
+  switch (r.kind) {
+    case "terminal": {
+      const m = r.match;
+      switch (m.kind) {
+        case "literal":   return m.text === "";
+        case "charClass": return false;
+        case "regex":     return m.pattern.test("");
+        case "eof":       return true;
+        case "empty":     return true;
+        case "fail":      return false;
+        case "indent":    return m.directive === "DEDENT" || m.directive === "SAMELINE";
+      }
+      return true;
+    }
+    case "nonterm": return nullable.has(r.name);
+    case "seq":     return r.items.every(item => isNullable(item, nullable));
+    case "alt":     return r.options.some(option => isNullable(option, nullable));
+    case "rep":     return r.min === 0 || isNullable(r.item, nullable);
+    case "opt":     return true;
+    case "guarded": return isNullable(r.item, nullable);
+  }
 }
 
 // --- Singleton ---

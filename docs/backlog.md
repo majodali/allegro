@@ -727,8 +727,9 @@ that prevents it.
   loads in well under a second.** Plan `docs/plans/fast-library-load.md`
   (active 2026-10-28; P1 (instrumentation and the corpus), P2 (a
   library loads once per run, closing B-155 (library load per module)),
-  P3 (numeric memo keys), P4 (fewer and cheaper entries) and P5
-  (dependency-tracked invalidation) landed). Measured: the planning
+  P3 (numeric memo keys), P4 (fewer and cheaper entries),
+  P5 (dependency-tracked invalidation) and
+  P7 (the ladder without left recursion) landed). Measured: the planning
   library loads in 68 s, 87% of it in the grammar-2 engine and 68% of
   the parse in the memo table (key strings, lookups, invalidation,
   garbage); evaluation under a second; 1.1 ms per character, linear.
@@ -743,7 +744,8 @@ that prevents it.
   for autonomous delivery (lane P in the lane table). **Blocked-by**:
   nothing.
   **Pointer**: `src/grammar2/engine.ts` (`memoKey`, `bucketAt`,
-  `memoSet`, `clearDependents`, `invalidateAtPos`), `src/test/alg-files.ts`
+  `memoSet`, `clearDependents`, `invalidateAtPos`),
+  `src/grammar2/base-grammar.ts` (`ladderLevels`), `src/test/alg-files.ts`
   (`libExtensions`), `docs/plans/fast-library-load.md`
   - **Progress.** P2 (a library loads once per run, 2026-10-28): one
     library cache per process in `src/modules.ts`, keyed by path and
@@ -791,6 +793,17 @@ that prevents it.
     ruling R4 (the tokenizer question), then cached parse artifacts
     (move M7 (cached parse artifacts)), then B-153 (re-evaluation per
     reference).
+  - **Progress.** P7 (the ladder without left recursion, 2026-10-29),
+    after the maintainer ratified P7–P10 (plan §6 R5): each precedence
+    level is still specified left-recursively, and `ladderLevels` runs
+    it as `tighter (op tighter)*`, for user operators too; the tree
+    builder's `foldLadders` restores the left-nested nodes, so built
+    programs, outputs and the folded parse trees are identical over all
+    68 `tests/` and `demos/` files. Planning: match attempts −98%, memo
+    writes −96%, invalidation entries and growth iterations to zero; the
+    parse runs in 0.13 s against 3.5 s, under the plan's 1 s target; the
+    gate 313.2 s against 322.8 s. Next: P8 (measure and the
+    scanner).
 
 ### T-bootstrap (M9)
 
