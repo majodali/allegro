@@ -243,7 +243,7 @@ class ParseState {
    * Map<string, Entry> implementation made invalidation O(NM) per round
    * and O(N²M) total, which dominated parse time on anything non-trivial.
    */
-  memo: Map<number, Map<number, MemoEntry | null>> = new Map();
+  memo: Map<number, MemoBucket> = new Map();
   /** Total entries across all pos-buckets — tracked for stats. */
   private _memoSize: number = 0;
   /** Rule ids. A non-terminal is identified by its NAME (every `NonTerm`
@@ -280,18 +280,29 @@ class ParseState {
     return sid < STACK_SLOTS ? id * STACK_SLOTS + sid : -(id * WIDE_STACK_SLOTS + sid);
   }
 
-  memoGet(pos: number, key: number): MemoEntry | null | undefined {
-    const bucket = this.memo.get(pos);
-    if (!bucket) return undefined;
-    return bucket.get(key);
+  /**
+   * The memo bucket for one position, created the first time the position
+   * is looked up. A bucket is never replaced or removed (`clearPos` deletes
+   * entries inside it), so `matchRule` looks it up once per attempt and
+   * holds it for the attempt's writes (B-157 P4).
+   */
+  bucketAt(pos: number): MemoBucket {
+    let bucket = this.memo.get(pos);
+    if (bucket === undefined) { bucket = new Map(); this.memo.set(pos, bucket); }
+    return bucket;
   }
 
-  memoSet(pos: number, key: number, entry: MemoEntry | null): void {
-    let bucket = this.memo.get(pos);
-    if (!bucket) { bucket = new Map(); this.memo.set(pos, bucket); }
-    const had = bucket.has(key);
+  /**
+   * Write one memo entry: one hash operation (B-157 P4). `added` says whether
+   * the key is new to the bucket, which keeps `_memoSize` without a `has`
+   * lookup. `matchRule` knows it at each write: its first write follows a
+   * lookup that missed, so the key is new; its second write (a failed
+   * attempt's `null`) overwrites that same key, which is still held because
+   * `clearPos` keeps the in-progress entry it replaces.
+   */
+  memoSet(bucket: MemoBucket, key: number, entry: MemoEntry | null, added: boolean): void {
     bucket.set(key, entry);
-    if (!had) this._memoSize++;
+    if (added) this._memoSize++;
     if (this.stats) this.stats.memoWrites++;
   }
 
@@ -347,19 +358,21 @@ class ParseState {
     return { top, parent, id: this.nextStackId++, children: null };
   }
 
-  advance(pos: number, activeRules: Rule[]): void {
+  /** Record a failed attempt of `rule` at `pos` for the farthest-advance
+   *  error. Takes the one rule rather than an array of active rules, so a
+   *  failure allocates nothing here unless it moves the frontier (B-157 P4). */
+  advance(pos: number, rule: Rule): void {
     if (pos > this.farthest) {
       this.farthest      = pos;
-      this.farthestRules = activeRules.slice();
+      this.farthestRules = [rule];
     } else if (pos === this.farthest) {
-      for (const r of activeRules) {
-        if (!this.farthestRules.includes(r)) {
-          this.farthestRules.push(r);
-        }
-      }
+      if (!this.farthestRules.includes(rule)) this.farthestRules.push(rule);
     }
   }
 }
+
+/** One position's memo entries, by `memoKey`. */
+type MemoBucket = Map<number, MemoEntry | null>;
 
 export interface MatchResult {
   tree:    ParseTree;
@@ -397,7 +410,8 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
     }
   }
   const key = state.memoKey(rule);
-  const cached = state.memoGet(pos, key);
+  const bucket = state.bucketAt(pos);
+  const cached = bucket.get(key);
   if (cached !== undefined) {
     if (state.stats) state.stats.memoHits++;
     if (cached === null) return null;
@@ -419,7 +433,7 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
 
   const snapshot = state.indentStack;
   const entry: MemoEntry = { result: null, isLR: true, seed: null, lrDetected: false };
-  state.memoSet(pos, key, entry);
+  state.memoSet(bucket, key, entry, /* added */ true);
 
   let result = runDoMatch(state, rule, pos, snapshot);
 
@@ -431,9 +445,9 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
     // caller sees an LR entry with seed=null and interprets it as "LR in
     // progress". That looks like two failures in a row instead of one.
     if (result === null) {
-      state.memoSet(pos, key, null);
+      state.memoSet(bucket, key, null, /* added */ false);
       state.indentStack = snapshot;
-      state.advance(pos, [rule]);
+      state.advance(pos, rule);
     } else if (result.newIndentStack) {
       // Commit post-state.
       state.indentStack = result.newIndentStack;
@@ -468,9 +482,9 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
   entry.isLR  = false;
   entry.result = entry.seed;
   if (entry.seed === null) {
-    state.memoSet(pos, key, null);
+    state.memoSet(bucket, key, null, /* added */ false);
     state.indentStack = snapshot;
-    state.advance(pos, [rule]);
+    state.advance(pos, rule);
   } else if (entry.seed.newIndentStack) {
     state.indentStack = entry.seed.newIndentStack;
   } else {
@@ -545,8 +559,9 @@ function doMatch(state: ParseState, rule: Rule, pos: number): MatchResult | null
 // --- Terminal ---
 
 function matchTerminal(state: ParseState, rule: Terminal, pos: number): MatchResult | null {
+  // No allocation before the terminal matches: most attempts fail
+  // (B-157 P4), so the zero-width range is built only where it is used.
   const m = rule.match;
-  const range: SourceRange = { start: pos, end: pos };
   switch (m.kind) {
     case "literal": {
       if (state.input.startsWith(m.text, pos)) {
@@ -585,7 +600,7 @@ function matchTerminal(state: ParseState, rule: Terminal, pos: number): MatchRes
     case "eof": {
       if (pos === state.input.length) {
         return {
-          tree: { kind: "leaf", text: "", range },
+          tree: { kind: "leaf", text: "", range: { start: pos, end: pos } },
           nextPos: pos,
         };
       }
@@ -593,7 +608,7 @@ function matchTerminal(state: ParseState, rule: Terminal, pos: number): MatchRes
     }
     case "empty": {
       return {
-        tree: { kind: "leaf", text: "", range },
+        tree: { kind: "leaf", text: "", range: { start: pos, end: pos } },
         nextPos: pos,
       };
     }
@@ -787,16 +802,24 @@ function matchNonTerm(state: ParseState, rule: NonTerm, pos: number): MatchResul
 // --- Seq ---
 
 function matchSeq(state: ParseState, rule: Seq, pos: number): MatchResult | null {
-  const children: ParseTree[] = [];
-  let cur = pos;
-  for (const item of rule.items) {
-    const m = matchRule(state, item, cur);
+  // The children array is made once the first item has matched, so a
+  // sequence that fails on its first item allocates nothing (B-157 P4).
+  const items = rule.items;
+  if (items.length === 0) {
+    return { tree: { kind: "branch", children: [], range: { start: pos, end: pos } }, nextPos: pos };
+  }
+  const first = matchRule(state, items[0], pos);
+  if (!first) return null;
+  const children: ParseTree[] = [first.tree];
+  let cur = first.nextPos;
+  for (let i = 1; i < items.length; i++) {
+    const m = matchRule(state, items[i], cur);
     if (!m) return null;
     children.push(m.tree);
     cur = m.nextPos;
   }
   const range: SourceRange = {
-    start: children.length ? children[0].range.start : pos,
+    start: children[0].range.start,
     end:   cur,
   };
   return {

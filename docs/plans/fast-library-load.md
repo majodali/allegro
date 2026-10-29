@@ -165,7 +165,7 @@ parse or user files.
 | **P1** | `ALLEGRO_PARSE_STATS=1` prints the engine stats for a run; `npm run bench:load` with the corpus of §3 and `bench/load-baseline.json`; `npm run lint:load` ratchets the counts; the profile of §1 recorded in the plan's §7 with the stats numbers | the new lint runs and passes at its own baseline | S |
 | **P2** | M5: a library loads once per run (B-155 closed). **Landed 2026-10-28** (§7) | solve demo under 90 s; counts unchanged; suite green | S–M |
 | **P3** | M1: numeric memo keys. **Landed 2026-10-28** (§7) | counts unchanged, clock falls, suite green | M |
-| **P4** | M3: fewer and cheaper entries | memo writes fall or allocation falls; suite green | M |
+| **P4** | M3: fewer and cheaper entries. **Landed 2026-10-28** (§7) | memo writes fall or allocation falls; suite green | M |
 | **P5** | M2: invalidation by generation; measured by the P1 stats before design | invalidation entries fall; grammar-2 left-recursion battery green | M |
 | **P6** | decision point: the §7 numbers against the §2 target; R4 taken (tokenizer or not); M7 taken or not | — (stops for the maintainer) | — |
 | **P7** | M6 (B-153) or hand-off to the kernel-semantics stream | demo re-evaluation count falls | M |
@@ -403,3 +403,97 @@ a parser that changes a program's meaning has left the stream's scope.
   inlines it into `matchRule`, so the `matchRule` row before is the
   two summed. The profiler attributes inlined callees to their callers,
   so the smaller rows move between functions from run to run.
+- 2026-10-28: **P4 landed** (M3: fewer and cheaper entries). No parse
+  semantics change, no `// expect:` line changed, and every count in
+  `bench/load-baseline.json` is identical, memo writes included: the
+  writes are the packrat contract, so no candidate skips one. The
+  micro-run over `lib/units.alg` and `lib/planning.alg` also matched the
+  counts the baseline does not gate (memo hits and misses, seed returns,
+  peak memo size). About 84% of the attempts that miss the memo fail
+  (planning: 89.8 M misses, 75.8 M of them written back as a failure's
+  `null`), so the chunk worked on the failure path. Three changes, all in
+  `src/grammar2/engine.ts`, were taken:
+  - **One hash operation per memo write.** `matchRule` looks up the
+    position's bucket once (`ParseState.bucketAt`) and holds it for the
+    attempt's lookup and both writes. `memoSet` takes the bucket and an
+    `added` flag, so it no longer calls `has` to keep the entry count.
+    The flag is known at each write: the first write follows a lookup
+    that missed, so its key is new; a failure's `null` overwrites that
+    key, which is still held because `clearPos` keeps the in-progress
+    entry. A miss and a failure did eight hash operations before (three
+    outer `get`s, one `get`, two `has`, two `set`) and four now. A
+    variant that asserted both facts ran clean over both libraries, and
+    the gated `finalMemoSize` is the standing check.
+  - **No array per failed attempt.** `advance` takes the failed rule
+    instead of a one-element array, which was 75.8 M arrays for planning.
+  - **No allocation before a match is known.** `matchTerminal` builds its
+    zero-width range only in the two cases that use it (`eof`, `empty`),
+    and `matchSeq` makes its children array once the first item has
+    matched.
+
+  What was measured and left (micro-benchmark, scratch, not committed):
+  `units` parsed in one process, 5 interleaved rounds, median; planning
+  one parse per fresh process, 3 rounds, median.
+
+  | Candidate | `units` median | planning median | Taken |
+  |---|---|---|---|
+  | none (`origin/main`) | 5.31 s | 28.7 s | — |
+  | `memoSet` without `has`, by the size difference | 4.99 s | — | no: the bucket-held form below subsumes it |
+  | bucket held for the attempt, `added` flag | 4.57 s | — | yes |
+  | `advance` without the array | 4.64 s | — | yes |
+  | both of the above | — | 26.0 s | yes |
+  | `advance` with a `Set` for the farthest rules | 5.01 s | — | no: no gain over the plain form |
+  | failed entries recycled through a free list | 5.24 s | — | no: no gain |
+  | no allocation before a terminal or sequence matches | 4.96 s | 24.7 s (with the two above) | yes |
+  | every `MatchResult` built with `newIndentStack` (one hidden class) | 5.00 s | 25.2 s (with the three above) | no: no gain over 24.7 s |
+
+  Two candidates of the brief were not built. A **flat `Map` keyed by
+  position and key together** cannot serve `clearPos`, which deletes one
+  position's entries and would need a per-position index of keys, which
+  is the bucket again. The flat keys would also leave V8's small-integer
+  range: planning creates 428 rule ids and 2 stacks, so a fixed-width
+  combined key reaches about 2.7e10 and every key would be boxed. Changing
+  `clearPos` is P5's. **`memoKey`** was left as it is: its remaining cost
+  is one `Map` lookup by rule object, and the only alternative, an id
+  stored on the grammar's shared rule objects, mutates values shared
+  across parses.
+
+  `npm run bench:load`, before (`origin/main` at `7cbd765`) and after,
+  same sandbox, one run each:
+
+  | Entry | Wall clock before | after | Planning parse before | after |
+  |---|---|---|---|---|
+  | `lib/units.alg` | 6.4 s | 5.0 s | — | — |
+  | `lib/planning.alg` | 40.0 s | 37.4 s | 33.4 s | 31.3 s |
+  | `tests/planning-solve-demo.alg` | 50.6 s | 47.0 s | 31.0 s | 27.4 s |
+  | `demos/rung3/01-model.alg` | 39.3 s | 35.3 s | 31.2 s | 27.9 s |
+  | `demos/rung3/02-solve.alg` | 46.3 s | 42.1 s | 31.5 s | 27.0 s |
+
+  The planning parse falls from 31 to 33 s to 27 to 31 s, about 12%;
+  `units` parses in 4.6 s against 5.9 s. The gate (`npm run
+  test:shards`, 3 shards): 774.6 s wall clock (1,446.7 s of work)
+  before, 789.2 s (1,498.6 s of work) after. The gate did not get
+  faster: the difference is within run-to-run noise, and the longest
+  shard spends most of its time outside the parse. The load ratchet's
+  check, inside the gate, parsed in 42.6 s before and 39.4 s after.
+
+  The CPU profile of the planning load (`use units`, `use planning`,
+  `print(1)`): 37.0 s sampled before, 30.4 s after. Self time:
+
+  | Function (`src/grammar2/engine.ts`) | Share after | Seconds before | after |
+  |---|---|---|---|
+  | `clearPos` | 26.4% | 9.0 | 8.0 |
+  | `matchRule` (with the bucket lookup inlined) | 19.1% | 8.3 | 5.8 |
+  | garbage collector | 15.1% | 5.3 | 4.6 |
+  | `memoSet` | 14.0% | 4.3 | 4.2 |
+  | `memoKey` | 5.3% | 1.8 | 1.6 |
+  | `matchNonTerm`, `invalidateAtPos`, `matchSeq`, `matchAlt`, `matchTerminal` | 15.3% | 5.0 | 4.6 |
+  | `runDoMatch` | 0.3% | 2.0 | 0.1 |
+
+  Where the time now goes: `memoSet` is one `Map.set` now and still
+  costs 4.2 s. What is left is the map write itself, the buckets growing
+  and rehashing. `clearPos` deletes most of a bucket at each growth round
+  and the next round fills it again, so the churn is invalidation's, and
+  P5 (M2, invalidation by generation) acts on it together with
+  `clearPos`. `runDoMatch` is now inlined into `matchRule`, which is why
+  its row falls and `matchRule`'s holds part of it.
