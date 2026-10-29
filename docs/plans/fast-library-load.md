@@ -668,8 +668,11 @@ a parser that changes a program's meaning has left the stream's scope.
   bundle whatever the engine costs. **(D) M6 (B-153)** is runtime work
   and unchanged in priority.
 
-  Recommended order, for the maintainer's ruling: P7 = (A) with the
-  built-program oracle; P8 = measure again and apply R4 if the
-  whitespace and lexical share still warrants it; P9 = (C) as a small
-  chunk at any point, since the web bundle needs it regardless; P10 =
-  (D). The §5 table carries these as proposed rows.
+  Recommended order, for the maintainer's ruling: first (A) with the
+  built-program oracle (the proposed chunk P7 (the ladder)); then a
+  second measurement and the scanner ruling R4 (the tokenizer question)
+  applied if the whitespace and lexical share still warrants it (P8
+  (measure and the scanner)); then (C) as a small chunk at any point,
+  since the web bundle needs it regardless (P9 (cached parse
+  artifacts)); then (D) (P10 (B-153)). The §5 table carries these as
+  proposed rows.

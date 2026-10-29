@@ -786,9 +786,11 @@ that prevents it.
     parse is 3.84 s on the gate's machine, from 68 s (about 18×); the
     remaining attempts are the expression precedence ladder (31%, and
     every growth iteration) and whitespace (13%). Recommended order:
-    P7 the ladder without left recursion (M8, new in the plan's §4),
-    P8 measure and apply the scanner ruling R4, P9 cached parse
-    artifacts (M7), P10 B-153 (re-evaluation per reference).
+    first the expression ladder without left recursion (the plan's new
+    move M8 (the ladder)), then a second measurement and the scanner
+    ruling R4 (the tokenizer question), then cached parse artifacts
+    (move M7 (cached parse artifacts)), then B-153 (re-evaluation per
+    reference).
 
 ### T-bootstrap (M9)
 
