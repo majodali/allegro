@@ -173,7 +173,7 @@ evaluator/runtime set; this is the complete session list):
   during construction, before it escapes. After that, derive
   (`src/structure.ts` states the rule and why).
 - **A library's values are immutable after load; a module writes only
-  into values it constructed** (the owner-module invariant, B-158;
+  into values it constructed** (the owner-module invariant of B-158 (in-place write through a library alias);
   `docs/book/extension/modules.md` "Loaded once per process"). A library
   is loaded once per process and shared by every program that uses it,
   so a program's alias of a library function or type (`f = lib_f`,
