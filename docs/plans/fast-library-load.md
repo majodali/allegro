@@ -164,6 +164,25 @@ by `scripts/sync-web-libs.ts`). This guarantees the outcome for
 repeated runs whatever the engine costs; it does not help the first
 parse or user files.
 
+**M8 — the expression ladder without left recursion** (added at P6,
+2026-10-29, from the per-rule counts). The base grammar encodes
+precedence as nine stratified productions, each left-recursive
+(`src/grammar2/base-grammar.ts`: "binary operators use LEFT RECURSION,
+handled by the engine's Warth iteration"). Every expression start
+position walks the ladder and grows a seed at each level that has an
+operator: after P5, all 1.67 M growth iterations on the planning parse
+are the ladder's (`expr_post` 1.01 M, `expr_mul` 0.33 M, `expr_add`
+0.16 M, …), about 1,350 per source line, and the ladder's named rules
+are 31% of all match attempts before their anonymous children are
+counted. The same language parses without left recursion as
+`level = tighter (ws op ws tighter)*`, folded left-associatively by
+the tree builder, which removes every growth iteration and every
+invalidation round. It changes the parse tree's SHAPE, not the built
+program, so its oracle is the built programs and outputs (the suite's
+pins and the user-operator fragments), not P5's raw-tree comparison.
+Risk: medium, in the tree builder's node shapes and the level-splicing
+mechanism `expr_form` extensions use.
+
 ## 5. Chunk sequence (to pre-ratify)
 
 | Chunk | What lands | Oracle | Size |
@@ -173,8 +192,11 @@ parse or user files.
 | **P3** | M1: numeric memo keys. **Landed 2026-10-28** (§7) | counts unchanged, clock falls, suite green | M |
 | **P4** | M3: fewer and cheaper entries. **Landed 2026-10-28** (§7) | memo writes fall or allocation falls; suite green | M |
 | **P5** | M2: invalidation by generation; measured by the P1 stats before design. **Landed 2026-10-29** (§7) as dependency-tracked invalidation | invalidation entries fall; grammar-2 left-recursion battery green | M |
-| **P6** | decision point: the §7 numbers against the §2 target; R4 taken (tokenizer or not); M7 taken or not | — (stops for the maintainer) | — |
-| **P7** | M6 (B-153) or hand-off to the kernel-semantics stream | demo re-evaluation count falls | M |
+| **P6** | decision point: the §7 numbers against the §2 target; R4 taken (tokenizer or not); M7 taken or not. **Decision requested 2026-10-29** (§7): the numbers, where the remaining attempts go, and the recommended order below | — (stops for the maintainer) | — |
+| **P7** (proposed) | M8 (§4): the expression precedence ladder without left recursion — each level `tighter (op tighter)*`, folded left by the tree builder; removes every growth iteration | built programs and outputs identical (the suite's pins), the grammar-2 battery, the user-operator fragments (`lib/pow.alg`, `lib/match_expr.alg`, the units literals); parse-tree shape may change, so the raw-tree comparison of P5 is not this chunk's oracle | M–L |
+| **P8** (proposed) | measure again; R4 applied: the scanner layer if the whitespace and lexical share still warrants it | counts fall; outputs identical; `grammar-formalism.md` §2 amended | L |
+| **P9** (proposed) | M7: cached parse artifacts by content hash (CLI and suite on disk; the web bundle pre-built) | repeated runs skip the parse; outputs identical | M |
+| **P10** | M6 (B-153) or hand-off to the kernel-semantics stream | demo re-evaluation count falls | M |
 
 The sequence stops on W-001's four conditions and on one more that is
 this stream's own: **any changed `// expect:` line stops it**, because
@@ -612,3 +634,45 @@ a parser that changes a program's meaning has left the stream's scope.
   character for planning against the target of §2 (under 1 s for the
   library); P6 weighs that against the tokenizer (R4) and cached parse
   artifacts (M7).
+- 2026-10-29: **P6, the decision point — decision requested.** Measured
+  on the gate's own machine, the planning library parsed through the
+  production loader with stats: **3.84 s** for 52,260 characters
+  (0.073 ms per character), from 68 s on the same machine at §1, about
+  18×. Counts after P5: 38.2 M attempts (730 per character), 22.6 M
+  hits, 15.6 M misses, 23.9 M writes, 1.67 M growth iterations, 15.1 M
+  invalidated entries. Against the §2 target (under 1 s) a factor of
+  about four remains here.
+
+  Where the attempts go. 17.6 M are named non-terminals and 20.6 M the
+  anonymous sequence, alternative, repetition and terminal rules those
+  names expand to. Of the named: the expression precedence ladder
+  (`expr_post` 5.08 M, `expr_mul` 2.28 M, `expr_atom` 1.29 M, `expr_cmp`
+  1.07 M, `expr_add` 0.82 M, `expr_of` 0.65 M, `expr_unary` 0.64 M,
+  `expr_eq` 0.20 M, `expr_and` 0.10 M, `expr_amp`, `expr_or`,
+  `expr_pipe`) is 11.9 M, 31% of all attempts; whitespace (`ws` 4.47 M,
+  `ws_any` 0.35 M, `ws_req` 0.19 M) is 5.0 M, 13%; everything else
+  named (`ident`, `args`, `number`, `string`, the statement forms) is
+  under 2%. Every growth iteration belongs to the ladder (M8 in §4).
+
+  The options, with that evidence: **(A) M8**, the ladder without left
+  recursion, removes every growth iteration and the invalidation rounds
+  with them, and most of the ladder's attempts; expected to be the
+  largest remaining win, roughly 2 to 3×, which puts the parse near but
+  probably not under 1 s on this machine. **(B) the scanner (R4)**
+  removes the 13% whitespace attempts and most of the anonymous
+  terminal matching; it amends the scannerless formalism and touches
+  every fragment that interleaves `ws` by hand (the offside fragment's
+  `hws`; user grammars); better measured after (A), which removes most
+  of the positions at which whitespace is tried. **(C) M7**, cached
+  parse artifacts, guarantees the outcome for repeated runs and the web
+  bundle whatever the engine costs. **(D) M6 (B-153)** is runtime work
+  and unchanged in priority.
+
+  Recommended order, for the maintainer's ruling: first (A) with the
+  built-program oracle (the proposed chunk P7 (the ladder)); then a
+  second measurement and the scanner ruling R4 (the tokenizer question)
+  applied if the whitespace and lexical share still warrants it (P8
+  (measure and the scanner)); then (C) as a small chunk at any point,
+  since the web bundle needs it regardless (P9 (cached parse
+  artifacts)); then (D) (P10 (B-153)). The §5 table carries these as
+  proposed rows.

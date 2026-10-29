@@ -781,6 +781,16 @@ that prevents it.
     identical over all 68 `tests/` and `demos/` files. The final memo
     size rises 4 to 10% and is now reported by `npm run lint:load`, not
     gated. Next: P6 (the decision point).
+  - **Progress.** P6 (the decision point, 2026-10-29): decision
+    requested of the maintainer, recorded in the plan's §7. The planning
+    parse is 3.84 s on the gate's machine, from 68 s (about 18×); the
+    remaining attempts are the expression precedence ladder (31%, and
+    every growth iteration) and whitespace (13%). Recommended order:
+    first the expression ladder without left recursion (the plan's new
+    move M8 (the ladder)), then a second measurement and the scanner
+    ruling R4 (the tokenizer question), then cached parse artifacts
+    (move M7 (cached parse artifacts)), then B-153 (re-evaluation per
+    reference).
 
 ### T-bootstrap (M9)
 
