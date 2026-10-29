@@ -172,6 +172,17 @@ evaluator/runtime set; this is the complete session list):
 - Write metadata in place ONLY while a value is provably unshared —
   during construction, before it escapes. After that, derive
   (`src/structure.ts` states the rule and why).
+- **A library's values are immutable after load; a module writes only
+  into values it constructed** (the owner-module invariant, B-158;
+  `docs/book/extension/modules.md` "Loaded once per process"). A library
+  is loaded once per process and shared by every program that uses it,
+  so a program's alias of a library function or type (`f = lib_f`,
+  `T = LibType`) hands a shared value to the pipeline's in-place writers:
+  the precompile effects write, the divergence stamp and member
+  re-keying all skip values the evaluation was handed through its
+  extensions (`libraryOwnedValues` in `src/runtime.ts`; types stabilise
+  once). The library-immutability test in `src/test/modules.ts` holds
+  it: a new in-place writer must consult the same set or that test fails.
 - Construct structures ONLY via `withMeta`/`makeStructure`; a
   stray object literal fails the W4 boundary invariant.
 - Every path cloning a `ComposedFunction` preserves metadata via the
