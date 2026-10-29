@@ -1,9 +1,15 @@
 # Fast library load — the performance stream
 
-> **Status: active** (2026-10-28) — the maintainer ratified the chunk
-> sequence in §5 and the rulings in §6 on 2026-10-28. The stream runs
-> as a pre-ratified sequence (W-001, `process.md` §3) under the merge
-> policy of R3: merge-on-green.
+> **Status: closed → B-157** (2026-10-29) — the chunk sequence of §5 is
+> complete and the §2 outcome is met: the planning library parses in
+> 0.2 s and loads in 0.6 s on the gate's machine, from 68 s when the
+> stream began (§7, the closing entry). The maintainer ratified the
+> sequence and the rulings of §6 on 2026-10-28 and 2026-10-29, and
+> closed the stream on 2026-10-29 with its follow-ons filed as backlog
+> items (B-159, B-160, B-161). The stream ran as a pre-ratified
+> sequence (W-001, `process.md` §3) under the merge policy of R3,
+> merge-on-green, with implementation delegated per chunk and every
+> diff read before its merge. Kept for its §7 record.
 >
 > **Reader**: someone who knows the project's layers and the gate but
 > has not read the parser engine. Terms: a *library* is a `lib/*.alg`
@@ -968,3 +974,30 @@ a parser that changes a program's meaning has left the stream's scope.
   evaluated once, that a type named in three signatures is evaluated at
   most twice, that a named binding's print runs once, and that forward
   references and mutual recursion still resolve.
+- 2026-10-29: **the stream closed** (the maintainer's ruling: P10's
+  semantics change ratified — an effect in a named binding runs once,
+  as it already did under `--base`; computed function bindings lose
+  their top-level precompile; the three P10 terms ratified; B-157
+  closed with its follow-ons as backlog items). The outcome against
+  §2, on the gate's machine: the planning library's parse 68 s → 0.2 s
+  (the load 0.6 s with evaluation), about 300×; `lib/units.alg` 13 s →
+  0.3 s; `tests/planning-solve-demo.alg` 151 s → 5.2 s; the rung-3
+  scenes 1.0 s and 2.3 s. The CI gate job 11 min at P1 → 7.6 min at
+  P10 on the same runner class. No parse or program semantics changed
+  at any step except the one ratified above; every `// expect:` line
+  is as it was. What each chunk removed: P2 the second load of a
+  library per module and the second parse of a program; P3 the memo's
+  key strings; P4 allocation on the failure path; P5 the re-matching
+  of every entry at a position on each left-recursion growth round
+  (only the entries that read the seed go); P7 the left recursion of
+  the base precedence levels (every growth iteration, and with it the
+  invalidation); P10 the precompile pass's evaluation of every binding
+  and of every binding a binding referenced. Filed as follow-ons, not
+  chunks: B-159 (the precompile and termination analysis of recursive
+  function definitions, now the gate's floor: the totality battery's
+  shard at 236 s against the planning demos' seconds), B-160 (Bits
+  decoded to strings on every member lookup, about 16% of the solve
+  demo's evaluation), B-161 (the CLI's TypeScript module loading, about
+  0.15 s of a 0.76 s run). Not taken and recorded: the scanner layer
+  (R4; P8), cached parse artifacts (M7; P9). Open from the stream's
+  findings: B-158 (in-place write through a library alias).
