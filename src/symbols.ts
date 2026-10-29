@@ -63,12 +63,23 @@ export function kernelMemberFqn(baseName: string): string {
   return KERNEL_SCOPE_FQN + FQN_SEP + baseName;
 }
 
+const STABLE_TYPE_SCOPE_PREFIX = "<type#";
+
 /** C6.1a: the NAME-STABLE member scope for a named type (built-ins,
  *  generics' concrete instances — anything whose name exists at
  *  construction). Distinct namespace from the counter-keyed anonymous
  *  scopes (`<type:N…>` vs `<type#NAME>`). */
 export function typeMemberScopeFqn(typeName: string): string {
-  return `<type#${typeName}>`;
+  return `${STABLE_TYPE_SCOPE_PREFIX}${typeName}>`;
+}
+
+/** B-158: is this member scope NAME-STABLE (`typeMemberScopeFqn`'s
+ *  namespace) rather than a construction's counter scope
+ *  (`newTypeMemberScope`'s `<type:N…>`)? The two namespaces are disjoint
+ *  by shape, so a type's `localMemberScope` says whether the type has been
+ *  stabilised without a marker of its own. */
+export function isNameStableTypeMemberScope(scopeFqn: string): boolean {
+  return scopeFqn.startsWith(STABLE_TYPE_SCOPE_PREFIX);
 }
 
 /** Base-name projection of an FQN storage key. Tolerant: a key without a

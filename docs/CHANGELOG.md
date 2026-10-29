@@ -4,7 +4,58 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
-## 2026-10 — B-157 (the performance stream) closed: the outcome met, follow-ons filed
+## 2026-10 — B-158 (in-place write through a library alias): the owner-module invariant
+
+Since B-157 P2 (a library loads once per run) a library's values are
+shared by every program in the process. The maintainer ruled the design
+on 2026-10-29: a library's values are immutable after load, and a module
+writes only into values it constructed. The **owner module** is the
+module whose evaluation constructed a value
+(`docs/book/extension/modules.md`, "Loaded once per process"). No corpus
+program binds such an alias; no `// expect:` line changed, and the 68
+corpus files print what they printed on `origin/main`.
+
+- **Reproduced first.** Program A (`T = Quantity`, `g = lib_f` beside its
+  own diverging `helper`) re-keyed `lib/units.alg`'s `Quantity` members
+  onto `<type#<main>::T>` and stamped `div` on the scratch library's
+  `lib_f`. Program B, run next in the same process, then halted with
+  `effects mismatch in h: declared pure, inferred div`; run alone it
+  prints `[2, 3]`.
+- **Member re-keying is write-once.** `stabilizeTypeMemberScope`
+  (`src/types-std.ts`) re-keys only a type whose `localMemberScope` is
+  still its construction's counter scope (`<type:N>`); a type on a
+  name-stable scope (`<type#…>`) is left alone. The two namespaces are
+  disjoint by shape, so no marker was added:
+  `isNameStableTypeMemberScope` (`src/symbols.ts`) reads the shape.
+- **The divergence stamp writes only to owned functions.**
+  `libraryOwnedValues` (`src/runtime.ts`) collects, by reference, the
+  values `evalSource` (the program pipeline) was handed: each
+  extension's bindings and each module object's fields. The stamp skips
+  them. A program's analysis no longer stamps a library function
+  through an alias; the library's own load stamps its functions as
+  before.
+- **Beyond the brief: the precompile write gets the same guard.** The
+  brief held that P10 (a binding evaluated once) had taken aliases out
+  of precompile. It had not: an alias evaluates to the library's own
+  function object, which is a function definition, and
+  `precompileFunction` (precompile) replaced its inferred effect set
+  with a new one. `precompileFunctionsInner` now skips a library-owned
+  function.
+- **The check.** `module: B-158` in `src/test/modules.ts` (next to the
+  P2 loader tests, which already load through `libExtensions`;
+  `src/boundary-tests.ts` builds its own type systems and is imported by
+  `src/test/alg-files.ts`, so it cannot import the harness without a
+  cycle). It snapshots every own host field, metadata field, effect set
+  and member key of every value `units` and a scratch library bind, runs
+  two aliasing programs, and asserts the snapshot is unchanged and that
+  `instanceof` and member dispatch on the aliased type still work. With
+  any one of the three guards removed it fails.
+- **Docs.** `modules.md` defines owner module (`def-owner-module`);
+  `structures.md` points to it from the in-place rule; B-135 (host-plane
+  declaration) takes a rider for a branded `Unshared<Value>` write
+  accessor.
+- Suite 1238/1238 (`npm run test:shards`), one test added.
+
 
 The stream's ten chunks are merged and the plan
 `docs/plans/fast-library-load.md` is closed (its §7 closing entry is the

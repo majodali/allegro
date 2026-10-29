@@ -6,7 +6,7 @@
 import { parseExtended, GrammarExtension } from "./grammar-ext.js";
 import { metaReadRaw, cloneMeta, hasShapeSlot, bumpMetaEpoch, withSource, carryMeta } from "./metadata.js";
 import { installAnalysis, kernelFieldWriter } from "./capability.js";
-import { getName, renameInPlace, isBareBindingName, isFutureBindingName } from "./slot-accessors.js";
+import { getName, renameInPlace, isBareBindingName, isFutureBindingName, asStructure } from "./slot-accessors.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
 import { markTailCalls, precompileFunction, remapParams, setInlineCutoff, markPatternBinders, beginEvalStats, endEvalStats, watchBindingExpr, setEvalStatsPrecompile } from "./evaluator.js";
 import { parseSource } from "./grammar2/engine.js";
@@ -575,6 +575,30 @@ function precompileMemoEntry(key: string, expr: Value, ctx: StructureValue): Bin
 }
 
 /**
+ * B-158: the values this evaluation was HANDED — each extension's binding
+ * values and each module object's fields. Their owner module is another
+ * evaluation (a library's load, or the type system's construction), and
+ * since B-157 P2 a library's values are shared by every program in the
+ * process, so this evaluation never writes into them; it writes only into
+ * values it constructs. Membership is by reference: an alias `f = lib_f`
+ * binds the library's own function object, which is therefore in the set.
+ * A library's own load is not handed its own functions (its extensions are
+ * its dependencies), so it still writes into them as their owner.
+ */
+function libraryOwnedValues(extensions?: Extension[]): Set<Value> {
+  const owned = new Set<Value>();
+  if (!extensions) return owned;
+  for (const ext of extensions) {
+    for (const value of Object.values(ext.bindings)) owned.add(value);
+    const moduleObject = asStructure(ext.moduleObject);
+    if (moduleObject) {
+      for (const b of moduleObject.bindings.values()) if (b.value) owned.add(b.value);
+    }
+  }
+  return owned;
+}
+
+/**
  * Pre-compile typed functions: partially evaluate their bodies with
  * typed param placeholders to infer return types and detect type errors.
  */
@@ -582,6 +606,7 @@ function precompileFunctions(
   fileCtx: any,
   extensions?: Extension[],
   typed?: boolean,
+  libraryOwned: Set<Value> = new Set(),
 ): CompilationReport {
   const report: CompilationReport = { inferred: [], unresolved: [], bindingTypes: new Map(), notifications: [] };
   if (!typed) return report;
@@ -593,7 +618,7 @@ function precompileFunctions(
   setLawInstantiationSuspended(true);
   setEvalStatsPrecompile(true);
   try {
-    return precompileFunctionsInner(fileCtx, extensions, report);
+    return precompileFunctionsInner(fileCtx, extensions, report, libraryOwned);
   } finally {
     setEvalStatsPrecompile(false);
     setLawInstantiationSuspended(false);
@@ -604,6 +629,7 @@ function precompileFunctionsInner(
   fileCtx: any,
   extensions: Extension[] | undefined,
   report: CompilationReport,
+  libraryOwned: Set<Value>,
 ): CompilationReport {
   // Build a minimal context for pre-compilation (primitives + extensions)
   const compileCtx = makeStructure();
@@ -692,6 +718,13 @@ function precompileFunctionsInner(
     } else {
       continue;
     }
+
+    // B-158: an alias of a library function (`f = lib_f`) evaluates to the
+    // library's own function object, and `precompileFunction` writes the
+    // inferred effect set onto the function it is given. The library's
+    // load already precompiled it, in its own scope; this evaluation does
+    // not own it and does not write into it.
+    if (libraryOwned.has(fn)) continue;
 
     // Pre-compile: partially evaluate body with typed placeholders
     const { inferredReturnType, errors: fnErrors } = precompileFunction(
@@ -1055,6 +1088,9 @@ export function evalSource(
   // skip the divergence check and nothing else. A pass that never
   // installs would leave a stale answer from an earlier compilation.
   installAnalysis(kernelFieldWriter("effects"), "diverges", () => null);
+  // B-158: the values this evaluation was handed and does not own — the
+  // precompile and the divergence stamp below write only outside this set.
+  const libraryOwned = libraryOwnedValues(extensions);
   // Normalize line endings — the parser expects \n only
   const normalized = source.replace(/\r\n/g, "\n");
 
@@ -1225,7 +1261,7 @@ export function evalSource(
     }
   }
   // Pre-compile typed functions: infer return types and detect type errors
-  const compilationReport = precompileFunctions(fileCtx, extensions, typed);
+  const compilationReport = precompileFunctions(fileCtx, extensions, typed, libraryOwned);
 
   // Phase D1: check effect declarations against inferred sets. Mismatches
   // (declared ⊉ inferred, ignoring "opaque" which is a Slice-1 placeholder
@@ -1265,9 +1301,16 @@ export function evalSource(
     // Stamp: div joins each carrier's INFERRED effect set — before the
     // declaration check below, so the existing inferred-⊆-declared
     // machinery (and its halt) carries div with no new enforcement path.
+    // B-158: only into a function this evaluation owns. A binding that
+    // aliases a library function (`f = lib_f`) is a stamp target whose
+    // value is the library's function, shared by every program in the
+    // process; stamping it would hand this program's verdict to the next.
+    // So a program's analysis no longer stamps a library function through
+    // an alias: the library's contract is the library's, stamped by the
+    // library's own load.
     for (const [name] of divR!.divBindings) {
       const cfn = divR!.stampTargets.get(name);
-      if (!cfn) continue;
+      if (!cfn || libraryOwned.has(cfn)) continue;
       const prior = (cfn as any).inferredEffects as Set<string> | undefined;
       const next = new Set(prior ?? []);
       next.add("div");
@@ -1438,7 +1481,9 @@ export function evalSource(
           // declaration-site scope (module FQN + binding name) — the
           // fixpoint may re-evaluate this declaration, and both
           // constructions must yield the SAME member symbols for
-          // conformance to hold across passes.
+          // conformance to hold across passes. B-158: write-once — a type
+          // already stabilised (a library's, or one an earlier binding
+          // named) keeps its scope, as the auto-name above keeps its name.
           stabilizeTypeMemberScope(typeCtx,
             typeMemberScopeFqn(`${moduleFqn ?? MAIN_SCOPE_FQN}${FQN_SEP}${b.key}`));
         }

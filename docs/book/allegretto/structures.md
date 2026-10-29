@@ -221,7 +221,10 @@ with enforcement deferred. Nothing ever branched on it, and it was false on
 every scope. The property is enforced by the boundary battery and by the
 in-place rule in `src/structure.ts`; the O(1) deep-immutability check D22
 describes becomes load-bearing only when mutability lands, and building it is
-**B-143**.
+**B-143**. The in-place rule's cross-module form is the owner-module invariant
+of B-158 (in-place write through a library alias): a library's values are
+immutable after load, and a module writes only into values it constructed
+([modules.md](../extension/modules.md), "Loaded once per process").
 
 **Base ops.** `struct_new`, `struct_get(key)`, `struct_with` (copy-on-write
 derive), `struct_slots` (D27).
