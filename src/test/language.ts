@@ -11,11 +11,11 @@ import { evalSource as runtimeEval, Extension } from "../runtime.js";
 import * as path from "path";
 import { bitsToString, BitsValue, makeInt, makeStructure, makeExpr, ValueKind, Value } from "../types.js";
 import { applyPhase } from "../runtime.js";
-import { evaluate } from "../evaluator.js";
+import { evaluate, setEvalStatsSink, type EvalReport } from "../evaluator.js";
 import { getTypeName } from "../types-std.js";
 import { metaOf } from "../metadata.js";
 import { extractGrammarFragment } from "../primitives.js";
-import { primNames, typeNames, fileTest, testsDir, libExtensions } from "./alg-files.js";
+import { primNames, typeNames, fileTest, testsDir, libExtensions, runAlgFile } from "./alg-files.js";
 import { putEntry } from "../structure.js";
 
 // == Guard Clauses (and) ==
@@ -172,6 +172,74 @@ test("multiline: when multi-case still works", () => {
 
 test("multiline: single-line if unchanged", () => {
   eq(evalNum("if 1 == 1 then 42 else 0"), 42);
+});
+
+// == B-153 (re-evaluation per reference): a binding is evaluated once ==
+//
+// B-157 P10. The stats sink (`setEvalStatsSink`) reports, per `evalSource`
+// call, how many times each top-level binding's expression was evaluated.
+// The precompile pass used to evaluate every binding in a context holding
+// expressions, so each reference re-evaluated the referenced binding.
+
+function bindingEvals(run: () => void, source = "<main>"): Map<string, number> {
+  const reports: EvalReport[] = [];
+  const previous = setEvalStatsSink(r => { reports.push(r); });
+  try { run(); } finally { setEvalStatsSink(previous); }
+  const own = reports.filter(r => r.source === source);
+  eq(own.length, 1, `one report for ${source}`);
+  return own[0].stats.bindingEvaluations;
+}
+
+test("B-153: a five-binding chain evaluates each binding once", () => {
+  const src = "d = 1 + 1\nc = d + 1\nb = c + d\na = b + c\ne = a + b\nprint(e)\n";
+  for (const typed of [true, false]) {
+    const printed: string[] = [];
+    const origLog = console.log;
+    console.log = (m: any) => printed.push(String(m));
+    let counts: Map<string, number>;
+    try {
+      counts = bindingEvals(() => runtimeEval(src, undefined, typed ? [typeExt] : [], undefined, typed));
+    } finally { console.log = origLog; }
+    eq(printed.join(","), "13", `output (${typed ? "standard" : "base"})`);
+    eq([...counts!.keys()].sort().join(","), "a,b,c,d,e", "every binding watched");
+    for (const [name, n] of counts!) eq(n, 1, `${name} evaluated once (${typed ? "standard" : "base"})`);
+  }
+});
+
+test("B-153: a named binding's print runs once", () => {
+  const printed: string[] = [];
+  const origLog = console.log;
+  console.log = (m: any) => printed.push(String(m));
+  try {
+    runtimeEval('x = print("hi")\ny = [x, x]\nprint("end")\n', undefined, [typeExt], undefined, true);
+  } finally { console.log = origLog; }
+  eq(printed.join(","), "hi,end");
+});
+
+test("B-153: a type named in several signatures is built once in precompile", () => {
+  const src = "Pos = Int & _ > 0\nf(x: Pos): Int => x + 1\ng(x: Pos): Int => x + 2\nh(x: Pos): Pos => x\nprint(f(1) + g(2) + h(3))\n";
+  const counts = bindingEvals(() => runtimeEval(src, undefined, [typeExt], undefined, true));
+  // Once speculatively (the definitions' precompile reads it), once for real.
+  const n = counts.get("Pos") ?? 0;
+  eq(n >= 1 && n <= 2, true, `Pos evaluated ${n} times, at most twice`);
+});
+
+test("B-153: a planning demo's plan binding is evaluated once", () => {
+  const counts = bindingEvals(() => runAlgFile(path.join(testsDir, "planning-release-demo.alg")));
+  eq(counts.get("SoftwareRelease"), 1, "SoftwareRelease evaluated once");
+  eq(counts.get("BuildPipeline"), 1, "BuildPipeline evaluated once");
+  for (const [name, n] of counts) eq(n, 1, `${name} evaluated once`);
+});
+
+test("B-153: forward references and mutual recursion still resolve", () => {
+  const out: string[] = [];
+  const origLog = console.log;
+  console.log = (m: any) => out.push(String(m));
+  try {
+    runtimeEval("a = b + 1\nb = 2\nev(n: Int): Bool => if n == 0 then true else od(n - 1)\nod(n: Int): Bool => if n == 0 then false else ev(n - 1)\nprint(a)\nprint(ev(10))\n",
+      undefined, [typeExt], undefined, true);
+  } finally { console.log = origLog; }
+  eq(out.join(","), "3,true");
 });
 
 // == Reactive Forward-Chaining Evaluation ==

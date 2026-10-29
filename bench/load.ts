@@ -6,9 +6,10 @@
 //   npx tsx bench/load.ts --check --update-baseline
 //
 // Report mode runs each corpus entry the way the CLI does
-// (`node --import tsx src/index.ts FILE`) with ALLEGRO_PARSE_STATS=1, and
-// prints the wall clock and the summed engine counts of every parse the run
-// performed. It may take several minutes and gates nothing.
+// (`node --import tsx src/index.ts FILE`) with ALLEGRO_PARSE_STATS=1 and
+// ALLEGRO_EVAL_STATS=1, and prints the wall clock, the summed engine counts
+// of every parse the run performed, and the run's evaluation counts (B-157
+// P10). It may take several minutes and gates nothing.
 //
 // Check mode parses only, in-process: each corpus program's body, and every
 // library it `use`s or `import`s, each library source ONCE across the whole
@@ -99,20 +100,38 @@ function readReportLines(stderr: string): RunParse[] {
   return out;
 }
 
+interface RunEval { evaluates: number; applyComposed: number; applyPrimitive: number; inlineExpansions: number; bindings: number; bindingEvals: number; maxPerBinding: number; reEvaluated: number; }
+
+/** The run's one `eval-stats` line (`formatRunStats` in src/evaluator.ts). */
+function readEvalLine(stderr: string): RunEval | null {
+  for (const line of stderr.split("\n")) {
+    if (!line.startsWith("eval-stats ")) continue;
+    const field = (k: string): number => Number(new RegExp(`\\b${k}=(\\d+)`).exec(line)?.[1] ?? NaN);
+    return {
+      evaluates: field("evaluates"), applyComposed: field("applyComposed"), applyPrimitive: field("applyPrimitive"),
+      inlineExpansions: field("inlineExpansions"), bindings: field("bindings"), bindingEvals: field("bindingEvals"),
+      maxPerBinding: field("maxPerBinding"), reEvaluated: field("reEvaluated"),
+    };
+  }
+  return null;
+}
+
 function runReport(): number {
-  console.log("Load corpus — full runs (parse + evaluation), ALLEGRO_PARSE_STATS=1");
+  console.log("Load corpus — full runs (parse + evaluation), ALLEGRO_PARSE_STATS=1 ALLEGRO_EVAL_STATS=1");
   console.log("Wall clock is reported, never gated (docs/plans/fast-library-load.md §3).\n");
-  const rows: { file: string; wall: number; code: number | null; parses: RunParse[]; tail: string }[] = [];
+  const rows: { file: string; wall: number; code: number | null; parses: RunParse[]; evals: RunEval | null; tail: string }[] = [];
   for (const entry of CORPUS) {
     const t0 = Date.now();
     const r = spawnSync(process.execPath, ["--import", "tsx", "src/index.ts", entry.file], {
       cwd: ROOT, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, ALLEGRO_PARSE_STATS: "1" },
+      env: { ...process.env, ALLEGRO_PARSE_STATS: "1", ALLEGRO_EVAL_STATS: "1" },
     });
     const wall = (Date.now() - t0) / 1000;
     const parses = readReportLines(r.stderr ?? "");
-    const tail = (r.stderr ?? "").split("\n").filter(l => l && !l.startsWith("parse-stats ")).slice(-8).join("\n");
-    rows.push({ file: entry.file, wall, code: r.status, parses, tail });
+    const evals = readEvalLine(r.stderr ?? "");
+    const tail = (r.stderr ?? "").split("\n")
+      .filter(l => l && !l.startsWith("parse-stats ") && !l.startsWith("eval-stats ")).slice(-8).join("\n");
+    rows.push({ file: entry.file, wall, code: r.status, parses, evals, tail });
     console.log(`  ${pad(entry.file, 32)} ${lpad(wall.toFixed(1), 7)} s  exit ${r.status}  (${parses.length} parses)`);
   }
 
@@ -126,6 +145,19 @@ function runReport(): number {
     console.log("  " + pad(row.file, 32) + lpad(row.wall.toFixed(1), 8) + lpad(String(row.parses.length), 8) +
       lpad((sum("ms") / 1000).toFixed(1), 9) + lpad(num(sum("attempts")), 14) + lpad(num(sum("memoWrites")), 14) +
       lpad(num(sum("invEntries")), 13) + lpad(num(sum("lrIters")), 10));
+  }
+
+  console.log("\nEvaluation per run (B-157 P10; a binding is a top-level binding whose expression computes):");
+  const eheader = "  " + pad("entry", 32) + lpad("evaluate", 12) + lpad("applyComposed", 15) + lpad("applyPrimitive", 16) +
+    lpad("inline exp.", 13) + lpad("bindings", 10) + lpad("binding evals", 15) + lpad("max", 5) + lpad("re-eval'd", 11);
+  console.log(eheader);
+  console.log("  " + "-".repeat(eheader.length - 2));
+  for (const row of rows) {
+    const e = row.evals;
+    if (!e) { console.log("  " + pad(row.file, 32) + "  (no eval-stats line)"); continue; }
+    console.log("  " + pad(row.file, 32) + lpad(num(e.evaluates), 12) + lpad(num(e.applyComposed), 15) +
+      lpad(num(e.applyPrimitive), 16) + lpad(num(e.inlineExpansions), 13) + lpad(num(e.bindings), 10) +
+      lpad(num(e.bindingEvals), 15) + lpad(String(e.maxPerBinding), 5) + lpad(String(e.reEvaluated), 11));
   }
 
   console.log("\nParses per run:");

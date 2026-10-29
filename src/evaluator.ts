@@ -41,6 +41,173 @@ export function setInlineCutoff(f: ((fn: Value) => boolean) | null): void {
   inlineCutoff = f;
 }
 
+// --- Evaluation stats (B-157 P10) ---
+//
+// `ALLEGRO_EVAL_STATS=1` prints one stderr line per run, at process exit,
+// with deterministic counts of the evaluator's work; a sink receives one
+// report per `evalSource` call (a program or a library). The shape mirrors
+// the parse stats (`parseSource` in `src/grammar2/engine.ts`). Off, with no
+// sink, nothing is counted: every counting site tests `evalStats` for null.
+
+/** Counts of the evaluator's work. All are deterministic for a given
+ *  program and library set. */
+export interface EvalStats {
+  /** `evaluate` calls. */
+  evaluateCalls:        number;
+  /** `applyComposed` calls (each TCO loop round is one more expansion, not
+   *  one more call). */
+  applyComposedCalls:   number;
+  /** `applyPrimitive` calls. */
+  applyPrimitiveCalls:  number;
+  /** Bodies a composed function's application expanded (`substituteParams`
+   *  then `evaluate`) while the precompile pass was running: its
+   *  speculative inlining. */
+  inlineExpansions:     number;
+  /** Evaluations of a top-level binding's expression, by binding name.
+   *  Only a binding whose expression computes (an application or a name)
+   *  is watched; a literal value evaluates to itself and costs nothing. */
+  bindingEvaluations:   Map<string, number>;
+  /** Of `bindingEvaluations`, the ones made inside the precompile pass. */
+  precompileBindingEvals: number;
+}
+
+/** One `evalSource` call's share: the counters' growth during the call,
+ *  and the evaluations of that call's own top-level bindings. */
+export interface EvalReport {
+  source: string;
+  stats:  EvalStats;
+}
+
+export type EvalStatsSink = (report: EvalReport) => void;
+
+/** The evaluations of one watched binding, in one `evalSource` call. */
+interface BindingTally { n: number; }
+
+/** The run's counters. */
+interface RunCounters {
+  evaluateCalls: number; applyComposedCalls: number; applyPrimitiveCalls: number;
+  inlineExpansions: number; precompileBindingEvals: number;
+  /** Every binding watched in the run, for the exit line. */
+  tallies: BindingTally[];
+}
+/** Null while nothing is counting. */
+let evalStats: RunCounters | null = null;
+/** A watched binding expression → its tally. */
+let watchedBindings: WeakMap<object, BindingTally> = new WeakMap();
+let inPrecompile = false;
+let evalStatsSink: EvalStatsSink | null = null;
+let exitLineRegistered = false;
+
+/** Install a sink that receives every `evalSource` call's report. Returns
+ *  the previous sink; `null` removes it. */
+export function setEvalStatsSink(sink: EvalStatsSink | null): EvalStatsSink | null {
+  const previous = evalStatsSink;
+  evalStatsSink = sink;
+  return previous;
+}
+
+/** `ALLEGRO_EVAL_STATS=1` (any value but empty or `0`). Guarded so the
+ *  evaluator stays browser-compatible. */
+function evalStatsSwitchOn(): boolean {
+  if (typeof process === "undefined") return false;
+  const v = process.env?.ALLEGRO_EVAL_STATS;
+  return v !== undefined && v !== "" && v !== "0";
+}
+
+/** The one-line summary the switch prints for the run. Fields are
+ *  `key=value` so `bench/load.ts` can read them back. `bindings` counts the
+ *  watched top-level bindings of every program and library the run
+ *  evaluated; `maxPerBinding` is the most times any one of them was
+ *  evaluated; `reEvaluated` is how many were evaluated more than once. */
+function formatRunStats(s: RunCounters): string {
+  let total = 0, max = 0, again = 0;
+  for (const t of s.tallies) {
+    total += t.n;
+    if (t.n > max) max = t.n;
+    if (t.n > 1) again++;
+  }
+  return `eval-stats evaluates=${s.evaluateCalls} applyComposed=${s.applyComposedCalls}` +
+    ` applyPrimitive=${s.applyPrimitiveCalls} inlineExpansions=${s.inlineExpansions}` +
+    ` bindings=${s.tallies.length} bindingEvals=${total}` +
+    ` precompileBindingEvals=${s.precompileBindingEvals}` +
+    ` maxPerBinding=${max} reEvaluated=${again}`;
+}
+
+/** An open `evalSource` call's view of the counters. */
+export interface EvalStatsFrame {
+  source: string;
+  start:  Omit<RunCounters, "tallies">;
+  own:    Map<string, BindingTally>;
+}
+
+/** Called by `evalSource` on entry: starts counting when the switch is on
+ *  or a sink is installed, and returns the frame `endEvalStats` closes.
+ *  Null when nothing counts. */
+export function beginEvalStats(source: string): EvalStatsFrame | null {
+  const switchOn = evalStatsSwitchOn();
+  if (!switchOn && evalStatsSink === null) return null;
+  if (evalStats === null) {
+    evalStats = {
+      evaluateCalls: 0, applyComposedCalls: 0, applyPrimitiveCalls: 0,
+      inlineExpansions: 0, precompileBindingEvals: 0, tallies: [],
+    };
+  }
+  if (switchOn && !exitLineRegistered && typeof process !== "undefined" && typeof process.on === "function") {
+    exitLineRegistered = true;
+    process.on("exit", () => { if (evalStats !== null) console.error(formatRunStats(evalStats)); });
+  }
+  const s = evalStats;
+  return {
+    source,
+    start: {
+      evaluateCalls: s.evaluateCalls, applyComposedCalls: s.applyComposedCalls,
+      applyPrimitiveCalls: s.applyPrimitiveCalls, inlineExpansions: s.inlineExpansions,
+      precompileBindingEvals: s.precompileBindingEvals,
+    },
+    own: new Map(),
+  };
+}
+
+/** Watch a top-level binding's expression: every later `evaluate` of that
+ *  object counts as one evaluation of the binding. */
+export function watchBindingExpr(frame: EvalStatsFrame, expr: Value, name: string): void {
+  if (evalStats === null) return;
+  const tally: BindingTally = { n: 0 };
+  watchedBindings.set(expr, tally);
+  frame.own.set(name, tally);
+  evalStats.tallies.push(tally);
+}
+
+/** Mark the precompile pass (runtime.ts `precompileFunctions`). */
+export function setEvalStatsPrecompile(on: boolean): void {
+  inPrecompile = on;
+}
+
+/** Called by `evalSource` on return: hands the call's report to the sink.
+ *  Counting stops once neither the switch nor a sink wants it. */
+export function endEvalStats(frame: EvalStatsFrame | null): void {
+  if (frame === null || evalStats === null) return;
+  const s = evalStats;
+  const own = new Map<string, number>();
+  for (const [name, t] of frame.own) own.set(name, t.n);
+  const report: EvalReport = {
+    source: frame.source,
+    stats: {
+      evaluateCalls:          s.evaluateCalls - frame.start.evaluateCalls,
+      applyComposedCalls:     s.applyComposedCalls - frame.start.applyComposedCalls,
+      applyPrimitiveCalls:    s.applyPrimitiveCalls - frame.start.applyPrimitiveCalls,
+      inlineExpansions:       s.inlineExpansions - frame.start.inlineExpansions,
+      bindingEvaluations:     own,
+      precompileBindingEvals: s.precompileBindingEvals - frame.start.precompileBindingEvals,
+    },
+  };
+  if (evalStatsSink !== null) evalStatsSink(report);
+  if (evalStatsSink === null && !evalStatsSwitchOn()) {
+    evalStats = null;
+    watchedBindings = new WeakMap();
+  }
+}
+
 // --- Tail Call Optimization ---
 
 /**
@@ -197,6 +364,14 @@ export function evaluate(
   value: Value, ctx: StructureValue, depth: number = 0, depCollector?: DepCollector,
 ): Value {
   if (depth > MAX_DEPTH) throw new AllegroError("Maximum evaluation depth exceeded");
+  if (evalStats !== null) {
+    evalStats.evaluateCalls++;
+    const tally = watchedBindings.get(value);
+    if (tally !== undefined) {
+      tally.n++;
+      if (inPrecompile) evalStats.precompileBindingEvals++;
+    }
+  }
 
   switch (value.kind) {
     case ValueKind.Bits:
@@ -359,6 +534,7 @@ function applyPrimitive(
   depth: number,
   depCollector?: DepCollector,
 ): Value {
+  if (evalStats !== null) evalStats.applyPrimitiveCalls++;
   // Stage F1: track effects fired during this primitive's evaluation so we
   // can attach the union to the result via the `effects` MultiValue component.
   // For lazy primitives we wrap evalFn to harvest effects from each subcall;
@@ -548,6 +724,7 @@ function applyComposed(
   let currentFn = fn;
   let currentArgs = args;
   let currentFnRaw = fnRaw;
+  if (evalStats !== null) evalStats.applyComposedCalls++;
 
   // TCO loop: re-enters when a tail call to the same (or different) function is detected
   tco_loop: while (true) {
@@ -611,6 +788,7 @@ function applyComposed(
       try { body = renderExprSource(currentFn.body).slice(0, 120).replace(/\n/g, " "); } catch { /* diagnostic only */ }
       console.error(`[evaluation depth ${depth}] ${body}`);
     }
+    if (evalStats !== null && inPrecompile) evalStats.inlineExpansions++;
     const substituted = substituteParams(currentFn, evalArgs);
     let result: Value | TailCall = evaluate(substituted, enrichedCtx, depth + 1, depCollector);
 

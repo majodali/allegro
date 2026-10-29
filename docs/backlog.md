@@ -728,8 +728,11 @@ that prevents it.
   (active 2026-10-28; P1 (instrumentation and the corpus), P2 (a
   library loads once per run, closing B-155 (library load per module)),
   P3 (numeric memo keys), P4 (fewer and cheaper entries),
-  P5 (dependency-tracked invalidation) and
-  P7 (the ladder without left recursion) landed). Measured: the planning
+  P5 (dependency-tracked invalidation),
+  P7 (the ladder without left recursion) and P10 (a binding evaluated
+  once, closing B-153 (re-evaluation per reference)) landed; P8 (measure
+  and the scanner) measured and not taken, P9 (cached parse artifacts)
+  not taken). Measured: the planning
   library loads in 68 s, 87% of it in the grammar-2 engine and 68% of
   the parse in the memo table (key strings, lookups, invalidation,
   garbage); evaluation under a second; 1.1 ms per character, linear.
@@ -804,6 +807,19 @@ that prevents it.
     parse runs in 0.13 s against 3.5 s, under the plan's 1 s target; the
     gate 313.2 s against 322.8 s. Next: P8 (measure and the
     scanner).
+  - **Progress.** P8 and P9 (2026-10-29), decided by the orchestrating
+    agent on the plan's text and R4 (the tokenizer question): after P7
+    the planning parse is 0.2 s and whitespace 11% of its attempts, so
+    the scanner layer is not built now (a recorded option) and cached
+    parse artifacts are not needed. P10 (a binding evaluated once,
+    2026-10-29): `ALLEGRO_EVAL_STATS=1` measures the evaluator; the
+    re-evaluation was the precompile pass, which evaluated every binding
+    in a context holding expressions. It now evaluates function
+    definitions only, and each value binding at most once. The solve
+    demo: binding evaluations 455 to 91, `evaluate` calls 13.6 M to
+    10.0 M, 6.4 s to 5.2 s; `demos/rung3/02-solve.alg` 4.0 s to 2.3 s.
+    Outputs identical over the 68 corpus files. B-153 closed. The
+    stream's chunk sequence is complete.
 
 ### T-bootstrap (M9)
 
@@ -1015,8 +1031,13 @@ that prevents it.
     getting-started (B-093 progress above). Next: E2 (the website
     loop), then C2 or D3 as a pilot plan demands, for the maintainer to
     say
-- [ ] **B-153** (re-evaluation per reference) · L0 · **A top-level
-  binding is re-evaluated at every reference.** Found by B-151 D1. Five bindings each referencing the
+- [x] **B-153** (re-evaluation per reference) · L0 · **A top-level
+  binding is re-evaluated at every reference.** Landed 2026-10-29 by
+  B-157 P10 (a binding evaluated once): the re-evaluation was the
+  precompile pass, which evaluated every binding in a context holding
+  expressions; it now evaluates function definitions only, and each
+  value binding at most once (plan `docs/plans/fast-library-load.md`
+  §7). Found by B-151 D1. Five bindings each referencing the
   previous (`d`, `c = …d…`, `b = …c…`, …) evaluate `d`'s expression six
   times; a plan referenced ten times by a demo is built ten times, and
   each build runs the plan's checks. Symbol resolution substitutes the
