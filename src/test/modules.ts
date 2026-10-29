@@ -16,9 +16,73 @@ import { libExtensions } from "./alg-files.js";
 import { evalNumExt, evalStd } from "./fixtures.js";
 import { exportedSymbols, symbolFromWire } from "../symbols.js";
 import { Extension } from "../runtime.js";
-import { BitsValue } from "../types.js";
+import { BitsValue, Value } from "../types.js";
+import { effectsOf } from "../effects.js";
+import { metaFieldList, metaReadRaw } from "../metadata.js";
+import { asStructure, getMembers } from "../slot-accessors.js";
 
 // == Module Loader ==
+
+/** B-158: evaluate a typed program and answer what it printed, one entry
+ *  per `print`, or the first line of the error that halted it. */
+function runCapturing(src: string, exts: Extension[]): string {
+  const out: string[] = [];
+  const orig = console.log;
+  console.log = (...a: unknown[]) => { out.push(a.map(String).join(" ")); };
+  try {
+    runtimeEval(src, undefined, exts, undefined, true);
+  } catch (e: any) {
+    out.push("ERROR: " + String(e?.message ?? e).split("\n").slice(0, 2).join(" "));
+  } finally {
+    console.log = orig;
+  }
+  return out.join(" ; ");
+}
+
+/** B-158: a structural snapshot of the host plane of every value the given
+ *  extensions bind (and of each module object's fields): each own field by
+ *  value or by object identity, a Set's contents, the metadata fields by
+ *  identity, the effect set, and a type's member keys with their values by
+ *  identity. Identities are numbered by one table per snapshotter, so two
+ *  snapshots compare entry by entry. Excluded: the derived caches a read
+ *  builds on first access (`_view`, `_positional` in `src/structure.ts`;
+ *  the members' lazy `memberNameIndex` is not on the value itself). */
+function hostPlaneSnapshotter(exts: Extension[]): () => Map<string, string> {
+  const ids = new Map<object, number>();
+  const id = (o: object): string => {
+    let n = ids.get(o);
+    if (n === undefined) { n = ids.size; ids.set(o, n); }
+    return `#${n}`;
+  };
+  const show = (x: unknown): string => {
+    if (x === null || typeof x !== "object") return typeof x === "function" ? `fn${id(x as object)}` : String(x);
+    if (x instanceof Set) return `${id(x)}{${[...x].map(String).sort().join(",")}}`;
+    return id(x);
+  };
+  const CACHES = new Set(["_view", "_positional"]);
+  const record = (out: Map<string, string>, at: string, v: Value): void => {
+    for (const k of Object.keys(v).sort()) {
+      if (!CACHES.has(k)) out.set(`${at} .${k}`, show((v as any)[k]));
+    }
+    for (const f of metaFieldList(v).sort()) out.set(`${at} meta:${f}`, show(metaReadRaw(v, f)));
+    out.set(`${at} effects`, [...(effectsOf(v) ?? [])].sort().join(","));
+    const asType = asStructure(v);
+    const members = asType ? asStructure(getMembers(asType)) : null;
+    if (members) {
+      out.set(`${at} members`, [...members.bindings.keys()].sort().join(" "));
+      for (const [k, b] of members.bindings) out.set(`${at} member ${k}`, show(b.value));
+    }
+  };
+  return () => {
+    const out = new Map<string, string>();
+    for (const ext of exts) {
+      for (const [name, v] of Object.entries(ext.bindings)) record(out, `${ext.name}.${name}`, v);
+      const mo = asStructure(ext.moduleObject);
+      if (mo) for (const [k, b] of mo.bindings) if (b.value) record(out, `${ext.name} module.${k}`, b.value);
+    }
+    return out;
+  };
+}
 
 export async function runModuleTests(): Promise<void> {
   await asyncTest("module: load simple module", async () => {
@@ -209,6 +273,72 @@ export async function runModuleTests(): Promise<void> {
       "",
     ].join("\n");
     eq(scanImports(body).join(","), "alpha,beta,gamma", "column-0 imports outside strings and comments");
+  });
+
+  // B-158 (in-place write through a library alias): the owner-module
+  // invariant. A library's values are immutable after its load, and an
+  // evaluation writes only into values it constructed. Two programs in one
+  // process alias a library's types and functions; the library's host
+  // plane reads the same afterwards, and the second program sees the
+  // library as its load left it. The snapshot covers every own host field
+  // of every value the libraries bind, so a writer added later that
+  // reaches a library value through a program fails here too.
+  await asyncTest("module: B-158 — programs that alias a library's values leave them as loaded", async () => {
+    // `lib_f` calls `helper` by name, so a program that defines its own
+    // diverging `helper` and aliases `lib_f` gets a divergence verdict for
+    // the alias that is not the library's; `spin` is a function the
+    // analysis cannot discharge, stamped `div` by the library's own load;
+    // `loud` has an inferred effect set for precompile to write.
+    const ownerSrc = "helper(n) => n + 1\nlib_f(n) => helper(n)\nspin(n: Int): Int => spin(n + 1)\n" +
+      "loud(n) =>\n  print(n)\n  n\n";
+    const owner = new ModuleLoader({
+      modules: [],
+      resolve: (id) => id === "b158_owner" ? "/mock/b158_owner.alg" : null,
+      readFileSync: () => ownerSrc,
+      extensions: [typeExt],
+    }).loadModuleSync("b158_owner");
+    const [units] = libExtensions(["units"]);
+    const [effects] = libExtensions(["effects"]);
+    const exts = [typeExt, units, effects, owner];
+    const snapshot = hostPlaneSnapshotter([units, owner]);
+    const before = snapshot();
+    eq(effectsOf(owner.bindings["spin"])?.has("div"), true, "the library's load stamps its own function");
+
+    const outA = runCapturing([
+      "T = Quantity",
+      "L = Length",
+      "f = qty",
+      "x = f(3, m)",
+      "print(x instanceof T)",
+      "print(x.add(x).mag)",
+      "helper(n: Int): Int => helper(n + 1)",
+      "g = lib_f",
+      "s = spin",
+      "k = loud",
+      "",
+    ].join("\n"), exts);
+    eq(outA, "true ; 6", "the aliasing program runs");
+    const outB = runCapturing([
+      "U = Quantity",
+      "y = qty(2, m)",
+      "print(y instanceof Quantity)",
+      "print(y instanceof U)",
+      "print(y.add(y).mag)",
+      "print(y.to(cm).mag)",
+      "h(xs) =>",
+      "  effects pure",
+      "  xs.map(lib_f)",
+      "print(h([1, 2]))",
+      "",
+    ].join("\n"), exts);
+    // Before B-158 the first program re-keyed Quantity's members onto
+    // `<main>::T` and stamped `div` on `lib_f`, so this program halted:
+    // `effects mismatch in h: declared pure, inferred div`.
+    eq(outB, "true ; true ; 4 ; 200 ; [2, 3]", "instanceof and member dispatch on the aliased type; the alias leaked no verdict");
+
+    const after = snapshot();
+    eq(after.size, before.size, "the libraries bind the same values");
+    for (const [k, v] of before) eq(after.get(k), v, `library value ${k} unchanged`);
   });
 
   await asyncTest("module: unknown module ID", async () => {

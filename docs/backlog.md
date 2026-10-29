@@ -1096,9 +1096,13 @@ that prevents it.
   operators join the viral rule) or keep the boolean reading and
   document it. **Blocked-by**: the discussion. **Pointer**:
   `src/primitives.ts` (`typed_or`, `typed_and`), `tests/logical.alg`
-- [ ] **B-158** (in-place write through a library alias) · L0 · **A
+- [x] **B-158** (in-place write through a library alias) · L0 · **A
   cached library value can be written in place through a top-level
-  alias.** Found by B-157 P2 (a library loads once per run). A library's
+  alias.** Landed 2026-10-29 under the maintainer's ruling of that day,
+  the owner-module invariant (`docs/book/extension/modules.md`, "Loaded
+  once per process"): member re-keying is write-once, and the divergence
+  stamp and the precompile write skip library-owned functions; the
+  test `module: B-158` in `src/test/modules.ts` holds it. Found by B-157 P2 (a library loads once per run). A library's
   extension is built once per process and shared by every program that
   uses it (`docs/book/extension/modules.md`, "Loaded once per process").
   A program that binds a top-level alias of a library function or type
@@ -3008,6 +3012,20 @@ that prevents it.
     `memberPrivilege`, `total`, `assumeTerminates`, `extendsChain`,
     `verified`). That is judgment work and belongs to this item; the rule it
     serves still does not exist.
+  - **Rider (2026-10-29, from B-158 (in-place write through a library
+    alias))**: the generated write accessors should take a branded
+    `Unshared<Value>`, which only constructors return, so the typecheck
+    enforces the in-place-write rule (`src/structure.ts`) for every
+    kernel writer instead of a review and a snapshot test. The
+    maintainer's preferred end state, planned as this rider rather than a
+    separate arc. Today the rule's cross-module form holds by two guards
+    and one check (the owner-module invariant,
+    `docs/book/extension/modules.md`); the census should list the
+    writers those guards cover (`stabilizeTypeMemberScope`, the
+    divergence stamp's `inferredEffects`, `precompileFunction`'s
+    `inferredEffects`, `renameInPlace`). B-158 added no host-plane field:
+    a type's stabilised state is read from the shape of its existing
+    `localMemberScope`.
   - **Not in scope**: Scope's representation, now **D49** / **B-136**.
   - **Pointer**: `docs/plans/host-plane-declaration.md`;
     `docs/plans/entry-sequence-composite.md` §5.5 and §5.7.

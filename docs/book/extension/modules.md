@@ -25,15 +25,41 @@
   keyed by the resolved path and the file's content, so an edited file
   loads afresh and two files of one name in different directories stay
   two modules. The extension served is the one the first load built,
-  under that load's base extensions and future manager. Sharing
-  assumes an evaluation that is handed a loaded module does not change
-  it. The in-place passes that reach a module's values from a consumer
-  (tail-position marks, body-metadata collapse) are idempotent. Two
-  writes are not: a consumer binding that is a top-level alias of a
-  module's function or type re-stamps that function's inferred effects
-  or re-keys that type's members. No program in the corpus binds such
-  an alias. The fix awaits a ruling: B-158 (in-place write through a
-  library alias).
+  under that load's base extensions and future manager.
+- <a id="def-owner-module"></a>**Owner module** (B-158 (in-place write
+  through a library alias), ruled 2026-10-29): the module whose
+  evaluation constructed a value. Sharing rests on one invariant: **a
+  library's values are immutable after load; a module writes only into
+  values it owns.** The in-place passes that reach a module's values
+  from a consumer (tail-position marks, body-metadata collapse) are
+  idempotent. Three writers in the program pipeline were not, and each
+  was reached through a consumer's top-level alias of a library value
+  (`T = LibType`, `f = lib_f`); each now has a guard:
+  - **Member re-keying** (`stabilizeTypeMemberScope` in
+    `src/types-std.ts`) is write-once. A type's `localMemberScope` is
+    its construction's counter scope (`<type:N>`) until the first
+    binding that names it moves its members onto a name-stable scope
+    (`<type#…>`); a type already on a name-stable scope is never
+    re-keyed. A library type keeps the scope its load gave it.
+  - **The divergence stamp** in `evalSource` (the program pipeline)
+    adds `div` only to functions the evaluation owns. The values
+    reachable from the `extensions` it was handed (each extension's
+    bindings and each module object's fields) are library-owned, and
+    the stamp skips them by reference. A program's analysis therefore
+    no longer stamps a library function through an alias; the
+    library's contract is the one its own load stamped.
+  - **The precompile write** (`precompileFunction` (precompile) stores
+    the inferred effect set on the function it is given) skips a
+    library-owned function the same way. An alias evaluates to the
+    library's own function object, which the library's load already
+    precompiled in its own scope.
+  - **The check**: the test `module: B-158` in `src/test/modules.ts`
+    snapshots every own host field, metadata field, effect set and
+    member key of every value `units` and a scratch library bind, runs
+    two programs that alias those values, and asserts the snapshot is
+    unchanged and that the second program's `instanceof` and member
+    dispatch on the aliased type still work. A writer added later that
+    reaches a library value through a program fails it.
 - **Import syntax**: `import name` — declarative; module values are
   provided via extensions, not by an imperative load at the site.
 - **Resolution order**: local `lib/` first, then the system `lib/`

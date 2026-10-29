@@ -14,7 +14,7 @@ import {
   textOf,
 } from "./types.js";
 import { domainFromPredicate, PredicateSet, withPredicates as rfWithPredicates, Predicate, occurrenceBoundOf, withOccurrenceBound, clearOccurrenceBound, typeShape, equalityShape } from "./refinements.js";
-import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, FQN_SEP } from "./symbols.js";
+import { kernelMemberFqn, fqnBaseName, memberFqnIn, newTypeMemberScope, typeMemberScopeFqn, isNameStableTypeMemberScope, FQN_SEP } from "./symbols.js";
 import { scopePrivilegeExtend, scopeHoldsPrivilege, scopeLookup, scopeExtend } from "./scope.js";
 import { effectsOf as fnEffectsOf } from "./effects.js";
 import { putEntry, removeEntry } from "./structure.js";
@@ -355,10 +355,20 @@ function memberBindingByName(members: StructureValue, name: string): Value | und
  *  or conformance between captures of different passes fails (the old
  *  name-string walk masked this; symbol identity exposes it). Runs at
  *  the binding step, before anything external draws the keys; drawn
- *  (non-local) keys are untouched. */
+ *  (non-local) keys are untouched.
+ *
+ *  B-158: WRITE-ONCE. Only a type whose local scope is still its
+ *  construction's counter scope is re-keyed; one already on a name-stable
+ *  scope is left alone, whatever binding names it later. A fresh computed
+ *  type (`T = make_type(x)`) is stabilised by the first binding that names
+ *  it; a library type was stabilised at its library's load, and a
+ *  program's `T = LibType` must not re-key the value every other program
+ *  in the process shares (the owner-module invariant,
+ *  `docs/book/extension/modules.md`). The fixpoint property above holds:
+ *  each re-evaluation constructs a fresh type, on a fresh counter scope. */
 export function stabilizeTypeMemberScope(typeCtx: StructureValue, stableScope: string): void {
   const local = (typeCtx as any).localMemberScope as string | undefined;
-  if (!local || local === stableScope) return;
+  if (!local || isNameStableTypeMemberScope(local)) return;
   const membersV = getMembers(typeCtx);
   if (membersV?.kind !== ValueKind.Structure) return;
   const members = membersV as StructureValue;
