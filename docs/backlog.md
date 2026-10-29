@@ -732,7 +732,8 @@ that prevents it.
   filed: B-159 (precompile and termination analysis of recursive
   definitions), B-160 (Bits decoded to strings per member lookup),
   B-161 (the CLI's module loading); B-158 (in-place write through a
-  library alias) open from P2's finding. Plan `docs/plans/fast-library-load.md`
+  library alias) open from the finding of P2 (a library loads once per
+  run). Plan `docs/plans/fast-library-load.md`
   (active 2026-10-28; P1 (instrumentation and the corpus), P2 (a
   library loads once per run, closing B-155 (library load per module)),
   P3 (numeric memo keys), P4 (fewer and cheaper entries),

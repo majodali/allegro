@@ -6,7 +6,9 @@
 > stream began (§7, the closing entry). The maintainer ratified the
 > sequence and the rulings of §6 on 2026-10-28 and 2026-10-29, and
 > closed the stream on 2026-10-29 with its follow-ons filed as backlog
-> items (B-159, B-160, B-161). The stream ran as a pre-ratified
+> items: B-159 (precompile of recursive definitions), B-160 (Bits
+> decoded per member lookup), B-161 (CLI startup). The stream ran as a
+> pre-ratified
 > sequence (W-001, `process.md` §3) under the merge policy of R3,
 > merge-on-green, with implementation delegated per chunk and every
 > diff read before its merge. Kept for its §7 record.
