@@ -4,6 +4,24 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream) closed: the outcome met, follow-ons filed
+
+The stream's ten chunks are merged and the plan
+`docs/plans/fast-library-load.md` is closed (its §7 closing entry is the
+record). On the gate's machine the planning library's parse went from
+68 s to 0.2 s (the load 0.6 s with evaluation), `lib/units.alg` from 13 s
+to 0.3 s, `tests/planning-solve-demo.alg` from 151 s to 5.2 s; the CI
+gate job from 11 min at P1 (instrumentation and the corpus) to 7.6 min
+at P10 (a binding evaluated once). No `// expect:` line
+changed; one semantics change ratified at P10 (an effect in a named
+binding runs once, as under `--base`). The maintainer's rulings of
+2026-10-29: P10's change and its three terms ratified; computed function
+bindings lose their top-level precompile; the stream closed. Filed:
+B-159 (precompile of recursive definitions — the gate's floor is now the
+totality battery), B-160 (Bits decoded per member lookup), B-161 (CLI
+startup). Lane P in the backlog's lane table keeps them. Open from the
+stream: B-158 (in-place write through a library alias). Docs only.
+
 ## 2026-10 — B-157 (the performance stream) P10 (a binding evaluated once): the precompile pass evaluates definitions only; P8 (measure and the scanner) and P9 (cached parse artifacts) not taken
 
 The stream's last chunk (`docs/plans/fast-library-load.md` §5 row P10,

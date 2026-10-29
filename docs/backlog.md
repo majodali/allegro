@@ -78,7 +78,7 @@ The grouping below comes from co-change measurement over the last 40
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
-| **P — performance stream** (added 2026-10-27) | B-157 (the performance stream): the grammar-2 engine's memo costs, B-155, the tokenizer ruling, cached parse artifacts; B-153 last or handed to lane D | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; the two runtime items (B-155 in the loader, B-153 in symbol resolution) are taken only when lane D is not in those files. Oracle: deterministic engine counts (`npm run lint:load`), every `// expect:` pin unchanged. The first candidate for autonomous delivery; merge-on-green (R3, 2026-10-28) |
+| **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29) | The follow-ons of B-157 (the performance stream): B-159 (precompile and termination analysis of recursive definitions), B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
 
 **What lane B unlocks:** C and D may then run *as lanes in parallel
 with each other* (C touches new/track files, D the L2 monoliths — a
@@ -723,8 +723,17 @@ that prevents it.
   planning pilot): `lib/planning.alg` is 1,233 lines; taken up by
   **B-157** (the performance stream) below, where the tokenizer question
   is ruling R4
-- [ ] **B-157** (the performance stream) · T-perf · L1 · **A library
-  loads in well under a second.** Plan `docs/plans/fast-library-load.md`
+- [x] **B-157** (the performance stream) · T-perf · L1 · **A library
+  loads in well under a second.** **CLOSED 2026-10-29**: the outcome is
+  met — the planning library's parse 68 s → 0.2 s on the gate's machine
+  (the load 0.6 s), the solve demo 151 s → 5.2 s, the CI gate job 11 min
+  → 7.6 min; no `// expect:` line changed; one semantics change
+  ratified at P10 (an effect in a named binding runs once). Follow-ons
+  filed: B-159 (precompile and termination analysis of recursive
+  definitions), B-160 (Bits decoded to strings per member lookup),
+  B-161 (the CLI's module loading); B-158 (in-place write through a
+  library alias) open from the finding of P2 (a library loads once per
+  run). Plan `docs/plans/fast-library-load.md`
   (active 2026-10-28; P1 (instrumentation and the corpus), P2 (a
   library loads once per run, closing B-155 (library load per module)),
   P3 (numeric memo keys), P4 (fewer and cheaper entries),
@@ -1110,6 +1119,46 @@ that prevents it.
   (`precompileFunction`), `src/runtime.ts` (`evalSource`: the divergence
   stamp and the `stabilizeTypeMemberScope` call), `src/types-std.ts`
   (`stabilizeTypeMemberScope`); `docs/plans/fast-library-load.md` §7
+- [ ] **B-159** (precompile of recursive definitions) · T-perf · L2 ·
+  **The gate's floor is the precompile and termination analysis of
+  recursive function definitions.** Found at the close of B-157 (the
+  performance stream): after P10 the gate's longest shard (236 s) is the
+  totality battery, not the planning demos — `tests/totality-termination-demo.alg`
+  takes 68 s and four Phase E tests on recursive functions (`factorial`
+  over `NonNeg` and `Int`, a lexicographic metric) 15 to 34 s each,
+  while every planning demo in that shard takes 0.4 to 1.7 s. The cost is
+  the precompile pass's speculative inlining of a recursive definition
+  under the inline cutoff and the Stage 2/3 termination analysis, which
+  B-087 (totality-analyzer performance) already names from the analyzer's
+  side. Measure first with `ALLEGRO_EVAL_STATS=1` (inline expansions per
+  binding) and a CPU profile of the demo; then a one-chunk plan with an
+  oracle (outputs identical; the suite's totality verdicts unchanged;
+  the shard's wall clock falls). **Blocked-by**: nothing. **Pointer**:
+  `src/evaluator.ts` (`precompileFunction`, the inline cutoff),
+  `src/totality.ts`, `src/test/totality*.ts`;
+  `docs/plans/fast-library-load.md` §7 (P10 and the closing entry)
+- [ ] **B-160** (Bits decoded per member lookup) · L0 · **Evaluation
+  decodes Bits to JavaScript strings on every member lookup.** Found at
+  the close of B-157 (the performance stream): the CPU profile of
+  `tests/planning-solve-demo.alg` (7.4 s sampled) spends about 16% in
+  `TextDecoder`, `bitsToString` and UTF-8 decoding — names and keys held
+  as Bits are decoded again at each lookup (`memberBindingByName`,
+  `dispatchThroughType`, the FQN keys). Candidates: intern a Bits value's
+  decoded text on the value once (a host-plane field, registered), or
+  key member lookups by the Bits value itself. Measure the share after
+  B-159 before choosing. **Blocked-by**: nothing. **Pointer**:
+  `src/types.ts` (`bitsToString`), `src/types-std.ts`
+  (`memberBindingByName`), `src/primitives.ts` (`dispatchThroughType`)
+- [ ] **B-161** (CLI startup) · T-tooling · **The CLI's TypeScript module
+  loading is now the largest fixed cost of a short run.** Found at the
+  close of B-157 (the performance stream): with the planning library
+  loading in 0.6 s, `tsx`'s module loading (`waitForWorker`,
+  `makeSyncRequest`, `compileSourceTextModule`) is about 0.15 s of a
+  0.76 s run and startup alone is about 4 s of wall clock in the sandbox
+  (`print(1)`). Candidates: a built `dist/` entry for the CLI (the web
+  bundle already builds with esbuild), or `tsx`'s compile cache. Not a
+  language or engine question; a tooling one. **Blocked-by**: nothing.
+  **Pointer**: `package.json` (`start`, `build:web`), `src/index.ts`
   (the P2 entry)
 - [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
