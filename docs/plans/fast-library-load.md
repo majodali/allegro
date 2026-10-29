@@ -93,7 +93,11 @@ mechanical:
    **The ratchet is on the counts, not the clock**: match attempts,
    memo writes and invalidation entries may only fall, which is
    deterministic and immune to the CPU-contention flake the index
-   test already shows. Wall clock is reported, not gated.
+   test already shows. Left-recursion iterations are gated too, as an
+   identity check on the growth loop. The final memo size is recorded
+   and reported, not gated (since P5): it is a footprint, not work, and
+   a chunk that stops redoing work keeps more entries. Wall clock is
+   reported, not gated.
 3. **The existing ratchets** (`lint:planes`, `lint:units`, the boundary
    baseline) hold as they do for every chunk.
 
@@ -110,7 +114,9 @@ integers") makes the key free and the lookup an integer hash. Expected:
 the 16.6% of `ruleKey` and part of `memoGet`/`memoSet`'s cost. Risk:
 low; the key's identity semantics are unchanged.
 
-**M2 — invalidation that does not clear.** `clearPos` and
+**M2 — invalidation that does not clear.** **Taken at P5** (§7), as
+the second candidate: a round removes only the entries that read a
+growing seed. `clearPos` and
 `invalidateAtPos` serve left-recursion growth (Warth-style seed
 growing): each growth iteration drops the position's bucket except the
 in-progress entries, and every rule at that position re-matches. The
@@ -166,7 +172,7 @@ parse or user files.
 | **P2** | M5: a library loads once per run (B-155 closed). **Landed 2026-10-28** (§7) | solve demo under 90 s; counts unchanged; suite green | S–M |
 | **P3** | M1: numeric memo keys. **Landed 2026-10-28** (§7) | counts unchanged, clock falls, suite green | M |
 | **P4** | M3: fewer and cheaper entries. **Landed 2026-10-28** (§7) | memo writes fall or allocation falls; suite green | M |
-| **P5** | M2: invalidation by generation; measured by the P1 stats before design | invalidation entries fall; grammar-2 left-recursion battery green | M |
+| **P5** | M2: invalidation by generation; measured by the P1 stats before design. **Landed 2026-10-29** (§7) as dependency-tracked invalidation | invalidation entries fall; grammar-2 left-recursion battery green | M |
 | **P6** | decision point: the §7 numbers against the §2 target; R4 taken (tokenizer or not); M7 taken or not | — (stops for the maintainer) | — |
 | **P7** | M6 (B-153) or hand-off to the kernel-semantics stream | demo re-evaluation count falls | M |
 
@@ -497,3 +503,112 @@ a parser that changes a program's meaning has left the stream's scope.
   P5 (M2, invalidation by generation) acts on it together with
   `clearPos`. `runDoMatch` is now inlined into `matchRule`, which is why
   its row falls and `matchRule`'s holds part of it.
+- 2026-10-29: **P5 landed** (M2: invalidation that does not clear, taken
+  as dependency-tracked invalidation). No parse semantics change, no
+  `// expect:` line changed, and the growth loop is unchanged:
+  `lrIterations` is identical for every source. The change is in
+  `src/grammar2/engine.ts`:
+  - **Dependence is observed.** `MemoBucket` is now a small class: the
+    entries by key (`byKey`), a per-position count of seed reads
+    (`seedReads`) and a list of dependent keys (`dependents`).
+    `matchRule` adds one to the count when it returns an in-progress
+    entry's seed, or hits a completed entry marked `dependent`. A new
+    entry is marked `dependent` when the count moved during its own
+    evaluation, and its key is appended to the list.
+  - **Failures carry the mark.** A failed attempt was a `null`; it is now
+    one of two shared frozen entries, `FAILED` or `FAILED_DEPENDENT`. Each
+    attempt makes the same writes as before.
+  - **A round removes only dependents.** `invalidateAtPos` calls
+    `clearDependents`, which replaces `clearPos`: it deletes the listed
+    keys and empties the list, and never removes an in-progress entry. A
+    scratch run with assertions confirmed that every listed key named a
+    completed dependent entry, without duplicates.
+
+  **Why it is sound** (the comment above `invalidateAtPos` states it in
+  full). An entry's value is a function of the input, its key and the
+  memo values its evaluation read. Matching only moves forward, so an
+  attempt at P reads seeds only at P: a head at a later position started
+  inside the attempt and settles before it returns, and an earlier
+  position is never looked up. So a growth step at P can change an entry
+  at P only if that entry read a seed at P, or hit an entry at P that did,
+  and those are the two events the count records. An inner attempt's
+  reads fall inside the outer one's, so the mark is transitive. The mark
+  over-approximates: a settled inner head at P and its readers are still
+  removed, which is why the growth iterations are the same.
+
+  **Two count decisions** (taken by the orchestrating agent on this
+  plan's text). Memo writes fall rather than hold: a kept entry is a
+  cache hit, so its write and its sub-attempts' writes are skipped. The
+  final memo size rises 4 to 10%, because an independent entry built in
+  one growth round and not reached in the next is now kept. It is
+  therefore reported, not gated (§3): `bench/load.ts --check` records and
+  prints it, and gates match attempts, memo writes, invalidation entries
+  and left-recursion iterations.
+
+  The load ratchet (`npm run lint:load`), before (baseline) and after:
+
+  | Source | Match attempts | Memo writes | Inv. entries | LR iterations | Final memo |
+  |---|---|---|---|---|---|
+  | `lib/totality.alg` | 399,154 → 147,509 (−63%) | 510,900 → 94,511 (−82%) | 281,878 → 57,948 (−79%) | 6,134 (same) | 3,458 → 3,607 (+4.3%) |
+  | `lib/units.alg` | 20,810,680 → 7,650,981 (−63%) | 28,539,694 → 4,805,094 (−83%) | 15,568,878 → 3,027,529 (−81%) | 328,068 (same) | 91,262 → 100,489 (+10.1%) |
+  | `lib/planning.alg` | 118,920,325 → 38,205,561 (−68%) | 165,600,140 → 23,874,878 (−86%) | 89,346,505 → 15,088,187 (−83%) | 1,665,399 (same) | 448,002 → 492,172 (+9.9%) |
+  | `tests/lib/build_pipeline.alg` | 441,837 → 197,609 (−55%) | 553,041 → 130,049 (−76%) | 315,638 → 79,284 (−75%) | 7,666 (same) | 4,831 → 5,159 (+6.8%) |
+  | `tests/planning-solve-demo.alg` | 8,250,119 → 2,806,009 (−66%) | 11,365,469 → 1,757,945 (−85%) | 6,178,458 → 1,111,264 (−82%) | 121,234 (same) | 35,489 → 38,555 (+8.6%) |
+  | `demos/rung3/01-model.alg` | 4,387,360 → 1,578,540 (−64%) | 5,943,027 → 1,005,547 (−83%) | 3,258,684 → 629,004 (−81%) | 65,725 (same) | 24,696 → 26,647 (+7.9%) |
+  | `demos/rung3/02-solve.alg` | 9,578,533 → 3,344,653 (−65%) | 13,110,220 → 2,114,078 (−84%) | 7,164,634 → 1,333,810 (−81%) | 141,380 (same) | 42,504 → 46,044 (+8.3%) |
+
+  **Trees identical.** Every `tests/*.alg` and `demos/**/*.alg` (68
+  files) ran through the file runner with both engines, `origin/main` at
+  `a412de2` and this change, each parse's tree serialised and hashed
+  (scratch, not committed): 129 parses of 85 distinct sources, every tree
+  identical, and every program's output and exit code identical. The one
+  parse that fails in that run fails in both with the same farthest-advance
+  error.
+
+  What was measured and left: the failure entries frozen or not, no
+  difference (load check parse 4.7 to 4.8 s both ways), so frozen. A
+  per-position `Map` for the count was not built: a field on the bucket
+  costs no lookup. Lazy invalidation by generation was not built:
+  invalidation is now about 7% of the profile (`invalidateAtPos` with
+  `clearDependents`), so stamping instead of deleting has little left to
+  save.
+
+  The numbers below are from a faster sandbox than the earlier entries
+  (the planning parse took 14.5 to 14.9 s there before this change,
+  against 27 to 31 s at P4). `npm run bench:load`, before (`origin/main`
+  at `a412de2`) and after, one run each:
+
+  | Entry | Wall clock before | after | Planning parse before | after |
+  |---|---|---|---|---|
+  | `lib/units.alg` | 3.0 s | 1.1 s | — | — |
+  | `lib/planning.alg` | 17.8 s | 4.4 s | 14.7 s | 3.3 s |
+  | `tests/planning-solve-demo.alg` | 24.4 s | 10.6 s | 14.5 s | 3.4 s |
+  | `demos/rung3/01-model.alg` | 18.9 s | 5.0 s | 14.7 s | 3.2 s |
+  | `demos/rung3/02-solve.alg` | 21.9 s | 8.4 s | 14.9 s | 3.5 s |
+
+  The planning parse is about 4.4 times faster; `units` parses in 0.7 s
+  against 2.6 s. The load ratchet's check parses in 4.6 to 5.0 s against
+  20.1 s. The gate (`npm run test:shards`, 3 shards): 343.7 s wall clock
+  (655.3 s of work) before, 309.4 s (544.0 s of work) after; the longest
+  shard spends most of its time outside the parse.
+
+  The CPU profile of the planning load (`use units`, `use planning`,
+  `print(1)`): 17.1 s sampled before, 3.9 s after. Self time:
+
+  | Function (`src/grammar2/engine.ts`) | Share after | Seconds before | after |
+  |---|---|---|---|
+  | `matchRule` | 37.5% | 3.42 | 1.47 |
+  | `memoSet` | 12.7% | 2.38 | 0.50 |
+  | garbage collector | 7.1% | 2.45 | 0.28 |
+  | `memoKey` | 6.6% | 1.06 | 0.26 |
+  | `runDoMatch` | 5.5% | 0.04 | 0.21 |
+  | `matchNonTerm` | 5.3% | 0.80 | 0.21 |
+  | `invalidateAtPos` and `clearDependents` (was `clearPos`) | 7.2% | 4.89 | 0.28 |
+  | `matchSeq`, `matchAlt`, `matchTerminal` | 5.8% | 1.20 | 0.23 |
+
+  Where the time now goes: the match itself (`matchRule` and the
+  combinators) is over half of the parse, and the memo table's writes
+  and clearing are about a fifth. The parse is now about 0.06 ms per
+  character for planning against the target of §2 (under 1 s for the
+  library); P6 weighs that against the tokenizer (R4) and cached parse
+  artifacts (M7).

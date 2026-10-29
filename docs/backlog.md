@@ -727,7 +727,8 @@ that prevents it.
   loads in well under a second.** Plan `docs/plans/fast-library-load.md`
   (active 2026-10-28; P1 (instrumentation and the corpus), P2 (a
   library loads once per run, closing B-155 (library load per module)),
-  P3 (numeric memo keys) and P4 (fewer and cheaper entries) landed). Measured: the planning
+  P3 (numeric memo keys), P4 (fewer and cheaper entries) and P5
+  (dependency-tracked invalidation) landed). Measured: the planning
   library loads in 68 s, 87% of it in the grammar-2 engine and 68% of
   the parse in the memo table (key strings, lookups, invalidation,
   garbage); evaluation under a second; 1.1 ms per character, linear.
@@ -742,7 +743,7 @@ that prevents it.
   for autonomous delivery (lane P in the lane table). **Blocked-by**:
   nothing.
   **Pointer**: `src/grammar2/engine.ts` (`memoKey`, `bucketAt`,
-  `memoSet`, `clearPos`, `invalidateAtPos`), `src/test/alg-files.ts`
+  `memoSet`, `clearDependents`, `invalidateAtPos`), `src/test/alg-files.ts`
   (`libExtensions`), `docs/plans/fast-library-load.md`
   - **Progress.** P2 (a library loads once per run, 2026-10-28): one
     library cache per process in `src/modules.ts`, keyed by path and
@@ -769,6 +770,17 @@ that prevents it.
     load-ratchet count identical, memo writes included.
     Next: P5 (invalidation by generation), which also owns the bucket
     churn that is now most of `memoSet`'s cost.
+  - **Progress.** P5 (dependency-tracked invalidation, 2026-10-29): a
+    left-recursion growth round removes only the memo entries at the
+    position that read a growing seed, directly or through another such
+    entry, instead of every entry there; the soundness argument is in
+    `docs/book/extension/grammar.md` §1. Planning: match attempts −68%,
+    memo writes −86%, invalidation entries −83%, growth iterations
+    identical; the parse runs in 3.2 to 3.5 s against 14.5 to 14.9 s in
+    the same sandbox; the gate 309.4 s against 343.7 s. Parse trees
+    identical over all 68 `tests/` and `demos/` files. The final memo
+    size rises 4 to 10% and is now reported by `npm run lint:load`, not
+    gated. Next: P6 (the decision point).
 
 ### T-bootstrap (M9)
 

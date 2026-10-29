@@ -237,11 +237,11 @@ class ParseState {
   farthestRules: Rule[] = [];
   /**
    * Memo cache indexed by position first, then by rule-within-indent-stack
-   * key. This shape lets `invalidateAtPos` clear only the entries at one
-   * position in O(entries_at_pos) instead of scanning the whole memo. For
-   * a grammar with N productions and M input positions, the previous flat
-   * Map<string, Entry> implementation made invalidation O(NM) per round
-   * and O(N²M) total, which dominated parse time on anything non-trivial.
+   * key. This shape keeps invalidation local to one position: a flat
+   * Map<string, Entry> made it O(NM) per round for N productions and M
+   * input positions, which dominated parse time on anything non-trivial.
+   * Since B-157 P5 a round touches only the position's dependent entries
+   * (`invalidateAtPos`).
    */
   memo: Map<number, MemoBucket> = new Map();
   /** Total entries across all pos-buckets — tracked for stats. */
@@ -282,13 +282,13 @@ class ParseState {
 
   /**
    * The memo bucket for one position, created the first time the position
-   * is looked up. A bucket is never replaced or removed (`clearPos` deletes
-   * entries inside it), so `matchRule` looks it up once per attempt and
-   * holds it for the attempt's writes (B-157 P4).
+   * is looked up. A bucket is never replaced or removed (invalidation
+   * deletes entries inside it), so `matchRule` looks it up once per attempt
+   * and holds it for the attempt's writes (B-157 P4).
    */
   bucketAt(pos: number): MemoBucket {
     let bucket = this.memo.get(pos);
-    if (bucket === undefined) { bucket = new Map(); this.memo.set(pos, bucket); }
+    if (bucket === undefined) { bucket = new MemoBucket(); this.memo.set(pos, bucket); }
     return bucket;
   }
 
@@ -297,28 +297,40 @@ class ParseState {
    * the key is new to the bucket, which keeps `_memoSize` without a `has`
    * lookup. `matchRule` knows it at each write: its first write follows a
    * lookup that missed, so the key is new; its second write (a failed
-   * attempt's `null`) overwrites that same key, which is still held because
-   * `clearPos` keeps the in-progress entry it replaces.
+   * attempt's failure entry) overwrites that same key, which is still held
+   * because invalidation never removes an in-progress entry.
    */
-  memoSet(bucket: MemoBucket, key: number, entry: MemoEntry | null, added: boolean): void {
-    bucket.set(key, entry);
+  memoSet(bucket: MemoBucket, key: number, entry: MemoEntry, added: boolean): void {
+    bucket.byKey.set(key, entry);
     if (added) this._memoSize++;
     if (this.stats) this.stats.memoWrites++;
   }
 
   memoSize(): number { return this._memoSize; }
 
-  /** Delete entries at one position. Returns the number of entries removed. */
-  clearPos(pos: number, keepKey: number): number {
-    const bucket = this.memo.get(pos);
-    if (!bucket) return 0;
+  /**
+   * Delete a position's dependent entries (B-157 P5) and empty its
+   * dependents list. Returns the number of entries removed. Every key on the
+   * list names a completed entry: a key is appended once its entry is
+   * written, and an entry is removed only here, which empties the list. The
+   * in-progress check is therefore a guard, not a case: it would keep an
+   * in-progress entry (the growing head itself, an outer head), which is
+   * listed again when it completes.
+   */
+  clearDependents(bucket: MemoBucket): number {
+    const deps = bucket.dependents;
+    const n = deps.length;
+    if (n === 0) return 0;
+    const byKey = bucket.byKey;
     let removed = 0;
-    for (const [k, entry] of Array.from(bucket.entries())) {
-      if (k === keepKey) continue;
-      if (entry && entry.isLR) continue; // in-progress outer LR — preserve
-      bucket.delete(k);
+    for (let i = 0; i < n; i++) {
+      const k = deps[i];
+      const entry = byKey.get(k);
+      if (entry === undefined || entry.isLR) continue;
+      byKey.delete(k);
       removed++;
     }
+    deps.length = 0;
     this._memoSize -= removed;
     return removed;
   }
@@ -371,8 +383,23 @@ class ParseState {
   }
 }
 
-/** One position's memo entries, by `memoKey`. */
-type MemoBucket = Map<number, MemoEntry | null>;
+/**
+ * One position's memo entries, by `memoKey`, with the two facts
+ * dependency-tracked invalidation needs at that position (B-157 P5; see
+ * `invalidateAtPos`).
+ */
+class MemoBucket {
+  /** The entries, by `memoKey`. A failed attempt is one of the two shared
+   *  failure entries, `FAILED` or `FAILED_DEPENDENT`. */
+  readonly byKey: Map<number, MemoEntry> = new Map();
+  /** Seed reads at this position so far: returns of an in-progress entry's
+   *  seed, and hits on a completed entry marked `dependent`. It only grows;
+   *  an attempt compares it before and after its own evaluation. */
+  seedReads: number = 0;
+  /** Keys of the completed entries marked `dependent`, appended as each is
+   *  written and emptied by each invalidation round. */
+  readonly dependents: number[] = [];
+}
 
 export interface MatchResult {
   tree:    ParseTree;
@@ -392,13 +419,30 @@ export interface MatchResult {
  *     this (rule, pos); recursive re-entry returns the current `seed`.
  *   - `lrDetected` flips to true when the recursive re-entry actually
  *     happens, triggering iteration after the first parse attempt.
+ *   - `dependent` is true when the attempt's evaluation read a seed at its
+ *     own position, directly or through a dependent entry there (B-157 P5).
+ *     Only dependent entries are removed when a seed at the position grows.
  */
 interface MemoEntry {
   result:     MatchResult | null;
   isLR:       boolean;
   seed:       MatchResult | null;
   lrDetected: boolean;
+  dependent:  boolean;
 }
+
+/**
+ * A failed attempt's entry, shared by every failure (B-157 P5; a failure was
+ * a `null`, which could not carry the dependence mark). `FAILED` is a failure
+ * independent of every seed at its position, `FAILED_DEPENDENT` one that read
+ * a seed there. Neither is ever written to after creation.
+ */
+const FAILED: MemoEntry = Object.freeze({
+  result: null, isLR: false, seed: null, lrDetected: false, dependent: false,
+});
+const FAILED_DEPENDENT: MemoEntry = Object.freeze({
+  result: null, isLR: false, seed: null, lrDetected: false, dependent: true,
+});
 
 // --- Rule dispatch ---
 
@@ -411,19 +455,23 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
   }
   const key = state.memoKey(rule);
   const bucket = state.bucketAt(pos);
-  const cached = bucket.get(key);
+  const cached = bucket.byKey.get(key);
   if (cached !== undefined) {
     if (state.stats) state.stats.memoHits++;
-    if (cached === null) return null;
     if (cached.isLR) {
       if (state.stats) state.stats.lrSeedReturns++;
+      bucket.seedReads++;
       cached.lrDetected = true;
       // Return the seed; seed may carry a newIndentStack (rare for LR seeds).
       if (cached.seed?.newIndentStack) state.indentStack = cached.seed.newIndentStack;
       return cached.seed;
     }
-    if (cached.result?.newIndentStack) state.indentStack = cached.result.newIndentStack;
-    return cached.result;
+    // Dependence propagates through a hit: the caller read a value that a
+    // seed here shaped (B-157 P5).
+    if (cached.dependent) bucket.seedReads++;
+    const hit = cached.result;
+    if (hit !== null && hit.newIndentStack) state.indentStack = hit.newIndentStack;
+    return hit;
   }
   if (state.stats) {
     state.stats.memoMisses++;
@@ -432,40 +480,46 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
   }
 
   const snapshot = state.indentStack;
-  const entry: MemoEntry = { result: null, isLR: true, seed: null, lrDetected: false };
+  // Seed reads at `pos` before this attempt's evaluation: any read during it
+  // makes the new entry dependent (B-157 P5).
+  const readsBefore = bucket.seedReads;
+  const entry: MemoEntry = { result: null, isLR: true, seed: null, lrDetected: false, dependent: false };
   state.memoSet(bucket, key, entry, /* added */ true);
 
   let result = runDoMatch(state, rule, pos, snapshot);
 
   if (!entry.lrDetected) {
+    const dependent = bucket.seedReads !== readsBefore;
     entry.isLR  = false;
     entry.result = result;
-    // When the result is null, collapse the bucket entry to `null` so
-    // re-entries get cached-null semantics immediately. Otherwise the
+    // When the result is null, collapse the bucket entry to a failure entry
+    // so re-entries get cached-failure semantics immediately. Otherwise the
     // caller sees an LR entry with seed=null and interprets it as "LR in
     // progress". That looks like two failures in a row instead of one.
     if (result === null) {
-      state.memoSet(bucket, key, null, /* added */ false);
+      state.memoSet(bucket, key, dependent ? FAILED_DEPENDENT : FAILED, /* added */ false);
       state.indentStack = snapshot;
       state.advance(pos, rule);
-    } else if (result.newIndentStack) {
+    } else {
+      entry.dependent = dependent;
       // Commit post-state.
-      state.indentStack = result.newIndentStack;
+      if (result.newIndentStack) state.indentStack = result.newIndentStack;
     }
+    if (dependent) bucket.dependents.push(key);
     return result;
   }
 
   // Left recursion detected. Iterate with seed growth. Between iterations,
-  // clear memo entries at the same pos (other than our own LR entry) — they
-  // were computed against a stale seed and would incorrectly short-circuit
-  // the re-evaluation. This is Warth's "growing heads" concern, handled here
-  // conservatively by position-scoped invalidation.
+  // remove the entries at the same pos that read the seed (other than our
+  // own LR entry) — they were computed against a stale seed and would
+  // incorrectly short-circuit the re-evaluation. This is Warth's "growing
+  // heads" concern; `invalidateAtPos` states which entries go and why.
   let iters = 0;
   while (result !== null) {
     if (entry.seed !== null && result.nextPos <= entry.seed.nextPos) break;
     entry.seed = result;
     state.indentStack = snapshot;
-    invalidateAtPos(state, pos, key);
+    invalidateAtPos(state, bucket);
     result = runDoMatch(state, rule, pos, snapshot);
     if (state.stats) {
       state.stats.lrIterations++;
@@ -479,30 +533,51 @@ function matchRule(state: ParseState, rule: Rule, pos: number): MatchResult | nu
     }
   }
 
+  // The head read its own seed (that re-entry set `lrDetected`), so the
+  // count has advanced and the settled entry is dependent.
+  const dependent = bucket.seedReads !== readsBefore;
   entry.isLR  = false;
   entry.result = entry.seed;
   if (entry.seed === null) {
-    state.memoSet(bucket, key, null, /* added */ false);
+    state.memoSet(bucket, key, dependent ? FAILED_DEPENDENT : FAILED, /* added */ false);
     state.indentStack = snapshot;
     state.advance(pos, rule);
-  } else if (entry.seed.newIndentStack) {
-    state.indentStack = entry.seed.newIndentStack;
   } else {
-    state.indentStack = snapshot;
+    entry.dependent = dependent;
+    state.indentStack = entry.seed.newIndentStack ?? snapshot;
   }
+  if (dependent) bucket.dependents.push(key);
   return entry.seed;
 }
 
 /**
- * Clear memo entries whose key identifies a match attempt at `pos`, except
- * the LR entry `keepKey` AND any other in-progress LR entries (isLR=true)
- * at the same position. Outer LR entries must be preserved so their own
- * seeds remain the active "current answer" for their rules during inner
- * iteration.
+ * One invalidation round, before a growth step of the head at `bucket`'s
+ * position P (B-157 P5): remove the entries at P marked `dependent`, and
+ * keep every in-progress entry (the head itself and any outer head at P,
+ * whose seeds must stay the current answer for their rules).
+ *
+ * Why the rest may stay. A memo entry's value is a function of the input,
+ * its key (rule and indent stack) and the memo values its evaluation read.
+ * Matching only moves forward, so an attempt at P looks up entries at P and
+ * after, never before. The seeds it can read are at P only: a seed at Q > P
+ * belongs to a head that started inside the attempt (heads in progress are
+ * the attempt's ancestors, at P or before, or its descendants), so that head
+ * settles before the attempt returns and the attempt reads only its final
+ * value; a seed at Q < P is never looked up. Hence growing a seed at P can
+ * change an entry at P only if its evaluation read a seed at P, or hit an
+ * entry at P that did. `matchRule` counts exactly those two events
+ * (`MemoBucket.seedReads`) and marks the entry when the count moved during
+ * its evaluation, and an inner attempt's reads fall inside the outer one's,
+ * so the mark is transitive. Every unmarked entry has the value a re-match
+ * would give, so keeping it changes no result.
+ *
+ * The mark over-approximates: it does not say which head's seed was read,
+ * so a settled inner head at P and its readers go too, as they did when a
+ * round cleared all of P.
  */
-function invalidateAtPos(state: ParseState, pos: number, keepKey: number): void {
+function invalidateAtPos(state: ParseState, bucket: MemoBucket): void {
   if (state.stats) state.stats.invalidationRounds++;
-  const removed = state.clearPos(pos, keepKey);
+  const removed = state.clearDependents(bucket);
   if (state.stats) state.stats.invalidationCount += removed;
 }
 

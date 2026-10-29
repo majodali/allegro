@@ -15,6 +15,32 @@ stratified precedence levels. Runtime grammar extension merges user
 fragments (`grammar { … }` blocks activated by `use`) into the base via
 level insertion and rule surgery, with cross-fragment conflict validation.
 
+Left recursion grows a seed: when a rule re-enters itself at the same
+position P, the engine re-runs it with the last result as the seed until
+the match stops getting longer. Before each growth step an invalidation
+round removes the memo entries at P that could be stale, and only those
+(B-157 P5 (dependency-tracked invalidation), `invalidateAtPos` in
+`src/grammar2/engine.ts`). An entry is marked *dependent* when its
+evaluation read a seed at P, or hit an entry at P that is marked; the
+engine counts those two events per position and compares the count
+before and after each attempt. Failed attempts carry the mark too. The
+round removes the dependent entries and keeps every in-progress one.
+
+Why the rest may stay: an entry's value is a function of the input, its
+rule and indent stack, and the memo values it read. Matching only moves
+forward, so an attempt at P reads seeds only at P: a head at a later
+position started inside the attempt and settles before it returns, and
+an earlier position is never looked up. A growth step at P therefore
+changes an entry at P only if the entry read a seed at P, directly or
+through a marked entry, and the mark is transitive because an inner
+attempt's reads fall inside the outer one's. This refines the earlier
+rule, which cleared every entry at P, a conservative over-approximation.
+The marked set is the *involved set* of Warth, Douglass and Millstein's
+left-recursion algorithm ("Packrat Parsers Can Support Left Recursion",
+2008), computed by observing reads rather than by tracking the rule
+stack. It still over-approximates: a settled inner head at P and its
+readers are removed too, so the growth iterations are unchanged.
+
 The Earley parser (`src/parser.ts`, `src/grammar-ext.ts`) remains only for
 standalone user-defined grammars via the `grammar_*` combinator primitives;
 its retirement in favor of `grammar2_*` is a tracked backlog item.
