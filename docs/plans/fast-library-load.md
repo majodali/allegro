@@ -156,13 +156,19 @@ substitutes a definition's expression rather than its value, and the
 reactive registry does not hand back a resolved cell. This is runtime
 work on the symbol-resolution path, in the kernel-semantics stream's
 files; it is sequenced last here and may move to that stream.
+**Taken at P10** (§7). The measurement placed the re-evaluation
+elsewhere: symbol resolution and the evaluation loop's cells already
+hand back a binding's value; the precompile pass evaluated every
+binding in a context that holds expressions.
 
 **M7 — cached parse artifacts.** If M1 to M4 leave the planning parse
 above a few seconds, cache the parsed program per library by content
 hash (on disk for the CLI and the suite; pre-built into the web bundle
 by `scripts/sync-web-libs.ts`). This guarantees the outcome for
 repeated runs whatever the engine costs; it does not help the first
-parse or user files.
+parse or user files. **Not taken** (P9, §7): after P7 the planning library parses in
+0.2 s, so a cache has no parse left to skip; the web bundle's load is
+the website's question.
 
 **M8 — the expression ladder without left recursion** (added at P6,
 2026-10-29, from the per-rule counts). **Taken at P7** (§7). The base grammar encodes
@@ -194,9 +200,9 @@ mechanism `expr_form` extensions use.
 | **P5** | M2: invalidation by generation; measured by the P1 stats before design. **Landed 2026-10-29** (§7) as dependency-tracked invalidation | invalidation entries fall; grammar-2 left-recursion battery green | M |
 | **P6** | decision point: the §7 numbers against the §2 target; R4 taken (tokenizer or not); M7 taken or not. **Decided 2026-10-29** (§6 R5): P7–P10 below, in that order | — (stops for the maintainer) | — |
 | **P7** | M8 (§4): the expression precedence ladder without left recursion — each level `tighter (op tighter)*`, folded left by the tree builder; removes every growth iteration. **Landed 2026-10-29** (§7) | built programs and outputs identical (the suite's pins), the grammar-2 battery, the user-operator fragments (`lib/pow.alg`, `lib/match_expr.alg`, the units literals); parse-tree shape may change, so the raw-tree comparison of P5 is not this chunk's oracle | M–L |
-| **P8** | measure again; R4 applied: the scanner layer if the whitespace and lexical share still warrants it | counts fall; outputs identical; `grammar-formalism.md` §2 amended | L |
-| **P9** | M7: cached parse artifacts by content hash (CLI and suite on disk; the web bundle pre-built) | repeated runs skip the parse; outputs identical | M |
-| **P10** | M6 (B-153) or hand-off to the kernel-semantics stream | demo re-evaluation count falls | M |
+| **P8** | measure again; R4 applied: the scanner layer if the whitespace and lexical share still warrants it. **Measured, not taken** 2026-10-29 (§7, §6 R4) | counts fall; outputs identical; `grammar-formalism.md` §2 amended | L |
+| **P9** | M7: cached parse artifacts by content hash (CLI and suite on disk; the web bundle pre-built). **Not taken, unnecessary** 2026-10-29 (§7) | repeated runs skip the parse; outputs identical | M |
+| **P10** | M6 (B-153) or hand-off to the kernel-semantics stream. **Landed 2026-10-29** (§7): `ALLEGRO_EVAL_STATS=1`; the precompile pass evaluates function definitions only, and each value binding at most once | demo re-evaluation count falls | M |
 
 The sequence stops on W-001's four conditions and on one more that is
 this stream's own: **any changed `// expect:` line stops it**, because
@@ -221,6 +227,11 @@ a parser that changes a program's meaning has left the stream's scope.
   hand: whether B-075's lexical layer is in scope, since it amends the
   scannerless formalism. **Taken**: a scanner/tokenizer layer is in
   scope; whether to build it is decided at P6 with P1's numbers.
+  **Outcome (P8, 2026-10-29)**: not built now. After P7 whitespace is
+  11% of a 0.2 s parse and the engine about 15% of the planning load,
+  so the layer would save hundredths of a second. It stays in scope as
+  a recorded option. Decided by the orchestrating agent on this plan's
+  text and this ruling.
 - **R5 — P7–P10 ratified and the built-program oracle confirmed,
   2026-10-29.** The maintainer ratified the chunks P7 to P10 of §5 in
   the order recommended at P6, and the oracle for P7: built programs and
@@ -812,3 +823,148 @@ a parser that changes a program's meaning has left the stream's scope.
   measures is therefore a small remainder: whitespace is now 11% of the
   planning parse's attempts (`ws` 55,702, `ws_req` 12,106, `ws_any`
   3,890 of 649,616).
+- 2026-10-29: **P8 measured, not taken; P9 not taken.** Decided by the
+  orchestrating agent on this plan's own text and R4 (the tokenizer
+  question). P8's measurement, after P7: whitespace is 11% of the
+  planning parse's match attempts (`ws` 55,702, `ws_req` 12,106,
+  `ws_any` 3,890 of 649,616), and the parse takes 0.2 s; the engine is
+  about 15% of the planning load's 0.7 s, below the CLI's TypeScript
+  module loading. R4 applied: the scanner layer is not built now. It is
+  in scope by the maintainer's ruling, but the parse is no longer the
+  cost; it stays a recorded option. P9 (M7, cached parse artifacts) is
+  not taken: a 0.2 s parse needs no cache, and the web bundle's load is
+  the website's question, not this stream's. What remains is
+  evaluation. `npm run bench:load` after P7: the solve demo
+  (`tests/planning-solve-demo.alg`) 6.2 s with 0.2 s of parse,
+  `demos/rung3/02-solve.alg` 4.0 s. The CPU profile of the solve demo
+  (7.4 s sampled): decoding Bits to strings (`TextDecoder`,
+  `bitsToString`, `decodeUTF8`) about 16%, `subst` 10.2%, the `__name`
+  helper 10.4% (closures created per evaluation under tsx's
+  keep-names), the garbage collector 9.8%, `applyPrimitive` 6.6%,
+  `evaluateExpr` 4.5%.
+- 2026-10-29: **P10 landed** (M6: a binding evaluated once; B-153
+  (re-evaluation per reference) closed). No `// expect:` line changed,
+  and every corpus program prints what it printed. Measured first, then
+  fixed.
+
+  **The instrument.** `ALLEGRO_EVAL_STATS=1` prints one stderr line per
+  run, at process exit: `evaluate`, `applyComposed` and `applyPrimitive`
+  calls, the precompile pass's inline expansions (composed-function
+  bodies expanded while precompile runs), and, for every top-level
+  binding whose expression computes, how many times that expression was
+  evaluated (the total, the share made in precompile, the maximum, and
+  how many bindings were evaluated more than once). A sink
+  (`setEvalStatsSink` in `src/evaluator.ts`) receives one report per
+  `evalSource` call. Off, with no sink, each counting site is one null
+  test. `npm run bench:load` prints the counts for each full run;
+  `lint:load` and its baseline are unchanged.
+
+  **The mechanism: the precompile pass, not symbol resolution.** The
+  evaluation loop already evaluates each binding once and stores the
+  value on its cell, and a later reference reads the cell. But
+  `precompileFunctions` in `src/runtime.ts` ran first, and it evaluated
+  every named binding, function or not, to find the functions to
+  precompile. Its context (`compileCtx`) holds the source bindings'
+  expressions, never their values, so every reference inside such an
+  evaluation evaluated the referenced binding's expression again,
+  transitively. The values were thrown away. The evidence:
+  - The five-binding chain with a print in the first binding (`d =
+    print(…)`, `c = [d, d]`, `b = [c, 1]`, …) printed ten times in
+    Allegro Standard and once under `--base` (Allegretto, which has no
+    precompile pass). The counts: 24 evaluations of 5 bindings, 19 of
+    them in precompile, 10 of `d`. A single `x = print("hi")` printed
+    twice.
+  - The solve demo: 455 evaluations of 73 watched bindings, 381 in
+    precompile, every binding evaluated more than once, `Unit` 65 times.
+    The program's precompile pass took 1.7 s against 4.6 s for its
+    evaluation loop, and made 3.65 M of the run's 13.58 M `evaluate`
+    calls, because it ran `best = solve(SoftwareRelease)` and rebuilt
+    the plan for each binding that names it. In the evaluation loop one
+    binding (`Quantity` in `lib/units.alg`) is evaluated twice: its law
+    instantiation reads `Quantity` while its own definition runs. That
+    is definition-time semantics and stays.
+  - Which bindings precompile needs: in the solve demo, 250 function
+    bindings are literals and none of the 73 value bindings evaluates
+    to a function. Over the 68 corpus files and the whole suite, the
+    bindings that evaluate to a function are literals, `typed_function`
+    applications, and seven computed ones (`add5 = make_adder(5)`,
+    `double_then_inc = compose(…)`, three `functional.compose`,
+    `pipe` and `twice` results in `tests/stdlib.alg`, an annotated
+    lambda binding, an alias of a function).
+
+  **The fix**, in `precompileFunctionsInner`, two parts:
+  - **Precompile evaluates function definitions only**: a function
+    literal or a `typed_function` application over one, the shapes the
+    effects declaration check reads before the evaluation loop
+    (`isFunctionDefinition`, over `asFunction` in `src/effects.ts`).
+    Every other binding is evaluated by the evaluation loop only. The
+    seven computed function bindings above lose their top-level
+    precompile. Nothing read it before the evaluation loop: the
+    declaration check and the totality analysis see the same two
+    shapes. What it produced was an entry in the report's inferred list
+    and a stash on a throwaway closure.
+  - **A value binding is evaluated at most once in the pass**: its
+    `compileCtx` entry evaluates the expression on the first lookup and
+    keeps the result (`precompileMemoEntry`), as the evaluation loop's
+    cell does. A lookup made during that evaluation reads the
+    expression, as before. This serves the types that definitions name
+    in their signatures and bodies.
+
+  What remains above one evaluation is by design: a type a definition
+  names is evaluated once speculatively in precompile (with law
+  instantiation suspended, so its value cannot be reused) and once for
+  real. The visible change is the bug's: a named binding's effect
+  (`x = print("hi")`) now runs once, as under `--base`. No corpus
+  program has such a binding.
+
+  The evaluation counts, `npm run bench:load` (before: `origin/main` at
+  `2da84a7` with only the instrument added; one run each, same
+  sandbox):
+
+  | Entry | `evaluate` before | after | inline expansions before | after | binding evaluations before | after | max before | after | re-evaluated before | after |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | `lib/units.alg` | 11,365 | 4,780 | 81 | 37 | 252 of 39 | 42 of 39 | 65 | 3 | 39 | 2 |
+  | `lib/planning.alg` | 36,183 | 26,285 | 546 | 502 | 394 of 58 | 76 of 58 | 65 | 3 | 58 | 17 |
+  | `tests/planning-solve-demo.alg` | 13,582,040 | 9,951,204 | 219,519 | 502 | 455 of 73 | 91 of 73 | 65 | 3 | 73 | 17 |
+  | `demos/rung3/01-model.alg` | 1,186,791 | 838,394 | 21,103 | 502 | 426 of 68 | 86 of 68 | 65 | 3 | 68 | 17 |
+  | `demos/rung3/02-solve.alg` | 7,205,933 | 3,585,957 | 217,092 | 502 | 461 of 75 | 93 of 75 | 65 | 3 | 75 | 17 |
+
+  `applyComposed` calls fall by the same proportion (the solve demo
+  769,442 to 565,195, `02-solve` 402,725 to 200,730), and
+  `applyPrimitive` calls likewise (3,164,858 to 2,315,455; 1,683,810 to
+  836,660). Every program binding of the solve demo is now evaluated
+  once; the 17 bindings above one are the library types the
+  definitions name.
+
+  | Entry | Wall clock before | after |
+  |---|---|---|
+  | `lib/units.alg` | 0.4 s | 0.3 s |
+  | `lib/planning.alg` | 0.5 s | 0.6 s |
+  | `tests/planning-solve-demo.alg` | 6.4 s | 5.2 s |
+  | `demos/rung3/01-model.alg` | 1.2 s | 1.0 s |
+  | `demos/rung3/02-solve.alg` | 4.0 s | 2.3 s |
+
+  The solve demo's remaining 4.4 s is its evaluation loop doing what
+  the program asks: it calls `solve` six times on three plans.
+
+  **The oracle.** Every `tests/*.alg` and `demos/**/*.alg` (68 files)
+  through the CLI on `origin/main` at `2da84a7` and on this change:
+  stdout, stderr and exit code identical for all 68. The full gate
+  green with every pin unchanged (1,235 distinct tests).
+
+  The gate (`npm run test:shards`, 3 shards): 235.5 s wall clock
+  (409.1 s of work) before, 236.2 s (409.9 s of work) after. The gate
+  did not fall, against this chunk's expectation. Its longest shard
+  (236 s) is the totality battery, not the planning demos:
+  `tests/totality-termination-demo.alg` 68 s and four Phase E tests on
+  recursive functions (`factorial` over `NonNeg` and `Int`, a
+  lexicographic metric) 15 to 34 s each. Their cost is the precompile
+  and termination analysis of function definitions, which this chunk
+  leaves as it was; the planning demos in that shard take 0.4 to 1.7 s
+  each. The before run had the instrument in place and the fix absent. New tests in
+  `src/test/language.ts` pin, through the sink, that the five-binding
+  chain evaluates each binding once in both modes, that the release
+  demo's two plan bindings (and every other binding of it) are
+  evaluated once, that a type named in three signatures is evaluated at
+  most twice, that a named binding's print runs once, and that forward
+  references and mutual recursion still resolve.

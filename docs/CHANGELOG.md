@@ -4,6 +4,57 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — B-157 (the performance stream) P10 (a binding evaluated once): the precompile pass evaluates definitions only; P8 (measure and the scanner) and P9 (cached parse artifacts) not taken
+
+The stream's last chunk (`docs/plans/fast-library-load.md` §5 row P10,
+move M6 (a binding evaluated once)), closing B-153 (re-evaluation per
+reference). Every corpus program prints what it printed and no
+`// expect:` line changed.
+
+- **P8 and P9 recorded as not taken.** After P7 (the ladder without left
+  recursion) the planning library parses in 0.2 s and whitespace is 11%
+  of its attempts, so R4 (the tokenizer question) is applied as "not
+  now": the scanner layer stays a recorded option. M7 (cached parse
+  artifacts) is unnecessary for a 0.2 s parse. Both decided by the
+  orchestrating agent on the plan's text and R4 (plan §6, §7).
+- **`ALLEGRO_EVAL_STATS=1`.** One stderr line per run at process exit:
+  `evaluate`, `applyComposed` and `applyPrimitive` calls, the precompile
+  pass's inline expansions, and how many times each top-level binding's
+  expression was evaluated (total, in precompile, maximum, bindings
+  evaluated more than once). A sink, `setEvalStatsSink` in
+  `src/evaluator.ts`, receives one report per `evalSource` call. Off,
+  each counting site is one null test. `npm run bench:load` prints the
+  counts per full run; `lint:load` is unchanged.
+- **The mechanism.** Not symbol resolution: the evaluation loop already
+  stores each binding's value on its cell. `precompileFunctions` in
+  `src/runtime.ts` evaluated every named binding to find the functions,
+  in a context holding the bindings' expressions, so each reference
+  re-evaluated the referenced binding's expression, transitively, and
+  the values were discarded. A five-binding chain whose first binding
+  printed printed ten times in Allegro Standard and once under
+  `--base`; the solve demo's precompile ran `solve` and rebuilt the plan.
+- **The fix.** Precompile evaluates function definitions only (a literal
+  or a `typed_function` application, `isFunctionDefinition` over
+  `asFunction` in `src/effects.ts`, the shapes the effects declaration
+  check reads). A value binding a definition reads is evaluated at most
+  once in the pass (`precompileMemoEntry`). Seven computed function
+  bindings in the corpus and suite (`add5 = make_adder(5)` and the
+  like) lose a top-level precompile that nothing read before
+  evaluation. A named binding's effect (`x = print("hi")`) now runs
+  once, as under `--base`.
+- **Numbers** (`npm run bench:load`, before with only the instrument
+  added): the solve demo, binding evaluations 455 to 91, `evaluate`
+  calls 13.58 M to 9.95 M, precompile inline expansions 219,519 to 502,
+  6.4 s to 5.2 s; `demos/rung3/02-solve.alg` 7.21 M to 3.59 M calls,
+  4.0 s to 2.3 s. The gate is unchanged (235.5 s before, 236.2 s
+  after): its longest shard is the totality battery's recursive-function
+  precompile, which this chunk does not touch.
+- **Tests.** `src/test/language.ts`: the five-binding chain evaluates
+  each binding once (both modes); the release demo's plan bindings are
+  evaluated once; a type named in three signatures at most twice; a
+  named binding's print runs once; forward references and mutual
+  recursion still resolve. 1,235 distinct tests, all passing.
+
 ## 2026-10 — B-157 (the performance stream) P7 (the ladder without left recursion): precedence levels run as repetitions
 
 The stream's seventh chunk (`docs/plans/fast-library-load.md` §5 row

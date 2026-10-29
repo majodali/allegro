@@ -23,7 +23,7 @@
 | `src/metadata.ts` | L0 | Metadata plane: field registry, propagation vocabulary (SC-7), free reads (D23), carry/clone idioms, the two generic propagation rules (`viralOnto`, `mergeOverMeta`), the install tables for merges, checks, dispatch, projections and analyses (unit `metadata`) |
 | `src/capability.ts` | L0 | Writer capabilities: field registration mints a writer (D21–D24), the gated `installFieldMerge` (P4), the base's own fields `source`/`error`/`knowledge`/`warnings`/`exported` (unit `capability`) |
 | `src/symbols.ts` | L0 | Symbol interning (FQN identity, D20/D29), kernel scope, base-name projection |
-| `src/evaluator.ts` | L0 | Recursive evaluator: PE Rules 1+2, TCO, closures; applies the propagation table through the metadata unit; runs the installed field checks and dispatchers (B-112 hooks (a) and (b): operator and equality dispatch, call-site unification and checking live in `types-std.ts`). Still performs effect and knowledge inference inside its loop (B-146) |
+| `src/evaluator.ts` | L0 | Recursive evaluator: PE Rules 1+2, TCO, closures; applies the propagation table through the metadata unit; runs the installed field checks and dispatchers (B-112 hooks (a) and (b): operator and equality dispatch, call-site unification and checking live in `types-std.ts`). Still performs effect and knowledge inference inside its loop (B-146). Counts its own work behind `ALLEGRO_EVAL_STATS=1` or a sink, `setEvalStatsSink` (B-157 P10 (a binding evaluated once)) |
 | `src/primitives.ts` | L0/L2 | All primitives: bits/expression/structure ops, type system ops, proof constructors + `proof_check`, grammar combinators, lazy print |
 | `src/runtime.ts` | L0/L1 | `evalSource` pipeline (below), symbol resolution, precompile, `CompilationReport` + notifications |
 | `src/refinements.ts` | L2 | Abstract domains + predicate sets: `domainFromPredicate`, lattice ops, propagation, `knowledgeOf` |
@@ -101,7 +101,7 @@ passes every other gate.
 
 | Path | Role |
 |---|---|
-| `bench/` | H-arc benchmark corpus + harness (`npm run bench`); `load.ts`, the library-load corpus (`npm run bench:load`) and its parse-count ratchet against `load-baseline.json` (`npm run lint:load`, in the gate) |
+| `bench/` | H-arc benchmark corpus + harness (`npm run bench`); `load.ts`, the library-load corpus (`npm run bench:load`) and its parse-count ratchet against `load-baseline.json` (`npm run lint:load`, in the gate); the full runs also report evaluation counts |
 | `pcp/llm-worker.ts` | `allegro prove` LLM worker (Anthropic SDK; pure helpers tested SDK-free) |
 | `scripts/` | `typecheck.sh` (sanctioned typecheck), `doc-ref-lint.ts`, `sync-web-libs.ts`, `check-deployed.ts` (B-096 live-site audit) |
 
@@ -121,7 +121,7 @@ passes every other gate.
 Stage order (in `src/runtime.ts`): `parse` (grammar2, with `use`
 pre-scan + fragment merge) → `typeLiterals` (raw Bits → Int/String
 wrapping) → `resolveSymbols` (lexical scoping) → `markTailCalls` →
-`collapseBodyMetadata` + `precompileFunctions` (PE of function bodies:
+`collapseBodyMetadata` + `precompileFunctions` (PE of the function definitions' bodies, each value binding they read evaluated at most once:
 type + effect inference; `CompilationReport`) → `buildEvalCtx` (scope
 chain: primitives ← extensions ← base ← source) → evaluation loop
 (forward-chaining on future cells). Post-passes:

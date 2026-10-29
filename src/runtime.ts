@@ -8,7 +8,7 @@ import { metaReadRaw, cloneMeta, hasShapeSlot, bumpMetaEpoch, withSource, carryM
 import { installAnalysis, kernelFieldWriter } from "./capability.js";
 import { getName, renameInPlace, isBareBindingName, isFutureBindingName } from "./slot-accessors.js";
 import { scopeNew, scopeLookup, scopeAllBindings, makeCell, resolveCell } from "./scope.js";
-import { markTailCalls, precompileFunction, remapParams, setInlineCutoff, markPatternBinders } from "./evaluator.js";
+import { markTailCalls, precompileFunction, remapParams, setInlineCutoff, markPatternBinders, beginEvalStats, endEvalStats, watchBindingExpr, setEvalStatsPrecompile } from "./evaluator.js";
 import { parseSource } from "./grammar2/engine.js";
 import { getBaseGrammar } from "./grammar2/base-grammar.js";
 import { buildProgram } from "./grammar2/tree-builder.js";
@@ -17,7 +17,7 @@ import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./
 import { primitives, asGrammarValue } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, StructureValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeStructure, makeExpr, makePrimitive, withMeta, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError} from "./types.js";
-import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf } from "./effects.js";
+import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf, isFunctionDefinition } from "./effects.js";
 import { collapseBodyMetadata, checkExhaustiveness, analyzeDivergence, NOTIF_TOTALITY_NEEDS_ANNOTATION, DivObligation, DivergenceResult } from "./totality.js";
 import { isFailedProof, describeFailedProof, formatProofFinding, ProofFinding } from "./proofs.js";
 import { checkProvenClauses, formatProvenFinding } from "./proven.js";
@@ -545,6 +545,36 @@ export function reportHasErrors(report: CompilationReport): boolean {
 }
 
 /**
+ * B-157 P10 (B-153): the precompile context's entry for a value binding.
+ * The context holds source expressions, not values, so every lookup of the
+ * name used to evaluate the binding's expression afresh: a type named in
+ * seventeen signatures was built seventeen times. The entry evaluates the
+ * expression on the first lookup, in the precompile context, and keeps the
+ * result, as the evaluation loop's cell keeps a binding's value. A lookup
+ * made while that evaluation runs (a self-reference) reads the expression,
+ * as every lookup did before; a failed evaluation keeps nothing, so the
+ * next lookup fails the same way.
+ */
+function precompileMemoEntry(key: string, expr: Value, ctx: StructureValue): Binding {
+  let held: Value | undefined;
+  let evaluating = false;
+  return {
+    key,
+    get value(): Value {
+      if (held !== undefined) return held;
+      if (evaluating) return expr;
+      evaluating = true;
+      try {
+        held = evaluate(expr, ctx, 0);
+      } finally {
+        evaluating = false;
+      }
+      return held;
+    },
+  } as Binding;
+}
+
+/**
  * Pre-compile typed functions: partially evaluate their bodies with
  * typed param placeholders to infer return types and detect type errors.
  */
@@ -561,9 +591,11 @@ function precompileFunctions(
   // obligation instantiation + the E-R5 gate so definition-time semantics
   // fire exactly once, at the real evaluation.
   setLawInstantiationSuspended(true);
+  setEvalStatsPrecompile(true);
   try {
     return precompileFunctionsInner(fileCtx, extensions, report);
   } finally {
+    setEvalStatsPrecompile(false);
     setLawInstantiationSuspended(false);
   }
 }
@@ -591,15 +623,28 @@ function precompileFunctionsInner(
       }
     }
   }
-  // Add source bindings to compile context
+  // Add source bindings to compile context. B-157 P10 (B-153): a value
+  // binding whose expression computes enters as a memo entry, so the
+  // definitions' annotations and bodies that reference it evaluate it once
+  // in this pass rather than once per reference.
   for (const b of fileCtx.bindingList) {
     if (b.key !== null && b.value !== undefined) {
-      putEntry(compileCtx, { key: b.key, value: b.value });
+      putEntry(compileCtx, isResolved(b.value) || isFunctionDefinition(b.value)
+        ? { key: b.key, value: b.value }
+        : precompileMemoEntry(b.key, b.value, compileCtx));
     }
   }
 
   for (const b of fileCtx.bindingList) {
     if (b.key === null || b.value === undefined) continue;
+    // B-157 P10 (B-153): precompile evaluates a binding only when it is a
+    // function DEFINITION, the shape the effects declaration check reads
+    // before evaluation (a function literal, or `typed_function` over one).
+    // Every other binding's expression was evaluated here and thrown away,
+    // and each reference to another binding inside it re-evaluated that
+    // binding's expression, since this context holds expressions, not
+    // values. A value binding is now evaluated by the evaluation loop only.
+    if (!isFunctionDefinition(b.value)) continue;
 
     // Evaluate the binding to resolve typed_function wrappers
     let val: Value;
@@ -1074,6 +1119,16 @@ export function evalSource(
   // Mark tail-position calls in function bodies for TCO
   markTailCallsInContext(fileCtx);
 
+  // B-157 P10: evaluation stats (ALLEGRO_EVAL_STATS=1, or a sink). Each
+  // named binding whose expression computes is watched from here on, so
+  // the report counts every evaluation of it, in precompile and after.
+  const statsFrame = beginEvalStats(moduleFqn ?? "<main>");
+  if (statsFrame !== null) {
+    for (const b of fileCtx.bindingList) {
+      if (b.key !== null && b.value !== undefined && !isResolved(b.value)) watchBindingExpr(statsFrame, b.value, b.key);
+    }
+  }
+
   // B-018 T-R6: the divergence analysis runs BEFORE precompile.
   // Precompile is where speculative inlining happens, so the cutoff has
   // to be installed first — measured: 124k inline expansions of a single
@@ -1508,5 +1563,6 @@ export function evalSource(
     }
   }
 
+  endEvalStats(statsFrame);
   return { value: lastValue, evalCtx, compilationReport, registry };
 }

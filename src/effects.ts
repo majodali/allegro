@@ -171,6 +171,14 @@ function asFunction(v: Value): ComposedFunctionValue | null {
   return null;
 }
 
+/** Is a top-level binding's expression a function DEFINITION — the shapes
+ *  `asFunction` peels? `precompileFunctions` (`src/runtime.ts`) evaluates
+ *  only these (B-157 P10, B-153): they are what the declaration check reads
+ *  before the evaluation loop runs. */
+export function isFunctionDefinition(v: Value): boolean {
+  return asFunction(v) !== null;
+}
+
 /** For each named binding in `ctx`, if it's a function with an `effects`
  *  declaration, check inferred ⊆ declared and collect mismatches.
  *

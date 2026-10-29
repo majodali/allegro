@@ -75,6 +75,8 @@ npm run bench:load                  # B-157 (the performance stream): load corpu
                                     #   full runs, wall clock + parse counts (minutes)
 ALLEGRO_PARSE_STATS=1 npx tsx src/index.ts f.alg  # one stderr line of engine
                                     #   stats per program or library parse
+ALLEGRO_EVAL_STATS=1 npx tsx src/index.ts f.alg   # one stderr line of evaluator
+                                    #   counts per run (B-157 P10 (the evaluation stats))
 npx tsx scripts/bench-slot-lookup.ts  # B-120: slot scan vs index crossover
 npx tsx scripts/analyze/index.ts <cmd> # B-127: binder-aware survey (props |
                                     #   any-props | kind-tests | refs |
