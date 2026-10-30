@@ -224,7 +224,7 @@ after it is up to date with `origin/main`:
 The maintainer adopted W-009 for these five chapters on 2026-10-30
 (`docs/classification.md` §Rules adopted by declaration). What each
 chunk therefore produces, under the methodology's specification
-`docs/intermediate-representation.md` at the pinned version:
+`intermediate-representation.md` of the methodology repository at the pinned version:
 
 - **The IR first.** `<chapter>.ir.md` beside the chapter, header
   `Reader: RD-4`, `Purpose: document`, `Source:` naming this plan's

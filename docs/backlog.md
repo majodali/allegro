@@ -2882,7 +2882,9 @@ table and the stream plans.
 - [ ] **B-170** (the book, Part II and III chapters writable now) ·
   T-docs · **The planned chapters whose gate has passed.** Plan
   `docs/plans/book-chapters-now.md` (stream A, lane A, human-gated;
-  filed 2026-10-30, ratified at the plan PR's merge). Five chapters,
+  filed 2026-10-30; rulings R1 to R7 taken and R8 decided the same day:
+  the chapters are written IR first under W-009, B-173 (the book
+  writes IR first)). Five chapters,
   one per chunk, in reading order: the evaluator (unit 13), the
   evaluation pipeline (unit 33), tooling (units 34 and 35), host
   environments, and the demo ladder with the rung-3 pilot (Part III).
