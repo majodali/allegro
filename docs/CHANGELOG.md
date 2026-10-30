@@ -4,6 +4,27 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — Merge-on-green is deviation D-2 (the pre-stream arc, S1)
+
+The maintainer ratified on 2026-10-30 the five items that precede
+development as concurrent streams, the split between the repository and
+a coordinating service, and the terms *stream*, *stream plan* and
+*lane manifest*. Chunk S1 of `docs/plans/parallel-streams.md` (the new
+plan, with the split table and the chunk sequence) records merge-on-green
+as **deviation D-2** in `docs/classification.md`: a ratified stream
+merges its own PRs on a green gate after reading the diff, under four
+conditions (a mechanical oracle, no open ruling, disjoint files,
+reversible), retiring when the pinned methodology carries the rule. The
+lane table gains row S and a merge-policy paragraph. The Tier-0
+contradiction in `docs/book/process.md` §3 ("a merged PR is the
+maintainer's approval; nothing else is") is surfaced, not resolved:
+plan §5 holds the proposed amendment for a dedicated PR. Backlog items
+filed under Track M: B-165 (merge-on-green recorded as a deviation,
+closed by this chunk), B-166 (the stream-plan document type),
+B-162 (conflict-free status documents), B-163 (the lane manifest and
+its check), B-164 (ratchet baselines under concurrent merges). Docs
+only.
+
 ## 2026-10 — The owner-module invariant joins `CLAUDE.md`
 
 Ratified by the maintainer 2026-10-29 after

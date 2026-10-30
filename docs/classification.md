@@ -28,7 +28,34 @@ field definitions and omission defaults per the methodology
 
 ## Deviation register
 
-No deviations recorded. **D-1** (W-001, the per-chunk gate) was recorded
+**D-2 — merge-on-green streams** (W-006, the PR waits for owner review;
+recorded 2026-10-30, owner B-165 (merge-on-green recorded as a
+deviation)). A stream whose stream plan declares merge-on-green, and
+that the maintainer has so ratified, merges its own PRs: the agent
+running the stream merges a PR once the gate is green and it has read
+the diff. The policy holds only while the stream meets four conditions:
+
+1. a mechanical oracle decides each chunk (deterministic counts, pinned
+   outputs, a lint), not a judgment;
+2. no ruling is open inside the chunk — a chunk needing a decision stops
+   as `docs/book/process.md` §3 says;
+3. the chunk's files are disjoint from every other active lane;
+4. the chunk is reversible by a revert of its merge.
+
+A chunk that fails any one condition waits for the maintainer like any
+other PR. The four stop conditions of the pre-ratified sequence are
+unchanged. First instance: the performance stream, B-157 (the
+performance stream), ruling R3 (the stream's merge policy) of
+`docs/plans/fast-library-load.md`,
+taken 2026-10-28, ten PRs merged on green. The maintainer ratified the
+policy for qualifying streams on 2026-10-30. `docs/book/process.md` §3
+("a merged PR is the maintainer's approval; nothing else is") is Tier 0
+and contradicts this practice; the proposed amendment is
+`docs/plans/parallel-streams.md` §5, for a dedicated PR. **Retires**
+when the pinned methodology version carries merge-on-green as a
+standard, which the maintainer says an upcoming version will.
+
+**D-1** (W-001, the per-chunk gate) was recorded
 2026-09-01 and **retired 2026-09-05**: methodology v1.5.0 released the
 pre-ratified sequence mode with allegro as its evidencing instance, and
 `docs/book/process.md` §3 now states all four of the released rule's stop
