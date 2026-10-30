@@ -131,6 +131,26 @@ only.
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
 
+### 2026-10 — Lane K for kernel hygiene; the branch-protection setting recorded
+
+B-167 (lane K for kernel hygiene), asked by the maintainer at the gate
+of the pre-stream arc's last chunk. The kernel-hygiene band (the M1
+residue, fourteen open L0 items from B-104 (retire the dunder
+convention) to B-147 (diagnostics), named in the lane row) had no lane
+of its own and fell under D, so a
+kernel-hygiene stream and an L2-semantics stream could not run
+concurrently. Row K in the lane table of `docs/backlog.md` §"Parallel
+lanes" and its entry in `scripts/analyze/lanes.json`: the L0 unit
+files, the boundary battery, `scripts/analyze/`, the Allegretto
+chapters; overlapping D in the evaluator, the primitives and the type
+files under the P rule (taken only when D is not in them). The suite's
+manifest check holds the row and the entry together. Also:
+`docs/classification.md` gains "Repository settings (owner-run)",
+recording the branch protection the owner set on `main` the same day
+(required check `test`; up to date with `main` before merge), which
+makes the stale-base case of B-164 (ratchet baselines under concurrent
+merges) impossible. Docs and manifest only.
+
 ## Record before streams (to 2026-10-30)
 
 The flat record as it stood when the sections above were created

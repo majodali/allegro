@@ -1,5 +1,5 @@
 {
-  "_": "The lane manifest (B-163, docs/plans/parallel-streams.md S4): docs/backlog.md §'Parallel lanes' as data. `lanes` maps each lane letter of the lane table to the files it may edit, as globs (`**` spans directories, `*` one segment, `?` one character). `shared` lists the status documents every lane edits under the rule 'Status documents under streams' (B-162) — exempt from the check. A stream plan's `boundary` header narrows its lane; the plan's own file is always allowed. Lanes A, C and D were declared from the lane table's prose on 2026-10-30 and are refined when a stream plan opens in them; P and S come from their plans' headers. Two lanes may list the same file (P and D share the evaluator and the totality analyzer: the lane table says P takes them only when D is not in them) — the per-PR check sees one lane; overlap between ACTIVE streams is the coordinating service's check at dispatch. Edited by lane S or a maintainer decision.",
+  "_": "The lane manifest (B-163, docs/plans/parallel-streams.md S4): docs/backlog.md §'Parallel lanes' as data. `lanes` maps each lane letter of the lane table to the files it may edit, as globs (`**` spans directories, `*` one segment, `?` one character). `shared` lists the status documents every lane edits under the rule 'Status documents under streams' (B-162) — exempt from the check. A stream plan's `boundary` header narrows its lane; the plan's own file is always allowed. Lanes A, C and D were declared from the lane table's prose on 2026-10-30, K from the kernel-hygiene band of the backlog the same day; all four are refined when a stream plan opens in them; P and S come from their plans' headers. Two lanes may list the same file (P and D share the evaluator and the totality analyzer: the lane table says P takes them only when D is not in them) — the per-PR check sees one lane; overlap between ACTIVE streams is the coordinating service's check at dispatch. Edited by lane S or a maintainer decision.",
   "shared": [
     "docs/CHANGELOG.md",
     "docs/backlog.md",
@@ -49,6 +49,32 @@
         "scripts/analyze/units.json",
         "scripts/analyze/units-baseline.json",
         "scripts/analyze/plane-baseline.json"
+      ]
+    },
+    "K": {
+      "name": "kernel hygiene",
+      "globs": [
+        "src/structure.ts",
+        "src/slot-accessors.ts",
+        "src/metadata.ts",
+        "src/symbols.ts",
+        "src/scope.ts",
+        "src/capability.ts",
+        "src/boundary-tests.ts",
+        "src/boundary-baseline.json",
+        "src/evaluator.ts",
+        "src/primitives.ts",
+        "src/types.ts",
+        "src/types-std.ts",
+        "scripts/analyze/**",
+        "src/test/base.ts",
+        "src/test/types-core.ts",
+        "src/test/types-construction.ts",
+        "src/test/tooling.ts",
+        "docs/book/allegretto/**",
+        "docs/book/units.md",
+        "docs/book/implementation-map.md",
+        "docs/plans/host-plane-declaration.md"
       ]
     },
     "P": {
