@@ -9,6 +9,8 @@ import { test, asyncTest, eq, SHARD } from "./harness.js";
 import { CORPUS, WRONG_SENTINEL_TERM } from "../../bench/manifest.js";
 import { runBenchmark, stripProof } from "../../bench/harness.js";
 import { lintDocRefs } from "../../scripts/doc-ref-lint.js";
+import { gateFindings, lintDocs, readBaseline } from "../../scripts/doc-lint.js";
+import * as os from "os";
 import { checkAll as checkStreamPlans, checkStreamPlan, loadContext as loadStreamPlanContext, parseFrontMatter, streamPlans } from "../../scripts/stream-plan.js";
 import { backlogIdOf, checkFiles, checkManifest, declaredLane, globToRegExp, loadManifest } from "../../scripts/analyze/lane-lint.js";
 import { assessDeployment, parseStamp } from "../../scripts/check-deployed.js";
@@ -106,8 +108,41 @@ export function runDocLintTests(): void {
     eq(rendered, "", "dangling doc references");
   });
 
-  // --- Stream plans (B-166): the machine-readable header is well-formed ---
+  // --- The document lints in the gate (B-150) ---
   const repoRoot = nodePath.resolve(import.meta.dirname, "../..");
+  test("doc lints (B-150): anchors resolve, no forward reference, bare identifiers at or below the baseline", () => {
+    const result = lintDocs({ root: repoRoot });
+    const baseline = readBaseline(repoRoot);
+    const problems = gateFindings(result, baseline);
+    const detail = result.findings.filter((f) => f.check !== "ids").map((f) => `${f.file}:${f.line} ${f.note}`).join("; ");
+    eq(problems.join("; "), "", `doc-lint gate: ${detail}`);
+    eq(result.counts.ids <= baseline.ids, true, `ids ${result.counts.ids} vs baseline ${baseline.ids}`);
+  });
+  test("doc lints (B-150): each lint refuses a known-bad document in a probe root", () => {
+    // The probe lives in its own root, so a concurrent shard running the gate
+    // test never sees it (markdownFiles lists the repository, not this dir).
+    const probe = fs.mkdtempSync(nodePath.join(os.tmpdir(), "doc-lint-probe-"));
+    try {
+      fs.mkdirSync(nodePath.join(probe, "docs/book"), { recursive: true });
+      fs.writeFileSync(nodePath.join(probe, "docs/book/first.md"), '# First\n\n<a id="def-thing"></a>**Thing**: defined here. See [later](second.md#def-later), a forward reference.\n');
+      fs.writeFileSync(nodePath.join(probe, "docs/book/second.md"), '# Second\n\n<a id="def-later"></a>**Later**. A [bad link](first.md#def-missing) and a bare B-999 citation, then B-999 again.\n');
+      fs.writeFileSync(nodePath.join(probe, "docs/reading-order.json"), JSON.stringify({ parts: [{ chapters: [{ doc: "docs/book/first.md", title: "First" }, { doc: "docs/book/second.md", title: "Second" }] }] }));
+      const files = ["docs/book/first.md", "docs/book/second.md"];
+      const r = lintDocs({ root: probe, files });
+      eq(r.counts.anchors, 1, `one unresolved anchor: ${JSON.stringify(r.findings)}`);
+      eq(r.findings.find((f) => f.check === "anchors")?.note, "no anchor #def-missing in docs/book/first.md");
+      eq(r.counts.order, 1, "one forward reference, first.md → second.md");
+      eq(r.counts.ids, 1, "B-999 bare once: the first use counts, the repeat does not");
+      const problems = gateFindings(r, { ids: 0 });
+      eq(problems.length, 3, `all three gate conditions fail on the probe: ${problems.join(" | ")}`);
+      eq(gateFindings({ counts: { anchors: 0, order: 0, ids: 5 }, findings: [] }, { ids: 5 }).length, 0, "ids at the baseline passes");
+      eq(gateFindings({ counts: { anchors: 0, order: 0, ids: 6 }, findings: [] }, { ids: 5 }).length, 1, "ids above the baseline fails");
+    } finally {
+      fs.rmSync(probe, { recursive: true, force: true });
+    }
+  });
+
+  // --- Stream plans (B-166): the machine-readable header is well-formed ---
   test("stream plans (B-166): every header in docs/plans validates against the repository", () => {
     const results = checkStreamPlans(repoRoot);
     eq(results.length >= 2, true, "the two first instances (fast-library-load, parallel-streams) carry headers");

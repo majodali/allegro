@@ -94,7 +94,12 @@ npm run lint:load                   # B-157: parse counts of the load corpus
                                     #   — IN THE GATE, once per run (~2 min)
 npm run lint:docs                   # D52: anchored links resolve, no forward
                                     #   references in the reading order, bare
-                                    #   identifiers — report-only until B-150
+                                    #   identifiers by file (report)
+npm run lint:docs:check             # B-150: the same as the gate holds it —
+                                    #   anchors 0, order 0, ids at or below
+                                    #   scripts/doc-lint-baseline.json — IN THE
+                                    #   GATE (suite); lower the baseline with
+                                    #   `npx tsx scripts/doc-lint.ts --update-baseline`
 npm run lint:streams                # B-166: every stream plan's header names
                                     #   a real lane, real backlog ids and real
                                     #   oracle commands — IN THE GATE (suite)

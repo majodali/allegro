@@ -2871,7 +2871,15 @@ table and the stream plans.
     failed-check and asks stops rather than deleting anything.
   - **Pointer**: methodology [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated).
 
-- [ ] **B-150** · T-docs · T-tooling · **The document lints join the gate.**
+- [x] **B-150** · T-docs · T-tooling · **The document lints join the gate.**
+  LANDED 2026-10-30 (lane S, unstreamed; the oracle of the book stream):
+  `npm run lint:docs:check` and the same check in `src/test/tooling.ts`
+  — anchors 0, order 0, bare identifiers at or below
+  `scripts/doc-lint-baseline.json` (796 at landing; lowered only by
+  `--update-baseline`, which refuses to raise); each lint probed against
+  a known-bad document in a temporary root. The heuristic's limits: the
+  ids count stays approximate (bold and links defeat the regex), which
+  is why it ratchets rather than hard-fails at zero.
   - **What**: `npm run lint:docs` (`scripts/doc-lint.ts`, D52 Phase 0)
     runs report-only. Gate the `anchors` check (deterministic: every
     anchored link resolves) in `src/test/tooling.ts` beside the doc-ref
