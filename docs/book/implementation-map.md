@@ -103,7 +103,7 @@ passes every other gate.
 |---|---|
 | `bench/` | H-arc benchmark corpus + harness (`npm run bench`); `load.ts`, the library-load corpus (`npm run bench:load`) and its parse-count ratchet against `load-baseline.json` (`npm run lint:load`, in the gate); the full runs also report evaluation counts |
 | `pcp/llm-worker.ts` | `allegro prove` LLM worker (Anthropic SDK; pure helpers tested SDK-free) |
-| `scripts/` | `typecheck.sh` (sanctioned typecheck), `doc-ref-lint.ts`, `doc-lint.ts` (D52 book lints), `stream-plan.ts` (B-166 stream-plan headers: reader and check), `sync-web-libs.ts`, `check-deployed.ts` (B-096 live-site audit) |
+| `scripts/` | `typecheck.sh` (sanctioned typecheck), `doc-ref-lint.ts`, `doc-lint.ts` (D52 book lints), `stream-plan.ts` (B-166 stream-plan headers: reader and check), `analyze/lanes.json` + `analyze/lane-lint.ts` (B-163 the lane table as data; a PR's files stay inside its lane), `sync-web-libs.ts`, `check-deployed.ts` (B-096 live-site audit) |
 
 ## Everything else
 

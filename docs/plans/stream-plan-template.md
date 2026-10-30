@@ -48,7 +48,7 @@ boundary:
 | `oracle` | the commands whose outcome decides a chunk — `npm test`, `npm run <script>` or `npx tsx <file>`; a stream with no mechanical oracle cannot be merge-on-green |
 | `chunks` | the chunk ids in landing order, letters then a number |
 | `reserves` | the backlog ids this stream mints, reserved here before it starts so two streams never mint the same id; each must already have an entry |
-| `boundary` | optional globs narrowing the lane's files; omit to inherit the lane's |
+| `boundary` | optional globs narrowing the lane's files in `scripts/analyze/lanes.json`; omit to inherit the lane's. `npm run lint:lanes` refuses a PR of this stream whose files fall outside it (B-163 (the lane manifest and its check)) |
 
 ## 1. Outcome and terms
 

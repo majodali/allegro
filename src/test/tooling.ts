@@ -10,6 +10,7 @@ import { CORPUS, WRONG_SENTINEL_TERM } from "../../bench/manifest.js";
 import { runBenchmark, stripProof } from "../../bench/harness.js";
 import { lintDocRefs } from "../../scripts/doc-ref-lint.js";
 import { checkAll as checkStreamPlans, checkStreamPlan, loadContext as loadStreamPlanContext, parseFrontMatter, streamPlans } from "../../scripts/stream-plan.js";
+import { backlogIdOf, checkFiles, checkManifest, declaredLane, globToRegExp, loadManifest } from "../../scripts/analyze/lane-lint.js";
 import { assessDeployment, parseStamp } from "../../scripts/check-deployed.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -144,6 +145,43 @@ export function runDocLintTests(): void {
     eq(unclosed.errors.some((e) => e.includes("never closed")), true, "unclosed front matter is a finding");
     const noHeader = parseFrontMatter("# A plan without front matter\n");
     eq(noHeader.header, null, "a plan without front matter is not a stream plan");
+  });
+
+  // --- The lane manifest and its check (B-163) ---
+  test("lane lint (B-163): the manifest agrees with the lane table and the stream plans", () => {
+    eq(checkManifest(repoRoot).join("; "), "", "manifest findings");
+    const manifest = loadManifest(repoRoot);
+    eq(manifest.shared.includes("docs/CHANGELOG.md") && manifest.shared.includes("docs/backlog.md"), true, "the status documents are shared");
+    eq(manifest.lanes.S !== undefined && manifest.lanes.P !== undefined, true, "the two streamed lanes have entries");
+  });
+  test("lane lint (B-163): globs match segments the way the manifest's note says", () => {
+    eq(globToRegExp("src/grammar2/**").test("src/grammar2/engine.ts"), true);
+    eq(globToRegExp("src/grammar2/**").test("src/grammar2/deep/x.ts"), true);
+    eq(globToRegExp("src/*.ts").test("src/evaluator.ts"), true);
+    eq(globToRegExp("src/*.ts").test("src/test/base.ts"), false, "one star stops at a slash");
+    eq(globToRegExp("docs/**").test("docs/CHANGELOG.md"), true);
+    eq(globToRegExp("src/test/grammar2-*.ts").test("src/test/grammar2-engine.ts"), true);
+    eq(globToRegExp("src/test/grammar2-*.ts").test("src/test/modules.ts"), false);
+    eq(globToRegExp("CLAUDE.md").test("docs/CLAUDE.md"), false, "a literal is anchored");
+  });
+  test("lane lint (B-163): a known-bad file list is refused; shared documents and the plan are not", () => {
+    const manifest = loadManifest(repoRoot);
+    eq(backlogIdOf("B-163: the lane manifest and its check (the pre-stream arc, S4)"), "B-163");
+    eq(backlogIdOf("docs: fix a typo"), null, "no id, unstreamed");
+    const decl = declaredLane(repoRoot, "B-163");
+    eq(decl?.lane, "S", "B-163 is reserved by the pre-stream arc, lane S");
+    eq(decl?.plan, "docs/plans/parallel-streams.md");
+    eq(declaredLane(repoRoot, "B-999999"), null, "an unreserved id declares no lane");
+    const findings = checkFiles(
+      ["docs/CHANGELOG.md", "docs/plans/parallel-streams.md", "scripts/analyze/lanes.json", "src/evaluator.ts", "lib/planning.alg"],
+      decl!, manifest,
+    );
+    eq(findings.map((f) => f.file).join(","), "src/evaluator.ts,lib/planning.alg", `exactly the two files outside lane S: ${findings.map((f) => `${f.file} ${f.reason}`).join(" | ")}`);
+    // Without a plan boundary the lane's own globs apply.
+    const bare = { lane: "P", plan: "", backlog: "", boundary: null };
+    eq(checkFiles(["src/grammar2/engine.ts", "bench/load.ts", "docs/backlog.md"], bare, manifest).length, 0, "lane P's files pass");
+    eq(checkFiles(["web/index.html"], bare, manifest).length, 1, "a lane-C file is outside lane P");
+    eq(checkFiles(["x.ts"], { lane: "Z", plan: "", backlog: "", boundary: null }, manifest)[0]?.reason.includes("not in scripts/analyze/lanes.json"), true, "an unknown lane refuses every file");
   });
 }
 
