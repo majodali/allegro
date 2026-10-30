@@ -4,6 +4,17 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — The owner-module invariant joins `CLAUDE.md`
+
+Ratified by the maintainer 2026-10-29 after
+B-158 (in-place write through a library alias) landed: a library's values
+are immutable after load, and a module writes only into values it
+constructed. One bullet in the
+invariant list, next to the in-place-write rule it is the cross-module
+form of, pointing at the three guarded writers, the ownership set
+(`libraryOwnedValues` in `src/runtime.ts`) and the library-immutability
+test in `src/test/modules.ts`. Docs only.
+
 ## 2026-10 — B-158 (in-place write through a library alias): the owner-module invariant
 
 Since B-157 P2 (a library loads once per run) a library's values are
