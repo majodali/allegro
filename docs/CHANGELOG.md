@@ -147,6 +147,17 @@ counted once) before being trusted, and the probe runs in the suite.
 The ids heuristic stays approximate, which is why it ratchets rather
 than hard-failing at zero. `npm run lint:docs` without `--check` still
 reports by file. Suite +2.
+### 2026-10 — A stream plan's boundary narrows its lane, never widens it
+
+B-163 (the lane manifest and its check), a follow-up found while
+preparing the first stream plans: `scripts/analyze/lane-lint.ts` let a
+plan's `boundary` header REPLACE the lane's globs, so a plan could
+declare files outside its lane and pass. A file is now allowed only
+when it is inside the lane's globs and, when the plan declares a
+boundary, inside that too; the finding names which of the two refused
+it. Two tests pin it: a lane-S plan declaring `src/**` still cannot
+touch the evaluator, and a boundary narrower than the lane refuses a
+lane file outside it. No manifest change.
 
 ### 2026-10 — Lane K for kernel hygiene; the branch-protection setting recorded
 

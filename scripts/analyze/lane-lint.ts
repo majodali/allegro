@@ -80,14 +80,15 @@ export interface FileFinding { file: string; reason: string }
 export function checkFiles(files: string[], decl: Declaration, manifest: LaneManifest): FileFinding[] {
   const lane = manifest.lanes[decl.lane];
   if (!lane) return files.map((file) => ({ file, reason: `lane ${decl.lane} is not in scripts/analyze/lanes.json` }));
-  const allowed = decl.boundary ?? lane.globs;
+  // A plan's boundary NARROWS its lane: a file must be inside the lane's
+  // globs AND, when the plan declares a boundary, inside that too. A
+  // boundary never admits a file the lane does not.
   const out: FileFinding[] = [];
   for (const file of files) {
     if (file === decl.plan) continue;
     if (matchesAny(file, manifest.shared)) continue;
-    if (matchesAny(file, allowed)) continue;
-    const where = decl.boundary ? `the boundary of ${decl.plan}` : `lane ${decl.lane} (${lane.name})`;
-    out.push({ file, reason: `outside ${where}` });
+    if (!matchesAny(file, lane.globs)) { out.push({ file, reason: `outside lane ${decl.lane} (${lane.name})` }); continue; }
+    if (decl.boundary && !matchesAny(file, decl.boundary)) out.push({ file, reason: `outside the boundary of ${decl.plan}` });
   }
   return out;
 }
