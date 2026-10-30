@@ -177,6 +177,14 @@ export function runDocLintTests(): void {
       decl!, manifest,
     );
     eq(findings.map((f) => f.file).join(","), "src/evaluator.ts,lib/planning.alg", `exactly the two files outside lane S: ${findings.map((f) => `${f.file} ${f.reason}`).join(" | ")}`);
+    // A boundary narrows the lane and never widens it: a plan in lane S
+    // declaring `src/**` still cannot touch the evaluator.
+    const widened = { lane: "S", plan: "docs/plans/parallel-streams.md", backlog: "B-163", boundary: ["src/**", "docs/**"] };
+    const w = checkFiles(["src/evaluator.ts", "docs/book/units.md", "docs/plans/fast-library-load.md"], widened, manifest);
+    eq(w.map((f) => `${f.file}: ${f.reason}`).join("; "), "src/evaluator.ts: outside lane S (the pre-stream arc)", "the lane bounds the boundary");
+    // And a boundary narrower than the lane refuses a lane file outside it.
+    const narrowed = { lane: "S", plan: "docs/plans/parallel-streams.md", backlog: "B-163", boundary: ["docs/plans/**"] };
+    eq(checkFiles(["docs/book/units.md"], narrowed, manifest)[0]?.reason, "outside the boundary of docs/plans/parallel-streams.md");
     // Without a plan boundary the lane's own globs apply.
     const bare = { lane: "P", plan: "", backlog: "", boundary: null };
     eq(checkFiles(["src/grammar2/engine.ts", "bench/load.ts", "docs/backlog.md"], bare, manifest).length, 0, "lane P's files pass");
