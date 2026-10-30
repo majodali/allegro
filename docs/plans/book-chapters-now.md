@@ -1,11 +1,12 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-170
 lane: A
 merge: human-gated
 oracle:
   - npm run lint:docs:check
+  - npm run lint:ir
   - npx tsx scripts/doc-ref-lint.ts
   - npm test
 chunks: [A1, A2, A3, A4, A5]
@@ -19,13 +20,16 @@ boundary:
 
 # The book's chapters that are writable now — the book-chapters stream
 
-> **Status: draft** (2026-10-30). Not ratified. The rulings of §6 come
-> before chunk 1. The plan PR files this plan at
-> `docs/plans/book-chapters-now.md`, appends its row to
-> `docs/plans/README.md`, creates `## Stream A — the book chapters` in
-> `docs/CHANGELOG.md` directly above `## Unstreamed`, files the three
-> backlog entries of §1, and names the stream in lane A's row of the lane
-> table (B-162 (conflict-free status documents)).
+> **Status: active** (2026-10-30). Rulings R1 to R7 taken as
+> recommended and R8 decided by the maintainer on 2026-10-30: the five
+> chapters are written IR first under the methodology's W-009 (the
+> methodology corpus writes its deliverables IR first), adopted for them
+> in `docs/classification.md` §Rules adopted by declaration (§3.1 here).
+> The plan PR files this plan at `docs/plans/book-chapters-now.md`,
+> appends its row to `docs/plans/README.md`, creates `## Stream A — the
+> book chapters` in `docs/CHANGELOG.md` directly above `## Unstreamed`,
+> files the three backlog entries of §1, and names the stream in lane
+> A's row of the lane table (B-162 (conflict-free status documents)).
 >
 > **Reader**: a session that will write the chapters, and the maintainer
 > gating them. Assumed known: the four layers and the capability tracks
@@ -36,14 +40,17 @@ boundary:
 ## 1. Outcome and terms
 
 **Outcome.** Every planned chapter of the book whose gate has passed
-exists, in reading order, written to the shape of the first Part II
-chapter. That is five chapters (§2.2). For each one: the chapter file
-exists; its `docs/reading-order.json` entry reads `present` with a
-`doc` path; its row in `docs/book/README.md` names it; the spine
-entries it absorbs are pointers in `docs/book/concepts.md`; and
-`npm run lint:docs` reports zero anchor findings and zero forward
-references. A reader can check this by opening the reading order: no
-`planned` entry is left whose gate has passed.
+exists, in reading order, written IR first (§3.1): its intermediate
+representation `<chapter>.ir.md` beside it passes `npm run lint:ir`,
+and the chapter is either prose rendered from that IR and reviewed in
+stranger rounds (the evaluator) or the IR itself, delivered IR-only
+(the other four). That is five chapters (§2.2). For each one: the
+chapter file exists; its `docs/reading-order.json` entry reads
+`present` with a `doc` path; its row in `docs/book/README.md` names it;
+the spine entries it absorbs are pointers in `docs/book/concepts.md`;
+and `npm run lint:docs:check` reports zero anchor findings and zero
+forward references. A reader can check this by opening the reading
+order: no `planned` entry is left whose gate has passed.
 
 **The book, in one paragraph.** D52 (the documentation book) orders the
 project's design documents as a book in dependency order:
@@ -207,9 +214,52 @@ after it is up to date with `origin/main`:
 
 | Command | Must report |
 |---|---|
-| `npm run lint:docs:check` | "gate passed": anchors 0; order 0; ids at or below `scripts/doc-lint-baseline.json` (796 at B-150 (the document lints join the gate), landed 2026-10-30) |
+| `npm run lint:docs:check` | "gate passed": anchors 0; order 0; ids at or below `scripts/doc-lint-baseline.json` (796 at B-150 (the document lints join the gate), landed 2026-10-30). The ids check skips `*.ir.md` and `*.review.md` |
+| `npm run lint:ir` | "clean": every `*.ir.md` passes the methodology's IR checks CK-01 to CK-14 and CK-16 under `mtool ir check` (B-173 (the book writes IR first)); the count of unratified terms it prints is recorded in §7 per chunk |
 | `npx tsx scripts/doc-ref-lint.ts` | "all markdown doc references resolve" |
-| `npm test` | green. The suite runs the same doc-lint gate in every shard, the doc-ref lint, the stream-plan and lane-manifest checks, and every pinned demo; the pinned demos are what the chapter's examples quote |
+| `npm test` | green. The suite runs the same doc-lint and IR gates in every shard, the doc-ref lint, the stream-plan and lane-manifest checks, and every pinned demo; the pinned demos are what the chapter's examples quote |
+
+### 3.1 The chapters are written IR first (R8)
+
+The maintainer adopted W-009 for these five chapters on 2026-10-30
+(`docs/classification.md` §Rules adopted by declaration). What each
+chunk therefore produces, under the methodology's specification
+`docs/intermediate-representation.md` at the pinned version:
+
+- **The IR first.** `<chapter>.ir.md` beside the chapter, header
+  `Reader: RD-4`, `Purpose: document`, `Source:` naming this plan's
+  chunk and the code it describes, `Footprint:` naming the chunk's
+  files; five sections in order (Terms, Claims, Relations, Evidence,
+  Asks). Every claim about the code as implemented carries an
+  `evidence:` pointer (file and line, or a pinned demo) and the status
+  `[proposed: this IR]`; a claim quoting a ratified decision or ruling
+  carries `[decided: <source>]`. A term the chapter defines carries its
+  `def-` anchor in the term element's body, since the chapter anchor is
+  this project's definition site (the custom definition in
+  `docs/classification.md`); a term defined elsewhere carries
+  `defined-at:` with a link into the book.
+- **The evaluator chapter (A1) is normative text.** The reasoning role
+  renders the prose from the IR and runs stranger rounds until the
+  verdict is readable or the limit of ten: a fresh Haiku instance per
+  round, reading only the IR, the prose and its brief; findings,
+  decisions and verdicts in `evaluator.review.md` beside the chapter;
+  the render map at the end of the prose. The chapter's prose is the
+  reading-order `doc`.
+- **The other four chapters (A2 to A5) are IR-only for now.** No prose
+  is rendered and no rounds run; the IR's Status reads `delivered
+  IR-only`; the reading-order `doc` and the README row point at the
+  `.ir.md` file. Rendering and review come at a later stage the
+  maintainer will schedule.
+- **Ratification in bulk.** The chunk's PR lists, in its Asks part, the
+  proposed claims and any proposed term. The maintainer's "ratified"
+  on the PR is the decision; the chunk then pushes one commit flipping
+  those statuses to `[decided: owner, <date>]` before the merge, so a
+  merged chapter's IR carries no `proposed` status it has not earned.
+- **The stranger and the paraphraser are never this session.** Each
+  round's stranger is dispatched fresh, with no conversation context;
+  the IR is written by the chunk's reasoning role (an Opus subagent)
+  and the normative chapter rendered by that same role, as the
+  specification requires for normative text.
 
 **Pins that must not move.** Every `// expect:` line in `tests/` and
 `demos/`: the stream edits neither. The ids baseline may only fall. If
@@ -287,16 +337,16 @@ chunk adds a `move` row to `docs/book-changes.md`.
 
 | Chunk | Backlog | Deliverable | Oracle |
 |---|---|---|---|
-| A1 | B-170 | **The evaluator**, `allegretto/evaluator.md` under `docs/book/` (unit 13): evaluation and its two partial-evaluation rules as implemented, application and substitution, tail calls, the derive-never-mutate rule's carve-out for scope, the install surface as the evaluator sees it, and the two edges B-146 (knowledge propagation) owns. Examples from `tests/functions.alg` and `tests/logical.alg`. The reading-order entry "Scope and the evaluator" splits in two: scope stays `planned`, the evaluator is `present` (a `split` row in `docs/book-changes.md`). README row II.5–6 becomes II.5 scope (*planned*) and II.6 the evaluator. Unit 13's status cell names the chapter. Absorbs [§27](../book/concepts.md#def-tail-calls); §25's as-implemented row becomes a pointer under R4 | anchors 0, order 0; ids at or below baseline, expected to fall by 1 (§27's bare citation); doc-ref clean; suite green |
-| A2 | B-170 | **The evaluation pipeline**, `platform/build-pipeline.md` under `docs/book/` (unit 33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, and the three things the unit still owes. The multi-phase build surface is tagged as undesigned. No examples. New reading-order entry after `platform/README.md`, `present`. README row appended after II.20. Unit 33's status cell names the chapter. Absorbs [§29](../book/concepts.md#def-the-evalsource-pipeline). `implementation-map.md`'s pipeline section becomes a pointer line. `platform/README.md` links the chapter | as A1; ids at or below baseline |
-| A3 | B-170 | **Tooling**, `platform/tooling.md` under `docs/book/` (units 34 and 35): the file runner and REPL, the subcommands `inspect`, `verify`, `obligations`, `propose`, `prove`, the safety grades, and the diagnostic variables (`ALLEGRO_STACK`, `ALLEGRO_TRACE_DEPTH`, `ALLEGRO_PARSE_STATS`, `ALLEGRO_EVAL_STATS`). Tracing and the IDE are tagged as not built. Examples, if any, from pinned demos only. Reading-order entry and README row after A2's. Units 34 and 35's status cells name the chapter. `platform/README.md` links the chapter | as A1 |
-| A4 | B-170 | **Host environments**, `platform/host.md` under `docs/book/`: the Node CLI and the browser sandbox, the browser-compatible core (`TextEncoder`, never `Buffer`), and the environment-capability contract of `allegretto/structures.md` §11, cited there. Asynchronous I/O capabilities and browser packaging are tagged as not built. Reading-order entry and README row after A3's. No unit row; the host plane is not a unit. `platform/README.md` links the chapter | as A1 |
-| A5 | B-170 | **The demo ladder and the rung-3 pilot**, `demo-ladder.md` under `docs/book/` (Part III, after `proving-in-allegro.md`): the three delivered rungs as the thesis test, each with what it shows, what it inherits and what it does not show, from `demos/rung1/` to `demos/rung3/` and the planning chapter (II.19). Examples from the pinned rung demos. Scope per R2. The Part III entry becomes `present`; its note is removed. README row III.2 names the chapter | as A1; every quoted demo line present in a file `src/test/proofs.ts` or `src/test/language.ts` runs |
+| A1 | B-170 | **The evaluator**, `allegretto/evaluator.md` under `docs/book/` (unit 13), IR first: `allegretto/evaluator.ir.md`, the prose rendered from it by the reasoning role, stranger rounds to a readable verdict or the limit with `allegretto/evaluator.review.md` (§3.1). Content: evaluation and its two partial-evaluation rules as implemented, application and substitution, tail calls, the derive-never-mutate rule's carve-out for scope, the install surface as the evaluator sees it, and the two edges B-146 (knowledge propagation) owns. Examples from `tests/functions.alg` and `tests/logical.alg`. The reading-order entry "Scope and the evaluator" splits in two: scope stays `planned`, the evaluator is `present` (a `split` row in `docs/book-changes.md`). README row II.5–6 becomes II.5 scope (*planned*) and II.6 the evaluator. Unit 13's status cell names the chapter. Absorbs [§27](../book/concepts.md#def-tail-calls); §25's as-implemented row becomes a pointer under R4 | anchors 0, order 0; ids at or below baseline, expected to fall by 1 (§27's bare citation); `lint:ir` clean; the review record's last round readable, or the limit reached and the maintainer's decision recorded; doc-ref clean; suite green |
+| A2 | B-170 | **The evaluation pipeline**, IR-only (§3.1): `platform/build-pipeline.ir.md` under `docs/book/` is the chapter (unit 33). Content: the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, and the three things the unit still owes. The multi-phase build surface is tagged as undesigned. No examples. New reading-order entry after `platform/README.md`, `present`. README row appended after II.20. Unit 33's status cell names the chapter. Absorbs [§29](../book/concepts.md#def-the-evalsource-pipeline). `implementation-map.md`'s pipeline section becomes a pointer line. `platform/README.md` links the chapter | anchors 0, order 0; ids at or below baseline; `lint:ir` clean with the IR's Status `delivered IR-only`; doc-ref clean; suite green |
+| A3 | B-170 | **Tooling**, IR-only (§3.1): `platform/tooling.ir.md` under `docs/book/` is the chapter (units 34 and 35). Content: the file runner and REPL, the subcommands `inspect`, `verify`, `obligations`, `propose`, `prove`, the safety grades, and the diagnostic variables (`ALLEGRO_STACK`, `ALLEGRO_TRACE_DEPTH`, `ALLEGRO_PARSE_STATS`, `ALLEGRO_EVAL_STATS`). Tracing and the IDE are tagged as not built. Examples, if any, from pinned demos only. Reading-order entry and README row after A2's. Units 34 and 35's status cells name the chapter. `platform/README.md` links the chapter | as A2 |
+| A4 | B-170 | **Host environments**, IR-only (§3.1): `platform/host.ir.md` under `docs/book/` is the chapter. Content: the Node CLI and the browser sandbox, the browser-compatible core (`TextEncoder`, never `Buffer`), and the environment-capability contract of `allegretto/structures.md` §11, cited there. Asynchronous I/O capabilities and browser packaging are tagged as not built. Reading-order entry and README row after A3's. No unit row; the host plane is not a unit. `platform/README.md` links the chapter | as A2 |
+| A5 | B-170 | **The demo ladder and the rung-3 pilot**, IR-only (§3.1): `demo-ladder.ir.md` under `docs/book/` is the chapter (Part III, after `proving-in-allegro.md`). Content: the three delivered rungs as the thesis test, each with what it shows, what it inherits and what it does not show, from `demos/rung1/` to `demos/rung3/` and the planning chapter (II.19). Examples from the pinned rung demos. Scope per R2. The Part III entry becomes `present`; its note is removed. README row III.2 names the chapter | as A2; every quoted demo line present in a file `src/test/proofs.ts` or `src/test/language.ts` runs |
 
 ## 6. Rulings
 
-Each ruling is open. The recommendation is the plan's; the maintainer
-takes them before chunk 1.
+R1 to R7 were taken as recommended by the maintainer on 2026-10-30,
+and R8 decided the same day. Each is kept with its options.
 
 **R1 — The chapter order.** Options: (a) reading order, A1 to A5 as in
 §5; (b) Part III first (A5), because it has the most outside readers,
@@ -357,6 +407,22 @@ plan's §7 is the record, and lane S adds one pointer line to the book
 plan when this stream closes; (b) the maintainer edits it per chunk.
 Recommendation: (a).
 
+**R8 — The chapters are written IR first.** Decided by the maintainer
+on 2026-10-30, after the orchestrating session's assessment of the
+methodology's IR specification: (1) the five new chapters only, the
+existing chapters retrofitted by a later stream, B-174 (the book's
+existing chapters retrofitted to IR); (2) the evaluator chapter is
+normative and is rendered and reviewed, the other four are IR-only for
+now and are rendered and reviewed at a later stage; (3) as-implemented
+claims are proposed with evidence and ratified in bulk at the chapter
+PR; (4) the definition site is the chapter's `def-` anchor, so
+`defined-at:` links point into the book; (5) a fresh Haiku instance per
+round is the stranger. The prerequisite lane-S chunk B-173 (the book
+writes IR first) landed the declaration, `npm run lint:ir` and the
+doc-lint exemption. §3.1 states what each chunk produces.
+
 ## 7. Record
 
-No chunk landed yet.
+- **2026-10-30 — rulings taken, R8 decided.** R1 to R7 as recommended;
+  R8 as above. A1 starts after the plan PR merges and B-173 is on main.
+- No chunk landed yet.
