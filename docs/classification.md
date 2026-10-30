@@ -50,9 +50,10 @@ performance stream), ruling R3 (the stream's merge policy) of
 taken 2026-10-28, ten PRs merged on green. The maintainer ratified the
 policy for qualifying streams on 2026-10-30. `docs/book/process.md` §3
 ("a merged PR is the maintainer's approval; nothing else is") is Tier 0
-and contradicts this practice; the proposed amendment is
-`docs/plans/parallel-streams.md` §5, opened as the dedicated PR #117 on
-2026-10-30. **Retires**
+and contradicted this practice until the maintainer signed off the
+amendment of `docs/plans/parallel-streams.md` §5 as the dedicated
+PR #117, merged 2026-10-30; §3 now carries the paragraph
+"Merge-on-green streams". **Retires**
 when the pinned methodology version carries merge-on-green as a
 standard, which the maintainer says an upcoming version will.
 

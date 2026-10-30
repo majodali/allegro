@@ -142,11 +142,11 @@ each PR waits for the maintainer.
 | S4 | B-163 | `scripts/analyze/lanes.json`, the lane manifest; `npm run lint:lanes`, a check that a PR's changed files stay inside the lane its branch or plan declares, the shared status documents exempt; in CI on pull requests; probed against a known-bad diff |
 | S5 | B-164 | The baseline-lowering rule (a baseline lowers only in a follow-up commit after rebase) in `CLAUDE.md`'s invariant list and the lane notes; the owner's branch-protection setting recorded in `docs/classification.md` once flipped |
 
-## 5. Proposed amendment to `docs/book/process.md` §3 (Tier 0)
+## 5. Amendment to `docs/book/process.md` §3 (Tier 0, landed)
 
 `docs/book/process.md` is Tier 0; an agent proposes, the maintainer
-lands (§2). The proposal, to append after "The PR is the gate (2026-09)"
-and its three bullets, in a dedicated PR — opened as PR #117 on
+lands (§2). The proposal, appended after "The PR is the gate (2026-09)"
+and its three bullets, in the dedicated PR #117 — signed off and merged
 2026-10-30 with this text, "D-2" written "D-2 (merge-on-green
 streams)" for the doc lint:
 
@@ -181,4 +181,4 @@ streams)" for the doc lint:
   `docs/plans/fast-library-load.md`, which gains the header as a closed
   stream. The definition of *stream plan* stays in §1 here, the type's
   definition site, rather than moving: the census row cites it. The
-  Tier-0 amendment of §5 is PR #117, opened the same day.
+  Tier-0 amendment of §5 is PR #117, opened and merged the same day.
