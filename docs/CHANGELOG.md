@@ -126,6 +126,12 @@ B-162 (conflict-free status documents), B-163 (the lane manifest and
 its check), B-164 (ratchet baselines under concurrent merges). Docs
 only.
 
+## Stream A — the book chapters
+
+Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
+2026-10-30 with the plan; entries newest first, directly below this
+line.
+
 ## Unstreamed
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.
