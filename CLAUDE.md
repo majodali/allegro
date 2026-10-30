@@ -257,6 +257,14 @@ evaluator/runtime set; this is the complete session list):
   (PROCESS §3, "The PR is the gate"). Before opening a PR, fetch
   `origin/main`: the maintainer may have merged while you worked.
   Deploys (`deploy.sh`) are owner-run only.
+- Status documents under streams (B-162 (conflict-free status
+  documents); `docs/backlog.md` §"Parallel lanes"): a changelog entry
+  goes under the stream's own `## Stream <lane>` section, newest first,
+  or under `## Unstreamed` outside a stream. In the backlog a stream
+  edits only its own items and its lane row; in the plans manifest only
+  its own row, new rows appended. Bring the branch up to date with
+  `origin/main` before its PR merges, and re-run the gate when the
+  update touched files outside `docs/`.
 
 ## Status pointers
 

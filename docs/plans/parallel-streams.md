@@ -27,7 +27,7 @@ boundary:
 > ratified on 2026-10-30 before development runs as several concurrent
 > streams, in the order ratified: the deviation record first, then the
 > stream-plan document type, then the status documents, the lane
-> manifest and the ratchet baselines. Chunks S1 and S2 landed; §6 is the
+> manifest and the ratchet baselines. Chunks S1 to S3 landed; §6 is the
 > record. The header above is this plan's own stream-plan header (S2).
 > Backlog owners: B-165 (merge-on-green recorded as a deviation),
 > B-166 (the stream-plan document type),
@@ -182,3 +182,17 @@ streams)" for the doc lint:
   stream. The definition of *stream plan* stays in §1 here, the type's
   definition site, rather than moving: the census row cites it. The
   Tier-0 amendment of §5 is PR #117, opened and merged the same day.
+- **S3 — landed 2026-10-30.** One insertion point per stream in each
+  shared status document: `docs/CHANGELOG.md` sectioned (`## Stream
+  <lane> — <name>`, entries newest first under the heading; `##
+  Unstreamed`; the record before 2026-10-30 frozen under its own
+  heading), the two pre-stream entries moved under `## Stream S`; the
+  rule "Status documents under streams" in `docs/backlog.md` §"Parallel
+  lanes" (own items and lane row in the backlog, own row in the
+  manifest with new rows appended, own section in the changelog, up to
+  date with `origin/main` before every merge with the gate re-run when
+  the update touched files outside `docs/`); the same rule in
+  `CLAUDE.md`'s branch-practice bullet and in the stream-plan template's
+  setup line. One departure from §4's wording: the rebase rule lives in
+  the lane notes of the backlog and `CLAUDE.md`, not in the landing
+  checklist, which is Tier 0.

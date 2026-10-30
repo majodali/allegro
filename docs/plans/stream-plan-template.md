@@ -18,8 +18,12 @@ boundary:
 
 > **Template** (B-166, the stream-plan document type). Copy this file
 > to `docs/plans/<outcome-name>.md`, replace every angle-bracket
-> placeholder, delete `template: true`, and add the plan's row to
-> `docs/plans/README.md`. The header above is the part a coordinating
+> placeholder, delete `template: true`, append the plan's row at the end
+> of the table in `docs/plans/README.md`, and create the stream's
+> section `## Stream <lane> — <name>` in `docs/CHANGELOG.md` directly
+> above `## Unstreamed`, all in the plan's PR (B-162 (conflict-free
+> status documents): `docs/backlog.md` §"Status documents under
+> streams"). The header above is the part a coordinating
 > service reads; `npx tsx scripts/stream-plan.ts --check` refuses a
 > header whose lane, backlog ids or oracle commands do not exist. The
 > rest is `docs/book/process.md` §4's plan shape, with the sections a
