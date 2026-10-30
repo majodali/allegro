@@ -20,6 +20,27 @@
 
 Plan `docs/plans/parallel-streams.md`; lane S; human-gated.
 
+### 2026-10 — The lane manifest and its check (the pre-stream arc, S4 (B-163))
+
+B-163 (the lane manifest and its check), chunk S4 of
+`docs/plans/parallel-streams.md`. The lane table of `docs/backlog.md`
+§"Parallel lanes" is now data: `scripts/analyze/lanes.json` carries each
+lane's files as globs and the shared status documents of B-162
+(conflict-free status documents) as exempt. `scripts/analyze/lane-lint.ts`
+(`npm run lint:lanes`) refuses a pull request whose changed files fall
+outside its lane: the lane comes from the first backlog id in the PR
+title, looked up in the stream plans' headers, and the plan's `boundary`
+narrows it; an id no stream plan reserves is unstreamed and reported,
+not checked. The CI workflow runs it on pull requests only, with the
+checkout at depth two so the merge commit's first parent gives exactly
+the PR's files, and the title passed through `env`. The suite holds the
+manifest consistent with the lane table and the stream plans, pins the
+glob matcher's segment rules, and probes the check against a known-bad
+file list before trusting it. Lanes A, C and D are declared from the
+table's prose and refined when a stream plan opens in them; the
+manifest notes that P and D share the evaluator and that overlap between
+active streams is the coordinating service's check. Suite +3.
+
 ### 2026-10 — Conflict-free status documents (the pre-stream arc, S3)
 
 B-162 (conflict-free status documents), chunk S3 of

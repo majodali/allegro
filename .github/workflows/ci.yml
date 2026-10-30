@@ -25,11 +25,23 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Two commits: on a pull_request event HEAD is the PR's merge
+          # commit, and its first parent is the base tip, so the lane check
+          # below diffs `HEAD^1...HEAD` — exactly the PR's files.
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Lane check (B-163) — the PR's files stay inside its lane
+        if: github.event_name == 'pull_request'
+        env:
+          # Through env, never interpolated into the script: a title is
+          # untrusted text.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: npm run lint:lanes -- --base HEAD^1
       - name: Typecheck (sanctioned invocation)
         run: bash scripts/typecheck.sh
       - name: Test suite (full landing gate, sharded)

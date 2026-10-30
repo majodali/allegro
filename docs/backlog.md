@@ -158,6 +158,19 @@ clones and cannot see each other's uncommitted work, so a collision
 surfaces only at merge — the lane boundaries above are the mechanism
 that prevents it.
 
+**The lane table as data (B-163 (the lane manifest and its check),
+2026-10-30).** `scripts/analyze/lanes.json` carries each lane's files as
+globs and the shared status documents; `npm run lint:lanes` runs on every
+pull request and refuses a PR whose changed files fall outside the lane
+its backlog id declares through a stream plan's header (the plan's
+`boundary` narrows the lane). A PR whose id no stream plan reserves is
+unstreamed: reported, not checked. Two lanes may list the same file, as P
+and D do for the evaluator and the totality analyzer; the check sees one
+PR's lane, and overlap between active streams is the coordinating
+service's check at dispatch. Edits to the manifest are lane S's or a
+maintainer decision; the suite holds the manifest consistent with this
+table and the stream plans.
+
 - [x] **B-001** · L0 · Boundary-test harness + baseline (chunk C0.1):
   accessor lint w/ ratchet, invariant property checks, forgery-suite
   skeleton, perf floor — plan §Phase 0. Landed 2026-07
@@ -1035,8 +1048,17 @@ that prevents it.
   changelog entry at merge from the PR's "What changed" part.
   **Blocked-by**: B-166. **Pointer**: `docs/plans/parallel-streams.md`
   §2, §3 item 1
-- [ ] **B-163** (the lane manifest and its check) · Track M · T-tooling
-  · **A PR's diff stays inside its lane, checked.** The lane manifest
+- [x] **B-163** (the lane manifest and its check) · Track M · T-tooling
+  · **A PR's diff stays inside its lane, checked.** LANDED 2026-10-30
+  (chunk S4 (the lane manifest) of `docs/plans/parallel-streams.md`):
+  `scripts/analyze/lanes.json` (the lane table as data, shared status
+  documents exempt), `scripts/analyze/lane-lint.ts` (`npm run
+  lint:lanes`: the lane from the PR title's backlog id through the
+  stream plans' headers, the plan's `boundary` narrowing it; an
+  unreserved id is unstreamed and reported, not checked), the CI step
+  on pull requests diffing the merge commit against its first parent,
+  the manifest consistency check in the suite, probed against a
+  known-bad file list. As planned: the lane manifest
   `scripts/analyze/lanes.json` (file globs per lane) and
   `npm run lint:lanes`, run in CI on pull requests, with the shared
   status documents exempt; probed against a known-bad diff before it is

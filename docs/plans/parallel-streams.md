@@ -15,6 +15,7 @@ boundary:
   - scripts/stream-plan.ts
   - scripts/doc-lint.ts
   - scripts/analyze/lanes.json
+  - scripts/analyze/lane-lint.ts
   - src/test/tooling.ts
   - .github/workflows/ci.yml
   - package.json
@@ -27,7 +28,7 @@ boundary:
 > ratified on 2026-10-30 before development runs as several concurrent
 > streams, in the order ratified: the deviation record first, then the
 > stream-plan document type, then the status documents, the lane
-> manifest and the ratchet baselines. Chunks S1 to S3 landed; §6 is the
+> manifest and the ratchet baselines. Chunks S1 to S4 landed; §6 is the
 > record. The header above is this plan's own stream-plan header (S2).
 > Backlog owners: B-165 (merge-on-green recorded as a deviation),
 > B-166 (the stream-plan document type),
@@ -196,3 +197,22 @@ streams)" for the doc lint:
   setup line. One departure from §4's wording: the rebase rule lives in
   the lane notes of the backlog and `CLAUDE.md`, not in the landing
   checklist, which is Tier 0.
+- **S4 — landed 2026-10-30.** The lane manifest
+  `scripts/analyze/lanes.json`: the lane table as data, each lane's
+  files as globs, the shared status documents of B-162 exempt; lanes A,
+  C and D declared from the table's prose, P and S from their plans.
+  The check `scripts/analyze/lane-lint.ts` (`npm run lint:lanes`): the
+  PR's lane comes from the first backlog id in its title, looked up in
+  the stream plans' headers (`backlog` and `reserves`), the plan's
+  `boundary` narrowing the lane's globs and the plan's own file always
+  allowed; an id no stream plan reserves is unstreamed and reported, not
+  checked. In CI on pull requests only, with the checkout at depth two
+  so `HEAD^1...HEAD` is exactly the PR's files, the title passed through
+  `env`. The suite holds the manifest consistent with the lane table and
+  the stream plans and probes the check against a known-bad file list,
+  the glob matcher against segment boundaries, and the title parser
+  against a title with no id. Two departures from §4: the lane is
+  declared by the PR title's backlog id rather than by the branch name,
+  since every PR here already cites its item and W-006 branch names
+  carry no lane; and the manifest check joins the suite rather than
+  running as a separate gate step, like the stream-plan check.

@@ -1,0 +1,95 @@
+{
+  "_": "The lane manifest (B-163, docs/plans/parallel-streams.md S4): docs/backlog.md §'Parallel lanes' as data. `lanes` maps each lane letter of the lane table to the files it may edit, as globs (`**` spans directories, `*` one segment, `?` one character). `shared` lists the status documents every lane edits under the rule 'Status documents under streams' (B-162) — exempt from the check. A stream plan's `boundary` header narrows its lane; the plan's own file is always allowed. Lanes A, C and D were declared from the lane table's prose on 2026-10-30 and are refined when a stream plan opens in them; P and S come from their plans' headers. Two lanes may list the same file (P and D share the evaluator and the totality analyzer: the lane table says P takes them only when D is not in them) — the per-PR check sees one lane; overlap between ACTIVE streams is the coordinating service's check at dispatch. Edited by lane S or a maintainer decision.",
+  "shared": [
+    "docs/CHANGELOG.md",
+    "docs/backlog.md",
+    "docs/plans/README.md",
+    "docs/decisions.md",
+    "docs/classification.md",
+    "docs/book-changes.md",
+    "CLAUDE.md"
+  ],
+  "lanes": {
+    "A": {
+      "name": "reval docs",
+      "globs": ["docs/book/**", "docs/documentation-census.md", "docs/reading-order.json"]
+    },
+    "B": {
+      "name": "suite split",
+      "closed": true,
+      "globs": []
+    },
+    "C": {
+      "name": "capability tracks",
+      "globs": [
+        "scripts/**",
+        "web/**",
+        "website/**",
+        "pcp/**",
+        "src/index.ts",
+        "src/pcp.ts",
+        "src/introspect.ts",
+        "src/test/tooling.ts",
+        "src/test/pcp.ts",
+        "docs/book/platform/**",
+        "docs/book/implementation-map.md",
+        "deploy.sh",
+        "package.json"
+      ]
+    },
+    "D": {
+      "name": "L2 semantics",
+      "globs": [
+        "src/*.ts",
+        "src/boundary-baseline.json",
+        "lib/**",
+        "tests/**",
+        "src/test/**",
+        "docs/book/**",
+        "scripts/analyze/units.json",
+        "scripts/analyze/units-baseline.json",
+        "scripts/analyze/plane-baseline.json"
+      ]
+    },
+    "P": {
+      "name": "performance stream",
+      "globs": [
+        "src/grammar2/**",
+        "bench/**",
+        "src/modules.ts",
+        "src/use-scanner.ts",
+        "src/runtime.ts",
+        "src/evaluator.ts",
+        "src/totality.ts",
+        "src/effects.ts",
+        "src/types.ts",
+        "src/types-std.ts",
+        "src/primitives.ts",
+        "src/symbols.ts",
+        "src/index.ts",
+        "src/test/grammar2-*.ts",
+        "src/test/modules.ts",
+        "src/test/tooling.ts",
+        "src/test/totality.ts",
+        "docs/book/extension/**",
+        "docs/book/implementation-map.md",
+        "docs/plans/fast-library-load.md",
+        "package.json"
+      ]
+    },
+    "S": {
+      "name": "the pre-stream arc",
+      "globs": [
+        "docs/**",
+        "scripts/stream-plan.ts",
+        "scripts/doc-lint.ts",
+        "scripts/analyze/lanes.json",
+        "scripts/analyze/lane-lint.ts",
+        "src/test/tooling.ts",
+        ".github/workflows/ci.yml",
+        "package.json",
+        "CLAUDE.md"
+      ]
+    }
+  }
+}

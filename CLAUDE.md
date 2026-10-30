@@ -98,6 +98,11 @@ npm run lint:streams                # B-166: every stream plan's header names
                                     #   a real lane, real backlog ids and real
                                     #   oracle commands — IN THE GATE (suite)
 npx tsx scripts/stream-plan.ts      # list the stream plans and their headers
+npm run lint:lanes                  # B-163: the PR's changed files stay inside
+                                    #   the lane its backlog id declares
+                                    #   (scripts/analyze/lanes.json) — IN CI on
+                                    #   pull requests; --check: manifest vs
+                                    #   lane table (in the suite)
 npm run build:web                   # web bundle; deploy.sh is OWNER-RUN only
 npm run check-deployed              # audit live site vs origin/main (needs site egress)
 ```
