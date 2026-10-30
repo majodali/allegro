@@ -1105,6 +1105,30 @@ table and the stream plans.
   setting in `docs/classification.md`. **Pointer**: this table;
   `scripts/analyze/lanes.json`; `docs/classification.md` §Repository
   settings
+- [x] **B-173** (the book writes IR first) · Track M · T-docs ·
+  T-tooling · **W-009 adopted for the book's new chapters.** LANDED
+  2026-10-30 (lane S, unstreamed; the prerequisite of stream A's first
+  chapter): the adoption declared in `docs/classification.md` §Rules
+  adopted by declaration with the owner's designations (the evaluator
+  chapter normative, the four others IR-only for now, a fresh Haiku
+  stranger per round, bulk ratification of as-implemented claims at
+  the chapter PR); the definition site declared as the chapter anchor;
+  `npm run lint:ir` (`scripts/ir-lint.ts`) running `mtool ir check`
+  from a methodology-tools checkout over every `*.ir.md`, in the suite
+  and in CI (which clones the tool), probed against a known-bad IR; the
+  bare-identifier lint skipping `*.ir.md` and `*.review.md`. Asked by
+  the maintainer 2026-10-30. **Pointer**: `docs/classification.md`;
+  `scripts/ir-lint.ts`; `book-chapters-now.md` under `docs/plans/`
+- [ ] **B-174** (the book's existing chapters retrofitted to IR) ·
+  T-docs · **Every existing chapter gains its IR.** A stream of its own
+  in lane A, after stream A (B-170 (the book, Part II and III chapters
+  writable now)) closes: each existing `docs/book/` chapter gets a
+  `<chapter>.ir.md` beside it under W-009 as adopted in
+  `docs/classification.md`, with the owner's designation per chapter
+  (normative and rendered, or IR-only) taken in that stream's plan.
+  Filed 2026-10-30 at the maintainer's instruction when adopting W-009
+  for the five new chapters. **Blocked-by**: B-170. **Pointer**:
+  `docs/classification.md` §Rules adopted by declaration
 
 ### L3 — Vivace (M5)
 
