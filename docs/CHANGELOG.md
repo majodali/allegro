@@ -131,17 +131,26 @@ only.
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
 
-### 2026-10 — A stream plan's boundary narrows its lane, never widens it
+### 2026-10 — Two lane-lint fixes found by the first stream plans
 
-B-163 (the lane manifest and its check), a follow-up found while
-preparing the first stream plans: `scripts/analyze/lane-lint.ts` let a
-plan's `boundary` header REPLACE the lane's globs, so a plan could
-declare files outside its lane and pass. A file is now allowed only
-when it is inside the lane's globs and, when the plan declares a
-boundary, inside that too; the finding names which of the two refused
-it. Two tests pin it: a lane-S plan declaring `src/**` still cannot
-touch the evaluator, and a boundary narrower than the lane refuses a
-lane file outside it. No manifest change.
+B-163 (the lane manifest and its check), two follow-ups found while
+preparing the first stream plans, both in `scripts/analyze/lane-lint.ts`.
+First, the check let a plan's `boundary` header REPLACE the lane's
+globs, so a plan could declare files outside its lane and pass. A file
+is now allowed only when it is inside the lane's globs and, when the
+plan declares a boundary, inside that too; the finding names which of
+the two refused it. Two tests pin it: a lane-S plan declaring `src/**`
+still cannot touch the evaluator, and a boundary narrower than the lane
+refuses a lane file outside it. Second, a closed stream's `reserves`
+records what it minted, and a later stream may take one of those items
+as its own (B-159 (precompile of recursive definitions) is in the
+performance stream's reserves and the recursive-precompile stream's
+`backlog` item); the resolver took the first plan alphabetically, so
+the new stream's PR was checked against the closed plan's boundary.
+`declarationRank` now ranks claims: an open plan beats a closed one, a
+`backlog` match beats a `reserves` match; a test pins the order and
+that a closed stream still declares its own item when no open plan
+claims it. No manifest change.
 
 ### 2026-10 — Lane K for kernel hygiene; the branch-protection setting recorded
 
