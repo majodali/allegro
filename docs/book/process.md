@@ -97,6 +97,19 @@ in a memory file.
    Motivated by 2026-09-01: a session opened a PR against a stale
    `origin/main` after the maintainer had already merged that branch's
    earlier work. The description claimed 41 commits; the diff held two.
+
+   **Merge-on-green streams (2026-10).** A stream whose stream plan
+   declares merge-on-green, and that the maintainer has so ratified,
+   merges its own PRs: the agent running the stream merges a PR once the
+   gate is green and it has read the diff. The policy applies only while
+   the stream meets four conditions — a mechanical oracle decides each
+   chunk, no ruling is open inside the chunk, the chunk's files are
+   disjoint from every other active lane, and the chunk is reversible by
+   revert — and a chunk that fails any one of them waits for the
+   maintainer like any other PR. The four stop conditions above are
+   unchanged. Recorded as deviation D-2 (merge-on-green streams) in
+   `docs/classification.md` until the pinned methodology version
+   carries the rule.
 4. **Land with the checklist** (§5) — every chunk, same PR/commit.
 
 **Deviation rule.** If implementation diverges from the plan or a design doc
