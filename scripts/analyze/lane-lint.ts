@@ -25,7 +25,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "child_process";
-import { loadContext, streamPlans } from "../stream-plan.js";
+import { loadContext, streamPlans, type Header } from "../stream-plan.js";
 
 export interface Lane { name: string; globs: string[]; closed?: boolean }
 export interface LaneManifest { _: string; shared: string[]; lanes: Record<string, Lane> }
@@ -56,17 +56,28 @@ export function matchesAny(file: string, globs: string[]): boolean {
 
 export interface Declaration { lane: string; plan: string; backlog: string; boundary: string[] | null }
 
-/** The lane a backlog id declares: the stream plan whose `backlog` or `reserves` names it. */
+/** How strongly a plan's header claims an id: an open plan beats a closed
+ *  one (a closed stream's `reserves` is its record of what it minted, and a
+ *  later stream may take one of those items as its own), and a `backlog`
+ *  match beats a `reserves` match. 0 means no claim. */
+export function declarationRank(header: Header, backlogId: string): number {
+  const reserves = Array.isArray(header.reserves) ? header.reserves : [];
+  const claim = header.backlog === backlogId ? 2 : reserves.includes(backlogId) ? 1 : 0;
+  if (claim === 0) return 0;
+  return claim + (header.status === "closed" ? 0 : 2);
+}
+
+/** The lane a backlog id declares: the stream plan whose `backlog` or `reserves` names it, the strongest claim winning. */
 export function declaredLane(root: string, backlogId: string): Declaration | null {
+  let best: { rank: number; decl: Declaration } | null = null;
   for (const p of streamPlans(root)) {
     if (p.header.template === "true") continue;
-    const reserves = Array.isArray(p.header.reserves) ? p.header.reserves : [];
-    if (p.header.backlog === backlogId || reserves.includes(backlogId)) {
-      const boundary = Array.isArray(p.header.boundary) ? p.header.boundary : null;
-      return { lane: String(p.header.lane), plan: p.file, backlog: backlogId, boundary };
-    }
+    const rank = declarationRank(p.header, backlogId);
+    if (rank === 0 || (best && best.rank >= rank)) continue;
+    const boundary = Array.isArray(p.header.boundary) ? p.header.boundary : null;
+    best = { rank, decl: { lane: String(p.header.lane), plan: p.file, backlog: backlogId, boundary } };
   }
-  return null;
+  return best?.decl ?? null;
 }
 
 export function backlogIdOf(title: string | undefined): string | null {
