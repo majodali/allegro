@@ -1,10 +1,34 @@
+---
+type: stream-plan
+status: active
+backlog: B-165
+lane: S
+merge: human-gated
+oracle:
+  - npm test
+  - npm run lint:docs
+  - npm run lint:streams
+chunks: [S1, S2, S3, S4, S5]
+reserves: [B-162, B-163, B-164, B-165, B-166]
+boundary:
+  - docs/**
+  - scripts/stream-plan.ts
+  - scripts/doc-lint.ts
+  - scripts/analyze/lanes.json
+  - src/test/tooling.ts
+  - .github/workflows/ci.yml
+  - package.json
+  - CLAUDE.md
+---
+
 # Parallel streams — the pre-stream arc
 
 > **Status: active** (2026-10-30). The five blocking items the maintainer
 > ratified on 2026-10-30 before development runs as several concurrent
 > streams, in the order ratified: the deviation record first, then the
 > stream-plan document type, then the status documents, the lane
-> manifest and the ratchet baselines. Chunk S1 landed; §6 is the record.
+> manifest and the ratchet baselines. Chunks S1 and S2 landed; §6 is the
+> record. The header above is this plan's own stream-plan header (S2).
 > Backlog owners: B-165 (merge-on-green recorded as a deviation),
 > B-166 (the stream-plan document type),
 > B-162 (conflict-free status documents),
@@ -38,8 +62,13 @@ concurrent stream would hit the five gaps of §3.
 - <a id="def-stream-plan"></a>**Stream plan**: the plan document a
   stream runs from. It declares the outcome, the oracle, the file
   boundary, the stop conditions, the merge policy, the ratified chunk
-  list and the backlog ids the stream reserves. Chunk S2 (B-166)
-  defines the type; `docs/plans/fast-library-load.md` is the model.
+  list and the backlog ids the stream reserves, and it opens with a
+  machine-readable header carrying the last five. Chunk S2 (B-166)
+  defined the type: the template `docs/plans/stream-plan-template.md`
+  documents the header's fields and the sections; `npm run
+  lint:streams` (`scripts/stream-plan.ts`) refuses a header whose lane,
+  backlog ids or oracle commands do not exist; the first instances are
+  `docs/plans/fast-library-load.md` and this plan.
 - <a id="def-lane-manifest"></a>**Lane manifest**: the machine-readable
   declaration of each lane's file globs, which a check reads. Chunk S4
   (B-163) creates it.
@@ -113,11 +142,13 @@ each PR waits for the maintainer.
 | S4 | B-163 | `scripts/analyze/lanes.json`, the lane manifest; `npm run lint:lanes`, a check that a PR's changed files stay inside the lane its branch or plan declares, the shared status documents exempt; in CI on pull requests; probed against a known-bad diff |
 | S5 | B-164 | The baseline-lowering rule (a baseline lowers only in a follow-up commit after rebase) in `CLAUDE.md`'s invariant list and the lane notes; the owner's branch-protection setting recorded in `docs/classification.md` once flipped |
 
-## 5. Proposed amendment to `docs/book/process.md` §3 (Tier 0, not landed)
+## 5. Amendment to `docs/book/process.md` §3 (Tier 0, landed)
 
 `docs/book/process.md` is Tier 0; an agent proposes, the maintainer
-lands (§2). The proposal, to append after "The PR is the gate (2026-09)"
-and its three bullets, in a dedicated PR:
+lands (§2). The proposal, appended after "The PR is the gate (2026-09)"
+and its three bullets, in the dedicated PR #117 — signed off and merged
+2026-10-30 with this text, "D-2" written "D-2 (merge-on-green
+streams)" for the doc lint:
 
 > **Merge-on-green streams (2026-10).** A stream whose stream plan
 > declares merge-on-green, and that the maintainer has so ratified,
@@ -136,5 +167,18 @@ and its three bullets, in a dedicated PR:
 - **S1 — landed 2026-10-30.** D-2 recorded in `docs/classification.md`;
   the lane table and its gate-policy paragraph updated; the five
   backlog items filed under Track M; §5 drafted; the terms of §1
-  defined here as their definition site until S2 moves the
-  stream-plan definition into the document type's home.
+  defined here as their definition site.
+- **S2 — landed 2026-10-30.** The stream-plan document type: the
+  header (YAML front matter, a fixed subset) with `type`, `status`,
+  `backlog`, `lane`, `merge`, `oracle`, `chunks`, `reserves` and an
+  optional `boundary`; the template
+  `docs/plans/stream-plan-template.md`; the reader and check
+  `scripts/stream-plan.ts` (`npm run lint:streams`, in the suite via
+  `src/test/tooling.ts`, probed against a known-bad header); the type
+  named in `docs/documentation-census.md` §1; `docs/doc-lint.ts`'s
+  bare-identifier check skips front matter the way it skips a table, so
+  the first prose use still names. First instances: this plan and
+  `docs/plans/fast-library-load.md`, which gains the header as a closed
+  stream. The definition of *stream plan* stays in §1 here, the type's
+  definition site, rather than moving: the census row cites it. The
+  Tier-0 amendment of §5 is PR #117, opened and merged the same day.

@@ -94,6 +94,10 @@ npm run lint:load                   # B-157: parse counts of the load corpus
 npm run lint:docs                   # D52: anchored links resolve, no forward
                                     #   references in the reading order, bare
                                     #   identifiers — report-only until B-150
+npm run lint:streams                # B-166: every stream plan's header names
+                                    #   a real lane, real backlog ids and real
+                                    #   oracle commands — IN THE GATE (suite)
+npx tsx scripts/stream-plan.ts      # list the stream plans and their headers
 npm run build:web                   # web bundle; deploy.sh is OWNER-RUN only
 npm run check-deployed              # audit live site vs origin/main (needs site egress)
 ```

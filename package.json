@@ -23,7 +23,8 @@
     "lint:planes": "tsx scripts/analyze/plane-lint.ts",
     "lint:units": "tsx scripts/analyze/index.ts units --check",
     "lint:load": "tsx bench/load.ts --check",
-    "lint:docs": "tsx scripts/doc-lint.ts"
+    "lint:docs": "tsx scripts/doc-lint.ts",
+    "lint:streams": "tsx scripts/stream-plan.ts --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.0",

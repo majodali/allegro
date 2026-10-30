@@ -43,6 +43,7 @@ own artifact types are given where one applies.
 | **Specification** | behaviour stated to be implemented against | an implementer | Specification | 1 |
 | **Study** | an exercise testing whether a model earns its keep; not settled design | the maintainer deciding adoption | none | 1 |
 | **Feature plan** | context, settled decisions, chunks, verification for one outcome | the maintainer gating chunks; the agent landing them | Plan | 12 |
+| **Stream plan** | a feature plan a stream runs from: outcome, oracle, file boundary, stop conditions, merge policy, chunk list and reserved backlog ids, opening with a machine-readable header a coordinating service reads (B-166 (the stream-plan document type); defined in `docs/plans/parallel-streams.md` §1, template `docs/plans/stream-plan-template.md`, checked by `npm run lint:streams`) | the session running the stream; a coordinating service; the maintainer gating it | Plan (a specialization) | 2 (added 2026-10-30) |
 | **Methodology proposal** | an amendment drafted for `majodali/methodology` | the methodology's owner | Plan (closest) | 3 |
 | **Consumable** | tutorial, reference or explanation for a user of the language | a language user | Specification (literate) or none | 4 |
 | **Orientation** | the root README | a visitor | Readme | 1 |
