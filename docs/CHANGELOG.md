@@ -18,7 +18,28 @@
 
 ## Stream S — the pre-stream arc
 
-Plan `docs/plans/parallel-streams.md`; lane S; human-gated.
+Plan `docs/plans/parallel-streams.md`; lane S; human-gated. Closed
+2026-10-30 with all five chunks landed.
+
+### 2026-10 — Ratchet baselines under concurrent merges; the arc closes (S5 (B-164))
+
+B-164 (ratchet baselines under concurrent merges), chunk S5 of
+`docs/plans/parallel-streams.md`, the last. The rule: a ratchet
+baseline (`scripts/analyze/plane-baseline.json`,
+`scripts/analyze/units-baseline.json`, `bench/load-baseline.json`,
+`src/boundary-baseline.json`) lowers only in its own commit at the top
+of the branch, made after the branch is up to date with `origin/main`
+and the lint re-run on that tree — never in the commit that earns the
+lowering — so the number was measured on main plus the branch and two
+branches lowering the same file conflict at that commit and
+re-measure. In `CLAUDE.md`'s invariant list and the backlog's "Status
+documents under streams". `CLAUDE.md`'s binding block now names the
+pinned methodology version, 1.6.0, and deviation D-2 (merge-on-green
+streams); it had said 1.5.0 and no deviations. The lane table's row S
+is marked complete and the plan closed: the five gaps of its §3 each
+have a mechanism, and its outcome is checked by first use when two
+streams run concurrently. The owner's branch-protection setting is
+recorded in `docs/classification.md` once flipped. Docs only.
 
 ### 2026-10 — The lane manifest and its check (the pre-stream arc, S4 (B-163))
 

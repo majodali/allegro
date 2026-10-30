@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: active
+status: closed
 backlog: B-165
 lane: S
 merge: human-gated
@@ -24,17 +24,20 @@ boundary:
 
 # Parallel streams — the pre-stream arc
 
-> **Status: active** (2026-10-30). The five blocking items the maintainer
-> ratified on 2026-10-30 before development runs as several concurrent
-> streams, in the order ratified: the deviation record first, then the
-> stream-plan document type, then the status documents, the lane
-> manifest and the ratchet baselines. Chunks S1 to S4 landed; §6 is the
-> record. The header above is this plan's own stream-plan header (S2).
-> Backlog owners: B-165 (merge-on-green recorded as a deviation),
-> B-166 (the stream-plan document type),
+> **Status: closed** (2026-10-30) → B-165 (merge-on-green recorded as a
+> deviation), B-166 (the stream-plan document type),
 > B-162 (conflict-free status documents),
 > B-163 (the lane manifest and its check),
 > B-164 (ratchet baselines under concurrent merges).
+> The five blocking items the maintainer ratified on 2026-10-30 before
+> development runs as several concurrent streams, in the order ratified:
+> the deviation record first, then the stream-plan document type, then
+> the status documents, the lane manifest and the ratchet baselines.
+> All five chunks landed the same day; §6 is the record. The §1 outcome
+> is checked by first use: two streams run concurrently and the five
+> gaps of §3 do not recur. Kept for its §2 split table, which the
+> coordinating service's design reads, and its §6 record. The header
+> above is this plan's own stream-plan header (S2).
 >
 > **Reader**: someone who knows the lane model of `docs/backlog.md`
 > §"Parallel lanes" and the gate of `docs/book/process.md` §5, and has
@@ -215,4 +218,15 @@ streams)" for the doc lint:
   declared by the PR title's backlog id rather than by the branch name,
   since every PR here already cites its item and W-006 branch names
   carry no lane; and the manifest check joins the suite rather than
-  running as a separate gate step, like the stream-plan check.
+  running as a separate gate step, like the stream-plan check. Both
+  ratified 2026-10-30, with the globs of lanes A, C and D.
+- **S5 — landed 2026-10-30; the arc closes.** The baseline rule in
+  `CLAUDE.md`'s invariant list and in the backlog's "Status documents
+  under streams": a ratchet baseline lowers only in its own commit at
+  the top of the branch, after the branch is up to date with
+  `origin/main` and the lint re-run on that tree, never in the commit
+  that earns the lowering. `CLAUDE.md`'s binding block corrected to
+  the pinned methodology version (1.6.0) and to name deviation D-2.
+  The lane table's row S marked complete; the plan closed. The owner's
+  branch-protection setting is not yet recorded: `docs/classification.md`
+  takes one line once it is flipped (an open ask at S5's gate).

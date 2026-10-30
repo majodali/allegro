@@ -2,13 +2,14 @@
 
 ## Methodology — binding
 
-This project follows majodali/methodology v1.5.0 as declared in
+This project follows majodali/methodology v1.6.0 as declared in
 `docs/classification.md`. That file strictly defines this project's
 document lifecycles and workflows. Read it before any work; nothing
 in this file or under `.claude/` overrides it.
 
 Classification: C2 / S0 / language-tool-platform / static-site
-Deviations: none
+Deviations: D-2 (merge-on-green streams) — `docs/classification.md`
+§Deviation register
 
 Everything authoritative lives under `docs/` (K-001). This file only
 bootstraps a session: commands, invariants, pointers. A reader who
@@ -234,6 +235,18 @@ evaluator/runtime set; this is the complete session list):
   (B-149): no new forbidden edge, no new mixed file, no rise in the
   discriminator count, no file without a unit; lower the baseline with
   `units --update-baseline` after a split lands, never raise it.
+- **A ratchet baseline lowers only in its own commit, made after the
+  branch is up to date with `origin/main`** (B-164 (ratchet baselines
+  under concurrent merges)). The four baseline files —
+  `scripts/analyze/plane-baseline.json`,
+  `scripts/analyze/units-baseline.json`, `bench/load-baseline.json`,
+  `src/boundary-baseline.json` — are committed counts that may only
+  fall. Lower one in a separate commit at the top of the branch, after
+  bringing the branch up to date with `origin/main` and re-running the
+  lint on that tree, so the number was measured on main plus this
+  branch and never on a stale base. Two branches lowering the same file
+  conflict at that commit, which is the point: the second re-measures.
+  Never lower a baseline in the commit that earns the lowering.
 - Commit messages with backticks: write to a file, `git commit -F` —
   inline `-m` backticks get shell-expanded.
 
