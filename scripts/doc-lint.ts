@@ -17,9 +17,13 @@
 //             links around the identifier defeat it, so counts are approximate
 //             and this check never gates.
 //
-// Report-only by default (exit 0). `--strict` exits 1 on any anchor finding,
-// which is the only check deterministic enough to gate; B-150 files the
-// baselines for the other two.
+// IN THE GATE since B-150 (the document lints join the gate): `--check`
+// exits 1 when anchors or order report anything, or when ids exceeds the
+// committed count in scripts/doc-lint-baseline.json — a ratchet that may
+// only fall (`--update-baseline` lowers it, never raises it). The suite
+// runs the same check through `lintDocs` (src/test/tooling.ts) and probes
+// each lint against a known-bad document in a temporary root. Report-only
+// without `--check` (exit 0); `--strict` is the older anchors-only gate.
 //
 // Lives outside tsconfig's rootDir like the other scripts; run via tsx.
 // =============================================================================
@@ -28,9 +32,48 @@ import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const ROOT = process.cwd();
+let ROOT = process.cwd();
 
-interface Finding { check: string; file: string; line: number; text: string; note: string }
+export interface Finding { check: string; file: string; line: number; text: string; note: string }
+
+export const BASELINE_FILE = "scripts/doc-lint-baseline.json";
+
+export interface DocLintResult { counts: Record<string, number>; findings: Finding[] }
+
+/** Run the lints as the suite does: over `files` (default: every governed
+ *  markdown file under `root`), with `root` as the repository root. */
+export function lintDocs(opts: { root?: string; files?: string[]; checks?: ("anchors" | "order" | "ids")[] } = {}): DocLintResult {
+  const previous = ROOT;
+  ROOT = opts.root ?? process.cwd();
+  anchorCache.clear();
+  try {
+    const files = opts.files ?? markdownFiles();
+    const checks = opts.checks ?? ["anchors", "order", "ids"];
+    const findings: Finding[] = [];
+    if (checks.includes("anchors")) findings.push(...lintAnchors(files));
+    if (checks.includes("order")) findings.push(...lintOrder(files));
+    if (checks.includes("ids")) findings.push(...lintIds(files));
+    const counts: Record<string, number> = { anchors: 0, order: 0, ids: 0 };
+    for (const f of findings) counts[f.check]++;
+    return { counts, findings };
+  } finally {
+    ROOT = previous;
+    anchorCache.clear();
+  }
+}
+
+export function readBaseline(root: string): { ids: number } {
+  return JSON.parse(fs.readFileSync(path.join(root, BASELINE_FILE), "utf-8")) as { ids: number };
+}
+
+/** The gate's verdict: anchors and order at zero, ids at or below the baseline. */
+export function gateFindings(result: DocLintResult, baseline: { ids: number }): string[] {
+  const out: string[] = [];
+  if (result.counts.anchors > 0) out.push(`anchors: ${result.counts.anchors} unresolved anchor link(s)`);
+  if (result.counts.order > 0) out.push(`order: ${result.counts.order} forward reference(s) in the reading order`);
+  if (result.counts.ids > baseline.ids) out.push(`ids: ${result.counts.ids} bare first-use identifier(s), above the baseline of ${baseline.ids} (${BASELINE_FILE})`);
+  return out;
+}
 
 function markdownFiles(): string[] {
   return execSync("git ls-files --cached --others --exclude-standard '*.md'", { cwd: ROOT, encoding: "utf-8" })
@@ -102,6 +145,7 @@ function readingOrder(): { index: Map<string, number>; lookahead: Set<string> } 
 }
 
 function lintOrder(files: string[]): Finding[] {
+  if (!fs.existsSync(path.join(ROOT, "docs/reading-order.json"))) return [];   // a probe root without an order
   const { index, lookahead } = readingOrder();
   const out: Finding[] = [];
   for (const file of files) {
@@ -170,15 +214,26 @@ function lintIds(files: string[]): Finding[] {
 function main(): void {
   const args = process.argv.slice(2);
   const json = args.includes("--json"), strict = args.includes("--strict");
+  const check = args.includes("--check"), update = args.includes("--update-baseline");
   const cmd = args.find((a) => !a.startsWith("--")) ?? "all";
-  const files = markdownFiles();
-  const findings: Finding[] = [];
-  if (cmd === "anchors" || cmd === "all") findings.push(...lintAnchors(files));
-  if (cmd === "order" || cmd === "all") findings.push(...lintOrder(files));
-  if (cmd === "ids" || cmd === "all") findings.push(...lintIds(files));
+  const checks = cmd === "all" ? undefined : [cmd as "anchors" | "order" | "ids"];
+  const { counts, findings } = lintDocs({ checks });
 
-  const counts: Record<string, number> = { anchors: 0, order: 0, ids: 0 };
-  for (const f of findings) counts[f.check]++;
+  if (update) {
+    const baseline = readBaseline(ROOT);
+    if (counts.ids > baseline.ids) { console.log(`doc-lint: ids ${counts.ids} is above the baseline ${baseline.ids}; a baseline only falls`); process.exit(1); }
+    fs.writeFileSync(path.join(ROOT, BASELINE_FILE), JSON.stringify({ _: "B-150: bare first-use identifiers (scripts/doc-lint.ts ids), a ratchet that may only fall. Lower it with `npx tsx scripts/doc-lint.ts --update-baseline` in its own commit after the branch is up to date with origin/main (CLAUDE.md, the ratchet-baseline rule).", ids: counts.ids }, null, 2) + "\n");
+    console.log(`doc-lint: baseline ids ${baseline.ids} → ${counts.ids}`);
+    return;
+  }
+  if (check) {
+    const problems = gateFindings({ counts, findings }, readBaseline(ROOT));
+    for (const f of findings.filter((x) => x.check !== "ids")) console.log(`  ${f.file}:${f.line}  ${f.text}\n      ${f.note}`);
+    for (const p of problems) console.log(`doc-lint: ${p}`);
+    console.log(`doc-lint: anchors ${counts.anchors} · order ${counts.order} · ids ${counts.ids} — ${problems.length === 0 ? "gate passed" : "GATE FAILED"}`);
+    if (problems.length > 0) process.exit(1);
+    return;
+  }
   if (json) { console.log(JSON.stringify({ counts, findings }, null, 2)); }
   else {
     for (const check of ["anchors", "order"]) {
@@ -198,4 +253,4 @@ function main(): void {
   if (strict && counts.anchors > 0) process.exit(1);
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) main();
