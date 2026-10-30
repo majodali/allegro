@@ -114,6 +114,32 @@ conditions are deviation D-2 (merge-on-green streams) in
 `docs/classification.md`. Lane P ran
 under it first (ruling R3 of `docs/plans/fast-library-load.md`).
 
+**Status documents under streams (B-162 (conflict-free status
+documents), 2026-10-30).** The three shared status documents have one
+insertion point per stream, so two streams never edit the same lines:
+
+- `docs/CHANGELOG.md` has a section per stream, `## Stream <lane> —
+  <name>`, created in the same PR as the stream plan; a stream's entries
+  go under its own heading, newest first. Work outside a stream goes
+  under `## Unstreamed`. The preamble there states the rule.
+- In this backlog a stream edits only its own items (the bullets whose
+  ids its plan's `reserves` names, plus the item it delivers) and its
+  own row of the lane table. Filing an item outside its reserved ids is
+  a stop: it needs a maintainer decision and a reserved id.
+- In `docs/plans/README.md` a stream edits only its own plan's row; a
+  new row is appended at the end of the table.
+- Every branch is brought up to date with `origin/main` (merge or
+  rebase; the branch is single-use, W-006) before its PR merges, and the
+  gate re-runs when the update touched files outside `docs/`. A merge
+  that pairs one stream's lowered ratchet baseline with another's new
+  count is the case this prevents (B-164 (ratchet baselines under
+  concurrent merges) adds the baseline rule).
+
+Creating a stream's section and row can conflict once, when two streams
+start in the same hour; the second rebases. Later the coordinating
+service appends the changelog entry at merge from the PR's "What
+changed" part, and streams stop editing the changelog at all.
+
 > This gate policy conforms to
 > [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated)
 > as released in methodology v1.5.0, with allegro as the amendment's
@@ -994,8 +1020,13 @@ that prevents it.
   a coordinating service hands a session, and the reserved ids end the
   B-101 collision between lanes.
   **Pointer**: `docs/plans/parallel-streams.md` §2, §4
-- [ ] **B-162** (conflict-free status documents) · Track M · T-docs ·
+- [x] **B-162** (conflict-free status documents) · Track M · T-docs ·
   **Two streams land without a conflict in the status documents.**
+  LANDED 2026-10-30 (chunk S3 (the status documents) of
+  `docs/plans/parallel-streams.md`): the changelog sectioned per stream
+  with the pre-stream entries under `## Stream S` and the record frozen;
+  "Status documents under streams" above, the same rule in `CLAUDE.md`
+  and the stream-plan template. As planned:
   `docs/CHANGELOG.md` restructured with a section per stream, each
   stream appending under its own heading; a stream's backlog edits
   stay inside its own items and its lane row; rebase onto main before

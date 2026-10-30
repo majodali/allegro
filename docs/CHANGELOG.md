@@ -1,10 +1,46 @@
 # Allegro — Changelog
 
 > Tier 2. Append an entry per landed chunk (see `docs/PROCESS.md` §5).
-> Newest first. Each entry: what landed, key decisions, deviations from
-> plan, test count.
+> Each entry: what landed, key decisions, deviations from plan, test
+> count.
+>
+> **Sections (B-162 (conflict-free status documents), 2026-10-30).**
+> One section per stream, `## Stream <lane> — <name>`, created in the
+> same PR as the stream's plan; the stream's entries go under its own
+> heading, newest first, directly after the heading's intro line, so two
+> streams never insert at the same place. Work outside any stream goes
+> under `## Unstreamed`, newest first. Entries inside a section are
+> `###`. Everything before the sections existed is under `## Record
+> before streams` and keeps its original `##` entries, newest first; it
+> is history and is not appended to. A new stream section goes directly
+> above `## Unstreamed`: two streams created in the same hour conflict
+> there once, at creation, and the second rebases.
 
-## 2026-10 — The stream-plan document type (the pre-stream arc, S2)
+## Stream S — the pre-stream arc
+
+Plan `docs/plans/parallel-streams.md`; lane S; human-gated.
+
+### 2026-10 — Conflict-free status documents (the pre-stream arc, S3)
+
+B-162 (conflict-free status documents), chunk S3 of
+`docs/plans/parallel-streams.md`. The three shared status documents now
+have one insertion point per stream. This changelog has a section per
+stream (the preamble states the rule); the two pre-stream entries moved
+under `## Stream S`, the record before 2026-10-30 is frozen under its
+own heading, and work outside a stream goes under `## Unstreamed`.
+`docs/backlog.md` §"Parallel lanes" gains "Status documents under
+streams": a stream edits only its own items and its lane row in the
+backlog, only its own row in the plans manifest (a new row is appended
+at the end of the table), and only its own section here; every branch
+is brought up to date with `origin/main` before its merge, and the gate
+re-runs when the update touched files outside `docs/`.
+`CLAUDE.md`'s branch-practice bullet carries the same four sentences;
+the stream-plan template tells a new stream to create its section and
+its manifest row with its plan. Later the coordinating service appends
+the changelog entry at merge from the PR's "What changed" part. Docs
+only; doc lints at baseline.
+
+### 2026-10 — The stream-plan document type (the pre-stream arc, S2)
 
 B-166 (the stream-plan document type), chunk S2 of
 `docs/plans/parallel-streams.md`. A stream plan now opens with a
@@ -27,7 +63,7 @@ first prose use still names. The Tier-0 amendment of plan §5 was opened
 as PR #117 the same day; deviation D-2 (merge-on-green streams) and the
 plan point at it. Suite +2.
 
-## 2026-10 — Merge-on-green is deviation D-2 (the pre-stream arc, S1)
+### 2026-10 — Merge-on-green is deviation D-2 (the pre-stream arc, S1)
 
 The maintainer ratified on 2026-10-30 the five items that precede
 development as concurrent streams, the split between the repository and
@@ -47,6 +83,16 @@ closed by this chunk), B-166 (the stream-plan document type),
 B-162 (conflict-free status documents), B-163 (the lane manifest and
 its check), B-164 (ratchet baselines under concurrent merges). Docs
 only.
+
+## Unstreamed
+
+Work outside any stream: per-chunk gated lanes and one-off chunks.
+Entries newest first, directly below this line.
+
+## Record before streams (to 2026-10-30)
+
+The flat record as it stood when the sections above were created
+(B-162). Newest first; original `##` entries; not appended to.
 
 ## 2026-10 — The owner-module invariant joins `CLAUDE.md`
 
