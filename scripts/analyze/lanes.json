@@ -12,7 +12,7 @@
   "lanes": {
     "A": {
       "name": "reval docs",
-      "globs": ["docs/book/**", "docs/documentation-census.md", "docs/reading-order.json"]
+      "globs": ["docs/book/**", "docs/documentation-census.md", "docs/reading-order.json", "scripts/doc-lint-baseline.json"]
     },
     "B": {
       "name": "suite split",

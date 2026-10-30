@@ -130,7 +130,10 @@ chapters I.4 and I.5, with stubs at `docs/VISION.md` and
 
 ### 4.2 What the lints check (Phase 0)
 
-`npm run lint:docs` (`scripts/doc-lint.ts`), report-only until B-150:
+`npm run lint:docs` (`scripts/doc-lint.ts`), in the gate since B-150 (the
+document lints join the gate, landed 2026-10-30): `npm run
+lint:docs:check` and the suite fail on any `anchors` or `order` finding
+and on an `ids` count above `scripts/doc-lint-baseline.json`, a ratchet:
 
 | Check | What | Deterministic |
 |---|---|---|

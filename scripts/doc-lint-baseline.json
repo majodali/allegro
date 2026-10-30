@@ -1,0 +1,4 @@
+{
+  "_": "B-150: bare first-use identifiers (scripts/doc-lint.ts ids), a ratchet that may only fall. Lower it with `npx tsx scripts/doc-lint.ts --update-baseline` in its own commit after the branch is up to date with origin/main (CLAUDE.md, the ratchet-baseline rule).",
+  "ids": 796
+}

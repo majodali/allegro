@@ -131,6 +131,22 @@ only.
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
 
+### 2026-10 — The document lints join the gate (B-150)
+
+B-150 (the document lints join the gate), lane S, landed as the oracle
+the book stream needs before its first chapter. `scripts/doc-lint.ts`
+now exports `lintDocs`, `readBaseline` and `gateFindings`; `npm run
+lint:docs:check` (and the same check in `src/test/tooling.ts`, every
+shard) fails when any anchored link is unresolved, any `#def-` link
+points forward in `docs/reading-order.json`, or the bare first-use
+identifier count exceeds `scripts/doc-lint-baseline.json` — 796 at
+landing, a ratchet that `--update-baseline` lowers and refuses to
+raise. Each lint was probed against a known-bad pair of documents in a
+temporary root (one bad anchor, one forward reference, one bare id
+counted once) before being trusted, and the probe runs in the suite.
+The ids heuristic stays approximate, which is why it ratchets rather
+than hard-failing at zero. `npm run lint:docs` without `--check` still
+reports by file. Suite +2.
 ### 2026-10 — A stream plan's boundary narrows its lane, never widens it
 
 B-163 (the lane manifest and its check), a follow-up found while
