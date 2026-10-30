@@ -78,7 +78,7 @@ The grouping below comes from co-change measurement over the last 40
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
-| **S — the pre-stream arc** (added 2026-10-30) | B-165, B-166, B-162, B-163, B-164 in that order — plan `docs/plans/parallel-streams.md` | **Runs alone until S4 lands**: it edits the shared status documents and the process records, so every other lane's PR rebases over it. Human-gated: not a merge-on-green stream |
+| **S — the pre-stream arc** (added 2026-10-30; **all five chunks landed 2026-10-30**) | ~~B-165, B-166, B-162, B-163, B-164~~ — plan `docs/plans/parallel-streams.md`, closed; the lane stays for process and lane-manifest edits | **Ran alone**: it edited the shared status documents and the process records. Human-gated: not a merge-on-green stream. Streams may now start in any lane; the rules are "Merge policy per stream", "Status documents under streams" and "The lane table as data" below |
 | **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29) | The follow-ons of B-157 (the performance stream): B-159 (precompile and termination analysis of recursive definitions), B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
 
 **What lane B unlocks:** C and D may then run *as lanes in parallel
@@ -132,8 +132,17 @@ insertion point per stream, so two streams never edit the same lines:
   rebase; the branch is single-use, W-006) before its PR merges, and the
   gate re-runs when the update touched files outside `docs/`. A merge
   that pairs one stream's lowered ratchet baseline with another's new
-  count is the case this prevents (B-164 (ratchet baselines under
-  concurrent merges) adds the baseline rule).
+  count is the case this prevents. B-164 (ratchet baselines under
+  concurrent merges) adds the baseline rule: a ratchet baseline
+  (`scripts/analyze/plane-baseline.json`,
+  `scripts/analyze/units-baseline.json`, `bench/load-baseline.json`,
+  `src/boundary-baseline.json`) lowers only in its own commit at the top
+  of the branch, made after the branch is up to date with `origin/main`
+  and the lint re-run on that tree — never in the commit that earns the
+  lowering. `CLAUDE.md`'s invariant list carries the rule. The owner's
+  branch-protection setting (a branch up to date with main before
+  merge) makes the stale-base case impossible rather than merely
+  forbidden; it is recorded in `docs/classification.md` once flipped.
 
 Creating a stream's section and row can conflict once, when two streams
 start in the same hour; the second rebases. Later the coordinating
@@ -1066,9 +1075,14 @@ table and the stream plans.
   dispatch and refuses an overlapping stream. Chunk S4 (the lane
   manifest). **Blocked-by**:
   B-162. **Pointer**: `docs/plans/parallel-streams.md` §2, §3 item 2
-- [ ] **B-164** (ratchet baselines under concurrent merges) · Track M ·
+- [x] **B-164** (ratchet baselines under concurrent merges) · Track M ·
   T-tooling · **A merge never pairs one stream's lowered baseline with
-  another's new count.** The rule that a baseline lowers only in a
+  another's new count.** LANDED 2026-10-30 (chunk S5 (the ratchet
+  baselines) of `docs/plans/parallel-streams.md`, which closes the arc):
+  the rule in `CLAUDE.md`'s invariant list and in "Status documents
+  under streams" above; the owner's branch-protection setting still to
+  record in `docs/classification.md` once flipped. As planned: the rule
+  that a baseline lowers only in a
   follow-up commit after rebase, in `CLAUDE.md`'s invariant list; the
   owner's branch-protection rule that a branch is up to date with main
   before merge, recorded in `docs/classification.md` once flipped.
