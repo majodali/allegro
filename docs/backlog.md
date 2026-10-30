@@ -78,6 +78,7 @@ The grouping below comes from co-change measurement over the last 40
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
+| **S — the pre-stream arc** (added 2026-10-30) | B-165, B-166, B-162, B-163, B-164 in that order — plan `docs/plans/parallel-streams.md` | **Runs alone until S4 lands**: it edits the shared status documents and the process records, so every other lane's PR rebases over it. Human-gated: not a merge-on-green stream |
 | **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29) | The follow-ons of B-157 (the performance stream): B-159 (precompile and termination analysis of recursive definitions), B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
 
 **What lane B unlocks:** C and D may then run *as lanes in parallel
@@ -102,6 +103,16 @@ sequences**: the maintainer approves the chunk list once at the start of
 an arc, and the lane lands them in order without stopping between each.
 **Lane D keeps the per-chunk gate** (PROCESS §3): land, summarize, stop.
 Everything else in the landing checklist is unchanged for every lane.
+
+**Merge policy per stream (2026-10-30).** A *stream* is a lane in
+motion: a sequence of sessions working one lane under one stream plan
+(`docs/plans/parallel-streams.md` §1 defines both terms). A stream
+whose plan declares merge-on-green, and that the maintainer has so
+ratified, merges its own PRs on a green gate after reading the diff;
+every other PR waits for the maintainer. The policy and its four
+conditions are deviation D-2 (merge-on-green streams) in
+`docs/classification.md`. Lane P ran
+under it first (ruling R3 of `docs/plans/fast-library-load.md`).
 
 > This gate policy conforms to
 > [W-001 (two delivery modes, human-gated)](https://github.com/majodali/methodology/blob/main/docs/rules/working-agreement.md#w-001--two-delivery-modes-human-gated)
@@ -961,6 +972,54 @@ that prevents it.
   stamp"; pure verdict logic unit-tested (7 tests, no network in the
   suite). `[stage: live]` designations are auditable once the owner's
   NEXT deploy publishes the first stamp. Feeds Article 11 tooling
+- [x] **B-165** (merge-on-green recorded as a deviation) · Track M ·
+  **Merge-on-green is deviation D-2.** LANDED 2026-10-30 (chunk S1 (the
+  deviation record) of `docs/plans/parallel-streams.md`): D-2 in
+  `docs/classification.md`
+  with its four conditions and its retirement condition; the lane
+  table's merge-policy paragraph; the Tier-0 contradiction in
+  `docs/book/process.md` §3 surfaced with proposed text (plan §5) for a
+  dedicated PR on sign-off. **Pointer**: `docs/classification.md`
+  §Deviation register; `docs/plans/parallel-streams.md` §4, §5
+- [ ] **B-166** (the stream-plan document type) · Track M · T-docs ·
+  **A stream runs from a stream plan.** The document type named in
+  `docs/documentation-census.md` §1; a template under `docs/plans/`
+  with a machine-readable header (lane, oracle commands, merge policy,
+  chunk list, reserved backlog ids); `docs/plans/fast-library-load.md`
+  conformed as the first instance. The header is the brief a
+  coordinating service hands a session, and the reserved ids end the
+  B-101 collision between lanes. Chunk S2 (the stream-plan type).
+  **Blocked-by**: B-165.
+  **Pointer**: `docs/plans/parallel-streams.md` §2, §4
+- [ ] **B-162** (conflict-free status documents) · Track M · T-docs ·
+  **Two streams land without a conflict in the status documents.**
+  `docs/CHANGELOG.md` restructured with a section per stream, each
+  stream appending under its own heading; a stream's backlog edits
+  stay inside its own items and its lane row; rebase onto main before
+  every merge. Chunk S3 (the status documents). Later the coordinating
+  service appends the
+  changelog entry at merge from the PR's "What changed" part.
+  **Blocked-by**: B-166. **Pointer**: `docs/plans/parallel-streams.md`
+  §2, §3 item 1
+- [ ] **B-163** (the lane manifest and its check) · Track M · T-tooling
+  · **A PR's diff stays inside its lane, checked.** The lane manifest
+  `scripts/analyze/lanes.json` (file globs per lane) and
+  `npm run lint:lanes`, run in CI on pull requests, with the shared
+  status documents exempt; probed against a known-bad diff before it is
+  trusted. Later the coordinating service reads the manifest at
+  dispatch and refuses an overlapping stream. Chunk S4 (the lane
+  manifest). **Blocked-by**:
+  B-162. **Pointer**: `docs/plans/parallel-streams.md` §2, §3 item 2
+- [ ] **B-164** (ratchet baselines under concurrent merges) · Track M ·
+  T-tooling · **A merge never pairs one stream's lowered baseline with
+  another's new count.** The rule that a baseline lowers only in a
+  follow-up commit after rebase, in `CLAUDE.md`'s invariant list; the
+  owner's branch-protection rule that a branch is up to date with main
+  before merge, recorded in `docs/classification.md` once flipped.
+  Later a serialized merge queue makes the rule redundant. Chunk S5
+  (the ratchet baselines).
+  **Blocked-by**: B-163. **Pointer**: `docs/plans/parallel-streams.md`
+  §2, §3 item 3
 
 ### L3 — Vivace (M5)
 
