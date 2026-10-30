@@ -141,7 +141,15 @@ function lintIds(files: string[]): Finding[] {
       for (const d of text.matchAll(/^#{1,6}\s+((?:D|R|SC|IC|B|W|K|P|M|Q|S|CE-R|E-R|V-R|T-R|CT-R|U-R|R-R)-?\d+[a-z′]?)\s*[—:]/g)) defined.add(d[1]);
     }
     const seen = new Set<string>();
+    // Front matter (a stream plan's machine-readable header, B-166) carries
+    // IDs as data, like a table: skipped, so the first PROSE use still names.
+    let frontMatterEnd = 0;
+    if (lines[0]?.trim() === "---") {
+      const close = lines.findIndex((l, k) => k > 0 && l.trim() === "---");
+      frontMatterEnd = close < 0 ? 0 : close + 1;
+    }
     lines.forEach((text, i) => {
+      if (i < frontMatterEnd) return;
       if (/^\s*(>\s*)?(\||```)/.test(text)) return;      // table rows (also inside blockquotes) and code carry IDs as data
       for (const m of text.matchAll(ID)) {
         const id = m[1];

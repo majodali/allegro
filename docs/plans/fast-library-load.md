@@ -1,3 +1,22 @@
+---
+type: stream-plan
+status: closed
+backlog: B-157
+lane: P
+merge: merge-on-green
+oracle:
+  - npm run lint:load
+  - npm test
+chunks: [P1, P2, P3, P4, P5, P6, P7, P8, P9, P10]
+reserves: [B-155, B-156, B-158, B-159, B-160, B-161]
+boundary:
+  - src/grammar2/**
+  - bench/**
+  - src/modules.ts
+  - src/use-scanner.ts
+  - src/runtime.ts
+---
+
 # Fast library load — the performance stream
 
 > **Status: closed → B-157** (2026-10-29) — the chunk sequence of §5 is

@@ -4,6 +4,29 @@
 > Newest first. Each entry: what landed, key decisions, deviations from
 > plan, test count.
 
+## 2026-10 — The stream-plan document type (the pre-stream arc, S2)
+
+B-166 (the stream-plan document type), chunk S2 of
+`docs/plans/parallel-streams.md`. A stream plan now opens with a
+machine-readable header — YAML front matter in a fixed subset — naming
+`type`, `status`, `backlog`, `lane`, `merge`, `oracle`, `chunks`,
+`reserves` and an optional `boundary`: the brief a coordinating service
+reads, and the place a stream reserves its backlog ids before it starts.
+`scripts/stream-plan.ts` is the reference reader and the check
+(`npm run lint:streams`): a header whose lane is not a row of the lane
+table, whose backlog ids have no entry, or whose oracle commands do not
+exist is refused; the check runs in the suite (`src/test/tooling.ts`)
+and was probed against a known-bad header field by field before being
+trusted. The template `docs/plans/stream-plan-template.md` documents the
+fields and the sections; the type is named in
+`docs/documentation-census.md` §1 and the plans manifest. First
+instances: the arc's own plan and `docs/plans/fast-library-load.md`,
+which gains the header as a closed stream. `scripts/doc-lint.ts`'s
+bare-identifier check skips front matter as it skips a table, so the
+first prose use still names. The Tier-0 amendment of plan §5 was opened
+as PR #117 the same day; deviation D-2 (merge-on-green streams) and the
+plan point at it. Suite +2.
+
 ## 2026-10 — Merge-on-green is deviation D-2 (the pre-stream arc, S1)
 
 The maintainer ratified on 2026-10-30 the five items that precede

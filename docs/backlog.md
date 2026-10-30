@@ -981,15 +981,18 @@ that prevents it.
   `docs/book/process.md` §3 surfaced with proposed text (plan §5) for a
   dedicated PR on sign-off. **Pointer**: `docs/classification.md`
   §Deviation register; `docs/plans/parallel-streams.md` §4, §5
-- [ ] **B-166** (the stream-plan document type) · Track M · T-docs ·
-  **A stream runs from a stream plan.** The document type named in
-  `docs/documentation-census.md` §1; a template under `docs/plans/`
-  with a machine-readable header (lane, oracle commands, merge policy,
-  chunk list, reserved backlog ids); `docs/plans/fast-library-load.md`
-  conformed as the first instance. The header is the brief a
-  coordinating service hands a session, and the reserved ids end the
-  B-101 collision between lanes. Chunk S2 (the stream-plan type).
-  **Blocked-by**: B-165.
+- [x] **B-166** (the stream-plan document type) · Track M · T-docs ·
+  **A stream runs from a stream plan.** LANDED 2026-10-30 (chunk S2 (the
+  stream-plan type) of `docs/plans/parallel-streams.md`): the header
+  (front matter: lane,
+  oracle commands, merge policy, chunk list, reserved backlog ids,
+  optional boundary), the template `docs/plans/stream-plan-template.md`,
+  the reader and check `scripts/stream-plan.ts` (`npm run lint:streams`,
+  in the suite, probed against a known-bad header), the type named in
+  `docs/documentation-census.md` §1, `docs/plans/fast-library-load.md`
+  and the arc's own plan as the first instances. The header is the brief
+  a coordinating service hands a session, and the reserved ids end the
+  B-101 collision between lanes.
   **Pointer**: `docs/plans/parallel-streams.md` §2, §4
 - [ ] **B-162** (conflict-free status documents) · Track M · T-docs ·
   **Two streams land without a conflict in the status documents.**

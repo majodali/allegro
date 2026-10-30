@@ -9,6 +9,7 @@ import { test, asyncTest, eq, SHARD } from "./harness.js";
 import { CORPUS, WRONG_SENTINEL_TERM } from "../../bench/manifest.js";
 import { runBenchmark, stripProof } from "../../bench/harness.js";
 import { lintDocRefs } from "../../scripts/doc-ref-lint.js";
+import { checkAll as checkStreamPlans, checkStreamPlan, loadContext as loadStreamPlanContext, parseFrontMatter, streamPlans } from "../../scripts/stream-plan.js";
 import { assessDeployment, parseStamp } from "../../scripts/check-deployed.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -102,6 +103,47 @@ export function runDocLintTests(): void {
     const findings = lintDocRefs(nodePath.resolve(import.meta.dirname, "../.."));
     const rendered = findings.map((f) => `${f.file}:${f.line} → ${f.ref}`).join("; ");
     eq(rendered, "", "dangling doc references");
+  });
+
+  // --- Stream plans (B-166): the machine-readable header is well-formed ---
+  const repoRoot = nodePath.resolve(import.meta.dirname, "../..");
+  test("stream plans (B-166): every header in docs/plans validates against the repository", () => {
+    const results = checkStreamPlans(repoRoot);
+    eq(results.length >= 2, true, "the two first instances (fast-library-load, parallel-streams) carry headers");
+    const rendered = results.flatMap((r) => r.findings.map((f) => `${r.file}: ${f}`)).join("; ");
+    eq(rendered, "", "stream-plan findings");
+    // The template is listed but never checked: its values are placeholders.
+    eq(streamPlans(repoRoot).some((p) => p.header.template === "true"), true, "the template carries template: true");
+  });
+  test("stream plans (B-166): a known-bad header is refused, field by field", () => {
+    const ctx = loadStreamPlanContext(repoRoot);
+    const bad = parseFrontMatter([
+      "---",
+      "type: stream-plan",
+      "status: running",
+      "backlog: B-999999",
+      "lane: Z",
+      "merge: auto",
+      "oracle:",
+      "  - npm run no-such-script",
+      "chunks: [S1, S1]",
+      "reserves: [B-162, B-999998]",
+      "extra: field",
+      "---",
+      "# body",
+    ].join("\n"));
+    eq(bad.errors.length, 0, "syntax is fine; the content is not");
+    const findings = checkStreamPlan(bad.header!, ctx);
+    const expect = ["status running", "B-999999 has no entry", "lane Z", "merge auto", "no npm script no-such-script", "duplicate chunk S1", "B-999998 has no entry", "unknown field: extra"];
+    for (const e of expect) eq(findings.some((f) => f.includes(e)), true, `refuses: ${e} — got ${findings.join(" | ")}`);
+    eq(findings.length, expect.length, `exactly these findings: ${findings.join(" | ")}`);
+    // A missing field and a syntax error are findings too.
+    const missing = parseFrontMatter("---\ntype: stream-plan\nstatus: active\n---\n");
+    eq(checkStreamPlan(missing.header!, ctx).filter((f) => f.startsWith("missing field")).length, 6, "six required fields missing");
+    const unclosed = parseFrontMatter("---\ntype: stream-plan\n");
+    eq(unclosed.errors.some((e) => e.includes("never closed")), true, "unclosed front matter is a finding");
+    const noHeader = parseFrontMatter("# A plan without front matter\n");
+    eq(noHeader.header, null, "a plan without front matter is not a stream plan");
   });
 }
 
