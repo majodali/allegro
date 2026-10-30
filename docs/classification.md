@@ -26,6 +26,18 @@ field definitions and omission defaults per the methodology
   migration (methodology vocabulary, *Workflow*); the three parts were
   already present in substance.
 
+## Repository settings (owner-run)
+
+- **Branch protection on `main`** (a ruleset; set by the owner
+  2026-10-30 at the gate of B-164 (ratchet baselines under concurrent
+  merges)): status checks must pass, with the CI job `test` required,
+  and a branch must be up to date with `main` before it merges. The
+  second makes the stale-base case of B-164 impossible rather than
+  forbidden: a merge can no longer pair one branch's lowered ratchet
+  baseline with another's new count, because the merging branch always
+  carries the other's merge. The baseline rule in `CLAUDE.md` still
+  says where the lowering commit goes.
+
 ## Deviation register
 
 **D-2 — merge-on-green streams** (W-006, the PR waits for owner review;
