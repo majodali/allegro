@@ -137,6 +137,29 @@ line.
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
 
+### 2026-10 — The book writes IR first (B-173): W-009 adopted for the new chapters
+
+B-173 (the book writes IR first), lane S, the prerequisite of stream
+A's first chapter. The maintainer adopted the methodology's W-009 for
+the five new chapters of B-170 (the book, Part II and III chapters
+writable now): each chapter is written first as an intermediate
+representation beside it. `docs/classification.md` gains "Rules adopted
+by declaration" with the owner's designations (the evaluator chapter is
+normative, rendered by the reasoning role and reviewed in stranger
+rounds; the other four are IR-only for now; the stranger is a fresh
+Haiku instance per round; as-implemented claims are proposed with
+evidence and ratified in bulk at the chapter PR) and a custom
+definition making the chapter's `def-` anchor the definition site.
+`npm run lint:ir` (`scripts/ir-lint.ts`) runs `mtool ir check` from a
+methodology-tools checkout over every `*.ir.md`, in the suite and in
+CI, which clones the tool; the suite probes the tool against a
+known-bad IR (a bad reader, a bare pronoun, a dangling relation) before
+trusting it, and passes vacuously while the repository holds no IR.
+The bare-identifier lint skips `*.ir.md` and `*.review.md`, whose
+provenance tags cite identifiers by convention. The retrofit of the
+existing chapters is filed as B-174 (the book's existing chapters
+retrofitted to IR), a later stream. Suite +1.
+
 ### 2026-10 — The document lints join the gate (B-150)
 
 B-150 (the document lints join the gate), lane S, landed as the oracle
