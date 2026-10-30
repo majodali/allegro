@@ -82,11 +82,40 @@ agent work uses single-use, outcome-named branches, deleted after merge.
 Extended 2026-09-01: a merged PR is the approval signal, open questions
 update the same branch and its PR, and a new branch waits for the merge.)*
 
+## Rules adopted by declaration
+
+- **W-009 (the methodology corpus writes its deliverables IR first)**,
+  adopted 2026-10-30 for the book's new chapters: the five chapters of
+  stream A (B-170 (the book, Part II and III chapters writable now),
+  `book-chapters-now.md` under `docs/plans/`) are written first as an
+  [intermediate representation](https://github.com/majodali/methodology/blob/main/docs/intermediate-representation.md)
+  beside the chapter, under the specification at the pinned version.
+  The owner's designations under that specification: the evaluator
+  chapter is normative text, rendered by the reasoning role and
+  reviewed in stranger rounds; the evaluation pipeline, tooling, host
+  environments and demo-ladder chapters are IR-only documents for now,
+  to be rendered and reviewed at a later stage; the stranger is a fresh
+  Haiku instance per round; a chapter's claims about the code as
+  implemented carry `[proposed: this IR]` with evidence pointers and are
+  ratified in bulk at the chapter PR's merge, listed in its Asks. The
+  existing chapters are not retrofitted under this adoption; the
+  retrofit is a separate stream, B-174 (the book's existing chapters
+  retrofitted to IR). The gate runs the specification's mechanical
+  checks over every IR (`npm run lint:ir`, B-173 (the book writes IR
+  first)).
+
 ## Custom definitions
 
-No custom definitions. (Candidate for a future entry: the `// expect:`
-literate-demo convention in `tests/` and `demos/`, if audits want it
-named; deferred until needed per Article 6.)
+- **Definition site** (owner, 2026-10-30, for W-009 as adopted above):
+  in this project the definition site of a term is the `def-` anchor in
+  the book chapter that defines it (`docs/book/`, D52 (the
+  documentation book)), not a row of a project vocabulary, which this
+  project does not keep. An IR's `defined-at:` links point into the
+  book.
+
+(Candidate for a future entry: the `// expect:` literate-demo
+convention in `tests/` and `demos/`, if audits want it named; deferred
+until needed per Article 6.)
 
 ## Adoption transition (Article 7 sandbox designations)
 
