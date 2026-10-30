@@ -1270,8 +1270,8 @@ table and the stream plans.
 - [ ] **B-159** (precompile of recursive definitions) · T-perf · L2 ·
   **The gate's floor is the precompile and termination analysis of
   recursive function definitions.** **Stream P, plan
-  `docs/plans/recursive-precompile.md` (filed 2026-10-30, draft until
-  its PR merges).** Measured 2026-10-30: the termination analysis costs
+  `docs/plans/recursive-precompile.md` (filed 2026-10-30; rulings taken and chunks R1 to R4 ratified
+  the same day, RR1 as option (b)).** Measured 2026-10-30: the termination analysis costs
   under 1 ms; the cost is a cutoff miss — T-R6's inline cutoff tests
   object identity and a typed function is a derived copy since B-121
   C2, so every typed recursive definition unfolds to a stack overflow
