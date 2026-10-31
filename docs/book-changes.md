@@ -16,6 +16,8 @@
 
 | Date | Kind | Subject | From → to | Pointer |
 |---|---|---|---|---|
+| 2026-10-31 (A1) | move | the definition site of *tail call* | `docs/book/concepts.md` §27 (anchor `def-tail-calls`) → `docs/book/allegretto/evaluator.md` §5 (anchor `def-tail-call`); the spine keeps the numbered heading and its anchor as a pointer | B-170 (the book, Part II and III chapters writable now), chunk A1 |
+| 2026-10-31 (A1) | split | the reading-order entry "Scope and the evaluator (units 12 and 13)" | one planned entry → "Scope (unit 12)", still planned, and "The evaluator (unit 13)", present as `docs/book/allegretto/evaluator.md`; table-of-contents row II.5–6 → II.5 and II.6 | B-170, chunk A1 |
 | 2026-10-21 | move | the definition sites of *metadata field*, *channel*, *propagation* and *writer capability* | `docs/book/concepts.md` §19, §19b, §20, §21 (anchors `def-metadata-field`, `def-channel`, `def-propagation`, `def-writer-capability`) → `docs/book/allegretto/metadata-and-capability.md` §3 to §6, the same anchors; the spine keeps the four numbered headings as pointers | PR (the chapter) |
 | 2026-10-21 | move | the constitution | `docs/VISION.md`, `docs/PROCESS.md` → `docs/book/vision.md`, `docs/book/process.md` (chapters I.4, I.5); stubs at the old paths | PR #78 |
 | 2026-10-21 | rename | requirement R3′ | R3′ (the merged metadata requirement's working name since 2026-08) → **R3**; anchor `def-r3-prime` → `def-r3`. Rule: `docs/book/process.md` §6, flat numbering, never primes | PR #79 |

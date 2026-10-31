@@ -233,6 +233,8 @@ C73. `precompileFunction` reports an error thrown during the body's evaluation a
 
 ### 5. Tail calls
 
+C134. Without tail calls, the finite host stack would bound the depth of recursion a program can use. [decided: docs/book/concepts.md §27]
+
 C74. `markTailCalls` marks the outermost Expression of a function body as one whose result is the function's result. evidence: E21. [proposed: this IR]
 
 C75. `markTailCalls` carries the mark into the branch bodies of `eval_if` and `eval_when`. evidence: E21. [proposed: this IR]
@@ -389,7 +391,7 @@ G15. cluster: C63, C64, C65, C66, C67, C68 [proposed: this IR]
 
 G16. cluster: C70, C71, C72, C73 [proposed: this IR]
 
-G17. cluster: C74, C75, C76, C77, C78 [proposed: this IR]
+G17. cluster: C134, C74, C75, C76, C77, C78 [proposed: this IR]
 
 G18. cluster: C79, C80, C81, C82, C83, C84 [proposed: this IR]
 
