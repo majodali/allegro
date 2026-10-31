@@ -26,7 +26,8 @@
     "lint:docs": "tsx scripts/doc-lint.ts",
     "lint:docs:check": "tsx scripts/doc-lint.ts --check",
     "lint:streams": "tsx scripts/stream-plan.ts --check",
-    "lint:lanes": "tsx scripts/analyze/lane-lint.ts"
+    "lint:lanes": "tsx scripts/analyze/lane-lint.ts",
+    "lint:ir": "tsx scripts/ir-lint.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.0",

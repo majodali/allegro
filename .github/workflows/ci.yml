@@ -42,10 +42,20 @@ jobs:
           # untrusted text.
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: npm run lint:lanes -- --base HEAD^1
+      - name: Fetch methodology-tools (B-173) — the IR checks run from a checkout
+        # `mtool ir check` is not published as a package; its node_modules
+        # are committed, so a shallow clone is the whole install.
+        run: git clone --quiet --depth 1 https://github.com/majodali/methodology-tools "$RUNNER_TEMP/methodology-tools"
+      - name: IR lint (B-173) — every IR passes the methodology's checks
+        env:
+          MTOOL_HOME: ${{ runner.temp }}/methodology-tools
+        run: npm run lint:ir
       - name: Typecheck (sanctioned invocation)
         run: bash scripts/typecheck.sh
       - name: Test suite (full landing gate, sharded)
         # Same 1197 tests, run as N processes with the gate applied to the
         # aggregate (scripts/test-shards.mjs). `npm test` remains the
         # sequential entry point for local work.
+        env:
+          MTOOL_HOME: ${{ runner.temp }}/methodology-tools
         run: npm run test:shards

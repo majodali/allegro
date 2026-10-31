@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08), then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/standard/*.md`; touches no `src/` |
+| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (B-170 (the book, Part II and III chapters writable now), plan `docs/plans/book-chapters-now.md`, 2026-10-30); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
@@ -1105,6 +1105,30 @@ table and the stream plans.
   setting in `docs/classification.md`. **Pointer**: this table;
   `scripts/analyze/lanes.json`; `docs/classification.md` §Repository
   settings
+- [x] **B-173** (the book writes IR first) · Track M · T-docs ·
+  T-tooling · **W-009 adopted for the book's new chapters.** LANDED
+  2026-10-30 (lane S, unstreamed; the prerequisite of stream A's first
+  chapter): the adoption declared in `docs/classification.md` §Rules
+  adopted by declaration with the owner's designations (the evaluator
+  chapter normative, the four others IR-only for now, a fresh Haiku
+  stranger per round, bulk ratification of as-implemented claims at
+  the chapter PR); the definition site declared as the chapter anchor;
+  `npm run lint:ir` (`scripts/ir-lint.ts`) running `mtool ir check`
+  from a methodology-tools checkout over every `*.ir.md`, in the suite
+  and in CI (which clones the tool), probed against a known-bad IR; the
+  bare-identifier lint skipping `*.ir.md` and `*.review.md`. Asked by
+  the maintainer 2026-10-30. **Pointer**: `docs/classification.md`;
+  `scripts/ir-lint.ts`; `book-chapters-now.md` under `docs/plans/`
+- [ ] **B-174** (the book's existing chapters retrofitted to IR) ·
+  T-docs · **Every existing chapter gains its IR.** A stream of its own
+  in lane A, after stream A (B-170 (the book, Part II and III chapters
+  writable now)) closes: each existing `docs/book/` chapter gets a
+  `<chapter>.ir.md` beside it under W-009 as adopted in
+  `docs/classification.md`, with the owner's designation per chapter
+  (normative and rendered, or IR-only) taken in that stream's plan.
+  Filed 2026-10-30 at the maintainer's instruction when adopting W-009
+  for the five new chapters. **Blocked-by**: B-170. **Pointer**:
+  `docs/classification.md` §Rules adopted by declaration
 
 ### L3 — Vivace (M5)
 
@@ -2894,6 +2918,29 @@ table and the stream plans.
   - **Pointer**: [D52](decisions.md); `docs/plans/documentation-book.md`
     §4.2; `docs/plans/documentation-standards-delta.md` §5.
 
+- [ ] **B-170** (the book, Part II and III chapters writable now) ·
+  T-docs · **The planned chapters whose gate has passed.** Plan
+  `docs/plans/book-chapters-now.md` (stream A, lane A, human-gated;
+  filed 2026-10-30; rulings R1 to R7 taken and R8 (the chapters are
+  written IR first) decided the same day, under W-009 (the methodology
+  corpus writes its deliverables IR first) as adopted by B-173 (the book
+  writes IR first)). Five chapters,
+  one per chunk, in reading order: the evaluator (unit 13), the
+  evaluation pipeline (unit 33), tooling (units 34 and 35), host
+  environments, and the demo ladder with the rung-3 pilot (Part III).
+  Each chunk updates the reading order, the table of contents, the
+  unit status row and the spine entries it absorbs. Waits, by gate:
+  the kinds (the `Value` split), scope (B-136 (scope leaves `Value`)),
+  futures and the base primitives (their moves), codegen (B-072 (code
+  generation)), proofs (B-052 (Lean export)). **Pointer**: D52 (the
+  documentation book); `docs/plans/documentation-book.md` §4, Phase 2;
+  the plan's §6 rulings R1 to R7
+- [ ] **B-171** (book-chapters stream, spare id 1) · T-docs · Reserved
+  by stream A (`docs/plans/book-chapters-now.md`) for a finding outside
+  its boundary. Placeholder until used; the stream rewrites this entry
+  when it files the finding. Two candidates are named in the plan §2.4.
+- [ ] **B-172** (book-chapters stream, spare id 2) · T-docs · As
+  B-171 (book-chapters stream, spare id 1).
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

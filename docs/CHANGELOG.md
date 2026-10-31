@@ -132,10 +132,39 @@ Plan `docs/plans/recursive-precompile.md`; lane P; merge-on-green
 under deviation D-2 (merge-on-green streams). Opened 2026-10-30 with
 the plan; entries newest first, directly below this line.
 
+## Stream A — the book chapters
+
+Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
+2026-10-30 with the plan; entries newest first, directly below this
+line.
+
 ## Unstreamed
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
+
+### 2026-10 — The book writes IR first (B-173): W-009 (IR first) adopted for the new chapters
+
+B-173 (the book writes IR first), lane S, the prerequisite of stream
+A's first chapter. The maintainer adopted the methodology's W-009 for
+the five new chapters of B-170 (the book, Part II and III chapters
+writable now): each chapter is written first as an intermediate
+representation beside it. `docs/classification.md` gains "Rules adopted
+by declaration" with the owner's designations (the evaluator chapter is
+normative, rendered by the reasoning role and reviewed in stranger
+rounds; the other four are IR-only for now; the stranger is a fresh
+Haiku instance per round; as-implemented claims are proposed with
+evidence and ratified in bulk at the chapter PR) and a custom
+definition making the chapter's `def-` anchor the definition site.
+`npm run lint:ir` (`scripts/ir-lint.ts`) runs `mtool ir check` from a
+methodology-tools checkout over every `*.ir.md`, in the suite and in
+CI, which clones the tool; the suite probes the tool against a
+known-bad IR (a bad reader, a bare pronoun, a dangling relation) before
+trusting it, and passes vacuously while the repository holds no IR.
+The bare-identifier lint skips `*.ir.md` and `*.review.md`, whose
+provenance tags cite identifiers by convention. The retrofit of the
+existing chapters is filed as B-174 (the book's existing chapters
+retrofitted to IR), a later stream. Suite +1.
 
 ### 2026-10 — The document lints join the gate (B-150)
 
@@ -153,17 +182,27 @@ counted once) before being trusted, and the probe runs in the suite.
 The ids heuristic stays approximate, which is why it ratchets rather
 than hard-failing at zero. `npm run lint:docs` without `--check` still
 reports by file. Suite +2.
-### 2026-10 — A stream plan's boundary narrows its lane, never widens it
 
-B-163 (the lane manifest and its check), a follow-up found while
-preparing the first stream plans: `scripts/analyze/lane-lint.ts` let a
-plan's `boundary` header REPLACE the lane's globs, so a plan could
-declare files outside its lane and pass. A file is now allowed only
-when it is inside the lane's globs and, when the plan declares a
-boundary, inside that too; the finding names which of the two refused
-it. Two tests pin it: a lane-S plan declaring `src/**` still cannot
-touch the evaluator, and a boundary narrower than the lane refuses a
-lane file outside it. No manifest change.
+### 2026-10 — Two lane-lint fixes found by the first stream plans
+
+B-163 (the lane manifest and its check), two follow-ups found while
+preparing the first stream plans, both in `scripts/analyze/lane-lint.ts`.
+First, the check let a plan's `boundary` header REPLACE the lane's
+globs, so a plan could declare files outside its lane and pass. A file
+is now allowed only when it is inside the lane's globs and, when the
+plan declares a boundary, inside that too; the finding names which of
+the two refused it. Two tests pin it: a lane-S plan declaring `src/**`
+still cannot touch the evaluator, and a boundary narrower than the lane
+refuses a lane file outside it. Second, a closed stream's `reserves`
+records what it minted, and a later stream may take one of those items
+as its own (B-159 (precompile of recursive definitions) is in the
+performance stream's reserves and the recursive-precompile stream's
+`backlog` item); the resolver took the first plan alphabetically, so
+the new stream's PR was checked against the closed plan's boundary.
+`declarationRank` now ranks claims: an open plan beats a closed one, a
+`backlog` match beats a `reserves` match; a test pins the order and
+that a closed stream still declares its own item when no open plan
+claims it. No manifest change.
 
 ### 2026-10 — Lane K for kernel hygiene; the branch-protection setting recorded
 
