@@ -36,6 +36,7 @@ and the stranger finds no contradiction and no undefined term.
 | 4 | 2,490 | 157 | 8 | 3.2 | not readable (contradictions 2, undefined terms 0; restatement mismatch on C154 counts under the override) |
 | 5 | 2,544 | 159 | 7 | 2.8 | not readable (contradictions 1, undefined terms 0; restatement mismatch 1, the stranger's own, on T30: the same passage as round 4's M1, so it counts under the override) |
 | 6 | 2,550 | 165 | 10 | 3.9 | not readable (contradictions 1, undefined terms 0; restatement mismatches 6, all the stranger's own; the one on C44 counts under the override) |
+| 7 | 2,561 | 165 | 8 | 3.1 | readable (contradictions 0, undefined terms 0; restatement mismatches 5, the stranger's own: one disagreement on C95 on no earlier passage, four omissions) |
 
 ## Round 1, 2026-10-31
 
@@ -382,3 +383,55 @@ to 8 and 10 confirmed; finding 9 withdrawn by the instance on the reason
 given, quoting the body's uses of the short form "kind", so it no
 longer counts. New defects in the changed passages: none. No touch-up;
 round 7 reviews this text.
+
+## Round 7, 2026-10-31
+
+Reviewed commit `f233a10`: 2,561 prose words by the stranger's count
+(`awk` and `wc -w`; code blocks, the §9 table and the render map
+excluded); IR 165 claims; 8 findings; 3.1 per thousand words. The
+restatement was written from the prose before the IR was opened. The
+stranger reported five restatement mismatches, all attributed to its own
+restatement, each with the prose sentence carrying the claim quoted: M1
+on C95 (the restatement narrowed the in-place rule of C94 to scopes),
+and four omissions, on C153 with C157, C158, C164 and C165 (M2), on C7,
+C131 and C136 to C138 (M3), on a grouped set of detail claims including
+C44 and C161 (M4), and on the meaning of *tail call*, T30 with C2 (M5).
+Contradictions 0; undefined terms 0. Verdict: readable for RD-4.
+
+The ruling on the override, by the orchestrating session. The
+specification defines a restatement mismatch as a disagreement between
+the restatement and the IR. M1 is a disagreement; M2 to M5 are
+omissions from a restatement bounded at 200 words for a chapter of
+2,561, which the stranger labels as its own. An omission is not a
+disagreement, so M2 to M5 are not mismatches under the definition, and
+the override (a restatement mismatch on one passage in any two rounds
+always counts) does not reach them, even though M2 falls on the
+discriminator-rule passage of rounds 1 and 6, M4 on the PE Rule 1
+passage of rounds 3, 4 and 6, and M5 on the tail-call definition of
+rounds 4 and 5. M1 is own, quotes the prose sentence carrying C95, and
+falls on no earlier round's passage, so it does not count. The verdict
+readable stands. The alternative reading is stated for the meta-review
+to judge: if an omission is a mismatch, the override counts M2, M4 and
+M5, and the verdict is not readable. The record's earlier rounds treated
+round 6's five omissions the same way: reported, not counted.
+
+| # | Finding (shortened) | Kind | Decision |
+|---|---|---|---|
+| 1 | "keep their definition sites in the spine, `concepts.md` §25" | excess | fixed: C3 cut; C132 already says earlier chapters define every term but *tail call*, and the links name the definition sites; the prose links partial evaluation in C4's sentence, "This chapter describes partial evaluation as implemented.", and residual joins the reader list |
+| 2 | "The inert rest of the kinds must fall to one default arm" | excess | fixed: C157 rephrased, "One default arm of the evaluator's switch must take the inert rest of the kinds."; the prose reads "One default arm must take the inert rest of the kinds." |
+| 3 | "The switch in `evaluate` has no default arm." against E3 (a switch over the seven kinds) and C153 (only the participating kinds) | mismatch | fixed: C153 names the participating kinds, "Under the discriminator rule, the evaluator's switch must name only the participating kinds: Symbol, Expression, the two function kinds and Param."; C158, "The switch in `evaluate` names all seven kinds, with no default arm."; C164, "The switch in `evaluate` is a defect against the discriminator rule."; R1, E3 and E48 reworded |
+| 4 | "where the value's fields win except a `union` field, which merges" | compound | fixed: C15 split; C15, "A resolved Symbol's own metadata fields are laid under the fields of its value by `mergeOverMeta`."; new C170, "In `mergeOverMeta`, a `union` field merges rather than giving way to the value's field.", with E33 |
+| 5 | "Nothing counts the defect, because the `units` report's discriminator count skips the `evaluator` unit." | compound | fixed: C151 rephrased as one statement, "The `units` report's discriminator count skips the `evaluator` unit, the switch in `evaluate` included." |
+| 6 | "holds the call's value, because the binding's `if` or `when` Expression is unmarked" | compound | fixed: C86 split; new C171, "The `if` or `when` Expression of a local binding is unmarked.", with E21 and E22; C86, "A local binding of an `if` or a `when` whose chosen branch is a call holds the call's value."; R6 now derives C86 from C171, with C85 named; the reason round 1's finding 18 asked for stays a sentence of its own |
+| 7 | "The generic `union` rule cannot replace the effect path, because the base cannot encode an effect set." | compound | declined: the sentence is one claim with its reason, quoting the ruling of `docs/plans/plane-interfaces.md` §9.8 in 18 words; the specification's compound check (CK-03) names `and`, `but`, `so`, a semicolon and an em-dash, not a reason clause, and the reason is not a claim the chapter states apart from the ruling |
+| 8 | "`markTailCalls` marks the outermost Expression of a function body as one whose result is the function's result" | excess | fixed: C74 shortened, "`markTailCalls` marks the outermost Expression of a function body."; the cut words repeat the definition of *tail call* (T30) in the sentence before; the claim stays because no other claim says what `markTailCalls` marks |
+
+Fixes after round 7: IR 165 to 166 claims (C3 cut; C170 split from
+C15, C171 split from C86; C74, C151, C153, C157, C158 and C164
+rephrased); clusters 34, G1, G5 and G19 changed; relations 10, R1 and R6
+reworded; evidence 48, E3 and E48 reworded; prose 2,561 to 2,548 words
+(same method: the stranger's count plus the change measured on the diff,
+−13, list markers counted). Lint clean; round trip 166 of 166.
+
+Confirmation: pending. The round 7 stranger instance confirms each fix
+before delivery; the orchestrating session relays its marks.

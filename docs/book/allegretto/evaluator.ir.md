@@ -77,8 +77,6 @@ C1. This chapter is the design truth for the `evaluator` unit, unit 13 of the un
 
 C2. This chapter is the definition site of the term tail call. [decided: docs/plans/book-chapters-now.md §5, 2026-10-30]
 
-C3. Partial evaluation and residual keep their definition sites in the spine, `docs/book/concepts.md` §25 and §26. [decided: docs/plans/book-chapters-now.md R4, 2026-10-30]
-
 C4. This chapter describes partial evaluation as implemented. [decided: docs/plans/book-chapters-now.md R4, 2026-10-30]
 
 C5. The reader of this chapter has read the Part I chapters and the chapter on metadata and capability. [proposed: this IR]
@@ -121,7 +119,9 @@ C13. `evaluate` returns a Bits, a primitive function, a composed function, a Str
 
 C14. `evaluate` resolves a Symbol by looking its name up along the scope's parent chain and evaluating the bound value. evidence: E4. [proposed: this IR]
 
-C15. A resolved Symbol's own metadata fields are laid under the fields of its value by `mergeOverMeta`, where the value's fields win except a `union` field, which merges. evidence: E4, E33. [proposed: this IR]
+C15. A resolved Symbol's own metadata fields are laid under the fields of its value by `mergeOverMeta`. evidence: E4, E33. [proposed: this IR]
+
+C170. In `mergeOverMeta`, a `union` field merges rather than giving way to the value's field. evidence: E33. [proposed: this IR]
 
 C16. The facts the scope holds for a Symbol's name are attached to the Symbol's value as predicates. evidence: E4. [proposed: this IR]
 
@@ -137,17 +137,17 @@ C21. `evaluate` throws "Maximum evaluation depth exceeded" when the depth passes
 
 C22. The discriminator rule lets only the evaluator switch on kind for behaviour. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C153. Under the discriminator rule, the evaluator's switch must name only the participating kinds. [decided: docs/book/units.md §3.2, ratified 2026-10]
+C153. Under the discriminator rule, the evaluator's switch must name only the participating kinds: Symbol, Expression, the two function kinds and Param. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C157. The inert rest of the kinds must fall to one default arm of the evaluator's switch. [decided: docs/book/units.md §3.2, ratified 2026-10]
+C157. One default arm of the evaluator's switch must take the inert rest of the kinds. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C158. The switch in `evaluate` has no default arm. evidence: E3. [proposed: this IR]
+C158. The switch in `evaluate` names all seven kinds, with no default arm. evidence: E3. [proposed: this IR]
 
-C164. The missing default arm of the switch in `evaluate` is a defect against the discriminator rule. [inferred: R1]
+C164. The switch in `evaluate` is a defect against the discriminator rule. [inferred: R1]
 
 C165. No backlog item owns the defect of the switch in `evaluate` against the discriminator rule. evidence: E48. [proposed: this IR]
 
-C151. Nothing counts the defect of the switch in `evaluate` against the discriminator rule, because the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [proposed: this IR]
+C151. The `units` report's discriminator count skips the `evaluator` unit, the switch in `evaluate` included. evidence: E45. [proposed: this IR]
 
 C24. Two walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves. evidence: E10. [proposed: this IR]
 
@@ -271,7 +271,7 @@ C140. The evaluator runs a tail call as another round of the enclosing applicati
 
 C134. Without tail calls, the finite host stack would bound the depth of recursion a program can use. [decided: docs/book/concepts.md §27]
 
-C74. `markTailCalls` marks the outermost Expression of a function body as one whose result is the function's result. evidence: E21. [proposed: this IR]
+C74. `markTailCalls` marks the outermost Expression of a function body. evidence: E21. [proposed: this IR]
 
 C75. `markTailCalls` carries the mark into the branch bodies of `eval_if` and `eval_when`. evidence: E21. [proposed: this IR]
 
@@ -295,7 +295,9 @@ C84. A chain of 100,000 tail calls through a typed function's return check compl
 
 C85. A sentinel that a primitive application returns inside an unmarked Expression is applied immediately by `evaluateExpr`. evidence: E5. [proposed: this IR]
 
-C86. A local binding of an `if` or a `when` whose chosen branch is a call holds the call's value, because the binding's `if` or `when` Expression is unmarked. evidence: E5, E22, E25. [proposed: this IR]
+C171. The `if` or `when` Expression of a local binding is unmarked. evidence: E21, E22. [proposed: this IR]
+
+C86. A local binding of an `if` or a `when` whose chosen branch is a call holds the call's value. evidence: E5, E25. [proposed: this IR]
 
 C87. Substitution and parameter remapping copy the mark onto each Expression they rebuild. evidence: E16, E17. [proposed: this IR]
 
@@ -423,7 +425,7 @@ C149. `npm run lint:units` pins the unit's file and permitted imports in `script
 
 ### Clusters
 
-G1. cluster: C1, C2, C3, C4, C5, C132 [proposed: this IR]
+G1. cluster: C1, C2, C4, C5, C132 [proposed: this IR]
 
 G2. cluster: C6, C150, C7, C131, C136, C137, C138, C8, C160 [proposed: this IR]
 
@@ -431,7 +433,7 @@ G3. cluster: C10, C11, C9 [proposed: this IR]
 
 G4. cluster: C12, C169, C13, C21 [proposed: this IR]
 
-G5. cluster: C14, C15, C16, C17, C18 [proposed: this IR]
+G5. cluster: C14, C15, C170, C16, C17, C18 [proposed: this IR]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [proposed: this IR]
 
@@ -459,7 +461,7 @@ G17. cluster: C140, C134, C74, C75, C76, C77, C78 [proposed: this IR]
 
 G18. cluster: C79, C80, C81, C82, C83, C84 [proposed: this IR]
 
-G19. cluster: C85, C86, C87 [proposed: this IR]
+G19. cluster: C85, C171, C86, C87 [proposed: this IR]
 
 G20. cluster: C88, C89, C90 [proposed: this IR]
 
@@ -493,7 +495,7 @@ G34. cluster: C36, C37, C38, C39, C40, C47 [proposed: this IR]
 
 ## Relations
 
-R1. C164 depends-on C157 because C158 states that the switch in `evaluate` has no default arm, which the ratified C157 requires.
+R1. C164 depends-on C153 because C158 states that the switch in `evaluate` names all seven kinds without the default arm, where the ratified C153 and C157 require the participating kinds and one default arm.
 
 R2. C57 depends-on C55 because a residual `eval_when` evaluates no branch, and C56 shows the same for `&&` and `||`.
 
@@ -503,7 +505,7 @@ R4. C45 refines C44 because the inline cutoff stops exactly the calls C44 except
 
 R5. C84 depends-on C83 because a loop round that keeps the depth lets a chain of any length stay under the bound.
 
-R6. C86 depends-on C85 because `eval_if` and `eval_when` hand back the sentinel of the marked branch body, which `evaluateExpr` applies immediately inside the unmarked binding Expression.
+R6. C86 depends-on C171 because `eval_if` and `eval_when` hand back the sentinel of the marked branch body, which `evaluateExpr` applies immediately inside the unmarked binding Expression (C85).
 
 R7. C91 depends-on C88 because each wrapper forwards the sentinel by its own code.
 
@@ -519,7 +521,7 @@ E1. `scripts/analyze/units.json` lines 16 and 51: the `evaluator` unit's permitt
 
 E2. `src/evaluator.ts` lines 3–13: the imports, including seven symbols from `src/refinements.ts` and `src/effects.ts`, `primitives` and `renderExprSource` from `src/primitives.ts`, and three reads from `src/scope.ts`.
 
-E3. `src/evaluator.ts` lines 363–427: `evaluate`, with the depth bound at line 366 and the switch over the seven kinds, which has no default arm.
+E3. `src/evaluator.ts` lines 363–427: `evaluate`, with the depth bound at line 366 and the switch, which names all seven kinds and has no default arm.
 
 E4. `src/evaluator.ts` lines 393–414: the Symbol arm: `scopeLookup`, `mergeOverMeta` over the Symbol's own fields, `scopeFactsFor` with `withPredicates`, and the dependency collector for an unresolved name.
 
@@ -609,10 +611,10 @@ E46. `src/primitives.ts` line 42, `docs/book/units.md` line 241 and `scripts/ana
 
 E47. `scripts/analyze/index.ts` lines 259–268: an edge starts with the verdict `unresolved` and is judged `ok` or `violation` only when neither end's file maps to several units.
 
-E48. `docs/backlog.md`, searched on 2026-10-31: no entry names the default arm of the switch in `evaluate`.
+E48. `docs/backlog.md`, searched on 2026-10-31: no entry names the switch in `evaluate`, the kinds it names or its default arm.
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C158, C161, C162, C165, C166, C167, C169. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C158, C161, C162, C165, C166, C167, C169.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C158, C161, C162, C165, C166, C167, C169, C170, C171. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C158, C161, C162, C165, C166, C167, C169, C170, C171.
 
 A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79, C140.

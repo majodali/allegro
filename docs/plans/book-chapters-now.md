@@ -428,8 +428,8 @@ doc-lint exemption. §3.1 states what each chunk produces.
 - **2026-10-31 — A1 written, in review.** Files:
   `docs/book/allegretto/evaluator.ir.md` (134 claims at round 1, 150
   after its fixes, 155 after round 2's and its touch-up, 157 after round 3's, 159 after round 4's, 165 after round 5's; 30 terms), `evaluator.md` (rendered by the reasoning
-  role), `evaluator.review.md` (opened). Stranger rounds: 6, all not
-  readable; verdict: pending. Ids 795 → 791;
+  role), `evaluator.review.md` (opened). Stranger rounds: 7, rounds 1 to 6
+  not readable, round 7 readable; confirmation: pending. Ids 795 → 791;
   unratified terms 1 (*tail call*). Found: `eval_when`, `&&` and `||`
   do not meet PE Rule 2, and the spine's §25 (partial evaluation) delta
   still says both rules are implemented as specified; a candidate for
