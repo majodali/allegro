@@ -99,6 +99,7 @@
         "src/test/totality.ts",
         "docs/book/extension/**",
         "docs/book/implementation-map.md",
+        "docs/book/standard/totality.md",
         "docs/plans/fast-library-load.md",
         "package.json"
       ]
