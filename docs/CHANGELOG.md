@@ -126,12 +126,18 @@ B-162 (conflict-free status documents), B-163 (the lane manifest and
 its check), B-164 (ratchet baselines under concurrent merges). Docs
 only.
 
+## Stream A — the book chapters
+
+Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
+2026-10-30 with the plan; entries newest first, directly below this
+line.
+
 ## Unstreamed
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
 
-### 2026-10 — The book writes IR first (B-173): W-009 adopted for the new chapters
+### 2026-10 — The book writes IR first (B-173): W-009 (IR first) adopted for the new chapters
 
 B-173 (the book writes IR first), lane S, the prerequisite of stream
 A's first chapter. The maintainer adopted the methodology's W-009 for
