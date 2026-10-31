@@ -377,4 +377,8 @@ clusters 34, G9 reordered; relations 10; evidence 48); prose 2,550 to
 on the diff, +4, list markers counted). Lint clean; round trip 165 of
 165.
 
-Confirmation: pending
+Confirmation, by the round's stranger on commit `458aa50`: findings 1
+to 8 and 10 confirmed; finding 9 withdrawn by the instance on the reason
+given, quoting the body's uses of the short form "kind", so it no
+longer counts. New defects in the changed passages: none. No touch-up;
+round 7 reviews this text.
