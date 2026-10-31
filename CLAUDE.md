@@ -109,6 +109,11 @@ npm run lint:lanes                  # B-163: the PR's changed files stay inside
                                     #   (scripts/analyze/lanes.json) — IN CI on
                                     #   pull requests; --check: manifest vs
                                     #   lane table (in the suite)
+npm run lint:ir                     # B-173: every *.ir.md passes the methodology's
+                                    #   IR checks (mtool ir check from a
+                                    #   methodology-tools checkout: $MTOOL_HOME or
+                                    #   ../majodali/methodology-tools) — IN THE
+                                    #   GATE (suite + CI); vacuous with no IR files
 npm run build:web                   # web bundle; deploy.sh is OWNER-RUN only
 npm run check-deployed              # audit live site vs origin/main (needs site egress)
 ```

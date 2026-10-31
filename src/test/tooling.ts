@@ -10,6 +10,7 @@ import { CORPUS, WRONG_SENTINEL_TERM } from "../../bench/manifest.js";
 import { runBenchmark, stripProof } from "../../bench/harness.js";
 import { lintDocRefs } from "../../scripts/doc-ref-lint.js";
 import { gateFindings, lintDocs, readBaseline } from "../../scripts/doc-lint.js";
+import { irFiles, resolveMtool, runIrCheck } from "../../scripts/ir-lint.js";
 import * as os from "os";
 import { checkAll as checkStreamPlans, checkStreamPlan, loadContext as loadStreamPlanContext, parseFrontMatter, streamPlans } from "../../scripts/stream-plan.js";
 import { backlogIdOf, checkFiles, checkManifest, declarationRank, declaredLane, globToRegExp, loadManifest } from "../../scripts/analyze/lane-lint.js";
@@ -137,6 +138,35 @@ export function runDocLintTests(): void {
       eq(problems.length, 3, `all three gate conditions fail on the probe: ${problems.join(" | ")}`);
       eq(gateFindings({ counts: { anchors: 0, order: 0, ids: 5 }, findings: [] }, { ids: 5 }).length, 0, "ids at the baseline passes");
       eq(gateFindings({ counts: { anchors: 0, order: 0, ids: 6 }, findings: [] }, { ids: 5 }).length, 1, "ids above the baseline fails");
+      // An IR and a review record cite identifiers by convention (B-173): the
+      // ids check skips them; the anchors check still reads them.
+      fs.writeFileSync(nodePath.join(probe, "docs/book/third.ir.md"), "# IR: third\n\nC1. B-998 is cited bare here, as provenance tags do. [decided: owner, 2026-10-30]\n");
+      fs.writeFileSync(nodePath.join(probe, "docs/book/third.review.md"), "# Review record\n\nRound 1: B-997 raised.\n");
+      const ir = lintDocs({ root: probe, files: ["docs/book/third.ir.md", "docs/book/third.review.md"], checks: ["ids"] });
+      eq(ir.counts.ids, 0, "no bare-identifier finding in an IR or a review record");
+    } finally {
+      fs.rmSync(probe, { recursive: true, force: true });
+    }
+  });
+
+  // --- The IR lint (B-173): every IR passes the methodology's checks ---
+  test("IR lint (B-173): every IR in the repository passes mtool ir check, and the tool refuses a known-bad IR", () => {
+    const files = irFiles(repoRoot);
+    const home = resolveMtool(repoRoot);
+    if (files.length > 0) eq(home !== null, true, `${files.length} IR file(s) need a methodology-tools checkout (MTOOL_HOME)`);
+    if (home === null) { console.log("    (no methodology-tools checkout and no IR files: the IR lint is vacuous here; CI clones the tool)"); return; }
+    if (files.length > 0) {
+      const r = runIrCheck(home, repoRoot, files);
+      eq(r.exitCode, 0, `mtool ir check over ${files.length} file(s): ${r.output.trim().split("\n").slice(-6).join(" | ")}`);
+    }
+    // Probe the tool before trusting it: a bad reader, a bare pronoun, a dangling relation.
+    const probe = fs.mkdtempSync(nodePath.join(os.tmpdir(), "ir-lint-probe-"));
+    try {
+      const bad = nodePath.join(probe, "bad.ir.md");
+      fs.writeFileSync(bad, "# IR: bad\n\nReader: RD-9\nPurpose: thing\nStatus: draft\nSource: probe\n\n## Terms\n\n## Claims\n\nC1. This is it and that works. [decided: owner, 2026-10-30]\n\n## Relations\n\nR1. C1 supports C9 because so.\n\n## Evidence\n\n## Asks\n\nA0. No asks.\n");
+      const r = runIrCheck(home, repoRoot, [bad]);
+      eq(r.exitCode !== 0, true, "the bad IR is refused");
+      for (const ck of ["CK-07", "CK-01", "CK-06"]) eq(r.output.includes(ck), true, `${ck} fires on the probe: ${r.output.trim()}`);
     } finally {
       fs.rmSync(probe, { recursive: true, force: true });
     }

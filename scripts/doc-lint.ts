@@ -174,6 +174,9 @@ const ID = /\b((?:D|R|SC|IC|B|W|K|P|M|Q|S|CE-R|E-R|V-R|T-R|CT-R|U-R|R-R)-?\d+[a-
 function lintIds(files: string[]): Finding[] {
   const out: Finding[] = [];
   for (const file of files) {
+    // An IR or a review record (B-173) cites identifiers in provenance tags and
+    // findings by convention; the IR checks (`npm run lint:ir`) govern them.
+    if (file.endsWith(".ir.md") || file.endsWith(".review.md")) continue;
     const lines = fs.readFileSync(path.join(ROOT, file), "utf-8").split("\n");
     // An ID the document itself defines, as a table row's first cell or a
     // bold definition (`**M1** — …`), is never bare in that document.
