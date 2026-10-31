@@ -518,7 +518,22 @@ Claims check before delivery: round trip 167 of 167 claims, 0 missing,
 0 stale (the render map and the re-read of changed passages, run after
 the touch-up).
 
-Confirmation of the touch-up: pending.
+Confirmation of the touch-up, by the round's stranger instance on
+commit `59eaae6`: B, C and D confirmed; A unfixed. The instance's
+reason for A: "The two function kinds and Param participate because
+each takes part in application" does not separate the sets, because §2
+says a Structure in function position with a constructor slot applies
+its constructor, so a Structure also takes part in application yet the
+rule lists it as inert. The reasoning role accepts the point: it is a
+gap between the discriminator rule's wording in `docs/book/units.md`
+§3.2 (Structure inert) and `evaluateExpr`, which applies a Structure's
+constructor; the chapter states both facts and the wording of C172
+follows the rule's. The unconfirmed words stay in the delivered prose,
+as the specification says, and the next edit of the chapter fixes A,
+round 7's finding 2 ("the inert rest of the kinds") and the one new
+defect the instance noted in the touched passage: the C172 sentence
+repeats "the two function kinds and Param" right after the list that
+names them (excess).
 
 ## Verdict and meta-review
 
@@ -540,7 +555,8 @@ declared 9, changed 10, surprises 1, misses 0)`.
 The four meta-review signals, checked against this record:
 
 1. Fired. A fix was not held at confirmation in rounds 2 and 3 (findings
-   2 and 3 of round 2, finding 5 of round 3) and in round 7 (finding 2).
+   2 and 3 of round 2, finding 5 of round 3) and in round 7 (finding 2,
+   and touch-up edit A).
 2. Fired. A restatement mismatch recurred on one passage: C113 in rounds
    1 and 2; C154 with C44, the PE Rule 1 passage, in rounds 3, 4 and 6;
    T30 in rounds 4 and 5.

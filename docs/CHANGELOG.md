@@ -138,14 +138,17 @@ Chunk A1 of B-170 (the book, Part II and III chapters writable now)
 writes the chapter for the `evaluator` unit (13) IR first, under
 W-009 (the methodology corpus writes its deliverables IR first) as
 adopted in `docs/classification.md`. `docs/book/allegretto/evaluator.ir.md` came
-first: 134 claims in 32 clusters, 30 terms, 9 relations, 41 evidence
-pointers at round 1, 150 claims in 33 clusters, 44 evidence pointers
-after round 1's fixes, 155 claims, 45 evidence pointers after round
-2's and its touch-up, 157 claims, 10 relations, 46 evidence pointers after round 3's, 159 claims in 34 clusters after round 4's, 165 claims, 48 evidence pointers after round 5's, 166 after round 7's and 167 at delivery; every claim about the code as implemented is proposed with a
-file-and-line pointer, for ratification in bulk at the PR. The reasoning
-role rendered `docs/book/allegretto/evaluator.md` from it, one claim per
-sentence, ending with the render map; `evaluator.review.md` beside it
-records the stranger rounds: seven rounds to a readable verdict; the review record's meta-review line reads pending. The IR's Status reads `reviewed` (count 1; footprint: surprises 1, misses 0). The chapter covers
+first: 134 claims in 32 clusters, 30 terms, 9 relations and 41 evidence
+pointers at round 1, grown by splits to 167 claims in 34 clusters, 10
+relations and 48 evidence pointers at delivery; every claim about the
+code as implemented is proposed with a file-and-line pointer, for
+ratification in bulk at the PR. The reasoning role rendered
+`docs/book/allegretto/evaluator.md` from it, one claim per sentence,
+ending with the render map; `evaluator.review.md` beside it records
+the stranger rounds: seven rounds to a readable verdict, the readable
+round's fixes confirmed by its instance, and the meta-review line
+reading pending (three of the four signals fired). The IR's Status
+reads `reviewed` (count 1; footprint: surprises 1, misses 0). The chapter covers
 evaluation, PE Rule 1 and PE Rule 2 as implemented, application and
 substitution, tail calls, the scope carve-out from D22 (structures are
 immutable by default), the install surface of B-112 (the four owed
