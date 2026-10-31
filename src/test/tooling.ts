@@ -13,7 +13,7 @@ import { gateFindings, lintDocs, readBaseline } from "../../scripts/doc-lint.js"
 import { irFiles, resolveMtool, runIrCheck } from "../../scripts/ir-lint.js";
 import * as os from "os";
 import { checkAll as checkStreamPlans, checkStreamPlan, loadContext as loadStreamPlanContext, parseFrontMatter, streamPlans } from "../../scripts/stream-plan.js";
-import { backlogIdOf, checkFiles, checkManifest, declaredLane, globToRegExp, loadManifest } from "../../scripts/analyze/lane-lint.js";
+import { backlogIdOf, checkFiles, checkManifest, declarationRank, declaredLane, globToRegExp, loadManifest } from "../../scripts/analyze/lane-lint.js";
 import { assessDeployment, parseStamp } from "../../scripts/check-deployed.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -237,6 +237,16 @@ export function runDocLintTests(): void {
     eq(decl?.lane, "S", "B-163 is reserved by the pre-stream arc, lane S");
     eq(decl?.plan, "docs/plans/parallel-streams.md");
     eq(declaredLane(repoRoot, "B-999999"), null, "an unreserved id declares no lane");
+    // The strongest claim wins: an open plan over a closed one, `backlog` over `reserves`.
+    const openBacklog = { status: "active", backlog: "B-1", reserves: ["B-1", "B-2"] };
+    const openReserve = { status: "active", backlog: "B-9", reserves: ["B-1"] };
+    const closedBacklog = { status: "closed", backlog: "B-1", reserves: [] as string[] };
+    const closedReserve = { status: "closed", backlog: "B-9", reserves: ["B-1"] };
+    const ranks = [openBacklog, openReserve, closedBacklog, closedReserve].map((h) => declarationRank(h, "B-1"));
+    eq(ranks.join(">"), [...ranks].sort((a, b) => b - a).join(">"), `ranks descend: ${ranks.join(", ")}`);
+    eq(new Set(ranks).size, 4, "the four claims are distinct");
+    eq(declarationRank(openReserve, "B-7"), 0, "no claim is rank 0");
+    eq(declaredLane(repoRoot, "B-157")?.plan, "docs/plans/fast-library-load.md", "a closed stream still declares its own item when no open plan claims it");
     const findings = checkFiles(
       ["docs/CHANGELOG.md", "docs/plans/parallel-streams.md", "scripts/analyze/lanes.json", "src/evaluator.ts", "lib/planning.alg"],
       decl!, manifest,
