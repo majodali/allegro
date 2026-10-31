@@ -35,6 +35,7 @@ and the stranger finds no contradiction and no undefined term.
 | 3 | 2,444 | 155 | 9 | 3.7 | not readable (contradictions 2, undefined terms 0; restatement mismatches 2, both the stranger's own) |
 | 4 | 2,490 | 157 | 8 | 3.2 | not readable (contradictions 2, undefined terms 0; restatement mismatch on C154 counts under the override) |
 | 5 | 2,544 | 159 | 7 | 2.8 | not readable (contradictions 1, undefined terms 0; restatement mismatch 1, the stranger's own, on T30: the same passage as round 4's M1, so it counts under the override) |
+| 6 | 2,550 | 165 | 10 | 3.9 | not readable (contradictions 1, undefined terms 0; restatement mismatches 6, all the stranger's own; the one on C44 counts under the override) |
 
 ## Round 1, 2026-10-31
 
@@ -331,3 +332,49 @@ round trip 165 of 165.
 The round 5 stranger instance was lost to a container restart before
 confirmation, so no fix of round 5 carries a confirmation mark. Round
 6's stranger reviews the fixed text.
+
+## Round 6, 2026-10-31
+
+Reviewed commit `be688c4`: 2,550 prose words by the stranger's count
+(whitespace tokens; code blocks, the §9 table and the render map
+excluded); IR 165 claims; 10 findings; 3.9 per thousand words. The
+restatement was written from the prose before the IR was opened. It had
+six mismatches with the IR, all attributed by the stranger to its own
+restatement, each with the prose sentence carrying the claim quoted: M1
+on C44 (the restatement had PE Rule 1 cover the unfolded applications),
+and five omissions, on C22 with C153, C157 and C164, on C151, on C9, on
+C57 and on C127. M1 falls on the passage of round 4's mismatch on C154
+with C44, so the specification's override counts it whatever its
+attribution. Contradictions 1 (finding 1); undefined terms 0. Verdict:
+not readable for RD-4. Finding 1 is the third stranger's contradiction
+on the PE Rule 1 passage (rounds 2, 4 and 6). The two earlier fixes
+added qualifying sentences after the rule (C154 in round 2, C161 in
+round 4), so this round's fix is structural: the rule's scope as
+implemented and its exception follow the rule directly, and the word
+"exception" is stated. Finding 1 was checked against `applyComposed` in
+`src/evaluator.ts` before the decision: the loop evaluates the
+arguments, then substitutes and evaluates the body whatever their
+resolution, except for a viral argument or a call the inline cutoff
+stops. Finding 9 was checked against the prose before the decision.
+
+| # | Finding (shortened) | Kind | Decision |
+|---|---|---|---|
+| 1 | PE Rule 1 "produces a residual" (C35) against "is unfolded into its substituted body" (C44) | contradiction | fixed: G9 reordered to C35, C161, C44, C154, C168; C161 rephrased, "As implemented, PE Rule 1 governs an eager primitive application and an application whose function position is unresolved."; C44 rephrased, "The exception to PE Rule 1 is a composed function applied to an unresolved argument, which `applyComposed` unfolds into its substituted body unless the call enters a recursion cycle during a typed compilation."; C154 "applies to" becomes "governs"; "instead of residualising" not taken; R3 kept as the refinement |
+| 2 | C81 "catches a sentinel … and loops" | compound | fixed: C81 rephrased as one conditional, "When the body that `applyComposed` evaluates returns a `TailCall` sentinel, `applyComposed` loops with the sentinel's function and arguments." |
+| 3 | C79 "is not applied: `evaluateExpr` evaluates … and returns" | compound | fixed by a cut: C29 already says a marked Expression is the exception to `applyComposed`; C79 reads "In a marked Expression, `evaluateExpr` returns a `TailCall` sentinel holding the composed function in function position and the evaluated arguments." |
+| 4 | C102 "write in place …, called by `src/runtime.ts` before …" | compound | fixed: C102 rephrased, "`markTailCalls` and `markPatternBinders` write in place into a file's own values before `src/runtime.ts` evaluates the file." |
+| 5 | C7 lists four decisions in one sentence | compound | fixed in the prose: C7 is a list after a colon, "This chapter executes the following decisions:", one decision per item, each identifier's name on its line |
+| 6 | C126 "…, plus the post-call `type` stamp" | compound | fixed in the prose: C126 is a list after "Two paths carry a field by name:", one path per item; the IR's "plus" becomes the list's semicolon |
+| 7 | C51 "…, with the primitive's own effect tags" | compound | fixed: C51 rephrased on C40's form, "A lazy primitive's result carries the union of the primitive's own effect tags and the effects of every evaluation made through the primitive's evaluation function." |
+| 8 | C66 "an unchanged subtree itself" | excess | fixed: "itself" cut, "Substitution returns an unchanged subtree, not a copy." |
+| 9 | "representation kind" in the reader list, unused | excess | declined: the body uses the term in its short form, linked from the reader list, for instance the §2 heading "Evaluation, one switch over the kinds", "`isResolved` answers true for every other kind" and "A function position that evaluates to no applicable kind" |
+| 10 | C162 "lies inside the lines of `src/primitives.ts` that the `base-primitives` unit holds" | excess | fixed: C162 reads "`renderExprSource` belongs to the `base-primitives` unit."; E46 keeps the lines |
+
+Fixes after round 6: IR 165 to 165 claims (C7, C44, C51, C66, C79, C81,
+C102, C126, C154, C161 and C162 rephrased; no claim added or cut;
+clusters 34, G9 reordered; relations 10; evidence 48); prose 2,550 to
+2,554 words (same method: the stranger's count plus the change measured
+on the diff, +4, list markers counted). Lint clean; round trip 165 of
+165.
+
+Confirmation: pending

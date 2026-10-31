@@ -87,7 +87,7 @@ C6. This chapter carries the Tier 1 authority that `docs/book/process.md` §1 gi
 
 C150. Each section of this chapter carries the status tag that `docs/book/README.md` defines. [decided: docs/book/README.md, Status convention]
 
-C7. The decisions this chapter executes are R2 (partial evaluation is the mechanism), R4 (evaluation is total over unresolved information), D22 (structures are immutable by default) and the rulings of B-112 (the four owed plane interfaces). [decided: docs/book/units.md §4.1]
+C7. This chapter executes the following decisions: R2 (partial evaluation is the mechanism); R4 (evaluation is total over unresolved information); D22 (structures are immutable by default); the rulings of B-112 (the four owed plane interfaces). [decided: docs/book/units.md §4.1]
 
 C131. This chapter executes three B-112 rulings. [decided: docs/plans/plane-interfaces.md §8 and §9.5]
 
@@ -179,11 +179,11 @@ C35. PE Rule 1 says that an application with an unresolved argument produces a r
 
 C168. Under PE Rule 1, metadata fields propagate onto the residual per their rules. [decided: docs/book/concepts.md §25]
 
-C161. The evaluator applies PE Rule 1 at an eager primitive application and at an unresolved function position. evidence: E6, E8. [proposed: this IR]
+C161. As implemented, PE Rule 1 governs an eager primitive application and an application whose function position is unresolved. evidence: E6, E8. [proposed: this IR]
 
-C44. A composed function applied to an unresolved argument is unfolded into its substituted body, unless the call enters a recursion cycle during a typed compilation. evidence: E9, E15. [proposed: this IR]
+C44. The exception to PE Rule 1 is a composed function applied to an unresolved argument, which `applyComposed` unfolds into its substituted body unless the call enters a recursion cycle during a typed compilation. evidence: E9, E15. [proposed: this IR]
 
-C154. In an unfolded body, PE Rule 1 applies to each application the body contains. evidence: E8, E15. [proposed: this IR]
+C154. In an unfolded body, PE Rule 1 governs each application the body contains. evidence: E8, E15. [proposed: this IR]
 
 C45. For a call that the inline cutoff stops, `applyComposed` returns a residual carrying the callee's effects. evidence: E9. [proposed: this IR]
 
@@ -215,7 +215,7 @@ C49. A lazy primitive receives its arguments unevaluated, with an evaluation fun
 
 C50. `src/evaluator.ts` leaves PE Rule 2 to each lazy primitive's implementation. evidence: E11. [proposed: this IR]
 
-C51. A lazy primitive's result carries the effects of every evaluation made through its evaluation function, with the primitive's own effect tags. evidence: E11, E39. [proposed: this IR]
+C51. A lazy primitive's result carries the union of the primitive's own effect tags and the effects of every evaluation made through the primitive's evaluation function. evidence: E11, E39. [proposed: this IR]
 
 C52. `eval_if` in `src/primitives.ts` evaluates both branches when its condition is unresolved. evidence: E12. [proposed: this IR]
 
@@ -247,7 +247,7 @@ C64. A Param is replaced only when the applied function owns the Param by member
 
 C65. Substitution leaves a Symbol in place, because a Symbol resolves by name through the scope. evidence: E16. [proposed: this IR]
 
-C66. Substitution returns an unchanged subtree itself, not a copy. evidence: E16. [proposed: this IR]
+C66. Substitution returns an unchanged subtree, not a copy. evidence: E16. [proposed: this IR]
 
 C67. Substitution copies an inner composed function whose body changed, with fresh Params rebound to the copy. evidence: E17. [proposed: this IR]
 
@@ -281,11 +281,11 @@ C77. `src/runtime.ts` marks every composed function body among a file's bindings
 
 C78. Before marking, `src/runtime.ts` collapses the `*_attach` wrappers of each function body onto function properties with `collapseBodyMetadata`. evidence: E22. [proposed: this IR]
 
-C79. In a marked Expression, a composed function in function position is not applied: `evaluateExpr` evaluates the arguments and returns a `TailCall` sentinel holding the function and the arguments. evidence: E5. [proposed: this IR]
+C79. In a marked Expression, `evaluateExpr` returns a `TailCall` sentinel holding the composed function in function position and the evaluated arguments. evidence: E5. [proposed: this IR]
 
 C80. A `TailCall` sentinel is a host object, not a value. evidence: E20. [proposed: this IR]
 
-C81. `applyComposed` catches a sentinel the body returns and loops with the sentinel's function and arguments. evidence: E15. [proposed: this IR]
+C81. When the body that `applyComposed` evaluates returns a `TailCall` sentinel, `applyComposed` loops with the sentinel's function and arguments. evidence: E15. [proposed: this IR]
 
 C82. The loop in `applyComposed` accepts any composed function, not only the function that made the call. evidence: E15. [proposed: this IR]
 
@@ -331,7 +331,7 @@ C100. `scopeCompileMode` in `src/scope.ts` reports compile mode when any scope a
 
 C101. `src/evaluator.ts` reads scopes through three functions of the `scope` unit: `scopeLookup`, `scopeFactsFor`, `scopeCompileMode`. evidence: E2. [proposed: this IR]
 
-C102. `markTailCalls` and `markPatternBinders` write in place into a file's own values, called by `src/runtime.ts` before those values are evaluated. evidence: E21, E22, E29. [proposed: this IR]
+C102. `markTailCalls` and `markPatternBinders` write in place into a file's own values before `src/runtime.ts` evaluates the file. evidence: E21, E22, E29. [proposed: this IR]
 
 C103. `precompileFunction` writes the inferred effect set onto the function it is given, as the function's `inferredEffects` property. evidence: E19. [proposed: this IR]
 
@@ -383,7 +383,7 @@ C124. The generic `union` rule cannot replace the effect path, because the base 
 
 C125. B-112's done-condition, that the `evaluator` unit imports nothing from Allegro Standard, is not met. [decided: docs/plans/plane-interfaces.md §9.8, 2026-10-24]
 
-C126. Two paths carry a field by name: precompile's placeholder seeding of `type` and `domain`, plus the post-call `type` stamp on an untyped Bits result. evidence: E8, E19. [proposed: this IR]
+C126. Two paths carry a field by name: precompile's placeholder seeding of `type` and `domain`; the post-call `type` stamp on an untyped Bits result. evidence: E8, E19. [proposed: this IR]
 
 C127. B-145 (type vocabulary) owns the carrying by name. [decided: docs/book/units.md §4.1]
 
@@ -395,7 +395,7 @@ C129. Until `src/primitives.ts` is split, the `units` report counts the `renderE
 
 C130. The unit DAG places `base-primitives`, one of the units `src/primitives.ts` holds, above the `evaluator` unit. [decided: docs/book/units.md §4.1]
 
-C162. `renderExprSource` lies inside the lines of `src/primitives.ts` that the `base-primitives` unit holds. evidence: E46. [proposed: this IR]
+C162. `renderExprSource` belongs to the `base-primitives` unit. evidence: E46. [proposed: this IR]
 
 C159. The unit DAG forbids the `evaluator` unit's import of `renderExprSource`. [inferred: R10]
 
@@ -439,7 +439,7 @@ G7. cluster: C22, C153, C157, C158, C164, C165, C151, C24, C25, C26 [proposed: t
 
 G8. cluster: C31, C32, C33, C163, C34 [proposed: this IR]
 
-G9. cluster: C35, C168, C161, C44, C154 [proposed: this IR]
+G9. cluster: C35, C161, C44, C154, C168 [proposed: this IR]
 
 G10. cluster: C41, C42, C43 [proposed: this IR]
 

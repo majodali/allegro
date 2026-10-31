@@ -145,7 +145,7 @@ after round 1's fixes, 155 claims, 45 evidence pointers after round
 file-and-line pointer, for ratification in bulk at the PR. The reasoning
 role rendered `docs/book/allegretto/evaluator.md` from it, one claim per
 sentence, ending with the render map; `evaluator.review.md` beside it
-records the stranger rounds (rounds 1 to 5 not readable; count: pending). The chapter covers
+records the stranger rounds (rounds 1 to 6 not readable; count: pending). The chapter covers
 evaluation, PE Rule 1 and PE Rule 2 as implemented, application and
 substitution, tail calls, the scope carve-out from D22 (structures are
 immutable by default), the install surface of B-112 (the four owed

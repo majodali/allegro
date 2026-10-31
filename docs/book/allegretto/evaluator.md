@@ -26,14 +26,16 @@
 > **Authority.** The chapter carries the [Tier 1](../process.md#1-documentation-map)
 > authority that `process.md` §1 (documentation map) gives every chapter of
 > the book. Each section carries the status tag that
-> `../README.md` defines. The chapter executes
-> [R2](../concepts.md#def-r2) (partial evaluation is the mechanism),
-> [R4](../concepts.md#def-r4) (evaluation is total over unresolved information),
-> D22 (structures are immutable by default) and the rulings of
-> B-112 (the four owed plane interfaces). The chapter executes three
-> B-112 rulings. The first ruling has the base call one check hook per
-> registered field. The second ruling folds member dispatch into the
-> dispatch hook. The third ruling, of 2026-10-22, puts call-site
+> `../README.md` defines. The chapter executes the following decisions:
+>
+> - [R2](../concepts.md#def-r2) (partial evaluation is the mechanism);
+> - [R4](../concepts.md#def-r4) (evaluation is total over unresolved information);
+> - D22 (structures are immutable by default);
+> - the rulings of B-112 (the four owed plane interfaces).
+>
+> The chapter executes three B-112 rulings. The first ruling has the base
+> call one check hook per registered field. The second ruling folds
+> member dispatch into the dispatch hook. The third ruling, of 2026-10-22, puts call-site
 > unification into the dispatch hook. The examples are verbatim excerpts of
 > `tests/functions.alg` and `tests/logical.alg`. The suite runs both files
 > against their `// expect:` lines.
@@ -122,15 +124,17 @@ abort that `src/evaluator.ts` raises is caused by an unresolved input.
 
 [PE Rule 1](../concepts.md#def-partial-evaluation) says that an
 application with an unresolved argument produces a
-[residual](../concepts.md#def-resolved-unresolved-residual). Under
-PE Rule 1, [metadata fields](metadata-and-capability.md#def-metadata-field)
+[residual](../concepts.md#def-resolved-unresolved-residual). As
+implemented, PE Rule 1 governs an eager primitive application and an
+application whose function position is unresolved. The exception to
+PE Rule 1 is a [composed function](../concepts.md#def-composedfunction)
+applied to an unresolved argument, which `applyComposed` unfolds into
+its substituted body unless the call enters a recursion cycle during a
+typed compilation. In an unfolded body, PE Rule 1 governs each
+application the body contains. Under PE Rule 1,
+[metadata fields](metadata-and-capability.md#def-metadata-field)
 [propagate](metadata-and-capability.md#def-propagation) onto the
-residual per their rules. The evaluator applies PE Rule 1 at an eager
-primitive application and at an unresolved function position. A
-[composed function](../concepts.md#def-composedfunction) applied to an
-unresolved argument is unfolded into its substituted body, unless the
-call enters a recursion cycle during a typed compilation. In an unfolded
-body, PE Rule 1 applies to each application the body contains.
+residual per their rules.
 
 `src/runtime.ts` decides cycle membership once per typed compilation.
 `src/runtime.ts` installs the cycle-membership answer as the inline
@@ -163,8 +167,8 @@ of its evaluated branches. A lazy primitive receives its arguments unevaluated, 
 an evaluation function the primitive calls on a
 [value](../concepts.md#def-value) and a [scope](../concepts.md#def-scope). `src/evaluator.ts` leaves PE Rule 2 to each lazy
 primitive's implementation. A lazy primitive's result carries the
-effects of every evaluation made through its evaluation function, with
-the primitive's own effect tags.
+union of the primitive's own effect tags and the effects of every
+evaluation made through the primitive's evaluation function.
 
 `eval_if` in `src/primitives.ts` evaluates both branches when its
 condition is unresolved. `eval_if` then returns a residual `eval_if`
@@ -195,8 +199,8 @@ body by the argument at the Param's position. A Param is replaced only
 when the applied function owns the Param by membership in its parameter
 list, or when no function has claimed the Param. Substitution leaves a
 [Symbol](../concepts.md#def-symbol) in place, because a Symbol resolves
-by name through the scope. Substitution returns an unchanged subtree
-itself, not a copy. Substitution copies an inner
+by name through the scope. Substitution returns an unchanged subtree,
+not a copy. Substitution copies an inner
 [composed function](../concepts.md#def-composedfunction) whose body
 changed, with fresh Params rebound to the copy. A copied composed
 function keeps its [metadata](metadata-and-capability.md#def-metadata-field)
@@ -254,11 +258,11 @@ before [precompile](../concepts.md#def-the-evalsource-pipeline). Before
 marking, `src/runtime.ts` collapses the `*_attach` wrappers of each
 function body onto function properties with `collapseBodyMetadata`.
 
-In a marked Expression, a composed function in function position is not
-applied: `evaluateExpr` evaluates the arguments and returns a `TailCall`
-sentinel holding the function and the arguments. A `TailCall` sentinel
-is a host object, not a [value](../concepts.md#def-value).
-`applyComposed` catches a sentinel the body returns and loops with the
+In a marked Expression, `evaluateExpr` returns a `TailCall` sentinel
+holding the composed function in function position and the evaluated
+arguments. A `TailCall` sentinel is a host object, not a
+[value](../concepts.md#def-value). When the body that `applyComposed`
+evaluates returns a `TailCall` sentinel, `applyComposed` loops with the
 sentinel's function and arguments. The loop in `applyComposed` accepts
 any composed function, not only the function that made the call. Each
 round of the loop in `applyComposed` evaluates the next body at the
@@ -342,8 +346,8 @@ compile mode when any scope along the parent chain carries the flag.
 `scopeCompileMode`.
 
 `markTailCalls` and `markPatternBinders` write in place into a file's
-own values, called by `src/runtime.ts` before those values are
-evaluated. `precompileFunction` writes the inferred
+own values before `src/runtime.ts` evaluates the file.
+`precompileFunction` writes the inferred
 [effect](../concepts.md#def-effect) set onto the function it is given, as
 the function's `inferredEffects` property. The
 [precompile](../concepts.md#def-the-evalsource-pipeline) stage in
@@ -397,17 +401,19 @@ a [Param](../concepts.md#def-param)'s bound or effect variable, the
 the base cannot encode an effect set. B-112's done-condition, that the
 `evaluator` unit imports nothing from Allegro Standard, is not met.
 
-Two paths carry a field by name: precompile's placeholder seeding of
-`type` and `domain`, plus the post-call `type` stamp on an untyped
-[Bits](../concepts.md#def-bits) result. B-145 (type vocabulary) owns the carrying by name.
+Two paths carry a field by name:
+
+- precompile's placeholder seeding of `type` and `domain`;
+- the post-call `type` stamp on an untyped [Bits](../concepts.md#def-bits) result.
+
+B-145 (type vocabulary) owns the carrying by name.
 
 `src/evaluator.ts` imports `primitives` and `renderExprSource` from
 `src/primitives.ts`, which holds units of three layers, Allegro Standard
 among them. The unit DAG places `base-primitives`, one of the units
 `src/primitives.ts` holds, above the `evaluator` unit.
-`renderExprSource` lies inside the lines of `src/primitives.ts` that the
-`base-primitives` unit holds. The unit DAG forbids the `evaluator`
-unit's import of `renderExprSource`. The `units` report counts an edge
+`renderExprSource` belongs to the `base-primitives` unit. The unit DAG
+forbids the `evaluator` unit's import of `renderExprSource`. The `units` report counts an edge
 as unresolved when `scripts/analyze/units.json` maps the file at either
 end to several units. Until `src/primitives.ts` is split, the `units`
 report counts the `renderExprSource` edge as unresolved, not as a
@@ -428,4 +434,4 @@ violation.
 | the marking of every function body, the install of the inline cutoff, the precompile stage | `src/runtime.ts` | the whole suite |
 | the unit's file and permitted imports | `scripts/analyze/units.json` | `npm run lint:units` |
 
-<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C160→¶2 C10→¶3 C11→¶3 C9→¶3 C12→¶4 C169→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C158→¶7 C164→¶7 C165→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C163→¶8 C34→¶8 C35→¶9 C168→¶9 C161→¶9 C44→¶9 C154→¶9 C46→¶10 C139→¶10 C45→¶10 C36→¶11 C37→¶11 C38→¶11 C39→¶11 C40→¶11 C47→¶11 C41→¶12 C42→¶12 C43→¶12 C48→¶13 C49→¶13 C50→¶13 C51→¶13 C52→¶14 C53→¶14 C54→¶14 C55→¶14 C56→¶14 C57→¶14 C58→¶15 C59→¶15 C60→¶15 C61→¶15 C62→¶15 C69→¶15 C63→¶16 C64→¶16 C65→¶16 C66→¶16 C67→¶16 C68→¶16 C156→¶16 C70→¶17 C71→¶17 C72→¶17 C73→¶17 C140→¶18 C134→¶18 C74→¶18 C75→¶18 C76→¶18 C77→¶18 C78→¶18 C79→¶19 C80→¶19 C81→¶19 C82→¶19 C83→¶19 C84→¶19 C85→¶20 C86→¶20 C87→¶20 C88→¶21 C89→¶21 C90→¶21 C91→¶22 C92→¶22 C93→¶23 C94→¶23 C95→¶23 C96→¶23 C133→¶23 C97→¶23 C98→¶24 C99→¶24 C100→¶24 C101→¶24 C102→¶25 C103→¶25 C104→¶25 C105→¶26 C106→¶26 C107→¶26 C108→¶27 C109→¶27 C110→¶27 C111→¶27 C112→¶28 C113→¶28 C114→¶28 C115→¶29 C116→¶29 C117→¶29 C118→¶29 C119→¶30 C120→¶30 C121→¶30 C122→¶31 C123→¶31 C124→¶31 C125→¶31 C126→¶32 C127→¶32 C128→¶33 C130→¶33 C162→¶33 C159→¶33 C166→¶33 C129→¶33 C141→¶34 C167→¶34 C142→¶34 C143→¶34 C144→¶34 C145→¶34 C146→¶34 C147→¶34 C148→¶34 C149→¶34 -->
+<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C160→¶2 C10→¶3 C11→¶3 C9→¶3 C12→¶4 C169→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C158→¶7 C164→¶7 C165→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C163→¶8 C34→¶8 C35→¶9 C161→¶9 C44→¶9 C154→¶9 C168→¶9 C46→¶10 C139→¶10 C45→¶10 C36→¶11 C37→¶11 C38→¶11 C39→¶11 C40→¶11 C47→¶11 C41→¶12 C42→¶12 C43→¶12 C48→¶13 C49→¶13 C50→¶13 C51→¶13 C52→¶14 C53→¶14 C54→¶14 C55→¶14 C56→¶14 C57→¶14 C58→¶15 C59→¶15 C60→¶15 C61→¶15 C62→¶15 C69→¶15 C63→¶16 C64→¶16 C65→¶16 C66→¶16 C67→¶16 C68→¶16 C156→¶16 C70→¶17 C71→¶17 C72→¶17 C73→¶17 C140→¶18 C134→¶18 C74→¶18 C75→¶18 C76→¶18 C77→¶18 C78→¶18 C79→¶19 C80→¶19 C81→¶19 C82→¶19 C83→¶19 C84→¶19 C85→¶20 C86→¶20 C87→¶20 C88→¶21 C89→¶21 C90→¶21 C91→¶22 C92→¶22 C93→¶23 C94→¶23 C95→¶23 C96→¶23 C133→¶23 C97→¶23 C98→¶24 C99→¶24 C100→¶24 C101→¶24 C102→¶25 C103→¶25 C104→¶25 C105→¶26 C106→¶26 C107→¶26 C108→¶27 C109→¶27 C110→¶27 C111→¶27 C112→¶28 C113→¶28 C114→¶28 C115→¶29 C116→¶29 C117→¶29 C118→¶29 C119→¶30 C120→¶30 C121→¶30 C122→¶31 C123→¶31 C124→¶31 C125→¶31 C126→¶32 C127→¶32 C128→¶33 C130→¶33 C162→¶33 C159→¶33 C166→¶33 C129→¶33 C141→¶34 C167→¶34 C142→¶34 C143→¶34 C144→¶34 C145→¶34 C146→¶34 C147→¶34 C148→¶34 C149→¶34 -->
