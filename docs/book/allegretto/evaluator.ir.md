@@ -67,7 +67,7 @@ T28. Layer, with Allegretto as L0 and Allegro Standard as L2. defined-at: ../lay
 
 T29. Discriminator rule. defined-at: ../units.md#32-the-discriminator-rule [decided: docs/book/units.md §3.2]
 
-T30. Tail call. An application of a composed function whose result is the result of the function body that contains the application, executed as another round of the enclosing application's loop instead of as a nested evaluation. anchor: #def-tail-call [proposed: this IR]
+T30. Tail call. An application of a composed function whose result is the result of the function body that contains the application. anchor: #def-tail-call [proposed: this IR]
 
 ## Claims
 
@@ -83,11 +83,19 @@ C4. This chapter describes partial evaluation as implemented. [decided: docs/pla
 
 C5. The reader of this chapter has read the Part I chapters and the chapter on metadata and capability. [proposed: this IR]
 
-C6. This chapter carries Tier 1 authority. [decided: docs/book/README.md]
+C6. This chapter carries Tier 1 authority, the authority `docs/book/process.md` §1 gives every chapter of the book. [decided: docs/book/process.md §1]
+
+C150. Each section of this chapter carries the status tag that `docs/book/README.md` defines. [decided: docs/book/README.md, Status convention]
 
 C7. The decisions this chapter executes are R2 (partial evaluation is the mechanism), R4 (evaluation is total over unresolved information), D22 (structures are immutable by default) and the rulings of B-112 (the four owed plane interfaces). [decided: docs/book/units.md §4.1]
 
-C131. The B-112 rulings this chapter executes are three: one check hook, called per registered field; member dispatch folded into the dispatch hook; call-site unification riding the dispatch install. [decided: docs/plans/plane-interfaces.md §8 and §9.5]
+C131. The B-112 rulings this chapter executes are three. [decided: docs/plans/plane-interfaces.md §8 and §9.5]
+
+C136. One B-112 ruling has the base call one check hook per registered field. [decided: docs/plans/plane-interfaces.md §8, 2026-09]
+
+C137. A second B-112 ruling folds member dispatch into the dispatch hook. [decided: docs/plans/plane-interfaces.md §8, 2026-09]
+
+C138. A third B-112 ruling, of 2026-10-22, puts call-site unification into the dispatch hook. [decided: docs/plans/plane-interfaces.md §9.5, 2026-10-22]
 
 C132. The terms this chapter uses without defining are defined in earlier chapters, each linked at its first use. [proposed: this IR]
 
@@ -125,7 +133,9 @@ C21. `evaluate` throws "Maximum evaluation depth exceeded" when the depth passes
 
 C22. The discriminator rule lets only the evaluator switch on kind for behaviour, naming the participating kinds and giving the inert rest one default arm. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C23. The switch in `evaluate` names all seven representation kinds, the five inert kinds by explicit arms, with no default arm. evidence: E3. [proposed: this IR]
+C23. The switch in `evaluate` departs from the discriminator rule by having no default arm. evidence: E3. [proposed: this IR]
+
+C135. The switch in `evaluate` gives an explicit arm to each of the five representation kinds it returns unchanged. evidence: E3. [proposed: this IR]
 
 C24. Two walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves. evidence: E10. [proposed: this IR]
 
@@ -173,11 +183,13 @@ C44. A composed function applied to an unresolved argument is unfolded: `applyCo
 
 C45. During a typed compilation, a call into a recursion cycle with an unresolved argument is not unfolded: `applyComposed` returns a residual carrying the callee's effects. evidence: E9. [proposed: this IR]
 
-C46. `src/runtime.ts` decides cycle membership per typed compilation and installs the answer as the inline cutoff through `setInlineCutoff`. evidence: E35. [proposed: this IR]
+C46. `src/runtime.ts` decides cycle membership once per typed compilation. evidence: E35. [proposed: this IR]
+
+C139. `src/runtime.ts` installs the cycle-membership answer as the inline cutoff through `setInlineCutoff`. evidence: E35. [proposed: this IR]
 
 C47. During precompile, an effectful primitive returns a residual even over resolved arguments, which defers its side effect to the run. evidence: E8, E11. [proposed: this IR]
 
-C48. PE Rule 2 says that a lazy primitive whose control input is unresolved evaluates both branches and residualises. [decided: docs/book/concepts.md §25]
+C48. PE Rule 2 says that a lazy primitive whose control input is unresolved returns a residual over both of its evaluated branches. [decided: docs/book/concepts.md §25]
 
 C49. A lazy primitive receives its arguments unevaluated, with an evaluation function the primitive calls on a value and a scope. evidence: E11. [proposed: this IR]
 
@@ -233,6 +245,8 @@ C73. `precompileFunction` reports an error thrown during the body's evaluation a
 
 ### 5. Tail calls
 
+C140. The evaluator runs a tail call as another round of the enclosing application's loop, not as a nested evaluation. evidence: E5, E15. [proposed: this IR]
+
 C134. Without tail calls, the finite host stack would bound the depth of recursion a program can use. [decided: docs/book/concepts.md §27]
 
 C74. `markTailCalls` marks the outermost Expression of a function body as one whose result is the function's result. evidence: E21. [proposed: this IR]
@@ -259,7 +273,7 @@ C84. A chain of 100,000 tail calls through a typed function's return check compl
 
 C85. A sentinel that a primitive application returns inside an unmarked Expression is applied at once by `evaluateExpr`. evidence: E5. [proposed: this IR]
 
-C86. A local binding of an `if` or a `when` whose chosen branch is a call holds the call's value. evidence: E25. [proposed: this IR]
+C86. A local binding of an `if` or a `when` whose chosen branch is a call holds the call's value, because the binding's `if` or `when` Expression is unmarked. evidence: E5, E22, E25. [proposed: this IR]
 
 C87. Substitution and parameter remapping copy the mark onto each Expression they rebuild. evidence: E16, E17. [proposed: this IR]
 
@@ -289,7 +303,7 @@ C97. A scope today is a Structure with `isScope` set. evidence: E28. [proposed: 
 
 C98. The one scope write in `src/evaluator.ts` is the `compileMode` flag that `precompileFunction` sets. evidence: E2, E19. [proposed: this IR]
 
-C99. `precompileFunction` sets the `compileMode` flag before the body's evaluation and restores the flag's previous value afterwards, also on error. evidence: E19. [proposed: this IR]
+C99. `precompileFunction` restores the `compileMode` flag's previous value after the body's evaluation, even when the evaluation throws. evidence: E19. [proposed: this IR]
 
 C100. `scopeCompileMode` in `src/scope.ts` reports compile mode when any scope along the parent chain carries the flag. evidence: E28. [proposed: this IR]
 
@@ -333,7 +347,7 @@ C118. The B-112 plan records the inline cutoff as an injection that should becom
 
 ### 8. The edges the unit still owes
 
-C119. `src/evaluator.ts` imports seven symbols from two Allegro Standard files: three from `src/refinements.ts`, four from `src/effects.ts`. evidence: E2. [proposed: this IR]
+C119. `src/evaluator.ts` imports seven symbols from two files that `scripts/analyze/units.json` assigns wholly to Allegro Standard units: three from `src/refinements.ts`, four from `src/effects.ts`. evidence: E2, E42. [proposed: this IR]
 
 C120. The `units` report shows both imports as violations of the unit DAG. evidence: E36. [proposed: this IR]
 
@@ -351,17 +365,37 @@ C126. Two paths carry a field by name: precompile's placeholder seeding of `type
 
 C127. B-145 (type vocabulary) owns the carrying by name. [decided: docs/book/units.md §4.1]
 
-C128. `src/evaluator.ts` imports `primitives` and `renderExprSource` from `src/primitives.ts`. evidence: E2. [proposed: this IR]
+C128. `src/evaluator.ts` imports `primitives` and `renderExprSource` from `src/primitives.ts`, which holds units of three layers, Allegro Standard among them. evidence: E2, E42. [proposed: this IR]
 
-C129. The `units` report leaves the edges to `src/primitives.ts` and `src/types.ts` unjudged, because both files are mixed. evidence: E36. [proposed: this IR]
+C129. The `units` report leaves the edges to `src/primitives.ts` and `src/types.ts` unjudged, because `scripts/analyze/units.json` maps each of the two files to several units. evidence: E36, E42. [proposed: this IR]
 
 C130. The unit DAG places `base-primitives`, one of the units `src/primitives.ts` holds, above the `evaluator` unit. [decided: docs/book/units.md §4.1]
+
+### 9. Where the code is, and what pins it
+
+C141. The whole suite pins `evaluate`, `evaluateExpr`, `applyPrimitive`, `applyComposed`, substitution, `checkArg`, `precompileFunction`, `markTailCalls`, `setInlineCutoff` and `assertPropagationTableLinkage` in `src/evaluator.ts`, with `tests/functions.alg` and `tests/logical.alg` run through `src/test/types-core.ts` and `src/test/grammar2-language.ts`. evidence: E38, E43. [proposed: this IR]
+
+C142. The whole suite pins `isResolved`, `makeExpr` and `withMeta` in `src/types.ts`. evidence: E43. [proposed: this IR]
+
+C143. The boundary gates of `src/boundary-tests.ts` pin `viralOnto`, `mergeOverMeta`, `metaReadRaw` and the check and dispatch tables in `src/metadata.ts`. evidence: E43. [proposed: this IR]
+
+C144. `src/test/effects.ts` pins `eval_if` in `src/primitives.ts` with both branches evaluated under an unresolved condition. evidence: E39. [proposed: this IR]
+
+C145. `src/test/totality.ts` pins `type_check` in `src/primitives.ts` with a tail call 100,000 deep. evidence: E24. [proposed: this IR]
+
+C146. `tests/functions.alg` and `tests/logical.alg` pin `eval_when`, `&&` and `||` in `src/primitives.ts`. evidence: E25, E26. [proposed: this IR]
+
+C147. The whole suite pins `scopeLookup`, `scopeFactsFor` and `scopeCompileMode` in `src/scope.ts`. evidence: E43. [proposed: this IR]
+
+C148. The whole suite pins the marking of every function body, the install of the inline cutoff and the precompile stage in `src/runtime.ts`. evidence: E43. [proposed: this IR]
+
+C149. `npm run lint:units` pins the unit's file and permitted imports in `scripts/analyze/units.json`. evidence: E44. [proposed: this IR]
 
 ### Clusters
 
 G1. cluster: C1, C2, C3, C4, C5, C132 [proposed: this IR]
 
-G2. cluster: C6, C7, C131, C8 [proposed: this IR]
+G2. cluster: C6, C150, C7, C131, C136, C137, C138, C8 [proposed: this IR]
 
 G3. cluster: C9, C10, C11 [proposed: this IR]
 
@@ -371,7 +405,7 @@ G5. cluster: C14, C15, C16, C17, C18 [proposed: this IR]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [proposed: this IR]
 
-G7. cluster: C22, C23, C24, C25, C26 [proposed: this IR]
+G7. cluster: C22, C23, C135, C24, C25, C26 [proposed: this IR]
 
 G8. cluster: C31, C32, C33, C34 [proposed: this IR]
 
@@ -379,7 +413,7 @@ G9. cluster: C35, C36, C37, C38, C39, C40, C47 [proposed: this IR]
 
 G10. cluster: C41, C42, C43 [proposed: this IR]
 
-G11. cluster: C44, C45, C46 [proposed: this IR]
+G11. cluster: C44, C45, C46, C139 [proposed: this IR]
 
 G12. cluster: C48, C49, C50, C51 [proposed: this IR]
 
@@ -391,7 +425,7 @@ G15. cluster: C63, C64, C65, C66, C67, C68 [proposed: this IR]
 
 G16. cluster: C70, C71, C72, C73 [proposed: this IR]
 
-G17. cluster: C134, C74, C75, C76, C77, C78 [proposed: this IR]
+G17. cluster: C140, C134, C74, C75, C76, C77, C78 [proposed: this IR]
 
 G18. cluster: C79, C80, C81, C82, C83, C84 [proposed: this IR]
 
@@ -423,9 +457,11 @@ G31. cluster: C126, C127 [proposed: this IR]
 
 G32. cluster: C128, C129, C130 [proposed: this IR]
 
+G33. cluster: C141, C142, C143, C144, C145, C146, C147, C148, C149 [proposed: this IR]
+
 ## Relations
 
-R1. C23 contradicts C22 because the rule asks for one default arm for the inert kinds and the switch has none.
+R1. C23 contradicts C22 because the rule asks for one default arm and the switch in `evaluate` has none.
 
 R2. C57 depends-on C55 because a residual `eval_when` evaluates no branch, and C56 shows the same for `&&` and `||`.
 
@@ -435,7 +471,7 @@ R4. C45 refines C44 because the inline cutoff bounds the unfolding of recursive 
 
 R5. C84 depends-on C83 because a loop round that keeps the depth lets a chain of any length stay under the bound.
 
-R6. C86 depends-on C85 because the branch's call is not marked and its sentinel is applied at once.
+R6. C86 depends-on C85 because `eval_if` and `eval_when` hand back the sentinel of the marked branch body, which `evaluateExpr` applies at once inside the unmarked binding Expression.
 
 R7. C91 depends-on C88 because each wrapper forwards the sentinel by its own code.
 
@@ -473,7 +509,7 @@ E13. `src/primitives.ts` lines 821–834: `eval_when_impl` returns a residual fo
 
 E14. `src/primitives.ts` lines 2190–2220 and 2288–2313: `typed_and_impl` and `typed_or_impl`: an unresolved left operand residualises with the right thunk unevaluated; the right thunk is applied as a call.
 
-E15. `src/evaluator.ts` lines 716–806: `applyComposed`: argument evaluation, the viral check, the dispatchers' call binding with `checkArg`, substitution, the tail-call loop at lines 796–802 re-evaluating at `depth + 1` each round.
+E15. `src/evaluator.ts` lines 716–806: `applyComposed`: argument evaluation, the viral check, the dispatchers' call binding with `checkArg`, substitution; the loop from line 730, with the body evaluated at `depth + 1` at line 793 and the tail-call check at lines 796–802. `depth` is not reassigned inside the loop, so every round evaluates its body at the depth of the first round.
 
 E16. `src/evaluator.ts` lines 851–884 and 925–933: positional substitution, ownership by membership through `ownsParam`, Symbols left in place, unchanged subtrees returned, the tail mark copied.
 
@@ -495,7 +531,7 @@ E24. `src/test/totality.ts` lines 735–765: a typed tail-recursive countdown re
 
 E25. `tests/functions.alg` lines 52–69: an `if` or `when` binding whose branch is a call (`// expect: 6`, `// expect: 6`, `// expect: 42`).
 
-E26. `tests/logical.alg` lines 56–70: `&&` and `||` with a call on the right (`// expect: false`, `// expect: true`, `// expect: true`, `// expect: false`).
+E26. `tests/logical.alg` lines 59–70: `&&` and `||` with a call on the right (`// expect: false`, `// expect: true`, `// expect: true`, `// expect: false`).
 
 E27. `docs/backlog.md`, the B-113 entry: tail-call forwarding is enforced by a recurring-lesson note and nothing else.
 
@@ -527,8 +563,14 @@ E40. `docs/book/allegretto/metadata-and-capability.md` §4, the Delta: the code 
 
 E41. `docs/plans/plane-interfaces.md` §9.7, finding 4: `setInlineCutoff` is an ungated injection that should become an installed analysis.
 
+E42. `scripts/analyze/units.json` lines 4–41 and 44–70: the layer of each unit; `src/refinements.ts` and `src/effects.ts` mapped to one L2 unit each; `src/primitives.ts` mapped to seven units of L0, L1 and L2; `src/types.ts` mapped to ten units.
+
+E43. `src/test/index.ts` lines 14–38 and 61: the suite's index imports every test area and runs the boundary gates of `src/boundary-tests.ts`, which import their reads from `src/metadata.ts` (line 36).
+
+E44. `package.json` line 24: `lint:units` runs `scripts/analyze/index.ts units --check` against `scripts/analyze/units.json`.
+
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132. Depends: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C135, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149. Depends: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C135, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149.
 
-A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79.
+A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79, C140.

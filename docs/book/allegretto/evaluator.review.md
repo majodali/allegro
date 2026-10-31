@@ -30,3 +30,48 @@ and the stranger finds no contradiction and no undefined term.
 
 | Round | Prose words | IR claims | Findings | Per 1,000 words | Verdict |
 |---|---|---|---|---|---|
+| 1 | 2,317 | 134 | 18 | 7.8 | not readable (contradictions 4, undefined terms 3; restatement mismatches 3, all the stranger's own) |
+
+## Round 1, 2026-10-31
+
+Reviewed commit `b5df05d`: 2,317 prose words by the stranger's count
+(code blocks, the §9 table and the render map excluded); IR 134 claims;
+18 findings; 7.8 per thousand words. The restatement was written from
+the prose before the IR was opened. It had three mismatches with the IR,
+on C113, C57 and C22. The stranger attributed all three to its own
+restatement and quoted the prose sentence carrying each claim, so none
+counts. Contradictions 4 (findings 1 to 4); undefined terms 3 (findings
+13 to 15). Verdict: not readable for RD-4. By fix kind as the stranger
+judged: add 8, rephrase 10, cut 0; by locus: prose 12, IR 2, both 4.
+
+| # | Finding (shortened) | Kind | Decision |
+|---|---|---|---|
+| 1 | "one default arm" (C22) against "no default arm" (C23), R1 | contradiction | fixed: the code departs from the rule, so C23 now states the departure ("The switch in `evaluate` departs from the discriminator rule by having no default arm."); the arms moved to C135; R1 reworded |
+| 2 | "seven symbols from two Allegro Standard files" against the `src/primitives.ts` import (C119, C128) | contradiction | fixed: C119 scoped to the two files `scripts/analyze/units.json` assigns wholly to Allegro Standard units; C128 says `src/primitives.ts` holds units of three layers; C129 says what "mixed" meant; E42 added |
+| 3 | E15 "re-evaluating at `depth + 1` each round" against C83 | contradiction | fixed in the IR: checked against `src/evaluator.ts` (`depth` is not reassigned in the loop; line 793 evaluates every round at `depth + 1`); E15 reworded; C83 stands |
+| 4 | "lines 59 to 70" against E26 "lines 56–70" | contradiction | fixed in the IR: E26 now reads lines 59–70, the excerpt's extent; lines 56–58 are a comment the excerpt leaves out |
+| 5 | "design truth", Tier 1 and the status tags against the IR's `Status: draft` and proposed claims | mismatch | declined: the tier and the tags are properties `docs/book/process.md` §1 and `docs/book/README.md` give every chapter, holding from the merge, which is also the bulk ratification of the proposed claims (plan §3.1); the IR's Status records the review count, a different question. The prose now cites both definitions (finding 14) |
+| 6 | C23 joins the kinds, the arms and the missing default arm | compound | fixed: split into C23 and C135 (with finding 1) |
+| 7 | C131 lists three rulings in one sentence | compound | fixed: split into C131 (the count), C136, C137, C138 (one ruling each) |
+| 8 | C46 "decides ... and installs" | compound | fixed: split into C46 (decides) and C139 (installs) |
+| 9 | C48 "evaluates both branches and residualises" | compound | fixed: C48 rephrased, "returns a residual over both of its evaluated branches" |
+| 10 | T30's definition, 38 words | compound | fixed: T30 keeps the meaning; how the evaluator runs a tail call is the new claim C140 |
+| 11 | C99 "sets ... and restores ..., also on error" | compound | fixed: C99 keeps the restore alone, C98 holds the set |
+| 12 | "residualises" | excess | fixed with finding 9 |
+| 13 | `TailCall` sentinel used in §2 without a link | undefined term | fixed: the first use links `#def-tail-call` |
+| 14 | "Tier 1 authority" neither defined nor cited | undefined term | fixed: C6 cites `docs/book/process.md` §1, linked at "Tier 1"; C150 added for the status tags `docs/book/README.md` defines |
+| 15 | "the Part I chapters" neither defined nor cited | undefined term | fixed: linked to Part I of the table of contents, `docs/book/README.md` |
+| 16 | "§9.7 (finding 4)": the parenthetical is not a name | identifier | fixed: the pointer is cut from the prose; E41 keeps it |
+| 17 | the §9 table has no IR claim behind it | mismatch | fixed: C141 to C149 in cluster G33 render as the table, with E43 and E44; the `src/primitives.ts` row split into three rows, one per pinning test; `ensures_check` left out, no single test pins it |
+| 18 | C86 gives no reason; R6 does | mismatch | fixed: C86 carries the reason, "because the binding's `if` or `when` Expression is unmarked"; R6 corrected, since the branch body is marked and the binding's Expression is not |
+
+Fixes after round 1: IR 134 to 150 claims (four splits adding six
+claims: C135, C136 to C138, C139, C140; C150 for the status tags; C141
+to C149 for the §9 table); clusters 32 to 33; relations 9, R1 and R6
+reworded; evidence 41 to 44 (E42 to E44 added, E15 and E26 corrected);
+prose 2,317 to 2,402 words (same method: code blocks, the §9 table and
+the render map excluded). Lint clean; round trip 150 of 150.
+
+The round 1 stranger instance was lost to a container restart before
+confirmation, so no fix of round 1 carries a confirmation mark. Round
+2's stranger reviews the fixed text.
