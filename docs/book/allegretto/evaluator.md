@@ -87,13 +87,15 @@ position is applied by `applyComposed`, except in an Expression that
 constructor slot applies its constructor.
 
 The [discriminator rule](../units.md#32-the-discriminator-rule) lets only
-the evaluator switch on kind for behaviour. The discriminator rule has
-the evaluator's switch name only the participating kinds, with one
-default arm for the inert rest. The switch in `evaluate` departs from the
-discriminator rule by having no default arm. Nothing counts the missing
-default arm of the switch in `evaluate`, because the `units` report's
-discriminator count skips the `evaluator` unit. Two walkers in
-`src/evaluator.ts`, `subst` and `remapParams`, switch on kind
+the evaluator switch on kind for behaviour. Under the discriminator
+rule, the evaluator's switch must name only the participating kinds. The
+inert rest of the kinds must fall to one default arm of the evaluator's
+switch. The switch in `evaluate` departs from the discriminator rule by
+having no default arm. The missing default arm in `evaluate` is a defect
+against the discriminator rule, which no backlog item owns. Nothing
+counts the missing default arm of the switch in `evaluate`, because the
+`units` report's discriminator count skips the `evaluator` unit. Two
+walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind
 themselves. The discriminator rule assigns every walker to a traversal
 protocol of the `kinds` [unit](../units.md#def-unit). The `kinds` unit, which would hold the
 traversal protocol, is owed.
@@ -174,9 +176,9 @@ argument carrying a viral field ends a composed application with a
 [residual](../concepts.md#def-resolved-unresolved-residual) carrying the
 viral field. Each installed dispatcher may bind the callee's declared
 constraints to the arguments through the dispatcher's `call` entry
-point. A call binding hands back the body's
-[scope](../concepts.md#def-scope), the substituted arguments and a
-finisher for the body's result. The evaluator
+point. A call binding hands back the
+[scope](../concepts.md#def-scope) the body evaluates in, the substituted
+arguments and a finisher for the body's result. The evaluator
 hands each dispatcher a check loop, `checkArg`, for the per-argument
 checks. `applyComposed` evaluates the substituted body in the scope a
 call binding handed back, or in the caller's scope when no dispatcher
@@ -192,8 +194,8 @@ itself, not a copy. Substitution copies an inner
 [composed function](../concepts.md#def-composedfunction) whose body
 changed, with fresh Params rebound to the copy. A copied composed
 function keeps its [metadata](metadata-and-capability.md#def-metadata-field)
-through `carryMeta`. A copied composed function keeps its preserved
-function properties through `PRESERVED_FN_META_KEYS`. The excerpt below
+through `carryMeta`. `PRESERVED_FN_META_KEYS` names the function
+properties that a copied composed function keeps. The excerpt below
 is `tests/functions.alg` lines 4 to 20: an application, a higher-order call and a closure.
 
 ```
@@ -414,4 +416,4 @@ each of the two files to several units. The unit DAG places `base-primitives`, o
 | the marking of every function body, the install of the inline cutoff, the precompile stage | `src/runtime.ts` | the whole suite |
 | the unit's file and permitted imports | `scripts/analyze/units.json` | `npm run lint:units` |
 
-<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C9→¶3 C10→¶3 C11→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C23→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶8 C35→¶9 C36→¶9 C37→¶9 C38→¶9 C39→¶9 C40→¶9 C47→¶9 C41→¶10 C42→¶10 C43→¶10 C44→¶11 C154→¶11 C45→¶11 C46→¶11 C139→¶11 C48→¶12 C49→¶12 C50→¶12 C51→¶12 C52→¶13 C53→¶13 C54→¶13 C55→¶13 C56→¶13 C57→¶13 C58→¶14 C59→¶14 C60→¶14 C61→¶14 C62→¶14 C69→¶14 C63→¶15 C64→¶15 C65→¶15 C66→¶15 C67→¶15 C68→¶15 C156→¶15 C70→¶16 C71→¶16 C72→¶16 C73→¶16 C140→¶17 C134→¶17 C74→¶17 C75→¶17 C76→¶17 C77→¶17 C78→¶17 C79→¶18 C80→¶18 C81→¶18 C82→¶18 C83→¶18 C84→¶18 C85→¶19 C86→¶19 C87→¶19 C88→¶20 C89→¶20 C90→¶20 C91→¶21 C92→¶21 C93→¶22 C94→¶22 C95→¶22 C96→¶22 C133→¶22 C97→¶22 C98→¶23 C99→¶23 C100→¶23 C101→¶23 C102→¶24 C103→¶24 C104→¶24 C105→¶25 C106→¶25 C107→¶25 C108→¶26 C109→¶26 C110→¶26 C111→¶26 C112→¶27 C113→¶27 C114→¶27 C115→¶28 C116→¶28 C117→¶28 C118→¶28 C119→¶29 C120→¶29 C121→¶29 C122→¶30 C123→¶30 C124→¶30 C125→¶30 C126→¶31 C127→¶31 C128→¶32 C129→¶32 C130→¶32 C141→¶33 C142→¶33 C143→¶33 C144→¶33 C145→¶33 C146→¶33 C147→¶33 C148→¶33 C149→¶33 -->
+<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C9→¶3 C10→¶3 C11→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C23→¶7 C158→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶8 C35→¶9 C36→¶9 C37→¶9 C38→¶9 C39→¶9 C40→¶9 C47→¶9 C41→¶10 C42→¶10 C43→¶10 C44→¶11 C154→¶11 C45→¶11 C46→¶11 C139→¶11 C48→¶12 C49→¶12 C50→¶12 C51→¶12 C52→¶13 C53→¶13 C54→¶13 C55→¶13 C56→¶13 C57→¶13 C58→¶14 C59→¶14 C60→¶14 C61→¶14 C62→¶14 C69→¶14 C63→¶15 C64→¶15 C65→¶15 C66→¶15 C67→¶15 C68→¶15 C156→¶15 C70→¶16 C71→¶16 C72→¶16 C73→¶16 C140→¶17 C134→¶17 C74→¶17 C75→¶17 C76→¶17 C77→¶17 C78→¶17 C79→¶18 C80→¶18 C81→¶18 C82→¶18 C83→¶18 C84→¶18 C85→¶19 C86→¶19 C87→¶19 C88→¶20 C89→¶20 C90→¶20 C91→¶21 C92→¶21 C93→¶22 C94→¶22 C95→¶22 C96→¶22 C133→¶22 C97→¶22 C98→¶23 C99→¶23 C100→¶23 C101→¶23 C102→¶24 C103→¶24 C104→¶24 C105→¶25 C106→¶25 C107→¶25 C108→¶26 C109→¶26 C110→¶26 C111→¶26 C112→¶27 C113→¶27 C114→¶27 C115→¶28 C116→¶28 C117→¶28 C118→¶28 C119→¶29 C120→¶29 C121→¶29 C122→¶30 C123→¶30 C124→¶30 C125→¶30 C126→¶31 C127→¶31 C128→¶32 C129→¶32 C130→¶32 C141→¶33 C142→¶33 C143→¶33 C144→¶33 C145→¶33 C146→¶33 C147→¶33 C148→¶33 C149→¶33 -->

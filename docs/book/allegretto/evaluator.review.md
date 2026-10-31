@@ -109,4 +109,44 @@ added); prose 2,437 to 2,466 words (same method: the stranger's count
 plus the change measured on the diff, +29). Lint clean; round trip 153
 of 153.
 
-Confirmation: pending
+Confirmation, by the round's stranger on commit `8a7dcf2`: findings 1
+and 4 to 10 confirmed. Finding 2 unfixed: R1 still read "C23
+contradicts C153", C151 only explains why the gap goes uncounted, and
+the prose never says whether the departure is owed, accepted or a
+defect. Finding 3 unfixed: C153 still joined the naming claim and the
+default-arm claim. New defects in the changed passages, three:
+
+- the C61 sentence, "the body's scope", is less precise than "the
+  scope the body evaluates in", and reads as a scope the body owns
+  (referent);
+- the C68 and C156 sentences repeat the subject "A copied composed
+  function keeps" (excess);
+- R3, "C154 refines C35 because C44", gives no reason (mismatch).
+
+Touch-up after confirmation, five edits, IR first, then prose and
+render map:
+
+1. Finding 2: new C158, inferred from R1, "The missing default arm in
+   `evaluate` is a defect against the discriminator rule, which no
+   backlog item owns." R1 now derives it: "C158 depends-on C23 because
+   C23 departs from the ratified C157, and no backlog item names the
+   missing default arm." C151 stays as the reason nothing counts it.
+   Checked against the switch in `evaluate` (`src/evaluator.ts` lines
+   376–426, seven arms, no default) and `docs/book/units.md` §3.2
+   rule 3; `docs/backlog.md` names no item for it.
+2. Finding 3: C153 split. C153, "Under the discriminator rule, the
+   evaluator's switch must name only the participating kinds."; new
+   C157, "The inert rest of the kinds must fall to one default arm of
+   the evaluator's switch."
+3. C61: "A call binding hands back the scope the body evaluates in,
+   the substituted arguments and a finisher for the body's result."
+4. C156: "`PRESERVED_FN_META_KEYS` names the function properties that
+   a copied composed function keeps."
+5. R3: "C154 refines C35 because `applyComposed` unfolds the composed
+   application (C44), so the applications PE Rule 1 governs are the
+   ones inside the body."
+
+Counts after the touch-up: IR 153 to 155 claims (C157, C158); clusters
+33 (G7 gains both); relations 9 (R1 and R3 reworded); evidence 45;
+prose 2,466 to 2,496 words (the stranger's method, +30 measured on the
+diff). Lint clean; round trip 155 of 155.

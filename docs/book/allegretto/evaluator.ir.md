@@ -133,9 +133,13 @@ C21. `evaluate` throws "Maximum evaluation depth exceeded" when the depth passes
 
 C22. The discriminator rule lets only the evaluator switch on kind for behaviour. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C153. The discriminator rule has the evaluator's switch name only the participating kinds, with one default arm for the inert rest. [decided: docs/book/units.md §3.2, ratified 2026-10]
+C153. Under the discriminator rule, the evaluator's switch must name only the participating kinds. [decided: docs/book/units.md §3.2, ratified 2026-10]
+
+C157. The inert rest of the kinds must fall to one default arm of the evaluator's switch. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
 C23. The switch in `evaluate` departs from the discriminator rule by having no default arm. evidence: E3. [proposed: this IR]
+
+C158. The missing default arm in `evaluate` is a defect against the discriminator rule, which no backlog item owns. [inferred: R1]
 
 C151. Nothing counts the missing default arm of the switch in `evaluate`, because the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [proposed: this IR]
 
@@ -221,7 +225,7 @@ C59. An argument carrying a viral field ends a composed application with a resid
 
 C60. Each installed dispatcher may bind the callee's declared constraints to the arguments through the dispatcher's `call` entry point. evidence: E15, E31. [proposed: this IR]
 
-C61. A call binding hands back the body's scope, the substituted arguments and a finisher for the body's result. evidence: E15, E31. [proposed: this IR]
+C61. A call binding hands back the scope the body evaluates in, the substituted arguments and a finisher for the body's result. evidence: E15, E31. [proposed: this IR]
 
 C62. The evaluator hands each dispatcher a check loop, `checkArg`, for the per-argument checks. evidence: E15, E18. [proposed: this IR]
 
@@ -237,7 +241,7 @@ C67. Substitution copies an inner composed function whose body changed, with fre
 
 C68. A copied composed function keeps its metadata through `carryMeta`. evidence: E17. [proposed: this IR]
 
-C156. A copied composed function keeps its preserved function properties through `PRESERVED_FN_META_KEYS`. evidence: E17. [proposed: this IR]
+C156. `PRESERVED_FN_META_KEYS` names the function properties that a copied composed function keeps. evidence: E17. [proposed: this IR]
 
 C69. `applyComposed` evaluates the substituted body in the scope a call binding handed back, or in the caller's scope when no dispatcher bound the call. evidence: E15. [proposed: this IR]
 
@@ -411,7 +415,7 @@ G5. cluster: C14, C15, C16, C17, C18 [proposed: this IR]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [proposed: this IR]
 
-G7. cluster: C22, C153, C23, C151, C24, C25, C26 [proposed: this IR]
+G7. cluster: C22, C153, C157, C23, C158, C151, C24, C25, C26 [proposed: this IR]
 
 G8. cluster: C31, C32, C33, C34 [proposed: this IR]
 
@@ -467,11 +471,11 @@ G33. cluster: C141, C142, C143, C144, C145, C146, C147, C148, C149 [proposed: th
 
 ## Relations
 
-R1. C23 contradicts C153 because the rule asks for one default arm and the switch in `evaluate` has none.
+R1. C158 depends-on C23 because C23 departs from the ratified C157, and no backlog item names the missing default arm.
 
 R2. C57 depends-on C55 because a residual `eval_when` evaluates no branch, and C56 shows the same for `&&` and `||`.
 
-R3. C154 refines C35 because C44.
+R3. C154 refines C35 because `applyComposed` unfolds the composed application (C44), so the applications PE Rule 1 governs are the ones inside the body.
 
 R4. C45 refines C44 because the inline cutoff bounds the unfolding of recursive calls.
 

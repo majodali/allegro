@@ -140,8 +140,8 @@ W-009 (the methodology corpus writes its deliverables IR first) as
 adopted in `docs/classification.md`. `docs/book/allegretto/evaluator.ir.md` came
 first: 134 claims in 32 clusters, 30 terms, 9 relations, 41 evidence
 pointers at round 1, 150 claims in 33 clusters, 44 evidence pointers
-after round 1's fixes, and 153 claims, 45 evidence pointers after round
-2's; every claim about the code as implemented is proposed with a
+after round 1's fixes, and 155 claims, 45 evidence pointers after round
+2's and its touch-up; every claim about the code as implemented is proposed with a
 file-and-line pointer, for ratification in bulk at the PR. The reasoning
 role rendered `docs/book/allegretto/evaluator.md` from it, one claim per
 sentence, ending with the render map; `evaluator.review.md` beside it
