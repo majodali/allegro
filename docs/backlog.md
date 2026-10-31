@@ -80,7 +80,7 @@ The grouping below comes from co-change measurement over the last 40
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
 | **S — the pre-stream arc** (added 2026-10-30; **all five chunks landed 2026-10-30**) | ~~B-165, B-166, B-162, B-163, B-164~~ — plan `docs/plans/parallel-streams.md`, closed; the lane stays for process and lane-manifest edits | **Ran alone**: it edited the shared status documents and the process records. Human-gated: not a merge-on-green stream. Streams may now start in any lane; the rules are "Merge policy per stream", "Status documents under streams" and "The lane table as data" below |
 | **K — kernel hygiene** (added 2026-10-30, B-167 (lane K for kernel hygiene)) | The M1 residue, the L0 band that is ratchet and audit work: B-104 (retire the dunder convention), B-110, B-113, B-114, B-118, B-119, B-123, B-124, B-126, B-128 b onward, B-132, B-135/B-137 (the host-plane declaration), B-143, B-147. Each stream plan in K reserves the items it takes; none blocks a rung | **Runs alongside A, C, P and S.** The L0 unit files (`src/structure.ts`, `src/slot-accessors.ts`, `src/metadata.ts`, `src/symbols.ts`, `src/scope.ts`), the boundary battery and its baseline, `scripts/analyze/`, the Allegretto chapters and `docs/book/units.md`. Overlaps D in the evaluator, the primitives and the type files — taken only when D is not in them (the P rule), and a coordinating service refuses the overlap at dispatch. B-104 is the wide one: its stream plan's `boundary` widens per chunk and its PRs need D idle. Globs in `scripts/analyze/lanes.json`, declared from this band, refined when a stream plan opens |
-| **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29) | The follow-ons of B-157 (the performance stream): B-159 (precompile and termination analysis of recursive definitions), B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
+| **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29; **stream P, the recursion cutoff restored**, plan `docs/plans/recursive-precompile.md`, filed 2026-10-30) | The follow-ons of B-157 (the performance stream): B-159 (precompile and termination analysis of recursive definitions) — now the stream's item, its measurement having found the cause is the inline cutoff missing typed functions, not the termination analysis; B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
 
 **What lane B unlocks:** C and D may then run *as lanes in parallel
 with each other* (C touches new/track files, D the L2 monoliths — a
@@ -1293,7 +1293,14 @@ table and the stream plans.
   (`stabilizeTypeMemberScope`); `docs/plans/fast-library-load.md` §7
 - [ ] **B-159** (precompile of recursive definitions) · T-perf · L2 ·
   **The gate's floor is the precompile and termination analysis of
-  recursive function definitions.** Found at the close of B-157 (the
+  recursive function definitions.** **Stream P, plan
+  `docs/plans/recursive-precompile.md` (filed 2026-10-30; rulings taken and chunks R1 to R4 ratified
+  the same day, RR1 as option (b)).** Measured 2026-10-30: the termination analysis costs
+  under 1 ms; the cost is a cutoff miss — T-R6's inline cutoff tests
+  object identity and a typed function is a derived copy since B-121
+  C2, so every typed recursive definition unfolds to a stack overflow
+  (plan §2.5; the gate's work fell about 95% in the experiment). Found
+  at the close of B-157 (the
   performance stream): after P10 the gate's longest shard (236 s) is the
   totality battery, not the planning demos — `tests/totality-termination-demo.alg`
   takes 68 s and four Phase E tests on recursive functions (`factorial`
@@ -1309,6 +1316,14 @@ table and the stream plans.
   `src/evaluator.ts` (`precompileFunction`, the inline cutoff),
   `src/totality.ts`, `src/test/totality*.ts`;
   `docs/plans/fast-library-load.md` §7 (P10 and the closing entry)
+- [ ] **B-168** (first out-of-scope finding of the recursive-precompile
+  stream) · T-perf · Reserved by stream P
+  (`docs/plans/recursive-precompile.md`) for a finding outside its
+  boundary. Placeholder until used; the stream rewrites this entry when
+  it files the finding, and closes it unused when the stream closes.
+- [ ] **B-169** (second out-of-scope finding of the recursive-precompile
+  stream) · T-perf · As B-168 (first out-of-scope finding of the
+  recursive-precompile stream).
 - [ ] **B-160** (Bits decoded per member lookup) · L0 · **Evaluation
   decodes Bits to JavaScript strings on every member lookup.** Found at
   the close of B-157 (the performance stream): the CPU profile of
