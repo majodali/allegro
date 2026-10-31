@@ -67,7 +67,7 @@ T28. Layer, with Allegretto as L0 and Allegro Standard as L2. defined-at: ../lay
 
 T29. Discriminator rule. defined-at: ../units.md#32-the-discriminator-rule [decided: docs/book/units.md §3.2]
 
-T30. Tail call. An application of a composed function whose result is the result of the function body that contains the application. anchor: #def-tail-call [proposed: this IR]
+T30. Tail call. An application of a composed function whose result is the enclosing function body's result. anchor: #def-tail-call [proposed: this IR]
 
 ## Claims
 
@@ -139,9 +139,7 @@ C153. Under the discriminator rule, the evaluator's switch must name only the pa
 
 C157. The inert rest of the kinds must fall to one default arm of the evaluator's switch. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C23. The switch in `evaluate` departs from the discriminator rule by having no default arm. evidence: E3. [proposed: this IR]
-
-C158. The missing default arm in `evaluate` is a defect against the discriminator rule, which no backlog item owns. [inferred: R1]
+C158. The switch in `evaluate` has no default arm, a defect against the discriminator rule that no backlog item owns. evidence: E3. [inferred: R1]
 
 C151. Nothing counts the missing default arm of the switch in `evaluate`, because the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [proposed: this IR]
 
@@ -167,9 +165,23 @@ C32. `isResolved` in `src/types.ts` answers false for a Symbol, a Param and an E
 
 C33. `isResolved` answers true for every other kind, including a Structure whatever its slots hold. evidence: E7. [proposed: this IR]
 
-C34. The aborts `src/evaluator.ts` raises during evaluation are three, none caused by an unresolved input: the depth bound; a declared parameter type with no field check installed; a primitive with no implementation. evidence: E3, E8, E18. [proposed: this IR]
+C163. No abort that `src/evaluator.ts` raises is caused by an unresolved input. evidence: E3, E8, E18, E34. [proposed: this IR]
+
+C34. `src/evaluator.ts` raises three aborts during evaluation: a depth past 10,000; a declared parameter type with no field check installed; a primitive with no implementation. evidence: E3, E8, E18. [proposed: this IR]
 
 C35. PE Rule 1 says that an application with an unresolved argument produces a residual, with metadata fields propagated onto the residual per their rules. [decided: docs/book/concepts.md §25]
+
+C161. The evaluator applies PE Rule 1 at an eager primitive application and at an unresolved function position. evidence: E6, E8. [proposed: this IR]
+
+C44. A composed function applied to an unresolved argument is unfolded into its substituted body, unless the call enters a recursion cycle during a typed compilation. evidence: E9, E15. [proposed: this IR]
+
+C154. In an unfolded body, PE Rule 1 applies to each application the body contains. evidence: E8, E15. [proposed: this IR]
+
+C45. For a call into a recursion cycle with an unresolved argument during a typed compilation, `applyComposed` returns a residual carrying the callee's effects. evidence: E9. [proposed: this IR]
+
+C46. `src/runtime.ts` decides cycle membership once per typed compilation. evidence: E35. [proposed: this IR]
+
+C139. `src/runtime.ts` installs the cycle-membership answer as the inline cutoff through `setInlineCutoff`. evidence: E35. [proposed: this IR]
 
 C36. An eager primitive receives its arguments evaluated, with their metadata intact. evidence: E8. [proposed: this IR]
 
@@ -186,16 +198,6 @@ C41. A function position that evaluates to no applicable kind yields a residual 
 C42. The residual of an unresolved function position carries the first viral field found on the function or on an argument. evidence: E6. [proposed: this IR]
 
 C43. When the unresolved function is a Param, the residual carries the Param's effect variable, the Param's effect bound, or the label `opaque` for a Param with no bound. evidence: E6. [proposed: this IR]
-
-C44. A composed function applied to an unresolved argument is unfolded: `applyComposed` substitutes the arguments into its body and evaluates the body. evidence: E15. [proposed: this IR]
-
-C154. When `applyComposed` unfolds a composed function, PE Rule 1 applies to the applications inside the body, not to the composed application itself. evidence: E8, E15. [proposed: this IR]
-
-C45. During a typed compilation, a call into a recursion cycle with an unresolved argument is not unfolded: `applyComposed` returns a residual carrying the callee's effects. evidence: E9. [proposed: this IR]
-
-C46. `src/runtime.ts` decides cycle membership once per typed compilation. evidence: E35. [proposed: this IR]
-
-C139. `src/runtime.ts` installs the cycle-membership answer as the inline cutoff through `setInlineCutoff`. evidence: E35. [proposed: this IR]
 
 C47. During precompile, an effectful primitive returns a residual even over resolved arguments, which defers its side effect to the run. evidence: E8, E11. [proposed: this IR]
 
@@ -383,7 +385,9 @@ C129. The `units` report counts the edges to `src/primitives.ts` and `src/types.
 
 C130. The unit DAG places `base-primitives`, one of the units `src/primitives.ts` holds, above the `evaluator` unit. [decided: docs/book/units.md §4.1]
 
-C159. The import of `renderExprSource` is an edge the unit DAG forbids, not counted as a violation by the `units` report until `src/primitives.ts` is split. evidence: E46. [inferred: R10]
+C162. `renderExprSource` lies inside the lines of `src/primitives.ts` that the `base-primitives` unit holds. evidence: E46. [proposed: this IR]
+
+C159. The unit DAG forbids the `evaluator` unit's import of `renderExprSource`. [inferred: R10]
 
 ### 9. Where the code is, and what pins it
 
@@ -411,7 +415,7 @@ G1. cluster: C1, C2, C3, C4, C5, C132 [proposed: this IR]
 
 G2. cluster: C6, C150, C7, C131, C136, C137, C138, C8, C160 [proposed: this IR]
 
-G3. cluster: C9, C10, C11 [proposed: this IR]
+G3. cluster: C10, C11, C9 [proposed: this IR]
 
 G4. cluster: C12, C13, C21 [proposed: this IR]
 
@@ -419,15 +423,15 @@ G5. cluster: C14, C15, C16, C17, C18 [proposed: this IR]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [proposed: this IR]
 
-G7. cluster: C22, C153, C157, C23, C158, C151, C24, C25, C26 [proposed: this IR]
+G7. cluster: C22, C153, C157, C158, C151, C24, C25, C26 [proposed: this IR]
 
-G8. cluster: C31, C32, C33, C34 [proposed: this IR]
+G8. cluster: C31, C32, C33, C163, C34 [proposed: this IR]
 
-G9. cluster: C35, C36, C37, C38, C39, C40, C47 [proposed: this IR]
+G9. cluster: C35, C161, C44, C154 [proposed: this IR]
 
 G10. cluster: C41, C42, C43 [proposed: this IR]
 
-G11. cluster: C44, C154, C45, C46, C139 [proposed: this IR]
+G11. cluster: C45, C46, C139 [proposed: this IR]
 
 G12. cluster: C48, C49, C50, C51 [proposed: this IR]
 
@@ -469,13 +473,15 @@ G30. cluster: C122, C123, C124, C125 [proposed: this IR]
 
 G31. cluster: C126, C127 [proposed: this IR]
 
-G32. cluster: C128, C129, C130, C159 [proposed: this IR]
+G32. cluster: C128, C130, C162, C159, C129 [proposed: this IR]
 
 G33. cluster: C141, C142, C143, C144, C145, C146, C147, C148, C149 [proposed: this IR]
 
+G34. cluster: C36, C37, C38, C39, C40, C47 [proposed: this IR]
+
 ## Relations
 
-R1. C158 depends-on C23 because C23 departs from the ratified C157, and no backlog item names the missing default arm.
+R1. C158 depends-on C157 because the switch in `evaluate` has seven arms and no default arm (E3), against the ratified C157, and no backlog item names the missing default arm.
 
 R2. C57 depends-on C55 because a residual `eval_when` evaluates no branch, and C56 shows the same for `&&` and `||`.
 
@@ -493,7 +499,7 @@ R8. C125 depends-on C119 because the done-condition counts the Allegro Standard 
 
 R9. C129 refines C120 because the report judges only edges between files assigned to one unit each.
 
-R10. C159 depends-on C130 because `renderExprSource` lies inside the lines of `src/primitives.ts` that `base-primitives` holds, a unit that depends on `evaluator`, and C129 says why the report does not count the edge as a violation.
+R10. C159 depends-on C162 because C162 puts `renderExprSource` in the `base-primitives` unit, which C130 places above the `evaluator` unit.
 
 ## Evidence
 
@@ -591,6 +597,6 @@ E46. `src/primitives.ts` line 42, `docs/book/units.md` line 241 and `scripts/ana
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C161, C162. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C161, C162.
 
 A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79, C140.

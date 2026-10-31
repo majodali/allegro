@@ -33,6 +33,7 @@ and the stranger finds no contradiction and no undefined term.
 | 1 | 2,317 | 134 | 18 | 7.8 | not readable (contradictions 4, undefined terms 3; restatement mismatches 3, all the stranger's own) |
 | 2 | 2,437 | 150 | 10 | 4.1 | not readable (contradictions 2, undefined terms 0; restatement mismatch 1, the stranger's own) |
 | 3 | 2,444 | 155 | 9 | 3.7 | not readable (contradictions 2, undefined terms 0; restatement mismatches 2, both the stranger's own) |
+| 4 | 2,490 | 157 | 8 | 3.2 | not readable (contradictions 2, undefined terms 0; restatement mismatches 2, both the stranger's own) |
 
 ## Round 1, 2026-10-31
 
@@ -216,3 +217,40 @@ map:
 Counts after the touch-up: IR 157 claims; clusters 33; relations 10
 (R10 reworded); evidence 46; prose 2,467 to 2,473 words (the stranger's
 method, +6 measured on the diff). Lint clean; round trip 157 of 157.
+
+## Round 4, 2026-10-31
+
+Reviewed commit `9fa137c`: 2,490 prose words by the stranger's count
+(`wc -w` with link targets counted; code blocks, the §9 table and the
+render map excluded); IR 157 claims; 8 findings; 3.2 per thousand words.
+The restatement was written from the prose before the IR was opened. It
+had two mismatches with the IR, on T30 and on C154 with C44. The
+stranger attributed both to its own restatement and quoted the prose
+sentence carrying each claim. The mismatch on C154 falls on the passage
+of round 3's mismatch on C154, so the specification's override counts it
+whatever its attribution. Contradictions 2 (findings 1 and 2); undefined
+terms 0. Verdict: not readable for RD-4. Finding 1 repeats round 2's
+finding 1 on the same passage: the PE Rule 1 sentence read against the
+unfolding sentence, with round 2's fix, C154, two sentences after the
+rule. Findings 1 and 2 were checked against `applyPrimitive`,
+`applyComposed` and the inline cutoff in `src/evaluator.ts` before the
+decision.
+
+| # | Finding (shortened) | Kind | Decision |
+|---|---|---|---|
+| 1 | PE Rule 1 "an application with an unresolved argument produces a residual" against "a composed function applied to an unresolved argument is unfolded" | contradiction | fixed: new C161 directly after the rule, "The evaluator applies PE Rule 1 at an eager primitive application and at an unresolved function position."; C44 and C154 moved into the rule's cluster G9; C154 rephrased, "In an unfolded body, PE Rule 1 applies to each application the body contains.", its "not to the composed application itself" cut, since the cutoff residual of C45 is one |
+| 2 | "is unfolded" against "a call into a recursion cycle … is not unfolded" | contradiction | fixed: the condition is in C44, "A composed function applied to an unresolved argument is unfolded into its substituted body, unless the call enters a recursion cycle during a typed compilation."; C45 rephrased, "For a call into a recursion cycle with an unresolved argument during a typed compilation, `applyComposed` returns a residual carrying the callee's effects." |
+| 3 | "an edge the unit DAG forbids": the prose never puts `renderExprSource` in `base-primitives` | mismatch | fixed: new C162, "`renderExprSource` lies inside the lines of `src/primitives.ts` that the `base-primitives` unit holds.", evidence E46; R10 now derives C159 from C162 and C130 |
+| 4 | the six decisions of §1 in one sentence | compound | fixed in the prose: the six decisions are a list ending §1's paragraph, G3 reordered to C10, C11, C9; C9 is already a list after a colon |
+| 5 | the aborts sentence joins a count and a cause | compound | fixed: split into new C163, "No abort that `src/evaluator.ts` raises is caused by an unresolved input.", and C34, "`src/evaluator.ts` raises three aborts during evaluation:", the three as a list |
+| 6 | C159 joins the DAG rule and the report | compound | fixed by a cut: C159 reads "The unit DAG forbids the `evaluator` unit's import of `renderExprSource`."; C129 already states the report half and now follows C159 in G32 |
+| 7 | "departs from the discriminator rule by having no default arm" before "a defect against the discriminator rule" | excess | fixed: C23 cut; C158 carries its fact, "The switch in `evaluate` has no default arm, a defect against the discriminator rule that no backlog item owns.", evidence E3; R1 now reads C158 depends-on C157 |
+| 8 | "whose result is the result of the function body that contains the application" | excess | fixed: T30 and its sentence, "A **tail call** is an application of a composed function whose result is the enclosing function body's result."; "its enclosing body" not taken, since "its" can be read as the called function |
+
+Fixes after round 4: IR 157 to 159 claims (C161, C162 and C163 added;
+C23 cut; C34, C44, C45, C154, C158 and C159 rephrased; clusters 33 to
+34, the eager-primitive claims moving from G9 to G34; relations 10, R1
+and R10 reworded; evidence 46); prose 2,490 to 2,485 words (same method,
+list markers excluded). Lint clean; round trip 159 of 159.
+
+Confirmation: pending

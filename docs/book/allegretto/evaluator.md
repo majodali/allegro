@@ -40,16 +40,18 @@
 
 ## 1. The unit and its file [implemented]
 
-The `evaluator` [unit](../units.md#def-unit) holds six decisions:
-[PE Rule 1](../concepts.md#def-partial-evaluation);
-[PE Rule 2](../concepts.md#def-partial-evaluation); application and
-substitution; [tail calls](#def-tail-call); the
-[scope](../concepts.md#def-scope) carve-out from D22;
-the four B-112 hooks as its install surface. `src/evaluator.ts` is the
-one file of the `evaluator` unit in `scripts/analyze/units.json`. The
-unit DAG lets the `evaluator` unit import eight units: `scope`,
-`expression`, `composed-function`, `primitive-function`, `param`,
-`symbol`, `metadata`, `capability`.
+`src/evaluator.ts` is the one file of the `evaluator`
+[unit](../units.md#def-unit) in `scripts/analyze/units.json`. The unit
+DAG lets the `evaluator` unit import eight units: `scope`, `expression`,
+`composed-function`, `primitive-function`, `param`, `symbol`, `metadata`,
+`capability`. The `evaluator` unit holds six decisions:
+
+- [PE Rule 1](../concepts.md#def-partial-evaluation);
+- [PE Rule 2](../concepts.md#def-partial-evaluation);
+- application and substitution;
+- [tail calls](#def-tail-call);
+- the [scope](../concepts.md#def-scope) carve-out from D22;
+- the four B-112 hooks as its install surface.
 
 ## 2. Evaluation, one switch over the kinds [implemented]
 
@@ -90,9 +92,8 @@ The [discriminator rule](../units.md#32-the-discriminator-rule) lets only
 the evaluator switch on kind for behaviour. Under the discriminator
 rule, the evaluator's switch must name only the participating kinds. The
 inert rest of the kinds must fall to one default arm of the evaluator's
-switch. The switch in `evaluate` departs from the discriminator rule by
-having no default arm. The missing default arm in `evaluate` is a defect
-against the discriminator rule, which no backlog item owns. Nothing
+switch. The switch in `evaluate` has no default arm, a defect against
+the discriminator rule that no backlog item owns. Nothing
 counts the missing default arm of the switch in `evaluate`, because the
 `units` report's discriminator count skips the `evaluator` unit. Two
 walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind
@@ -109,20 +110,35 @@ produce a residual, never a failure to proceed. `isResolved` in
 [Param](../concepts.md#def-param) and an
 [Expression](../concepts.md#def-expression). `isResolved` answers true
 for every other kind, including a
-[Structure](../concepts.md#def-structure) whatever its slots hold. The
-aborts `src/evaluator.ts` raises during evaluation are three, none
-caused by an unresolved input: the depth bound; a declared parameter type
-with no field check installed; a primitive with no implementation.
+[Structure](../concepts.md#def-structure) whatever its slots hold. No
+abort that `src/evaluator.ts` raises is caused by an unresolved input.
+`src/evaluator.ts` raises three aborts during evaluation:
+
+- a depth past 10,000;
+- a declared parameter type with no field check installed;
+- a primitive with no implementation.
 
 [PE Rule 1](../concepts.md#def-partial-evaluation) says that an
 application with an unresolved argument produces a
 [residual](../concepts.md#def-resolved-unresolved-residual), with
 [metadata fields](metadata-and-capability.md#def-metadata-field)
 [propagated](metadata-and-capability.md#def-propagation) onto the
-residual per their rules. An eager primitive receives its
-arguments evaluated, with their metadata intact. An eager primitive with
-an unresolved argument returns a residual Expression of the primitive
-over the evaluated arguments. An eager primitive application whose
+residual per their rules. The evaluator applies PE Rule 1 at an eager
+primitive application and at an unresolved function position. A
+[composed function](../concepts.md#def-composedfunction) applied to an
+unresolved argument is unfolded into its substituted body, unless the
+call enters a recursion cycle during a typed compilation. In an unfolded
+body, PE Rule 1 applies to each application the body contains.
+
+For a call into a recursion cycle with an unresolved argument during a
+typed compilation, `applyComposed` returns a residual carrying the
+callee's effects. `src/runtime.ts` decides cycle membership once per
+typed compilation. `src/runtime.ts` installs the cycle-membership answer
+as the inline cutoff through `setInlineCutoff`.
+
+An eager primitive receives its arguments evaluated, with their
+metadata intact. An eager primitive with an unresolved argument returns
+a residual Expression of the primitive over the evaluated arguments. An eager primitive application whose
 arguments carry a viral field returns a residual carrying the first such
 field, whether or not the arguments are resolved. The first installed
 dispatcher that answers gives an eager primitive's residual its type. An
@@ -139,17 +155,6 @@ first viral field found on the function or on an argument. When the
 unresolved function is a Param, the residual carries the Param's effect
 variable, the Param's effect bound, or the label `opaque` for a Param
 with no bound.
-
-A [composed function](../concepts.md#def-composedfunction) applied to an
-unresolved argument is unfolded: `applyComposed` substitutes the
-arguments into its body and evaluates the body. When `applyComposed`
-unfolds a composed function, PE Rule 1 applies to the applications inside
-the body, not to the composed application itself. During a typed
-compilation, a call into a recursion cycle with an unresolved argument
-is not unfolded: `applyComposed` returns a residual carrying the
-callee's effects. `src/runtime.ts` decides cycle membership once per
-typed compilation. `src/runtime.ts` installs the cycle-membership answer
-as the inline cutoff through `setInlineCutoff`.
 
 [PE Rule 2](../concepts.md#def-partial-evaluation) says that a lazy
 primitive whose control input is unresolved returns a residual over both
@@ -232,7 +237,7 @@ abort.
 
 A **tail call** is an application of a
 [composed function](../concepts.md#def-composedfunction) whose result is
-the result of the function body that contains the application. The
+the enclosing function body's result. The
 evaluator runs a tail call as another round of the enclosing
 application's loop, not as a nested evaluation. Without tail calls, the finite host stack would bound
 the depth of recursion a program can use. `markTailCalls` marks the outermost
@@ -397,13 +402,14 @@ Two paths carry a field by name: precompile's placeholder seeding of
 
 `src/evaluator.ts` imports `primitives` and `renderExprSource` from
 `src/primitives.ts`, which holds units of three layers, Allegro Standard
-among them. The `units` report counts the edges to `src/primitives.ts`
-and `src/types.ts` as unresolved, not as violations, because
-`scripts/analyze/units.json` maps each of the two files to several units.
-The unit DAG places `base-primitives`, one of the units
-`src/primitives.ts` holds, above the `evaluator` unit. The import of
-`renderExprSource` is an edge the unit DAG forbids, not counted as a
-violation by the `units` report until `src/primitives.ts` is split.
+among them. The unit DAG places `base-primitives`, one of the units
+`src/primitives.ts` holds, above the `evaluator` unit.
+`renderExprSource` lies inside the lines of `src/primitives.ts` that the
+`base-primitives` unit holds. The unit DAG forbids the `evaluator`
+unit's import of `renderExprSource`. The `units` report counts the edges
+to `src/primitives.ts` and `src/types.ts` as unresolved, not as
+violations, because `scripts/analyze/units.json` maps each of the two
+files to several units.
 
 ## 9. Where the code is, and what pins it [implemented]
 
@@ -419,4 +425,4 @@ violation by the `units` report until `src/primitives.ts` is split.
 | the marking of every function body, the install of the inline cutoff, the precompile stage | `src/runtime.ts` | the whole suite |
 | the unit's file and permitted imports | `scripts/analyze/units.json` | `npm run lint:units` |
 
-<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C160→¶2 C9→¶3 C10→¶3 C11→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C23→¶7 C158→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶8 C35→¶9 C36→¶9 C37→¶9 C38→¶9 C39→¶9 C40→¶9 C47→¶9 C41→¶10 C42→¶10 C43→¶10 C44→¶11 C154→¶11 C45→¶11 C46→¶11 C139→¶11 C48→¶12 C49→¶12 C50→¶12 C51→¶12 C52→¶13 C53→¶13 C54→¶13 C55→¶13 C56→¶13 C57→¶13 C58→¶14 C59→¶14 C60→¶14 C61→¶14 C62→¶14 C69→¶14 C63→¶15 C64→¶15 C65→¶15 C66→¶15 C67→¶15 C68→¶15 C156→¶15 C70→¶16 C71→¶16 C72→¶16 C73→¶16 C140→¶17 C134→¶17 C74→¶17 C75→¶17 C76→¶17 C77→¶17 C78→¶17 C79→¶18 C80→¶18 C81→¶18 C82→¶18 C83→¶18 C84→¶18 C85→¶19 C86→¶19 C87→¶19 C88→¶20 C89→¶20 C90→¶20 C91→¶21 C92→¶21 C93→¶22 C94→¶22 C95→¶22 C96→¶22 C133→¶22 C97→¶22 C98→¶23 C99→¶23 C100→¶23 C101→¶23 C102→¶24 C103→¶24 C104→¶24 C105→¶25 C106→¶25 C107→¶25 C108→¶26 C109→¶26 C110→¶26 C111→¶26 C112→¶27 C113→¶27 C114→¶27 C115→¶28 C116→¶28 C117→¶28 C118→¶28 C119→¶29 C120→¶29 C121→¶29 C122→¶30 C123→¶30 C124→¶30 C125→¶30 C126→¶31 C127→¶31 C128→¶32 C129→¶32 C130→¶32 C159→¶32 C141→¶33 C142→¶33 C143→¶33 C144→¶33 C145→¶33 C146→¶33 C147→¶33 C148→¶33 C149→¶33 -->
+<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C160→¶2 C10→¶3 C11→¶3 C9→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C158→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C163→¶8 C34→¶8 C35→¶9 C161→¶9 C44→¶9 C154→¶9 C45→¶10 C46→¶10 C139→¶10 C36→¶11 C37→¶11 C38→¶11 C39→¶11 C40→¶11 C47→¶11 C41→¶12 C42→¶12 C43→¶12 C48→¶13 C49→¶13 C50→¶13 C51→¶13 C52→¶14 C53→¶14 C54→¶14 C55→¶14 C56→¶14 C57→¶14 C58→¶15 C59→¶15 C60→¶15 C61→¶15 C62→¶15 C69→¶15 C63→¶16 C64→¶16 C65→¶16 C66→¶16 C67→¶16 C68→¶16 C156→¶16 C70→¶17 C71→¶17 C72→¶17 C73→¶17 C140→¶18 C134→¶18 C74→¶18 C75→¶18 C76→¶18 C77→¶18 C78→¶18 C79→¶19 C80→¶19 C81→¶19 C82→¶19 C83→¶19 C84→¶19 C85→¶20 C86→¶20 C87→¶20 C88→¶21 C89→¶21 C90→¶21 C91→¶22 C92→¶22 C93→¶23 C94→¶23 C95→¶23 C96→¶23 C133→¶23 C97→¶23 C98→¶24 C99→¶24 C100→¶24 C101→¶24 C102→¶25 C103→¶25 C104→¶25 C105→¶26 C106→¶26 C107→¶26 C108→¶27 C109→¶27 C110→¶27 C111→¶27 C112→¶28 C113→¶28 C114→¶28 C115→¶29 C116→¶29 C117→¶29 C118→¶29 C119→¶30 C120→¶30 C121→¶30 C122→¶31 C123→¶31 C124→¶31 C125→¶31 C126→¶32 C127→¶32 C128→¶33 C130→¶33 C162→¶33 C159→¶33 C129→¶33 C141→¶34 C142→¶34 C143→¶34 C144→¶34 C145→¶34 C146→¶34 C147→¶34 C148→¶34 C149→¶34 -->
