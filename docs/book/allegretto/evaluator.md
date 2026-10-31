@@ -93,9 +93,9 @@ the evaluator switch on kind for behaviour. Under the discriminator
 rule, the evaluator's switch must name only the participating kinds. The
 inert rest of the kinds must fall to one default arm of the evaluator's
 switch. The switch in `evaluate` has no default arm, a defect against
-the discriminator rule that no backlog item owns. Nothing
-counts the missing default arm of the switch in `evaluate`, because the
-`units` report's discriminator count skips the `evaluator` unit. Two
+the discriminator rule that no backlog item owns. Nothing counts that
+defect, because the `units` report's discriminator count skips the
+`evaluator` unit. Two
 walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind
 themselves. The discriminator rule assigns every walker to a traversal
 protocol of the `kinds` [unit](../units.md#def-unit). The `kinds` unit, which would hold the
@@ -406,9 +406,10 @@ among them. The unit DAG places `base-primitives`, one of the units
 `src/primitives.ts` holds, above the `evaluator` unit.
 `renderExprSource` lies inside the lines of `src/primitives.ts` that the
 `base-primitives` unit holds. The unit DAG forbids the `evaluator`
-unit's import of `renderExprSource`. The `units` report counts the edges
-to `src/primitives.ts` and `src/types.ts` as unresolved, not as
-violations, because `scripts/analyze/units.json` maps each of the two
+unit's import of `renderExprSource`. Until `src/primitives.ts` is split,
+the `units` report counts the `renderExprSource` edge, like every edge to
+`src/primitives.ts` or `src/types.ts`, as unresolved rather than as a
+violation, because `scripts/analyze/units.json` maps each of the two
 files to several units.
 
 ## 9. Where the code is, and what pins it [implemented]

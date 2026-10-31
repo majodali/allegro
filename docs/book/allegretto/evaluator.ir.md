@@ -141,7 +141,7 @@ C157. The inert rest of the kinds must fall to one default arm of the evaluator'
 
 C158. The switch in `evaluate` has no default arm, a defect against the discriminator rule that no backlog item owns. evidence: E3. [inferred: R1]
 
-C151. Nothing counts the missing default arm of the switch in `evaluate`, because the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [proposed: this IR]
+C151. Nothing counts the defect of the switch in `evaluate` against the discriminator rule, because the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [proposed: this IR]
 
 C24. Two walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves. evidence: E10. [proposed: this IR]
 
@@ -381,7 +381,7 @@ C127. B-145 (type vocabulary) owns the carrying by name. [decided: docs/book/uni
 
 C128. `src/evaluator.ts` imports `primitives` and `renderExprSource` from `src/primitives.ts`, which holds units of three layers, Allegro Standard among them. evidence: E2, E42. [proposed: this IR]
 
-C129. The `units` report counts the edges to `src/primitives.ts` and `src/types.ts` as unresolved, not as violations, because `scripts/analyze/units.json` maps each of the two files to several units. evidence: E36, E42. [proposed: this IR]
+C129. Until `src/primitives.ts` is split, the `units` report counts the `renderExprSource` edge, like every edge to `src/primitives.ts` or `src/types.ts`, as unresolved rather than as a violation, because `scripts/analyze/units.json` maps each of the two files to several units. evidence: E36, E42. [proposed: this IR]
 
 C130. The unit DAG places `base-primitives`, one of the units `src/primitives.ts` holds, above the `evaluator` unit. [decided: docs/book/units.md §4.1]
 

@@ -31,9 +31,9 @@ and the stranger finds no contradiction and no undefined term.
 | Round | Prose words | IR claims | Findings | Per 1,000 words | Verdict |
 |---|---|---|---|---|---|
 | 1 | 2,317 | 134 | 18 | 7.8 | not readable (contradictions 4, undefined terms 3; restatement mismatches 3, all the stranger's own) |
-| 2 | 2,437 | 150 | 10 | 4.1 | not readable (contradictions 2, undefined terms 0; restatement mismatch 1, the stranger's own) |
+| 2 | 2,437 | 150 | 10 | 4.1 | not readable (contradictions 2, undefined terms 0; restatement mismatch on C113 counts under the override) |
 | 3 | 2,444 | 155 | 9 | 3.7 | not readable (contradictions 2, undefined terms 0; restatement mismatches 2, both the stranger's own) |
-| 4 | 2,490 | 157 | 8 | 3.2 | not readable (contradictions 2, undefined terms 0; restatement mismatches 2, both the stranger's own) |
+| 4 | 2,490 | 157 | 8 | 3.2 | not readable (contradictions 2, undefined terms 0; restatement mismatch on C154 counts under the override) |
 
 ## Round 1, 2026-10-31
 
@@ -86,10 +86,13 @@ Reviewed commit `e8bd66e`: 2,437 prose words by the stranger's count
 10 findings; 4.1 per thousand words. The restatement was written from
 the prose before the IR was opened. It had one mismatch with the IR, on
 C113 and C114. The stranger attributed it to its own restatement and
-quoted the §7 sentences carrying both claims, so it does not count.
-Contradictions 2 (findings 1 and 2); undefined terms 0. Verdict: not
-readable for RD-4. Both contradictions were checked against
-`src/evaluator.ts` and `docs/book/units.md` §3.2 before the decision.
+quoted the §7 sentences carrying both claims. The mismatch falls on the
+passage of round 1's mismatch on C113, so the specification's override
+counts it whatever its attribution. Before a correction made after
+round 4, this record said the mismatch did not count. Contradictions 2
+(findings 1 and 2); undefined terms 0. Verdict: not readable for RD-4.
+Both contradictions were checked against `src/evaluator.ts` and
+`docs/book/units.md` §3.2 before the decision.
 
 | # | Finding (shortened) | Kind | Decision |
 |---|---|---|---|
@@ -228,10 +231,13 @@ had two mismatches with the IR, on T30 and on C154 with C44. The
 stranger attributed both to its own restatement and quoted the prose
 sentence carrying each claim. The mismatch on C154 falls on the passage
 of round 3's mismatch on C154, so the specification's override counts it
-whatever its attribution. Contradictions 2 (findings 1 and 2); undefined
-terms 0. Verdict: not readable for RD-4. Finding 1 repeats round 2's
-finding 1 on the same passage: the PE Rule 1 sentence read against the
-unfolding sentence, with round 2's fix, C154, two sentences after the
+whatever its attribution. That recurrence is the second meta-review
+signal of the specification's Meta-review section. The first signal has
+also fired: a fix was not held at confirmation in rounds 2 and 3. The
+`Meta-review:` line is written at the end of the count. Contradictions 2
+(findings 1 and 2); undefined terms 0. Verdict: not readable for RD-4.
+Finding 1 repeats round 2's finding 1 on the same passage: the
+PE Rule 1 sentence read against the unfolding sentence, with round 2's fix, C154, two sentences after the
 rule. Findings 1 and 2 were checked against `applyPrimitive`,
 `applyComposed` and the inline cutoff in `src/evaluator.ts` before the
 decision.
@@ -253,4 +259,31 @@ C23 cut; C34, C44, C45, C154, C158 and C159 rephrased; clusters 33 to
 and R10 reworded; evidence 46); prose 2,490 to 2,485 words (same method,
 list markers excluded). Lint clean; round trip 159 of 159.
 
-Confirmation: pending
+Confirmation, by the round's stranger on commit `74b0daf`: findings 1
+to 8 confirmed. New defects in the changed passages, two:
+
+- the C129 sentence no longer says whether the `units` report counts the
+  forbidden `renderExprSource` import, so it reads as a tension with the
+  C159 sentence, "The unit DAG forbids", before it (mismatch);
+- the C158 sentence's "has no default arm" and the C151 sentence's
+  "missing default arm" repeat one point within two sentences (excess).
+
+Touch-up after confirmation, two edits, IR first, then prose; the render
+map is unchanged, since no claim moved:
+
+1. C129 links the report to the forbidden edge: "Until
+   `src/primitives.ts` is split, the `units` report counts the
+   `renderExprSource` edge, like every edge to `src/primitives.ts` or
+   `src/types.ts`, as unresolved rather than as a violation, because
+   `scripts/analyze/units.json` maps each of the two files to several
+   units." (36 words.)
+2. C151 no longer restates the missing default arm. The IR reads
+   "Nothing counts the defect of the switch in `evaluate` against the
+   discriminator rule, because the `units` report's discriminator count
+   skips the `evaluator` unit."; the prose, after the C158 sentence,
+   reads "Nothing counts that defect, because the `units` report's
+   discriminator count skips the `evaluator` unit."
+
+Counts after the touch-up: IR 159 claims; clusters 34; relations 10;
+evidence 46; prose 2,485 to 2,488 words (the stranger's method, +3
+measured on the diff). Lint clean; round trip 159 of 159.
