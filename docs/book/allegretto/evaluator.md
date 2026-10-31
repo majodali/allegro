@@ -9,17 +9,19 @@
 > and §26 (resolved, unresolved, residual). This chapter describes
 > partial evaluation as implemented. The reader has read the
 > [Part I chapters](../README.md#part-i-foundations) and the chapter on metadata and capability
-> (`metadata-and-capability.md`). The terms used here without definition
-> are defined in earlier chapters, each linked at its first use:
-> [value](../concepts.md#def-value),
-> [representation kind](../concepts.md#def-representation-kind),
-> [Structure](../concepts.md#def-structure),
-> [binding](../concepts.md#def-binding), [scope](../concepts.md#def-scope),
-> [plane](../concepts.md#def-plane),
-> [metadata field](metadata-and-capability.md#def-metadata-field),
-> [channel](metadata-and-capability.md#def-channel),
-> [propagation](metadata-and-capability.md#def-propagation) and
-> [writer capability](metadata-and-capability.md#def-writer-capability).
+> (`metadata-and-capability.md`). Earlier chapters define the terms used
+> here without definition, each linked at its first use:
+>
+> - [value](../concepts.md#def-value)
+> - [representation kind](../concepts.md#def-representation-kind)
+> - [Structure](../concepts.md#def-structure)
+> - [binding](../concepts.md#def-binding)
+> - [scope](../concepts.md#def-scope)
+> - [plane](../concepts.md#def-plane)
+> - [metadata field](metadata-and-capability.md#def-metadata-field)
+> - [channel](metadata-and-capability.md#def-channel)
+> - [propagation](metadata-and-capability.md#def-propagation)
+> - [writer capability](metadata-and-capability.md#def-writer-capability)
 >
 > **Authority.** The chapter carries [Tier 1](../process.md#1-documentation-map)
 > authority, the authority `process.md` §1 (documentation map) gives every
@@ -80,18 +82,17 @@ fields of the application's result, except when the result is a
 [`TailCall` sentinel](#def-tail-call) (§5). `evaluateExpr` evaluates an Expression's
 function position before anything else. A primitive function in function
 position is applied by `applyPrimitive`. A composed function in function
-position is applied by `applyComposed`, or returned as a
-[tail call](#def-tail-call) (§5).
-A Structure in function position with a constructor slot applies its
-constructor.
+position is applied by `applyComposed`, except in an Expression that
+`markTailCalls` marked (§5). A Structure in function position with a
+constructor slot applies its constructor.
 
 The [discriminator rule](../units.md#32-the-discriminator-rule) lets only
-the evaluator switch on kind for behaviour, naming the participating
-kinds and giving the inert rest one default arm. The switch in
-`evaluate` departs from the discriminator rule by having no default arm.
-The switch in `evaluate` gives an explicit arm to each of the five
-[representation kinds](../concepts.md#def-representation-kind) it
-returns unchanged. Two walkers in
+the evaluator switch on kind for behaviour. The discriminator rule has
+the evaluator's switch name only the participating kinds, with one
+default arm for the inert rest. The switch in `evaluate` departs from the
+discriminator rule by having no default arm. Nothing counts the missing
+default arm of the switch in `evaluate`, because the `units` report's
+discriminator count skips the `evaluator` unit. Two walkers in
 `src/evaluator.ts`, `subst` and `remapParams`, switch on kind
 themselves. The discriminator rule assigns every walker to a traversal
 protocol of the `kinds` [unit](../units.md#def-unit). The `kinds` unit, which would hold the
@@ -139,7 +140,9 @@ with no bound.
 
 A [composed function](../concepts.md#def-composedfunction) applied to an
 unresolved argument is unfolded: `applyComposed` substitutes the
-arguments into its body and evaluates the body. During a typed
+arguments into its body and evaluates the body. When `applyComposed`
+unfolds a composed function, PE Rule 1 applies to the applications inside
+the body, not to the composed application itself. During a typed
 compilation, a call into a recursion cycle with an unresolved argument
 is not unfolded: `applyComposed` returns a residual carrying the
 callee's effects. `src/runtime.ts` decides cycle membership once per
@@ -162,7 +165,7 @@ over the condition and the two evaluated branches. The residual
 type names. `eval_when` returns a residual without evaluating any branch
 when its subject is unresolved. `&&` and `||` return a residual without
 evaluating the right operand when the left operand is unresolved.
-`eval_when`, `&&` and `||` do not meet PE Rule 2.
+So `eval_when`, `&&` and `||` do not meet PE Rule 2.
 
 ## 4. Application and substitution [implemented]
 
@@ -171,9 +174,9 @@ argument carrying a viral field ends a composed application with a
 [residual](../concepts.md#def-resolved-unresolved-residual) carrying the
 viral field. Each installed dispatcher may bind the callee's declared
 constraints to the arguments through the dispatcher's `call` entry
-point. A call binding hands back three things: the
-[scope](../concepts.md#def-scope) the body evaluates in; the arguments as
-substituted; a finisher applied to the body's result. The evaluator
+point. A call binding hands back the body's
+[scope](../concepts.md#def-scope), the substituted arguments and a
+finisher for the body's result. The evaluator
 hands each dispatcher a check loop, `checkArg`, for the per-argument
 checks. `applyComposed` evaluates the substituted body in the scope a
 call binding handed back, or in the caller's scope when no dispatcher
@@ -189,9 +192,9 @@ itself, not a copy. Substitution copies an inner
 [composed function](../concepts.md#def-composedfunction) whose body
 changed, with fresh Params rebound to the copy. A copied composed
 function keeps its [metadata](metadata-and-capability.md#def-metadata-field)
-through `carryMeta` and its preserved function properties through
-`PRESERVED_FN_META_KEYS`. The excerpt below is `tests/functions.alg`
-lines 4 to 20: an application, a higher-order call and a closure.
+through `carryMeta`. A copied composed function keeps its preserved
+function properties through `PRESERVED_FN_META_KEYS`. The excerpt below
+is `tests/functions.alg` lines 4 to 20: an application, a higher-order call and a closure.
 
 ```
 // Basic function
@@ -256,7 +259,7 @@ function's return check completes without reaching the depth bound.
 
 A sentinel that a
 [primitive function](../concepts.md#def-primitivefunction)'s application
-returns inside an unmarked Expression is applied at once by
+returns inside an unmarked Expression is applied immediately by
 `evaluateExpr`. A local binding of an `if` or a `when` whose chosen
 branch is a call holds the call's value, because the binding's `if` or
 `when` Expression is unmarked. Substitution and parameter
@@ -411,4 +414,4 @@ each of the two files to several units. The unit DAG places `base-primitives`, o
 | the marking of every function body, the install of the inline cutoff, the precompile stage | `src/runtime.ts` | the whole suite |
 | the unit's file and permitted imports | `scripts/analyze/units.json` | `npm run lint:units` |
 
-<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C9→¶3 C10→¶3 C11→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C23→¶7 C135→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶8 C35→¶9 C36→¶9 C37→¶9 C38→¶9 C39→¶9 C40→¶9 C47→¶9 C41→¶10 C42→¶10 C43→¶10 C44→¶11 C45→¶11 C46→¶11 C139→¶11 C48→¶12 C49→¶12 C50→¶12 C51→¶12 C52→¶13 C53→¶13 C54→¶13 C55→¶13 C56→¶13 C57→¶13 C58→¶14 C59→¶14 C60→¶14 C61→¶14 C62→¶14 C69→¶14 C63→¶15 C64→¶15 C65→¶15 C66→¶15 C67→¶15 C68→¶15 C70→¶16 C71→¶16 C72→¶16 C73→¶16 C140→¶17 C134→¶17 C74→¶17 C75→¶17 C76→¶17 C77→¶17 C78→¶17 C79→¶18 C80→¶18 C81→¶18 C82→¶18 C83→¶18 C84→¶18 C85→¶19 C86→¶19 C87→¶19 C88→¶20 C89→¶20 C90→¶20 C91→¶21 C92→¶21 C93→¶22 C94→¶22 C95→¶22 C96→¶22 C133→¶22 C97→¶22 C98→¶23 C99→¶23 C100→¶23 C101→¶23 C102→¶24 C103→¶24 C104→¶24 C105→¶25 C106→¶25 C107→¶25 C108→¶26 C109→¶26 C110→¶26 C111→¶26 C112→¶27 C113→¶27 C114→¶27 C115→¶28 C116→¶28 C117→¶28 C118→¶28 C119→¶29 C120→¶29 C121→¶29 C122→¶30 C123→¶30 C124→¶30 C125→¶30 C126→¶31 C127→¶31 C128→¶32 C129→¶32 C130→¶32 C141→¶33 C142→¶33 C143→¶33 C144→¶33 C145→¶33 C146→¶33 C147→¶33 C148→¶33 C149→¶33 -->
+<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C9→¶3 C10→¶3 C11→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C23→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶8 C35→¶9 C36→¶9 C37→¶9 C38→¶9 C39→¶9 C40→¶9 C47→¶9 C41→¶10 C42→¶10 C43→¶10 C44→¶11 C154→¶11 C45→¶11 C46→¶11 C139→¶11 C48→¶12 C49→¶12 C50→¶12 C51→¶12 C52→¶13 C53→¶13 C54→¶13 C55→¶13 C56→¶13 C57→¶13 C58→¶14 C59→¶14 C60→¶14 C61→¶14 C62→¶14 C69→¶14 C63→¶15 C64→¶15 C65→¶15 C66→¶15 C67→¶15 C68→¶15 C156→¶15 C70→¶16 C71→¶16 C72→¶16 C73→¶16 C140→¶17 C134→¶17 C74→¶17 C75→¶17 C76→¶17 C77→¶17 C78→¶17 C79→¶18 C80→¶18 C81→¶18 C82→¶18 C83→¶18 C84→¶18 C85→¶19 C86→¶19 C87→¶19 C88→¶20 C89→¶20 C90→¶20 C91→¶21 C92→¶21 C93→¶22 C94→¶22 C95→¶22 C96→¶22 C133→¶22 C97→¶22 C98→¶23 C99→¶23 C100→¶23 C101→¶23 C102→¶24 C103→¶24 C104→¶24 C105→¶25 C106→¶25 C107→¶25 C108→¶26 C109→¶26 C110→¶26 C111→¶26 C112→¶27 C113→¶27 C114→¶27 C115→¶28 C116→¶28 C117→¶28 C118→¶28 C119→¶29 C120→¶29 C121→¶29 C122→¶30 C123→¶30 C124→¶30 C125→¶30 C126→¶31 C127→¶31 C128→¶32 C129→¶32 C130→¶32 C141→¶33 C142→¶33 C143→¶33 C144→¶33 C145→¶33 C146→¶33 C147→¶33 C148→¶33 C149→¶33 -->

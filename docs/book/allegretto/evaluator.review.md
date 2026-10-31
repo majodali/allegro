@@ -31,6 +31,7 @@ and the stranger finds no contradiction and no undefined term.
 | Round | Prose words | IR claims | Findings | Per 1,000 words | Verdict |
 |---|---|---|---|---|---|
 | 1 | 2,317 | 134 | 18 | 7.8 | not readable (contradictions 4, undefined terms 3; restatement mismatches 3, all the stranger's own) |
+| 2 | 2,437 | 150 | 10 | 4.1 | not readable (contradictions 2, undefined terms 0; restatement mismatch 1, the stranger's own) |
 
 ## Round 1, 2026-10-31
 
@@ -75,3 +76,37 @@ the render map excluded). Lint clean; round trip 150 of 150.
 The round 1 stranger instance was lost to a container restart before
 confirmation, so no fix of round 1 carries a confirmation mark. Round
 2's stranger reviews the fixed text.
+
+## Round 2, 2026-10-31
+
+Reviewed commit `e8bd66e`: 2,437 prose words by the stranger's count
+(code blocks, the §9 table and the render map excluded); IR 150 claims;
+10 findings; 4.1 per thousand words. The restatement was written from
+the prose before the IR was opened. It had one mismatch with the IR, on
+C113 and C114. The stranger attributed it to its own restatement and
+quoted the §7 sentences carrying both claims, so it does not count.
+Contradictions 2 (findings 1 and 2); undefined terms 0. Verdict: not
+readable for RD-4. Both contradictions were checked against
+`src/evaluator.ts` and `docs/book/units.md` §3.2 before the decision.
+
+| # | Finding (shortened) | Kind | Decision |
+|---|---|---|---|
+| 1 | PE Rule 1 (C35) against "a composed function applied to an unresolved argument is unfolded" (C44) | contradiction | fixed: new C154, "When `applyComposed` unfolds a composed function, PE Rule 1 applies to the applications inside the body, not to the composed application itself."; R3 now reads C154 refines C35 because C44 |
+| 2 | R1: "one default arm" (C22) against "no default arm" (C23): owed, accepted or a defect? | contradiction | fixed: the code departs from a ratified rule; new C151, "Nothing counts the missing default arm of the switch in `evaluate`, because the `units` report's discriminator count skips the `evaluator` unit.", with E45; no document names an owner, so none is stated; R1 now relates C23 to C153 |
+| 3 | C22 joins the rule's scope and its default arm | compound | fixed: split into C22 (the scope) and C153 (the default arm) |
+| 4 | C29 "applied by `applyComposed`, or returned as a tail call" | compound | fixed: C29 rephrased, "applied by `applyComposed`, except in an Expression that `markTailCalls` marked (§5)"; C79 holds the marked case |
+| 5 | C61 "hands back three things: …; …; …" | compound | fixed: C61 rephrased, "A call binding hands back the body's scope, the substituted arguments and a finisher for the body's result." |
+| 6 | C68 joins `carryMeta` and `PRESERVED_FN_META_KEYS` | compound | fixed: split into C68 (`carryMeta`) and C156 (`PRESERVED_FN_META_KEYS`) |
+| 7 | the reader block's 41-word sentence of ten links | compound | fixed: a shorter sentence, "Earlier chapters define the terms used here without definition, each linked at its first use:", then the ten links as a list |
+| 8 | C135 repeats the five kinds of C13 | excess | fixed: C135 cut |
+| 9 | C85 "applied at once" | excess | fixed: "applied immediately" in C85, R6 and E5 |
+| 10 | C57 is inferred (R2); the prose states it as a plain fact | mismatch | fixed: the prose sentence opens with "So", marking the consequence |
+
+Fixes after round 2: IR 150 to 153 claims (two splits adding C153 and
+C156; C151 and C154 added for the two contradictions; C135 cut);
+clusters 33; relations 9, R1 and R3 reworded; evidence 44 to 45 (E45
+added); prose 2,437 to 2,466 words (same method: the stranger's count
+plus the change measured on the diff, +29). Lint clean; round trip 153
+of 153.
+
+Confirmation: pending

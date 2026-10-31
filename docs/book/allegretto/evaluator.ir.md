@@ -131,11 +131,13 @@ C20. An Expression's own metadata fields are laid under the fields of the applic
 
 C21. `evaluate` throws "Maximum evaluation depth exceeded" when the depth passes 10,000. evidence: E3. [proposed: this IR]
 
-C22. The discriminator rule lets only the evaluator switch on kind for behaviour, naming the participating kinds and giving the inert rest one default arm. [decided: docs/book/units.md §3.2, ratified 2026-10]
+C22. The discriminator rule lets only the evaluator switch on kind for behaviour. [decided: docs/book/units.md §3.2, ratified 2026-10]
+
+C153. The discriminator rule has the evaluator's switch name only the participating kinds, with one default arm for the inert rest. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
 C23. The switch in `evaluate` departs from the discriminator rule by having no default arm. evidence: E3. [proposed: this IR]
 
-C135. The switch in `evaluate` gives an explicit arm to each of the five representation kinds it returns unchanged. evidence: E3. [proposed: this IR]
+C151. Nothing counts the missing default arm of the switch in `evaluate`, because the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [proposed: this IR]
 
 C24. Two walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves. evidence: E10. [proposed: this IR]
 
@@ -147,7 +149,7 @@ C27. `evaluateExpr` evaluates an Expression's function position before anything 
 
 C28. A primitive function in function position is applied by `applyPrimitive`. evidence: E5. [proposed: this IR]
 
-C29. A composed function in function position is applied by `applyComposed`, or returned as a tail call (§5). evidence: E5. [proposed: this IR]
+C29. A composed function in function position is applied by `applyComposed`, except in an Expression that `markTailCalls` marked (§5). evidence: E5. [proposed: this IR]
 
 C30. A Structure in function position with a constructor slot applies its constructor. evidence: E5. [proposed: this IR]
 
@@ -180,6 +182,8 @@ C42. The residual of an unresolved function position carries the first viral fie
 C43. When the unresolved function is a Param, the residual carries the Param's effect variable, the Param's effect bound, or the label `opaque` for a Param with no bound. evidence: E6. [proposed: this IR]
 
 C44. A composed function applied to an unresolved argument is unfolded: `applyComposed` substitutes the arguments into its body and evaluates the body. evidence: E15. [proposed: this IR]
+
+C154. When `applyComposed` unfolds a composed function, PE Rule 1 applies to the applications inside the body, not to the composed application itself. evidence: E8, E15. [proposed: this IR]
 
 C45. During a typed compilation, a call into a recursion cycle with an unresolved argument is not unfolded: `applyComposed` returns a residual carrying the callee's effects. evidence: E9. [proposed: this IR]
 
@@ -217,7 +221,7 @@ C59. An argument carrying a viral field ends a composed application with a resid
 
 C60. Each installed dispatcher may bind the callee's declared constraints to the arguments through the dispatcher's `call` entry point. evidence: E15, E31. [proposed: this IR]
 
-C61. A call binding hands back three things: the scope the body evaluates in; the arguments as substituted; a finisher applied to the body's result. evidence: E15, E31. [proposed: this IR]
+C61. A call binding hands back the body's scope, the substituted arguments and a finisher for the body's result. evidence: E15, E31. [proposed: this IR]
 
 C62. The evaluator hands each dispatcher a check loop, `checkArg`, for the per-argument checks. evidence: E15, E18. [proposed: this IR]
 
@@ -231,7 +235,9 @@ C66. Substitution returns an unchanged subtree itself, not a copy. evidence: E16
 
 C67. Substitution copies an inner composed function whose body changed, with fresh Params rebound to the copy. evidence: E17. [proposed: this IR]
 
-C68. A copied composed function keeps its metadata through `carryMeta` and its preserved function properties through `PRESERVED_FN_META_KEYS`. evidence: E17. [proposed: this IR]
+C68. A copied composed function keeps its metadata through `carryMeta`. evidence: E17. [proposed: this IR]
+
+C156. A copied composed function keeps its preserved function properties through `PRESERVED_FN_META_KEYS`. evidence: E17. [proposed: this IR]
 
 C69. `applyComposed` evaluates the substituted body in the scope a call binding handed back, or in the caller's scope when no dispatcher bound the call. evidence: E15. [proposed: this IR]
 
@@ -271,7 +277,7 @@ C83. Each round of the loop in `applyComposed` evaluates the next body at the de
 
 C84. A chain of 100,000 tail calls through a typed function's return check completes without reaching the depth bound. evidence: E24. [proposed: this IR]
 
-C85. A sentinel that a primitive application returns inside an unmarked Expression is applied at once by `evaluateExpr`. evidence: E5. [proposed: this IR]
+C85. A sentinel that a primitive application returns inside an unmarked Expression is applied immediately by `evaluateExpr`. evidence: E5. [proposed: this IR]
 
 C86. A local binding of an `if` or a `when` whose chosen branch is a call holds the call's value, because the binding's `if` or `when` Expression is unmarked. evidence: E5, E22, E25. [proposed: this IR]
 
@@ -405,7 +411,7 @@ G5. cluster: C14, C15, C16, C17, C18 [proposed: this IR]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [proposed: this IR]
 
-G7. cluster: C22, C23, C135, C24, C25, C26 [proposed: this IR]
+G7. cluster: C22, C153, C23, C151, C24, C25, C26 [proposed: this IR]
 
 G8. cluster: C31, C32, C33, C34 [proposed: this IR]
 
@@ -413,7 +419,7 @@ G9. cluster: C35, C36, C37, C38, C39, C40, C47 [proposed: this IR]
 
 G10. cluster: C41, C42, C43 [proposed: this IR]
 
-G11. cluster: C44, C45, C46, C139 [proposed: this IR]
+G11. cluster: C44, C154, C45, C46, C139 [proposed: this IR]
 
 G12. cluster: C48, C49, C50, C51 [proposed: this IR]
 
@@ -421,7 +427,7 @@ G13. cluster: C52, C53, C54, C55, C56, C57 [proposed: this IR]
 
 G14. cluster: C58, C59, C60, C61, C62, C69 [proposed: this IR]
 
-G15. cluster: C63, C64, C65, C66, C67, C68 [proposed: this IR]
+G15. cluster: C63, C64, C65, C66, C67, C68, C156 [proposed: this IR]
 
 G16. cluster: C70, C71, C72, C73 [proposed: this IR]
 
@@ -461,17 +467,17 @@ G33. cluster: C141, C142, C143, C144, C145, C146, C147, C148, C149 [proposed: th
 
 ## Relations
 
-R1. C23 contradicts C22 because the rule asks for one default arm and the switch in `evaluate` has none.
+R1. C23 contradicts C153 because the rule asks for one default arm and the switch in `evaluate` has none.
 
 R2. C57 depends-on C55 because a residual `eval_when` evaluates no branch, and C56 shows the same for `&&` and `||`.
 
-R3. C44 refines C35 because a composed callee is unfolded rather than residualised, so its residuals arise inside its body.
+R3. C154 refines C35 because C44.
 
 R4. C45 refines C44 because the inline cutoff bounds the unfolding of recursive calls.
 
 R5. C84 depends-on C83 because a loop round that keeps the depth lets a chain of any length stay under the bound.
 
-R6. C86 depends-on C85 because `eval_if` and `eval_when` hand back the sentinel of the marked branch body, which `evaluateExpr` applies at once inside the unmarked binding Expression.
+R6. C86 depends-on C85 because `eval_if` and `eval_when` hand back the sentinel of the marked branch body, which `evaluateExpr` applies immediately inside the unmarked binding Expression.
 
 R7. C91 depends-on C88 because each wrapper forwards the sentinel by its own code.
 
@@ -489,7 +495,7 @@ E3. `src/evaluator.ts` lines 363–427: `evaluate`, with the depth bound at line
 
 E4. `src/evaluator.ts` lines 393–414: the Symbol arm: `scopeLookup`, `mergeOverMeta` over the Symbol's own fields, `scopeFactsFor` with `withPredicates`, and the dependency collector for an unresolved name.
 
-E5. `src/evaluator.ts` lines 416–473: the Expression arm and `evaluateExpr`'s dispatch on the callee's kind; the sentinel at lines 452–456; the at-once application at lines 446–448; the constructor slot at lines 460–473.
+E5. `src/evaluator.ts` lines 416–473: the Expression arm and `evaluateExpr`'s dispatch on the callee's kind; the sentinel at lines 452–456; the immediate application at lines 446–448; the constructor slot at lines 460–473.
 
 E6. `src/evaluator.ts` lines 475–525: the residual for an unresolved function position, with the Param's effects and `viralOnto`.
 
@@ -569,8 +575,10 @@ E43. `src/test/index.ts` lines 14–38 and 61: the suite's index imports every t
 
 E44. `package.json` line 24: `lint:units` runs `scripts/analyze/index.ts units --check` against `scripts/analyze/units.json`.
 
+E45. `scripts/analyze/units.json` line 79 and `scripts/analyze/index.ts` lines 273–289: the discriminator count tallies direct `.kind ===` comparisons outside the allowed units, `evaluator` among the allowed; a switch arm is not counted.
+
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C135, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149. Depends: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C135, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156. Depends: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156.
 
 A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79, C140.
