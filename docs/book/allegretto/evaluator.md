@@ -2,15 +2,15 @@
 
 > **Reader.** This chapter is the design truth for the `evaluator`
 > [unit](../units.md#def-unit), unit 13 of the unit DAG. The chapter is
-> the definition site of one term, [*tail call*](#def-tail-call) (§5).
+> the definition site of one term, [*tail call*](#def-tail-call).
 > [Partial evaluation](../concepts.md#def-partial-evaluation) and
 > [residual](../concepts.md#def-resolved-unresolved-residual) keep their
 > definition sites in the spine, `concepts.md` §25 (partial evaluation)
 > and §26 (resolved, unresolved, residual). This chapter describes
 > partial evaluation as implemented. The reader has read the
 > [Part I chapters](../README.md#part-i-foundations) and the chapter on metadata and capability
-> (`metadata-and-capability.md`). Earlier chapters define the terms used
-> here without definition, each linked at its first use:
+> (`metadata-and-capability.md`). Earlier chapters define every term this
+> chapter uses except *tail call*, each linked at its first use:
 >
 > - [value](../concepts.md#def-value)
 > - [representation kind](../concepts.md#def-representation-kind)
@@ -23,19 +23,19 @@
 > - [propagation](metadata-and-capability.md#def-propagation)
 > - [writer capability](metadata-and-capability.md#def-writer-capability)
 >
-> **Authority.** The chapter carries [Tier 1](../process.md#1-documentation-map)
-> authority, the authority `process.md` §1 (documentation map) gives every
-> chapter of the book. Each section carries the status tag that
+> **Authority.** The chapter carries the [Tier 1](../process.md#1-documentation-map)
+> authority that `process.md` §1 (documentation map) gives every chapter of
+> the book. Each section carries the status tag that
 > `../README.md` defines. The chapter executes
 > [R2](../concepts.md#def-r2) (partial evaluation is the mechanism),
 > [R4](../concepts.md#def-r4) (evaluation is total over unresolved information),
 > D22 (structures are immutable by default) and the rulings of
 > B-112 (the four owed plane interfaces). The B-112 rulings executed are
 > three. One B-112 ruling has the base call one check hook per registered
-> field. A second B-112 ruling folds member dispatch into the dispatch
-> hook. A third B-112 ruling, of 2026-10-22, puts call-site unification
-> into the dispatch hook. The examples are verbatim excerpts of
-> `tests/functions.alg` and `tests/logical.alg`, which the suite runs
+> field. A second ruling folds member dispatch into the dispatch hook. A
+> third ruling, of 2026-10-22, puts call-site unification into the
+> dispatch hook. The examples are verbatim excerpts of
+> `tests/functions.alg` and `tests/logical.alg`. The suite runs both files
 > against their `// expect:` lines.
 
 ## 1. The unit and its file [implemented]
@@ -361,7 +361,7 @@ and no field check is installed.
 The evaluator reaches the projection hook only through `metaReadRaw`,
 which serves an installed projection without naming the field. The
 channel-registration hook is not built. B-111 (field versus channel
-registration) owns the channel-registration hook.
+registration) owns that hook.
 
 The evaluator applies the two generic
 [propagation](metadata-and-capability.md#def-propagation) rules through
@@ -383,8 +383,8 @@ shows both imports as violations of the [unit](../units.md#def-unit) DAG.
 B-146 (knowledge propagation) owns both edges.
 
 The `refinements` edge is [knowledge](../concepts.md#def-knowledge)
-propagation: predicate sets computed at primitive application, plus scope
-facts attached at [Symbol](../concepts.md#def-symbol) lookup. The `effects` edge is
+propagation: predicate sets computed at primitive application, plus the
+[scope](../concepts.md#def-scope) facts of §2 (evaluation). The `effects` edge is
 [effect](../concepts.md#def-effect) inference: a primitive's static tags,
 a [Param](../concepts.md#def-param)'s bound or effect variable, the
 `opaque` label, the precompile stash. The generic `union` rule cannot replace the effect path, because
@@ -397,10 +397,13 @@ Two paths carry a field by name: precompile's placeholder seeding of
 
 `src/evaluator.ts` imports `primitives` and `renderExprSource` from
 `src/primitives.ts`, which holds units of three layers, Allegro Standard
-among them. The `units` report leaves the edges to `src/primitives.ts`
-and `src/types.ts` unjudged, because `scripts/analyze/units.json` maps
-each of the two files to several units. The unit DAG places `base-primitives`, one of the units
-`src/primitives.ts` holds, above the `evaluator` unit.
+among them. The `units` report counts the edges to `src/primitives.ts`
+and `src/types.ts` as unresolved, not as violations, because
+`scripts/analyze/units.json` maps each of the two files to several units.
+The unit DAG places `base-primitives`, one of the units
+`src/primitives.ts` holds, above the `evaluator` unit. The import of
+`renderExprSource` is an edge the unit DAG forbids, uncounted by the
+`units` report until `src/primitives.ts` is split.
 
 ## 9. Where the code is, and what pins it [implemented]
 
@@ -416,4 +419,4 @@ each of the two files to several units. The unit DAG places `base-primitives`, o
 | the marking of every function body, the install of the inline cutoff, the precompile stage | `src/runtime.ts` | the whole suite |
 | the unit's file and permitted imports | `scripts/analyze/units.json` | `npm run lint:units` |
 
-<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C9→¶3 C10→¶3 C11→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C23→¶7 C158→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶8 C35→¶9 C36→¶9 C37→¶9 C38→¶9 C39→¶9 C40→¶9 C47→¶9 C41→¶10 C42→¶10 C43→¶10 C44→¶11 C154→¶11 C45→¶11 C46→¶11 C139→¶11 C48→¶12 C49→¶12 C50→¶12 C51→¶12 C52→¶13 C53→¶13 C54→¶13 C55→¶13 C56→¶13 C57→¶13 C58→¶14 C59→¶14 C60→¶14 C61→¶14 C62→¶14 C69→¶14 C63→¶15 C64→¶15 C65→¶15 C66→¶15 C67→¶15 C68→¶15 C156→¶15 C70→¶16 C71→¶16 C72→¶16 C73→¶16 C140→¶17 C134→¶17 C74→¶17 C75→¶17 C76→¶17 C77→¶17 C78→¶17 C79→¶18 C80→¶18 C81→¶18 C82→¶18 C83→¶18 C84→¶18 C85→¶19 C86→¶19 C87→¶19 C88→¶20 C89→¶20 C90→¶20 C91→¶21 C92→¶21 C93→¶22 C94→¶22 C95→¶22 C96→¶22 C133→¶22 C97→¶22 C98→¶23 C99→¶23 C100→¶23 C101→¶23 C102→¶24 C103→¶24 C104→¶24 C105→¶25 C106→¶25 C107→¶25 C108→¶26 C109→¶26 C110→¶26 C111→¶26 C112→¶27 C113→¶27 C114→¶27 C115→¶28 C116→¶28 C117→¶28 C118→¶28 C119→¶29 C120→¶29 C121→¶29 C122→¶30 C123→¶30 C124→¶30 C125→¶30 C126→¶31 C127→¶31 C128→¶32 C129→¶32 C130→¶32 C141→¶33 C142→¶33 C143→¶33 C144→¶33 C145→¶33 C146→¶33 C147→¶33 C148→¶33 C149→¶33 -->
+<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C160→¶2 C9→¶3 C10→¶3 C11→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C23→¶7 C158→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶8 C35→¶9 C36→¶9 C37→¶9 C38→¶9 C39→¶9 C40→¶9 C47→¶9 C41→¶10 C42→¶10 C43→¶10 C44→¶11 C154→¶11 C45→¶11 C46→¶11 C139→¶11 C48→¶12 C49→¶12 C50→¶12 C51→¶12 C52→¶13 C53→¶13 C54→¶13 C55→¶13 C56→¶13 C57→¶13 C58→¶14 C59→¶14 C60→¶14 C61→¶14 C62→¶14 C69→¶14 C63→¶15 C64→¶15 C65→¶15 C66→¶15 C67→¶15 C68→¶15 C156→¶15 C70→¶16 C71→¶16 C72→¶16 C73→¶16 C140→¶17 C134→¶17 C74→¶17 C75→¶17 C76→¶17 C77→¶17 C78→¶17 C79→¶18 C80→¶18 C81→¶18 C82→¶18 C83→¶18 C84→¶18 C85→¶19 C86→¶19 C87→¶19 C88→¶20 C89→¶20 C90→¶20 C91→¶21 C92→¶21 C93→¶22 C94→¶22 C95→¶22 C96→¶22 C133→¶22 C97→¶22 C98→¶23 C99→¶23 C100→¶23 C101→¶23 C102→¶24 C103→¶24 C104→¶24 C105→¶25 C106→¶25 C107→¶25 C108→¶26 C109→¶26 C110→¶26 C111→¶26 C112→¶27 C113→¶27 C114→¶27 C115→¶28 C116→¶28 C117→¶28 C118→¶28 C119→¶29 C120→¶29 C121→¶29 C122→¶30 C123→¶30 C124→¶30 C125→¶30 C126→¶31 C127→¶31 C128→¶32 C129→¶32 C130→¶32 C159→¶32 C141→¶33 C142→¶33 C143→¶33 C144→¶33 C145→¶33 C146→¶33 C147→¶33 C148→¶33 C149→¶33 -->

@@ -32,6 +32,7 @@ and the stranger finds no contradiction and no undefined term.
 |---|---|---|---|---|---|
 | 1 | 2,317 | 134 | 18 | 7.8 | not readable (contradictions 4, undefined terms 3; restatement mismatches 3, all the stranger's own) |
 | 2 | 2,437 | 150 | 10 | 4.1 | not readable (contradictions 2, undefined terms 0; restatement mismatch 1, the stranger's own) |
+| 3 | 2,444 | 155 | 9 | 3.7 | not readable (contradictions 2, undefined terms 0; restatement mismatches 2, both the stranger's own) |
 
 ## Round 1, 2026-10-31
 
@@ -150,3 +151,37 @@ Counts after the touch-up: IR 153 to 155 claims (C157, C158); clusters
 33 (G7 gains both); relations 9 (R1 and R3 reworded); evidence 45;
 prose 2,466 to 2,496 words (the stranger's method, +30 measured on the
 diff). Lint clean; round trip 155 of 155.
+
+## Round 3, 2026-10-31
+
+Reviewed commit `ec8fec9`: 2,444 prose words by the stranger's count
+(code blocks, the §9 table, link targets and the render map excluded);
+IR 155 claims; 9 findings; 3.7 per thousand words. The restatement was
+written from the prose before the IR was opened. It had two mismatches
+with the IR, on C154 and C158. The stranger attributed both to its own
+restatement and quoted the prose sentence carrying each claim, so
+neither counts. Contradictions 2 (findings 1 and 2); undefined terms 0.
+Verdict: not readable for RD-4. Finding 2 was checked against
+`src/primitives.ts`, `scripts/analyze/units.json`, `docs/book/units.md`
+§4.1 and the `units` report before the decision.
+
+| # | Finding (shortened) | Kind | Decision |
+|---|---|---|---|
+| 1 | "Earlier chapters define the terms used here without definition" | contradiction | fixed: C132 rephrased, "Earlier chapters define every term this chapter uses except tail call, each term linked at its first use." |
+| 2 | the edges to `src/primitives.ts` "unjudged" (C129) against `base-primitives` "above the `evaluator` unit" (C130) | contradiction | fixed: C129 now says the report counts the edges as unresolved, not as violations; new C159, inferred from the new R10, "The import of `renderExprSource` is an edge the unit DAG forbids, uncounted by the `units` report until `src/primitives.ts` is split."; E46 added (`renderExprSource` at `src/primitives.ts` line 42, inside the lines 23–1197 that `base-primitives` holds, a unit that depends on `evaluator`) |
+| 3 | C8 joins the excerpt claim and the suite-run claim | compound | fixed: split into C8 (the excerpts, evidence E25, E26, E37) and C160, "The suite runs both example files, `tests/functions.alg` and `tests/logical.alg`, against their `// expect:` lines." |
+| 4 | T30 is proposed; the prose defines *tail call* with no marker | mismatch | declined: a chapter's prose carries no provenance markers, which live in the IR, and the term is ratified at the chapter PR's merge with A2 and the IR's proposed claims (plan §3.1) |
+| 5 | "tail call (§5)" in the reader block | identifier | fixed: "(§5)" cut; the link names the target |
+| 6 | "Tier 1 authority, the authority `process.md` §1" | excess | fixed: C6 rephrased, "This chapter carries the Tier 1 authority that `docs/book/process.md` §1 gives every chapter of the book." |
+| 7 | C122's scope facts repeat C16 of §2 | excess | fixed: C122 now ends "plus the scope facts of §2." |
+| 8 | "owns the channel-registration hook" repeats the noun | excess | fixed in the prose: "owns that hook"; C114 keeps the full noun, since each claim names its referents |
+| 9 | "B-112 ruling" three times | excess | fixed in the prose: the second and third sentences read "A second ruling" and "A third ruling"; C137 and C138 keep the name, since each claim names its referents |
+
+Fixes after round 3: IR 155 to 157 claims (C8 split adding C160; C159
+added for the contradiction; C6, C122, C129 and C132 rephrased);
+clusters 33 (G2 gains C160, G32 gains C159); relations 9 to 10 (R10
+added); evidence 45 to 46 (E46 added); prose 2,444 to 2,467 words (same
+method: the stranger's count plus the change measured on the diff,
++23). Lint clean; round trip 157 of 157.
+
+Confirmation: pending

@@ -83,7 +83,7 @@ C4. This chapter describes partial evaluation as implemented. [decided: docs/pla
 
 C5. The reader of this chapter has read the Part I chapters and the chapter on metadata and capability. [proposed: this IR]
 
-C6. This chapter carries Tier 1 authority, the authority `docs/book/process.md` §1 gives every chapter of the book. [decided: docs/book/process.md §1]
+C6. This chapter carries the Tier 1 authority that `docs/book/process.md` §1 gives every chapter of the book. [decided: docs/book/process.md §1]
 
 C150. Each section of this chapter carries the status tag that `docs/book/README.md` defines. [decided: docs/book/README.md, Status convention]
 
@@ -97,9 +97,11 @@ C137. A second B-112 ruling folds member dispatch into the dispatch hook. [decid
 
 C138. A third B-112 ruling, of 2026-10-22, puts call-site unification into the dispatch hook. [decided: docs/plans/plane-interfaces.md §9.5, 2026-10-22]
 
-C132. The terms this chapter uses without defining are defined in earlier chapters, each linked at its first use. [proposed: this IR]
+C132. Earlier chapters define every term this chapter uses except tail call, each term linked at its first use. [proposed: this IR]
 
-C8. The examples are verbatim excerpts of `tests/functions.alg` and `tests/logical.alg`, which the suite runs against their `// expect:` lines. evidence: E38. [proposed: this IR]
+C8. The examples are verbatim excerpts of `tests/functions.alg` and `tests/logical.alg`. evidence: E25, E26, E37. [proposed: this IR]
+
+C160. The suite runs both example files, `tests/functions.alg` and `tests/logical.alg`, against their `// expect:` lines. evidence: E38. [proposed: this IR]
 
 ### 1. The unit and its file
 
@@ -363,7 +365,7 @@ C120. The `units` report shows both imports as violations of the unit DAG. evide
 
 C121. B-146 (knowledge propagation) owns both edges. [decided: docs/plans/plane-interfaces.md §9.8, 2026-10-24]
 
-C122. The `refinements` edge is knowledge propagation: predicate sets computed at primitive application, plus scope facts attached at Symbol lookup. evidence: E4, E8. [proposed: this IR]
+C122. The `refinements` edge is knowledge propagation: predicate sets computed at primitive application, plus the scope facts of §2. evidence: E4, E8. [proposed: this IR]
 
 C123. The `effects` edge is effect inference: a primitive's static tags, a Param's bound or effect variable, the `opaque` label, the precompile stash. evidence: E6, E8, E19. [proposed: this IR]
 
@@ -377,9 +379,11 @@ C127. B-145 (type vocabulary) owns the carrying by name. [decided: docs/book/uni
 
 C128. `src/evaluator.ts` imports `primitives` and `renderExprSource` from `src/primitives.ts`, which holds units of three layers, Allegro Standard among them. evidence: E2, E42. [proposed: this IR]
 
-C129. The `units` report leaves the edges to `src/primitives.ts` and `src/types.ts` unjudged, because `scripts/analyze/units.json` maps each of the two files to several units. evidence: E36, E42. [proposed: this IR]
+C129. The `units` report counts the edges to `src/primitives.ts` and `src/types.ts` as unresolved, not as violations, because `scripts/analyze/units.json` maps each of the two files to several units. evidence: E36, E42. [proposed: this IR]
 
 C130. The unit DAG places `base-primitives`, one of the units `src/primitives.ts` holds, above the `evaluator` unit. [decided: docs/book/units.md §4.1]
+
+C159. The import of `renderExprSource` is an edge the unit DAG forbids, uncounted by the `units` report until `src/primitives.ts` is split. evidence: E46. [inferred: R10]
 
 ### 9. Where the code is, and what pins it
 
@@ -405,7 +409,7 @@ C149. `npm run lint:units` pins the unit's file and permitted imports in `script
 
 G1. cluster: C1, C2, C3, C4, C5, C132 [proposed: this IR]
 
-G2. cluster: C6, C150, C7, C131, C136, C137, C138, C8 [proposed: this IR]
+G2. cluster: C6, C150, C7, C131, C136, C137, C138, C8, C160 [proposed: this IR]
 
 G3. cluster: C9, C10, C11 [proposed: this IR]
 
@@ -465,7 +469,7 @@ G30. cluster: C122, C123, C124, C125 [proposed: this IR]
 
 G31. cluster: C126, C127 [proposed: this IR]
 
-G32. cluster: C128, C129, C130 [proposed: this IR]
+G32. cluster: C128, C129, C130, C159 [proposed: this IR]
 
 G33. cluster: C141, C142, C143, C144, C145, C146, C147, C148, C149 [proposed: this IR]
 
@@ -488,6 +492,8 @@ R7. C91 depends-on C88 because each wrapper forwards the sentinel by its own cod
 R8. C125 depends-on C119 because the done-condition counts the Allegro Standard imports.
 
 R9. C129 refines C120 because the report judges only edges between files assigned to one unit each.
+
+R10. C159 depends-on C130 because `renderExprSource` lies inside the lines of `src/primitives.ts` that `base-primitives` holds, a unit that depends on `evaluator`, and C129 says why the report does not count the edge.
 
 ## Evidence
 
@@ -581,8 +587,10 @@ E44. `package.json` line 24: `lint:units` runs `scripts/analyze/index.ts units -
 
 E45. `scripts/analyze/units.json` line 79 and `scripts/analyze/index.ts` lines 273–289: the discriminator count tallies direct `.kind ===` comparisons outside the allowed units, `evaluator` among the allowed; a switch arm is not counted.
 
+E46. `src/primitives.ts` line 42, `docs/book/units.md` line 241 and `scripts/analyze/units.json` line 18: `renderExprSource` sits inside lines 23–1197, which unit 15, `base-primitives`, holds; `base-primitives` lists `evaluator` among its dependencies.
+
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156. Depends: C5, C8, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C23, C24, C27, C28, C29, C30, C32, C33, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156.
 
 A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79, C140.
