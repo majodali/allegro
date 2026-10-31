@@ -184,4 +184,35 @@ added); evidence 45 to 46 (E46 added); prose 2,444 to 2,467 words (same
 method: the stranger's count plus the change measured on the diff,
 +23). Lint clean; round trip 157 of 157.
 
-Confirmation: pending
+Confirmation, by the round's stranger on commit `4b4ae38`: findings 1
+to 3 and 6 to 9 confirmed. Finding 4 withdrawn by the stranger on the
+reason given: the definition ships only with the merged chapter, after
+A2 ratifies it, so it no longer counts. The stranger quoted the prose:
+"A **tail call** is an application of a composed function whose result
+is the result of the function body that contains the application."
+Finding 5 unfixed: cutting "(§5)" from the reader block moved the first
+use of §5 to the §2 sentence of C20, "`TailCall` sentinel (§5)", still
+with no name after it. New defects in the changed passages, one:
+
+- C129 and its §8 sentence say the `units` report counts the edges to
+  `src/primitives.ts` as unresolved, while C159 and its sentence call
+  the `renderExprSource` edge to the same file "uncounted by the
+  `units` report" (contradiction).
+
+Touch-up after confirmation, two edits, IR first, then prose and render
+map:
+
+1. Finding 5: C20 and its sentence give §5 its name on the same line,
+   "except when the result is a `TailCall` sentinel (§5 (tail call))."
+   No later first use of a section number is bare: the second "(§5)",
+   in the C29 sentence, follows the named first use, and §8 names §2 as
+   "§2 (evaluation)".
+2. The new defect: C159 takes C129's vocabulary, "The import of
+   `renderExprSource` is an edge the unit DAG forbids, not counted as a
+   violation by the `units` report until `src/primitives.ts` is split."
+   R10 now ends "C129 says why the report does not count the edge as a
+   violation."
+
+Counts after the touch-up: IR 157 claims; clusters 33; relations 10
+(R10 reworded); evidence 46; prose 2,467 to 2,473 words (the stranger's
+method, +6 measured on the diff). Lint clean; round trip 157 of 157.

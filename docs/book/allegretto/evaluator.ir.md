@@ -129,7 +129,7 @@ C18. The dependency collector records the name of each Symbol that evaluates to 
 
 C19. `evaluate` applies an Expression through `evaluateExpr`. evidence: E5. [proposed: this IR]
 
-C20. An Expression's own metadata fields are laid under the fields of the application's result, except when the result is a `TailCall` sentinel. evidence: E5. [proposed: this IR]
+C20. An Expression's own metadata fields are laid under the fields of the application's result, except when the result is a `TailCall` sentinel (§5 (tail call)). evidence: E5. [proposed: this IR]
 
 C21. `evaluate` throws "Maximum evaluation depth exceeded" when the depth passes 10,000. evidence: E3. [proposed: this IR]
 
@@ -383,7 +383,7 @@ C129. The `units` report counts the edges to `src/primitives.ts` and `src/types.
 
 C130. The unit DAG places `base-primitives`, one of the units `src/primitives.ts` holds, above the `evaluator` unit. [decided: docs/book/units.md §4.1]
 
-C159. The import of `renderExprSource` is an edge the unit DAG forbids, uncounted by the `units` report until `src/primitives.ts` is split. evidence: E46. [inferred: R10]
+C159. The import of `renderExprSource` is an edge the unit DAG forbids, not counted as a violation by the `units` report until `src/primitives.ts` is split. evidence: E46. [inferred: R10]
 
 ### 9. Where the code is, and what pins it
 
@@ -493,7 +493,7 @@ R8. C125 depends-on C119 because the done-condition counts the Allegro Standard 
 
 R9. C129 refines C120 because the report judges only edges between files assigned to one unit each.
 
-R10. C159 depends-on C130 because `renderExprSource` lies inside the lines of `src/primitives.ts` that `base-primitives` holds, a unit that depends on `evaluator`, and C129 says why the report does not count the edge.
+R10. C159 depends-on C130 because `renderExprSource` lies inside the lines of `src/primitives.ts` that `base-primitives` holds, a unit that depends on `evaluator`, and C129 says why the report does not count the edge as a violation.
 
 ## Evidence
 

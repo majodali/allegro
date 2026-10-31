@@ -79,8 +79,8 @@ evaluates to itself.
 `evaluate` applies an [Expression](../concepts.md#def-expression) through
 `evaluateExpr`. An Expression's own metadata fields are laid under the
 fields of the application's result, except when the result is a
-[`TailCall` sentinel](#def-tail-call) (§5). `evaluateExpr` evaluates an Expression's
-function position before anything else. A primitive function in function
+[`TailCall` sentinel](#def-tail-call) (§5 (tail call)). `evaluateExpr`
+evaluates an Expression's function position before anything else. A primitive function in function
 position is applied by `applyPrimitive`. A composed function in function
 position is applied by `applyComposed`, except in an Expression that
 `markTailCalls` marked (§5). A Structure in function position with a
@@ -402,8 +402,8 @@ and `src/types.ts` as unresolved, not as violations, because
 `scripts/analyze/units.json` maps each of the two files to several units.
 The unit DAG places `base-primitives`, one of the units
 `src/primitives.ts` holds, above the `evaluator` unit. The import of
-`renderExprSource` is an edge the unit DAG forbids, uncounted by the
-`units` report until `src/primitives.ts` is split.
+`renderExprSource` is an edge the unit DAG forbids, not counted as a
+violation by the `units` report until `src/primitives.ts` is split.
 
 ## 9. Where the code is, and what pins it [implemented]
 
