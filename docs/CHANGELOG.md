@@ -141,11 +141,11 @@ adopted in `docs/classification.md`. `docs/book/allegretto/evaluator.ir.md` came
 first: 134 claims in 32 clusters, 30 terms, 9 relations, 41 evidence
 pointers at round 1, 150 claims in 33 clusters, 44 evidence pointers
 after round 1's fixes, 155 claims, 45 evidence pointers after round
-2's and its touch-up, 157 claims, 10 relations, 46 evidence pointers after round 3's, and 159 claims in 34 clusters after round 4's; every claim about the code as implemented is proposed with a
+2's and its touch-up, 157 claims, 10 relations, 46 evidence pointers after round 3's, 159 claims in 34 clusters after round 4's, and 165 claims, 48 evidence pointers after round 5's; every claim about the code as implemented is proposed with a
 file-and-line pointer, for ratification in bulk at the PR. The reasoning
 role rendered `docs/book/allegretto/evaluator.md` from it, one claim per
 sentence, ending with the render map; `evaluator.review.md` beside it
-records the stranger rounds (rounds 1 to 4 not readable; count: pending). The chapter covers
+records the stranger rounds (rounds 1 to 5 not readable; count: pending). The chapter covers
 evaluation, PE Rule 1 and PE Rule 2 as implemented, application and
 substitution, tail calls, the scope carve-out from D22 (structures are
 immutable by default), the install surface of B-112 (the four owed

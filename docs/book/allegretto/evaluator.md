@@ -30,11 +30,11 @@
 > [R2](../concepts.md#def-r2) (partial evaluation is the mechanism),
 > [R4](../concepts.md#def-r4) (evaluation is total over unresolved information),
 > D22 (structures are immutable by default) and the rulings of
-> B-112 (the four owed plane interfaces). The B-112 rulings executed are
-> three. One B-112 ruling has the base call one check hook per registered
-> field. A second ruling folds member dispatch into the dispatch hook. A
-> third ruling, of 2026-10-22, puts call-site unification into the
-> dispatch hook. The examples are verbatim excerpts of
+> B-112 (the four owed plane interfaces). The chapter executes three
+> B-112 rulings. The first ruling has the base call one check hook per
+> registered field. The second ruling folds member dispatch into the
+> dispatch hook. The third ruling, of 2026-10-22, puts call-site
+> unification into the dispatch hook. The examples are verbatim excerpts of
 > `tests/functions.alg` and `tests/logical.alg`. The suite runs both files
 > against their `// expect:` lines.
 
@@ -57,7 +57,10 @@ DAG lets the `evaluator` unit import eight units: `scope`, `expression`,
 
 `evaluate` in `src/evaluator.ts` takes a [value](../concepts.md#def-value),
 a [scope](../concepts.md#def-scope), a depth and an optional dependency
-collector, and returns a value. `evaluate` returns a
+collector. `evaluate` returns a value, or a
+[`TailCall` sentinel](#def-tail-call) for an
+[Expression](../concepts.md#def-expression) that
+`markTailCalls` marked (§5 (tail call)). `evaluate` returns a
 [Bits](../concepts.md#def-bits), a
 [primitive function](../concepts.md#def-primitivefunction), a
 [composed function](../concepts.md#def-composedfunction), a
@@ -78,12 +81,11 @@ whose binding is a pending
 itself. The dependency collector records the name of each Symbol that
 evaluates to itself.
 
-`evaluate` applies an [Expression](../concepts.md#def-expression) through
-`evaluateExpr`. An Expression's own metadata fields are laid under the
-fields of the application's result, except when the result is a
-[`TailCall` sentinel](#def-tail-call) (§5 (tail call)). `evaluateExpr`
-evaluates an Expression's function position before anything else. A primitive function in function
-position is applied by `applyPrimitive`. A composed function in function
+`evaluate` applies an Expression through `evaluateExpr`. An Expression's
+own metadata fields are laid under the fields of the application's
+result, except when the result is a `TailCall` sentinel. `evaluateExpr`
+evaluates an Expression's function position before anything else. A
+primitive function in function position is applied by `applyPrimitive`. A composed function in function
 position is applied by `applyComposed`, except in an Expression that
 `markTailCalls` marked (§5). A Structure in function position with a
 constructor slot applies its constructor.
@@ -92,14 +94,14 @@ The [discriminator rule](../units.md#32-the-discriminator-rule) lets only
 the evaluator switch on kind for behaviour. Under the discriminator
 rule, the evaluator's switch must name only the participating kinds. The
 inert rest of the kinds must fall to one default arm of the evaluator's
-switch. The switch in `evaluate` has no default arm, a defect against
-the discriminator rule that no backlog item owns. Nothing counts that
-defect, because the `units` report's discriminator count skips the
-`evaluator` unit. Two
-walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind
-themselves. The discriminator rule assigns every walker to a traversal
-protocol of the `kinds` [unit](../units.md#def-unit). The `kinds` unit, which would hold the
-traversal protocol, is owed.
+switch. The switch in `evaluate` has no default arm. The missing arm is
+a defect against the discriminator rule. No backlog item owns the
+defect. Nothing counts the defect, because the `units` report's
+discriminator count skips the `evaluator` unit. Two walkers in
+`src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves.
+The discriminator rule assigns every walker to a traversal protocol of
+the `kinds` [unit](../units.md#def-unit). The `kinds` unit, which would
+hold the traversal protocol, is owed.
 
 ## 3. Partial evaluation as implemented [partial]
 
@@ -120,9 +122,9 @@ abort that `src/evaluator.ts` raises is caused by an unresolved input.
 
 [PE Rule 1](../concepts.md#def-partial-evaluation) says that an
 application with an unresolved argument produces a
-[residual](../concepts.md#def-resolved-unresolved-residual), with
-[metadata fields](metadata-and-capability.md#def-metadata-field)
-[propagated](metadata-and-capability.md#def-propagation) onto the
+[residual](../concepts.md#def-resolved-unresolved-residual). Under
+PE Rule 1, [metadata fields](metadata-and-capability.md#def-metadata-field)
+[propagate](metadata-and-capability.md#def-propagation) onto the
 residual per their rules. The evaluator applies PE Rule 1 at an eager
 primitive application and at an unresolved function position. A
 [composed function](../concepts.md#def-composedfunction) applied to an
@@ -130,11 +132,10 @@ unresolved argument is unfolded into its substituted body, unless the
 call enters a recursion cycle during a typed compilation. In an unfolded
 body, PE Rule 1 applies to each application the body contains.
 
-For a call into a recursion cycle with an unresolved argument during a
-typed compilation, `applyComposed` returns a residual carrying the
-callee's effects. `src/runtime.ts` decides cycle membership once per
-typed compilation. `src/runtime.ts` installs the cycle-membership answer
-as the inline cutoff through `setInlineCutoff`.
+`src/runtime.ts` decides cycle membership once per typed compilation.
+`src/runtime.ts` installs the cycle-membership answer as the inline
+cutoff through `setInlineCutoff`. For a call that the inline cutoff
+stops, `applyComposed` returns a residual carrying the callee's effects.
 
 An eager primitive receives its arguments evaluated, with their
 metadata intact. An eager primitive with an unresolved argument returns
@@ -406,17 +407,18 @@ among them. The unit DAG places `base-primitives`, one of the units
 `src/primitives.ts` holds, above the `evaluator` unit.
 `renderExprSource` lies inside the lines of `src/primitives.ts` that the
 `base-primitives` unit holds. The unit DAG forbids the `evaluator`
-unit's import of `renderExprSource`. Until `src/primitives.ts` is split,
-the `units` report counts the `renderExprSource` edge, like every edge to
-`src/primitives.ts` or `src/types.ts`, as unresolved rather than as a
-violation, because `scripts/analyze/units.json` maps each of the two
-files to several units.
+unit's import of `renderExprSource`. The `units` report counts an edge
+as unresolved when `scripts/analyze/units.json` maps the file at either
+end to several units. Until `src/primitives.ts` is split, the `units`
+report counts the `renderExprSource` edge as unresolved, not as a
+violation.
 
 ## 9. Where the code is, and what pins it [implemented]
 
 | What | Where | Pinned by |
 |---|---|---|
-| `evaluate`, `evaluateExpr`, `applyPrimitive`, `applyComposed`, substitution, `checkArg`, `precompileFunction`, `markTailCalls`, `setInlineCutoff`, `assertPropagationTableLinkage` | `src/evaluator.ts` | the whole suite; `tests/functions.alg` and `tests/logical.alg` through `src/test/types-core.ts` and `src/test/grammar2-language.ts` |
+| `evaluate`, `evaluateExpr`, `applyPrimitive`, `applyComposed`, substitution, `checkArg`, `precompileFunction`, `markTailCalls`, `setInlineCutoff`, `assertPropagationTableLinkage` | `src/evaluator.ts` | the whole suite |
+| the application and tail-call paths that §4 (application and substitution) and §5 quote | `src/evaluator.ts` | `tests/functions.alg` and `tests/logical.alg`, run through `src/test/types-core.ts` and `src/test/grammar2-language.ts` |
 | `isResolved`, `makeExpr`, `withMeta` | `src/types.ts` | the whole suite |
 | `viralOnto`, `mergeOverMeta`, `metaReadRaw`, the check and dispatch tables | `src/metadata.ts` | the boundary gates of `src/boundary-tests.ts` |
 | `eval_if` | `src/primitives.ts` | `src/test/effects.ts` (both branches under an unresolved condition) |
@@ -426,4 +428,4 @@ files to several units.
 | the marking of every function body, the install of the inline cutoff, the precompile stage | `src/runtime.ts` | the whole suite |
 | the unit's file and permitted imports | `scripts/analyze/units.json` | `npm run lint:units` |
 
-<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C160→¶2 C10→¶3 C11→¶3 C9→¶3 C12→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C158→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C163→¶8 C34→¶8 C35→¶9 C161→¶9 C44→¶9 C154→¶9 C45→¶10 C46→¶10 C139→¶10 C36→¶11 C37→¶11 C38→¶11 C39→¶11 C40→¶11 C47→¶11 C41→¶12 C42→¶12 C43→¶12 C48→¶13 C49→¶13 C50→¶13 C51→¶13 C52→¶14 C53→¶14 C54→¶14 C55→¶14 C56→¶14 C57→¶14 C58→¶15 C59→¶15 C60→¶15 C61→¶15 C62→¶15 C69→¶15 C63→¶16 C64→¶16 C65→¶16 C66→¶16 C67→¶16 C68→¶16 C156→¶16 C70→¶17 C71→¶17 C72→¶17 C73→¶17 C140→¶18 C134→¶18 C74→¶18 C75→¶18 C76→¶18 C77→¶18 C78→¶18 C79→¶19 C80→¶19 C81→¶19 C82→¶19 C83→¶19 C84→¶19 C85→¶20 C86→¶20 C87→¶20 C88→¶21 C89→¶21 C90→¶21 C91→¶22 C92→¶22 C93→¶23 C94→¶23 C95→¶23 C96→¶23 C133→¶23 C97→¶23 C98→¶24 C99→¶24 C100→¶24 C101→¶24 C102→¶25 C103→¶25 C104→¶25 C105→¶26 C106→¶26 C107→¶26 C108→¶27 C109→¶27 C110→¶27 C111→¶27 C112→¶28 C113→¶28 C114→¶28 C115→¶29 C116→¶29 C117→¶29 C118→¶29 C119→¶30 C120→¶30 C121→¶30 C122→¶31 C123→¶31 C124→¶31 C125→¶31 C126→¶32 C127→¶32 C128→¶33 C130→¶33 C162→¶33 C159→¶33 C129→¶33 C141→¶34 C142→¶34 C143→¶34 C144→¶34 C145→¶34 C146→¶34 C147→¶34 C148→¶34 C149→¶34 -->
+<!-- render map: C1→¶1 C2→¶1 C3→¶1 C4→¶1 C5→¶1 C132→¶1 C6→¶2 C150→¶2 C7→¶2 C131→¶2 C136→¶2 C137→¶2 C138→¶2 C8→¶2 C160→¶2 C10→¶3 C11→¶3 C9→¶3 C12→¶4 C169→¶4 C13→¶4 C21→¶4 C14→¶5 C15→¶5 C16→¶5 C17→¶5 C18→¶5 C19→¶6 C20→¶6 C27→¶6 C28→¶6 C29→¶6 C30→¶6 C22→¶7 C153→¶7 C157→¶7 C158→¶7 C164→¶7 C165→¶7 C151→¶7 C24→¶7 C25→¶7 C26→¶7 C31→¶8 C32→¶8 C33→¶8 C163→¶8 C34→¶8 C35→¶9 C168→¶9 C161→¶9 C44→¶9 C154→¶9 C46→¶10 C139→¶10 C45→¶10 C36→¶11 C37→¶11 C38→¶11 C39→¶11 C40→¶11 C47→¶11 C41→¶12 C42→¶12 C43→¶12 C48→¶13 C49→¶13 C50→¶13 C51→¶13 C52→¶14 C53→¶14 C54→¶14 C55→¶14 C56→¶14 C57→¶14 C58→¶15 C59→¶15 C60→¶15 C61→¶15 C62→¶15 C69→¶15 C63→¶16 C64→¶16 C65→¶16 C66→¶16 C67→¶16 C68→¶16 C156→¶16 C70→¶17 C71→¶17 C72→¶17 C73→¶17 C140→¶18 C134→¶18 C74→¶18 C75→¶18 C76→¶18 C77→¶18 C78→¶18 C79→¶19 C80→¶19 C81→¶19 C82→¶19 C83→¶19 C84→¶19 C85→¶20 C86→¶20 C87→¶20 C88→¶21 C89→¶21 C90→¶21 C91→¶22 C92→¶22 C93→¶23 C94→¶23 C95→¶23 C96→¶23 C133→¶23 C97→¶23 C98→¶24 C99→¶24 C100→¶24 C101→¶24 C102→¶25 C103→¶25 C104→¶25 C105→¶26 C106→¶26 C107→¶26 C108→¶27 C109→¶27 C110→¶27 C111→¶27 C112→¶28 C113→¶28 C114→¶28 C115→¶29 C116→¶29 C117→¶29 C118→¶29 C119→¶30 C120→¶30 C121→¶30 C122→¶31 C123→¶31 C124→¶31 C125→¶31 C126→¶32 C127→¶32 C128→¶33 C130→¶33 C162→¶33 C159→¶33 C166→¶33 C129→¶33 C141→¶34 C167→¶34 C142→¶34 C143→¶34 C144→¶34 C145→¶34 C146→¶34 C147→¶34 C148→¶34 C149→¶34 -->

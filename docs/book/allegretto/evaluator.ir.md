@@ -89,7 +89,7 @@ C150. Each section of this chapter carries the status tag that `docs/book/README
 
 C7. The decisions this chapter executes are R2 (partial evaluation is the mechanism), R4 (evaluation is total over unresolved information), D22 (structures are immutable by default) and the rulings of B-112 (the four owed plane interfaces). [decided: docs/book/units.md §4.1]
 
-C131. The B-112 rulings this chapter executes are three. [decided: docs/plans/plane-interfaces.md §8 and §9.5]
+C131. This chapter executes three B-112 rulings. [decided: docs/plans/plane-interfaces.md §8 and §9.5]
 
 C136. One B-112 ruling has the base call one check hook per registered field. [decided: docs/plans/plane-interfaces.md §8, 2026-09]
 
@@ -113,7 +113,9 @@ C11. The unit DAG lets the `evaluator` unit import eight units: `scope`, `expres
 
 ### 2. Evaluation, one switch over the kinds
 
-C12. `evaluate` in `src/evaluator.ts` takes a value, a scope, a depth and an optional dependency collector, and returns a value. evidence: E3. [proposed: this IR]
+C12. `evaluate` in `src/evaluator.ts` takes a value, a scope, a depth and an optional dependency collector. evidence: E3. [proposed: this IR]
+
+C169. `evaluate` returns a value, or a `TailCall` sentinel for an Expression that `markTailCalls` marked (§5 (tail call)). evidence: E3, E5. [proposed: this IR]
 
 C13. `evaluate` returns a Bits, a primitive function, a composed function, a Structure or a Param unchanged. evidence: E3. [proposed: this IR]
 
@@ -129,7 +131,7 @@ C18. The dependency collector records the name of each Symbol that evaluates to 
 
 C19. `evaluate` applies an Expression through `evaluateExpr`. evidence: E5. [proposed: this IR]
 
-C20. An Expression's own metadata fields are laid under the fields of the application's result, except when the result is a `TailCall` sentinel (§5 (tail call)). evidence: E5. [proposed: this IR]
+C20. An Expression's own metadata fields are laid under the fields of the application's result, except when the result is a `TailCall` sentinel. evidence: E5. [proposed: this IR]
 
 C21. `evaluate` throws "Maximum evaluation depth exceeded" when the depth passes 10,000. evidence: E3. [proposed: this IR]
 
@@ -139,7 +141,11 @@ C153. Under the discriminator rule, the evaluator's switch must name only the pa
 
 C157. The inert rest of the kinds must fall to one default arm of the evaluator's switch. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C158. The switch in `evaluate` has no default arm, a defect against the discriminator rule that no backlog item owns. evidence: E3. [inferred: R1]
+C158. The switch in `evaluate` has no default arm. evidence: E3. [proposed: this IR]
+
+C164. The missing default arm of the switch in `evaluate` is a defect against the discriminator rule. [inferred: R1]
+
+C165. No backlog item owns the defect of the switch in `evaluate` against the discriminator rule. evidence: E48. [proposed: this IR]
 
 C151. Nothing counts the defect of the switch in `evaluate` against the discriminator rule, because the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [proposed: this IR]
 
@@ -169,7 +175,9 @@ C163. No abort that `src/evaluator.ts` raises is caused by an unresolved input. 
 
 C34. `src/evaluator.ts` raises three aborts during evaluation: a depth past 10,000; a declared parameter type with no field check installed; a primitive with no implementation. evidence: E3, E8, E18. [proposed: this IR]
 
-C35. PE Rule 1 says that an application with an unresolved argument produces a residual, with metadata fields propagated onto the residual per their rules. [decided: docs/book/concepts.md §25]
+C35. PE Rule 1 says that an application with an unresolved argument produces a residual. [decided: docs/book/concepts.md §25]
+
+C168. Under PE Rule 1, metadata fields propagate onto the residual per their rules. [decided: docs/book/concepts.md §25]
 
 C161. The evaluator applies PE Rule 1 at an eager primitive application and at an unresolved function position. evidence: E6, E8. [proposed: this IR]
 
@@ -177,7 +185,7 @@ C44. A composed function applied to an unresolved argument is unfolded into its 
 
 C154. In an unfolded body, PE Rule 1 applies to each application the body contains. evidence: E8, E15. [proposed: this IR]
 
-C45. For a call into a recursion cycle with an unresolved argument during a typed compilation, `applyComposed` returns a residual carrying the callee's effects. evidence: E9. [proposed: this IR]
+C45. For a call that the inline cutoff stops, `applyComposed` returns a residual carrying the callee's effects. evidence: E9. [proposed: this IR]
 
 C46. `src/runtime.ts` decides cycle membership once per typed compilation. evidence: E35. [proposed: this IR]
 
@@ -381,7 +389,9 @@ C127. B-145 (type vocabulary) owns the carrying by name. [decided: docs/book/uni
 
 C128. `src/evaluator.ts` imports `primitives` and `renderExprSource` from `src/primitives.ts`, which holds units of three layers, Allegro Standard among them. evidence: E2, E42. [proposed: this IR]
 
-C129. Until `src/primitives.ts` is split, the `units` report counts the `renderExprSource` edge, like every edge to `src/primitives.ts` or `src/types.ts`, as unresolved rather than as a violation, because `scripts/analyze/units.json` maps each of the two files to several units. evidence: E36, E42. [proposed: this IR]
+C166. The `units` report counts an edge as unresolved when `scripts/analyze/units.json` maps the file at either end to several units. evidence: E42, E47. [proposed: this IR]
+
+C129. Until `src/primitives.ts` is split, the `units` report counts the `renderExprSource` edge as unresolved, not as a violation. evidence: E36. [proposed: this IR]
 
 C130. The unit DAG places `base-primitives`, one of the units `src/primitives.ts` holds, above the `evaluator` unit. [decided: docs/book/units.md §4.1]
 
@@ -391,7 +401,9 @@ C159. The unit DAG forbids the `evaluator` unit's import of `renderExprSource`. 
 
 ### 9. Where the code is, and what pins it
 
-C141. The whole suite pins `evaluate`, `evaluateExpr`, `applyPrimitive`, `applyComposed`, substitution, `checkArg`, `precompileFunction`, `markTailCalls`, `setInlineCutoff` and `assertPropagationTableLinkage` in `src/evaluator.ts`, with `tests/functions.alg` and `tests/logical.alg` run through `src/test/types-core.ts` and `src/test/grammar2-language.ts`. evidence: E38, E43. [proposed: this IR]
+C141. The whole suite pins `evaluate`, `evaluateExpr`, `applyPrimitive`, `applyComposed`, substitution, `checkArg`, `precompileFunction`, `markTailCalls`, `setInlineCutoff` and `assertPropagationTableLinkage` in `src/evaluator.ts`. evidence: E43. [proposed: this IR]
+
+C167. `tests/functions.alg` and `tests/logical.alg`, run through `src/test/types-core.ts` and `src/test/grammar2-language.ts`, pin the application and tail-call paths of `src/evaluator.ts` that §4 (application and substitution) and §5 quote. evidence: E25, E26, E37, E38. [proposed: this IR]
 
 C142. The whole suite pins `isResolved`, `makeExpr` and `withMeta` in `src/types.ts`. evidence: E43. [proposed: this IR]
 
@@ -417,21 +429,21 @@ G2. cluster: C6, C150, C7, C131, C136, C137, C138, C8, C160 [proposed: this IR]
 
 G3. cluster: C10, C11, C9 [proposed: this IR]
 
-G4. cluster: C12, C13, C21 [proposed: this IR]
+G4. cluster: C12, C169, C13, C21 [proposed: this IR]
 
 G5. cluster: C14, C15, C16, C17, C18 [proposed: this IR]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [proposed: this IR]
 
-G7. cluster: C22, C153, C157, C158, C151, C24, C25, C26 [proposed: this IR]
+G7. cluster: C22, C153, C157, C158, C164, C165, C151, C24, C25, C26 [proposed: this IR]
 
 G8. cluster: C31, C32, C33, C163, C34 [proposed: this IR]
 
-G9. cluster: C35, C161, C44, C154 [proposed: this IR]
+G9. cluster: C35, C168, C161, C44, C154 [proposed: this IR]
 
 G10. cluster: C41, C42, C43 [proposed: this IR]
 
-G11. cluster: C45, C46, C139 [proposed: this IR]
+G11. cluster: C46, C139, C45 [proposed: this IR]
 
 G12. cluster: C48, C49, C50, C51 [proposed: this IR]
 
@@ -473,21 +485,21 @@ G30. cluster: C122, C123, C124, C125 [proposed: this IR]
 
 G31. cluster: C126, C127 [proposed: this IR]
 
-G32. cluster: C128, C130, C162, C159, C129 [proposed: this IR]
+G32. cluster: C128, C130, C162, C159, C166, C129 [proposed: this IR]
 
-G33. cluster: C141, C142, C143, C144, C145, C146, C147, C148, C149 [proposed: this IR]
+G33. cluster: C141, C167, C142, C143, C144, C145, C146, C147, C148, C149 [proposed: this IR]
 
 G34. cluster: C36, C37, C38, C39, C40, C47 [proposed: this IR]
 
 ## Relations
 
-R1. C158 depends-on C157 because the switch in `evaluate` has seven arms and no default arm (E3), against the ratified C157, and no backlog item names the missing default arm.
+R1. C164 depends-on C157 because C158 states that the switch in `evaluate` has no default arm, which the ratified C157 requires.
 
 R2. C57 depends-on C55 because a residual `eval_when` evaluates no branch, and C56 shows the same for `&&` and `||`.
 
 R3. C154 refines C35 because `applyComposed` unfolds the composed application (C44), so the applications PE Rule 1 governs are the ones inside the body.
 
-R4. C45 refines C44 because the inline cutoff bounds the unfolding of recursive calls.
+R4. C45 refines C44 because the inline cutoff stops exactly the calls C44 excepts: a call into a recursion cycle with an unresolved argument during a typed compilation.
 
 R5. C84 depends-on C83 because a loop round that keeps the depth lets a chain of any length stay under the bound.
 
@@ -497,7 +509,7 @@ R7. C91 depends-on C88 because each wrapper forwards the sentinel by its own cod
 
 R8. C125 depends-on C119 because the done-condition counts the Allegro Standard imports.
 
-R9. C129 refines C120 because the report judges only edges between files assigned to one unit each.
+R9. C129 refines C120 because C166 makes the report judge only edges between files assigned to one unit each.
 
 R10. C159 depends-on C162 because C162 puts `renderExprSource` in the `base-primitives` unit, which C130 places above the `evaluator` unit.
 
@@ -595,8 +607,12 @@ E45. `scripts/analyze/units.json` line 79 and `scripts/analyze/index.ts` lines 2
 
 E46. `src/primitives.ts` line 42, `docs/book/units.md` line 241 and `scripts/analyze/units.json` line 18: `renderExprSource` sits inside lines 23–1197, which unit 15, `base-primitives`, holds; `base-primitives` lists `evaluator` among its dependencies.
 
+E47. `scripts/analyze/index.ts` lines 259–268: an edge starts with the verdict `unresolved` and is judged `ok` or `violation` only when neither end's file maps to several units.
+
+E48. `docs/backlog.md`, searched on 2026-10-31: no entry names the default arm of the switch in `evaluate`.
+
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C161, C162. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C161, C162.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C158, C161, C162, C165, C166, C167, C169. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C158, C161, C162, C165, C166, C167, C169.
 
 A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79, C140.

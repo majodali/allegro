@@ -34,6 +34,7 @@ and the stranger finds no contradiction and no undefined term.
 | 2 | 2,437 | 150 | 10 | 4.1 | not readable (contradictions 2, undefined terms 0; restatement mismatch on C113 counts under the override) |
 | 3 | 2,444 | 155 | 9 | 3.7 | not readable (contradictions 2, undefined terms 0; restatement mismatches 2, both the stranger's own) |
 | 4 | 2,490 | 157 | 8 | 3.2 | not readable (contradictions 2, undefined terms 0; restatement mismatch on C154 counts under the override) |
+| 5 | 2,544 | 159 | 7 | 2.8 | not readable (contradictions 1, undefined terms 0; restatement mismatch 1, the stranger's own, on T30: the same passage as round 4's M1, so it counts under the override) |
 
 ## Round 1, 2026-10-31
 
@@ -287,3 +288,46 @@ map is unchanged, since no claim moved:
 Counts after the touch-up: IR 159 claims; clusters 34; relations 10;
 evidence 46; prose 2,485 to 2,488 words (the stranger's method, +3
 measured on the diff). Lint clean; round trip 159 of 159.
+
+## Round 5, 2026-10-31
+
+Reviewed commit `a3f5d75`: 2,544 prose words by the stranger's count
+(`wc` with markup tokens such as `>` and list dashes counted; code
+blocks, the §9 table and the render map excluded); IR 159 claims; 7
+findings; 2.8 per thousand words. The restatement was written from the
+prose before the IR was opened. It had one mismatch with the IR, on T30:
+the restatement dropped "of a composed function" from the definition of
+*tail call*. The stranger attributed it to its own restatement and
+quoted the prose sentence carrying T30. The mismatch falls on the
+passage of round 4's mismatch on T30, so the specification's override
+counts it whatever its attribution. That recurrence on one passage in
+two rounds is again the second meta-review signal of the specification's
+Meta-review section; the `Meta-review:` line is written at the end of
+the count. Contradictions 1 (finding 1); undefined terms 0. Verdict: not
+readable for RD-4. Finding 1 was checked against `evaluate`,
+`evaluateExpr` and `applyComposed` in `src/evaluator.ts` before the
+decision: `evaluate` is declared to return `Value`, its Expression arm
+passes the sentinel `evaluateExpr` makes for a marked Expression through
+with a cast, and `applyComposed` catches it.
+
+| # | Finding (shortened) | Kind | Decision |
+|---|---|---|---|
+| 1 | "`evaluate` … returns a value" (C12) against "A `TailCall` sentinel is a host object, not a value" (C80) | contradiction | fixed: C12 split; C12 keeps the inputs, "`evaluate` in `src/evaluator.ts` takes a value, a scope, a depth and an optional dependency collector."; new C169, "`evaluate` returns a value, or a `TailCall` sentinel for an Expression that `markTailCalls` marked (§5 (tail call))."; C20 drops its "(§5 (tail call))", now named at C169; C80 unchanged |
+| 2 | C158 joins the missing default arm, the defect and the ownership | compound | fixed: split into C158, "The switch in `evaluate` has no default arm.", proposed with E3; new C164, "The missing default arm of the switch in `evaluate` is a defect against the discriminator rule.", inferred from R1; new C165, "No backlog item owns the defect of the switch in `evaluate` against the discriminator rule.", with the new E48; R1 now derives C164 |
+| 3 | C129's sentence, 36 words, joins the reporting rule to its cause | compound | fixed: split into new C166, "The `units` report counts an edge as unresolved when `scripts/analyze/units.json` maps the file at either end to several units.", with the new E47, and C129, "Until `src/primitives.ts` is split, the `units` report counts the `renderExprSource` edge as unresolved, not as a violation."; R9 reworded |
+| 4 | the §9 table's first "Pinned by" cell joins two claims with a semicolon | compound | fixed: C141 split; C141 keeps the whole suite; new C167, "`tests/functions.alg` and `tests/logical.alg`, run through `src/test/types-core.ts` and `src/test/grammar2-language.ts`, pin the application and tail-call paths of `src/evaluator.ts` that §4 (application and substitution) and §5 quote.", a row of its own |
+| 5 | PE Rule 1's sentence joins residual production and propagation | compound | fixed: split into C35, "PE Rule 1 says that an application with an unresolved argument produces a residual.", and new C168, "Under PE Rule 1, metadata fields propagate onto the residual per their rules.", both decided from `docs/book/concepts.md` §25; the spine's sentence cuts cleanly before "with metadata fields" |
+| 6 | the C45 sentence repeats the recursion-cycle condition of the C44 sentence | excess | fixed: G11 reordered to C46, C139, C45; C45 rephrased, "For a call that the inline cutoff stops, `applyComposed` returns a residual carrying the callee's effects."; R4 now names the calls the cutoff stops |
+| 7 | "The B-112 rulings executed are three." then "One", "A second", "A third" | excess | fixed: C131 rephrased, "This chapter executes three B-112 rulings."; the prose reads "The chapter executes three B-112 rulings. The first ruling …", "The second ruling …", "The third ruling, of 2026-10-22, …" |
+
+Fixes after round 5: IR 159 to 165 claims (five splits adding six
+claims: C164 and C165 from C158, C166 from C129, C167 from C141, C168
+from C35, C169 from C12; C45 and C131 rephrased); clusters 34, G11
+reordered; relations 10, R1, R4 and R9 reworded; evidence 46 to 48
+(E47 and E48 added); prose 2,544 to 2,555 words (same method: the
+stranger's count plus the change measured on the diff, +11). Lint clean;
+round trip 165 of 165.
+
+The round 5 stranger instance was lost to a container restart before
+confirmation, so no fix of round 5 carries a confirmation mark. Round
+6's stranger reviews the fixed text.
