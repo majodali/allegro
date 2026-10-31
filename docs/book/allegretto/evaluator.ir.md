@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `evaluator` unit (unit 13): evaluation and partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, and the edges the unit still owes.
-Status: draft
+Status: reviewed (count 1, round 7 readable 2026-10-31; unratified terms 1; footprint: declared 9, changed 10, surprises 1, misses 0)
 Source: chunk A1 of docs/plans/book-chapters-now.md (stream A, B-170); src/evaluator.ts as assigned to unit 13 since B-112's exit
 Normative: yes
 Footprint: docs/book/allegretto/evaluator.md; docs/book/allegretto/evaluator.ir.md; docs/book/allegretto/evaluator.review.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
@@ -139,6 +139,8 @@ C22. The discriminator rule lets only the evaluator switch on kind for behaviour
 
 C153. Under the discriminator rule, the evaluator's switch must name only the participating kinds: Symbol, Expression, the two function kinds and Param. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
+C172. Under the discriminator rule, the two function kinds and Param participate because each takes part in application. [decided: docs/book/units.md §3.2, ratified 2026-10]
+
 C157. One default arm of the evaluator's switch must take the inert rest of the kinds. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
 C158. The switch in `evaluate` names all seven kinds, with no default arm. evidence: E3. [proposed: this IR]
@@ -147,7 +149,7 @@ C164. The switch in `evaluate` is a defect against the discriminator rule. [infe
 
 C165. No backlog item owns the defect of the switch in `evaluate` against the discriminator rule. evidence: E48. [proposed: this IR]
 
-C151. The `units` report's discriminator count skips the `evaluator` unit, the switch in `evaluate` included. evidence: E45. [proposed: this IR]
+C151. Nothing counts the defect of the switch in `evaluate` against the discriminator rule: the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [proposed: this IR]
 
 C24. Two walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves. evidence: E10. [proposed: this IR]
 
@@ -437,7 +439,7 @@ G5. cluster: C14, C15, C170, C16, C17, C18 [proposed: this IR]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [proposed: this IR]
 
-G7. cluster: C22, C153, C157, C158, C164, C165, C151, C24, C25, C26 [proposed: this IR]
+G7. cluster: C22, C153, C172, C157, C158, C164, C165, C151, C24, C25, C26 [proposed: this IR]
 
 G8. cluster: C31, C32, C33, C163, C34 [proposed: this IR]
 

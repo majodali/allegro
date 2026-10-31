@@ -78,6 +78,10 @@ reworded; evidence 41 to 44 (E42 to E44 added, E15 and E26 corrected);
 prose 2,317 to 2,402 words (same method: code blocks, the §9 table and
 the render map excluded). Lint clean; round trip 150 of 150.
 
+Claims check before round 2: round trip 150 of 150 claims, 0 missing, 0
+stale (the render map and the re-read of changed passages, run after the
+fixes).
+
 The round 1 stranger instance was lost to a container restart before
 confirmation, so no fix of round 1 carries a confirmation mark. Round
 2's stranger reviews the fixed text.
@@ -159,6 +163,10 @@ Counts after the touch-up: IR 153 to 155 claims (C157, C158); clusters
 prose 2,466 to 2,496 words (the stranger's method, +30 measured on the
 diff). Lint clean; round trip 155 of 155.
 
+Claims check before round 3: round trip 155 of 155 claims, 0 missing, 0
+stale (the render map and the re-read of changed passages, run after the
+fixes).
+
 ## Round 3, 2026-10-31
 
 Reviewed commit `ec8fec9`: 2,444 prose words by the stranger's count
@@ -223,6 +231,10 @@ map:
 Counts after the touch-up: IR 157 claims; clusters 33; relations 10
 (R10 reworded); evidence 46; prose 2,467 to 2,473 words (the stranger's
 method, +6 measured on the diff). Lint clean; round trip 157 of 157.
+
+Claims check before round 4: round trip 157 of 157 claims, 0 missing, 0
+stale (the render map and the re-read of changed passages, run after the
+fixes).
 
 ## Round 4, 2026-10-31
 
@@ -291,6 +303,10 @@ Counts after the touch-up: IR 159 claims; clusters 34; relations 10;
 evidence 46; prose 2,485 to 2,488 words (the stranger's method, +3
 measured on the diff). Lint clean; round trip 159 of 159.
 
+Claims check before round 5: round trip 159 of 159 claims, 0 missing, 0
+stale (the render map and the re-read of changed passages, run after the
+fixes).
+
 ## Round 5, 2026-10-31
 
 Reviewed commit `a3f5d75`: 2,544 prose words by the stranger's count
@@ -329,6 +345,10 @@ reordered; relations 10, R1, R4 and R9 reworded; evidence 46 to 48
 (E47 and E48 added); prose 2,544 to 2,555 words (same method: the
 stranger's count plus the change measured on the diff, +11). Lint clean;
 round trip 165 of 165.
+
+Claims check before round 6: round trip 165 of 165 claims, 0 missing, 0
+stale (the render map and the re-read of changed passages, run after the
+fixes).
 
 The round 5 stranger instance was lost to a container restart before
 confirmation, so no fix of round 5 carries a confirmation mark. Round
@@ -384,6 +404,10 @@ given, quoting the body's uses of the short form "kind", so it no
 longer counts. New defects in the changed passages: none. No touch-up;
 round 7 reviews this text.
 
+Claims check before round 7: round trip 165 of 165 claims, 0 missing, 0
+stale (the render map and the re-read of changed passages, run after the
+fixes).
+
 ## Round 7, 2026-10-31
 
 Reviewed commit `f233a10`: 2,561 prose words by the stranger's count
@@ -433,5 +457,105 @@ reworded; evidence 48, E3 and E48 reworded; prose 2,561 to 2,548 words
 (same method: the stranger's count plus the change measured on the diff,
 −13, list markers counted). Lint clean; round trip 166 of 166.
 
-Confirmation: pending. The round 7 stranger instance confirms each fix
-before delivery; the orchestrating session relays its marks.
+Confirmation, by the round's stranger instance on commit `8bf227e`:
+findings 1, 3, 4, 5, 6 and 8 confirmed. Finding 7 withdrawn by the
+instance on the reason given: C124 renders the whole sentence as one
+decided claim with its reason clause inside it, and "because" is not in
+the compound list. Finding 2 unfixed: "One default arm must take the
+inert rest of the kinds." still uses the phrase "the inert rest of the
+kinds", which the finding asked to replace with a plainer one. Under the
+specification, the unconfirmed fix's words stay in the delivered prose,
+and the reasoning role fixes finding 2 at the next edit of the chapter.
+That sentence is not changed now. New defects in the changed passages,
+four:
+
+- A. The §2 sentence of C153 lists primitive function, composed function
+  and Param as participating, which C13 says `evaluate` returns
+  unchanged, as it does Bits and Structure; no sentence says why the
+  first three participate and the last two do not (mismatch).
+- B. The C151 sentence, "the switch in `evaluate` included", no longer
+  states that nothing counts the defect, which C151 held before round 7
+  (mismatch).
+- C. The C158 and C164 sentences both open with "The switch in
+  `evaluate`" (excess).
+- D. The link from the unmarked Expression (C171) to "holds the call's
+  value" (C86) is adjacency only, though R6 makes C86 depend on C171
+  (minor).
+
+Touch-up after confirmation, four edits, IR first, then prose and render
+map:
+
+1. A: new C172, after C153 in G7, decided from `docs/book/units.md`
+   §3.2, which names the participating kinds by their part in
+   evaluation (Symbol resolves, Expression applies, the function kinds
+   and Param take part in application): "Under the discriminator rule,
+   the two function kinds and Param participate because each takes part
+   in application." The prose reads "The two function kinds and Param
+   participate because each takes part in application." Checked against
+   `evaluateExpr` (a function kind in function position is applied; an
+   unresolved Param in function position yields a residual carrying the
+   Param's effects) and `subst` (a Param is replaced by its argument) in
+   `src/evaluator.ts`.
+2. B: C151 restores the conclusion with a colon, not "because": "Nothing
+   counts the defect of the switch in `evaluate` against the
+   discriminator rule: the `units` report's discriminator count skips
+   the `evaluator` unit." The prose reads "Nothing counts the defect: the
+   `units` report's discriminator count skips the `evaluator` unit."
+3. C: the C164 sentence opens with a determiner and noun, "That switch
+   is a defect against the discriminator rule."; C164 in the IR keeps
+   the full name.
+4. D: the C86 sentence opens with the connective "So", carrying R6's
+   dependency: "So a local binding of an `if` or a `when` whose chosen
+   branch is a call holds the call's value." C86 keeps its provenance,
+   proposed with evidence E5 and E25.
+
+Counts after the touch-up: IR 166 to 167 claims (C172 added; C151
+rephrased); clusters 34 (G7 gains C172); relations 10; evidence 48;
+prose 2,548 to 2,559 words (the stranger's method, +11 measured on the
+diff). Lint clean; round trip 167 of 167.
+
+Claims check before delivery: round trip 167 of 167 claims, 0 missing,
+0 stale (the render map and the re-read of changed passages, run after
+the touch-up).
+
+Confirmation of the touch-up: pending.
+
+## Verdict and meta-review
+
+Readable for RD-4 at round 7 of a count of seven. The count ends at the
+readable verdict. Findings per thousand words by round: 7.8, 4.1, 3.7,
+3.2, 2.8, 3.9, 3.1. Prose 2,317 words at round 1 and 2,559 at delivery;
+IR 134 claims at round 1, 166 after round 7's fixes and 167 at delivery,
+the growth from splits. Two stranger instances were lost to container
+restarts before confirmation, in rounds 1 and 5.
+
+Footprint before delivery, by `git diff --name-only origin/main...HEAD`
+with the IR and the review record excluded: declared 9, changed 10,
+surprises 1, misses 0. The surprise is `docs/backlog.md`, where this
+count's close files B-172 (the partial-evaluation rules as implemented
+against the spine) in the stream's spare id. IR Status set to `reviewed
+(count 1, round 7 readable 2026-10-31; unratified terms 1; footprint:
+declared 9, changed 10, surprises 1, misses 0)`.
+
+The four meta-review signals, checked against this record:
+
+1. Fired. A fix was not held at confirmation in rounds 2 and 3 (findings
+   2 and 3 of round 2, finding 5 of round 3) and in round 7 (finding 2).
+2. Fired. A restatement mismatch recurred on one passage: C113 in rounds
+   1 and 2; C154 with C44, the PE Rule 1 passage, in rounds 3, 4 and 6;
+   T30 in rounds 4 and 5.
+3. Not fired. Words per IR claim were 17.3 at round 1 (2,317 / 134) and
+   15.3 at round 7 (2,548 / 166; the text round 7 reviewed, 2,561 / 165,
+   gives 15.5). The last does not exceed the first by more than one
+   tenth: it fell.
+4. Fired. Round 3's finding 2 fell on C129, which round 1's fixes added;
+   round 4's finding 1 fell on C154, which round 2's fixes added; round
+   6's finding 1 fell on the same PE Rule 1 passage.
+
+The point for the meta-review: round 7's verdict rests on the
+orchestrating session's reading that an omission in a restatement
+bounded at 200 words is not a disagreement, so the override does not
+reach M2 to M5. Under the other reading, the override counts M2, M4 and
+M5, and round 7 is not readable.
+
+Meta-review: pending (signals checked: 1 fired, 2 fired, 3 not fired, 4 fired; the count reached no limit)
