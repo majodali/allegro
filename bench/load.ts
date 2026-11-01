@@ -20,6 +20,14 @@
 // fails; the final memo size is recorded and printed, never gated (B-157 P5).
 // Wall clock is printed, never gated. `--update-baseline` rewrites the file; it is run
 // only to LOWER the baseline after a chunk lands (or when the corpus changes).
+//
+// The precompile corpus (B-159 (precompile of recursive definitions), chunk
+// R1 (the measurement lands); plan docs/plans/recursive-precompile.md §5) is
+// report-only: report mode runs and prints it after the load corpus, check
+// mode never sees it, so the
+// parse ratchet and bench/load-baseline.json ignore it. Its counts enter the
+// ratchet with their own baseline at R2 (ruling RR3 (whether and how the
+// counts are gated)), once the inline cutoff makes them deterministic.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -42,15 +50,34 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const BASELINE = path.join(ROOT, "bench", "load-baseline.json");
 const SYSTEM_LIB = path.join(ROOT, "lib");
 
-/** The corpus of the plan's §3. A `library` entry is loaded as a module
- *  (`use NAME`); a `program` entry is a file the CLI runs. */
-const CORPUS: { file: string; kind: "library" | "program" }[] = [
-  { file: "lib/units.alg",                 kind: "library" },
-  { file: "lib/planning.alg",              kind: "library" },
-  { file: "tests/planning-solve-demo.alg", kind: "program" },
-  { file: "demos/rung3/01-model.alg",      kind: "program" },
-  { file: "demos/rung3/02-solve.alg",      kind: "program" },
+/** A corpus group. `load` is the plan's §3 corpus, run by report mode and
+ *  ratcheted by check mode. `precompile` (B-159 R1) is run by report mode
+ *  only: check mode skips it, so it is in no baseline. */
+type CorpusGroup = "load" | "precompile";
+
+/** The corpus of the plan's §3, then the precompile corpus. A `library` entry
+ *  is loaded as a module (`use NAME`); a `program` entry is a file the CLI
+ *  runs. */
+const CORPUS: { file: string; kind: "library" | "program"; group: CorpusGroup }[] = [
+  { file: "lib/units.alg",                 kind: "library", group: "load" },
+  { file: "lib/planning.alg",              kind: "library", group: "load" },
+  { file: "tests/planning-solve-demo.alg", kind: "program", group: "load" },
+  { file: "demos/rung3/01-model.alg",      kind: "program", group: "load" },
+  { file: "demos/rung3/02-solve.alg",      kind: "program", group: "load" },
+  // The six Phase E sources of docs/plans/recursive-precompile.md §2.2 and
+  // the two totality demos that unfold a typed recursive definition.
+  { file: "bench/corpus/precompile/factorial-nonneg.alg", kind: "program", group: "precompile" },
+  { file: "bench/corpus/precompile/factorial-int.alg",    kind: "program", group: "precompile" },
+  { file: "bench/corpus/precompile/f-decreases.alg",      kind: "program", group: "precompile" },
+  { file: "bench/corpus/precompile/k-lex.alg",            kind: "program", group: "precompile" },
+  { file: "bench/corpus/precompile/sum_to.alg",           kind: "program", group: "precompile" },
+  { file: "bench/corpus/precompile/bad.alg",              kind: "program", group: "precompile" },
+  { file: "tests/totality-termination-demo.alg",          kind: "program", group: "precompile" },
+  { file: "tests/totality-decreases-demo.alg",            kind: "program", group: "precompile" },
 ];
+
+/** The entries check mode parses and ratchets: the load group only. */
+const CHECKED = CORPUS.filter(e => e.group === "load");
 
 /** The counts the ratchet gates: the engine's work. All are deterministic
  *  for a given grammar and source; wall clock is not among them.
@@ -82,6 +109,8 @@ function rel(label: string): string {
 function pad(s: string, n: number): string { return s.length >= n ? s : s + " ".repeat(n - s.length); }
 function lpad(s: string, n: number): string { return s.length >= n ? s : " ".repeat(n - s.length) + s; }
 function num(n: number): string { return n.toLocaleString("en-US"); }
+/** The width of the report's entry column. */
+const W = 48;
 
 // --- Report mode: full runs ---------------------------------------------------
 
@@ -100,7 +129,7 @@ function readReportLines(stderr: string): RunParse[] {
   return out;
 }
 
-interface RunEval { evaluates: number; applyComposed: number; applyPrimitive: number; inlineExpansions: number; bindings: number; bindingEvals: number; maxPerBinding: number; reEvaluated: number; }
+interface RunEval { evaluates: number; applyComposed: number; applyPrimitive: number; inlineExpansions: number; bindings: number; bindingEvals: number; maxPerBinding: number; reEvaluated: number; cutoffResiduals: number; precompiles: number; }
 
 /** The run's one `eval-stats` line (`formatRunStats` in src/evaluator.ts). */
 function readEvalLine(stderr: string): RunEval | null {
@@ -111,6 +140,7 @@ function readEvalLine(stderr: string): RunEval | null {
       evaluates: field("evaluates"), applyComposed: field("applyComposed"), applyPrimitive: field("applyPrimitive"),
       inlineExpansions: field("inlineExpansions"), bindings: field("bindings"), bindingEvals: field("bindingEvals"),
       maxPerBinding: field("maxPerBinding"), reEvaluated: field("reEvaluated"),
+      cutoffResiduals: field("cutoffResiduals"), precompiles: field("precompiles"),
     };
   }
   return null;
@@ -119,8 +149,14 @@ function readEvalLine(stderr: string): RunEval | null {
 function runReport(): number {
   console.log("Load corpus — full runs (parse + evaluation), ALLEGRO_PARSE_STATS=1 ALLEGRO_EVAL_STATS=1");
   console.log("Wall clock is reported, never gated (docs/plans/fast-library-load.md §3).\n");
-  const rows: { file: string; wall: number; code: number | null; parses: RunParse[]; evals: RunEval | null; tail: string }[] = [];
+  const rows: { file: string; group: CorpusGroup; wall: number; code: number | null; parses: RunParse[]; evals: RunEval | null; tail: string }[] = [];
+  let group: CorpusGroup | null = null;
   for (const entry of CORPUS) {
+    if (entry.group !== group) {
+      group = entry.group;
+      console.log(group === "load" ? "Load corpus (ratcheted by npm run lint:load):"
+        : "Precompile corpus (B-159; reported, not gated):");
+    }
     const t0 = Date.now();
     const r = spawnSync(process.execPath, ["--import", "tsx", "src/index.ts", entry.file], {
       cwd: ROOT, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024,
@@ -131,33 +167,36 @@ function runReport(): number {
     const evals = readEvalLine(r.stderr ?? "");
     const tail = (r.stderr ?? "").split("\n")
       .filter(l => l && !l.startsWith("parse-stats ") && !l.startsWith("eval-stats ")).slice(-8).join("\n");
-    rows.push({ file: entry.file, wall, code: r.status, parses, evals, tail });
-    console.log(`  ${pad(entry.file, 32)} ${lpad(wall.toFixed(1), 7)} s  exit ${r.status}  (${parses.length} parses)`);
+    rows.push({ file: entry.file, group: entry.group, wall, code: r.status, parses, evals, tail });
+    console.log(`  ${pad(entry.file, W)} ${lpad(wall.toFixed(1), 7)} s  exit ${r.status}  (${parses.length} parses)`);
   }
 
   console.log("");
-  const header = "  " + pad("entry", 32) + lpad("wall s", 8) + lpad("parses", 8) + lpad("parse s", 9) +
+  const header = "  " + pad("entry", W) + lpad("wall s", 8) + lpad("parses", 8) + lpad("parse s", 9) +
     lpad("attempts", 14) + lpad("memo writes", 14) + lpad("inv entries", 13) + lpad("LR iters", 10);
   console.log(header);
   console.log("  " + "-".repeat(header.length - 2));
   for (const row of rows) {
     const sum = (k: keyof RunParse) => row.parses.reduce((a, p) => a + (p[k] as number), 0);
-    console.log("  " + pad(row.file, 32) + lpad(row.wall.toFixed(1), 8) + lpad(String(row.parses.length), 8) +
+    console.log("  " + pad(row.file, W) + lpad(row.wall.toFixed(1), 8) + lpad(String(row.parses.length), 8) +
       lpad((sum("ms") / 1000).toFixed(1), 9) + lpad(num(sum("attempts")), 14) + lpad(num(sum("memoWrites")), 14) +
       lpad(num(sum("invEntries")), 13) + lpad(num(sum("lrIters")), 10));
   }
 
-  console.log("\nEvaluation per run (B-157 P10; a binding is a top-level binding whose expression computes):");
-  const eheader = "  " + pad("entry", 32) + lpad("evaluate", 12) + lpad("applyComposed", 15) + lpad("applyPrimitive", 16) +
-    lpad("inline exp.", 13) + lpad("bindings", 10) + lpad("binding evals", 15) + lpad("max", 5) + lpad("re-eval'd", 11);
+  console.log("\nEvaluation per run (B-157 P10; a binding is a top-level binding whose expression computes;");
+  console.log("cutoff res. and precompiles are B-159 R1's counters):");
+  const eheader = "  " + pad("entry", W) + lpad("evaluate", 12) + lpad("applyComposed", 15) + lpad("applyPrimitive", 16) +
+    lpad("inline exp.", 13) + lpad("cutoff res.", 13) + lpad("precompiles", 13) +
+    lpad("bindings", 10) + lpad("binding evals", 15) + lpad("max", 8) + lpad("re-eval'd", 11);
   console.log(eheader);
   console.log("  " + "-".repeat(eheader.length - 2));
   for (const row of rows) {
     const e = row.evals;
-    if (!e) { console.log("  " + pad(row.file, 32) + "  (no eval-stats line)"); continue; }
-    console.log("  " + pad(row.file, 32) + lpad(num(e.evaluates), 12) + lpad(num(e.applyComposed), 15) +
-      lpad(num(e.applyPrimitive), 16) + lpad(num(e.inlineExpansions), 13) + lpad(num(e.bindings), 10) +
-      lpad(num(e.bindingEvals), 15) + lpad(String(e.maxPerBinding), 5) + lpad(String(e.reEvaluated), 11));
+    if (!e) { console.log("  " + pad(row.file, W) + "  (no eval-stats line)"); continue; }
+    console.log("  " + pad(row.file, W) + lpad(num(e.evaluates), 12) + lpad(num(e.applyComposed), 15) +
+      lpad(num(e.applyPrimitive), 16) + lpad(num(e.inlineExpansions), 13) +
+      lpad(num(e.cutoffResiduals), 13) + lpad(num(e.precompiles), 13) + lpad(num(e.bindings), 10) +
+      lpad(num(e.bindingEvals), 15) + lpad(String(e.maxPerBinding), 8) + lpad(String(e.reEvaluated), 11));
   }
 
   console.log("\nParses per run:");
@@ -226,7 +265,7 @@ async function measure(): Promise<{ rows: Map<string, SourceRow>; ms: Map<string
 
   const previous = setParseStatsSink(record);
   try {
-    for (const entry of CORPUS) {
+    for (const entry of CHECKED) {
       const file = path.join(ROOT, entry.file);
       currentDir = path.dirname(file);
       try {
