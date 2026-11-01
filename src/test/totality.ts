@@ -21,6 +21,7 @@ import type { Extension } from "../runtime.js";
 import { primitives as primRegistry } from "../primitives.js";
 import { summarizeModule, renderModuleSummary } from "../introspect.js";
 import { scopeLookup } from "../scope.js";
+import { setEvalStatsSink, type EvalReport, type EvalStats } from "../evaluator.js";
 
 // --- Phase E Stage 0: totality substrate (`partial` opt-out) ---
 
@@ -903,4 +904,68 @@ factorial(n: NonNeg): Int =>
     eq(s.callee === s.bound, true, "the callee is the object the definition is bound to");
   }
   eq(new Set(inPrecompile.map(s => s.callee)).size, 1, "one object per definition");
+});
+
+/** Compile and run one file as `verdictOf` does, through the stats sink, and
+ *  return the program's evaluation counts and its compilation report. */
+function precompileCountsOf(file: string): { stats: EvalStats; notifications: { kind: string; binding?: string | null; message: string }[] } {
+  const { names, body } = useHeaders(fs.readFileSync(file, "utf-8"));
+  const loader = libLoader();
+  const exts: Extension[] = [typeExt];
+  for (const id of names) {
+    const ext = loader.loadModuleSync(id);
+    exts.push({ name: id, bindings: { ...ext.bindings }, grammarFragment: ext.grammarFragment });
+  }
+  const reports: EvalReport[] = [];
+  const previousSink = setEvalStatsSink(r => { reports.push(r); });
+  const origLog = console.log;
+  console.log = () => {};
+  let report;
+  try {
+    ({ compilationReport: report } = runtimeEval(body, undefined, exts, undefined, true));
+  } finally {
+    console.log = origLog;
+    setEvalStatsSink(previousSink);
+  }
+  const own = reports.filter(r => r.source === "<main>");
+  eq(own.length, 1, `one stats report for ${path.basename(file)}`);
+  return { stats: own[0].stats, notifications: report!.notifications };
+}
+
+// The precompile corpus of the plan's §5 (row R1): the six Phase E sources
+// and the two totality demos. `maxInline` bounds the precompile pass's inline
+// expansions. A recursive definition's unfolding made tens of thousands of
+// them before R2; the bound is the only other expansion the pass makes: the
+// refinement predicate of `NonNeg = Int & _ >= 0` (the lambda `_ >= 0`),
+// expanded at most once per definition with a `NonNeg` parameter. Whether it
+// is expanded depends on what an earlier compilation in the same process
+// left behind: the first compilation in a process expands it 0 times (as the
+// CLI does), a later one once. So the bound is exact for the suite, where
+// other programs run first, and 0 through `npm run lint:load`.
+const R2_CORPUS: { file: string; maxInline: number }[] = [
+  { file: "bench/corpus/precompile/factorial-nonneg.alg", maxInline: 1 },
+  { file: "bench/corpus/precompile/factorial-int.alg",    maxInline: 0 },
+  { file: "bench/corpus/precompile/f-decreases.alg",      maxInline: 0 },
+  { file: "bench/corpus/precompile/k-lex.alg",            maxInline: 0 },
+  { file: "bench/corpus/precompile/sum_to.alg",           maxInline: 1 },
+  { file: "bench/corpus/precompile/bad.alg",              maxInline: 0 },
+  { file: "tests/totality-termination-demo.alg",          maxInline: 2 },
+  { file: "tests/totality-decreases-demo.alg",            maxInline: 0 },
+];
+
+for (const row of R2_CORPUS) {
+  test(`B-159 R2 regression: ${path.basename(row.file)} — the cutoff fires; no recursive unfolding; no precompile-type-error`, () => {
+    const { stats, notifications } = precompileCountsOf(path.resolve(row.file));
+    eq(stats.inlineExpansions <= row.maxInline, true,
+      `${row.file}: inline expansions ${stats.inlineExpansions}, at most ${row.maxInline} (none of a recursive definition)`);
+    eq(stats.cutoffResiduals >= 1, true, `${row.file}: cutoff residuals ${stats.cutoffResiduals}, at least 1`);
+    const spurious = notifications.filter(n => n.kind === "precompile-type-error");
+    eq(spurious.length, 0, `${row.file}: no precompile-type-error, got ${JSON.stringify(spurious.map(n => `${n.binding}: ${n.message}`))}`);
+  });
+}
+
+test("B-159 R2 regression: the list covers every source in bench/corpus/precompile/", () => {
+  const files = fs.readdirSync(precompileCorpusDir).filter(f => f.endsWith(".alg")).map(f => `bench/corpus/precompile/${f}`);
+  const listed = R2_CORPUS.map(r => r.file).filter(f => f.startsWith("bench/"));
+  eq(JSON.stringify(listed.sort()), JSON.stringify(files.sort()));
 });
