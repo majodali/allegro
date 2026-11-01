@@ -149,7 +149,7 @@ field, whether or not the arguments are resolved. The first installed
 dispatcher that answers gives an eager primitive's residual its type. An
 eager primitive's result carries the union of the primitive's static
 [effect](../concepts.md#def-effect) tags and the effects of its evaluated
-arguments. During [precompile](../concepts.md#def-the-evalsource-pipeline),
+arguments. During [precompile](../layers.md#def-precompile),
 an effectful primitive returns a residual even over resolved arguments,
 which defers its side effect to the run.
 
@@ -253,7 +253,7 @@ carries the mark through a wrapper (`type_check`, `ensures_check`, an
 further wrapper, never to a bare call. `src/runtime.ts` marks every
 composed function body among a file's
 [bindings](../concepts.md#def-binding) after symbol resolution and
-before [precompile](../concepts.md#def-the-evalsource-pipeline). Before
+before [precompile](../layers.md#def-precompile). Before
 marking, `src/runtime.ts` collapses the `*_attach` wrappers of each
 function body onto function properties with `collapseBodyMetadata`.
 
@@ -349,7 +349,7 @@ own values before `src/runtime.ts` evaluates the file.
 `precompileFunction` writes the inferred
 [effect](../concepts.md#def-effect) set onto the function it is given, as
 the function's `inferredEffects` property. The
-[precompile](../concepts.md#def-the-evalsource-pipeline) stage in
+[precompile](../layers.md#def-precompile) stage in
 `src/runtime.ts` skips a function that a library owns.
 
 ## 7. The install surface [partial]
