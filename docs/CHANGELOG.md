@@ -132,6 +132,25 @@ Plan `docs/plans/recursive-precompile.md`; lane P; merge-on-green
 under deviation D-2 (merge-on-green streams). Opened 2026-10-30 with
 the plan; entries newest first, directly below this line.
 
+### 2026-11 — The measurement lands (B-159, chunk R1): two counters, the precompile corpus, the verdict pin
+
+B-159 (precompile of recursive definitions), chunk R1 of
+`docs/plans/recursive-precompile.md`, with no behaviour change. The
+evaluation stats of B-157 (the performance stream) gain two counters in
+`src/evaluator.ts`: `cutoffResiduals`, the speculative calls the inline
+cutoff returned as residuals, and `precompiles`, the entries to
+`precompileFunction`. `bench/load.ts` gains a precompile corpus: the six
+Phase E sources under `bench/corpus/precompile/` and the two totality
+demos. `npm run bench:load` reports it; `npm run lint:load` skips it,
+and its baseline is unchanged under RR3 (whether and how the counts are
+gated). `src/test/totality.ts` gains the verdict pin, 12 rows: the
+`totality-*` notifications and discharge tiers of every
+`tests/totality-*.alg` demo and every Phase E source, as they are
+today. Headline numbers, from this sandbox: every corpus source makes 0
+cutoff residuals and between 45,955 and 207,234 inline expansions;
+`tests/totality-termination-demo.alg` makes 84,065,836 `evaluate`
+calls in 62.7 s. The plan's §7 holds the full table.
+
 ## Stream A — the book chapters
 
 Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened

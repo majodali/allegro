@@ -63,6 +63,12 @@ export interface EvalStats {
    *  then `evaluate`) while the precompile pass was running: its
    *  speculative inlining. */
   inlineExpansions:     number;
+  /** Speculative calls (an argument unresolved) that `applyComposed`
+   *  returned as residuals because the installed inline cutoff answered
+   *  true for the callee (T-R6). Counted in and out of the precompile pass. */
+  cutoffResiduals:      number;
+  /** `precompileFunction` calls, nested ones included: a plain entry count. */
+  precompiles:          number;
   /** Evaluations of a top-level binding's expression, by binding name.
    *  Only a binding whose expression computes (an application or a name)
    *  is watched; a literal value evaluates to itself and costs nothing. */
@@ -87,6 +93,7 @@ interface BindingTally { n: number; }
 interface RunCounters {
   evaluateCalls: number; applyComposedCalls: number; applyPrimitiveCalls: number;
   inlineExpansions: number; precompileBindingEvals: number;
+  cutoffResiduals: number; precompiles: number;
   /** Every binding watched in the run, for the exit line. */
   tallies: BindingTally[];
 }
@@ -130,7 +137,8 @@ function formatRunStats(s: RunCounters): string {
     ` applyPrimitive=${s.applyPrimitiveCalls} inlineExpansions=${s.inlineExpansions}` +
     ` bindings=${s.tallies.length} bindingEvals=${total}` +
     ` precompileBindingEvals=${s.precompileBindingEvals}` +
-    ` maxPerBinding=${max} reEvaluated=${again}`;
+    ` maxPerBinding=${max} reEvaluated=${again}` +
+    ` cutoffResiduals=${s.cutoffResiduals} precompiles=${s.precompiles}`;
 }
 
 /** An open `evalSource` call's view of the counters. */
@@ -149,7 +157,8 @@ export function beginEvalStats(source: string): EvalStatsFrame | null {
   if (evalStats === null) {
     evalStats = {
       evaluateCalls: 0, applyComposedCalls: 0, applyPrimitiveCalls: 0,
-      inlineExpansions: 0, precompileBindingEvals: 0, tallies: [],
+      inlineExpansions: 0, precompileBindingEvals: 0,
+      cutoffResiduals: 0, precompiles: 0, tallies: [],
     };
   }
   if (switchOn && !exitLineRegistered && typeof process !== "undefined" && typeof process.on === "function") {
@@ -163,6 +172,7 @@ export function beginEvalStats(source: string): EvalStatsFrame | null {
       evaluateCalls: s.evaluateCalls, applyComposedCalls: s.applyComposedCalls,
       applyPrimitiveCalls: s.applyPrimitiveCalls, inlineExpansions: s.inlineExpansions,
       precompileBindingEvals: s.precompileBindingEvals,
+      cutoffResiduals: s.cutoffResiduals, precompiles: s.precompiles,
     },
     own: new Map(),
   };
@@ -199,6 +209,8 @@ export function endEvalStats(frame: EvalStatsFrame | null): void {
       inlineExpansions:       s.inlineExpansions - frame.start.inlineExpansions,
       bindingEvaluations:     own,
       precompileBindingEvals: s.precompileBindingEvals - frame.start.precompileBindingEvals,
+      cutoffResiduals:        s.cutoffResiduals - frame.start.cutoffResiduals,
+      precompiles:            s.precompiles - frame.start.precompiles,
     },
   };
   if (evalStatsSink !== null) evalStatsSink(report);
@@ -777,6 +789,7 @@ function applyComposed(
       evalArgs.some(a => !isResolved(a)) &&
       inlineCutoff(currentFn as unknown as Value)
     ) {
+      if (evalStats !== null) evalStats.cutoffResiduals++;
       const residual = makeExpr(currentFnRaw ?? currentFn, evalArgs);
       const calleeEffects = effectsOf(currentFn as unknown as Value);
       return calleeEffects ? withEffects(residual, calleeEffects) : residual;
@@ -998,6 +1011,7 @@ export function precompileFunction(
   paramTypes: Value[],
   ctx: StructureValue,
 ): { inferredReturnType: Value | null; inferredEffects: EffectSet | null; errors: string[] } {
+  if (evalStats !== null) evalStats.precompiles++;
   const errors: string[] = [];
 
   // Create typed placeholders for each param
