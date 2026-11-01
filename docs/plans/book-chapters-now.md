@@ -425,7 +425,7 @@ doc-lint exemption. §3.1 states what each chunk produces.
 
 - **2026-10-30 — rulings taken, R8 decided.** R1 to R7 as recommended;
   R8 as above. A1 starts after the plan PR merges and B-173 is on main.
-- **2026-10-31 — A1 written and reviewed.** Files:
+- **2026-10-31 — A1 landed (PR #129, merged 2026-11-01).** Files:
   `docs/book/allegretto/evaluator.ir.md` (134 claims at round 1, 150
   after its fixes, 155 after round 2's and its touch-up, 157 after round 3's, 159 after round 4's, 165 after round 5's, 166 after round 7's, 167 at delivery; 30 terms), `evaluator.md` (rendered by the reasoning
   role), `evaluator.review.md`. Stranger rounds: seven rounds to a
@@ -453,3 +453,6 @@ doc-lint exemption. §3.1 states what each chunk produces.
   lane P's boundary, whose chunk R2 will change the precompile context
   the chapter's claims C84 to C87 and C99 to C103 describe, so the PR
   asks who re-syncs the chapter after R2.
+  The ratification flip followed the merge in its own PR; asks 3 and 4
+  of PR #129 (B-172's lane, the default arm's owner, the meta-review
+  dispatch) are open with the maintainer.
