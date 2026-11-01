@@ -242,6 +242,12 @@ Per-stage disposition of `docs/plans/archive/phase-e-totality-plan.md`
   user-facing `precompile-type-error` on correct code. The cutoff
   removes today's trigger; it does not give the analyzer a real
   termination discipline.
+  **Inert for typed functions from 2026-08-31 to 2026-11-01.**
+  B-121 (metadata on every kind) chunk C2 made a typed function a derived
+  copy of its literal. The cutoff tested identity against the literal, so
+  it missed every typed recursive call, and the symptoms above returned.
+  B-159 (precompile of recursive definitions) restored it in
+  R2 (one object per definition); §8 T-R6 records how and the numbers.
 - **B-087 totality-analysis performance** — open, hypothesis refuted
   by measurement (memo ≈ 2%); needs a real profile.
 - **Productive corecursion** — `div` is *unproductive* nontermination;
@@ -307,3 +313,26 @@ design truth for this layer.
   reasoning (partially-applied calls, mutual cycles, HOF edges) and the
   fact that the checking algorithm could hit host stack overflow at
   all, which is a symptom the cutoff hides rather than cures.
+  **Inert period, 2026-08-31 to 2026-11-01 (B-159 (precompile of
+  recursive definitions), chunk R2).** The cutoff tests object identity.
+  It held the function literals that `analyzeDivergence` peels. B-121
+  (metadata on every kind) chunk C2 made a typed function a derived copy
+  of its literal (`withType` derives a new object), so no typed recursive
+  call matched. Only untyped recursive functions were cut. Every typed
+  recursive definition outside a tail call unfolded to a stack overflow
+  and carried the spurious `precompile-type-error` again. No test asserted
+  that the cutoff fires for a typed function. R2 restores it:
+  - The precompile context binds each function definition once. Every
+    reference in the pass resolves to that one typed function object.
+  - The cutoff's set holds the objects the recursive bindings are bound
+    to. A second identity test matches a function that shares a bound
+    object's `body`. It catches the evaluation loop's copies, made when
+    `typed_function_impl` precompiles a pure literal again.
+  - A guard test pins the binding; regression tests pin zero inline
+    expansions, at least one cutoff residual and no
+    `precompile-type-error` per corpus source.
+
+  Restored numbers: `tests/totality-termination-demo.alg` 62.7 s and
+  84,065,836 `evaluate` calls before, 0.3 s and 694 after; the gate
+  (`npm run test:shards`) 361.6 s of wall clock before, 14.1 s after.
+  Every totality verdict is unchanged.
