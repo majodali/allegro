@@ -434,7 +434,10 @@ doc-lint exemption. §3.1 states what each chunk produces.
   do not meet PE Rule 2, and the spine's §25 (partial evaluation) delta
   still says both rules are implemented as specified; filed as
   B-172 (the partial-evaluation rules as implemented against the spine).
-- **2026-11-01 — A2 written, IR-only.** File:
+  The ratification flip followed the merge in its own PR (PR #130, merged
+  2026-11-01); asks 3 and 4 of PR #129 (B-172's lane, the default arm's
+  owner, the meta-review dispatch) are open with the maintainer.
+- **2026-11-01 — A2 landed (PR #132, merged 2026-11-01), IR-only.** File:
   `docs/book/platform/build-pipeline.ir.md`, Status `delivered IR-only`
   (159 claims, of which 127 proposed, 31 decided and 1 inferred; 36
   terms, of which 2 proposed; 28 clusters). No prose and no rounds
@@ -453,6 +456,6 @@ doc-lint exemption. §3.1 states what each chunk produces.
   lane P's boundary, whose chunk R2 will change the precompile context
   the chapter's claims C84 to C87 and C99 to C103 describe, so the PR
   asks who re-syncs the chapter after R2.
-  The ratification flip followed the merge in its own PR; asks 3 and 4
-  of PR #129 (B-172's lane, the default arm's owner, the meta-review
-  dispatch) are open with the maintainer.
+  The ratification flip followed the merge in its own PR; ruling R9 and the
+  question of who re-syncs the chapter after stream P's R2 are open with the
+  maintainer.
