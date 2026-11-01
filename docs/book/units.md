@@ -289,8 +289,8 @@ The grain here is a first cut by dependency set. Refine when touched.
 | # | Unit | Decisions it holds | Depends on | Today | Status |
 |---|---|---|---|---|---|
 | 33 | **`pipeline`** | the `evalSource` stage order; `CompilationReport`; the post-passes that halt (CE-R1); precompile | everything it assembles | `runtime.ts` | in place as a file; owes `typeLiterals` (M3), `DependencyRegistry` (14), clone helpers (7). Chapter: `platform/build-pipeline.ir.md` (IR-only) |
-| 34 | **`introspect`** | summaries and safety grades for `inspect` | `pipeline` | `introspect.ts` | in place |
-| 35 | **`cli`** | file runner, REPL, subcommands | `pipeline`, `introspect`, `module-loading` | `index.ts` | in place |
+| 34 | **`introspect`** | summaries and safety grades for `inspect` | `pipeline` | `introspect.ts` | in place. Chapter: `platform/tooling.ir.md` (IR-only) |
+| 35 | **`cli`** | file runner, REPL, subcommands | `pipeline`, `introspect`, `module-loading` | `index.ts` | in place. Chapter: `platform/tooling.ir.md` (IR-only) |
 
 The pipeline is the top of the DAG. It is the one unit allowed to import
 anything, because its job is assembly; a decision found inside it belongs
