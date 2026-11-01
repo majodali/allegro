@@ -237,6 +237,9 @@ order gains the chapter after `platform/README.md`, the table of contents
 gains row II.21, and unit 33's status cell names the chapter. Bare
 first-use identifiers 791 (`npm run lint:docs:check`); unratified terms 2
 (*the evalSource pipeline*, and *tail call*, the evaluator chapter's).
+Merged as PR #132 on 2026-11-01; the IR's proposed claims and the term were
+ratified by the merge, and a follow-up flipped their statuses to decided;
+ruling R9 (the definition site of the evalSource pipeline) stays open.
 
 ### 2026-10 — The evaluator chapter (B-170, chunk A1): IR first, rendered and reviewed
 

@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `pipeline` unit (unit 33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, the phases and futures as far as `evalSource` drives them, and the three moves the unit still owes.
-Status: delivered IR-only (unratified terms 2; footprint: declared 10, changed 10, surprises 0, misses 0)
+Status: delivered IR-only (ratified at the merge of PR #132, 2026-11-01; unratified terms 0; footprint: declared 10, changed 10, surprises 0, misses 0)
 Source: chunk A2 of docs/plans/book-chapters-now.md (stream A, B-170); src/runtime.ts as the file of unit 33
 Footprint: docs/book/platform/build-pipeline.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book/implementation-map.md; docs/book/platform/README.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -60,7 +60,7 @@ T25. Metadata field. defined-at: ../allegretto/metadata-and-capability.md#def-me
 
 T26. Writer capability. defined-at: ../allegretto/metadata-and-capability.md#def-writer-capability [decided: docs/book/allegretto/metadata-and-capability.md §6]
 
-T27. Tail call. defined-at: ../allegretto/evaluator.md#def-tail-call [proposed: docs/book/allegretto/evaluator.ir.md T30]
+T27. Tail call. defined-at: ../allegretto/evaluator.md#def-tail-call [decided: owner, 2026-11-01]
 
 T28. Unit. defined-at: ../units.md#def-unit [decided: D50]
 
@@ -90,9 +90,9 @@ C2. This chapter is the definition site of the term the evalSource pipeline, whi
 
 C3. This chapter is delivered IR-only: no prose is rendered from this IR until a later stage that the maintainer schedules. [decided: docs/plans/book-chapters-now.md §3.1 and R8, 2026-10-30]
 
-C4. The reader of this chapter has read the Part I chapters and the Part II chapters before this chapter, the evaluator chapter included. [proposed: this IR]
+C4. The reader of this chapter has read the Part I chapters and the Part II chapters before this chapter, the evaluator chapter included. [decided: owner, 2026-11-01]
 
-C5. Earlier chapters define every term this chapter uses except the evalSource pipeline, each term linked from this chapter's Terms section. [proposed: this IR]
+C5. Earlier chapters define every term this chapter uses except the evalSource pipeline, each term linked from this chapter's Terms section. [decided: owner, 2026-11-01]
 
 C6. This chapter carries the Tier 1 authority that `docs/book/process.md` §1 gives every chapter of the book. [decided: docs/book/process.md §1]
 
@@ -108,117 +108,117 @@ C10. The `pipeline` unit is the top of the unit DAG, the one unit allowed to imp
 
 C11. A decision found inside the `pipeline` unit belongs to another unit. [decided: docs/book/units.md §4.4]
 
-C12. `scripts/analyze/units.json` maps `src/runtime.ts` to four units: `pipeline`, `composed-function`, `futures`, `core-types`. evidence: E1. [proposed: this IR]
+C12. `scripts/analyze/units.json` maps `src/runtime.ts` to four units: `pipeline`, `composed-function`, `futures`, `core-types`. evidence: E1. [decided: owner, 2026-11-01]
 
-C13. The `units` report lists `src/runtime.ts` among the five mixed files, the files whose split is owed. evidence: E2. [proposed: this IR]
+C13. The `units` report lists `src/runtime.ts` among the five mixed files, the files whose split is owed. evidence: E2. [decided: owner, 2026-11-01]
 
-C14. `src/index.ts`, the file of the `cli` unit, calls `evalSource` for a file run, a REPL entry, an inline `use grammar` block and the `inspect`, `verify`, `obligations` and `propose` subcommands. evidence: E3. [proposed: this IR]
+C14. `src/index.ts`, the file of the `cli` unit, calls `evalSource` for a file run, a REPL entry, an inline `use grammar` block and the `inspect`, `verify`, `obligations` and `propose` subcommands. evidence: E3. [decided: owner, 2026-11-01]
 
-C15. `ModuleLoader` in `src/modules.ts` calls `evalSource` to load each library. evidence: E4. [proposed: this IR]
+C15. `ModuleLoader` in `src/modules.ts` calls `evalSource` to load each library. evidence: E4. [decided: owner, 2026-11-01]
 
 C16. The evalSource pipeline realises three requirements: R2 (partial evaluation is the mechanism by which layers are added); R9 (the language surface is extensible); R14 (code is organised into separately-loadable units). [decided: docs/book/concepts.md §29]
 
 ### The evalSource pipeline [implemented]
 
-C17. The evalSource pipeline runs once per call of `evalSource` in `src/runtime.ts`, over one source text. evidence: E5. [proposed: this IR]
+C17. The evalSource pipeline runs once per call of `evalSource` in `src/runtime.ts`, over one source text. evidence: E5. [decided: owner, 2026-11-01]
 
-C18. `evalSource` takes a source text and seven optional inputs: a base scope for REPL persistence; the extensions; a legacy Earley grammar extension; the `typed` flag; a future manager; the `softFail` flag; the module's scope name. evidence: E5. [proposed: this IR]
+C18. `evalSource` takes a source text and seven optional inputs: a base scope for REPL persistence; the extensions; a legacy Earley grammar extension; the `typed` flag; a future manager; the `softFail` flag; the module's scope name. evidence: E5. [decided: owner, 2026-11-01]
 
-C19. `evalSource` returns the last bare expression's value, the evaluation scope, the compilation report and the dependency registry. evidence: E5. [proposed: this IR]
+C19. `evalSource` returns the last bare expression's value, the evaluation scope, the compilation report and the dependency registry. evidence: E5. [decided: owner, 2026-11-01]
 
-C20. The `typed` flag selects Allegro Standard. evidence: E5. [proposed: this IR]
+C20. The `typed` flag selects Allegro Standard. evidence: E5. [decided: owner, 2026-11-01]
 
-C21. Literal typing, the divergence analysis, precompile and the post-passes before the evaluation loop run only when the `typed` flag is set. evidence: E8, E14, E15, E18. [proposed: this IR]
+C21. Literal typing, the divergence analysis, precompile and the post-passes before the evaluation loop run only when the `typed` flag is set. evidence: E8, E14, E15, E18. [decided: owner, 2026-11-01]
 
-C22. `evalSource` first seals the channel registrations that earlier passes minted from Allegro code, through `bumpMetaEpoch`. evidence: E6. [proposed: this IR]
+C22. `evalSource` first seals the channel registrations that earlier passes minted from Allegro code, through `bumpMetaEpoch`. evidence: E6. [decided: owner, 2026-11-01]
 
-C23. `evalSource` next installs an `effects:diverges` analysis that answers "not analysed" until the divergence analysis of the pass has run. evidence: E6. [proposed: this IR]
+C23. `evalSource` next installs an `effects:diverges` analysis that answers "not analysed" until the divergence analysis of the pass has run. evidence: E6. [decided: owner, 2026-11-01]
 
-C24. `evalSource` next collects the library-owned values of the call's extensions with `libraryOwnedValues`. evidence: E6. [proposed: this IR]
+C24. `evalSource` next collects the library-owned values of the call's extensions with `libraryOwnedValues`. evidence: E6. [decided: owner, 2026-11-01]
 
-C25. `evalSource` merges the grammar fragments that the extensions carry into the base grammar, then parses the source with grammar2. evidence: E7. [proposed: this IR]
+C25. `evalSource` merges the grammar fragments that the extensions carry into the base grammar, then parses the source with grammar2. evidence: E7. [decided: owner, 2026-11-01]
 
-C26. Before parsing, `assertGrammarClean` refuses a fragment-extended grammar in which the grammar analyzer finds an error. evidence: E7. [proposed: this IR]
+C26. Before parsing, `assertGrammarClean` refuses a fragment-extended grammar in which the grammar analyzer finds an error. evidence: E7. [decided: owner, 2026-11-01]
 
-C27. `evalSource` parses with the Earley parser instead when the caller passes a legacy grammar extension. evidence: E7. [proposed: this IR]
+C27. `evalSource` parses with the Earley parser instead when the caller passes a legacy grammar extension. evidence: E7. [decided: owner, 2026-11-01]
 
-C28. `buildProgram` turns the parse tree into the file context whose binding list every later stage walks. evidence: E7. [proposed: this IR]
+C28. `buildProgram` turns the parse tree into the file context whose binding list every later stage walks. evidence: E7. [decided: owner, 2026-11-01]
 
-C29. `evalSource` runs no `use` pre-scan. evidence: E5, E7. [proposed: this IR]
+C29. `evalSource` runs no `use` pre-scan. evidence: E5, E7. [decided: owner, 2026-11-01]
 
-C156. Each caller of `evalSource` scans the `use` header, loads the named modules as extensions, then strips the header before the call. evidence: E3, E4. [proposed: this IR]
+C156. Each caller of `evalSource` scans the `use` header, loads the named modules as extensions, then strips the header before the call. evidence: E3, E4. [decided: owner, 2026-11-01]
 
-C30. Under the `typed` flag, `typeLiterals` gives each untyped Bits literal a type: Int for a Bits of 64 bits, String for any other Bits. evidence: E8. [proposed: this IR]
+C30. Under the `typed` flag, `typeLiterals` gives each untyped Bits literal a type: Int for a Bits of 64 bits, String for any other Bits. evidence: E8. [decided: owner, 2026-11-01]
 
-C31. `typeLiterals` leaves a Bits that already carries a type unchanged. evidence: E8. [proposed: this IR]
+C31. `typeLiterals` leaves a Bits that already carries a type unchanged. evidence: E8. [decided: owner, 2026-11-01]
 
-C32. `resolveSymbols` first replaces each primitive stub the parser left with the registered primitive of the stub's name. evidence: E9. [proposed: this IR]
+C32. `resolveSymbols` first replaces each primitive stub the parser left with the registered primitive of the stub's name. evidence: E9. [decided: owner, 2026-11-01]
 
-C33. `resolveSymbols` replaces a Symbol naming a primitive, an extension's binding, a module or a base-scope binding with the named value. evidence: E9. [proposed: this IR]
+C33. `resolveSymbols` replaces a Symbol naming a primitive, an extension's binding, a module or a base-scope binding with the named value. evidence: E9. [decided: owner, 2026-11-01]
 
-C34. Under the `typed` flag, `resolveSymbols` resolves a primitive's name to the primitive wrapped as an `UntypedFunction`. evidence: E9. [proposed: this IR]
+C34. Under the `typed` flag, `resolveSymbols` resolves a primitive's name to the primitive wrapped as an `UntypedFunction`. evidence: E9. [decided: owner, 2026-11-01]
 
-C35. `resolveSymbols` leaves a Symbol naming a source binding in place, to resolve through the evaluation scope at run time. evidence: E9. [proposed: this IR]
+C35. `resolveSymbols` leaves a Symbol naming a source binding in place, to resolve through the evaluation scope at run time. evidence: E9. [decided: owner, 2026-11-01]
 
-C36. `resolveSymbols` marks the binders among the `when` patterns through `markPatternBinders`. evidence: E9. [proposed: this IR]
+C36. `resolveSymbols` marks the binders among the `when` patterns through `markPatternBinders`. evidence: E9. [decided: owner, 2026-11-01]
 
-C37. `markTailCallsInContext` runs `collapseBodyMetadata` over every binding before running `markTailCalls` over every composed function body. evidence: E10. [proposed: this IR]
+C37. `markTailCallsInContext` runs `collapseBodyMetadata` over every binding before running `markTailCalls` over every composed function body. evidence: E10. [decided: owner, 2026-11-01]
 
-C38. `collapseBodyMetadata` peels the `*_attach` wrappers off each function body, descending through `type_check`. evidence: E11. [proposed: this IR]
+C38. `collapseBodyMetadata` peels the `*_attach` wrappers off each function body, descending through `type_check`. evidence: E11. [decided: owner, 2026-11-01]
 
-C157. `collapseBodyMetadata` stores each peeled wrapper's metadata as a property of the function. evidence: E11. [proposed: this IR]
+C157. `collapseBodyMetadata` stores each peeled wrapper's metadata as a property of the function. evidence: E11. [decided: owner, 2026-11-01]
 
-C39. `markTailCalls` marks each Expression in tail position, which is where the evaluator's tail calls come from. evidence: E10, E12. [proposed: this IR]
+C39. `markTailCalls` marks each Expression in tail position, which is where the evaluator's tail calls come from. evidence: E10, E12. [decided: owner, 2026-11-01]
 
-C40. After marking, `evalSource` opens an evaluation-stats frame through `beginEvalStats` when `ALLEGRO_EVAL_STATS` is set or a stats sink is installed. evidence: E13. [proposed: this IR]
+C40. After marking, `evalSource` opens an evaluation-stats frame through `beginEvalStats` when `ALLEGRO_EVAL_STATS` is set or a stats sink is installed. evidence: E13. [decided: owner, 2026-11-01]
 
-C41. The stats frame watches each named binding whose expression is unresolved, counting every later evaluation of the expression. evidence: E13. [proposed: this IR]
+C41. The stats frame watches each named binding whose expression is unresolved, counting every later evaluation of the expression. evidence: E13. [decided: owner, 2026-11-01]
 
-C42. `evalSource` clears the inline cutoff before every divergence analysis, leaving no pass with an earlier pass's cutoff. evidence: E14. [proposed: this IR]
+C42. `evalSource` clears the inline cutoff before every divergence analysis, leaving no pass with an earlier pass's cutoff. evidence: E14. [decided: owner, 2026-11-01]
 
-C43. Under the `typed` flag, `analyzeDivergence` analyses the binding list for termination before precompile. evidence: E14. [proposed: this IR]
+C43. Under the `typed` flag, `analyzeDivergence` analyses the binding list for termination before precompile. evidence: E14. [decided: owner, 2026-11-01]
 
-C44. `precompileFunctions` then precompiles the function definitions. evidence: E15, E16. [proposed: this IR]
+C44. `precompileFunctions` then precompiles the function definitions. evidence: E15, E16. [decided: owner, 2026-11-01]
 
-C45. After precompile, four steps run in order: the totality notices; the divergence stamp; the `total` check; the effects declaration check with its opaque-effect notices. evidence: E18. [proposed: this IR]
+C45. After precompile, four steps run in order: the totality notices; the divergence stamp; the `total` check; the effects declaration check with its opaque-effect notices. evidence: E18. [decided: owner, 2026-11-01]
 
-C46. `buildEvalCtx` then builds the evaluation scope. evidence: E20. [proposed: this IR]
+C46. `buildEvalCtx` then builds the evaluation scope. evidence: E20. [decided: owner, 2026-11-01]
 
-C47. The evaluation loop evaluates each binding of the binding list that has a value once, in source order. evidence: E22. [proposed: this IR]
+C47. The evaluation loop evaluates each binding of the binding list that has a value once, in source order. evidence: E22. [decided: owner, 2026-11-01]
 
-C48. After the evaluation loop, `propagateCompletions` re-evaluates the dependents of the bindings that completed. evidence: E23. [proposed: this IR]
+C48. After the evaluation loop, `propagateCompletions` re-evaluates the dependents of the bindings that completed. evidence: E23. [decided: owner, 2026-11-01]
 
-C49. After forward chaining, two post-passes run in order: the proof check; the `proven` check. evidence: E25, E26. [proposed: this IR]
+C49. After forward chaining, two post-passes run in order: the proof check; the `proven` check. evidence: E25, E26. [decided: owner, 2026-11-01]
 
-C50. Last, `evalSource` registers each top-level binding name of the evaluation scope as a symbol under the module's scope name, or under `<main>`. evidence: E27. [proposed: this IR]
+C50. Last, `evalSource` registers each top-level binding name of the evaluation scope as a symbol under the module's scope name, or under `<main>`. evidence: E27. [decided: owner, 2026-11-01]
 
-C51. `evalSource` closes the stats frame through `endEvalStats` before returning. evidence: E13. [proposed: this IR]
+C51. `evalSource` closes the stats frame through `endEvalStats` before returning. evidence: E13. [decided: owner, 2026-11-01]
 
 ### What each stage may assume [implemented]
 
 C52. `resolveSymbols` runs before `markTailCalls` because a tail call is recognised by its callee. [decided: docs/book/concepts.md §29]
 
-C53. `markTailCalls` recognises a branching primitive or a body wrapper by the function position's kind and primitive name. evidence: E12. [proposed: this IR]
+C53. `markTailCalls` recognises a branching primitive or a body wrapper by the function position's kind and primitive name. evidence: E12. [decided: owner, 2026-11-01]
 
-C54. `collapseBodyMetadata` runs before `markTailCalls`, letting `markTailCalls` compute tail positions on the function body without the body's `*_attach` wrappers. evidence: E10. [proposed: this IR]
+C54. `collapseBodyMetadata` runs before `markTailCalls`, letting `markTailCalls` compute tail positions on the function body without the body's `*_attach` wrappers. evidence: E10. [decided: owner, 2026-11-01]
 
 C55. `collapseBodyMetadata` runs before `precompileFunctions` because analysers read function properties rather than peeling wrappers. [decided: docs/book/concepts.md §29]
 
-C56. `typeLiterals` runs before `resolveSymbols`, while the tree `typeLiterals` walks holds no value an extension provides. evidence: E8, E9. [proposed: this IR]
+C56. `typeLiterals` runs before `resolveSymbols`, while the tree `typeLiterals` walks holds no value an extension provides. evidence: E8, E9. [decided: owner, 2026-11-01]
 
-C57. The divergence analysis reads the binding list, a type lookup and a leaf-effect resolver, never an output of precompile. evidence: E14. [proposed: this IR]
+C57. The divergence analysis reads the binding list, a type lookup and a leaf-effect resolver, never an output of precompile. evidence: E14. [decided: owner, 2026-11-01]
 
-C58. Precompile runs after the divergence analysis, with the inline cutoff already installed while precompile speculates. evidence: E14. [proposed: this IR]
+C58. Precompile runs after the divergence analysis, with the inline cutoff already installed while precompile speculates. evidence: E14. [decided: owner, 2026-11-01]
 
-C59. The divergence stamp runs after precompile, because the stamp extends the inferred effect sets that precompile writes. evidence: E18. [proposed: this IR]
+C59. The divergence stamp runs after precompile, because the stamp extends the inferred effect sets that precompile writes. evidence: E18. [decided: owner, 2026-11-01]
 
 C60. The termination analysis writes `div` into the inferred effect sets before the effects declaration check. [decided: CE-R1]
 
-C61. The divergence stamp runs before the effects declaration check in `evalSource`, putting `div` into the inferred sets that the check compares with the declarations. evidence: E18. [proposed: this IR]
+C61. The divergence stamp runs before the effects declaration check in `evalSource`, putting `div` into the inferred sets that the check compares with the declarations. evidence: E18. [decided: owner, 2026-11-01]
 
-C62. `buildEvalCtx` takes the source bindings as `resolveSymbols` left them. evidence: E20. [proposed: this IR]
+C62. `buildEvalCtx` takes the source bindings as `resolveSymbols` left them. evidence: E20. [decided: owner, 2026-11-01]
 
-C63. The `proven` check reads the evaluation scope that the evaluation loop filled. evidence: E26. [proposed: this IR]
+C63. The `proven` check reads the evaluation scope that the evaluation loop filled. evidence: E26. [decided: owner, 2026-11-01]
 
 ### The post-passes that halt [implemented]
 
@@ -228,147 +228,147 @@ C65. Two paths are weaker than a halt: a construction-path invariant failure yie
 
 C66. Promoting either weaker path to a halt is a maintainer decision. [decided: CE-R8]
 
-C67. A halting post-pass records each failure as an error notification in the compilation report before throwing. evidence: E18, E25, E26. [proposed: this IR]
+C67. A halting post-pass records each failure as an error notification in the compilation report before throwing. evidence: E18, E25, E26. [decided: owner, 2026-11-01]
 
-C68. With the `softFail` flag set, a halting post-pass records the error notifications without throwing. evidence: E5, E18, E25, E26. [proposed: this IR]
+C68. With the `softFail` flag set, a halting post-pass records the error notifications without throwing. evidence: E5, E18, E25, E26. [decided: owner, 2026-11-01]
 
-C69. The `verify`, `obligations` and `propose` subcommands run `evalSource` with the `softFail` flag set, for a verdict that describes the failures. evidence: E3. [proposed: this IR]
+C69. The `verify`, `obligations` and `propose` subcommands run `evalSource` with the `softFail` flag set, for a verdict that describes the failures. evidence: E3. [decided: owner, 2026-11-01]
 
-C70. The `total` check halts on a function declared `total` whose `div` is undischarged, whether the function's own or inherited through a call. evidence: E18. [proposed: this IR]
+C70. The `total` check halts on a function declared `total` whose `div` is undischarged, whether the function's own or inherited through a call. evidence: E18. [decided: owner, 2026-11-01]
 
 C71. `total` is the per-function strict opt-in. [decided: CE-R3]
 
-C72. The effects declaration check halts on each function whose inferred effects exceed the function's declared effects, the `opaque` label ignored. evidence: E18. [proposed: this IR]
+C72. The effects declaration check halts on each function whose inferred effects exceed the function's declared effects, the `opaque` label ignored. evidence: E18. [decided: owner, 2026-11-01]
 
-C73. The proof check halts on each binding whose value is a Proof with a false `discharged` field. evidence: E25. [proposed: this IR]
+C73. The proof check halts on each binding whose value is a Proof with a false `discharged` field. evidence: E25. [decided: owner, 2026-11-01]
 
-C74. The `proven` check halts on each `proven` clause that a sampled argument falsifies, reporting the counterexample. evidence: E26. [proposed: this IR]
+C74. The `proven` check halts on each `proven` clause that a sampled argument falsifies, reporting the counterexample. evidence: E26. [decided: owner, 2026-11-01]
 
-C75. A failed type or refinement annotation check throws from the `type_check` primitive when the evaluation applies the annotated function. evidence: E24. [proposed: this IR]
+C75. A failed type or refinement annotation check throws from the `type_check` primitive when the evaluation applies the annotated function. evidence: E24. [decided: owner, 2026-11-01]
 
-C76. `evalSource` catches no error that the evaluation loop throws. evidence: E22. [proposed: this IR]
+C76. `evalSource` catches no error that the evaluation loop throws. evidence: E22. [decided: owner, 2026-11-01]
 
 C77. A failed annotation check in an applied function halts compilation. [inferred: R1]
 
-C78. Five notification kinds are info and never halt: `totality-exhaustiveness`; `totality-nontermination`; the needs-annotation notice; `effects-opaque-from-stdlib-hof`; `proven-skipped`. evidence: E18, E26. [proposed: this IR]
+C78. Five notification kinds are info and never halt: `totality-exhaustiveness`; `totality-nontermination`; the needs-annotation notice; `effects-opaque-from-stdlib-hof`; `proven-skipped`. evidence: E18, E26. [decided: owner, 2026-11-01]
 
-C79. Precompile records three error-severity notification kinds without halting: `precompile-eval`, `precompile-type-error`, `return-type-mismatch`. evidence: E16, E18. [proposed: this IR]
+C79. Precompile records three error-severity notification kinds without halting: `precompile-eval`, `precompile-type-error`, `return-type-mismatch`. evidence: E16, E18. [decided: owner, 2026-11-01]
 
-C80. A function whose declared return type differs from the function's inferred return type halts compilation only when the evaluation applies the function. evidence: E16, E24, E39. [proposed: this IR]
+C80. A function whose declared return type differs from the function's inferred return type halts compilation only when the evaluation applies the function. evidence: E16, E24, E39. [decided: owner, 2026-11-01]
 
 ### Precompile [implemented]
 
-C81. `precompileFunctions` returns an empty compilation report when the `typed` flag is unset. evidence: E15. [proposed: this IR]
+C81. `precompileFunctions` returns an empty compilation report when the `typed` flag is unset. evidence: E15. [decided: owner, 2026-11-01]
 
-C82. During precompile, `precompileFunctions` suspends law-obligation instantiation, leaving definition-time semantics to the evaluation loop. evidence: E15. [proposed: this IR]
+C82. During precompile, `precompileFunctions` suspends law-obligation instantiation, leaving definition-time semantics to the evaluation loop. evidence: E15. [decided: owner, 2026-11-01]
 
-C83. `precompileFunctions` marks the precompile period for the evaluation stats through `setEvalStatsPrecompile`. evidence: E15. [proposed: this IR]
+C83. `precompileFunctions` marks the precompile period for the evaluation stats through `setEvalStatsPrecompile`. evidence: E15. [decided: owner, 2026-11-01]
 
-C84. The precompile context is one Structure binding the primitives, each extension's bindings and module object, then the source bindings. evidence: E16. [proposed: this IR]
+C84. The precompile context is one Structure binding the primitives, each extension's bindings and module object, then the source bindings. evidence: E16. [decided: owner, 2026-11-01]
 
-C85. A source binding whose value is neither resolved nor a function definition enters the precompile context as a memo entry. evidence: E16, E19. [proposed: this IR]
+C85. A source binding whose value is neither resolved nor a function definition enters the precompile context as a memo entry. evidence: E16, E19. [decided: owner, 2026-11-01]
 
-C86. A memo entry evaluates the binding's expression at the first lookup, keeping the result for every later lookup. evidence: E19. [proposed: this IR]
+C86. A memo entry evaluates the binding's expression at the first lookup, keeping the result for every later lookup. evidence: E19. [decided: owner, 2026-11-01]
 
-C87. A lookup made while a memo entry's own evaluation runs reads the unevaluated expression. evidence: E19. [proposed: this IR]
+C87. A lookup made while a memo entry's own evaluation runs reads the unevaluated expression. evidence: E19. [decided: owner, 2026-11-01]
 
-C88. Precompile evaluates only the bindings whose value is a function definition: a function literal, or `typed_function` over a function literal. evidence: E16, E17. [proposed: this IR]
+C88. Precompile evaluates only the bindings whose value is a function definition: a function literal, or `typed_function` over a function literal. evidence: E16, E17. [decided: owner, 2026-11-01]
 
-C89. A function definition whose evaluation throws yields a `precompile-eval` notification and no precompile. evidence: E16. [proposed: this IR]
+C89. A function definition whose evaluation throws yields a `precompile-eval` notification and no precompile. evidence: E16. [decided: owner, 2026-11-01]
 
-C90. Precompile gives a typed function's placeholders the function's declared parameter types. evidence: E16. [proposed: this IR]
+C90. Precompile gives a typed function's placeholders the function's declared parameter types. evidence: E16. [decided: owner, 2026-11-01]
 
-C91. Precompile gives an untyped function's placeholders, and a bare composed function's placeholders, no type. evidence: E16. [proposed: this IR]
+C91. Precompile gives an untyped function's placeholders, and a bare composed function's placeholders, no type. evidence: E16. [decided: owner, 2026-11-01]
 
-C92. Precompile skips a function in the library-owned values of the call's extensions. evidence: E6, E16. [proposed: this IR]
+C92. Precompile skips a function in the library-owned values of the call's extensions. evidence: E6, E16. [decided: owner, 2026-11-01]
 
-C93. `precompileFunction` in `src/evaluator.ts` partially evaluates the function body over the placeholders. evidence: E28. [proposed: this IR]
+C93. `precompileFunction` in `src/evaluator.ts` partially evaluates the function body over the placeholders. evidence: E28. [decided: owner, 2026-11-01]
 
-C158. `precompileFunction` writes the inferred effect set onto the given function, as the function's `inferredEffects` property. evidence: E28. [proposed: this IR]
+C158. `precompileFunction` writes the inferred effect set onto the given function, as the function's `inferredEffects` property. evidence: E28. [decided: owner, 2026-11-01]
 
-C94. Each error that `precompileFunction` returns becomes a `precompile-type-error` notification. evidence: E16. [proposed: this IR]
+C94. Each error that `precompileFunction` returns becomes a `precompile-type-error` notification. evidence: E16. [decided: owner, 2026-11-01]
 
-C95. Precompile records each inferred return type in the compilation report's `inferred` list. evidence: E16. [proposed: this IR]
+C95. Precompile records each inferred return type in the compilation report's `inferred` list. evidence: E16. [decided: owner, 2026-11-01]
 
-C96. Precompile reports `return-type-mismatch` when a declared return type other than Any names a different type than a known inferred return type. evidence: E16. [proposed: this IR]
+C96. Precompile reports `return-type-mismatch` when a declared return type other than Any names a different type than a known inferred return type. evidence: E16. [decided: owner, 2026-11-01]
 
-C97. Precompile lists each source binding that has no value in the compilation report's `unresolved` list. evidence: E16. [proposed: this IR]
+C97. Precompile lists each source binding that has no value in the compilation report's `unresolved` list. evidence: E16. [decided: owner, 2026-11-01]
 
-C98. The inline cutoff is the hook, installed through `setInlineCutoff`, that tells `applyComposed` which callees to leave as residuals when an argument is unresolved. evidence: E14, E29. [proposed: this IR]
+C98. The inline cutoff is the hook, installed through `setInlineCutoff`, that tells `applyComposed` which callees to leave as residuals when an argument is unresolved. evidence: E14, E29. [decided: owner, 2026-11-01]
 
-C99. Under the `typed` flag, `evalSource` installs the inline cutoff over the function objects of the recursive bindings that `analyzeDivergence` reports. evidence: E14. [proposed: this IR]
+C99. Under the `typed` flag, `evalSource` installs the inline cutoff over the function objects of the recursive bindings that `analyzeDivergence` reports. evidence: E14. [decided: owner, 2026-11-01]
 
-C100. `analyzeDivergence` reports a binding as recursive when the binding's function calls into its own recursion cycle, whatever the binding's discharge tier. evidence: E30. [proposed: this IR]
+C100. `analyzeDivergence` reports a binding as recursive when the binding's function calls into its own recursion cycle, whatever the binding's discharge tier. evidence: E30. [decided: owner, 2026-11-01]
 
-C101. The inline cutoff answers by object identity against the set of recursive function objects. evidence: E14. [proposed: this IR]
+C101. The inline cutoff answers by object identity against the set of recursive function objects. evidence: E14. [decided: owner, 2026-11-01]
 
-C102. `evalSource` installs no inline cutoff when no binding is recursive. evidence: E14. [proposed: this IR]
+C102. `evalSource` installs no inline cutoff when no binding is recursive. evidence: E14. [decided: owner, 2026-11-01]
 
 C103. B-159 (precompile of recursive definitions) is the open item that changes the inline cutoff. [decided: docs/plans/recursive-precompile.md §5, ratified 2026-10-30]
 
-C104. With `ALLEGRO_EVAL_STATS=1`, the evaluator prints one stderr line of counts per run, at process exit. evidence: E13. [proposed: this IR]
+C104. With `ALLEGRO_EVAL_STATS=1`, the evaluator prints one stderr line of counts per run, at process exit. evidence: E13. [decided: owner, 2026-11-01]
 
-C105. An installed stats sink receives one report per `evalSource` call. evidence: E13. [proposed: this IR]
+C105. An installed stats sink receives one report per `evalSource` call. evidence: E13. [decided: owner, 2026-11-01]
 
 ### The phases and the futures [partial]
 
 C106. The spine's §28 gives the cell semantics this section relies on: a cell is filled once, monotonically, and forward chaining re-evaluates what residualised on the cell. [decided: docs/book/concepts.md §28]
 
-C107. `buildEvalCtx` builds the evaluation scope as a chain of four layers, rootmost first: the primitives; the extensions; the base scope; the source bindings. evidence: E20. [proposed: this IR]
+C107. `buildEvalCtx` builds the evaluation scope as a chain of four layers, rootmost first: the primitives; the extensions; the base scope; the source bindings. evidence: E20. [decided: owner, 2026-11-01]
 
-C108. Under the `typed` flag, the primitives layer holds each primitive wrapped as an `UntypedFunction`. evidence: E20. [proposed: this IR]
+C108. Under the `typed` flag, the primitives layer holds each primitive wrapped as an `UntypedFunction`. evidence: E20. [decided: owner, 2026-11-01]
 
-C109. `buildEvalCtx` copies each binding of the base scope into a fresh layer, keeping the evaluation's writes out of the previous pass's scope. evidence: E20. [proposed: this IR]
+C109. `buildEvalCtx` copies each binding of the base scope into a fresh layer, keeping the evaluation's writes out of the previous pass's scope. evidence: E20. [decided: owner, 2026-11-01]
 
-C110. A declared source binding with no value and no provider below the source layer becomes a pending future cell in the source layer. evidence: E20. [proposed: this IR]
+C110. A declared source binding with no value and no provider below the source layer becomes a pending future cell in the source layer. evidence: E20. [decided: owner, 2026-11-01]
 
-C111. `evalSource` creates a fresh dependency registry per call. evidence: E21. [proposed: this IR]
+C111. `evalSource` creates a fresh dependency registry per call. evidence: E21. [decided: owner, 2026-11-01]
 
-C112. The dependency registry tracks the binding objects of the evaluation scope's source layer, not copies. evidence: E21, E22. [proposed: this IR]
+C112. The dependency registry tracks the binding objects of the evaluation scope's source layer, not copies. evidence: E21, E22. [decided: owner, 2026-11-01]
 
-C113. When a future manager is passed, `evalSource` points the manager at the new dependency registry and evaluation scope. evidence: E21. [proposed: this IR]
+C113. When a future manager is passed, `evalSource` points the manager at the new dependency registry and evaluation scope. evidence: E21. [decided: owner, 2026-11-01]
 
-C114. The evaluation loop evaluates each binding with a dependency collector, which records the unresolved names the evaluation met. evidence: E22. [proposed: this IR]
+C114. The evaluation loop evaluates each binding with a dependency collector, which records the unresolved names the evaluation met. evidence: E22. [decided: owner, 2026-11-01]
 
-C115. The evaluation loop writes a named binding's value into the binding's cell in the evaluation scope. evidence: E22. [proposed: this IR]
+C115. The evaluation loop writes a named binding's value into the binding's cell in the evaluation scope. evidence: E22. [decided: owner, 2026-11-01]
 
-C116. A named binding whose value stays unresolved is registered as a dependent of each name the binding's collector recorded. evidence: E22. [proposed: this IR]
+C116. A named binding whose value stays unresolved is registered as a dependent of each name the binding's collector recorded. evidence: E22. [decided: owner, 2026-11-01]
 
-C117. A resolved named binding's value carries the binding's source expression on the `source` channel, unless the value is a Structure. evidence: E22. [proposed: this IR]
+C117. A resolved named binding's value carries the binding's source expression on the `source` channel, unless the value is a Structure. evidence: E22. [decided: owner, 2026-11-01]
 
-C118. A bare expression whose value stays unresolved with recorded dependencies gets a synthetic cell, named `__bare_<n>`, in the dependency registry and the evaluation scope. evidence: E22. [proposed: this IR]
+C118. A bare expression whose value stays unresolved with recorded dependencies gets a synthetic cell, named `__bare_<n>`, in the dependency registry and the evaluation scope. evidence: E22. [decided: owner, 2026-11-01]
 
-C119. `propagateCompletions` works in passes, each pass re-evaluating the dependents of the names that the previous pass completed. evidence: E23. [proposed: this IR]
+C119. `propagateCompletions` works in passes, each pass re-evaluating the dependents of the names that the previous pass completed. evidence: E23. [decided: owner, 2026-11-01]
 
-C120. `propagateCompletions` stops at the first pass that completes no new binding. evidence: E23. [proposed: this IR]
+C120. `propagateCompletions` stops at the first pass that completes no new binding. evidence: E23. [decided: owner, 2026-11-01]
 
-C121. A completed binding that still holds a pending future in a data slot gets a refined value in the binding's cell when the future lands. evidence: E23. [proposed: this IR]
+C121. A completed binding that still holds a pending future in a data slot gets a refined value in the binding's cell when the future lands. evidence: E23. [decided: owner, 2026-11-01]
 
-C122. `applyPhase` resolves each named cell in place, or adds a binding for a new name, before running `propagateCompletions`. evidence: E31. [proposed: this IR]
+C122. `applyPhase` resolves each named cell in place, or adds a binding for a new name, before running `propagateCompletions`. evidence: E31. [decided: owner, 2026-11-01]
 
-C123. `applyPhase` throws on a cell that is already complete, because a future or import cell is written once. evidence: E31. [proposed: this IR]
+C123. `applyPhase` throws on a cell that is already complete, because a future or import cell is written once. evidence: E31. [decided: owner, 2026-11-01]
 
-C124. The future manager settles each resolved or rejected promise through `applyPhase`, first into the pass that minted the future. evidence: E32. [proposed: this IR]
+C124. The future manager settles each resolved or rejected promise through `applyPhase`, first into the pass that minted the future. evidence: E32. [decided: owner, 2026-11-01]
 
-C125. Outside the suite, the future manager in `src/futures.ts` is the only caller of `applyPhase`. evidence: E33. [proposed: this IR]
+C125. Outside the suite, the future manager in `src/futures.ts` is the only caller of `applyPhase`. evidence: E33. [decided: owner, 2026-11-01]
 
 C126. The multi-phase build surface is undesigned: the T-build track, not this chapter, designs the surface. [decided: docs/plans/book-chapters-now.md R3, 2026-10-30]
 
 C127. A library is loaded once per process, every `ModuleLoader` reading one library cache. [decided: docs/book/extension/modules.md, Loaded once per process]
 
-C128. The library cache keys a library by the resolved path plus a hash of the file's text. evidence: E4. [proposed: this IR]
+C128. The library cache keys a library by the resolved path plus a hash of the file's text. evidence: E4. [decided: owner, 2026-11-01]
 
-C129. A hit in the library cache also compares the file's text itself. evidence: E4. [proposed: this IR]
+C129. A hit in the library cache also compares the file's text itself. evidence: E4. [decided: owner, 2026-11-01]
 
-C130. A library's load runs `evalSource` with the `typed` flag set, the `softFail` flag unset and the library's resolved path as the module's scope name. evidence: E4. [proposed: this IR]
+C130. A library's load runs `evalSource` with the `typed` flag set, the `softFail` flag unset and the library's resolved path as the module's scope name. evidence: E4. [decided: owner, 2026-11-01]
 
 C131. A library's values are immutable after load: a module writes only into values the module owns. [decided: docs/book/extension/modules.md, B-158 ruling, 2026-10-29]
 
-C132. `libraryOwnedValues` collects each extension's binding values and each module object's field values. evidence: E6. [proposed: this IR]
+C132. `libraryOwnedValues` collects each extension's binding values and each module object's field values. evidence: E6. [decided: owner, 2026-11-01]
 
-C133. Membership in the library-owned values is by reference, which puts the library's own function in the set for an alias `f = lib_f`. evidence: E6. [proposed: this IR]
+C133. Membership in the library-owned values is by reference, which puts the library's own function in the set for an alias `f = lib_f`. evidence: E6. [decided: owner, 2026-11-01]
 
-C134. The divergence stamp skips a function in the library-owned values. evidence: E18. [proposed: this IR]
+C134. The divergence stamp skips a function in the library-owned values. evidence: E18. [decided: owner, 2026-11-01]
 
 C135. The member re-keying in the evaluation loop, `stabilizeTypeMemberScope`, is write-once: a library type keeps the member scope the library's load gave the type. [decided: docs/book/extension/modules.md, B-158 ruling, 2026-10-29]
 
@@ -380,17 +380,17 @@ C137. M3 (`typeLiterals` is in the pipeline) puts the raw-literal typing rule in
 
 C138. The `futures` unit's row names `DependencyRegistry` and `applyPhase` in `src/runtime.ts` among the unit's homes today. [decided: docs/book/units.md §4.1]
 
-C139. `src/runtime.ts` clones a composed function at three sites: `typeLiterals`, `resolveNamedParams`, `resolveNamedParamsInner`. evidence: E8, E9. [proposed: this IR]
+C139. `src/runtime.ts` clones a composed function at three sites: `typeLiterals`, `resolveNamedParams`, `resolveNamedParamsInner`. evidence: E8, E9. [decided: owner, 2026-11-01]
 
-C140. Each of the three clone sites in `src/runtime.ts` carries the function's metadata with `carryMeta`. evidence: E8, E9. [proposed: this IR]
+C140. Each of the three clone sites in `src/runtime.ts` carries the function's metadata with `carryMeta`. evidence: E8, E9. [decided: owner, 2026-11-01]
 
-C159. Each of the three clone sites in `src/runtime.ts` copies the `genericParams` property by hand. evidence: E8, E9. [proposed: this IR]
+C159. Each of the three clone sites in `src/runtime.ts` copies the `genericParams` property by hand. evidence: E8, E9. [decided: owner, 2026-11-01]
 
 C141. Every code path that clones a composed function must preserve the function's metadata through the shared helpers. [decided: docs/book/process.md §6]
 
 C142. A unit moves when the unit is next touched for other reasons, with no campaign. [decided: docs/book/units.md §7]
 
-C143. Neither a backlog item nor a row of the move table in `docs/book/units.md` §7 schedules any of the three moves the `pipeline` unit owes. evidence: E35, E36. [proposed: this IR]
+C143. Neither a backlog item nor a row of the move table in `docs/book/units.md` §7 schedules any of the three moves the `pipeline` unit owes. evidence: E35, E36. [decided: owner, 2026-11-01]
 
 C144. The post-passes are Allegro Standard concepts running in the pipeline, as layer stages hardcoded into the base's stage list. [decided: docs/book/concepts.md §29]
 
@@ -400,81 +400,81 @@ C146. B-110 (the L0 evaluator implements the L2 type system) owns the registrati
 
 ### Where the code is, and what pins it [implemented]
 
-C147. `src/runtime.ts` holds `evalSource`, `typeLiterals`, `resolveSymbols`, `precompileFunctions`, `buildEvalCtx`, `propagateCompletions`, `applyPhase` and `libraryOwnedValues`. evidence: E5, E6, E8, E9, E15, E20, E23, E31. [proposed: this IR]
+C147. `src/runtime.ts` holds `evalSource`, `typeLiterals`, `resolveSymbols`, `precompileFunctions`, `buildEvalCtx`, `propagateCompletions`, `applyPhase` and `libraryOwnedValues`. evidence: E5, E6, E8, E9, E15, E20, E23, E31. [decided: owner, 2026-11-01]
 
-C148. The suite runs every literate demo under `tests/` through `evalSource`, checking each demo's `// expect:` lines. evidence: E37. [proposed: this IR]
+C148. The suite runs every literate demo under `tests/` through `evalSource`, checking each demo's `// expect:` lines. evidence: E37. [decided: owner, 2026-11-01]
 
-C149. Named tests pin the four halting post-passes: the proof check, the `proven` check, the effects declaration check, the `total` check. evidence: E38. [proposed: this IR]
+C149. Named tests pin the four halting post-passes: the proof check, the `proven` check, the effects declaration check, the `total` check. evidence: E38. [decided: owner, 2026-11-01]
 
-C150. `src/test/totality.ts` pins the exhaustiveness notice as info. evidence: E38. [proposed: this IR]
+C150. `src/test/totality.ts` pins the exhaustiveness notice as info. evidence: E38. [decided: owner, 2026-11-01]
 
-C151. `src/test/async-futures.ts` pins the single write of a future cell through `applyPhase`. evidence: E38. [proposed: this IR]
+C151. `src/test/async-futures.ts` pins the single write of a future cell through `applyPhase`. evidence: E38. [decided: owner, 2026-11-01]
 
-C152. `src/test/language.ts` pins the re-evaluation of dependents through `applyPhase`. evidence: E38. [proposed: this IR]
+C152. `src/test/language.ts` pins the re-evaluation of dependents through `applyPhase`. evidence: E38. [decided: owner, 2026-11-01]
 
-C153. `src/test/modules.ts` pins the library cache and the owner-module invariant. evidence: E34, E38. [proposed: this IR]
+C153. `src/test/modules.ts` pins the library cache and the owner-module invariant. evidence: E34, E38. [decided: owner, 2026-11-01]
 
-C154. `npm run lint:units` pins the mapping of `src/runtime.ts` in `scripts/analyze/units.json`. evidence: E40. [proposed: this IR]
+C154. `npm run lint:units` pins the mapping of `src/runtime.ts` in `scripts/analyze/units.json`. evidence: E40. [decided: owner, 2026-11-01]
 
-C155. `npm run lint:load` pins the parse counts of the load corpus that the pipeline parses. evidence: E40. [proposed: this IR]
+C155. `npm run lint:load` pins the parse counts of the load corpus that the pipeline parses. evidence: E40. [decided: owner, 2026-11-01]
 
 ### Clusters
 
-G1. cluster: C1, C2, C3, C4, C5 [proposed: this IR]
+G1. cluster: C1, C2, C3, C4, C5 [decided: owner, 2026-11-01]
 
-G2. cluster: C6, C7, C8 [proposed: this IR]
+G2. cluster: C6, C7, C8 [decided: owner, 2026-11-01]
 
-G3. cluster: C9, C10, C11, C12, C13 [proposed: this IR]
+G3. cluster: C9, C10, C11, C12, C13 [decided: owner, 2026-11-01]
 
-G4. cluster: C14, C15, C16 [proposed: this IR]
+G4. cluster: C14, C15, C16 [decided: owner, 2026-11-01]
 
-G5. cluster: C17, C18, C19, C20, C21 [proposed: this IR]
+G5. cluster: C17, C18, C19, C20, C21 [decided: owner, 2026-11-01]
 
-G6. cluster: C22, C23, C24 [proposed: this IR]
+G6. cluster: C22, C23, C24 [decided: owner, 2026-11-01]
 
-G7. cluster: C25, C26, C27, C28, C29, C156 [proposed: this IR]
+G7. cluster: C25, C26, C27, C28, C29, C156 [decided: owner, 2026-11-01]
 
-G8. cluster: C30, C31, C32, C33, C34, C35, C36 [proposed: this IR]
+G8. cluster: C30, C31, C32, C33, C34, C35, C36 [decided: owner, 2026-11-01]
 
-G9. cluster: C37, C38, C157, C39, C40, C41 [proposed: this IR]
+G9. cluster: C37, C38, C157, C39, C40, C41 [decided: owner, 2026-11-01]
 
-G10. cluster: C42, C43, C44, C45, C46, C47, C48, C49, C50, C51 [proposed: this IR]
+G10. cluster: C42, C43, C44, C45, C46, C47, C48, C49, C50, C51 [decided: owner, 2026-11-01]
 
-G11. cluster: C52, C53, C54, C55, C56 [proposed: this IR]
+G11. cluster: C52, C53, C54, C55, C56 [decided: owner, 2026-11-01]
 
-G12. cluster: C57, C58, C59, C60, C61, C62, C63 [proposed: this IR]
+G12. cluster: C57, C58, C59, C60, C61, C62, C63 [decided: owner, 2026-11-01]
 
-G13. cluster: C64, C65, C66 [proposed: this IR]
+G13. cluster: C64, C65, C66 [decided: owner, 2026-11-01]
 
-G14. cluster: C67, C68, C69 [proposed: this IR]
+G14. cluster: C67, C68, C69 [decided: owner, 2026-11-01]
 
-G15. cluster: C70, C71, C72, C73, C74 [proposed: this IR]
+G15. cluster: C70, C71, C72, C73, C74 [decided: owner, 2026-11-01]
 
-G16. cluster: C75, C76, C77, C78, C79, C80 [proposed: this IR]
+G16. cluster: C75, C76, C77, C78, C79, C80 [decided: owner, 2026-11-01]
 
-G17. cluster: C81, C82, C83, C84, C85, C86, C87 [proposed: this IR]
+G17. cluster: C81, C82, C83, C84, C85, C86, C87 [decided: owner, 2026-11-01]
 
-G18. cluster: C88, C89, C90, C91, C92, C93, C158, C94, C95, C96, C97 [proposed: this IR]
+G18. cluster: C88, C89, C90, C91, C92, C93, C158, C94, C95, C96, C97 [decided: owner, 2026-11-01]
 
-G19. cluster: C98, C99, C100, C101, C102, C103 [proposed: this IR]
+G19. cluster: C98, C99, C100, C101, C102, C103 [decided: owner, 2026-11-01]
 
-G20. cluster: C104, C105 [proposed: this IR]
+G20. cluster: C104, C105 [decided: owner, 2026-11-01]
 
-G21. cluster: C106, C107, C108, C109, C110 [proposed: this IR]
+G21. cluster: C106, C107, C108, C109, C110 [decided: owner, 2026-11-01]
 
-G22. cluster: C111, C112, C113, C114, C115, C116, C117, C118 [proposed: this IR]
+G22. cluster: C111, C112, C113, C114, C115, C116, C117, C118 [decided: owner, 2026-11-01]
 
-G23. cluster: C119, C120, C121, C122, C123, C124, C125, C126 [proposed: this IR]
+G23. cluster: C119, C120, C121, C122, C123, C124, C125, C126 [decided: owner, 2026-11-01]
 
-G24. cluster: C127, C128, C129, C130 [proposed: this IR]
+G24. cluster: C127, C128, C129, C130 [decided: owner, 2026-11-01]
 
-G25. cluster: C131, C132, C133, C134, C135 [proposed: this IR]
+G25. cluster: C131, C132, C133, C134, C135 [decided: owner, 2026-11-01]
 
-G26. cluster: C136, C137, C138, C139, C140, C159, C141, C142, C143 [proposed: this IR]
+G26. cluster: C136, C137, C138, C139, C140, C159, C141, C142, C143 [decided: owner, 2026-11-01]
 
-G27. cluster: C144, C145, C146 [proposed: this IR]
+G27. cluster: C144, C145, C146 [decided: owner, 2026-11-01]
 
-G28. cluster: C147, C148, C149, C150, C151, C152, C153, C154, C155 [proposed: this IR]
+G28. cluster: C147, C148, C149, C150, C151, C152, C153, C154, C155 [decided: owner, 2026-11-01]
 
 ## Relations
 
@@ -586,4 +586,8 @@ E40. `package.json` lines 24–25: `lint:units` runs `scripts/analyze/index.ts u
 
 A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C4, C5, C12, C13, C14, C15, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C53, C54, C56, C57, C58, C59, C61, C62, C63, C67, C68, C69, C70, C72, C73, C74, C75, C76, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C94, C95, C96, C97, C98, C99, C100, C101, C102, C104, C105, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C128, C129, C130, C132, C133, C134, C139, C140, C143, C147, C148, C149, C150, C151, C152, C153, C154, C155, C156, C157, C158, C159. Depends: C4, C5, C12, C13, C14, C15, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C53, C54, C56, C57, C58, C59, C61, C62, C63, C67, C68, C69, C70, C72, C73, C74, C75, C76, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C94, C95, C96, C97, C98, C99, C100, C101, C102, C104, C105, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C128, C129, C130, C132, C133, C134, C139, C140, C143, C147, C148, C149, C150, C151, C152, C153, C154, C155, C156, C157, C158, C159.
 
+A1 resolved: ratified by the owner at the merge of PR #132, 2026-11-01; the claims carry decided provenance from that date.
+
 A2. Ratify or strike the proposed term the evalSource pipeline (T34); the term tail call (T27) is proposed by the evaluator chapter's IR and rides that IR's own ratification ask. Depends: C2, C17, C45, C49.
+
+A2 resolved: ratified by the owner at the merge of PR #132, 2026-11-01. Ruling R9 was taken on 2026-11-01 as option (a): the spine's §29 stays the definition site of the evalSource pipeline, T34 links to it, and the chapter is the as-implemented home; precompile (T35) is defined in docs/book/layers.md §2, before its first use in reading order.
