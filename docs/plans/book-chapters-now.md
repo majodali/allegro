@@ -475,9 +475,9 @@ definition site before its first use in reading order
   `docs/book/platform/tooling.ir.md`, Status `delivered IR-only`
   (170 claims, of which 157 proposed, 10 decided and 3 inferred; 30
   terms, of which 2 proposed; 26 clusters; 11 relations; 37 evidence
-  pointers). No prose and no rounds (§3.1). Unratified terms 2 in the
-  chapter (*safety grade*, defined here; *the evalSource pipeline*, A2's,
-  still proposed). Footprint: declared 7, changed 7, surprises 0, misses
+  pointers). No prose and no rounds (§3.1). Unratified terms 1 in the
+  chapter (*safety grade*, defined here; *the evalSource pipeline* and
+  *precompile* link to their definition sites since ruling R9). Footprint: declared 7, changed 7, surprises 0, misses
   0. Ids 790 (unchanged on the updated base). No spine entry absorbed.
   The branch was fast-forwarded to `origin/main` before the commits,
   which brought B-159 (precompile of recursive definitions) chunk R2:

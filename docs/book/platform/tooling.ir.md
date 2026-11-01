@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `introspect` unit (unit 34) and the `cli` unit (unit 35): the file runner, the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, and the four diagnostic variables, with tracing and the IDE integration stated as not built.
-Status: delivered IR-only (unratified terms 2; footprint: declared 7, changed 7, surprises 0, misses 0)
+Status: delivered IR-only (unratified terms 1; footprint: declared 7, changed 7, surprises 0, misses 0)
 Source: chunk A3 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts and src/introspect.ts as the files of units 35 and 34
 Footprint: docs/book/platform/tooling.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -60,11 +60,11 @@ T25. Extension, a set of named bindings the execution context injects between th
 
 T26. Library, a module file that `ModuleLoader` loads into an extension. defined-at: ../extension/modules.md#loading-l1 [decided: docs/book/extension/modules.md, Loading]
 
-T27. The evalSource pipeline. defined-at: build-pipeline.ir.md#def-the-evalsource-pipeline [proposed: docs/book/platform/build-pipeline.ir.md T34]
+T27. The evalSource pipeline. defined-at: ../concepts.md#def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
 
-T28. Precompile, the stage of the evalSource pipeline that partially evaluates each function definition's body before the evaluation loop. defined-at: build-pipeline.ir.md#def-the-evalsource-pipeline [decided: docs/book/platform/build-pipeline.ir.md T35]
+T28. Precompile, the stage of the evalSource pipeline that partially evaluates each function definition's body before the evaluation loop. defined-at: ../layers.md#def-precompile [decided: docs/book/layers.md §2]
 
-T29. Post-pass, a check of the evalSource pipeline that runs after precompile or after the evaluation loop. defined-at: build-pipeline.ir.md#def-the-evalsource-pipeline [decided: docs/book/platform/build-pipeline.ir.md T36]
+T29. Post-pass, a check of the evalSource pipeline that runs after precompile or after the evaluation loop. defined-at: ../concepts.md#def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
 
 T30. Safety grade. The one-word grade that `inspect` prints for a whole module from the module's compilation report and binding summaries: `proven-safe`, `partial`, `has-warnings` or `has-errors`. anchor: #def-safety-grade [proposed: this IR]
 
@@ -592,4 +592,4 @@ E37. Search of `src/`, `pcp/` and `web/` on 2026-11-01, outside `src/test/`, for
 
 A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own reader, terms and examples: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170. Depends: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170.
 
-A2. Ratify or strike the proposed term safety grade (T30); the term the evalSource pipeline (T27) is proposed by the evaluation pipeline chapter's IR and rides that IR's own ratification ask. Depends: C2, C86, C90, C93.
+A2. Ratify or strike the proposed term safety grade (T30); the evalSource pipeline (T27) and precompile (T28) have their definition sites in the spine's §29 and in `docs/book/layers.md` §2 since ruling R9 of 2026-11-01. Depends: C2, C86, C90, C93.
