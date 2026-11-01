@@ -132,6 +132,38 @@ Plan `docs/plans/recursive-precompile.md`; lane P; merge-on-green
 under deviation D-2 (merge-on-green streams). Opened 2026-10-30 with
 the plan; entries newest first, directly below this line.
 
+### 2026-11 — The cutoff recognises a typed recursive definition (B-159, chunk R2): one object per definition
+
+B-159 (precompile of recursive definitions), chunk R2 of
+`docs/plans/recursive-precompile.md`. T-R6 (the recursion inlining
+cutoff) fires again for typed functions. It had been inert for them
+since B-121 (metadata on every kind) chunk C2. The precompile context in
+`src/runtime.ts` binds each function definition once
+(`precompileDefinitionEntry`), so every reference sees one typed
+function object. The cutoff's set holds those bound objects. A second
+identity test, on the function's `body`, catches the copies the
+evaluation loop makes when `typed_function_impl` precompiles a pure
+literal again.
+
+- `tests/totality-termination-demo.alg` takes 0.3 s and 694 `evaluate`
+  calls, against 62.7 s and 84,065,836 at R1. The gate falls from
+  361.6 s to 14.1 s of wall clock.
+- Every precompile-corpus source makes zero inline expansions of a
+  recursive definition. Each source makes at least one cutoff residual.
+  None carries a `precompile-type-error`.
+- Four spurious `precompile-type-error` notifications leave the
+  compilation reports of the corpus. One `inferred` entry appears. Each
+  affected `inspect` summary now reads `proven-safe`. Program output,
+  every totality verdict and every inferred effect are unchanged.
+- A guard test and eight regression tests in `src/test/totality.ts` pin
+  the binding and the counts.
+- `npm run lint:load` gates the precompile corpus's evaluation counts
+  against a new `precompile` section of `bench/load-baseline.json`.
+- `docs/book/standard/totality.md` §7 and §8 record the inert period.
+- For R3: the evaluation-time F3b precompile of a pure top-level literal
+  is a third precompile of the same body. The plan's §7 records the
+  experiment.
+
 ### 2026-11 — The measurement lands (B-159, chunk R1): two counters, the precompile corpus, the verdict pin
 
 B-159 (precompile of recursive definitions), chunk R1 of

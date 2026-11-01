@@ -25,7 +25,7 @@
 | `src/symbols.ts` | L0 | Symbol interning (FQN identity, D20/D29), kernel scope, base-name projection |
 | `src/evaluator.ts` | L0 | Recursive evaluator: PE Rules 1+2, TCO, closures; applies the propagation table through the metadata unit; runs the installed field checks and dispatchers (B-112 hooks (a) and (b): operator and equality dispatch, call-site unification and checking live in `types-std.ts`). Still performs effect and knowledge inference inside its loop (B-146). Counts its own work behind `ALLEGRO_EVAL_STATS=1` or a sink, `setEvalStatsSink` (B-157 P10 (a binding evaluated once)) |
 | `src/primitives.ts` | L0/L2 | All primitives: bits/expression/structure ops, type system ops, proof constructors + `proof_check`, grammar combinators, lazy print |
-| `src/runtime.ts` | L0/L1 | `evalSource` pipeline (below), symbol resolution, precompile, `CompilationReport` + notifications |
+| `src/runtime.ts` | L0/L1 | `evalSource` pipeline (below), symbol resolution, precompile, `CompilationReport` + notifications; installs the inline cutoff of T-R6 (the recursion inlining cutoff), whose set holds the objects the precompile context binds the recursive definitions to (B-159 (precompile of recursive definitions) R2) |
 | `src/refinements.ts` | L2 | Abstract domains + predicate sets: `domainFromPredicate`, lattice ops, propagation, `knowledgeOf` |
 | `src/effects.ts` | L2 | EffectSet ops, effects-as-component storage (`withEffects`/`effectsOf`) |
 | `src/totality.ts` | L2 | Exhaustiveness + termination analysis (SCC/Tarjan, `decreases`, HOF edges), body-form metadata readers |
@@ -121,7 +121,9 @@ passes every other gate.
 Stage order (in `src/runtime.ts`): `parse` (grammar2, with `use`
 pre-scan + fragment merge) → `typeLiterals` (raw Bits → Int/String
 wrapping) → `resolveSymbols` (lexical scoping) → `markTailCalls` →
-`collapseBodyMetadata` + `precompileFunctions` (PE of the function definitions' bodies, each value binding they read evaluated at most once:
+`collapseBodyMetadata` + `precompileFunctions` (PE of the function definitions' bodies, each value binding they read evaluated at most once,
+each function definition bound once to one object, which every reference
+resolves to and the inline cutoff recognises by identity or by its body:
 type + effect inference; `CompilationReport`) → `buildEvalCtx` (scope
 chain: primitives ← extensions ← base ← source) → evaluation loop
 (forward-chaining on future cells). Post-passes:

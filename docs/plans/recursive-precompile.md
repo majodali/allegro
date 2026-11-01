@@ -554,3 +554,110 @@ plan's recommendation and the ruling taken.
   each typed recursive definition outside a tail call (the decreases
   demo's `countdown` is a tail call and carries none). The verdict pin
   does not record that notification, since RR2 lets R2 remove it.
+- **2026-11-01 — R2 landed.** One object per definition; the
+  [inline cutoff](#def-inline-cutoff) recognises it again. RR1 is taken as
+  option (b), with option (a)'s body match added as the second predicate
+  that RR1's downside 2 provides for.
+  - **The mechanism, as built** (`src/runtime.ts`):
+    - `precompileDefinitionEntry` is the precompile context's entry for a
+      function definition. It evaluates the definition on its first
+      lookup and keeps the object, so every later reference in the
+      [precompile pass](#def-precompile-pass) resolves to it. A lookup
+      made while that first evaluation runs comes from the definition's
+      own construction: `typed_function_impl`'s F3b inline precompile
+      reaches the recursive call. It evaluates the definition
+      re-entrantly and binds that first-built object. The outer result is
+      dropped.
+    - `precompileFunctionsInner` puts each definition into the context
+      through that entry. Its loop reads the entry instead of calling
+      `evaluate`, so the function it precompiles is the bound one.
+    - `evalSource` installs the cutoff as two identity tests: the callee
+      is a bound object, or its `body` is a bound object's body. The
+      context fills both sets as it binds the recursive bindings
+      (`addCutoffBound`). The set no longer holds the literals that
+      `analyzeDivergence` peels (`stampTargets`).
+  - **Why the second predicate.** With (b) alone, `inlineExpansions`
+    was 0 for every corpus source, but `evaluate` varied between runs
+    (`factorial-nonneg.alg`: 138,999 and 137,422). The cause is outside
+    the precompile context. In the evaluation loop, `typed_function_impl`
+    runs its F3b precompile once more for every pure top-level literal,
+    since such a literal's `inferredEffects` stays undefined. There the
+    recursive name resolves to a fresh `withType` copy of the
+    definition. The copy missed the identity test and unfolded to a
+    stack overflow, which was caught silently. `inlineExpansions` counts
+    only inside the precompile pass, so it never showed this. The body
+    test recognises the copy, since it shares its literal's body.
+  - **For R3: the candidate now shows.** The evaluation-time F3b
+    precompile of a pure top-level literal is a third precompile of the
+    same body. In an experiment, reverted, `typed_function_impl` skipped
+    it for a literal the precompile pass had already precompiled (with
+    (b) and without the body test). `evaluate` per source fell to
+    `bad.alg` 32, `f-decreases.alg` 62, `factorial-int.alg` 62,
+    `factorial-nonneg.alg` 74, `k-lex.alg` 67, `sum_to.alg` 74,
+    `tests/totality-termination-demo.alg` 631 and
+    `tests/totality-decreases-demo.alg` 31,182. `precompiles` fell by
+    one per pure top-level definition (the termination demo from 9 to 6). The counts were deterministic over
+    three CLI runs, and the output diff was the same as R2's. R3 decides
+    it on measurement.
+  - **RR1's three downsides.** (1) No inferred effect changed: every
+    `effects:` line of `inspect` over `tests/*.alg` and `demos/**/*.alg`
+    is identical. (2) One path copies a function between binding and
+    call: the evaluation-time F3b precompile above. The body test covers
+    it. The guard test pins the binding in the precompile context.
+    (3) The full output oracle ran over the corpus (below).
+  - **Tests** (`src/test/totality.ts`). The guard, "B-159 R2 guard: a
+    recursive call site in the precompile context resolves to the bound
+    object", wraps the recursive call in a lazy probe primitive. The
+    probe compares the callee with the object the name is bound to. It
+    failed on the parent commit and passes here. One regression test per
+    corpus source, through the stats sink, asserts `cutoffResiduals` ≥ 1
+    and no `precompile-type-error`. It bounds `inlineExpansions` by the
+    one other expansion the pass makes: the `NonNeg` refinement predicate
+    (`_ >= 0`), at most once per `NonNeg` definition. The bound is 1 for
+    `factorial-nonneg.alg` and `sum_to.alg`, 2 for the termination demo
+    and 0 elsewhere. A compilation expands that predicate only when it
+    is not the first in its process, so the bound holds in the suite. It
+    is 0 through the CLI. R1's `VERDICT_PIN` passes untouched.
+  - **Outputs** (RR2). 68 programs, each run through the CLI with `run`
+    and with `inspect`. Every stdout, stderr and exit code of `run` is
+    identical. Three `inspect` outputs differ:
+    `tests/totality-termination-demo.alg`,
+    `tests/totality-decreases-demo.alg` and `tests/type-annotations.alg`.
+    Four `precompile-type-error: Maximum call stack size exceeded`
+    notifications disappear (`factorial`, `sum_to`, `ack_inner`,
+    `factorial`). One `inferred` entry appears (`factorial: Int` in
+    `tests/type-annotations.alg`). With the errors gone, each of the
+    three summaries reads `safety grade: proven-safe`, not `has-errors`.
+    That is the same difference as the removed notifications, rendered
+    as a summary; the maintainer confirms the reading at this PR. Nothing
+    else differs.
+  - **Re-measured**, in the same sandbox as §2.
+    `tests/totality-termination-demo.alg` alone takes 0.3 s: `evaluate`
+    694, `applyComposed` 41, `applyPrimitive` 152, `inlineExpansions` 0,
+    `cutoffResiduals` 6, `precompiles` 9 (R1: 62.7 s and 84,065,836). The
+    corpus through `npm run bench:load`:
+
+    | Source | Wall clock | `evaluate` | `inlineExpansions` | `cutoffResiduals` | `precompiles` |
+    |---|---|---|---|---|---|
+    | `factorial-nonneg.alg` | 0.4 s | 102 | 0 | 3 | 3 |
+    | `factorial-int.alg` | 0.3 s | 62 | 0 | 2 | 2 |
+    | `f-decreases.alg` | 0.3 s | 89 | 0 | 3 | 3 |
+    | `k-lex.alg` | 0.3 s | 96 | 0 | 3 | 3 |
+    | `sum_to.alg` | 0.3 s | 102 | 0 | 3 | 3 |
+    | `bad.alg` | 0.3 s | 32 | 0 | 2 | 2 |
+    | `tests/totality-termination-demo.alg` | 0.3 s | 694 | 0 | 6 | 9 |
+    | `tests/totality-decreases-demo.alg` | 0.4 s | 31,270 | 0 | 3 | 6 |
+
+    The load corpus's counts are unchanged (`lib/planning.alg` still
+    makes 245 cutoff residuals). The gate, `npm run test:shards`: shards
+    of 14.1 s, 11.3 s and 8.7 s, 14.1 s of wall clock and 34.2 s of work
+    (§2.3 before: 301.7 s, 361.6 s and 74.5 s, 361.6 s and 737.8 s).
+  - **The baseline** (RR3). All four counts were identical over three
+    CLI runs per source, so all four are gated. `npm run lint:load` runs
+    each source through the CLI, one fresh process each, and compares
+    with the `precompile` section of `bench/load-baseline.json`.
+    `evaluates`, `inlineExpansions` and `precompiles` fail when they
+    rise; `cutoffResiduals` fails when it falls. The baseline values are
+    the table's four count columns. The section was created in its own
+    last commit, on a branch up to date with `origin/main`. The load
+    section is unchanged.
