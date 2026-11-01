@@ -79,10 +79,10 @@
     ],
     "sources": {
       "bench/corpus/precompile/factorial-nonneg.alg": {
-        "evaluates": 102,
+        "evaluates": 74,
         "inlineExpansions": 0,
-        "precompiles": 3,
-        "cutoffResiduals": 3
+        "precompiles": 2,
+        "cutoffResiduals": 2
       },
       "bench/corpus/precompile/factorial-int.alg": {
         "evaluates": 62,
@@ -91,22 +91,22 @@
         "cutoffResiduals": 2
       },
       "bench/corpus/precompile/f-decreases.alg": {
-        "evaluates": 89,
+        "evaluates": 62,
         "inlineExpansions": 0,
-        "precompiles": 3,
-        "cutoffResiduals": 3
+        "precompiles": 2,
+        "cutoffResiduals": 2
       },
       "bench/corpus/precompile/k-lex.alg": {
-        "evaluates": 96,
+        "evaluates": 67,
         "inlineExpansions": 0,
-        "precompiles": 3,
-        "cutoffResiduals": 3
+        "precompiles": 2,
+        "cutoffResiduals": 2
       },
       "bench/corpus/precompile/sum_to.alg": {
-        "evaluates": 102,
+        "evaluates": 74,
         "inlineExpansions": 0,
-        "precompiles": 3,
-        "cutoffResiduals": 3
+        "precompiles": 2,
+        "cutoffResiduals": 2
       },
       "bench/corpus/precompile/bad.alg": {
         "evaluates": 32,
@@ -115,16 +115,16 @@
         "cutoffResiduals": 2
       },
       "tests/totality-termination-demo.alg": {
-        "evaluates": 694,
-        "inlineExpansions": 0,
-        "precompiles": 9,
-        "cutoffResiduals": 6
-      },
-      "tests/totality-decreases-demo.alg": {
-        "evaluates": 31270,
+        "evaluates": 631,
         "inlineExpansions": 0,
         "precompiles": 6,
-        "cutoffResiduals": 3
+        "cutoffResiduals": 4
+      },
+      "tests/totality-decreases-demo.alg": {
+        "evaluates": 31182,
+        "inlineExpansions": 0,
+        "precompiles": 4,
+        "cutoffResiduals": 2
       }
     }
   }

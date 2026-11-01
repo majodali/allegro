@@ -969,3 +969,35 @@ test("B-159 R2 regression: the list covers every source in bench/corpus/precompi
   const listed = R2_CORPUS.map(r => r.file).filter(f => f.startsWith("bench/"));
   eq(JSON.stringify(listed.sort()), JSON.stringify(files.sort()));
 });
+
+// --- B-159 R3: the second precompile of a top-level literal is skipped ---
+//
+// B-159, chunk R3; plan docs/plans/recursive-precompile.md §5. The precompile
+// pass precompiles a top-level definition twice: `typed_function_impl`'s F3b
+// precompile of the literal while the pass builds the typed function, then
+// the pass's own precompile of it. Before R3 the evaluation loop added a
+// third, the F3b precompile again, for every pure top-level literal (an
+// effectful or diverging one already skipped it, its `inferredEffects` being
+// set). The pass now marks the literals it covered and that third one is
+// skipped. `precompiles` counts every entry to `precompileFunction`, and does
+// not depend on what an earlier compilation in the process left behind.
+
+test("B-159 R3 regression: the evaluation does not precompile a top-level literal the pass covered", () => {
+  const reports: EvalReport[] = [];
+  const previousSink = setEvalStatsSink(r => { reports.push(r); });
+  const origLog = console.log;
+  console.log = () => {};
+  try {
+    runtimeEval("square(n: Int): Int => n * n\nprint(square(7))\n", undefined, [typeExt], undefined, true);
+  } finally {
+    console.log = origLog;
+    setEvalStatsSink(previousSink);
+  }
+  const own = reports.filter(r => r.source === "<main>");
+  eq(own.length, 1, "one stats report");
+  eq(own[0].stats.precompiles, 2, "one pure definition: the F3b precompile and the pass's, none in the evaluation (3 before R3)");
+  // The termination demo: three pure definitions, two precompiles each
+  // (9 before R3, the value R2's baseline holds).
+  const { stats } = precompileCountsOf(path.resolve("tests/totality-termination-demo.alg"));
+  eq(stats.precompiles, 6, "tests/totality-termination-demo.alg: 6 precompiles");
+});
