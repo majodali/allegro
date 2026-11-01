@@ -66,5 +66,66 @@
       "lrIterations": 0,
       "finalMemoSize": 54048
     }
+  },
+  "precompile": {
+    "_": "B-159 (precompile of recursive definitions) R2: the precompile corpus's evaluation counts, one CLI run per source with ALLEGRO_EVAL_STATS=1. `gated` fail when they rise, `floor` when it falls (a cutoff residual lost is a call the inline cutoff stopped recognising). Lower `gated` / raise `floor` only in its own commit (B-164). docs/plans/recursive-precompile.md §3 and ruling RR3.",
+    "gated": [
+      "evaluates",
+      "inlineExpansions",
+      "precompiles"
+    ],
+    "floor": [
+      "cutoffResiduals"
+    ],
+    "sources": {
+      "bench/corpus/precompile/factorial-nonneg.alg": {
+        "evaluates": 102,
+        "inlineExpansions": 0,
+        "precompiles": 3,
+        "cutoffResiduals": 3
+      },
+      "bench/corpus/precompile/factorial-int.alg": {
+        "evaluates": 62,
+        "inlineExpansions": 0,
+        "precompiles": 2,
+        "cutoffResiduals": 2
+      },
+      "bench/corpus/precompile/f-decreases.alg": {
+        "evaluates": 89,
+        "inlineExpansions": 0,
+        "precompiles": 3,
+        "cutoffResiduals": 3
+      },
+      "bench/corpus/precompile/k-lex.alg": {
+        "evaluates": 96,
+        "inlineExpansions": 0,
+        "precompiles": 3,
+        "cutoffResiduals": 3
+      },
+      "bench/corpus/precompile/sum_to.alg": {
+        "evaluates": 102,
+        "inlineExpansions": 0,
+        "precompiles": 3,
+        "cutoffResiduals": 3
+      },
+      "bench/corpus/precompile/bad.alg": {
+        "evaluates": 32,
+        "inlineExpansions": 0,
+        "precompiles": 2,
+        "cutoffResiduals": 2
+      },
+      "tests/totality-termination-demo.alg": {
+        "evaluates": 694,
+        "inlineExpansions": 0,
+        "precompiles": 9,
+        "cutoffResiduals": 6
+      },
+      "tests/totality-decreases-demo.alg": {
+        "evaluates": 31270,
+        "inlineExpansions": 0,
+        "precompiles": 6,
+        "cutoffResiduals": 3
+      }
+    }
   }
 }

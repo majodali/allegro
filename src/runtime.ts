@@ -575,6 +575,81 @@ function precompileMemoEntry(key: string, expr: Value, ctx: StructureValue): Bin
 }
 
 /**
+ * B-159 R2 (one object per definition): the inline cutoff's view of the
+ * precompile context. `recursive` names the bindings on a recursion cycle
+ * (`analyzeDivergence`'s `recursiveBindings`); `bound` is the set the
+ * installed cutoff tests by identity, and holds the object each of those
+ * bindings is bound to in the precompile context.
+ */
+interface PrecompileCutoff {
+  recursive: ReadonlySet<string>;
+  bound: Set<Value>;
+  /** The `body` of each object in `bound`: the second predicate (RR1's
+   *  downside 2) recognises a copy of a bound function made outside the
+   *  precompile context, which shares its body. */
+  bodies: Set<Value>;
+}
+
+/** B-159 R2: a recursive binding's bound object joins the cutoff, by
+ *  identity and by its body. */
+function addCutoffBound(cutoff: PrecompileCutoff, v: Value): void {
+  cutoff.bound.add(v);
+  if (v.kind === ValueKind.ComposedFunction) cutoff.bodies.add(v.body);
+}
+
+/**
+ * B-159 R2: the precompile context's entry for a function DEFINITION (a
+ * function literal under `typed_function`). It evaluates the definition
+ * once, on the first lookup, and every later lookup returns that object,
+ * so every reference in this pass sees the one typed function, and the
+ * inline cutoff can recognise it by identity. Before R2 each lookup
+ * evaluated `typed_function(…)` again and got a fresh copy (`withType`
+ * derives one), which the cutoff's identity test missed (plan
+ * `docs/plans/recursive-precompile.md` §2.5).
+ *
+ * A lookup made while that first evaluation runs is a self-reference from
+ * inside the definition's own construction: `typed_function_impl`
+ * precompiles the literal before it returns (its F3b inline-lambda
+ * precompile), and the body's recursive call names the definition. That
+ * lookup evaluates the definition re-entrantly, which builds the typed
+ * function without the nested precompile, and binds THAT object: the
+ * object first built is the one the definition is bound to, and the outer
+ * evaluation's own result is dropped. `onBound` hands the bound object to
+ * the cutoff. A failed evaluation keeps nothing.
+ */
+function precompileDefinitionEntry(
+  key: string,
+  expr: Value,
+  ctx: StructureValue,
+  onBound: (v: Value) => void,
+): Binding {
+  let held: Value | undefined;
+  let evaluating = false;
+  const bind = (v: Value): Value => {
+    if (held !== undefined) return held;
+    held = v;
+    onBound(v);
+    return v;
+  };
+  return {
+    key,
+    get value(): Value {
+      if (held !== undefined) return held;
+      if (evaluating) return bind(evaluate(expr, ctx, 0));
+      evaluating = true;
+      try {
+        return bind(evaluate(expr, ctx, 0));
+      } catch (e) {
+        held = undefined;
+        throw e;
+      } finally {
+        evaluating = false;
+      }
+    },
+  } as Binding;
+}
+
+/**
  * B-158: the values this evaluation was HANDED — each extension's binding
  * values and each module object's fields. Their owner module is another
  * evaluation (a library's load, or the type system's construction), and
@@ -607,6 +682,7 @@ function precompileFunctions(
   extensions?: Extension[],
   typed?: boolean,
   libraryOwned: Set<Value> = new Set(),
+  cutoff?: PrecompileCutoff,
 ): CompilationReport {
   const report: CompilationReport = { inferred: [], unresolved: [], bindingTypes: new Map(), notifications: [] };
   if (!typed) return report;
@@ -618,7 +694,7 @@ function precompileFunctions(
   setLawInstantiationSuspended(true);
   setEvalStatsPrecompile(true);
   try {
-    return precompileFunctionsInner(fileCtx, extensions, report, libraryOwned);
+    return precompileFunctionsInner(fileCtx, extensions, report, libraryOwned, cutoff);
   } finally {
     setEvalStatsPrecompile(false);
     setLawInstantiationSuspended(false);
@@ -630,6 +706,7 @@ function precompileFunctionsInner(
   extensions: Extension[] | undefined,
   report: CompilationReport,
   libraryOwned: Set<Value>,
+  cutoff?: PrecompileCutoff,
 ): CompilationReport {
   // Build a minimal context for pre-compilation (primitives + extensions)
   const compileCtx = makeStructure();
@@ -652,12 +729,28 @@ function precompileFunctionsInner(
   // Add source bindings to compile context. B-157 P10 (B-153): a value
   // binding whose expression computes enters as a memo entry, so the
   // definitions' annotations and bodies that reference it evaluate it once
-  // in this pass rather than once per reference.
+  // in this pass rather than once per reference. B-159 R2: a function
+  // definition enters as a definition entry, evaluated once, so every
+  // reference sees one typed function object; the object each recursive
+  // binding is bound to joins the cutoff's set (an already-resolved value,
+  // an untyped literal, is its own bound object).
+  const entries = new Map<any, Binding>();
   for (const b of fileCtx.bindingList) {
     if (b.key !== null && b.value !== undefined) {
-      putEntry(compileCtx, isResolved(b.value) || isFunctionDefinition(b.value)
-        ? { key: b.key, value: b.value }
-        : precompileMemoEntry(b.key, b.value, compileCtx));
+      const key: string = b.key;
+      const onCycle = cutoff?.recursive.has(key) ?? false;
+      let entry: Binding;
+      if (isResolved(b.value)) {
+        entry = { key, value: b.value };
+        if (onCycle) addCutoffBound(cutoff!, b.value);
+      } else if (isFunctionDefinition(b.value)) {
+        entry = precompileDefinitionEntry(key, b.value, compileCtx,
+          onCycle ? (v: Value) => addCutoffBound(cutoff!, v) : () => {});
+      } else {
+        entry = precompileMemoEntry(key, b.value, compileCtx);
+      }
+      entries.set(b, entry);
+      putEntry(compileCtx, entry);
     }
   }
 
@@ -672,10 +765,12 @@ function precompileFunctionsInner(
     // values. A value binding is now evaluated by the evaluation loop only.
     if (!isFunctionDefinition(b.value)) continue;
 
-    // Evaluate the binding to resolve typed_function wrappers
+    // Evaluate the binding to resolve typed_function wrappers. B-159 R2:
+    // through its definition entry, so the function precompiled here is
+    // the object every reference in this pass resolves to.
     let val: Value;
     try {
-      val = evaluate(b.value, compileCtx, 0);
+      val = entries.get(b)!.value as Value;
     } catch (e: any) {
       // Skip bindings that can't be evaluated at compile time
       report.notifications.push({
@@ -1174,6 +1269,7 @@ export function evalSource(
   // after precompile has written its inferred sets.
   let divR: DivergenceResult | undefined;
   let exhTypeLookup: ((name: string) => Value | undefined) | undefined;
+  let cutoff: PrecompileCutoff | undefined;
   setInlineCutoff(null);
   if (typed) {
     // Phase E Stages 1-2 — totality analyzers. The exhaustiveness check
@@ -1251,17 +1347,33 @@ export function evalSource(
     // NonNeg)` cost 71.1s to compile and produced a spurious error,
     // while the same function over bare `Int` (undischarged, hence cut)
     // took 0.1s. Proving termination must not be punished.
-    const cutoffCfns = new Set<Value>();
-    for (const name of divR.recursiveBindings) {
-      const cfn = divR.stampTargets.get(name);
-      if (cfn) cutoffCfns.add(cfn as unknown as Value);
-    }
-    if (cutoffCfns.size > 0) {
-      setInlineCutoff((fnValue: Value) => cutoffCfns.has(fnValue));
+    //
+    // B-159 R2 (one object per definition): the set holds the objects the
+    // recursive bindings are bound to in the precompile context, which
+    // fills it as it binds them (`precompileDefinitionEntry`). It used to
+    // hold the literals `analyzeDivergence` peeled (`stampTargets`), and
+    // since B-121 (metadata on every kind) chunk C2 a typed function is a
+    // derived copy of its literal, so the identity test missed every typed
+    // recursive call.
+    //
+    // The second predicate, by body, is ruling RR1's provision for a path
+    // that copies a function between binding and call (plan
+    // `docs/plans/recursive-precompile.md` §6, downside 2). One exists: in
+    // the evaluation loop, `typed_function_impl` precompiles a pure
+    // top-level literal again (its F3b inline precompile), and there the
+    // recursive name resolves to a fresh `withType` copy of the definition,
+    // never to the object bound here. A copy shares its literal's body, so
+    // the body set recognises it. Both tests are identity tests.
+    if (divR.recursiveBindings.size > 0) {
+      const cutoffCfns = new Set<Value>();
+      const cutoffBodies = new Set<Value>();
+      cutoff = { recursive: divR.recursiveBindings, bound: cutoffCfns, bodies: cutoffBodies };
+      setInlineCutoff((fnValue: Value) => cutoffCfns.has(fnValue)
+        || (fnValue.kind === ValueKind.ComposedFunction && cutoffBodies.has(fnValue.body)));
     }
   }
   // Pre-compile typed functions: infer return types and detect type errors
-  const compilationReport = precompileFunctions(fileCtx, extensions, typed, libraryOwned);
+  const compilationReport = precompileFunctions(fileCtx, extensions, typed, libraryOwned, cutoff);
 
   // Phase D1: check effect declarations against inferred sets. Mismatches
   // (declared ⊉ inferred, ignoring "opaque" which is a Slice-1 placeholder
