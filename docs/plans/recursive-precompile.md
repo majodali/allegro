@@ -19,6 +19,7 @@ boundary:
   - bench/**
   - docs/book/implementation-map.md
   - docs/book/standard/totality.md
+  - docs/book/platform/build-pipeline.ir.md
   - docs/plans/recursive-precompile.md
 ---
 

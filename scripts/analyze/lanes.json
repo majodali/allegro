@@ -100,6 +100,7 @@
         "docs/book/extension/**",
         "docs/book/implementation-map.md",
         "docs/book/standard/totality.md",
+    "docs/book/platform/build-pipeline.ir.md",
         "docs/plans/fast-library-load.md",
         "package.json"
       ]
