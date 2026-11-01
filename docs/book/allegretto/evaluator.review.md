@@ -575,3 +575,17 @@ reach M2 to M5. Under the other reading, the override counts M2, M4 and
 M5, and round 7 is not readable.
 
 Meta-review: pending (signals checked: 1 fired, 2 fired, 3 not fired, 4 fired; the count reached no limit)
+
+## After the count, 2026-11-01
+
+The owner merged PR #129 on 2026-11-01 (00:40 UTC) with no comment.
+Under `docs/book/process.md` §3 the merge is the approval.
+The merge ratified ask A1 (161 claims) and ask A2 (the term tail call).
+This follow-up flips their statuses to decided and the IR's Status to delivered.
+The plan's flip before the merge was overtaken by the merge.
+Three defects stay for the next edit: round 7's finding 2, touch-up edit A and the excess in the C172 sentence.
+This follow-up leaves them untouched.
+Asks 3 and 4 of the PR remain open with the maintainer.
+Ask 3 is the lane of B-172 (the partial-evaluation rules as implemented against the spine) and the owner of the missing default arm.
+Ask 4 is the dispatch of the meta-review.
+`Meta-review:` stays `pending`.

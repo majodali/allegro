@@ -167,7 +167,10 @@ unit 13's status cell names the chapter. The spine's §27 (tail calls) is
 an absorbed entry, a pointer to the chapter's definition site of *tail
 call*, and §25's as-implemented row points at the chapter; both logged
 in `docs/book-changes.md`. Bare first-use identifiers 795 → 791
-(`npm run lint:docs:check`); unratified terms 1 (*tail call*).
+(`npm run lint:docs:check`); unratified terms 1 (*tail call*). Merged as PR #129 on 2026-11-01;
+the IR's proposed claims and the term were ratified by the merge, and a
+follow-up flipped their statuses to decided and the IR's Status to
+delivered.
 
 ## Unstreamed
 
