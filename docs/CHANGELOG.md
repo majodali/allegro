@@ -132,6 +132,31 @@ Plan `docs/plans/recursive-precompile.md`; lane P; merge-on-green
 under deviation D-2 (merge-on-green streams). Opened 2026-10-30 with
 the plan; entries newest first, directly below this line.
 
+### 2026-11 — The second precompile of a top-level literal is skipped (B-159, chunk R3)
+
+B-159 (precompile of recursive definitions), chunk R3 of
+`docs/plans/recursive-precompile.md`. The evaluation loop no longer
+precompiles a top-level literal that the precompile pass already
+precompiled. The pass marks each such literal (`markPrecompiledByPass`,
+`src/primitives.ts`), and `typed_function_impl` skips its F3b
+precompile of a marked one. Only a typed program's top-level definitions
+are marked. A nested lambda, an untyped program and a module's load keep
+the F3b precompile as before.
+
+- One precompile less per pure top-level definition.
+  `tests/totality-termination-demo.alg` makes 6 precompiles and 631
+  `evaluate` calls, against 9 and 694 at R2. The corpus falls the same
+  way: `factorial-nonneg.alg` from 102 to 74 `evaluate` calls.
+- `cutoffResiduals` falls with it, from 3 to 2 per one-definition
+  source: the residuals lost are the skipped precompile's calls. The
+  baseline lowers that floor; the plan's §7 records why.
+- Program output and every compilation report are identical: 136 CLI
+  runs, 136 identical. Every totality verdict is unchanged.
+- Wall clock does not change measurably at these sizes.
+- A regression test in `src/test/totality.ts` pins the count.
+- `bench/load-baseline.json`'s `precompile` section lowers to the new
+  counts.
+
 ### 2026-11 — The cutoff recognises a typed recursive definition (B-159, chunk R2): one object per definition
 
 B-159 (precompile of recursive definitions), chunk R2 of
