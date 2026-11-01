@@ -2935,10 +2935,24 @@ table and the stream plans.
   generation)), proofs (B-052 (Lean export)). **Pointer**: D52 (the
   documentation book); `docs/plans/documentation-book.md` §4, Phase 2;
   the plan's §6 rulings R1 to R7
-- [ ] **B-171** (book-chapters stream, spare id 1) · T-docs · Reserved
-  by stream A (`docs/plans/book-chapters-now.md`) for a finding outside
-  its boundary. Placeholder until used; the stream rewrites this entry
-  when it files the finding. Two candidates are named in the plan §2.4.
+- [ ] **B-171** (the pipeline chapter's two findings) · T-docs · L0 ·
+  **Two facts the evaluation pipeline chapter states that no item owns.**
+  Filed by chunk A2 of B-170 (the book, Part II and III chapters writable
+  now) from the stream's spare id; the chapter is
+  `docs/book/platform/build-pipeline.ir.md`. (1) The `pipeline` unit
+  (33) owes three moves that no backlog item and no row of
+  `docs/book/units.md` §7 schedules: `typeLiterals` to `core-types` (unit
+  24, misalignment M3), `DependencyRegistry` to `futures` (unit 14), the
+  clone helpers to `composed-function` (unit 7); lane K is the natural
+  owner. (2) The precompile pass's error-severity notifications
+  (`precompile-eval`, `precompile-type-error`, `return-type-mismatch`) do
+  not halt compilation: `evalSource` never throws on them, and a return
+  type that contradicts the declaration halts only when the function is
+  called (checked: the uncalled case exits 0, the called case 1). That
+  reads against the halt rule of CE-R1 (a failed annotation check halts)
+  in `CLAUDE.md` and `docs/book/standard/README.md`; decide whether the
+  rule or the code gives (lane D). **Pointer**: the chapter's claims C79,
+  C80 and C136 to C143.
 - [ ] **B-172** (the partial-evaluation rules as implemented against the
   spine) · T-docs · L0 · **The spine's §25 (partial evaluation) delta
   says both PE rules are implemented as specified; the evaluator chapter
