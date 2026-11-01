@@ -214,7 +214,7 @@ gains row II.22, units 34 and 35's status cells name the chapter, and
 `docs/book/platform/README.md` links it. Bare first-use identifiers 790
 (`npm run lint:docs:check`, unchanged); unratified terms 1 in the
 chapter (*safety grade*; *the evalSource pipeline* and *precompile* link
-to their definition sites since ruling R9).
+to their definition sites since ruling R9 (the definition site of the evalSource pipeline)).
 
 ### 2026-11 — R9 (the definition site of the evalSource pipeline) taken as option (a): §29 stays the definition site; §25's delta corrected (B-170)
 
