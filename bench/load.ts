@@ -22,12 +22,18 @@
 // only to LOWER the baseline after a chunk lands (or when the corpus changes).
 //
 // The precompile corpus (B-159 (precompile of recursive definitions), chunk
-// R1 (the measurement lands); plan docs/plans/recursive-precompile.md §5) is
-// report-only: report mode runs and prints it after the load corpus, check
-// mode never sees it, so the
-// parse ratchet and bench/load-baseline.json ignore it. Its counts enter the
-// ratchet with their own baseline at R2 (ruling RR3 (whether and how the
-// counts are gated)), once the inline cutoff makes them deterministic.
+// R1 (the measurement lands); plan docs/plans/recursive-precompile.md §5):
+// report mode runs and prints it after the load corpus. Since chunk R2 (one
+// object per definition) check mode also gates it (ruling RR3 (whether and
+// how the counts are gated)): each source runs through the CLI with
+// ALLEGRO_EVAL_STATS=1, one fresh process per source, and its evaluation
+// counts are compared with the `precompile` section of
+// bench/load-baseline.json. `evaluates`, `inlineExpansions` and `precompiles`
+// fail when they rise; `cutoffResiduals` fails when it falls, since a fall is
+// a call the inline cutoff stopped recognising. A fresh process per source,
+// not one in-process loop, because a compilation's counts depend on what an
+// earlier compilation in the same process left behind (the refinement
+// predicate of `NonNeg` is expanded once more after the first).
 
 import * as fs from "fs";
 import * as path from "path";
@@ -51,8 +57,8 @@ const BASELINE = path.join(ROOT, "bench", "load-baseline.json");
 const SYSTEM_LIB = path.join(ROOT, "lib");
 
 /** A corpus group. `load` is the plan's §3 corpus, run by report mode and
- *  ratcheted by check mode. `precompile` (B-159 R1) is run by report mode
- *  only: check mode skips it, so it is in no baseline. */
+ *  ratcheted by check mode's parse counts. `precompile` (B-159 R1) is run by
+ *  report mode and, since R2, by check mode for its evaluation counts. */
 type CorpusGroup = "load" | "precompile";
 
 /** The corpus of the plan's §3, then the precompile corpus. A `library` entry
@@ -78,6 +84,8 @@ const CORPUS: { file: string; kind: "library" | "program"; group: CorpusGroup }[
 
 /** The entries check mode parses and ratchets: the load group only. */
 const CHECKED = CORPUS.filter(e => e.group === "load");
+/** The entries check mode runs for their evaluation counts (B-159 R2). */
+const PRECOMPILE_CHECKED = CORPUS.filter(e => e.group === "precompile");
 
 /** The counts the ratchet gates: the engine's work. All are deterministic
  *  for a given grammar and source; wall clock is not among them.
@@ -146,6 +154,37 @@ function readEvalLine(stderr: string): RunEval | null {
   return null;
 }
 
+// --- Check mode: the precompile corpus's evaluation counts (B-159 R2) --------
+
+/** The evaluation counts the precompile ratchet gates against a RISE. */
+const PRECOMPILE_GATED = ["evaluates", "inlineExpansions", "precompiles"] as const;
+/** The counts it gates against a FALL: the cutoff's residuals are a floor. */
+const PRECOMPILE_FLOOR = ["cutoffResiduals"] as const;
+type PrecompileRow = Record<typeof PRECOMPILE_GATED[number] | typeof PRECOMPILE_FLOOR[number], number>;
+
+/** Run each precompile-corpus source through the CLI, a fresh process each,
+ *  and read its `eval-stats` line. */
+function measurePrecompile(): { rows: Map<string, PrecompileRow>; failures: string[] } {
+  const rows = new Map<string, PrecompileRow>();
+  const failures: string[] = [];
+  for (const entry of PRECOMPILE_CHECKED) {
+    const r = spawnSync(process.execPath, ["--import", "tsx", "src/index.ts", entry.file], {
+      cwd: ROOT, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024,
+      env: { ...process.env, ALLEGRO_EVAL_STATS: "1" },
+    });
+    const e = readEvalLine(r.stderr ?? "");
+    if (r.status !== 0 || !e) {
+      failures.push(`${entry.file}: exited ${r.status}${e ? "" : " with no eval-stats line"}`);
+      continue;
+    }
+    rows.set(entry.file, {
+      evaluates: e.evaluates, inlineExpansions: e.inlineExpansions,
+      precompiles: e.precompiles, cutoffResiduals: e.cutoffResiduals,
+    });
+  }
+  return { rows, failures };
+}
+
 function runReport(): number {
   console.log("Load corpus — full runs (parse + evaluation), ALLEGRO_PARSE_STATS=1 ALLEGRO_EVAL_STATS=1");
   console.log("Wall clock is reported, never gated (docs/plans/fast-library-load.md §3).\n");
@@ -155,7 +194,7 @@ function runReport(): number {
     if (entry.group !== group) {
       group = entry.group;
       console.log(group === "load" ? "Load corpus (ratcheted by npm run lint:load):"
-        : "Precompile corpus (B-159; reported, not gated):");
+        : "Precompile corpus (B-159; evaluation counts ratcheted by npm run lint:load since R2):");
     }
     const t0 = Date.now();
     const r = spawnSync(process.execPath, ["--import", "tsx", "src/index.ts", entry.file], {
@@ -316,6 +355,8 @@ async function measure(): Promise<{ rows: Map<string, SourceRow>; ms: Map<string
 async function runCheck(update: boolean): Promise<number> {
   const t0 = Date.now();
   const { rows, ms, failures } = await measure();
+  const pre = measurePrecompile();
+  failures.push(...pre.failures);
   const wall = (Date.now() - t0) / 1000;
 
   const header = "  " + pad("source", 34) + lpad("chars", 8) + lpad("parse s", 9) +
@@ -330,6 +371,16 @@ async function runCheck(update: boolean): Promise<number> {
   }
   const parseSeconds = [...ms.values()].reduce((a, b) => a + b, 0) / 1000;
 
+  const pheader = "  " + pad("precompile source", W) + lpad("evaluate", 10) + lpad("inline exp.", 13) +
+    lpad("precompiles", 13) + lpad("cutoff res.", 13);
+  console.log("Precompile ratchet (B-159 R2) — evaluation counts, one CLI run per source");
+  console.log(pheader);
+  console.log("  " + "-".repeat(pheader.length - 2));
+  for (const [src, r] of pre.rows) {
+    console.log("  " + pad(src, W) + lpad(num(r.evaluates), 10) + lpad(num(r.inlineExpansions), 13) +
+      lpad(num(r.precompiles), 13) + lpad(num(r.cutoffResiduals), 13));
+  }
+
   if (failures.length) {
     for (const f of failures) console.log(`  FAIL ${f}`);
     console.log(`load lint: FAILED — ${failures.length} source(s) did not load`);
@@ -339,14 +390,22 @@ async function runCheck(update: boolean): Promise<number> {
   if (update) {
     const sources: Record<string, SourceRow> = {};
     for (const [src, r] of rows) sources[src] = r;
+    const precompileSources: Record<string, PrecompileRow> = {};
+    for (const [src, r] of pre.rows) precompileSources[src] = r;
     const doc = {
       _: "B-157 (the performance stream) P1: the load ratchet's baseline, written by `npm run lint:load -- --update-baseline`. Per corpus source, the engine's deterministic parse counts. Four are gated (match attempts, memo writes, invalidation entries, left-recursion iterations): `npm run lint:load` fails when any rises. The final memo size is recorded and reported, not gated (since P5). Lower it after a chunk lands; never raise it to pass. docs/plans/fast-library-load.md §3.",
       gated: GATED,
       reported: REPORTED,
       sources,
+      precompile: {
+        _: "B-159 (precompile of recursive definitions) R2: the precompile corpus's evaluation counts, one CLI run per source with ALLEGRO_EVAL_STATS=1. `gated` fail when they rise, `floor` when it falls (a cutoff residual lost is a call the inline cutoff stopped recognising). Lower `gated` / raise `floor` only in its own commit (B-164). docs/plans/recursive-precompile.md §3 and ruling RR3.",
+        gated: PRECOMPILE_GATED,
+        floor: PRECOMPILE_FLOOR,
+        sources: precompileSources,
+      },
     };
     fs.writeFileSync(BASELINE, JSON.stringify(doc, null, 2) + "\n");
-    console.log(`load lint: baseline written for ${rows.size} sources (bench/load-baseline.json; parse ${parseSeconds.toFixed(1)} s, check ${wall.toFixed(1)} s)`);
+    console.log(`load lint: baseline written for ${rows.size} sources and ${pre.rows.size} precompile sources (bench/load-baseline.json; parse ${parseSeconds.toFixed(1)} s, check ${wall.toFixed(1)} s)`);
     return 0;
   }
 
@@ -354,7 +413,8 @@ async function runCheck(update: boolean): Promise<number> {
     console.log("load lint: FAILED — bench/load-baseline.json is missing (run with --update-baseline)");
     return 1;
   }
-  const baseline = JSON.parse(fs.readFileSync(BASELINE, "utf-8")).sources as Record<string, SourceRow>;
+  const baselineDoc = JSON.parse(fs.readFileSync(BASELINE, "utf-8"));
+  const baseline = baselineDoc.sources as Record<string, SourceRow>;
   const rises: string[] = [];
   const falls: string[] = [];
   for (const [src, r] of rows) {
@@ -368,10 +428,30 @@ async function runCheck(update: boolean): Promise<number> {
   for (const src of Object.keys(baseline)) {
     if (!rows.has(src)) rises.push(`${src}: in the baseline but no longer parsed (corpus changed? run with --update-baseline)`);
   }
+  const preBaseline = baselineDoc.precompile?.sources as Record<string, PrecompileRow> | undefined;
+  if (!preBaseline) {
+    rises.push("precompile: bench/load-baseline.json has no `precompile` section (run with --update-baseline)");
+  } else {
+    for (const [src, r] of pre.rows) {
+      const b = preBaseline[src];
+      if (!b) { rises.push(`${src}: not in the precompile baseline (corpus changed? run with --update-baseline)`); continue; }
+      for (const k of PRECOMPILE_GATED) {
+        if (r[k] > b[k]) rises.push(`${src}: ${k} ${num(r[k])} > baseline ${num(b[k])}`);
+        else if (r[k] < b[k]) falls.push(`${src}: ${k} ${num(r[k])} < baseline ${num(b[k])}`);
+      }
+      for (const k of PRECOMPILE_FLOOR) {
+        if (r[k] < b[k]) rises.push(`${src}: ${k} ${num(r[k])} < baseline floor ${num(b[k])}`);
+        else if (r[k] > b[k]) falls.push(`${src}: ${k} ${num(r[k])} > baseline floor ${num(b[k])}`);
+      }
+    }
+    for (const src of Object.keys(preBaseline)) {
+      if (!pre.rows.has(src)) rises.push(`${src}: in the precompile baseline but no longer run (corpus changed? run with --update-baseline)`);
+    }
+  }
   for (const f of falls) console.log(`  below baseline: ${f}`);
   for (const r of rises) console.log(`  ABOVE BASELINE: ${r}`);
   if (falls.length && !rises.length) console.log("  (lower the baseline with `npm run lint:load -- --update-baseline`)");
-  const summary = `${rows.size} sources, parse ${parseSeconds.toFixed(1)} s, check ${wall.toFixed(1)} s (clock not gated)`;
+  const summary = `${rows.size} sources and ${pre.rows.size} precompile sources, parse ${parseSeconds.toFixed(1)} s, check ${wall.toFixed(1)} s (clock not gated)`;
   if (rises.length) {
     console.log(`load lint: FAILED — ${rises.length} count(s) above baseline; ${summary}`);
     return 1;
