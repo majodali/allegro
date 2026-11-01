@@ -72,7 +72,7 @@ A term has one definition site, a heading preceded by
 | II.18 | `vivace/README.md` | L3 boundary contract |
 | II.19 | `vivace/planning-dsl.md` | The planning DSL, the first Vivace pilot (rung 3): the outcome-graph model, the twelve conventions, the rejections, the `SoftwareRelease` example, what Allegro provides today, the well-formedness checks. Definition site of *plan*, *plan node*, *wiring*, *failure handler* |
 | II.20 | `platform/README.md` | Capability tracks; planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
-| II.21 | `platform/build-pipeline.ir.md` | The `pipeline` unit (33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, the phases and futures, the three moves the unit still owes; the multi-phase build surface tagged undesigned. Definition site of *the evalSource pipeline* (IR-only; rendered and reviewed at a later stage) |
+| II.21 | `platform/build-pipeline.ir.md` | The `pipeline` unit (33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, the phases and futures, the three moves the unit still owes; the multi-phase build surface tagged undesigned. As-implemented home of *the evalSource pipeline* (definition site: the spine's §29) (IR-only; rendered and reviewed at a later stage) |
 
 Planned under L2, revalidation-gated (backlog register): `standard/proofs.md`,
 `standard/pcp.md`.
