@@ -14,7 +14,7 @@ import { getBaseGrammar } from "./grammar2/base-grammar.js";
 import { buildProgram } from "./grammar2/tree-builder.js";
 import { getGrammarWithFragments } from "./grammar2/fragments.js";
 import { analyze as analyzeGrammar, assertClean as assertGrammarClean } from "./grammar2/analyzer.js";
-import { primitives, asGrammarValue } from "./primitives.js";
+import { primitives, asGrammarValue, markPrecompiledByPass } from "./primitives.js";
 import { evaluate } from "./evaluator.js";
 import { Value, ValueKind, StructureValue, Binding, BitsValue, PrimitiveFunctionValue, ExpressionValue, ComposedFunctionValue, ParamValue, makeStructure, makeExpr, makePrimitive, withMeta, bitsToString, stringToBits, Extension, DepCollector, isResolved, GrammarFragment, AllegroError} from "./types.js";
 import { checkEffectsDeclarations, formatMismatch, opaqueEffectNotices, effectsOf, isFunctionDefinition } from "./effects.js";
@@ -683,6 +683,7 @@ function precompileFunctions(
   typed?: boolean,
   libraryOwned: Set<Value> = new Set(),
   cutoff?: PrecompileCutoff,
+  covered?: ReadonlyMap<string, ComposedFunctionValue>,
 ): CompilationReport {
   const report: CompilationReport = { inferred: [], unresolved: [], bindingTypes: new Map(), notifications: [] };
   if (!typed) return report;
@@ -694,7 +695,7 @@ function precompileFunctions(
   setLawInstantiationSuspended(true);
   setEvalStatsPrecompile(true);
   try {
-    return precompileFunctionsInner(fileCtx, extensions, report, libraryOwned, cutoff);
+    return precompileFunctionsInner(fileCtx, extensions, report, libraryOwned, cutoff, covered);
   } finally {
     setEvalStatsPrecompile(false);
     setLawInstantiationSuspended(false);
@@ -707,6 +708,7 @@ function precompileFunctionsInner(
   report: CompilationReport,
   libraryOwned: Set<Value>,
   cutoff?: PrecompileCutoff,
+  covered?: ReadonlyMap<string, ComposedFunctionValue>,
 ): CompilationReport {
   // Build a minimal context for pre-compilation (primitives + extensions)
   const compileCtx = makeStructure();
@@ -827,6 +829,16 @@ function precompileFunctionsInner(
       paramTypes ?? [],
       compileCtx,
     );
+
+    // B-159 R3: this definition's literal is covered, so the evaluation
+    // loop's `typed_function_impl` skips its own F3b precompile of it
+    // (`markPrecompiledByPass` in `src/primitives.ts`). `covered` maps each
+    // definition to the literal `analyzeDivergence` peeled from it, the
+    // object the evaluation hands `typed_function_impl`; evalSource passes
+    // it only for a program's compilation. A precompile that failed here
+    // marks nothing, so the evaluation keeps its own attempt.
+    const literal = covered?.get(b.key);
+    if (literal && fnErrors.length === 0) markPrecompiledByPass(literal);
 
     if (fnErrors.length > 0) {
       for (const err of fnErrors) {
@@ -1363,7 +1375,11 @@ export function evalSource(
     // top-level literal again (its F3b inline precompile), and there the
     // recursive name resolves to a fresh `withType` copy of the definition,
     // never to the object bound here. A copy shares its literal's body, so
-    // the body set recognises it. Both tests are identity tests.
+    // the body set recognises it. Both tests are identity tests. Since
+    // B-159 R3 that evaluation-time precompile is skipped for a program's
+    // top-level literal the pass covered (below); it still runs in a
+    // module's load and after a failed precompile in the pass, so the body
+    // test stays.
     if (divR.recursiveBindings.size > 0) {
       const cutoffCfns = new Set<Value>();
       const cutoffBodies = new Set<Value>();
@@ -1372,8 +1388,22 @@ export function evalSource(
         || (fnValue.kind === ValueKind.ComposedFunction && cutoffBodies.has(fnValue.body)));
     }
   }
+  // B-159 R3 (the second precompile of a top-level literal is skipped): the
+  // literals the pass covers, whose evaluation-time F3b precompile in
+  // `typed_function_impl` is skipped. Which literals that is, case by case:
+  //   - a top-level definition of a typed program: covered, the pass
+  //     precompiles it below (`stampTargets` holds the literal it peels);
+  //   - a lambda nested in a body: not covered, the pass precompiles only
+  //     top-level definitions, so it is never in the map;
+  //   - an untyped program (`--base`): not covered, there is no pass and no
+  //     divergence analysis, so there is no map;
+  //   - a module's load (`moduleFqn` given, a library loaded once per
+  //     process): not covered, its F3b precompile runs as before. It runs
+  //     once per process, not once per program, and leaving it keeps a
+  //     library's load exactly as it was.
+  const covered = moduleFqn === undefined ? divR?.stampTargets : undefined;
   // Pre-compile typed functions: infer return types and detect type errors
-  const compilationReport = precompileFunctions(fileCtx, extensions, typed, libraryOwned, cutoff);
+  const compilationReport = precompileFunctions(fileCtx, extensions, typed, libraryOwned, cutoff, covered);
 
   // Phase D1: check effect declarations against inferred sets. Mismatches
   // (declared ⊉ inferred, ignoring "opaque" which is a Slice-1 placeholder
