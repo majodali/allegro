@@ -434,3 +434,13 @@ doc-lint exemption. §3.1 states what each chunk produces.
   do not meet PE Rule 2, and the spine's §25 (partial evaluation) delta
   still says both rules are implemented as specified; filed as
   B-172 (the partial-evaluation rules as implemented against the spine).
+- **2026-11-01 — A2 written, IR-only.** File:
+  `docs/book/platform/build-pipeline.ir.md`, Status `delivered IR-only`
+  (159 claims, of which 127 proposed, 31 decided and 1 inferred; 36
+  terms, of which 2 proposed; 28 clusters). No prose and no rounds
+  (§3.1). Unratified terms 2 (*the evalSource pipeline*; *tail call*,
+  A1's, still proposed). Footprint: declared 10, changed 10, surprises 0,
+  misses 0. Ids 791 (unchanged). Absorbed §29 (the evalSource pipeline).
+  Found: the three moves the `pipeline` unit owes have no owner item, and
+  precompile's error-severity notifications do not halt; both reported to
+  the maintainer for a ruling.

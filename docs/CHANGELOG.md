@@ -138,6 +138,35 @@ Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
 2026-10-30 with the plan; entries newest first, directly below this
 line.
 
+### 2026-11 — The evaluation pipeline chapter (B-170, chunk A2): IR-only
+
+Chunk A2 of B-170 (the book, Part II and III chapters writable now)
+writes the chapter for the `pipeline` unit (33) as its intermediate
+representation alone: `docs/book/platform/build-pipeline.ir.md`, Status
+`delivered IR-only`, with no prose rendered and no stranger rounds until a
+later stage (`docs/plans/book-chapters-now.md` §3.1). It holds 159 claims
+in 28 clusters (127 proposed, 31 decided, 1 inferred), 36 terms, 11
+relations and 40 evidence pointers; every claim about the code as
+implemented is proposed with a file-and-line pointer, for ratification in
+bulk at the PR. The chapter covers the stage order of `evalSource`, what
+each stage may assume, the post-passes that halt and the paths CE-R8
+(construction failure is an error value, non-exhaustive match is info)
+keeps weaker, precompile and the inline cutoff as installed today, the
+phases and futures, and library loading under the owner-module invariant
+of B-158 (in-place write through a library alias). It states the
+multi-phase build surface as undesigned, left to the T-build track under
+ruling R3 (the platform chapters are written from delivered state). The
+three moves the unit owes are stated as owed: `typeLiterals` to
+`core-types`, `DependencyRegistry` to `futures`, the clone helpers to
+`composed-function`; no backlog item schedules any of them. The spine's
+§29 (the evalSource pipeline) is an absorbed entry, a pointer to the
+chapter's definition site, logged in `docs/book-changes.md`; the
+implementation map's pipeline section is a pointer line; the reading
+order gains the chapter after `platform/README.md`, the table of contents
+gains row II.21, and unit 33's status cell names the chapter. Bare
+first-use identifiers 791 (`npm run lint:docs:check`); unratified terms 2
+(*the evalSource pipeline*, and *tail call*, the evaluator chapter's).
+
 ### 2026-10 — The evaluator chapter (B-170, chunk A1): IR first, rendered and reviewed
 
 Chunk A1 of B-170 (the book, Part II and III chapters writable now)

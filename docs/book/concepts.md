@@ -1641,27 +1641,8 @@ recurrence. **→ B-114.**
 <a id="def-the-evalsource-pipeline"></a>
 ## 29. The evalSource pipeline
 
-> **Level: IMPLEMENTATION** — realises R2, R9, R14.
-
-**Definition.** The fixed stage order that turns source into a result:
-parse (grammar2, with `use` pre-scan and fragment merge) → `typeLiterals` →
-`resolveSymbols` → `markTailCalls` → `collapseBodyMetadata` +
-`precompileFunctions` → `buildEvalCtx` → the evaluation loop with forward
-chaining. Then post-passes: effects declarations, exhaustiveness,
-termination, the proof-finding loop, proven clauses.
-
-**Rationale.** The order is what each stage may assume. `resolveSymbols`
-before `markTailCalls` because a tail call is recognised by its callee;
-`collapseBodyMetadata` before `precompileFunctions` because analysers read
-properties rather than peeling wrappers.
-
-**As implemented.** `evalSource` in `src/runtime.ts`.
-
-**Delta.** The **post-passes are L2 concepts running in the L0/L1 pipeline** —
-effects, exhaustiveness, termination, proofs. This is §23's violation in its
-other form: not an import into the evaluator, but layer stages hardcoded into
-the base's stage list. A layer should *register* a post-pass. Same root, same
-fix shape (§24). **→ B-110** (scope note).
+**Defined in** [`platform/build-pipeline.ir.md`](platform/build-pipeline.ir.md), the chapter for the
+`pipeline` unit (IR-only), which is the definition site of *the evalSource pipeline*.
 
 ---
 
