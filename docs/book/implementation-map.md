@@ -131,6 +131,7 @@ chain: primitives ← extensions ← base ← source) → evaluation loop
 the proof-finding loop, `checkProvenClauses` — each can halt
 compilation ("build safety in"); notifications carry
 kind + severity.
+The stage order of `evalSource` in `src/runtime.ts`, what each stage may assume, the post-passes that halt and precompile: [`platform/build-pipeline.ir.md`](platform/build-pipeline.ir.md), the chapter for the `pipeline` unit (33).
 
 ## Async runtime surface
 
