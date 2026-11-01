@@ -421,6 +421,15 @@ round is the stranger. The prerequisite lane-S chunk B-173 (the book
 writes IR first) landed the declaration, `npm run lint:ir` and the
 doc-lint exemption. §3.1 states what each chunk produces.
 
+**R9 — The definition site of the evalSource pipeline.** Options: (a)
+the spine's §29 stays the definition site and the chapter is the
+as-implemented home, as R4 for partial evaluation; (b) the absorption
+stands and the evaluator chapter defines *precompile* itself.
+**Taken: (a)**, 2026-11-01, the default of PR #132; and, by the
+maintainer's instruction of the same day, *precompile* gets its own
+definition site before its first use in reading order
+(`docs/book/layers.md` §2).
+
 ## 7. Record
 
 - **2026-10-30 — rulings taken, R8 decided.** R1 to R7 as recommended;
@@ -434,7 +443,10 @@ doc-lint exemption. §3.1 states what each chunk produces.
   do not meet PE Rule 2, and the spine's §25 (partial evaluation) delta
   still says both rules are implemented as specified; filed as
   B-172 (the partial-evaluation rules as implemented against the spine).
-- **2026-11-01 — A2 written, IR-only.** File:
+  The ratification flip followed the merge in its own PR (PR #130, merged
+  2026-11-01); asks 3 and 4 of PR #129 (B-172's lane, the default arm's
+  owner, the meta-review dispatch) are open with the maintainer.
+- **2026-11-01 — A2 landed (PR #132, merged 2026-11-01), IR-only.** File:
   `docs/book/platform/build-pipeline.ir.md`, Status `delivered IR-only`
   (159 claims, of which 127 proposed, 31 decided and 1 inferred; 36
   terms, of which 2 proposed; 28 clusters). No prose and no rounds
@@ -453,9 +465,12 @@ doc-lint exemption. §3.1 states what each chunk produces.
   lane P's boundary, whose chunk R2 will change the precompile context
   the chapter's claims C84 to C87 and C99 to C103 describe, so the PR
   asks who re-syncs the chapter after R2.
-  The ratification flip followed the merge in its own PR; asks 3 and 4
-  of PR #129 (B-172's lane, the default arm's owner, the meta-review
-  dispatch) are open with the maintainer.
+  The ratification flip followed the merge in its own PR; ruling R9 was
+  taken the same day (next bullet) and lane P holds the chapter for the
+  re-sync after stream P's R2 (the manifest, PR of B-163).
+- **2026-11-01 — R9 taken as (a);** the follow-up PR reversed §29's
+  absorption; B-172's two decisions recorded; *precompile* defined in
+  `docs/book/layers.md` §2, before its first use in reading order.
 - **2026-11-01 — A3 written, IR-only.** File:
   `docs/book/platform/tooling.ir.md`, Status `delivered IR-only`
   (170 claims, of which 157 proposed, 10 decided and 3 inferred; 30

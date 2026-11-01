@@ -216,6 +216,26 @@ gains row II.22, units 34 and 35's status cells name the chapter, and
 chapter (*safety grade*, and *the evalSource pipeline*, the pipeline
 chapter's).
 
+### 2026-11 — R9 (the definition site of the evalSource pipeline) taken as option (a): §29 stays the definition site; §25's delta corrected (B-170)
+
+The maintainer took ruling R9 of PR #132 as option (a) on 2026-11-01. The spine's §29 in
+`docs/book/concepts.md` is restored as the definition site of *the
+evalSource pipeline*. Its As implemented paragraph now points at
+`docs/book/platform/build-pipeline.ir.md`, the chapter for the `pipeline`
+unit. Its Delta row adds that the chapter's claims give a stage order
+that differs from the spine's list in four places. The chapter's T34
+links to §29, and its Claims sub-heading no longer carries the anchor.
+By the maintainer's instruction of the same day, *precompile* gets its
+own definition site before its first use in reading order:
+`docs/book/layers.md` §2 (`def-precompile`). The evaluator chapter's
+links and its IR's T20, and the pipeline chapter's T35, point there. The
+spine's §25 delta row now states that neither PE rule is implemented as
+specified, citing `docs/book/allegretto/evaluator.md` §3; this is the
+lane-A half of B-172 (the partial-evaluation rules as implemented
+against the spine). B-172 records the two decisions: lane A corrects the
+delta row, and the `evaluate` switch's missing default arm joins the
+item. `docs/book-changes.md` logs both definition-site moves.
+
 ### 2026-11 — The evaluation pipeline chapter (B-170, chunk A2): IR-only
 
 Chunk A2 of B-170 (the book, Part II and III chapters writable now)
@@ -244,6 +264,9 @@ order gains the chapter after `platform/README.md`, the table of contents
 gains row II.21, and unit 33's status cell names the chapter. Bare
 first-use identifiers 791 (`npm run lint:docs:check`); unratified terms 2
 (*the evalSource pipeline*, and *tail call*, the evaluator chapter's).
+Merged as PR #132 on 2026-11-01; the IR's proposed claims and the term were
+ratified by the merge, and a follow-up flipped their statuses to decided;
+ruling R9 (the definition site of the evalSource pipeline) stays open.
 
 ### 2026-10 — The evaluator chapter (B-170, chunk A1): IR first, rendered and reviewed
 
