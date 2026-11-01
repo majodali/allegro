@@ -448,7 +448,8 @@ doc-lint exemption. §3.1 states what each chunk produces.
   (its IR's T20) linked to a definition site that is now a pointer to a
   later chapter, which is stop condition 3 (a forward reference the order
   lint cannot see, since the anchor stays in `concepts.md`), so the PR
-  asks for ruling R9; and `docs/book/implementation-map.md` is also in
+  asks for ruling R9 (the definition site of the evalSource pipeline);
+  and `docs/book/implementation-map.md` is also in
   lane P's boundary, whose chunk R2 will change the precompile context
   the chapter's claims C84 to C87 and C99 to C103 describe, so the PR
   asks who re-syncs the chapter after R2.
