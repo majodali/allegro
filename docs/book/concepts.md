@@ -1578,9 +1578,8 @@ separate IR and no separate checking pass. Rule 2 is what stops an unknown
 condition from hiding everything behind it — without it, a single unresolved
 `if` would end analysis for the whole branch.
 
-**As implemented.** `evaluate` / `evaluateExpr` in `src/evaluator.ts`;
-`isResolved` is the test; `makeExpr` builds the residual. Field propagation
-onto residuals runs through the propagation table (§20).
+**As implemented.** In [`allegretto/evaluator.md` §3](allegretto/evaluator.md), the chapter for the
+`evaluator` unit; the definition stays here.
 
 **Delta.** — *(Rule 1 and Rule 2 are implemented as specified; the evaluator's
 delta is §23, which is about what it imports, not what it computes.)*
@@ -1607,24 +1606,8 @@ interpreter that fails.
 <a id="def-tail-calls"></a>
 ## 27. Tail calls
 
-> **Level: IMPLEMENTATION** — realises R4 under a host constraint.
-
-**Definition.** A self-call in tail position is executed as a loop rather
-than a nested evaluation, via a sentinel the applying frame recognises.
-
-**Rationale.** Not a language concept — a host stack is finite, and without
-this, recursion depth would bound program size. It is in the spine because
-the sentinel is visible to anything wrapping a function body: body wrappers
-must **forward** it or tail calls silently become ordinary calls.
-
-**As implemented.** The `TailCall` sentinel in `src/evaluator.ts`
-(`isTailCall`, `makeTailCall`); `markTailCalls` in the pipeline;
-`type_check` and the `*_attach` wrappers forward it.
-
-**Delta.** The forwarding obligation is enforced by convention and a
-recurring-lesson note in `PROCESS.md` §6 — nothing checks it. A wrapper that
-forgets is a silent performance cliff, not an error. Candidate for a boundary
-invariant. **→ B-113.**
+**Defined in** [`allegretto/evaluator.md` §5](allegretto/evaluator.md), the chapter for the
+`evaluator` unit, which is the definition site of *tail call*.
 
 <a id="def-future-cell-and-completion"></a>
 ## 28. Future cell and completion

@@ -2939,8 +2939,27 @@ table and the stream plans.
   by stream A (`docs/plans/book-chapters-now.md`) for a finding outside
   its boundary. Placeholder until used; the stream rewrites this entry
   when it files the finding. Two candidates are named in the plan §2.4.
-- [ ] **B-172** (book-chapters stream, spare id 2) · T-docs · As
-  B-171 (book-chapters stream, spare id 1).
+- [ ] **B-172** (the partial-evaluation rules as implemented against the
+  spine) · T-docs · L0 · **The spine's §25 (partial evaluation) delta
+  says both PE rules are implemented as specified; the evaluator chapter
+  found otherwise.** Filed by chunk A1 of B-170 (the book, Part II and
+  III chapters writable now) from the stream's spare id. Two gaps, each
+  stated in `docs/book/allegretto/evaluator.md` §3 (partial evaluation
+  as implemented) with evidence in its IR: (1)
+  `eval_when`, `&&` and `||` in `src/primitives.ts` return a residual
+  without evaluating both branches, so only `eval_if` meets PE Rule 2;
+  (2) a composed function applied to an unresolved argument is unfolded
+  into its body rather than residualised, so PE Rule 1 as the spine
+  states it ("the application itself, as a value") governs only an eager
+  primitive application and an unresolved function position. A third
+  finding rides along: the switch in `evaluate` has no default arm, a
+  defect against the discriminator rule (`docs/book/units.md` §3.2) that
+  the `units` report's discriminator count skips and no item owns.
+  Decide: correct §25's delta row (lane A, docs only) or change the code
+  to meet the rules as stated (lane D or K); and whether the default-arm
+  defect gets an owner or joins this item. **Pointer**:
+  `docs/book/allegretto/evaluator.ir.md` claims C44, C55 to C57, C158
+  and C165; chapter §2 (evaluation) and §3.
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

@@ -132,11 +132,61 @@ Plan `docs/plans/recursive-precompile.md`; lane P; merge-on-green
 under deviation D-2 (merge-on-green streams). Opened 2026-10-30 with
 the plan; entries newest first, directly below this line.
 
+### 2026-11 — The measurement lands (B-159, chunk R1): two counters, the precompile corpus, the verdict pin
+
+B-159 (precompile of recursive definitions), chunk R1 of
+`docs/plans/recursive-precompile.md`, with no behaviour change. The
+evaluation stats of B-157 (the performance stream) gain two counters in
+`src/evaluator.ts`: `cutoffResiduals`, the speculative calls the inline
+cutoff returned as residuals, and `precompiles`, the entries to
+`precompileFunction`. `bench/load.ts` gains a precompile corpus: the six
+Phase E sources under `bench/corpus/precompile/` and the two totality
+demos. `npm run bench:load` reports it; `npm run lint:load` skips it,
+and its baseline is unchanged under RR3 (whether and how the counts are
+gated). `src/test/totality.ts` gains the verdict pin, 12 rows: the
+`totality-*` notifications and discharge tiers of every
+`tests/totality-*.alg` demo and every Phase E source, as they are
+today. Headline numbers, from this sandbox: every corpus source makes 0
+cutoff residuals and between 45,955 and 207,234 inline expansions;
+`tests/totality-termination-demo.alg` makes 84,065,836 `evaluate`
+calls in 62.7 s. The plan's §7 holds the full table.
+
 ## Stream A — the book chapters
 
 Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
 2026-10-30 with the plan; entries newest first, directly below this
 line.
+
+### 2026-10 — The evaluator chapter (B-170, chunk A1): IR first, rendered and reviewed
+
+Chunk A1 of B-170 (the book, Part II and III chapters writable now)
+writes the chapter for the `evaluator` unit (13) IR first, under
+W-009 (the methodology corpus writes its deliverables IR first) as
+adopted in `docs/classification.md`. `docs/book/allegretto/evaluator.ir.md` came
+first: 134 claims in 32 clusters, 30 terms, 9 relations and 41 evidence
+pointers at round 1, grown by splits to 167 claims in 34 clusters, 10
+relations and 48 evidence pointers at delivery; every claim about the
+code as implemented is proposed with a file-and-line pointer, for
+ratification in bulk at the PR. The reasoning role rendered
+`docs/book/allegretto/evaluator.md` from it, one claim per sentence,
+ending with the render map; `evaluator.review.md` beside it records
+the stranger rounds: seven rounds to a readable verdict, the readable
+round's fixes confirmed by its instance, and the meta-review line
+reading pending (three of the four signals fired). The IR's Status
+reads `reviewed` (count 1; footprint: surprises 1, misses 0). The chapter covers
+evaluation, PE Rule 1 and PE Rule 2 as implemented, application and
+substitution, tail calls, the scope carve-out from D22 (structures are
+immutable by default), the install surface of B-112 (the four owed
+plane interfaces), and the two edges B-146 (knowledge propagation)
+owns. It records that `eval_when`, `&&` and `||` do not meet PE Rule 2,
+filed as B-172 (the partial-evaluation rules as implemented against the spine).
+The reading-order entry "Scope and the evaluator" splits: scope stays
+planned, the evaluator is present; table-of-contents rows II.5 and II.6;
+unit 13's status cell names the chapter. The spine's §27 (tail calls) is
+an absorbed entry, a pointer to the chapter's definition site of *tail
+call*, and §25's as-implemented row points at the chapter; both logged
+in `docs/book-changes.md`. Bare first-use identifiers 795 → 791
+(`npm run lint:docs:check`); unratified terms 1 (*tail call*).
 
 ## Unstreamed
 

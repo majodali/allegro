@@ -56,7 +56,8 @@ A term has one definition site, a heading preceded by
 | II.2 | `allegretto/structures.md` | Structures, scopes, channels, symbols, kinds: the v2 design |
 | II.3 | *planned* | The kinds and the assembly (units 1 to 9); written when the `Value` union splits (`units.md` §7); until then the spine's T0 and T1 entries are the text |
 | II.4 | `allegretto/metadata-and-capability.md` | The `metadata` and `capability` units: the metadata plane on every value, fields, channels, propagation, writer capabilities, installed meaning, the base's own fields. Definition site of *metadata field*, *channel*, *propagation* and *writer capability* |
-| II.5–6 | *planned* | Scope and the evaluator (units 12 and 13, at B-136 and B-112's exit); futures and the base primitives (units 14 and 15). Until then the spine's T2 and T3 entries are the text |
+| II.5 | *planned* | Scope (unit 12), at B-136 (scope leaves `Value`). Futures and the base primitives (units 14 and 15), which follow II.6 in the reading order, are planned too. Until then the spine's T2 entries and its §28 (future cell and completion) are the text |
+| II.6 | `allegretto/evaluator.md` | The `evaluator` unit (13): evaluation, partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, the edges the unit still owes. Definition site of *tail call* |
 | II.7 | `extension/README.md` | L1 boundary contract |
 | II.8 | `grammar-formalism.md` | The grammar formalism (specification; implemented by `src/grammar2/`) |
 | II.9 | `extension/grammar.md` | Grammar and parser: design decisions and goals |
