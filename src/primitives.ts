@@ -1903,6 +1903,23 @@ import { putEntry } from "./structure.js";
 // completes or throws.
 const _precompileInProgress = new WeakSet<ComposedFunctionValue>();
 
+// B-159 R3 (the second precompile of a top-level literal is skipped): the
+// function literals of top-level definitions that a program's precompile
+// pass (`precompileFunctions` in runtime.ts) has precompiled. The F3b
+// precompile below skips them when the evaluation loop builds the typed
+// function, since the pass already did that work in this compilation. Only
+// the pass adds to the set (`markPrecompiledByPass`), and only for the
+// literal it peeled from a top-level definition, so a lambda nested in a
+// body is never in it. Membership is by identity: a literal belongs to one
+// parse, so a mark never reaches another compilation.
+const _precompiledByPass = new WeakSet<ComposedFunctionValue>();
+
+/** B-159 R3: the precompile pass covered this top-level literal; the
+ *  evaluation's F3b precompile of it is skipped. See `_precompiledByPass`. */
+export function markPrecompiledByPass(literal: ComposedFunctionValue): void {
+  _precompiledByPass.add(literal);
+}
+
 // E3 (E-R5): the purity/knowledge-independence inspector for `eq`
 // implementations and coercion fns. types-std can't import the evaluator
 // (import direction), so the answer is INSTALLED here (B-112 C5: the
@@ -2157,9 +2174,19 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // inline lambdas like `arr.map((x: Int): Int => print(x))` need it here
   // so the cb's effects component is populated when the outer call's
   // applyPrimitive runs its arg-effects loop.
+  //
+  // B-159 R3: a top-level literal the precompile pass covered is skipped.
+  // Inside the pass this precompile still runs (the pass marks a literal
+  // only after its own precompile of the definition), and it must: it is
+  // what writes the literal's `inferredEffects`, which the declaration
+  // check reads. In the evaluation loop it ran again for every pure
+  // top-level literal (a pure one keeps `inferredEffects` undefined, so the
+  // guard above never stopped it): a third precompile of the same body,
+  // whose answer the pass already has.
   if (fnPrimary.kind === ValueKind.ComposedFunction
       && (fnPrimary as any).inferredEffects === undefined
-      && !_precompileInProgress.has(fnPrimary as ComposedFunctionValue)) {
+      && !_precompileInProgress.has(fnPrimary as ComposedFunctionValue)
+      && !_precompiledByPass.has(fnPrimary as ComposedFunctionValue)) {
     _precompileInProgress.add(fnPrimary as ComposedFunctionValue);
     try {
       _precompileFunction(fnPrimary as ComposedFunctionValue, paramTypes, ctx!);
