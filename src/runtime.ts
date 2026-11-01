@@ -584,6 +584,17 @@ function precompileMemoEntry(key: string, expr: Value, ctx: StructureValue): Bin
 interface PrecompileCutoff {
   recursive: ReadonlySet<string>;
   bound: Set<Value>;
+  /** The `body` of each object in `bound`: the second predicate (RR1's
+   *  downside 2) recognises a copy of a bound function made outside the
+   *  precompile context, which shares its body. */
+  bodies: Set<Value>;
+}
+
+/** B-159 R2: a recursive binding's bound object joins the cutoff, by
+ *  identity and by its body. */
+function addCutoffBound(cutoff: PrecompileCutoff, v: Value): void {
+  cutoff.bound.add(v);
+  if (v.kind === ValueKind.ComposedFunction) cutoff.bodies.add(v.body);
 }
 
 /**
@@ -731,10 +742,10 @@ function precompileFunctionsInner(
       let entry: Binding;
       if (isResolved(b.value)) {
         entry = { key, value: b.value };
-        if (onCycle) cutoff!.bound.add(b.value);
+        if (onCycle) addCutoffBound(cutoff!, b.value);
       } else if (isFunctionDefinition(b.value)) {
         entry = precompileDefinitionEntry(key, b.value, compileCtx,
-          onCycle ? (v: Value) => { cutoff!.bound.add(v); } : () => {});
+          onCycle ? (v: Value) => addCutoffBound(cutoff!, v) : () => {});
       } else {
         entry = precompileMemoEntry(key, b.value, compileCtx);
       }
@@ -1344,10 +1355,21 @@ export function evalSource(
     // since B-121 (metadata on every kind) chunk C2 a typed function is a
     // derived copy of its literal, so the identity test missed every typed
     // recursive call.
+    //
+    // The second predicate, by body, is ruling RR1's provision for a path
+    // that copies a function between binding and call (plan
+    // `docs/plans/recursive-precompile.md` §6, downside 2). One exists: in
+    // the evaluation loop, `typed_function_impl` precompiles a pure
+    // top-level literal again (its F3b inline precompile), and there the
+    // recursive name resolves to a fresh `withType` copy of the definition,
+    // never to the object bound here. A copy shares its literal's body, so
+    // the body set recognises it. Both tests are identity tests.
     if (divR.recursiveBindings.size > 0) {
       const cutoffCfns = new Set<Value>();
-      cutoff = { recursive: divR.recursiveBindings, bound: cutoffCfns };
-      setInlineCutoff((fnValue: Value) => cutoffCfns.has(fnValue));
+      const cutoffBodies = new Set<Value>();
+      cutoff = { recursive: divR.recursiveBindings, bound: cutoffCfns, bodies: cutoffBodies };
+      setInlineCutoff((fnValue: Value) => cutoffCfns.has(fnValue)
+        || (fnValue.kind === ValueKind.ComposedFunction && cutoffBodies.has(fnValue.body)));
     }
   }
   // Pre-compile typed functions: infer return types and detect type errors
