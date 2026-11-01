@@ -42,7 +42,8 @@
         { "doc": "docs/book/standard/contracts.md", "title": "Contracts and invariants" },
         { "doc": "docs/book/vivace/README.md", "title": "L3 Vivace: boundary contract" },
         { "doc": "docs/book/vivace/planning-dsl.md", "title": "The planning DSL: the first Vivace pilot" },
-        { "doc": "docs/book/platform/README.md", "title": "Capability tracks" }
+        { "doc": "docs/book/platform/README.md", "title": "Capability tracks" },
+        { "doc": "docs/book/platform/build-pipeline.ir.md", "title": "The evaluation pipeline (unit 33)", "units": ["pipeline"] }
       ]
     },
     {

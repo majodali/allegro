@@ -21,3 +21,7 @@ phase-gate postconditions scan the expression graph for unresolved
 elements before a phase may close; extension modules may consume
 bindings internally (e.g. the module system consumes a filesystem);
 the phase chain itself is `layers.md` §2.
+
+The delivered part of T-build, the `evalSource` pipeline of the
+`pipeline` unit (33), is the chapter
+[`build-pipeline.ir.md`](build-pipeline.ir.md) (IR-only).

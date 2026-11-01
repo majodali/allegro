@@ -434,6 +434,25 @@ doc-lint exemption. §3.1 states what each chunk produces.
   do not meet PE Rule 2, and the spine's §25 (partial evaluation) delta
   still says both rules are implemented as specified; filed as
   B-172 (the partial-evaluation rules as implemented against the spine).
+- **2026-11-01 — A2 written, IR-only.** File:
+  `docs/book/platform/build-pipeline.ir.md`, Status `delivered IR-only`
+  (159 claims, of which 127 proposed, 31 decided and 1 inferred; 36
+  terms, of which 2 proposed; 28 clusters). No prose and no rounds
+  (§3.1). Unratified terms 2 (*the evalSource pipeline*; *tail call*,
+  A1's, still proposed). Footprint: declared 10, changed 10, surprises 0,
+  misses 0. Ids 791 (unchanged). Absorbed §29 (the evalSource pipeline).
+  Found: the three moves the `pipeline` unit owes have no owner item, and
+  precompile's error-severity notifications do not halt; both filed as
+  B-171 (the pipeline chapter's two findings). Two more points for the
+  PR: absorbing §29 leaves the evaluator chapter's term *precompile*
+  (its IR's T20) linked to a definition site that is now a pointer to a
+  later chapter, which is stop condition 3 (a forward reference the order
+  lint cannot see, since the anchor stays in `concepts.md`), so the PR
+  asks for ruling R9 (the definition site of the evalSource pipeline);
+  and `docs/book/implementation-map.md` is also in
+  lane P's boundary, whose chunk R2 will change the precompile context
+  the chapter's claims C84 to C87 and C99 to C103 describe, so the PR
+  asks who re-syncs the chapter after R2.
   The ratification flip followed the merge in its own PR; asks 3 and 4
   of PR #129 (B-172's lane, the default arm's owner, the meta-review
   dispatch) are open with the maintainer.

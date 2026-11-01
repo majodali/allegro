@@ -118,17 +118,7 @@ passes every other gate.
 
 ## The evalSource pipeline
 
-Stage order (in `src/runtime.ts`): `parse` (grammar2, with `use`
-pre-scan + fragment merge) → `typeLiterals` (raw Bits → Int/String
-wrapping) → `resolveSymbols` (lexical scoping) → `markTailCalls` →
-`collapseBodyMetadata` + `precompileFunctions` (PE of the function definitions' bodies, each value binding they read evaluated at most once:
-type + effect inference; `CompilationReport`) → `buildEvalCtx` (scope
-chain: primitives ← extensions ← base ← source) → evaluation loop
-(forward-chaining on future cells). Post-passes:
-`checkEffectsDeclarations`, `checkExhaustiveness`, `checkTermination`,
-the proof-finding loop, `checkProvenClauses` — each can halt
-compilation ("build safety in"); notifications carry
-kind + severity.
+The stage order of `evalSource` in `src/runtime.ts`, what each stage may assume, the post-passes that halt and precompile: [`platform/build-pipeline.ir.md`](platform/build-pipeline.ir.md), the chapter for the `pipeline` unit (33).
 
 ## Async runtime surface
 
