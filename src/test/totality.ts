@@ -20,6 +20,7 @@ import { fileTest, testsDir, libLoader } from "./alg-files.js";
 import type { Extension } from "../runtime.js";
 import { primitives as primRegistry } from "../primitives.js";
 import { summarizeModule, renderModuleSummary } from "../introspect.js";
+import { scopeLookup } from "../scope.js";
 
 // --- Phase E Stage 0: totality substrate (`partial` opt-out) ---
 
@@ -854,4 +855,52 @@ test("B-159 R1 verdict pin: the table covers every totality demo and Phase E sou
   const demos = fs.readdirSync(testsDir).filter(f => /^totality-.*\.alg$/.test(f));
   const sources = fs.readdirSync(precompileCorpusDir).filter(f => f.endsWith(".alg"));
   eq(JSON.stringify(pinned), JSON.stringify([...demos, ...sources].sort()));
+});
+
+// --- B-159 R2: one object per definition; the cutoff recognises it ---
+//
+// B-159 (precompile of recursive definitions), chunk R2; plan
+// docs/plans/recursive-precompile.md §5 and ruling RR1 (option (b)). The
+// precompile context binds each function definition once, and the inline
+// cutoff of T-R6 (the recursion inlining cutoff) holds the bound objects, so
+// its identity test sees one object per definition.
+
+/** A lazy probe around a call site: `r2_call_site(f(x))` resolves the call's
+ *  callee the way the evaluator does (it evaluates the callee Symbol in the
+ *  call's context), records it with the value the name is bound to in that
+ *  context, then evaluates the call itself, so it changes nothing else. */
+function callSiteProbe(): { ext: Extension; seen: { callee: any; bound: any; precompile: boolean }[] } {
+  const seen: { callee: any; bound: any; precompile: boolean }[] = [];
+  const impl = (args: any[], ctx: any, evalFn: any) => {
+    const call = args[0];
+    if (call.kind === ValueKind.Expression && call.fn.kind === ValueKind.Symbol) {
+      const name = call.fn.name as string;
+      const callee = evalFn(call.fn, ctx);
+      const bound = scopeLookup(ctx, name)?.value;
+      // The precompile context is one flat structure holding the source
+      // bindings; the evaluation's scope chain roots at the primitives layer.
+      let root = ctx;
+      while (root.parent) root = root.parent;
+      seen.push({ callee, bound, precompile: root.bindings.has(name) && !root.isScope });
+    }
+    return evalFn(call, ctx);
+  };
+  const ext: Extension = { name: "r2_probe", bindings: { r2_call_site: makePrimitive("r2_call_site", impl as any, true) } };
+  return { ext, seen };
+}
+
+test("B-159 R2 guard: a recursive call site in the precompile context resolves to the bound object", () => {
+  const src = `NonNeg = Int & _ >= 0
+factorial(n: NonNeg): Int =>
+  if n == 0 then 1 else n * r2_call_site(factorial(n - 1))
+`;
+  const { ext, seen } = callSiteProbe();
+  runtimeEval(src, undefined, [typeExt, ext], undefined, true);
+  const inPrecompile = seen.filter(s => s.precompile);
+  eq(inPrecompile.length > 0, true, "the call site is evaluated in the precompile context");
+  for (const s of inPrecompile) {
+    eq(s.callee.kind, ValueKind.ComposedFunction, "the callee is a function");
+    eq(s.callee === s.bound, true, "the callee is the object the definition is bound to");
+  }
+  eq(new Set(inPrecompile.map(s => s.callee)).size, 1, "one object per definition");
 });
