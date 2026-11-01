@@ -47,7 +47,7 @@ T18. Resolved and unresolved. defined-at: ../concepts.md#def-resolved-unresolved
 
 T19. Future cell. defined-at: ../concepts.md#def-future-cell-and-completion [decided: docs/book/concepts.md §28]
 
-T20. Precompile, the stage of the evalSource pipeline. defined-at: ../concepts.md#def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
+T20. Precompile. defined-at: ../layers.md#def-precompile [decided: docs/book/layers.md §2]
 
 T21. Knowledge. defined-at: ../concepts.md#def-knowledge [decided: docs/book/concepts.md §34]
 

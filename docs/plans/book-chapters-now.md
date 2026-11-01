@@ -421,6 +421,15 @@ round is the stranger. The prerequisite lane-S chunk B-173 (the book
 writes IR first) landed the declaration, `npm run lint:ir` and the
 doc-lint exemption. §3.1 states what each chunk produces.
 
+**R9 — The definition site of the evalSource pipeline.** Options: (a)
+the spine's §29 stays the definition site and the chapter is the
+as-implemented home, as R4 for partial evaluation; (b) the absorption
+stands and the evaluator chapter defines *precompile* itself.
+**Taken: (a)**, 2026-11-01, the default of PR #132; and, by the
+maintainer's instruction of the same day, *precompile* gets its own
+definition site before its first use in reading order
+(`docs/book/layers.md` §2).
+
 ## 7. Record
 
 - **2026-10-30 — rulings taken, R8 decided.** R1 to R7 as recommended;
@@ -456,6 +465,9 @@ doc-lint exemption. §3.1 states what each chunk produces.
   lane P's boundary, whose chunk R2 will change the precompile context
   the chapter's claims C84 to C87 and C99 to C103 describe, so the PR
   asks who re-syncs the chapter after R2.
-  The ratification flip followed the merge in its own PR; ruling R9 and the
-  question of who re-syncs the chapter after stream P's R2 are open with the
-  maintainer.
+  The ratification flip followed the merge in its own PR; ruling R9 was
+  taken the same day (next bullet) and lane P holds the chapter for the
+  re-sync after stream P's R2 (the manifest, PR of B-163).
+- **2026-11-01 — R9 taken as (a);** the follow-up PR reversed §29's
+  absorption; B-172's two decisions recorded; *precompile* defined in
+  `docs/book/layers.md` §2, before its first use in reading order.
