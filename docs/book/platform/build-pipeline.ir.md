@@ -74,11 +74,11 @@ T32. Library, a module file that `ModuleLoader` loads into an extension. defined
 
 T33. Owner module. defined-at: ../extension/modules.md#def-owner-module [decided: B-158 ruling, 2026-10-29]
 
-T34. The evalSource pipeline. The fixed stage order by which `evalSource` in `src/runtime.ts` turns one source text into an evaluation scope and a compilation report: parse; literal typing; symbol resolution; body-metadata collapse and tail marking; divergence analysis; precompile; the post-passes before evaluation; the evaluation loop with forward chaining; the post-passes after it. anchor: #def-the-evalsource-pipeline [proposed: this IR]
+T34. The evalSource pipeline. defined-at: ../concepts.md#def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
 
-T35. Precompile, the stage of the evalSource pipeline that partially evaluates each function definition's body before the evaluation loop. defined-at: #def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
+T35. Precompile, the stage of the evalSource pipeline that partially evaluates each function definition's body before the evaluation loop. defined-at: ../layers.md#def-precompile [decided: docs/book/layers.md §2]
 
-T36. Post-pass, a check of the evalSource pipeline that runs after precompile or after the evaluation loop. defined-at: #def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
+T36. Post-pass, a check of the evalSource pipeline that runs after precompile or after the evaluation loop. defined-at: ../concepts.md#def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
 
 ## Claims
 
@@ -118,7 +118,7 @@ C15. `ModuleLoader` in `src/modules.ts` calls `evalSource` to load each library.
 
 C16. The evalSource pipeline realises three requirements: R2 (partial evaluation is the mechanism by which layers are added); R9 (the language surface is extensible); R14 (code is organised into separately-loadable units). [decided: docs/book/concepts.md §29]
 
-### <a id="def-the-evalsource-pipeline"></a>The evalSource pipeline [implemented]
+### The evalSource pipeline [implemented]
 
 C17. The evalSource pipeline runs once per call of `evalSource` in `src/runtime.ts`, over one source text. evidence: E5. [proposed: this IR]
 

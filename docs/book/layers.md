@@ -64,6 +64,14 @@ dependency *of* a layer.
 | **T-bootstrap** | L1–L2 | Self-hosting closure: L1/L2 machinery re-expressed in Allegro; depends on Standard + T-backend |
 | **T-ecosystem** | L2 | Packages, versioning, dependency resolution, registry |
 
+<a id="def-precompile"></a>**Precompile** is the compilation stage that
+partially evaluates each function definition's body before the program's
+evaluation loop runs, inferring the definition's return type and effects
+(`precompileFunctions` in `src/runtime.ts`; the chapter for the `pipeline`
+unit, `platform/build-pipeline.ir.md`, describes the stage; the chapter for
+the `evaluator` unit, `allegretto/evaluator.md`, describes
+`precompileFunction`). It runs only in Allegro Standard, never in Allegretto.
+
 ## 3. Milestones
 
 Named completion states, each pinned to a layer or track, each tagged

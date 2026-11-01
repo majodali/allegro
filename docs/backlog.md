@@ -2973,7 +2973,13 @@ table and the stream plans.
   to meet the rules as stated (lane D or K); and whether the default-arm
   defect gets an owner or joins this item. **Pointer**:
   `docs/book/allegretto/evaluator.ir.md` claims C44, C55 to C57, C158
-  and C165; chapter §2 (evaluation) and §3.
+  and C165; chapter §2 (evaluation) and §3. Decided 2026-11-01 (the
+  maintainer approved the defaults of PR #129): lane A corrects §25's
+  delta row (done in the follow-up PR of ruling R9 (the definition site
+  of the evalSource pipeline)); the missing default arm joins
+  this item. What remains is the code question: whether the evaluator
+  changes to meet the rules as stated (lane D), or the spine's rules are
+  restated to the implementation (lane A).
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations
