@@ -14,8 +14,10 @@ import {
   NOTIF_TOTALITY_NEEDS_ANNOTATION,
 } from "../totality.js";
 import * as path from "path";
+import * as fs from "fs";
 import { makeInt, makeExpr, makePrimitive, makeComposedFn, ValueKind, BitsValue } from "../types.js";
-import { fileTest, testsDir } from "./alg-files.js";
+import { fileTest, testsDir, libLoader } from "./alg-files.js";
+import type { Extension } from "../runtime.js";
 import { primitives as primRegistry } from "../primitives.js";
 import { summarizeModule, renderModuleSummary } from "../introspect.js";
 
@@ -767,3 +769,89 @@ countdown(100000)
   }
 });
 
+// --- B-159 R1: the verdict pin ---
+//
+// B-159 (precompile of recursive definitions), chunk R1 (the measurement
+// lands); plan docs/plans/recursive-precompile.md §3 check 2. For every
+// tests/totality-*.alg demo and the six Phase E sources of the plan's §2.2
+// (bench/corpus/precompile/, copied from the tests above), the compilation
+// report's `totality-*` notifications (kind and binding) and its discharge
+// tiers (`divObligations`, binding and tier), each as a sorted list. One
+// test per source, one compilation each, so the slow sources spread across
+// shards.
+
+/** The `use NAME` headers of a file, as the file runner reads them. */
+function useHeaders(source: string): { names: string[]; body: string } {
+  const names: string[] = [];
+  let rest = source;
+  for (;;) {
+    const m = /^(?:\s|\/\/[^\n]*)*use\s+(\w+)[ \t]*(\r?\n|$)/.exec(rest);
+    if (!m) break;
+    names.push(m[1]);
+    rest = rest.slice(m[0].length);
+  }
+  return { names, body: rest };
+}
+
+/** Compile and run one file under the standard type system and its `use`
+ *  libraries, printing nothing, and return its verdict. */
+function verdictOf(file: string): { totality: string[]; tiers: string[] } {
+  const { names, body } = useHeaders(fs.readFileSync(file, "utf-8"));
+  const loader = libLoader();
+  const exts: Extension[] = [typeExt];
+  for (const id of names) {
+    const ext = loader.loadModuleSync(id);
+    exts.push({ name: id, bindings: { ...ext.bindings }, grammarFragment: ext.grammarFragment });
+  }
+  const origLog = console.log;
+  console.log = () => {};
+  let report;
+  try {
+    ({ compilationReport: report } = runtimeEval(body, undefined, exts, undefined, true));
+  } finally {
+    console.log = origLog;
+  }
+  const totality = report!.notifications
+    .filter(n => n.kind.startsWith("totality-"))
+    .map(n => `${n.kind} ${n.binding ?? "-"}`).sort();
+  const tiers = (report!.divObligations ?? []).map(o => `${o.binding}:${o.tier}`).sort();
+  return { totality, tiers };
+}
+
+const precompileCorpusDir = path.resolve("bench", "corpus", "precompile");
+
+// The pinned verdicts, measured on unchanged code at R1 (2026-11-01). A
+// chunk that changes a verdict changes this table knowingly, in the same
+// commit, and says so: under the plan's §3 a changed verdict stops the
+// stream until the maintainer rules on it.
+const VERDICT_PIN: { file: string; totality: string[]; tiers: string[] }[] = [
+  { file: "totality-decreases-demo.alg",      totality: [], tiers: ["ack_inner:witnessed", "countdown:witnessed"] },
+  { file: "totality-exhaustiveness-demo.alg", totality: ["totality-exhaustiveness int_partial", "totality-exhaustiveness yes_only"],
+    tiers: ["both_bool:auto", "explicitly_partial:undischarged", "int_partial:auto", "with_else:auto", "with_wildcard:auto", "yes_only:auto"] },
+  { file: "totality-hof-demo.alg",            totality: [], tiers: ["double_list:auto", "double_self:auto", "tree_sum:auto"] },
+  { file: "totality-mutual-demo.alg",         totality: [], tiers: ["f1:auto", "f2:auto", "f3:auto", "isEven:auto", "isOdd:auto"] },
+  { file: "totality-partial-demo.alg",        totality: [], tiers: ["classify:undischarged", "trivial:undischarged"] },
+  { file: "totality-termination-demo.alg",    totality: [], tiers: ["factorial:auto", "square:auto", "sum_to:auto"] },
+  { file: "bad.alg",                          totality: ["totality-nontermination bad"], tiers: ["bad:undischarged"] },
+  { file: "f-decreases.alg",                  totality: [], tiers: ["f:witnessed"] },
+  { file: "factorial-int.alg",                totality: ["totality-nontermination factorial"], tiers: ["factorial:undischarged"] },
+  { file: "factorial-nonneg.alg",             totality: [], tiers: ["factorial:auto"] },
+  { file: "k-lex.alg",                        totality: [], tiers: ["k:witnessed"] },
+  { file: "sum_to.alg",                       totality: [], tiers: ["sum_to:auto"] },
+];
+
+for (const row of VERDICT_PIN) {
+  test(`B-159 R1 verdict pin: ${row.file}`, () => {
+    const dir = row.file.startsWith("totality-") ? testsDir : precompileCorpusDir;
+    const got = verdictOf(path.join(dir, row.file));
+    eq(JSON.stringify(got.totality), JSON.stringify(row.totality), `${row.file} totality-* notifications`);
+    eq(JSON.stringify(got.tiers), JSON.stringify(row.tiers), `${row.file} tiers`);
+  });
+}
+
+test("B-159 R1 verdict pin: the table covers every totality demo and Phase E source", () => {
+  const pinned = VERDICT_PIN.map(r => r.file).sort();
+  const demos = fs.readdirSync(testsDir).filter(f => /^totality-.*\.alg$/.test(f));
+  const sources = fs.readdirSync(precompileCorpusDir).filter(f => f.endsWith(".alg"));
+  eq(JSON.stringify(pinned), JSON.stringify([...demos, ...sources].sort()));
+});
