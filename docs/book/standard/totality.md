@@ -248,8 +248,9 @@ Per-stage disposition of `docs/plans/archive/phase-e-totality-plan.md`
   it missed every typed recursive call, and the symptoms above returned.
   B-159 (precompile of recursive definitions) restored it in
   R2 (one object per definition); §8 T-R6 records how and the numbers.
-- **B-087 totality-analysis performance** — open, hypothesis refuted
-  by measurement (memo ≈ 2%); needs a real profile.
+- **B-087 totality-analysis performance** — closed 2026-11-01,
+  superseded by B-159: the termination analysis costs under 1 ms, and
+  the remaining cost was the cutoff's inert period above.
 - **Productive corecursion** — `div` is *unproductive* nontermination;
   the codata boundary is noted in structures.md §13.
 - **Termination of effectful loops** driven by external state — awaits
@@ -327,7 +328,11 @@ design truth for this layer.
   - The cutoff's set holds the objects the recursive bindings are bound
     to. A second identity test matches a function that shares a bound
     object's `body`. It catches the evaluation loop's copies, made when
-    `typed_function_impl` precompiles a pure literal again.
+    `typed_function_impl` precompiles a pure literal again. Since chunk
+    R3 (the second precompile of a top-level literal is skipped), the
+    evaluation loop skips that precompile for a program's top-level
+    literal the pass covered. The copies remain only in a module's load
+    and after a failed precompile.
   - A guard test pins the binding; regression tests pin zero inline
     expansions, at least one cutoff residual and no
     `precompile-type-error` per corpus source.
@@ -335,4 +340,9 @@ design truth for this layer.
   Restored numbers: `tests/totality-termination-demo.alg` 62.7 s and
   84,065,836 `evaluate` calls before, 0.3 s and 694 after; the gate
   (`npm run test:shards`) 361.6 s of wall clock before, 14.1 s after.
-  Every totality verdict is unchanged.
+  Every totality verdict is unchanged. At the stream's close (B-159
+  closed 2026-11-01, after R3) the gate's work was 41.5 s against
+  737.8 s before, down about 95%. The soundness review stays open in
+  B-100, which now also records that the checking algorithm can still
+  reach a host stack overflow through recursion the cutoff does not
+  see.
