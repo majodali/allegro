@@ -456,3 +456,31 @@ doc-lint exemption. §3.1 states what each chunk produces.
   The ratification flip followed the merge in its own PR; asks 3 and 4
   of PR #129 (B-172's lane, the default arm's owner, the meta-review
   dispatch) are open with the maintainer.
+- **2026-11-01 — A3 written, IR-only.** File:
+  `docs/book/platform/tooling.ir.md`, Status `delivered IR-only`
+  (170 claims, of which 157 proposed, 10 decided and 3 inferred; 30
+  terms, of which 2 proposed; 26 clusters; 11 relations; 37 evidence
+  pointers). No prose and no rounds (§3.1). Unratified terms 2 in the
+  chapter (*safety grade*, defined here; *the evalSource pipeline*, A2's,
+  still proposed). Footprint: declared 7, changed 7, surprises 0, misses
+  0. Ids 790 (unchanged on the updated base). No spine entry absorbed.
+  The branch was fast-forwarded to `origin/main` before the commits,
+  which brought B-159 (precompile of recursive definitions) chunk R2:
+  `npm run lint:load` now runs the file runner with `ALLEGRO_EVAL_STATS`
+  (claims C169, C170). Not built, with owners: tracing and step-through
+  debugging, B-064 (execution tracing and step-through debugging); the
+  IDE integration, B-067 (LSP and IDE integration). Found, each a code
+  change or an edit outside the boundary, both spare ids being used, so
+  each is an ask on the PR: `inspect` and the three proof subcommands
+  load no module for a `use NAME.MEMBER` directive or an inline grammar
+  block, and stop on two pinned demos the file runner runs (C67, C69);
+  `obligations` without `--pending` lists no failed `proven` clause,
+  while `--pending` does (C114, C115, C168); `prove` evaluates the file
+  with its `use` header unstripped (C133 to C135) and its missing-key
+  message offers a `--api-key` flag the CLI does not parse (C124); the
+  comment on `ALLEGRO_TRACE_DEPTH` in `src/evaluator.ts` misstates what
+  a value of 1 does (C143, C144); the REPL buffers continuation lines the
+  grammar then rejects (C62), which B-065 (REPL improvements) owns; the
+  grade `has-warnings` is never produced (C92); and
+  `docs/book/implementation-map.md` puts `src/introspect.ts` on L2 where
+  the unit manifest puts the unit on the track layer (C22).

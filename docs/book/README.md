@@ -73,6 +73,7 @@ A term has one definition site, a heading preceded by
 | II.19 | `vivace/planning-dsl.md` | The planning DSL, the first Vivace pilot (rung 3): the outcome-graph model, the twelve conventions, the rejections, the `SoftwareRelease` example, what Allegro provides today, the well-formedness checks. Definition site of *plan*, *plan node*, *wiring*, *failure handler* |
 | II.20 | `platform/README.md` | Capability tracks; planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
 | II.21 | `platform/build-pipeline.ir.md` | The `pipeline` unit (33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, the phases and futures, the three moves the unit still owes; the multi-phase build surface tagged undesigned. Definition site of *the evalSource pipeline* (IR-only; rendered and reviewed at a later stage) |
+| II.22 | `platform/tooling.ir.md` | The `introspect` and `cli` units (34 and 35): the file runner and the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, the four diagnostic variables; tracing and the IDE integration tagged not built. Definition site of *safety grade* (IR-only; rendered and reviewed at a later stage) |
 
 Planned under L2, revalidation-gated (backlog register): `standard/proofs.md`,
 `standard/pcp.md`.
