@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `pipeline` unit (unit 33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, the phases and futures as far as `evalSource` drives them, and the three moves the unit still owes.
-Status: delivered IR-only (ratified at the merge of PR #132, 2026-11-01; unratified terms 0; footprint: declared 10, changed 10, surprises 0, misses 0)
+Status: delivered IR-only (ratified at the merge of PR #132, 2026-11-01; unratified terms 0; footprint: declared 10, changed 10, surprises 0, misses 0; edited 2026-11-01: the precompile context and cutoff re-synced after B-159's R2 and R3 (claims C160 to C175; C99, C101 and C103 removed; evidence re-pointed to the current lines), unratified terms 0)
 Source: chunk A2 of docs/plans/book-chapters-now.md (stream A, B-170); src/runtime.ts as the file of unit 33
 Footprint: docs/book/platform/build-pipeline.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book/implementation-map.md; docs/book/platform/README.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -272,6 +272,20 @@ C86. A memo entry evaluates the binding's expression at the first lookup, keepin
 
 C87. A lookup made while a memo entry's own evaluation runs reads the unevaluated expression. evidence: E19. [decided: owner, 2026-11-01]
 
+C160. A source binding whose value is a function definition enters the precompile context as a definition entry. evidence: E16, E41. [proposed: this IR]
+
+C161. A definition entry evaluates the function definition at the first lookup, every later lookup returning the object that the definition entry binds. evidence: E41. [proposed: this IR]
+
+C162. A lookup made while a definition entry's first evaluation runs evaluates the function definition again, re-entrantly. evidence: E41. [proposed: this IR]
+
+C163. A definition entry binds the first object that any evaluation of the entry's function definition returns, dropping the result of an evaluation that returns later. evidence: E41. [proposed: this IR]
+
+C164. In a recursive definition, the re-entrant lookup comes from the F3b inline-lambda precompile in `typed_function_impl`, which reaches the body's recursive call while `typed_function_impl` builds the typed function. evidence: E41, E42. [proposed: this IR]
+
+C165. A definition entry whose evaluation throws binds nothing, leaving the next lookup to evaluate the function definition afresh. evidence: E41. [proposed: this IR]
+
+C166. Precompile partially evaluates the object that a function definition's entry binds, the object to which every reference during precompile resolves. evidence: E16. [proposed: this IR]
+
 C88. Precompile evaluates only the bindings whose value is a function definition: a function literal, or `typed_function` over a function literal. evidence: E16, E17. [decided: owner, 2026-11-01]
 
 C89. A function definition whose evaluation throws yields a `precompile-eval` notification and no precompile. evidence: E16. [decided: owner, 2026-11-01]
@@ -294,17 +308,29 @@ C96. Precompile reports `return-type-mismatch` when a declared return type other
 
 C97. Precompile lists each source binding that has no value in the compilation report's `unresolved` list. evidence: E16. [decided: owner, 2026-11-01]
 
+C167. Precompile marks the function literal of a top-level definition through `markPrecompiledByPass` in `src/primitives.ts` once precompile of the definition returns no error. evidence: E16, E42. [proposed: this IR]
+
+C168. `evalSource` hands precompile the function literals to mark, the literals that `analyzeDivergence` peels, only when the call compiles a program rather than loading a module. evidence: E30, E43. [proposed: this IR]
+
+C169. In the evaluation loop, `typed_function_impl` skips the F3b inline-lambda precompile of a function literal that precompile marked. evidence: E42. [proposed: this IR]
+
 C98. The inline cutoff is the hook, installed through `setInlineCutoff`, that tells `applyComposed` which callees to leave as residuals when an argument is unresolved. evidence: E14, E29. [decided: owner, 2026-11-01]
 
-C99. Under the `typed` flag, `evalSource` installs the inline cutoff over the function objects of the recursive bindings that `analyzeDivergence` reports. evidence: E14. [decided: owner, 2026-11-01]
+C170. The inline cutoff's first set holds the object that each recursive binding is bound to in the precompile context. evidence: E14, E16. [proposed: this IR]
+
+C171. The precompile context adds a recursive binding's object to the inline cutoff's first set when the precompile context binds the object. evidence: E16, E41. [proposed: this IR]
+
+C172. The inline cutoff's second set holds the body of each composed function in the inline cutoff's first set. evidence: E41. [proposed: this IR]
 
 C100. `analyzeDivergence` reports a binding as recursive when the binding's function calls into its own recursion cycle, whatever the binding's discharge tier. evidence: E30. [decided: owner, 2026-11-01]
 
-C101. The inline cutoff answers by object identity against the set of recursive function objects. evidence: E14. [decided: owner, 2026-11-01]
+C173. The inline cutoff answers true by either of two identity tests: the callee is an object in the first set, or the callee's body is in the second set. evidence: E14. [proposed: this IR]
+
+C174. The second identity test recognises a copy of a bound function made outside the precompile context, because the copy shares the bound function's body. evidence: E14. [proposed: this IR]
 
 C102. `evalSource` installs no inline cutoff when no binding is recursive. evidence: E14. [decided: owner, 2026-11-01]
 
-C103. B-159 (precompile of recursive definitions) is the open item that changes the inline cutoff. [decided: docs/plans/recursive-precompile.md §5, ratified 2026-10-30]
+C175. B-159 (precompile of recursive definitions) restored the inline cutoff for typed functions at chunk R2, after B-121 (metadata on every kind) chunk C2 had left the cutoff inert for typed functions. [decided: docs/plans/recursive-precompile.md §7, the R2 record, merged 2026-11-01]
 
 C104. With `ALLEGRO_EVAL_STATS=1`, the evaluator prints one stderr line of counts per run, at process exit. evidence: E13. [decided: owner, 2026-11-01]
 
@@ -454,9 +480,13 @@ G16. cluster: C75, C76, C77, C78, C79, C80 [decided: owner, 2026-11-01]
 
 G17. cluster: C81, C82, C83, C84, C85, C86, C87 [decided: owner, 2026-11-01]
 
+G29. cluster: C160, C161, C162, C163, C164, C165, C166 [proposed: this IR]
+
 G18. cluster: C88, C89, C90, C91, C92, C93, C158, C94, C95, C96, C97 [decided: owner, 2026-11-01]
 
-G19. cluster: C98, C99, C100, C101, C102, C103 [decided: owner, 2026-11-01]
+G31. cluster: C167, C168, C169 [proposed: this IR]
+
+G30. cluster: C98, C170, C171, C172, C100, C173, C174, C102, C175 [proposed: this IR]
 
 G20. cluster: C104, C105 [decided: owner, 2026-11-01]
 
@@ -482,7 +512,7 @@ R1. C77 depends-on C75 because an annotation check throws from `type_check` duri
 
 R2. C59 depends-on C158 because the divergence stamp adds `div` to the inferred effect set that `precompileFunction` writes onto each function.
 
-R3. C58 depends-on C99 because the inline cutoff is built from the recursive bindings that the divergence analysis reports.
+R3. C58 depends-on C170 because the inline cutoff's first set holds the objects of the recursive bindings that the divergence analysis reports before precompile binds them.
 
 R4. C80 refines C64 because the annotation check that halts is the evaluation's `type_check` (C75), while precompile's comparison of the declared and inferred return types only reports (C79).
 
@@ -500,6 +530,12 @@ R10. C125 supports C126 because no code drives a phase other than an arriving fu
 
 R11. C61 refines C60 because the stamp in `evalSource` is where the termination analysis's `div` enters the inferred sets.
 
+R12. C170 depends-on C161 because the first identity test sees one object per definition only when every lookup of the definition returns the bound object.
+
+R13. C174 refines C173 because the second identity test exists for the copies of a bound function that the first identity test misses.
+
+R14. C169 depends-on C167 because the skip in `typed_function_impl` reads the mark that precompile writes.
+
 ## Evidence
 
 E1. `scripts/analyze/units.json` lines 39 and 54: the `pipeline` unit's dependencies are `*`, and `src/runtime.ts` is mapped to `pipeline`, `composed-function`, `futures` and `core-types`.
@@ -510,59 +546,59 @@ E3. `src/index.ts` lines 115–227 (`runFile`: `scanUses`, the `use` modules loa
 
 E4. `src/modules.ts` lines 188–227 (the process's library cache, keyed by path and content hash, a hit comparing the text), 331–340 (the cache answers first), 357–404 (the `use` pre-scan and the header strip), 409–431 (`evalSource` with `typed` true, `softFail` undefined, the resolved path as scope name) and 493 (the cache written).
 
-E5. `src/runtime.ts` lines 1050–1081 and 1612: the `evalSource` signature, the seven optional inputs with `softFail` documented as "push their notifications as usual but do NOT throw", and the returned value, scope, report and registry.
+E5. `src/runtime.ts` lines 1157–1188 and 1754: the `evalSource` signature, the seven optional inputs with `softFail` documented as "push their notifications as usual but do NOT throw", and the returned value, scope, report and registry.
 
-E6. `src/runtime.ts` lines 1082–1093 and 577–599: `bumpMetaEpoch`, the `diverges` analysis installed as `() => null` under the effects writer, `libraryOwnedValues` collecting extension binding values and module-object field values by reference.
+E6. `src/runtime.ts` lines 1189–1200 and 652–674: `bumpMetaEpoch`, the `diverges` analysis installed as `() => null` under the effects writer, `libraryOwnedValues` collecting extension binding values and module-object field values by reference.
 
-E7. `src/runtime.ts` lines 1094–1141: line endings normalised, grammar fragments gathered from the extensions, the Earley fallback, `getGrammarWithFragments`, `assertGrammarClean`, `parseSource`, `buildProgram`.
+E7. `src/runtime.ts` lines 1201–1248: line endings normalised, grammar fragments gathered from the extensions, the Earley fallback, `getGrammarWithFragments`, `assertGrammarClean`, `parseSource`, `buildProgram`.
 
-E8. `src/runtime.ts` lines 31–80 and 1143–1150: `typeLiterals` (a typed Bits returned as is, a 64-bit Bits typed Int, any other String; the composed-function clone with `carryMeta` and `genericParams` at lines 61–71), called per binding under `typed`.
+E8. `src/runtime.ts` lines 31–80 and 1250–1257: `typeLiterals` (a typed Bits returned as is, a 64-bit Bits typed Int, any other String; the composed-function clone with `carryMeta` and `genericParams` at lines 61–71), called per binding under `typed`.
 
-E9. `src/runtime.ts` lines 82–124, 126–243, 285–450 and 1152–1153: `resolvePrimitives`; `resolveSymbols` (primitives wrapped under `typed` at 156–163, extensions and module objects at 165–175, the base scope at 177–186, stubs at 188–199, pattern binders at 213–224, source names left as Symbols at 236–242); `resolveNamedParams` and `resolveNamedParamsInner`, each cloning a composed function with `carryMeta` and `genericParams` (329–356, 413–437); the call after `typeLiterals`.
+E9. `src/runtime.ts` lines 82–124, 126–243, 285–450 and 1259–1260: `resolvePrimitives`; `resolveSymbols` (primitives wrapped under `typed` at 156–163, extensions and module objects at 165–175, the base scope at 177–186, stubs at 188–199, pattern binders at 213–224, source names left as Symbols at 236–242); `resolveNamedParams` and `resolveNamedParamsInner`, each cloning a composed function with `carryMeta` and `genericParams` (329–356, 413–437); the call after `typeLiterals`.
 
-E10. `src/runtime.ts` lines 452–483 and 1155–1156: `markTailCallsInContext` collapses body-form metadata over every binding before marking, so that tail positions are computed on the real body; `markTailCalls` per composed function body.
+E10. `src/runtime.ts` lines 452–483 and 1262–1263: `markTailCallsInContext` collapses body-form metadata over every binding before marking, so that tail positions are computed on the real body; `markTailCalls` per composed function body.
 
 E11. `src/totality.ts` lines 43–115: `collapseOneFunction` peels the `*_attach` chain, descending through `type_check`, into function properties; `collapseBodyMetadata` over every reachable composed function.
 
-E12. `src/evaluator.ts` lines 233–320: `markTailCalls` sets the tail mark and recognises `eval_if`, `eval_when` and the body wrappers by `fn.kind` and primitive name.
+E12. `src/evaluator.ts` lines 245–332: `markTailCalls` sets the tail mark and recognises `eval_if`, `eval_when` and the body wrappers by `fn.kind` and primitive name.
 
-E13. `src/evaluator.ts` lines 44–50, 109–115 and 140–200, with `src/runtime.ts` lines 1158–1166 and 1611: the stats switch and sink, the exit line, `beginEvalStats`, `watchBindingExpr` per named unresolved binding, `endEvalStats`.
+E13. `src/evaluator.ts` lines 44–50, 116–122 and 148–210, with `src/runtime.ts` lines 1265–1273 and 1753: the stats switch and sink, the exit line, `beginEvalStats`, `watchBindingExpr` per named unresolved binding, `endEvalStats`.
 
-E14. `src/runtime.ts` lines 1168–1262 and `src/evaluator.ts` lines 26–42: the divergence analysis ahead of precompile and consuming none of its output, `setInlineCutoff(null)` at line 1177, `analyzeDivergence` at line 1242, the cutoff set of recursive stamp targets installed only when non-empty, answering `cutoffCfns.has(fnValue)`.
+E14. `src/runtime.ts` lines 1275–1390 and `src/evaluator.ts` lines 26–42: the divergence analysis ahead of precompile and consuming none of its output, `setInlineCutoff(null)` at line 1285, `analyzeDivergence` at line 1350, the cutoff installed at lines 1383–1389 only when a binding is recursive, with two sets that precompile fills, answering `cutoffCfns.has(fnValue)` or, for a composed function, `cutoffBodies.has(fnValue.body)`; the comment at lines 1371–1382 naming the evaluation loop's `withType` copy as the case the body test covers.
 
-E15. `src/runtime.ts` lines 601–626: `precompileFunctions` returns an empty report when untyped, suspends law instantiation and marks the stats precompile period around the pass.
+E15. `src/runtime.ts` lines 676–703: `precompileFunctions` returns an empty report when untyped, suspends law instantiation and marks the stats precompile period around the pass.
 
-E16. `src/runtime.ts` lines 628–783: the precompile context, memo entries for computing value bindings, only function definitions evaluated, `precompile-eval` on a throw, typed and untyped placeholders, the library-owned skip at line 727, `precompile-type-error`, `inferred`, `return-type-mismatch`, `unresolved`; no throw.
+E16. `src/runtime.ts` lines 705–890 (`precompileFunctionsInner`): the precompile context; at lines 739–756 a resolved source binding entered as the value, a function definition as a definition entry, any other binding as a memo entry, a recursive binding's object handed to `addCutoffBound`; the loop reading a definition's entry at line 775; `precompile-eval` on a throw; typed and untyped placeholders; the library-owned skip at line 824; `markPrecompiledByPass` at line 841 after a precompile with no error; `precompile-type-error`, `inferred`, `return-type-mismatch`, `unresolved`; no throw.
 
 E17. `src/effects.ts` lines 173–180: `isFunctionDefinition`, the shapes `asFunction` peels, which precompile evaluates.
 
-E18. `src/runtime.ts` lines 1263–1380: precompile called; the info notices (exhaustiveness, nontermination, needs-annotation) at 1272–1300; the stamp, skipping library-owned functions, at 1301–1318; the `total` check and its throw at 1319–1337; the `diverges` analysis installed at 1341–1351; the effects declaration check and its throw at 1353–1371; the opaque info notices at 1372–1379.
+E18. `src/runtime.ts` lines 1405–1522: precompile called; the info notices (exhaustiveness, nontermination, needs-annotation) at 1414–1442; the stamp, skipping library-owned functions, at 1443–1460; the `total` check and its throw at 1461–1479; the `diverges` analysis installed at 1483–1493; the effects declaration check and its throw at 1495–1513; the opaque info notices at 1514–1379.
 
 E19. `src/runtime.ts` lines 547–575: `precompileMemoEntry` evaluates on first lookup, keeps the result, reads the expression during its own evaluation, keeps nothing on a failure.
 
-E20. `src/runtime.ts` lines 785–885 and 1382: `buildEvalCtx`, the four-layer chain, the typed primitive wrapping, the base copied into a fresh layer, source bindings "already resolved by resolveSymbols", pending cells for unprovided names.
+E20. `src/runtime.ts` lines 892–992 and 1524: `buildEvalCtx`, the four-layer chain, the typed primitive wrapping, the base copied into a fresh layer, source bindings "already resolved by resolveSymbols", pending cells for unprovided names.
 
-E21. `src/runtime.ts` lines 906–922 and 1383–1390: `DependencyRegistry` shares the scope's binding objects; a fresh registry per call; the future manager pointed at the registry and scope.
+E21. `src/runtime.ts` lines 1013–1029 and 1525–1532: `DependencyRegistry` shares the scope's binding objects; a fresh registry per call; the future manager pointed at the registry and scope.
 
-E22. `src/runtime.ts` lines 1419–1536: the evaluation loop in binding-list order, the dependency collector, the `__bare_<n>` cells, type naming and `stabilizeTypeMemberScope`, `withSource` on resolved non-Structure values, `resolveCell` into the scope's binding, dependents registered; no try or catch around it.
+E22. `src/runtime.ts` lines 1561–1678: the evaluation loop in binding-list order, the dependency collector, the `__bare_<n>` cells, type naming and `stabilizeTypeMemberScope`, `withSource` on resolved non-Structure values, `resolveCell` into the scope's binding, dependents registered; no try or catch around it.
 
-E23. `src/runtime.ts` lines 933–1002 and 1538–1541: `propagateCompletions`, iterative passes until none completes a binding, the in-place refinement of a complete binding's pending data slot.
+E23. `src/runtime.ts` lines 1040–1109 and 1680–1683: `propagateCompletions`, iterative passes until none completes a binding, the in-place refinement of a complete binding's pending data slot.
 
-E24. `src/primitives.ts` lines 2629–2800: `type_check_impl` throws an `AllegroError` for a refinement predicate that fails (line 2737) and for a type mismatch (line 2762, and lines 2704, 2775, 2780, 2795).
+E24. `src/primitives.ts` lines 2656–2827: `type_check_impl` throws an `AllegroError` for a refinement predicate that fails (line 2764) and for a type mismatch (line 2789, and lines 2731, 2802, 2807, 2822).
 
-E25. `src/runtime.ts` lines 1423–1447 and 1543–1562, with `src/proofs.ts` lines 41–50: failed proofs collected during the loop, `proof-failure` notifications, the throw unless `softFail`; `isFailedProof` reads a false `discharged` field on a Proof.
+E25. `src/runtime.ts` lines 1565–1589 and 1685–1704, with `src/proofs.ts` lines 41–50: failed proofs collected during the loop, `proof-failure` notifications, the throw unless `softFail`; `isFailedProof` reads a false `discharged` field on a Proof.
 
-E26. `src/runtime.ts` lines 1564–1597, with `src/proven.ts` lines 180–284: `checkProvenClauses` over the evaluation scope, `proven-skipped` info, `proven-failed` errors with counterexamples, the throw unless `softFail`.
+E26. `src/runtime.ts` lines 1706–1739, with `src/proven.ts` lines 180–284: `checkProvenClauses` over the evaluation scope, `proven-skipped` info, `proven-failed` errors with counterexamples, the throw unless `softFail`.
 
-E27. `src/runtime.ts` lines 1599–1609: `registerScopeSymbol` for every binding name of the scope except the bare and future cells, under the module's scope name or `<main>`.
+E27. `src/runtime.ts` lines 1741–1751: `registerScopeSymbol` for every binding name of the scope except the bare and future cells, under the module's scope name or `<main>`.
 
-E28. `src/evaluator.ts` lines 996–1095: `precompileFunction` evaluates the body over placeholders and writes `inferredEffects` onto the function.
+E28. `src/evaluator.ts` lines 1009–1109: `precompileFunction` evaluates the body over placeholders and writes `inferredEffects` onto the function.
 
-E29. `src/evaluator.ts` lines 759–783: `applyComposed` returns a residual for a call the cutoff names when any argument is unresolved.
+E29. `src/evaluator.ts` lines 771–796: `applyComposed` returns a residual for a call the cutoff names when any argument is unresolved.
 
 E30. `src/totality.ts` lines 520–531 and 560–582: `recursiveBindings`, computed from strongly connected components before any tier-specific exit; `stampTargets`, the collapsed function per binding.
 
-E31. `src/runtime.ts` lines 1004–1044: `applyPhase` resolves an existing cell in place, adds a new binding otherwise, throws on a complete cell (D33 write-once), then calls `propagateCompletions`.
+E31. `src/runtime.ts` lines 1111–1151: `applyPhase` resolves an existing cell in place, adds a new binding otherwise, throws on a complete cell (D33 write-once), then calls `propagateCompletions`.
 
 E32. `src/futures.ts` lines 44–86: `createFuture` mints a pending cell and settles the resolved value, or an error value on rejection, through `applyPhase` into the minting pass first.
 
@@ -582,12 +618,20 @@ E39. A run on this branch on 2026-11-01 of `npx tsx src/index.ts` over two scrat
 
 E40. `package.json` lines 24–25: `lint:units` runs `scripts/analyze/index.ts units --check`; `lint:load` runs `bench/load.ts --check`.
 
+E41. `src/runtime.ts` lines 577–650: `PrecompileCutoff` with the recursive names, the bound objects and their bodies; `addCutoffBound` adding an object and, for a composed function, the object's body; `precompileDefinitionEntry` evaluating on the first lookup, a lookup during that evaluation evaluating the definition re-entrantly, the first object built bound and handed to `onBound`, a later result dropped, nothing kept on a throw.
+
+E42. `src/primitives.ts` lines 1906–1921 and 2172–2200: `_precompiledByPass`, a WeakSet of the literals precompile covered, filled only through `markPrecompiledByPass`; the F3b inline-lambda precompile in `typed_function_impl`, skipped at line 2189 for a literal in that set, its comment stating that the precompile still runs inside the pass and writes the literal's `inferredEffects`.
+
+E43. `src/runtime.ts` lines 1391–1406: `covered` set to `analyzeDivergence`'s `stampTargets` only when `moduleFqn` is undefined, then passed to `precompileFunctions`; the comment listing the cases not covered: a nested lambda, an untyped program, a module's load.
+
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C4, C5, C12, C13, C14, C15, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C53, C54, C56, C57, C58, C59, C61, C62, C63, C67, C68, C69, C70, C72, C73, C74, C75, C76, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C94, C95, C96, C97, C98, C99, C100, C101, C102, C104, C105, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C128, C129, C130, C132, C133, C134, C139, C140, C143, C147, C148, C149, C150, C151, C152, C153, C154, C155, C156, C157, C158, C159. Depends: C4, C5, C12, C13, C14, C15, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C53, C54, C56, C57, C58, C59, C61, C62, C63, C67, C68, C69, C70, C72, C73, C74, C75, C76, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C94, C95, C96, C97, C98, C99, C100, C101, C102, C104, C105, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C128, C129, C130, C132, C133, C134, C139, C140, C143, C147, C148, C149, C150, C151, C152, C153, C154, C155, C156, C157, C158, C159.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C4, C5, C12, C13, C14, C15, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C53, C54, C56, C57, C58, C59, C61, C62, C63, C67, C68, C69, C70, C72, C73, C74, C75, C76, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C94, C95, C96, C97, C98, C100, C102, C104, C105, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C128, C129, C130, C132, C133, C134, C139, C140, C143, C147, C148, C149, C150, C151, C152, C153, C154, C155, C156, C157, C158, C159. Depends: C4, C5, C12, C13, C14, C15, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C53, C54, C56, C57, C58, C59, C61, C62, C63, C67, C68, C69, C70, C72, C73, C74, C75, C76, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C94, C95, C96, C97, C98, C100, C102, C104, C105, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C128, C129, C130, C132, C133, C134, C139, C140, C143, C147, C148, C149, C150, C151, C152, C153, C154, C155, C156, C157, C158, C159.
 
 A1 resolved: ratified by the owner at the merge of PR #132, 2026-11-01; the claims carry decided provenance from that date.
 
 A2. Ratify or strike the proposed term the evalSource pipeline (T34); the term tail call (T27) is proposed by the evaluator chapter's IR and rides that IR's own ratification ask. Depends: C2, C17, C45, C49.
 
 A2 resolved: ratified by the owner at the merge of PR #132, 2026-11-01. Ruling R9 was taken on 2026-11-01 as option (a): the spine's §29 stays the definition site of the evalSource pipeline, T34 links to it, and the chapter is the as-implemented home; precompile (T35) is defined in docs/book/layers.md §2, before its first use in reading order.
+
+A3. Ratify in bulk the re-synced claims about the precompile context, the inline cutoff and the skipped F3b inline-lambda precompile, as chunks R2 and R3 of B-159 left the code, with their clusters G29, G30 and G31: C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170, C171, C172, C173, C174. Depends: C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170, C171, C172, C173, C174.
