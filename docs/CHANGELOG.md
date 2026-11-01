@@ -138,6 +138,37 @@ Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
 2026-10-30 with the plan; entries newest first, directly below this
 line.
 
+### 2026-10 — The evaluator chapter (B-170, chunk A1): IR first, rendered and reviewed
+
+Chunk A1 of B-170 (the book, Part II and III chapters writable now)
+writes the chapter for the `evaluator` unit (13) IR first, under
+W-009 (the methodology corpus writes its deliverables IR first) as
+adopted in `docs/classification.md`. `docs/book/allegretto/evaluator.ir.md` came
+first: 134 claims in 32 clusters, 30 terms, 9 relations and 41 evidence
+pointers at round 1, grown by splits to 167 claims in 34 clusters, 10
+relations and 48 evidence pointers at delivery; every claim about the
+code as implemented is proposed with a file-and-line pointer, for
+ratification in bulk at the PR. The reasoning role rendered
+`docs/book/allegretto/evaluator.md` from it, one claim per sentence,
+ending with the render map; `evaluator.review.md` beside it records
+the stranger rounds: seven rounds to a readable verdict, the readable
+round's fixes confirmed by its instance, and the meta-review line
+reading pending (three of the four signals fired). The IR's Status
+reads `reviewed` (count 1; footprint: surprises 1, misses 0). The chapter covers
+evaluation, PE Rule 1 and PE Rule 2 as implemented, application and
+substitution, tail calls, the scope carve-out from D22 (structures are
+immutable by default), the install surface of B-112 (the four owed
+plane interfaces), and the two edges B-146 (knowledge propagation)
+owns. It records that `eval_when`, `&&` and `||` do not meet PE Rule 2,
+filed as B-172 (the partial-evaluation rules as implemented against the spine).
+The reading-order entry "Scope and the evaluator" splits: scope stays
+planned, the evaluator is present; table-of-contents rows II.5 and II.6;
+unit 13's status cell names the chapter. The spine's §27 (tail calls) is
+an absorbed entry, a pointer to the chapter's definition site of *tail
+call*, and §25's as-implemented row points at the chapter; both logged
+in `docs/book-changes.md`. Bare first-use identifiers 795 → 791
+(`npm run lint:docs:check`); unratified terms 1 (*tail call*).
+
 ## Unstreamed
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.

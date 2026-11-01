@@ -425,4 +425,12 @@ doc-lint exemption. §3.1 states what each chunk produces.
 
 - **2026-10-30 — rulings taken, R8 decided.** R1 to R7 as recommended;
   R8 as above. A1 starts after the plan PR merges and B-173 is on main.
-- No chunk landed yet.
+- **2026-10-31 — A1 written and reviewed.** Files:
+  `docs/book/allegretto/evaluator.ir.md` (134 claims at round 1, 150
+  after its fixes, 155 after round 2's and its touch-up, 157 after round 3's, 159 after round 4's, 165 after round 5's, 166 after round 7's, 167 at delivery; 30 terms), `evaluator.md` (rendered by the reasoning
+  role), `evaluator.review.md`. Stranger rounds: seven rounds to a
+  readable verdict; the review record's meta-review line reads pending.
+  Unratified terms 1 (*tail call*); ids 791 (from 795). Found: `eval_when`, `&&` and `||`
+  do not meet PE Rule 2, and the spine's §25 (partial evaluation) delta
+  still says both rules are implemented as specified; filed as
+  B-172 (the partial-evaluation rules as implemented against the spine).
