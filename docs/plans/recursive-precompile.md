@@ -503,4 +503,54 @@ plan's recommendation and the ruling taken.
   reaches a host stack overflow through any recursion the cutoff does
   not see; the regression of §2.5 is an instance (for B-100 (soundness
   review of the cutoff)'s entry at R4).
-- No chunk landed yet.
+- **2026-11-01 — R1 landed.** The measurement, with no behaviour
+  change. Two counters join `ALLEGRO_EVAL_STATS=1` and the stats sink:
+  - `cutoffResiduals` counts the speculative calls that `applyComposed`
+    returned as residuals because the installed
+    [inline cutoff](#def-inline-cutoff) answered true for the callee, in
+    and out of the [precompile pass](#def-precompile-pass).
+  - `precompiles` counts the entries to `precompileFunction`, nested
+    ones included.
+
+  The precompile corpus is a second group in `bench/load.ts`: the six
+  Phase E sources of §2.2 under `bench/corpus/precompile/` and the two
+  totality demos (`sum_to.alg` is the termination demo's `sum_to` with
+  its `NonNeg` line, since `src/test/totality.ts` holds no such test;
+  §2.2 named it among the sources). `npm run bench:load` reports it; `npm run lint:load`
+  skips it, and `bench/load-baseline.json` is unchanged (RR3). The
+  verdict pin is in `src/test/totality.ts`: 12 rows, one test each (the
+  six `tests/totality-*.alg` demos and the six sources), plus one test
+  that the table covers every demo and source. Each row holds the
+  report's `totality-*` notifications (kind, binding) and its
+  discharge tiers (`divObligations`, binding and tier). It passes on
+  unchanged code.
+
+  Re-measured on this tree, in the same sandbox as §2, so the times are
+  indicative. `tests/totality-termination-demo.alg` alone, timed:
+  62.7 s; `evaluate` 84,065,836; `applyPrimitive` 27,769,524;
+  `applyComposed` 94,511; `inlineExpansions` 93,832;
+  `cutoffResiduals` 0; `precompiles` 584. The corpus through
+  `npm run bench:load` (one run, with other measurements sharing the
+  machine):
+
+  | Source | Wall clock | `evaluate` | `inlineExpansions` | `cutoffResiduals` | `precompiles` | `totality-*` notifications |
+  |---|---|---|---|---|---|---|
+  | `factorial-nonneg.alg` | 31.0 s | 40,376,884 | 45,979 | 0 | 289 | none |
+  | `factorial-int.alg` | 31.0 s | 40,070,999 | 45,955 | 0 | 288 | `totality-nontermination factorial` |
+  | `f-decreases.alg` | 37.1 s | 42,594,747 | 47,643 | 0 | 294 | none |
+  | `k-lex.alg` | 24.4 s | 27,437,036 | 45,974 | 0 | 289 | none |
+  | `sum_to.alg` | 34.0 s | 40,368,652 | 45,973 | 0 | 289 | none |
+  | `bad.alg` | 2.5 s | 2,281,653 | 207,234 | 0 | 662 | `totality-nontermination bad` |
+  | `tests/totality-termination-demo.alg` | 65.2 s | 81,841,720 | 92,403 | 0 | 581 | none |
+  | `tests/totality-decreases-demo.alg` | 41.7 s | 56,458,121 | 78,861 | 0 | 661 | none |
+
+  Every row has `cutoffResiduals` 0: the cutoff never fires for a typed
+  recursive definition, which is the [cutoff miss](#def-cutoff-miss) of
+  §2.5. It does fire elsewhere: each run that loads `lib/planning.alg`
+  makes 245 cutoff residuals. The counts still differ between runs (the
+  demo made 93,078 calls to `applyComposed` under `bench:load` and
+  94,511 alone), as §2.5 predicts, so none of them can be a baseline
+  before R2. Every source carries a `precompile-type-error` today for
+  each typed recursive definition outside a tail call (the decreases
+  demo's `countdown` is a tail call and carries none). The verdict pin
+  does not record that notification, since RR2 lets R2 remove it.

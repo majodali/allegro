@@ -103,3 +103,18 @@ npx tsx bench/load.ts --check --update-baseline   # rewrite the baseline (to low
   `load-baseline.json` fails. Wall clock is printed and never gated. It
   runs once per gate run (`scripts/test-shards.mjs`, and
   `src/test/tooling.ts` `runLoadLintTests` when unsharded).
+
+### The precompile corpus
+
+A second group of entries in `load.ts`'s corpus, from B-159 (precompile
+of recursive definitions), chunk R1 (the measurement lands) of
+`docs/plans/recursive-precompile.md`. It holds the six Phase E sources
+of the plan's §2.2, one file each under `corpus/precompile/`, and
+`tests/totality-termination-demo.alg` and
+`tests/totality-decreases-demo.alg`. `npm run bench:load` runs and
+prints it after the load corpus, with the evaluation counts
+`cutoffResiduals` and `precompiles`. `npm run lint:load` skips it, so
+it is in no baseline: its counts end at a host stack overflow today and
+are not deterministic. They enter the ratchet with their own baseline
+at R2 (ruling RR3 (whether and how the counts are gated)). The
+verdict pin in `src/test/totality.ts` reads the same files.
