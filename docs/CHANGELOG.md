@@ -132,6 +132,36 @@ Plan `docs/plans/recursive-precompile.md`; lane P; merge-on-green
 under deviation D-2 (merge-on-green streams). Opened 2026-10-30 with
 the plan; entries newest first, directly below this line.
 
+### 2026-11 — The recursive-precompile stream closes (B-159, chunk R4 (the stream closes)): outcome met; the pipeline chapter re-synced
+
+B-159 (precompile of recursive definitions), chunk R4 of
+`docs/plans/recursive-precompile.md`. The plan's §1 outcome is met on
+all three conditions, recorded in the plan's §7 closing entry. No
+recursive definition in the precompile corpus is expanded
+speculatively: `inlineExpansions` is 0 for every source since R2, gated
+in `bench/load-baseline.json` and pinned by the R2 regression tests in
+`src/test/totality.ts`. Outputs are identical (133 of 136 CLI runs at
+R2, the other three differing only as ruling RR2 (what "outputs
+identical" means) allows; 136 of 136 at R3), no `// expect:` line
+changed, and R1's verdict pin held. The gate's work fell from 737.8 s
+to 41.5 s, about 95%; `tests/totality-termination-demo.alg` from 62.7 s
+to 0.3 s.
+
+- Closed: B-159; B-087 (totality-analyzer performance), superseded
+  under ruling RR4 (B-087's fate); the reserves B-168 (first
+  out-of-scope finding of the recursive-precompile stream) and
+  B-169 (second out-of-scope finding of the recursive-precompile stream),
+  both unused.
+- B-100 (soundness review of the cutoff) records ruling RR7 (a
+  follow-on outside the stream)'s finding: the checking algorithm can
+  still reach a host stack overflow through recursion the cutoff does
+  not see.
+- `docs/book/standard/totality.md` §7 and §8 carry the closing numbers.
+- `docs/book/platform/build-pipeline.ir.md` describes the precompile
+  context, the inline cutoff and the skipped F3b inline-lambda
+  precompile as R2 and R3 left them: claims C160 to C175 replace C99,
+  C101 and C103, and its ask A3 asks the maintainer to ratify them.
+
 ### 2026-11 — The second precompile of a top-level literal is skipped (B-159, chunk R3)
 
 B-159 (precompile of recursive definitions), chunk R3 of
