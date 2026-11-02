@@ -574,7 +574,7 @@ bounded at 200 words is not a disagreement, so the override does not
 reach M2 to M5. Under the other reading, the override counts M2, M4 and
 M5, and round 7 is not readable.
 
-Meta-review: pending (signals checked: 1 fired, 2 fired, 3 not fired, 4 fired; the count reached no limit)
+Meta-review: delivered (docs/records/evaluator-chapter-meta-review.md, 2026-11-01; signals checked: 1 fired, 2 fired, 3 not fired, 4 fired)
 
 ## After the count, 2026-11-01
 
@@ -589,3 +589,4 @@ Asks 3 and 4 of the PR remain open with the maintainer.
 Ask 3 is the lane of B-172 (the partial-evaluation rules as implemented against the spine) and the owner of the missing default arm.
 Ask 4 is the dispatch of the meta-review.
 `Meta-review:` stays `pending`.
+Meta-review delivered 2026-11-01 by a fresh session with no part in the rounds; its asks are open with the maintainer.
