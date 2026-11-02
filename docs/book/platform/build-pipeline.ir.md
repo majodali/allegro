@@ -86,7 +86,7 @@ T36. Post-pass, a check of the evalSource pipeline that runs after precompile or
 
 C1. This chapter is the design truth for the `pipeline` unit, unit 33 of the unit DAG. [decided: docs/plans/book-chapters-now.md §5, 2026-10-30]
 
-C2. This chapter is the definition site of the term the evalSource pipeline, which moved here from the spine's §29. [decided: docs/plans/book-chapters-now.md §5, 2026-10-30]
+C2. This chapter is the as-implemented home of the term the evalSource pipeline, whose definition site stays in the spine's §29 under ruling R9. [decided: owner, 2026-11-01]
 
 C3. This chapter is delivered IR-only: no prose is rendered from this IR until a later stage that the maintainer schedules. [decided: docs/plans/book-chapters-now.md §3.1 and R8, 2026-10-30]
 

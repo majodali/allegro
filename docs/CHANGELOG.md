@@ -132,7 +132,7 @@ Plan `docs/plans/recursive-precompile.md`; lane P; merge-on-green
 under deviation D-2 (merge-on-green streams). Opened 2026-10-30 with
 the plan; entries newest first, directly below this line.
 
-### 2026-11 — The recursive-precompile stream closes (B-159, chunk R4): outcome met; the pipeline chapter re-synced
+### 2026-11 — The recursive-precompile stream closes (B-159, chunk R4 (the stream closes)): outcome met; the pipeline chapter re-synced
 
 B-159 (precompile of recursive definitions), chunk R4 of
 `docs/plans/recursive-precompile.md`. The plan's §1 outcome is met on
