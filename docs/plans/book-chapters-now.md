@@ -499,3 +499,35 @@ definition site before its first use in reading order
   grade `has-warnings` is never produced (C92); and
   `docs/book/implementation-map.md` puts `src/introspect.ts` on L2 where
   the unit manifest puts the unit on the track layer (C22).
+- **2026-11-02 — A4 written, IR-only.** File:
+  `docs/book/platform/host.ir.md`, Status `delivered IR-only` (140
+  claims, of which 114 proposed, 20 decided and 6 inferred; 16 terms,
+  none proposed; 24 clusters; 13 relations; 33 evidence pointers). No
+  prose and no rounds (§3.1). Unratified terms 0: the chapter defines no
+  term, linking *environment capability* and *ENV* to
+  `allegretto/structures.md` §11. Footprint: declared 6, changed 6,
+  surprises 0, misses 0. Ids 788 (from 790: the changelog entry names two identifiers above
+  their older unnamed first uses; the baseline is not lowered). No spine entry absorbed; no
+  unit row, as `docs/book/units.md` records in
+  M10 (the environment has no unit). Not built, with owners: asynchronous
+  I/O capabilities, B-071 (async I/O capabilities); browser packaging,
+  B-070 (browser runtime packaging); the Environment interface,
+  B-141 (there is no Environment interface). Found, each a code change or an edit outside
+  the boundary, both spare ids being used, so each is an ask on the PR:
+  the web bundle built from main fails to load in a browser, since line
+  23 of `src/evaluator.ts` reads `process.env` without testing for
+  `process` (commit b25eac6, 2026-10-27), while the live site (95ae3a1,
+  2026-08-24) predates the line and no gate check builds or loads the
+  bundle, so the next `deploy.sh` would publish a broken sandbox (C110 to
+  C118); the three pages' copy of `lib/units.alg` has drifted since
+  d73922c and `scripts/sync-web-libs.ts --check` fails, outside the gate
+  (C86, C87, C119); the browser-compatible-core rule is stated only in
+  `CLAUDE.md`, and the typecheck compiles `src/` against Node's types, so
+  no gate check enforces the rule (C102 to C104, C120, C121); under
+  `--base` the CLI creates no future manager, so `delay` and `fetch`
+  throw where the browser sandbox runs them (C58, C59, C72); the browser
+  sandbox leaves an `import NAME` unresolved with no error, and keeps its
+  own copy of `scanUses` (C79 to C81); and row A4's phrase "the host
+  plane is not a unit" names the spine's host plane, interpreter
+  bookkeeping, where the chapter's unitless subject is M10's environment
+  (C18, C20, C21).
