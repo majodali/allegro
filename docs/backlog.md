@@ -983,6 +983,7 @@ table and the stream plans.
     library parses in about 40 s on node: B-153 (re-evaluation per
     reference), B-155 (library load per module)); deploy is the
     maintainer's.
+- **See also B-177** (the demo ladder chapter's findings), filed after B-176: eight defects in the demos, their documentation and their pins, among them a rung 2 break-it comment that does not reproduce its transcript (B-093 packages rung 3).
 
 ### Track M — methodology (2026-08)
 
@@ -3129,6 +3130,61 @@ table and the stream plans.
   role edits the IR when the code changes. **Pointer**:
   `docs/book/platform/host.ir.md`; the plan's §7 A4 bullet,
   `docs/plans/book-chapters-now.md`
+- [ ] **B-177** (the demo ladder chapter's findings) · Track R · T-docs ·
+  lane D (`src/test/`; `docs/book/` lies in lanes A and D, and `demos/`
+  in no lane of `scripts/analyze/lanes.json`) · **Eight defects in the
+  demos, their documentation and their pins that the demo ladder
+  chapter's IR records and no item owned.** Found by chunk A5 of B-170
+  (the book, Part II and III chapters writable now), the demo ladder
+  chapter `docs/book/demo-ladder.ir.md`, while running every scene
+  against its README and transcripts; filed here under the default of PR
+  #145, approved on 2026-11-02. Each line names the defect, its file and
+  lines, the IR claims that state it and the evidence:
+  1. The break-it comment of `demos/rung2/03-laws.alg` (lines 19–26) does
+     not reproduce `demos/rung2/transcripts/03-gate.txt`: with the
+     `Law.assume` removed and `theorem bad` uncommented, the run halts
+     first on "type_dispatch: 'lawTier' not found on Proof", not on the
+     strict gate that the transcript records (lines 1–5); claims C119,
+     C120; evidence E6, E18, E38.
+  2. The rung 1 README (`demos/rung1/README.md` lines 21–22) and
+     `docs/book/getting-started.md` lines 91 to 93 say that every rung 1
+     scene has a break-it block with captured transcripts, but
+     `demos/rung1/01-discharge.alg` has none, and scenes 1 and 5 have no
+     transcript under `demos/rung1/transcripts/`; claims C121, C122,
+     C123, C144; evidence E1, E2, E36, E37.
+  3. Lines 8 to 9 of `demos/rung1/03-effects.alg` say that `inspect`
+     prints `effects: pure (inferred)` for `square`, which `inspect`
+     does not print; claims C124, C125; evidence E7, E8.
+  4. The rung 1 and rung 2 transcripts begin each halt with "Error:",
+     where the file runner now prints "Error in" followed by the file's
+     path (`demos/rung1/transcripts/02-broken.txt` line 4,
+     `03-broken.txt` line 4, `04-gate.txt` line 5,
+     `demos/rung2/transcripts/01-halt.txt` line 4, `03-gate.txt` line
+     4); claim C126; evidence E6, E38.
+  5. The suite reads no file under a rung's `transcripts/` directory and
+     nothing of `demos/rung1/05-prover-loop.md`, so the halts those files
+     record are reproduced only by hand and can drift unseen
+     (`src/test/proofs.ts` line 759 and `src/test/language.ts` line 689
+     name the transcripts without reading them); claims C116, C117;
+     evidence E30.
+  6. `docs/book/implementation-map.md` line 114 lists `demos/rung1` and
+     `demos/rung2` with no row for `demos/rung3`, and the `language.ts`
+     row (line 67) does not name the rung 3 demos it registers; claim
+     C143; evidence E22, E35.
+  7. No backlog item owns Shape 2, in which Allegro would run a model;
+     `docs/backlog.md`; claim C133; evidence E33.
+  8. No chapter defines *pinned demo*; the demo ladder chapter describes
+     the pins in plain words (claims C137 to C141); evidence E21, E22,
+     E23.
+
+  Re-checked 2026-11-02 on the branch: the files still show every defect
+  (items 1 to 4 and 6 by re-reading the cited lines of the demos, the
+  transcripts, `getting-started.md` and `implementation-map.md`; items 5,
+  7 and 8 by searching `src/`, `scripts/`, `bench/`, `docs/backlog.md`
+  and `docs/book/`; no scene or command was re-run). Each fix re-proposes the claim that
+  states the defect; the chapter's reasoning role edits the IR when the
+  code changes. **Pointer**: `docs/book/demo-ladder.ir.md`; the plan's §7
+  A5 bullet, `docs/plans/book-chapters-now.md`
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

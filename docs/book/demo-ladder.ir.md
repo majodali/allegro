@@ -2,15 +2,15 @@
 
 Reader: RD-4
 Purpose: document. The book's Part III chapter on the demo ladder as the thesis test: the three delivered rungs under `demos/`, what each rung shows of the defining bet of `docs/book/vision.md` §1 and §2, what each inherits from the rung below, what each does not show, and what pins each scene.
-Status: delivered IR-only (unratified terms 2; footprint: declared 5, changed 5, surprises 0, misses 0)
+Status: delivered IR-only (ratified at the merge of PR #145, 2026-11-02; unratified terms 0; footprint: declared 5, changed 5, surprises 0, misses 0)
 Source: chunk A5 of docs/plans/book-chapters-now.md (stream A, B-170); demos/rung1/, demos/rung2/, demos/rung3/ and their pinning tests as the delivered state; docs/book/vision.md §1 to §2 as the thesis
 Footprint: docs/book/demo-ladder.ir.md; docs/book/README.md; docs/reading-order.json; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
 ## Terms
 
-T1. Rung. A demo package under `demos/`, numbered from 1: a README naming what each scene shows, runnable scenes the suite runs against their `// expect:` lines, transcripts of halted builds. anchor: #def-rung [proposed: this IR]
+T1. Rung. defined-at: vivace/planning-dsl.md#def-rung [decided: docs/book/vivace/planning-dsl.md, the Reader block, 2026-11-02]
 
-T2. Demo ladder. The rungs in the order of their numbers, the scenes of each rung using mechanisms that the scenes of a lower rung show. anchor: #def-demo-ladder [proposed: this IR]
+T2. Demo ladder. defined-at: vivace/planning-dsl.md#def-demo-ladder [decided: docs/book/vivace/planning-dsl.md, the Reader block, 2026-11-02]
 
 T3. Layer, with Allegretto as L0, Allegro Standard as L2 and Vivace as L3. defined-at: layers.md#def-layer [decided: docs/book/layers.md §1]
 
@@ -90,29 +90,31 @@ C3. This chapter states delivered state only, leaving out the claims register an
 
 C4. Principle 17 of `docs/book/vision.md` keeps claims private until delivered. [decided: docs/book/vision.md §5, principle 17]
 
-C5. This chapter is the definition site of two terms: rung; demo ladder. [proposed: this IR]
+C5. This chapter is the definition site of two terms: rung; demo ladder. [decided: owner, 2026-11-02]
 
-C6. Earlier chapters define every other term this chapter uses, each term linked from this chapter's Terms section. [proposed: this IR]
+C145. The planning chapter `docs/book/vivace/planning-dsl.md`, chapter II.19, is the definition site of two terms that this chapter uses: rung; demo ladder. [decided: owner, 2026-11-02]
 
-C7. The reader of this chapter has read Part I, Part II and the proving primer `docs/book/proving-in-allegro.md`, chapter III.1. [proposed: this IR]
+C6. Earlier chapters define every other term this chapter uses, each term linked from this chapter's Terms section. [decided: owner, 2026-11-02]
+
+C7. The reader of this chapter has read Part I, Part II and the proving primer `docs/book/proving-in-allegro.md`, chapter III.1. [decided: owner, 2026-11-02]
 
 C8. This chapter carries the Tier 1 authority that `docs/book/process.md` §1 gives every chapter of the book. [decided: docs/book/process.md §1]
 
 C9. Each Claims sub-heading of this chapter after the first carries the status tag that `docs/book/README.md` defines. [decided: docs/book/README.md, Status convention]
 
-C10. This chapter's examples are lines quoted from the nine `.alg` scenes, each quoted line present in a scene that the suite runs. evidence: E21, E22. [proposed: this IR]
+C10. This chapter's examples are lines quoted from the nine `.alg` scenes, each quoted line present in a scene that the suite runs. evidence: E21, E22. [decided: owner, 2026-11-02]
 
-C11. The planning chapter `docs/book/vivace/planning-dsl.md`, chapter II.19, holds the planning model that rung 3 uses, cited here without restatement. [proposed: this IR]
+C11. The planning chapter `docs/book/vivace/planning-dsl.md`, chapter II.19, holds the planning model that rung 3 uses, cited here without restatement. [decided: owner, 2026-11-02]
 
-### <a id="def-rung"></a><a id="def-demo-ladder"></a>The ladder as the thesis test [implemented]
+### The ladder as the thesis test [implemented]
 
-C12. `demos/` holds three rungs: `demos/rung1/`, `demos/rung2/`, `demos/rung3/`. evidence: E1, E15, E24. [proposed: this IR]
+C12. `demos/` holds three rungs: `demos/rung1/`, `demos/rung2/`, `demos/rung3/`. evidence: E1, E15, E24. [decided: owner, 2026-11-02]
 
-C13. The README titles name each rung's subject: rung 1, verified code at AI velocity; rung 2, a provable DSL for units of measure; rung 3, a domain model the kernel checks and searches. evidence: E1, E15, E24. [proposed: this IR]
+C13. The README titles name each rung's subject: rung 1, verified code at AI velocity; rung 2, a provable DSL for units of measure; rung 3, a domain model the kernel checks and searches. evidence: E1, E15, E24. [decided: owner, 2026-11-02]
 
-C14. Each rung's README tabulates the rung's scenes with what each scene shows. evidence: E1, E15, E24. [proposed: this IR]
+C14. Each rung's README tabulates the rung's scenes with what each scene shows. evidence: E1, E15, E24. [decided: owner, 2026-11-02]
 
-C15. Each rung's README states that the test suite validates the rung's `.alg` scenes through their `// expect:` comments. evidence: E1, E15, E24. [proposed: this IR]
+C15. Each rung's README states that the test suite validates the rung's `.alg` scenes through their `// expect:` comments. evidence: E1, E15, E24. [decided: owner, 2026-11-02]
 
 C16. Allegro's defining feature is provable correctness and safety. [decided: docs/book/vision.md §1 and §2]
 
@@ -132,67 +134,67 @@ C23. Failed proofs and false declarations halt the build visibly, never degradin
 
 C24. A safety or correctness feature that needs parallel infrastructure, instead of reusing predicate-set entailment and PE discharge, fails the thesis in implementation. [decided: docs/book/vision.md §2, the falsifiable design constraint]
 
-C25. Rung 1 tests the thesis on ordinary code through five scenes: discharge; counterexamples; effects; laws with discharge tiers; the prover loop. evidence: E1. [proposed: this IR]
+C25. Rung 1 tests the thesis on ordinary code through five scenes: discharge; counterexamples; effects; laws with discharge tiers; the prover loop. evidence: E1. [decided: owner, 2026-11-02]
 
-C26. Rung 2 tests the thesis on a domain language built as a library, with no host code of its own. evidence: E15, E28. [proposed: this IR]
+C26. Rung 2 tests the thesis on a domain language built as a library, with no host code of its own. evidence: E15, E28. [decided: owner, 2026-11-02]
 
 C27. Rung 3 of the demo ladder tests the Vivace hypothesis on one domain model with three things: rich constraints; solution finding over the model; failures a non-programmer can read. [decided: docs/book/vivace/planning-dsl.md §1]
 
 C28. Decision R-R4 set the ladder order, choosing units-of-measure physics as rung 2's domain for the bridge to rung 3. [decided: docs/decisions.md R-R4]
 
-C29. This chapter counts a scene line as demonstrated only when the line sits in a scene that the suite runs. [proposed: this IR]
+C29. This chapter counts a scene line as demonstrated only when the line sits in a scene that the suite runs. [decided: owner, 2026-11-02]
 
 ### Rung 1, verified code at AI velocity [implemented]
 
-C30. `demos/rung1/` holds four `.alg` scenes with one Markdown scene, `05-prover-loop.md`. evidence: E1. [proposed: this IR]
+C30. `demos/rung1/` holds four `.alg` scenes with one Markdown scene, `05-prover-loop.md`. evidence: E1. [decided: owner, 2026-11-02]
 
-C31. Scene 1, `01-discharge.alg`, states three kinds of claim in the program's own syntax: a refinement; a contract; a theorem. evidence: E2. [proposed: this IR]
+C31. Scene 1, `01-discharge.alg`, states three kinds of claim in the program's own syntax: a refinement; a contract; a theorem. evidence: E2. [decided: owner, 2026-11-02]
 
-C32. Line 27 of `01-discharge.alg` reads `theorem four: 2 + 2 == 4`. evidence: E2. [proposed: this IR]
+C32. Line 27 of `01-discharge.alg` reads `theorem four: 2 + 2 == 4`. evidence: E2. [decided: owner, 2026-11-02]
 
-C33. In a run on 2026-11-02, `verify` on `01-discharge.alg` reported all four theorems discharged by auto-PE, with a clean assumption ledger. evidence: E3. [proposed: this IR]
+C33. In a run on 2026-11-02, `verify` on `01-discharge.alg` reported all four theorems discharged by auto-PE, with a clean assumption ledger. evidence: E3. [decided: owner, 2026-11-02]
 
-C34. Line 23 of `01-discharge.alg` reads `print(double_pos(PositiveInt(7)))`, pinned by `// expect: 14`. evidence: E2. [proposed: this IR]
+C34. Line 23 of `01-discharge.alg` reads `print(double_pos(PositiveInt(7)))`, pinned by `// expect: 14`. evidence: E2. [decided: owner, 2026-11-02]
 
-C35. In a run on 2026-11-02, `inspect` on `01-discharge.alg` reported the safety grade `proven-safe`, with the precondition `x ≥ 1` and the postcondition `_ ≥ 1` on `double_pos`. evidence: E3. [proposed: this IR]
+C35. In a run on 2026-11-02, `inspect` on `01-discharge.alg` reported the safety grade `proven-safe`, with the precondition `x ≥ 1` and the postcondition `_ ≥ 1` on `double_pos`. evidence: E3. [decided: owner, 2026-11-02]
 
-C36. `requires_stmt` returns without evaluating its predicate when the facts of the argument entail the predicate. evidence: E4. [proposed: this IR]
+C36. `requires_stmt` returns without evaluating its predicate when the facts of the argument entail the predicate. evidence: E4. [decided: owner, 2026-11-02]
 
 C37. Scene 1 shows PE-as-discharge on closed theorems and on a contract whose argument facts entail the contract's predicate. [inferred: R1]
 
-C38. Line 9 of `02-counterexamples.alg` reads `print(error of SmallPos(0 - 5))`, pinned by `// expect: refinement check failed: expected ≥ 1 (got -5)`. evidence: E5. [proposed: this IR]
+C38. Line 9 of `02-counterexamples.alg` reads `print(error of SmallPos(0 - 5))`, pinned by `// expect: refinement check failed: expected ≥ 1 (got -5)`. evidence: E5. [decided: owner, 2026-11-02]
 
-C39. A failed refinement construction in scene 2 yields an error value naming the violated bound with the actual value. evidence: E5. [proposed: this IR]
+C39. A failed refinement construction in scene 2 yields an error value naming the violated bound with the actual value. evidence: E5. [decided: owner, 2026-11-02]
 
-C40. The commented break-it block of scene 2 holds `theorem wrong: 2 + 2 == 5`. evidence: E5. [proposed: this IR]
+C40. The commented break-it block of scene 2 holds `theorem wrong: 2 + 2 == 5`. evidence: E5. [decided: owner, 2026-11-02]
 
-C41. In a run on 2026-11-02 with `theorem wrong` uncommented, the file runner printed the scene's pinned output, then halted with exit code 1 on "proposition is false". evidence: E6. [proposed: this IR]
+C41. In a run on 2026-11-02 with `theorem wrong` uncommented, the file runner printed the scene's pinned output, then halted with exit code 1 on "proposition is false". evidence: E6. [decided: owner, 2026-11-02]
 
 C42. Scene 2 shows a false theorem halting the build, with the counterexample named in the halt. [inferred: R2]
 
-C43. Scene 3, `03-effects.alg`, checks each effect declaration against the effects inferred from what the function transitively calls. evidence: E7. [proposed: this IR]
+C43. Scene 3, `03-effects.alg`, checks each effect declaration against the effects inferred from what the function transitively calls. evidence: E7. [decided: owner, 2026-11-02]
 
-C44. Lines 15 and 16 of `03-effects.alg` read `loud(msg) =>` and `effects io`, with the call at line 19 pinned by `// expect: declared and verified`. evidence: E7. [proposed: this IR]
+C44. Lines 15 and 16 of `03-effects.alg` read `loud(msg) =>` and `effects io`, with the call at line 19 pinned by `// expect: declared and verified`. evidence: E7. [decided: owner, 2026-11-02]
 
-C45. In a run on 2026-11-02, `inspect` on `03-effects.alg` reported `loud` with "io (declared, verified)". evidence: E8. [proposed: this IR]
+C45. In a run on 2026-11-02, `inspect` on `03-effects.alg` reported `loud` with "io (declared, verified)". evidence: E8. [decided: owner, 2026-11-02]
 
-C46. The commented break-it block of scene 3 declares `effects pure` on a function that calls `print`. evidence: E7. [proposed: this IR]
+C46. The commented break-it block of scene 3 declares `effects pure` on a function that calls `print`. evidence: E7. [decided: owner, 2026-11-02]
 
-C47. In a run on 2026-11-02 with that break-it block uncommented, the file runner halted with exit code 1 on "effects mismatch in sneaky: declared `pure`, inferred `io` (undeclared: io)". evidence: E6. [proposed: this IR]
+C47. In a run on 2026-11-02 with that break-it block uncommented, the file runner halted with exit code 1 on "effects mismatch in sneaky: declared `pure`, inferred `io` (undeclared: io)". evidence: E6. [decided: owner, 2026-11-02]
 
 C48. Scene 3 shows the safety family of the thesis: an undeclared effect halts the build. [inferred: R3]
 
-C49. Lines 9 and 10 of `04-laws.alg` read `p = proof_trans(proof_refl(7), proof_refl(7))` and `print(p.lawTier)`, pinned by `// expect: kernel`. evidence: E9. [proposed: this IR]
+C49. Lines 9 and 10 of `04-laws.alg` read `p = proof_trans(proof_refl(7), proof_refl(7))` and `print(p.lawTier)`, pinned by `// expect: kernel`. evidence: E9. [decided: owner, 2026-11-02]
 
-C50. Line 33 of `04-laws.alg` reads `Law.assume(Cell, "trans")`. evidence: E9. [proposed: this IR]
+C50. Line 33 of `04-laws.alg` reads `Law.assume(Cell, "trans")`. evidence: E9. [decided: owner, 2026-11-02]
 
-C51. Line 40 of `04-laws.alg` reads `print(q.lawTier)`, pinned by `// expect: admitted`. evidence: E9. [proposed: this IR]
+C51. Line 40 of `04-laws.alg` reads `print(q.lawTier)`, pinned by `// expect: admitted`. evidence: E9. [decided: owner, 2026-11-02]
 
-C52. In a run on 2026-11-02, `verify` on `04-laws.alg` reported "1 ADMITTED (assumed, not proof)", the assumption ledger mapping the admitted `trans` law of `Cell` to the proofs `t_cell` and `q`. evidence: E10. [proposed: this IR]
+C52. In a run on 2026-11-02, `verify` on `04-laws.alg` reported "1 ADMITTED (assumed, not proof)", the assumption ledger mapping the admitted `trans` law of `Cell` to the proofs `t_cell` and `q`. evidence: E10. [decided: owner, 2026-11-02]
 
-C53. The verdict of `04-laws.alg` leaves the `refl` and `sym` laws of `Cell` pending. evidence: E10. [proposed: this IR]
+C53. The verdict of `04-laws.alg` leaves the `refl` and `sym` laws of `Cell` pending. evidence: E10. [decided: owner, 2026-11-02]
 
-C54. In a run on 2026-11-02 with `theorem t_bad` uncommented, the file runner halted with exit code 1 on "transitivity of 'Cell' is neither proven nor admitted". evidence: E6. [proposed: this IR]
+C54. In a run on 2026-11-02 with `theorem t_bad` uncommented, the file runner halted with exit code 1 on "transitivity of 'Cell' is neither proven nor admitted". evidence: E6. [decided: owner, 2026-11-02]
 
 C55. Every claim is a predicate with a visible discharge strength, answered by a tier, never by a bare checkmark. [decided: docs/book/vision.md §1a, move 2]
 
@@ -200,55 +202,55 @@ C56. Verification claims state their strength, never letting a weaker check borr
 
 C57. Scene 4 shows a discharge tier carried on a proof value, with an admitted law visible in the verdict and its assumption ledger. [inferred: R4]
 
-C58. Scene 5, `05-prover-loop.md`, walks through the prover loop: an obligation; a proposal; a verdict; recorded authorship. evidence: E11. [proposed: this IR]
+C58. Scene 5, `05-prover-loop.md`, walks through the prover loop: an obligation; a proposal; a verdict; recorded authorship. evidence: E11. [decided: owner, 2026-11-02]
 
-C59. In a run on 2026-11-02 over the two source lines of scene 5, `obligations --pending` printed the obligation `double_four` with the hash `0728a8d1`, as the scene shows. evidence: E12. [proposed: this IR]
+C59. In a run on 2026-11-02 over the two source lines of scene 5, `obligations --pending` printed the obligation `double_four` with the hash `0728a8d1`, as the scene shows. evidence: E12. [decided: owner, 2026-11-02]
 
-C60. In a run on 2026-11-02 over those two source lines, `propose` printed the failure reason "proof term establishes a different equality" with the scene's hint. evidence: E12. [proposed: this IR]
+C60. In a run on 2026-11-02 over those two source lines, `propose` printed the failure reason "proof term establishes a different equality" with the scene's hint. evidence: E12. [decided: owner, 2026-11-02]
 
-C61. `prove` refuses to run without the environment variable `ANTHROPIC_API_KEY`. evidence: E11, E12. [proposed: this IR]
+C61. `prove` refuses to run without the environment variable `ANTHROPIC_API_KEY`. evidence: E11, E12. [decided: owner, 2026-11-02]
 
-C62. `src/test/pcp.ts` pins the LLM worker's loop with a mock client: the client's term is spliced into the source, discharges the obligation, and records the mock model as the prover. evidence: E13. [proposed: this IR]
+C62. `src/test/pcp.ts` pins the LLM worker's loop with a mock client: the client's term is spliced into the source, discharges the obligation, and records the mock model as the prover. evidence: E13. [decided: owner, 2026-11-02]
 
-C63. Scene 5 states that partial evaluation alone discharges all ten closed propositions of the `npm run bench` corpus. evidence: E11, E14. [proposed: this IR]
+C63. Scene 5 states that partial evaluation alone discharges all ten closed propositions of the `npm run bench` corpus. evidence: E11, E14. [decided: owner, 2026-11-02]
 
 C64. Scene 5 shows the participant-neutral protocol as a walk-through, the suite pinning the worker loop with a mock client instead of the scene. [inferred: R5]
 
 ### Rung 2, a provable DSL [implemented]
 
-C65. Rung 2 is a units-of-measure DSL built as the library `lib/units.alg`, with three scenes. evidence: E15, E20. [proposed: this IR]
+C65. Rung 2 is a units-of-measure DSL built as the library `lib/units.alg`, with three scenes. evidence: E15, E20. [decided: owner, 2026-11-02]
 
-C66. The rung 2 README states that the DSL is built with zero host code. evidence: E15. [proposed: this IR]
+C66. The rung 2 README states that the DSL is built with zero host code. evidence: E15. [decided: owner, 2026-11-02]
 
-C67. Outside `src/test/`, the words quantity and planning occur in `src/` only in four comments. evidence: E28. [proposed: this IR]
+C67. Outside `src/test/`, the words quantity and planning occur in `src/` only in four comments. evidence: E28. [decided: owner, 2026-11-02]
 
-C68. `lib/units.alg` defines each named dimension as a refinement over one `Quantity` record, such as `Velocity     = Quantity & _.dim == velocity_dim`. evidence: E20. [proposed: this IR]
+C68. `lib/units.alg` defines each named dimension as a refinement over one `Quantity` record, such as `Velocity     = Quantity & _.dim == velocity_dim`. evidence: E20. [decided: owner, 2026-11-02]
 
-C69. Line 22 of `01-dimensions.alg` reads `print(error of bad)`, pinned by `// expect: cannot add m and s: length vs time`. evidence: E16. [proposed: this IR]
+C69. Line 22 of `01-dimensions.alg` reads `print(error of bad)`, pinned by `// expect: cannot add m and s: length vs time`. evidence: E16. [decided: owner, 2026-11-02]
 
-C70. The break-it block of rung 2's scene 1 passes a length where `speed` expects an `Acceleration`. evidence: E16. [proposed: this IR]
+C70. The break-it block of rung 2's scene 1 passes a length where `speed` expects an `Acceleration`. evidence: E16. [decided: owner, 2026-11-02]
 
-C71. In a run on 2026-11-02 with that break-it block uncommented, the file runner halted with "Type error: argument 0 failed refinement predicate for Acceleration". evidence: E6. [proposed: this IR]
+C71. In a run on 2026-11-02 with that break-it block uncommented, the file runner halted with "Type error: argument 0 failed refinement predicate for Acceleration". evidence: E6. [decided: owner, 2026-11-02]
 
-C72. `src/test/proofs.ts` pins the wrong-dimension halt as the anti-goal check that dimensional soundness flows through the standard refinement machinery. evidence: E21. [proposed: this IR]
+C72. `src/test/proofs.ts` pins the wrong-dimension halt as the anti-goal check that dimensional soundness flows through the standard refinement machinery. evidence: E21. [decided: owner, 2026-11-02]
 
 C73. Rung 2 meets the falsifiable design constraint for dimensional soundness: the check is refinement discharge, with no parallel infrastructure. [inferred: R6]
 
-C74. `lib/units.alg` declares the DSL's literal syntax in a twelve-line grammar block, `units_grammar`. evidence: E20. [proposed: this IR]
+C74. `lib/units.alg` declares the DSL's literal syntax in a twelve-line grammar block, `units_grammar`. evidence: E20. [decided: owner, 2026-11-02]
 
-C75. Line 12 of `02-literals.alg` reads `print((9.8 m/s^2).toString())`, pinned by `// expect: 9.8 m/s^2`. evidence: E17. [proposed: this IR]
+C75. Line 12 of `02-literals.alg` reads `print((9.8 m/s^2).toString())`, pinned by `// expect: 9.8 m/s^2`. evidence: E17. [decided: owner, 2026-11-02]
 
-C76. Line 25 of `02-literals.alg` reads `print(a + zz)`, pinned by `// expect: 8`, ordinary code untouched by the literal syntax. evidence: E17. [proposed: this IR]
+C76. Line 25 of `02-literals.alg` reads `print(a + zz)`, pinned by `// expect: 8`, ordinary code untouched by the literal syntax. evidence: E17. [decided: owner, 2026-11-02]
 
-C77. Line 10 of `03-laws.alg` reads `theorem km_scale: 1 km == 1000 m`. evidence: E18. [proposed: this IR]
+C77. Line 10 of `03-laws.alg` reads `theorem km_scale: 1 km == 1000 m`. evidence: E18. [decided: owner, 2026-11-02]
 
-C78. In a run on 2026-11-02, `verify` on `03-laws.alg` reported the four physics theorems discharged by auto-PE. evidence: E19. [proposed: this IR]
+C78. In a run on 2026-11-02, `verify` on `03-laws.alg` reported the four physics theorems discharged by auto-PE. evidence: E19. [decided: owner, 2026-11-02]
 
-C79. `Quantity` draws `Equatable` in `lib/units.alg`. evidence: E20. [proposed: this IR]
+C79. `Quantity` draws `Equatable` in `lib/units.alg`. evidence: E20. [decided: owner, 2026-11-02]
 
-C80. `03-laws.alg` admits the `trans` law of `Quantity` at line 27, with line 32's `print(p.lawTier)` pinned by `// expect: admitted`. evidence: E18. [proposed: this IR]
+C80. `03-laws.alg` admits the `trans` law of `Quantity` at line 27, with line 32's `print(p.lawTier)` pinned by `// expect: admitted`. evidence: E18. [decided: owner, 2026-11-02]
 
-C81. In a run on 2026-11-02, `verify` on `03-laws.alg` reported two algebraic laws of `Quantity` pending: `mul_comm`; `conv_roundtrip`. evidence: E19. [proposed: this IR]
+C81. In a run on 2026-11-02, `verify` on `03-laws.alg` reported two algebraic laws of `Quantity` pending: `mul_comm`; `conv_roundtrip`. evidence: E19. [decided: owner, 2026-11-02]
 
 C82. An Allegro surface inherits the entire kernel: types, proofs, effects, laws, counterexamples, the prover protocol. [decided: docs/book/vision.md §1, Substrate and surfaces]
 
@@ -258,7 +260,7 @@ C84. Rung 2 shows a narrow surface using five kernel mechanisms in its scenes: r
 
 ### Rung 3, a domain model that checks itself [implemented]
 
-C85. Rung 3 is a project-planning model built as the library `lib/planning.alg`, with two scenes. evidence: E24, E27. [proposed: this IR]
+C85. Rung 3 is a project-planning model built as the library `lib/planning.alg`, with two scenes. evidence: E24, E27. [decided: owner, 2026-11-02]
 
 C86. The planning DSL is the first domain model written in Allegro Vivace, a plan being a graph of outcomes rather than a list of tasks. [decided: docs/book/vivace/planning-dsl.md, Reader]
 
@@ -266,171 +268,171 @@ C87. Under the Vivace hypothesis, failures are build errors with counterexamples
 
 C88. Shape 1 is sufficient to test every claim of the Vivace hypothesis except execution. [decided: docs/book/vision.md §4]
 
-C89. `lib/planning.alg` declares the `plan NAME:` statement form in its grammar block `planning_grammar`, binding NAME with the type `WellFormedPlan`. evidence: E27. [proposed: this IR]
+C89. `lib/planning.alg` declares the `plan NAME:` statement form in its grammar block `planning_grammar`, binding NAME with the type `WellFormedPlan`. evidence: E27. [decided: owner, 2026-11-02]
 
-C90. `WellFormedPlan` is a refinement of `Plan` by the predicate `well_formed`, which answers an error value listing every finding. evidence: E27. [proposed: this IR]
+C90. `WellFormedPlan` is a refinement of `Plan` by the predicate `well_formed`, which answers an error value listing every finding. evidence: E27. [decided: owner, 2026-11-02]
 
-C91. Line 152 of `01-model.alg` reads `print(SoftwareRelease instanceof WellFormedPlan)`, pinned by `// expect: true`. evidence: E25. [proposed: this IR]
+C91. Line 152 of `01-model.alg` reads `print(SoftwareRelease instanceof WellFormedPlan)`, pinned by `// expect: true`. evidence: E25. [decided: owner, 2026-11-02]
 
-C92. Line 161 of `01-model.alg` pins the worst-case bound of `SoftwareRelease`: `duration 1345 min, effort 24 person-hours, money none`. evidence: E25. [proposed: this IR]
+C92. Line 161 of `01-model.alg` pins the worst-case bound of `SoftwareRelease`: `duration 1345 min, effort 24 person-hours, money none`. evidence: E25. [decided: owner, 2026-11-02]
 
-C93. Line 178 of `01-model.alg` reads `print(error of validate(with_budget(SoftwareRelease, effort_budget(person_hours(20)))))`. evidence: E25. [proposed: this IR]
+C93. Line 178 of `01-model.alg` reads `print(error of validate(with_budget(SoftwareRelease, effort_budget(person_hours(20)))))`. evidence: E25. [decided: owner, 2026-11-02]
 
-C94. Line 179 of `01-model.alg` pins the refusal: `SoftwareRelease is not well-formed: budget of SoftwareRelease: effort 24 person-hours exceeds 20 person-hours`. evidence: E25. [proposed: this IR]
+C94. Line 179 of `01-model.alg` pins the refusal: `SoftwareRelease is not well-formed: budget of SoftwareRelease: effort 24 person-hours exceeds 20 person-hours`. evidence: E25. [decided: owner, 2026-11-02]
 
-C95. The break-it block of rung 3's scene 1 changes the input of `Compile` to `Missing`, which no node produces. evidence: E25. [proposed: this IR]
+C95. The break-it block of rung 3's scene 1 changes the input of `Compile` to `Missing`, which no node produces. evidence: E25. [decided: owner, 2026-11-02]
 
-C96. With that change, the file runner halted on "refinement predicate failed for WellFormedPlan: BuildPipeline is not well-formed: input Missing of Compile is not produced by any node of BuildPipeline or by its inputs". evidence: E6. [proposed: this IR]
+C96. With that change, the file runner halted on "refinement predicate failed for WellFormedPlan: BuildPipeline is not well-formed: input Missing of Compile is not produced by any node of BuildPipeline or by its inputs". evidence: E6. [decided: owner, 2026-11-02]
 
-C97. `src/test/language.ts` pins the `plan` statement's halt on a plan that does not check, with the finding in planning vocabulary. evidence: E22. [proposed: this IR]
+C97. `src/test/language.ts` pins the `plan` statement's halt on a plan that does not check, with the finding in planning vocabulary. evidence: E22. [decided: owner, 2026-11-02]
 
 C98. Solution finding is search through the space the claims constrain. [decided: docs/book/vision.md §1a]
 
-C99. `solve` picks the resolution of a template that passes every check, the budget included, best by the bound's effort and then its duration. evidence: E26, E27. [proposed: this IR]
+C99. `solve` picks the resolution of a template that passes every check, the budget included, best by the bound's effort and then its duration. evidence: E26, E27. [decided: owner, 2026-11-02]
 
-C100. Line 143 of `02-solve.alg` pins the cheapest resolution: `Test via Quick, Deploy via Direct; bound effort 20.75 person-hours, duration 1460 min`. evidence: E26. [proposed: this IR]
+C100. Line 143 of `02-solve.alg` pins the cheapest resolution: `Test via Quick, Deploy via Direct; bound effort 20.75 person-hours, duration 1460 min`. evidence: E26. [decided: owner, 2026-11-02]
 
-C101. Line 162 of `02-solve.alg` pins the counterexample: `no choice of Test and Deploy fits the budget of SoftwareRelease; the cheapest, Test via Quick, Deploy via Direct, is duration 1460 min against 20 h`. evidence: E26. [proposed: this IR]
+C101. Line 162 of `02-solve.alg` pins the counterexample: `no choice of Test and Deploy fits the budget of SoftwareRelease; the cheapest, Test via Quick, Deploy via Direct, is duration 1460 min against 20 h`. evidence: E26. [decided: owner, 2026-11-02]
 
-C102. Line 186 of `02-solve.alg` pins a completion from a catalog: `Delivered from LastMile, Shipped from Ship, Labelled from Label; Label via PrintLabel; bound effort 1.75 person-hours, duration 235 min`. evidence: E26. [proposed: this IR]
+C102. Line 186 of `02-solve.alg` pins a completion from a catalog: `Delivered from LastMile, Shipped from Ship, Labelled from Label; Label via PrintLabel; bound effort 1.75 person-hours, duration 235 min`. evidence: E26. [decided: owner, 2026-11-02]
 
 C103. Rung 3 shows a domain model checked as a refinement, refused in planning vocabulary, solved over its choices and completed from a catalog. [inferred: R8]
 
 ### What the rungs inherit [implemented]
 
-C104. Rung 2's scenes use five mechanisms that rung 1's scenes show: refinements; theorems discharged by partial evaluation; error values; the strict gate; `Law.assume` with the admitted tier. evidence: E2, E5, E9, E16, E18. [proposed: this IR]
+C104. Rung 2's scenes use five mechanisms that rung 1's scenes show: refinements; theorems discharged by partial evaluation; error values; the strict gate; `Law.assume` with the admitted tier. evidence: E2, E5, E9, E16, E18. [decided: owner, 2026-11-02]
 
-C105. Rung 2's scenes declare no effect and run no prover loop. evidence: E16, E17, E18. [proposed: this IR]
+C105. Rung 2's scenes declare no effect and run no prover loop. evidence: E16, E17, E18. [decided: owner, 2026-11-02]
 
-C106. The rung 2 README lists the effects calculus and the prover loop among the mechanisms that rung 2 inherited. evidence: E15. [proposed: this IR]
+C106. The rung 2 README lists the effects calculus and the prover loop among the mechanisms that rung 2 inherited. evidence: E15. [decided: owner, 2026-11-02]
 
 C107. Rung 2 inherits the effects calculus and the prover loop by the README's statement only, no rung 2 scene exercising either mechanism. [inferred: R9]
 
-C108. Rung 3's scenes use three mechanisms that rung 2's scenes show: the duration literals of the units DSL, through `use units`; a refinement as a domain check; a library grammar block. evidence: E16, E17, E25, E27. [proposed: this IR]
+C108. Rung 3's scenes use three mechanisms that rung 2's scenes show: the duration literals of the units DSL, through `use units`; a refinement as a domain check; a library grammar block. evidence: E16, E17, E25, E27. [decided: owner, 2026-11-02]
 
-C109. Rung 3's `plan` statement halts on the refinement annotation path that rung 2's wrong-dimension call takes, each halt message beginning "Type error:" and naming the refinement. evidence: E6. [proposed: this IR]
+C109. Rung 3's `plan` statement halts on the refinement annotation path that rung 2's wrong-dimension call takes, each halt message beginning "Type error:" and naming the refinement. evidence: E6. [decided: owner, 2026-11-02]
 
-C110. Rung 3's scenes read refusals as error values through `error of`, a form that rung 1's scene 2 shows. evidence: E5, E25, E26. [proposed: this IR]
+C110. Rung 3's scenes read refusals as error values through `error of`, a form that rung 1's scene 2 shows. evidence: E5, E25, E26. [decided: owner, 2026-11-02]
 
-C111. Rung 3's scenes state no theorem, no law and no effect declaration. evidence: E25, E26. [proposed: this IR]
+C111. Rung 3's scenes state no theorem, no law and no effect declaration. evidence: E25, E26. [decided: owner, 2026-11-02]
 
-C112. `lib/planning.alg` activates the libraries `totality` and `units` through `use`. evidence: E27. [proposed: this IR]
+C112. `lib/planning.alg` activates the libraries `totality` and `units` through `use`. evidence: E27. [decided: owner, 2026-11-02]
 
-C113. The rung 3 README lists cross-file `uses` through `import` among the mechanisms that rung 3 inherited. evidence: E24. [proposed: this IR]
+C113. The rung 3 README lists cross-file `uses` through `import` among the mechanisms that rung 3 inherited. evidence: E24. [decided: owner, 2026-11-02]
 
-C114. Both rung 3 scenes borrow `BuildPipeline` within one file, the cross-file form being pinned by `tests/planning-split-demo.alg` instead. evidence: E25, E26, E22. [proposed: this IR]
+C114. Both rung 3 scenes borrow `BuildPipeline` within one file, the cross-file form being pinned by `tests/planning-split-demo.alg` instead. evidence: E25, E26, E22. [decided: owner, 2026-11-02]
 
 ### What is not shown or not delivered [partial]
 
 C115. Rung 4 is named in this chapter as direction, not as a claim. [decided: docs/plans/book-chapters-now.md R2, 2026-10-30]
 
-C116. The suite runs no part of `05-prover-loop.md` and no file under a rung's `transcripts/` directory. evidence: E30. [proposed: this IR]
+C116. The suite runs no part of `05-prover-loop.md` and no file under a rung's `transcripts/` directory. evidence: E30. [decided: owner, 2026-11-02]
 
 C117. The halts that the transcripts record are checked by hand, not by the suite. [inferred: R10]
 
-C118. Two halts of the scenes' kinds are pinned by tests outside the scenes: the wrong-dimension call in `src/test/proofs.ts`; the `plan` statement in `src/test/language.ts`. evidence: E21, E22. [proposed: this IR]
+C118. Two halts of the scenes' kinds are pinned by tests outside the scenes: the wrong-dimension call in `src/test/proofs.ts`; the `plan` statement in `src/test/language.ts`. evidence: E21, E22. [decided: owner, 2026-11-02]
 
-C119. In a run on 2026-11-02 following the break-it comment of `demos/rung2/03-laws.alg`, the file runner halted on "type_dispatch: 'lawTier' not found on Proof", not on the strict gate. evidence: E6. [proposed: this IR]
+C119. In a run on 2026-11-02 following the break-it comment of `demos/rung2/03-laws.alg`, the file runner halted on "type_dispatch: 'lawTier' not found on Proof", not on the strict gate. evidence: E6. [decided: owner, 2026-11-02]
 
-C120. `demos/rung2/transcripts/03-gate.txt` records the strict gate's refusal of `theorem bad` for that break-it comment. evidence: E38. [proposed: this IR]
+C120. `demos/rung2/transcripts/03-gate.txt` records the strict gate's refusal of `theorem bad` for that break-it comment. evidence: E38. [decided: owner, 2026-11-02]
 
-C121. The rung 1 README states that each scene holds a commented break-it block. evidence: E1. [proposed: this IR]
+C121. The rung 1 README states that each scene holds a commented break-it block. evidence: E1. [decided: owner, 2026-11-02]
 
-C122. `demos/rung1/01-discharge.alg` holds no break-it block. evidence: E2. [proposed: this IR]
+C122. `demos/rung1/01-discharge.alg` holds no break-it block. evidence: E2. [decided: owner, 2026-11-02]
 
-C123. `docs/book/getting-started.md` describes each rung 1 scene as carrying a break-it block with captured transcripts. evidence: E36. [proposed: this IR]
+C123. `docs/book/getting-started.md` describes each rung 1 scene as carrying a break-it block with captured transcripts. evidence: E36. [decided: owner, 2026-11-02]
 
-C124. Lines 8 and 9 of `demos/rung1/03-effects.alg` state that `inspect` shows `effects: pure (inferred)` for `square`. evidence: E7. [proposed: this IR]
+C124. Lines 8 and 9 of `demos/rung1/03-effects.alg` state that `inspect` shows `effects: pure (inferred)` for `square`. evidence: E7. [decided: owner, 2026-11-02]
 
-C125. In a run on 2026-11-02, `inspect` on `demos/rung1/03-effects.alg` printed no effects line for `square`. evidence: E8. [proposed: this IR]
+C125. In a run on 2026-11-02, `inspect` on `demos/rung1/03-effects.alg` printed no effects line for `square`. evidence: E8. [decided: owner, 2026-11-02]
 
-C144. `demos/rung1/transcripts/` holds transcripts for scenes 2, 3 and 4 only. evidence: E37. [proposed: this IR]
+C144. `demos/rung1/transcripts/` holds transcripts for scenes 2, 3 and 4 only. evidence: E37. [decided: owner, 2026-11-02]
 
-C126. The transcripts of rungs 1 and 2 open each halt with "Error:", where the file runner prints "Error in" followed by the file's path. evidence: E6, E38. [proposed: this IR]
+C126. The transcripts of rungs 1 and 2 open each halt with "Error:", where the file runner prints "Error in" followed by the file's path. evidence: E6, E38. [decided: owner, 2026-11-02]
 
-C127. The algebraic laws of `Quantity` stay pending because record-domain quantifiers have no sample construction. evidence: E20. [proposed: this IR]
+C127. The algebraic laws of `Quantity` stay pending because record-domain quantifiers have no sample construction. evidence: E20. [decided: owner, 2026-11-02]
 
-C128. B-089 (lawful-interface follow-ons) is the open backlog item that owns the sampled tier for record-domain quantifiers. evidence: E32. [proposed: this IR]
+C128. B-089 (lawful-interface follow-ons) is the open backlog item that owns the sampled tier for record-domain quantifiers. evidence: E32. [decided: owner, 2026-11-02]
 
-C129. The rung 3 README states that rung 3 shows one model, at pilot scale, as specification and checking only, which is Shape 1. evidence: E24. [proposed: this IR]
+C129. The rung 3 README states that rung 3 shows one model, at pilot scale, as specification and checking only, which is Shape 1. evidence: E24. [decided: owner, 2026-11-02]
 
-C130. The rung 3 README names three things rung 3 does not show: a plan executed; a second model composed with the first; an AI agent in the loop over the model. evidence: E24. [proposed: this IR]
+C130. The rung 3 README names three things rung 3 does not show: a plan executed; a second model composed with the first; an AI agent in the loop over the model. evidence: E24. [decided: owner, 2026-11-02]
 
-C131. B-082 (model composition patterns) is the open backlog item that owns the composition of models. evidence: E32. [proposed: this IR]
+C131. B-082 (model composition patterns) is the open backlog item that owns the composition of models. evidence: E32. [decided: owner, 2026-11-02]
 
-C132. B-083 (the AI iteration loop) is the open backlog item that owns an AI agent's loop over a model. evidence: E32. [proposed: this IR]
+C132. B-083 (the AI iteration loop) is the open backlog item that owns an AI agent's loop over a model. evidence: E32. [decided: owner, 2026-11-02]
 
-C133. No backlog item names Shape 2, in which Allegro would run a model. evidence: E33. [proposed: this IR]
+C133. No backlog item names Shape 2, in which Allegro would run a model. evidence: E33. [decided: owner, 2026-11-02]
 
-C134. The web pages' library registry in `scripts/sync-web-libs.ts` holds six libraries, `planning` not among them. evidence: E34. [proposed: this IR]
+C134. The web pages' library registry in `scripts/sync-web-libs.ts` holds six libraries, `planning` not among them. evidence: E34. [decided: owner, 2026-11-02]
 
-C135. Rung 3's website loop is not delivered: a landing section; a sandbox preset; `planning` in the web library registry. evidence: E31, E34. [proposed: this IR]
+C135. Rung 3's website loop is not delivered: a landing section; a sandbox preset; `planning` in the web library registry. evidence: E31, E34. [decided: owner, 2026-11-02]
 
-C136. B-093 (rung-3 packaging) is the open backlog item that owns rung 3's website loop, the deploy being the maintainer's. evidence: E31. [proposed: this IR]
+C136. B-093 (rung-3 packaging) is the open backlog item that owns rung 3's website loop, the deploy being the maintainer's. evidence: E31. [decided: owner, 2026-11-02]
 
 ### Where the demos are and what pins them [implemented]
 
-C137. `src/test/proofs.ts` registers the four `.alg` scenes of rung 1 and the three of rung 2 through `fileTest`. evidence: E21. [proposed: this IR]
+C137. `src/test/proofs.ts` registers the four `.alg` scenes of rung 1 and the three of rung 2 through `fileTest`. evidence: E21. [decided: owner, 2026-11-02]
 
-C138. `src/test/language.ts` registers the two scenes of rung 3 through `fileTest`. evidence: E22. [proposed: this IR]
+C138. `src/test/language.ts` registers the two scenes of rung 3 through `fileTest`. evidence: E22. [decided: owner, 2026-11-02]
 
-C139. `fileTest` runs a scene under Allegro Standard, comparing the printed lines in order with the scene's `// expect:` lines. evidence: E23. [proposed: this IR]
+C139. `fileTest` runs a scene under Allegro Standard, comparing the printed lines in order with the scene's `// expect:` lines. evidence: E23. [decided: owner, 2026-11-02]
 
-C140. A scene that halts, prints a different line or prints a different number of lines fails its `fileTest`. evidence: E23. [proposed: this IR]
+C140. A scene that halts, prints a different line or prints a different number of lines fails its `fileTest`. evidence: E23. [decided: owner, 2026-11-02]
 
-C141. In runs on 2026-11-02, the file runner printed exactly the `// expect:` lines of each of the nine `.alg` scenes, exiting with code 0. evidence: E29. [proposed: this IR]
+C141. In runs on 2026-11-02, the file runner printed exactly the `// expect:` lines of each of the nine `.alg` scenes, exiting with code 0. evidence: E29. [decided: owner, 2026-11-02]
 
-C142. `lib/units.alg` holds 246 lines, `lib/planning.alg` 1233. evidence: E20, E27. [proposed: this IR]
+C142. `lib/units.alg` holds 246 lines, `lib/planning.alg` 1233. evidence: E20, E27. [decided: owner, 2026-11-02]
 
-C143. `docs/book/implementation-map.md` lists `demos/rung1` and `demos/rung2` as suite-registered demo packages, with no row for `demos/rung3`. evidence: E35. [proposed: this IR]
+C143. `docs/book/implementation-map.md` lists `demos/rung1` and `demos/rung2` as suite-registered demo packages, with no row for `demos/rung3`. evidence: E35. [decided: owner, 2026-11-02]
 
 ### Clusters
 
-G1. cluster: C1, C2, C3, C4, C5, C6, C7 [proposed: this IR]
+G1. cluster: C1, C2, C3, C4, C145, C6, C7 [decided: owner, 2026-11-02]
 
-G2. cluster: C8, C9, C10, C11 [proposed: this IR]
+G2. cluster: C8, C9, C10, C11 [decided: owner, 2026-11-02]
 
-G3. cluster: C12, C13, C14, C15 [proposed: this IR]
+G3. cluster: C12, C13, C14, C15 [decided: owner, 2026-11-02]
 
-G4. cluster: C16, C17, C18, C19, C20, C21, C22, C23, C24 [proposed: this IR]
+G4. cluster: C16, C17, C18, C19, C20, C21, C22, C23, C24 [decided: owner, 2026-11-02]
 
-G5. cluster: C25, C26, C27, C28, C29 [proposed: this IR]
+G5. cluster: C25, C26, C27, C28, C29 [decided: owner, 2026-11-02]
 
-G6. cluster: C30, C31, C32, C33, C34, C35, C36, C37 [proposed: this IR]
+G6. cluster: C30, C31, C32, C33, C34, C35, C36, C37 [decided: owner, 2026-11-02]
 
-G7. cluster: C38, C39, C40, C41, C42 [proposed: this IR]
+G7. cluster: C38, C39, C40, C41, C42 [decided: owner, 2026-11-02]
 
-G8. cluster: C43, C44, C45, C46, C47, C48 [proposed: this IR]
+G8. cluster: C43, C44, C45, C46, C47, C48 [decided: owner, 2026-11-02]
 
-G9. cluster: C49, C50, C51, C52, C53, C54, C55, C56, C57 [proposed: this IR]
+G9. cluster: C49, C50, C51, C52, C53, C54, C55, C56, C57 [decided: owner, 2026-11-02]
 
-G10. cluster: C58, C59, C60, C61, C62, C63, C64 [proposed: this IR]
+G10. cluster: C58, C59, C60, C61, C62, C63, C64 [decided: owner, 2026-11-02]
 
-G11. cluster: C65, C66, C67, C68 [proposed: this IR]
+G11. cluster: C65, C66, C67, C68 [decided: owner, 2026-11-02]
 
-G12. cluster: C69, C70, C71, C72, C73 [proposed: this IR]
+G12. cluster: C69, C70, C71, C72, C73 [decided: owner, 2026-11-02]
 
-G13. cluster: C74, C75, C76 [proposed: this IR]
+G13. cluster: C74, C75, C76 [decided: owner, 2026-11-02]
 
-G14. cluster: C77, C78, C79, C80, C81, C82, C83, C84 [proposed: this IR]
+G14. cluster: C77, C78, C79, C80, C81, C82, C83, C84 [decided: owner, 2026-11-02]
 
-G15. cluster: C85, C86, C87, C88 [proposed: this IR]
+G15. cluster: C85, C86, C87, C88 [decided: owner, 2026-11-02]
 
-G16. cluster: C89, C90, C91, C92, C93, C94, C95, C96, C97 [proposed: this IR]
+G16. cluster: C89, C90, C91, C92, C93, C94, C95, C96, C97 [decided: owner, 2026-11-02]
 
-G17. cluster: C98, C99, C100, C101, C102, C103 [proposed: this IR]
+G17. cluster: C98, C99, C100, C101, C102, C103 [decided: owner, 2026-11-02]
 
-G18. cluster: C104, C105, C106, C107 [proposed: this IR]
+G18. cluster: C104, C105, C106, C107 [decided: owner, 2026-11-02]
 
-G19. cluster: C108, C109, C110, C111, C112, C113, C114 [proposed: this IR]
+G19. cluster: C108, C109, C110, C111, C112, C113, C114 [decided: owner, 2026-11-02]
 
-G20. cluster: C115, C116, C117, C118 [proposed: this IR]
+G20. cluster: C115, C116, C117, C118 [decided: owner, 2026-11-02]
 
-G21. cluster: C119, C120, C121, C122, C144, C123, C124, C125, C126 [proposed: this IR]
+G21. cluster: C119, C120, C121, C122, C144, C123, C124, C125, C126 [decided: owner, 2026-11-02]
 
-G22. cluster: C127, C128, C129, C130, C131, C132, C133, C134, C135, C136 [proposed: this IR]
+G22. cluster: C127, C128, C129, C130, C131, C132, C133, C134, C135, C136 [decided: owner, 2026-11-02]
 
-G23. cluster: C137, C138, C139, C140, C141, C142, C143 [proposed: this IR]
+G23. cluster: C137, C138, C139, C140, C141, C142, C143 [decided: owner, 2026-11-02]
 
 ## Relations
 
@@ -465,6 +467,8 @@ R14. C119 contradicts C120 because the recorded refusal does not come from follo
 R15. C26 supports C83 because a domain language with no host code of its own runs on the kernel alone (C82).
 
 R16. C27 supports C88 because rung 3 tests the hypothesis without executing a plan (C129).
+
+R17. C145 contradicts C5 because ruling R10 of `docs/plans/book-chapters-now.md` moved the definition sites of rung and demo ladder to II.19 after the owner ratified C5.
 
 ## Evidence
 
@@ -548,4 +552,8 @@ E38. `demos/rung1/transcripts/02-broken.txt` line 4, `03-broken.txt` line 4, `04
 
 A1. Ratify in bulk the proposed claims, every claim about the demos and the code as delivered and the six about this chapter's terms, reader, examples and scope: C5, C6, C7, C10, C11, C12, C13, C14, C15, C25, C26, C29, C30, C31, C32, C33, C34, C35, C36, C38, C39, C40, C41, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C58, C59, C60, C61, C62, C63, C65, C66, C67, C68, C69, C70, C71, C72, C74, C75, C76, C77, C78, C79, C80, C81, C85, C89, C90, C91, C92, C93, C94, C95, C96, C97, C99, C100, C101, C102, C104, C105, C106, C108, C109, C110, C111, C112, C113, C114, C116, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C135, C136, C137, C138, C139, C140, C141, C142, C143, C144. Depends: C5, C6, C7, C10, C11, C12, C13, C14, C15, C25, C26, C29, C30, C31, C32, C33, C34, C35, C36, C38, C39, C40, C41, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C58, C59, C60, C61, C62, C63, C65, C66, C67, C68, C69, C70, C71, C72, C74, C75, C76, C77, C78, C79, C80, C81, C85, C89, C90, C91, C92, C93, C94, C95, C96, C97, C99, C100, C101, C102, C104, C105, C106, C108, C109, C110, C111, C112, C113, C114, C116, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C135, C136, C137, C138, C139, C140, C141, C142, C143, C144.
 
+A1 resolved: ratified by the owner at the merge of PR #145, 2026-11-02; the statuses are flipped.
+
 A2. Ratify or strike the two proposed terms this chapter defines: rung (T1), anchored at `#def-rung`; demo ladder (T2), anchored at `#def-demo-ladder`. Depends: C5, C12, C14, C104, C108.
+
+A2 resolved: both terms ratified at the merge of PR #145, 2026-11-02; their definition sites moved to vivace/planning-dsl.md (II.19), which uses them first, and T1 and T2 link there.

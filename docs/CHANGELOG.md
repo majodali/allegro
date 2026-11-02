@@ -273,7 +273,7 @@ no owner item. The reading order's Part III entry for the chapter is
 now present, so no Part III entry is planned, and row III.2 of the table
 of contents names the chapter. Bare first-use identifiers 785 (`npm run lint:docs:check`, from 787:
 this entry names B-089 and B-082 above their older unnamed first uses;
-the baseline is not lowered here); unratified terms 2 in the chapter.
+the baseline is not lowered here); unratified terms 2 in the chapter. Merged as PR #145 on 2026-11-02 with defaults approved: the claims and both terms were ratified and flipped in a follow-up, the definition sites of *rung* and *demo ladder* moved to II.19 (`vivace/planning-dsl.md`), which uses them first, and the chapter's eight findings are filed as B-177 (the demo ladder chapter's findings).
 
 ### 2026-11 — The evaluator chapter's count: round 7 ruled not readable; the meta-review's defaults applied (B-170)
 

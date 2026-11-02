@@ -430,6 +430,8 @@ maintainer's instruction of the same day, *precompile* gets its own
 definition site before its first use in reading order
 (`docs/book/layers.md` §2).
 
+**R10 — The definition sites of rung and demo ladder.** Options: (a) II.19, the chapter that uses them first, as R9 kept §29 for the evalSource pipeline and the precompile move put the term before its first use; (b) III.2, with II.19's uses unlinked. **Taken: (a)**, 2026-11-02, the default of PR #145.
+
 ## 7. Record
 
 - **2026-10-30 — rulings taken, R8 decided.** R1 to R7 as recommended;
@@ -531,7 +533,7 @@ definition site before its first use in reading order
   plane is not a unit" names the spine's host plane, interpreter
   bookkeeping, where the chapter's unitless subject is M10's environment
   (C18, C20, C21). The ratification flip followed the merge in its own PR; the findings are filed as B-176 (the host chapter's findings) under the PR's default; row A4's phrase was corrected to cite M10 under the same default.
-- **2026-11-02 — A5 written, IR-only.** File: `docs/book/demo-ladder.ir.md`,
+- **2026-11-02 — A5 landed (PR #145, merged 2026-11-02), IR-only.** File: `docs/book/demo-ladder.ir.md`,
   Status `delivered IR-only` (144 claims, of which 108 proposed, 26
   decided and 10 inferred; 35 terms, of which 2 proposed; 23 clusters;
   16 relations; 38 evidence pointers). No prose and no rounds (§3.1).
@@ -560,4 +562,4 @@ definition site before its first use in reading order
   row for `demos/rung3` (C143); no chapter defines *pinned demo*, whose
   only anchor is this plan's *pinned example*; and the planning chapter
   (II.19) uses *rung* and *demo ladder* before this chapter defines them,
-  without a link, so the order lint cannot see it.
+  without a link, so the order lint cannot see it. The ratification flip followed in its own PR; R10 taken as (a), the definition sites moved to II.19; the findings are filed as B-177 (the demo ladder chapter's findings) under the PR's default.

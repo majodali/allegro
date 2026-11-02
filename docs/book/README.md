@@ -70,7 +70,7 @@ A term has one definition site, a heading preceded by
 | II.16 | `standard/totality.md` | Totality and termination |
 | II.17 | `standard/contracts.md` | Contracts and invariants |
 | II.18 | `vivace/README.md` | L3 boundary contract |
-| II.19 | `vivace/planning-dsl.md` | The planning DSL, the first Vivace pilot (rung 3): the outcome-graph model, the twelve conventions, the rejections, the `SoftwareRelease` example, what Allegro provides today, the well-formedness checks. Definition site of *plan*, *plan node*, *wiring*, *failure handler* |
+| II.19 | `vivace/planning-dsl.md` | The planning DSL, the first Vivace pilot (rung 3): the outcome-graph model, the twelve conventions, the rejections, the `SoftwareRelease` example, what Allegro provides today, the well-formedness checks. Definition site of *plan*, *plan node*, *wiring*, *failure handler*, *rung* and *demo ladder* |
 | II.20 | `platform/README.md` | Capability tracks; planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
 | II.21 | `platform/build-pipeline.ir.md` | The `pipeline` unit (33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, the phases and futures, the three moves the unit still owes; the multi-phase build surface tagged undesigned. As-implemented home of *the evalSource pipeline* (definition site: the spine's §29) (IR-only; rendered and reviewed at a later stage) |
 | II.22 | `platform/tooling.ir.md` | The `introspect` and `cli` units (34 and 35): the file runner and the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, the four diagnostic variables; tracing and the IDE integration tagged not built. Definition site of *safety grade* (IR-only; rendered and reviewed at a later stage) |
@@ -84,7 +84,7 @@ Planned under L2, revalidation-gated (backlog register): `standard/proofs.md`,
 | Order | Document | What it holds |
 |---|---|---|
 | III.1 | `proving-in-allegro.md` | The participant-neutral proving primer; loaded at runtime by the PCP LLM worker |
-| III.2 | `demo-ladder.ir.md` | The demo ladder and the rung-3 pilot: the three delivered rungs under `demos/` as the thesis test, what each rung shows, inherits and does not show, the scenes' pins in the suite; rung 4 named as direction only. Definition site of *rung* and *demo ladder* (IR-only; rendered and reviewed at a later stage) |
+| III.2 | `demo-ladder.ir.md` | The demo ladder and the rung-3 pilot: the three delivered rungs under `demos/` as the thesis test, what each rung shows, inherits and does not show, the scenes' pins in the suite; rung 4 named as direction only (IR-only; rendered and reviewed at a later stage) |
 
 ## Appendices: registers and records
 
