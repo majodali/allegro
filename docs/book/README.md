@@ -84,7 +84,7 @@ Planned under L2, revalidation-gated (backlog register): `standard/proofs.md`,
 | Order | Document | What it holds |
 |---|---|---|
 | III.1 | `proving-in-allegro.md` | The participant-neutral proving primer; loaded at runtime by the PCP LLM worker |
-| III.2 | *planned* | The demo ladder and the rung-3 pilot; today's content is the release-track plan, which is intent, not state |
+| III.2 | `demo-ladder.ir.md` | The demo ladder and the rung-3 pilot: the three delivered rungs under `demos/` as the thesis test, what each rung shows, inherits and does not show, the scenes' pins in the suite; rung 4 named as direction only. Definition site of *rung* and *demo ladder* (IR-only; rendered and reviewed at a later stage) |
 
 ## Appendices: registers and records
 

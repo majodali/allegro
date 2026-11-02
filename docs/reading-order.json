@@ -53,7 +53,7 @@
       "title": "The thesis test",
       "chapters": [
         { "doc": "docs/book/proving-in-allegro.md", "title": "Proving in Allegro" },
-        { "doc": null, "title": "The demo ladder and the rung-3 pilot", "status": "planned", "note": "today's content is the release-track plan, which is intent, not state" }
+        { "doc": "docs/book/demo-ladder.ir.md", "title": "The demo ladder and the rung-3 pilot" }
       ]
     },
     {
