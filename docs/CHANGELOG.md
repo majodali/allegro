@@ -214,6 +214,33 @@ Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
 2026-10-30 with the plan; entries newest first, directly below this
 line.
 
+### 2026-11 — The tooling chapter (B-170, chunk A3): IR-only
+
+Chunk A3 of B-170 (the book, Part II and III chapters writable now)
+writes the chapter for the `introspect` unit (34) and the `cli` unit
+(35) as its intermediate representation alone:
+`docs/book/platform/tooling.ir.md`, Status `delivered IR-only`, with no
+prose rendered and no stranger rounds until a later stage
+(`docs/plans/book-chapters-now.md` §3.1). It holds 170 claims in 26
+clusters (157 proposed, 10 decided, 3 inferred), 30 terms, 11 relations
+and 37 evidence pointers; every claim about the code as implemented is
+proposed with a file-and-line pointer or a dated run, for ratification
+in bulk at the PR. The chapter covers the entry point and its `--base`
+flag, the file runner, the REPL, the subcommands `inspect`, `verify`,
+`obligations`, `propose` and `prove`, the safety grades and the four
+diagnostic variables (`ALLEGRO_STACK`, `ALLEGRO_TRACE_DEPTH`,
+`ALLEGRO_PARSE_STATS`, `ALLEGRO_EVAL_STATS`). It defines *safety
+grade*, with its anchor in the chapter. Tracing and step-through
+debugging are stated as undesigned and not built, owned by B-064
+(execution tracing and step-through debugging); the IDE integration as
+not built, owned by B-067 (LSP and IDE integration). The reading order
+gains the chapter after the pipeline chapter, the table of contents
+gains row II.22, units 34 and 35's status cells name the chapter, and
+`docs/book/platform/README.md` links it. Bare first-use identifiers 790
+(`npm run lint:docs:check`, unchanged); unratified terms 1 in the
+chapter (*safety grade*; *the evalSource pipeline* and *precompile* link
+to their definition sites since ruling R9 (the definition site of the evalSource pipeline)).
+
 ### 2026-11 — R9 (the definition site of the evalSource pipeline) taken as option (a): §29 stays the definition site; §25's delta corrected (B-170)
 
 The maintainer took ruling R9 of PR #132 as option (a) on 2026-11-01. The spine's §29 in
