@@ -247,6 +247,29 @@ Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
 2026-10-30 with the plan; entries newest first, directly below this
 line.
 
+### 2026-11 — Stream A closes (B-170): the five chapters delivered, Part III complete in IR
+
+Stream A closes with B-170 (the book, Part II and III chapters writable
+now), its outcome met: the five chapters exist in reading order, each
+beside an intermediate representation that `npm run lint:ir` passes
+with no unratified term. The evaluator chapter
+`docs/book/allegretto/evaluator.md` is rendered and reviewed; the
+pipeline, tooling, host and demo ladder chapters are delivered IR-only.
+Each `docs/reading-order.json` entry is present with a `doc` path, each
+row of `docs/book/README.md` names its chapter, and `npm run
+lint:docs:check` reports anchors 0 and order 0, with bare first-use
+identifiers 785, down from 796 at the plan's measurement. The stream
+landed as PRs #129, #130, #132, #134, #135, #137, #138, #140, #141,
+#142, #144, #145 and the closing PR. Left: the evaluator chapter's count
+2 at its next edit, the rendering of the four IR-only chapters at a
+later stage, the findings items B-171 (the pipeline chapter's two
+findings), B-172 (the partial-evaluation rules as implemented against
+the spine), B-175 (the tooling chapter's findings), B-176 (the host
+chapter's findings) and B-177 (the demo ladder chapter's findings),
+three methodology proposals for the maintainer to file upstream, and
+B-174 (the book's existing chapters retrofitted to IR) as lane A's next
+stream. The plan's §7 closing entry checks the outcome clause by clause.
+
 ### 2026-11 — The demo ladder chapter (B-170, chunk A5): IR-only; Part III complete in IR
 
 Chunk A5 of B-170 (the book, Part II and III chapters writable now)

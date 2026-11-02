@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (B-170 (the book, Part II and III chapters writable now), plan `docs/plans/book-chapters-now.md`, 2026-10-30); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
+| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
@@ -2941,7 +2941,7 @@ table and the stream plans.
   - **Pointer**: [D52](decisions.md); `docs/plans/documentation-book.md`
     §4.2; `docs/plans/documentation-standards-delta.md` §5.
 
-- [ ] **B-170** (the book, Part II and III chapters writable now) ·
+- [x] **B-170** (the book, Part II and III chapters writable now) ·
   T-docs · **The planned chapters whose gate has passed.** Plan
   `docs/plans/book-chapters-now.md` (stream A, lane A, human-gated;
   filed 2026-10-30; rulings R1 to R7 taken and R8 (the chapters are
@@ -2957,7 +2957,15 @@ table and the stream plans.
   futures and the base primitives (their moves), codegen (B-072 (code
   generation)), proofs (B-052 (Lean export)). **Pointer**: D52 (the
   documentation book); `docs/plans/documentation-book.md` §4, Phase 2;
-  the plan's §6 rulings R1 to R7
+  the plan's §6 rulings R1 to R7. **CLOSED 2026-11-02** with stream A:
+  landed as PRs #129, #130, #132, #134, #135, #137, #138, #140, #141,
+  #142, #144, #145 and the closing PR; five chapters, the evaluator
+  rendered and reviewed and the other four IR-only, with the bare
+  first-use ids count from 796 to 785. Left: the evaluator chapter's
+  count 2 at its next edit, the rendering of the four IR-only chapters,
+  B-174 (the book's existing chapters retrofitted to IR) as the lane's
+  next stream, and the findings items B-171 (the pipeline chapter's two
+  findings), B-172, B-175, B-176 and B-177 (the plan's §7 closing entry)
 - [ ] **B-171** (the pipeline chapter's two findings) · T-docs · L0 ·
   **Two facts the evaluation pipeline chapter states that no item owns.**
   Filed by chunk A2 of B-170 (the book, Part II and III chapters writable

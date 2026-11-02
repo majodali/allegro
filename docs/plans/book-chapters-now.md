@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: active
+status: closed
 backlog: B-170
 lane: A
 merge: human-gated
@@ -20,16 +20,29 @@ boundary:
 
 # The book's chapters that are writable now — the book-chapters stream
 
-> **Status: active** (2026-10-30). Rulings R1 to R7 taken as
-> recommended and R8 decided by the maintainer on 2026-10-30: the five
-> chapters are written IR first under the methodology's W-009 (the
-> methodology corpus writes its deliverables IR first), adopted for them
-> in `docs/classification.md` §Rules adopted by declaration (§3.1 here).
-> The plan PR files this plan at `docs/plans/book-chapters-now.md`,
-> appends its row to `docs/plans/README.md`, creates `## Stream A — the
-> book chapters` in `docs/CHANGELOG.md` directly above `## Unstreamed`,
-> files the three backlog entries of §1, and names the stream in lane
-> A's row of the lane table (B-162 (conflict-free status documents)).
+> **Status: closed** (2026-11-02) — the chunk sequence of §5 is
+> complete and the §1 outcome is met: the five chapters exist in reading
+> order, each beside an intermediate representation that passes `npm run
+> lint:ir` with no unratified term; the evaluator is rendered and
+> reviewed, the other four are delivered IR-only; and `npm run
+> lint:docs:check` reports anchors 0 and order 0 (§7, the closing
+> entry). Rulings R1 to R7 were taken as recommended and R8 decided by
+> the maintainer on 2026-10-30: the five chapters are written IR first
+> under the methodology's W-009 (the methodology corpus writes its
+> deliverables IR first), adopted for them in `docs/classification.md`
+> §Rules adopted by declaration (§3.1 here). R9 and R10 were taken as
+> option (a) at the merges of PR #132 and PR #145. The plan PR filed this
+> plan, appended its row to `docs/plans/README.md`, created `## Stream A
+> — the book chapters` in `docs/CHANGELOG.md`, filed the three backlog
+> entries of §1 and named the stream in lane A's row of the lane table
+> (B-162 (conflict-free status documents)). The stream ran human-gated,
+> one PR per chunk and one ratification PR after each, from PR #129 to
+> the closing PR. It closes with B-170 (the book, Part II and III
+> chapters writable now); the reserves B-171 (the pipeline chapter's two
+> findings) and B-172 (the partial-evaluation rules as implemented
+> against the spine) were used for findings and stay open. Kept for its
+> §7 record. The status line and the header's `status` say the same
+> thing.
 >
 > **Reader**: a session that will write the chapters, and the maintainer
 > gating them. Assumed known: the four layers and the capability tracks
@@ -563,3 +576,76 @@ definition site before its first use in reading order
   only anchor is this plan's *pinned example*; and the planning chapter
   (II.19) uses *rung* and *demo ladder* before this chapter defines them,
   without a link, so the order lint cannot see it. The ratification flip followed in its own PR; R10 taken as (a), the definition sites moved to II.19; the findings are filed as B-177 (the demo ladder chapter's findings) under the PR's default.
+- **2026-11-02 — The stream closes.** The outcome of §1, clause by
+  clause, from the records above and the lints run on this branch:
+  - **The five chapters exist, written IR first.** A1:
+    `docs/book/allegretto/evaluator.md`, rendered from
+    `allegretto/evaluator.ir.md` and reviewed in stranger rounds
+    (`allegretto/evaluator.review.md`); count 1 stopped at round 7, which
+    the meta-review ruled not readable (PR #138, its defaults applied in
+    PR #141), and count 2 runs at the chapter's next edit. A2 to A5 are
+    the IRs themselves, delivered IR-only (§3.1):
+    `platform/build-pipeline.ir.md`, `platform/tooling.ir.md`,
+    `platform/host.ir.md` and `demo-ladder.ir.md`, all under
+    `docs/book/`.
+  - **Each IR passes `npm run lint:ir`.** "ir-lint: 5 file(s) via
+    /home/user/majodali/methodology-tools: clean", with "unratified
+    terms: 0": the five terms the stream proposed (*tail call*, *the
+    evalSource pipeline*, *safety grade*, *rung*, *demo ladder*) are
+    ratified.
+  - **Each reading-order entry is `present` with a `doc` path.**
+    `docs/reading-order.json` lines 30 (`docs/book/allegretto/evaluator.md`),
+    46 (`docs/book/platform/build-pipeline.ir.md`), 47
+    (`docs/book/platform/tooling.ir.md`), 48
+    (`docs/book/platform/host.ir.md`) and 56
+    (`docs/book/demo-ladder.ir.md`), none with `status: planned`. The three
+    entries still planned (lines 27, 29 and 31: the kinds, scope, futures
+    and the base primitives) wait on gates that have not passed (§2.2),
+    so no `planned` entry is left whose gate has passed.
+  - **Each README row names the chapter.** `docs/book/README.md` rows
+    II.6 (`allegretto/evaluator.md`), II.21, II.22, II.23 and III.2, the
+    last four marked "IR-only; rendered and reviewed at a later stage".
+  - **The spine entries absorbed are pointers.** §27 (tail calls) of
+    `docs/book/concepts.md` is a pointer to the evaluator chapter's §5
+    (A1). §29 (the evalSource pipeline) stays the definition site under
+    R9, its "As implemented" line pointing to
+    `platform/build-pipeline.ir.md`. §25 (partial evaluation) keeps its
+    definition, its as-implemented row pointing to the evaluator
+    chapter's §3 under R4. A3, A4 and A5 absorb no spine entry; A5's two
+    terms are defined in II.19 under R10.
+  - **The doc lints.** `npm run lint:docs:check`: "doc-lint: anchors 0 ·
+    order 0 · ids 785 — gate passed". The ids count fell from 796 at the
+    plan's measurement (§2.1) to 785; the baseline is not lowered here.
+
+  The PRs, all merged: #129 (A1, the evaluator chapter, seven stranger
+  rounds, B-172 filed); #130 (A1's ratification flip); #132 (A2, the
+  pipeline chapter IR-only, B-171 filed); #134 (A2's flip); #135 (R9
+  taken as (a): the spine keeps §29, *precompile* defined in
+  `docs/book/layers.md` §2); #137 (A3, the tooling chapter IR-only);
+  #138 (the meta-review of the evaluator chapter's count 1, and lane P
+  holding the pipeline chapter for its re-sync); #140 (A3's flip, B-175
+  minted); #141 (the meta-review's defaults: round 7 ruled not
+  readable); #142 (A4, the host chapter IR-only); #144 (A4's flip,
+  B-176 minted); #145 (A5, the demo ladder chapter IR-only); and the
+  closing PR (A5's flip, R10, B-177 minted, this entry). PR #143 flipped
+  the pipeline chapter's re-synced claims for B-159 (precompile of
+  recursive definitions), stream P's item, not this stream's.
+
+  What the stream leaves, none of it proposed here:
+  - The evaluator chapter's count 2, at its next edit, which three
+    unfixed defects named in `allegretto/evaluator.review.md` require:
+    round 7's finding 2, touch-up edit A, and the excess in the C172
+    sentence.
+  - The rendering and review of the four IR-only chapters at a later
+    stage that the maintainer schedules; their README rows say so.
+  - The findings, each with its owner: B-171 (the pipeline chapter's two
+    findings), lane K for the unit's moves and lane D for the halt rule;
+    B-172 (the partial-evaluation rules as implemented against the
+    spine), the code question for lane D or lane A; B-175 (the tooling
+    chapter's findings), lane C with items 7 and 11 in lane K; B-176 (the
+    host chapter's findings), lane C; B-177 (the demo ladder chapter's
+    findings), lane D, with the demos in no lane.
+  - The meta-review's recommendations 2, 3 and 7, three methodology
+    proposals that the maintainer files in the methodology repository.
+  - B-174 (the book's existing chapters retrofitted to IR), the next
+    stream of lane A.
