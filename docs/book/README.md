@@ -74,6 +74,7 @@ A term has one definition site, a heading preceded by
 | II.20 | `platform/README.md` | Capability tracks; planned as designed: `build-pipeline.md`, `tooling.md`, `host.md`, `codegen.md` |
 | II.21 | `platform/build-pipeline.ir.md` | The `pipeline` unit (33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, the phases and futures, the three moves the unit still owes; the multi-phase build surface tagged undesigned. As-implemented home of *the evalSource pipeline* (definition site: the spine's §29) (IR-only; rendered and reviewed at a later stage) |
 | II.22 | `platform/tooling.ir.md` | The `introspect` and `cli` units (34 and 35): the file runner and the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, the four diagnostic variables; tracing and the IDE integration tagged not built. Definition site of *safety grade* (IR-only; rendered and reviewed at a later stage) |
+| II.23 | `platform/host.ir.md` | The T-host track, which has no unit: the Node CLI and the browser sandbox as host environments, the environment capabilities `print`, `delay` and `fetch` with the future manager, the browser-compatible core, the deployed site; the environment-capability contract cited from `allegretto/structures.md` §11; asynchronous I/O capabilities and browser packaging tagged not built (IR-only; rendered and reviewed at a later stage) |
 
 Planned under L2, revalidation-gated (backlog register): `standard/proofs.md`,
 `standard/pcp.md`.
