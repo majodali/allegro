@@ -1,6 +1,6 @@
 # The planning DSL: the first Vivace pilot
 
-> **Reader.** Someone who will build or review the rung-3 pilot: the
+> **Reader.** Someone who will build or review the [rung](#def-rung)-3 pilot: the
 > first domain model written in Allegro Vivace, a planning language in
 > which a plan is a graph of outcomes rather than a list of tasks. The
 > chapter is the design truth for that language. It states the model,
@@ -12,12 +12,21 @@
 > [effect](../concepts.md#def-effect), the layer model in `../layers.md`
 > and the L3 contract in `README.md`.
 >
+> <a id="def-rung"></a>**Rung**: a demo package under `demos/`,
+> numbered from 1: a README naming what each scene shows, runnable
+> scenes the suite runs against their `// expect:` lines, transcripts of
+> halted builds.
+>
+> <a id="def-demo-ladder"></a>**Demo ladder**: the rungs in the order
+> of their numbers, the scenes of each rung using mechanisms that the
+> scenes of a lower rung show.
+>
 > **Authority.** Tier 1. This chapter is the revalidation (B-079) of the
 > archived v1 design `docs/plans/archive/project-1-planning-dsl-design.md`
 > against `docs/book/allegretto/structures.md` and the code as of
 > 2026-10-25. Every pinned decision below was re-checked; where the code
 > has moved since the archive was written, the chapter says so. The
-> rung it serves is rung 3 of the demo ladder
+> rung it serves is rung 3 of the [demo ladder](#def-demo-ladder)
 > (`docs/plans/release-track.md` §5); the work plan is
 > `docs/plans/planning-pilot.md`. Each section carries the status tag
 > `../README.md` defines.

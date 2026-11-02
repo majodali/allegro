@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (B-170 (the book, Part II and III chapters writable now), plan `docs/plans/book-chapters-now.md`, 2026-10-30); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
+| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); next B-174 (the book's existing chapters retrofitted to IR) as the lane's next stream; then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
@@ -983,6 +983,7 @@ table and the stream plans.
     library parses in about 40 s on node: B-153 (re-evaluation per
     reference), B-155 (library load per module)); deploy is the
     maintainer's.
+- **See also B-177** (the demo ladder chapter's findings), filed after B-176: eight defects in the demos, their documentation and their pins, among them a rung 2 break-it comment that does not reproduce its transcript (B-093 packages rung 3).
 
 ### Track M — methodology (2026-08)
 
@@ -2940,7 +2941,7 @@ table and the stream plans.
   - **Pointer**: [D52](decisions.md); `docs/plans/documentation-book.md`
     §4.2; `docs/plans/documentation-standards-delta.md` §5.
 
-- [ ] **B-170** (the book, Part II and III chapters writable now) ·
+- [x] **B-170** (the book, Part II and III chapters writable now) ·
   T-docs · **The planned chapters whose gate has passed.** Plan
   `docs/plans/book-chapters-now.md` (stream A, lane A, human-gated;
   filed 2026-10-30; rulings R1 to R7 taken and R8 (the chapters are
@@ -2956,7 +2957,15 @@ table and the stream plans.
   futures and the base primitives (their moves), codegen (B-072 (code
   generation)), proofs (B-052 (Lean export)). **Pointer**: D52 (the
   documentation book); `docs/plans/documentation-book.md` §4, Phase 2;
-  the plan's §6 rulings R1 to R7
+  the plan's §6 rulings R1 to R7. **CLOSED 2026-11-02** with stream A:
+  landed as PRs #129, #130, #132, #134, #135, #137, #138, #140, #141,
+  #142, #144, #145 and the closing PR; five chapters, the evaluator
+  rendered and reviewed and the other four IR-only, with the bare
+  first-use ids count from 796 to 785. Left: the evaluator chapter's
+  count 2 at its next edit, the rendering of the four IR-only chapters,
+  B-174 (the book's existing chapters retrofitted to IR) as the lane's
+  next stream, and the findings items B-171 (the pipeline chapter's two
+  findings), B-172, B-175, B-176 and B-177 (the plan's §7 closing entry)
 - [ ] **B-171** (the pipeline chapter's two findings) · T-docs · L0 ·
   **Two facts the evaluation pipeline chapter states that no item owns.**
   Filed by chunk A2 of B-170 (the book, Part II and III chapters writable
@@ -3129,6 +3138,61 @@ table and the stream plans.
   role edits the IR when the code changes. **Pointer**:
   `docs/book/platform/host.ir.md`; the plan's §7 A4 bullet,
   `docs/plans/book-chapters-now.md`
+- [ ] **B-177** (the demo ladder chapter's findings) · Track R · T-docs ·
+  lane D (`src/test/`; `docs/book/` lies in lanes A and D, and `demos/`
+  in no lane of `scripts/analyze/lanes.json`) · **Eight defects in the
+  demos, their documentation and their pins that the demo ladder
+  chapter's IR records and no item owned.** Found by chunk A5 of B-170
+  (the book, Part II and III chapters writable now), the demo ladder
+  chapter `docs/book/demo-ladder.ir.md`, while running every scene
+  against its README and transcripts; filed here under the default of PR
+  #145, approved on 2026-11-02. Each line names the defect, its file and
+  lines, the IR claims that state it and the evidence:
+  1. The break-it comment of `demos/rung2/03-laws.alg` (lines 19–26) does
+     not reproduce `demos/rung2/transcripts/03-gate.txt`: with the
+     `Law.assume` removed and `theorem bad` uncommented, the run halts
+     first on "type_dispatch: 'lawTier' not found on Proof", not on the
+     strict gate that the transcript records (lines 1–5); claims C119,
+     C120; evidence E6, E18, E38.
+  2. The rung 1 README (`demos/rung1/README.md` lines 21–22) and
+     `docs/book/getting-started.md` lines 91 to 93 say that every rung 1
+     scene has a break-it block with captured transcripts, but
+     `demos/rung1/01-discharge.alg` has none, and scenes 1 and 5 have no
+     transcript under `demos/rung1/transcripts/`; claims C121, C122,
+     C123, C144; evidence E1, E2, E36, E37.
+  3. Lines 8 to 9 of `demos/rung1/03-effects.alg` say that `inspect`
+     prints `effects: pure (inferred)` for `square`, which `inspect`
+     does not print; claims C124, C125; evidence E7, E8.
+  4. The rung 1 and rung 2 transcripts begin each halt with "Error:",
+     where the file runner now prints "Error in" followed by the file's
+     path (`demos/rung1/transcripts/02-broken.txt` line 4,
+     `03-broken.txt` line 4, `04-gate.txt` line 5,
+     `demos/rung2/transcripts/01-halt.txt` line 4, `03-gate.txt` line
+     4); claim C126; evidence E6, E38.
+  5. The suite reads no file under a rung's `transcripts/` directory and
+     nothing of `demos/rung1/05-prover-loop.md`, so the halts those files
+     record are reproduced only by hand and can drift unseen
+     (`src/test/proofs.ts` line 759 and `src/test/language.ts` line 689
+     name the transcripts without reading them); claims C116, C117;
+     evidence E30.
+  6. `docs/book/implementation-map.md` line 114 lists `demos/rung1` and
+     `demos/rung2` with no row for `demos/rung3`, and the `language.ts`
+     row (line 67) does not name the rung 3 demos it registers; claim
+     C143; evidence E22, E35.
+  7. No backlog item owns Shape 2, in which Allegro would run a model;
+     `docs/backlog.md`; claim C133; evidence E33.
+  8. No chapter defines *pinned demo*; the demo ladder chapter describes
+     the pins in plain words (claims C137 to C141); evidence E21, E22,
+     E23.
+
+  Re-checked 2026-11-02 on the branch: the files still show every defect
+  (items 1 to 4 and 6 by re-reading the cited lines of the demos, the
+  transcripts, `getting-started.md` and `implementation-map.md`; items 5,
+  7 and 8 by searching `src/`, `scripts/`, `bench/`, `docs/backlog.md`
+  and `docs/book/`; no scene or command was re-run). Each fix re-proposes the claim that
+  states the defect; the chapter's reasoning role edits the IR when the
+  code changes. **Pointer**: `docs/book/demo-ladder.ir.md`; the plan's §7
+  A5 bullet, `docs/plans/book-chapters-now.md`
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations
