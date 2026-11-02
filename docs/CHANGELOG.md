@@ -302,6 +302,7 @@ gains row II.22, units 34 and 35's status cells name the chapter, and
 (`npm run lint:docs:check`, unchanged); unratified terms 1 in the
 chapter (*safety grade*; *the evalSource pipeline* and *precompile* link
 to their definition sites since ruling R9 (the definition site of the evalSource pipeline)).
+Merged as PR #137 on 2026-11-02; the IR's proposed claims and the term were ratified by the merge, and a follow-up flipped their statuses to decided; the chapter's findings are filed as B-175 (the tooling chapter's findings) on the maintainer's instruction.
 
 ### 2026-11 — R9 (the definition site of the evalSource pipeline) taken as option (a): §29 stays the definition site; §25's delta corrected (B-170)
 
