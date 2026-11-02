@@ -247,6 +247,35 @@ Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
 2026-10-30 with the plan; entries newest first, directly below this
 line.
 
+### 2026-11 — The host environments chapter (B-170, chunk A4): IR-only
+
+Chunk A4 of B-170 (the book, Part II and III chapters writable now)
+writes the chapter for the T-host track as its intermediate
+representation alone: `docs/book/platform/host.ir.md`, Status
+`delivered IR-only`, with no prose rendered and no stranger rounds
+until a later stage (`docs/plans/book-chapters-now.md` §3.1). It holds
+140 claims in 24 clusters (114 proposed, 20 decided, 6 inferred), 16
+terms, 13 relations and 33 evidence pointers; every claim about the code
+as implemented is proposed with a file-and-line pointer or a dated run,
+for ratification in bulk at the PR. The chapter covers the Node CLI
+(`src/index.ts`) and the browser sandbox (`web/allegro-web.ts`, the
+pages under `website/`, `deploy.sh`) as host environments, the
+environment capabilities `print`, `delay` and `fetch` with the future
+manager of `src/futures.ts`, and the browser-compatible core. It cites
+the environment-capability contract of `docs/book/allegretto/structures.md`
+§11 under D27 (the minimal base surface) and defines no term. The T-host
+track has no unit row, as `docs/book/units.md` records in
+M10 (the environment has no unit). Asynchronous I/O capabilities are
+stated as not built, owned by B-071 (async I/O capabilities); browser
+packaging as not built, owned by B-070 (browser runtime packaging); the
+missing Environment interface stays with B-141 (there is no Environment
+interface). The reading order gains the chapter after the tooling
+chapter, the table of contents gains row II.23, and
+`docs/book/platform/README.md` links it. Bare first-use identifiers 788
+(`npm run lint:docs:check`, from 790: this entry names two identifiers
+above their older unnamed first uses; the baseline is not lowered here);
+unratified terms 0 in the chapter.
+
 ### 2026-11 — The tooling chapter (B-170, chunk A3): IR-only
 
 Chunk A3 of B-170 (the book, Part II and III chapters writable now)
