@@ -662,3 +662,89 @@ plan's recommendation and the ruling taken.
     the table's four count columns. The section was created in its own
     last commit, on a branch up to date with `origin/main`. The load
     section is unchanged.
+- **2026-11-01 — R3 landed.** The candidate is taken: the counters show
+  it. The evaluation loop no longer precompiles a top-level literal that
+  the [precompile pass](#def-precompile-pass) covered.
+  - **The skip, as built.** `src/primitives.ts:1915` holds a WeakSet of
+    the literals the pass covered, filled through `markPrecompiledByPass`
+    (`:1919`). `typed_function_impl`'s F3b precompile skips a literal in
+    it (`:2189`). The pass marks a definition's literal after its own
+    precompile of the definition succeeds (`src/runtime.ts:841`). The
+    literal comes from `analyzeDivergence`'s `stampTargets`, the object
+    the evaluation hands `typed_function_impl`. `evalSource` passes that
+    map only for a program's compilation (`src/runtime.ts:1404`).
+  - **What it covers and what it leaves.** Covered: each top-level
+    definition of a typed program. Left as before: a lambda nested in a
+    body (the pass precompiles only top-level definitions), an untyped
+    program (`--base`: no pass, no map), a module's load (a library
+    loaded once per process; its precompile runs once per process, not
+    once per program), and a definition whose precompile in the pass
+    failed. The F3b precompile inside the pass stays: it writes the
+    literal's `inferredEffects`, which the declaration check reads. An
+    effectful or diverging literal skipped the evaluation-time precompile
+    already, since its `inferredEffects` is set. So the saving is one
+    precompile per pure top-level definition.
+  - **Counts.** `tests/totality-termination-demo.alg` alone, three runs,
+    identical: `evaluate` 694 to 631, `applyComposed` 41 to 39,
+    `applyPrimitive` 152 to 138, `cutoffResiduals` 6 to 4, `precompiles`
+    9 to 6, most evaluations of one binding 4 to 3; stdout `120`, `55`,
+    `49`; 0.76 to 0.89 s per run before and 0.73 to 0.86 s after,
+    timed with process start, which dominates. The corpus through `npm run bench:load`:
+
+    | Source | `evaluate` R2 | R3 | `precompiles` R2 | R3 | `cutoffResiduals` R2 | R3 |
+    |---|---|---|---|---|---|---|
+    | `factorial-nonneg.alg` | 102 | 74 | 3 | 2 | 3 | 2 |
+    | `factorial-int.alg` | 62 | 62 | 2 | 2 | 2 | 2 |
+    | `f-decreases.alg` | 89 | 62 | 3 | 2 | 3 | 2 |
+    | `k-lex.alg` | 96 | 67 | 3 | 2 | 3 | 2 |
+    | `sum_to.alg` | 102 | 74 | 3 | 2 | 3 | 2 |
+    | `bad.alg` | 32 | 32 | 2 | 2 | 2 | 2 |
+    | `tests/totality-termination-demo.alg` | 694 | 631 | 9 | 6 | 6 | 4 |
+    | `tests/totality-decreases-demo.alg` | 31,270 | 31,182 | 6 | 4 | 3 | 2 |
+
+    `inlineExpansions` stays 0 everywhere. `factorial-int.alg` and
+    `bad.alg` hold: their definition diverges, so the divergence stamp
+    sets its `inferredEffects` and the evaluation skipped it before R3.
+    The `evaluate` values are the experiment's of R2. All four counts
+    were identical over three CLI runs per source. The load corpus's
+    counts are unchanged, including the 245 cutoff residuals of
+    `lib/planning.alg`, which are a module load's.
+  - **The fallen floor.** `cutoffResiduals` is a floor in the baseline:
+    `npm run lint:load` fails when it falls. It fell for six sources.
+    The residuals lost are the ones the skipped precompile made: with a
+    probe on the installed cutoff, every residual left in the corpus is
+    an identity hit on a bound object, and none comes from the body test.
+    So no call stopped being recognised; the calls are no longer made.
+    The baseline lowers the floor to the new values with the gated
+    counts. The baseline's own note allows a floor only to rise; the
+    maintainer confirms this reading at this PR.
+  - **Outputs** (RR2). 68 programs, each through the CLI with `run` and
+    `inspect`: 136 runs, 136 identical in stdout, stderr (stats lines
+    stripped) and exit code. No report differs.
+  - **Verdicts.** R1's `VERDICT_PIN` passes untouched; R2's guard and
+    regression tests pass.
+  - **Test** (`src/test/totality.ts`). "B-159 R3 regression: the
+    evaluation does not precompile a top-level literal the pass covered":
+    one pure definition makes 2 precompiles, and the termination demo 6.
+    It failed on the parent commit (3). `precompiles` does not depend on
+    an earlier compilation in the process.
+  - **The gate**, `npm run test:shards`: shards of 16.7 s, 13.4 s and
+    10.1 s before (16.7 s of wall clock, 40.2 s of work), 17.5 s, 13.8 s
+    and 10.2 s after (17.5 s, 41.5 s). The difference is noise: at these
+    sizes the saving does not show in wall clock.
+  - **The baseline** (B-164). The `precompile` section of
+    `bench/load-baseline.json` takes the table's R3 columns, in its own
+    last commit, on a branch up to date with `origin/main`. The load
+    section is unchanged.
+  - **What is left.** Of §2.5's list, the re-evaluation per reference is
+    gone since R2 and the evaluation-time precompile since R3. Nothing
+    measurable remains at these sizes. The pass still precompiles each
+    top-level definition twice, once as F3b on the literal (for its
+    effects) and once as the pass's own on the typed function (for its
+    return type), and a recursive definition is evaluated a second time
+    re-entrantly while it is first bound (R2). Each costs one
+    precompile or one evaluation per definition. Removing the first would
+    change which object the declaration check reads its effects from
+    (`src/effects.ts`, outside this stream's boundary); removing the
+    second would change how R2 binds the first-built object. Neither is
+    proposed.
