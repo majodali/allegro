@@ -80,6 +80,8 @@ T35. Precompile, the stage of the evalSource pipeline that partially evaluates e
 
 T36. Post-pass, a check of the evalSource pipeline that runs after precompile or after the evaluation loop. defined-at: ../concepts.md#def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
 
+T37. Definition entry, the precompile context's entry for a function definition: evaluated once at the first lookup, binding the object that every later lookup returns. anchor: #def-definition-entry [decided: owner, 2026-11-02]
+
 ## Claims
 
 ### Reader and authority
@@ -256,7 +258,7 @@ C79. Precompile records three error-severity notification kinds without halting:
 
 C80. A function whose declared return type differs from the function's inferred return type halts compilation only when the evaluation applies the function. evidence: E16, E24, E39. [decided: owner, 2026-11-01]
 
-### Precompile [implemented]
+### <a id="def-definition-entry"></a>Precompile [implemented]
 
 C81. `precompileFunctions` returns an empty compilation report when the `typed` flag is unset. evidence: E15. [decided: owner, 2026-11-01]
 
@@ -636,4 +638,4 @@ A2 resolved: ratified by the owner at the merge of PR #132, 2026-11-01. Ruling R
 
 A3. Ratify in bulk the re-synced claims about the precompile context, the inline cutoff and the skipped F3b inline-lambda precompile, as chunks R2 and R3 of B-159 left the code, with their clusters G29, G30 and G31: C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170, C171, C172, C173, C174. Depends: C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170, C171, C172, C173, C174.
 
-A3 resolved: ratified at the merge of PR #139, 2026-11-02; the statuses are flipped.
+A3 resolved: ratified at the merge of PR #139, 2026-11-02; the statuses are flipped. The term *definition entry* gained its T element and definition site (T37) at the flip.
