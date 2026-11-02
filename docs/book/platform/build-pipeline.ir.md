@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `pipeline` unit (unit 33): the stage order of `evalSource`, what each stage may assume, the post-passes that halt, precompile, the phases and futures as far as `evalSource` drives them, and the three moves the unit still owes.
-Status: delivered IR-only (ratified at the merge of PR #132, 2026-11-01; unratified terms 0; footprint: declared 10, changed 10, surprises 0, misses 0; edited 2026-11-01: the precompile context and cutoff re-synced after B-159's R2 and R3 (claims C160 to C175; C99, C101 and C103 removed; evidence re-pointed to the current lines), unratified terms 0)
+Status: delivered IR-only (ratified at the merge of PR #132, 2026-11-01; unratified terms 0; footprint: declared 10, changed 10, surprises 0, misses 0; edited 2026-11-01: the precompile context and cutoff re-synced after B-159's R2 and R3 (claims C160 to C175; C99, C101 and C103 removed; evidence re-pointed to the current lines), unratified terms 0, ratified at the merge of PR #139, 2026-11-02)
 Source: chunk A2 of docs/plans/book-chapters-now.md (stream A, B-170); src/runtime.ts as the file of unit 33
 Footprint: docs/book/platform/build-pipeline.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book/implementation-map.md; docs/book/platform/README.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -272,19 +272,19 @@ C86. A memo entry evaluates the binding's expression at the first lookup, keepin
 
 C87. A lookup made while a memo entry's own evaluation runs reads the unevaluated expression. evidence: E19. [decided: owner, 2026-11-01]
 
-C160. A source binding whose value is a function definition enters the precompile context as a definition entry. evidence: E16, E41. [proposed: this IR]
+C160. A source binding whose value is a function definition enters the precompile context as a definition entry. evidence: E16, E41. [decided: owner, 2026-11-02]
 
-C161. A definition entry evaluates the function definition at the first lookup, every later lookup returning the object that the definition entry binds. evidence: E41. [proposed: this IR]
+C161. A definition entry evaluates the function definition at the first lookup, every later lookup returning the object that the definition entry binds. evidence: E41. [decided: owner, 2026-11-02]
 
-C162. A lookup made while a definition entry's first evaluation runs evaluates the function definition again, re-entrantly. evidence: E41. [proposed: this IR]
+C162. A lookup made while a definition entry's first evaluation runs evaluates the function definition again, re-entrantly. evidence: E41. [decided: owner, 2026-11-02]
 
-C163. A definition entry binds the first object that any evaluation of the entry's function definition returns, dropping the result of an evaluation that returns later. evidence: E41. [proposed: this IR]
+C163. A definition entry binds the first object that any evaluation of the entry's function definition returns, dropping the result of an evaluation that returns later. evidence: E41. [decided: owner, 2026-11-02]
 
-C164. In a recursive definition, the re-entrant lookup comes from the F3b inline-lambda precompile in `typed_function_impl`, which reaches the body's recursive call while `typed_function_impl` builds the typed function. evidence: E41, E42. [proposed: this IR]
+C164. In a recursive definition, the re-entrant lookup comes from the F3b inline-lambda precompile in `typed_function_impl`, which reaches the body's recursive call while `typed_function_impl` builds the typed function. evidence: E41, E42. [decided: owner, 2026-11-02]
 
-C165. A definition entry whose evaluation throws binds nothing, leaving the next lookup to evaluate the function definition afresh. evidence: E41. [proposed: this IR]
+C165. A definition entry whose evaluation throws binds nothing, leaving the next lookup to evaluate the function definition afresh. evidence: E41. [decided: owner, 2026-11-02]
 
-C166. Precompile partially evaluates the object that a function definition's entry binds, the object to which every reference during precompile resolves. evidence: E16. [proposed: this IR]
+C166. Precompile partially evaluates the object that a function definition's entry binds, the object to which every reference during precompile resolves. evidence: E16. [decided: owner, 2026-11-02]
 
 C88. Precompile evaluates only the bindings whose value is a function definition: a function literal, or `typed_function` over a function literal. evidence: E16, E17. [decided: owner, 2026-11-01]
 
@@ -308,25 +308,25 @@ C96. Precompile reports `return-type-mismatch` when a declared return type other
 
 C97. Precompile lists each source binding that has no value in the compilation report's `unresolved` list. evidence: E16. [decided: owner, 2026-11-01]
 
-C167. Precompile marks the function literal of a top-level definition through `markPrecompiledByPass` in `src/primitives.ts` once precompile of the definition returns no error. evidence: E16, E42. [proposed: this IR]
+C167. Precompile marks the function literal of a top-level definition through `markPrecompiledByPass` in `src/primitives.ts` once precompile of the definition returns no error. evidence: E16, E42. [decided: owner, 2026-11-02]
 
-C168. `evalSource` hands precompile the function literals to mark, the literals that `analyzeDivergence` peels, only when the call compiles a program rather than loading a module. evidence: E30, E43. [proposed: this IR]
+C168. `evalSource` hands precompile the function literals to mark, the literals that `analyzeDivergence` peels, only when the call compiles a program rather than loading a module. evidence: E30, E43. [decided: owner, 2026-11-02]
 
-C169. In the evaluation loop, `typed_function_impl` skips the F3b inline-lambda precompile of a function literal that precompile marked. evidence: E42. [proposed: this IR]
+C169. In the evaluation loop, `typed_function_impl` skips the F3b inline-lambda precompile of a function literal that precompile marked. evidence: E42. [decided: owner, 2026-11-02]
 
 C98. The inline cutoff is the hook, installed through `setInlineCutoff`, that tells `applyComposed` which callees to leave as residuals when an argument is unresolved. evidence: E14, E29. [decided: owner, 2026-11-01]
 
-C170. The inline cutoff's first set holds the object that each recursive binding is bound to in the precompile context. evidence: E14, E16. [proposed: this IR]
+C170. The inline cutoff's first set holds the object that each recursive binding is bound to in the precompile context. evidence: E14, E16. [decided: owner, 2026-11-02]
 
-C171. The precompile context adds a recursive binding's object to the inline cutoff's first set when the precompile context binds the object. evidence: E16, E41. [proposed: this IR]
+C171. The precompile context adds a recursive binding's object to the inline cutoff's first set when the precompile context binds the object. evidence: E16, E41. [decided: owner, 2026-11-02]
 
-C172. The inline cutoff's second set holds the body of each composed function in the inline cutoff's first set. evidence: E41. [proposed: this IR]
+C172. The inline cutoff's second set holds the body of each composed function in the inline cutoff's first set. evidence: E41. [decided: owner, 2026-11-02]
 
 C100. `analyzeDivergence` reports a binding as recursive when the binding's function calls into its own recursion cycle, whatever the binding's discharge tier. evidence: E30. [decided: owner, 2026-11-01]
 
-C173. The inline cutoff answers true by either of two identity tests: the callee is an object in the first set, or the callee's body is in the second set. evidence: E14. [proposed: this IR]
+C173. The inline cutoff answers true by either of two identity tests: the callee is an object in the first set, or the callee's body is in the second set. evidence: E14. [decided: owner, 2026-11-02]
 
-C174. The second identity test recognises a copy of a bound function made outside the precompile context, because the copy shares the bound function's body. evidence: E14. [proposed: this IR]
+C174. The second identity test recognises a copy of a bound function made outside the precompile context, because the copy shares the bound function's body. evidence: E14. [decided: owner, 2026-11-02]
 
 C102. `evalSource` installs no inline cutoff when no binding is recursive. evidence: E14. [decided: owner, 2026-11-01]
 
@@ -480,13 +480,13 @@ G16. cluster: C75, C76, C77, C78, C79, C80 [decided: owner, 2026-11-01]
 
 G17. cluster: C81, C82, C83, C84, C85, C86, C87 [decided: owner, 2026-11-01]
 
-G29. cluster: C160, C161, C162, C163, C164, C165, C166 [proposed: this IR]
+G29. cluster: C160, C161, C162, C163, C164, C165, C166 [decided: owner, 2026-11-02]
 
 G18. cluster: C88, C89, C90, C91, C92, C93, C158, C94, C95, C96, C97 [decided: owner, 2026-11-01]
 
-G31. cluster: C167, C168, C169 [proposed: this IR]
+G31. cluster: C167, C168, C169 [decided: owner, 2026-11-02]
 
-G30. cluster: C98, C170, C171, C172, C100, C173, C174, C102, C175 [proposed: this IR]
+G30. cluster: C98, C170, C171, C172, C100, C173, C174, C102, C175 [decided: owner, 2026-11-02]
 
 G20. cluster: C104, C105 [decided: owner, 2026-11-01]
 
@@ -635,3 +635,5 @@ A2. Ratify or strike the proposed term the evalSource pipeline (T34); the term t
 A2 resolved: ratified by the owner at the merge of PR #132, 2026-11-01. Ruling R9 was taken on 2026-11-01 as option (a): the spine's §29 stays the definition site of the evalSource pipeline, T34 links to it, and the chapter is the as-implemented home; precompile (T35) is defined in docs/book/layers.md §2, before its first use in reading order.
 
 A3. Ratify in bulk the re-synced claims about the precompile context, the inline cutoff and the skipped F3b inline-lambda precompile, as chunks R2 and R3 of B-159 left the code, with their clusters G29, G30 and G31: C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170, C171, C172, C173, C174. Depends: C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170, C171, C172, C173, C174.
+
+A3 resolved: ratified at the merge of PR #139, 2026-11-02; the statuses are flipped.

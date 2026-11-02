@@ -817,3 +817,6 @@ plan's recommendation and the ruling taken.
   The pipeline chapter, `docs/book/platform/build-pipeline.ir.md`, is
   re-synced to the code R2 and R3 left: its claims C160 to C175 replace
   C99, C101 and C103, and its ask A3 asks the maintainer to ratify them.
+  Merged as PR #139 on 2026-11-02; the pipeline chapter's re-synced
+  claims and the term *definition entry* were ratified by the merge and
+  flipped to decided in a follow-up.
