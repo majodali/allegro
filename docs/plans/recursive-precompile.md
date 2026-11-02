@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: active
+status: closed
 backlog: B-159
 lane: P
 merge: merge-on-green
@@ -19,14 +19,28 @@ boundary:
   - bench/**
   - docs/book/implementation-map.md
   - docs/book/standard/totality.md
+  - docs/book/platform/build-pipeline.ir.md
   - docs/plans/recursive-precompile.md
 ---
 
 # The recursion cutoff restored — the recursive-precompile stream
 
-> **Status: active** — drafted 2026-10-30 from the measurements in §2;
-> the rulings of §6 taken and the chunk sequence of §5 ratified by the
-> maintainer the same day (RR1 as option (b), the rest as recommended).
+> **Status: closed → B-159** (2026-11-01) — the chunk sequence of §5 is
+> complete and the §1 outcome is met: no recursive definition in the
+> precompile corpus is expanded speculatively, every output, pin and
+> totality verdict is unchanged, and the gate's work fell from 737.8 s
+> to 34.2 s at R2 and 41.5 s at R3, about 95%, as §2 predicted
+> (§7, the closing entry). The termination demo went from 62.7 s to
+> 0.3 s. The plan was drafted 2026-10-30 from the measurements in §2;
+> the maintainer took the rulings of §6 and ratified the chunk sequence
+> the same day (RR1 as option (b), the rest as recommended). The stream
+> ran as a pre-ratified sequence under merge-on-green (RR6), one PR per
+> chunk: R1 #131, R2 #133, R3 #136, R4 the closing PR. It closes with
+> B-159 (precompile of recursive definitions), B-087 (totality-analyzer
+> performance) as superseded (RR4) and the unused reserves B-168 (first
+> out-of-scope finding of the recursive-precompile stream) and
+> B-169 (second out-of-scope finding of the recursive-precompile stream).
+> Kept for its §7 record.
 > The status line and the header's `status` say the same thing.
 >
 > **Reader**: someone who knows the project's layers, the gate
@@ -747,3 +761,59 @@ plan's recommendation and the ruling taken.
     (`src/effects.ts`, outside this stream's boundary); removing the
     second would change how R2 binds the first-built object. Neither is
     proposed.
+- **2026-11-01 — The stream closes** (chunk R4). The outcome of §1,
+  condition by condition, from the records above:
+  - **No speculative inline expansion of a recursive definition.**
+    Since R2, `ALLEGRO_EVAL_STATS=1` shows `inlineExpansions=0` through
+    the CLI for `tests/totality-termination-demo.alg`,
+    `tests/totality-decreases-demo.alg` and the six Phase E sources
+    under `bench/corpus/precompile/`, which hold §1's four Phase E tests.
+    The `precompile` section of `bench/load-baseline.json` gates
+    `inlineExpansions` at 0 for all eight under `npm run lint:load`. In
+    the suite, the eight tests "B-159 R2 regression: <source> — the
+    cutoff fires; no recursive unfolding; no precompile-type-error"
+    assert at least one cutoff residual and no `precompile-type-error`
+    per source. They allow only the expansion of the `NonNeg`
+    refinement predicate, which is not a recursive definition (R2's
+    record). "B-159 R2 guard: a recursive call site in the precompile
+    context resolves to the bound object" pins the binding.
+  - **Outputs, pins and verdicts unchanged.** R2 ran 68 programs
+    through the CLI with `run` and `inspect`: 133 of 136 outputs
+    identical. The three that differ are `inspect` outputs, and they
+    differ only as RR2 allows: four `precompile-type-error`
+    notifications gone, one `inferred` entry added, and the
+    `proven-safe` summaries that follow. R3: 136 of 136 identical. No
+    `// expect:` line changed: no commit of the stream touched `tests/`
+    or `basics.alg`. R1's `VERDICT_PIN` passed untouched at R2 and R3;
+    `src/test/totality.ts` gained lines only after R1. No inferred
+    effect changed (R2's `effects:` lines of `inspect`), so neither of
+    §3's own stop conditions fired.
+  - **The shard falls.** `npm run test:shards`, in the sandbox of §2:
+    before, the longest shard 361.6 s and the work 737.8 s (§2.3);
+    after R2, 14.1 s and 34.2 s; after R3, 17.5 s and 41.5 s, against
+    R3's own before run of 16.7 s and 40.2 s, a difference within noise.
+    The gate's work fell by about 95%, as §2 predicted, not only the
+    totality shard's. `tests/totality-termination-demo.alg` alone: 62.7 s
+    at R1, 0.3 s at R2.
+
+  What the stream leaves, none of it proposed:
+  - The F3b inline-lambda precompile inside the pass still runs once per
+    top-level definition, beside the pass's own precompile: removing it
+    changes which object the declaration check reads its effects from
+    (`src/effects.ts`, outside the boundary). Each recursive definition
+    is also evaluated once more, re-entrantly, while R2's definition
+    entry binds it. Each costs one precompile or one evaluation per
+    definition (R3's record).
+  - The cutoff's second identity test, by body, stays: the evaluation
+    still copies a bound function in a module's load and after a failed
+    precompile in the pass, where the F3b precompile still runs.
+  - RR7's follow-on, for B-100 (soundness review of the cutoff): the
+    checking algorithm can still reach a host stack overflow through any
+    recursion the cutoff does not see. B-100's entry records it.
+
+  Closed with the stream: B-159; B-087 (totality-analyzer performance),
+  superseded by B-159 under RR4; the reserves B-168 and B-169, unused.
+  The totality chapter's T-R6 record (RR5) carries the closing numbers.
+  The pipeline chapter, `docs/book/platform/build-pipeline.ir.md`, is
+  re-synced to the code R2 and R3 left: its claims C160 to C175 replace
+  C99, C101 and C103, and its ask A3 asks the maintainer to ratify them.
