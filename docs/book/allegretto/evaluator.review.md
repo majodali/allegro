@@ -36,7 +36,7 @@ and the stranger finds no contradiction and no undefined term.
 | 4 | 2,490 | 157 | 8 | 3.2 | not readable (contradictions 2, undefined terms 0; restatement mismatch on C154 counts under the override) |
 | 5 | 2,544 | 159 | 7 | 2.8 | not readable (contradictions 1, undefined terms 0; restatement mismatch 1, the stranger's own, on T30: the same passage as round 4's M1, so it counts under the override) |
 | 6 | 2,550 | 165 | 10 | 3.9 | not readable (contradictions 1, undefined terms 0; restatement mismatches 6, all the stranger's own; the one on C44 counts under the override) |
-| 7 | 2,561 | 165 | 8 | 3.1 | readable (contradictions 0, undefined terms 0; restatement mismatches 5, the stranger's own: one disagreement on C95 on no earlier passage, four omissions) |
+| 7 | 2,561 | 165 | 8 | 3.1 | not readable on meta-review (contradictions 0, undefined terms 0; restatement mismatches 5, the stranger's own: one disagreement on C95 on no earlier passage, four omissions, of which M5 on T30 counts under the override: the same passage as rounds 4 and 5) |
 
 ## Round 1, 2026-10-31
 
@@ -437,7 +437,7 @@ falls on no earlier round's passage, so it does not count. The verdict
 readable stands. The alternative reading is stated for the meta-review
 to judge: if an omission is a mismatch, the override counts M2, M4 and
 M5, and the verdict is not readable. The record's earlier rounds treated
-round 6's five omissions the same way: reported, not counted.
+round 6's five omissions the same way: reported, not counted. The meta-review took the alternative reading on 2026-11-02 (PR #138 merged, defaults approved): M5 counts, and round 7 is not readable.
 
 | # | Finding (shortened) | Kind | Decision |
 |---|---|---|---|
@@ -537,8 +537,7 @@ names them (excess).
 
 ## Verdict and meta-review
 
-Readable for RD-4 at round 7 of a count of seven. The count ends at the
-readable verdict. Findings per thousand words by round: 7.8, 4.1, 3.7,
+Not readable at round 7 of a count of seven, by the meta-review's ruling of 2026-11-02 (the round's own verdict was readable; M5 counts under the override). The count stopped at round 7 and did not reach a readable verdict; the chapter was merged as PR #129 on its round 7 text, and count 2 runs at the chapter's next edit. Findings per thousand words by round: 7.8, 4.1, 3.7,
 3.2, 2.8, 3.9, 3.1. Prose 2,317 words at round 1 and 2,559 at delivery;
 IR 134 claims at round 1, 166 after round 7's fixes and 167 at delivery,
 the growth from splits. Two stranger instances were lost to container
@@ -572,7 +571,7 @@ The point for the meta-review: round 7's verdict rests on the
 orchestrating session's reading that an omission in a restatement
 bounded at 200 words is not a disagreement, so the override does not
 reach M2 to M5. Under the other reading, the override counts M2, M4 and
-M5, and round 7 is not readable.
+M5, and round 7 is not readable. Ruled: M5 counts; see the meta-review.
 
 Meta-review: delivered (docs/records/evaluator-chapter-meta-review.md, 2026-11-01; signals checked: 1 fired, 2 fired, 3 not fired, 4 fired)
 
@@ -590,3 +589,5 @@ Ask 3 is the lane of B-172 (the partial-evaluation rules as implemented against 
 Ask 4 is the dispatch of the meta-review.
 `Meta-review:` stays `pending`.
 Meta-review delivered 2026-11-01 by a fresh session with no part in the rounds; its asks are open with the maintainer.
+
+2026-11-02 — PR #138 merged; the meta-review's defaults stand: round 7 marked not readable above, recommendations 1, 4, 5, 6, 8 and 9 adopted for count 2 (the briefs carry them), recommendations 2, 3 and 7 go to the methodology repository as proposals, the report's two terms are struck after count 2.
