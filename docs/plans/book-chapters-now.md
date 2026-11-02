@@ -531,3 +531,33 @@ definition site before its first use in reading order
   plane is not a unit" names the spine's host plane, interpreter
   bookkeeping, where the chapter's unitless subject is M10's environment
   (C18, C20, C21).
+- **2026-11-02 — A5 written, IR-only.** File: `docs/book/demo-ladder.ir.md`,
+  Status `delivered IR-only` (144 claims, of which 108 proposed, 26
+  decided and 10 inferred; 35 terms, of which 2 proposed; 23 clusters;
+  16 relations; 38 evidence pointers). No prose and no rounds (§3.1).
+  Unratified terms 2 (*rung* and *demo ladder*, defined here; no chapter
+  had a `def-` anchor for either). Footprint: declared 5, changed 5,
+  surprises 0, misses 0. Ids 785 (from 787: the changelog entry names
+  B-089 (lawful-interface follow-ons) and B-082 (model composition
+  patterns) above their older unnamed first uses; the baseline is not
+  lowered). The Part III entry is `present`, so no Part III entry is
+  planned. Every quoted demo line was found with `grep -F` in a scene
+  that `src/test/proofs.ts` or `src/test/language.ts` registers through
+  `fileTest`. Rung 4 is one decided claim under R2 (C115). Not
+  delivered, with owners: the sampled tier for rung 2's pending laws,
+  B-089; model composition, B-082; an AI agent's loop over a model,
+  B-083 (the AI iteration loop); rung 3's website loop, B-093 (rung-3
+  packaging); Shape 2 has no owner item (C133). Found, each a demo or
+  document change outside the boundary, so each is an ask on the PR:
+  the break-it comment of `demos/rung2/03-laws.alg` does not reproduce
+  `transcripts/03-gate.txt` (C119, C120); the rung 1 README and
+  `docs/book/getting-started.md` give every rung 1 scene a break-it block,
+  where scene 1 has none (C121 to C123, C144); a comment in
+  `demos/rung1/03-effects.alg` names an `inspect` line that `inspect`
+  does not print (C124, C125); the rung 1 and rung 2 transcripts show an
+  older halt prefix (C126); the suite reads no transcript and no part of
+  `05-prover-loop.md` (C116); `docs/book/implementation-map.md` has no
+  row for `demos/rung3` (C143); no chapter defines *pinned demo*, whose
+  only anchor is this plan's *pinned example*; and the planning chapter
+  (II.19) uses *rung* and *demo ladder* before this chapter defines them,
+  without a link, so the order lint cannot see it.

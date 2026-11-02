@@ -247,6 +247,34 @@ Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
 2026-10-30 with the plan; entries newest first, directly below this
 line.
 
+### 2026-11 — The demo ladder chapter (B-170, chunk A5): IR-only; Part III complete in IR
+
+Chunk A5 of B-170 (the book, Part II and III chapters writable now)
+writes the Part III chapter on the demo ladder as its intermediate
+representation alone: `docs/book/demo-ladder.ir.md`, Status `delivered
+IR-only`, with no prose rendered and no stranger rounds until a later
+stage (`docs/plans/book-chapters-now.md` §3.1). It holds 144 claims in
+23 clusters (108 proposed, 26 decided, 10 inferred), 35 terms (2
+proposed), 16 relations and 38 evidence pointers. The chapter covers
+the three delivered rungs under `demos/` as the thesis test of
+`docs/book/vision.md` §1 and §2: what each rung shows, what it inherits
+from the rung below, what it does not show, and the tests in
+`src/test/proofs.ts` and `src/test/language.ts` that pin the nine
+`.alg` scenes. Every demo line it quotes sits in a scene the suite
+runs. It defines *rung* and *demo ladder*. Under ruling
+R2 (what the demo-ladder chapter covers), rung 4 is named as direction
+only, with no claims-register or release-track content. Not delivered,
+with owners: the sampled tier that would settle rung 2's pending
+algebraic laws, B-089 (lawful-interface follow-ons); the composition of
+models, B-082 (model composition patterns); an AI agent's loop over a
+model, B-083 (the AI iteration loop); rung 3's website loop,
+B-093 (rung-3 packaging). Shape 2, in which Allegro runs a model, has
+no owner item. The reading order's Part III entry for the chapter is
+now present, so no Part III entry is planned, and row III.2 of the table
+of contents names the chapter. Bare first-use identifiers 785 (`npm run lint:docs:check`, from 787:
+this entry names B-089 and B-082 above their older unnamed first uses;
+the baseline is not lowered here); unratified terms 2 in the chapter.
+
 ### 2026-11 — The evaluator chapter's count: round 7 ruled not readable; the meta-review's defaults applied (B-170)
 
 The meta-review of the evaluator chapter's count 1, `docs/records/evaluator-chapter-meta-review.md`, was delivered in PR #138 and merged on 2026-11-02 with no comment; under `docs/book/process.md` §3 the merge approves its four defaults. B-170 (the book, Part II and III chapters writable now) is the item. Round 7's verdict is ruled not readable: M5 (the omitted meaning of *tail call*) counts under the override, so the count should have continued to round 8. The review record `docs/book/allegretto/evaluator.review.md` marks round 7 accordingly, and the IR's Status and the plan's §7 follow. The chapter's text does not change now; PR #129 (the chapter's delivery) stays merged, and count 2 runs at the chapter's next edit, which three unfixed defects already require. Recommendations 1, 4, 5, 6, 8 and 9 are adopted for count 2 in the session's stranger and reasoning-role briefs; recommendations 2, 3 and 7 go to the methodology repository as proposals; the report's two terms are struck after count 2.
