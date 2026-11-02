@@ -161,6 +161,9 @@ to 0.3 s.
   context, the inline cutoff and the skipped F3b inline-lambda
   precompile as R2 and R3 left them: claims C160 to C175 replace C99,
   C101 and C103, and its ask A3 asks the maintainer to ratify them.
+  Merged as PR #139 on 2026-11-02; the re-synced claims and the term
+  *definition entry* were ratified by the merge, and a follow-up flipped
+  their statuses to decided.
 
 ### 2026-11 — The second precompile of a top-level literal is skipped (B-159, chunk R3)
 
