@@ -25,3 +25,7 @@ the phase chain itself is `layers.md` §2.
 The delivered part of T-build, the `evalSource` pipeline of the
 `pipeline` unit (33), is the chapter
 [`build-pipeline.ir.md`](build-pipeline.ir.md) (IR-only).
+
+The delivered part of T-tooling, the `introspect` unit (34) and the
+`cli` unit (35), is the chapter [`tooling.ir.md`](tooling.ir.md)
+(IR-only).
