@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
+| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); next B-174 (the book's existing chapters retrofitted to IR) as the lane's next stream; then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
