@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `introspect` unit (unit 34) and the `cli` unit (unit 35): the file runner, the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, and the four diagnostic variables, with tracing and the IDE integration stated as not built.
-Status: delivered IR-only (unratified terms 1; footprint: declared 7, changed 7, surprises 0, misses 0)
+Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0)
 Source: chunk A3 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts and src/introspect.ts as the files of units 35 and 34
 Footprint: docs/book/platform/tooling.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -66,7 +66,7 @@ T28. Precompile, the stage of the evalSource pipeline that partially evaluates e
 
 T29. Post-pass, a check of the evalSource pipeline that runs after precompile or after the evaluation loop. defined-at: ../concepts.md#def-the-evalsource-pipeline [decided: docs/book/concepts.md §29]
 
-T30. Safety grade. The one-word grade that `inspect` prints for a whole module from the module's compilation report and binding summaries: `proven-safe`, `partial`, `has-warnings` or `has-errors`. anchor: #def-safety-grade [proposed: this IR]
+T30. Safety grade. The one-word grade that `inspect` prints for a whole module from the module's compilation report and binding summaries: `proven-safe`, `partial`, `has-warnings` or `has-errors`. anchor: #def-safety-grade [decided: owner, 2026-11-02]
 
 ## Claims
 
@@ -74,19 +74,19 @@ T30. Safety grade. The one-word grade that `inspect` prints for a whole module f
 
 C1. This chapter is the design truth for two units of the unit DAG: the `introspect` unit, unit 34; the `cli` unit, unit 35. [decided: docs/plans/book-chapters-now.md §5, 2026-10-30]
 
-C2. This chapter is the definition site of the term safety grade. [proposed: this IR]
+C2. This chapter is the definition site of the term safety grade. [decided: owner, 2026-11-02]
 
 C3. This chapter is delivered IR-only: no prose is rendered from this IR until a later stage that the maintainer schedules. [decided: docs/plans/book-chapters-now.md §3.1 and R8, 2026-10-30]
 
-C4. The reader of this chapter has read the Part I chapters and the Part II chapters before this chapter, the evaluation pipeline chapter included. [proposed: this IR]
+C4. The reader of this chapter has read the Part I chapters and the Part II chapters before this chapter, the evaluation pipeline chapter included. [decided: owner, 2026-11-02]
 
-C5. Earlier chapters define every term this chapter uses except safety grade, each term linked from this chapter's Terms section. [proposed: this IR]
+C5. Earlier chapters define every term this chapter uses except safety grade, each term linked from this chapter's Terms section. [decided: owner, 2026-11-02]
 
 C6. This chapter carries the Tier 1 authority that `docs/book/process.md` §1 gives every chapter of the book. [decided: docs/book/process.md §1]
 
 C7. Each Claims sub-heading of this chapter carries the status tag that `docs/book/README.md` defines. [decided: docs/book/README.md, Status convention]
 
-C8. This chapter holds no examples. [proposed: this IR]
+C8. This chapter holds no examples. [decided: owner, 2026-11-02]
 
 C9. The T-tooling track covers tracing, debugging, introspection through `inspect`, and the review experience, enriched by Allegro Standard's knowledge. [decided: docs/book/layers.md §2]
 
@@ -98,395 +98,395 @@ C11. The `introspect` unit holds the summaries and the safety grades for `inspec
 
 C12. The `cli` unit holds the file runner, the REPL and the subcommands, depending on the `pipeline`, `introspect` and `module-loading` units. [decided: docs/book/units.md §4.4]
 
-C13. `scripts/analyze/units.json` maps `src/introspect.ts` to the `introspect` unit and `src/index.ts` to the `cli` unit, each unit on the track layer. evidence: E1. [proposed: this IR]
+C13. `scripts/analyze/units.json` maps `src/introspect.ts` to the `introspect` unit and `src/index.ts` to the `cli` unit, each unit on the track layer. evidence: E1. [decided: owner, 2026-11-02]
 
-C14. The `units` report lists neither `src/introspect.ts` nor `src/index.ts` among the mixed files. evidence: E2. [proposed: this IR]
+C14. The `units` report lists neither `src/introspect.ts` nor `src/index.ts` among the mixed files. evidence: E2. [decided: owner, 2026-11-02]
 
-C15. The `units` report counts 19 direct kind comparisons in `src/introspect.ts` outside the units that the discriminator rule allows. evidence: E2. [proposed: this IR]
+C15. The `units` report counts 19 direct kind comparisons in `src/introspect.ts` outside the units that the discriminator rule allows. evidence: E2. [decided: owner, 2026-11-02]
 
-C16. The `units` report lists seven import edges from `src/index.ts`: two permitted, five unresolved at a mixed file. evidence: E2. [proposed: this IR]
+C16. The `units` report lists seven import edges from `src/index.ts`: two permitted, five unresolved at a mixed file. evidence: E2. [decided: owner, 2026-11-02]
 
-C17. `src/index.ts` imports `src/introspect.ts`, `src/pcp.ts` and `pcp/llm-worker.ts` dynamically, inside the subcommand that uses each file. evidence: E3. [proposed: this IR]
+C17. `src/index.ts` imports `src/introspect.ts`, `src/pcp.ts` and `pcp/llm-worker.ts` dynamically, inside the subcommand that uses each file. evidence: E3. [decided: owner, 2026-11-02]
 
-C18. The `units` report lists no edge from `src/index.ts` to `src/introspect.ts` or `src/pcp.ts`. evidence: E2. [proposed: this IR]
+C18. The `units` report lists no edge from `src/index.ts` to `src/introspect.ts` or `src/pcp.ts`. evidence: E2. [decided: owner, 2026-11-02]
 
-C19. `scripts/analyze/units.json` maps files under `src/` only, leaving `pcp/llm-worker.ts`, the file of the `prove` loop, without a unit. evidence: E1. [proposed: this IR]
+C19. `scripts/analyze/units.json` maps files under `src/` only, leaving `pcp/llm-worker.ts`, the file of the `prove` loop, without a unit. evidence: E1. [decided: owner, 2026-11-02]
 
-C20. `src/pcp.ts`, the file of the `pcp` unit (unit 30), builds the verdicts and obligations that `verify`, `obligations` and `propose` print. evidence: E12, E14. [proposed: this IR]
+C20. `src/pcp.ts`, the file of the `pcp` unit (unit 30), builds the verdicts and obligations that `verify`, `obligations` and `propose` print. evidence: E12, E14. [decided: owner, 2026-11-02]
 
-C21. The web sandbox's inspect function in `web/allegro-web.ts` also builds the module summary through `summarizeModule` and `renderModuleSummary`. evidence: E34. [proposed: this IR]
+C21. The web sandbox's inspect function in `web/allegro-web.ts` also builds the module summary through `summarizeModule` and `renderModuleSummary`. evidence: E34. [decided: owner, 2026-11-02]
 
-C22. `docs/book/implementation-map.md` assigns `src/introspect.ts` to L2 and `src/index.ts` to the T-build track. evidence: E36. [proposed: this IR]
+C22. `docs/book/implementation-map.md` assigns `src/introspect.ts` to L2 and `src/index.ts` to the T-build track. evidence: E36. [decided: owner, 2026-11-02]
 
 ### The entry point [implemented]
 
-C23. `src/index.ts` is the command-line entry, run as `npx tsx src/index.ts` or as `npm start`. evidence: E35. [proposed: this IR]
+C23. `src/index.ts` is the command-line entry, run as `npx tsx src/index.ts` or as `npm start`. evidence: E35. [decided: owner, 2026-11-02]
 
-C24. `package.json` declares no `bin` entry. evidence: E35. [proposed: this IR]
+C24. `package.json` declares no `bin` entry. evidence: E35. [decided: owner, 2026-11-02]
 
-C25. The usage messages of `src/index.ts` name the command `allegro`, as in `allegro inspect <file>`. evidence: E3. [proposed: this IR]
+C25. The usage messages of `src/index.ts` name the command `allegro`, as in `allegro inspect <file>`. evidence: E3. [decided: owner, 2026-11-02]
 
-C26. The first positional argument selects one of five subcommands: `inspect`, `verify`, `obligations`, `propose`, `prove`. evidence: E3. [proposed: this IR]
+C26. The first positional argument selects one of five subcommands: `inspect`, `verify`, `obligations`, `propose`, `prove`. evidence: E3. [decided: owner, 2026-11-02]
 
-C27. A first positional argument that names no subcommand is the path of a file to run. evidence: E3. [proposed: this IR]
+C27. A first positional argument that names no subcommand is the path of a file to run. evidence: E3. [decided: owner, 2026-11-02]
 
-C28. With no positional argument, `src/index.ts` starts the REPL. evidence: E3. [proposed: this IR]
+C28. With no positional argument, `src/index.ts` starts the REPL. evidence: E3. [decided: owner, 2026-11-02]
 
-C29. The `--base` flag selects Allegretto for the file runner, the REPL, `inspect`, `verify`, `obligations` and `propose`. evidence: E3. [proposed: this IR]
+C29. The `--base` flag selects Allegretto for the file runner, the REPL, `inspect`, `verify`, `obligations` and `propose`. evidence: E3. [decided: owner, 2026-11-02]
 
-C30. Without the `--base` flag, the file runner, the REPL, `inspect`, `verify`, `obligations` and `propose` start from one extension, the type system that `createTypeSystem` builds. evidence: E3, E4, E5, E6, E10. [proposed: this IR]
+C30. Without the `--base` flag, the file runner, the REPL, `inspect`, `verify`, `obligations` and `propose` start from one extension, the type system that `createTypeSystem` builds. evidence: E3, E4, E5, E6, E10. [decided: owner, 2026-11-02]
 
-C31. `prove` ignores the `--base` flag. evidence: E3, E17. [proposed: this IR]
+C31. `prove` ignores the `--base` flag. evidence: E3, E17. [decided: owner, 2026-11-02]
 
-C32. A subcommand given no file prints the subcommand's usage line and exits with code 1. evidence: E3. [proposed: this IR]
+C32. A subcommand given no file prints the subcommand's usage line and exits with code 1. evidence: E3. [decided: owner, 2026-11-02]
 
-C33. Every subcommand evaluates the file through `evalSource`, the entry of the evalSource pipeline. evidence: E6, E10, E17. [proposed: this IR]
+C33. Every subcommand evaluates the file through `evalSource`, the entry of the evalSource pipeline. evidence: E6, E10, E17. [decided: owner, 2026-11-02]
 
 ### The file runner [implemented]
 
-C34. The file runner reads the file, then hands the file's text to `runFile`. evidence: E3. [proposed: this IR]
+C34. The file runner reads the file, then hands the file's text to `runFile`. evidence: E3. [decided: owner, 2026-11-02]
 
-C35. Under Allegretto, `runFile` passes the whole text to `evalSource` with no extension, no module loading and no future manager. evidence: E4. [proposed: this IR]
+C35. Under Allegretto, `runFile` passes the whole text to `evalSource` with no extension, no module loading and no future manager. evidence: E4. [decided: owner, 2026-11-02]
 
-C36. Under Allegro Standard, `runFile` creates one future manager for the whole run before any module loads. evidence: E4. [proposed: this IR]
+C36. Under Allegro Standard, `runFile` creates one future manager for the whole run before any module loads. evidence: E4. [decided: owner, 2026-11-02]
 
-C37. `runFile` scans the `use` header with `scanUses`, then loads each module the header names as an extension before the parse. evidence: E4. [proposed: this IR]
+C37. `runFile` scans the `use` header with `scanUses`, then loads each module the header names as an extension before the parse. evidence: E4. [decided: owner, 2026-11-02]
 
-C38. For a `use NAME.MEMBER` directive, `runFile` keeps the module's bindings while dropping every Grammar binding other than the named members. evidence: E4. [proposed: this IR]
+C38. For a `use NAME.MEMBER` directive, `runFile` keeps the module's bindings while dropping every Grammar binding other than the named members. evidence: E4. [decided: owner, 2026-11-02]
 
-C39. `runFile` throws when a `use NAME.MEMBER` directive names a missing binding or a binding that holds no Grammar value. evidence: E4. [proposed: this IR]
+C39. `runFile` throws when a `use NAME.MEMBER` directive names a missing binding or a binding that holds no Grammar value. evidence: E4. [decided: owner, 2026-11-02]
 
-C40. `runFile` evaluates each inline `use grammar { … }` block over the type system alone, adding the resulting Grammar value as an extension. evidence: E4. [proposed: this IR]
+C40. `runFile` evaluates each inline `use grammar { … }` block over the type system alone, adding the resulting Grammar value as an extension. evidence: E4. [decided: owner, 2026-11-02]
 
-C41. `runFile` strips the `use` header before the main parse. evidence: E4. [proposed: this IR]
+C41. `runFile` strips the `use` header before the main parse. evidence: E4. [decided: owner, 2026-11-02]
 
-C42. `runFile` then loads the modules that the body's `import` statements name, found by `scanImports` without a parse. evidence: E4. [proposed: this IR]
+C42. `runFile` then loads the modules that the body's `import` statements name, found by `scanImports` without a parse. evidence: E4. [decided: owner, 2026-11-02]
 
-C43. `loadImportedModules` resolves a module name first in the `lib/` directory beside the source file, then in the `lib/` directory beside `src/`. evidence: E4. [proposed: this IR]
+C43. `loadImportedModules` resolves a module name first in the `lib/` directory beside the source file, then in the `lib/` directory beside `src/`. evidence: E4. [decided: owner, 2026-11-02]
 
-C44. `loadImportedModules` skips a module name that an existing extension already provides. evidence: E4. [proposed: this IR]
+C44. `loadImportedModules` skips a module name that an existing extension already provides. evidence: E4. [decided: owner, 2026-11-02]
 
-C45. `runFile` evaluates the stripped body once through `evalSource`, with the `typed` flag set and the `softFail` flag unset. evidence: E4. [proposed: this IR]
+C45. `runFile` evaluates the stripped body once through `evalSource`, with the `typed` flag set and the `softFail` flag unset. evidence: E4. [decided: owner, 2026-11-02]
 
-C46. After the evaluation, `runFile` waits for every pending future of the run's future manager. evidence: E4. [proposed: this IR]
+C46. After the evaluation, `runFile` waits for every pending future of the run's future manager. evidence: E4. [decided: owner, 2026-11-02]
 
-C47. On any error, `runFile` prints `Error in <file>: <message>` to stderr, then exits with code 1. evidence: E4. [proposed: this IR]
+C47. On any error, `runFile` prints `Error in <file>: <message>` to stderr, then exits with code 1. evidence: E4. [decided: owner, 2026-11-02]
 
-C48. A halting post-pass ends a file run with exit code 1. evidence: E24. [proposed: this IR]
+C48. A halting post-pass ends a file run with exit code 1. evidence: E24. [decided: owner, 2026-11-02]
 
-C49. The suite runs the literate demos through `evalSource` with extensions the suite chooses, not through the file runner. evidence: E31. [proposed: this IR]
+C49. The suite runs the literate demos through `evalSource` with extensions the suite chooses, not through the file runner. evidence: E31. [decided: owner, 2026-11-02]
 
-C50. In a run on 2026-11-01, the file runner stopped on the demo `tests/proofs-proven-demo.alg` with a parse error, the demo's `proven` extension being one the suite supplies. evidence: E26, E31. [proposed: this IR]
+C50. In a run on 2026-11-01, the file runner stopped on the demo `tests/proofs-proven-demo.alg` with a parse error, the demo's `proven` extension being one the suite supplies. evidence: E26, E31. [decided: owner, 2026-11-02]
 
 ### The REPL [implemented]
 
-C51. The REPL prompt reads `allegro> ` under Allegro Standard and `allegretto> ` under Allegretto. evidence: E5. [proposed: this IR]
+C51. The REPL prompt reads `allegro> ` under Allegro Standard and `allegretto> ` under Allegretto. evidence: E5. [decided: owner, 2026-11-02]
 
-C52. The REPL appends each input line to a buffer. evidence: E5. [proposed: this IR]
+C52. The REPL appends each input line to a buffer. evidence: E5. [decided: owner, 2026-11-02]
 
-C53. The REPL evaluates the buffer at a blank line or at a line whose last non-blank character is none of `+ - * / % = < > , ( & |`. evidence: E5. [proposed: this IR]
+C53. The REPL evaluates the buffer at a blank line or at a line whose last non-blank character is none of `+ - * / % = < > , ( & |`. evidence: E5. [decided: owner, 2026-11-02]
 
-C54. The REPL evaluates each entry through `evalSource`, passing the evaluation scope of the previous entry as the base scope. evidence: E5. [proposed: this IR]
+C54. The REPL evaluates each entry through `evalSource`, passing the evaluation scope of the previous entry as the base scope. evidence: E5. [decided: owner, 2026-11-02]
 
-C55. Under Allegro Standard, the REPL passes one future manager, created at start, to every entry. evidence: E5. [proposed: this IR]
+C55. Under Allegro Standard, the REPL passes one future manager, created at start, to every entry. evidence: E5. [decided: owner, 2026-11-02]
 
-C56. The REPL prints the value of an entry's last bare expression through `formatValue`, unless the value is null. evidence: E5. [proposed: this IR]
+C56. The REPL prints the value of an entry's last bare expression through `formatValue`, unless the value is null. evidence: E5. [decided: owner, 2026-11-02]
 
-C57. The REPL prints an entry's error as `Error: <message>`, keeping the previous entry's scope as the base for the next entry. evidence: E5. [proposed: this IR]
+C57. The REPL prints an entry's error as `Error: <message>`, keeping the previous entry's scope as the base for the next entry. evidence: E5. [decided: owner, 2026-11-02]
 
-C58. While futures are pending, the REPL defers the next prompt until the future manager drains. evidence: E5. [proposed: this IR]
+C58. While futures are pending, the REPL defers the next prompt until the future manager drains. evidence: E5. [decided: owner, 2026-11-02]
 
-C59. At the end of input, the REPL prints `Bye!` before exiting with code 0. evidence: E5. [proposed: this IR]
+C59. At the end of input, the REPL prints `Bye!` before exiting with code 0. evidence: E5. [decided: owner, 2026-11-02]
 
-C60. The REPL loads no module named by a `use` line or an `import` line. evidence: E5. [proposed: this IR]
+C60. The REPL loads no module named by a `use` line or an `import` line. evidence: E5. [decided: owner, 2026-11-02]
 
-C61. In a run on 2026-11-01, the REPL answered a `use contracts` line with a parse error. evidence: E25. [proposed: this IR]
+C61. In a run on 2026-11-01, the REPL answered a `use contracts` line with a parse error. evidence: E25. [decided: owner, 2026-11-02]
 
-C62. In a run on 2026-11-01, each REPL entry continued after a trailing `+`, `,` or `=` failed with a parse error at the line break. evidence: E25. [proposed: this IR]
+C62. In a run on 2026-11-01, each REPL entry continued after a trailing `+`, `,` or `=` failed with a parse error at the line break. evidence: E25. [decided: owner, 2026-11-02]
 
-C63. B-065 (REPL improvements: multi-line, error display, completion) is the open backlog item that owns multi-line REPL entry. evidence: E33. [proposed: this IR]
+C63. B-065 (REPL improvements: multi-line, error display, completion) is the open backlog item that owns multi-line REPL entry. evidence: E33. [decided: owner, 2026-11-02]
 
-C64. No test of the suite drives the REPL. evidence: E32. [proposed: this IR]
+C64. No test of the suite drives the REPL. evidence: E32. [decided: owner, 2026-11-02]
 
-C65. `src/test/base.ts` pins the persistent scope across two `evalSource` calls, the mechanism the REPL uses. evidence: E31. [proposed: this IR]
+C65. `src/test/base.ts` pins the persistent scope across two `evalSource` calls, the mechanism the REPL uses. evidence: E31. [decided: owner, 2026-11-02]
 
 ### The `inspect` subcommand [implemented]
 
-C66. `inspect` loads the modules of the file's `use NAME` directives and `import` statements, as the file runner does. evidence: E6. [proposed: this IR]
+C66. `inspect` loads the modules of the file's `use NAME` directives and `import` statements, as the file runner does. evidence: E6. [decided: owner, 2026-11-02]
 
-C67. `inspect` loads no module for a `use NAME.MEMBER` directive or an inline `use grammar { … }` block. evidence: E6. [proposed: this IR]
+C67. `inspect` loads no module for a `use NAME.MEMBER` directive or an inline `use grammar { … }` block. evidence: E6. [decided: owner, 2026-11-02]
 
-C68. In a run on 2026-11-01, the file runner ran `tests/dotted-use-demo.alg` and `tests/inline-grammar-demo.alg` to exit code 0. evidence: E26. [proposed: this IR]
+C68. In a run on 2026-11-01, the file runner ran `tests/dotted-use-demo.alg` and `tests/inline-grammar-demo.alg` to exit code 0. evidence: E26. [decided: owner, 2026-11-02]
 
-C69. In a run on 2026-11-01, `inspect` and `verify` stopped on each of `tests/dotted-use-demo.alg` and `tests/inline-grammar-demo.alg` with a parse error. evidence: E26. [proposed: this IR]
+C69. In a run on 2026-11-01, `inspect` and `verify` stopped on each of `tests/dotted-use-demo.alg` and `tests/inline-grammar-demo.alg` with a parse error. evidence: E26. [decided: owner, 2026-11-02]
 
-C70. `inspect` passes no future manager to `evalSource`. evidence: E6. [proposed: this IR]
+C70. `inspect` passes no future manager to `evalSource`. evidence: E6. [decided: owner, 2026-11-02]
 
-C71. `inspect` silences `console.log` during the evaluation, discarding the program's printed output. evidence: E6. [proposed: this IR]
+C71. `inspect` silences `console.log` during the evaluation, discarding the program's printed output. evidence: E6. [decided: owner, 2026-11-02]
 
-C72. `inspect` runs `evalSource` with the `softFail` flag unset. evidence: E6. [proposed: this IR]
+C72. `inspect` runs `evalSource` with the `softFail` flag unset. evidence: E6. [decided: owner, 2026-11-02]
 
-C73. A halting post-pass ends `inspect` with the post-pass's error message and exit code 1, before any summary prints. evidence: E6, E24. [proposed: this IR]
+C73. A halting post-pass ends `inspect` with the post-pass's error message and exit code 1, before any summary prints. evidence: E6, E24. [decided: owner, 2026-11-02]
 
-C74. `inspect` leaves out of the summary every binding name that a primitive or an extension provides. evidence: E6. [proposed: this IR]
+C74. `inspect` leaves out of the summary every binding name that a primitive or an extension provides. evidence: E6. [decided: owner, 2026-11-02]
 
-C75. `summarizeModule` summarises each remaining binding of the evaluation scope that has a value. evidence: E7. [proposed: this IR]
+C75. `summarizeModule` summarises each remaining binding of the evaluation scope that has a value. evidence: E7. [decided: owner, 2026-11-02]
 
-C76. A binding summary holds the binding's type name, a resolved mark and a short description of the binding's value. evidence: E7. [proposed: this IR]
+C76. A binding summary holds the binding's type name, a resolved mark and a short description of the binding's value. evidence: E7. [decided: owner, 2026-11-02]
 
-C77. A binding summary takes the type name from the compilation report's binding types first, then from the value's own type. evidence: E7. [proposed: this IR]
+C77. A binding summary takes the type name from the compilation report's binding types first, then from the value's own type. evidence: E7. [decided: owner, 2026-11-02]
 
-C78. A binding summary lists the value's refinement predicates, the primitive functions the value calls and the unresolved Symbols the value refers to. evidence: E7. [proposed: this IR]
+C78. A binding summary lists the value's refinement predicates, the primitive functions the value calls and the unresolved Symbols the value refers to. evidence: E7. [decided: owner, 2026-11-02]
 
-C79. For a composed function, a binding summary holds the `requires` and `ensures` entries of the function's contract with the function's declared and inferred effects. evidence: E7. [proposed: this IR]
+C79. For a composed function, a binding summary holds the `requires` and `ensures` entries of the function's contract with the function's declared and inferred effects. evidence: E7. [decided: owner, 2026-11-02]
 
-C80. A binding summary suggests promoting an in-body `assert` to `requires` when the asserted predicate names only the function's parameters. evidence: E7. [proposed: this IR]
+C80. A binding summary suggests promoting an in-body `assert` to `requires` when the asserted predicate names only the function's parameters. evidence: E7. [decided: owner, 2026-11-02]
 
-C81. The rendered summary of a proof binding names each admitted or sampled law that the proof rests on, with the law's tier. evidence: E7. [proposed: this IR]
+C81. The rendered summary of a proof binding names each admitted or sampled law that the proof rests on, with the law's tier. evidence: E7. [decided: owner, 2026-11-02]
 
-C82. A binding summary shows the totality notifications anchored to the binding, each with any counterexample. evidence: E7. [proposed: this IR]
+C82. A binding summary shows the totality notifications anchored to the binding, each with any counterexample. evidence: E7. [decided: owner, 2026-11-02]
 
-C83. `renderModuleSummary` prints the safety grade, the binding counts, the error count, the unresolved bindings and the error messages before one block per binding. evidence: E7. [proposed: this IR]
+C83. `renderModuleSummary` prints the safety grade, the binding counts, the error count, the unresolved bindings and the error messages before one block per binding. evidence: E7. [decided: owner, 2026-11-02]
 
-C84. The header comment of `src/introspect.ts` states that the file adds no analysis: every summary field comes from what parsing, symbol resolution, precompile and evaluation already computed. evidence: E7. [proposed: this IR]
+C84. The header comment of `src/introspect.ts` states that the file adds no analysis: every summary field comes from what parsing, symbol resolution, precompile and evaluation already computed. evidence: E7. [decided: owner, 2026-11-02]
 
 ### <a id="def-safety-grade"></a>The safety grades [partial]
 
 C85. Principle 7 of `docs/book/vision.md` makes a safety grade, not a proof transcript, the default surface of verification, with theorem-level detail as an opt-in drill-down. [decided: docs/book/vision.md §5, principle 7]
 
-C86. `SafetyGrade` in `src/introspect.ts` has four values: `proven-safe`, `partial`, `has-warnings`, `has-errors`. evidence: E8. [proposed: this IR]
+C86. `SafetyGrade` in `src/introspect.ts` has four values: `proven-safe`, `partial`, `has-warnings`, `has-errors`. evidence: E8. [decided: owner, 2026-11-02]
 
-C87. `safetyGradeFor` grades a missing compilation report `partial`. evidence: E8. [proposed: this IR]
+C87. `safetyGradeFor` grades a missing compilation report `partial`. evidence: E8. [decided: owner, 2026-11-02]
 
-C88. `safetyGradeFor` grades a compilation report that holds an error-severity notification `has-errors`. evidence: E8. [proposed: this IR]
+C88. `safetyGradeFor` grades a compilation report that holds an error-severity notification `has-errors`. evidence: E8. [decided: owner, 2026-11-02]
 
-C89. `safetyGradeFor` grades a compilation report with an unresolved binding and no error `partial`. evidence: E8. [proposed: this IR]
+C89. `safetyGradeFor` grades a compilation report with an unresolved binding and no error `partial`. evidence: E8. [decided: owner, 2026-11-02]
 
-C90. `safetyGradeFor` grades every other compilation report `proven-safe`. evidence: E8. [proposed: this IR]
+C90. `safetyGradeFor` grades every other compilation report `proven-safe`. evidence: E8. [decided: owner, 2026-11-02]
 
-C91. `safetyGradeForSummary` lowers the grade to `has-errors` when any summarised binding's type name is `Error`. evidence: E8. [proposed: this IR]
+C91. `safetyGradeForSummary` lowers the grade to `has-errors` when any summarised binding's type name is `Error`. evidence: E8. [decided: owner, 2026-11-02]
 
-C92. No code path in `src/`, `pcp/`, `web/` or `scripts/` produces the grade `has-warnings`. evidence: E9. [proposed: this IR]
+C92. No code path in `src/`, `pcp/`, `web/` or `scripts/` produces the grade `has-warnings`. evidence: E9. [decided: owner, 2026-11-02]
 
-C93. The grade `proven-safe` states only the absence of three things: an error notification in the compilation report; an unresolved binding; a binding typed `Error`. evidence: E8. [proposed: this IR]
+C93. The grade `proven-safe` states only the absence of three things: an error notification in the compilation report; an unresolved binding; a binding typed `Error`. evidence: E8. [decided: owner, 2026-11-02]
 
-C94. The comment above `safetyGradeFor` calls the grade a coarse placeholder, naming effects, refinements, totality and proof counts as later refinements of the grade. evidence: E8. [proposed: this IR]
+C94. The comment above `safetyGradeFor` calls the grade a coarse placeholder, naming effects, refinements, totality and proof counts as later refinements of the grade. evidence: E8. [decided: owner, 2026-11-02]
 
 C95. Under `inspect`, a failed proof, an undeclared effect or a failed `proven` clause never reaches a safety grade. [inferred: R2]
 
 C96. Under `inspect`, the grade `has-errors` comes from an error notification on which no post-pass halts, such as precompile's, or from a binding typed `Error`. [inferred: R3]
 
-C97. The web sandbox's inspect function returns the grade `has-errors` for a source whose evaluation throws. evidence: E34. [proposed: this IR]
+C97. The web sandbox's inspect function returns the grade `has-errors` for a source whose evaluation throws. evidence: E34. [decided: owner, 2026-11-02]
 
-C98. `src/test/pcp.ts` pins the four rules of `safetyGradeFor` and the grade `proven-safe` of a clean module. evidence: E30. [proposed: this IR]
+C98. `src/test/pcp.ts` pins the four rules of `safetyGradeFor` and the grade `proven-safe` of a clean module. evidence: E30. [decided: owner, 2026-11-02]
 
 ### The `verify`, `obligations` and `propose` subcommands [implemented]
 
-C99. `verify`, `obligations` and `propose` load a file through `pcpLoadAndEval`, which loads modules as `inspect` does. evidence: E10. [proposed: this IR]
+C99. `verify`, `obligations` and `propose` load a file through `pcpLoadAndEval`, which loads modules as `inspect` does. evidence: E10. [decided: owner, 2026-11-02]
 
-C100. `pcpLoadAndEval` runs `evalSource` with the `softFail` flag set, silencing `console.log` during the evaluation. evidence: E10. [proposed: this IR]
+C100. `pcpLoadAndEval` runs `evalSource` with the `softFail` flag set, silencing `console.log` during the evaluation. evidence: E10. [decided: owner, 2026-11-02]
 
-C101. `verify` prints the verdict that `buildVerdict` in `src/pcp.ts` builds from the evaluation scope and the compilation report. evidence: E11, E12. [proposed: this IR]
+C101. `verify` prints the verdict that `buildVerdict` in `src/pcp.ts` builds from the evaluation scope and the compilation report. evidence: E11, E12. [decided: owner, 2026-11-02]
 
-C102. A verdict lists each theorem as discharged, failed or skipped, with a failed theorem's reason and counterexample. evidence: E12. [proposed: this IR]
+C102. A verdict lists each theorem as discharged, failed or skipped, with a failed theorem's reason and counterexample. evidence: E12. [decided: owner, 2026-11-02]
 
-C103. A verdict also records the totality findings, the effect mismatches, the law and coercion obligations with their discharge tiers, the `div` obligations above the `auto` tier and the admitted liveness of the asynchronous sources in use. evidence: E12. [proposed: this IR]
+C103. A verdict also records the totality findings, the effect mismatches, the law and coercion obligations with their discharge tiers, the `div` obligations above the `auto` tier and the admitted liveness of the asynchronous sources in use. evidence: E12. [decided: owner, 2026-11-02]
 
-C104. A verdict is verified when no theorem failed and the compilation report holds no error-severity notification. evidence: E12. [proposed: this IR]
+C104. A verdict is verified when no theorem failed and the compilation report holds no error-severity notification. evidence: E12. [decided: owner, 2026-11-02]
 
-C105. A pending law obligation leaves a verdict verified. evidence: E12. [proposed: this IR]
+C105. A pending law obligation leaves a verdict verified. evidence: E12. [decided: owner, 2026-11-02]
 
-C106. The text form of a verdict prints the assumption ledger after the theorems and obligations, before the hints. evidence: E13. [proposed: this IR]
+C106. The text form of a verdict prints the assumption ledger after the theorems and obligations, before the hints. evidence: E13. [decided: owner, 2026-11-02]
 
-C107. The assumption ledger lists the admitted and sampled backings, each with the proofs resting on the backing, and counts the pending obligations. evidence: E13. [proposed: this IR]
+C107. The assumption ledger lists the admitted and sampled backings, each with the proofs resting on the backing, and counts the pending obligations. evidence: E13. [decided: owner, 2026-11-02]
 
-C108. `verify --json` prints the verdict as one JSON object. evidence: E11. [proposed: this IR]
+C108. `verify --json` prints the verdict as one JSON object. evidence: E11. [decided: owner, 2026-11-02]
 
-C109. `verify --obligation O.json` fails the verdict unless the obligation's theorem is discharged with a matching proposition hash. evidence: E11, E12. [proposed: this IR]
+C109. `verify --obligation O.json` fails the verdict unless the obligation's theorem is discharged with a matching proposition hash. evidence: E11, E12. [decided: owner, 2026-11-02]
 
-C110. `verify` exits with code 0 for a verified verdict and code 1 otherwise. evidence: E11, E24. [proposed: this IR]
+C110. `verify` exits with code 0 for a verified verdict and code 1 otherwise. evidence: E11, E24. [decided: owner, 2026-11-02]
 
-C111. `obligations` lists one obligation per proof binding, per undischarged `div` entry and per law or coercion obligation of the types the evaluation scope binds. evidence: E14. [proposed: this IR]
+C111. `obligations` lists one obligation per proof binding, per undischarged `div` entry and per law or coercion obligation of the types the evaluation scope binds. evidence: E14. [decided: owner, 2026-11-02]
 
-C112. In a run on 2026-11-01, `obligations` over a two-line file with one theorem listed 15 obligations: the theorem, 12 laws of the core types, 2 coercion obligations. evidence: E24. [proposed: this IR]
+C112. In a run on 2026-11-01, `obligations` over a two-line file with one theorem listed 15 obligations: the theorem, 12 laws of the core types, 2 coercion obligations. evidence: E24. [decided: owner, 2026-11-02]
 
-C113. With `--pending`, `obligations` leaves out the discharged proofs and the settled law and coercion obligations. evidence: E14. [proposed: this IR]
+C113. With `--pending`, `obligations` leaves out the discharged proofs and the settled law and coercion obligations. evidence: E14. [decided: owner, 2026-11-02]
 
-C114. With `--pending`, `obligations` also lists each failed or skipped `proven` clause. evidence: E14, E29. [proposed: this IR]
+C114. With `--pending`, `obligations` also lists each failed or skipped `proven` clause. evidence: E14, E29. [decided: owner, 2026-11-02]
 
-C115. Without `--pending`, `obligations` lists no `proven` clause. evidence: E14, E29. [proposed: this IR]
+C115. Without `--pending`, `obligations` lists no `proven` clause. evidence: E14, E29. [decided: owner, 2026-11-02]
 
-C168. The comment beside the `pendingOnly === false` test in `extractObligations` says that the `proven` clauses are already covered via bindings. evidence: E14. [proposed: this IR]
+C168. The comment beside the `pendingOnly === false` test in `extractObligations` says that the `proven` clauses are already covered via bindings. evidence: E14. [decided: owner, 2026-11-02]
 
-C116. `obligations --json` prints one JSON object per line. evidence: E14. [proposed: this IR]
+C116. `obligations --json` prints one JSON object per line. evidence: E14. [decided: owner, 2026-11-02]
 
-C117. `obligations` exits with code 0 whatever the obligations' state. evidence: E14, E24. [proposed: this IR]
+C117. `obligations` exits with code 0 whatever the obligations' state. evidence: E14, E24. [decided: owner, 2026-11-02]
 
-C118. `propose` prints a Markdown TODO with one section per pending obligation, holding the proposition, the last failure, the verdict's hints, the lemmas in scope and the count of prior attempts. evidence: E15. [proposed: this IR]
+C118. `propose` prints a Markdown TODO with one section per pending obligation, holding the proposition, the last failure, the verdict's hints, the lemmas in scope and the count of prior attempts. evidence: E15. [decided: owner, 2026-11-02]
 
-C119. `propose --all` gives every obligation a section. evidence: E15. [proposed: this IR]
+C119. `propose --all` gives every obligation a section. evidence: E15. [decided: owner, 2026-11-02]
 
-C120. `propose --output FILE.md` writes the TODO to the named file instead of stdout. evidence: E15. [proposed: this IR]
+C120. `propose --output FILE.md` writes the TODO to the named file instead of stdout. evidence: E15. [decided: owner, 2026-11-02]
 
-C121. The TODO's last line tells the reader to run `allegro verify` on the edited source. evidence: E15. [proposed: this IR]
+C121. The TODO's last line tells the reader to run `allegro verify` on the edited source. evidence: E15. [decided: owner, 2026-11-02]
 
-C122. `propose` exits with code 0 whatever the obligations' state. evidence: E15, E30. [proposed: this IR]
+C122. `propose` exits with code 0 whatever the obligations' state. evidence: E15, E30. [decided: owner, 2026-11-02]
 
 ### The `prove` subcommand [implemented]
 
-C123. `prove` creates a language-model client before reading the file, exiting with code 1 when `ANTHROPIC_API_KEY` is unset. evidence: E16, E24. [proposed: this IR]
+C123. `prove` creates a language-model client before reading the file, exiting with code 1 when `ANTHROPIC_API_KEY` is unset. evidence: E16, E24. [decided: owner, 2026-11-02]
 
-C124. The missing-key message offers a `--api-key` flag that `src/index.ts` does not parse. evidence: E3, E16. [proposed: this IR]
+C124. The missing-key message offers a `--api-key` flag that `src/index.ts` does not parse. evidence: E3, E16. [decided: owner, 2026-11-02]
 
-C125. `prove` runs `runLlmWorker` in `pcp/llm-worker.ts` with at most `--max-attempts` attempts per pending obligation, five by default. evidence: E3, E17. [proposed: this IR]
+C125. `prove` runs `runLlmWorker` in `pcp/llm-worker.ts` with at most `--max-attempts` attempts per pending obligation, five by default. evidence: E3, E17. [decided: owner, 2026-11-02]
 
-C126. `runLlmWorker` takes the pending obligations from one run of `evalSource` with the `softFail` flag set. evidence: E17. [proposed: this IR]
+C126. `runLlmWorker` takes the pending obligations from one run of `evalSource` with the `softFail` flag set. evidence: E17. [decided: owner, 2026-11-02]
 
-C127. Per attempt, `runLlmWorker` sends the primer and an iteration message to the client, then splices the answer's first `allegro` code block, or else its first fenced block, into the theorem's `by` slot. evidence: E17. [proposed: this IR]
+C127. Per attempt, `runLlmWorker` sends the primer and an iteration message to the client, then splices the answer's first `allegro` code block, or else its first fenced block, into the theorem's `by` slot. evidence: E17. [decided: owner, 2026-11-02]
 
-C128. `runLlmWorker` re-evaluates the spliced source through `evalSource`, keeping the proof term when the new verdict lists the theorem as discharged. evidence: E17. [proposed: this IR]
+C128. `runLlmWorker` re-evaluates the spliced source through `evalSource`, keeping the proof term when the new verdict lists the theorem as discharged. evidence: E17. [decided: owner, 2026-11-02]
 
-C129. The primer is `docs/book/proving-in-allegro.md`, read relative to the current working directory. evidence: E18. [proposed: this IR]
+C129. The primer is `docs/book/proving-in-allegro.md`, read relative to the current working directory. evidence: E18. [decided: owner, 2026-11-02]
 
-C130. A discharged obligation's authorship names the client's model as the prover, with the attempts used. evidence: E17. [proposed: this IR]
+C130. A discharged obligation's authorship names the client's model as the prover, with the attempts used. evidence: E17. [decided: owner, 2026-11-02]
 
-C131. `prove --output FILE.alg` writes the source with every kept proof term spliced in. evidence: E3. [proposed: this IR]
+C131. `prove --output FILE.alg` writes the source with every kept proof term spliced in. evidence: E3. [decided: owner, 2026-11-02]
 
-C132. `prove` exits with code 0 when every pending obligation discharged, code 1 otherwise. evidence: E3. [proposed: this IR]
+C132. `prove` exits with code 0 when every pending obligation discharged, code 1 otherwise. evidence: E3. [decided: owner, 2026-11-02]
 
-C133. `runLlmWorker` passes the file's text to `evalSource` with the type system as the one extension, the `use` header unstripped. evidence: E17. [proposed: this IR]
+C133. `runLlmWorker` passes the file's text to `evalSource` with the type system as the one extension, the `use` header unstripped. evidence: E17. [decided: owner, 2026-11-02]
 
-C134. In a run on 2026-11-01, `evalSource` over a source opening with `use contracts`, the type system the one extension, threw a parse error. evidence: E28. [proposed: this IR]
+C134. In a run on 2026-11-01, `evalSource` over a source opening with `use contracts`, the type system the one extension, threw a parse error. evidence: E28. [decided: owner, 2026-11-02]
 
 C135. With an API key set, `prove` fails on a file whose header holds a `use` directive. [inferred: R4]
 
-C136. `src/test/pcp.ts` pins the worker's helpers, one loop of `runLlmWorker` with a mock client, and the missing-key failure of `prove`. evidence: E30. [proposed: this IR]
+C136. `src/test/pcp.ts` pins the worker's helpers, one loop of `runLlmWorker` with a mock client, and the missing-key failure of `prove`. evidence: E30. [decided: owner, 2026-11-02]
 
 ### The diagnostic variables [implemented]
 
-C137. Four environment variables switch on diagnostics: `ALLEGRO_STACK`, `ALLEGRO_TRACE_DEPTH`, `ALLEGRO_PARSE_STATS`, `ALLEGRO_EVAL_STATS`. evidence: E19, E20, E21, E22. [proposed: this IR]
+C137. Four environment variables switch on diagnostics: `ALLEGRO_STACK`, `ALLEGRO_TRACE_DEPTH`, `ALLEGRO_PARSE_STATS`, `ALLEGRO_EVAL_STATS`. evidence: E19, E20, E21, E22. [decided: owner, 2026-11-02]
 
-C138. With `ALLEGRO_STACK` set, the file runner prints the JavaScript stack of an error after the error's message. evidence: E19, E27. [proposed: this IR]
+C138. With `ALLEGRO_STACK` set, the file runner prints the JavaScript stack of an error after the error's message. evidence: E19, E27. [decided: owner, 2026-11-02]
 
-C139. `runFile` holds the one read of `ALLEGRO_STACK` in `src/`, leaving the REPL and the subcommands to print the message alone. evidence: E19, E27. [proposed: this IR]
+C139. `runFile` holds the one read of `ALLEGRO_STACK` in `src/`, leaving the REPL and the subcommands to print the message alone. evidence: E19, E27. [decided: owner, 2026-11-02]
 
-C140. With `ALLEGRO_TRACE_DEPTH` set to a number N, `applyComposed` prints the evaluation depth and the first 120 characters of the applied body's source to stderr at each depth waterline. evidence: E20. [proposed: this IR]
+C140. With `ALLEGRO_TRACE_DEPTH` set to a number N, `applyComposed` prints the evaluation depth and the first 120 characters of the applied body's source to stderr at each depth waterline. evidence: E20. [decided: owner, 2026-11-02]
 
-C141. The first depth waterline is N, each later waterline lying N levels beyond the depth of the last printed line. evidence: E20. [proposed: this IR]
+C141. The first depth waterline is N, each later waterline lying N levels beyond the depth of the last printed line. evidence: E20. [decided: owner, 2026-11-02]
 
-C142. A value of `ALLEGRO_TRACE_DEPTH` that is zero or no number sets the step N to 500. evidence: E20. [proposed: this IR]
+C142. A value of `ALLEGRO_TRACE_DEPTH` that is zero or no number sets the step N to 500. evidence: E20. [decided: owner, 2026-11-02]
 
-C143. The comment above `TRACE_DEPTH` in `src/evaluator.ts` says that `ALLEGRO_TRACE_DEPTH=1` prints a line every 500 levels. evidence: E20. [proposed: this IR]
+C143. The comment above `TRACE_DEPTH` in `src/evaluator.ts` says that `ALLEGRO_TRACE_DEPTH=1` prints a line every 500 levels. evidence: E20. [decided: owner, 2026-11-02]
 
-C144. In a run on 2026-11-01, `ALLEGRO_TRACE_DEPTH=1` printed 383 lines, one at every second depth level, before the stack overflowed. evidence: E27. [proposed: this IR]
+C144. In a run on 2026-11-01, `ALLEGRO_TRACE_DEPTH=1` printed 383 lines, one at every second depth level, before the stack overflowed. evidence: E27. [decided: owner, 2026-11-02]
 
-C145. `ALLEGRO_TRACE_DEPTH` is a diagnostic for runaway recursion, not a tracer of evaluation. evidence: E20. [proposed: this IR]
+C145. `ALLEGRO_TRACE_DEPTH` is a diagnostic for runaway recursion, not a tracer of evaluation. evidence: E20. [decided: owner, 2026-11-02]
 
-C146. With `ALLEGRO_PARSE_STATS` set to any value but empty or `0`, `parseSource` prints one `parse-stats` line to stderr per program or library parse. evidence: E21. [proposed: this IR]
+C146. With `ALLEGRO_PARSE_STATS` set to any value but empty or `0`, `parseSource` prints one `parse-stats` line to stderr per program or library parse. evidence: E21. [decided: owner, 2026-11-02]
 
-C147. A `parse-stats` line gives the source, the character count, the outcome, the duration and six engine counts as `key=value` fields. evidence: E21, E27. [proposed: this IR]
+C147. A `parse-stats` line gives the source, the character count, the outcome, the duration and six engine counts as `key=value` fields. evidence: E21, E27. [decided: owner, 2026-11-02]
 
-C148. With `ALLEGRO_EVAL_STATS` set to any value but empty or `0`, the evaluator prints one `eval-stats` line to stderr at process exit. evidence: E22. [proposed: this IR]
+C148. With `ALLEGRO_EVAL_STATS` set to any value but empty or `0`, the evaluator prints one `eval-stats` line to stderr at process exit. evidence: E22. [decided: owner, 2026-11-02]
 
-C149. An `eval-stats` line gives eleven `key=value` counts for the whole run, every program and library included. evidence: E22, E27. [proposed: this IR]
+C149. An `eval-stats` line gives eleven `key=value` counts for the whole run, every program and library included. evidence: E22, E27. [decided: owner, 2026-11-02]
 
-C150. `ALLEGRO_PARSE_STATS` and `ALLEGRO_EVAL_STATS` reach every caller of `evalSource`, because `parseSource` and `beginEvalStats` read the variables inside the evalSource pipeline. evidence: E21, E22. [proposed: this IR]
+C150. `ALLEGRO_PARSE_STATS` and `ALLEGRO_EVAL_STATS` reach every caller of `evalSource`, because `parseSource` and `beginEvalStats` read the variables inside the evalSource pipeline. evidence: E21, E22. [decided: owner, 2026-11-02]
 
-C151. `npm run bench:load` runs the load corpus through the file runner with both stats variables set, reading the stderr lines back. evidence: E23. [proposed: this IR]
+C151. `npm run bench:load` runs the load corpus through the file runner with both stats variables set, reading the stderr lines back. evidence: E23. [decided: owner, 2026-11-02]
 
-C152. `npm run lint:load` counts parses through the stats sink of `setParseStatsSink`, not through `ALLEGRO_PARSE_STATS`. evidence: E23. [proposed: this IR]
+C152. `npm run lint:load` counts parses through the stats sink of `setParseStatsSink`, not through `ALLEGRO_PARSE_STATS`. evidence: E23. [decided: owner, 2026-11-02]
 
-C169. Since B-159 chunk R2, `npm run lint:load` runs each source of the precompile corpus through the file runner with `ALLEGRO_EVAL_STATS=1`, gating counts of the `eval-stats` line. evidence: E23. [proposed: this IR]
+C169. Since B-159 chunk R2, `npm run lint:load` runs each source of the precompile corpus through the file runner with `ALLEGRO_EVAL_STATS=1`, gating counts of the `eval-stats` line. evidence: E23. [decided: owner, 2026-11-02]
 
-C153. No test of the suite sets any of the four diagnostic variables. evidence: E32. [proposed: this IR]
+C153. No test of the suite sets any of the four diagnostic variables. evidence: E32. [decided: owner, 2026-11-02]
 
-C154. `src/test/language.ts` pins the evaluation counts through the stats sink of `setEvalStatsSink`. evidence: E31. [proposed: this IR]
+C154. `src/test/language.ts` pins the evaluation counts through the stats sink of `setEvalStatsSink`. evidence: E31. [decided: owner, 2026-11-02]
 
 ### What the T-tooling track has not built [partial]
 
 C155. Tracing and step-through debugging are undesigned. [decided: docs/book/platform/README.md, track table]
 
-C156. No file of `src/`, `pcp/` or `web/` holds an execution tracer, a stepper or a breakpoint. evidence: E37. [proposed: this IR]
+C156. No file of `src/`, `pcp/` or `web/` holds an execution tracer, a stepper or a breakpoint. evidence: E37. [decided: owner, 2026-11-02]
 
-C157. B-064 (execution tracing and step-through debugging) is the open backlog item that owns tracing. evidence: E33. [proposed: this IR]
+C157. B-064 (execution tracing and step-through debugging) is the open backlog item that owns tracing. evidence: E33. [decided: owner, 2026-11-02]
 
-C158. No file of `src/`, `pcp/` or `web/` holds a language server or an editor integration. evidence: E37. [proposed: this IR]
+C158. No file of `src/`, `pcp/` or `web/` holds a language server or an editor integration. evidence: E37. [decided: owner, 2026-11-02]
 
-C159. B-067 (LSP and IDE integration) is the open backlog item that owns the IDE integration. evidence: E33. [proposed: this IR]
+C159. B-067 (LSP and IDE integration) is the open backlog item that owns the IDE integration. evidence: E33. [decided: owner, 2026-11-02]
 
-C160. B-068 (the review experience) is the open backlog item that owns the semantic summary as the primary reviewable artifact. evidence: E33. [proposed: this IR]
+C160. B-068 (the review experience) is the open backlog item that owns the semantic summary as the primary reviewable artifact. evidence: E33. [decided: owner, 2026-11-02]
 
-C161. B-161 (CLI startup) is the open backlog item that owns the startup cost of the CLI's module loading. evidence: E33. [proposed: this IR]
+C161. B-161 (CLI startup) is the open backlog item that owns the startup cost of the CLI's module loading. evidence: E33. [decided: owner, 2026-11-02]
 
 ### Where the code is, and what pins it [implemented]
 
-C162. `src/index.ts` holds `runFile`, `repl`, `runInspect`, `pcpLoadAndEval`, `runPcpVerify`, `runPcpObligations`, `runPcpPropose` and `runPcpProve`. evidence: E3, E4, E5, E6, E10, E11, E14, E15. [proposed: this IR]
+C162. `src/index.ts` holds `runFile`, `repl`, `runInspect`, `pcpLoadAndEval`, `runPcpVerify`, `runPcpObligations`, `runPcpPropose` and `runPcpProve`. evidence: E3, E4, E5, E6, E10, E11, E14, E15. [decided: owner, 2026-11-02]
 
-C163. `src/introspect.ts` holds `summarizeValue`, `safetyGradeFor`, `safetyGradeForSummary`, `summarizeModule` and `renderModuleSummary`. evidence: E7, E8. [proposed: this IR]
+C163. `src/introspect.ts` holds `summarizeValue`, `safetyGradeFor`, `safetyGradeForSummary`, `summarizeModule` and `renderModuleSummary`. evidence: E7, E8. [decided: owner, 2026-11-02]
 
-C164. `src/test/pcp.ts` pins four subcommands by child-process runs of `src/index.ts`: `verify`; `obligations --json`; `propose`, with and without `--output`; the missing-key failure of `prove`. evidence: E30, E32. [proposed: this IR]
+C164. `src/test/pcp.ts` pins four subcommands by child-process runs of `src/index.ts`: `verify`; `obligations --json`; `propose`, with and without `--output`; the missing-key failure of `prove`. evidence: E30, E32. [decided: owner, 2026-11-02]
 
-C165. Tests in `src/test/pcp.ts`, `src/test/effects.ts`, `src/test/refinements.ts`, `src/test/totality.ts` and `src/test/equality-laws.ts` pin the summaries of `src/introspect.ts`. evidence: E30. [proposed: this IR]
+C165. Tests in `src/test/pcp.ts`, `src/test/effects.ts`, `src/test/refinements.ts`, `src/test/totality.ts` and `src/test/equality-laws.ts` pin the summaries of `src/introspect.ts`. evidence: E30. [decided: owner, 2026-11-02]
 
-C166. No test of the suite runs the file runner, the REPL or the `inspect` subcommand as a command. evidence: E32. [proposed: this IR]
+C166. No test of the suite runs the file runner, the REPL or the `inspect` subcommand as a command. evidence: E32. [decided: owner, 2026-11-02]
 
-C170. `npm run lint:load` is the one gate check that runs the file runner, over the precompile corpus. evidence: E23, E32. [proposed: this IR]
+C170. `npm run lint:load` is the one gate check that runs the file runner, over the precompile corpus. evidence: E23, E32. [decided: owner, 2026-11-02]
 
-C167. `npm run lint:units` pins the unit mapping of `src/index.ts` and `src/introspect.ts`. evidence: E35. [proposed: this IR]
+C167. `npm run lint:units` pins the unit mapping of `src/index.ts` and `src/introspect.ts`. evidence: E35. [decided: owner, 2026-11-02]
 
 ### Clusters
 
-G1. cluster: C1, C2, C3, C4, C5 [proposed: this IR]
+G1. cluster: C1, C2, C3, C4, C5 [decided: owner, 2026-11-02]
 
-G2. cluster: C6, C7, C8, C9, C10 [proposed: this IR]
+G2. cluster: C6, C7, C8, C9, C10 [decided: owner, 2026-11-02]
 
-G3. cluster: C11, C12, C13, C14, C15 [proposed: this IR]
+G3. cluster: C11, C12, C13, C14, C15 [decided: owner, 2026-11-02]
 
-G4. cluster: C16, C17, C18, C19 [proposed: this IR]
+G4. cluster: C16, C17, C18, C19 [decided: owner, 2026-11-02]
 
-G5. cluster: C20, C21, C22 [proposed: this IR]
+G5. cluster: C20, C21, C22 [decided: owner, 2026-11-02]
 
-G6. cluster: C23, C24, C25, C26, C27, C28 [proposed: this IR]
+G6. cluster: C23, C24, C25, C26, C27, C28 [decided: owner, 2026-11-02]
 
-G7. cluster: C29, C30, C31, C32, C33 [proposed: this IR]
+G7. cluster: C29, C30, C31, C32, C33 [decided: owner, 2026-11-02]
 
-G8. cluster: C34, C35, C36, C37, C38, C39, C40, C41 [proposed: this IR]
+G8. cluster: C34, C35, C36, C37, C38, C39, C40, C41 [decided: owner, 2026-11-02]
 
-G9. cluster: C42, C43, C44, C45, C46, C47, C48 [proposed: this IR]
+G9. cluster: C42, C43, C44, C45, C46, C47, C48 [decided: owner, 2026-11-02]
 
-G10. cluster: C49, C50 [proposed: this IR]
+G10. cluster: C49, C50 [decided: owner, 2026-11-02]
 
-G11. cluster: C51, C52, C53, C54, C55, C56, C57, C58, C59 [proposed: this IR]
+G11. cluster: C51, C52, C53, C54, C55, C56, C57, C58, C59 [decided: owner, 2026-11-02]
 
-G12. cluster: C60, C61, C62, C63, C64, C65 [proposed: this IR]
+G12. cluster: C60, C61, C62, C63, C64, C65 [decided: owner, 2026-11-02]
 
-G13. cluster: C66, C67, C68, C69, C70, C71, C72, C73 [proposed: this IR]
+G13. cluster: C66, C67, C68, C69, C70, C71, C72, C73 [decided: owner, 2026-11-02]
 
-G14. cluster: C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84 [proposed: this IR]
+G14. cluster: C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84 [decided: owner, 2026-11-02]
 
-G15. cluster: C85, C86, C87, C88, C89, C90, C91, C92, C93, C94 [proposed: this IR]
+G15. cluster: C85, C86, C87, C88, C89, C90, C91, C92, C93, C94 [decided: owner, 2026-11-02]
 
-G16. cluster: C95, C96, C97, C98 [proposed: this IR]
+G16. cluster: C95, C96, C97, C98 [decided: owner, 2026-11-02]
 
-G17. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110 [proposed: this IR]
+G17. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110 [decided: owner, 2026-11-02]
 
-G18. cluster: C111, C112, C113, C114, C115, C168, C116, C117 [proposed: this IR]
+G18. cluster: C111, C112, C113, C114, C115, C168, C116, C117 [decided: owner, 2026-11-02]
 
-G19. cluster: C118, C119, C120, C121, C122 [proposed: this IR]
+G19. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
-G20. cluster: C123, C124, C125, C126, C127, C128, C129, C130, C131, C132 [proposed: this IR]
+G20. cluster: C123, C124, C125, C126, C127, C128, C129, C130, C131, C132 [decided: owner, 2026-11-02]
 
-G21. cluster: C133, C134, C135, C136 [proposed: this IR]
+G21. cluster: C133, C134, C135, C136 [decided: owner, 2026-11-02]
 
-G22. cluster: C137, C138, C139 [proposed: this IR]
+G22. cluster: C137, C138, C139 [decided: owner, 2026-11-02]
 
-G23. cluster: C140, C141, C142, C143, C144, C145 [proposed: this IR]
+G23. cluster: C140, C141, C142, C143, C144, C145 [decided: owner, 2026-11-02]
 
-G24. cluster: C146, C147, C148, C149, C150, C151, C152, C169, C153, C154 [proposed: this IR]
+G24. cluster: C146, C147, C148, C149, C150, C151, C152, C169, C153, C154 [decided: owner, 2026-11-02]
 
-G25. cluster: C155, C156, C157, C158, C159, C160, C161 [proposed: this IR]
+G25. cluster: C155, C156, C157, C158, C159, C160, C161 [decided: owner, 2026-11-02]
 
-G26. cluster: C162, C163, C164, C165, C166, C170, C167 [proposed: this IR]
+G26. cluster: C162, C163, C164, C165, C166, C170, C167 [decided: owner, 2026-11-02]
 
 ## Relations
 
@@ -592,4 +592,8 @@ E37. Search of `src/`, `pcp/` and `web/` on 2026-11-01, outside `src/test/`, for
 
 A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own reader, terms and examples: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170. Depends: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170.
 
+A1 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the claims carry decided provenance from that date.
+
 A2. Ratify or strike the proposed term safety grade (T30); the evalSource pipeline (T27) and precompile (T28) have their definition sites in the spine's §29 and in `docs/book/layers.md` §2 since ruling R9 of 2026-11-01. Depends: C2, C86, C90, C93.
+
+A2 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the term's definition site is this chapter's anchor. The PR's ask 2 (an owner for the chapter's seven findings) was not answered at the merge and stays open with the maintainer.
