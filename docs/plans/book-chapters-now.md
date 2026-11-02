@@ -470,7 +470,7 @@ definition site before its first use in reading order
 - **2026-11-01 — R9 taken as (a);** the follow-up PR reversed §29's
   absorption; B-172's two decisions recorded; *precompile* defined in
   `docs/book/layers.md` §2, before its first use in reading order.
-- **2026-11-01 — A3 written, IR-only.** File:
+- **2026-11-01 — A3 landed (PR #137, merged 2026-11-02), IR-only.** File:
   `docs/book/platform/tooling.ir.md`, Status `delivered IR-only`
   (170 claims, of which 157 proposed, 10 decided and 3 inferred; 30
   terms, of which 2 proposed; 26 clusters; 11 relations; 37 evidence
@@ -498,6 +498,7 @@ definition site before its first use in reading order
   grade `has-warnings` is never produced (C92); and
   `docs/book/implementation-map.md` puts `src/introspect.ts` on L2 where
   the unit manifest puts the unit on the track layer (C22).
+  The ratification flip followed the merge in its own PR; the findings are filed as B-175 (the tooling chapter's findings), minted on the maintainer's instruction of 2026-11-02.
 - **2026-11-02 — A4 written, IR-only.** File:
   `docs/book/platform/host.ir.md`, Status `delivered IR-only` (140
   claims, of which 114 proposed, 20 decided and 6 inferred; 16 terms,
