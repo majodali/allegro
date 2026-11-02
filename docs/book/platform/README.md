@@ -29,3 +29,7 @@ The delivered part of T-build, the `evalSource` pipeline of the
 The delivered part of T-tooling, the `introspect` unit (34) and the
 `cli` unit (35), is the chapter [`tooling.ir.md`](tooling.ir.md)
 (IR-only).
+
+The delivered part of T-host, the Node CLI and the browser sandbox as
+host environments, is the chapter [`host.ir.md`](host.ir.md)
+(IR-only).
