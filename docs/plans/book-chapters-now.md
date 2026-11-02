@@ -437,8 +437,7 @@ definition site before its first use in reading order
 - **2026-10-31 — A1 landed (PR #129, merged 2026-11-01).** Files:
   `docs/book/allegretto/evaluator.ir.md` (134 claims at round 1, 150
   after its fixes, 155 after round 2's and its touch-up, 157 after round 3's, 159 after round 4's, 165 after round 5's, 166 after round 7's, 167 at delivery; 30 terms), `evaluator.md` (rendered by the reasoning
-  role), `evaluator.review.md`. Stranger rounds: seven rounds to a
-  readable verdict; the review record's meta-review line reads pending.
+  role), `evaluator.review.md`. Stranger rounds: seven; round 7's readable verdict was overturned by the meta-review (PR #138, merged 2026-11-02): M5 (the omitted meaning of *tail call*) counts under the override, so count 1 stopped without a readable verdict and count 2 runs at the chapter's next edit, which three unfixed defects already require. The meta-review's recommendations 1, 4, 5, 6, 8 and 9 are adopted for count 2; 2, 3 and 7 go to the methodology repository as proposals.
   Unratified terms 1 (*tail call*); ids 791 (from 795). Found: `eval_when`, `&&` and `||`
   do not meet PE Rule 2, and the spine's §25 (partial evaluation) delta
   still says both rules are implemented as specified; filed as
