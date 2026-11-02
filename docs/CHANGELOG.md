@@ -214,6 +214,10 @@ Plan `docs/plans/book-chapters-now.md`; lane A; human-gated. Opened
 2026-10-30 with the plan; entries newest first, directly below this
 line.
 
+### 2026-11 — The evaluator chapter's count: round 7 ruled not readable; the meta-review's defaults applied (B-170)
+
+The meta-review of the evaluator chapter's count 1, `docs/records/evaluator-chapter-meta-review.md`, was delivered in PR #138 and merged on 2026-11-02 with no comment; under `docs/book/process.md` §3 the merge approves its four defaults. B-170 (the book, Part II and III chapters writable now) is the item. Round 7's verdict is ruled not readable: M5 (the omitted meaning of *tail call*) counts under the override, so the count should have continued to round 8. The review record `docs/book/allegretto/evaluator.review.md` marks round 7 accordingly, and the IR's Status and the plan's §7 follow. The chapter's text does not change now; PR #129 (the chapter's delivery) stays merged, and count 2 runs at the chapter's next edit, which three unfixed defects already require. Recommendations 1, 4, 5, 6, 8 and 9 are adopted for count 2 in the session's stranger and reasoning-role briefs; recommendations 2, 3 and 7 go to the methodology repository as proposals; the report's two terms are struck after count 2.
+
 ### 2026-11 — The tooling chapter (B-170, chunk A3): IR-only
 
 Chunk A3 of B-170 (the book, Part II and III chapters writable now)
@@ -325,7 +329,7 @@ in `docs/book-changes.md`. Bare first-use identifiers 795 → 791
 (`npm run lint:docs:check`); unratified terms 1 (*tail call*). Merged as PR #129 on 2026-11-01;
 the IR's proposed claims and the term were ratified by the merge, and a
 follow-up flipped their statuses to decided and the IR's Status to
-delivered.
+delivered. Round 7's verdict was overturned on meta-review (the entry above).
 
 ## Unstreamed
 
