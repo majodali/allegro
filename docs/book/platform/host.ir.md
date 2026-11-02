@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the T-host track: the Node CLI and the browser sandbox as host environments, the environment capabilities they supply, the browser-compatible core, and the environment-capability contract of `docs/book/allegretto/structures.md` §11, with asynchronous I/O capabilities and browser packaging stated as not built.
-Status: delivered IR-only (unratified terms 0; footprint: declared 6, changed 6, surprises 0, misses 0)
+Status: delivered IR-only (ratified at the merge of PR #142, 2026-11-02; unratified terms 0; footprint: declared 6, changed 6, surprises 0, misses 0)
 Source: chunk A4 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts, web/allegro-web.ts and website/ as the host surfaces; docs/book/allegretto/structures.md §11 as the contract
 Footprint: docs/book/platform/host.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -48,17 +48,17 @@ C1. This chapter covers four subjects: the Node CLI; the browser sandbox; the br
 
 C2. This chapter is delivered IR-only: no prose is rendered from this IR until a later stage that the maintainer schedules. [decided: docs/plans/book-chapters-now.md §3.1 and R8, 2026-10-30]
 
-C3. This chapter defines no term: each term it uses links from this chapter's Terms section to a definition site in an earlier chapter. [proposed: this IR]
+C3. This chapter defines no term: each term it uses links from this chapter's Terms section to a definition site in an earlier chapter. [decided: owner, 2026-11-02]
 
-C4. The reader of this chapter has read the Part I chapters and the Part II chapters before this chapter, the tooling chapter included. [proposed: this IR]
+C4. The reader of this chapter has read the Part I chapters and the Part II chapters before this chapter, the tooling chapter included. [decided: owner, 2026-11-02]
 
 C5. This chapter carries the Tier 1 authority that `docs/book/process.md` §1 gives every chapter of the book. [decided: docs/book/process.md §1]
 
 C6. Each Claims sub-heading of this chapter carries the status tag that `docs/book/README.md` defines. [decided: docs/book/README.md, Status convention]
 
-C7. This chapter holds no examples. [proposed: this IR]
+C7. This chapter holds no examples. [decided: owner, 2026-11-02]
 
-C8. The tooling chapter, `docs/book/platform/tooling.ir.md`, describes the file runner, the REPL and the subcommands of `src/index.ts`, which this chapter treats only as host code. [proposed: this IR]
+C8. The tooling chapter, `docs/book/platform/tooling.ir.md`, describes the file runner, the REPL and the subcommands of `src/index.ts`, which this chapter treats only as host code. [decided: owner, 2026-11-02]
 
 ### The T-host track and the environment-capability contract [designed]
 
@@ -88,173 +88,173 @@ C20. `docs/book/units.md` §4.1 states that the host plane is not a unit, each u
 
 C21. The host plane holds interpreter bookkeeping that is no part of the value it rides. [decided: docs/book/concepts.md §18]
 
-C22. B-141 (there is no Environment interface) is the open backlog item that owns the provider side of the environment-capability contract. evidence: E1. [proposed: this IR]
+C22. B-141 (there is no Environment interface) is the open backlog item that owns the provider side of the environment-capability contract. evidence: E1. [decided: owner, 2026-11-02]
 
-C23. B-141 records that the Node CLI and the browser sandbox differ by capturing `print` output and by substituting extensions, not by implementing a stated interface. evidence: E1. [proposed: this IR]
+C23. B-141 records that the Node CLI and the browser sandbox differ by capturing `print` output and by substituting extensions, not by implementing a stated interface. evidence: E1. [decided: owner, 2026-11-02]
 
-C24. B-141 waits for B-136 (scope leaves `Value`), because the future manager is planted on the scope. evidence: E1. [proposed: this IR]
+C24. B-141 waits for B-136 (scope leaves `Value`), because the future manager is planted on the scope. evidence: E1. [decided: owner, 2026-11-02]
 
 ### The environment capabilities as implemented [implemented]
 
-C25. `src/primitives.ts` registers `print` with the effect label `io`, `delay` with `time` and `fetch` with `net`. evidence: E2. [proposed: this IR]
+C25. `src/primitives.ts` registers `print` with the effect label `io`, `delay` with `time` and `fetch` with `net`. evidence: E2. [decided: owner, 2026-11-02]
 
-C26. `evalSource` plants the run's future manager as a host-plane property of the evaluation scope. evidence: E3. [proposed: this IR]
+C26. `evalSource` plants the run's future manager as a host-plane property of the evaluation scope. evidence: E3. [decided: owner, 2026-11-02]
 
-C27. `print`, `delay` and `fetch` find the future manager through `scopeHostRead`, which walks the scope's parent chain. evidence: E3, E4, E5. [proposed: this IR]
+C27. `print`, `delay` and `fetch` find the future manager through `scopeHostRead`, which walks the scope's parent chain. evidence: E3, E4, E5. [decided: owner, 2026-11-02]
 
-C28. `print` returns a residual while the printed value or a slot of the printed value is pending. evidence: E4. [proposed: this IR]
+C28. `print` returns a residual while the printed value or a slot of the printed value is pending. evidence: E4. [decided: owner, 2026-11-02]
 
-C29. `print` hands the formatted value to the future manager's `onOutput` callback when one is set, else to `console.log`. evidence: E4. [proposed: this IR]
+C29. `print` hands the formatted value to the future manager's `onOutput` callback when one is set, else to `console.log`. evidence: E4. [decided: owner, 2026-11-02]
 
-C30. `delay` and `fetch` each throw "requires async runtime" when the scope chain holds no future manager. evidence: E5. [proposed: this IR]
+C30. `delay` and `fetch` each throw "requires async runtime" when the scope chain holds no future manager. evidence: E5. [decided: owner, 2026-11-02]
 
-C31. `delay(ms)` returns a future cell that a JavaScript `setTimeout` timer fills with the Int 0 after `ms` milliseconds. evidence: E5. [proposed: this IR]
+C31. `delay(ms)` returns a future cell that a JavaScript `setTimeout` timer fills with the Int 0 after `ms` milliseconds. evidence: E5. [decided: owner, 2026-11-02]
 
-C32. `fetch(url)` returns a future cell that `globalThis.fetch` fills with the response body as a String. evidence: E5. [proposed: this IR]
+C32. `fetch(url)` returns a future cell that `globalThis.fetch` fills with the response body as a String. evidence: E5. [decided: owner, 2026-11-02]
 
-C33. A failed request or a response status outside 200 to 299 fills the `fetch` cell with an error value instead of throwing. evidence: E5. [proposed: this IR]
+C33. A failed request or a response status outside 200 to 299 fills the `fetch` cell with an error value instead of throwing. evidence: E5. [decided: owner, 2026-11-02]
 
-C34. `fetch` passes only the URL to `globalThis.fetch`, which therefore sends a GET request with no body. evidence: E5. [proposed: this IR]
+C34. `fetch` passes only the URL to `globalThis.fetch`, which therefore sends a GET request with no body. evidence: E5. [decided: owner, 2026-11-02]
 
-C35. `src/primitives.ts` declares the liveness of `delay` as live, a timer always firing. evidence: E6. [proposed: this IR]
+C35. `src/primitives.ts` declares the liveness of `delay` as live, a timer always firing. evidence: E6. [decided: owner, 2026-11-02]
 
-C36. `src/primitives.ts` declares the liveness of `fetch` at the `admitted` discharge tier, with the assumption that the fetched endpoint eventually responds. evidence: E6. [proposed: this IR]
+C36. `src/primitives.ts` declares the liveness of `fetch` at the `admitted` discharge tier, with the assumption that the fetched endpoint eventually responds. evidence: E6. [decided: owner, 2026-11-02]
 
-C37. `createFuture` in `src/futures.ts` adds one pending future cell to the evaluation scope for each JavaScript Promise it receives. evidence: E7. [proposed: this IR]
+C37. `createFuture` in `src/futures.ts` adds one pending future cell to the evaluation scope for each JavaScript Promise it receives. evidence: E7. [decided: owner, 2026-11-02]
 
-C38. A settled Promise fills its future cell through `applyPhase`, which re-evaluates what residualised on the cell. evidence: E7. [proposed: this IR]
+C38. A settled Promise fills its future cell through `applyPhase`, which re-evaluates what residualised on the cell. evidence: E7. [decided: owner, 2026-11-02]
 
-C39. A rejected Promise fills its future cell with an error value, never a throw. evidence: E7. [proposed: this IR]
+C39. A rejected Promise fills its future cell with an error value, never a throw. evidence: E7. [decided: owner, 2026-11-02]
 
-C40. `waitForAll` returns a Promise that resolves once the future manager has no pending future. evidence: E7. [proposed: this IR]
+C40. `waitForAll` returns a Promise that resolves once the future manager has no pending future. evidence: E7. [decided: owner, 2026-11-02]
 
-C41. Outside the suite, `delay` and `fetch` are the only callers of `createFuture`. evidence: E8. [proposed: this IR]
+C41. Outside the suite, `delay` and `fetch` are the only callers of `createFuture`. evidence: E8. [decided: owner, 2026-11-02]
 
-C42. Neither host environment replaces `print`, `delay` or `fetch`: both run the implementations in `src/primitives.ts`. evidence: E9, E15. [proposed: this IR]
+C42. Neither host environment replaces `print`, `delay` or `fetch`: both run the implementations in `src/primitives.ts`. evidence: E9, E15. [decided: owner, 2026-11-02]
 
 ### The Node CLI [implemented]
 
-C43. `src/index.ts` is the Node CLI, run through `tsx` as `npx tsx src/index.ts` or as `npm start`. evidence: E10. [proposed: this IR]
+C43. `src/index.ts` is the Node CLI, run through `tsx` as `npx tsx src/index.ts` or as `npm start`. evidence: E10. [decided: owner, 2026-11-02]
 
-C44. `package.json` names no Node version: the file has no `engines` field. evidence: E10. [proposed: this IR]
+C44. `package.json` names no Node version: the file has no `engines` field. evidence: E10. [decided: owner, 2026-11-02]
 
-C45. CI runs the gate on Node 22. evidence: E29. [proposed: this IR]
+C45. CI runs the gate on Node 22. evidence: E29. [decided: owner, 2026-11-02]
 
-C46. `src/index.ts` imports three Node modules: `fs`, `path`, `readline`. evidence: E9. [proposed: this IR]
+C46. `src/index.ts` imports three Node modules: `fs`, `path`, `readline`. evidence: E9. [decided: owner, 2026-11-02]
 
-C47. Outside `src/test/`, two more files of `src/` import a Node module: `src/boundary-tests.ts` and `src/grammar2/bench.ts`. evidence: E8. [proposed: this IR]
+C47. Outside `src/test/`, two more files of `src/` import a Node module: `src/boundary-tests.ts` and `src/grammar2/bench.ts`. evidence: E8. [decided: owner, 2026-11-02]
 
-C48. The Node CLI reads each source file with `fs.readFileSync` as UTF-8. evidence: E9. [proposed: this IR]
+C48. The Node CLI reads each source file with `fs.readFileSync` as UTF-8. evidence: E9. [decided: owner, 2026-11-02]
 
-C49. The Node CLI finds the `lib/` directory beside `src/` from `import.meta.url`. evidence: E9. [proposed: this IR]
+C49. The Node CLI finds the `lib/` directory beside `src/` from `import.meta.url`. evidence: E9. [decided: owner, 2026-11-02]
 
-C50. The Node CLI resolves a module name with `fs.existsSync`, trying the `lib/` directory beside the source file before the `lib/` directory beside `src/`. evidence: E9. [proposed: this IR]
+C50. The Node CLI resolves a module name with `fs.existsSync`, trying the `lib/` directory beside the source file before the `lib/` directory beside `src/`. evidence: E9. [decided: owner, 2026-11-02]
 
-C51. `ModuleLoader` in `src/modules.ts` reads no file itself: its caller supplies a `readFile` or `readFileSync` function. evidence: E11. [proposed: this IR]
+C51. `ModuleLoader` in `src/modules.ts` reads no file itself: its caller supplies a `readFile` or `readFileSync` function. evidence: E11. [decided: owner, 2026-11-02]
 
-C52. The Node CLI supplies `ModuleLoader` with a `readFile` function over `fs.readFileSync`. evidence: E9. [proposed: this IR]
+C52. The Node CLI supplies `ModuleLoader` with a `readFile` function over `fs.readFileSync`. evidence: E9. [decided: owner, 2026-11-02]
 
-C53. The REPL reads lines from `process.stdin` through `readline`, prompting on `process.stdout`. evidence: E9. [proposed: this IR]
+C53. The REPL reads lines from `process.stdin` through `readline`, prompting on `process.stdout`. evidence: E9. [decided: owner, 2026-11-02]
 
-C54. The Node CLI takes its arguments from `process.argv`. evidence: E9. [proposed: this IR]
+C54. The Node CLI takes its arguments from `process.argv`. evidence: E9. [decided: owner, 2026-11-02]
 
-C55. The Node CLI ends a failed run through `process.exit` with code 1. evidence: E9. [proposed: this IR]
+C55. The Node CLI ends a failed run through `process.exit` with code 1. evidence: E9. [decided: owner, 2026-11-02]
 
-C56. The Node CLI sets no `onOutput` callback, leaving `print` to write through `console.log` to stdout. evidence: E4, E9. [proposed: this IR]
+C56. The Node CLI sets no `onOutput` callback, leaving `print` to write through `console.log` to stdout. evidence: E4, E9. [decided: owner, 2026-11-02]
 
-C57. Under Allegro Standard, the file runner and the REPL each create one future manager. evidence: E9. [proposed: this IR]
+C57. Under Allegro Standard, the file runner and the REPL each create one future manager. evidence: E9. [decided: owner, 2026-11-02]
 
-C58. Under Allegretto, the file runner and the REPL create no future manager. evidence: E9. [proposed: this IR]
+C58. Under Allegretto, the file runner and the REPL create no future manager. evidence: E9. [decided: owner, 2026-11-02]
 
-C59. In a run on 2026-11-02, the file runner under Allegretto stopped on a file calling `delay(5)` with exit code 1 and the message "delay: requires async runtime (no FutureManager available)". evidence: E12. [proposed: this IR]
+C59. In a run on 2026-11-02, the file runner under Allegretto stopped on a file calling `delay(5)` with exit code 1 and the message "delay: requires async runtime (no FutureManager available)". evidence: E12. [decided: owner, 2026-11-02]
 
-C60. In a run on 2026-11-02, the file runner under Allegro Standard printed 0 for that file, exiting with code 0. evidence: E12. [proposed: this IR]
+C60. In a run on 2026-11-02, the file runner under Allegro Standard printed 0 for that file, exiting with code 0. evidence: E12. [decided: owner, 2026-11-02]
 
-C61. The file runner waits for every pending future of its future manager before the run ends. evidence: E9. [proposed: this IR]
+C61. The file runner waits for every pending future of its future manager before the run ends. evidence: E9. [decided: owner, 2026-11-02]
 
 ### The browser sandbox [implemented]
 
-C62. `web/allegro-web.ts` is the entry of the web bundle. evidence: E13. [proposed: this IR]
+C62. `web/allegro-web.ts` is the entry of the web bundle. evidence: E13. [decided: owner, 2026-11-02]
 
-C63. `npm run build:web` bundles `web/allegro-web.ts` with esbuild into `web/dist/allegro.js`, an IIFE for the browser platform. evidence: E10. [proposed: this IR]
+C63. `npm run build:web` bundles `web/allegro-web.ts` with esbuild into `web/dist/allegro.js`, an IIFE for the browser platform. evidence: E10. [decided: owner, 2026-11-02]
 
-C64. The web bundle is a build output: `.gitignore` excludes every `dist/` directory. evidence: E14. [proposed: this IR]
+C64. The web bundle is a build output: `.gitignore` excludes every `dist/` directory. evidence: E14. [decided: owner, 2026-11-02]
 
-C65. In a build on 2026-11-02, the web bundle held 28 files of `src/` with `web/allegro-web.ts`. evidence: E15. [proposed: this IR]
+C65. In a build on 2026-11-02, the web bundle held 28 files of `src/` with `web/allegro-web.ts`. evidence: E15. [decided: owner, 2026-11-02]
 
-C66. The web bundle leaves out seven files of `src/` outside `src/test/`: `src/index.ts`, `src/modules.ts`, `src/pcp.ts`, `src/use-scanner.ts`, `src/grammar2/to-allegro.ts`, `src/boundary-tests.ts`, `src/grammar2/bench.ts`. evidence: E15. [proposed: this IR]
+C66. The web bundle leaves out seven files of `src/` outside `src/test/`: `src/index.ts`, `src/modules.ts`, `src/pcp.ts`, `src/use-scanner.ts`, `src/grammar2/to-allegro.ts`, `src/boundary-tests.ts`, `src/grammar2/bench.ts`. evidence: E15. [decided: owner, 2026-11-02]
 
-C67. `web/allegro-web.ts` imports no Node module. evidence: E13. [proposed: this IR]
+C67. `web/allegro-web.ts` imports no Node module. evidence: E13. [decided: owner, 2026-11-02]
 
-C68. The web bundle sets `window.Allegro` to an object of six functions: `eval`, `evalAsync`, `reset`, `formatValue`, `registerLibrary`, `inspect`. evidence: E13. [proposed: this IR]
+C68. The web bundle sets `window.Allegro` to an object of six functions: `eval`, `evalAsync`, `reset`, `formatValue`, `registerLibrary`, `inspect`. evidence: E13. [decided: owner, 2026-11-02]
 
-C69. `Allegro.eval` and `Allegro.evalAsync` evaluate under Allegro Standard by default, with the type system as the base extension. evidence: E13. [proposed: this IR]
+C69. `Allegro.eval` and `Allegro.evalAsync` evaluate under Allegro Standard by default, with the type system as the base extension. evidence: E13. [decided: owner, 2026-11-02]
 
-C70. `Allegro.eval` and `Allegro.evalAsync` keep the evaluation scope from one call to the next. evidence: E13, E16. [proposed: this IR]
+C70. `Allegro.eval` and `Allegro.evalAsync` keep the evaluation scope from one call to the next. evidence: E13, E16. [decided: owner, 2026-11-02]
 
-C71. `Allegro.reset` drops the kept evaluation scope with the future manager. evidence: E13, E16. [proposed: this IR]
+C71. `Allegro.reset` drops the kept evaluation scope with the future manager. evidence: E13, E16. [decided: owner, 2026-11-02]
 
-C72. The browser sandbox creates a future manager under Allegretto as under Allegro Standard. evidence: E13. [proposed: this IR]
+C72. The browser sandbox creates a future manager under Allegretto as under Allegro Standard. evidence: E13. [decided: owner, 2026-11-02]
 
-C73. `Allegro.eval` collects `console.log` output into the result's `output` list during the evaluation. evidence: E13. [proposed: this IR]
+C73. `Allegro.eval` collects `console.log` output into the result's `output` list during the evaluation. evidence: E13. [decided: owner, 2026-11-02]
 
-C74. `Allegro.eval` returns without waiting for pending futures. evidence: E13. [proposed: this IR]
+C74. `Allegro.eval` returns without waiting for pending futures. evidence: E13. [decided: owner, 2026-11-02]
 
-C75. `Allegro.evalAsync` streams each `print` to the page's callback through the future manager's `onOutput` callback. evidence: E13, E16. [proposed: this IR]
+C75. `Allegro.evalAsync` streams each `print` to the page's callback through the future manager's `onOutput` callback. evidence: E13, E16. [decided: owner, 2026-11-02]
 
-C76. When futures are pending, `Allegro.evalAsync` resolves after `waitForAll`, with no result value. evidence: E13. [proposed: this IR]
+C76. When futures are pending, `Allegro.evalAsync` resolves after `waitForAll`, with no result value. evidence: E13. [decided: owner, 2026-11-02]
 
-C77. The browser sandbox resolves a `use NAME` directive only against a library that the page registered through `Allegro.registerLibrary`. evidence: E13. [proposed: this IR]
+C77. The browser sandbox resolves a `use NAME` directive only against a library that the page registered through `Allegro.registerLibrary`. evidence: E13. [decided: owner, 2026-11-02]
 
-C78. A `use` directive naming an unregistered library fails with "Grammar library 'NAME' not registered". evidence: E13, E16. [proposed: this IR]
+C78. A `use` directive naming an unregistered library fails with "Grammar library 'NAME' not registered". evidence: E13, E16. [decided: owner, 2026-11-02]
 
-C79. `web/allegro-web.ts` holds its own `scanUses`, a second implementation beside the one in `src/use-scanner.ts`. evidence: E13. [proposed: this IR]
+C79. `web/allegro-web.ts` holds its own `scanUses`, a second implementation beside the one in `src/use-scanner.ts`. evidence: E13. [decided: owner, 2026-11-02]
 
-C80. The browser sandbox loads no module for an `import` statement, the web bundle holding no module loader. evidence: E13, E15. [proposed: this IR]
+C80. The browser sandbox loads no module for an `import` statement, the web bundle holding no module loader. evidence: E13, E15. [decided: owner, 2026-11-02]
 
-C81. In a run on 2026-11-02, the source `import math` followed by `math` returned `<symbol:math>` in the browser sandbox with no error. evidence: E16. [proposed: this IR]
+C81. In a run on 2026-11-02, the source `import math` followed by `math` returned `<symbol:math>` in the browser sandbox with no error. evidence: E16. [decided: owner, 2026-11-02]
 
-C82. `Allegro.inspect` evaluates a source under Allegro Standard with its `print` output discarded, returning the summary that `summarizeModule` and `renderModuleSummary` build. evidence: E13, E16. [proposed: this IR]
+C82. `Allegro.inspect` evaluates a source under Allegro Standard with its `print` output discarded, returning the summary that `summarizeModule` and `renderModuleSummary` build. evidence: E13, E16. [decided: owner, 2026-11-02]
 
 ### The pages and the deployed site [implemented]
 
-C83. The pages register six of the sixteen libraries under `lib/`: `pow`, `match_expr`, `invariants`, `contracts`, `effects`, `units`. evidence: E17. [proposed: this IR]
+C83. The pages register six of the sixteen libraries under `lib/`: `pow`, `match_expr`, `invariants`, `contracts`, `effects`, `units`. evidence: E17. [decided: owner, 2026-11-02]
 
-C84. `scripts/sync-web-libs.ts` copies each registered library's source from `lib/` into a marked region of `website/index.html`, `website/sandbox.html` and `web/sandbox.html`. evidence: E17. [proposed: this IR]
+C84. `scripts/sync-web-libs.ts` copies each registered library's source from `lib/` into a marked region of `website/index.html`, `website/sandbox.html` and `web/sandbox.html`. evidence: E17. [decided: owner, 2026-11-02]
 
-C85. `npx tsx scripts/sync-web-libs.ts --check` compares the three regions with `lib/` without writing. evidence: E17. [proposed: this IR]
+C85. `npx tsx scripts/sync-web-libs.ts --check` compares the three regions with `lib/` without writing. evidence: E17. [decided: owner, 2026-11-02]
 
-C86. In a run on 2026-11-02, the check failed: in all three pages, the copy of `lib/units.alg` differs from the file. evidence: E18. [proposed: this IR]
+C86. In a run on 2026-11-02, the check failed: in all three pages, the copy of `lib/units.alg` differs from the file. evidence: E18. [decided: owner, 2026-11-02]
 
-C87. `lib/units.alg` last changed in commit d73922c of 2026-10-26, after the three pages last changed in commit 2249aea of 2026-08-25. evidence: E18. [proposed: this IR]
+C87. `lib/units.alg` last changed in commit d73922c of 2026-10-26, after the three pages last changed in commit 2249aea of 2026-08-25. evidence: E18. [decided: owner, 2026-11-02]
 
-C88. `web/sandbox.html` is the local sandbox page, loading the bundle from `dist/allegro.js` beside the page. evidence: E19. [proposed: this IR]
+C88. `web/sandbox.html` is the local sandbox page, loading the bundle from `dist/allegro.js` beside the page. evidence: E19. [decided: owner, 2026-11-02]
 
-C89. `web/sandbox.html` runs the editor's source through `Allegro.evalAsync`. evidence: E19. [proposed: this IR]
+C89. `web/sandbox.html` runs the editor's source through `Allegro.evalAsync`. evidence: E19. [decided: owner, 2026-11-02]
 
-C90. `web/sandbox.html` keeps named snippets in the browser's `localStorage`. evidence: E19. [proposed: this IR]
+C90. `web/sandbox.html` keeps named snippets in the browser's `localStorage`. evidence: E19. [decided: owner, 2026-11-02]
 
-C91. `website/sandbox.html` differs from `web/sandbox.html` in two lines: a link to the documentation page; the bundle's path, `/allegro.js`. evidence: E19. [proposed: this IR]
+C91. `website/sandbox.html` differs from `web/sandbox.html` in two lines: a link to the documentation page; the bundle's path, `/allegro.js`. evidence: E19. [decided: owner, 2026-11-02]
 
-C92. `website/index.html` runs each example through `Allegro.evalAsync`, resetting the session after each run. evidence: E20. [proposed: this IR]
+C92. `website/index.html` runs each example through `Allegro.evalAsync`, resetting the session after each run. evidence: E20. [decided: owner, 2026-11-02]
 
-C93. `website/index.html` offers an inspect action per example through `Allegro.inspect`. evidence: E20. [proposed: this IR]
+C93. `website/index.html` offers an inspect action per example through `Allegro.inspect`. evidence: E20. [decided: owner, 2026-11-02]
 
 C94. Deploys through `deploy.sh` are run by the owner only. [decided: CLAUDE.md, Session contract]
 
-C95. `deploy.sh` builds the web bundle before stamping `website/version.json` with the commit, the branch, the deploy time and a dirty flag. evidence: E21. [proposed: this IR]
+C95. `deploy.sh` builds the web bundle before stamping `website/version.json` with the commit, the branch, the deploy time and a dirty flag. evidence: E21. [decided: owner, 2026-11-02]
 
-C96. `deploy.sh` syncs `website/` to the S3 bucket `allegrolang.org` with deletion, then copies `web/dist/allegro.js` to the bucket's `allegro.js`. evidence: E21. [proposed: this IR]
+C96. `deploy.sh` syncs `website/` to the S3 bucket `allegrolang.org` with deletion, then copies `web/dist/allegro.js` to the bucket's `allegro.js`. evidence: E21. [decided: owner, 2026-11-02]
 
-C97. `deploy.sh` ends with a CloudFront invalidation of every path. evidence: E21. [proposed: this IR]
+C97. `deploy.sh` ends with a CloudFront invalidation of every path. evidence: E21. [decided: owner, 2026-11-02]
 
-C98. `deploy.sh` warns without stopping when the branch is not `main` or the working tree is dirty. evidence: E21. [proposed: this IR]
+C98. `deploy.sh` warns without stopping when the branch is not `main` or the working tree is dirty. evidence: E21. [decided: owner, 2026-11-02]
 
-C99. `npm run check-deployed` compares the live `version.json` with `origin/main`, exiting with one of three codes: 0 when current; 1 when stale or mismatched; 2 when unverifiable. evidence: E22. [proposed: this IR]
+C99. `npm run check-deployed` compares the live `version.json` with `origin/main`, exiting with one of three codes: 0 when current; 1 when stale or mismatched; 2 when unverifiable. evidence: E22. [decided: owner, 2026-11-02]
 
-C100. `npm run check-deployed` runs `git fetch origin main` before comparing. evidence: E22. [proposed: this IR]
+C100. `npm run check-deployed` runs `git fetch origin main` before comparing. evidence: E22. [decided: owner, 2026-11-02]
 
-C101. In a run on 2026-11-02, `npm run check-deployed` reported the live site at commit 95ae3a1 of `main`, deployed from a dirty tree on 2026-08-24, 372 commits behind `origin/main`. evidence: E23. [proposed: this IR]
+C101. In a run on 2026-11-02, `npm run check-deployed` reported the live site at commit 95ae3a1 of `main`, deployed from a dirty tree on 2026-08-24, 372 commits behind `origin/main`. evidence: E23. [decided: owner, 2026-11-02]
 
 ### The browser-compatible core [partial]
 
@@ -262,133 +262,133 @@ C102. The project's session invariants require a browser-compatible core: `TextE
 
 C103. `docs/book/process.md` §6 places the complete gotcha list in `CLAUDE.md`, a Tier 3 document. [decided: docs/book/process.md §1 and §6]
 
-C104. No chapter of the book states the browser-compatible-core rule. evidence: E24. [proposed: this IR]
+C104. No chapter of the book states the browser-compatible-core rule. evidence: E24. [decided: owner, 2026-11-02]
 
-C105. The title of B-070 (browser runtime packaging) states that the core is browser-compatible. evidence: E25. [proposed: this IR]
+C105. The title of B-070 (browser runtime packaging) states that the core is browser-compatible. evidence: E25. [decided: owner, 2026-11-02]
 
-C106. No file of `src/` or `web/` names `Buffer` outside one comment in `src/types.ts`. evidence: E8. [proposed: this IR]
+C106. No file of `src/` or `web/` names `Buffer` outside one comment in `src/types.ts`. evidence: E8. [decided: owner, 2026-11-02]
 
-C107. `src/types.ts` converts between strings and UTF-8 bytes through one `TextEncoder` and one `TextDecoder` for the process. evidence: E26. [proposed: this IR]
+C107. `src/types.ts` converts between strings and UTF-8 bytes through one `TextEncoder` and one `TextDecoder` for the process. evidence: E26. [decided: owner, 2026-11-02]
 
-C108. `src/parser-helpers.ts` and the generated `src/parser.ts` each encode through a `TextEncoder`. evidence: E26. [proposed: this IR]
+C108. `src/parser-helpers.ts` and the generated `src/parser.ts` each encode through a `TextEncoder`. evidence: E26. [decided: owner, 2026-11-02]
 
-C109. `src/grammar2/engine.ts` and `src/evaluator.ts` test `typeof process` before reading `ALLEGRO_PARSE_STATS` or `ALLEGRO_EVAL_STATS`. evidence: E27. [proposed: this IR]
+C109. `src/grammar2/engine.ts` and `src/evaluator.ts` test `typeof process` before reading `ALLEGRO_PARSE_STATS` or `ALLEGRO_EVAL_STATS`. evidence: E27. [decided: owner, 2026-11-02]
 
-C110. Line 23 of `src/evaluator.ts` reads `process.env.ALLEGRO_TRACE_DEPTH` at module load without testing `typeof process`. evidence: E27. [proposed: this IR]
+C110. Line 23 of `src/evaluator.ts` reads `process.env.ALLEGRO_TRACE_DEPTH` at module load without testing `typeof process`. evidence: E27. [decided: owner, 2026-11-02]
 
-C111. Line 23 of `src/evaluator.ts` came in commit b25eac6 of 2026-10-27. evidence: E27. [proposed: this IR]
+C111. Line 23 of `src/evaluator.ts` came in commit b25eac6 of 2026-10-27. evidence: E27. [decided: owner, 2026-11-02]
 
-C112. In a run on 2026-11-02, the web bundle built from this branch threw `ReferenceError: process is not defined` at load, in a Node `vm` context with no `process` global. evidence: E16. [proposed: this IR]
+C112. In a run on 2026-11-02, the web bundle built from this branch threw `ReferenceError: process is not defined` at load, in a Node `vm` context with no `process` global. evidence: E16. [decided: owner, 2026-11-02]
 
-C113. With a stub `process` global holding an empty `env`, the bundle built from this branch evaluated sources, streamed `print` output, resolved `delay` and resolved a stubbed `fetch`. evidence: E16. [proposed: this IR]
+C113. With a stub `process` global holding an empty `env`, the bundle built from this branch evaluated sources, streamed `print` output, resolved `delay` and resolved a stubbed `fetch`. evidence: E16. [decided: owner, 2026-11-02]
 
 C114. A browser, which defines no `process` global, fails to load the web bundle built from this branch. [inferred: R1]
 
-C115. Commit 95ae3a1, the live site's stamp, is an ancestor of commit b25eac6. evidence: E23, E27. [proposed: this IR]
+C115. Commit 95ae3a1, the live site's stamp, is an ancestor of commit b25eac6. evidence: E23, E27. [decided: owner, 2026-11-02]
 
 C116. The live site's bundle predates the unguarded read in line 23 of `src/evaluator.ts`. [inferred: R2]
 
 C117. A deploy from this branch would publish a web bundle that fails to load in a browser. [inferred: R3]
 
-C118. No CI step, suite test or lint builds or loads the web bundle. evidence: E28, E29. [proposed: this IR]
+C118. No CI step, suite test or lint builds or loads the web bundle. evidence: E28, E29. [decided: owner, 2026-11-02]
 
-C119. No CI step, suite test or lint runs `scripts/sync-web-libs.ts --check`. evidence: E28, E29. [proposed: this IR]
+C119. No CI step, suite test or lint runs `scripts/sync-web-libs.ts --check`. evidence: E28, E29. [decided: owner, 2026-11-02]
 
-C120. `tsconfig.json` compiles `src/` against Node's type declarations, with no DOM library. evidence: E30. [proposed: this IR]
+C120. `tsconfig.json` compiles `src/` against Node's type declarations, with no DOM library. evidence: E30. [decided: owner, 2026-11-02]
 
 C121. The gate's typecheck accepts a read of the Node global `process` or `Buffer` anywhere in `src/`. [inferred: R4]
 
-C122. `tsconfig.json` includes `src/` alone, leaving `web/allegro-web.ts` outside the gate's typecheck. evidence: E30. [proposed: this IR]
+C122. `tsconfig.json` includes `src/` alone, leaving `web/allegro-web.ts` outside the gate's typecheck. evidence: E30. [decided: owner, 2026-11-02]
 
 ### What the T-host track has not built [partial]
 
-C123. No primitive of `src/primitives.ts` reads a file, opens a socket, starts a process or reads an environment variable. evidence: E31. [proposed: this IR]
+C123. No primitive of `src/primitives.ts` reads a file, opens a socket, starts a process or reads an environment variable. evidence: E31. [decided: owner, 2026-11-02]
 
 C124. Asynchronous I/O capabilities for files, processes and WebSockets are not built. [inferred: R5]
 
-C125. B-071 (async I/O capabilities: filesystem, networking, process, WebSocket, timers) is the open backlog item that owns asynchronous I/O capabilities. evidence: E25. [proposed: this IR]
+C125. B-071 (async I/O capabilities: filesystem, networking, process, WebSocket, timers) is the open backlog item that owns asynchronous I/O capabilities. evidence: E25. [decided: owner, 2026-11-02]
 
-C126. The one browser artifact is `web/dist/allegro.js`, an IIFE bundle that sets a `window.Allegro` global. evidence: E10, E13. [proposed: this IR]
+C126. The one browser artifact is `web/dist/allegro.js`, an IIFE bundle that sets a `window.Allegro` global. evidence: E10, E13. [decided: owner, 2026-11-02]
 
-C127. `package.json` marks the package private, declaring `build:web` as its one build for the browser. evidence: E10. [proposed: this IR]
+C127. `package.json` marks the package private, declaring `build:web` as its one build for the browser. evidence: E10. [decided: owner, 2026-11-02]
 
 C128. Browser packaging is not built. [inferred: R6]
 
-C129. B-070 (browser runtime packaging) is the open backlog item that owns browser packaging. evidence: E25. [proposed: this IR]
+C129. B-070 (browser runtime packaging) is the open backlog item that owns browser packaging. evidence: E25. [decided: owner, 2026-11-02]
 
-C130. Lane C of the backlog's lane table holds B-070 and B-071. evidence: E25. [proposed: this IR]
+C130. Lane C of the backlog's lane table holds B-070 and B-071. evidence: E25. [decided: owner, 2026-11-02]
 
-C131. No test of the suite performs a `fetch` request. evidence: E28. [proposed: this IR]
+C131. No test of the suite performs a `fetch` request. evidence: E28. [decided: owner, 2026-11-02]
 
 ### Where the code is, and what pins it [implemented]
 
-C132. `src/index.ts` holds the Node CLI's host code: the Node imports, the argument reads, the file reads, the exits. evidence: E9. [proposed: this IR]
+C132. `src/index.ts` holds the Node CLI's host code: the Node imports, the argument reads, the file reads, the exits. evidence: E9. [decided: owner, 2026-11-02]
 
-C133. `web/allegro-web.ts` holds the browser sandbox's host code: the library registry, the output capture, the `window.Allegro` object. evidence: E13. [proposed: this IR]
+C133. `web/allegro-web.ts` holds the browser sandbox's host code: the library registry, the output capture, the `window.Allegro` object. evidence: E13. [decided: owner, 2026-11-02]
 
-C134. `src/futures.ts` holds the future manager. evidence: E7. [proposed: this IR]
+C134. `src/futures.ts` holds the future manager. evidence: E7. [decided: owner, 2026-11-02]
 
-C135. `src/primitives.ts` holds `print`, `delay` and `fetch`. evidence: E2. [proposed: this IR]
+C135. `src/primitives.ts` holds `print`, `delay` and `fetch`. evidence: E2. [decided: owner, 2026-11-02]
 
-C136. `scripts/analyze/units.json` maps `src/futures.ts` to the `futures` unit, `src/primitives.ts` to seven units and `src/index.ts` to the `cli` unit. evidence: E32. [proposed: this IR]
+C136. `scripts/analyze/units.json` maps `src/futures.ts` to the `futures` unit, `src/primitives.ts` to seven units and `src/index.ts` to the `cli` unit. evidence: E32. [decided: owner, 2026-11-02]
 
-C137. `scripts/analyze/units.json` maps no file of `web/`. evidence: E32. [proposed: this IR]
+C137. `scripts/analyze/units.json` maps no file of `web/`. evidence: E32. [decided: owner, 2026-11-02]
 
-C138. `src/test/async-futures.ts` pins `delay`, the deferred `print`, the rejected Promise, the missing future manager and the liveness of `delay` and `fetch`. evidence: E33. [proposed: this IR]
+C138. `src/test/async-futures.ts` pins `delay`, the deferred `print`, the rejected Promise, the missing future manager and the liveness of `delay` and `fetch`. evidence: E33. [decided: owner, 2026-11-02]
 
-C139. `src/test/tooling.ts` pins the verdict logic of `scripts/check-deployed.ts`, not the network fetch. evidence: E22. [proposed: this IR]
+C139. `src/test/tooling.ts` pins the verdict logic of `scripts/check-deployed.ts`, not the network fetch. evidence: E22. [decided: owner, 2026-11-02]
 
-C140. No test of the suite loads the web bundle or calls a function of `web/allegro-web.ts`. evidence: E28. [proposed: this IR]
+C140. No test of the suite loads the web bundle or calls a function of `web/allegro-web.ts`. evidence: E28. [decided: owner, 2026-11-02]
 
 ### Clusters
 
-G1. cluster: C1, C2, C3, C4 [proposed: this IR]
+G1. cluster: C1, C2, C3, C4 [decided: owner, 2026-11-02]
 
-G2. cluster: C5, C6, C7, C8 [proposed: this IR]
+G2. cluster: C5, C6, C7, C8 [decided: owner, 2026-11-02]
 
-G3. cluster: C9, C10, C11, C12, C13 [proposed: this IR]
+G3. cluster: C9, C10, C11, C12, C13 [decided: owner, 2026-11-02]
 
-G4. cluster: C14, C15, C16, C17 [proposed: this IR]
+G4. cluster: C14, C15, C16, C17 [decided: owner, 2026-11-02]
 
-G5. cluster: C18, C19, C20, C21 [proposed: this IR]
+G5. cluster: C18, C19, C20, C21 [decided: owner, 2026-11-02]
 
-G6. cluster: C22, C23, C24 [proposed: this IR]
+G6. cluster: C22, C23, C24 [decided: owner, 2026-11-02]
 
-G7. cluster: C25, C26, C27, C28, C29, C30 [proposed: this IR]
+G7. cluster: C25, C26, C27, C28, C29, C30 [decided: owner, 2026-11-02]
 
-G8. cluster: C31, C32, C33, C34, C35, C36 [proposed: this IR]
+G8. cluster: C31, C32, C33, C34, C35, C36 [decided: owner, 2026-11-02]
 
-G9. cluster: C37, C38, C39, C40, C41, C42 [proposed: this IR]
+G9. cluster: C37, C38, C39, C40, C41, C42 [decided: owner, 2026-11-02]
 
-G10. cluster: C43, C44, C45, C46, C47 [proposed: this IR]
+G10. cluster: C43, C44, C45, C46, C47 [decided: owner, 2026-11-02]
 
-G11. cluster: C48, C49, C50, C51, C52, C53, C54, C55, C56 [proposed: this IR]
+G11. cluster: C48, C49, C50, C51, C52, C53, C54, C55, C56 [decided: owner, 2026-11-02]
 
-G12. cluster: C57, C58, C59, C60, C61 [proposed: this IR]
+G12. cluster: C57, C58, C59, C60, C61 [decided: owner, 2026-11-02]
 
-G13. cluster: C62, C63, C64, C65, C66, C67, C68 [proposed: this IR]
+G13. cluster: C62, C63, C64, C65, C66, C67, C68 [decided: owner, 2026-11-02]
 
-G14. cluster: C69, C70, C71, C72, C73, C74, C75, C76 [proposed: this IR]
+G14. cluster: C69, C70, C71, C72, C73, C74, C75, C76 [decided: owner, 2026-11-02]
 
-G15. cluster: C77, C78, C79, C80, C81, C82 [proposed: this IR]
+G15. cluster: C77, C78, C79, C80, C81, C82 [decided: owner, 2026-11-02]
 
-G16. cluster: C83, C84, C85, C86, C87 [proposed: this IR]
+G16. cluster: C83, C84, C85, C86, C87 [decided: owner, 2026-11-02]
 
-G17. cluster: C88, C89, C90, C91, C92, C93 [proposed: this IR]
+G17. cluster: C88, C89, C90, C91, C92, C93 [decided: owner, 2026-11-02]
 
-G18. cluster: C94, C95, C96, C97, C98, C99, C100, C101 [proposed: this IR]
+G18. cluster: C94, C95, C96, C97, C98, C99, C100, C101 [decided: owner, 2026-11-02]
 
-G19. cluster: C102, C103, C104, C105 [proposed: this IR]
+G19. cluster: C102, C103, C104, C105 [decided: owner, 2026-11-02]
 
-G20. cluster: C106, C107, C108, C109, C110, C111 [proposed: this IR]
+G20. cluster: C106, C107, C108, C109, C110, C111 [decided: owner, 2026-11-02]
 
-G21. cluster: C112, C113, C114, C115, C116, C117 [proposed: this IR]
+G21. cluster: C112, C113, C114, C115, C116, C117 [decided: owner, 2026-11-02]
 
-G22. cluster: C118, C119, C120, C121, C122 [proposed: this IR]
+G22. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
-G23. cluster: C123, C124, C125, C126, C127, C128, C129, C130, C131 [proposed: this IR]
+G23. cluster: C123, C124, C125, C126, C127, C128, C129, C130, C131 [decided: owner, 2026-11-02]
 
-G24. cluster: C132, C133, C134, C135, C136, C137, C138, C139, C140 [proposed: this IR]
+G24. cluster: C132, C133, C134, C135, C136, C137, C138, C139, C140 [decided: owner, 2026-11-02]
 
 ## Relations
 
@@ -490,4 +490,8 @@ E33. `src/test/async-futures.ts` lines 26, 36, 45 (`delay` pending, resolving, t
 
 A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own terms, reader, examples and scope: C3, C4, C7, C8, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C95, C96, C97, C98, C99, C100, C101, C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C115, C118, C119, C120, C122, C123, C125, C126, C127, C129, C130, C131, C132, C133, C134, C135, C136, C137, C138, C139, C140. Depends: C3, C4, C7, C8, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C95, C96, C97, C98, C99, C100, C101, C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C115, C118, C119, C120, C122, C123, C125, C126, C127, C129, C130, C131, C132, C133, C134, C135, C136, C137, C138, C139, C140.
 
+A1 resolved: ratified by the owner at the merge of PR #142, 2026-11-02; the statuses are flipped.
+
 A2. No term is proposed: every term this chapter uses, environment capability and ENV included, links to a definition site in an earlier chapter. Depends: C3.
+
+A2 resolved: confirmed at the merge of PR #142, 2026-11-02; no term is proposed.
