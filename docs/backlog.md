@@ -766,6 +766,7 @@ table and the stream plans.
 - [ ] **B-070** · Browser runtime packaging (core is browser-compatible)
 - [ ] **B-071** · Async I/O capabilities: filesystem, networking, process,
   WebSocket, timers (env-provided, effect-labeled)
+- **See also B-176** (the host chapter's findings), filed after B-175: five defects in the web bundle, the sandbox and the host rules, among them a web bundle that fails to load in a browser (B-070 packages the browser runtime).
 
 ### T-backend (M8)
 
@@ -3073,6 +3074,61 @@ table and the stream plans.
   states the defect; the chapter's reasoning role edits the IR when the
   code changes. **Pointer**: `docs/book/platform/tooling.ir.md`; the
   plan's §7 A3 bullet, `docs/plans/book-chapters-now.md`
+- [ ] **B-176** (the host chapter's findings) · T-host · T-docs · lane C
+  (item 1's guard lies in lane K; item 3's chapter statement lies in lane
+  A) · **Five defects in the web bundle, the sandbox and the host rules
+  that the host chapter's IR records and no item owned.** Found by chunk
+  A4 of B-170 (the book, Part II and III chapters writable now), the host
+  environments chapter `docs/book/platform/host.ir.md`, while verifying
+  its as-implemented claims against the CLI, the web bundle and the site;
+  filed here under the default of PR #142, approved at its merge on
+  2026-11-02. Each line names the defect, its file and lines, the IR
+  claims that state it and the evidence:
+  1. The web bundle built from main fails to load in a browser: line 23 of
+     `src/evaluator.ts` reads `process.env` without the `typeof process`
+     guard that line 22 has (commit b25eac6, 2026-10-27), so the bundle
+     throws `ReferenceError: process is not defined` in a context with no
+     `process` global; the live site's stamp 95ae3a1 predates the line; no
+     CI step, suite test or lint builds or loads the bundle, so the next
+     owner-run `deploy.sh` would publish a broken sandbox; claims C110,
+     C111, C112, C113, C114, C115, C116, C117, C118; evidence E16, E23,
+     E27, E28, E29. Fix: guard line 23 as line 22 is guarded, and add a
+     gate check that builds and loads the bundle in a context with no
+     `process` global.
+  2. The three web pages' copy of `lib/units.alg` has drifted from the
+     file since d73922c (2026-10-26): `scripts/sync-web-libs.ts --check`
+     fails with "website/index.html: lib 'units' drifted from
+     lib/units.alg", and the gate does not run it;
+     `scripts/sync-web-libs.ts`, the three pages under `website/`;
+     claims C86, C87, C119; evidence E18, E28, E29.
+  3. The browser-compatible-core rule (`TextEncoder`/`TextDecoder`, never
+     `Buffer`) is stated only in `CLAUDE.md` (line 155); no chapter
+     states it; the typecheck compiles `src/` against Node's declarations
+     (`tsconfig.json` lines 5–6, `types: ["node"]`, no DOM library), so
+     no gate check enforces it; `CLAUDE.md`, `tsconfig.json`,
+     `scripts/typecheck.sh`; claims C102, C103, C104, C120, C121; evidence
+     E24, E30.
+  4. Under `--base` the CLI creates no future manager, so `delay` and
+     `fetch` throw there ("delay: requires async runtime (no
+     FutureManager available)"), while the browser sandbox runs them under
+     Allegretto; `src/index.ts` lines 117–119 (the file runner) and 242
+     (the REPL), against `web/allegro-web.ts` lines 140 and 201; claims
+     C58, C59, C72; evidence E9, E12, E13.
+  5. The browser sandbox leaves an `import NAME` statement unresolved
+     with no error (`import math` then `math` returns `<symbol:math>`),
+     because the web bundle holds no module loader, and it keeps its own
+     copy of `scanUses` beside the one in `src/use-scanner.ts`;
+     `web/allegro-web.ts` lines 25–103 (`scanUses`); claims C79, C80,
+     C81; evidence E13, E15, E16.
+
+  Re-checked 2026-11-02 on the branch: the code still shows every defect
+  (item 1 by reading lines 22 and 23 of `src/evaluator.ts`, item 2 by
+  re-running `scripts/sync-web-libs.ts --check`, items 3 to 5 by reading
+  the cited lines; nothing that needs the network was re-run). Each fix
+  re-proposes the claim that states the defect; the chapter's reasoning
+  role edits the IR when the code changes. **Pointer**:
+  `docs/book/platform/host.ir.md`; the plan's §7 A4 bullet,
+  `docs/plans/book-chapters-now.md`
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

@@ -271,7 +271,7 @@ chapter, the table of contents gains row II.23, and
 `docs/book/platform/README.md` links it. Bare first-use identifiers 788
 (`npm run lint:docs:check`, from 790: this entry names two identifiers
 above their older unnamed first uses; the baseline is not lowered here);
-unratified terms 0 in the chapter.
+unratified terms 0 in the chapter. Merged as PR #142 on 2026-11-02; the IR's proposed claims were ratified by the merge and a follow-up flipped their statuses to decided; the chapter's five findings are filed as B-176 (the host chapter's findings) and row A4 of the plan now cites M10.
 
 ### 2026-11 — The tooling chapter (B-170, chunk A3): IR-only
 
