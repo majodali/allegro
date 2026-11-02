@@ -499,4 +499,4 @@ definition site before its first use in reading order
   grade `has-warnings` is never produced (C92); and
   `docs/book/implementation-map.md` puts `src/introspect.ts` on L2 where
   the unit manifest puts the unit on the track layer (C22).
-  The ratification flip followed the merge in its own PR; the owner of the seven findings is open with the maintainer.
+  The ratification flip followed the merge in its own PR; the findings are filed as B-175 (the tooling chapter's findings), minted on the maintainer's instruction of 2026-11-02.

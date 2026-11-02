@@ -719,6 +719,7 @@ table and the stream plans.
 
 - [ ] **B-064** · Execution tracing + step-through debugging
 - [ ] **B-065** · REPL improvements (multi-line, error display, completion)
+- **See also B-175** (the tooling chapter's findings), filed after B-172: eleven defects in the CLI and its documentation, among them the REPL's missing continuation (B-065 owns that fix).
 - [ ] **B-066** · Expression-graph processing (query/transform/rewrite)
 - [ ] **B-067** · LSP / IDE integration
 - [ ] **B-068** · Review UX (v1 "Phase J"): semantic summary as the primary
@@ -2980,6 +2981,78 @@ table and the stream plans.
   this item. What remains is the code question: whether the evaluator
   changes to meet the rules as stated (lane D), or the spine's rules are
   restated to the implementation (lane A).
+- [ ] **B-175** (the tooling chapter's findings) · T-tooling · T-docs ·
+  lane C (items 7 and 11 lie in lane K) · **Eleven defects in the CLI and
+  its documentation that the tooling chapter's IR records and no item
+  owned.** Found by chunk A3 of B-170 (the book, Part II and III chapters
+  writable now), the tooling chapter `docs/book/platform/tooling.ir.md`,
+  while verifying its as-implemented claims against the CLI; filed here on
+  the maintainer's instruction of 2026-11-02 (PR #137). Each line names
+  the defect, its file, the IR claims that state it and the evidence or
+  pinned demo:
+  1. `inspect` and the commands that load through `pcpLoadAndEval` load no
+     module for a `use NAME.MEMBER` directive, so `inspect` and `verify`
+     stop with a parse error on `tests/dotted-use-demo.alg` (position
+     141), which the file runner runs to exit 0; `src/index.ts`
+     (`runInspect`, `pcpLoadAndEval`; `runFile` loads it); claims C66,
+     C67, C68, C69, C99; evidence E6, E10, E26.
+  2. The same two paths load no inline `use grammar { … }` block, so
+     `inspect` and `verify` stop with a parse error on
+     `tests/inline-grammar-demo.alg` (position 80), which the file runner
+     runs to exit 0; `src/index.ts`; claims C67, C68, C69, C99; evidence
+     E6, E10, E26.
+  3. `obligations` without `--pending` lists no failed or skipped `proven`
+     clause, while `--pending` lists it and `verify` reports it failed:
+     `extractObligations` skips the `proven-failed` and `proven-skipped`
+     notifications when `pendingOnly === false`; `src/pcp.ts` line 1029;
+     claims C114, C115; evidence E14, E29.
+  4. The comment on that skip says the `proven` clauses are "already
+     covered via bindings", but a `proven` clause rides a function
+     binding, which the proof-binding loop skips as no proof binding, so
+     the comment is wrong; `src/pcp.ts` line 1029; claim C168 (relation
+     R9); evidence E14.
+  5. `prove` evaluates the file with its `use` header unstripped and no
+     module loaded: `evalSource` over a source opening with `use
+     contracts` throws "Parse error at position 4", so with an API key set
+     `prove` fails on any file whose header holds a `use` directive;
+     `pcp/llm-worker.ts` lines 266–271 (`runLlmWorker`); claims C133,
+     C134, C135 (relation R4); evidence E17, E28.
+  6. The missing-key message of `prove` offers a `--api-key` flag that the
+     CLI does not parse (`src/index.ts` lines 355–361 read
+     `--max-attempts`, `--model`, `--output` and `--json` only);
+     `pcp/llm-worker.ts` line 186 (`createAnthropicClient`); claim C124;
+     evidence E3, E16.
+  7. The comment above `TRACE_DEPTH` says `ALLEGRO_TRACE_DEPTH=1` prints
+     a line every 500 levels, but the value is the step itself: a value of
+     1 printed 383 lines, at every second depth, before the stack
+     overflowed; `src/evaluator.ts` lines 17–24; claims C143, C144
+     (relations R5, C141, C142); evidence E20, E27.
+  8. The REPL buffers no continuation: an entry that ends in `+`, `,` or
+     `=` fails with a parse error at the line break, and a `use` or
+     `import` line loads no module; `src/index.ts` lines 229–280 (`repl`);
+     claims C62, C60, C61; evidence E5, E25. B-065 (REPL improvements)
+     owns the fix; listed here so the chapter's findings stay in one
+     place.
+  9. The safety grade `has-warnings` is declared and never produced;
+     `src/introspect.ts` line 108 (the `SafetyGrade` type); claim C92
+     (with C90, C93); evidence E9. Decide: produce it or remove it.
+  10. `docs/book/implementation-map.md` puts `src/introspect.ts` on L2 and
+      `src/index.ts` on T-build, where `scripts/analyze/units.json` puts
+      the `introspect` and `cli` units on the track layer; lines 35 and 40
+      of the map; claims C22, C13 (relation R7); evidence E1, E36.
+  11. The `units` report lists no edge from `src/index.ts` to
+      `src/introspect.ts` or `src/pcp.ts`, because the CLI imports them
+      dynamically (`src/index.ts` lines 427, 482, 521 and 556), so the unit
+      DAG check cannot see the `cli` unit's edges to the `introspect` and
+      `pcp` units; `scripts/analyze/index.ts`; claims C17, C18 (C19 rides
+      along: `pcp/llm-worker.ts` has no unit); evidence E2, E3, E1.
+
+  Re-checked 2026-11-02 on the branch: the code still shows every defect
+  (items 1 and 2 by re-running the demos, items 3 to 11 by reading the
+  cited lines). Each fix re-proposes the claim that
+  states the defect; the chapter's reasoning role edits the IR when the
+  code changes. **Pointer**: `docs/book/platform/tooling.ir.md`; the
+  plan's §7 A3 bullet, `docs/plans/book-chapters-now.md`
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

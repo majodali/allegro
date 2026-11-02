@@ -596,4 +596,4 @@ A1 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the clai
 
 A2. Ratify or strike the proposed term safety grade (T30); the evalSource pipeline (T27) and precompile (T28) have their definition sites in the spine's §29 and in `docs/book/layers.md` §2 since ruling R9 of 2026-11-01. Depends: C2, C86, C90, C93.
 
-A2 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the term's definition site is this chapter's anchor. The PR's ask 2 (an owner for the chapter's seven findings) was not answered at the merge and stays open with the maintainer.
+A2 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the term's definition site is this chapter's anchor. The PR's ask 2 (an owner for the chapter's seven findings) was not answered at the merge and stays open with the maintainer. Filed as B-175.
