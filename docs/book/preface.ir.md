@@ -53,11 +53,9 @@ C12. Among decisions that do not depend on each other, the more significant deci
 
 C62. The decisions that shape most of Allegro arrive as early as their dependencies allow. [proposed: this IR]
 
-C13. A tour will open the book, telling the main design wagers of Allegro as a story. reworded in count 1, round 1. [decided: owner, 2026-11-03]
+C13. A tour will open the book: a story of the main design wagers of Allegro, each wager pointing forward to the wager's full treatment. reworded in count 1, round 1, C14 merged in. [decided: owner, 2026-11-03]
 
 C9. The tour is not yet written. evidence: E2 [proposed: this IR]
-
-C14. The tour points forward to the full treatment of each wager. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
 C15. After the tour, the book descends through the decisions in dependency order. [decided: owner, 2026-11-03]
 
@@ -95,11 +93,7 @@ C30. A decision about the language's vision or aesthetics may need fewer blocks.
 
 C31. The decision and rationale block may show how a rejected option fails. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
-C32. The evidence of a failure is an experiment written for the book. reworded in count 1, round 1. [decided: owner, 2026-11-03]
-
-C68. The book includes each such experiment. [decided: owner, 2026-11-03]
-
-C65. Any reader can run an experiment in the book again. [proposed: this IR]
+C32. The evidence of such a failure is an experiment written into the book, one experiment you can run again yourself. reworded in count 1, round 1, C68 and C65 merged in. [proposed: this IR]
 
 C33. Nothing in the book is drawn from the project's history. [decided: owner, 2026-11-03]
 
@@ -157,7 +151,7 @@ C54. The prose keeps every claim of the intermediate representation. [decided: o
 
 C55. The prose aims to be clear and brief enough to hold your interest. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
-C56. Rendering each sentence from one checked claim keeps out the phrasing habits of agents that make text harder for you to follow. reworded in count 1, round 1, C57 folded in. [decided: owner, 2026-11-03]
+C56. Rendering each sentence from one claim of the intermediate representation keeps out the phrasing habits of agents that make text harder for you to follow. reworded in count 1, round 1, C57 folded in. [decided: owner, 2026-11-03]
 
 ### Tracking numbers and process detail stay outside the book
 
@@ -181,7 +175,7 @@ G3. cluster: C7, C8, C2 [proposed: this IR]
 
 G4. cluster: C10, C11, C12, C62 [proposed: this IR]
 
-G5. cluster: C13, C9, C14, C15 [proposed: this IR]
+G5. cluster: C13, C15, C9 [proposed: this IR]
 
 G6. cluster: C16, C17, C18, C64 [proposed: this IR]
 
@@ -191,7 +185,7 @@ G8. cluster: C22, C23, C24, C25, C26, C27, C28 [proposed: this IR]
 
 G9. cluster: C30 [decided: owner, 2026-11-03]
 
-G10. cluster: C31, C32, C68, C65, C33 [proposed: this IR]
+G10. cluster: C31, C32, C33 [proposed: this IR]
 
 G11. cluster: C34, C35, C36, C37 [proposed: this IR]
 
@@ -249,7 +243,7 @@ E8. `docs/book/allegretto/evaluator.ir.md` beside `docs/book/allegretto/evaluato
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C7, C8, C9, C46, C47, C48, C49, C52), the reasons given for the principles (C11, C62, C64, C65, C66, C67), the definitions (C19, C34, C35, C38) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C7, C8, C9, C11, C62, C64, C65, C66, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C49, C52.
+A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C7, C8, C9, C46, C47, C48, C49, C52), the reasons given for the principles (C11, C62, C64, C66, C67), the definitions (C19, C34, C35, C38) and the merged claim on experiments (C32) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C7, C8, C9, C11, C62, C64, C32, C66, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C49, C52.
 
 A2. Ratify or strike the proposed terms decision section (T1), swappable decision (T2), foundational decision (T3) and open decision (T4). The plan ratified the first three concepts on 2026-11-03, as one term "swappable or foundational" for the second and third. The preface is their definition site in the book. Depends: C19, C34, C35, C38.
 

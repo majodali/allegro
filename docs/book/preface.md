@@ -20,13 +20,13 @@ or agent.
 The first rule is dependency order: a decision comes after the decisions
 it builds on. Everything a decision rests on is therefore explained
 before the decision itself. Among decisions that do not depend on each
-other, the more significant one comes first. As a result, the decisions
-that shape most of Allegro arrive as early as their dependencies allow.
+other, the more significant one comes first. The decisions that shape
+most of Allegro arrive as early as their dependencies allow.
 
-A tour will open the book, telling Allegro's main design wagers as a
-story. The tour is not yet written. Once written, it will point forward
-to the full treatment of each wager. After the tour, the book descends
-through the decisions in dependency order.
+A tour will open the book: a story of Allegro's main design wagers, each
+pointing forward to its full treatment. After the tour, the book
+descends through the decisions in dependency order. The tour itself is
+not yet written.
 
 Concepts follow a similar rule. A concept is defined where the book
 first uses it, or where the book settles its meaning. The book marks
@@ -57,9 +57,8 @@ A decision about the language's vision or aesthetics may need fewer
 blocks.
 
 The decision and rationale block may show how a rejected option fails.
-The evidence of such a failure is an experiment written for the book.
-The book includes each such experiment. You can run any of these
-experiments again yourself. Nothing in the book is drawn from the
+The evidence of such a failure is an experiment written into the book,
+one you can run again yourself. Nothing in the book is drawn from the
 project's history.
 
 ## Swappable and foundational decisions
@@ -107,8 +106,8 @@ chapter's intermediate representation sits beside its prose, in a file
 whose name ends in `.ir.md`. The form for people is prose, like this
 preface. The prose keeps every claim of the intermediate representation.
 
-Rendering each sentence from one checked claim keeps out the phrasing
-habits of agents that make text harder for you to follow. The prose aims
+Rendering each sentence from one claim of the intermediate
+representation keeps out the phrasing habits of agents that make text harder for you to follow. The prose aims
 to be clear and brief enough to hold your interest.
 
 ## Tracking numbers and process detail stay outside the book
@@ -120,8 +119,8 @@ decision is about without a lookup. The numbers live in the
 and in the project's records, such as its
 [decision register](../decisions.md).
 
-How the project is worked on also lives outside the book's narrative:
+How the project is worked on lives outside the book's narrative:
 its process, its measurements, its file maps and its studies. The
 narrative therefore stays on the design and the reasons for it.
 
-<!-- render map: C3→¶1 C1→¶1 C4→¶1 C5→¶1 C6→¶1 C7→¶2 C8→¶2 C2→¶2 C10→¶3 C11→¶3 C12→¶3 C62→¶3 C13→¶4 C9→¶4 C14→¶4 C15→¶4 C16→¶5 C17→¶5 C18→¶5 C64→¶5 C19→¶6 C20→¶6 C21→¶6 C22→¶7 C23→¶7 C24→¶7 C25→¶7 C26→¶7 C27→¶7 C28→¶7 C30→¶8 C31→¶9 C32→¶9 C68→¶9 C65→¶9 C33→¶9 C34→¶10 C35→¶10 C36→¶10 C37→¶10 C38→¶11 C39→¶11 C40→¶11 C41→¶11 C42→¶12 C43→¶12 C44→¶13 C45→¶13 C69→¶13 C46→¶13 C47→¶13 C48→¶14 C49→¶14 C50→¶15 C51→¶15 C52→¶15 C53→¶15 C54→¶15 C56→¶16 C55→¶16 C59→¶17 C60→¶17 C67→¶17 C61→¶17 C58→¶18 C66→¶18 -->
+<!-- render map: C3→¶1 C1→¶1 C4→¶1 C5→¶1 C6→¶1 C7→¶2 C8→¶2 C2→¶2 C10→¶3 C11→¶3 C12→¶3 C62→¶3 C13→¶4 C15→¶4 C9→¶4 C16→¶5 C17→¶5 C18→¶5 C64→¶5 C19→¶6 C20→¶6 C21→¶6 C22→¶7 C23→¶7 C24→¶7 C25→¶7 C26→¶7 C27→¶7 C28→¶7 C30→¶8 C31→¶9 C32→¶9 C33→¶9 C34→¶10 C35→¶10 C36→¶10 C37→¶10 C38→¶11 C39→¶11 C40→¶11 C41→¶11 C42→¶12 C43→¶12 C44→¶13 C45→¶13 C69→¶13 C46→¶13 C47→¶13 C48→¶14 C49→¶14 C50→¶15 C51→¶15 C52→¶15 C53→¶15 C54→¶15 C56→¶16 C55→¶16 C59→¶17 C60→¶17 C67→¶17 C61→¶17 C58→¶18 C66→¶18 -->

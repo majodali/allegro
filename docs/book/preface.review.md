@@ -89,4 +89,26 @@ the fixed IR is carried by the fixed prose (66 of 66 in the render map).
 C29, C57 and C63 are removed; C68 and C69 are new splits. No claim
 reported missing or stale.
 
-Confirmation: pending.
+Confirmation: the round's stranger instance confirmed the fixes of
+findings 1 to 21 and of M1, M2 and M3. Finding 22 is unfixed in part:
+"therefore" fell to two, but runs of short declaratives remained in the
+tour paragraph and the paragraph on failures. The stranger named three
+new defects the fixes introduced (23 to 25) and the remainder of 22 as
+finding 26. All four count toward round 1's fix set, not a new round.
+
+### Confirmation and carry-over
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| 22 | run of short declaratives remains (tour paragraph; failures paragraph) | pattern | stranger, at confirmation | fixed: C14 merged into C13; C65 and C68 merged into C32 (findings 26 and below) |
+| 23 | "one checked claim": "checked" undefined | jargon | round 1 fixes | fixed: C56 reads "from one claim of the intermediate representation" |
+| 24 | "As a result," does not follow from the sentence before | lost thread | round 1 fixes | fixed: "As a result," cut from C62's sentence |
+| 25 | "also lives outside the book's narrative" | excess | round 1 fixes | fixed: "also" cut |
+| 26 | the run "The evidence… The book includes… You can run…" | pattern | round 1 fixes | fixed: C32, C68 and C65 merged into one claim, C32, now proposed; the tour paragraph reordered with C13 and C14 merged |
+
+Claims check after the carry-over fixes, against the confirmed prose:
+every claim of the fixed IR is carried (63 of 63 in the render map).
+C14, C65 and C68 are merged into C13 and C32. No claim reported missing
+or stale. Prose words 930.
+
+Confirmation of the carry-over fixes: pending.
