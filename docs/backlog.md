@@ -3351,7 +3351,11 @@ table and the stream plans.
   files (`src/grammar2/`) or the contracts body form in `lib/`, not
   located further. Worked by the orchestrating session; the book pass
   only filed it.
-- [ ] **B-184** (the root README's corrections) · T-docs · Filed
+- [x] **B-184** (the root README's corrections) · T-docs · LANDED
+  2026-11-03 at PR #160 by the orchestrating session: the five steps
+  below as filed, plus the two READMEs added to the boundary of lane
+  S's closed plan (`docs/plans/parallel-streams.md`), which the lane
+  check applies. Filed
   2026-11-03 by the book pass, rulings R-F1-1 to R-F1-4 of its review of
   the root README (`docs/records/book-pass/f1-readme.md`). One lane-S PR,
   worked by the orchestrating session, since no lane holds `README.md`:
