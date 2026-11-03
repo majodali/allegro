@@ -34,6 +34,7 @@ and no jargon; no lost thread.
 | Round | Prose words | IR claims | Findings | Per 1,000 words | Verdict |
 |---|---|---|---|---|---|
 | 1 | 944 | 67 | 22 | 23.3 | not readable (restatement mismatches 3: 1 own, 2 prose; contradictions 0; undefined terms 1; jargon 3; lost thread 3) |
+| 2 | 913 | 63 | 16 | 17.5 | not readable (restatement mismatches 4: 2 own, 2 prose; contradictions 1; undefined terms 2; jargon 2; lost thread 2, one of them counting under the override) |
 
 ## Round 1
 
@@ -111,4 +112,65 @@ every claim of the fixed IR is carried (63 of 63 in the render map).
 C14, C65 and C68 are merged into C13 and C32. No claim reported missing
 or stale. Prose words 930.
 
-Confirmation of the carry-over fixes: pending.
+Confirmation of the carry-over fixes: the round's stranger instance
+confirmed 22, 23, 24, 25 and 26, and the reordered tour paragraph. It
+named two new defects of the carry-over fixes, 27 and 28.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| 27 | C56, how the prose is rendered, against C58, process detail stays out of the narrative | contradiction | carry-over fixes | declined in text: a ruling for the maintainer, ask A6 of the IR; the passage stays unchanged until the ruling (count-2 rule: a finding that needs a ruling goes to the owner) |
+| 28 | C32 "an experiment written into the book, one you can run again yourself" | compound | carry-over fixes | declined: the clause is an appositive of one claim; splitting it restores the run of short declaratives that finding 22 removed |
+
+## Round 2
+
+Words 913, claims 63, findings 16, from a fresh stranger instance. The
+restatement was correct overall. Mismatches: two own (G2, C3; G19, C67)
+and two attributed to the prose (G2, C6: "for any decision" widened
+"a decision" and sat oddly with C48 and C49; G2, C4: every decision
+"appears here" as present fact, against C7). Contradictions 1 (finding
+2). Undefined terms 2 (findings 4 and 5, both headings). Jargon 2
+(findings 3 and 13). Lost thread 2 (findings 14 and 15). Verdict: not
+readable.
+
+Override comparison by passage. Round 1's mismatches fell on G7 (C21,
+C29), G14 (C45) and a heading tag that no claim carried. Round 2's fell
+on G2 (C3, C4, C6) and G19 (C67). No mismatch recurs on one passage.
+Finding 14 falls on C56 (G17), the passage of carry-over finding 27: one
+passage flagged in two rounds. Under the override it counts against
+round 2's verdict. It is not edited: the passage waits for the
+maintainer's ruling under ask A6.
+
+The stranger wanted to read on at the tour and at a real decision
+section showing a rejected option failing. Neither is added: the tour
+is stated as not yet written (C9), and a worked decision section is ask
+A5.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| M1 | G2, C3 | restatement mismatch (own) | stranger | no fix needed: the stranger's own compression |
+| M2 | G19, C67 | restatement mismatch (own) | stranger | no fix needed: the stranger's own compression |
+| M3 | G2, C6 "for any decision" | restatement mismatch (prose) | stranger | fixed: finding 1 |
+| M4 | G2, C4 "appears here" as present fact | restatement mismatch (prose) | stranger | fixed: finding 2 |
+| 1 | "try another option for any decision" | mismatch | stranger | fixed: "for a decision", as C6 holds |
+| 2 | C4 as present fact against C7 | contradiction | stranger | fixed: C4 reworded as the book's aim |
+| 3 | "main design wagers" | jargon | stranger | fixed: C13 names "the few large choices that define Allegro" |
+| 4 | heading "The seven blocks of a decision section" before the definition | undefined term | stranger | declined: a heading may name the term its section defines; the section's first sentence defines it |
+| 5 | heading "Swappable and foundational decisions" | undefined term | stranger | declined: as for 4; the section's first two sentences define both terms |
+| 6 | C16, two sites in one sentence | compound | stranger | declined: one rule with two definition sites, one statement |
+| 7 | C13 joins the story and the forward pointers | compound | stranger | fixed: split into C13 and C70 |
+| 8 | "clear and brief enough to hold your interest" | excess | stranger | declined: holding the reader's interest is the aim the principle states, not tone |
+| 9 | "The code is organized to match the book." | excess | stranger | fixed: C42 cut; the heading carries it, and C43 states the rule |
+| 10 | C66, a closing restatement | pattern | stranger | fixed: C66 cut as a sentence, its reason merged into C58 |
+| 11 | heading "Two forms of each chapter" | pattern | stranger | fixed: heading "Prose for people, an intermediate representation for agents" |
+| 12 | "the design and the reasons for it" | referent | stranger | fixed: "the reasons for the design" (C58) |
+| 13 | "claims" in C51 | jargon | stranger | fixed: C51 glosses a claim as a single statement |
+| 14 | C56, the phrasing-habits sentence | lost thread | stranger | declined in text: the passage of finding 27, counted under the override and held for the maintainer's ruling under A6 |
+| 15 | C58, why process detail lives outside | lost thread | stranger | fixed: C58 gives the reason, merged from C66 |
+| 16 | "Some source files, however, still hold" | pattern | stranger | fixed: "however" cut |
+
+Claims check after the fix pass, against round 2's prose: every claim of
+the fixed IR is carried (62 of 62 in the render map). C42 and C66 are
+removed (C66 merged into C58); C70 is a new split of C13. No claim
+reported missing or stale. Prose words after the fixes 940 (by `wc`).
+
+Confirmation: pending.
