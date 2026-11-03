@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); next B-174 (the book's existing chapters retrofitted to IR) as the lane's next stream; then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
+| **A — reval docs** (**stream A, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, proposed: draft until its PR merges) | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 and B-184 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters and writes chapter reviews; touches no `src/`. Human-gated; run by its own review session (the plan's §8) |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, **active 2026-11-03**: ratified at the merge of PR #147, every recommendation taken) | B-172 (the partial-evaluation rules as implemented against the spine) — the stream's item, with B-178 and B-179 as its spare ids; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
@@ -1137,7 +1137,10 @@ table and the stream plans.
   (normative and rendered, or IR-only) taken in that stream's plan.
   Filed 2026-10-30 at the maintainer's instruction when adopting W-009
   for the five new chapters. **Blocked-by**: B-170. **Pointer**:
-  `docs/classification.md` §Rules adopted by declaration
+  `docs/classification.md` §Rules adopted by declaration. Stream plan:
+  `docs/plans/book-pass.md`, proposed 2026-11-03; the stream widens this
+  item to a one-chapter-at-a-time pass with restructuring, per the
+  maintainer's instruction of 2026-11-03.
 
 ### L3 — Vivace (M5)
 
@@ -3309,6 +3312,34 @@ table and the stream plans.
   §2; `docs/book/platform/README.md` (T-build row);
   `docs/plans/pe-rules.md` RR3; `docs/book/platform/build-pipeline.ir.md`
   C126.
+- [ ] **B-182** (unit tidy-ups from the book pass) · T-docs · L0 ·
+  lane D or lane K by file (lane P for `src/grammar2/`, lane C for
+  `src/index.ts`, `src/introspect.ts` and `src/pcp.ts`) · **The hand-off
+  item between the book pass and the tidy-up stream.** Filed 2026-11-03
+  at the maintainer's instruction, with the stream plan of B-174 (the
+  book's existing chapters retrofitted to IR). Each merged chapter edit
+  of the book pass appends its unit tidy-ups below as numbered lines:
+  the unit (from `scripts/analyze/units.json`), the file, what to change,
+  and the chapter review under `docs/records/book-pass/` as the pointer.
+  A tidy-up changes no behaviour: a move, a rename, a comment pointer to
+  the chapter, or dead code removed. Its oracle: every `tests/*.alg` and
+  `demos/**/*.alg` run with `run` and `inspect` gives identical stdout,
+  stderr and exit code; every pin and verdict is unchanged; every
+  ratchet only falls. The orchestrating session reads this item at its
+  check-ins and opens one tidy-up chunk per unit whose files no active
+  stream holds. Who edits it is ruling R2 (who edits B-182) of the plan;
+  as recommended, the book pass appends lines and never checks one off,
+  and the tidy-up stream checks a line off when its chunk merges, adding
+  only the PR, and never appends one. The tidy-up stream's own plan
+  names this item as its `backlog` when it opens. Lines: none yet.
+  **Pointer**: `docs/plans/book-pass.md` §2.3, §2.4 and §6 (R1, R2)
+- [ ] **B-183** (first out-of-scope finding of the book pass) · T-docs ·
+  Reserved by the book pass (`docs/plans/book-pass.md`) for a finding
+  that is not a tidy-up. Placeholder until used; the stream rewrites
+  this entry when it files the finding, and closes it unused when the
+  stream closes.
+- [ ] **B-184** (second out-of-scope finding of the book pass) · T-docs
+  · As B-183 (first out-of-scope finding of the book pass).
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

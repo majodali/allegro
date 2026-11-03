@@ -493,6 +493,13 @@ option (a)) was built but is set aside: its default arm returned a
 `majodali/b172-c5-default-arm` for the maintainer's choice. The record
 is the plan's §7.
 
+## Stream A — the book pass
+
+Plan `docs/plans/book-pass.md`; lane A; human-gated. Opened 2026-11-03
+with the plan, draft until its PR merges; entries newest first, directly
+below this line. A second stream in lane A, told apart from the closed
+`## Stream A — the book chapters` above by its name.
+
 ## Unstreamed
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.
