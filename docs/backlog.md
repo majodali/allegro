@@ -77,7 +77,7 @@ The grouping below comes from co-change measurement over the last 40
 | **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); next B-174 (the book's existing chapters retrofitted to IR) as the lane's next stream; then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
-| **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, proposed: draft until its PR merges) | B-172 (the partial-evaluation rules as implemented against the spine) — the stream's item, with B-178 and B-179 as its spare ids; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
+| **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, **active 2026-11-03**: ratified at the merge of PR #147, every recommendation taken) | B-172 (the partial-evaluation rules as implemented against the spine) — the stream's item, with B-178 and B-179 as its spare ids; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
 | **S — the pre-stream arc** (added 2026-10-30; **all five chunks landed 2026-10-30**) | ~~B-165, B-166, B-162, B-163, B-164~~ — plan `docs/plans/parallel-streams.md`, closed; the lane stays for process and lane-manifest edits | **Ran alone**: it edited the shared status documents and the process records. Human-gated: not a merge-on-green stream. Streams may now start in any lane; the rules are "Merge policy per stream", "Status documents under streams" and "The lane table as data" below |
 | **K — kernel hygiene** (added 2026-10-30, B-167 (lane K for kernel hygiene)) | The M1 residue, the L0 band that is ratchet and audit work: B-104 (retire the dunder convention), B-110, B-113, B-114, B-118, B-119, B-123, B-124, B-126, B-128 b onward, B-132, B-135/B-137 (the host-plane declaration), B-143, B-147. Each stream plan in K reserves the items it takes; none blocks a rung | **Runs alongside A, C, P and S.** The L0 unit files (`src/structure.ts`, `src/slot-accessors.ts`, `src/metadata.ts`, `src/symbols.ts`, `src/scope.ts`), the boundary battery and its baseline, `scripts/analyze/`, the Allegretto chapters and `docs/book/units.md`. Overlaps D in the evaluator, the primitives and the type files — taken only when D is not in them (the P rule), and a coordinating service refuses the overlap at dispatch. B-104 is the wide one: its stream plan's `boundary` widens per chunk and its PRs need D idle. Globs in `scripts/analyze/lanes.json`, declared from this band, refined when a stream plan opens |
 | **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29; **stream P, the recursion cutoff restored**, plan `docs/plans/recursive-precompile.md`, filed 2026-10-30, **closed 2026-11-01**) | The follow-ons of B-157 (the performance stream): ~~B-159 (precompile and termination analysis of recursive definitions)~~ closed 2026-11-01 by stream P, the gate's work down about 95%, with ~~B-087 (totality-analyzer performance)~~ closed as superseded; B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
@@ -652,6 +652,7 @@ table and the stream plans.
 - [ ] **B-050** · Variance + type constraints (`where T: Comparable`) —
   absorbed conceptually by knowledge-on-type-values (S5); surface design
   remains
+- **See also B-180** (recursion handling under partial evaluation), filed after B-179: a review of the inline cutoff and of the unfolding of recursive calls; B-100 (soundness review of the cutoff) holds the soundness thread.
 
 ### L2 — provability capability (M4)
 
@@ -714,6 +715,7 @@ table and the stream plans.
 - [ ] **B-062** · Typed phase-resource declarations (successor to retired
   `ctx_use` — design with B-013)
 - [ ] **B-063** · Tree shaking via partial evaluation
+- **See also B-181** (the hard-coded precompile and compile-time phases), filed after B-179: the evaluator and the runtime fix two phases, where B-061 designs a configurable pipeline.
 
 ### T-tooling (M7)
 
@@ -3011,7 +3013,8 @@ table and the stream plans.
   this item. What remains is the code question: whether the evaluator
   changes to meet the rules as stated (lane D), or the spine's rules are
   restated to the implementation (lane A). Stream plan:
-  `docs/plans/pe-rules.md`, proposed 2026-11-03.
+  `docs/plans/pe-rules.md`, proposed 2026-11-03. Ratified 2026-11-03 at
+  the merge of PR #147, all recommendations taken; the stream is active.
 - [ ] **B-175** (the tooling chapter's findings) · T-tooling · T-docs ·
   lane C (items 7 and 11 lie in lane K) · **Eleven defects in the CLI and
   its documentation that the tooling chapter's IR records and no item
@@ -3201,6 +3204,111 @@ table and the stream plans.
   closes.
 - [ ] **B-179** (second out-of-scope finding of the PE-rules stream) ·
   L0 · As B-178 (first out-of-scope finding of the PE-rules stream).
+- [ ] **B-180** (recursion handling under partial evaluation) · L0 ·
+  lane D (lane P for the cutoff's performance side) · **Review how
+  partial evaluation handles a recursive call; the current handling
+  stands until then.** Filed on the maintainer's instruction of
+  2026-11-03 at the merge of PR #147: "improvements to recursion
+  handling when partially evaluating functions"; the stream plan of
+  B-172 (the partial-evaluation rules as implemented against the spine)
+  goes with the current handling for now and the review comes later. The
+  current handling, with its pointers:
+  1. A speculative recursive call (an argument unresolved, the callee in
+     a recursion cycle of a typed compilation) is residualised by the
+     inline cutoff of B-018 (totality design revalidation) T-R6 (the
+     recursion inlining cutoff), as B-159 (precompile of recursive
+     definitions) restored it. `applyComposed` in `src/evaluator.ts` tests
+     the cutoff at lines 787 to 796 and returns an Expression carrying the
+     callee's effects; `evalSource` installs the cutoff at
+     `src/runtime.ts:1387`, for the bindings that `analyzeDivergence`
+     finds in a call-graph cycle (`recursiveBindings`,
+     `src/totality.ts:582`).
+  2. Every other speculative recursive call is unfolded. An untyped
+     compilation installs no cutoff (`src/runtime.ts:1285` clears it and
+     only a typed compilation sets it), and a recursion that the
+     call-graph analysis does not see as a cycle is not in the set; such
+     a call unfolds until `MAX_DEPTH` (10000, `src/evaluator.ts:15`,
+     checked at `:378`) or the host stack gives out.
+  3. The precompile pass still evaluates each recursive definition once
+     more, re-entrantly, while it binds the definition
+     (`precompileDefinitionEntry`, `src/runtime.ts:620`; the closing
+     entry of stream P (the recursion cutoff restored),
+     `docs/plans/recursive-precompile.md` §7, "What the stream leaves").
+  4. B-100 (soundness review of the cutoff) records the follow-on of
+     RR7 of `docs/plans/recursive-precompile.md` (the stack overflow
+     through recursion the cutoff does not see): the checking algorithm
+     can still reach a host stack overflow, reported as a user-facing
+     type error.
+  5. RR7 of `docs/plans/pe-rules.md` (a tail call inside a speculatively
+     evaluated branch) rules that such a call is applied and then
+     governed by this handling, with a residual where no cutoff is
+     installed; stream D takes that ruling, and this item does not
+     reopen it.
+
+  What a later stream could revisit, as questions and not decisions:
+  (a) bounded unfolding: unfold a recursive call a fixed number of times
+  before residualising, so that a base case reachable in a few steps is
+  found; (b) structural recursion: recognise it from the decreasing
+  argument that the totality analysis finds, so that the residual carries
+  what the recursion establishes; (c) a residual for the whole cycle that
+  keeps the body's effects and type without unfolding it; (d) whether the
+  cutoff should be program-configurable, which touches B-181 (the
+  hard-coded precompile and compile-time phases). **Pointer**:
+  `docs/plans/pe-rules.md` §2.3 and RR7; `docs/plans/recursive-precompile.md`
+  §2.5 and §7; B-100 above.
+- [ ] **B-181** (the hard-coded precompile and compile-time phases) ·
+  T-build · L0 · lane C (the track) and lane D (the evaluator) · **Review
+  whether the two phases that the evaluator and the runtime hard-code
+  should be program-specific or configurable, as earlier decided; the
+  hard-coded phases stand until then.** Filed on the maintainer's
+  instruction of 2026-11-03 at the merge of PR #147: "hard-coded
+  'precompile' and 'compile-time' phases, when such phases were
+  previously decided to be program specific and/or configurable. We'll
+  go with them for now, but review later." The facts, with their
+  pointers:
+  1. The code fixes two phases. The precompile pass is
+     `precompileFunctions` in `src/runtime.ts` (line 680; it returns at
+     once unless the compilation is typed, line 689), the stage the
+     `evalSource` pipeline runs before the evaluation loop
+     (`docs/book/layers.md` §2, *precompile*, line 67). Compile mode is
+     the scope mark that `precompileFunction` sets for the span of one
+     body (`src/evaluator.ts:1066` to `:1067`, restored at `:1108`) and
+     that `scopeCompileMode` reads up the scope chain
+     (`src/scope.ts:84` to `:91`); under it an effectful primitive defers
+     to a residual that carries its effects (`src/evaluator.ts:574` for a
+     lazy primitive, `:618` for an eager one). `inPrecompile`
+     (`src/evaluator.ts:104`) is not a phase mark: it only gates the
+     evaluation statistics.
+  2. RR3 of `docs/plans/pe-rules.md` (speculative evaluation and
+     effects), option (a), builds speculative evaluation on the
+     compile-mode mark, at run time as well.
+  3. The vision says otherwise of phases in general: "Each build phase is
+     a partial evaluation step in which phase-specific resources become
+     available" (`docs/book/vision.md`, lines 41 to 43). `docs/book/layers.md`
+     makes the multi-phase pipeline a track with "PE phases +
+     phase-gate semantics" at L0 (§1, lines 45 to 48, and the T-build row
+     of §2, line 59). The L0 phase mechanism, `applyPhase`
+     (`src/runtime.ts:1115`), completes pending cells; outside the suite
+     its only caller is the future manager (`src/futures.ts:82` and
+     `:84`; claims C124 and C125 of the pipeline chapter), so no pipeline
+     drives it and the precompile pass does not use it.
+  4. B-061 (multi-phase build pipeline) owns the pipeline's design, with
+     per-layer capabilities per the 2026-07 ruling; B-062 (typed
+     phase-resource declarations) owns the typed declarations. The
+     pipeline chapter records the surface as undesigned (C126, "the
+     multi-phase build surface is undesigned"), and the track's row in
+     `docs/book/platform/README.md` (line 11) says the same.
+
+  The review question, not decided here: whether the precompile pass and
+  compile mode become two phases of the configurable pipeline, declared
+  by the program or its configuration, with the deferral of effects a
+  phase-gate rule; or stay fixed stages that the pipeline wraps. Two
+  more: what `applyPhase` and the precompile pass share, and what the
+  speculation mark of RR3 means once phases are declared. **Pointer**:
+  B-061 and B-062 in the T-build section; `docs/book/layers.md` §1 and
+  §2; `docs/book/platform/README.md` (T-build row);
+  `docs/plans/pe-rules.md` RR3; `docs/book/platform/build-pipeline.ir.md`
+  C126.
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations
