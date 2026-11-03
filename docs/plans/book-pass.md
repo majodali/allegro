@@ -820,6 +820,18 @@ took every recommendation of the preface's PR:
   waits for B-184's lane widening. R20 open: the stream has no spare id.
   Lints: `lint:docs:check` anchors 0 · order 0 · ids 784; `lint:ir` 6
   files clean, unratified terms 0; `doc-ref-lint` all resolve.
+- **2026-11-03 — the label ruled; count 1 closed at round 5** (the
+  review session). The maintainer ruled the IR's ask A7 on PR #161:
+  every decision section carries the label, "aesthetic" names the
+  rationale, and the label depends on what rests on the decision.
+  Rounds 4 and 5: 6 then 11 findings (6.0, then 10.8 per 1,000 words).
+  The count closed at round 5 on its meta-review: the curve rose, the
+  tour passage drew findings in five rounds under every structure, and
+  strangers contradicted each other. The maintainer's reading is the
+  test (R14 (the human reader)). Asks A8 (the aim sentence) and A9 (the
+  tour) open. The preface: 66 claims, 976 words. P1's research ran
+  beside it: three fragments (97, 95 and 92 entries), being merged in
+  the scratchpad until this PR merges.
 
 ## 8. Sessions
 
