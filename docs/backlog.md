@@ -3018,6 +3018,10 @@ table and the stream plans.
   restated to the implementation (lane A). Stream plan:
   `docs/plans/pe-rules.md`, proposed 2026-11-03. Ratified 2026-11-03 at
   the merge of PR #147, all recommendations taken; the stream is active.
+  Ruling RR9 (unfolding inside a speculated `when` arm) was taken as
+  option C on PR #155, 2026-11-03, to be revisited, in the maintainer's
+  words, "when we want to push PE for more optimizations, or if we run
+  into cases where we need the full metadata evaluation".
 - [ ] **B-175** (the tooling chapter's findings) · T-tooling · T-docs ·
   lane C (items 7 and 11 lie in lane K) · **Eleven defects in the CLI and
   its documentation that the tooling chapter's IR records and no item

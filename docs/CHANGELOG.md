@@ -467,7 +467,11 @@ arms' effects: an effect behind `when` is now inferred, and the
 gated count changed; loading `lib/planning.alg` became about 30 seconds
 slower (`evaluate` 219,433 to 63,915,555), put to the maintainer. The
 evaluator IR flips C2's claims to decided, gains claims C189 to C196 and
-ask A5. The record is the plan's §7.
+ask A5. Under ruling RR9 (unfolding inside a speculated `when` arm),
+taken as option C, a composed call inside a speculated arm is
+residualised with the callee's effects instead of unfolded, which brings
+the load of `lib/planning.alg` back to 234,306 `evaluate` calls. The
+record is the plan's §7.
 
 ### 2026-11 — Rule 2 for && and ||; speculation runs no effect; the branch tail call applied; the inert default arm (B-172, chunks C2 and C5)
 

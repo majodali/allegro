@@ -537,6 +537,34 @@ over unresolved information) are cited in the same text.
     `when` under an unresolved input, so no count is expected to move;
     a rise would be news and deserves a look.
   **Taken: (a)**, 2026-11-03, at the merge of PR #147.
+- **RR9 — Unfolding inside a speculated when arm.** C3 as first committed
+  unfolded every composed call reached inside a speculated `when` arm
+  (RR1 (a)'s policy), and the unfolded callees' own `if`s and `when`s were
+  speculated in turn, nesting up to depth 26. Loading `lib/planning.alg`
+  rose from 219,433 `evaluate` calls to 63,915,555 (§7, C3). Measured
+  behind flags in a scratch copy, each with 136 of 136 outputs identical
+  and every C3 pin passing:
+
+  | Option | `evaluate` | `inlineExpansions` | `cutoffResiduals` | Load | `lint:load` |
+  |---|---|---|---|---|---|
+  | Without `when` speculation | 219,433 | 910 | 936 | 0.9 s | passes |
+  | C3 as committed | 63,915,555 | 5,260 | 1,367 | 31.7 s | passes |
+  | A: the binder's subject a stand-in Param carrying its metadata | 23,507,422 | 5,260 | 1,367 | 14.7 s | passes |
+  | B: no speculation inside a speculation (`when`, `if`, `&&`, `\|\|`) | 27,598 | 511 | 201 | 0.7 s | fails: `cutoffResiduals` below the floor |
+  | B2: no `when` speculation inside a speculation | 227,407 | 1,045 | 984 | 1.0 s | passes |
+  | C: a composed call inside a speculated `when` arm residualised with the callee's effects | 234,306 | 946 | 936 | 1.0 s | passes |
+
+  What each loses: A, nothing measured, and it removes two thirds of the
+  cost only; B, every effect found through nested speculation, and C2's
+  nested `if`s; B2, the effects of a `when` inside an `if` branch or inside
+  another arm (probed: both lost); C, effects that only unfolding inside
+  an arm would find (a callee with no stashed set yet; an effect variable
+  instantiated at the call; a return type through the call), none of
+  which a probe showed.
+  - **Recommended: C.** It returns the load to the base within 7%, keeps
+    every pin, output and gated count, and narrows RR1 (a) inside `when`
+    arms only.
+  **Taken: C**, 2026-11-03, by the maintainer on PR #155, to be revisited when partial evaluation is pushed for further optimisation or a case needs the full metadata evaluation inside an arm.
 
 ## 7. Record
 
@@ -926,3 +954,26 @@ over unresolved information) are cited in the same text.
       0 files outside.
     - `npm run test:shards`: 1,294 test runs, 1,294 passed, 0 failed;
       gate passed, 93 s.
+  - **RR9 taken.** The maintainer ruled on PR #155 for option C ("let's
+    go forward with option C, but we'll need to revisit when we want to
+    push PE for more optimizations, or if we run into cases where we need
+    the full metadata evaluation"). `src/evaluator.ts`:
+    `evaluateWhenArmSpeculatively` and its counter `whenArmSpeculations`
+    (lines 272 to 285); in `applyComposed`, a composed call with an
+    unresolved argument made while a `when` arm speculation is open is
+    residualised as an Expression carrying the callee's stashed effects
+    (lines 906 to 923). `src/primitives.ts`: `speculateWhenArms` speculates
+    guards, arms and the rest of the chain through it (lines 871, 872 and
+    881). `if`, `&&` and `||` are as C2 left them. Loading
+    `lib/planning.alg`, three CLI runs: `evaluate` 234,306 each time
+    (base 219,433; C3 as first committed 63,915,555), `inlineExpansions`
+    946, `cutoffResiduals` 936, `precompiles` 251, wall clock 1.28 s, 1.17 s and 1.20 s (base 0.9 s, C3 as first
+    committed 31.7 s).
+    Two pins added: a call inside an arm (`fwd` calling the forward
+    reference `later`, `callee_when` calling the untyped `h`) is a residual
+    carrying `io` while the same call in an `if` branch still unfolds; an
+    eight-level chain of `when`s each calling the next level twice stays at
+    or below 2,000 `evaluate` calls (460 through the CLI, 37,716
+    unfolded). Outputs: 136 of 136 identical against `origin/main`. The
+    IR gains C197, C198 and C200 (proposed, in ask A5) and C199 (decided
+    by RR9), cluster G39 and relation R11.
