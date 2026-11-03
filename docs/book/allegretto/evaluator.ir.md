@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `evaluator` unit (unit 13): evaluation and partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, and the edges the unit still owes.
-Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0; edited 2026-11-03: claims C178 to C180 and C182 to C188, clusters G36 and G37 and the term speculation mark (T31) ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: `eval_when` under PE Rule 2 by B-172's chunk C3 (claims C189 to C196 and cluster G38; C55, C181 and cluster G36 removed; C55 also dropped from ask A1; relation R2 re-pointed; evidence E51 added; E13, E14, E23, E50 and every `src/evaluator.ts` pointer moved by C3 re-synced), unratified terms 0)
+Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0; edited 2026-11-03: claims C178 to C180 and C182 to C188, clusters G36 and G37 and the term speculation mark (T31) ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: `eval_when` under PE Rule 2 by B-172's chunk C3 (claims C189 to C196 and cluster G38; C55, C181 and cluster G36 removed; C55 also dropped from ask A1; relation R2 re-pointed; evidence E51 added; E13, E14, E23, E50 and every `src/evaluator.ts` pointer moved by C3 re-synced), unratified terms 0; edited 2026-11-03: claims C173, C176 and C177 and cluster G35 ratified at the merge of PR #150, unratified terms 0)
 Source: chunk A1 of docs/plans/book-chapters-now.md (stream A, B-170); src/evaluator.ts as assigned to unit 13 since B-112's exit
 Normative: yes
 Footprint: docs/book/allegretto/evaluator.md; docs/book/allegretto/evaluator.ir.md; docs/book/allegretto/evaluator.review.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
@@ -145,15 +145,15 @@ C172. Under the discriminator rule, the two function kinds and Param participate
 
 C157. One default arm of the evaluator's switch must take the inert rest of the kinds. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C173. The switch in `evaluate` names five kinds: Symbol, Expression, the two function kinds and Param. evidence: E3. [proposed: this IR]
+C173. The switch in `evaluate` names five kinds: Symbol, Expression, the two function kinds and Param. evidence: E3. [decided: owner, 2026-11-03]
 
-C177. The switch in `evaluate` has one default arm, which returns the value unchanged for every kind the switch does not name, Bits and Structure among them. evidence: E3. [proposed: this IR]
+C177. The switch in `evaluate` has one default arm, which returns the value unchanged for every kind the switch does not name, Bits and Structure among them. evidence: E3. [decided: owner, 2026-11-03]
 
 C174. The switch in `evaluate` meets the discriminator rule. [inferred: R1]
 
 C175. B-172 (the partial-evaluation rules as implemented against the spine) owns the default arm of the switch in `evaluate`: the stream's ruling RR5 took option (a), an inert default arm. [decided: docs/plans/pe-rules.md §6, RR5, taken at the merge of PR #147, 2026-11-03]
 
-C176. The `units` report's discriminator count skips the `evaluator` unit, so no lint counts the kinds that the switch in `evaluate` names. evidence: E45. [proposed: this IR]
+C176. The `units` report's discriminator count skips the `evaluator` unit, so no lint counts the kinds that the switch in `evaluate` names. evidence: E45. [decided: owner, 2026-11-03]
 
 C24. Two walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves. evidence: E10. [decided: owner, 2026-11-01]
 
@@ -469,7 +469,7 @@ G5. cluster: C14, C15, C170, C16, C17, C18 [decided: owner, 2026-11-01]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [decided: owner, 2026-11-01]
 
-G35. cluster: C22, C153, C172, C157, C173, C177, C174, C175, C176, C24, C25, C26 [proposed: this IR]
+G35. cluster: C22, C153, C172, C157, C173, C177, C174, C175, C176, C24, C25, C26 [decided: owner, 2026-11-03]
 
 G8. cluster: C31, C32, C33, C163, C34 [decided: owner, 2026-11-01]
 
@@ -660,6 +660,8 @@ A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79, C
 A2 resolved: ratified by the owner at the merge of PR #129, 2026-11-01; the term's definition site is the chapter's anchor.
 
 A3. Ratify in bulk the re-proposed claims about the switch in `evaluate`, as chunk C5 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their cluster G35: C173, C177, C176. C174 is inferred through R1, and C175 is decided by ruling RR5. Depends: C173, C177, C176.
+
+A3 resolved: ratified by the owner at the merge of PR #150, 2026-11-03; the statuses are flipped.
 
 A4. Ratify in bulk the re-proposed claims about speculative evaluation and the branch tail call, as chunk C2 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their clusters G36 and G37: C178, C179, C185, C180, C186, C187, C182, C183, C188, C184. C181 is inferred through R2. Depends: C178, C179, C185, C180, C186, C187, C182, C183, C188, C184.
 
