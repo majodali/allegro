@@ -121,7 +121,7 @@
         "cutoffResiduals": 4
       },
       "tests/totality-decreases-demo.alg": {
-        "evaluates": 31182,
+        "evaluates": 31222,
         "inlineExpansions": 0,
         "precompiles": 4,
         "cutoffResiduals": 2
