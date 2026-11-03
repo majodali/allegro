@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-174
 lane: A
 merge: human-gated
@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
+chunks: [P0, P1, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
 reserves: [B-183, B-184]
 boundary:
   - docs/book/**
@@ -19,15 +19,17 @@ boundary:
   - docs/records/book-pass/**
   - docs/plans/book-pass-briefs.md
   - docs/plans/book-pass.md
+  - scripts/doc-lint-baseline.json
 ---
 
 # Every chapter of the book reviewed and edited IR first — the book pass
 
-> **Status: draft** — drafted 2026-11-03 by the orchestrating session
-> (§8), at the maintainer's instruction of the same day; a proposal the
-> maintainer ratifies by merging its PR. Every open question is a ruling
-> in §6 with options and a recommendation. The status line and the
-> header's `status` say the same thing.
+> **Status: active** — drafted 2026-11-03 by the orchestrating session
+> (§8), at the maintainer's instruction of the same day. Ratified the
+> same day by the merge of PR #154, which took every ruling of §6 as
+> recommended. Two amendments were ruled after the merge (§6, "Rulings
+> taken"). The status line and the header's `status` say the same
+> thing.
 >
 > **Reader**: the review session (§1) that runs this stream, starting
 > with no context, and the maintainer ruling on §6. Assumed known: the
@@ -39,6 +41,16 @@ boundary:
 > everything a session needs. Terms are defined in §1.
 
 ## 1. Outcome and terms
+
+**Purpose (re-scoped 2026-11-03, by the rulings of §6 on the
+re-scope).** The book was written by agents for agents. It works as
+technical documentation, not as a book a person would read. The pass
+now restructures, reviews and rewrites it, chapter by chapter, under
+the organizing principles of §2.6. The aim is one book that a person
+finds interesting and accessible, and that an agent finds well
+structured and logical for implementation work. Designing Allegro is an
+open journey, and the book invites readers along: to follow each
+decision, and to try the alternatives in code organized to match.
 
 **Outcome.** B-174 (the book's existing chapters retrofitted to IR), as
 this stream widens it, is met when all of these hold:
@@ -54,6 +66,10 @@ this stream widens it, is met when all of these hold:
 - Every term is defined before its first use in reading order, at one
   definition site with a `def-` anchor. `npm run lint:docs:check`
   reports anchors 0 and order 0, and ids at or below the baseline.
+- The book follows the organizing principles of §2.6, as the preface
+  states them (chunk P0 (the principles)), in the order the
+  [decision inventory](#def-decision-inventory) gives
+  (chunk P1 (the decision inventory)).
 - Every chapter's [tidy-up](#def-tidy-up) findings are filed as numbered
   lines under B-182 (unit tidy-ups from the book pass), or the review
   states that it found none.
@@ -86,6 +102,25 @@ vocabulary nor `docs/book/` defines it.
   or part of them, another active stream's boundary holds. It does not
   start, or its edit does not start, until that stream releases them
   (§2.4).
+- <a id="def-decision-section"></a>**Decision section**: a section of
+  the book that presents one decision, or a few tightly related ones:
+  the problem, the forces, the options, the decision and its rationale,
+  the consequences, the decision as implemented, and how to explore an
+  alternative (§2.6, principle 2).
+- <a id="def-decision-inventory"></a>**Decision inventory**: the list of
+  every design and implementation decision of the project, each with a
+  short name, the decisions it depends on and a significance rank. The
+  book's table of contents is derived from it.
+- <a id="def-swappable"></a>**Swappable or foundational**: whether
+  trying another option for a decision replaces one unit behind its
+  interface (swappable), or cascades through the decisions that depend
+  on it (foundational).
+- <a id="def-curious-programmer"></a>**Curious programmer**: the book's
+  human reader. A working programmer, curious about language design,
+  who has never seen the repository. The prose is written for this
+  reader; the IR is written for agents.
+
+All four were ratified by the maintainer on 2026-11-03.
 
 **Reserved ids.** The header reserves B-183 (first out-of-scope finding
 of the book pass) and B-184 (second out-of-scope finding of the book
@@ -198,6 +233,52 @@ files:
 One chunk per chapter, in two PRs, both human-gated. The procedure is
 stated once above the table in §5.
 
+### 2.6 The organizing principles
+
+Agreed with the maintainer on 2026-11-03 (the re-scope rulings of §6). Chunk P0 writes
+them as the book's preface, "How this book is organized"; until it
+merges, this list is their text.
+
+1. **Decisions in order.** Every design and implementation decision
+   appears with a discussion of its options and rationale. Dependency
+   order binds: a decision comes after the decisions it builds on.
+   Significance breaks ties: among decisions that do not depend on each
+   other, the more significant comes first. Most decisions have their
+   own section. Tightly related decisions may share one.
+2. **A default section shape.** A
+   [decision section](#def-decision-section) has seven blocks: problem,
+   forces, options, decision and rationale, consequences, as
+   implemented, explore. The shape is a default, not a rule. A decision
+   about the language's vision or aesthetics may need fewer blocks.
+3. **Failures are rationale, not history.** An option's rationale may
+   say how it fails. Evidence is an experiment written for the book and
+   included in it. Nothing is drawn from the project's history, and no
+   historical content enters the book.
+4. **A forward-pointing tour opens the book.** It tells the big bets as
+   a story and points to their full treatment. The rest of the book then
+   descends in dependency order.
+5. **Swappability is marked.** Each decision says whether it is
+   [swappable or foundational](#def-swappable), so a reader who branches
+   the code knows what an alternative costs.
+6. **Open decisions are invitations.** An open decision has a
+   consistent form and says how a reader can contribute an alternative.
+7. **Two readers, two forms.** The IR serves agents: claims, evidence,
+   pointers to the code. The prose serves the
+   [curious programmer](#def-curious-programmer). It keeps every IR
+   claim.
+8. **Engaging, clear, succinct.** Writing the prose from the IR also
+   helps break the phrasing patterns agents fall into. Many of those
+   patterns reduce clarity. The review checks for them, and the briefs
+   carry the list.
+9. **Process detail moves out.** How the project is worked on (process,
+   lanes, measurement, file maps, studies) leaves the book's narrative.
+10. **A concept is defined where it is first used or decided.**
+11. **No ids in the text.** The prose carries no backlog, decision or
+    ruling ids. Decisions and chapters have short, clear names. Ids live
+    in the IR and in the registers.
+12. **The code matches the book.** A decision lives in one unit where it
+    can, so a reader can branch the code and try another design.
+
 ## 3. Oracle and stop conditions
 
 **What decides a chunk.** Each command in the header, run on the branch
@@ -216,6 +297,8 @@ after it is up to date with `origin/main`:
 no demo. The ids baseline may only fall. A fall is recorded in §7 and
 the baseline is lowered in its own commit, after the branch is up to
 date, under the B-164 (ratchet baselines under concurrent merges) rule.
+The baseline file, `scripts/doc-lint-baseline.json`, is in this plan's
+boundary for that commit alone (amendment M1 of §6).
 
 **What no tool checks.** That a pinned example is a verbatim excerpt of
 its source; that a review's claims about the code are true. The
@@ -259,19 +342,24 @@ five:
 - `docs/records/book-pass/**`: the chapter reviews.
 - `docs/plans/book-pass-briefs.md`: the stream's working briefs.
 - This plan.
+- `scripts/doc-lint-baseline.json`, the ids baseline, in a lowering
+  commit only (§3; amendment M1 of §6). Lane A's manifest entry holds
+  it; no other file under `scripts/` is in the boundary.
 - The status documents under B-162, which every lane edits: this
   stream's section of `docs/CHANGELOG.md`; in `docs/backlog.md` B-174,
   B-183, B-184, lane A's row, and B-182 as R2 rules; this plan's row of
   `docs/plans/README.md`; rows of `docs/book-changes.md`.
 
-Lane A's globs in `scripts/analyze/lanes.json` do not hold
-`docs/records/book-pass/**` or `docs/plans/book-pass-briefs.md` today.
-R8 rules how they enter it.
+Lane A's globs in `scripts/analyze/lanes.json` hold
+`docs/records/book-pass/**` and `docs/plans/book-pass-briefs.md` since
+PR #153 (B-163 (the lane manifest and its check)), merged 2026-11-03 as
+R8 asked.
 
 **Outside the boundary, on purpose.** A chunk that needs one of these
 stops:
 
-- `src/**`, `lib/**`, `tests/**`, `demos/**`, `bench/**`, `scripts/**`,
+- `src/**`, `lib/**`, `tests/**`, `demos/**`, `bench/**`, `scripts/**`
+  (except the ids baseline, as above),
   `pcp/**`, `web/**`, `website/**`: code, demos and tools.
 - The root `README.md`: no lane A glob holds it (R9).
 - The Tier-0 chapters `docs/book/vision.md` and `docs/book/process.md`
@@ -284,6 +372,29 @@ stops:
   except through a ruling the maintainer takes.
 
 ## 5. Chunk sequence
+
+**The re-scoped front (the re-scope rulings of §6).** Three chunks come before any
+further chapter, each one PR, human-gated:
+
+- **P0 (the principles).** The preface "How this book is organized",
+  written IR first from §2.6, the first chapter of the reading order.
+- **P1 (the decision inventory).** Every decision of the project, from
+  `docs/decisions.md`, the plans' rulings, the spine's entries and the
+  chapters, each with a short name, its dependencies, a significance
+  rank and its swappability. P1 proposes the book's new table of
+  contents from it, chapter names included. It must give any chapter
+  the context it needs.
+- **P2 (the pilot chapter).** One chapter rewritten to the principles,
+  `docs/book/allegretto/metadata-and-capability.md` unless P1's table of
+  contents proposes another. The maintainer's reading is its test. The
+  briefs of `docs/plans/book-pass-briefs.md` are revised from it: the
+  review template gains the inventory's decisions and a phrasing-pattern
+  check, and the stranger brief a pattern finding kind. The chunk sequence
+  below and the cost per chapter are reset from P2.
+
+F1's review stands: its findings are factual. The tables below list the
+present chapters, the work the pass must cover. Their order and their
+chunk ids are superseded by P1's table of contents when it merges.
 
 **The per-chapter procedure.** Each chunk is one chapter, in two PRs,
 both human-gated and titled `B-174: …`.
@@ -393,8 +504,25 @@ a file no unit holds.
 
 ## 6. Rulings
 
-Each ruling is put to the maintainer at this plan's PR. The merge with
+Each ruling was put to the maintainer at this plan's PR. The merge with
 "defaults" takes every recommendation.
+
+**Rulings taken.** The maintainer merged PR #154 on 2026-11-03 with no
+ruling comment. The merge took the defaults: R1 to R9 as recommended,
+and the six terms of §1 ratified. The maintainer then ruled two
+amendments the same day, in the review session, both as recommended:
+
+- **M1 — The ids baseline is in the boundary.** Lane A's manifest entry
+  holds `scripts/doc-lint-baseline.json`, and §3 has the stream lower
+  it. The header's `boundary` did not list it, so the lane check would
+  have refused the lowering commit. The header now lists it, for that
+  commit only. The option not taken: the orchestrating session makes
+  every lowering.
+- **M2 — R8 restated as decided in effect.** PR #153 widened lane A as
+  R8's option (a) asked, before the plan merged. What R8 left open is
+  how the reviews are listed. Each merged review gets one appendix row
+  in `docs/reading-order.json`. One index record, option (c), is the
+  fallback if the rows crowd the appendix.
 
 **R1 — Tidy-ups beside stream D.** Lane D is internally serial (the lane
 table in `docs/backlog.md`, "Internally serial, permanently"). The
@@ -551,6 +679,24 @@ Options:
 of a Tier-0 chapter needs its review. An IR beside a Tier-0 chapter
 would govern Tier-0 text, so it waits for the same sign-off.
 
+**Rulings taken 2026-11-03, the re-scope.** Discussed with the
+maintainer in the review session after PR #154's merge.
+
+- **R10 — The book is written for human readers too.** The purpose of
+  §1 and the principles of §2.6, agreed as discussed. The section shape
+  of principle 2 is adopted as a default, expected to loosen.
+- **R11 — Pause and re-scope.** No chapter review after F1 until P0, P1
+  and P2 land. Taken.
+- **R12 — The principles are the book's preface.** Option not taken:
+  a section of this plan only. Taken.
+- **R13 — Failures are rationale, not history.** Taken as principle 3.
+  No amendment of `docs/book/process.md` is needed: experiments are
+  written for the book, and history stays out of it.
+- **R14 — The human reader.** The
+  [curious programmer](#def-curious-programmer) is the prose's reader.
+  The maintainer's reading is the test of human readability; a stranger
+  brief in the persona's voice may catch cheaper failures first. Taken.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -563,6 +709,23 @@ would govern Tier-0 text, so it waits for the same sign-off.
   review session records the rulings taken in §6 and flips the header to
   `status: active` in its first chunk's PR, as `docs/plans/pe-rules.md`
   did at PR #148.
+- **2026-11-03 — plan ratified; F1 reviewed** (the review session).
+  PR #154 merged the same day with no ruling comment, taken as the
+  defaults: R1 to R9 as recommended, the six terms of §1 ratified.
+  Amendments M1 and M2 ruled the same day (§6). Header `status:
+  active`. F1, review only (R9): `docs/records/book-pass/f1-readme.md`,
+  20 claims checked (13 hold, 6 wrong, 0 stale, 1 unverifiable), no
+  term moved, no tidy-up, one out-of-scope finding for B-183 (a parse
+  failure in the README's taste example), rulings R-F1-1 to R-F1-8 and
+  one term (*unstreamed PR*) put to the maintainer. Lints:
+  `lint:docs:check` anchors 0 · order 0 · ids 784; `lint:ir` 5 files
+  clean, unratified terms 0; `doc-ref-lint` all resolve; `lint:streams`
+  0 findings. One PR, as §5 allows for a review-only chunk.
+
+- **2026-11-03 — re-scoped** (the review session). The re-scope rulings
+  recorded in §6; the purpose in §1, the twelve principles in §2.6, the
+  front chunks P0 to P2 in §5. Four terms added to §1 and ratified the
+  same day. No chapter edited.
 
 ## 8. Sessions
 
@@ -585,7 +748,7 @@ two sessions share. Neither reads the other's conversation.
 **What each session never does.**
 
 - The review session never edits `src/`, `lib/`, `tests/`, `demos/`,
-  `bench/` or `scripts/`; never edits a file inside stream D's or the
+  `bench/` or `scripts/`, except the ids baseline under M1 (§6); never edits a file inside stream D's or the
   tidy-up stream's boundary; never checks off a B-182 line; never edits
   another stream's backlog items, lane row, manifest row or changelog
   section.

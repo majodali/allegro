@@ -519,9 +519,22 @@ is the plan's §7.
 ## Stream A — the book pass
 
 Plan `docs/plans/book-pass.md`; lane A; human-gated. Opened 2026-11-03
-with the plan, draft until its PR merges; entries newest first, directly
-below this line. A second stream in lane A, told apart from the closed
-`## Stream A — the book chapters` above by its name.
+with the plan, active since its PR #154 merged the same day; entries
+newest first, directly below this line. A second stream in lane A, told
+apart from the closed `## Stream A — the book chapters` above by its
+name.
+
+- **2026-11-03 — the plan ratified, and chunk F1 reviewed.** The merge
+  of PR #154 took rulings R1 to R9 of `docs/plans/book-pass.md` §6 as
+  recommended; amendments M1 (the ids baseline in the boundary) and M2
+  (R8 decided in effect) were ruled the same day. The plan's header
+  reads `status: active`. Chunk F1, review only under R9 (the three
+  chapters this stream may not edit): the record
+  `docs/records/book-pass/f1-readme.md` checks 20 claims of the root
+  `README.md` (13 hold, 6 wrong, 1 unverifiable), finds that its taste
+  example does not parse, and puts rulings R-F1-1 to R-F1-8 to the
+  maintainer. Listed as an appendix record in `docs/reading-order.json`
+  and `docs/book/README.md`. Ids 784, one below the 785 the plan measured.
 
 ## Unstreamed
 

@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** (**stream A, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, proposed: draft until its PR merges) | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 and B-184 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters and writes chapter reviews; touches no `src/`. Human-gated; run by its own review session (the plan's §8) |
+| **A — reval docs** (**stream A, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, active since PR #154 merged the same day) | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 and B-184 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters and writes chapter reviews; touches no `src/`. Human-gated; run by its own review session (the plan's §8) |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, **active 2026-11-03**: ratified at the merge of PR #147, every recommendation taken) | B-172 (the partial-evaluation rules as implemented against the spine) — the stream's item, with B-178 and B-179 as its spare ids; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
@@ -1134,13 +1134,16 @@ table and the stream plans.
   writable now)) closes: each existing `docs/book/` chapter gets a
   `<chapter>.ir.md` beside it under W-009 as adopted in
   `docs/classification.md`, with the owner's designation per chapter
-  (normative and rendered, or IR-only) taken in that stream's plan.
+  (normative and rendered, or IR-only): the stream's plan sets the
+  default and a chapter's review takes the exception (ruling R3 (the
+  designation of a chapter that has no IR) of the plan).
   Filed 2026-10-30 at the maintainer's instruction when adopting W-009
   for the five new chapters. **Blocked-by**: B-170. **Pointer**:
   `docs/classification.md` §Rules adopted by declaration. Stream plan:
-  `docs/plans/book-pass.md`, proposed 2026-11-03; the stream widens this
-  item to a one-chapter-at-a-time pass with restructuring, per the
-  maintainer's instruction of 2026-11-03.
+  `docs/plans/book-pass.md`, active since its PR #154 merged on
+  2026-11-03; the stream widens this item to a one-chapter-at-a-time
+  pass with restructuring, per the maintainer's instruction of
+  2026-11-03.
 
 ### L3 — Vivace (M5)
 
