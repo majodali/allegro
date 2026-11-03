@@ -540,6 +540,19 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-03 — the preface's rulings applied, and round 3.** The
+  maintainer's rulings at the merge of PR #157, recorded in
+  `docs/plans/book-pass.md` §6 (the preface's asks, the two finding
+  kinds, claims merged for flow, spare ids picked by the maintainer):
+  the preface's claims and terms ratified, its reading-order entry
+  marked `"organized": true` and its table-of-contents row marked
+  *organized*, the form of an open decision stated, and the sentence on
+  how the prose is written cut. Round 3 of the preface's count: 10
+  findings, not readable; fixes confirmed but one passage held for the
+  maintainer (whether a vision or aesthetics decision carries the
+  swappable-or-foundational label). The briefs' part (c) gains the rule
+  that claims a reader takes as one idea are merged in the IR. Ids 784.
+
 - **2026-11-03 — the re-scope, and the preface.** The book pass now
   writes the book for human readers too: the re-scope rulings of
   `docs/plans/book-pass.md` §6, the twelve organizing principles in its

@@ -806,6 +806,17 @@ took every recommendation of the preface's PR:
   *pattern* kind and part (d). Lints: `lint:docs:check` anchors 0 ·
   order 0 · ids 784; `lint:ir` 6 files clean, unratified terms 4;
   `doc-ref-lint` all resolve; `lint:streams` 0 findings.
+- **2026-11-03 — PR #157's rulings applied; round 3; paused again**
+  (the review session). R17 to R20 recorded in §6, R19 in part (c) of
+  the briefs. The preface: the IR's asks A1 to A6 applied, 0 unratified
+  terms; round 3, 935 words, 10 findings (10.7 per 1,000 words, from
+  23.3 and 17.5), not readable; the fixes confirmed, one passage held as
+  the IR's ask A7. Stream D's chunk C4 merged (PR #158), so F11's edit
+  of `docs/book/concepts.md` is no longer waiting (§2.4); the order of
+  the re-scoped front holds it until P1's table of contents. P1 still
+  waits for B-184's lane widening. R20 open: the stream has no spare id.
+  Lints: `lint:docs:check` anchors 0 · order 0 · ids 784; `lint:ir` 6
+  files clean, unratified terms 0; `doc-ref-lint` all resolve.
 
 ## 8. Sessions
 
