@@ -19,6 +19,7 @@ import { runBoundaryTests } from "../boundary-tests.js";
 // --- Areas (register at import) ----------------------------------------------
 
 import "./base.js";                // Allegretto: arithmetic … extensions
+import "./evaluator.js";           // B-172: the two PE rules, pinned
 import "./modules.js";             // the module loader
 import "./grammar-legacy.js";      // Earley combinators, JSON parser
 import "./types-core.js";          // Standard core types + the .alg corpus
