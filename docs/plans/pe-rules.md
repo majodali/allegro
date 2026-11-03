@@ -537,6 +537,34 @@ over unresolved information) are cited in the same text.
     `when` under an unresolved input, so no count is expected to move;
     a rise would be news and deserves a look.
   **Taken: (a)**, 2026-11-03, at the merge of PR #147.
+- **RR9 — Unfolding inside a speculated when arm.** C3 as first committed
+  unfolded every composed call reached inside a speculated `when` arm
+  (RR1 (a)'s policy), and the unfolded callees' own `if`s and `when`s were
+  speculated in turn, nesting up to depth 26. Loading `lib/planning.alg`
+  rose from 219,433 `evaluate` calls to 63,915,555 (§7, C3). Measured
+  behind flags in a scratch copy, each with 136 of 136 outputs identical
+  and every C3 pin passing:
+
+  | Option | `evaluate` | `inlineExpansions` | `cutoffResiduals` | Load | `lint:load` |
+  |---|---|---|---|---|---|
+  | Without `when` speculation | 219,433 | 910 | 936 | 0.9 s | passes |
+  | C3 as committed | 63,915,555 | 5,260 | 1,367 | 31.7 s | passes |
+  | A: the binder's subject a stand-in Param carrying its metadata | 23,507,422 | 5,260 | 1,367 | 14.7 s | passes |
+  | B: no speculation inside a speculation (`when`, `if`, `&&`, `\|\|`) | 27,598 | 511 | 201 | 0.7 s | fails: `cutoffResiduals` below the floor |
+  | B2: no `when` speculation inside a speculation | 227,407 | 1,045 | 984 | 1.0 s | passes |
+  | C: a composed call inside a speculated `when` arm residualised with the callee's effects | 234,306 | 946 | 936 | 1.0 s | passes |
+
+  What each loses: A, nothing measured, and it removes two thirds of the
+  cost only; B, every effect found through nested speculation, and C2's
+  nested `if`s; B2 (the nested `when` cap), the effects of a `when` inside an `if` branch or inside
+  another arm (probed: both lost); C, effects that only unfolding inside
+  an arm would find (a callee with no stashed set yet; an effect variable
+  instantiated at the call; a return type through the call), none of
+  which a probe showed.
+  - **Recommended: C.** It returns the load to the base within 7%, keeps
+    every pin, output and gated count, and narrows RR1 (a) inside `when`
+    arms only.
+  **Taken: C**, 2026-11-03, by the maintainer on PR #155, to be revisited when partial evaluation is pushed for further optimisation or a case needs the full metadata evaluation inside an arm.
 
 ## 7. Record
 
@@ -807,3 +835,238 @@ over unresolved information) are cited in the same text.
       0 files outside.
     - `npm run test:shards`: 1,291 test runs, 1,291 passed, 0 failed;
       the gate fails on the load lint's one count alone. The count stop was ruled (a) by the maintainer on 2026-11-03: the baseline of `tests/totality-decreases-demo.alg` is raised to 31,222 evaluates and 10 cutoff residuals by a one-file lane P PR handed over under RR8 (a), which merges before this chunk; the cutoff floor follows once the count has risen on main.
+- **2026-11-03 — C3 landed.** At the merge of PR #150 the maintainer
+  ratified C2's IR claims (ask A4) and the term *speculation mark*. C3
+  implements RR2 (a) for `eval_when`. No output, verdict or gated count
+  changed; one ungated cost rose sharply and is put to the maintainer
+  (below).
+  - **The C2 flip.** In `docs/book/allegretto/evaluator.ir.md`, C178 to
+    C180 and C182 to C188 and clusters G36 and G37 go from proposed to
+    decided (12 statuses); the term, which had no T element, is added as
+    T31, decided; A4 resolved. A3 (C5's claims) is not flipped: the merge
+    did not name it.
+  - **What changed.** `src/primitives.ts`: `speculateWhenArms` (lines 821
+    to 879) and its call in `eval_when_impl` (`eval_when`, line 897). With
+    the subject unresolved, every arm's guard and body are evaluated
+    through `evaluateSpeculatively`. A binder pattern (the `when_bind`
+    marker, or a Symbol pattern bound nowhere in scope, line 864) binds
+    the evaluated subject: it is substituted for the arm function's one
+    Param. A type pattern (`is Int`) or a destructuring pattern (`{x,
+    y}`, `Point(x, y)`) leaves each name as the arm function's own Param,
+    unbound and untyped: the arm's body is evaluated as written, and a
+    Param evaluates to itself. Nothing constructs a Param; the arm
+    function's Params are already fresh per arm, since substitution gives
+    every copied function fresh Params (`subst`). The guard is speculated
+    like the body, and the body whatever the guard gives. The walk follows
+    the chain's links over the same subject, evaluating the subject once,
+    speculates a written `else`, and never evaluates the default
+    `when_no_match`. A throw inside an arm's speculation propagates, as
+    C2 decided. `src/evaluator.ts`: `whenArmThunk`, `isUnboundPatternName`
+    and `thunkBodyOf` (lines 272 to 298), the walk's three kind questions,
+    kept in the evaluator under the discriminator rule
+    (`docs/book/units.md` §3.2); the discriminator count is 456, baseline
+    458.
+  - **The residual's shape.** The residual `eval_when` holds the
+    evaluated subject with the pattern, guard, arm and rest of the chain
+    as written, and carries the speculated arms' effects through
+    `applyPrimitive`'s tracking of the lazy primitive's evaluation
+    function; no type. The reason: the residual must still match when its
+    subject resolves, and an evaluated arm cannot be matched again (a
+    binder arm's body has the subject substituted, the other arms' bodies
+    hold their arm function's Params outside that function). RR2 (a)
+    says "the residual holds the evaluated arms"; C3 meets its purpose,
+    "the effects of every arm reach the enclosing function", and keeps
+    the arms as written. Put to the maintainer.
+  - **The pins**, in `src/test/evaluator.ts`. Flipped under RR2: the
+    `eval_when` residual pin (now: the residual keeps the arms as written
+    and carries `io`; `whenop` and `whenbind` infer `io`) and the
+    `pure`-declared `when` row (now halting with the mismatch). Added:
+    binder, type-pattern, destructuring, structural, `else` and guard
+    arms each hiding a `print` infer `io`, the binder's name being the
+    typed placeholder and a destructured name an untyped Param; the
+    default `when_no_match` is not evaluated; a residual re-evaluated in
+    a scope binding its subject runs the matching arm once, in Standard
+    mode and in Allegretto. The run-time pin for `&&`, `||` and `when`
+    keeps "nothing printed" and adds that `w` carries `io`.
+  - **Outputs** (§3 check 3), 136 CLI runs against `b320735` (C2's
+    merge): 136 identical after the code commit. No `inspect` line
+    changed: no program of `tests/` or `demos/` had an effect hidden
+    behind a `when` that reached an `inspect` effect line. No new halt.
+  - **Stop: the load of `lib/planning.alg` became about 30 seconds
+    slower.** The gated counts did not move (`npm run lint:load` passes;
+    the precompile corpus has no `when` under an unresolved subject), but
+    every program that loads `lib/planning.alg` pays it. `evaluate`
+    calls, base then C3, one CLI run each:
+
+    | Source | Base | C3 | Wall clock |
+    |---|---|---|---|
+    | `lib/units.alg` | 168,862 | 170,898 | 0.9 s, 0.7 s |
+    | `lib/planning.alg` | 219,433 | 63,915,555 | 0.9 s, 31.7 s |
+    | `tests/planning-solve-demo.alg` | 10,144,352 | 73,840,474 | 7.7 s, 38.0 s |
+    | `demos/rung3/01-model.alg` | 1,031,542 | 64,727,664 | 1.6 s, 31.0 s |
+    | `demos/rung3/02-solve.alg` | 3,779,105 | 67,475,227 | 3.2 s, 32.1 s |
+
+    For `lib/planning.alg`, `inlineExpansions` rose from 910 to 5,260,
+    `cutoffResiduals` from 936 to 1,367, `precompiles` stayed 251. The
+    136 CLI runs took 245 s against 41 s. The sharded suite took 93 s.
+    The cause: the precompile pass now unfolds the calls in every arm of
+    the untyped library functions' `when`s (`build_plan`, `apply_item`,
+    `build_handler`), whose arms reach the `if`s that C2 already
+    speculates, and a local binding or a binder's subject that is a
+    residual is evaluated again at each use. The three costliest `when`s
+    account for 53 million of the 64 million: `first_or(items, "budget",
+    none)` in `build_plan`, `i.k` in `apply_item`, and a `when` over a
+    `measure_or` result. Leaving a binder's name unbound instead of
+    binding the subject measured 23.5 million. Options, for the
+    maintainer: (a) accept the cost and hand it to lane P (B-157, the
+    performance stream); (b) bound the speculation, for instance by
+    residualising a composed call reached inside a `when` arm's
+    speculation with the callee's effects (RR7 (b)'s form), which loses
+    effects of forward references and effect variables instantiated
+    there; (c) leave a binder's name unbound too, which RR2 (a) excludes
+    and which removes about two thirds of the cost only.
+  - **The IR** (RR4 (a)): C55 and C181 leave the file (C55 also leaves
+    A1's lists); C189 to C195 are new and proposed (every arm
+    speculated; a binder's name bound to the subject; other names left as
+    the arm's own Params; `else` speculated and `when_no_match` not; the
+    residual's shape; its effects and no type; re-evaluation runs the
+    matching arm); C196 is inferred through R2 (Rule 2 met for effects);
+    cluster G38 replaces G36; R2 re-pointed; E51 added; E13, E14, E23,
+    E50 and every `src/evaluator.ts` pointer moved by C3 re-synced. New
+    ask A5.
+  - **Oracle**, on the final tree:
+    - `bash scripts/typecheck.sh`: typecheck clean (9 TS6059
+      rootDir-convention diagnostics ignored).
+    - `ALLEGRO_TEST_FILTER="evaluator|R1 verdict pin|R2|R3" npm test`:
+      54 total, 54 passed, 0 failed.
+    - `ALLEGRO_TEST_FILTER="effects|refine|totality|file: |when|match"
+      npm test`: 253 total, 253 passed, 0 failed.
+    - `npm run lint:load`: counts at or below the baseline.
+    - `npm run lint:units`: the unit DAG holds at its baseline
+      (discriminator 456, baseline 458).
+    - `npm run lint:planes`: the storage plane is reached only through
+      the accessor layer.
+    - `npm run lint:docs:check`: anchors 0, order 0, gate passed.
+    - `npm run lint:ir`: 5 files, clean, 0 warnings.
+    - `npx tsx scripts/doc-ref-lint.ts`: all markdown doc references
+      resolve.
+    - `npx tsx scripts/analyze/lane-lint.ts --base origin/main`: lane D,
+      0 files outside.
+    - `npm run test:shards`: 1,294 test runs, 1,294 passed, 0 failed;
+      gate passed, 93 s.
+  - **RR9 taken.** The maintainer ruled on PR #155 for option C ("let's
+    go forward with option C, but we'll need to revisit when we want to
+    push PE for more optimizations, or if we run into cases where we need
+    the full metadata evaluation"). `src/evaluator.ts`:
+    `evaluateWhenArmSpeculatively` and its counter `whenArmSpeculations`
+    (lines 272 to 285); in `applyComposed`, a composed call with an
+    unresolved argument made while a `when` arm speculation is open is
+    residualised as an Expression carrying the callee's stashed effects
+    (lines 906 to 923). `src/primitives.ts`: `speculateWhenArms` speculates
+    guards, arms and the rest of the chain through it (lines 871, 872 and
+    881). `if`, `&&` and `||` are as C2 left them. Loading
+    `lib/planning.alg`, three CLI runs: `evaluate` 234,306 each time
+    (base 219,433; C3 as first committed 63,915,555), `inlineExpansions`
+    946, `cutoffResiduals` 936, `precompiles` 251, wall clock 1.28 s, 1.17 s and 1.20 s (base 0.9 s, C3 as first
+    committed 31.7 s).
+    Two pins added: a call inside an arm (`fwd` calling the forward
+    reference `later`, `callee_when` calling the untyped `h`) is a residual
+    carrying `io` while the same call in an `if` branch still unfolds; an
+    eight-level chain of `when`s each calling the next level twice stays at
+    or below 2,000 `evaluate` calls (460 through the CLI, 37,716
+    unfolded). Outputs: 136 of 136 identical against `origin/main`. The
+    IR gains C197, C198 and C200 (proposed, in ask A5) and C199 (decided
+    by RR9), cluster G39 and relation R11 (C197 refines C44).
+- **2026-11-03 — C4 landed.** At the merge of PR #155 the maintainer
+  took every default, which ratifies ask A5 and the residual's shape of
+  the C3 record. C4 restates PE Rule 1 in the spine under RR1 (a), as
+  amended by RR9. Docs only: no file under `src/`, `tests/`, `bench/` or
+  `scripts/` changed.
+  - **The C3 flip.** In `docs/book/allegretto/evaluator.ir.md`, C189 to
+    C195, C197, C198 and C200 and clusters G38 and G39 go from proposed
+    to decided (12 statuses); A5 resolved. No proposed status was left
+    before C4's own claims.
+  - **The restated rule**, `docs/book/concepts.md` §25 (partial
+    evaluation), lines 1568 to 1576: "An application with an unresolved
+    argument produces a **residual** — the application itself, as a
+    value — with metadata fields propagated onto it per their rules,
+    unless it applies a composed function. A composed function is
+    **unfolded**: its body is evaluated with the arguments substituted,
+    and Rule 1 governs each application inside it. Two calls are
+    residualised instead, carrying the callee's effects: a call into a
+    recursion cycle during a typed compilation, because unfolding it
+    cannot converge; and a call reached inside a `when` arm that Rule 2
+    evaluates, because the unfoldings nested there grow without bound."
+    Rule 2's wording is unchanged. The Rationale gains the reason for
+    unfolding (lines 1583 to 1586): refinement checks, effect inference
+    and theorem discharge run on the unfolded body, where a residual
+    would hide everything behind the callee's signature. The
+    As-implemented paragraph (lines 1590 to 1595) adds that `eval_if`,
+    `&&`, `||` and `eval_when` evaluate their branches or arms
+    speculatively and that the evaluation runs no effect. The spine
+    still defines *residual* in §26; §25 keeps its inline gloss ("the
+    application itself, as a value"), as before.
+  - **The delta row**, lines 1597 to 1603: "No delta: both rules are
+    implemented as stated since chunks C2 to C4 of **B-172** (the
+    partial-evaluation rules as implemented against the spine). The
+    `when`-arm exception of Rule 1 is to be revisited, in the
+    maintainer's words, "when we want to push PE for more
+    optimizations, or if we run into cases where we need the full
+    metadata evaluation" (`plans/pe-rules.md` §6, ruling RR9 (unfolding
+    inside a speculated `when` arm)). **→ B-172**." (The link on
+    `plans/pe-rules.md` is elided.) The pointer is to
+    RR9 rather than to B-180 (recursion handling under partial
+    evaluation), since the `when`-arm exception is not a recursion
+    question. C6 removes or rewrites the `→ B-172` pointer when the
+    stream closes.
+  - **The IR** (RR4 (a)). C35 is replaced by C201 (residual unless a
+    composed function); C202 (unfolding) and C203 (the two exceptions)
+    are new; the three quote the spine and are decided by it. C161 ("as
+    implemented, PE Rule 1 governs an eager primitive application and an
+    application whose function position is unresolved") became false
+    under the restated rule, which governs a composed call too, and is
+    replaced by C204 (those two applications produce a residual, as the
+    rule states). C44 (one exception) is replaced by C205
+    (`applyComposed` unfolds, except a call into a recursion cycle
+    during a typed compilation or one made inside a `when` arm
+    speculation). C154 and C168 stay, both still true. Cluster G40
+    replaces G9; relations R3, R4 and R11 re-pointed from C35 and C44 to
+    C202 and C205; C44 and C161 leave ask A1's lists. New ask A6: C204
+    and C205.
+  - **Stale in `docs/book/allegretto/evaluator.md` §3**, for lane A's
+    count 2 under RR4 (a), the prose being unchanged by this stream:
+    lines 127 to 129, "As implemented, PE Rule 1 governs an eager
+    primitive application and an application whose function position is
+    unresolved" (C161's sentence); lines 129 to 133, "The exception to
+    PE Rule 1 is a composed function applied to an unresolved argument,
+    which `applyComposed` unfolds into its substituted body unless the
+    call enters a recursion cycle during a typed compilation" (C44's
+    sentence: unfolding is now the rule, and there are two exceptions);
+    lines 173 to 174, "`eval_if` in `src/primitives.ts` evaluates both
+    branches when its condition is unresolved" (true, but silent on
+    speculation, stale since C2); lines 177 to 180, "`eval_when` returns
+    a residual without evaluating any branch when its subject is
+    unresolved. `&&` and `||` return a residual without evaluating the
+    right operand when the left operand is unresolved. So `eval_when`,
+    `&&` and `||` do not meet PE Rule 2" (false since C2 and C3). The
+    section's `[partial]` tag is stale with them.
+  - **`docs/book-changes.md`**: no row. Its rules log a non-monotonic
+    structural change (an identifier renamed, merged, removed,
+    renumbered or reclassified; a chapter moved, split or merged; a
+    definition site moved). A restated rule is none of these, and the
+    file has never logged an IR claim's replacement.
+  - **Oracle**, on the final tree:
+    - `npm run lint:docs:check`: anchors 0, order 0, ids 784, gate
+      passed (main's count, unchanged).
+    - `MTOOL_HOME=/home/user/majodali/methodology-tools npm run lint:ir`:
+      5 files, clean, 0 violations, 0 warnings, unratified terms 0.
+    - `npx tsx scripts/doc-ref-lint.ts`: all markdown doc references
+      resolve.
+    - `npm run lint:streams`: 6 plans checked, 0 with findings.
+    - `PR_TITLE="B-172: Rule 1 restated in the spine, unfolding as the
+      policy with its two exceptions (C4)" npx tsx
+      scripts/analyze/lane-lint.ts --base origin/main`: lane D, 4 files,
+      0 outside.
+    - `ALLEGRO_TEST_FILTER="doc-ref|doc lints|IR lint|stream plans|lane
+      lint|evaluator" MTOOL_HOME=/home/user/majodali/methodology-tools npm
+      test`: 37 total, 37 passed, 0 failed.

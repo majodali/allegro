@@ -450,6 +450,45 @@ Plan `docs/plans/pe-rules.md`; lane D; human-gated (lane D keeps the
 per-chunk gate). Opened 2026-11-03 with the plan, draft until its PR
 merges; entries newest first, directly below this line.
 
+### 2026-11 — Rule 1 restated in the spine: unfolding as the policy with its two exceptions (B-172, chunk C4)
+
+B-172 (the partial-evaluation rules as implemented against the spine),
+chunk C4 of `docs/plans/pe-rules.md`, under ruling RR1 (PE Rule 1:
+restate the spine, or change the code) option (a). Docs only.
+`docs/book/concepts.md` §25 (partial evaluation) now states that a
+composed function applied to an unresolved argument is unfolded, Rule 1
+governing each application inside its body, and names the two calls
+residualised instead, carrying the callee's effects: a call into a
+recursion cycle during a typed compilation, and a call inside a `when`
+arm that Rule 2 evaluates (ruling RR9 (unfolding inside a speculated
+`when` arm)). The Rationale gives the reason for unfolding; the Delta
+reads "No delta" and names only RR9's revisit. The evaluator IR flips
+C3's claims to decided (ask A5), replaces C35, C44 and C161 by C201 to
+C205, and opens ask A6. The record is the plan's §7.
+
+### 2026-11 — Rule 2 for eval_when: every arm speculated with its pattern names unresolved (B-172, chunk C3)
+
+B-172 (the partial-evaluation rules as implemented against the spine),
+chunk C3 of `docs/plans/pe-rules.md`, under ruling RR2 (what "evaluates
+both branches" means for `eval_when`) option (a). With an unresolved
+subject, `eval_when_impl` (`eval_when`, `src/primitives.ts`) evaluates
+every arm's guard and body through `evaluateSpeculatively`: a binder
+pattern binds the subject, a type or destructuring pattern leaves its
+names as the arm function's own unbound Params, and the default
+`when_no_match` is never evaluated. The residual keeps the arms as
+written, so it still matches once its subject resolves, and carries the
+arms' effects: an effect behind `when` is now inferred, and the
+`pure`-declared `when` row halts. Two gap pins of
+`src/test/evaluator.ts` flipped, three tests added. No output, verdict or
+gated count changed; loading `lib/planning.alg` became about 30 seconds
+slower (`evaluate` 219,433 to 63,915,555), put to the maintainer. The
+evaluator IR flips C2's claims to decided, gains claims C189 to C196 and
+ask A5. Under ruling RR9 (unfolding inside a speculated `when` arm),
+taken as option C, a composed call inside a speculated arm is
+residualised with the callee's effects instead of unfolded, which brings
+the load of `lib/planning.alg` back to 234,306 `evaluate` calls. The
+record is the plan's §7.
+
 ### 2026-11 — Rule 2 for && and ||; speculation runs no effect; the branch tail call applied; the inert default arm (B-172, chunks C2 and C5)
 
 B-172 (the partial-evaluation rules as implemented against the spine),

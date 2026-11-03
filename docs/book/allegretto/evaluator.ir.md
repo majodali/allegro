@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `evaluator` unit (unit 13): evaluation and partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, and the edges the unit still owes.
-Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0)
+Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0; edited 2026-11-03: claims C178 to C180 and C182 to C188, clusters G36 and G37 and the term speculation mark (T31) ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: `eval_when` under PE Rule 2 by B-172's chunk C3 (claims C189 to C196 and cluster G38; C55, C181 and cluster G36 removed; C55 also dropped from ask A1; relation R2 re-pointed; evidence E51 added; E13, E14, E23, E50 and every `src/evaluator.ts` pointer moved by C3 re-synced), unratified terms 0; edited 2026-11-03: claims C173, C176 and C177 and cluster G35 ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: the `when` arm policy of ruling RR9 (claims C197 to C200, cluster G39, relation R11, evidence E52 and E53; E9 and every pointer moved re-synced), unratified terms 0; edited 2026-11-03: claims C189 to C195, C197, C198 and C200 and clusters G38 and G39 ratified at the merge of PR #155, unratified terms 0; edited 2026-11-03: PE Rule 1 restated in `docs/book/concepts.md` §25 by B-172's chunk C4 (claims C201 to C204 and cluster G40; C35, C44, C161 and cluster G9 removed; C44 and C161 also dropped from ask A1; C154 and C168 kept; relations R3, R4 and R11 re-pointed), unratified terms 0)
 Source: chunk A1 of docs/plans/book-chapters-now.md (stream A, B-170); src/evaluator.ts as assigned to unit 13 since B-112's exit
 Normative: yes
 Footprint: docs/book/allegretto/evaluator.md; docs/book/allegretto/evaluator.ir.md; docs/book/allegretto/evaluator.review.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
@@ -68,6 +68,8 @@ T28. Layer, with Allegretto as L0 and Allegro Standard as L2. defined-at: ../lay
 T29. Discriminator rule. defined-at: ../units.md#32-the-discriminator-rule [decided: docs/book/units.md §3.2]
 
 T30. Tail call. An application of a composed function whose result is the enclosing function body's result. anchor: #def-tail-call [decided: owner, 2026-11-01]
+
+T31. Speculation mark. The `compileMode` host property that `speculate` sets on the fresh child scope it makes for one speculative evaluation. anchor: #3-partial-evaluation-as-implemented [decided: owner, 2026-11-03]
 
 ## Claims
 
@@ -143,15 +145,15 @@ C172. Under the discriminator rule, the two function kinds and Param participate
 
 C157. One default arm of the evaluator's switch must take the inert rest of the kinds. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C173. The switch in `evaluate` names five kinds: Symbol, Expression, the two function kinds and Param. evidence: E3. [proposed: this IR]
+C173. The switch in `evaluate` names five kinds: Symbol, Expression, the two function kinds and Param. evidence: E3. [decided: owner, 2026-11-03]
 
-C177. The switch in `evaluate` has one default arm, which returns the value unchanged for every kind the switch does not name, Bits and Structure among them. evidence: E3. [proposed: this IR]
+C177. The switch in `evaluate` has one default arm, which returns the value unchanged for every kind the switch does not name, Bits and Structure among them. evidence: E3. [decided: owner, 2026-11-03]
 
 C174. The switch in `evaluate` meets the discriminator rule. [inferred: R1]
 
 C175. B-172 (the partial-evaluation rules as implemented against the spine) owns the default arm of the switch in `evaluate`: the stream's ruling RR5 took option (a), an inert default arm. [decided: docs/plans/pe-rules.md §6, RR5, taken at the merge of PR #147, 2026-11-03]
 
-C176. The `units` report's discriminator count skips the `evaluator` unit, so no lint counts the kinds that the switch in `evaluate` names. evidence: E45. [proposed: this IR]
+C176. The `units` report's discriminator count skips the `evaluator` unit, so no lint counts the kinds that the switch in `evaluate` names. evidence: E45. [decided: owner, 2026-11-03]
 
 C24. Two walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves. evidence: E10. [decided: owner, 2026-11-01]
 
@@ -179,13 +181,17 @@ C163. No abort that `src/evaluator.ts` raises is caused by an unresolved input. 
 
 C34. `src/evaluator.ts` raises three aborts during evaluation: a depth past 10,000; a declared parameter type with no field check installed; a primitive with no implementation. evidence: E3, E8, E18. [decided: owner, 2026-11-01]
 
-C35. PE Rule 1 says that an application with an unresolved argument produces a residual. [decided: docs/book/concepts.md §25]
+C201. PE Rule 1 says that an application with an unresolved argument produces a residual, unless it applies a composed function. [decided: docs/book/concepts.md §25]
 
 C168. Under PE Rule 1, metadata fields propagate onto the residual per their rules. [decided: docs/book/concepts.md §25]
 
-C161. As implemented, PE Rule 1 governs an eager primitive application and an application whose function position is unresolved. evidence: E6, E8. [decided: owner, 2026-11-01]
+C202. PE Rule 1 says that a composed function is unfolded: its body is evaluated with the arguments substituted, and PE Rule 1 governs each application inside it. [decided: docs/book/concepts.md §25]
 
-C44. The exception to PE Rule 1 is a composed function applied to an unresolved argument, which `applyComposed` unfolds into its substituted body unless the call enters a recursion cycle during a typed compilation. evidence: E9, E15. [decided: owner, 2026-11-01]
+C203. PE Rule 1 says that two calls are residualised instead of unfolded, carrying the callee's effects: a call into a recursion cycle during a typed compilation, and a call reached inside a `when` arm that PE Rule 2 evaluates. [decided: docs/book/concepts.md §25]
+
+C204. An eager primitive application and an application whose function position is unresolved produce a residual under an unresolved argument, as PE Rule 1 states. evidence: E6, E8. [proposed: this IR]
+
+C205. `applyComposed` unfolds a composed call with an unresolved argument into its substituted body, except a call into a recursion cycle during a typed compilation or one made inside a `when` arm speculation, which it residualises. evidence: E9, E15, E52. [proposed: this IR]
 
 C154. In an unfolded body, PE Rule 1 governs each application the body contains. evidence: E8, E15. [decided: owner, 2026-11-01]
 
@@ -221,31 +227,51 @@ C50. `src/evaluator.ts` leaves PE Rule 2 to each lazy primitive's implementation
 
 C51. A lazy primitive's result carries the union of the primitive's own effect tags and the effects of every evaluation made through the primitive's evaluation function. evidence: E11, E39. [decided: owner, 2026-11-01]
 
-C178. `eval_if` in `src/primitives.ts` evaluates both branches speculatively when its condition is unresolved, at run time as in the precompile pass. evidence: E12, E50. [proposed: this IR]
+C178. `eval_if` in `src/primitives.ts` evaluates both branches speculatively when its condition is unresolved, at run time as in the precompile pass. evidence: E12, E50. [decided: owner, 2026-11-03]
 
 C53. `eval_if` then returns a residual `eval_if` over the condition and the two evaluated branches. evidence: E12. [decided: owner, 2026-11-01]
 
 C54. The residual `eval_if` carries a type when the two evaluated branches have matching type names. evidence: E12. [decided: owner, 2026-11-01]
 
-C55. `eval_when` returns a residual without evaluating any branch when its subject is unresolved. evidence: E13. [decided: owner, 2026-11-01]
+C189. `eval_when` evaluates the guard and the body of every arm speculatively when its subject is unresolved, at run time as in the precompile pass. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C179. `&&` and `||` evaluate the right operand speculatively when the left operand is unresolved. evidence: E14, E50. [proposed: this IR]
+C190. In the speculation of an arm whose pattern is a binder, the pattern's name is bound to the evaluated subject. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C185. The residual of `&&` or `||` under an unresolved left operand holds the left operand and the evaluated right operand in a thunk. evidence: E14, E50. [proposed: this IR]
+C191. In the speculation of an arm whose type pattern or destructuring pattern binds names, each name stays the arm function's own Param, unbound and untyped. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C180. A speculative evaluation runs in a fresh child scope of the caller's scope that carries the `compileMode` flag. evidence: E49. [proposed: this IR]
+C192. Under an unresolved subject, `eval_when` speculates a written `else` but never evaluates the default `when_no_match` arm. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C186. An effectful primitive that a speculative evaluation reaches returns a residual carrying its effects, at run time as in the precompile pass. evidence: E8, E11, E49, E50. [proposed: this IR]
+C193. The residual `eval_when` under an unresolved subject holds the evaluated subject with the pattern, the guard, the arm and the rest of the chain as written. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C187. A speculative evaluation leaves the caller's own scope without the `compileMode` flag. evidence: E49, E50. [proposed: this IR]
+C194. The residual `eval_when` carries the effects of every speculated arm and carries no type. evidence: E11, E13, E51. [decided: owner, 2026-11-03]
 
-C182. A `TailCall` sentinel that a speculative evaluation produces is applied there: with an inline cutoff installed, `applyComposed` applies the call; with none installed, the call becomes a residual Expression carrying the callee's effects. evidence: E49, E50. [proposed: this IR]
+C195. A residual `eval_when` evaluated in a scope that resolves its subject runs only the matching arm. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C183. No residual of `eval_if`, `&&` or `||` holds a `TailCall` sentinel. evidence: E49, E50. [proposed: this IR]
+C179. `&&` and `||` evaluate the right operand speculatively when the left operand is unresolved. evidence: E14, E50. [decided: owner, 2026-11-03]
 
-C188. `evaluate` is handed no `TailCall` sentinel in the programs of `tests/` and `demos/`. evidence: E50. [proposed: this IR]
+C185. The residual of `&&` or `||` under an unresolved left operand holds the left operand and the evaluated right operand in a thunk. evidence: E14, E50. [decided: owner, 2026-11-03]
 
-C181. `eval_when` does not meet PE Rule 2. [inferred: R2]
+C180. A speculative evaluation runs in a fresh child scope of the caller's scope that carries the `compileMode` flag. evidence: E49. [decided: owner, 2026-11-03]
+
+C186. An effectful primitive that a speculative evaluation reaches returns a residual carrying its effects, at run time as in the precompile pass. evidence: E8, E11, E49, E50. [decided: owner, 2026-11-03]
+
+C187. A speculative evaluation leaves the caller's own scope without the `compileMode` flag. evidence: E49, E50. [decided: owner, 2026-11-03]
+
+C182. A `TailCall` sentinel that a speculative evaluation produces is applied there: with an inline cutoff installed, `applyComposed` applies the call; with none installed, the call becomes a residual Expression carrying the callee's effects. evidence: E49, E50. [decided: owner, 2026-11-03]
+
+C183. No residual of `eval_if`, `&&` or `||` holds a `TailCall` sentinel. evidence: E49, E50. [decided: owner, 2026-11-03]
+
+C188. `evaluate` is handed no `TailCall` sentinel in the programs of `tests/` and `demos/`. evidence: E50. [decided: owner, 2026-11-03]
+
+C197. While a speculation of a `when` arm is open, `applyComposed` residualises a composed call with an unresolved argument instead of unfolding it. evidence: E52, E53. [decided: owner, 2026-11-03]
+
+C198. The residual of a composed call inside a speculated `when` arm carries the callee's stashed effects. evidence: E52, E53. [decided: owner, 2026-11-03]
+
+C199. Ruling RR9 narrows the unfolding of RR1 (a) inside speculated `when` arms only, until partial evaluation is pushed for further optimisation or a case needs the full metadata evaluation inside an arm. [decided: docs/plans/pe-rules.md §6, RR9, taken by the owner on PR #155, 2026-11-03]
+
+C200. Outside a speculated `when` arm, a composed call in a speculated branch of `eval_if`, `&&` or `||` is still unfolded. evidence: E52, E53. [decided: owner, 2026-11-03]
+
+C196. `eval_when` meets PE Rule 2 for effects, though its residual holds the arms as written rather than the evaluated arms. [inferred: R2]
 
 ### 4. Application and substitution
 
@@ -343,7 +369,7 @@ C133. B-136 (scope leaves `Value`) owns the execution of D49. [decided: D49]
 
 C97. A scope today is a Structure with `isScope` set. evidence: E28. [decided: owner, 2026-11-01]
 
-C184. `src/evaluator.ts` writes one scope property, the `compileMode` flag: `precompileFunction` sets it on its compile scope, and a speculative evaluation sets it on the fresh child scope it makes before that scope escapes. evidence: E2, E19, E49. [proposed: this IR]
+C184. `src/evaluator.ts` writes one scope property, the `compileMode` flag: `precompileFunction` sets it on its compile scope, and a speculative evaluation sets it on the fresh child scope it makes before that scope escapes. evidence: E2, E19, E49. [decided: owner, 2026-11-03]
 
 C99. `precompileFunction` restores the `compileMode` flag's previous value after the body's evaluation, even when the evaluation throws. evidence: E19. [decided: owner, 2026-11-01]
 
@@ -455,11 +481,11 @@ G5. cluster: C14, C15, C170, C16, C17, C18 [decided: owner, 2026-11-01]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [decided: owner, 2026-11-01]
 
-G35. cluster: C22, C153, C172, C157, C173, C177, C174, C175, C176, C24, C25, C26 [proposed: this IR]
+G35. cluster: C22, C153, C172, C157, C173, C177, C174, C175, C176, C24, C25, C26 [decided: owner, 2026-11-03]
 
 G8. cluster: C31, C32, C33, C163, C34 [decided: owner, 2026-11-01]
 
-G9. cluster: C35, C161, C44, C154, C168 [decided: owner, 2026-11-01]
+G40. cluster: C201, C168, C202, C203, C204, C205, C154 [proposed: this IR]
 
 G10. cluster: C41, C42, C43 [decided: owner, 2026-11-01]
 
@@ -467,7 +493,9 @@ G11. cluster: C46, C139, C45 [decided: owner, 2026-11-01]
 
 G12. cluster: C48, C49, C50, C51 [decided: owner, 2026-11-01]
 
-G36. cluster: C178, C53, C54, C55, C179, C185, C180, C186, C187, C182, C183, C188, C181 [proposed: this IR]
+G38. cluster: C178, C53, C54, C189, C190, C191, C192, C193, C194, C195, C179, C185, C180, C186, C187, C182, C183, C188, C196 [decided: owner, 2026-11-03]
+
+G39. cluster: C197, C198, C199, C200 [decided: owner, 2026-11-03]
 
 G14. cluster: C58, C59, C60, C61, C62, C69 [decided: owner, 2026-11-01]
 
@@ -487,7 +515,7 @@ G21. cluster: C91, C92 [decided: owner, 2026-11-01]
 
 G22. cluster: C93, C94, C95, C96, C133, C97 [decided: owner, 2026-11-01]
 
-G37. cluster: C184, C99, C100, C101 [proposed: this IR]
+G37. cluster: C184, C99, C100, C101 [decided: owner, 2026-11-03]
 
 G24. cluster: C102, C103, C104 [decided: owner, 2026-11-01]
 
@@ -515,11 +543,11 @@ G34. cluster: C36, C37, C38, C39, C40, C47 [decided: owner, 2026-11-01]
 
 R1. C174 depends-on C153 because C173 and C177 state that the switch in `evaluate` names the participating kinds and has one default arm, which the ratified C153 and C157 require.
 
-R2. C181 depends-on C55 because a residual `eval_when` evaluates no branch, where C178 and C179 show `eval_if`, `&&` and `||` evaluating theirs.
+R2. C196 depends-on C189 because every arm of `eval_when` is evaluated under an unresolved subject, as C178 and C179 show for `eval_if`, `&&` and `||`, while C193 keeps the arms as written in the residual.
 
-R3. C154 refines C35 because `applyComposed` unfolds the composed application (C44), so the applications PE Rule 1 governs are the ones inside the body.
+R3. C154 refines C202 because `applyComposed` unfolds the composed application (C205), so the applications PE Rule 1 governs are the ones inside the body.
 
-R4. C45 refines C44 because the inline cutoff stops exactly the calls C44 excepts: a call into a recursion cycle with an unresolved argument during a typed compilation.
+R4. C45 refines C205 because the inline cutoff stops exactly the first of the calls C205 excepts: a call into a recursion cycle with an unresolved argument during a typed compilation.
 
 R5. C84 depends-on C83 because a loop round that keeps the depth lets a chain of any length stay under the bound.
 
@@ -533,53 +561,55 @@ R9. C129 refines C120 because C166 makes the report judge only edges between fil
 
 R10. C159 depends-on C162 because C162 puts `renderExprSource` in the `base-primitives` unit, which C130 places above the `evaluator` unit.
 
+R11. C197 refines C205 because a composed call with an unresolved argument inside a speculated `when` arm is residualised, the second of the exceptions to unfolding that C205 names, beside the recursion-cycle cutoff.
+
 ## Evidence
 
 E1. `scripts/analyze/units.json` lines 16 and 51: the `evaluator` unit's permitted dependencies, and `src/evaluator.ts` mapped to the unit alone.
 
 E2. `src/evaluator.ts` lines 3–13: the imports, including seven symbols from `src/refinements.ts` and `src/effects.ts`, `primitives` and `renderExprSource` from `src/primitives.ts`, and three reads and the constructor `scopeNew` from `src/scope.ts`.
 
-E3. `src/evaluator.ts` lines 446–514: `evaluate`, with the depth bound at line 449 and the switch from line 463, which names Symbol, Expression, the two function kinds and Param, and whose default arm at lines 505–512 returns the value.
+E3. `src/evaluator.ts` lines 487–555: `evaluate`, with the depth bound at line 490 and the switch from line 504, which names Symbol, Expression, the two function kinds and Param, and whose default arm at lines 546–553 returns the value.
 
-E4. `src/evaluator.ts` lines 471–492: the Symbol arm: `scopeLookup`, `mergeOverMeta` over the Symbol's own fields, `scopeFactsFor` with `withPredicates`, and the dependency collector for an unresolved name.
+E4. `src/evaluator.ts` lines 512–533: the Symbol arm: `scopeLookup`, `mergeOverMeta` over the Symbol's own fields, `scopeFactsFor` with `withPredicates`, and the dependency collector for an unresolved name.
 
-E5. `src/evaluator.ts` lines 494–502 and 516–560: the Expression arm and `evaluateExpr`'s dispatch on the callee's kind; the sentinel at lines 539–543; the immediate application at lines 533–535; the constructor slot at lines 547–560.
+E5. `src/evaluator.ts` lines 535–543 and 557–601: the Expression arm and `evaluateExpr`'s dispatch on the callee's kind; the sentinel at lines 580–584; the immediate application at lines 574–576; the constructor slot at lines 588–601.
 
-E6. `src/evaluator.ts` lines 562–612: the residual for an unresolved function position, with the Param's effects and `viralOnto`.
+E6. `src/evaluator.ts` lines 603–653: the residual for an unresolved function position, with the Param's effects and `viralOnto`.
 
 E7. `src/types.ts` lines 455–472: `isResolved`, false for Param, Symbol and Expression, true otherwise.
 
-E8. `src/evaluator.ts` lines 672–777: the eager path of `applyPrimitive`: evaluated arguments, the compile-mode deferral, the viral check, the unresolved residual and the dispatchers, the predicate-set propagation, the post-call `type` stamp, the effect union; the unresolved-stub throw at line 747.
+E8. `src/evaluator.ts` lines 713–818: the eager path of `applyPrimitive`: evaluated arguments, the compile-mode deferral, the viral check, the unresolved residual and the dispatchers, the predicate-set propagation, the post-call `type` stamp, the effect union; the unresolved-stub throw at line 788.
 
-E9. `src/evaluator.ts` lines 849–874: the inline cutoff in `applyComposed`, a residual for a speculative call into a recursion cycle.
+E9. `src/evaluator.ts` lines 890–905 and 924–933: the inline cutoff in `applyComposed`, a residual for a speculative call into a recursion cycle.
 
-E10. `src/evaluator.ts` lines 906–940 and 953–1027: `remapParams` and `subst`, each a switch on kind.
+E10. `src/evaluator.ts` lines 965–999 and 1012–1086: `remapParams` and `subst`, each a switch on kind.
 
-E11. `src/evaluator.ts` lines 625–670: the lazy path of `applyPrimitive`: unevaluated arguments, the tracking evaluation function with the speculative switch at line 632, the compile-mode deferral of an effectful lazy primitive.
+E11. `src/evaluator.ts` lines 666–711: the lazy path of `applyPrimitive`: unevaluated arguments, the tracking evaluation function with the speculative switch at line 673, the compile-mode deferral of an effectful lazy primitive.
 
 E12. `src/primitives.ts` lines 567–627: `eval_if_impl`, both branches evaluated speculatively under an unresolved condition at lines 603–604, the residual, the shared type.
 
-E13. `src/primitives.ts` lines 821–834: `eval_when_impl` returns a residual for an unresolved subject before evaluating any branch.
+E13. `src/primitives.ts` lines 821–912 and `src/evaluator.ts` lines 286–312: `speculateWhenArms` (`src/primitives.ts` line 865) with the binder test (line 869), each arm's guard and body speculated (lines 871–872), the chain walk and the `when_no_match` skip (lines 873–882); `eval_when_impl` (line 886) speculates every arm for an unresolved subject (line 902) and returns the residual over the arms as written (line 911); in `src/evaluator.ts`, `whenArmThunk` binds a binder's name to the subject or leaves the arm's own Params unbound, and `isUnboundPatternName` and `thunkBodyOf` answer the kind questions.
 
-E14. `src/primitives.ts` lines 2217–2254 and 2322–2349: `typed_and_impl` and `typed_or_impl`: under an unresolved left operand the right operand is evaluated speculatively (lines 2229 and 2326) and the residual holds it in a thunk; with a resolved left operand the right thunk is applied as a call.
+E14. `src/primitives.ts` lines 2295–2332 and 2400–2427: `typed_and_impl` and `typed_or_impl`: under an unresolved left operand the right operand is evaluated speculatively (lines 2307 and 2404) and the residual holds it in a thunk; with a resolved left operand the right thunk is applied as a call.
 
-E15. `src/evaluator.ts` lines 806–897: `applyComposed`: argument evaluation, the viral check, the dispatchers' call binding with `checkArg`, substitution; the loop from line 820, with the body evaluated at `depth + 1` at line 884 and the tail-call check at lines 887–893. `depth` is not reassigned inside the loop, so every round evaluates its body at the depth of the first round.
+E15. `src/evaluator.ts` lines 847–956: `applyComposed`: argument evaluation, the viral check, the dispatchers' call binding with `checkArg`, substitution; the loop from line 861, with the body evaluated at `depth + 1` at line 943 and the tail-call check at lines 946–952. `depth` is not reassigned inside the loop, so every round evaluates its body at the depth of the first round.
 
-E16. `src/evaluator.ts` lines 942–975 and 1016–1024: positional substitution, ownership by membership through `ownsParam`, Symbols left in place, unchanged subtrees returned, the tail mark copied.
+E16. `src/evaluator.ts` lines 1001–1034 and 1075–1083: positional substitution, ownership by membership through `ownsParam`, Symbols left in place, unchanged subtrees returned, the tail mark copied.
 
-E17. `src/evaluator.ts` lines 921–938 and 977–1013: an inner composed function copied with fresh Params, `carryMeta` and `PRESERVED_FN_META_KEYS`; `remapParams` copying the tail mark.
+E17. `src/evaluator.ts` lines 980–997 and 1036–1072: an inner composed function copied with fresh Params, `carryMeta` and `PRESERVED_FN_META_KEYS`; `remapParams` copying the tail mark.
 
-E18. `src/evaluator.ts` lines 1045–1069: `checkArg`, every installed field check, and the throw when none is installed.
+E18. `src/evaluator.ts` lines 1104–1128: `checkArg`, every installed field check, and the throw when none is installed.
 
-E19. `src/evaluator.ts` lines 1087–1187: `precompileFunction`: placeholders with `type` and `domain`, the `compileMode` flag set and restored in `finally`, the sentinel loop bounded at 10,000, the inferred type read, the `inferredEffects` write, errors returned.
+E19. `src/evaluator.ts` lines 1146–1246: `precompileFunction`: placeholders with `type` and `domain`, the `compileMode` flag set and restored in `finally`, the sentinel loop bounded at 10,000, the inferred type read, the `inferredEffects` write, errors returned.
 
 E20. `src/evaluator.ts` lines 225–243: the `TailCall` interface, `isTailCall`, `makeTailCall`.
 
-E21. `src/evaluator.ts` lines 316–403: `markTailCalls`, `forwardedArgIndex`, `isBranchingPrimitive`; the in-place `_tailPosition` write at line 328.
+E21. `src/evaluator.ts` lines 357–444: `markTailCalls`, `forwardedArgIndex`, `isBranchingPrimitive`; the in-place `_tailPosition` write at line 369.
 
 E22. `src/runtime.ts` lines 452–482 and 1259–1263: `markTailCallsInContext` collapses body-form metadata first, then marks each composed function body; called after `resolveSymbols`.
 
-E23. `src/primitives.ts` lines 2665–2674 and 3493–3499: `type_check_impl` and `ensures_check_impl` return a sentinel untouched.
+E23. `src/primitives.ts` lines 2743–2752 and 3571–3577: `type_check_impl` and `ensures_check_impl` return a sentinel untouched.
 
 E24. `src/test/totality.ts` lines 739–769: a typed tail-recursive countdown returns 0, from 5 and from 100,000.
 
@@ -591,7 +621,7 @@ E27. `docs/backlog.md`, the B-113 entry: tail-call forwarding is enforced by a r
 
 E28. `src/scope.ts` lines 32–38 and 84–91: `scopeNew` makes a Structure and sets `isScope`; `scopeCompileMode` walks the parent chain.
 
-E29. `src/evaluator.ts` lines 420–442 and `src/runtime.ts` lines 215–223: `markPatternBinders` rewrites a `when` pattern argument in place during symbol resolution.
+E29. `src/evaluator.ts` lines 461–483 and `src/runtime.ts` lines 215–223: `markPatternBinders` rewrites a `when` pattern argument in place during symbol resolution.
 
 E30. `src/runtime.ts` lines 814–830: the pipeline skips a library-owned function before calling `precompileFunction`.
 
@@ -601,7 +631,7 @@ E32. `src/metadata.ts` lines 142–166: `metaReadRaw` reads the value's own `met
 
 E33. `src/metadata.ts` lines 325–375: `viralOnto` (the first viral field, with its candidate's `type`) and `mergeOverMeta` (inner fields win, `union` fields merge).
 
-E34. `src/evaluator.ts` lines 780–802: `assertPropagationTableLinkage` over `error`, `effects`, `shape`, `predicates`, `domain` and `discharged`.
+E34. `src/evaluator.ts` lines 821–843: `assertPropagationTableLinkage` over `error`, `effects`, `shape`, `predicates`, `domain` and `discharged`.
 
 E35. `src/evaluator.ts` lines 26–42 and `src/runtime.ts` lines 1285 and 1387: `setInlineCutoff` takes a bare callback; the pipeline clears it and installs the cycle set.
 
@@ -629,13 +659,19 @@ E46. `src/primitives.ts` line 42, `docs/book/units.md` line 241 and `scripts/ana
 
 E47. `scripts/analyze/index.ts` lines 259–268: an edge starts with the verdict `unresolved` and is judged `ok` or `violation` only when neither end's file maps to several units.
 
-E49. `src/evaluator.ts` lines 244–314: speculative evaluation: `evaluateSpeculatively` (line 266) hands the value to the lazy primitive's evaluation function with the speculative switch; `speculate` (line 290) makes a child scope with `scopeNew` and sets `compileMode` on it (lines 291–292), unwraps a thunk, and applies a `TailCall` sentinel: a residual carrying the callee's effects when `inlineCutoff` is null (lines 308–312), `applyComposed` otherwise (line 313).
+E49. `src/evaluator.ts` lines 244–355: speculative evaluation: `evaluateSpeculatively` (line 266) hands the value to the lazy primitive's evaluation function with the speculative switch; `speculate` (line 331) makes a child scope with `scopeNew` and sets `compileMode` on it (lines 332–333), unwraps a thunk, and applies a `TailCall` sentinel: a residual carrying the callee's effects when `inlineCutoff` is null (lines 349–353), `applyComposed` otherwise (line 354).
 
-E50. `src/test/evaluator.ts` lines 324–364, 374–385 and 394–525: the `&&` and `||` residuals hold the deferred `print` and carry `io`, and their `pure`-declared rows halt; a branch tail call is residualised with the callee's `io` where no cutoff is installed and unfolded where one is, and no residual holds a sentinel; `via_if` precompiles without a fault; `eval_if` at run time prints nothing for an unresolved Symbol or Param condition. The 68 programs of `tests/` and `demos/` hand `evaluate` no sentinel, measured with a probe on `evaluate` on 2026-11-03.
+E50. `src/test/evaluator.ts` lines 445–485, 495–506 and 516–647: the `&&` and `||` residuals hold the deferred `print` and carry `io`, and their `pure`-declared rows halt; a branch tail call is residualised with the callee's `io` where no cutoff is installed and unfolded where one is, and no residual holds a sentinel; `via_if` precompiles without a fault; `eval_if` at run time prints nothing for an unresolved Symbol or Param condition. The 68 programs of `tests/` and `demos/` hand `evaluate` no sentinel, measured with a probe on `evaluate` on 2072-11-03.
+
+E51. `src/test/evaluator.ts` lines 305–400, 508–513 and 649–661: under an unresolved subject `whenop`, binder, type-pattern, destructuring, `else` and guard arms infer `io`; the binder's name is the typed placeholder and a destructured name an untyped Param; the residual keeps its arms as written and carries `io`; `when_no_match` is not evaluated; the `pure`-declared `when` row halts; a residual re-evaluated with its subject bound runs the matching arm once.
+
+E52. `src/evaluator.ts` lines 272–285 and 906–923: `whenArmSpeculations` and `evaluateWhenArmSpeculatively`; in `applyComposed`, the residual carrying the callee's effects while a `when` arm speculation is open (line 919). `src/primitives.ts` lines 857–861, 871–872 and 881: `speculateWhenArms` speculates through `evaluateWhenArmSpeculatively`.
+
+E53. `src/test/evaluator.ts` lines 402–444: a call of the forward reference `later` and of the untyped `h` inside an arm is a residual carrying `io`, the same call in an `if` branch unfolds; an eight-level chain of `when`s calling the next level twice stays at or below 2,000 `evaluate` calls (460 through the CLI, 37,716 unfolded).
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C53, C54, C55, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C161, C162, C166, C167, C169, C170, C171. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C53, C54, C55, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C161, C162, C166, C167, C169, C170, C171.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C45, C46, C47, C49, C50, C51, C53, C54, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C162, C166, C167, C169, C170, C171. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C45, C46, C47, C49, C50, C51, C53, C54, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C162, C166, C167, C169, C170, C171.
 
 A1 resolved: ratified by the owner at the merge of PR #129, 2026-11-01; the claims carry decided provenance from that date.
 
@@ -645,4 +681,14 @@ A2 resolved: ratified by the owner at the merge of PR #129, 2026-11-01; the term
 
 A3. Ratify in bulk the re-proposed claims about the switch in `evaluate`, as chunk C5 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their cluster G35: C173, C177, C176. C174 is inferred through R1, and C175 is decided by ruling RR5. Depends: C173, C177, C176.
 
+A3 resolved: ratified by the owner at the merge of PR #150, 2026-11-03; the statuses are flipped.
+
 A4. Ratify in bulk the re-proposed claims about speculative evaluation and the branch tail call, as chunk C2 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their clusters G36 and G37: C178, C179, C185, C180, C186, C187, C182, C183, C188, C184. C181 is inferred through R2. Depends: C178, C179, C185, C180, C186, C187, C182, C183, C188, C184.
+
+A4 resolved: ratified by the owner at the merge of PR #150, 2026-11-03; the statuses are flipped.
+
+A5. Ratify in bulk the re-proposed claims about `eval_when` under PE Rule 2, as chunk C3 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their cluster G38, and the claims of ruling RR9 (the arm policy) with their cluster G39: C189, C190, C191, C192, C193, C194, C195, C197, C198, C200. C196 is inferred through R2, and C199 is decided by ruling RR9. Depends: C189, C190, C191, C192, C193, C194, C195, C197, C198, C200.
+
+A5 resolved: ratified by the owner at the merge of PR #155, 2026-11-03; the statuses are flipped.
+
+A6. Ratify in bulk the re-proposed claims about PE Rule 1 as implemented, as chunk C4 of B-172 (the partial-evaluation rules as implemented against the spine) restated the rule in `docs/book/concepts.md` §25, with their cluster G40: C204, C205. C201, C202 and C203 quote the restated rule and are decided by the spine. Depends: C204, C205.

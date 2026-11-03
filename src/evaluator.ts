@@ -4,7 +4,7 @@ import { renderExprSource, primitives } from "./primitives.js";
 import {
   Value, ValueKind, ExpressionValue, StructureValue,
   ComposedFunctionValue, ParamValue,
-  AllegroError, isResolved, makeExpr, withMeta, makeStructure,
+  AllegroError, isResolved, makeExpr, makeComposedFn, withMeta, makeStructure,
   DepCollector, ownsParam, Metadata} from "./types.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
@@ -267,6 +267,47 @@ export function evaluateSpeculatively(
   value: Value, ctx: StructureValue, evalFn: (v: Value, c: StructureValue) => Value,
 ): Value {
   return (evalFn as SpeculativeEvalFn)(value, ctx, true);
+}
+
+/** B-172 C3, ruling RR9 (option C): how many speculations of a `when` arm
+ *  are open. While one is, `applyComposed` residualises a composed call with
+ *  an unresolved argument instead of unfolding it (see there). */
+let whenArmSpeculations = 0;
+
+/** Evaluate a `when` arm, guard or the rest of a `when` chain speculatively,
+ *  as `evaluateSpeculatively` does, with the arm policy of RR9 in force. */
+export function evaluateWhenArmSpeculatively(
+  value: Value, ctx: StructureValue, evalFn: (v: Value, c: StructureValue) => Value,
+): Value {
+  whenArmSpeculations++;
+  try { return evaluateSpeculatively(value, ctx, evalFn); } finally { whenArmSpeculations--; }
+}
+
+/** B-172 C3, ruling RR2 (a): the three kind questions `eval_when`'s
+ *  speculation asks (`speculateWhenArms` in `src/primitives.ts`), answered
+ *  here because the discriminator rule (`docs/book/units.md` §3.2) leaves
+ *  kind tests to the evaluator. */
+
+/** The thunk a `when` arm or guard is speculated through. A composed
+ *  function over the arm's pattern names becomes a zero-parameter thunk over
+ *  its body: with `subject` given (a binder pattern) the subject is
+ *  substituted for the one name, as a match binds it; otherwise each name
+ *  stays the arm function's own Param, unbound, which evaluates to itself.
+ *  Anything else (a thunk, the guard's literal) is returned as it is. */
+export function whenArmThunk(arm: Value, subject: Value | null): Value {
+  if (arm.kind !== ValueKind.ComposedFunction || arm.params.length === 0) return arm;
+  return makeComposedFn([], subject !== null && arm.params.length === 1 ? substituteParams(arm, [subject]) : arm.body);
+}
+
+/** Whether a `when` pattern is a Symbol bound nowhere in `ctx`: the binder
+ *  that `eval_when_impl`'s matching path recognises after evaluating it. */
+export function isUnboundPatternName(pattern: Value, ctx: StructureValue): boolean {
+  return pattern.kind === ValueKind.Symbol && scopeLookup(ctx, pattern.name)?.value === undefined;
+}
+
+/** The body of a zero-parameter thunk, or the value itself. */
+export function thunkBodyOf(v: Value): Value {
+  return v.kind === ValueKind.ComposedFunction && v.params.length === 0 ? v.body : v;
 }
 
 /** `applyPrimitive`'s `evalFn`, with the speculative switch only this module
@@ -862,6 +903,24 @@ function applyComposed(
     // calls must still run (and may legitimately diverge; that is what
     // the declaration opted into). Residualizing there would change
     // semantics, not just cost.
+    // B-172 C3, ruling RR9 (option C), taken by the maintainer on PR #155:
+    // inside a speculated `when` arm a composed call with an unresolved
+    // argument is residualised, carrying the callee's stashed effects as the
+    // cutoff's residual below does, instead of unfolded. Unfolding there
+    // nests: the callee's own `if`s and `when`s are speculated, their arms
+    // unfold further callees, and so on. Loading `lib/planning.alg` measured
+    // 63,915,555 `evaluate` calls against 219,433 without `when` speculation,
+    // at speculation depths up to 26; with this policy, 234,306. It narrows
+    // Rule 1's unfolding (RR1 (a)) inside `when` arms only: `if`, `&&` and
+    // `||` speculate and unfold as C2 left them. RR9 in
+    // `docs/plans/pe-rules.md` records when to revisit it: when partial
+    // evaluation is pushed for further optimisation, or a case needs the full
+    // metadata evaluation inside an arm.
+    if (whenArmSpeculations > 0 && evalArgs.some(a => !isResolved(a))) {
+      const residual = makeExpr(currentFnRaw ?? currentFn, evalArgs);
+      const calleeEffects = effectsOf(currentFn as unknown as Value);
+      return calleeEffects ? withEffects(residual, calleeEffects) : residual;
+    }
     if (
       inlineCutoff !== null &&
       evalArgs.some(a => !isResolved(a)) &&
