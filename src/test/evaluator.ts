@@ -320,10 +320,13 @@ test("B-172 C1 evaluator: gap pin (C3 flips, RR2) — eval_when with an unresolv
   eq(effectsText(valueOf(bind, "whenbind")), "none", "whenbind's effects (C3: io)");
 });
 
-test("B-172 C1 evaluator: gap pin (C2 flips, RR3) — && with an unresolved left operand residualises without the right operand evaluated", () => {
-  // GAP PIN. C2 flips it under RR3 (a): the right operand will be evaluated
-  // speculatively by applying its thunk, and the residual will hold the
-  // evaluated operand and its effects, so `andop` will infer `io`.
+test("B-172 C1 evaluator: Rule 2 — && with an unresolved left operand evaluates the right operand speculatively (gap pin, C2 flipped it, RR3)", () => {
+  // Was a GAP PIN; C2 flipped it under RR3 (a). The right operand is
+  // evaluated speculatively by applying its thunk in a scope compile mode
+  // marks, so the `print` defers to a residual carrying `io`; the residual
+  // holds that evaluated operand in a thunk and carries its effects, so
+  // `andop` infers `io`. Until C2 the residual held the thunk as written and
+  // `andop` inferred nothing.
   const c = compile("andop(b: Bool): Bool => c1_probe(b && print(b))\n");
   eq(c.seen.length, 2, "the probe ran in both precompiles of andop");
   for (const r of c.seen) {
@@ -331,15 +334,17 @@ test("B-172 C1 evaluator: gap pin (C2 flips, RR3) — && with an unresolved left
     if (r.kind !== ValueKind.Expression) continue;
     eq(r.args[0].kind, ValueKind.Param, "the unresolved left operand");
     const right = thunkBody(r.args[1]);
-    eq(shape(right), "Expression(primitive print; 1 args)", "the right operand's thunk, as written");
-    eq(effectsText(right), "none", "the right operand was not evaluated");
-    eq(effectsText(r), "none", "the residual carries no effect");
+    eq(shape(right), "Expression(primitive print; 1 args)", "the right operand, evaluated: a deferred print");
+    eq(effectsText(right), "io", "the deferred print carries io");
+    eq(effectsText(r), "io", "the residual carries the right operand's effects");
   }
-  eq(effectsText(valueOf(c, "andop")), "none", "andop's effects (C2: io)");
+  eq(effectsText(valueOf(c, "andop")), "io", "andop's effects");
+  eq(c.printed.length, 0, "nothing printed at compile time");
 });
 
-test("B-172 C1 evaluator: gap pin (C2 flips, RR3) — || with an unresolved left operand residualises without the right operand evaluated", () => {
-  // GAP PIN. C2 flips it under RR3 (a), as for `&&`: `orop` will infer `io`.
+test("B-172 C1 evaluator: Rule 2 — || with an unresolved left operand evaluates the right operand speculatively (gap pin, C2 flipped it, RR3)", () => {
+  // Was a GAP PIN; C2 flipped it under RR3 (a), as for `&&`: `orop` infers
+  // `io`. Until C2 it inferred nothing.
   const c = compile("orop(b: Bool): Bool => c1_probe(b || print(b))\n");
   eq(c.seen.length, 2, "the probe ran in both precompiles of orop");
   for (const r of c.seen) {
@@ -347,11 +352,12 @@ test("B-172 C1 evaluator: gap pin (C2 flips, RR3) — || with an unresolved left
     if (r.kind !== ValueKind.Expression) continue;
     eq(r.args[0].kind, ValueKind.Param, "the unresolved left operand");
     const right = thunkBody(r.args[1]);
-    eq(shape(right), "Expression(primitive print; 1 args)", "the right operand's thunk, as written");
-    eq(effectsText(right), "none", "the right operand was not evaluated");
-    eq(effectsText(r), "none", "the residual carries no effect");
+    eq(shape(right), "Expression(primitive print; 1 args)", "the right operand, evaluated: a deferred print");
+    eq(effectsText(right), "io", "the deferred print carries io");
+    eq(effectsText(r), "io", "the residual carries the right operand's effects");
   }
-  eq(effectsText(valueOf(c, "orop")), "none", "orop's effects (C2: io)");
+  eq(effectsText(valueOf(c, "orop")), "io", "orop's effects");
+  eq(c.printed.length, 0, "nothing printed at compile time");
 });
 
 // --- The effect gap of the plan's §2.4: `effects pure` over a hidden print ---
@@ -364,15 +370,17 @@ test("B-172 C1 evaluator: Rule 1 — a pure-declared function whose unfolded cal
   eq(haltOf(pureDeclared("h(b)"))?.includes(MISMATCH), true, "the call row halts");
 });
 
-test("B-172 C1 evaluator: gap pin (C2 flips, RR3) — a pure-declared function whose && hides a print compiles", () => {
-  // GAP PIN. C2 flips it under RR3 (a): the `print` will be inferred and the
-  // declaration check will halt with the mismatch, as the `if` row does.
-  eq(haltOf(pureDeclared(`b && print("x")`)), null, "the && row compiles (C2: halts)");
+test("B-172 C1 evaluator: Rule 2 — a pure-declared function whose && hides a print halts with the mismatch (gap pin, C2 flipped it, RR3)", () => {
+  // Was a GAP PIN; C2 flipped it under RR3 (a): the `print` is inferred and
+  // the declaration check halts with the mismatch, as the `if` row does.
+  // Until C2 the row compiled.
+  eq(haltOf(pureDeclared(`b && print("x")`))?.includes(MISMATCH), true, "the && row halts");
 });
 
-test("B-172 C1 evaluator: gap pin (C2 flips, RR3) — a pure-declared function whose || hides a print compiles", () => {
-  // GAP PIN. C2 flips it under RR3 (a), as for `&&`.
-  eq(haltOf(pureDeclared(`b || print("x")`)), null, "the || row compiles (C2: halts)");
+test("B-172 C1 evaluator: Rule 2 — a pure-declared function whose || hides a print halts with the mismatch (gap pin, C2 flipped it, RR3)", () => {
+  // Was a GAP PIN; C2 flipped it under RR3 (a), as for `&&`. Until C2 the
+  // row compiled.
+  eq(haltOf(pureDeclared(`b || print("x")`))?.includes(MISMATCH), true, "the || row halts");
 });
 
 test("B-172 C1 evaluator: gap pin (C3 flips, RR2) — a pure-declared function whose when hides a print compiles", () => {

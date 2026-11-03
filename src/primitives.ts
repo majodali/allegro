@@ -1894,7 +1894,7 @@ import {
 // admitted and verdict-visible (ledger wiring lands with F3's tiers).
 declareLiveness("delay", "live");
 declareLiveness("fetch", "admitted", "the fetched endpoint eventually responds");
-import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams } from "./evaluator.js";
+import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams, evaluateSpeculatively as _evaluateSpeculatively } from "./evaluator.js";
 import { putEntry } from "./structure.js";
 
 // F3b: tracks ComposedFunctions whose body is currently being precompiled,
@@ -2220,7 +2220,14 @@ const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // `typed_amp` since Slice 2 Stage 0; `&&` no longer creates refinements.
   const left = evalFn!(args[0], ctx!);
   if (!isResolved(left)) {
-    return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, args[1]]);
+    // B-172 C2, PE Rule 2 under ruling RR3 (a): the right operand is
+    // evaluated speculatively, in a scope compile mode marks, so an effect in
+    // it defers to a residual carrying its effects, and a call in its tail
+    // position is applied (`evaluateSpeculatively`). The residual holds the
+    // evaluated operand in a thunk, the shape the parser gives it, and its
+    // effects reach the residual through the lazy primitive's effect tracking.
+    const right = _evaluateSpeculatively(args[1], ctx!, evalFn!);
+    return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, makeComposedFn([], right)]);
   }
   const leftP = left;
   if (leftP.kind === ValueKind.Bits && leftP.data === 0n) {
@@ -2315,7 +2322,9 @@ function isEffectExtending(t: StructureValue): boolean {
 const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   const left = evalFn!(args[0], ctx!);
   if (!isResolved(left)) {
-    return makeExpr(makePrimitive("typed_or", typed_or_impl, true), [left, args[1]]);
+    // B-172 C2, RR3 (a): the right operand speculatively, as for `&&`.
+    const right = _evaluateSpeculatively(args[1], ctx!, evalFn!);
+    return makeExpr(makePrimitive("typed_or", typed_or_impl, true), [left, makeComposedFn([], right)]);
   }
   // Short-circuit: if left is truthy, return true without evaluating right
   const leftP = left;
