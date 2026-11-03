@@ -6,8 +6,8 @@ defining feature is provable correctness and safety. The book is written
 for you: a working programmer who is curious about language design and
 new to Allegro's repository. The book aims to present every design and
 implementation decision of Allegro with the options it weighed and the
-rationale for the option taken. The book invites you into the design of Allegro, which
-is still under way. The code is organized so that you can branch it to
+rationale for the option taken. You are invited into the design of
+Allegro, which is still under way. The code is organized so that you can branch it to
 try another option for a decision.
 
 Most chapters do not yet follow the organization this preface describes.

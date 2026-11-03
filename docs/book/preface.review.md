@@ -173,4 +173,29 @@ the fixed IR is carried (62 of 62 in the render map). C42 and C66 are
 removed (C66 merged into C58); C70 is a new split of C13. No claim
 reported missing or stale. Prose words after the fixes 940 (by `wc`).
 
-Confirmation: pending.
+Confirmation: the round's stranger instance confirmed the fixes of 1, 2,
+3, 7, 9, 10, 11, 12, 13, 15 and 16, and accepted the declines of 4, 5, 6
+and 8. It disputed 14: the held sentence still gives no reason why a
+reader needs it, so the thread stays lost whatever the ruling on keeping
+it. Finding 14 stays held under A6, whose text now carries the dispute:
+keep C56 and give the reader's gain, or cut C56. The stranger named two
+new defects of the round 2 fixes.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| 14 | the held C56 sentence gives no reader's gain | lost thread (disputed at confirmation) | stranger | unfixed: held for the maintainer under A6, the dispute added to A6 |
+| 17 | C58 "…which keeps the narrative on the design and the reasons for the design" | compound | round 2 fixes | declined: the clause is the reason finding 15 asked for; splitting it detaches the reason |
+| 18 | three consecutive sentences in ¶1 open "The book …" | excess | round 2 fixes | fixed: C5 reads "You are invited into the design of Allegro, which is still under way." |
+
+Claims check after the confirmation fixes: 62 of 62 claims carried in
+the render map; no claim missing or stale. Prose words 940 (by `wc`).
+
+## The count paused
+
+The count pauses after round 2 for the maintainer's rulings on asks A3
+to A6 of the IR. Round 3 runs after the rulings. Under the override, the
+passage C56 (G17) counts against the verdict of any round until A6 is
+ruled.
+
+Meta-review: not indicated at the pause (signals checked: first, second
+and fourth; the count has not ended).

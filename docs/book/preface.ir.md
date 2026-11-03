@@ -35,7 +35,7 @@ C3. This book explains the design of Allegro, a programmable language platform w
 
 C4. The book aims to present every design and implementation decision of Allegro with the options the decision weighed and the rationale for the option taken. reworded in count 1, round 2. [decided: owner, 2026-11-03]
 
-C5. The book invites you into the design of Allegro, which is still under way. reworded in count 1, round 1. [decided: owner, 2026-11-03]
+C5. You are invited into the design of Allegro, which is still under way. reworded in count 1, rounds 1 and 2. [decided: owner, 2026-11-03]
 
 C6. The code is organized so that you can branch the code to try another option for a decision. [decided: owner, 2026-11-03]
 
@@ -249,4 +249,4 @@ A4. Decide the form every open decision takes. Proposed: the seven blocks of a d
 
 A5. Decide whether the preface shows one worked decision section, or points to one, once the pilot chapter exists. Round 1 of count 1 asked for it. Depends: C19, C21.
 
-A6. Decide whether the preface keeps the sentence on how the prose is written (C56), given that process detail stays outside the book (C58). Strangers flagged C56 in count 1 at round 1's confirmation, as a contradiction, and at round 2, as a lost thread. The passage stays unchanged until the ruling. Depends: C56, C58.
+A6. Decide whether the preface keeps the sentence on how the prose is written (C56), given that process detail stays outside the book (C58). Strangers flagged C56 in count 1 at round 1's confirmation, as a contradiction, and at round 2, as a lost thread. The round 2 stranger disputes holding the passage: the sentence gives no reason why a reader needs it, so the thread stays lost whatever the ruling. The options are therefore to keep C56 and add the reader's gain, or to cut C56. The passage stays unchanged until the ruling. Depends: C56, C58.
