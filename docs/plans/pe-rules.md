@@ -1235,7 +1235,10 @@ over unresolved information) are cited in the same text.
     kind questions into the evaluator and the count fell to 456 there.
   - **Oracle**, on the tree before the baseline commit:
     measured on this branch merged with `origin/main` at `564881f` (the
-    merge of PR #157, B-174's preface), which moved while C6 was written.
+    merge of PR #157, the preface of B-174 (the book's existing chapters
+    retrofitted to IR)), which moved while C6 was written. After the
+    baseline commit: `npm run lint:units` reads discriminator 456,
+    baseline 456, and the lane lint 7 files, 0 outside.
     - `npm run lint:streams`: 6 plans checked, 0 with findings.
     - `npm run lint:docs:check`: anchors 0, order 0, ids 784, gate
       passed (main's count, unchanged).
