@@ -1594,13 +1594,14 @@ every arm, each speculatively: the program may never take that path, so the
 evaluation runs no effect, and an effect it reaches is carried on the
 residual instead.
 
-**Delta.** No delta: both rules are implemented as stated since chunks C2
-to C4 of **B-172** (the partial-evaluation rules as implemented against the
-spine). The `when`-arm exception of Rule 1 is to be revisited, in the
-maintainer's words, "when we want to push PE for more optimizations, or if
-we run into cases where we need the full metadata evaluation"
-([`plans/pe-rules.md`](../plans/pe-rules.md) §6, ruling RR9 (unfolding
-inside a speculated `when` arm)). **→ B-172**.
+**Delta.** — *(closed 2026-11-03 with **B-172** (the partial-evaluation
+rules as implemented against the spine): both rules are implemented as
+stated since its chunks C2 to C4. The `when`-arm exception of Rule 1 is to
+be revisited, in the maintainer's words, "when we want to push PE for more
+optimizations, or if we run into cases where we need the full metadata
+evaluation" ([`plans/pe-rules.md`](../plans/pe-rules.md) §6, ruling RR9
+(unfolding inside a speculated `when` arm)); the revisit is a condition the
+ruling records, not a delta.)*
 
 <a id="def-resolved-unresolved-residual"></a>
 ## 26. Resolved, unresolved, residual

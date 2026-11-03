@@ -447,8 +447,42 @@ delivered. Round 7's verdict was overturned on meta-review (the entry above).
 ## Stream D — the partial-evaluation rules
 
 Plan `docs/plans/pe-rules.md`; lane D; human-gated (lane D keeps the
-per-chunk gate). Opened 2026-11-03 with the plan, draft until its PR
-merges; entries newest first, directly below this line.
+per-chunk gate). Opened 2026-11-03 with the plan, active since its PR
+#147 merged the same day; closed 2026-11-03 with all six chunks landed.
+Entries newest first, directly below this line.
+
+### 2026-11 — The stream closes: both rules implemented as stated, the prose and count 2 handed to lane A (B-172, chunk C6)
+
+B-172 (the partial-evaluation rules as implemented against the spine),
+chunk C6 of `docs/plans/pe-rules.md`. The plan's §1 outcome is met on
+all six clauses, checked in the plan's §7 closing entry with evidence.
+Both rules of `docs/book/concepts.md` §25 are implemented as stated
+since chunks C2 to C4, and the delta row is closed: it names only the
+revisit of ruling RR9 (unfolding inside a speculated `when` arm), which
+stays open by ruling. `eval_if`, `eval_when`, `&&` and `||` speculate
+under an unresolved input, and no speculation runs an effect. No
+residual holds a `TailCall` sentinel. The switch in `evaluate` has its
+inert default arm. No `// expect:` line or totality verdict changed;
+the one count that moved, C2's, was raised by lane P under RR8 (what
+may move).
+
+- The evaluator IR flips ask A6 (C204, C205, G40) to decided, ratified
+  at the merge of PR #158; no proposed status remains. Its Status line
+  records the close.
+- Closed: B-172; the reserves B-178 (first out-of-scope finding of the
+  PE-rules stream) and B-179 (second out-of-scope finding of the
+  PE-rules stream), unused. Lane D's row names B-180 (recursion
+  handling under partial evaluation) and B-181 (the hard-coded
+  precompile and compile-time phases) as its later reviews.
+- Handed to lane A under RR4 (how the evaluator chapter is kept true)
+  option (a): the stale sentences of `docs/book/allegretto/evaluator.md`
+  §2 and §3 and §3's `[partial]` tag, count 2, and requirement R2's
+  summary of Rule 1 in the spine (the book pass's chunk F11). The
+  plan's §7 closing entry lists each by line.
+- The plan's header widens `boundary` by
+  `scripts/analyze/units-baseline.json`, as the C4 PR's ask announced,
+  and the top commit lowers the units discriminator baseline from 458
+  to 456 (B-164 (ratchet baselines under concurrent merges)).
 
 ### 2026-11 — Rule 1 restated in the spine: unfolding as the policy with its two exceptions (B-172, chunk C4)
 
