@@ -3353,7 +3353,7 @@ table and the stream plans.
   worked by the orchestrating session, since no lane holds `README.md`:
   (1) widen lane S's globs in `scripts/analyze/lanes.json` by `README.md`
   and `demos/rung1/README.md`, and lane A's by
-  `docs/plans/book-pass-inventory.md` (ruling R15 (where the decision
+  `book-pass-inventory.md` under `docs/plans/` (ruling R15 (where the decision
   inventory lives) of the plan); (2) in `README.md`, move the trailing
   comment of the taste example above `double_pos`, name `first.alg`,
   and say once that `allegro` stands for `npx tsx src/index.ts`; (3)
