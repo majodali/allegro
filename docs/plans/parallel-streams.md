@@ -20,6 +20,8 @@ boundary:
   - .github/workflows/ci.yml
   - package.json
   - CLAUDE.md
+  - README.md
+  - demos/rung1/README.md
 ---
 
 # Parallel streams — the pre-stream arc
