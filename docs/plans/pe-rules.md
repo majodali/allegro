@@ -806,4 +806,4 @@ over unresolved information) are cited in the same text.
     - `npx tsx scripts/analyze/lane-lint.ts --base origin/main`: lane D,
       0 files outside.
     - `npm run test:shards`: 1,291 test runs, 1,291 passed, 0 failed;
-      the gate fails on the load lint's one count alone. The count stop was ruled (a) by the maintainer on 2026-11-03: the baseline of `tests/totality-decreases-demo.alg` is raised to 31,222 evaluates and 10 cutoff residuals in the top commit of the chunk, the merge of PR #150 being the widening RR8 names.
+      the gate fails on the load lint's one count alone. The count stop was ruled (a) by the maintainer on 2026-11-03: the baseline of `tests/totality-decreases-demo.alg` is raised to 31,222 evaluates and 10 cutoff residuals by a one-file lane P PR handed over under RR8 (a), which merges before this chunk; the cutoff floor follows once the count has risen on main.

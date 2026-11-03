@@ -121,10 +121,10 @@
         "cutoffResiduals": 4
       },
       "tests/totality-decreases-demo.alg": {
-        "evaluates": 31222,
+        "evaluates": 31182,
         "inlineExpansions": 0,
         "precompiles": 4,
-        "cutoffResiduals": 10
+        "cutoffResiduals": 2
       }
     }
   }
