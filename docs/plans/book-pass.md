@@ -772,6 +772,21 @@ R-F1-8 included. Two further rulings, the same day:
   `README.md` and `demos/rung1/README.md`, lane A by
   `book-pass-inventory.md` under `docs/plans/`. Chunk P1 waits for that widening.
   R15 and R16 recorded in §6; the pattern list in §2.6.
+- **2026-11-03 — P0, the preface, written; count paused** (the review
+  session). `docs/book/preface.ir.md` first, then `docs/book/preface.md`
+  by the reasoning role: 62 claims, 4 proposed terms, about 940 words, no
+  ids in the prose. A new part "Preface" heads `docs/reading-order.json`
+  and `docs/book/README.md`, with no renumbering; two `book-changes.md`
+  rows (the principles and three definition sites moved from this plan
+  to the preface, plus *open decision*). Count 1 under brief (d) of the
+  briefs, a fresh stranger instance per round: round 1, 22 findings, not
+  readable; round 2, 16 findings, not readable; every fix confirmed but
+  one passage held for a ruling (ask A6 of the IR), which counts against
+  any round under the override. Paused for the maintainer's rulings on
+  the IR's asks A1 to A6. The briefs gain §8 of the review template, the
+  *pattern* kind and part (d). Lints: `lint:docs:check` anchors 0 ·
+  order 0 · ids 784; `lint:ir` 6 files clean, unratified terms 4;
+  `doc-ref-lint` all resolve; `lint:streams` 0 findings.
 
 ## 8. Sessions
 
