@@ -10,7 +10,15 @@
 > - **(a)** the chapter-review record template, step 1 of the plan's
 >   per-chapter procedure (§5);
 > - **(b)** the stranger brief, count-2 version, for step 3;
-> - **(c)** the reasoning-role brief, count-2 version, for steps 2 to 4.
+> - **(c)** the reasoning-role brief, count-2 version, for steps 2 to 4;
+> - **(d)** the human-reader stranger brief, for prose whose reader is
+>   the curious programmer (`docs/plans/book-pass.md` §1, ruling R14 (the
+>   human reader)).
+>
+> The phrasing patterns of the plan's §2.6, principle 8 (ruling R16 (the
+> phrasing patterns)), are checked in all four: the review's §8, and the
+> finding kind *pattern* in (b) and (d). The list grows as the pass meets
+> new patterns; the plan's list is the source.
 >
 > Parts (b) and (c) are stream A's briefs (`docs/plans/book-chapters-now.md`)
 > with the meta-review's recommendations 1, 4, 5, 6, 8 and 9 adopted
@@ -105,8 +113,17 @@ State "No tidy-ups found." when there are none.>
 ### 7. Other findings
 
 <A behaviour the chapter states that the code does not have, or a defect
-no unit holds: for B-183 (first out-of-scope finding of the book pass) or B-184 (second out-of-scope finding of the book pass), the stream's spare ids. State "None."
-when there are none.>
+no unit holds: filed under an id the plan's header reserves, rewritten
+from its placeholder by the review's rulings commit. State "None." when
+there are none.>
+
+### 8. Headings and phrasing
+
+<Each heading that names its section's shape rather than its content,
+with a heading that uses the section's terms. Each place where the most
+significant point is not first. Each instance of the other patterns of
+the plan's §2.6, principle 8, counted by pattern, with two or three
+examples quoted.>
 
 ## Terms introduced
 
@@ -154,6 +171,7 @@ Then report findings, each as one table row: number; the quoted prose or IR text
 - **excess**: a repeated statement, a word or clause that adds tone but not content, a plainer phrase available.
 - **identifier**: an identifier such as a backlog id, a decision id, a ruling id or a section number whose first use in the chapter is not followed by its name in parentheses or a link.
 - **mismatch**: the prose carries something the IR does not, or drops a claim the IR holds.
+- **pattern**: a phrasing pattern of `docs/plans/book-pass.md` §2.6, principle 8: a heading that names its section's shape rather than its content; the most significant point not first in its document, section or paragraph; contrast framing, groups of three for rhythm, em-dash chains, signposting, closing restatements, intensifiers, bold labels on list items, an abstract noun where a verb would do.
 
 Do not ask for edge cases to be elaborated, rules to be extended, or definitions the chapter does not need. Do not propose new content. A finding that proposes fewer words is as valid as any other.
 
@@ -271,3 +289,34 @@ Commit messages go in a file and are committed with `git commit -F <file>` (back
 Status; the map: file paths, IR claim/term/relation/evidence counts, proposed-claim ids, proposed term ids, prose word count (excluding the render map), lint results verbatim (one line each), the ids count; what you could not do and why; any stop condition hit; questions for the maintainer, if any, as asks. Do not paste the chapter.
 
 Then stay available: the review session will send you each stranger round's findings by message. For each round: make the decisions (fixed / declined with reason), fix the IR first, then the prose and render map, re-run `lint:ir` and `lint:docs:check`, append the round to the review record (curve row + table), commit (`B-174: <chapter>, round <n> fixes`), and reply with the list of fixes made (finding number → what changed, quoting the new sentence) so the same stranger can confirm them. After confirmation results arrive, mark each fix confirmed or unfixed in the record and commit.
+
+## (d) The human-reader stranger brief
+
+# Stranger brief — round {N}, read as the curious programmer
+
+You are a stranger reviewer with no part in writing the text and no conversation context. Read as this person: a working programmer, curious about language design, who has never seen the Allegro repository. You know general programming well. You do not know this project's vocabulary, process or history.
+
+Read ONLY the prose `{PROSE}`, then, after step A is written, the IR `{IR}`. Both are in the chapter's working folder named in the chunk's brief. Read nothing else.
+
+## Step A — what you took away (before opening the IR)
+
+In at most 200 words: what the chapter is about, what it decided and why, and the terms it taught you. Then in at most 80 words: where you lost interest or lost the thread, and where you wanted to read on. Be honest: "nowhere" is a valid answer.
+
+## Step B — compare with the IR
+
+As in the count-2 brief (part (b)), step B: report each restatement mismatch, with the passage (cluster id `G<n>` where the IR has one, else the claim or term id), attributed to your restatement or to the prose. Quote the prose sentence when you attribute it to yourself.
+
+## Step C — findings
+
+One table row each: number; the quoted text (short); kind; the fix (`cut`, `rephrase` or `add`); locus (`prose`, `IR` or `both`). Kinds: the kinds of part (b), *pattern* included, plus:
+
+- **jargon**: a word a programmer new to the project would not know, used without a definition or a link at its first use in the section;
+- **lost thread**: a point where you could not tell why the text was telling you this, or how it connects to what came before.
+
+Do not ask for content the chapter does not need. A finding that proposes fewer words is as valid as any other.
+
+## Step D — verdict
+
+The prose's word count (excluding the final render-map comment), then the verdict, `readable` or `not readable`, by four conditions: (1) no restatement mismatch you attribute to the prose; (2) no contradiction; (3) no undefined term and no jargon; (4) no lost thread. State the counts by kind.
+
+Reply in this order: step A, the mismatches, the findings table, the word count and verdict. Nothing else. You will be asked afterwards to confirm each fix; keep your findings numbered.
