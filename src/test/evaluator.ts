@@ -22,7 +22,7 @@ import { evalSource as runtimeEval, type Extension, type CompilationReport } fro
 import { setEvalStatsSink, isTailCall, evaluate, type EvalReport, type EvalStats } from "../evaluator.js";
 import { effectsOf } from "../effects.js";
 import { metaReadRaw } from "../metadata.js";
-import { scopeCompileMode } from "../scope.js";
+import { scopeCompileMode, scopeExtend } from "../scope.js";
 import { getName } from "../slot-accessors.js";
 import { makePrimitive, makeStructure, bitsToString, ValueKind, type Value, type BitsValue, type StructureValue } from "../types.js";
 
@@ -299,11 +299,14 @@ test("B-172 C1 evaluator: Rule 2 — eval_if with an unresolved condition evalua
   eq(c.printed.length, 0, "nothing printed at compile time");
 });
 
-test("B-172 C1 evaluator: gap pin (C3 flips, RR2) — eval_when with an unresolved subject residualises with no arm evaluated", () => {
-  // GAP PIN. C3 flips it under RR2 (a): each arm's guard and body will be
-  // evaluated speculatively and the residual will hold the evaluated arms,
-  // so `whenop` and `whenbind` will infer `io`. Today the residual holds the
-  // arms as written and no arm's effect reaches the function.
+test("B-172 C1 evaluator: Rule 2 — eval_when with an unresolved subject evaluates every arm speculatively; the residual keeps the arms as written and carries their effects (gap pin, C3 flipped it, RR2)", () => {
+  // Was a GAP PIN; C3 flipped it under RR2 (a). Each arm's guard and body
+  // are evaluated speculatively (`speculateWhenArms` in `src/primitives.ts`),
+  // so the `print` defers to a residual carrying `io` and `whenop` and
+  // `whenbind` infer `io`. The residual keeps the arms as written, since it
+  // must still match once its subject resolves (the run-time pin below), and
+  // carries the speculated arms' effects. Until C3 no arm was evaluated and
+  // the residual carried no effect.
   const c = compile("whenop(b: Int): Int => c1_probe(when b is 0 then print(b) is _ then 0)\n");
   eq(c.seen.length, 2, "the probe ran in both precompiles of whenop");
   for (const r of c.seen) {
@@ -312,13 +315,85 @@ test("B-172 C1 evaluator: gap pin (C3 flips, RR2) — eval_when with an unresolv
     eq(r.args[0].kind, ValueKind.Param, "the unresolved subject");
     const arm = thunkBody(r.args[3]);
     eq(shape(arm), "Expression(primitive print; 1 args)", "the first arm's body, as written");
-    eq(effectsText(arm), "none", "the arm was not evaluated: no deferred print, no io");
+    eq(effectsText(arm), "none", "the arm as written: the speculation's deferred print is not kept in it");
     eq(shape(thunkBody(r.args[4])), "Expression(primitive eval_when; 5 args)", "the rest of the chain, as written");
-    eq(effectsText(r), "none", "the residual carries no effect");
+    eq(effectsText(r), "io", "the residual carries the speculated arms' effects");
   }
-  eq(effectsText(valueOf(c, "whenop")), "none", "whenop's effects (C3: io)");
+  eq(effectsText(valueOf(c, "whenop")), "io", "whenop's effects");
+  eq(c.printed.length, 0, "nothing printed at compile time");
   const bind = compile("whenbind(b: Int): Int => when b is n then print(n) is _ then 0\n");
-  eq(effectsText(valueOf(bind, "whenbind")), "none", "whenbind's effects (C3: io)");
+  eq(effectsText(valueOf(bind, "whenbind")), "io", "whenbind's effects");
+});
+
+test("B-172 C3 evaluator: Rule 2 — a binder, a type-pattern and a destructuring arm each hiding a print infer io (RR2)", () => {
+  // RR2 (a): a binder pattern binds the subject; a type pattern or a
+  // destructuring pattern leaves each pattern name as the arm function's own
+  // Param, unbound. The probe shows which: the binder's name is the typed
+  // placeholder of the enclosing function's parameter, the destructured
+  // names are untyped Params.
+  const c = compile(
+    "Point = Type.define({x: Int, y: Int}, Int)\n" +
+    "binder(b: Int): Int => when b is n then print(n) is _ then 0\n" +
+    "typepat(b: Int): Int => when b is Int then print(b) is _ then 0\n" +
+    "destruct(p: Point): Int => when p is Point(x, y) then print(x) is _ then 0\n" +
+    "structural(p: Point): Int => when p is {x, y} then print(y) else 0\n" +
+    "elsearm(b: Int): Int => when b is 0 then 0 else print(b)\n" +
+    "guarded(b: Int): Int => when b is n and n > 0 then print(n) is _ then 0\n" +
+    "inguard(b: Int): Int => when b is n and print(n) > 0 then 0 is _ then 0\n" +
+    "seebinder(b: Int): Int => when b is n then c1_probe(n) is _ then 0\n" +
+    "seefield(p: Point): Int => when p is Point(x, y) then c1_probe(x) is _ then 0\n");
+  for (const name of ["binder", "typepat", "destruct", "structural", "elsearm", "guarded", "inguard"]) {
+    eq(effectsText(valueOf(c, name)), "io", `${name}'s effects`);
+  }
+  eq(c.printed.length, 0, "nothing printed at compile time");
+  eq(c.seen.length, 4, "the probe ran in both precompiles of seebinder and of seefield");
+  const [b1, b2, f1, f2] = c.seen;
+  for (const b of [b1, b2]) {
+    eq(b.kind, ValueKind.Param, "the binder's name: a Param");
+    eq(typeName(b), "Int", "the binder's name is the subject, seebinder's typed placeholder");
+  }
+  for (const f of [f1, f2]) {
+    eq(f.kind, ValueKind.Param, "the destructured name: a Param");
+    eq(typeName(f), "untyped", "the destructured name is the arm's own Param, unbound and untyped");
+  }
+});
+
+test("B-172 C3 evaluator: Rule 2 — the default when_no_match arm is not evaluated (RR2)", () => {
+  // `when_no_match` always throws; evaluated, it would make the precompile
+  // pass report the throw for `partialwhen`. It stays unevaluated.
+  const c = compile("partialwhen(b: Int): Int => when b is 0 then print(b)\n");
+  eq(effectsText(valueOf(c, "partialwhen")), "io", "partialwhen's effects");
+  const faults = c.report.notifications.filter(n => n.kind === "precompile-type-error");
+  eq(JSON.stringify(faults.map(n => `${n.binding}: ${n.message}`)), "[]", "no throw reported");
+});
+
+test("B-172 C3 evaluator: Rule 2 — a when residual re-evaluated once its subject resolves matches its arms as written (RR2)", () => {
+  // At run time `zzz` is bound nowhere, so `w` and `v` are residual
+  // `eval_when`s; their speculation printed nothing. Evaluated again in a
+  // scope that binds `zzz`, each runs exactly the arm that matches, once.
+  const src = `one = 1\nseven = 7\n` +
+    `w = when zzz is 1 then print("when-ran") is _ then print("when-else-ran")\n` +
+    `v = when zzz is 5 then 0 is n then print(n)\n`;
+  for (const typed of [true, false]) {
+    const mode = typed ? "Standard" : "Allegretto";
+    const c = compile(src, typed);
+    eq(c.printed.length, 0, `${mode}: nothing printed by the speculation`);
+    for (const name of ["w", "v"]) {
+      eq(shape(valueOf(c, name)), "Expression(primitive eval_when; 5 args)", `${mode}: ${name} is the residual eval_when`);
+      eq(effectsText(valueOf(c, name)), "io", `${mode}: ${name} carries io`);
+    }
+    const run = (name: string, subject: string): string[] => {
+      const scope = scopeExtend(c.ctx, [["zzz", { key: "zzz", value: valueOf(c, subject) }]]);
+      const printedNow: string[] = [];
+      const origLog = console.log;
+      console.log = (...a: any[]) => { printedNow.push(a.join(" ")); };
+      try { evaluate(valueOf(c, name), scope, 0); } finally { console.log = origLog; }
+      return printedNow;
+    };
+    eq(JSON.stringify(run("w", "one")), JSON.stringify(["when-ran"]), `${mode}: w with zzz = 1`);
+    eq(JSON.stringify(run("w", "seven")), JSON.stringify(["when-else-ran"]), `${mode}: w with zzz = 7`);
+    eq(JSON.stringify(run("v", "seven")), JSON.stringify(["7"]), `${mode}: v with zzz = 7, the binder bound to the subject`);
+  }
 });
 
 test("B-172 C1 evaluator: Rule 2 — && with an unresolved left operand evaluates the right operand speculatively (gap pin, C2 flipped it, RR3)", () => {
@@ -384,10 +459,11 @@ test("B-172 C1 evaluator: Rule 2 — a pure-declared function whose || hides a p
   eq(haltOf(pureDeclared(`b || print("x")`))?.includes(MISMATCH), true, "the || row halts");
 });
 
-test("B-172 C1 evaluator: gap pin (C3 flips, RR2) — a pure-declared function whose when hides a print compiles", () => {
-  // GAP PIN. C3 flips it under RR2 (a): the arm will be evaluated and the
-  // declaration check will halt with the mismatch.
-  eq(haltOf(pureDeclared(`when b is 1 then print("x") is _ then 0`)), null, "the when row compiles (C3: halts)");
+test("B-172 C1 evaluator: Rule 2 — a pure-declared function whose when hides a print halts with the mismatch (gap pin, C3 flipped it, RR2)", () => {
+  // Was a GAP PIN; C3 flipped it under RR2 (a): the arm is evaluated
+  // speculatively, the `print` is inferred and the declaration check halts
+  // with the mismatch, as the `if` row does. Until C3 the row compiled.
+  eq(haltOf(pureDeclared(`when b is 1 then print("x") is _ then 0`))?.includes(MISMATCH), true, "the when row halts");
 });
 
 // --- The two findings of the plan's §2.5 ---------------------------------------
@@ -525,12 +601,15 @@ test("B-172 C1 evaluator: Rule 2 — eval_if at run time with an unresolved cond
 });
 
 test("B-172 C1 evaluator: at run time &&, || and when with an unresolved input print nothing", () => {
-  // The other side of finding 2: these run no speculative evaluation today.
-  // Under RR3 (a) their speculation will defer every effect, so this stays.
+  // The other side of finding 2. Until C2 and C3 these ran no speculative
+  // evaluation; since then (RR3 (a), RR2 (a)) they speculate in a scope
+  // compile mode marks, which defers every effect, so this stays true.
   const src = `s = zzz && print("and-ran")\nt = zzz || print("or-ran")\n` +
     `w = when zzz is 1 then print("when-ran") is _ then print("when-else-ran")\n`;
   for (const typed of [true, false]) {
     const c = compile(src, typed);
     eq(c.printed.length, 0, `${typed ? "Standard" : "Allegretto"}: nothing printed`);
+    // C3: the residual `when` carries the deferred prints' effects.
+    eq(effectsText(valueOf(c, "w")), "io", `${typed ? "Standard" : "Allegretto"}: w carries io`);
   }
 });

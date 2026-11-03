@@ -4,7 +4,7 @@ import { renderExprSource, primitives } from "./primitives.js";
 import {
   Value, ValueKind, ExpressionValue, StructureValue,
   ComposedFunctionValue, ParamValue,
-  AllegroError, isResolved, makeExpr, withMeta, makeStructure,
+  AllegroError, isResolved, makeExpr, makeComposedFn, withMeta, makeStructure,
   DepCollector, ownsParam, Metadata} from "./types.js";
 import { propagateSetForPrimitive, withPredicates, PredicateSet } from "./refinements.js";
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
@@ -267,6 +267,33 @@ export function evaluateSpeculatively(
   value: Value, ctx: StructureValue, evalFn: (v: Value, c: StructureValue) => Value,
 ): Value {
   return (evalFn as SpeculativeEvalFn)(value, ctx, true);
+}
+
+/** B-172 C3, ruling RR2 (a): the three kind questions `eval_when`'s
+ *  speculation asks (`speculateWhenArms` in `src/primitives.ts`), answered
+ *  here because the discriminator rule (`docs/book/units.md` §3.2) leaves
+ *  kind tests to the evaluator. */
+
+/** The thunk a `when` arm or guard is speculated through. A composed
+ *  function over the arm's pattern names becomes a zero-parameter thunk over
+ *  its body: with `subject` given (a binder pattern) the subject is
+ *  substituted for the one name, as a match binds it; otherwise each name
+ *  stays the arm function's own Param, unbound, which evaluates to itself.
+ *  Anything else (a thunk, the guard's literal) is returned as it is. */
+export function whenArmThunk(arm: Value, subject: Value | null): Value {
+  if (arm.kind !== ValueKind.ComposedFunction || arm.params.length === 0) return arm;
+  return makeComposedFn([], subject !== null && arm.params.length === 1 ? substituteParams(arm, [subject]) : arm.body);
+}
+
+/** Whether a `when` pattern is a Symbol bound nowhere in `ctx`: the binder
+ *  that `eval_when_impl`'s matching path recognises after evaluating it. */
+export function isUnboundPatternName(pattern: Value, ctx: StructureValue): boolean {
+  return pattern.kind === ValueKind.Symbol && scopeLookup(ctx, pattern.name)?.value === undefined;
+}
+
+/** The body of a zero-parameter thunk, or the value itself. */
+export function thunkBodyOf(v: Value): Value {
+  return v.kind === ValueKind.ComposedFunction && v.params.length === 0 ? v.body : v;
 }
 
 /** `applyPrimitive`'s `evalFn`, with the speculative switch only this module

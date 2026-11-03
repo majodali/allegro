@@ -818,6 +818,66 @@ function evalThenBranch(
   return evalThen;
 }
 
+/** B-172 C3, ruling RR2 (a): speculate the arms of a `when` chain whose
+ *  subject is unresolved. `args` are `eval_when`'s five: subject, pattern,
+ *  guard, arm, rest of the chain; `subject` is the subject as evaluated.
+ *
+ *  The pattern names. The parser builds an arm whose pattern binds names as
+ *  a composed function over those names (`src/grammar2/tree-builder.ts`),
+ *  and its guard the same way. A binder pattern (`is n`: the `when_bind`
+ *  marker, or a Symbol pattern bound nowhere in scope, which the matching
+ *  path of `eval_when_impl` treats as a binder) binds the subject itself, as
+ *  a match does: the evaluated subject is substituted for the arm
+ *  function's one Param (`whenArmThunk` in `src/evaluator.ts`, which
+ *  answers this function's kind questions under the discriminator rule). Every other pattern that binds
+ *  names (a type pattern `is Int`, a destructuring `{x, y}` or `Point(x,
+ *  y)`) leaves each name as the arm function's own Param, unbound: the body
+ *  is evaluated as written, and a Param evaluates to itself, unresolved.
+ *  Those Params are fresh per arm, since substitution gives every copied
+ *  function fresh Params (`subst`), and nothing here constructs one. No
+ *  placeholder is typed: the field types of a destructured type are
+ *  `src/types-std.ts`'s (RR2's option (b), not taken). The guard or body,
+ *  its names so bound, is wrapped in a zero-parameter thunk, so `speculate`
+ *  unwraps it and applies a call in its tail position under RR7 (a), as for
+ *  a branch of `if`.
+ *
+ *  The guard is speculated like the body, and the body is speculated
+ *  whatever the guard gives: an unresolved guard leaves the body speculated
+ *  too, as does a guard that reduces to false, since speculation runs no
+ *  effect and the inferred effects bound every path the program may take.
+ *
+ *  The rest of the chain. The parser's next link tests the same subject
+ *  (the same object in its first argument), so the walk continues there
+ *  with the subject evaluated once, instead of speculating the link as an
+ *  `eval_when` application that would evaluate the subject again. Anything
+ *  else (a written `else`, a link over another subject) is speculated as a
+ *  branch of `if` is. The default `when_no_match(subject)` is not: it always
+ *  throws.
+ *
+ *  A throw inside a speculation propagates, as C2 decided for `&&`, `||`
+ *  and `if`. The values are discarded; the effects reach the residual
+ *  through `applyPrimitive`'s tracking of `evalFn`. */
+function speculateWhenArms(args: Value[], subject: Value, ctx: StructureValue, evalFn: EvalFn): void {
+  let link = args;
+  for (;;) {
+    const pattern = link[1];
+    const binder = isPatternPrim(pattern, "when_bind") || _isUnboundPatternName(pattern, ctx);
+    const bindTo = binder ? subject : null;
+    _evaluateSpeculatively(_whenArmThunk(link[2], bindTo), ctx, evalFn);
+    _evaluateSpeculatively(_whenArmThunk(link[3], bindTo), ctx, evalFn);
+    const rest = link[4];
+    const restBody = _thunkBodyOf(rest);
+    if (isPatternPrim(restBody, "when_no_match")) return;
+    if (isPatternPrim(restBody, "eval_when") && (restBody as ExpressionValue).args.length === 5 &&
+        (restBody as ExpressionValue).args[0] === args[0]) {
+      link = (restBody as ExpressionValue).args;
+      continue;
+    }
+    _evaluateSpeculatively(rest, ctx, evalFn);
+    return;
+  }
+}
+
 const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 5) throw new AllegroError(`eval_when: need 5 args, got ${args.length}`);
   const subject = evalFn!(args[0], ctx!);
@@ -830,6 +890,19 @@ const eval_when_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // legitimate compile-time scenario into a spurious precompile error.
   // The residual evaluates normally once the subject is resolved.
   if (!isResolved(subject)) {
+    // B-172 C3, ruling RR2 (a): PE Rule 2 for `when`. Every arm's guard and
+    // body are evaluated speculatively first (`speculateWhenArms`, above), so
+    // the effects of every arm reach the enclosing function through this
+    // primitive's effect tracking, as for `if` since C2.
+    speculateWhenArms(args, subject, ctx!, evalFn!);
+    // The residual keeps the arms AS WRITTEN, not the evaluated ones: it must
+    // still match when its subject resolves at run time, and an evaluated arm
+    // cannot be matched again (a binder arm's body has the subject
+    // substituted for its pattern name; the other arms' bodies hold their
+    // arm function's Params outside that function). `applyPrimitive` attaches
+    // the effects tracked during the speculation to this residual, which is
+    // how they reach its consumers. No type is attached: today's residual is
+    // untyped, and RR2 (a) moves effects only.
     return makeExpr(eval_when_value, [subject, args[1], args[2], args[3], args[4]]);
   }
 
@@ -1894,7 +1967,7 @@ import {
 // admitted and verdict-visible (ledger wiring lands with F3's tiers).
 declareLiveness("delay", "live");
 declareLiveness("fetch", "admitted", "the fetched endpoint eventually responds");
-import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams, evaluateSpeculatively as _evaluateSpeculatively } from "./evaluator.js";
+import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams, evaluateSpeculatively as _evaluateSpeculatively, whenArmThunk as _whenArmThunk, isUnboundPatternName as _isUnboundPatternName, thunkBodyOf as _thunkBodyOf } from "./evaluator.js";
 import { putEntry } from "./structure.js";
 
 // F3b: tracks ComposedFunctions whose body is currently being precompiled,
