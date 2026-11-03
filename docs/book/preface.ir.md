@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's preface: how the book is organized and why, the invitation to follow each decision and try an alternative in code organized to match, and the principles that bind every author of the book.
-Status: draft (count 1: round 3 not readable, ask A7 ruled 2026-11-03, round 4 owed; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
+Status: draft (count 1: round 3 not readable, round 4 not readable, round 5 owed; ask A7 ruled 2026-11-03; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
 Source: chunk P0 of docs/plans/book-pass.md (the book pass, B-174); the organizing principles of its §2.6 and the rulings R10 to R16 of its §6, taken 2026-11-03; docs/book/units.md for the code as organized
 Normative: yes
 Footprint: docs/book/preface.md; docs/reading-order.json; docs/book/README.md; docs/book-changes.md; docs/documentation-census.md
@@ -29,6 +29,8 @@ C1. The book is written for you: a working programmer who is curious about langu
 
 C71. The table of contents marks each rewritten chapter. evidence: E9 reworded in count 1, round 3. [decided: owner, 2026-11-03]
 
+C13. A tour of the few large choices that define Allegro, each pointing forward to its full treatment, will open the book once the tour is written. evidence: E2 merged C9, C14, C70. [decided: owner, 2026-11-03]
+
 C2. The principles of this preface also bind every author of the book, human or agent. [decided: owner, 2026-11-03]
 
 ### What the book is for
@@ -47,19 +49,13 @@ C8. The chapters of the book are being rewritten to this organization one at a t
 
 ### Decisions in dependency order
 
-C10. A decision comes after the decisions it builds on. [decided: owner, 2026-11-03]
+C10. Decisions come in dependency order: a decision comes after the decisions it builds on. reworded in count 1, round 4. [decided: owner, 2026-11-03]
 
 C11. Everything a decision rests on is therefore explained before the decision itself. [decided: owner, 2026-11-03]
 
 C12. Among decisions that do not depend on each other, the more significant decision comes first. [decided: owner, 2026-11-03]
 
 C62. The decisions that shape most of Allegro arrive as early as their dependencies allow. [decided: owner, 2026-11-03]
-
-C13. A tour, not yet written, will open the book by telling the story of the few large choices that define Allegro. evidence: E2 reworded in count 1, rounds 1 to 3, C14 and C9 merged in. [decided: owner, 2026-11-03]
-
-C70. Each choice in the tour will point forward to the choice's full treatment later in the book. split from C13 in count 1, round 2. [decided: owner, 2026-11-03]
-
-C15. After the tour, the book descends through the decisions in dependency order. [decided: owner, 2026-11-03]
 
 C16. A concept is defined where the book first uses the concept or where the book settles the concept's meaning. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
@@ -109,7 +105,9 @@ C36. Each decision section labels its decision swappable or foundational. [decid
 
 C74. The label depends only on what other decisions rest on the decision, whatever the decision's rationale. added at the ruling on A7. [decided: owner, 2026-11-03]
 
-C75. Choosing an offside-rule grammar, where indentation marks block ends, for aesthetic reasons would likely be a swappable decision, whereas choosing purely functional semantics for aesthetic reasons would be a foundational decision. added at the ruling on A7. [decided: owner, 2026-11-03]
+C75. Choosing an offside-rule grammar, where indentation marks block ends, for aesthetic reasons would likely be a swappable decision. split in count 1, round 4. [decided: owner, 2026-11-03]
+
+C76. Choosing purely functional semantics for aesthetic reasons would be a foundational decision. split from C75 in count 1, round 4. [decided: owner, 2026-11-03]
 
 C37. The label tells you what an alternative costs before you branch the code. [decided: owner, 2026-11-03]
 
@@ -175,11 +173,9 @@ C73. That separation keeps the narrative on the design and its reasons. split fr
 
 G2. cluster: C3, C1, C4, C5, C6 [decided: owner, 2026-11-03]
 
-G3. cluster: C7, C8, C71, C2 [decided: owner, 2026-11-03]
+G3. cluster: C7, C8, C71, C13, C2 [decided: owner, 2026-11-03]
 
 G4. cluster: C10, C11, C12, C62 [decided: owner, 2026-11-03]
-
-G5. cluster: C13, C70, C15 [decided: owner, 2026-11-03]
 
 G6. cluster: C16, C17, C18, C64 [decided: owner, 2026-11-03]
 
@@ -191,7 +187,7 @@ G9. cluster: C30 [decided: owner, 2026-11-03]
 
 G10. cluster: C31, C32, C33 [decided: owner, 2026-11-03]
 
-G11. cluster: C34, C35, C36, C74, C75, C37 [decided: owner, 2026-11-03]
+G11. cluster: C34, C35, C36, C74, C75, C76, C37 [decided: owner, 2026-11-03]
 
 G12. cluster: C38, C39, C72, C40, C41 [decided: owner, 2026-11-03]
 
