@@ -556,7 +556,7 @@ over unresolved information) are cited in the same text.
 
   What each loses: A, nothing measured, and it removes two thirds of the
   cost only; B, every effect found through nested speculation, and C2's
-  nested `if`s; B2, the effects of a `when` inside an `if` branch or inside
+  nested `if`s; B2 (the nested `when` cap), the effects of a `when` inside an `if` branch or inside
   another arm (probed: both lost); C, effects that only unfolding inside
   an arm would find (a callee with no stashed set yet; an effect variable
   instantiated at the call; a return type through the call), none of
@@ -976,4 +976,4 @@ over unresolved information) are cited in the same text.
     or below 2,000 `evaluate` calls (460 through the CLI, 37,716
     unfolded). Outputs: 136 of 136 identical against `origin/main`. The
     IR gains C197, C198 and C200 (proposed, in ask A5) and C199 (decided
-    by RR9), cluster G39 and relation R11.
+    by RR9), cluster G39 and relation R11 (C197 refines C44).
