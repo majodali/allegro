@@ -36,6 +36,7 @@ and no jargon; no lost thread.
 | 1 | 944 | 67 | 22 | 23.3 | not readable (restatement mismatches 3: 1 own, 2 prose; contradictions 0; undefined terms 1; jargon 3; lost thread 3) |
 | 2 | 913 | 63 | 16 | 17.5 | not readable (restatement mismatches 4: 2 own, 2 prose; contradictions 1; undefined terms 2; jargon 2; lost thread 2, one of them counting under the override) |
 | 3 | 935 | 63 | 10 | 10.7 | not readable (restatement mismatches 2: 1 own, 1 prose; contradictions 1, held for ask A7; undefined terms 1; jargon 0; lost thread 3) |
+| 4 | 1,000 | 65 | 6 | 6.0 | not readable (restatement mismatches 4: 3 own, 1 prose; contradictions 0; undefined terms 0; jargon 0; lost thread 1) |
 
 ## Round 1
 
@@ -316,3 +317,55 @@ and fourth; the count has not ended).
 
 After the ruling: 65 claims, the render map covering all 65. Round 4
 is owed, with a fresh stranger instance.
+
+## Round 4
+
+Words about 1,000, claims 65, findings 6, from a fresh stranger
+instance reading ff08496 merged with `origin/main` (b5a59fb). The
+restatement was correct. Mismatches: three own (C16's second site
+dropped; C4's "aims to" dropped; C43's hedge dropped; no fix) and one
+attributed to the prose (G4: "The first rule is dependency order"
+implies further rules that no claim gives). Contradictions 0. Undefined
+terms 0. Jargon 0. Lost thread 1 (finding 2). Verdict: not readable.
+
+Override comparison by passage. The tour passage, C13 (G5 until this
+round's fix, which moved C13 into G3), drew a finding in rounds 1
+(findings 1 and 2), 3 (finding 2) and 4 (finding 2). A lost thread is
+not covered by the override; the recurrence is recorded so the
+maintainer sees it, and this round's fix treats it as a placement
+problem rather than wording. The prose mismatch on G4 is the first
+mismatch on that passage. The aim sentence C55 (G17) is flagged as
+excess for the third round running (round 2's finding 8, round 3's
+finding 10, round 4's finding 3), each time declined: a recurring
+finding for the maintainer. The separation sentence C73 (G18) was split
+at round 3's confirmation on that stranger's finding 7, and round 4's
+stranger flags the split (finding 4): the two strangers disagree.
+
+The stranger lost interest at the mixed-files paragraph (G15, read as
+process) and asked how the experiments sentence relates to the block
+list. No finding was filed on either. The experiments paragraph already
+opens "The decision and rationale block may show how a rejected option
+fails.", which ties it to block 4; it is left as it stands. The
+stranger wanted to read on at the offside-rule example and at the
+code-organized claim.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| M1 | C16's second site | restatement mismatch (own) | stranger | no fix needed |
+| M2 | C4's "aims to" | restatement mismatch (own) | stranger | no fix needed |
+| M3 | C43's hedge | restatement mismatch (own) | stranger | no fix needed |
+| M4 | "The first rule is dependency order" implies a series | restatement mismatch (prose) | stranger | fixed: finding 1 |
+| 1 | "The first rule is dependency order" | mismatch | stranger | fixed: C10 reads "Decisions come in dependency order: a decision comes after the decisions it builds on." |
+| 2 | the tour paragraph, a promise with no content | lost thread (recurring: rounds 1, 3, 4) | stranger | fixed by placement: C13, C70 merged into C13 and moved into the status paragraph, "A tour of the few large choices that define Allegro, each pointing forward to its full treatment, will open the book once the tour is written."; C15 cut, its dependency order already stated by C10 |
+| 3 | "The prose aims to be clear and brief enough to hold your interest." | excess (recurring: rounds 2, 3, 4) | stranger | declined: holding the reader's interest is the stated aim; recorded as recurring for the maintainer |
+| 4 | "That separation keeps the narrative on the design and its reasons." | pattern | stranger | declined: round 3's stranger asked for this split (its finding 7); the strangers disagree, recorded for the maintainer |
+| 5 | C75 joins the two example choices | compound | stranger | fixed: C75 split into C75 and C76, "Choosing an offside-rule grammar, where indentation marks block ends, for aesthetic reasons would likely be a swappable decision. Choosing purely functional semantics for aesthetic reasons would be a foundational one." |
+| 6 | "The explore block of an open decision says…" repeats the referent | excess | stranger | fixed: the prose reads "The explore block says how and where to contribute one."; the IR claim C41 keeps its named referent |
+
+Claims check after the fix pass, against round 4's prose: every claim of
+the fixed IR is carried (64 of 64 in the render map, re-numbered for 17
+paragraphs). C70 merged into C13; C15 cut; C76 a new split of C75. No
+claim reported missing or stale. Prose words after the fixes 965 (by
+`wc`).
+
+Confirmation: pending.
