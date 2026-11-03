@@ -12,10 +12,10 @@ Everything it does differently is a composition of three moves:
    proofs, and effects are ordinary values; partial evaluation is the
    only engine. Type checking, proof discharge, and optimization are
    the same evaluation, run as far as the available facts allow.
-2. **Every claim carries a visible strength.** No boolean "verified"
-   anywhere: a refinement, contract, law, or effect declaration
-   resolves to a tier — *proven, enumerated, sampled, witnessed,
-   admitted, pending*. The escape hatches are legal and loud, and the
+2. **Every claim carries a visible strength.** No claim is a bare yes
+   or no: each resolves to a tier. A refinement, contract, law, or
+   effect declaration lands on *proven, enumerated, sampled, witnessed,
+   admitted,* or *pending*. The escape hatches are legal and loud, and the
    verdict's assumption ledger shows exactly what every proof rests on.
 3. **Every participant goes through the same kernel.** A human, an
    LLM, a tool — same obligations, same protocol, same verification,
@@ -23,7 +23,7 @@ Everything it does differently is a composition of three moves:
 
 ## Quick start
 
-Requires Node.js 18+.
+Requires Node.js 22 or later.
 
 ```bash
 git clone https://github.com/majodali/allegro
@@ -36,17 +36,18 @@ npm test                          # full suite
 ```
 
 A taste — claims are part of the program, and breaking one halts the
-build with a concrete counterexample:
+build with a concrete counterexample. Save it as `first.alg`:
 
 ```allegro
 use contracts
 
 PositiveInt = Int & _ > 0
 
+// both checks discharge statically
 double_pos(x: PositiveInt): PositiveInt =>
   requires x > 0
   ensures _ > 0
-  x + x                            // both checks discharge statically
+  x + x
 
 theorem doubles: double_pos(PositiveInt(3)) == 6
 ```
@@ -62,11 +63,12 @@ npx tsx src/index.ts verify first.alg    # theorems, law tiers, the
 
 - **[Getting started](docs/book/getting-started.md)** — install to first
   verified program.
-- **[`demos/rung1/`](demos/rung1/)** — five runnable scenes: proof
-  discharge, counterexamples, effects refusal, laws + the admitted
-  tier, and the participant-neutral prover loop
-  (`allegro obligations` / `propose` / `prove`), each with a "break
-  it" block and captured transcripts.
+- **[`demos/rung1/`](demos/rung1/)** — four runnable scenes and a
+  walkthrough of the prover loop: proof discharge, counterexamples,
+  effects refusal, laws + the admitted tier, and the participant-neutral
+  loop (`allegro obligations` / `propose` / `prove`, where `allegro`
+  stands for `npx tsx src/index.ts`); three scenes carry a "break it"
+  block and a captured transcript.
 - **[`demos/rung2/`](demos/rung2/)** — a provable DSL: units of measure
   as a pure Allegro library, dimensional soundness as refinement
   discharge, physics theorems, the ledger over quantities.

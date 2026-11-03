@@ -574,6 +574,19 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-03 — the preface's rulings applied, and round 3.** The
+  maintainer's rulings at the merge of PR #157, recorded in
+  `docs/plans/book-pass.md` §6 (the preface's asks, the two finding
+  kinds, claims merged for flow, spare ids picked by the maintainer):
+  the preface's claims and terms ratified, its reading-order entry
+  marked `"organized": true` and its table-of-contents row marked
+  *organized*, the form of an open decision stated, and the sentence on
+  how the prose is written cut. Round 3 of the preface's count: 10
+  findings, not readable; fixes confirmed but one passage held for the
+  maintainer (whether a vision or aesthetics decision carries the
+  swappable-or-foundational label). The briefs' part (c) gains the rule
+  that claims a reader takes as one idea are merged in the IR. Ids 784.
+
 - **2026-11-03 — the re-scope, and the preface.** The book pass now
   writes the book for human readers too: the re-scope rulings of
   `docs/plans/book-pass.md` §6, the twelve organizing principles in its
@@ -606,6 +619,28 @@ name.
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
+
+### 2026-11 — The root README's corrections (B-184): the taste parses, and lane S holds the two READMEs
+
+B-184 (the root README's corrections), lane S, filed by the book pass
+(`docs/plans/book-pass.md`) from its review of the root README
+(`docs/records/book-pass/f1-readme.md`, rulings R-F1-1 to R-F1-4) and
+worked by the orchestrating session. `README.md`: the taste example's
+trailing comment moves above `double_pos`, so the example parses (as
+printed it hit B-183 (a trailing comment breaks a contract body's
+parse)); the example is named `first.alg`, the file the next commands
+run; `allegro` is said once to stand for `npx tsx src/index.ts`;
+"Node.js 22 or later" replaces "18+", 22 being the version CI runs; "No
+claim is a bare yes or no: each resolves to a tier" replaces "No boolean
+"verified" anywhere", since the verdict carries and prints a boolean
+`verified`; rung 1 is described as four runnable scenes and a
+walkthrough of the prover loop, three scenes carrying a "break it" block
+and a captured transcript, here and in `demos/rung1/README.md`.
+`scripts/analyze/lanes.json`: lane S gains `README.md` and
+`demos/rung1/README.md`, which no lane held, so later README edits are
+checked; lane A gains `book-pass-inventory.md` under `docs/plans/`, the
+decision inventory that the book pass's chunk P1 (the decision
+inventory) writes, which waited for this widening.
 
 ### 2026-10 — The book writes IR first (B-173): W-009 (IR first) adopted for the new chapters
 

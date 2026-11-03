@@ -1,7 +1,8 @@
 # Rung 1 — verified code at AI velocity
 
 The first demo ladder rung (see `docs/messaging.md` for the story
-these scenes tell). Five scenes, each runnable as-is:
+these scenes tell). Four scenes, each runnable as-is, and a walkthrough
+of the prover loop:
 
 ```bash
 npx tsx src/index.ts demos/rung1/01-discharge.alg
@@ -18,8 +19,9 @@ npx tsx src/index.ts demos/rung1/04-laws.alg
 | `04-laws.alg` | Laws carry discharge tiers; the `proof_trans` strict gate; `Law.assume` is legal and loud |
 | `05-prover-loop.md` | The participant-neutral loop: obligations → proposal → verdict → authorship, for humans and LLMs alike |
 
-Each scene contains a commented **break it** block; uncommenting it
-halts the build with the exact output captured in `transcripts/`.
+Scenes 2, 3 and 4 each contain a commented **break it** block;
+uncommenting it halts the build with the exact output captured in
+`transcripts/`.
 Deeper inspection at any point:
 
 ```bash

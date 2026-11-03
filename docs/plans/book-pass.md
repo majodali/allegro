@@ -736,6 +736,25 @@ R-F1-8 included. Two further rulings, the same day:
   burying the lede, then the sentence-level candidates. The list grows
   as the pass meets others.
 
+**Rulings taken 2026-11-03, at the merge of PR #157.** The maintainer
+took every recommendation of the preface's PR:
+
+- **R17 — The preface's asks.** The IR's asks A1 to A6 as recommended:
+  the proposed claims and the four terms ratified; a chapter rewritten
+  to the organization carries `"organized": true` in
+  `docs/reading-order.json` and a marker in the table of contents; an
+  open decision takes the seven blocks with "the question still open"
+  for "decision and rationale"; the preface points to the pilot chapter
+  once it exists; the sentence on how the prose is written is cut.
+- **R18 — The finding kinds of the human-reader brief.** *Jargon* and
+  *lost thread* ratified.
+- **R19 — Claims merged for flow.** Where a reader takes two claims as
+  one idea, the reasoning role merges them in the IR before rendering.
+  A standing rule of part (c) of `docs/plans/book-pass-briefs.md`.
+- **R20 — Spare ids.** The maintainer or the orchestrating session picks
+  the stream's next two spare backlog ids; the review session does not
+  number them. Open until the numbers are given.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -790,6 +809,17 @@ R-F1-8 included. Two further rulings, the same day:
   *pattern* kind and part (d). Lints: `lint:docs:check` anchors 0 ·
   order 0 · ids 784; `lint:ir` 6 files clean, unratified terms 4;
   `doc-ref-lint` all resolve; `lint:streams` 0 findings.
+- **2026-11-03 — PR #157's rulings applied; round 3; paused again**
+  (the review session). R17 to R20 recorded in §6, R19 in part (c) of
+  the briefs. The preface: the IR's asks A1 to A6 applied, 0 unratified
+  terms; round 3, 935 words, 10 findings (10.7 per 1,000 words, from
+  23.3 and 17.5), not readable; the fixes confirmed, one passage held as
+  the IR's ask A7. Stream D's chunk C4 merged (PR #158), so F11's edit
+  of `docs/book/concepts.md` is no longer waiting (§2.4); the order of
+  the re-scoped front holds it until P1's table of contents. P1 still
+  waits for B-184's lane widening. R20 open: the stream has no spare id.
+  Lints: `lint:docs:check` anchors 0 · order 0 · ids 784; `lint:ir` 6
+  files clean, unratified terms 0; `doc-ref-lint` all resolve.
 
 ## 8. Sessions
 
