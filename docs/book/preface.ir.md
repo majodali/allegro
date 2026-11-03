@@ -29,8 +29,6 @@ C1. The book is written for you: a working programmer who is curious about langu
 
 C71. The table of contents marks each rewritten chapter. evidence: E9 reworded in count 1, round 3. [decided: owner, 2026-11-03]
 
-C13. A tour of the few large choices that define Allegro, each pointing forward to its full treatment, will open the book once the tour is written. evidence: E2 merged C9, C14, C70. [decided: owner, 2026-11-03]
-
 C2. The principles of this preface also bind every author of the book, human or agent. [decided: owner, 2026-11-03]
 
 ### What the book is for
@@ -43,7 +41,7 @@ C5. You are invited into the design of Allegro, which is still under way. reword
 
 C6. The code is organized so that you can branch the code to try another option for a decision. [decided: owner, 2026-11-03]
 
-C7. Most chapters of the book do not yet follow the organization this preface describes. evidence: E1 [decided: owner, 2026-11-03]
+C7. The tour that opens the book is not yet written, and most chapters do not yet follow the organization this preface describes. evidence: E1, E2 [decided: owner, 2026-11-03]
 
 C8. The chapters of the book are being rewritten to this organization one at a time. evidence: E1 reworded in count 1, round 3 and its confirmation. [decided: owner, 2026-11-03]
 
@@ -56,6 +54,10 @@ C11. Everything a decision rests on is therefore explained before the decision i
 C12. Among decisions that do not depend on each other, the more significant decision comes first. [decided: owner, 2026-11-03]
 
 C62. The decisions that shape most of Allegro arrive as early as their dependencies allow. [decided: owner, 2026-11-03]
+
+C13. The book opens with a tour of the few large choices that define Allegro, each choice pointing forward to its full treatment. restructured at round 4's confirmation, C9, C14 and C70 merged in. [decided: owner, 2026-11-03]
+
+C77. After the tour, the book descends through the decisions in dependency order. the cut C15 reinstated at round 4's confirmation. [decided: owner, 2026-11-03]
 
 C16. A concept is defined where the book first uses the concept or where the book settles the concept's meaning. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
@@ -173,9 +175,11 @@ C73. That separation keeps the narrative on the design and its reasons. split fr
 
 G2. cluster: C3, C1, C4, C5, C6 [decided: owner, 2026-11-03]
 
-G3. cluster: C7, C8, C71, C13, C2 [decided: owner, 2026-11-03]
+G3. cluster: C7, C8, C71, C2 [decided: owner, 2026-11-03]
 
 G4. cluster: C10, C11, C12, C62 [decided: owner, 2026-11-03]
+
+G5. cluster: C13, C77 [decided: owner, 2026-11-03]
 
 G6. cluster: C16, C17, C18, C64 [decided: owner, 2026-11-03]
 
@@ -268,3 +272,5 @@ A6 resolved: option (a) at the merge of PR #157, 2026-11-03; C56 cut from the IR
 A7. Decide whether a decision about vision or aesthetics carries the swappable-or-foundational label. Options: (a) every decision section carries the label (C36 as it stands); (b) the label applies only to decisions with an implementation, and a vision or aesthetics decision carries none. Recommended: (b). Round 3 of count 1 found C36 in possible contradiction with C30, C34 and C35. The passage stays unchanged until the ruling. Depends: C30, C34, C35, C36.
 
 A7 resolved: option (a) with a correction, ruled by the owner on PR #161, 2026-11-03. Aesthetics describes a decision's rationale, never its outcome. Every decision section carries the label (C36), and the label follows from what other decisions rest on the decision (C74). C30 reworded; C74 and C75 added.
+
+A8. Decide whether the aim sentence C55 keeps "enough to hold your interest" (the owner asked for an engaging book) or cuts it to "The prose aims to be clear and brief." Strangers flagged the phrase as excess in rounds 2, 3 and 4 of count 1, and round 4's stranger disputed the decline at confirmation. The passage stays unchanged until the ruling. Depends: C55.

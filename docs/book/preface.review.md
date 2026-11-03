@@ -368,4 +368,23 @@ paragraphs). C70 merged into C13; C15 cut; C76 a new split of C75. No
 claim reported missing or stale. Prose words after the fixes 965 (by
 `wc`).
 
-Confirmation: pending.
+Confirmation: the round's stranger instance confirmed the fixes of 1, 5
+and 6, and accepted the decline of 4. It disputed the decline of 3:
+"clear and brief" keeps the aim, and "enough to hold your interest"
+adds tone without content. The decline stands, and the finding goes to
+the maintainer as ask A8 of the IR. Finding 2 is unfixed: in the status
+paragraph, the tour sentence connected to nothing.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| 3 | "enough to hold your interest" adds tone (disputed at confirmation) | excess | stranger | declined, the dispute recorded: ask A8 (keep the phrase, or cut it to "The prose aims to be clear and brief.") |
+| 2 | the tour sentence in the status paragraph connects to nothing (unfixed at confirmation) | lost thread | stranger | fixed by restructuring, not rewording: the tour is described as part of the book's structure in the dependency-order section, C13 "The book opens with a tour of the few large choices that define Allegro, each pointing forward to its full treatment." and C77 "After the tour, the book descends through the decisions in dependency order." (C15's content reinstated under a new number); the status is stated once, folded into C7, "The tour that opens the book is not yet written, and most chapters do not yet follow the organization this preface describes." |
+
+The tour has drawn findings in rounds 1, 3 and 4 and at round 4's
+confirmation. The restructuring leaves no sentence that promises: the
+structure is described in the present tense of the book's design, and
+the status sits once with the other status.
+
+Claims check after the confirmation fixes: 65 of 65 claims carried in
+the render map, re-numbered for 18 paragraphs; C77 new; C13 moved; C7
+reworded. No claim missing or stale. Prose words 983 (by `wc`).

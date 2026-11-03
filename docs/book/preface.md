@@ -10,12 +10,12 @@ rationale for the option taken. You are invited into the design of
 Allegro, which is still under way. The code is organized so that you can branch it to
 try another option for a decision.
 
-Most chapters do not yet follow the organization this preface describes.
-The chapters are being rewritten to this organization one at a time. The
-[table of contents](README.md) marks each rewritten chapter. A tour of the few large choices that
-define Allegro, each pointing forward to its full treatment, will open
-the book once the tour is written. The principles of this
-preface also bind every author of the book, human or agent.
+The tour that opens the book is not yet written, and most chapters do not
+yet follow the organization this preface describes. The chapters are
+being rewritten to this organization one at a time. The
+[table of contents](README.md) marks each rewritten chapter. The
+principles of this preface also bind every author of the book, human or
+agent.
 
 ## Decisions in dependency order
 
@@ -25,8 +25,11 @@ before the decision itself. Among decisions that do not depend on each
 other, the more significant one comes first. The decisions that shape
 most of Allegro arrive as early as their dependencies allow.
 
-A concept is defined where the book
-first uses it, or where the book settles its meaning. The book marks
+The book opens with a tour of the few large choices that define Allegro,
+each pointing forward to its full treatment. After the tour, the book
+descends through the decisions in dependency order.
+
+A concept is defined where the book first uses it, or where the book settles its meaning. The book marks
 each concept at its definition. Every other chapter links its first use
 of a concept back to that definition. A concept never appears before its
 meaning.
@@ -126,4 +129,4 @@ The project's process, measurements, file maps and studies live outside
 the book's narrative. That separation keeps the narrative on the design
 and its reasons.
 
-<!-- render map: C3→¶1 C1→¶1 C4→¶1 C5→¶1 C6→¶1 C7→¶2 C8→¶2 C71→¶2 C13→¶2 C2→¶2 C10→¶3 C11→¶3 C12→¶3 C62→¶3 C16→¶4 C17→¶4 C18→¶4 C64→¶4 C19→¶5 C20→¶5 C21→¶5 C22→¶6 C23→¶6 C24→¶6 C25→¶6 C26→¶6 C27→¶6 C28→¶6 C30→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶9 C35→¶9 C36→¶9 C74→¶9 C75→¶9 C76→¶9 C37→¶9 C38→¶10 C39→¶10 C72→¶10 C40→¶10 C41→¶10 C43→¶11 C44→¶12 C45→¶12 C69→¶12 C46→¶12 C47→¶12 C48→¶13 C49→¶13 C50→¶14 C51→¶14 C52→¶14 C53→¶14 C54→¶14 C55→¶15 C59→¶16 C60→¶16 C67→¶16 C61→¶16 C58→¶17 C73→¶17 -->
+<!-- render map: C3→¶1 C1→¶1 C4→¶1 C5→¶1 C6→¶1 C7→¶2 C8→¶2 C71→¶2 C2→¶2 C10→¶3 C11→¶3 C12→¶3 C62→¶3 C13→¶4 C77→¶4 C16→¶5 C17→¶5 C18→¶5 C64→¶5 C19→¶6 C20→¶6 C21→¶6 C22→¶7 C23→¶7 C24→¶7 C25→¶7 C26→¶7 C27→¶7 C28→¶7 C30→¶8 C31→¶9 C32→¶9 C33→¶9 C34→¶10 C35→¶10 C36→¶10 C74→¶10 C75→¶10 C76→¶10 C37→¶10 C38→¶11 C39→¶11 C72→¶11 C40→¶11 C41→¶11 C43→¶12 C44→¶13 C45→¶13 C69→¶13 C46→¶13 C47→¶13 C48→¶14 C49→¶14 C50→¶15 C51→¶15 C52→¶15 C53→¶15 C54→¶15 C55→¶16 C59→¶17 C60→¶17 C67→¶17 C61→¶17 C58→¶18 C73→¶18 -->
