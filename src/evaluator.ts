@@ -10,7 +10,7 @@ import { propagateSetForPrimitive, withPredicates, PredicateSet } from "./refine
 import { effectsOf, withEffects, unionEffectSets, EffectSet } from "./effects.js";
 import { getConstruct } from "./slot-accessors.js";
 import { metaReadRaw, cloneMeta, metaOf, metaFieldSpec, fieldChecks, CheckSite, dispatchers, CallBinding, viralOnto, mergeOverMeta, PRESERVED_FN_META_KEYS, withSource, carryMeta } from "./metadata.js";
-import { scopeLookup, scopeCompileMode, scopeFactsFor } from "./scope.js";
+import { scopeLookup, scopeCompileMode, scopeFactsFor, scopeNew } from "./scope.js";
 
 const MAX_DEPTH = 10000;
 
@@ -242,6 +242,77 @@ function makeTailCall(fn: ComposedFunctionValue, args: Value[], fnRaw?: Value): 
   return { tailCall: true, fn, args, fnRaw };
 }
 
+// --- Speculative evaluation (B-172 C2) ---
+//
+// Speculative evaluation is evaluating an operand or a branch whose value the
+// program may never use (`docs/plans/pe-rules.md` §1): the right operand of
+// `&&` or `||` under an unresolved left operand, both branches of an `if`
+// under an unresolved condition. Ruling RR3 (a): it always runs in a scope
+// that compile mode marks, at run time as in the precompile pass, so every
+// effectful primitive it reaches defers to a residual carrying its effects
+// (`applyPrimitive` reads the mark through the chain, `scopeCompileMode`).
+// Ruling RR7 (a): a TailCall sentinel it produces is applied here, so no
+// residual holds one.
+
+/** Evaluate `value` speculatively in `ctx`, through the `evalFn` that
+ *  `applyPrimitive` handed the lazy primitive. A zero-parameter thunk (the
+ *  parser's wrapper of a branch or of a right operand) has its body
+ *  evaluated. Returns a value, never a TailCall sentinel. The `evalFn` does
+ *  the work (`speculate`, below), so the result reaches the lazy primitive's
+ *  effect tracking like any other evaluation, and the residual the primitive
+ *  builds carries the speculation's effects by the same path as before. A
+ *  lazy primitive's impl is applied only by `applyPrimitive`, so its `evalFn`
+ *  is always that closure. */
+export function evaluateSpeculatively(
+  value: Value, ctx: StructureValue, evalFn: (v: Value, c: StructureValue) => Value,
+): Value {
+  return (evalFn as SpeculativeEvalFn)(value, ctx, true);
+}
+
+/** `applyPrimitive`'s `evalFn`, with the speculative switch only this module
+ *  passes. */
+type SpeculativeEvalFn = (v: Value, c: StructureValue, speculative?: boolean) => Value;
+
+/** The speculation itself.
+ *
+ *  The mark: a fresh child scope of `ctx`, made here and marked before it
+ *  escapes, which is the write rule for an unshared value. The caller's own
+ *  scope is never marked, so compile mode does not leak into the rest of the
+ *  program's evaluation, and the speculation's own scope writes (an
+ *  `assert`'s facts) stay in the child. `src/scope.ts` is not touched:
+ *  `scopeNew` is its exported constructor, and the mark is the same host
+ *  property `precompileFunction` sets on its compile scope.
+ *
+ *  A throw inside the speculation (a type error in the right operand or in a
+ *  branch) propagates as any evaluation error does: the same program on the
+ *  resolved path would throw too, and the precompile pass reports a throw as
+ *  it reports any other. */
+function speculate(value: Value, ctx: StructureValue, depth: number, depCollector?: DepCollector): Value {
+  const marked = scopeNew(ctx);
+  (marked as any).compileMode = true;
+  const v = evaluate(value, marked, depth, depCollector);
+  const r: Value | TailCall = (v.kind === ValueKind.ComposedFunction && v.params.length === 0)
+    ? evaluate(v.body, marked, depth, depCollector) : v;
+  if (!isTailCall(r)) return r as Value;
+  // RR7 (a): a call in tail position of the branch or operand. With an
+  // inline cutoff installed (a typed compilation with a recursion cycle,
+  // `src/runtime.ts`) the call is applied as `evaluateExpr` applies a
+  // sentinel from an unmarked Expression: `applyComposed` unfolds it under
+  // Rule 1's policy and the cutoff stops a recursive one. Where none is
+  // installed the call is residualised as an Expression carrying the
+  // callee's effects, as the cutoff's branch of `applyComposed` does, so an
+  // untyped recursive branch cannot unfold without bound. The test is
+  // `inlineCutoff === null`: the hook is this module's own, cleared by every
+  // compilation and set only by a typed one with a recursion cycle.
+  const tc = r as TailCall;
+  if (inlineCutoff === null) {
+    const residual = makeExpr(tc.fnRaw ?? tc.fn, tc.args);
+    const calleeEffects = effectsOf(tc.fn as unknown as Value);
+    return calleeEffects ? withEffects(residual, calleeEffects) : residual;
+  }
+  return applyComposed(tc.fn, tc.args, marked, depth, tc.fnRaw, depCollector);
+}
+
 /**
  * Mark tail-position Expressions in a function body.
  * A tail-position Expression is one whose result IS the function's result.
@@ -385,21 +456,16 @@ export function evaluate(
     }
   }
 
+  // The discriminator rule (docs/book/units.md §3.2): the switch names only
+  // the kinds that participate — Symbol resolves, Expression applies, the
+  // function kinds and Param take part in application — and one default arm
+  // takes the inert rest.
   switch (value.kind) {
-    case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
     case ValueKind.ComposedFunction:
-      return value;
-
-    case ValueKind.Structure:
-      // Structures self-evaluate. B-121 C4 deleted the CARRIER arm that stood
-      // here — it re-evaluated the wrapped value, because a residual under
-      // metadata was still pending computation. A residual now carries its own
-      // metadata as an Expression and is handled by that case; `mergeOverMeta`,
-      // extracted from this arm at C2, is what it calls.
-      return value;
-
     case ValueKind.Param:
+      // Each takes part in application (evaluateExpr, applyComposed,
+      // substitution), and evaluates to itself.
       return value;
 
     case ValueKind.Symbol: {
@@ -435,6 +501,15 @@ export function evaluate(
       }
       return result as Value;
     }
+
+    default:
+      // The inert rest: Bits, Structure, and "a kind a fork adds is inert
+      // until its author says otherwise" (docs/book/units.md §3.2; B-172's
+      // ruling RR5, option (a)). A Structure self-evaluates: B-121 C4 deleted
+      // the CARRIER arm that stood here, which re-evaluated the wrapped value
+      // because a residual under metadata was still pending computation; a
+      // residual now carries its own metadata as an Expression.
+      return value;
   }
 }
 
@@ -553,8 +628,11 @@ function applyPrimitive(
   // for eager primitives we read effects off the evaluated args after the
   // fact (logic further down).
   const trackedEffects: EffectSet = new Set();
-  const evalFn = (v: Value, c: StructureValue) => {
-    const r = evaluate(v, c, depth + 1, depCollector);
+  // B-172 C2: the third argument is `evaluateSpeculatively`'s, above.
+  const evalFn: SpeculativeEvalFn = (v, c, speculative) => {
+    const r = speculative
+      ? speculate(v, c, depth + 1, depCollector)
+      : evaluate(v, c, depth + 1, depCollector);
     if (fn.lazy) {
       const e = effectsOf(r);
       if (e) for (const lbl of e) trackedEffects.add(lbl);

@@ -450,6 +450,26 @@ Plan `docs/plans/pe-rules.md`; lane D; human-gated (lane D keeps the
 per-chunk gate). Opened 2026-11-03 with the plan, draft until its PR
 merges; entries newest first, directly below this line.
 
+### 2026-11 — Rule 2 for && and ||; speculation runs no effect; the branch tail call applied; the inert default arm (B-172, chunks C2 and C5)
+
+B-172 (the partial-evaluation rules as implemented against the spine),
+chunk C2 of `docs/plans/pe-rules.md`, with the deferred chunk C5. Under
+ruling RR3 (speculative evaluation and effects) option (a), `eval_if`
+evaluates both branches, and `&&` and `||` their right operand, under an
+unresolved input through `evaluateSpeculatively` (`src/evaluator.ts`):
+in a fresh child scope carrying the compile-mode flag, at run time as in
+the precompile pass, so an effect behind `&&` or `||` is now inferred
+and `if zzz then print("then-ran") else print("else-ran")` prints
+nothing. Under RR7 (a tail call inside a speculatively evaluated branch)
+option (a), a `TailCall` sentinel from a branch is applied there, so no
+residual holds one. Seven gap pins of `src/test/evaluator.ts` flipped.
+C5's commit (the inert default arm of the switch in `evaluate`, ruling
+RR5 option (a)) is cherry-picked and changes no output. The `inspect`
+output of `tests/functions.alg` loses the `via_if` host fault. One gated
+count rose (`tests/totality-decreases-demo.alg`, `evaluates` 31,182 to
+31,222), put to the maintainer before the PR merges. The evaluator IR
+gains claims C178 to C188 and ask A4. The record is the plan's §7.
+
 ### 2026-11 — Both rules pinned and the RR1 experiment measured (B-172, chunk C1); the default arm measured and set aside (C5)
 
 B-172 (the partial-evaluation rules as implemented against the spine),
