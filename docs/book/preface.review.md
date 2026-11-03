@@ -297,3 +297,22 @@ Round 4 runs after the ruling, with a fresh stranger instance.
 
 Meta-review: not indicated at the pause (signals checked: first, second
 and fourth; the count has not ended).
+
+## Ruling taken, 2026-11-03, on PR #161
+
+- A7, option (a) with a correction. The maintainer: aesthetics describes
+  the rationale for a decision, not its outcome; whether the decision is
+  swappable or foundational depends on what other decisions may depend
+  on it. Applied IR first: C36 stands, decided at the ruling. C30 reads
+  "Not every decision needs all seven blocks: a decision taken for
+  reasons of vision or aesthetics may need fewer." New C74: "The label
+  depends only on what other decisions rest on the decision, whatever
+  its rationale." New C75, the maintainer's examples, both stated as
+  hypothetical choices: "Choosing an offside-rule grammar, where
+  indentation marks block ends, for aesthetic reasons would likely be a
+  swappable decision, whereas choosing purely functional semantics for
+  aesthetic reasons would be a foundational one." Finding 4 of round 3
+  is resolved by the ruling.
+
+After the ruling: 65 claims, the render map covering all 65. Round 4
+is owed, with a fresh stranger instance.

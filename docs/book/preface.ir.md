@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's preface: how the book is organized and why, the invitation to follow each decision and try an alternative in code organized to match, and the principles that bind every author of the book.
-Status: draft (count 1: round 3 not readable, paused for the ruling on ask A7, round 4 after it; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
+Status: draft (count 1: round 3 not readable, ask A7 ruled 2026-11-03, round 4 owed; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
 Source: chunk P0 of docs/plans/book-pass.md (the book pass, B-174); the organizing principles of its §2.6 and the rulings R10 to R16 of its §6, taken 2026-11-03; docs/book/units.md for the code as organized
 Normative: yes
 Footprint: docs/book/preface.md; docs/reading-order.json; docs/book/README.md; docs/book-changes.md; docs/documentation-census.md
@@ -91,7 +91,7 @@ C27. The as-implemented block points to the unit of code that holds the decision
 
 C28. The explore block says how to try another option in the code. [decided: owner, 2026-11-03]
 
-C30. Not every decision needs all seven blocks: a decision about the language's vision or aesthetics may need fewer. reworded in count 1, round 3. [decided: owner, 2026-11-03]
+C30. Not every decision needs all seven blocks: a decision taken for reasons of vision or aesthetics may need fewer. reworded in count 1, round 3, and at the ruling on A7. [decided: owner, 2026-11-03]
 
 C31. The decision and rationale block may show how a rejected option fails. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
@@ -105,7 +105,11 @@ C34. A swappable decision is one for which trying another option replaces one un
 
 C35. A foundational decision is one for which trying another option cascades through the decisions that depend on the foundational decision. [decided: owner, 2026-11-03]
 
-C36. Each decision section labels its decision swappable or foundational. [decided: owner, 2026-11-03]
+C36. Each decision section labels its decision swappable or foundational. [decided: owner, 2026-11-03, ruling on A7]
+
+C74. The label depends only on what other decisions rest on the decision, whatever the decision's rationale. added at the ruling on A7. [decided: owner, 2026-11-03]
+
+C75. Choosing an offside-rule grammar, where indentation marks block ends, for aesthetic reasons would likely be a swappable decision, whereas choosing purely functional semantics for aesthetic reasons would be a foundational decision. added at the ruling on A7. [decided: owner, 2026-11-03]
 
 C37. The label tells you what an alternative costs before you branch the code. [decided: owner, 2026-11-03]
 
@@ -187,7 +191,7 @@ G9. cluster: C30 [decided: owner, 2026-11-03]
 
 G10. cluster: C31, C32, C33 [decided: owner, 2026-11-03]
 
-G11. cluster: C34, C35, C36, C37 [decided: owner, 2026-11-03]
+G11. cluster: C34, C35, C36, C74, C75, C37 [decided: owner, 2026-11-03]
 
 G12. cluster: C38, C39, C72, C40, C41 [decided: owner, 2026-11-03]
 
@@ -266,3 +270,5 @@ A6. Decide whether the preface keeps the sentence on how the prose is written (C
 A6 resolved: option (a) at the merge of PR #157, 2026-11-03; C56 cut from the IR and the prose, C55 kept.
 
 A7. Decide whether a decision about vision or aesthetics carries the swappable-or-foundational label. Options: (a) every decision section carries the label (C36 as it stands); (b) the label applies only to decisions with an implementation, and a vision or aesthetics decision carries none. Recommended: (b). Round 3 of count 1 found C36 in possible contradiction with C30, C34 and C35. The passage stays unchanged until the ruling. Depends: C30, C34, C35, C36.
+
+A7 resolved: option (a) with a correction, ruled by the owner on PR #161, 2026-11-03. Aesthetics describes a decision's rationale, never its outcome. Every decision section carries the label (C36), and the label follows from what other decisions rest on the decision (C74). C30 reworded; C74 and C75 added.
