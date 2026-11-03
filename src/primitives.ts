@@ -854,6 +854,11 @@ function evalThenBranch(
  *  branch of `if` is. The default `when_no_match(subject)` is not: it always
  *  throws.
  *
+ *  Each is evaluated through `evaluateWhenArmSpeculatively`, so a composed
+ *  call with an unresolved argument inside it is residualised with the
+ *  callee's effects rather than unfolded (ruling RR9, option C; the reason
+ *  is at that policy in `applyComposed`).
+ *
  *  A throw inside a speculation propagates, as C2 decided for `&&`, `||`
  *  and `if`. The values are discarded; the effects reach the residual
  *  through `applyPrimitive`'s tracking of `evalFn`. */
@@ -863,8 +868,8 @@ function speculateWhenArms(args: Value[], subject: Value, ctx: StructureValue, e
     const pattern = link[1];
     const binder = isPatternPrim(pattern, "when_bind") || _isUnboundPatternName(pattern, ctx);
     const bindTo = binder ? subject : null;
-    _evaluateSpeculatively(_whenArmThunk(link[2], bindTo), ctx, evalFn);
-    _evaluateSpeculatively(_whenArmThunk(link[3], bindTo), ctx, evalFn);
+    _evaluateWhenArmSpeculatively(_whenArmThunk(link[2], bindTo), ctx, evalFn);
+    _evaluateWhenArmSpeculatively(_whenArmThunk(link[3], bindTo), ctx, evalFn);
     const rest = link[4];
     const restBody = _thunkBodyOf(rest);
     if (isPatternPrim(restBody, "when_no_match")) return;
@@ -873,7 +878,7 @@ function speculateWhenArms(args: Value[], subject: Value, ctx: StructureValue, e
       link = (restBody as ExpressionValue).args;
       continue;
     }
-    _evaluateSpeculatively(rest, ctx, evalFn);
+    _evaluateWhenArmSpeculatively(rest, ctx, evalFn);
     return;
   }
 }
@@ -1967,7 +1972,7 @@ import {
 // admitted and verdict-visible (ledger wiring lands with F3's tiers).
 declareLiveness("delay", "live");
 declareLiveness("fetch", "admitted", "the fetched endpoint eventually responds");
-import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams, evaluateSpeculatively as _evaluateSpeculatively, whenArmThunk as _whenArmThunk, isUnboundPatternName as _isUnboundPatternName, thunkBodyOf as _thunkBodyOf } from "./evaluator.js";
+import { precompileFunction as _precompileFunction, isTailCall as _isTailCall, remapParams as _remapParams, evaluateSpeculatively as _evaluateSpeculatively, whenArmThunk as _whenArmThunk, evaluateWhenArmSpeculatively as _evaluateWhenArmSpeculatively, isUnboundPatternName as _isUnboundPatternName, thunkBodyOf as _thunkBodyOf } from "./evaluator.js";
 import { putEntry } from "./structure.js";
 
 // F3b: tracks ComposedFunctions whose body is currently being precompiled,

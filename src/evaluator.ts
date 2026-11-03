@@ -269,6 +269,20 @@ export function evaluateSpeculatively(
   return (evalFn as SpeculativeEvalFn)(value, ctx, true);
 }
 
+/** B-172 C3, ruling RR9 (option C): how many speculations of a `when` arm
+ *  are open. While one is, `applyComposed` residualises a composed call with
+ *  an unresolved argument instead of unfolding it (see there). */
+let whenArmSpeculations = 0;
+
+/** Evaluate a `when` arm, guard or the rest of a `when` chain speculatively,
+ *  as `evaluateSpeculatively` does, with the arm policy of RR9 in force. */
+export function evaluateWhenArmSpeculatively(
+  value: Value, ctx: StructureValue, evalFn: (v: Value, c: StructureValue) => Value,
+): Value {
+  whenArmSpeculations++;
+  try { return evaluateSpeculatively(value, ctx, evalFn); } finally { whenArmSpeculations--; }
+}
+
 /** B-172 C3, ruling RR2 (a): the three kind questions `eval_when`'s
  *  speculation asks (`speculateWhenArms` in `src/primitives.ts`), answered
  *  here because the discriminator rule (`docs/book/units.md` §3.2) leaves
@@ -889,6 +903,24 @@ function applyComposed(
     // calls must still run (and may legitimately diverge; that is what
     // the declaration opted into). Residualizing there would change
     // semantics, not just cost.
+    // B-172 C3, ruling RR9 (option C), taken by the maintainer on PR #155:
+    // inside a speculated `when` arm a composed call with an unresolved
+    // argument is residualised, carrying the callee's stashed effects as the
+    // cutoff's residual below does, instead of unfolded. Unfolding there
+    // nests: the callee's own `if`s and `when`s are speculated, their arms
+    // unfold further callees, and so on. Loading `lib/planning.alg` measured
+    // 63,915,555 `evaluate` calls against 219,433 without `when` speculation,
+    // at speculation depths up to 26; with this policy, 234,306. It narrows
+    // Rule 1's unfolding (RR1 (a)) inside `when` arms only: `if`, `&&` and
+    // `||` speculate and unfold as C2 left them. RR9 in
+    // `docs/plans/pe-rules.md` records when to revisit it: when partial
+    // evaluation is pushed for further optimisation, or a case needs the full
+    // metadata evaluation inside an arm.
+    if (whenArmSpeculations > 0 && evalArgs.some(a => !isResolved(a))) {
+      const residual = makeExpr(currentFnRaw ?? currentFn, evalArgs);
+      const calleeEffects = effectsOf(currentFn as unknown as Value);
+      return calleeEffects ? withEffects(residual, calleeEffects) : residual;
+    }
     if (
       inlineCutoff !== null &&
       evalArgs.some(a => !isResolved(a)) &&

@@ -159,6 +159,9 @@ function pureDeclared(body: string): string {
   return `h(m) => print(m)\ng(b) =>\n  effects pure\n  ${body}\n`;
 }
 
+/** The ceiling of the bounded-nesting pin (RR9). */
+const BOUNDED_CEILING = 2000;
+
 const MISMATCH = "effects mismatch in g: declared `pure`, inferred `io`";
 
 // --- PE Rule 1: an application with an unresolved argument -------------------
@@ -394,6 +397,49 @@ test("B-172 C3 evaluator: Rule 2 — a when residual re-evaluated once its subje
     eq(JSON.stringify(run("w", "seven")), JSON.stringify(["when-else-ran"]), `${mode}: w with zzz = 7`);
     eq(JSON.stringify(run("v", "seven")), JSON.stringify(["7"]), `${mode}: v with zzz = 7, the binder bound to the subject`);
   }
+});
+
+test("B-172 C3 evaluator: Rule 2 — a composed call inside a speculated when arm is residualised, carrying the callee's effects (RR9, option C)", () => {
+  // RR9 (option C): inside a speculated `when` arm a composed call with an
+  // unresolved argument is not unfolded but residualised as an Expression
+  // over the callee, carrying the callee's stashed effects: `later` (a
+  // forward reference) and `h` (an untyped callee with its own `when`). The
+  // same call in an `if` branch is still unfolded, as C2 left it.
+  const c = compile(
+    "fwd(x: Int): Int => when x is n then c1_probe(later(n)) is _ then 0\n" +
+    "later(m: Int): Int => print(m)\n" +
+    "h(m) => when m is 0 then print(m) is _ then 0\n" +
+    "callee_when(x: Int): Int => when x is n then c1_probe(h(n)) is _ then 0\n" +
+    "inif(x: Int): Int => if x == 0 then c1_probe(h(x)) else 0\n");
+  eq(c.seen.length, 6, "the probe ran in both precompiles of fwd, callee_when and inif");
+  for (const r of c.seen.slice(0, 4)) {
+    eq(shape(r), "Expression(ComposedFunction; 1 args)", "the residual call inside the arm");
+    if (r.kind === ValueKind.Expression) eq(r.args[0].kind, ValueKind.Param, "its argument: the arm's subject, unresolved");
+    eq(effectsText(r), "io", "the residual carries the callee's io");
+  }
+  for (const r of c.seen.slice(4)) {
+    eq(shape(r), "Expression(primitive eval_when; 5 args)", "in an if branch the call of h is unfolded to h's when");
+  }
+  for (const name of ["fwd", "callee_when", "inif"]) eq(effectsText(valueOf(c, name)), "io", `${name}'s effects`);
+  eq(c.printed.length, 0, "nothing printed at compile time");
+});
+
+test("B-172 C3 evaluator: Rule 2 — a when inside an unfolded callee chain stays bounded (RR9, option C)", () => {
+  // Each `f<k>` calls `f<k+1>` twice from a `when` arm. Unfolded inside the
+  // arm (C3 before RR9), the precompile pass speculated every callee's own
+  // `when` again, doubling per level: the shape of the 64M `evaluate` calls
+  // of loading `lib/planning.alg`. Measured through the CLI: 37,716 calls
+  // unfolded, 460 residualised. The compile helper checks the count is the
+  // same on three runs.
+  let src = "";
+  for (let k = 1; k <= 8; k++) {
+    src += k < 8
+      ? `f${k}(x: Int): Int => when x is 0 then 0 is n then f${k + 1}(n) + f${k + 1}(n - 1)\n`
+      : `f${k}(x: Int): Int => when x is 0 then 0 is n then print(n)\n`;
+  }
+  const c = compile(src);
+  eq(c.stats.evaluateCalls <= BOUNDED_CEILING, true, `evaluate calls ${c.stats.evaluateCalls} at or below ${BOUNDED_CEILING}`);
+  eq(effectsText(valueOf(c, "f7")), "io", "f7 carries f8's io through the residualised calls");
 });
 
 test("B-172 C1 evaluator: Rule 2 — && with an unresolved left operand evaluates the right operand speculatively (gap pin, C2 flipped it, RR3)", () => {
