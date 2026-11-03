@@ -11,7 +11,7 @@ oracle:
   - npm run lint:streams
   - npm test
 chunks: [P0, P1, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
-reserves: [B-183, B-184]
+reserves: [B-183, B-184, B-185, B-186]
 boundary:
   - docs/book/**
   - docs/reading-order.json
@@ -127,7 +127,10 @@ All four were ratified by the maintainer on 2026-11-03.
 of the book pass) and B-184 (second out-of-scope finding of the book
 pass). The plan's PR files both as placeholder entries in
 `docs/backlog.md`, so the header resolves under `npm run lint:streams`.
-B-182 is filed by the same PR as the hand-off item, at the maintainer's
+B-185 (third out-of-scope finding of the book pass) and B-186 (fourth
+out-of-scope finding of the book pass) were reserved the same way on
+2026-11-03, at the review session's request, once chunk F1 had used the
+first two. B-182 is filed by the same PR as the hand-off item, at the maintainer's
 instruction of 2026-11-03. It is not in this plan's `reserves`: the
 tidy-up stream's plan will name it as its `backlog`, and the lane check
 (`scripts/analyze/lane-lint.ts`) routes a PR to the plan whose header
@@ -330,7 +333,7 @@ carries asks. Every chunk stops at its PRs in any case. The stream adds
 five:
 
 1. **A chapter that needs a code change stops that change.** The need is
-   filed: under B-182 if it is a tidy-up (§1), under B-183 or B-184 if it
+   filed: under B-182 if it is a tidy-up (§1), under B-183 to B-186 if it
    changes behaviour or lies outside every unit. The chapter then says
    what the code does today. A corrected source comment is a tidy-up.
 2. **A Tier-0 edit stops.** `docs/book/vision.md` and
@@ -369,7 +372,7 @@ five:
   it; no other file under `scripts/` is in the boundary.
 - The status documents under B-162, which every lane edits: this
   stream's section of `docs/CHANGELOG.md`; in `docs/backlog.md` B-174,
-  B-183, B-184, lane A's row, and B-182 as R2 rules; this plan's row of
+  B-183 to B-186, lane A's row, and B-182 as R2 rules; this plan's row of
   `docs/plans/README.md`; rows of `docs/book-changes.md`.
 
 Lane A's globs in `scripts/analyze/lanes.json` hold
@@ -520,7 +523,7 @@ primitives) are not chunks: their gates have not passed. A planned
 entry whose gate passes during the stream is a scope change, put to the
 maintainer as an ask.
 
-Reserves: B-183 and B-184, for findings that are not tidy-ups: a
+Reserves: B-183 to B-186, for findings that are not tidy-ups: a
 behaviour the chapter states that the code does not have, or a defect in
 a file no unit holds.
 
