@@ -35,6 +35,7 @@ and no jargon; no lost thread.
 |---|---|---|---|---|---|
 | 1 | 944 | 67 | 22 | 23.3 | not readable (restatement mismatches 3: 1 own, 2 prose; contradictions 0; undefined terms 1; jargon 3; lost thread 3) |
 | 2 | 913 | 63 | 16 | 17.5 | not readable (restatement mismatches 4: 2 own, 2 prose; contradictions 1; undefined terms 2; jargon 2; lost thread 2, one of them counting under the override) |
+| 3 | 935 | 63 | 10 | 10.7 | not readable (restatement mismatches 2: 1 own, 1 prose; contradictions 1, held for ask A7; undefined terms 1; jargon 0; lost thread 3) |
 
 ## Round 1
 
@@ -199,3 +200,119 @@ ruled.
 
 Meta-review: not indicated at the pause (signals checked: first, second
 and fourth; the count has not ended).
+
+## Rulings taken, 2026-11-03, at the merge of PR #157
+
+The maintainer took the default on every ask of the IR and merged PR
+#157 on 2026-11-03.
+
+- A1: the listed proposed claims are ratified; they carry
+  `[decided: owner, 2026-11-03]`, and so do the clusters.
+- A2: the terms decision section, swappable decision, foundational
+  decision and open decision are ratified; unratified terms 0.
+- A3: a chapter rewritten to the organization carries `"organized":
+  true` on its entry in `docs/reading-order.json`, and its row in
+  `docs/book/README.md` carries the marker *organized*, explained in one
+  sentence under the README's status convention. Applied to the preface
+  itself. New claim C71: "The table of contents marks each chapter
+  rewritten to this organization."
+- A4: new claim C72: "The section of an open decision takes the seven
+  blocks of a decision section, with the question still open in place
+  of the decision and rationale." C41 reworded: "The explore block of an
+  open decision says how and where to contribute one."
+- A5: the preface will point to the pilot chapter once that chapter
+  exists. No text change now.
+- A6, option (a): C56 is cut from the IR and the prose. C55, the
+  prose's aim, is kept. Finding 14 of round 2 and finding 27 of round
+  1's carry-over are resolved by the cut.
+
+After the rulings: 63 claims, 953 words (by `wc`), the render map
+covering all 63. The count stays paused after round 2. Round 3 owes a
+fresh stranger instance reading the prose and the IR as they now stand.
+Status of the IR: draft, count 1 owing round 3.
+
+## Round 3
+
+Words about 935, claims 63, findings 10, from a fresh stranger instance
+reading the prose and the IR as the rulings of PR #157 left them. The
+restatement was correct overall. Mismatches: one own (the restatement
+overstated the reasons; no fix) and one attributed to the prose: the
+connective "Concepts follow a similar rule." carries no IR claim and
+names no rule (G6). Contradictions 1, possible (finding 4). Undefined
+terms 1 (finding 8, a heading). Lost thread 3 (findings 2, 3 and 5).
+Verdict: not readable.
+
+Override comparison by passage. Round 1's mismatches fell on G7, G14
+and a heading tag; round 2's on G2 and G19; round 3's prose mismatch on
+G6. No mismatch recurs on one passage. Finding 4 falls on C36 (G11)
+against C30 (G9): no earlier round raised a mismatch or a contradiction
+on either. Round 1's finding 15 touched G9 through C29, an excess since
+cut, not the same claim. The held finding 4 counts against round 3's
+verdict and, under the rule for a finding that needs a ruling, against
+later rounds until ask A7 is ruled.
+
+The stranger wanted to read on at an explore block and at a worked
+rejected option. Neither is added: a worked decision section is the
+ruled ask A5, pointed to once the pilot chapter exists.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| M1 | the reasons overstated | restatement mismatch (own) | stranger | no fix needed: the stranger's own reading |
+| M2 | "Concepts follow a similar rule." carries no claim | restatement mismatch (prose) | stranger | fixed: finding 1 |
+| 1 | "Concepts follow a similar rule." | mismatch | stranger | fixed: the connective cut; ¶5 opens with C16 |
+| 2 | "The tour itself is not yet written." | lost thread | stranger | fixed: C9 merged into C13, "A tour, not yet written, will open the book by telling the story of the few large choices that define Allegro." |
+| 3 | C30 not linked to the block list | lost thread | stranger | fixed: C30 reads "Not every decision needs all seven blocks: a decision about the language's vision or aesthetics may need fewer." It leaves the label of ask A7 open |
+| 4 | C36 against C30, C34 and C35 | contradiction (possible) | stranger | declined in text: a ruling for the maintainer, ask A7 (recommended (b)); the passage stays until the ruling |
+| 5 | "Nothing in the book is drawn from the project's history." | lost thread | stranger | fixed: C33 reads "Nothing in the book, evidence included, is drawn from the project's history." |
+| 6 | the consequences block joins two claims | compound | stranger | declined: one idea, what a decision opens and closes |
+| 7 | C58 repeats "the design" | compound, excess | stranger | fixed: the repeat removed, the reason clause kept (round 2's finding 17): "…which keeps the narrative on the design and its reasons." |
+| 8 | heading names "intermediate representation" before its link | undefined term | stranger | fixed: heading "Prose for people, a structured form for agents" |
+| 9 | "this organization" three times in the status paragraph | excess | stranger | fixed: C8 reads "The chapters are being rewritten one at a time." and C71 "The table of contents marks each rewritten chapter." |
+| 10 | "clear and brief enough to hold your interest" | excess | stranger | declined: holding the reader's interest is the stated aim, as at round 2's finding 8 |
+
+Claims check after the fix pass, against round 3's prose: every claim of
+the fixed IR is carried (62 of 62 in the render map). C9 is merged into
+C13, and relation R1, which related the two, is removed. No claim
+reported missing or stale. Prose words after the fixes 943 (by `wc`).
+
+Confirmation: the round's stranger instance confirmed the fixes of 1,
+2, 3, 5, 8 and 9, and accepted the declines of 6 and 10 and the hold of
+4 under ask A7. Finding 7 is unfixed: the reason clause of C58 is still
+a compound the reader judges separately. The stranger named two new
+defects of the round 3 fixes.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| 7 | "which keeps the narrative on the design and its reasons" | compound (unfixed at confirmation) | stranger | fixed: C58 split into C58 and C73, "That separation keeps the narrative on the design and its reasons." |
+| 11 | heading "Prose for people, a structured form for agents" differs from the paragraph's term | pattern | round 3 fixes | fixed: heading "Prose for people, an intermediate representation for agents"; the term stays linked at its first use in the paragraph |
+| 12 | "The chapters are being rewritten one at a time." | lost thread | round 3 fixes | fixed: C8 reads "The chapters are being rewritten to this organization one at a time." |
+
+Claims check after the confirmation fixes: 63 of 63 claims carried in
+the render map; C73 is a new split of C58; no claim missing or stale.
+
+## The count paused for ask A7
+
+The count pauses after round 3 for the maintainer's ruling on ask A7.
+Round 4 runs after the ruling, with a fresh stranger instance.
+
+Meta-review: not indicated at the pause (signals checked: first, second
+and fourth; the count has not ended).
+
+## Ruling taken, 2026-11-03, on PR #161
+
+- A7, option (a) with a correction. The maintainer: aesthetics describes
+  the rationale for a decision, not its outcome; whether the decision is
+  swappable or foundational depends on what other decisions may depend
+  on it. Applied IR first: C36 stands, decided at the ruling. C30 reads
+  "Not every decision needs all seven blocks: a decision taken for
+  reasons of vision or aesthetics may need fewer." New C74: "The label
+  depends only on what other decisions rest on the decision, whatever
+  its rationale." New C75, the maintainer's examples, both stated as
+  hypothetical choices: "Choosing an offside-rule grammar, where
+  indentation marks block ends, for aesthetic reasons would likely be a
+  swappable decision, whereas choosing purely functional semantics for
+  aesthetic reasons would be a foundational one." Finding 4 of round 3
+  is resolved by the ruling.
+
+After the ruling: 65 claims, the render map covering all 65. Round 4
+is owed, with a fresh stranger instance.

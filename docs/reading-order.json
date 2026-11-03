@@ -1,11 +1,11 @@
 {
-  "_": "The reading order of the project's documentation: the book's chapters before the book exists (docs/plans/documentation-book.md, Phase 0; D52). Dependency order, not didactic order: a chapter may define a term using only terms defined in earlier chapters. `scripts/doc-lint.ts order` checks links to `#def-` anchors against this order. `lookahead: true` exempts a chapter that is a lookup aid or an introduction and may point forward by design. `status: planned` marks a chapter that does not exist yet. Registers and records are appendices, outside the order check.",
+  "_": "The reading order of the project's documentation: the book's chapters before the book exists (docs/plans/documentation-book.md, Phase 0; D52). Dependency order, not didactic order: a chapter may define a term using only terms defined in earlier chapters. `scripts/doc-lint.ts order` checks links to `#def-` anchors against this order. `lookahead: true` exempts a chapter that is a lookup aid or an introduction and may point forward by design. `status: planned` marks a chapter that does not exist yet. `organized: true` marks a chapter rewritten to the organization the preface (docs/book/preface.md) describes. Registers and records are appendices, outside the order check.",
   "parts": [
     {
       "part": "Preface",
       "title": "How this book is organized",
       "chapters": [
-        { "doc": "docs/book/preface.md", "title": "How this book is organized", "lookahead": true }
+        { "doc": "docs/book/preface.md", "title": "How this book is organized", "lookahead": true, "organized": true }
       ]
     },
     {
