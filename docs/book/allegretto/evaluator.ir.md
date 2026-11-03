@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `evaluator` unit (unit 13): evaluation and partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, and the edges the unit still owes.
-Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0; edited 2026-11-03: claims C178 to C180 and C182 to C188, clusters G36 and G37 and the term speculation mark (T31) ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: `eval_when` under PE Rule 2 by B-172's chunk C3 (claims C189 to C196 and cluster G38; C55, C181 and cluster G36 removed; C55 also dropped from ask A1; relation R2 re-pointed; evidence E51 added; E13, E14, E23, E50 and every `src/evaluator.ts` pointer moved by C3 re-synced), unratified terms 0; edited 2026-11-03: claims C173, C176 and C177 and cluster G35 ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: the `when` arm policy of ruling RR9 (claims C197 to C200, cluster G39, relation R11, evidence E52 and E53; E9 and every pointer moved re-synced), unratified terms 0)
+Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0; edited 2026-11-03: claims C178 to C180 and C182 to C188, clusters G36 and G37 and the term speculation mark (T31) ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: `eval_when` under PE Rule 2 by B-172's chunk C3 (claims C189 to C196 and cluster G38; C55, C181 and cluster G36 removed; C55 also dropped from ask A1; relation R2 re-pointed; evidence E51 added; E13, E14, E23, E50 and every `src/evaluator.ts` pointer moved by C3 re-synced), unratified terms 0; edited 2026-11-03: claims C173, C176 and C177 and cluster G35 ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: the `when` arm policy of ruling RR9 (claims C197 to C200, cluster G39, relation R11, evidence E52 and E53; E9 and every pointer moved re-synced), unratified terms 0; edited 2026-11-03: claims C189 to C195, C197, C198 and C200 and clusters G38 and G39 ratified at the merge of PR #155, unratified terms 0; edited 2026-11-03: PE Rule 1 restated in `docs/book/concepts.md` §25 by B-172's chunk C4 (claims C201 to C204 and cluster G40; C35, C44, C161 and cluster G9 removed; C44 and C161 also dropped from ask A1; C154 and C168 kept; relations R3, R4 and R11 re-pointed), unratified terms 0)
 Source: chunk A1 of docs/plans/book-chapters-now.md (stream A, B-170); src/evaluator.ts as assigned to unit 13 since B-112's exit
 Normative: yes
 Footprint: docs/book/allegretto/evaluator.md; docs/book/allegretto/evaluator.ir.md; docs/book/allegretto/evaluator.review.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
@@ -181,13 +181,17 @@ C163. No abort that `src/evaluator.ts` raises is caused by an unresolved input. 
 
 C34. `src/evaluator.ts` raises three aborts during evaluation: a depth past 10,000; a declared parameter type with no field check installed; a primitive with no implementation. evidence: E3, E8, E18. [decided: owner, 2026-11-01]
 
-C35. PE Rule 1 says that an application with an unresolved argument produces a residual. [decided: docs/book/concepts.md §25]
+C201. PE Rule 1 says that an application with an unresolved argument produces a residual, unless it applies a composed function. [decided: docs/book/concepts.md §25]
 
 C168. Under PE Rule 1, metadata fields propagate onto the residual per their rules. [decided: docs/book/concepts.md §25]
 
-C161. As implemented, PE Rule 1 governs an eager primitive application and an application whose function position is unresolved. evidence: E6, E8. [decided: owner, 2026-11-01]
+C202. PE Rule 1 says that a composed function is unfolded: its body is evaluated with the arguments substituted, and PE Rule 1 governs each application inside it. [decided: docs/book/concepts.md §25]
 
-C44. The exception to PE Rule 1 is a composed function applied to an unresolved argument, which `applyComposed` unfolds into its substituted body unless the call enters a recursion cycle during a typed compilation. evidence: E9, E15. [decided: owner, 2026-11-01]
+C203. PE Rule 1 says that two calls are residualised instead of unfolded, carrying the callee's effects: a call into a recursion cycle during a typed compilation, and a call reached inside a `when` arm that PE Rule 2 evaluates. [decided: docs/book/concepts.md §25]
+
+C204. An eager primitive application and an application whose function position is unresolved produce a residual under an unresolved argument, as PE Rule 1 states. evidence: E6, E8. [proposed: this IR]
+
+C205. `applyComposed` unfolds a composed call with an unresolved argument into its substituted body, except a call into a recursion cycle during a typed compilation or one made inside a `when` arm speculation, which it residualises. evidence: E9, E15, E52. [proposed: this IR]
 
 C154. In an unfolded body, PE Rule 1 governs each application the body contains. evidence: E8, E15. [decided: owner, 2026-11-01]
 
@@ -229,19 +233,19 @@ C53. `eval_if` then returns a residual `eval_if` over the condition and the two 
 
 C54. The residual `eval_if` carries a type when the two evaluated branches have matching type names. evidence: E12. [decided: owner, 2026-11-01]
 
-C189. `eval_when` evaluates the guard and the body of every arm speculatively when its subject is unresolved, at run time as in the precompile pass. evidence: E13, E51. [proposed: this IR]
+C189. `eval_when` evaluates the guard and the body of every arm speculatively when its subject is unresolved, at run time as in the precompile pass. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C190. In the speculation of an arm whose pattern is a binder, the pattern's name is bound to the evaluated subject. evidence: E13, E51. [proposed: this IR]
+C190. In the speculation of an arm whose pattern is a binder, the pattern's name is bound to the evaluated subject. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C191. In the speculation of an arm whose type pattern or destructuring pattern binds names, each name stays the arm function's own Param, unbound and untyped. evidence: E13, E51. [proposed: this IR]
+C191. In the speculation of an arm whose type pattern or destructuring pattern binds names, each name stays the arm function's own Param, unbound and untyped. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C192. Under an unresolved subject, `eval_when` speculates a written `else` but never evaluates the default `when_no_match` arm. evidence: E13, E51. [proposed: this IR]
+C192. Under an unresolved subject, `eval_when` speculates a written `else` but never evaluates the default `when_no_match` arm. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C193. The residual `eval_when` under an unresolved subject holds the evaluated subject with the pattern, the guard, the arm and the rest of the chain as written. evidence: E13, E51. [proposed: this IR]
+C193. The residual `eval_when` under an unresolved subject holds the evaluated subject with the pattern, the guard, the arm and the rest of the chain as written. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C194. The residual `eval_when` carries the effects of every speculated arm and carries no type. evidence: E11, E13, E51. [proposed: this IR]
+C194. The residual `eval_when` carries the effects of every speculated arm and carries no type. evidence: E11, E13, E51. [decided: owner, 2026-11-03]
 
-C195. A residual `eval_when` evaluated in a scope that resolves its subject runs only the matching arm. evidence: E13, E51. [proposed: this IR]
+C195. A residual `eval_when` evaluated in a scope that resolves its subject runs only the matching arm. evidence: E13, E51. [decided: owner, 2026-11-03]
 
 C179. `&&` and `||` evaluate the right operand speculatively when the left operand is unresolved. evidence: E14, E50. [decided: owner, 2026-11-03]
 
@@ -259,13 +263,13 @@ C183. No residual of `eval_if`, `&&` or `||` holds a `TailCall` sentinel. eviden
 
 C188. `evaluate` is handed no `TailCall` sentinel in the programs of `tests/` and `demos/`. evidence: E50. [decided: owner, 2026-11-03]
 
-C197. While a speculation of a `when` arm is open, `applyComposed` residualises a composed call with an unresolved argument instead of unfolding it. evidence: E52, E53. [proposed: this IR]
+C197. While a speculation of a `when` arm is open, `applyComposed` residualises a composed call with an unresolved argument instead of unfolding it. evidence: E52, E53. [decided: owner, 2026-11-03]
 
-C198. The residual of a composed call inside a speculated `when` arm carries the callee's stashed effects. evidence: E52, E53. [proposed: this IR]
+C198. The residual of a composed call inside a speculated `when` arm carries the callee's stashed effects. evidence: E52, E53. [decided: owner, 2026-11-03]
 
 C199. Ruling RR9 narrows the unfolding of RR1 (a) inside speculated `when` arms only, until partial evaluation is pushed for further optimisation or a case needs the full metadata evaluation inside an arm. [decided: docs/plans/pe-rules.md §6, RR9, taken by the owner on PR #155, 2026-11-03]
 
-C200. Outside a speculated `when` arm, a composed call in a speculated branch of `eval_if`, `&&` or `||` is still unfolded. evidence: E52, E53. [proposed: this IR]
+C200. Outside a speculated `when` arm, a composed call in a speculated branch of `eval_if`, `&&` or `||` is still unfolded. evidence: E52, E53. [decided: owner, 2026-11-03]
 
 C196. `eval_when` meets PE Rule 2 for effects, though its residual holds the arms as written rather than the evaluated arms. [inferred: R2]
 
@@ -481,7 +485,7 @@ G35. cluster: C22, C153, C172, C157, C173, C177, C174, C175, C176, C24, C25, C26
 
 G8. cluster: C31, C32, C33, C163, C34 [decided: owner, 2026-11-01]
 
-G9. cluster: C35, C161, C44, C154, C168 [decided: owner, 2026-11-01]
+G40. cluster: C201, C168, C202, C203, C204, C205, C154 [proposed: this IR]
 
 G10. cluster: C41, C42, C43 [decided: owner, 2026-11-01]
 
@@ -489,9 +493,9 @@ G11. cluster: C46, C139, C45 [decided: owner, 2026-11-01]
 
 G12. cluster: C48, C49, C50, C51 [decided: owner, 2026-11-01]
 
-G38. cluster: C178, C53, C54, C189, C190, C191, C192, C193, C194, C195, C179, C185, C180, C186, C187, C182, C183, C188, C196 [proposed: this IR]
+G38. cluster: C178, C53, C54, C189, C190, C191, C192, C193, C194, C195, C179, C185, C180, C186, C187, C182, C183, C188, C196 [decided: owner, 2026-11-03]
 
-G39. cluster: C197, C198, C199, C200 [proposed: this IR]
+G39. cluster: C197, C198, C199, C200 [decided: owner, 2026-11-03]
 
 G14. cluster: C58, C59, C60, C61, C62, C69 [decided: owner, 2026-11-01]
 
@@ -541,9 +545,9 @@ R1. C174 depends-on C153 because C173 and C177 state that the switch in `evaluat
 
 R2. C196 depends-on C189 because every arm of `eval_when` is evaluated under an unresolved subject, as C178 and C179 show for `eval_if`, `&&` and `||`, while C193 keeps the arms as written in the residual.
 
-R3. C154 refines C35 because `applyComposed` unfolds the composed application (C44), so the applications PE Rule 1 governs are the ones inside the body.
+R3. C154 refines C202 because `applyComposed` unfolds the composed application (C205), so the applications PE Rule 1 governs are the ones inside the body.
 
-R4. C45 refines C44 because the inline cutoff stops exactly the calls C44 excepts: a call into a recursion cycle with an unresolved argument during a typed compilation.
+R4. C45 refines C205 because the inline cutoff stops exactly the first of the calls C205 excepts: a call into a recursion cycle with an unresolved argument during a typed compilation.
 
 R5. C84 depends-on C83 because a loop round that keeps the depth lets a chain of any length stay under the bound.
 
@@ -557,7 +561,7 @@ R9. C129 refines C120 because C166 makes the report judge only edges between fil
 
 R10. C159 depends-on C162 because C162 puts `renderExprSource` in the `base-primitives` unit, which C130 places above the `evaluator` unit.
 
-R11. C197 refines C44 because a composed call with an unresolved argument inside a speculated `when` arm is residualised, a second exception to unfolding beside the recursion-cycle cutoff.
+R11. C197 refines C205 because a composed call with an unresolved argument inside a speculated `when` arm is residualised, the second of the exceptions to unfolding that C205 names, beside the recursion-cycle cutoff.
 
 ## Evidence
 
@@ -667,7 +671,7 @@ E53. `src/test/evaluator.ts` lines 402–444: a call of the forward reference `l
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C53, C54, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C161, C162, C166, C167, C169, C170, C171. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C53, C54, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C161, C162, C166, C167, C169, C170, C171.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C45, C46, C47, C49, C50, C51, C53, C54, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C162, C166, C167, C169, C170, C171. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C45, C46, C47, C49, C50, C51, C53, C54, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C162, C166, C167, C169, C170, C171.
 
 A1 resolved: ratified by the owner at the merge of PR #129, 2026-11-01; the claims carry decided provenance from that date.
 
@@ -684,3 +688,7 @@ A4. Ratify in bulk the re-proposed claims about speculative evaluation and the b
 A4 resolved: ratified by the owner at the merge of PR #150, 2026-11-03; the statuses are flipped.
 
 A5. Ratify in bulk the re-proposed claims about `eval_when` under PE Rule 2, as chunk C3 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their cluster G38, and the claims of ruling RR9 (the arm policy) with their cluster G39: C189, C190, C191, C192, C193, C194, C195, C197, C198, C200. C196 is inferred through R2, and C199 is decided by ruling RR9. Depends: C189, C190, C191, C192, C193, C194, C195, C197, C198, C200.
+
+A5 resolved: ratified by the owner at the merge of PR #155, 2026-11-03; the statuses are flipped.
+
+A6. Ratify in bulk the re-proposed claims about PE Rule 1 as implemented, as chunk C4 of B-172 (the partial-evaluation rules as implemented against the spine) restated the rule in `docs/book/concepts.md` §25, with their cluster G40: C204, C205. C201, C202 and C203 quote the restated rule and are decided by the spine. Depends: C204, C205.
